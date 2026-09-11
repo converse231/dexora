@@ -40,6 +40,16 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
   const showBall = animating || phase === "caught" || phase === "broke";
   const monCaptured = ["suck", "drop", "wait", "shake", "caught"].includes(phase);
   const monGone = phase === "fled" || phase === "ran";
+  /* IS THE POKEMON STILL STANDING THERE? Every tier's effect layer was gated
+     on `!monGone` alone, which is only true once it has FLED - so from the
+     moment the ball opened, a Holo's foil band went on sweeping, an Astral's
+     star field went on twinkling and the sparks went on popping over an empty
+     patch of grass while the creature itself was inside the ball. The sprite
+     shrinks away under `mon-absorb`; the effects are its siblings, so nothing
+     took them with it.
+     Holo was the one anybody noticed because a moving rainbow is hard to miss,
+     but all four did it. */
+  const monHere = !monCaptured && !monGone;
   const idle = phase === "idle";
   const outOfBalls = BALLS.every((b) => !(bag?.[b.id] > 0));
 
@@ -63,8 +73,8 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
           {/* Both of the big tiers put something BEHIND the sprite - an
               Astral's aura, an Origin's seal - so each reads as something the
               creature is standing in rather than a layer over its art. */}
-          {enc.astral && !monGone && <span className="astral-aura" aria-hidden="true" />}
-          {enc.origin && !monGone && <span className="origin-seal" aria-hidden="true" />}
+          {enc.astral && monHere && <span className="astral-aura" aria-hidden="true" />}
+          {enc.origin && monHere && <span className="origin-seal" aria-hidden="true" />}
 
           <Sprite
             id={enc.speciesId}
@@ -76,7 +86,7 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
           {/* The tell, not just the artwork. A shiny Pidgey and an ordinary one
               differ by a few pixels of hue, which is not something to notice
               while deciding what to throw. */}
-          {enc.shiny && !monGone && (
+          {enc.shiny && monHere && (
             <span className="shiny-spark" aria-hidden="true">
               <i /><i /><i /><i /><i />
             </span>
@@ -86,7 +96,7 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
               band of light clipped to the creature's own outline. Masked to
               `--art` for the same reason the Astral sky is: unmasked, a
               rainbow rectangle slides across the grass behind it. */}
-          {enc.holo && !monGone && (
+          {enc.holo && monHere && (
             <span
               className="holo-foil"
               style={{ "--art": `url(${spriteUrl(enc.speciesId)})` }}
@@ -95,14 +105,14 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
           )}
 
           {/* The sky inside it, clipped to its own outline. */}
-          {enc.astral && !monGone && (
+          {enc.astral && monHere && (
             <span
               className="astral-sky"
               style={{ "--art": `url(${spriteUrl(enc.speciesId)})` }}
               aria-hidden="true"
             />
           )}
-          {enc.astral && !monGone && (
+          {enc.astral && monHere && (
             <span className="astral-fx" aria-hidden="true">
               <b className="astral-orbit" />
               <i /><i /><i /><i /><i /><i /><i />
@@ -113,7 +123,7 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
               and the sprite forms out from its own centre, which is why the
               silhouette and the gleam are masked to `--art` - the sprite's own
               outline - instead of being rectangles laid over it. */}
-          {enc.origin && !monGone && (
+          {enc.origin && monHere && (
             <span
               className="origin-fx"
               style={{ "--art": `url(${spriteUrl(enc.speciesId, "origin")})` }}

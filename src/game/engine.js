@@ -24,6 +24,7 @@ import { medalsFor, milestoneAt } from "./medals.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, startingState, DEX_BONUS, levelReward,
   evolutionRow, evolveState, feedSelection, bestRod, holding, canRun, RUN_LEVEL,
+  ANY_HERO,
   stepReward,
 } from "./items.js";
 
@@ -811,6 +812,46 @@ export function createEngine(canvas, onChange, mini = null) {
     render(now);
     raf = requestAnimationFrame(frame);
   }
+  /* ---- a hidden tab pauses, it does not fast-forward -------------------
+     `requestAnimationFrame` stops being called when the page is hidden, so
+     the game freezes on its own - that part is the browser and is fine. What
+     is NOT fine is coming back: every deadline in here is an absolute
+     `performance.now()` stamp, so after two minutes in another window the
+     first frame back finds `now` far past all of them and the phase machine
+     fires one step per frame. A throw you left mid-air resolves in six
+     frames, the ball shakes, and something is caught or gone before you have
+     focused the window.
+
+     So the gap is measured and every live deadline is pushed forward by it.
+     There are exactly three - a walk in progress, the encounter's phase, and
+     a cast - and they are all here rather than scattered, which is the only
+     reason this is three lines instead of an audit.
+
+     Held keys are dropped too. `blur` in App.jsx already does that for a
+     window switch, but moving to another TAB in the same window does not
+     always blur, and a key held through that would walk the trainer the
+     moment you returned. */
+  let hiddenAt = 0;
+  function visibility() {
+    if (document.hidden) {
+      hiddenAt = performance.now();
+      held.clear();
+      state.running = false;
+      return;
+    }
+    if (!hiddenAt) return;
+    const gap = performance.now() - hiddenAt;
+    hiddenAt = 0;
+    if (move.active) move.startedAt += gap;
+    if (state.encounter?.until) state.encounter.until += gap;
+    if (state.fishing?.until) state.fishing.until += gap;
+    /* `running` was cleared on the way out without telling React - there was
+       nothing on screen to tell. It has to be told on the way back in, or the
+       rail keeps showing RUN over a trainer who is walking. */
+    changed();
+  }
+  document.addEventListener("visibilitychange", visibility);
+
   bakeMini();
   raf = requestAnimationFrame(frame);
 
@@ -838,14 +879,18 @@ export function createEngine(canvas, onChange, mini = null) {
      evolution takes its stone from the bag as well. The animation is cosmetic:
      the state change has already happened by the time it plays, so there is no
      half-applied evolution to recover from if the tab is closed mid-flash. */
-  function evolve(speciesId, targetId) {
+  function evolve(speciesId, targetId, hero = ANY_HERO) {
+    /* `hero` is which variant of `speciesId` is doing the evolving - the Box
+       passes the row you pressed, so an ordinary pile never spends the Holo
+       standing next to it. Defaults to the old "whichever is best" so any
+       caller that has not been taught about rows still works. */
     if (state.encounter || state.evolution) return null;
 
     const row = evolutionRow(speciesId, targetId);
     if (!row) return null;
-    const want = evolveState(state.box, state.bag, row);
+    const want = evolveState(state.box, state.bag, row, hero);
     if (!want.ready) return null;
-    const pick = feedSelection(state.box, row);
+    const pick = feedSelection(state.box, row, hero);
     if (!pick) return null;
 
     const eaten = new Set(pick.fed.map((m) => m.uid));
@@ -1007,6 +1052,7 @@ export function createEngine(canvas, onChange, mini = null) {
     destroy() {
       cancelAnimationFrame(raf);
       clearTimeout(saveTimer);
+      document.removeEventListener("visibilitychange", visibility);
     },
   };
 }

@@ -1122,6 +1122,30 @@ Four different kinds of rare, which is what lets all four stand together instead
 of being four strengths of one idea. Any rare at all lands about **1 in 54**
 encounters.
 
+### A variant is its own pile
+
+A Holo Pidgey used to sit inside a row labelled **Pidgey ×12**, under an
+evolve button and a sell button. Nothing could actually take it — `keeper()`
+has refused since the first shiny — but a guarantee you cannot see is not one
+anybody will trust, and the count was a lie either way.
+
+Rows key on **species and variant** now. Three things fall out of that, and
+only the third needed new code:
+
+- **It cannot be sold.** `duplicateUids` and `heldUids` both filter keepers, so
+  a variant row has no spares and renders no SELL button at all.
+- **It cannot be eaten.** The feed in `feedable` is `!keeper`, unchanged.
+- **It cannot be evolved by accident.** This one was real: the hero was always
+  the *rarest one present*, which is the right answer when one row stands for a
+  whole species and the wrong one the moment rows split — press evolve on the
+  ordinary pile and your Holo would be what evolved. `feedable(box, row, want)`
+  takes the row's own variant now, and `evolveState`/`feedSelection` thread the
+  same answer so a row cannot say READY over a feed it cannot assemble.
+
+A variant row can still evolve, feeding on ordinary duplicates, and the hero
+comes out the other side still Holo — that was always the design and it would
+have been a real loss to break it in the name of safety.
+
 ### Origin is earned, not found
 
 **The 1996 artwork does not appear in the wild until every ordinary Pokémon of

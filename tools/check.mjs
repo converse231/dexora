@@ -116,7 +116,7 @@ import {
   DEX_BONUS, levelReward, evolutionsOf, evolutionRow, feedCost, feedPool,
   feedSelection, evolveState, feedable, reserveFor, stoneFor, stoneFeed,
   keeper, heldUids, stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
-  TREASURE_LEVEL, liveMult, PLAIN_BALLS,
+  TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf, ANY_HERO,
 } from "../src/game/items.js";
 import { ENCLOSED } from "../src/game/biomes.js";
 
@@ -1620,6 +1620,68 @@ import { saveProblem } from "../src/game/engine.js";
     }
     console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
       .map((t) => `${t} ${got[t]}`).join(", ")}, origin 0`);
+  }
+
+  /* A VARIANT IS ITS OWN PILE. The Box keys rows on species AND variant, so
+     pressing evolve on the ordinary Pidgey stack must produce an ordinary
+     Pidgeotto even with a Holo two rows down - and the Holo must be neither
+     the hero nor the feed. Before rows were split the hero was always the
+     rarest one present, which is the right answer for one row standing for a
+     whole species and the wrong one now. */
+  {
+    // Pidgey (16) -> Pidgeotto (17). One Holo, one Origin, eight ordinary.
+    const pidgey = [
+      { uid: 1, species: 16, level: 30, holo: 1 },
+      { uid: 2, species: 16, level: 28, origin: 1 },
+      ...Array.from({ length: 8 }, (_, i) => ({ uid: 10 + i, species: 16, level: 5 + i })),
+    ];
+    const row = evolutionRow(16, 17);
+    assert.ok(row, "Pidgey must still evolve into Pidgeotto");
+
+    assert.equal(variantOf(pidgey[0]), "holo", "variantOf must name the tier");
+    assert.equal(variantOf(pidgey[2]), null, "and null for an ordinary one");
+
+    // Asking for the ordinary pile must not touch either rare.
+    const plain = feedable(pidgey, row, null);
+    assert.equal(variantOf(plain.hero), null,
+      "the ordinary row evolved a variant - that is the whole bug this guards");
+    assert.equal(plain.hero.level, 12, "and it should be the best ordinary one");
+
+    // Asking for a specific tier gets exactly that one.
+    for (const t of ["holo", "origin"]) {
+      const pick = feedable(pidgey, row, t);
+      assert.equal(variantOf(pick.hero), t, `asking for ${t} got something else`);
+    }
+
+    /* THE FEED IS NEVER A VARIANT, whoever is evolving. This is the guarantee
+       the player is actually worried about, and it has to hold on every row. */
+    for (const want of [ANY_HERO, null, "holo", "origin"]) {
+      const { hero, rest } = feedable(pidgey, row, want);
+      assert.ok(!rest.some(keeper), `a variant was in the feed for want=${want}`);
+      assert.ok(hero, `no hero for want=${want}`);
+    }
+
+    // A tier you do not own is not evolvable, and must not silently fall back.
+    assert.equal(feedable(pidgey, row, "astral").hero, null,
+      "asked to evolve an Astral that is not in the box and got one anyway");
+    assert.equal(feedSelection(pidgey, row, "astral"), null,
+      "and feedSelection must agree rather than picking somebody else");
+
+    /* evolveState and feedSelection must answer for the SAME hero, or a row
+       says READY over a feed that cannot be assembled - the bug CLAUDE.md
+       already records, now with one more way to happen. */
+    for (const want of [ANY_HERO, null, "holo", "origin", "astral"]) {
+      assert.equal(
+        evolveState(pidgey, {}, row, want).ready,
+        !!feedSelection(pidgey, row, want),
+        `evolveState and feedSelection disagree for want=${want}`,
+      );
+    }
+
+    // And the default is still what every untouched caller expects.
+    assert.equal(variantOf(feedable(pidgey, row).hero), "holo",
+      "the default hero is no longer the rarest, which changes old call sites");
+    console.log("variant rows ok — ordinary evolves ordinary, no variant is ever feed");
   }
 
   /* Raticate registered, so Rattata's reserve is 1 rather than the whole feed

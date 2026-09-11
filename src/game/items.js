@@ -367,6 +367,21 @@ export function reserveFor(sp, dex) {
    remembered, which is the whole reason the list exists. */
 export const keeper = (mon) => !!mon && TIERS.some((t) => mon[t]);
 
+/* Which tier a box entry is, or null for an ordinary one. Rarest first, so a
+   hand-edited save carrying two is described by its best - the same order
+   every other panel reads. */
+export const variantOf = (mon) => TIERS.find((t) => mon?.[t]) ?? null;
+
+/* "Whichever one is best" - the answer every caller wanted before the Box
+   split its rows by variant, and still the right answer for a badge that only
+   asks whether ANYTHING can evolve.
+
+   A string, and one that cannot be a tier name, because the other two answers
+   are a tier name and `null` (meaning the ordinary one, specifically). Using
+   `undefined` for "any" and `null` for "ordinary" would have worked and would
+   have been one typo away from silently evolving the wrong Pokemon. */
+export const ANY_HERO = "*";
+
 /* Who can be fed to an evolution, and who evolves. One function, because
    `evolveState` counting the pool one way while `feedSelection` picked from it
    another is exactly how a panel comes to say READY over a feed that cannot be
@@ -377,16 +392,31 @@ export const keeper = (mon) => !!mon && TIERS.some((t) => mon[t]);
    Pidgeotto with nothing to undo it. A shiny CAN be the hero - the hero is the
    one that comes out the other side, still shiny, which is what the real games
    do - and it is preferred as hero for the same reason. */
-export function feedable(box, row) {
+export function feedable(box, row, want = ANY_HERO) {
   const pool = feedPool(row.from);
   const rank = new Map(pool.map((id, i) => [id, i])); // 0 is the species itself
   const mine = box.filter((m) => rank.has(m.species));
 
+  /* WHICH ONE EVOLVES. The Box shows a species' variants as separate rows now,
+     so "evolve" has to mean the row you pressed - press it on the ordinary
+     Pidgey pile and you get an ordinary Pidgeotto, even though a Holo is
+     sitting two rows down. Before this the hero was always the rarest one
+     present, which was the only sensible answer while one row stood for the
+     whole species and is the wrong one now.
+
+     `keeper` still leads the sort, and that is not redundant: with ANY_HERO it
+     is what keeps the old behaviour, and with a tier named every candidate is
+     a keeper anyway so it costs nothing. */
   const hero = mine
-    .filter((m) => m.species === row.from)
+    .filter((m) => m.species === row.from
+      && (want === ANY_HERO || variantOf(m) === want))
     .sort((a, b) =>
       (keeper(b) ? 1 : 0) - (keeper(a) ? 1 : 0) || b.level - a.level || a.uid - b.uid)[0] ?? null;
 
+  /* The feed is unchanged and deliberately so: `!keeper` means NO variant is
+     ever eaten, whichever one is doing the evolving. A Holo evolves by
+     consuming ordinary duplicates, which is the only way a Holo Pidgeotto can
+     ever exist. */
   const rest = mine
     .filter((m) => m.uid !== hero?.uid && !keeper(m))
     .sort(
@@ -399,9 +429,9 @@ export function feedable(box, row) {
 }
 
 /* Everything the UI needs to describe one evolution without doing sums itself. */
-export function evolveState(box, bag, row) {
+export function evolveState(box, bag, row, want = ANY_HERO) {
   const cost = feedCost(row);
-  const { hero, rest } = feedable(box, row);
+  const { hero, rest } = feedable(box, row, want);
   // The hero is spent too, so it counts towards the bill.
   const have = hero ? 1 + rest.length : 0;
   const stone = stoneFor(row);
@@ -412,9 +442,9 @@ export function evolveState(box, bag, row) {
 /* What a feed actually eats. The best of the species does the evolving and
    carries its level forward; the rest of the bill is paid from the line below
    it, earliest stage and weakest first, so your good ones are the last to go. */
-export function feedSelection(box, row) {
+export function feedSelection(box, row, want = ANY_HERO) {
   const cost = feedCost(row);
-  const { hero, rest } = feedable(box, row);
+  const { hero, rest } = feedable(box, row, want);
   if (!hero || 1 + rest.length < cost) return null;
   return { hero, fed: [hero, ...rest.slice(0, cost - 1)] };
 }

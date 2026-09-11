@@ -880,21 +880,31 @@ canvas {
 }
 .cell.caught.full { border-color: var(--gold); background: #fdf4dc; }
 
+/* The tier mark on a box row's sprite. It was a coloured star glyph with a
+   per-tier text-shadow; it holds the DRAWN mark now - the same icon the Dex
+   tile and the encounter badge use, so one tier looks like itself in all
+   three places. No count on it any more either: a row is one variant, so the
+   count beside the name already says how many. */
 .bx-rare {
-  position: absolute; font-size: 11px; line-height: 1;
-  color: var(--gold); text-shadow: 0 0 3px #fff, 0 1px 0 #7a4d0d;
-  pointer-events: none;
+  position: absolute; left: 38px; top: 6px;
+  display: flex; pointer-events: none;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, .95));
 }
-.bx-rare.astral {
-  color: #7d6bff; text-shadow: 0 0 4px #fff, 0 1px 0 #2a1f6b;
+
+/* And the word, beside the name, because a 13px icon is a reminder rather
+   than a label - this row is a DIFFERENT PILE from the ordinary one above it
+   and that has to survive being skimmed. Flat colours rather than the
+   nameplate's `.np-*` gradients: those carry pulse animations, which is right
+   for one badge in an encounter and wrong for eight rows of a list. */
+.bx-vtag {
+  font-family: var(--pixel); font-size: 7.5px; letter-spacing: .06em;
+  line-height: 1; padding: 3px 5px 2px; border-radius: 4px;
+  color: #fff; background: var(--ink-soft);
 }
-.bx-rare.origin {
-  color: #c8942f; text-shadow: 0 0 3px #fff, 0 1px 0 #5d4211;
-}
-.bx-rare.holo {
-  color: #b06bff; text-shadow: 0 0 4px #fff, 0 1px 0 #3c1a63;
-}
-.bx-rare { left: 40px; top: 8px; font-family: var(--pixel); font-size: 9px; }
+.bx-vtag.origin { background: #b07d22; }
+.bx-vtag.holo   { background: #8f52c4; }
+.bx-vtag.shiny  { background: #c79512; color: #3a2a05; }
+.bx-vtag.astral { background: #4a3fb0; }
 /* One badge, used everywhere a type is named. It was sized in cqw, which only
    resolves inside the battle overlay, so it could not be reused in the rail -
    which is why the map tag and the travel list printed types as prose. Plain px

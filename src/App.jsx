@@ -349,7 +349,7 @@ export default function App() {
           onSelect={setEntry}
           onSell={(uids) => engine.sell(uids)}
           onBuy={(id, n) => engine.buy(id, n)}
-          onEvolve={(from, to) => engine.evolve(from, to)}
+          onEvolve={(from, to, hero) => engine.evolve(from, to, hero)}
           onSpend={(id) => engine.spend(id)}
           onBike={() => engine.toggleBike()}
           /* The three save-file calls, handed over as one object so the panel

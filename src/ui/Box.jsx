@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SPECIES } from "../data/species.js";
 import {
   sellValue, duplicateUids, heldUids, evolutionsOf, evolveState, itemById,
+  variantOf,
 } from "../game/items.js";
 import { label } from "../game/map.js";
 import Types from "./Types.jsx";
@@ -26,10 +27,17 @@ import FilterBar from "./FilterBar.jsx";
 import { valuedAt } from "../game/trainer.js";
 import Confirm from "./Confirm.jsx";
 import Sprite from "./Sprite.jsx";
+import Mark from "./Marks.jsx";
 
 // Rarest first: the order the Box, the Dex and the encounter all read in -
 // one array, in biomes.js, beside the odds that define it.
 import { TIERS as RARE } from "../game/biomes.js";
+
+/* The order rows of one species sit in: the ordinary pile, then its variants
+   kindest first - the same order the Dex sheet lists its FORMS in, so the two
+   screens do not disagree about what comes after what. */
+const VARIANT_ORDER = [null, ...[...RARE].reverse()];
+const variantRank = (v) => VARIANT_ORDER.indexOf(v);
 
 export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve }) {
   const [pending, setPending] = useState(null);
@@ -52,9 +60,24 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
     const spare = new Set(duplicateUids(box, dex));
     const byId = new Map();
 
+    /* KEYED ON SPECIES **AND** VARIANT. One row used to stand for every
+       Pidgey you owned, so a Holo sat inside a stack labelled "x12" with an
+       evolve button and a sell button over it. Nothing could actually take it
+       - `keeper()` has always refused - but a guarantee you cannot see is not
+       one a player will trust, and the count was a lie either way.
+
+       Now a variant is its own card. It falls out of that for free:
+       - it cannot be sold, because `duplicateUids` and `heldUids` both filter
+         keepers, so a variant row has no spares and shows no SELL button;
+       - it cannot be eaten, because `feedable`'s feed is `!keeper`;
+       - it cannot be evolved BY ACCIDENT, because the row passes its own
+         variant as the hero - see `feedable(box, row, want)`. */
     for (const mon of box) {
-      const g = byId.get(mon.species) ?? {
+      const variant = variantOf(mon);
+      const key = `${mon.species}:${variant ?? ""}`;
+      const g = byId.get(key) ?? {
         species: mon.species,
+        variant,
         count: 0,
         best: 0,
         mons: [],
@@ -62,24 +85,19 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
       };
       g.count += 1;
       g.best = Math.max(g.best, mon.level);
-      // A group draws one sprite, so the rarest thing in it claims the sprite -
-      // that is what you are scanning the panel for.
-      for (const t of RARE) if (mon[t]) g[t] = (g[t] ?? 0) + 1;
       g.mons.push(mon);
       if (spare.has(mon.uid)) g.spares.push(mon.uid);
-      byId.set(mon.species, g);
+      byId.set(key, g);
     }
 
     for (const g of byId.values()) {
-      // The rarest one in the group claims the sprite - that is what you are
-      // scanning the panel for - and the star counts all of them.
-      g.rarest = RARE.find((t) => g[t]) ?? null;
-      g.rares = RARE.reduce((n, t) => n + (g[t] ?? 0), 0);
       /* One state per branch — Eevee has three, each wanting a different stone
-         but all counting the same pile. */
+         but all counting the same pile. `g.variant` is what makes the answer
+         belong to THIS row: the feed is shared across the species (ordinary
+         duplicates), but the one that survives is the one you pressed. */
       g.paths = evolutionsOf(g.species).map((row) => ({
         row,
-        ...evolveState(box, bag, row),
+        ...evolveState(box, bag, row, g.variant),
       }));
       g.ready = g.paths.some((p) => p.ready);
       // The bar tracks the nearest branch, so it always shows real progress.
@@ -102,7 +120,8 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
       (a, b) =>
         Number(b.ready) - Number(a.ready) ||
         Number(b.spares.length > 0) - Number(a.spares.length > 0) ||
-        a.species - b.species,
+        a.species - b.species ||
+        variantRank(a.variant) - variantRank(b.variant),
     );
     return {
       groups,
@@ -115,6 +134,11 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
     // place, so their references alone would keep this memo stale forever.
   }, [box, bag, dex, rev, stats]);
 
+  /* Distinct SPECIES, not rows. A row is one species-and-variant now, so
+     `groups.length` counts a Holo Pidgey separately from the ordinary pile -
+     which is right for the list and wrong for a heading that says "species".
+     Three Pidgey rows are still one Pidgey. */
+  const speciesCount = new Set(groups.map((g) => g.species)).size;
   const readyCount = groups.filter((g) => g.ready).length;
   const spareCount = groups.filter((g) => g.spares.length > 0).length;
 
@@ -162,7 +186,10 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
       lines: [
         ["Pokémon sold", spareUids.length],
         ["You receive", `¥${spareValue.toLocaleString()}`],
-        ["Kept", `${groups.length} — the best of each species`],
+        /* Counted, not inferred. It was `groups.length`, which was the row
+           count - fine while a row was a species, and an undercount now that
+           a second Holo shares one row with the first. */
+        ["Kept", `${box.length - spareUids.length} — the best of each, and every variant`],
       ],
       note: "Anything an unregistered evolution still needs is held back.",
       confirmLabel: `SELL ${spareUids.length} · +¥${spareValue.toLocaleString()}`,
@@ -215,10 +242,14 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
         ...(stone ? [["Uses", `1 × ${stone.name}`]] : []),
         ["Left holding", `${group.have - path.cost} from the line`],
       ],
-      note: "Your best does the evolving, and keeps its level.",
+      /* A variant row has to say what survives, because the feed is ordinary
+         duplicates and it would otherwise look like the rare is being spent. */
+      note: group.variant
+        ? `Your ${group.variant} does the evolving, and stays ${group.variant}.`
+        : "Your best does the evolving, and keeps its level.",
       confirmLabel: "EVOLVE",
       run: () => {
-        const done = onEvolve(group.species, path.row.to);
+        const done = onEvolve(group.species, path.row.to, group.variant);
         if (!done) setFlash("Not enough to evolve.");
       },
     });
@@ -286,7 +317,7 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
       <div className="panel-head">
         <span>{box.length} STORED</span>
         <span>
-          {groups.length} SPECIES · {spareUids.length} SPARE
+          {speciesCount} SPECIES · {spareUids.length} SPARE
           {readyCount > 0 && ` · ${readyCount} READY`}
         </span>
       </div>
@@ -317,24 +348,26 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
           const sellable = group.spares.length || group.held.length;
           return (
             <div
-              key={group.species}
+              key={`${group.species}:${group.variant ?? ""}`}
               className={`boxrow${group.ready ? " ready" : group.spares.length ? " spare" : ""}`}
             >
-              <Sprite id={group.species} variant={group.rarest} />
-              {group.rarest && (
-                <span
-                  className={`bx-rare ${group.rarest}`}
-                  title={RARE
-                    .filter((t) => group[t])
-                    .map((t) => `${group[t]} ${t}`)
-                    .join(" \u00b7 ")}
-                >
-                  ✦{group.rares > 1 ? group.rares : ""}
+              <Sprite id={group.species} variant={group.variant} />
+              {/* The drawn mark, not a star glyph: the same icon the Dex tile
+                  and the encounter badge use, so one tier looks like itself
+                  everywhere. */}
+              {group.variant && (
+                <span className={`bx-rare ${group.variant}`}>
+                  <Mark tier={group.variant} size={13} />
                 </span>
               )}
               <div className="bx-main">
                 <span className="bx-name">
                   {label(sp)}
+                  {group.variant && (
+                    <span className={`bx-vtag ${group.variant}`}>
+                      {group.variant.toUpperCase()}
+                    </span>
+                  )}
                   <span className={`tier tier-${sp.tier}`}>{sp.tier}</span>
                 </span>
                 <Types of={sp.types} className="bx-types" />

@@ -753,6 +753,21 @@ every tenth haul - 25,000 steps - gated at level 20, which is two over a
 priced: a Master Ball has no price, and pricing the unpriceable is how a budget
 assertion starts approving them.
 
+**A variant is its own row in the Box, and its own hero.** Rows key on
+species AND variant. That is a UI change with a logic tail: `feedable(box,
+row, want)` takes which variant is evolving - `ANY_HERO` (the old "rarest
+present", still the default), `null` for the ordinary pile, or a tier name -
+and `evolveState`/`feedSelection` thread the same `want`, or a row says READY
+over a feed it cannot assemble. The FEED is untouched and must stay so: it is
+`!keeper`, so no variant is ever eaten no matter who is evolving. `ANY_HERO`
+is the string `"*"` rather than `undefined`, because the other two answers are
+a tier name and `null`, and `undefined`-means-any next to `null`-means-ordinary
+is one typo from evolving the wrong Pokemon.
+
+**Counts that said "species" now count rows.** Three Pidgey rows are still one
+Pidgey - `speciesCount` is a Set over `g.species`, and the sell-all dialog
+counts what is kept as `box.length - spares` rather than the row count.
+
 **No rare tier is ever taken by a bulk action.** `duplicateUids` (sell spares) holds
 shinies out of the spare list *entirely* rather than sorting them to the front —
 sorting only ever protects the first `keep` of them - and `feedable()` excludes
@@ -1034,6 +1049,26 @@ nothing from a background colour), and **the modal lock**. `useModalLock()` is
 the same counter `Confirm` uses and App.jsx already bails on `modalOpen()`;
 without it the arrow keys walk the trainer while the menu is open. Reach for a
 `<select>` for anything else.
+
+**An effect layer is not a child of the sprite.** Every tier's extras - the
+Holo foil, the Astral sky and aura and orbit, the shiny sparks, the Origin
+seal - are SIBLINGS of `.mon`, so `mon-absorb` shrinking the sprite into the
+ball does nothing to them. They were all gated on `!monGone`, which is only
+true once something has FLED, so from the moment the ball opened they went on
+playing over an empty patch of grass. Gate on `monHere` (`!monCaptured &&
+!monGone`). Anything new that decorates the Pokemon has to be gated the same
+way; Holo is just the one people notice, because a moving rainbow is.
+
+**A hidden tab freezes and then fast-forwards.** `requestAnimationFrame` stops
+while the page is hidden - fine - but every deadline in the engine is an
+absolute `performance.now()` stamp, so the first frame back finds `now` far
+past all of them and the phase machine fires one step per frame: a throw left
+mid-air resolves in six frames. `visibilitychange` measures the gap and pushes
+the three live deadlines forward by it (`move.startedAt`, `encounter.until`,
+`fishing.until`) - keep that list complete if a fourth timer is ever added. It
+also drops held keys, because switching TABS does not always fire `blur` the
+way switching windows does, and calls `changed()` on return so the rail is not
+showing RUN over a trainer who is walking.
 
 **CSS**
 - **An animation beats a plain declaration.** `.mon` runs `mon-appear`, whose
