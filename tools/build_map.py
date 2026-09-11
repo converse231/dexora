@@ -1263,18 +1263,29 @@ def pond_shore():
     # --- what stands in the water ----------------------------------------
     # Carved back out rather than drawn on top, so the lake stays one shape with
     # holes in it and the rim wraps each hole by itself.
-    rect(g, ".", 20, 9, 29, 12)         # the island - piers only
+    rect(g, ".", 20, 9, 29, 12)         # the island - bridges only
     rect(g, ".", 31, 13, 33, 15)        # a headland, off the east shore
     rect(g, ".", 33, 5, 36, 6)          # and a spur off the north, making a bay
 
     # --- the crossing, in two spans that do not line up ------------------
-    pier(g, 26, 5, 28, 8)               # island -> north shore
-    pier(g, 21, 13, 23, 18)             # south beach -> island
+    # BRIDGES, not piers. These were `pier()` - the `D` deck - and they were
+    # the wrong art for what they are: a pier is a JETTY, it runs out from
+    # land and stops, and its outer ring is drawn to meet sand, so laying it
+    # across open water fringed both spans in beach. Every tile of these two
+    # runs has water on both sides and dry ground at each end, which is a
+    # bridge, and the bridge planks are baked for exactly that.
+    #
+    # Two across, not three. Route 12's own bridge is two wide so the plank
+    # set is a left half and a right half and nothing else; `bridgeId()` picks
+    # by parity, so a third column comes out left/right/left and draws a rail
+    # down the middle of its own deck.
+    bridge(g, 26, 5, 27, 8, over="water")    # island -> north shore
+    bridge(g, 21, 13, 22, 18, over="water")  # south beach -> island
 
     # --- sand, only where you walk ---------------------------------------
     rect(g, "#", 11, 3, 39, 4)          # the north shore
     rect(g, "#", 8, 3, 11, 22)          # down the west bank
-    rect(g, "#", 8, 20, 30, 22)         # the beach the pier lands on
+    rect(g, "#", 8, 20, 30, 22)         # the beach the bridge lands on
     rect(g, "#", 19, 23, 22, 30)        # the lane south
 
     # --- trees standing in the open --------------------------------------

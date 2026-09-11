@@ -1,13 +1,44 @@
 /* Pure catch math. No DOM, no React — tools/check.mjs imports this directly. */
 
-/* Every ball caps at 95% - a throw can always miss - except the Master Ball,
-   which is defined by never failing. That is the whole reason it is a reward
-   rather than something you can buy. */
+/* A throw can always miss - except the Master Ball, which is defined by never
+   failing. That is the whole reason it is a reward rather than something you
+   can buy. */
 export const GUARANTEED = 255;
+
+/* HOW OFTEN THE BEST CASE STILL FAILS. One in five, for a Poke Ball thrown at
+   something that barely resists.
+
+   This exists because a single flat 95% ceiling made the ball tiers
+   meaningless exactly where they are used most. `(rate/255) * mult` reaches
+   0.95 at a catch rate of 255/mult, so a Poke Ball was already capped against
+   the FIFTEEN commonest species in the dex - every Pidgey, Rattata and
+   Caterpie - and a Great Ball bought you nothing at all on them. At rate 190
+   even Great and Ultra were identical. Measured across the dex before
+   touching anything, which is the only reason it was believable.
+
+   So the ceiling belongs to the ball, not to the game: the chance of missing
+   shrinks with the ball you threw. Poke 0.80, Great 0.89, Ultra 0.93, a
+   boosted situational 0.94, a Timer Ball at its cap 0.95 - and nothing
+   reaches 1, because that is the Master Ball's job alone.
+
+   Below the ceiling NOTHING CHANGES. A rare at rate 45 is 0.18 / 0.32 / 0.53
+   exactly as it was, so the economy this whole file defends is untouched; the
+   fix lands only on the commons, which is where the complaint was. */
+export const NEVER_CERTAIN = 0.2;
+
+/* AND NEVER HOPELESS - but only just. This was 0.03, which flattened the ball
+   ladder at the BOTTOM of the range exactly as the flat ceiling flattened it
+   at the top: the four rate-3 legendaries sat on the floor with a Poke Ball
+   AND a Great Ball, so the two were the same throw at Articuno as they were
+   at a Pidgey. At 0.01 the floor binds for no species in the dex - the
+   rawest of them, rate 3, computes 1.2% / 2.1% / 3.5% and differentiates on
+   its own - while a throw still cannot be worth nothing. */
+export const NEVER_HOPELESS = 0.01;
 
 export function catchChance(rate, ballMult) {
   if (ballMult >= GUARANTEED) return 1;
-  return Math.min(0.95, Math.max(0.03, (rate / 255) * ballMult));
+  const ceiling = Math.min(0.95, 1 - NEVER_CERTAIN / ballMult);
+  return Math.min(ceiling, Math.max(NEVER_HOPELESS, (rate / 255) * ballMult));
 }
 
 // Rarer species flee more. The line that makes rarity feel like rarity.

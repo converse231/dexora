@@ -114,7 +114,6 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
           )}
           {enc.astral && monHere && (
             <span className="astral-fx" aria-hidden="true">
-              <b className="astral-orbit" />
               <i /><i /><i /><i /><i /><i /><i />
             </span>
           )}

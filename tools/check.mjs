@@ -8,14 +8,46 @@ import {
   canSpend, catchMult, stepScale, xpScale, pricedAt, valuedAt, weighted,
   rarityPower, sellScale, priceScale,
 } from "../src/game/trainer.js";
-import { catchChance, fleeChance, shakesFor, resolveThrow } from "../src/catch.js";
+import { catchChance, fleeChance, shakesFor, resolveThrow, NEVER_CERTAIN } from "../src/catch.js";
 
 const near = (a, b) => Math.abs(a - b) < 0.005;
 
 // --- odds -----------------------------------------------------------------
-assert.ok(near(catchChance(255, 1), 0.95), "pidgey caps at 95, never 100");
-assert.ok(near(catchChance(3, 1), 0.03), "mewtwo sits on the floor");
-assert.ok(near(catchChance(3, 3), 0.035), "better balls barely help mewtwo");
+/* THE CEILING BELONGS TO THE BALL, NOT THE GAME. A single flat 0.95 made
+   every ball identical against the fifteen commonest species in the dex - a
+   Great Ball bought you literally nothing on a Pidgey - so the miss chance
+   shrinks with the ball instead. Nothing reaches 1: that is the Master Ball's
+   job and nobody else's. */
+assert.ok(near(catchChance(255, 1), 1 - NEVER_CERTAIN),
+  "a Poke Ball's best case is one miss in five, not a hard 95");
+assert.ok(catchChance(255, 1.8) > catchChance(255, 1),
+  "a Great Ball must beat a Poke Ball on a PIDGEY - the commonest throw in " +
+  "the game, and the one where a flat cap made them the same thing");
+assert.ok(catchChance(255, 3) > catchChance(255, 1.8), "and an Ultra both");
+for (const mult of [1, 1.8, 3, 3.5, 4]) {
+  assert.ok(catchChance(255, mult) < 1, `mult ${mult} reaches certainty`);
+  assert.ok(catchChance(255, mult) <= 0.95, `mult ${mult} passes the hard ceiling`);
+}
+/* And it has to hold across the whole dex, not just at the top: every species
+   a player can actually meet must reward the better ball, or the shop is
+   selling a number that does nothing on that Pokemon. */
+{
+  const rates = [...new Set(SPECIES.map((sp) => sp.rate))];
+  const rungs = [1, 1.8, 3];
+  const flat = [];
+  for (const rate of rates) {
+    for (let i = 1; i < rungs.length; i++) {
+      if (catchChance(rate, rungs[i]) <= catchChance(rate, rungs[i - 1])) flat.push(rate);
+    }
+  }
+  assert.deepEqual([...new Set(flat)], [],
+    `a better ball is worth nothing at catch rate(s) ${[...new Set(flat)].join(", ")}`);
+}
+assert.ok(near(catchChance(3, 1), 0.0118), "mewtwo is nearly hopeless with a Poke Ball");
+assert.ok(near(catchChance(3, 3), 0.0353), "better balls barely help mewtwo");
+assert.ok(catchChance(3, 1.8) > catchChance(3, 1),
+  "the FLOOR flattened the ladder at the bottom the way the ceiling did at " +
+  "the top - a Great Ball has to beat a Poke Ball on a legendary too");
 assert.ok(near(catchChance(45, 1), 0.176), "dratini pokeball");
 assert.ok(near(catchChance(45, 3), 0.529), "ultra roughly triples mid-tier");
 assert.ok(near(fleeChance(255), 0.2), "commons wait around");

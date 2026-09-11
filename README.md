@@ -1122,6 +1122,45 @@ Four different kinds of rare, which is what lets all four stand together instead
 of being four strengths of one idea. Any rare at all lands about **1 in 54**
 encounters.
 
+### A Great Ball had to be worth something
+
+`catchChance` clamped to a flat 0.95, and `(rate / 255) × mult` hits that at a
+catch rate of `255 / mult` — so a **Poké Ball was already capped against the
+fifteen commonest species in the dex**. On a Pidgey, a Rattata, a Caterpie — the
+throws you actually make — a Great Ball bought you exactly nothing, and at rate
+190 even Great and Ultra were the same number. The 0.03 floor did the same
+thing at the other end: all four rate-3 legendaries sat on it with both a Poké
+Ball and a Great Ball.
+
+The ceiling belongs to the **ball** now, not the game: the chance of missing
+shrinks with what you threw (`1 − 0.2 / mult`), so a Poké Ball's best case is
+0.80, a Great Ball's 0.89, an Ultra's 0.93 — and nothing reaches 1, because
+that is the Master Ball's job alone. The floor drops to 0.01, low enough that
+no species in the dex sits on it and the raw numbers differentiate by
+themselves.
+
+| catch rate | | Poké | Great | Ultra |
+|---|---|---|---|---|
+| 255 (Pidgey) | was | 0.95 | 0.95 | 0.95 |
+| | now | **0.80** | **0.89** | **0.93** |
+| 45 (Dratini) | both | 0.18 | 0.32 | 0.53 |
+
+**Everything between the floor and the ceiling is byte-identical**, which is
+why the rare economy did not move at all — the fix lands only on the commons,
+which is where the problem was. `npm run check` now sweeps every catch rate the
+dex actually contains and fails if a better ball is ever worth nothing on any
+of them.
+
+### The pond crossings were piers
+
+Both spans across the lake were drawn with the `D` deck — a **jetty**, which
+runs out from land and stops, and whose outer ring is drawn to meet sand. Laid
+across open water it fringed both bridges in beach. They cross water with dry
+ground at each end, which is a bridge, so they are `N` now and wear Route 12's
+planks — and **two across, not three**, because that plank set is a left half
+and a right half and nothing else; a third column comes out left/right/left and
+draws a rail down the middle of its own deck.
+
 ### A variant is its own pile
 
 A Holo Pidgey used to sit inside a row labelled **Pidgey ×12**, under an

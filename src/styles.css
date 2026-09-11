@@ -677,14 +677,19 @@ canvas {
 .astral-aura {
   position: absolute; inset: -14%; z-index: 0; pointer-events: none;
   border-radius: 50%;
+  /* Roughly two thirds of its old strength. With the orbit gone this is the
+     only thing behind the sprite, and at the old alphas it was a spotlight -
+     it lit the grass around the Pokemon rather than the Pokemon. A glow you
+     notice second, after the creature, is the one that reads as coming off
+     it. */
   background:
-    radial-gradient(circle at 50% 52%, rgba(150, 190, 255, .34) 0 22%,
-                    rgba(96, 92, 220, .30) 34%, rgba(58, 34, 140, .20) 52%, transparent 72%);
-  animation: astral-breathe 3.2s ease-in-out infinite;
+    radial-gradient(circle at 50% 52%, rgba(150, 190, 255, .20) 0 22%,
+                    rgba(96, 92, 220, .17) 34%, rgba(58, 34, 140, .10) 52%, transparent 72%);
+  animation: astral-breathe 3.6s ease-in-out infinite;
 }
 @keyframes astral-breathe {
-  0%, 100% { opacity: .68; transform: scale(.97); }
-  50% { opacity: 1; transform: scale(1.03); }
+  0%, 100% { opacity: .45; transform: scale(.98); }
+  50% { opacity: .72; transform: scale(1.02); }
 }
 
 .astral-fx i {
@@ -704,22 +709,12 @@ canvas {
 .astral-fx i:nth-child(7) { top: 30%; right: 26%; background: #e9e2ff; width: 5px; height: 5px; animation-delay: 1.4s; animation-duration: 2.9s; }
 .astral-fx i:nth-child(8) { bottom: 36%; left: 30%; background: #e9e2ff; width: 5px; height: 5px; animation-delay: 1.85s; animation-duration: 2.9s; }
 
-/* The orbital arc. A ring with three of its four borders transparent, so what
-   sweeps round is an arc rather than a circle, tilted so it reads as an orbit
-   rather than a spinner. */
-.astral-orbit {
-  position: absolute; inset: 6%; border-radius: 50%;
-  border: 2px solid transparent;
-  border-top-color: rgba(190, 225, 255, .9);
-  border-right-color: rgba(150, 130, 255, .5);
-  transform: rotate(0deg) rotateX(66deg);
-  animation: astral-orbit 2.6s linear infinite;
-}
-@keyframes astral-orbit {
-  0% { transform: rotate(0deg) rotateX(66deg); opacity: 0; }
-  12%, 78% { opacity: .95; }
-  100% { transform: rotate(360deg) rotateX(66deg); opacity: 0; }
-}
+/* The orbital arc - a tilted ring sweeping round the sprite - lived here and
+   is gone. It was the loudest thing in the treatment and it was drawing a
+   shape the Pokemon is not: a hoop around a creature reads as a spinner or a
+   selection ring, which is UI, where everything else about Astral says
+   "material". The star field inside the silhouette and the sparks say it
+   without describing an orbit nothing is in. */
 
 /* The sprite has to sit above its own aura. */
 .mon-slot .mon { position: relative; z-index: 1; }
@@ -2066,7 +2061,7 @@ button:disabled { transition: none; }
   /* The shiny badge and its sparks are decoration on information that is
      already in the text - so they stop, and nothing is lost. */
   .np-shiny, .np-astral, .np-holo, .np-tier, .shiny-spark i, .astral-fx i,
-  .astral-aura, .astral-orbit, .holo-foil,
+  .astral-aura, .holo-foil,
   .origin-fx i, .origin-fx u, .origin-gleam, .origin-ghost,
   .astral-sky { animation: none; }
   /* The reveal must not stop mid-reveal: with no animation the mask has to be
@@ -2081,7 +2076,6 @@ button:disabled { transition: none; }
      how you know which tier this is, so stopping them must not remove them. */
   .shiny-spark i, .astral-fx i { opacity: .9; transform: scale(1); }
   .astral-aura { opacity: .8; }
-  .astral-orbit { opacity: .85; }
   /* Parked mid-sweep rather than at `from`, which is off the sprite entirely -
      a Holo with no band on it is just a slightly brighter Pokemon, and the
      band is how you know which tier it is. */

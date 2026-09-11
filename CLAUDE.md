@@ -516,7 +516,13 @@ Planks lie **across** the way you walk and alternate every other tile, and which
 axis that is comes from the run's own extents — so a bridge must be **≥2 across**
 or it is half a bridge. The sea pier (`deck`) is a **jetty**, not a bridge: its
 outer ring is drawn to meet sand and brought a green fringe with it over lava.
-It is still right for Pond & Shore's pier (`D`) and nothing else.
+**And it was wrong for Pond & Shore too, which is the only place that used
+it.** Those two spans cross the lake - water on both sides, dry ground at each
+end - so they are bridges, and the jetty's sand-meeting outer ring fringed them
+in beach. They are `N` now, two across as Route 12's own bridge is. `D` and
+`pier()` are kept and currently have NO caller: the deck is real, correct art
+for a jetty that runs out from land and stops, and this map simply never had
+one. Do not reach for it to cross anything.
 
 Biomes: `m/M` ember · `i/I` ice · `p/P` plant · `h/H` tower
 
@@ -1069,6 +1075,17 @@ the three live deadlines forward by it (`move.startedAt`, `encounter.until`,
 also drops held keys, because switching TABS does not always fire `blur` the
 way switching windows does, and calls `changed()` on return so the rail is not
 showing RUN over a trainer who is walking.
+
+**A flat cap or floor flattens the ball ladder.** `catchChance` clamped to
+0.95 and 0.03, and `(rate/255) * mult` reaches 0.95 at rate 255/mult - so a
+Poke Ball was already capped against the fifteen commonest species in the dex
+and a Great Ball bought nothing at all on a Pidgey, while at rate 3 the floor
+made Poke and Great identical on every legendary. The ceiling belongs to the
+BALL now (`1 - NEVER_CERTAIN / mult`, so a better ball misses less often) and
+the floor is low enough (`NEVER_HOPELESS` 0.01) that no species in the dex sits
+on it. Everything between the two is untouched, which is why the rare economy
+did not move. check.mjs sweeps every catch rate the dex actually contains and
+fails if a better ball is ever worth nothing.
 
 **CSS**
 - **An animation beats a plain declaration.** `.mon` runs `mon-appear`, whose
