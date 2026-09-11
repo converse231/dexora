@@ -54,8 +54,13 @@ function whereToFind(id) {
     return [{ key: "legend", where: "Anywhere", how: "vanishingly rare" }];
   }
 
+  /* `from` is the level an evolved form starts turning up at. Printed, because
+     a sheet that says "Deep Woods · rare" for a Venusaur to a Lv 3 trainer is
+     sending them somewhere nothing will happen. */
   const out = areas.map((a) => ({
-    key: a.id, where: a.name, how: howOften(a.share),
+    key: a.id,
+    where: a.name,
+    how: a.from ? `${howOften(a.share)} · Lv ${a.from}+` : howOften(a.share),
   }));
   for (const rod of rods) out.push({ key: rod, where: "Any water", how: rod });
 

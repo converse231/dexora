@@ -8,7 +8,8 @@ import {
   AREAS, AREA_IDS, areaOf, walkable, label, MINI, MINI_UNKNOWN,
 } from "./map.js";
 import {
-  biomeFor, levelFromXp, xpForCatch, rodTable, rodBite, rollVariant, TIERS,
+  biomeFor, tableFor, levelFromXp, xpForCatch, rodTable, rodBite,
+  rollVariant, TIERS,
   lockedTiers, originReady,
 } from "./biomes.js";
 import {
@@ -367,7 +368,10 @@ export function createEngine(canvas, onChange, mini = null) {
        anywhere you can put your feet, something can appear. */
     const biome = biomeFor(state.areaId);
     if (biome && !state.evolution && Math.random() < ENCOUNTER_RATE) {
-      startEncounter(biome.table);
+      /* The level is part of the table, not a modifier on the roll: past Lv 8
+         a map starts turning up the evolved forms of what already lives there.
+         `tableFor` caches, because this is asked on every step that spawns. */
+      startEncounter(tableFor(biome, levelFromXp(state.xp)));
     }
     save();
     changed();

@@ -16,7 +16,7 @@ is how to work in the codebase: the invariants, the traps, and the method.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   node tools/check.mjs (17 suites)
+npm run dev        vite dev server           npm run check   node tools/check.mjs (18 suites)
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
                                              npm run layout  composition metrics
@@ -595,7 +595,7 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 [tools/check.mjs](tools/check.mjs) adds seventeen suites — catch odds, phase
 machine, balls, economy, evolution, evolution animation, trainer stats,
 casting, tileset, player, medals, origin gate, variant rows, steps, minimap,
-battle scene, areas.
+battle scene, spawn ladder, areas.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
 crown is whole. Biome ground and solid lists must be disjoint (an "invisible
@@ -625,6 +625,29 @@ exactly what rank 10 used to be: `catchMult` .06→.03, `rarityPower` .04→.02
 `effect()` strings that quote them. Miss one and the ceiling moves without
 anything failing — the numbers stay monotone, which is all the suite checks.
 The design number is **49 points against 100 ranks**, asserted directly.
+
+**Evolved forms are appended to every biome table by rule too, and for the
+same reason.** 41 of the 151 were in no table and on no rod - every third stage
+but Dragonite's - and the fix is `encounterTable(biome, level)`, which walks the
+evolution graph out from whatever the map already spawns. **Never hand-write an
+evolved form into a table to "fix" one species**: a species listed once and
+derived once has two weights in the same map, and nothing fails when they
+disagree. A hand-written row keeps its own weight and gets no derived one (the
+`weight.has(to)` guard) but still seeds the next step, so **depth is measured
+from what the map already spawns** - Ember lists Charmeleon, so Charizard is one
+step away there and Venusaur is two from Deep Woods' Bulbasaur.
+
+`EVO_FLOOR` is the load-bearing number, not `EVO_SHARE`. Proportional weight
+compounds, so a weight-1 line's third stage lands at 0.04 - a rounding error,
+not a chance. The floor is what makes the rarest lines reachable, and it is why
+the "an evolution is never commoner than what it evolves from" assertion has to
+exempt rows sitting ON the floor.
+
+The engine calls `tableFor`, which caches one (biome, level) pair - it is asked
+on every step that spawns. And **anything that grows a table dilutes the
+legendaries**, whose weights are fixed: check.mjs asserts their share can only
+fall as the level rises, because a floor applied carelessly could raise it and
+nothing else would say so.
 
 **Legendaries are appended to every biome table by rule, never listed in one.**
 `LEGENDARY` holds the dex ids; `legendsFor()` adds each to every table at

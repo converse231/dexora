@@ -195,6 +195,9 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
       .sort((a, b) => a[0] - b[0])
       .map(([id, levels]) => ({
         key: id,
+        /* No variant: `duplicateUids` holds every keeper out of the spare list
+           entirely, so nothing in a sweep is ever anything but ordinary. */
+        icon: { id },
         label: `${levels.length} × ${label(SPECIES[id - 1])}`,
         sub: `Lv ${levels.sort((a, b) => a - b).join(", ")}`,
       }));
@@ -251,6 +254,7 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
       ],
       manifest: going.map((m) => ({
         key: m.uid,
+        icon: { id: group.species, variant: group.variant ?? null },
         label: `${label(sp)}${group.variant ? ` · ${group.variant.toUpperCase()}` : ""}`,
         sub: `Lv ${m.level}`,
       })),

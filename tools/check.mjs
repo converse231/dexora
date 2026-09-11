@@ -1235,6 +1235,10 @@ import {
   LEGENDARY, LEGEND_MATCHED, LEGEND_STRAY, GEN_LAST, genOf,
 } from "../src/game/biomes.js";
 import { AREAS, AREA_IDS, SOLID, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
+import {
+  encounterTable, evoScale, evoUnlock, EVO_DEPTH, EVO_STEP, EVO_FLOOR,
+} from "../src/game/biomes.js";
+import { EVOLUTIONS } from "../src/data/evolutions.js";
 
 assert.equal(BIOMES.length, AREA_IDS.length, "every area needs a biome");
 
@@ -1965,6 +1969,91 @@ import { saveProblem } from "../src/game/engine.js";
   }
   console.log(`battle scene ok — ${Object.keys(AREAS).length} floors, ` +
     `${(css.match(/\.battle\[data-area=/g) ?? []).length} skies`);
+}
+
+/* THE SPAWN LADDER: evolved forms turning up in the wild as the trainer levels.
+
+   Five ways this goes wrong, and none of them fails on its own:
+
+   1. A species listed by hand AND derived has two weights in one map - the
+      exact bug `legendsFor()` was written to avoid, and it looks like nothing.
+   2. The ladder leaks: something appears below the level that is supposed to
+      open it, and the progression the whole feature is for never happens.
+   3. The ladder never opens, so the 41 species that had no wild home still
+      have none and the change was cosmetic.
+   4. A derived form out-commons what it evolves from, which reads as a bug in
+      the world rather than in a table.
+   5. LEGENDARIES get easier. They are appended to every table at a fixed
+      weight, so anything that grows a table dilutes them - but a floor applied
+      carelessly could grow them too, and nothing else here would notice. */
+{
+  const wildAt = (level) => {
+    const seen = new Set();
+    for (const b of BIOMES) for (const [id] of encounterTable(b, level)) seen.add(id);
+    return seen;
+  };
+
+  // 1. one weight per species per map, at every level the ramp passes through.
+  for (const b of BIOMES) {
+    for (const level of [1, EVO_STEP, EVO_STEP * EVO_DEPTH, MAX_LEVEL]) {
+      const t = encounterTable(b, level);
+      const ids = t.map(([id]) => id);
+      assert.equal(new Set(ids).size, ids.length,
+        `${b.id} at Lv ${level} lists a species twice - a hand-written row and ` +
+        "a derived one give it two different sets of odds in the same map");
+      for (const [, w] of t) assert.ok(w > 0, `${b.id}: a weight of zero at Lv ${level}`);
+    }
+  }
+
+  // 2. nothing evolved before its level, and the base table is untouched at Lv 1.
+  for (const b of BIOMES) {
+    assert.deepEqual(encounterTable(b, 1), b.table,
+      `${b.id} spawns something derived at Lv 1 - the early game is base forms only`);
+  }
+  for (let depth = 1; depth <= EVO_DEPTH; depth++) {
+    assert.equal(evoScale(evoUnlock(depth) - 1, depth), 0,
+      `depth ${depth} leaks one level early`);
+    assert.ok(evoScale(evoUnlock(depth), depth) > 0,
+      `depth ${depth} is still absent on the level the Dex advertises`);
+    assert.equal(evoScale(MAX_LEVEL, depth), 1, `depth ${depth} never reaches full strength`);
+  }
+
+  // 3. the ladder actually opens: everything is findable by the cap.
+  const early = wildAt(1);
+  const late = wildAt(MAX_LEVEL);
+  assert.ok(late.size > early.size, "levelling adds no species at all");
+  for (const sp of SPECIES) {
+    assert.ok(late.has(sp.id),
+      `${sp.name} is in no wild table even at Lv ${MAX_LEVEL} - a species that ` +
+      "exists only inside the Box is a species the Dex cannot honestly place");
+  }
+
+  // 4. an evolution is never commoner than what it evolves from, in its own map.
+  const pre = new Map();
+  for (const e of EVOLUTIONS) pre.set(e.to, e.from);
+  for (const b of BIOMES) {
+    const w = new Map(encounterTable(b, MAX_LEVEL).map(([id, x]) => [id, x]));
+    for (const [to, from] of pre) {
+      if (!w.has(to) || !w.has(from)) continue;
+      assert.ok(w.get(to) <= w.get(from) || w.get(to) <= EVO_FLOOR + 1e-9,
+        `${b.id}: ${SPECIES[to - 1].name} (${w.get(to)}) is commoner than ` +
+        `${SPECIES[from - 1].name} (${w.get(from)})`);
+    }
+  }
+
+  // 5. legendaries only ever get rarer as the table grows.
+  for (const b of BIOMES) {
+    const share = (level) => {
+      const t = encounterTable(b, level);
+      const total = t.reduce((n, [, x]) => n + x, 0);
+      return LEGENDARY.reduce((n, id) => n + (t.find(([i]) => i === id)?.[1] ?? 0), 0) / total;
+    };
+    assert.ok(share(MAX_LEVEL) <= share(1) + 1e-9,
+      `${b.id}: legendaries are easier at Lv ${MAX_LEVEL} than at Lv 1`);
+  }
+
+  console.log(`spawn ladder ok — ${early.size} species in the wild at Lv 1, ` +
+    `${late.size} at Lv ${MAX_LEVEL}; legendaries no easier anywhere`);
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, none locked, ${sizes[0]} … ${sizes.at(-1)}`);

@@ -1,4 +1,5 @@
 import { SPECIES } from "../data/species.js";
+import { EVOLUTIONS } from "../data/evolutions.js";
 
 /* The eight areas: what each one is, and what spawns there.
 
@@ -165,11 +166,21 @@ export const TIERS = TIER_ODDS.map(([tier]) => tier);
 export function foundIn(speciesId) {
   if (LEGENDARY.includes(speciesId)) return { legendary: true, areas: [], rods: [] };
 
+  /* At the LEVEL CAP, because the question is "where does this live", not
+     "where can I find one this minute". A row that only opens later carries the
+     level it opens at, so the sheet can say so rather than quietly promise a
+     Venusaur to a Lv 3 trainer. */
   const areas = [];
   for (const b of BIOMES) {
-    const total = b.table.reduce((n, [, w]) => n + w, 0);
-    const row = b.table.find(([id]) => id === speciesId);
-    if (row) areas.push({ id: b.id, name: b.name, share: row[1] / total });
+    const full = encounterTable(b, MAX_LEVEL);
+    const total = full.reduce((n, [, w]) => n + w, 0);
+    const row = full.find(([id]) => id === speciesId);
+    if (row) {
+      areas.push({
+        id: b.id, name: b.name, share: row[1] / total,
+        from: row[2] ? evoUnlock(row[2]) : 0,
+      });
+    }
   }
   areas.sort((a, b) => b.share - a.share);
 
@@ -285,17 +296,29 @@ const RESIDENTS = [
     types: ["bug", "grass", "poison"],
     table: [
       [10, 16], [13, 16], [11, 9], [14, 9], [46, 10], [48, 10], [23, 8],
-      [43, 8], [69, 8], [92, 6], [63, 6], [102, 5], [114, 2], [123, 1],
-      [127, 1], [1, 1],
+      [43, 8], [69, 8], [1, 8], [92, 6], [63, 6], [102, 5], [114, 2],
+      [123, 1], [127, 1],
     ],
   },
   {
     id: "pond",
     name: "Pond & Shore",
-    types: ["water"],
+    /* GRASS, not just water. Half this map is bank: sand, grass and a stand of
+       trees, and a lake with nothing living on its shore is a swimming pool.
+       It was the only biome whose table was a single type, and it read as one -
+       thirteen rows and twelve of them Water.
+
+       The type list is not decoration: `legendsFor()` matches legendaries
+       against it, so adding "grass" is a real change. It is a no-op today
+       because no Gen 1 legendary is Grass, and it is the right answer the day
+       a Celebi exists. */
+    types: ["water", "grass"],
     table: [
       [129, 20], [72, 14], [60, 12], [54, 10], [118, 10], [98, 8], [120, 7],
-      [116, 6], [90, 5], [79, 5], [147, 2], [131, 1], [7, 1],
+      [116, 6], [90, 5], [79, 5], [7, 8],
+      // The bank: what grows where the water stops.
+      [43, 8], [69, 7], [46, 6], [102, 4], [114, 2],
+      [147, 2], [131, 1],
     ],
   },
   {
@@ -350,6 +373,111 @@ export const BIOMES = RESIDENTS.map((b) => ({
   ...b,
   table: [...b.table, ...legendsFor(b.types)],
 }));
+
+
+/* ---------------------------------------------------------------------------
+   EVOLVED FORMS IN THE WILD, and why they are derived rather than listed.
+
+   Measured before any of this was written: **41 of the 151 appeared in no
+   biome table and on no rod** - every third stage but Dragonite's line, so
+   1 of 16 - and the only way to see a Venusaur was to build one out of eight
+   Bulbasaurs that themselves turned up 0.86% of the time in one map. The dex
+   was reachable, but its tail was reachable only through the Box.
+
+   The fix is a RULE over the evolution graph, not 41 new rows across 8 tables.
+   Hand-written rows are exactly what `legendsFor()` exists to avoid: a species
+   listed in two places has two different sets of odds in the same map, and
+   nothing fails when they disagree. It also means adding a species to a table
+   brings its whole line with it, and that Gen 2 costs nothing here.
+
+   **Depth is measured from what the map already spawns**, not from the bottom
+   of the line. Ember Caldera lists Charmeleon by hand, so Charizard is one step
+   away there while Venusaur is two steps from Deep Woods' Bulbasaur - which is
+   the honest reading of "how far is this from something I can already find".
+
+   Three numbers, and the FLOOR is the one doing the kindness. Proportional
+   weight alone compounds: Bulbasaur at weight 8 gives Ivysaur 1.6 and Venusaur
+   0.32, but Lapras at weight 1 would give its line 0.04, which is not a chance,
+   it is a rounding error. So a derived form is a fifth of what it comes from,
+   OR the floor, whichever is larger - a rare line's tail is never rarer than a
+   common line's tail. That is what makes the hardest species in the game
+   findable without making the easy ones trivial. */
+const NEXT = new Map();
+for (const e of EVOLUTIONS) {
+  if (!NEXT.has(e.from)) NEXT.set(e.from, []);
+  NEXT.get(e.from).push(e.to);
+}
+
+export const EVO_SHARE = 0.2;   // a fifth as common as what it evolves from
+export const EVO_FLOOR = 0.3;   // ...but never rarer than this
+export const EVO_STEP = 8;      // one more step of a line per this many levels
+export const EVO_RAMP = 24;     // and this many levels from first sighting to full
+export const EVO_DEPTH = 2;     // no Gen 1 line is longer than this from a base
+
+/* 0 until the level that opens this depth, then a straight ramp to 1.
+
+   A ramp rather than a switch, because a tier that arrives at full strength on
+   one level-up is an event that happens once; a tier that thickens for twenty
+   levels is the map changing under you. The first step opens at Lv 8 and is at
+   full strength by 32; the second opens at 16 and fills by 40. Nothing evolved
+   exists below Lv 8 at all - the early game is where you are still learning
+   which map is which, and an Ivysaur in it is just a Bulbasaur you cannot use. */
+export function evoScale(level, depth) {
+  /* `+ 1` so the first sighting happens ON the level the Dex advertises. At
+     a plain difference the scale is exactly 0 there and the species is still
+     absent, which is the one thing a "from Lv 16" label must not do. */
+  return Math.max(0, Math.min(1, (level - EVO_STEP * depth + 1) / EVO_RAMP));
+}
+
+export const evoUnlock = (depth) => EVO_STEP * depth;
+
+/* The table an encounter actually rolls on: the biome's own rows, plus every
+   evolution of them that the trainer's level has opened.
+
+   A derived row carries its DEPTH as a third element. The roll destructures two
+   and ignores it; `foundIn` reads it, so the Dex can say which level a species
+   starts appearing at instead of promising one that will not come.
+
+   A species already written into the table keeps its hand-written weight and
+   gets no derived row - the `weight.has(to)` guard - but it still seeds the
+   next step, so Ember's hand-placed Charmeleon is what Charizard is measured
+   against. One weight per species per map, which is the whole invariant. */
+export function encounterTable(biome, level = 1) {
+  const weight = new Map(biome.table);
+  const extra = [];
+  let front = biome.table.map(([id]) => id);
+
+  for (let depth = 1; depth <= EVO_DEPTH && front.length; depth++) {
+    const scale = evoScale(level, depth);
+    const next = [];
+    for (const id of front) {
+      for (const to of NEXT.get(id) ?? []) {
+        if (!weight.has(to)) {
+          const w = Math.max(weight.get(id) * EVO_SHARE, EVO_FLOOR);
+          weight.set(to, w);
+          if (scale > 0) extra.push([to, w * scale, depth]);
+        }
+        next.push(to);
+      }
+    }
+    front = next;
+  }
+  return extra.length ? [...biome.table, ...extra] : biome.table;
+}
+
+/* Asked on every step that starts an encounter, and the answer only changes on
+   a level-up, so the last one is kept. One entry is enough: you are on one map
+   at a time. */
+let lastKey = null;
+let lastTable = null;
+export function tableFor(biome, level) {
+  const key = `${biome.id}:${level}`;
+  if (key !== lastKey) {
+    lastKey = key;
+    lastTable = encounterTable(biome, level);
+  }
+  return lastTable;
+}
 
 // A biome id is an area id: one map, one biome.
 export const biomeFor = (areaId) => BIOMES.find((b) => b.id === areaId) ?? null;

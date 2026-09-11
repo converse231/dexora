@@ -1603,6 +1603,96 @@ Two things went wrong building it, both worth keeping:
 neither half fails loudly — a missing PNG is a blank floor and a missing sky is
 the default daylight, which is the exact bug this replaced.
 
+### The wild had no tail
+
+Measured, before anything was changed: **41 of the 151 appeared in no biome
+table and on no rod** — every third stage in the game except Dragonite's line,
+so **1 of 16**. They existed only as something you built in the Box. And the
+starters were not comparable with each other at all:
+
+| | best share, before |
+|---|---|
+| Charmander | 10.66% |
+| Squirtle | 0.99% |
+| Bulbasaur | **0.86%** |
+
+A twelfth of Charmander's odds, and then eight of them to reach an Ivysaur that
+appeared nowhere, and eight of *those* for a Venusaur that appeared nowhere
+either. Bulbasaur and Squirtle are weight 8 now, alongside the rest of their
+maps' mid-tier residents. **Charmander was left at 10** — it is an outlier, but
+the ask was a kinder game and trimming it would have made something worse. Ember
+Caldera's table is also the smallest in the game, which is half of why its share
+is high.
+
+**Evolved forms now appear in the wild, and they are DERIVED, not listed.**
+Forty-one new rows across eight tables is exactly the data `legendsFor()` exists
+to avoid — a species written into a table twice has two different sets of odds
+in the same map and nothing fails when they disagree. So it is a rule over the
+evolution graph: everything a biome already spawns brings its line with it.
+Adding a species to a table brings its evolutions for free, and Gen 2 costs
+nothing here.
+
+Three numbers, and **the floor is the one doing the kindness**:
+
+- `EVO_SHARE` **0.2** — an evolved form is a fifth as common as what it comes from.
+- `EVO_FLOOR` **0.3** — but never rarer than this. Proportional weight alone
+  compounds: a Lapras at weight 1 would give its line 0.04, which is not a
+  chance, it is a rounding error. The floor is what makes the *hardest* species
+  findable without touching the easy ones.
+- `EVO_STEP` **8** — one more step of a line opens every eight levels, ramping to
+  full strength over the following 24.
+
+**Depth is measured from what the map already spawns**, not from the bottom of
+the line. Ember Caldera lists Charmeleon by hand, so Charizard is one step away
+*there* (Lv 8) while Venusaur is two steps from Deep Woods' Bulbasaur (Lv 16).
+That is the honest reading of "how far is this from something I can already
+find". A hand-written row always keeps its own weight and gets no derived one,
+but it still seeds the next step.
+
+What it comes to:
+
+| | wild species | |
+|---|---|---|
+| Lv 1 | **100** of 151 | base forms only — the early game is unchanged |
+| Lv 16 | 142 | |
+| Lv 32 | **151** | everything in the game has a place to be found |
+
+Deep Woods at the cap: Bulbasaur 5.62%, Ivysaur 1.12% (from Lv 8), Venusaur
+0.22% (from Lv 16) — about one in 450 encounters, which is a hunt rather than a
+grind. Blastoise and Dragonite land near 0.2% in Pond & Shore.
+
+**Legendaries got harder everywhere, and that needed no change.** They are
+appended to every table at a fixed weight, so anything that grows a table
+dilutes them: 0.93% → 0.77% in Tall Grass, 0.30% → 0.24% in Pond & Shore. The
+suite asserts the share can only ever fall, because a floor applied carelessly
+could have raised it and nothing else would have noticed.
+
+**Fortune compounds with this on purpose.** It raises every weight to a power
+below 1, which flattens a table toward its tail — and the tail is now where the
+evolved forms live. A trainer who built for Fortune is the trainer who finds
+Venusaurs.
+
+### The shore was a swimming pool
+
+Pond & Shore was the only biome whose type list was a single type, and it read
+as one: thirteen rows, twelve of them Water. Half that map is bank — sand, grass
+and a stand of trees — and nothing lived on it. Oddish, Bellsprout, Paras,
+Exeggcute and Tangela now hold about **20%** of the table between them.
+
+The type list is not decoration — `legendsFor()` matches legendaries against it
+— so adding `"grass"` is a real change. It is a no-op today because no Gen 1
+legendary is Grass, and it is the right answer the day a Celebi exists.
+
+### The sale shows you the Pokémon
+
+The manifest added last pass listed names and levels. A name is something you
+read and then check; **a sprite is something you recognise before you have
+finished reading**, which is what you want from the last screen before an action
+with no undo. `manifest` rows take an optional `icon`, so both sell dialogs draw
+the real art — the per-row one at the variant it is actually selling, the sweep
+always ordinary, because `duplicateUids` holds every keeper out of the spare list
+entirely.
+
 **Your calls, answered:** generous rewards, and kinder odds.
 
 ---

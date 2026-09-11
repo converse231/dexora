@@ -8,6 +8,8 @@
 import { useEffect } from "react";
 import { useModalLock } from "./modal.js";
 
+import Sprite from "./Sprite.jsx";
+
 export default function Confirm({
   title,
   lines = [],
@@ -66,6 +68,20 @@ export default function Confirm({
           <ul className="cf-manifest">
             {manifest.map((row) => (
               <li key={row.key}>
+                {/* The picture is the point of the list. A name is something
+                    you read and check; a sprite is something you recognise
+                    before you have finished reading, which is what you want
+                    from the last screen before an action with no undo.
+                    `aria-hidden`, because the label beside it already says
+                    which Pokemon this is. */}
+                {row.icon && (
+                  <Sprite
+                    id={row.icon.id}
+                    variant={row.icon.variant ?? null}
+                    className="cf-pic"
+                    alt=""
+                  />
+                )}
                 <span>{row.label}</span>
                 {row.sub && <em>{row.sub}</em>}
               </li>

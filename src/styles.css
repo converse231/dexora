@@ -1582,8 +1582,15 @@ canvas {
   display: grid; gap: 4px;
 }
 .cf-manifest li {
-  display: flex; align-items: baseline; gap: 8px;
+  display: flex; align-items: center; gap: 8px;
   font-size: 12.5px; color: var(--ink-soft);
+}
+/* 28px: the sprites are 64px art, and at 28 a Pidgey and a Spearow are still
+   told apart while forty rows still fit a scrollable box. `flex: none` because
+   an image in a flex row is exactly the thing that gets squashed first. */
+.cf-pic {
+  flex: none; width: 28px; height: 28px;
+  object-fit: contain; image-rendering: pixelated;
 }
 .cf-manifest li span { flex: 1; min-width: 0; }
 .cf-manifest li em {
