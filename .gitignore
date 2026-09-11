@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Fetch-on-demand caches: pret decompilation raw dumps + rips, re-creatable
+# via npm run assets / art / map / tilesets. Large (~12MB) and not the game's
+# own art - see CLAUDE.md's "Generated files" table.
+.assets-src/
+
+# Tile-usage study renders (tools/study_tiles.py) - reference only, not part
+# of the build.
+.study/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS cruft
+.DS_Store
+Thumbs.db

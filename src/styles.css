@@ -1,0 +1,2473 @@
+:root {
+  --paper: #f4f8ef; --surface: #fff; --surface-2: #e9f1e3;
+  --ink: #253a2e; --ink-soft: #5f7566; --ink-faint: #8ca091;
+  --line: #d6e2ce; --line-firm: #b9ccb0;
+  --canopy: #2f6b4c; --path: #a4695e; --path-soft: #f0ddd6;
+  --sand: #e5d5a2; --gold: #b4741a;
+  --display: "Fredoka", "Trebuchet MS", sans-serif;
+  --body: "Nunito Sans", "Segoe UI", system-ui, sans-serif;
+  --pixel: "Silkscreen", "Courier New", monospace;
+
+  /* Must match T in game/engine.js. */
+  --t-throw: 560ms;
+  --t-suck: 460ms;
+  --t-drop: 560ms;
+  --t-wait: 520ms;
+  --t-shake: 720ms;
+  --t-result: 1200ms;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  display: flex;
+  justify-content: center;
+  padding: 14px 14px 18px;
+  min-height: 100vh;
+}
+/* 1180px left a third of a 1080p screen empty on both sides while the map sat
+   small in the middle. The map is `width: 100%`, so giving the shell the room
+   makes the game itself bigger rather than just spreading the furniture out. */
+.app { width: 100%; max-width: 1500px; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 11px 15px; margin-bottom: 12px;
+  background: var(--surface); border: 2px solid var(--line-firm);
+  border-radius: 12px; box-shadow: 0 2px 0 var(--line-firm);
+  font-family: var(--pixel); font-size: 12.5px; color: var(--ink-soft);
+}
+.tb-brand { display: flex; align-items: center; gap: 10px; }
+.topbar .title { font-family: var(--display); font-size: 21px; font-weight: 600; color: var(--ink); }
+
+.topbar b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
+/* Every figure is a tile: a small faint label over a large value. The old row
+   set all four in the same size and colour, so telling money from steps meant
+   reading the labels every time. */
+.tb-stats { display: flex; align-items: stretch; gap: 0; }
+.tb-stat {
+  position: relative;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  padding: 2px 14px;
+  border-left: 2px solid var(--line);
+}
+.tb-stat:first-child { border-left: 0; }
+.tb-stat i {
+  font-style: normal; font-family: var(--pixel);
+  font-size: 8px; letter-spacing: .1em; color: var(--ink-faint);
+}
+.tb-stat b {
+  font-family: var(--display); font-weight: 600; font-size: 17px;
+  line-height: 1.05; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+/* The denominator is context, not a figure in its own right. */
+.tb-stat b u { text-decoration: none; font-size: 12px; color: var(--ink-faint); }
+.topbar .cash b { color: var(--path); display: inline-block; }
+.topbar .cash.bump b { animation: cash-bump 450ms ease-out; }
+@keyframes cash-bump { 35% { transform: scale(1.3); } }
+
+/* Deltas fall out of the counter that changed, so the number and the reason
+   for it are in the same place. */
+.deltas { position: absolute; left: 50%; top: 100%; width: 0; }
+.deltas em {
+  position: absolute; left: 0; font-style: normal;
+  font-family: var(--pixel); font-size: 11.5px; white-space: nowrap;
+  animation: delta-fly 1150ms ease-out forwards;
+}
+/* Two changes inside a second - sell a pile, then level up - both started at
+   the same coordinates and rendered as one illegible smear. Stepped down by
+   index so an overlap reads as two numbers. */
+.deltas em:nth-child(2) { margin-top: 13px; }
+.deltas em:nth-child(3) { margin-top: 26px; }
+.deltas em:nth-child(n + 4) { display: none; }
+.deltas em.up { color: #2f8b52; }
+.deltas em.down { color: #b5483c; }
+@keyframes delta-fly {
+  0%   { transform: translate(-50%, -4px); opacity: 0; }
+  18%  { opacity: 1; }
+  100% { transform: translate(-50%, 26px); opacity: 0; }
+}
+.topbar .spacer { flex: 1; }
+.topbar button {
+  font-family: var(--pixel); font-size: 10.5px; padding: 8px 12px 7px;
+  border: 2px solid var(--line-firm); border-radius: 8px;
+  background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
+}
+.topbar button:hover { border-color: var(--path); color: var(--path); }
+
+/* Level reads as one object: the number, the bar it fills, and the figures
+   behind the bar - rather than three separate things sharing a gap. */
+.tb-lv {
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 12px 5px; border-radius: 999px;
+  border: 2px solid var(--line); background: var(--surface-2);
+}
+.tb-lv-num { font-family: var(--pixel); font-size: 11px; color: var(--ink-soft); }
+.tb-lv-num b { color: var(--canopy); font-size: 14px; }
+.tb-lv-xp {
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.xpbar {
+  width: 56px; height: 8px; border-radius: 99px;
+  background: var(--line); overflow: hidden;
+}
+.xpbar i { display: block; height: 100%; background: var(--canopy); border-radius: 99px; }
+
+/* Names the zone you are standing in, and says so plainly when it is silent. */
+.biome-tag {
+  position: absolute; top: 12px; left: 3%; z-index: 5;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 9px 14px 8px;
+  background: var(--surface); border: 2px solid var(--line-firm);
+  border-radius: 10px; box-shadow: 0 2px 0 var(--line-firm);
+  font-family: var(--pixel); font-size: 11px; color: var(--ink);
+  pointer-events: none;
+}
+.biome-tag.locked { border-color: var(--path); }
+.biome-tag .types { margin-top: 3px; }
+.biome-tag i { font-style: normal; font-size: 9px; color: var(--ink-faint); }
+.biome-tag em { font-style: normal; font-size: 9.5px; color: var(--path); }
+
+/* ---------- layout ---------- */
+.stage { display: grid; gap: 12px; align-items: start; }
+
+/* Side by side, the two columns are one object and should end on the same line.
+   The rail stretches to the map's height and its list scrolls inside whatever
+   is left over, instead of every panel carrying a guessed max-height that left
+   a ragged gap under the shorter one. */
+
+.screen {
+  background: var(--surface); border: 2px solid var(--line-firm);
+  border-radius: 14px; padding: 10px; box-shadow: 0 2px 0 var(--line-firm);
+}
+.viewport { position: relative; }
+canvas {
+  display: block; width: 100%; height: auto;
+  border-radius: 9px; border: 2px solid var(--line-firm);
+  background: #79c493; touch-action: none;
+  image-rendering: pixelated;
+}
+.hint {
+  font-family: var(--pixel); font-size: 10.5px; color: var(--ink-faint);
+  text-align: center; margin-top: 10px; letter-spacing: .04em;
+}
+/* RUN is listed as soon as it is yours and lights up while Shift is down, so
+   the same line says both what you can do and what you are doing. */
+.hint b { font-weight: 400; color: var(--ink-soft); }
+.hint b.lit { color: var(--path); }
+
+/* ---------- encounter: fills the map screen ---------- */
+/* Sizes inside are given in cqw so the whole battle screen scales with the map
+   viewport rather than the browser window. The container lives here, not on
+   .viewport: containing .viewport would zero its content contribution and
+   starve the grid track that sizes the map. */
+.battle {
+  position: absolute; inset: 0; z-index: 10; overflow: hidden;
+  container-type: inline-size;
+  border-radius: 9px; border: 2px solid var(--canopy);
+  animation: battle-in .3s ease-out;
+}
+@keyframes battle-in { from { opacity: 0; transform: scale(1.03); } }
+
+.battle-sky {
+  position: absolute; inset: 0 0 50% 0;
+  background: linear-gradient(#bfe9f7 0%, #ddf3f0 58%, #e9f5df 100%);
+}
+.battle-ground {
+  position: absolute; inset: 50% 0 0 0;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, .3), transparent 60%),
+    linear-gradient(rgba(255, 255, 255, .1), rgba(22, 62, 42, .24)),
+    url("/battle/ground.png") 0 0 / 48px 48px repeat;
+  image-rendering: pixelated;
+  box-shadow: inset 0 6px 16px rgba(30, 70, 45, .2);
+}
+
+/* The band between the nameplate and the textbox. Sizing the slot by HEIGHT
+   rather than width is what stops big Pokémon being clipped: the old slot was a
+   fixed share of the width and its foot sat behind the message box. */
+.battle-field {
+  position: absolute; left: 0; right: 0; top: 9%; bottom: 19%;
+  display: grid; place-items: center;
+}
+.mon-slot {
+  position: relative; display: grid; place-items: center;
+  height: 100%; aspect-ratio: 1 / 1;
+}
+
+/* Dust kicked up where it lands, on appearing. */
+.land-ring {
+  position: absolute; left: 50%; top: 50%;
+  width: 46%; height: 12%; margin: 24% 0 0 -23%;
+  border-radius: 50%; border: 3px solid rgba(255, 255, 255, .8);
+  pointer-events: none;
+  animation: land-ring 640ms ease-out forwards;
+}
+@keyframes land-ring {
+  0%   { transform: scale(.15); opacity: 0; }
+  40%  { opacity: .85; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.mon-shadow {
+  position: absolute; bottom: 16%; width: 48%; height: 8%;
+  border-radius: 50%; background: rgba(28, 66, 44, .22);
+  transition: opacity 200ms ease-in, transform 200ms ease-in;
+}
+.mon-shadow.hidden { opacity: 0; transform: scale(.2); }
+
+.mon {
+  width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;
+  /* Drops in with a squash landing, then breathes. */
+  animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both,
+             mon-idle 2.6s ease-in-out 700ms infinite;
+}
+@keyframes mon-appear {
+  0%   { transform: translateY(-40%) scale(.2); opacity: 0; filter: brightness(3) saturate(0); }
+  30%  { opacity: 1; filter: brightness(1.7) saturate(.55); }
+  68%  { transform: translateY(0) scale(1.1); filter: none; }
+  84%  { transform: translateY(0) scale(.95); }
+  100% { transform: translateY(0) scale(1); opacity: 1; filter: none; }
+}
+@keyframes mon-idle { 50% { transform: translateY(-3%); } }
+
+/* Absorbed: swells, spins down into the ball, and only whites out at the very
+   end. Blowing the highlights early made it vanish instead of visibly shrink. */
+.mon.captured {
+  /* Above the aura and the effect layers, below the ball - it is being drawn
+     INTO the ball, so the ball is in front of it as it goes. */
+  position: relative; z-index: 2;
+  animation: mon-absorb var(--t-suck) cubic-bezier(.5, 0, .85, .4) forwards;
+}
+@keyframes mon-absorb {
+  0%   { transform: scale(1) rotate(0deg); opacity: 1; filter: none; }
+  18%  { transform: scale(1.09) rotate(-5deg); filter: brightness(1.45) saturate(.8); }
+  62%  { transform: scale(.42) rotate(14deg); opacity: 1; filter: brightness(2.2) saturate(.4); }
+  100% { transform: scale(.04) translateY(10%) rotate(30deg); opacity: 0; filter: brightness(4.5) saturate(0); }
+}
+
+/* Bounds away in hops rather than fading on the spot. */
+.mon.gone { animation: mon-flee 780ms cubic-bezier(.3, 0, .7, 1) forwards; }
+@keyframes mon-flee {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  16%  { transform: translate(-7%, -5%) scale(1.05); }
+  38%  { transform: translate(24%, -20%) scale(.92); }
+  56%  { transform: translate(46%, 0) scale(.85); }
+  76%  { transform: translate(72%, -14%) scale(.7); opacity: .9; }
+  100% { transform: translate(118%, 8%) scale(.42); opacity: 0; }
+}
+
+/* The slot carries position (arc in, then fall); the ball itself carries spin
+   and wobble, so the two never fight over transform.
+
+   `z-index: 4` is a fix, not decoration. The slot had no z-index at all, which
+   was fine until `.mon-slot .mon` was given `z-index: 1` so an Astral sprite
+   would sit above its own aura - from then on every throw arced BEHIND the
+   Pokemon. Four clears the sprite (1), the captured sprite (2) and the effect
+   layers (3: the star field, the foil, the sparks), so the ball you threw is
+   in front of everything, which is where a thrown object goes. */
+.ball-slot {
+  position: absolute; inset: 0; z-index: 4;
+  display: grid; place-items: center;
+}
+.ball-slot.throw { animation: ball-arc var(--t-throw) cubic-bezier(.25, .6, .5, 1) both; }
+.ball-slot.drop { animation: ball-drop var(--t-drop) linear both; }
+.ball-slot.wait, .ball-slot.shake, .ball-slot.caught,
+.ball-slot.broke { transform: translateY(30%); }
+
+/* ---- the ball, as drawn frames ----------------------------------------
+   A 64x2048 vertical strip: 32 frames of 64px, sliced per ball by
+   tools/build_balls.py out of Anarlaurendil's throw sheet (CC BY 3.0, credited
+   in README). The phase picks a range and `steps()` walks it.
+
+   HOW THE MATHS WORKS, because percentage background-position is not
+   intuitive: with `background-size: 100% 3200%` the image is 32 box-heights
+   tall, and a position of p% aligns the p% point of the image with the p%
+   point of the box - which works out to an offset of -31 x p% x box-height.
+   So frame i sits at p = i/31, and `--f` is that one step. A range a..b runs
+   `from` frame a `to` frame b+1 with `steps(b-a+1)`, because steps() shows the
+   start value first and never reaches the end one.
+
+   `--f` is a constant, not an animated property; keyframes only read it.
+
+   **`jump-none`, and that is a bug fix.** The obvious spelling is to run `to`
+   one frame PAST the range and use plain `steps(n)`, which walks a..b and
+   never reaches the end value - correct while an animation is running, and
+   wrong the moment one holds. `forwards` holds the END value, so the catch
+   held frame 32, which is off the strip, and the ball simply vanished after
+   the click; the break-out held frame 27, which is the CATCH's gold flash, so
+   a Pokemon that escaped ended on the animation for keeping it. `jump-none`
+   spreads n values across the range inclusive, so `from` is the first frame,
+   `to` is the last, and holding the end holds the right picture. Sampling the
+   animation over time is what showed it - see the timeline harness. The
+   looping spin keeps plain `steps()`: a loop wants four equal frames that
+   wrap, not four that pause on the last.
+
+   WIDTH IS DERIVED, NOT PICKED. The ball art fills 14 of the cell's 64 px
+   (21.9%), and the old PokeAPI icon filled 60% of a box drawn at 30% of the
+   slot - so the ball used to read at 18% of the slot. 18 / 0.219 = 82, and
+   that keeps the ball exactly the size it has always been while giving the
+   bursts the rest of the cell to happen in. Change the art and re-derive it;
+   build_balls.py asserts the 14x14 so this cannot drift silently. */
+.ball {
+  --f: calc(100% / 31);
+  /* ONE FRAME, and everything is a multiple of it. This is the fix for "still
+     choppy", and the cause was not the CSS - it was stretching the artist's
+     frames across OUR phase durations, which come from FireRed's engine
+     timings and have nothing to do with how many pictures there are. Measured:
+     the throw ran at 28fps and the aspiration at 24, and nobody complained
+     about those; the shake ran at **6.9fps**, the catch at 8.1 and the
+     break-out at 10. Below about twelve, stepped pixel art stops being
+     animation and becomes a slideshow.
+
+     So each sequence now plays at 24fps and the phase HOLDS the rest of its
+     beat, instead of the art being stretched to fill it. The pause that
+     leaves at the end of a shake is not dead air - it is the pause FireRed
+     puts between shakes, which is where the suspense was always coming from. */
+  --bf: 42ms;
+  width: 82%; aspect-ratio: 1;
+  background-repeat: no-repeat;
+  background-size: 100% 3200%;
+  /* Frame 3: the ball closed and face-on. Every phase that is not stepping
+     through a range - the fall, the wait - simply rests here. */
+  background-position-y: calc(var(--f) * 3);
+  image-rendering: pixelated;
+}
+/* The shadow belongs to the ball, not to a starburst, so it is only on the
+   phases where the thing on screen IS a ball. */
+.ball.throw, .ball.drop, .ball.wait, .ball.shake {
+  filter: drop-shadow(0 3px 2px rgba(20, 50, 34, .35));
+}
+
+/* f00-f03, the spin. Four frames of the ball turning: the white underside
+   rotating away, the lid coming round the edge, then face-on. It loops about
+   three times across the throw, which is what the old `rotate(860deg)` was
+   imitating - and imitating badly, because rotating a 14px pixel-art ball
+   resamples it into mush at every angle. */
+/* Exactly four turns across the throw, so the spin and the arc start and end
+   together instead of the rotation being cut off wherever it happened to be.
+   At 560ms that is 140ms a turn - 28fps, which is where a four-pose rotation
+   stops reading as four poses and starts reading as a ball turning. */
+.ball.throw { animation: ball-spin calc(var(--t-throw) / 4) steps(4) infinite; }
+/* f04-f14, the aspiration: opens, the burst, the beam drawing in, closes. */
+/* 11 frames x 42ms = 462ms, against a 460ms phase: the aspiration is the one
+   sequence whose frame count already matched its beat, which is why it was
+   the one that looked right. */
+.ball.suck { animation: ball-open calc(var(--bf) * 11) steps(11, jump-none) forwards; }
+/* `drop` rests on the default frame 3 - a clean, centred, closed ball. It used
+   to be pinned to frame 14 to avoid the ring vanishing in one cut, and that
+   was the wrong trade: it held a full-size ring on screen for the whole 560ms
+   of the fall. The cut is the artist's own sequence boundary, and one frame is
+   what a cut costs. */
+/* f15-f19, the shakes. THE MOVEMENT IS DRAWN INTO THESE, so there is no CSS
+   transform - doing both compounds into a lurch.
+
+   But they are a PAN, not a wobble. Measured, the five frames put the ball's
+   x-centre at 28, 30, 32, 34, 36: a steady sweep left to right, with f17 in
+   the middle. Played straight through, every shake drifted the ball 8px right
+   and then snapped back to centre when the next one began - which is half of
+   why this read as choppy and none of it was the frame rate.
+
+   Run as a pendulum around f17 instead: centre, out right, across to left,
+   back to centre. It starts and ends on f17, whose art is the same centred
+   closed ball as the resting frame 3, so there is no pop into or out of a
+   shake. No `forwards` for the same reason - reverting to the base frame at
+   the end is reverting to the same picture. */
+.ball.shake { animation: ball-jiggle calc(var(--bf) * 11); }
+/* f20-f26, the catch failing: bursts open and the halves fly apart. */
+.ball.broke { animation: ball-burst calc(var(--bf) * 7) steps(7, jump-none) forwards; }
+/* f27-f31, the catch landing: 210ms of click and sparkle, and then NO
+   `forwards`. Held, the last frame sat on screen for the rest of the 1200ms
+   result beat - a full second of a darkened ball inside an expanding ring,
+   which is a flash outstaying its welcome by four times its own length.
+   Without `forwards` the animation simply ends and the element falls back to
+   `.ball`'s own resting frame 3: the plain, closed, face-on ball. Which is
+   what a caught ball looks like once it has stopped doing anything. */
+.ball.caught { animation: ball-click calc(var(--bf) * 5) steps(5, jump-none); }
+
+@keyframes ball-spin {
+  from { background-position-y: 0; }
+  to { background-position-y: calc(var(--f) * 4); }
+}
+@keyframes ball-open {
+  from { background-position-y: calc(var(--f) * 4); }
+  to { background-position-y: calc(var(--f) * 14); }
+}
+/* The pendulum. Three segments with THREE DIFFERENT step counts, which is why
+   the step function is per-keyframe rather than on the animation: `steps()` on
+   the animation itself divides the whole thing evenly, and the turns at each
+   extreme would land between frames and skip one. The percentages are the
+   frame counts - 3, 5, 3 of 11 - so every frame gets the same time. */
+@keyframes ball-jiggle {
+  0% {
+    background-position-y: calc(var(--f) * 17);
+    animation-timing-function: steps(3, jump-none);
+  }
+  27% {
+    background-position-y: calc(var(--f) * 19);
+    animation-timing-function: steps(5, jump-none);
+  }
+  73% {
+    background-position-y: calc(var(--f) * 15);
+    animation-timing-function: steps(3, jump-none);
+  }
+  100% { background-position-y: calc(var(--f) * 17); }
+}
+@keyframes ball-burst {
+  from { background-position-y: calc(var(--f) * 20); }
+  to { background-position-y: calc(var(--f) * 26); }
+}
+@keyframes ball-click {
+  from { background-position-y: calc(var(--f) * 27); }
+  to { background-position-y: calc(var(--f) * 31); }
+}
+
+/* No `rotate()` any more: the ball turns because its own frames turn it, and
+   rotating the element as well spun the spin. */
+@keyframes ball-arc {
+  0%   { transform: translate(-100%, 80%) scale(.4); opacity: 0; }
+  12%  { opacity: 1; }
+  55%  { transform: translate(-30%, -34%) scale(.85); }
+  100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+/* Four bounces of decreasing height, as pokeball.c does it. */
+@keyframes ball-drop {
+  0%   { transform: translateY(0); }
+  30%  { transform: translateY(30%); }
+  43%  { transform: translateY(15%); }
+  56%  { transform: translateY(30%); }
+  66%  { transform: translateY(21%); }
+  75%  { transform: translateY(30%); }
+  83%  { transform: translateY(26%); }
+  90%  { transform: translateY(30%); }
+  95%  { transform: translateY(28.5%); }
+  100% { transform: translateY(30%); }
+}
+/* `ball-wobble` and a transform-based `ball-click` lived here and are gone:
+   the drawn frames do both now. `ball-click` had to go rather than merely
+   stop being used - it was DEFINED TWICE once the frame version arrived, and
+   the later definition wins, so this one was quietly overriding the new one
+   and the catch played a scale-pop over frame 27. A duplicate @keyframes name
+   fails silently in exactly this direction. */
+
+/* The catch burst - three rings, seven stars and six glints thrown outward in
+   CSS - used to live here and is gone.
+
+   It was drawn for a static ball, where nothing else on screen marked the
+   moment. The sprite sheet's last five frames ARE that moment: a gold click
+   and its own expanding rings and sparkles, drawn by the artist to sit on the
+   ball. Running both put two sets of stars over one event at two different
+   frame rates, which is most of what made the catch look unsteady. */
+
+
+/* Success is announced on the Pokémon, not in a corner. */
+/* Top right, opposite the nameplate: centred, it lands on the Pokemon's face. */
+.shout {
+  position: absolute; top: 4%; right: 3%;
+  display: grid; gap: 3px; justify-items: center; white-space: nowrap;
+  padding: 1.6cqw 2.6cqw 1.4cqw; z-index: 6;
+  background: var(--canopy); color: var(--paper); border-radius: 12px;
+  box-shadow: 0 4px 0 rgba(20, 50, 34, .35);
+  font-family: var(--pixel); font-size: 1.7cqw; letter-spacing: .05em;
+  animation: shout-in 420ms cubic-bezier(.2, 1.5, .4, 1) both;
+}
+.shout b { font-size: 2.4cqw; font-weight: 400; }
+.shout .lv { color: #ffe57a; }
+@keyframes shout-in {
+  from { transform: translateY(-20px) scale(.85); opacity: 0; }
+}
+
+.nameplate {
+  position: absolute; top: 4%; left: 3%;
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 8px 13px 7px;
+  background: var(--surface); border: 3px solid var(--canopy);
+  border-radius: 11px; box-shadow: 0 3px 0 rgba(47, 107, 76, .3);
+}
+.np-name { font-family: var(--display); font-weight: 600; font-size: 17px; font-size: 3.2cqw; }
+.np-lv { font-family: var(--pixel); font-size: 10px; font-size: 1.7cqw; color: var(--ink-soft); }
+.np-types { display: flex; gap: 4px; }
+.np-gen { font-size: 1.35cqw; }
+/* Green because green already means "this one is done" here - it is what a
+   maxed trainer stat turns. White on --canopy is 6.31:1, which an 8.5px pixel
+   font needs. */
+/* Just the ball. A Poke Ball beside a name has meant "registered" since 1996,
+   so the word was the same statement twice - and on a nameplate that now also
+   carries a tier badge, the shorter of the two wins. */
+.np-caught {
+  display: inline-flex; align-items: center; line-height: 1;
+  padding: 3px; border-radius: 50%;
+  background: var(--canopy); box-shadow: 0 0 0 1.5px #1d4630 inset;
+}
+.np-caught img { width: 13px; height: 13px; image-rendering: pixelated; display: block; }
+
+/* One badge shape for all three tiers, wearing the drawn icon and its own
+   colour. They were three near-identical chips with a star glyph typed into
+   each; the icons say it faster and the word beside them is now a caption
+   rather than the whole message. */
+.np-tier {
+  display: inline-flex; align-items: center; gap: 4px; line-height: 1;
+  font-family: var(--pixel); font-size: 8.5px; font-size: 1.35cqw;
+  letter-spacing: .04em; padding: 3px 7px 2px; border-radius: 5px;
+}
+.np-tier .mark { width: 14px; height: 14px; }
+.np-origin { color: #4a3208; background: linear-gradient(160deg, #f2ddab, #cfa243);
+             box-shadow: 0 0 0 1.5px #8a6420 inset; }
+.np-shiny  { color: #3a2a05; background: linear-gradient(160deg, #ffe9a8, var(--gold));
+             box-shadow: 0 0 0 1.5px #7a4d0d inset;
+             animation: shiny-pulse 1.5s ease-in-out infinite; }
+.np-holo   { color: #2c1442; background: linear-gradient(112deg, #ffd9f2, #9be8ff 45%, #d7c2ff);
+             box-shadow: 0 0 0 1.5px #7a4fa8 inset;
+             animation: holo-pulse 2.4s ease-in-out infinite; }
+.np-astral { color: #eaf3ff; background: linear-gradient(160deg, #4a3fb0, #1b1550);
+             box-shadow: 0 0 0 1.5px #8f7dff inset, 0 0 8px rgba(130, 110, 255, .55);
+             animation: astral-pulse 2.1s ease-in-out infinite; }
+@keyframes shiny-pulse { 50% { filter: brightness(1.22); } }
+@keyframes holo-pulse { 50% { filter: saturate(1.45) brightness(1.12); } }
+@keyframes astral-pulse {
+  50% { box-shadow: 0 0 0 1.5px #b9aaff inset, 0 0 13px rgba(150, 130, 255, .8); }
+}
+
+/* ---- the shiny twinkle -------------------------------------------------
+   GBA-era shiny: a few small four-point stars that pop in, swell, twinkle and
+   go, near the upper left, upper right and lower sides. White with a pale gold
+   tint. Not a glow - a glow is a modern effect and would sit on the sprite like
+   a filter; these are discrete sparks that read as drawn frames.
+
+   `steps()` on the scale is what makes it feel low-frame. Eased, it slides like
+   a CSS animation; in four steps it pops like sprite art. */
+.shiny-spark, .astral-fx { position: absolute; inset: 0; pointer-events: none; }
+
+.shiny-spark i {
+  position: absolute; width: 9px; height: 9px;
+  background: #fff;
+  /* A four-point star, so it never has to be an image. */
+  clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
+  box-shadow: 0 0 4px rgba(255, 226, 150, .95);
+  opacity: 0; transform: scale(.3);
+  animation: spark 1.8s steps(4, end) infinite;
+}
+.shiny-spark i:nth-child(1) { top: 10%; left: 16%; animation-delay: 0s; }
+.shiny-spark i:nth-child(2) { top: 20%; right: 12%; animation-delay: .3s; width: 7px; height: 7px; }
+.shiny-spark i:nth-child(3) { bottom: 24%; left: 8%; animation-delay: .62s; }
+.shiny-spark i:nth-child(4) { bottom: 12%; right: 18%; animation-delay: .95s; width: 7px; height: 7px; }
+.shiny-spark i:nth-child(5) { top: 46%; left: 46%; animation-delay: 1.25s; width: 6px; height: 6px; }
+@keyframes spark {
+  0%, 62%, 100% { opacity: 0; transform: scale(.3); }
+  8% { opacity: 1; transform: scale(1.35); }
+  22% { opacity: 1; transform: scale(.95); }
+  34% { opacity: .85; transform: scale(1.15); }
+  50% { opacity: 0; transform: scale(.5); }
+}
+
+/* An Astral is made of starlight, and that is the whole static identity.
+
+   It needed one: Origin took the Gen 1 artwork and shiny has the alternate
+   palette, so Astral was left wearing the ordinary sprite - which is fine in an
+   encounter where an aura is turning behind it, and invisible in a 52px Dex
+   cell where nothing is. A blue-silver **duotone** solves it everywhere at once
+   and costs nothing: no fourth sprite set, no requests, one GPU filter.
+
+   Duotone rather than a hue shift, which was tried and rejected - rotating hue
+   makes a green Charizard, and a wrong colour reads as a rendering fault. A
+   duotone throws the palette away entirely and rebuilds it on one ramp, so the
+   creature is recognised by its shape, which is what pixel art is carried by.
+
+   The chain is the browser's way of getting there: grayscale to luminance,
+   sepia for a ramp, hue-rotate to swing that ramp from brown to blue, then
+   saturate and lift. */
+.sprite-astral {
+  /* `!important` is load-bearing, not laziness. `.mon` runs `mon-appear`, whose
+     keyframes set `filter: none` and whose fill is `both` - and an animation
+     beats a plain declaration in the cascade, so the duotone applied in the Dex
+     (no animation there) and silently vanished the moment an Astral landed in
+     an encounter. `!important` is the one thing that outranks an animation.
+     The cost is that `mon-absorb`'s brightness ramp no longer whitens an Astral
+     as it is caught; it still shrinks and still fades on opacity, and a starlit
+     Pokemon staying starlit while it goes into the ball is arguably the better
+     reading anyway. */
+  filter: grayscale(1) sepia(1) hue-rotate(186deg) saturate(2.6) brightness(1.14)
+          !important;
+}
+
+/* ---- Holo: the finish, not the picture --------------------------------
+   The artwork is untouched. That is the whole tier - Origin changes the
+   drawing, Shiny changes the palette, Astral changes what the thing is made
+   of, and Holo changes only the SURFACE over it.
+
+   Two pieces, and the split is the same one Astral makes. The FILTER has to
+   carry the tier on its own, because a Dex cell is a single <img> with nowhere
+   to hang a layer. The LAYER is the part that appears only where there is a
+   container to put it in - the encounter, and the Forms strip.
+
+   What the filter must NOT do is rotate hue. A full rotation is the "Prism"
+   treatment that was tried and rejected: it is unmistakable and it reads as a
+   rendering fault, because a green Charizard is what a broken palette looks
+   like. So the iridescence comes from two drop-shadows in different hues,
+   which rim the art in foil colours without repainting a pixel of it. */
+.sprite-holo {
+  /* `!important` for the same reason `.sprite-astral` carries one: `.mon` runs
+     `mon-appear`, whose keyframes set `filter: none` with `fill-mode: both`,
+     and an animation beats a plain declaration. Without it the foil rim
+     applies in the Dex, where nothing is animating, and vanishes the instant a
+     Holo lands in an encounter. */
+  filter: saturate(1.85) contrast(1.1) brightness(1.05)
+          drop-shadow(0 0 2px rgba(196, 128, 255, .85))
+          drop-shadow(0 0 5px rgba(116, 226, 255, .6)) !important;
+}
+
+/* The sheen. Masked to `--art` - the sprite's own PNG - the same trick the
+   Astral sky and the Origin gleam use, so the band follows the creature's
+   shape. Unmasked it is a rainbow rectangle sliding over the grass behind it.
+   `color-dodge` rather than `overlay` because foil does not paint over ink, it
+   throws light back off it. */
+.holo-foil {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  mix-blend-mode: color-dodge; opacity: .8;
+  background-image: linear-gradient(112deg,
+    transparent 32%, rgba(255, 90, 160, .85) 40%, rgba(255, 236, 120, .85) 46%,
+    rgba(110, 255, 205, .85) 52%, rgba(120, 170, 255, .85) 58%, transparent 67%);
+  background-size: 300% 100%; background-repeat: no-repeat;
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+  animation: holo-sweep 3.6s linear infinite;
+}
+@keyframes holo-sweep {
+  from { background-position: 220% 0; }
+  to { background-position: -80% 0; }
+}
+
+/* A scatter of stars inside the silhouette. `screen` so they sit in the
+   creature's own light rather than on top of it, and two gradient layers at
+   different sizes so the pattern never reads as a grid. Masked to `--art`, the
+   same trick the Origin reveal uses - it is the sprite's outline, so the sky is
+   inside the Pokemon and nowhere else. */
+.astral-sky {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  mix-blend-mode: screen; opacity: .85;
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,.95) 0 .7px, transparent 1.2px),
+    radial-gradient(circle, rgba(190,225,255,.8) 0 .6px, transparent 1.1px);
+  background-size: 17px 15px, 11px 23px;
+  background-position: 3px 1px, 8px 6px;
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+  animation: astral-sky 3.4s ease-in-out infinite;
+}
+@keyframes astral-sky { 50% { opacity: .5; } }
+
+/* ---- Astral ------------------------------------------------------------
+   The rarest tier, so it gets the whole cosmic reading: a deep blue and violet
+   aura BEHIND the sprite, white / cyan / lavender star particles around it, a
+   thin orbital arc that sweeps once and comes round again, and a couple of
+   constellation specks. Everything is transform and opacity, so it composites
+   on the GPU and costs nothing - and it is one sprite on screen, not a field
+   of them.
+
+   The aura sits behind (z-index below the sprite) on purpose: in front, it
+   washes the artwork out, and the artwork is the thing being collected. */
+.astral-aura {
+  position: absolute; inset: -14%; z-index: 0; pointer-events: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 52%, rgba(150, 190, 255, .34) 0 22%,
+                    rgba(96, 92, 220, .30) 34%, rgba(58, 34, 140, .20) 52%, transparent 72%);
+  animation: astral-breathe 3.2s ease-in-out infinite;
+}
+@keyframes astral-breathe {
+  0%, 100% { opacity: .68; transform: scale(.97); }
+  50% { opacity: 1; transform: scale(1.03); }
+}
+
+.astral-fx i {
+  position: absolute; width: 8px; height: 8px;
+  clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
+  opacity: 0; transform: scale(.3);
+  animation: spark 2.1s steps(4, end) infinite;
+}
+/* White, cyan and lavender, the three the brief asks for - assigned by index
+   so the mix is even rather than random. */
+.astral-fx i:nth-child(2) { top: 8%; left: 20%; background: #fff; box-shadow: 0 0 5px #cfe6ff; animation-delay: 0s; }
+.astral-fx i:nth-child(3) { top: 16%; right: 10%; background: #b9f2ff; box-shadow: 0 0 5px #7fe3ff; animation-delay: .28s; }
+.astral-fx i:nth-child(4) { top: 44%; left: 4%; background: #d8c6ff; box-shadow: 0 0 5px #b39cff; animation-delay: .55s; width: 7px; height: 7px; }
+.astral-fx i:nth-child(5) { bottom: 20%; right: 6%; background: #fff; box-shadow: 0 0 5px #cfe6ff; animation-delay: .82s; width: 7px; height: 7px; }
+.astral-fx i:nth-child(6) { bottom: 8%; left: 22%; background: #b9f2ff; box-shadow: 0 0 5px #7fe3ff; animation-delay: 1.1s; }
+/* Two constellation specks: smaller, dimmer, slower. */
+.astral-fx i:nth-child(7) { top: 30%; right: 26%; background: #e9e2ff; width: 5px; height: 5px; animation-delay: 1.4s; animation-duration: 2.9s; }
+.astral-fx i:nth-child(8) { bottom: 36%; left: 30%; background: #e9e2ff; width: 5px; height: 5px; animation-delay: 1.85s; animation-duration: 2.9s; }
+
+/* The orbital arc. A ring with three of its four borders transparent, so what
+   sweeps round is an arc rather than a circle, tilted so it reads as an orbit
+   rather than a spinner. */
+.astral-orbit {
+  position: absolute; inset: 6%; border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: rgba(190, 225, 255, .9);
+  border-right-color: rgba(150, 130, 255, .5);
+  transform: rotate(0deg) rotateX(66deg);
+  animation: astral-orbit 2.6s linear infinite;
+}
+@keyframes astral-orbit {
+  0% { transform: rotate(0deg) rotateX(66deg); opacity: 0; }
+  12%, 78% { opacity: .95; }
+  100% { transform: rotate(360deg) rotateX(66deg); opacity: 0; }
+}
+
+/* The sprite has to sit above its own aura. */
+.mon-slot .mon { position: relative; z-index: 1; }
+
+/* ---- Origin: restored, not revealed ------------------------------------
+   The brief is the opposite of a shiny's: nothing flies outward. Pale-gold
+   particles fall INWARD, the creature forms out from its own centre, an
+   ancient seal turns behind it, a gleam sweeps up the body, and amber embers
+   drift off. It plays ONCE - a restoration that looped would be a machine -
+   and only the embers keep going, so a player who takes ten seconds choosing a
+   ball still has something alive on screen.
+
+   Two layers are masked to `--art`, the sprite's own PNG: the silhouette and
+   the gleam. That is what makes them follow the creature's outline instead of
+   being a rectangle laid over it, and it is why Sprite.jsx exports the URL. */
+.origin-fx { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+
+/* The sprite forms from the middle out. `mask-size` is the animatable part of
+   a radial mask, so the reveal is a growing disc rather than a fade - which is
+   what "reconstructing from the centre outward" actually looks like. */
+.sprite-origin.mon {
+  -webkit-mask-image: radial-gradient(circle at 50% 52%, #000 58%, transparent 72%);
+          mask-image: radial-gradient(circle at 50% 52%, #000 58%, transparent 72%);
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  /* This replaces `.mon`'s whole animation list, so `mon-idle` has to be named
+     again or an Origin forms and then stands perfectly still while every other
+     Pokemon breathes. The reveal is its entrance; `mon-appear` is not wanted. */
+  animation: origin-form 1250ms steps(7, end) forwards,
+             mon-idle 2.6s ease-in-out 1300ms infinite;
+}
+@keyframes origin-form {
+  0%   { -webkit-mask-size: 0% 0%; mask-size: 0% 0%; filter: brightness(.25) saturate(.2); }
+  55%  { -webkit-mask-size: 60% 60%; mask-size: 60% 60%; filter: brightness(.7) saturate(.6); }
+  100% { -webkit-mask-size: 260% 260%; mask-size: 260% 260%; filter: none; }
+}
+
+/* The faint silhouette it forms out of: a flat wash masked to the outline,
+   fading as the real art takes over. */
+.origin-ghost {
+  position: absolute; inset: 0;
+  background: #f2e3b6;
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+  opacity: .55;
+  animation: origin-ghost 1250ms steps(5, end) forwards;
+}
+@keyframes origin-ghost {
+  0%, 30% { opacity: .55; }
+  100% { opacity: 0; }
+}
+
+/* The gleam: a narrow bright band travelling UP the body, clipped to the body.
+   `screen` so it brightens the art rather than painting over it. */
+.origin-gleam {
+  position: absolute; inset: 0; mix-blend-mode: screen; opacity: 0;
+  background: linear-gradient(0deg,
+    transparent 0 38%, rgba(255, 246, 214, .95) 46% 54%, transparent 62% 100%);
+  background-size: 100% 300%;
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+  animation: origin-gleam 950ms steps(6, end) 1050ms forwards;
+}
+@keyframes origin-gleam {
+  0% { opacity: 0; background-position: 50% 100%; }
+  10%, 60% { opacity: 1; }
+  100% { opacity: 0; background-position: 50% 0%; }
+}
+
+/* Particles falling inward. Each starts out at its own angle - set by the
+   index below - and converges on the middle. */
+.origin-fx i {
+  position: absolute; left: 50%; top: 52%; width: 6px; height: 6px;
+  margin: -3px 0 0 -3px;
+  background: #fff5cf;
+  clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
+  box-shadow: 0 0 4px rgba(240, 205, 120, .9);
+  opacity: 0;
+  animation: origin-fall 1100ms steps(6, end) forwards;
+}
+.origin-fx i:nth-child(3)  { --x: -54px; --y: -36px; animation-delay: 0ms; }
+.origin-fx i:nth-child(4)  { --x:  50px; --y: -42px; animation-delay: 70ms; }
+.origin-fx i:nth-child(5)  { --x: -62px; --y:  18px; animation-delay: 140ms; }
+.origin-fx i:nth-child(6)  { --x:  58px; --y:  26px; animation-delay: 210ms; }
+.origin-fx i:nth-child(7)  { --x:  -8px; --y: -58px; animation-delay: 280ms; }
+.origin-fx i:nth-child(8)  { --x:  14px; --y:  56px; animation-delay: 350ms; }
+.origin-fx i:nth-child(9)  { --x: -40px; --y:  50px; animation-delay: 420ms; }
+.origin-fx i:nth-child(10) { --x:  44px; --y: -12px; animation-delay: 490ms; }
+@keyframes origin-fall {
+  0%   { opacity: 0; transform: translate(var(--x), var(--y)) scale(.5); }
+  20%  { opacity: 1; }
+  85%  { opacity: 1; transform: translate(0, 0) scale(1.1); }
+  100% { opacity: 0; transform: translate(0, 0) scale(.3); }
+}
+
+/* Amber embers drifting up afterwards - the only part that loops. */
+.origin-fx u {
+  position: absolute; width: 4px; height: 4px; border-radius: 50%;
+  background: #ffb23e; box-shadow: 0 0 5px rgba(255, 170, 60, .8);
+  opacity: 0; animation: origin-ember 2600ms ease-out infinite;
+}
+.origin-fx u:nth-child(11) { left: 34%; bottom: 22%; animation-delay: 1200ms; }
+.origin-fx u:nth-child(12) { left: 58%; bottom: 16%; animation-delay: 2000ms; }
+.origin-fx u:nth-child(13) { left: 46%; bottom: 28%; animation-delay: 2800ms; }
+@keyframes origin-ember {
+  0%   { opacity: 0; transform: translateY(0) scale(.6); }
+  12%  { opacity: .95; }
+  70%  { opacity: .6; }
+  100% { opacity: 0; transform: translateY(-46px) scale(1); }
+}
+
+/* The seal: two thin golden rings and a band of tick marks, behind the sprite.
+   It arrives once the creature is whole, expands a little, and goes. */
+.origin-seal {
+  position: absolute; inset: 9%; z-index: 0; border-radius: 50%;
+  border: 2px solid rgba(232, 197, 106, .85);
+  box-shadow: 0 0 7px rgba(240, 205, 120, .22);
+  opacity: 0;
+  animation: origin-seal 1700ms steps(7, end) 1000ms forwards;
+}
+.origin-seal::before {
+  content: ""; position: absolute; inset: 13%; border-radius: 50%;
+  border: 1.5px solid rgba(242, 214, 140, .6);
+}
+/* The geometric markings: twelve ticks on a ring, from one gradient. */
+.origin-seal::after {
+  content: ""; position: absolute; inset: -7%; border-radius: 50%;
+  background: repeating-conic-gradient(
+    rgba(242, 214, 140, .9) 0 2.5deg, transparent 2.5deg 30deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 45%, #000 45% 52%, transparent 52%);
+          mask: radial-gradient(circle, transparent 0 45%, #000 45% 52%, transparent 52%);
+}
+@keyframes origin-seal {
+  0%   { opacity: 0; transform: scale(.82) rotate(-12deg); }
+  25%  { opacity: .95; transform: scale(1) rotate(0deg); }
+  70%  { opacity: .8; }
+  100% { opacity: 0; transform: scale(1.22) rotate(14deg); }
+}
+
+/* In the Box and the Dex a shiny is one mark on a crowded row, so it is a
+   corner star rather than a word. */
+/* ---- variant marks ------------------------------------------------------
+   Drawn icons now, normalised to one canvas by tools/build_marks.py and shown at
+   half their native size so `pixelated` has whole pixels to work with. They were
+   CSS shapes - a ring, a star, a diamond - which was defensible at 8px and
+   stopped being so when the tile grew. */
+.cell-marks {
+  position: absolute; left: 4px; bottom: 3px;
+  display: flex; gap: 2px; pointer-events: none;
+}
+.mark { image-rendering: pixelated; display: block; }
+
+/* Every variant of one species - the only mark in the game that cannot be had
+   by simply playing long enough. */
+.cell-full {
+  position: absolute; right: 3px; top: 3px; pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(255, 206, 110, .8));
+}
+.cell.caught.full { border-color: var(--gold); background: #fdf4dc; }
+
+.bx-rare {
+  position: absolute; font-size: 11px; line-height: 1;
+  color: var(--gold); text-shadow: 0 0 3px #fff, 0 1px 0 #7a4d0d;
+  pointer-events: none;
+}
+.bx-rare.astral {
+  color: #7d6bff; text-shadow: 0 0 4px #fff, 0 1px 0 #2a1f6b;
+}
+.bx-rare.origin {
+  color: #c8942f; text-shadow: 0 0 3px #fff, 0 1px 0 #5d4211;
+}
+.bx-rare.holo {
+  color: #b06bff; text-shadow: 0 0 4px #fff, 0 1px 0 #3c1a63;
+}
+.bx-rare { left: 40px; top: 8px; font-family: var(--pixel); font-size: 9px; }
+/* One badge, used everywhere a type is named. It was sized in cqw, which only
+   resolves inside the battle overlay, so it could not be reused in the rail -
+   which is why the map tag and the travel list printed types as prose. Plain px
+   by default, container units only where there is a container. */
+.types { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.type {
+  display: inline-block; line-height: 1;
+  font-family: var(--pixel); font-size: 8.5px;
+  letter-spacing: .04em; padding: 4px 6px 3px; border-radius: 5px;
+  color: #fff; background: var(--ink-soft);
+}
+.battle .type { font-size: 1.35cqw; }
+.t-normal { background: #9b9b73; }
+.t-flying { background: #8f9fe8; }
+.t-bug { background: #9aa620; }
+.t-poison { background: #9b53a0; }
+.t-grass { background: #68b04c; }
+.t-psychic { background: #e35f8c; }
+.t-fighting { background: #b53b2c; }
+.t-ground { background: #c8a54a; }
+.t-rock { background: #a89440; }
+.t-fire { background: #e6802f; }
+.t-water { background: #5a8fdd; }
+.t-electric { background: #dcb32a; }
+.t-ice { background: #79cfcf; }
+.t-ghost { background: #6a5a9b; }
+.t-dragon { background: #6a3ae8; }
+.t-dark { background: #6a5648; }
+.t-steel { background: #9a9ab5; }
+.t-fairy { background: #d98fa8; }
+/* Not types, but they stand in the same row of badges and have to be read the
+   same way: neutral for "no filter", and the gold the game already spends on
+   rarity for the legendaries. Gold takes dark text - white on it is the one
+   pairing in this palette that fails to read. */
+.t-any { background: var(--ink-faint); }
+.t-legend { background: var(--gold); color: #3a2a05; }
+/* Not a type - the Flower Clearing has no theme but scarcity. */
+/* Not a type, so not a type colour - see Gen.jsx. This replaces .t-rare, the
+   Flower Clearing's pseudo-type badge, which went with the map. */
+.gen {
+  display: inline-block; line-height: 1;
+  font-family: var(--pixel); font-size: 8.5px;
+  letter-spacing: .04em; padding: 4px 6px 3px; border-radius: 5px;
+  /* Sand with a gold edge, not gold with ink on it. Both inks on --gold measure
+     under 4.5:1 (3.16 dark, 3.85 white) and this chip is an 8.5px pixel font;
+     ink on --sand is 8.34:1 and still reads as the odd one out beside the
+     saturated type chips, which is the whole job. */
+  color: var(--ink); background: var(--sand);
+  box-shadow: inset 0 0 0 1.5px var(--gold);
+}
+
+/* Message on the left, RUN on the right, one row. The balls moved out to the
+   rail and the box gave back the height they were using, which is most of the
+   point of moving them: the Pokemon is what the screen is for. */
+.textbox {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 2.2cqw 3cqw 2cqw;
+  background: var(--surface); border-top: 4px solid var(--canopy);
+  min-height: 16%;
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; column-gap: 2.4cqw;
+}
+.tb-msg {
+  font-family: var(--pixel); line-height: 1.55; color: var(--ink);
+  margin: 0; font-size: 12px; font-size: 2.05cqw;
+}
+.tb-hint {
+  font-family: var(--pixel); color: var(--ink-faint); letter-spacing: .06em;
+  font-size: 9px; font-size: 1.5cqw; text-align: right;
+}
+
+.tb-warn {
+  grid-column: 1 / -1;
+  font-family: var(--pixel); font-size: 1.6cqw; color: var(--path);
+  margin: 1.2cqw 0 0;
+}
+
+/* ---------- side rail ---------- */
+/* Sizes here are deliberately generous. The pixel face is charming on short
+   labels but unreadable as body text, so anything you actually read - species
+   names, item descriptions - uses the body face instead. */
+.rail {
+  background: var(--surface-2); border: 2px solid var(--line-firm);
+  border-radius: 14px; padding: 12px; box-shadow: 0 2px 0 var(--line-firm);
+}
+/* Five tabs in a narrow rail, so each is a glyph over a short label rather than
+   a word fighting for width. The badge is the point of the redesign: a count is
+   information, a pulsing dot means "there is something here you can act on", and
+   it is the same dot on every tab so it only has to be learnt once. */
+.tabs { display: flex; gap: 5px; margin-bottom: 12px; }
+.tab {
+  position: relative;
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-family: var(--pixel); font-size: 9.5px; letter-spacing: .04em;
+  padding: 8px 2px 7px;
+  border: 2px solid var(--line-firm); border-radius: 11px;
+  background: var(--surface); color: var(--ink-faint); cursor: pointer;
+}
+/* The icon is a MASK filled with the tab's own text colour, so it is dark on
+   an idle tab and pale on the active one without a second file or a filter.
+   32px of art shown at 16 - whole halves, so a 2x display gets it at 1:1. */
+.tab-glyph {
+  width: 16px; height: 16px;
+  background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+          mask: var(--icon) center / contain no-repeat;
+}
+.tab-name { line-height: 1; }
+.tab:hover { color: var(--path); border-color: var(--path); }
+.tab.on {
+  background: var(--canopy); border-color: var(--canopy); color: var(--paper);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .18);
+}
+/* Rides the corner so it never squeezes the label. Only ever present when the
+   tab has something to act on, so it is always the one colour that means so. */
+.tab em {
+  position: absolute; top: -6px; right: -4px;
+  font-style: normal; font-size: 9px; line-height: 1;
+  min-width: 16px; padding: 3px 4px 2px;
+  border-radius: 99px; border: 2px solid var(--paper);
+  background: var(--gold); color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.tab.on em { border-color: var(--canopy); }
+/* A slow pulse, so it reads as waiting rather than alarming. */
+.tab.urgent em { animation: tab-ping 1.8s ease-in-out infinite; }
+@keyframes tab-ping {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.22); }
+}
+
+/* ------------------------------------------------------------------ trainer */
+
+.tr-points {
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 11px 13px; margin-bottom: 10px;
+  border-radius: 11px; border: 2px dashed var(--line-firm);
+  font-size: 13px; color: var(--ink-faint);
+}
+.tr-points.has {
+  border-style: solid; border-color: var(--gold);
+  background: #fdf6e4; color: var(--ink);
+  animation: ready-glow 2.6s ease-in-out infinite;
+}
+.tr-points b {
+  font-family: var(--display); font-size: 22px; font-weight: 600; color: var(--gold);
+}
+/* The warning the confirm dialog used to carry, said once instead of every click. */
+.tr-points i { font-style: normal; color: var(--ink-faint); font-size: 12px; }
+
+.trscroll {
+  max-height: 430px; overflow-y: auto; padding-right: 4px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.trlist { display: grid; gap: 7px; }
+.trrow {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  grid-template-areas: "glyph main add" "pips pips pips";
+  gap: 4px 10px; align-items: center;
+  padding: 10px 12px;
+  border-radius: 11px; border: 2px solid var(--line);
+  background: var(--surface);
+}
+.trrow.maxed { border-color: var(--canopy); background: #f2f9f0; }
+/* A spend is instant now, so it has to be visible: the row it landed on lights
+   up for a beat and its new pip lands with it. */
+.trrow.lit { animation: tr-spend 700ms ease-out; }
+@keyframes tr-spend {
+  0% { border-color: var(--gold); background: #fdf0d2; transform: translateX(2px); }
+  40% { border-color: var(--gold); background: #fdf6e6; }
+  100% { transform: none; }
+}
+.trrow.lit .tr-pips i.on:last-of-type,
+.trrow.lit .tr-pips i:not(.on) + i.on { animation: pip-pop 700ms ease-out; }
+@keyframes pip-pop {
+  0% { transform: scaleY(2.4); }
+  60% { transform: scaleY(1); }
+}
+.tr-glyph { grid-area: glyph; font-size: 19px; color: var(--canopy); text-align: center; }
+.tr-main { grid-area: main; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tr-name {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--display); font-weight: 600; font-size: 16px; color: var(--ink);
+}
+.tr-name em {
+  font-style: normal; font-family: var(--pixel); font-size: 9.5px;
+  color: var(--ink-faint); font-variant-numeric: tabular-nums;
+}
+.trrow.maxed .tr-name em { color: var(--canopy); }
+.tr-effect { font-family: var(--pixel); font-size: 10px; color: var(--gold); }
+/* What the next rank buys, shown before the click rather than in a dialog after
+   it. On its own line and dimmer than the current value, so the two never read
+   as one number and neither wraps through the middle of a phrase. */
+.tr-effect b { display: block; font-weight: 400; color: var(--ink-faint); }
+.trrow.maxed .tr-effect { color: var(--canopy); }
+.tr-blurb { font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
+
+.tr-pips { grid-area: pips; display: flex; gap: 3px; margin-top: 3px; }
+.tr-pips i {
+  flex: 1; height: 5px; border-radius: 2px; background: var(--line);
+  transition: background 180ms ease;
+}
+.tr-pips i.on { background: var(--gold); }
+.trrow.maxed .tr-pips i.on { background: var(--canopy); }
+
+/* The steps counter borrows the money counter's floating delta, so a parcel
+   lands in a shape the eye already knows. */
+.tb-stat.steps .deltas em { color: var(--canopy); }
+
+/* SAVE FILE. Two buttons that are peers, so they are the same size and sit on
+   one row - export is not the "primary" of the pair, and styling it as one
+   would suggest importing is the risky half when the opposite is true. */
+.trsave { padding: 10px 12px 12px; display: grid; gap: 9px; }
+.ts-why { margin: 0; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
+.ts-row { display: flex; gap: 8px; }
+.ts-btn {
+  flex: 1; text-align: center; cursor: pointer;
+  font-family: var(--pixel); font-size: 11px; padding: 10px 8px 8px;
+  border: 2px solid var(--canopy); border-radius: 9px;
+  background: var(--surface); color: var(--canopy);
+  transition: background 140ms ease, color 140ms ease;
+}
+.ts-btn:hover:not(.off) { background: var(--canopy); color: #fff; }
+.ts-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+/* A label wrapping a hidden input: the file picker's own button cannot be
+   styled, and a bare input reads as a form field in a panel of buttons. */
+.ts-file { position: relative; overflow: hidden; }
+.ts-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.ts-file.off { opacity: .45; cursor: default; }
+.ts-note {
+  margin: 0; font-family: var(--pixel); font-size: 10px; line-height: 1.5;
+  color: var(--path);
+}
+
+.tr-add {
+  grid-area: add;
+  font-family: var(--pixel); font-size: 12px; padding: 9px 12px 7px;
+  border: 2px solid var(--gold); border-radius: 9px;
+  background: var(--gold); color: #fff; cursor: pointer;
+  box-shadow: 0 3px 0 #8a5a12;
+}
+.tr-add:disabled {
+  background: var(--surface-2); border-color: var(--line-firm);
+  color: var(--ink-faint); box-shadow: none; opacity: .6; cursor: default;
+}
+.tr-add:not(:disabled):active { box-shadow: 0 1px 0 #8a5a12; }
+
+.tr-head { margin-top: 16px; }
+.trkeys { display: grid; gap: 6px; }
+.trkey {
+  display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center;
+  padding: 9px 12px; border-radius: 11px;
+  border: 2px solid var(--line); background: var(--surface);
+}
+.trkey.locked { opacity: .5; }
+.trkey img { width: 30px; height: 30px; image-rendering: pixelated; }
+.tk-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tk-name { font-family: var(--display); font-weight: 600; font-size: 15px; }
+.tk-blurb { font-size: 11.5px; color: var(--ink-soft); line-height: 1.4; }
+.tk-toggle {
+  font-family: var(--pixel); font-size: 10px; padding: 8px 10px 6px;
+  border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
+}
+.tk-toggle.on { background: var(--canopy); border-color: var(--canopy); color: var(--paper); }
+
+/* A hint that turns into a real button when there is something to press. */
+.hint-act {
+  font: inherit; color: var(--ink); cursor: pointer;
+  border: 2px solid var(--path); border-radius: 9px;
+  background: var(--path-soft); padding: 5px 14px 4px;
+}
+.hint-act:hover { filter: brightness(1.03); }
+.hint-act b { color: var(--path); }
+.hint kbd {
+  font: inherit; padding: 1px 5px; margin: 0 1px;
+  border: 1px solid var(--line-firm); border-radius: 4px;
+  background: var(--surface); color: var(--ink-soft);
+}
+
+.panel-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  font-family: var(--pixel); font-size: 11px; color: var(--ink-faint);
+  letter-spacing: .04em; margin-bottom: 11px;
+}
+.panel-head span:last-child { color: var(--ink); text-align: right; }
+.empty { font-size: 15px; color: var(--ink-faint); text-align: center; padding: 26px 0; }
+
+.bigbtn {
+  display: block; width: 100%; margin-bottom: 10px;
+  font-family: var(--pixel); font-size: 12px; padding: 12px 10px 10px;
+  border: 3px solid var(--path); border-radius: 11px;
+  background: var(--path); color: #fff6f3; cursor: pointer;
+  box-shadow: 0 3px 0 #86524a;
+}
+.bigbtn:hover:not(:disabled) { transform: translateY(-1px); }
+.bigbtn:disabled {
+  background: var(--surface); border-color: var(--line-firm);
+  color: var(--ink-faint); box-shadow: none; cursor: default;
+}
+/* Nothing to sell is not worth a full-size control. */
+.bigbtn.quiet {
+  font-size: 9.5px; padding: 7px 10px 6px; border-width: 2px;
+  border-style: dashed; margin-bottom: 8px;
+}
+
+/* ---------- dex ---------- */
+.count {
+  flex: none;
+  display: flex; align-items: baseline; gap: 7px;
+  font-family: var(--display); font-size: 26px; font-weight: 600;
+  margin-bottom: 6px;
+}
+.count span { font-size: 17px; color: var(--ink-faint); }
+/* Pushed to the right-hand end, where a percentage belongs when the count is
+   already on the left. */
+.count em {
+  margin-left: auto; font-style: normal;
+  font-family: var(--pixel); font-size: 10px; letter-spacing: .05em;
+  color: var(--path);
+}
+
+/* ---- the dex progress bar ---------------------------------------------
+   It was a 9px line with one fill, which is a loading bar, not a collection.
+   Two things were wrong with that: it was thin enough to read as a divider
+   rather than a control, and it threw away the number the Dex already knows
+   and nothing else shows - how many you have SEEN.
+
+   So it is two layers in one track. The pale fill is everything you have met;
+   the solid one is what you actually caught. The gap between them is the
+   game's whole to-do list, and it appears for free from data that was already
+   on screen a moment ago in the SHOW dropdown.
+
+   16px, an inset track and a lip on the fill: at nine it read as a hairline
+   at any distance. `overflow: hidden` on the track is what lets both fills
+   keep square inner edges and round outer ones without either being clipped
+   to the wrong shape. */
+.bar {
+  /* `flex: none` is the whole reason this ever looked like a hairline, and it
+     was true of the old 9px one too. On a wide screen `.rail > .panel` is a
+     COLUMN flex container, so every child is a flex item - and a flex item
+     with no content shrinks first when the dex grid below it wants room. The
+     bar was not 9px tall and then 16px tall; it was however many pixels were
+     left over. Nothing about the rule said so, which is why thickening it
+     alone would not have fixed it. */
+  flex: none;
+  position: relative; height: 16px; margin-bottom: 13px;
+  border-radius: 99px; overflow: hidden;
+  background: var(--line);
+  box-shadow: inset 0 2px 3px rgba(40, 60, 35, .16);
+}
+.bar i, .bar b {
+  position: absolute; left: 0; top: 0; height: 100%;
+  border-radius: 99px;
+  transition: width 420ms cubic-bezier(.2, .8, .3, 1);
+}
+/* Seen: behind, and quiet. */
+.bar b { background: var(--path-soft); }
+/* Caught: in front, with a highlight along the top so it reads as a solid
+   object in the track rather than a coloured region of it. */
+.bar i {
+  background: linear-gradient(var(--path), #8f5a52);
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .28);
+}
+/* A soft leading edge, so a bar at 3% still looks like something started. */
+.bar i::after {
+  content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: 99px; background: rgba(255, 246, 236, .5);
+}
+.bar i[style*="width: 0%"]::after { display: none; }
+/* The rows are a fixed height rather than the cells being square by
+   aspect-ratio. With `1fr` columns the cell's inline size is not known while
+   the browser is sizing rows, so the ratio cannot contribute to them: the rows
+   collapsed to the height of the cell's content - about 8px - and every cell
+   overflowed into the one below it. A definite row also gives the sprite's
+   `height: 88%` something real to resolve against. */
+/* FOUR columns, not auto-fill. A tile carries a sprite, a number, up to three
+   variant marks and a completion badge now; at the ~52px auto-fill produced
+   those were fighting for the same corner. Four fixed columns give ~76px, which
+   is enough for each of them to have a place. */
+.dexgrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 84px; gap: 7px;
+  max-height: 440px; overflow-y: auto; padding-right: 4px;
+  align-content: start;
+}
+.cell {
+  position: relative; border-radius: 8px;
+  border: 2px solid var(--line-firm); background: var(--surface);
+  display: grid; place-items: center; overflow: hidden;
+  padding: 0; cursor: pointer; font: inherit;
+}
+/* `:not(.mark)` so the rarity badges keep their own size - see Marks.jsx. */
+.cell img:not(.mark) { width: 88%; height: 88%; object-fit: contain; image-rendering: pixelated; }
+.cell-no {
+  position: absolute; bottom: 2px; right: 4px;
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
+}
+.cell.caught .cell-no { color: var(--path); }
+/* Kept for a save from before this: `unseen` no longer renders an image at
+   all, but an old build's markup should still hide it rather than spoil it. */
+.cell.unseen img { opacity: 0; }
+.cell.seen img { filter: brightness(0); opacity: .3; }
+.cell.caught { background: var(--path-soft); border-color: var(--path); }
+
+.cell:hover, .cell:focus-visible {
+  border-color: var(--canopy); outline: none; transform: translateY(-1px);
+}
+
+/* ---------- box ---------- */
+.boxlist { display: grid; gap: 6px; max-height: 400px; overflow-y: auto; padding-right: 4px; }
+.boxrow {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    "img main  count"
+    "img evo   evo"
+    "acts acts acts";
+  align-items: center;
+  gap: 2px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+/* A row with spares is what the sell button is for, so mark it. */
+.boxrow.spare { border-color: var(--path); background: var(--path-soft); }
+/* The Pokémon is the row. It was a 42px thumbnail against three lines of text
+   and a full-width button bar, so the card read as chrome with a sticker on it. */
+.boxrow img {
+  grid-area: img; width: 62px; height: 62px; align-self: center;
+  object-fit: contain; image-rendering: pixelated;
+}
+.bx-main { grid-area: main; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bx-name { font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.bx-meta { font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; }
+.bx-count {
+  grid-area: count;
+  justify-self: end;
+  font-family: var(--pixel); font-size: 14px; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+/* Short buttons. They were as tall as two lines of the text they sit under,
+   which is what made the card feel like mostly button. */
+.boxrow button {
+  font-family: var(--pixel); font-size: 10px; padding: 7px 9px 6px;
+  border: 2px solid var(--line-firm); border-radius: 8px;
+  background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
+}
+.boxrow button:hover { border-color: var(--path); color: var(--path); background: var(--surface); }
+
+.tier {
+  font-family: var(--pixel); font-size: 9px; padding: 3px 6px 2px;
+  border-radius: 5px; color: #fff;
+}
+.tier-C { background: #6f9e7c; }
+.tier-B { background: #5a8fdd; }
+.tier-A { background: var(--path); }
+.tier-S { background: var(--gold); }
+
+/* ---------- travel ---------- */
+.arealist { display: grid; gap: 6px; max-height: 430px; overflow-y: auto; padding-right: 4px; }
+.arearow {
+  /* Explicit placement: the button auto-placed into column 1 and stretched. */
+  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto;
+  gap: 3px 12px; align-items: center; text-align: left;
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--surface); border: 2px solid var(--line);
+  cursor: pointer; font: inherit;
+}
+.arearow:hover:not(:disabled) { border-color: var(--path); transform: translateY(-1px); }
+.arearow.here { background: var(--path-soft); border-color: var(--path); cursor: default; }
+.arearow:disabled { cursor: default; }
+.ar-name { grid-column: 1; grid-row: 1; font-size: 16px; font-weight: 700; }
+.ar-types { grid-column: 1; grid-row: 2; }
+.arearow em {
+  grid-column: 2; grid-row: 1 / span 2; justify-self: end; font-style: normal;
+  font-family: var(--pixel); font-size: 10px; color: var(--ink-faint);
+  padding: 7px 9px 6px; border: 2px solid var(--line-firm); border-radius: 8px;
+}
+.arearow.here em { color: var(--path); border-color: var(--path); }
+
+/* ---------- shop ---------- */
+.shoplist { display: grid; gap: 7px; }
+/* One scroller for the whole shop, matching .boxlist and .arealist. Without it
+   the shop was the one tab that could grow past the screen. */
+.shopscroll {
+  max-height: 430px; overflow-y: auto; padding-right: 4px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.sh-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--pixel); font-size: 10px; letter-spacing: .08em;
+  color: var(--ink-faint); padding: 2px 2px 0;
+}
+.sh-head span:last-child { color: var(--ink-soft); }
+
+.shoprow {
+  border-radius: 11px;
+  background: var(--surface); border: 2px solid var(--line);
+}
+.shoprow.open { border-color: var(--path); background: var(--path-soft); }
+.shoprow.locked { opacity: .5; }
+
+/* The whole closed row is the hit target - one line, scannable, and big enough
+   to hit on a phone. */
+.sh-pick {
+  width: 100%; display: grid; grid-template-columns: 30px 1fr auto;
+  gap: 10px; align-items: center; text-align: left;
+  padding: 9px 11px; border: 0; border-radius: 9px;
+  background: none; color: inherit; cursor: pointer; font: inherit;
+}
+.sh-pick:disabled { cursor: default; }
+.sh-pick:not(:disabled):hover b { color: var(--path); }
+.sh-pick img { width: 30px; height: 30px; image-rendering: pixelated; }
+
+.sh-title, .sh-tail { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sh-tail { text-align: right; }
+.sh-title b, .sh-tail b {
+  font-family: var(--display); font-weight: 600; font-size: 16px;
+  color: var(--ink); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.sh-tail b { font-variant-numeric: tabular-nums; }
+.sh-title i, .sh-tail i {
+  font-style: normal; font-family: var(--pixel);
+  font-size: 9.5px; color: var(--ink-faint); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Stepper, MAX, then the button that spends the money - left to right in the
+   order you decide them. */
+.sh-buy { display: flex; gap: 5px; padding: 0 9px 9px; }
+.sh-buy button {
+  font-family: var(--pixel); font-size: 11px; padding: 10px 8px 8px;
+  border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--surface); color: var(--ink-soft); cursor: pointer;
+}
+.sh-buy button:hover:not(:disabled) { border-color: var(--path); color: var(--path); }
+.sh-buy button:disabled { opacity: .38; cursor: default; }
+
+.qty { display: flex; align-items: stretch; gap: 4px; flex: 0 0 auto; }
+.qty button { width: 30px; padding: 0; font-size: 15px; line-height: 1; }
+/* Native number input, minus the spinners: the stepper buttons are the
+   affordance and the arrows are too small to hit on a touch screen anyway. */
+.qty input {
+  width: 46px; text-align: center;
+  font-family: var(--pixel); font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--surface); color: var(--ink);
+  -moz-appearance: textfield;
+}
+.qty input::-webkit-outer-spin-button,
+.qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qty input:focus-visible { outline: 2px solid var(--path); outline-offset: 1px; }
+
+.sh-max { flex: 0 0 auto; }
+/* The total is what is being decided: it takes the leftover width and never
+   shrinks under its own label, which is what made it spill out of its border. */
+.sh-go {
+  flex: 1 1 auto; min-width: max-content; white-space: nowrap;
+  background: var(--path); border-color: var(--path); color: #fff6f3;
+  box-shadow: 0 3px 0 #86524a;
+}
+.sh-go:hover:not(:disabled) { color: #fff6f3; filter: brightness(1.07); }
+
+/* A footnote, not a paragraph: the flex gap already separates it, so it only
+   needs the rule above it and none of the margin it used to carry. */
+.shop-note {
+  font-size: 12.5px; line-height: 1.5; color: var(--ink-faint);
+  margin: 0; padding-top: 8px; border-top: 2px solid var(--line);
+}
+
+/* ---------- confirm dialog ----------
+
+   A confirm is read in about a second, so it should be about a second tall. The
+   first version set a 23px title, 10px-padded rows and 15px buttons inside 22px
+   of card padding, which made three short facts fill half the screen. */
+.confirm {
+  width: min(400px, 100%);
+  background: var(--surface); border: 3px solid var(--canopy);
+  border-radius: 14px; box-shadow: 0 5px 0 rgba(47, 107, 76, .3);
+  padding: 15px 17px 13px;
+}
+.cf-title {
+  font-family: var(--display); font-weight: 600; font-size: 19px;
+  margin: 0 0 10px; line-height: 1.25;
+}
+.cf-lines { margin: 0 0 10px; display: grid; gap: 3px; }
+.cf-line {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 6px 10px; background: var(--surface-2); border-radius: 7px;
+}
+.cf-line dt { font-family: var(--pixel); font-size: 9.5px; color: var(--ink-faint); }
+.cf-line dd {
+  margin: 0; font-family: var(--display); font-weight: 600; font-size: 15px;
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.cf-note {
+  font-size: 12px; line-height: 1.45; color: var(--ink-soft);
+  margin: 0 0 10px; padding-left: 9px; border-left: 3px solid var(--sand);
+}
+.cf-actions { display: flex; gap: 7px; }
+.cf-actions button {
+  flex: 1; font-family: var(--pixel); font-size: 11px; padding: 11px 8px 9px;
+  border: 3px solid var(--line-firm); border-radius: 10px;
+  background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
+}
+.cf-yes {
+  background: var(--path) !important; border-color: var(--path) !important;
+  color: #fff6f3 !important; box-shadow: 0 3px 0 #86524a;
+}
+.cf-yes.buy {
+  background: var(--canopy) !important; border-color: var(--canopy) !important;
+  box-shadow: 0 3px 0 #22513a;
+}
+.cf-actions button:hover { transform: translateY(-1px); }
+.cf-keys {
+  font-family: var(--pixel); font-size: 8.5px; color: var(--ink-faint);
+  text-align: center; margin: 9px 0 0; letter-spacing: .04em;
+}
+
+/* ---------- dex detail ---------- */
+.sheet {
+  position: fixed; inset: 0; z-index: 70;
+  display: grid; place-items: center; padding: 20px;
+  background: rgba(26, 48, 36, .5);
+  animation: battle-in .18s ease-out;
+}
+.sheet-card {
+  width: min(460px, 100%); max-height: 88vh; overflow-y: auto;
+  background: var(--surface); border: 3px solid var(--canopy);
+  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  padding: 20px 22px 24px;
+}
+/* The header is the only block on the card that gets to be loud: portrait,
+   number, name, genus, types. Everything below it is either the collection
+   (FORMS) or reference, and both are set quieter on purpose - a card where
+   five blocks all shout is a card with no hierarchy, which is what this was. */
+.sheet-top {
+  display: flex; align-items: center; gap: 16px;
+  padding-bottom: 16px; margin-bottom: 16px;
+  border-bottom: 2px solid var(--line);
+}
+.sheet-art {
+  width: 108px; height: 108px; object-fit: contain; image-rendering: pixelated;
+  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px;
+  flex: none;
+}
+.sheet-art.locked { filter: brightness(0); opacity: .22; }
+.sheet-no { font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
+.sheet-name { font-family: var(--display); font-size: 27px; font-weight: 600; line-height: 1.1; margin: 3px 0; }
+.sheet-genus { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; }
+.sheet-types { display: flex; gap: 5px; }
+.sheet-types .type { font-size: 8.5px; }
+
+/* THE DEX TEXT. No coloured bar down the side - it was the only accent on the
+   card and it was spent on the one block that is pure reference, which had the
+   hierarchy exactly upside down. It reads as a quoted passage now: no fill, no
+   border, just indentation and a softer colour, which is what prose in a
+   reference panel should look like. */
+.sheet-flavor {
+  font-size: 14px; line-height: 1.7; color: var(--ink-soft);
+  margin: 0 0 14px; padding: 0 2px;
+  max-width: 62ch;
+}
+/* Measurements, last, and read as a row of label/value pairs rather than
+   three cards. They were three filled tiles the same size and weight as the
+   FORMS slots above them, which made a Pokemon's height look as important as
+   whether you own its Astral. One rule, no fills. */
+.sheet-facts {
+  display: flex; flex-wrap: wrap; gap: 6px 22px;
+  margin: 0; padding-top: 12px; border-top: 2px solid var(--line);
+}
+.fact { display: flex; align-items: baseline; gap: 7px; }
+.fact dt {
+  font-family: var(--pixel); font-size: 8px; color: var(--ink-faint);
+  letter-spacing: .06em;
+}
+.fact dd {
+  margin: 0; font-family: var(--display); font-weight: 600; font-size: 14px;
+  color: var(--ink-soft); font-variant-numeric: tabular-nums;
+}
+/* FORMS: the four ways this species comes, and which you hold. The ones you do
+   not are shown as silhouettes rather than hidden - the point of the strip is as
+   much "go and find these" as "look what you have". */
+/* Promoted: this sits directly under the name now, because it is what the
+   dialog is opened for. The extra breathing room under it separates the
+   collection from the reference material that follows. */
+.sheet-forms { display: grid; gap: 7px; margin-bottom: 18px; }
+.sf-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--pixel); font-size: 8.5px; letter-spacing: .1em;
+  color: var(--ink-faint);
+}
+.sf-all { display: inline-flex; align-items: center; gap: 5px; color: var(--gold); }
+/* Five columns, not four: Ordinary plus every tier. `1fr` five times rather
+   than `auto-fit`, because these are one set and a tier wrapping onto its own
+   row would read as a different kind of thing. The art shrank 46 -> 38 to pay
+   for the extra column, which is still two whole pixel-doublings of a 64px
+   sprite. */
+.sf-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.sf-one {
+  display: grid; justify-items: center; gap: 2px;
+  padding: 7px 1px 6px; border-radius: 9px;
+  border: 2px solid var(--line); background: var(--paper);
+}
+.sf-one.got { border-color: var(--path); background: var(--path-soft); }
+.sf-art { position: relative; width: 38px; height: 38px; display: grid; place-items: center; }
+.sf-art img:not(.mark) { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+/* Not held: a flat silhouette, so the shape is a hint and the colours are not
+   given away. The Origin and Astral treatments stay off until you own one. */
+.sf-one:not(.got) .sf-art img { filter: brightness(0) opacity(.22); }
+.sf-one:not(.got) .sprite-astral,
+.sf-one:not(.got) .sprite-holo { filter: brightness(0) opacity(.22) !important; }
+/* A silhouette with a rainbow travelling over it would be showing you the
+   treatment you have not earned yet, which is the one thing the strip must
+   not do. */
+.sf-one:not(.got) .holo-foil { display: none; }
+.sf-badge {
+  position: absolute; right: -2px; bottom: -2px;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, .9));
+}
+.sf-one:not(.got) .sf-badge { opacity: .35; filter: grayscale(1); }
+.sf-name {
+  font-family: var(--pixel); font-size: 8px; letter-spacing: .04em;
+  color: var(--ink-soft);
+}
+.sf-one.got .sf-name { color: var(--path); }
+.sf-note { font-size: 8.5px; line-height: 1.2; color: var(--ink-faint); text-align: center; }
+
+/* The six base-stat bars lived here. Nothing in this game reads `stats` -
+   there is no battling - so they were six rows of precise numbers that could
+   not affect a decision, and they were the biggest block on the card. */
+.sheet-locked {
+  font-family: var(--pixel); font-size: 11px; color: var(--ink-faint);
+  text-align: center; padding: 26px 0; line-height: 2;
+}
+.sheet-close {
+  display: block; width: 100%; margin-top: 18px;
+  font-family: var(--pixel); font-size: 11px; padding: 12px;
+  border: 3px solid var(--line-firm); border-radius: 11px;
+  background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
+}
+.sheet-close:hover { border-color: var(--path); color: var(--path); }
+
+/* ---------- touch dpad ---------- */
+.dpad {
+  display: none; justify-content: center; margin-top: 10px;
+  grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(2, 42px); gap: 5px;
+}
+.dpad button {
+  font-size: 15px; cursor: pointer;
+  border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--surface-2); color: var(--ink-soft);
+}
+.dpad-up { grid-area: 1 / 2; }
+.dpad-left { grid-area: 2 / 1; }
+.dpad-down { grid-area: 2 / 2; }
+.dpad-right { grid-area: 2 / 3; }
+@media (hover: none) and (pointer: coarse) { .dpad { display: grid; } }
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .battle, .ball-slot, .ball, .mon, .shout, .sheet,
+  .land-ring, .deltas em {
+    animation: none !important;
+  }
+  .land-ring { opacity: 0; }
+  /* With the animations off the ball holds frame 3, a closed ball, which is
+     right for the throw and the wait and says nothing about how it ended. The
+     two frames that ARE the answer are pinned instead: the last of the burst,
+     and the last of the click. */
+  .ball.broke { background-position-y: calc(var(--f) * 26); }
+  .ball.caught { background-position-y: calc(var(--f) * 31); }
+  .mon, .mon-shadow, .br-wrap, .br-tab { transition: none; }
+}
+
+.shout .won {
+  display: inline-flex;
+  align-items: center;
+  gap: .5ch;
+  color: #ffe57a;
+}
+.shout .won img { width: 1.6cqw; height: 1.6cqw; image-rendering: pixelated; }
+
+/* A row that can evolve right now outranks one that merely has spares, so it
+   gets the warmer border - it is the thing worth acting on. */
+.boxrow.ready { border-color: #d8a13a; background: #fbf3e0; }
+
+.bx-evo {
+  grid-area: evo;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.bx-evo.on { color: #9a6a12; font-weight: 700; }
+.bx-bar {
+  flex: 0 0 46px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.bx-bar::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: calc(var(--f) * 100%);
+  background: var(--ink-soft);
+  transition: width 260ms ease;
+}
+.bx-evo.on .bx-bar::after { background: #d8a13a; }
+
+/* Actions get the full width of the row: three Eevee stones need somewhere to
+   wrap to, and nothing here should crowd the count or the progress bar. */
+.bx-acts {
+  grid-area: acts;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.bx-acts:empty { display: none; }
+.bx-acts button { flex: 1 1 auto; }
+.boxrow .evobtn:not(:disabled) { border-color: #d8a13a; color: #9a6a12; font-weight: 700; }
+.boxrow .evobtn:disabled { opacity: .45; cursor: not-allowed; }
+/* Selling into an evolution's reserve is allowed, but it should not look like
+   the same button as selling junk. */
+.boxrow button.risky { border-style: dashed; color: var(--ink-soft); }
+
+.bx-flash {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--path-soft);
+  border: 1px solid var(--path);
+  font-size: 13.5px;
+  animation: shout-in 300ms ease both;
+}
+
+/* ---------------------------------------------------------------- evolution
+
+   Ported from pret/pokefirered's CycleEvolutionMonSprite. The scales are driven
+   from JS frame by frame; everything here is the dressing around them: which
+   sprite is white, what the backdrop is doing, and when the screen blows out.  */
+
+.evo {
+  position: absolute; inset: 0; z-index: 12; overflow: hidden;
+  container-type: inline-size;
+  border-radius: 9px; border: 2px solid var(--canopy);
+  animation: battle-in .3s ease-out;
+}
+
+/* Bright and plain while the Pokémon is still itself; the dark ring backdrop
+   takes over the moment it starts flashing, exactly when the GBA switches. */
+.evo-bg {
+  position: absolute; inset: 0;
+  background: linear-gradient(#dff0f7 0%, #eaf6ef 60%, #e6f2dd 100%);
+  transition: background .3s linear;
+}
+.evo-whiten .evo-bg, .evo-cycle .evo-bg, .evo-flash .evo-bg {
+  background: linear-gradient(#0d2036 0%, #12314f 60%, #0b1c30 100%);
+}
+
+/* The concentric shockwave rings behind the silhouette. Hard steps, not a soft
+   glow - the GBA drew this as a tiled pattern, so no blur. */
+.evo-rings {
+  position: absolute; inset: -25%;
+  opacity: 0;
+  background: repeating-radial-gradient(
+    circle at 50% 50%,
+    rgba(120, 190, 255, .16) 0 3.2cqw,
+    rgba(10, 30, 55, .30) 3.2cqw 6.4cqw
+  );
+  transition: opacity .3s linear;
+}
+.evo-cycle .evo-rings, .evo-flash .evo-rings {
+  opacity: 1;
+  animation: evo-rings 2.4s linear infinite;
+}
+@keyframes evo-rings { to { transform: scale(1.35); } }
+
+.evo-stage {
+  position: absolute; left: 0; right: 0; top: 0; bottom: 19%;
+  display: grid; place-items: center;
+}
+
+.evo-mon {
+  grid-area: 1 / 1;
+  width: 34cqw; height: 34cqw;
+  object-fit: contain;
+  image-rendering: pixelated;
+  transform-origin: 50% 50%;
+}
+
+/* Every visible pixel replaced with solid white, alpha untouched - the CSS
+   equivalent of filling the sprite's palette with RGB_WHITE. Hard-edged, so
+   the silhouette stays exact. */
+.evo-whiten .evo-mon { filter: brightness(0) invert(1); transition: filter .3s linear; }
+.evo-cycle .evo-mon, .evo-flash .evo-mon { filter: brightness(0) invert(1); }
+
+/* Before the cycle only the original is on screen; after it, only the result. */
+.evo-intro .evo-post, .evo-whiten .evo-post { visibility: hidden; }
+.evo-flash .evo-pre, .evo-reveal .evo-pre { visibility: hidden; }
+.evo-reveal .evo-post { transform: scale(1) !important; animation: evo-pop .32s ease-out; }
+@keyframes evo-pop { from { transform: scale(1.14) !important; } }
+
+.evo-white {
+  position: absolute; inset: 0; background: #fff;
+  opacity: 0; pointer-events: none;
+}
+.evo-flash .evo-white { opacity: 1; }
+.evo-reveal .evo-white { opacity: 0; transition: opacity .22s ease-out; }
+
+/* ---------- the message box, same furniture as an encounter ---------- */
+
+/* Three short lines and a button do not need a quarter of the screen. The stage
+   above gives up the same amount, so the two still meet flush. */
+.evo-box {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 1.9cqw 2.6cqw 1.7cqw;
+  background: var(--surface); border-top: 4px solid var(--canopy);
+  min-height: 19%;
+}
+.evo-msg {
+  font-family: var(--pixel); line-height: 1.5; color: var(--ink);
+  margin: 0 0 .8cqw; font-size: 12px; font-size: 1.95cqw;
+}
+.evo-msg b { color: var(--path); font-weight: 400; }
+.evo-sub {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0 1.8cqw;
+  font-family: var(--pixel); color: var(--ink-faint);
+  font-size: 9px; font-size: 1.45cqw; margin: 0 0 1.1cqw;
+}
+.evo-new { color: #b8791f; }
+.evo-lv { color: #2f7d4f; }
+.evo-won { display: inline-flex; align-items: center; gap: .5ch; color: #2f7d4f; }
+.evo-won img { width: 2.2cqw; min-width: 12px; image-rendering: pixelated; }
+
+.evo-go {
+  font-family: var(--pixel); font-size: 11px; font-size: 1.75cqw;
+  padding: 1.1cqw 2.4cqw .9cqw;
+  border: 3px solid var(--path); border-radius: 10px;
+  background: var(--path); color: #fff6f3;
+  box-shadow: 0 3px 0 #86524a; cursor: pointer;
+}
+.evo-go kbd {
+  font: inherit; margin-left: 1.2cqw; padding: 0 .5ch;
+  border: 1px solid rgba(255, 255, 255, .5); border-radius: 4px;
+}
+
+/* ---------- the payoff ---------- */
+
+/* Offsets are cqw, not percentages: a percentage here resolves against each
+   spark's own tiny box, which buries half of them under the sprite. */
+.evo-spark {
+  grid-area: 1 / 1;
+  width: 1.5cqw; height: 1.5cqw;
+  background: #fff8cf;
+  box-shadow: 0 0 0 .35cqw rgba(255, 226, 122, .55);
+  transform: rotate(calc(var(--i) * 30deg)) translateY(-4cqw);
+  animation: evo-spark .9s ease-out both;
+  animation-delay: calc(var(--i) * 28ms);
+  pointer-events: none;
+}
+@keyframes evo-spark {
+  0% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-3cqw) scale(.4); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-19cqw) scale(.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evo-rings { animation: none; }
+  .evo-spark { animation-duration: .01ms; }
+}
+
+/* An evolve button carries three things now: which stone it wants, where it
+   leads, and what is missing. Stack them so the stone reads as a requirement
+   rather than decoration. */
+.boxrow .evobtn {
+  display: flex; align-items: center; gap: 5px;
+  flex-wrap: wrap; justify-content: center;
+}
+.boxrow .evobtn img {
+  width: 16px; height: 16px; image-rendering: pixelated; flex: none;
+}
+.boxrow .evobtn em {
+  flex-basis: 100%;
+  font-style: normal; font-size: 10.5px; color: var(--ink-faint);
+}
+
+/* The stones get their own header inside the shop panel. */
+.sh-head { margin-top: 14px; }
+
+/* ================================================================ interaction
+
+   Every button in the game now answers a press. It is one rule rather than a
+   per-component flourish, so nothing is left feeling dead: a press sinks the
+   button by a pixel and shortens its shadow, which is the cheapest possible
+   read of "that did something". */
+
+button { transition: transform 90ms ease, filter 120ms ease, border-color 120ms ease,
+                     background-color 120ms ease, color 120ms ease; }
+button:not(:disabled):active { transform: translateY(1px) scale(.985); }
+/* Buttons that carry a drop shadow lose most of it on the way down, so the
+   travel reads as depth rather than as the whole thing sliding. */
+.bigbtn:not(:disabled):active, .sh-go:not(:disabled):active,
+.cf-yes:not(:disabled):active, .evo-go:not(:disabled):active {
+  box-shadow: 0 1px 0 #86524a;
+}
+button:disabled { transition: none; }
+
+/* Keyboard users get the same affordance as the mouse, in the game's own ink
+   rather than the browser's blue. */
+:where(button, input, [tabindex]):focus-visible {
+  outline: 3px solid var(--canopy);
+  outline-offset: 2px;
+  border-radius: 9px;
+}
+
+/* Switching tabs replays a short settle, so the panel reads as arriving rather
+   than the content teleporting under a static frame. */
+.panel { animation: panel-in 220ms cubic-bezier(.2, .9, .3, 1); }
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+/* A row that can evolve right now earns a slow shimmer - it is the one thing on
+   the screen you can act on, and it should catch the eye without nagging. */
+.boxrow.ready { animation: ready-glow 2.6s ease-in-out infinite; }
+@keyframes ready-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(216, 161, 58, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(216, 161, 58, .28); }
+}
+.boxrow .evobtn:not(:disabled) { animation: ready-nudge 2.6s ease-in-out infinite; }
+@keyframes ready-nudge {
+  0%, 92%, 100% { transform: none; }
+  96% { transform: translateY(-2px); }
+}
+
+/* ------------------------------------------------------------------- cheer
+
+   Drops from the top over everything else, including the battle and the
+   evolution scene, because it can fire during either. */
+
+.cheer {
+  position: fixed; inset: 0 0 auto 0; z-index: 60;
+  display: grid; place-items: center;
+  padding: 14px 12px 0;
+  pointer-events: auto; cursor: pointer;
+}
+
+.cheer-card {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 13px 30px 15px;
+  border-radius: 16px;
+  border: 3px solid var(--gold);
+  background: linear-gradient(#fffdf4, #fdf3dc);
+  box-shadow: 0 10px 26px rgba(40, 60, 40, .26);
+  animation: cheer-drop 460ms cubic-bezier(.16, 1.5, .4, 1) both,
+             cheer-out 380ms ease-in 2820ms both;
+  text-align: center;
+}
+.cheer-dex .cheer-card { border-color: var(--canopy); background: linear-gradient(#f6fdf6, #e6f5e6); }
+
+@keyframes cheer-drop {
+  from { opacity: 0; transform: translateY(-46px) scale(.9); }
+}
+@keyframes cheer-out {
+  to { opacity: 0; transform: translateY(-18px) scale(.97); }
+}
+
+.cheer-kind {
+  font-family: var(--pixel); font-size: 9.5px; letter-spacing: .18em;
+  color: var(--gold);
+}
+.cheer-dex .cheer-kind { color: var(--canopy); }
+.cheer-medal .cheer-kind { color: var(--path); }
+.cheer-shiny .cheer-kind { color: var(--gold); }
+.cheer-origin .cheer-kind { color: #b8862a; }
+.cheer-holo .cheer-kind { color: #9b5fc9; }
+.cheer-astral .cheer-kind { color: #6f5bff; }
+.cheer-steps .cheer-kind { color: var(--canopy); }
+/* The larger half of a medal, so it reads before the row of ball icons. */
+.cheer-cash {
+  font-family: var(--pixel); font-size: 15px; color: var(--canopy);
+  font-variant-numeric: tabular-nums;
+}
+.cheer-title {
+  font-family: var(--display); font-weight: 600; font-size: 24px;
+  line-height: 1.1; color: var(--ink);
+}
+.cheer-sub { font-size: 13px; color: var(--ink-soft); }
+.cheer-items {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px;
+  margin-top: 6px; padding-top: 8px;
+  border-top: 2px solid var(--line);
+  font-family: var(--pixel); font-size: 10px; color: var(--ink-soft);
+}
+.cheer-items span { display: inline-flex; align-items: center; gap: .6ch; }
+.cheer-items img { width: 16px; height: 16px; image-rendering: pixelated; }
+
+/* Confetti thrown from behind the card. Offsets are in vmin so the spread is
+   the same shape on any screen, and each spark is placed by its index rather
+   than randomly, so it never lands in a clump. */
+.cheer-burst { position: absolute; top: 46px; left: 50%; width: 0; height: 0; }
+.cheer-burst span {
+  position: absolute; width: 8px; height: 8px; border-radius: 2px;
+  background: var(--gold);
+  transform: rotate(calc(var(--i) * 26deg)) translateY(-10px);
+  animation: cheer-spark 900ms cubic-bezier(.2, .8, .3, 1) both;
+  animation-delay: calc(var(--i) * 22ms);
+}
+.cheer-burst span:nth-child(even) { background: var(--canopy); width: 6px; height: 10px; }
+.cheer-dex .cheer-burst span { background: var(--canopy); }
+.cheer-dex .cheer-burst span:nth-child(even) { background: var(--gold); }
+@keyframes cheer-spark {
+  0% { opacity: 0; transform: rotate(calc(var(--i) * 26deg)) translateY(-6px) scale(.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(calc(var(--i) * 26deg)) translateY(-15vmin) scale(.7); }
+}
+
+/* The wild-encounter cut. FRLG punches the screen a few times before the battle
+   resolves; three hard flashes is the part your eye actually remembers, and it
+   covers the swap from map to battle. */
+/* Defaults to invisible and the animation carries no fill, so the worst case if
+   it never runs is no flash - rather than a battle permanently behind a white
+   sheet, which is what a `both` fill would leave. */
+.battle::after {
+  content: ""; position: absolute; inset: 0; z-index: 30;
+  background: #fff; opacity: 0; pointer-events: none;
+  animation: battle-flash 460ms steps(1, end);
+}
+@keyframes battle-flash {
+  0%, 12% { opacity: .92; }
+  13%, 28% { opacity: 0; }
+  29%, 40% { opacity: .7; }
+  41%, 56% { opacity: 0; }
+  57%, 64% { opacity: .45; }
+  65%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel, .cheer-card, .cheer-burst span, .battle::after { animation: none; }
+  .cheer-burst span, .battle::after { opacity: 0; }
+  .boxrow.ready, .boxrow .evobtn:not(:disabled) { animation: none; }
+  .tab.urgent em, .tr-points.has, .trrow.lit, .trrow.lit .tr-pips i { animation: none; }
+  /* The shiny badge and its sparks are decoration on information that is
+     already in the text - so they stop, and nothing is lost. */
+  .np-shiny, .np-astral, .np-holo, .np-tier, .shiny-spark i, .astral-fx i,
+  .astral-aura, .astral-orbit, .holo-foil,
+  .origin-fx i, .origin-fx u, .origin-gleam, .origin-ghost,
+  .astral-sky { animation: none; }
+  /* The reveal must not stop mid-reveal: with no animation the mask has to be
+     wide open, or an Origin renders as a hole where a Pokemon should be. */
+  .sprite-origin.mon {
+    animation: none;
+    -webkit-mask-size: 260% 260%; mask-size: 260% 260%;
+  }
+  .origin-ghost, .origin-gleam { opacity: 0; }
+  .origin-seal { animation: none; opacity: .85; }
+  /* Held at their visible state rather than hidden: the sparks and the arc are
+     how you know which tier this is, so stopping them must not remove them. */
+  .shiny-spark i, .astral-fx i { opacity: .9; transform: scale(1); }
+  .astral-aura { opacity: .8; }
+  .astral-orbit { opacity: .85; }
+  /* Parked mid-sweep rather than at `from`, which is off the sprite entirely -
+     a Holo with no band on it is just a slightly brighter Pokemon, and the
+     band is how you know which tier it is. */
+  .holo-foil { animation: none; background-position: 58% 0; }
+  button:not(:disabled):active { transform: none; }
+}
+
+/* ---------------------------------------------------------------- minimap
+
+   Bottom left, inside the viewport. Left because the ball rail owns the right
+   during an encounter and the eye should not learn two homes for two things;
+   bottom because the biome tag is already top-left.
+
+   **The canvas sizes itself.** `bakeMini()` sets the backing store AND the CSS
+   width/height from the area's own dimensions, because the eight areas are
+   different shapes and one fixed box would letterbox Frost Hollow or crop the
+   Meadow. So nothing here sets a width, and nothing here should.
+
+   `display` is deliberately absent too: a phone has no room for a map of the
+   map, so the base is `none` and the wide layout at the end of this file turns
+   it on. Layout overrides go last, the same rule the rail follows. */
+.minimap {
+  display: none;
+  position: absolute; left: 10px; bottom: 10px; z-index: 3;
+  padding: 4px; border-radius: 7px;
+  background: rgba(18, 26, 16, .62);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .35) inset,
+              0 2px 8px rgba(0, 0, 0, .3);
+  /* It sits over the thing being played, so it stays back until looked at. */
+  opacity: .82; transition: opacity 140ms ease;
+  /* Nothing on it is clickable, and a box that eats clicks over the route is
+     a box that eats a click meant for the route. */
+  pointer-events: none;
+}
+/* Beats the wide-layout rule below on specificity rather than on order, so it
+   holds wherever that rule ends up. */
+.minimap.gone { display: none; }
+.minimap canvas { display: block; image-rendering: pixelated; border-radius: 3px; }
+/* ------------------------------------------------------------- filter bar
+
+   Shared by the Dex and the Box. Search first because that is the question you
+   arrive with; chips under it because those are the question you arrive with
+   the second time. */
+
+.filterbar { display: grid; gap: 6px; margin-bottom: 9px; }
+.filterbar input {
+  width: 100%; padding: 10px 12px;
+  font: inherit; font-size: 13px;
+  border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--surface); color: var(--ink);
+}
+.filterbar input::placeholder { color: var(--ink-faint); }
+.filterbar input:focus-visible { outline: 2px solid var(--canopy); outline-offset: 1px; }
+
+/* Search and CLEAR share a row: the button only exists when there is something
+   to clear, so it is never a control that does nothing. */
+.fb-find { display: flex; gap: 6px; }
+.fb-find input { flex: 1; min-width: 0; }
+.fb-clear {
+  flex: 0 0 auto; font-family: var(--pixel); font-size: 9px; letter-spacing: .06em;
+  padding: 0 11px; border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--surface); color: var(--ink-faint); cursor: pointer;
+}
+.fb-clear:hover { border-color: var(--path); color: var(--path); }
+
+/* The type picker: one line closed, the whole palette open.
+
+   It is shaped as a sibling of `.fb-sel` - same border, same height - so the
+   three filter axes read as one control and not as a dropdown, a dropdown and
+   a thing.
+
+   The menu is absolutely positioned and the picker is the containing block, so
+   it hangs over the dex grid rather than pushing it down - a filter that
+   reflows the list it filters makes you lose the row you were looking at. */
+/* A SWATCH, not a third full-width dropdown. It shares the row with two
+   selects and it only ever has to show one badge, so it takes what that badge
+   needs and gives the rest back - `flex: 0 1 auto` rather than a share. */
+.fb-types {
+  position: relative;
+  flex: 0 1 auto; min-width: 0;
+  display: flex;
+}
+.fb-topen {
+  display: flex; align-items: center; gap: 5px;
+  height: 100%; padding: 6px 7px; cursor: pointer;
+  border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--paper); font: inherit;
+}
+.fb-topen:hover { border-color: var(--canopy); }
+.fb-topen[aria-expanded="true"] { border-color: var(--canopy); }
+.fb-topen:focus-visible { outline: 2px solid var(--canopy); outline-offset: 1px; }
+/* The caret, as a triangle rather than a glyph: a character here would be the
+   only place in the rail that is not either pixel type or drawn art. */
+.fb-topen i {
+  margin-left: auto; width: 0; height: 0;
+  border: 4px solid transparent; border-top-color: var(--ink-soft);
+  transform: translateY(2px);
+}
+.fb-types.on .fb-topen { border-color: var(--canopy); }
+
+.fb-tmenu {
+  position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 4px;
+  /* At least as wide as the control it hangs off, and no wider than its own
+     content needs. `min-width` beats `max-width` when they disagree, so in the
+     rail the first of these wins and the menu is exactly the control's width -
+     which is what makes it read as the control opening rather than as a
+     separate box landing on top of it. The cap only bites somewhere wider. */
+  min-width: 100%; max-width: 300px; width: max-content;
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 8px; border-radius: 10px;
+  border: 2px solid var(--line-firm); background: var(--paper);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .2);
+}
+.fb-tmenu .type {
+  cursor: pointer; border: 2px solid transparent;
+  opacity: .72; transition: opacity 120ms ease, transform 120ms ease;
+}
+.fb-tmenu .type:hover { opacity: 1; }
+/* Ringed, never recoloured: the colour IS the information, so tinting the
+   selected one would be overwriting the answer with the question. */
+.fb-tmenu .type.on { opacity: 1; border-color: var(--ink); transform: translateY(-1px); }
+.fb-tmenu .type:focus-visible { outline: 2px solid var(--canopy); outline-offset: 1px; }
+
+/* One dropdown per axis. They share a row and wrap when the rail is narrow,
+   which is the whole reason these replaced chips - a closed select is one line
+   tall however many options it holds, so a fourth axis costs nothing. */
+/* All three axes on ONE row, and no caption over any of them. The captions
+   were three 9px lines in a rail whose whole job is the grid below, and each
+   one repeated what its own value already said.
+
+   A native select CLIPS rather than ellipsizing - "Everything (1!" shipped
+   once at 96px - so the widths here are not a guess.
+
+   THE BASIS IS THE WRAP THRESHOLD, not the final width. At 118px the three
+   summed to exactly the 330px a rail has, and the longest type badge -
+   FIGHTING, an 82px swatch - tipped it over: the swatch dropped to its own
+   line and the row count went straight back to three the moment anyone
+   filtered by a long-named type. 100px leaves headroom, `flex-grow` still
+   fills the row, and the selects end up the same 118px they were. Measured at
+   360px with FIGHTING selected, which is the worst case the game can show. */
+.fb-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: stretch; }
+.fb-sel {
+  flex: 1 1 100px; min-width: 0;
+  width: 100%;
+  font-family: var(--body); font-size: 12px; color: var(--ink);
+  padding: 7px 22px 7px 9px;
+  border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--surface);
+  /* The native arrow cannot be styled, so it is replaced by a drawn one. Two
+     gradients rather than an SVG data URI: fewer bytes and no escaping. */
+  -webkit-appearance: none; appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%),
+    linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%);
+  background-position: right 12px top 53%, right 7px top 53%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+.fb-sel.on { border-color: var(--canopy); }
+.fb-sel:focus-visible { outline: 2px solid var(--canopy); outline-offset: 1px; }
+
+.bx-types { margin: 1px 0; }
+
+.runbtn {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .5cqw; padding: 1.4cqw 2.6cqw 1.1cqw;
+  font-family: var(--pixel); font-size: 1.7cqw;
+  border: 3px solid var(--line-firm); border-radius: 11px;
+  background: var(--surface); color: var(--ink-soft); cursor: pointer;
+}
+.runbtn:hover { border-color: var(--path); color: var(--path); }
+.runbtn kbd {
+  font-family: var(--pixel); font-size: 1.25cqw; line-height: 1;
+  padding: .5cqw .8cqw .35cqw; border-radius: 5px; border: 0;
+  background: var(--ink-faint); color: var(--surface);
+}
+.runbtn:hover kbd { background: var(--canopy); }
+
+/* ------------------------------------------------------------ casting a line
+
+   Bottom-centre of the map, opposite the rail and clear of the biome tag. It
+   only ever holds two words, so it is sized to them rather than to a column. */
+.castbox {
+  position: absolute; left: 50%; bottom: 3.5%; transform: translateX(-50%);
+  z-index: 11; display: flex; align-items: baseline; gap: .8cqw;
+  padding: .7cqw 1.4cqw .6cqw;
+  background: rgba(255, 255, 255, .9);
+  border: 2px solid var(--line-firm); border-radius: 11px;
+  box-shadow: 0 2px 0 var(--line-firm);
+  font-family: var(--pixel); white-space: nowrap;
+  animation: cheer-drop 260ms cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.castbox b { font-size: 1.3cqw; color: var(--ink-faint); font-weight: 400; }
+.castbox span { font-size: 1.7cqw; color: var(--ink); }
+/* A bite is the one moment worth colouring, and it lasts about half a second. */
+.castbox.bite { border-color: var(--gold); background: #fdf6e6; }
+.castbox.bite span { color: var(--path); }
+
+/* ------------------------------------------------------------- the ball rail
+
+   Down the left edge, which is the one strip that is empty in both states: out
+   walking, and mid-battle with the Pokemon centred and the nameplate in the
+   opposite corner. It sits above the battle overlay, so it is the single
+   control that never leaves the screen.
+
+   The wrapper is out of flow, so making it a query container costs the layout
+   nothing - and 1cqw is then 1% of the map, the same basis the battle screen is
+   sized in, so the two scale together. Containing .viewport itself would zero
+   its content contribution and starve the grid track that sizes the map. */
+.ballwrap {
+  position: absolute; inset: 0; z-index: 12;
+  pointer-events: none; container-type: inline-size;
+}
+.ballrail {
+  position: absolute; left: 3%; top: max(92px, 9.5cqw);
+  /* The rail was four balls tall and is eight now, and it is absolutely
+     positioned with a `top` and no floor - so on a WIDE BUT SHORT window the
+     bottom two ran off the end of the map with nothing to say so. Worked out
+     rather than guessed: the viewport is capped at `(100vh - 210px) * 15/11`
+     wide and is 15:11, so a 1366x600 window gives it 286px of height while
+     eight tiles plus the tab need about 250 under a 92px offset. The cap is
+     the parent's height less that same offset, so the two expressions cannot
+     drift, and the list scrolls inside it rather than overflowing. */
+  max-height: calc(100% - max(92px, 9.5cqw) - 3%);
+  display: flex; flex-direction: column; align-items: stretch; gap: 0;
+  padding: .7cqw .55cqw; pointer-events: auto;
+  background: rgba(255, 255, 255, .84);
+  border: 2px solid var(--line-firm); border-radius: 13px;
+  box-shadow: 0 2px 0 var(--line-firm);
+}
+
+/* Collapsed, the rail is only this: one ball and the total, which is the
+   number worth carrying around while you walk. */
+.br-tab {
+  display: flex; align-items: center; justify-content: center; gap: .5cqw;
+  padding: .25cqw .55cqw .35cqw; border: 0; border-radius: 8px;
+  border-bottom: 2px solid transparent; transition: border-color .22s ease;
+  background: transparent; cursor: pointer; font-family: var(--pixel);
+}
+.br-tab:hover { background: var(--surface-2); }
+/* Pinned open by an encounter, the tab is a heading rather than a control. */
+.ballrail.pinned .br-tab { cursor: default; }
+.ballrail.pinned .br-tab:hover { background: transparent; }
+/* A rule under the tab, so the total reads as the heading of the list rather
+   than as a fifth ball. Only when there is a list to head. */
+.ballrail:not(.shut) .br-tab { border-bottom-color: var(--line); }
+.br-tab img { width: 3.2cqw; min-width: 15px; image-rendering: pixelated; }
+.br-tab em {
+  font-style: normal; font-size: 1.5cqw; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.br-chev { font-size: 1.9cqw; line-height: 1; color: var(--ink-faint); }
+.br-tab:hover .br-chev { color: var(--path); }
+
+.br-wrap {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows .22s ease;
+}
+.ballrail:not(.shut) .br-wrap { grid-template-rows: 1fr; }
+.br-list {
+  list-style: none; margin: 0; padding: 0;
+  /* `overflow: hidden` while closed is what lets the 0fr/1fr row animate; once
+     open it has to be able to scroll, or a capped rail simply clips the balls
+     it cannot fit. */
+  min-height: 0; overflow: hidden;
+  display: flex; flex-direction: column; gap: .3cqw;
+}
+.ballrail:not(.shut) .br-list { padding-top: .35cqw; overflow-y: auto; }
+
+/* One line per ball: art, how many, and the key that throws it. The count sat
+   on the sprite's corner as a badge to begin with and covered half the ball -
+   at this size the art is only about twenty pixels, so anything riding it wins.
+   Reading across is also just what a bag looks like. */
+.br-ball {
+  display: flex; align-items: center; gap: .55cqw;
+  padding: .4cqw .5cqw; width: 100%;
+  border: 2px solid transparent; border-radius: 9px;
+  background: transparent; color: var(--ink);
+  font-family: var(--pixel);
+}
+.ballrail.live .br-ball { cursor: pointer; }
+.ballrail.live .br-ball:not(:disabled):hover {
+  border-color: var(--path); background: var(--path-soft);
+}
+.br-ball:disabled { opacity: .4; cursor: default; }
+.br-ball img { width: 3.6cqw; min-width: 18px; image-rendering: pixelated; }
+.br-ball em {
+  flex: 1 1 auto; font-style: normal; font-size: 1.55cqw;
+  color: var(--ink); font-variant-numeric: tabular-nums; text-align: right;
+}
+.br-ball kbd {
+  font-size: 1.1cqw; line-height: 1; padding: .3cqw .5cqw .2cqw;
+  border-radius: 5px; border: 0;
+  background: var(--ink-faint); color: var(--surface);
+}
+.ballrail.live .br-ball:not(:disabled) kbd { background: var(--canopy); }
+
+/* A situational ball while its condition holds. Gold, and only ever on screen
+   when the ball is genuinely the best thing in the bag - so the rail answers
+   "which one" without the player having to remember four rules. */
+.br-ball.boosted { border-color: var(--gold); background: rgba(255, 206, 110, .18); }
+.br-boost {
+  font-style: normal; font-size: 1.1cqw; line-height: 1;
+  padding: .3cqw .45cqw .2cqw; border-radius: 5px;
+  background: var(--gold); color: #3a2a05;
+}
+
+/* The Master Ball is the only one you cannot buy, so it is the only one that
+   looks like treasure. */
+.br-ball.master {
+  border-color: #b57ae0;
+  background: linear-gradient(#553073, #35204a);
+  box-shadow: 0 0 0 1px rgba(181, 122, 224, .35), 0 0 12px rgba(181, 122, 224, .3);
+}
+.br-ball.master em { color: #f3e6ff; }
+.ballrail.live .br-ball.master:not(:disabled) kbd { background: #b57ae0; color: #2a1840; }
+.ballrail.live .br-ball.master:not(:disabled):hover {
+  border-color: #e2c6ff; background: linear-gradient(#653a88, #402759);
+}
+
+/* How close this species is to evolving - the number the throw actually turns
+   on, so it gets its own card opposite the nameplate rather than a grey line
+   underneath it. Only while you are choosing; the catch banner takes this
+   corner once the ball has landed. */
+.evocard {
+  position: absolute; top: 4%; right: 3%; z-index: 6;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0;
+  padding: .8cqw 1.3cqw .7cqw;
+  background: var(--surface); border: 3px solid var(--line-firm);
+  border-radius: 11px; box-shadow: 0 3px 0 rgba(60, 80, 65, .22);
+  animation: cheer-drop 380ms cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.evocard.on {
+  border-color: var(--gold); background: #fdf6e6;
+  animation: cheer-drop 380ms cubic-bezier(.2, 1.4, .4, 1) both,
+             ready-glow 2.4s ease-in-out 400ms infinite;
+}
+.ec-label {
+  font-family: var(--pixel); font-size: 1.05cqw; letter-spacing: .12em;
+  color: var(--ink-faint); line-height: 1.4;
+}
+.evocard.on .ec-label { color: var(--gold); }
+/* The count and what it is for share a line. Stacked on three rows the card was
+   mostly padding, and the long form - "NEEDS A WATER STONE" - set a width the
+   two rows above it then had to leave empty. */
+.ec-line { display: flex; align-items: baseline; gap: .7cqw; }
+.ec-count {
+  font-family: var(--display); font-weight: 600; font-size: 2.4cqw;
+  line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.ec-count span { font-size: 1.6cqw; color: var(--ink-faint); }
+.ec-sub {
+  font-family: var(--pixel); font-size: 1.2cqw; color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* ================================================= responsive, last on purpose
+
+   These override base rules declared much further down the file - each scroll
+   container carries its own `max-height`. A media query adds no specificity, so
+   while this block sat up beside `.stage` every one of those base rules won on
+   source order: the rail stretched but its list stayed pinned to a guessed 400px
+   and left a gap underneath. Layout overrides go last. */
+
+/* A wide screen can afford a wider rail, which is where the dense content is. */
+@media (min-width: 1400px) {
+  .stage { grid-template-columns: 1fr 400px; }
+}
+
+@media (min-width: 980px) {
+  .stage { grid-template-columns: 1fr 360px; align-items: stretch; }
+
+  /* Wide enough for the route and a map of it. */
+  .minimap { display: block; }
+
+  /* The map grows with the column, so without this a wide window makes it
+     taller than the screen and the whole page scrolls. Cap its width by what is
+     left of the viewport height, using the canvas's own 15:11 ratio. */
+  .viewport { max-width: calc((100vh - 210px) * 15 / 11); margin-inline: auto; }
+  /* `align-items: stretch` equalises the two columns to the TALLER one, and the
+     rail's natural height is its whole list - so stretching made the map grow
+     to match the box rather than the other way round, and the page scrolled.
+     A zero height keeps the rail out of the row calculation entirely; the row
+     is then the map's height, and min-height fills the rail back into it. */
+  .rail {
+    display: flex; flex-direction: column;
+    height: 0; min-height: 100%;
+  }
+  .rail > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .dexgrid, .boxlist, .arealist, .shopscroll, .trscroll {
+    max-height: none; flex: 1 1 auto; min-height: 120px;
+    /* These are grids that now fill the column, so their rows would stretch to
+       share the leftover height - which turned every square dex cell into a
+       tall thin one. Pack to the top and let the overflow scroll instead. */
+    align-content: start;
+  }
+}
