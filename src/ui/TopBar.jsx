@@ -26,7 +26,7 @@ export default function TopBar({
           still saying PHASE 1 through two phases of work - a label that can
           only ever be right by coincidence. The roadmap lives in README.md. */}
       <div className="tb-brand">
-        <span className="title">Meadow Route</span>
+        <span className="title">Dexora</span>
       </div>
 
       <div

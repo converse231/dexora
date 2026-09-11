@@ -1,4 +1,4 @@
-# Meadow Route
+# Dexora
 
 An eight-map, 151-species collecting game: walk, meet, throw, bank the
 duplicates, evolve.
@@ -1497,6 +1497,111 @@ Thickening it alone would not have fixed that, and nothing in the rule said so.
 
 **A "seen but never caught" view** was already built — the Dex has had a SEEN
 chip since the FilterBar landed. It got a **SHINY** chip beside it instead.
+
+### R runs
+
+Fleeing was Escape only. Escape is the right key for *dismiss this* and it
+stays, but it is also across the keyboard from a hand that is on WASD, and the
+button it dismisses has the word **RUN** printed on it. `r` was free — not a
+movement key, not fishing (F), not the bike (B) — so nothing had to move to
+make room, and the `<kbd>` on the button says R now because that is the key a
+player will actually reach for.
+
+### A sale names what it is taking
+
+`Sell spares` said **"23 Pokémon sold, ¥4,140"**. That is a number you have to
+*trust*: the box holds thirty-odd rows, the rule for what counts as spare is
+three sentences long, and the action has no undo at all. If one of those
+twenty-three was a Lv 30 you had been walking up for an hour, you found out
+afterwards.
+
+Both sell dialogs now carry a **manifest** — a scrollable list of exactly what
+is going, one line per species with the levels beside it, **lowest first,
+because that is the order they are taken in**. A Lv 30 sitting in a pile of Lv 3s
+is visible before you press the button rather than after. It is a new optional
+`manifest` prop on `Confirm`, not a new dialog: `lines` answers *how many* and
+this answers *which ones*, and most confirmations in the game are about a single
+named thing where a manifest of one would be noise.
+
+The per-row sale lists the individual Pokémon; the whole-box sweep groups by
+species, because forty separate lines is not a thing anyone reads.
+
+### The bar got thinner, and stopped being two shapes
+
+The last pass took the dex bar from 9px to 16px to fit a second fill in it, and
+16px of chrome above a grid of sprites is a **slab**. It is 9px again, and the
+second fill did not have to go: both fills are `position: absolute` in the same
+track now rather than flex items sharing it, so they **overlap** — the caught
+fill sits on top of the seen fill, at the same left edge, which is the honest
+picture since everything caught was also seen.
+
+That also fixed the thing that made it look odd at low percentages. As flex
+items each fill was its own rounded pill, so at 3% the bar was a stubby capsule
+floating in a longer capsule and the two radii fought. One track has the
+rounding now; the fills are square and are simply clipped by it.
+
+`flex: none` stays, for the reason the last pass found it: on a wide screen the
+bar is a flex item in a column, and a flex item with no content shrinks first.
+
+### The dex entry says where to go and look
+
+The single most useful thing a Pokédex can tell you about something you have
+never met is **where it lives**, and the sheet did not say. Every entry now
+carries a **WHERE TO LOOK** block: the areas it rolls in, ordered by how likely
+you are to find one there, each marked *common* / *uncommon* / *rare* — and
+those words mean common **in that place**, which is the question being asked.
+Rods are listed beside them.
+
+`foundIn()` in `biomes.js` reads it straight out of the tables that actually
+roll, so it cannot drift from them; move a species between biomes and its entry
+updates itself. Two cases needed handling by hand:
+
+- **Legendaries** are appended to every table by rule, so listing their eight
+  areas would be true and useless. They get one line: *Anywhere · vanishingly
+  rare*.
+- **51 of the 151 are in no table at all** — every second and third stage — and
+  for those the sheet said nothing whatsoever, on exactly the entries a player
+  is most likely to open wondering where the thing is. They fall back to the
+  evolution graph: *Evolve Machoke · by trade*.
+
+It shows on the locked entries too, which is the point of it. A silhouette with
+no information is a door; a silhouette that names a map is a lead.
+
+### The encounter happens where you are
+
+You could walk to the bottom of Ember Caldera, meet a Geodude, and fight it
+standing on **grass under a blue sky** — the battle scene was one fixed
+backdrop, and it was the meadow's.
+
+Two halves, and they are deliberately different kinds of thing:
+
+**The floor is the map's own metatile.** `build_ground()` cuts one 16×16 tile
+per area out of the same atlas the map draws from, and it reads the ids back out
+of `route.json` — `cave.floor`, `volcano.floor`, `tower.floor` — rather than
+picking them by eye, because this script is what wrote them there. So the ground
+under an encounter is, exactly, the ground you were standing on.
+
+**The sky is CSS**, because a cave's problem is not its floor tile — it is that
+there is no sky. Each area sets four custom properties: the gradient overhead,
+the tint and the near-ground glow that say what light is falling, and the lip
+under the horizon. Rock Ridge is brown dark over warm lamplight, the Power Plant
+a badly-lit room, Ember Caldera lit **from below**, Frost Hollow pale with blue
+shadows, the Haunted Tower purple-black. Deep Woods keeps the meadow's grass and
+changes only its light, which is what being under a canopy is.
+
+Two things went wrong building it, both worth keeping:
+
+- The properties were first set on `.battle-field` — and `.battle-sky` and
+  `.battle-ground` are its **siblings**, not its children. A custom property
+  only inherits downwards, so every area drew the default. They live on
+  `.battle` now.
+- The near-ground highlight was a fixed 30% white sitting on top of every tint,
+  which washed the cave, the plant and the tower straight back to daylight: a
+  dark sky over a floor lit by nothing. It is `--ground-glow`, per area.
+
+`check.mjs` asserts every area has both a floor PNG and a sky block, because
+neither half fails loudly — a missing PNG is a blank floor and a missing sky is
+the default daylight, which is the exact bug this replaced.
 
 **Your calls, answered:** generous rewards, and kinder odds.
 

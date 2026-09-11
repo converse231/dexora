@@ -3,7 +3,7 @@
 Produces, into public/:
   tilesets/route.png   + route.json    the FireRed metatile atlas (640 x 16x16 tiles)
   tilesets/player.png  + player.json   the player walk cycle, background keyed out
-  battle/ground.png, tallgrass.png     single tiles for the encounter backdrop
+  battle/<area>.png                   the floor each area fights on
 
 Sources live in .assets-src/ and are fetched from the pret/pokefirered
 decompilation, except the player sheet which you supply. Requires Pillow.
@@ -822,14 +822,43 @@ def build_shoes(strip, meta):
 
 def build_ground():
     """Single metatiles pulled out of the atlas so CSS can tile them as the
-    encounter background. Same art as the map, no extra source needed."""
+    encounter background. Same art as the map, no extra source needed.
+
+    ONE PER AREA. Every encounter used to happen on grass - you could be deep
+    in Ember Caldera, meet something, and fight it standing on a meadow. The
+    floor each area actually walks on is already named in route.json, because
+    this same script wrote it there, so the ids are read back out rather than
+    picked by eye: `cave.floor`, `volcano.floor` and so on are the exact
+    metatiles the map draws underfoot.
+
+    The three outdoor maps keep primary metatile 1, the grass they are made
+    of. What separates those three from each other is the sky, which is CSS -
+    see `--sky` in styles.css - not the ground."""
     atlas = Image.open(os.path.join(PUB, "tilesets", "route.png"))
+    with io.open(os.path.join(PUB, "tilesets", "route.json"), encoding="utf-8") as f:
+        meta = json.load(f)
     os.makedirs(os.path.join(PUB, "battle"), exist_ok=True)
-    for name, mid in (("ground", 1), ("tallgrass", 13)):
-        my, mx = divmod(mid, 16)
+
+    grounds = {
+        "meadow": 1, "woods": 1, "pond": 1,          # grass, from the primary
+        "ridge": meta["cave"]["floor"],
+        "power": meta["power"]["floor"],
+        "ember": meta["volcano"]["floor"],
+        "frost": meta["frost"]["floor"],
+        "tower": meta["tower"]["floor"],
+    }
+    # The fallback an area with no tile of its own lands on, and what the CSS
+    # default points at.
+    grounds["ground"] = 1
+
+    for name, mid in grounds.items():
+        assert isinstance(mid, int), (
+            "%s's floor is %r - build_ground wants a single metatile id, and a "
+            "3x3 autotile has no one tile that IS the floor" % (name, mid))
+        my, mx = divmod(mid, meta["atlasCols"])
         atlas.crop((mx * 16, my * 16, mx * 16 + 16, my * 16 + 16)).save(
             os.path.join(PUB, "battle", f"{name}.png"))
-    print("  ground.png + tallgrass.png  16x16")
+    print("  battle grounds: %s  16x16" % " ".join(sorted(grounds)))
 
 
 if __name__ == "__main__":

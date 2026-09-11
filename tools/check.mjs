@@ -1944,4 +1944,27 @@ import { saveProblem } from "../src/game/engine.js";
     `map characters${spare.length ? `; unused: ${spare.join(" ")}` : ""}`);
 }
 
+/* Every map fights on its own ground, under its own sky.
+
+   Both halves are easy to forget, and neither fails loudly: a missing PNG is a
+   404 into a blank floor, and a missing `[data-area]` block is the default
+   daylight - so you meet something at the bottom of Ember Caldera and battle it
+   under a blue sky, which is the bug this whole pair exists to fix. The three
+   outdoor maps DO differ (their skies), so there is no area this can skip.
+
+   The floors come from `npm run art`, the skies are hand-written CSS; this is
+   the only thing that says the two agree with the list of maps. */
+{
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  for (const id of Object.keys(AREAS)) {
+    assert.ok(existsSync(new URL(`../public/battle/${id}.png`, import.meta.url)),
+      `no public/battle/${id}.png - run npm run art after adding a map`);
+    assert.ok(css.includes(`.battle[data-area="${id}"]`) || id === "meadow",
+      `${id} has no sky: add a .battle[data-area="${id}"] block to ` +
+      "styles.css, or its encounters happen under the default daylight");
+  }
+  console.log(`battle scene ok — ${Object.keys(AREAS).length} floors, ` +
+    `${(css.match(/\.battle\[data-area=/g) ?? []).length} skies`);
+}
+
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, none locked, ${sizes[0]} … ${sizes.at(-1)}`);

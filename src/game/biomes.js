@@ -149,6 +149,43 @@ export const TIER_ODDS = [
    is what a row of marks reads in - progress towards the rarest. */
 export const TIERS = TIER_ODDS.map(([tier]) => tier);
 
+/* WHERE TO GO AND LOOK. The single most useful thing the Dex can say about a
+   species you have never met, and it was the one thing it did not say.
+
+   Everything here is read out of the tables that actually roll, so it cannot
+   drift from them - a species moved between biomes updates its own entry.
+
+   Legendaries are the exception and have to be, because `legendsFor()` appends
+   them to EVERY table by rule: listing their eight areas would be true and
+   useless. They get one honest sentence instead.
+
+   A `weight` is the biome table's own, and the share is against that table's
+   total - so "Rock Ridge (common)" means common THERE, which is the question
+   being asked. Areas are ordered by how likely you are to actually find one. */
+export function foundIn(speciesId) {
+  if (LEGENDARY.includes(speciesId)) return { legendary: true, areas: [], rods: [] };
+
+  const areas = [];
+  for (const b of BIOMES) {
+    const total = b.table.reduce((n, [, w]) => n + w, 0);
+    const row = b.table.find(([id]) => id === speciesId);
+    if (row) areas.push({ id: b.id, name: b.name, share: row[1] / total });
+  }
+  areas.sort((a, b) => b.share - a.share);
+
+  const rods = RODS
+    .filter((r) => r.table.some(([id]) => id === speciesId))
+    .map((r) => r.name);
+
+  return { legendary: false, areas, rods };
+}
+
+/* How a share reads out loud. Thresholds rather than a percentage: the exact
+   number is noise at this scale, and "one in forty" is a thing nobody can act
+   on where "uncommon" is. */
+export const howOften = (share) =>
+  (share >= 0.12 ? "common" : share >= 0.05 ? "uncommon" : "rare");
+
 /* One roll, one answer. Rolled here rather than at four call sites so the
    precedence - rarest first - cannot be written down four different ways.
 

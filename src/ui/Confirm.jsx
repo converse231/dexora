@@ -11,6 +11,12 @@ import { useModalLock } from "./modal.js";
 export default function Confirm({
   title,
   lines = [],
+  /* An itemised list of what the action will actually touch. `lines` answers
+     "how many"; this answers "which ones", and for a sale those are different
+     questions - "Sold 8 x Pidgey" is a number you have to trust, where a list
+     of levels is one you can check. Optional, because most dialogs here are
+     about a single named thing and a manifest of one is noise. */
+  manifest = [],
   note,
   confirmLabel = "CONFIRM",
   tone = "",
@@ -54,6 +60,17 @@ export default function Confirm({
               </div>
             ))}
           </dl>
+        )}
+
+        {manifest.length > 0 && (
+          <ul className="cf-manifest">
+            {manifest.map((row) => (
+              <li key={row.key}>
+                <span>{row.label}</span>
+                {row.sub && <em>{row.sub}</em>}
+              </li>
+            ))}
+          </ul>
         )}
 
         {note && <p className="cf-note">{note}</p>}

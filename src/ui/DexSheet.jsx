@@ -23,6 +23,8 @@ import { useModalLock } from "./modal.js";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import Sprite, { spriteUrl } from "./Sprite.jsx";
+import { foundIn, howOften } from "../game/biomes.js";
+import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
 
 /* Kindest first, so the row reads as progress toward the rarest. Origin and
@@ -35,6 +37,59 @@ const VARIANTS = [
   ["shiny", "Shiny", "the alternate palette"],
   ["astral", "Astral", "made of starlight"],
 ];
+
+/* Where this one turns up, in a sentence a player can act on.
+
+   Ordered by what is actually useful: a wild table beats a rod beats an
+   evolution, because "go to Rock Ridge" is a thing you can do now and "evolve
+   a Machoke" is a thing you can do once you already have one.
+
+   The evolution fallback matters more than it looks: 51 of the 151 are in no
+   table at all - every second-stage and third-stage Pokemon - and for those
+   the old sheet said nothing whatsoever, on exactly the entries a player is
+   most likely to open wondering where it is. */
+function whereToFind(id) {
+  const { legendary, areas, rods } = foundIn(id);
+  if (legendary) {
+    return [{ key: "legend", where: "Anywhere", how: "vanishingly rare" }];
+  }
+
+  const out = areas.map((a) => ({
+    key: a.id, where: a.name, how: howOften(a.share),
+  }));
+  for (const rod of rods) out.push({ key: rod, where: "Any water", how: rod });
+
+  if (!out.length) {
+    const from = EVOLUTIONS.filter((r) => r.to === id);
+    for (const row of from) {
+      out.push({
+        key: `evo-${row.from}`,
+        where: `Evolve ${label(SPECIES[row.from - 1])}`,
+        how: row.kind === "level" ? `at Lv ${row.level}`
+          : row.kind === "stone" ? "with a stone" : "by trade",
+      });
+    }
+  }
+  return out;
+}
+
+function Where({ id }) {
+  const rows = whereToFind(id);
+  if (!rows.length) return null;
+  return (
+    <div className="sheet-where">
+      <div className="sw-head">WHERE TO LOOK</div>
+      <ul>
+        {rows.map((r) => (
+          <li key={r.key}>
+            <span>{r.where}</span>
+            <em>{r.how}</em>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function DexSheet({
   id, state, variant = null, held = {}, originLocked = false, onClose,
@@ -144,6 +199,11 @@ export default function DexSheet({
               </div>
             </div>
 
+            {/* Shown whether or not it is caught - see the `seen` branch
+                below, which shows it too. An entry you have never filled in is
+                exactly the one that needs to say where to go. */}
+            <Where id={id} />
+
             <p className="sheet-flavor">{sp.flavor}</p>
 
             <dl className="sheet-facts">
@@ -162,11 +222,16 @@ export default function DexSheet({
             </dl>
           </>
         ) : (
-          <p className="sheet-locked">
-            {seen
-              ? "CATCH ONE TO FILL IN THIS ENTRY"
-              : "NOT YET ENCOUNTERED"}
-          </p>
+          <>
+            <p className="sheet-locked">
+              {seen
+                ? "CATCH ONE TO FILL IN THIS ENTRY"
+                : "NOT YET ENCOUNTERED"}
+            </p>
+            {/* The whole point. A silhouette with no information is a locked
+                door; a silhouette that tells you which map to walk is a lead. */}
+            <Where id={id} />
+          </>
         )}
 
         <button className="sheet-close" onClick={onClose}>CLOSE</button>

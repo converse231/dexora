@@ -177,18 +177,92 @@ canvas {
 }
 @keyframes battle-in { from { opacity: 0; transform: scale(1.03); } }
 
+/* ---- the encounter stands somewhere ------------------------------------
+   Every fight used to happen on a meadow under a blue sky, whichever map you
+   were on - you could meet something at the bottom of Ember Caldera and battle
+   it standing on grass. The FLOOR is the metatile that area actually walks on,
+   set as `--ground` by the encounter (see Encounter.jsx); the SKY and the
+   light on the ground are these three variables, because a cave's problem is
+   not its floor tile, it is that there is no sky.
+
+   Defaults are the outdoor daylight the scene has always had, so an area that
+   never gets its own line still looks like it did. */
+.battle {
+  --sky: linear-gradient(#bfe9f7 0%, #ddf3f0 58%, #e9f5df 100%);
+  /* `none`, not a url: Encounter.jsx always sets this inline, and a relative
+     url() here would be resolved against the BUILT stylesheet in dist/assets/
+     and 404 - the same trap `spriteUrl()` documents. Vite says so at build
+     time, which is how this was caught. A missing floor leaves the sky and the
+     tint drawing; a broken `var()` would take the whole background with it. */
+  --ground: none;
+  --ground-tint: linear-gradient(rgba(255, 255, 255, .1), rgba(22, 62, 42, .24));
+  --ground-lip: rgba(30, 70, 45, .2);
+  /* The light falling on the near ground. A variable, not a fixed white, and
+     that was the whole difference indoors: a flat 30% white highlight sat on
+     top of every tint and washed the cave, the plant and the tower back to
+     daylight, so the dark sky read as a ceiling over a floor lit by nothing. */
+  --ground-glow: rgba(255, 255, 255, .3);
+}
+
+/* Deep Woods: the same grass, under a canopy. Green light, not blue. */
+.battle[data-area="woods"] {
+  --sky: linear-gradient(#7fb069 0%, #a8cf8e 55%, #cfe3b4 100%);
+  --ground-tint: linear-gradient(rgba(210, 255, 190, .12), rgba(18, 52, 30, .38));
+  --ground-lip: rgba(20, 56, 32, .3);
+  --ground-glow: rgba(226, 255, 196, .22);
+}
+/* Pond & Shore: more sky, and it is over water. */
+.battle[data-area="pond"] {
+  --sky: linear-gradient(#9fd8f0 0%, #c6ecf3 55%, #dff2e6 100%);
+}
+/* Rock Ridge: underground. A brown dark above, warm lamp light below. */
+.battle[data-area="ridge"] {
+  --sky: linear-gradient(#2e2620 0%, #4b3d31 60%, #6b5645 100%);
+  --ground-tint: linear-gradient(rgba(120, 88, 48, .30), rgba(16, 11, 7, .60));
+  --ground-lip: rgba(14, 10, 6, .5);
+  --ground-glow: rgba(255, 216, 150, .16);
+}
+/* The Power Plant: a room, lit badly. */
+.battle[data-area="power"] {
+  --sky: linear-gradient(#232a31 0%, #3b4650 58%, #5a6773 100%);
+  --ground-tint: linear-gradient(rgba(70, 92, 116, .34), rgba(10, 15, 21, .58));
+  --ground-lip: rgba(10, 16, 22, .5);
+  --ground-glow: rgba(196, 222, 255, .14);
+}
+/* Ember Caldera: the light comes from BELOW, which is the whole place. */
+.battle[data-area="ember"] {
+  --sky: linear-gradient(#2a1109 0%, #5e2410 55%, #9c3f13 100%);
+  --ground-tint: linear-gradient(rgba(255, 130, 40, .22), rgba(34, 10, 3, .52));
+  --ground-lip: rgba(120, 40, 10, .45);
+  --ground-glow: rgba(255, 186, 110, .26);
+}
+/* Frost Hollow: everything is pale and the shadows are blue. */
+.battle[data-area="frost"] {
+  --sky: linear-gradient(#8fb8d6 0%, #bcd9ea 55%, #dceef7 100%);
+  --ground-tint: linear-gradient(rgba(255, 255, 255, .16), rgba(56, 96, 130, .34));
+  --ground-lip: rgba(70, 110, 140, .3);
+  --ground-glow: rgba(236, 248, 255, .3);
+}
+/* The Haunted Tower: indoors, and the dark is the point. */
+.battle[data-area="tower"] {
+  --sky: linear-gradient(#1a1424 0%, #2e2440 58%, #4a3c62 100%);
+  --ground-tint: linear-gradient(rgba(96, 74, 150, .34), rgba(12, 7, 22, .62));
+  --ground-lip: rgba(8, 5, 16, .55);
+  --ground-glow: rgba(186, 160, 255, .13);
+}
+
 .battle-sky {
   position: absolute; inset: 0 0 50% 0;
-  background: linear-gradient(#bfe9f7 0%, #ddf3f0 58%, #e9f5df 100%);
+  background: var(--sky);
 }
 .battle-ground {
   position: absolute; inset: 50% 0 0 0;
   background:
-    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, .3), transparent 60%),
-    linear-gradient(rgba(255, 255, 255, .1), rgba(22, 62, 42, .24)),
-    url("/battle/ground.png") 0 0 / 48px 48px repeat;
+    radial-gradient(120% 90% at 50% 0%, var(--ground-glow), transparent 60%),
+    var(--ground-tint),
+    var(--ground) 0 0 / 48px 48px repeat;
   image-rendering: pixelated;
-  box-shadow: inset 0 6px 16px rgba(30, 70, 45, .2);
+  box-shadow: inset 0 6px 16px var(--ground-lip);
 }
 
 /* The band between the nameplate and the textbox. Sizing the slot by HEIGHT
@@ -1248,30 +1322,24 @@ canvas {
      left over. Nothing about the rule said so, which is why thickening it
      alone would not have fixed it. */
   flex: none;
-  position: relative; height: 16px; margin-bottom: 13px;
+  position: relative; height: 9px; margin-bottom: 13px;
   border-radius: 99px; overflow: hidden;
   background: var(--line);
-  box-shadow: inset 0 2px 3px rgba(40, 60, 35, .16);
+  box-shadow: inset 0 1px 2px rgba(40, 60, 35, .14);
 }
+/* SQUARE ENDS. Both fills used to be pills in their own right, so the pale
+   "seen" layer showed a rounded cap partway along the track and the whole
+   thing read as two separate lozenges overlapping rather than one bar with
+   two zones. The track is the only rounded thing now and it clips them. */
 .bar i, .bar b {
   position: absolute; left: 0; top: 0; height: 100%;
-  border-radius: 99px;
   transition: width 420ms cubic-bezier(.2, .8, .3, 1);
 }
 /* Seen: behind, and quiet. */
 .bar b { background: var(--path-soft); }
 /* Caught: in front, with a highlight along the top so it reads as a solid
    object in the track rather than a coloured region of it. */
-.bar i {
-  background: linear-gradient(var(--path), #8f5a52);
-  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .28);
-}
-/* A soft leading edge, so a bar at 3% still looks like something started. */
-.bar i::after {
-  content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 3px;
-  border-radius: 99px; background: rgba(255, 246, 236, .5);
-}
-.bar i[style*="width: 0%"]::after { display: none; }
+.bar i { background: var(--path); }
 /* The rows are a fixed height rather than the cells being square by
    aspect-ratio. With `1fr` columns the cell's inline size is not known while
    the browser is sizing rows, so the ratio cannot contribute to them: the rows
@@ -1504,6 +1572,26 @@ canvas {
   margin: 0; font-family: var(--display); font-weight: 600; font-size: 15px;
   font-variant-numeric: tabular-nums; text-align: right;
 }
+/* What the action is actually taking. Scrolls rather than growing, because a
+   full sweep can be forty Pokemon and a dialog taller than the screen has no
+   confirm button on it. */
+.cf-manifest {
+  list-style: none; margin: 0 0 12px; padding: 8px 10px;
+  max-height: 168px; overflow-y: auto;
+  background: var(--surface-2); border-radius: 9px;
+  display: grid; gap: 4px;
+}
+.cf-manifest li {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 12.5px; color: var(--ink-soft);
+}
+.cf-manifest li span { flex: 1; min-width: 0; }
+.cf-manifest li em {
+  font-style: normal; font-family: var(--pixel); font-size: 8px;
+  color: var(--ink-faint); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .cf-note {
   font-size: 12px; line-height: 1.45; color: var(--ink-soft);
   margin: 0 0 10px; padding-left: 9px; border-left: 3px solid var(--sand);
@@ -1561,6 +1649,28 @@ canvas {
 .sheet-genus { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; }
 .sheet-types { display: flex; gap: 5px; }
 .sheet-types .type { font-size: 8.5px; }
+
+/* WHERE TO LOOK. Set as a list of place-and-likelihood pairs rather than
+   prose: it is a thing you read to decide where to walk next, so it wants to
+   be scanned, not read. Quiet enough to sit under the FORMS strip without
+   competing with it. */
+.sheet-where { margin: 0 0 14px; }
+.sw-head {
+  font-family: var(--pixel); font-size: 8.5px; letter-spacing: .1em;
+  color: var(--ink-faint); margin-bottom: 6px;
+}
+.sheet-where ul {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 3px;
+}
+.sheet-where li {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 13px; color: var(--ink-soft);
+}
+.sheet-where li span { flex: 1; min-width: 0; }
+.sheet-where li em {
+  font-style: normal; font-family: var(--pixel); font-size: 8px;
+  color: var(--ink-faint); letter-spacing: .04em;
+}
 
 /* THE DEX TEXT. No coloured bar down the side - it was the only accent on the
    card and it was spent on the one block that is pure reference, which had the

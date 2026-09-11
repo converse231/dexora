@@ -1,4 +1,4 @@
-# Meadow Route
+# Dexora
 
 A personal, non-commercial browser game: catch, collect and evolve the 151 Gen 1
 Pokémon across eight hand-made areas. Inspired by DelugeRPG's loop — walk, meet,
@@ -16,7 +16,7 @@ is how to work in the codebase: the invariants, the traps, and the method.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   node tools/check.mjs (14 suites)
+npm run dev        vite dev server           npm run check   node tools/check.mjs (17 suites)
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
                                              npm run layout  composition metrics
@@ -592,9 +592,10 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 `ladders_clear()`, whenever a pool is placed.
 - spawn not inside a wall; ≥200 walkable tiles; ≥90% reachable (directed)
 
-[tools/check.mjs](tools/check.mjs) adds fourteen suites — catch odds, phase
+[tools/check.mjs](tools/check.mjs) adds seventeen suites — catch odds, phase
 machine, balls, economy, evolution, evolution animation, trainer stats,
-casting, tileset, player, medals, steps, minimap, areas.
+casting, tileset, player, medals, origin gate, variant rows, steps, minimap,
+battle scene, areas.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
 crown is whole. Biome ground and solid lists must be disjoint (an "invisible
@@ -1113,6 +1114,18 @@ fails if a better ball is ever worth nothing.
   `.evo`.
 - Never `animation-fill-mode: both` on a fade-in — it holds the invisible start
   state if the animation does not run.
+
+**The encounter scene is two different kinds of thing, and they live apart.**
+The FLOOR is the area's own metatile, cut by `build_ground()` out of the atlas
+with the id read back out of `route.json` (`cave.floor`, `volcano.floor`, ...) -
+so it cannot disagree with what the map draws underfoot. The SKY and the light
+are CSS custom properties per `[data-area]`, because a cave's problem is not its
+floor tile, it is that there is no sky. **They go on `.battle`**: `.battle-sky`
+and `.battle-ground` are SIBLINGS of `.battle-field`, and a custom property only
+inherits downwards - set one level too low and every area silently drew the
+default daylight. check.mjs asserts both halves exist for every area in `AREAS`,
+because neither fails loudly on its own, and `--ground` is built against
+`document.baseURI` for the same reason `spriteUrl()` is.
 
 **Rendering a map to look at it** — no browser needed, and no temporary
 viewport edits to forget to revert. Drive the real `drawTile()` from Node with a

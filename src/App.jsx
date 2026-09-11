@@ -109,7 +109,13 @@ export default function App() {
           ev.preventDefault();
           const pick = BALLS[Number(ev.key) - 1];
           if (pick) e.throwBall(pick.id);
-        } else if (enc.phase === "idle" && ev.key === "Escape") {
+        /* R for run, as well as Escape. Escape is the correct key for
+           "dismiss this" and stays; R is the one a hand already on WASD can
+           reach without looking, and it is what the word on the button says.
+           `r` is not a movement key and not taken by fishing (F) or the bike
+           (B), so nothing had to move to make room. */
+        } else if (enc.phase === "idle"
+                   && (ev.key === "Escape" || ev.key === "r" || ev.key === "R")) {
           ev.preventDefault();
           e.flee();
         }

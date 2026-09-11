@@ -979,7 +979,7 @@ def ledge(g, x0, x1, y):
 
 
 def tall_grass():
-    """Meadow Route: a vertical meadow of four terraces, path switchbacking up.
+    """Tall Grass: a vertical meadow of four terraces, path switchbacking up.
 
     32x40, of which 28x34 is playable - about two screens across and three and a
     half down, which is Route 1's proportions. Coordinates are absolute; the

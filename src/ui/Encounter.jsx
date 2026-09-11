@@ -54,8 +54,24 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
   const outOfBalls = BALLS.every((b) => !(bag?.[b.id] > 0));
 
   return (
+    /* The ground you are standing on, and the light you are standing in.
+       `enc.areaId` was already on the encounter for the Dusk Ball, so this
+       needed no new state - only for the scene to stop assuming grass.
+
+       It goes on `.battle`, NOT on `.battle-field`: the sky and the ground are
+       SIBLINGS of the field, not children of it, and a custom property only
+       inherits downwards. Set one tier lower and every area drew the default.
+
+       The url is ABSOLUTE for the reason `spriteUrl` is: a relative one inside
+       a custom property resolves against the stylesheet that reads it, not the
+       element that sets it, and would 404 into a blank floor. */
     <div
       className={`battle ${phase}`}
+      data-area={enc.areaId ?? "meadow"}
+      style={{
+        "--ground": `url(${new URL(
+          `battle/${enc.areaId ?? "ground"}.png`, document.baseURI).href})`,
+      }}
       onClick={animating ? onSkip : undefined}
       title={animating ? "Click to skip" : undefined}
       role="dialog"
@@ -227,7 +243,7 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
         {idle ? (
           <button className="runbtn" type="button" onClick={onFlee}>
             <span>RUN</span>
-            <kbd>ESC</kbd>
+            <kbd>R</kbd>
           </button>
         ) : (
           <div className="tb-hint">{animating ? "CLICK TO SKIP" : " "}</div>

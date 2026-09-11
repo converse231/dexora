@@ -180,6 +180,26 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
     );
   }).sort((a, b) => SORTS[sort](a, b) || a.species - b.species);
 
+  /* Built here rather than in the dialog: it is a pass over the whole box and
+     the dialog is rebuilt on every keystroke of the search field. */
+  const sellManifest = useMemo(() => {
+    const spare = new Set(spareUids);
+    const bySpecies = new Map();
+    for (const m of box) {
+      if (!spare.has(m.uid)) continue;
+      const at = bySpecies.get(m.species) ?? [];
+      at.push(m.level);
+      bySpecies.set(m.species, at);
+    }
+    return [...bySpecies.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([id, levels]) => ({
+        key: id,
+        label: `${levels.length} × ${label(SPECIES[id - 1])}`,
+        sub: `Lv ${levels.sort((a, b) => a - b).join(", ")}`,
+      }));
+  }, [box, spareUids, rev]);
+
   const confirmSellAll = () =>
     setPending({
       title: "Sell every spare?",
@@ -191,6 +211,11 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
            a second Holo shares one row with the first. */
         ["Kept", `${box.length - spareUids.length} — the best of each, and every variant`],
       ],
+      /* The sweep reaches across the whole box, so this is the one dialog
+         where "which ones" cannot be inferred from the row you pressed. One
+         line per species with the levels going, so a Lv 30 sitting in a pile
+         of Lv 3s is visible before it is gone. */
+      manifest: sellManifest,
       note: "Anything an unregistered evolution still needs is held back.",
       confirmLabel: `SELL ${spareUids.length} · +¥${spareValue.toLocaleString()}`,
       run: () => {
@@ -208,6 +233,15 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
     const value = uids.length * worth(sp);
     const left = group.count - uids.length;
 
+    /* WHICH ONES, not just how many. A sale is the one action in the game
+       with no undo, and "8 x Pidgey" asks you to trust that the eight are the
+       eight you think they are. Listed by level, lowest first - the order they
+       are actually taken in - so anything you were keeping for a reason is
+       visible before you press the button rather than after. */
+    const going = group.mons
+      .filter((m) => uids.includes(m.uid))
+      .sort((a, b) => a.level - b.level || a.uid - b.uid);
+
     setPending({
       title: digging ? `Sell ${label(sp)} you are saving?` : `Sell spare ${label(sp)}?`,
       lines: [
@@ -215,6 +249,11 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
         ["You receive", `¥${value.toLocaleString()}`],
         ["Kept", `${left} × ${label(sp)} at Lv ${group.best}`],
       ],
+      manifest: going.map((m) => ({
+        key: m.uid,
+        label: `${label(sp)}${group.variant ? ` · ${group.variant.toUpperCase()}` : ""}`,
+        sub: `Lv ${m.level}`,
+      })),
       note:
         digging && group.paths.length
           ? `These are evolution material — it would leave you ${
@@ -429,6 +468,7 @@ export default function Box({ box, bag, dex, rev, stats, busy, onSell, onEvolve 
         <Confirm
           title={pending.title}
           lines={pending.lines}
+          manifest={pending.manifest}
           note={pending.note}
           confirmLabel={pending.confirmLabel}
           tone="sell"
