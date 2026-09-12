@@ -438,7 +438,8 @@ export default function Box({
             onClick={() => confirmSweep(true)}
             title="Rare Candy. 1 candy = 1 level, on any Pokémon you hold."
           >
-            CANDY · +{spareCandy}
+            <img src="items/rare-candy.png" alt="" />
+            +{spareCandy}
           </button>
         </div>
       ) : (
@@ -482,7 +483,7 @@ export default function Box({
                 </span>
                 <Types of={sp.types} className="bx-types" />
                 <span className="bx-meta">
-                  Lv {group.best} best · ¥{worth(sp)} / {candyValue(sp)}★ each
+                  Lv {group.best} best · ¥{worth(sp)} / {candyValue(sp)} candy
                 </span>
               </div>
 
@@ -546,7 +547,8 @@ export default function Box({
                       onClick={() => confirmSellOne(group, true)}
                       title={`${spare * candyValue(sp)} Rare Candy`}
                     >
-                      ★ {spare * candyValue(sp)}
+                      <img src="items/rare-candy.png" alt="" />
+                      {spare * candyValue(sp)}
                     </button>
                   </>
                 )}

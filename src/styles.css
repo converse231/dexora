@@ -1633,7 +1633,19 @@ canvas {
   background: var(--candy-soft); border: 1px solid var(--candy);
   border-radius: 10px;
 }
-.cr-star { color: var(--candy); font-size: 17px; line-height: 1; }
+/* The real PokeAPI item sprite, at the 30px the shelf icons use. A drawn star
+   beside eight photographed item icons read as a placeholder for a sprite that
+   had not been fetched yet - which is exactly what it was. */
+.cr-pic { flex: none; width: 30px; height: 30px; image-rendering: pixelated; }
+.bx-sweep .bigbtn.candy img,
+.bx-acts .candy img {
+  width: 16px; height: 16px; vertical-align: -3px; margin-right: 3px;
+  image-rendering: pixelated;
+}
+.tb-candy {
+  width: 15px; height: 15px; vertical-align: -2px; margin-right: 2px;
+  image-rendering: pixelated;
+}
 .cr-copy { flex: 1; min-width: 0; display: grid; }
 .cr-copy b { font-size: 13px; }
 .cr-copy i {
@@ -1978,8 +1990,19 @@ canvas {
 /* Every visible pixel replaced with solid white, alpha untouched - the CSS
    equivalent of filling the sprite's palette with RGB_WHITE. Hard-edged, so
    the silhouette stays exact. */
-.evo-whiten .evo-mon { filter: brightness(0) invert(1); transition: filter .3s linear; }
-.evo-cycle .evo-mon, .evo-flash .evo-mon { filter: brightness(0) invert(1); }
+/* `!important`, and it is load-bearing rather than lazy. `.sprite-astral` and
+   `.sprite-holo` carry `filter: ... !important` - they have to, because an
+   animation outranks a plain declaration and `.mon` runs one. Now that the evo
+   scene wears those classes, the tier's filter would win here too and the
+   sprite would never whiten: the transformation is a white silhouette morphing,
+   and an Astral that stays blue through it has no transformation in it at all.
+   Within the `!important` tier specificity decides, and two classes beat one. */
+.evo-whiten .evo-mon {
+  filter: brightness(0) invert(1) !important; transition: filter .3s linear;
+}
+.evo-cycle .evo-mon, .evo-flash .evo-mon {
+  filter: brightness(0) invert(1) !important;
+}
 
 /* Before the cycle only the original is on screen; after it, only the result. */
 .evo-intro .evo-post, .evo-whiten .evo-post { visibility: hidden; }

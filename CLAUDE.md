@@ -744,6 +744,27 @@ nowhere to hang a layer, so whatever identifies the tier there has to come from
 there is a container: the encounter and the Forms strip. Astral splits the same
 way (duotone everywhere, sky and aura and orbit only in the encounter).
 
+**A TIER IS TWO THINGS, and a second copy of `FOLDER` only ever gets one.**
+Shiny and Origin have their own artwork; **Holo and Astral have no folder** and
+are the ordinary sprite plus a CSS filter. `Evolve.jsx` kept its own
+`const FOLDER` and picked the sprite from it - right for the two with folders,
+a no-op for the two without - so an Astral evolution played out in entirely
+ordinary art: you watched a normal Pokemon become a normal Pokemon and found an
+Astral in the box afterwards. The exact failure this file already recorded for
+shiny, reintroduced by a duplicated constant that was only fixed in one copy.
+**Never re-derive a sprite path**: `spriteUrl(id, variant)` is the one that
+knows, and anything drawing a tier needs `sprite-${variant}` as well as the
+path. check.mjs asserts both, against the source, because neither half fails
+loudly - a missing folder is the right picture and a missing class is a picture
+that is merely the wrong colour.
+
+**And the evo scene's whiten needs `!important` back.** The tier filters carry
+it (an animation outranks a plain declaration), so the moment those classes
+reached `.evo-mon` the duotone won there too and an Astral stayed blue through a
+transformation whose whole point is a white silhouette. Two classes beat one
+inside the `!important` tier, so `.evo-whiten .evo-mon` wins - but only because
+it also says `!important`.
+
 **`Sprite.jsx` takes the one word the engine decided** (`"origin"`, `"shiny"`,
 `"holo"`, `"astral"` or nothing) and picks the folder; no screen re-derives it,
 so none can disagree, and `spriteUrl()` exports the same path for the things

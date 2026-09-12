@@ -57,7 +57,10 @@ export default function TopBar({
             decision: a spare is one or the other and you pick every time. */}
         <span className="tb-stat">
           <i>CANDY</i>
-          <b>{candy.toLocaleString()}</b>
+          <b>
+            <img src="items/rare-candy.png" alt="" className="tb-candy" />
+            {candy.toLocaleString()}
+          </b>
         </span>
 
         <span className="tb-stat">

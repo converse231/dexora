@@ -26,10 +26,15 @@ const TOOLS = [
    error looking like a network problem. Misses are collected now and reported
    together at the end, so one bad name cannot hide the rest of the list. */
 const KEYS = ["bicycle", "old-rod", "good-rod", "super-rod"];
+/* Rare Candy is a CURRENCY here, not a bag item - it is spent per level and
+   lives beside the money in the top bar rather than in the bag. It still wants
+   its real sprite: the shop row and the Box buttons were drawing a text star,
+   and a drawn star next to eight real item icons reads as a placeholder. */
+const CURRENCY = ["rare-candy"];
 
 await mkdir("public/items", { recursive: true });
 const missing = [];
-for (const name of [...BALLS, ...TOOLS, ...KEYS]) {
+for (const name of [...BALLS, ...TOOLS, ...KEYS, ...CURRENCY]) {
   const res = await fetch(`${BASE}/${name}.png`);
   if (!res.ok) {
     missing.push(`${name} (${res.status})`);

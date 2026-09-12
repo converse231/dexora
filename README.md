@@ -1693,6 +1693,39 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### An Astral evolved into an ordinary Pokémon
+
+Reported from play: evolving a variant "produces a normal one and an astral
+evolution". The engine was innocent — it mutates one box entry in place and
+never pushes a second — so this was the scene lying about what happened.
+
+`Evolve.jsx` kept **its own copy of `FOLDER`**. That is right for Shiny and
+Origin, the two tiers with their own artwork, and does nothing whatsoever for
+Holo and Astral, which are the ordinary sprite plus a CSS filter. So the whole
+transformation played out in ordinary art and the Astral only appeared once you
+got back to the Box. It is the exact failure this document already records for
+shiny, reintroduced by a duplicated constant that was only ever fixed in the
+first copy.
+
+The scene takes `spriteUrl()` now and wears `sprite-${variant}` as well —
+**both halves of what a tier is**. And the whiten needed `!important` back:
+the tier filters carry it, so the duotone would otherwise win during the cycle
+and an Astral would stay blue through a transformation that is meant to be a
+white silhouette morphing.
+
+`check.mjs` asserts both halves against the source, because neither fails
+loudly: a missing folder is the right picture, and a missing class is a picture
+that is merely the wrong colour. The second of those two assertions found a hole
+in itself — a 200-character window ran past the rule's closing brace into the
+next rule, which has its own `!important`, so deleting one of the two passed. It
+reads the rule's own braces now.
+
+**Rare Candy wears its real sprite.** It was a text star beside eight
+photographed item icons, which reads as a placeholder for a sprite nobody had
+fetched — which is exactly what it was. `rare-candy` is in `fetch-items.mjs` now
+and draws in all four places it appears: the top bar, the sweep, the row button
+and the shop.
+
 ### Rare Candy: duplicates became fungible
 
 The old system was already "spend duplicates to evolve" — `feedCost` was

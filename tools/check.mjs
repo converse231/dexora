@@ -606,6 +606,47 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
   assert.equal(evoNext({ uid: 9, species: 132, level: 5 }, {}), null,
     "a Ditto evolves into nothing and must say so rather than throwing");
 
+  /* THE EVOLUTION SCENE MUST WEAR THE TIER, and a tier is TWO things.
+
+     This shipped broken. `Evolve.jsx` kept its own copy of `FOLDER` and picked
+     the sprite from it - correct for Shiny and Origin, which have their own
+     artwork, and a no-op for Holo and Astral, which are the ordinary sprite
+     plus a CSS filter. So an Astral evolution played out in entirely ordinary
+     art: a normal Pokemon became a normal Pokemon and an Astral turned up in
+     the box afterwards.
+
+     Asserted against the SOURCE, because neither half fails loudly - a missing
+     folder is the right picture and a missing class is a picture that is merely
+     the wrong colour. The rule is that the scene must not re-derive the path:
+     `spriteUrl` is the one function that knows. */
+  {
+    const src = readFileSync(new URL("../src/ui/Evolve.jsx", import.meta.url), "utf8");
+    assert.ok(src.includes("spriteUrl("),
+      "Evolve.jsx must take its sprite path from spriteUrl, not a second FOLDER");
+    assert.ok(!/const FOLDER\s*=/.test(src),
+      "Evolve.jsx has its own FOLDER again - that is how Astral lost its filter");
+    assert.ok(src.includes("sprite-${evo.variant}"),
+      "Evolve.jsx must also apply the tier CLASS: Holo and Astral have no folder " +
+      "and are nothing but the filter");
+
+    /* And the whiten must still beat it. The tier filters carry `!important`
+       (an animation outranks a plain declaration), so without a matching one
+       here an Astral would stay blue through a transformation whose entire
+       point is a white silhouette. */
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    for (const sel of [".evo-whiten .evo-mon", ".evo-cycle .evo-mon"]) {
+      const at = css.indexOf(sel);
+      assert.ok(at >= 0, `${sel} is gone`);
+      /* The rule's OWN braces, not a fixed window. A 200-character slice ran
+         past the closing brace into the next rule, which has its own
+         `!important` - so deleting one of the two passed. Found by trying it. */
+      const rule = css.slice(at, css.indexOf("}", at));
+      assert.ok(rule.includes("!important"),
+        `${sel} must beat the tier filter, which is !important - or the sprite ` +
+        "never whitens and there is no transformation in the scene");
+    }
+  }
+
   console.log(`evolution ok — ${chains} chains, ${synthetic} synthetic levels, ` +
     `candy ${CANDY.C}/${CANDY.B}/${CANDY.A}/${CANDY.S} at ¥${CANDY_PRICE}`);
 }

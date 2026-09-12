@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import { evoCycleFrames, SCALE_MAX } from "../game/evocycle.js";
+import { spriteUrl } from "./Sprite.jsx";
 
 const FRAME = 1000 / 60; // the GBA's frame, which every number below counts in
 const CYCLE = evoCycleFrames();
@@ -27,12 +28,25 @@ const FLASH = 10;
 
 const SPARKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
-/* Both halves of the scene wear the tier the hero was carrying. Not <Sprite>,
-   because the animation holds refs to these two elements. */
-const FOLDER = { shiny: "shiny/", origin: "origin/" };
+/* Both halves of the scene wear the tier the hero was carrying, and that takes
+   BOTH halves of what a tier is.
 
+   This shipped with only one of them. The scene kept its own copy of `FOLDER`
+   and picked the sprite from it - which is right for Shiny and Origin, the two
+   tiers with their own artwork, and does nothing at all for **Holo and Astral,
+   which have no folder**. Those two are the ordinary sprite plus a CSS filter,
+   so an Astral evolution played out entirely in ordinary art: you watched a
+   normal Pokemon become a normal Pokemon and then found an Astral in the box.
+   Exactly the failure CLAUDE.md records for shiny, reintroduced by a second
+   copy of a constant that only got fixed in the first copy.
+
+   `spriteUrl` is the one that knows, so the copy is gone. Still not <Sprite>,
+   because the animation holds refs to these two elements. */
 export default function Evolve({ evo, onDone }) {
-  const art = (id) => `sprites/${FOLDER[evo.variant] ?? ""}${id}.png`;
+  const art = (id) => spriteUrl(id, evo.variant);
+  // The filter half. Empty for a tier that has its own artwork, which is why
+  // the missing half was invisible for as long as it was.
+  const tier = evo.variant ? `sprite-${evo.variant}` : "";
   const [phase, setPhase] = useState("intro");
   const preRef = useRef(null);
   const postRef = useRef(null);
@@ -116,8 +130,18 @@ export default function Evolve({ evo, onDone }) {
       <div className="evo-stage">
         {/* Both sprites stay mounted: the cycle is a scale swap between two
             silhouettes, so unmounting either would break the tug-of-war. */}
-        <img ref={preRef} className="evo-mon evo-pre" src={art(evo.from)} alt="" />
-        <img ref={postRef} className="evo-mon evo-post" src={art(evo.to)} alt="" />
+        <img
+          ref={preRef}
+          className={`evo-mon evo-pre ${tier}`.trim()}
+          src={art(evo.from)}
+          alt=""
+        />
+        <img
+          ref={postRef}
+          className={`evo-mon evo-post ${tier}`.trim()}
+          src={art(evo.to)}
+          alt=""
+        />
 
         {phase === "reveal" &&
           SPARKS.map((i) => (

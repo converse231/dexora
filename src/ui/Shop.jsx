@@ -189,7 +189,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
         </div>
 
         <div className="candyrow">
-          <span className="cr-star">★</span>
+          <img src="items/rare-candy.png" alt="" className="cr-pic" />
           <span className="cr-copy">
             <b>Rare Candy</b>
             <i>1 candy = 1 level</i>
