@@ -13,6 +13,13 @@ the artist before anything ships.
 UI rationale, per-screen decisions. Read it before changing behaviour. This file
 is how to work in the codebase: the invariants, the traps, and the method.
 
+**`README.md` also carries a "Deferred on purpose" section**, and it is the first
+place to look before designing anything that sounds like it has been thought
+about before — band budgets for rarity dilution, pity for the rare tiers, the
+hybrid data model, and a watch-list of things decided one way that may want
+revisiting. Each carries the TRIGGER that should bring it back. Adding something
+there beats opening a ticket, because a ticket loses the reason.
+
 ## Commands
 
 ```

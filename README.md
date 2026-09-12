@@ -1797,8 +1797,6 @@ the Box groups by species **and** variant. Same rule on both sides now.
 
 **Your calls, answered:** generous rewards, and kinder odds.
 
----
-
 ### Phase 3 — Make it feel like a game
 
 *Goal: the loop is mechanically complete and completely silent.*
@@ -1847,6 +1845,110 @@ wanted.*
 
 **Your calls:** one generation at a time or several at once, and whether the
 older maps get new-generation residents or the new generations get new maps.
+
+---
+
+### Deferred on purpose
+
+Designed, costed, and **not built** — each with the trigger that should bring it
+back. They are here rather than in a tracker because every one of them is a
+design decision with a reason, and a one-line ticket loses the reason.
+
+### Band budgets — the anti-dilution guarantee
+
+**Trigger: the day a second generation lands. Not before.**
+
+Spawns are per-biome tables that each sum to 1, so Dexora is already immune to
+the global-pool dilution that would make every Gen 1 species rarer at 1,025
+species. Two local risks remain, and the first is the dangerous one:
+
+1. **Sprinkling a new generation into the eight existing tables.** The rule is
+   *a new generation is a new region with new tables* — never add a species to a
+   shipped table without removing weight.
+2. **A table growing from within**, which ours already does: the evolved-form
+   overlay took Tall Grass legendaries from 0.93% → 0.77%. Small now, structural
+   at scale.
+
+The fix for (2) is to reserve a fixed share per rarity band and normalise
+*within* the band:
+
+```
+BANDS = { common: .62, uncommon: .26, rare: .10, legendary: .02 }   # fixed forever
+
+pick(table, level):
+    band    = weightedChoice(BANDS)                    # never changes
+    members = table.filter(b => b.band == band && unlockedAt(level))
+    if members.empty: return pick from nearest non-empty band
+    return weightedChoice(members)                     # normalised inside the band
+```
+
+The legendary rate is then 2% in every region, at every level, in every
+generation, **by construction** — provable rather than measured. The honest cost:
+an individual species does get rarer as its band fills, which is unavoidable and
+is what rarity means. The guarantee is about the band, which is what a player
+feels.
+
+### Pity for the rare tiers
+
+**Trigger: a playtest where someone goes a long session with no variant.**
+
+Bad luck against a 1/480 Astral is genuinely miserable and completely invisible.
+One counter in save state:
+
+```
+if encountersSinceVariant > 300:
+    oddsMultiplier = 1 + (encountersSinceVariant - 300) / 100
+```
+
+It changes the measured rates `check.mjs` pins over 400k rolls, so it has to land
+with those assertions updated in the same commit — that is most of the work.
+
+### The hybrid data model
+
+**Trigger: a box that is slow to render or slow to save. Not a species count.**
+
+`box` would keep instances for keepers and your best of each species, while
+ordinary spares collapse to `dupes: { [speciesId]: count }`. A variant has
+identity — you would name it, keep it, trade it — so it must be a row. Forty
+ordinary Pidgey rows are forty objects to serialise, sort, filter and render,
+carrying one bit of information: "forty".
+
+Counts lose nothing, because a duplicate's only use is conversion and
+`candyValue` reads the species, not the individual.
+
+**Deliberately not built now.** It is a scale optimisation, the box is cleared
+regularly in practice so it does not grow without bound, and it has the largest
+blast radius of anything on this list — it touches the sweep, the row sale, the
+manifests and every memo over `box`. The migration has a precedent in
+`loadState`, and must run *after* the `TIERS` spread or it gets overwritten.
+
+The four atomic transactions to name if this ever moves to a server: `catch`
+(ball decremented **iff** box incremented), `convert` (dupes decremented **iff**
+candy incremented), `spendCandy` (candy decremented **iff** level raised, on one
+named uid), `evolve` (old form gone **iff** new form created, level and variant
+carried across).
+
+### Watch-list from the candy pass
+
+Not bugs. Things that were decided a particular way and are worth looking at
+again with a controller in hand.
+
+- **Caterpie and Weedle evolve for free.** Both evolve at Lv 7 and a wild one can
+  be caught at 7, so the cost is 0 candy. Left in deliberately: it means your
+  first evolution happens in the first ten minutes and teaches the mechanic. If
+  it reads as anticlimactic instead, the fix is a floor on `evoLevel`, not a
+  change to `candyValue` — that one is load-bearing.
+- **Charmander is still weight 10 where Bulbasaur and Squirtle are 8.** A real
+  inconsistency, left because trimming it would make something worse and the ask
+  was a kinder game. Ember Caldera also has the smallest table in the game, which
+  is half of why its share is high.
+- **Commons are candy, rares are cash.** 22 evolved forms of commons are worth
+  more sold than converted. No candy is printed and it gives both currencies a
+  natural source, so it is kept — but it means the payout choice is a solved
+  decision for those 22 rather than a real one.
+- **A same-line conversion bonus** (a duplicate fed to its own family worth 2×)
+  is the tuning lever held in reserve if generic candy ends up feeling flat. Do
+  not build it until playtesting asks for it.
 
 ---
 
