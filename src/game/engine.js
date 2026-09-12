@@ -8,7 +8,7 @@ import {
   AREAS, AREA_IDS, areaOf, walkable, label, MINI, MINI_UNKNOWN,
 } from "./map.js";
 import {
-  biomeFor, tableFor, levelFromXp, xpForCatch, rodTable, rodBite,
+  biomeFor, tableFor, bornLevel, levelFromXp, xpForCatch, rodTable, rodBite,
   rollVariant, TIERS,
   lockedTiers, originReady,
 } from "./biomes.js";
@@ -450,7 +450,11 @@ export function createEngine(canvas, onChange, mini = null) {
       /* Throws already made at THIS Pokemon. The Timer Ball reads it, and it
          is why a ball that breaks free is not simply a wasted ball. */
       throws: 0,
-      level: 2 + Math.floor(Math.random() * 6),
+      /* Wild levels are 2-7, EXCEPT that nothing may appear below the level
+         it evolves at: a wild Venusaur is a Lv 32 Venusaur. Rolled on top of
+         that floor rather than replaced by it, so a found evolution is not
+         pinned to exactly its threshold. */
+      level: bornLevel(sp.id) + 2 + Math.floor(Math.random() * 6),
       phase: "idle",
       shakesDone: 0,
       shakesTotal: 0,

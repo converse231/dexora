@@ -1236,7 +1236,7 @@ import {
 } from "../src/game/biomes.js";
 import { AREAS, AREA_IDS, SOLID, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
 import {
-  encounterTable, evoScale, evoUnlock, EVO_DEPTH, EVO_STEP, EVO_FLOOR,
+  encounterTable, evoScale, evoUnlock, bornLevel, EVO_DEPTH, EVO_STEP, EVO_FLOOR,
 } from "../src/game/biomes.js";
 import { EVOLUTIONS } from "../src/data/evolutions.js";
 
@@ -2052,8 +2052,18 @@ import { saveProblem } from "../src/game/engine.js";
       `${b.id}: legendaries are easier at Lv ${MAX_LEVEL} than at Lv 1`);
   }
 
+  /* 6. nothing spawns below the level it evolves at. A wild Venusaur is a Lv 32
+        Venusaur - it cannot be a Lv 3 one, and a level that contradicts the
+        creature's own dex entry reads as a rendering fault rather than a roll. */
+  for (const [to, from] of pre) {
+    assert.ok(bornLevel(to) > bornLevel(from),
+      `${SPECIES[to - 1].name} is born no later than ${SPECIES[from - 1].name} ` +
+      `(${bornLevel(to)} vs ${bornLevel(from)}) - a chain must climb`);
+  }
+  assert.equal(bornLevel(1), 0, "a base form is born at 0");
+
   console.log(`spawn ladder ok — ${early.size} species in the wild at Lv 1, ` +
-    `${late.size} at Lv ${MAX_LEVEL}; legendaries no easier anywhere`);
+    `${late.size} at Lv ${MAX_LEVEL}; legendaries no easier anywhere; nothing born below its own evolution level`);
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, none locked, ${sizes[0]} … ${sizes.at(-1)}`);

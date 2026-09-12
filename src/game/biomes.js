@@ -408,9 +408,19 @@ for (const e of EVOLUTIONS) {
   NEXT.get(e.from).push(e.to);
 }
 
-export const EVO_SHARE = 0.2;   // a fifth as common as what it evolves from
-export const EVO_FLOOR = 0.3;   // ...but never rarer than this
-export const EVO_STEP = 8;      // one more step of a line per this many levels
+/* RE-PRICED once a wild evolved form stopped being a free sprite and started
+   being a free EVOLUTION. `bornLevel` below hands one out at the level it would
+   have had to be raised to, so a wild Venusaur is a Lv 32 Venusaur - roughly
+   forty duplicates of work, met in one encounter. That is a treasure, and a
+   treasure that turns up a fifth as often as its own base form is not one.
+
+   Cut from 0.2/0.3, and the second step pushed from Lv 16 to Lv 20: finding one
+   should be the story of a session, not the way the dex gets filled. The
+   evolution feed stays the reliable path, which is the point - a lottery you can
+   opt out of beats a lottery you depend on. */
+export const EVO_SHARE = 0.12;  // an eighth as common as what it evolves from
+export const EVO_FLOOR = 0.2;   // ...but never rarer than this
+export const EVO_STEP = 10;     // one more step of a line per this many levels
 export const EVO_RAMP = 24;     // and this many levels from first sighting to full
 export const EVO_DEPTH = 2;     // no Gen 1 line is longer than this from a base
 
@@ -430,6 +440,41 @@ export function evoScale(level, depth) {
 }
 
 export const evoUnlock = (depth) => EVO_STEP * depth;
+
+/* The level a species cannot be below.
+
+   Wild levels were `2 + rand(6)` for everything, which was harmless while a
+   level was decoration and absurd the moment evolved forms started spawning:
+   a **Lv 3 Venusaur**, a creature that by its own dex entry cannot exist below
+   32. It reads as a bug because it is one, and it gets worse rather than better
+   the day levels do anything - a wild Venusaur below its own evolution level
+   would be a Venusaur you could not have made and could not explain.
+
+   Read off the evolution row that PRODUCES this species, so it is the real
+   number from PokeAPI and not a second table to keep in step. 0 for anything
+   that evolves from nothing, which is every base form. */
+const BORN_AT = new Map();
+/* Two passes, because a stone or trade row carries NO level - PokeAPI has none
+   to give - and skipping them left a wild Alakazam at Lv 3 beside a wild
+   Venusaur at 32, which is the same absurdity wearing a different hat. About
+   twenty species evolve that way.
+
+   So an evolution with no level of its own inherits its PARENT'S, plus a step.
+   Kadabra evolves at 16, so an Alakazam is at least 17. Derived from the chain
+   rather than from a hand-written table of synthetic levels - which is the
+   thing to build only if a stone evolution ever needs to COST something
+   level-shaped, and is not needed merely to stop one reading as a bug.
+
+   Ordered: the chain has to be walked parent-first, so the loop repeats until
+   nothing changes. Four passes at most for Gen 1; it is 151 rows once. */
+for (let again = true; again; ) {
+  again = false;
+  for (const e of EVOLUTIONS) {
+    const at = e.level || (BORN_AT.get(e.from) ?? 0) + 1;
+    if (at > (BORN_AT.get(e.to) ?? 0)) { BORN_AT.set(e.to, at); again = true; }
+  }
+}
+export const bornLevel = (speciesId) => BORN_AT.get(speciesId) ?? 0;
 
 /* The table an encounter actually rolls on: the biome's own rows, plus every
    evolution of them that the trainer's level has opened.

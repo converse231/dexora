@@ -620,20 +620,23 @@ canvas {
    a CSS animation; in four steps it pops like sprite art. */
 .shiny-spark, .astral-fx { position: absolute; inset: 0; pointer-events: none; }
 
+/* 13px, up from 9. At 9 the stars read as specks of dust against a 64px
+   sprite blown up to fill a battle scene - the tell of the tier was the one
+   thing on screen you had to look for. */
 .shiny-spark i {
-  position: absolute; width: 9px; height: 9px;
+  position: absolute; width: 13px; height: 13px;
   background: #fff;
   /* A four-point star, so it never has to be an image. */
   clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
-  box-shadow: 0 0 4px rgba(255, 226, 150, .95);
+  box-shadow: 0 0 7px rgba(255, 226, 150, .95);
   opacity: 0; transform: scale(.3);
   animation: spark 1.8s steps(4, end) infinite;
 }
 .shiny-spark i:nth-child(1) { top: 10%; left: 16%; animation-delay: 0s; }
-.shiny-spark i:nth-child(2) { top: 20%; right: 12%; animation-delay: .3s; width: 7px; height: 7px; }
+.shiny-spark i:nth-child(2) { top: 20%; right: 12%; animation-delay: .3s; width: 10px; height: 10px; }
 .shiny-spark i:nth-child(3) { bottom: 24%; left: 8%; animation-delay: .62s; }
-.shiny-spark i:nth-child(4) { bottom: 12%; right: 18%; animation-delay: .95s; width: 7px; height: 7px; }
-.shiny-spark i:nth-child(5) { top: 46%; left: 46%; animation-delay: 1.25s; width: 6px; height: 6px; }
+.shiny-spark i:nth-child(4) { bottom: 12%; right: 18%; animation-delay: .95s; width: 10px; height: 10px; }
+.shiny-spark i:nth-child(5) { top: 46%; left: 46%; animation-delay: 1.25s; width: 9px; height: 9px; }
 @keyframes spark {
   0%, 62%, 100% { opacity: 0; transform: scale(.3); }
   8% { opacity: 1; transform: scale(1.35); }
