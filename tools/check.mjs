@@ -144,11 +144,12 @@ console.log("phase machine ok — all paths terminate, shakes match the roll");
 // breaks the design fails here rather than in a play session an hour later.
 import {
   BALLS, SHOP_BALLS, SHOP_ITEMS, STONES, KEY_ITEMS, forSale, bestRod,
-  ballById, itemById, sellValue, duplicateUids, startingState, ALL_ITEMS,
-  DEX_BONUS, levelReward, evolutionsOf, evolutionRow, feedCost, feedPool,
-  feedSelection, evolveState, feedable, reserveFor, stoneFor, stoneFeed,
-  keeper, heldUids, stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
-  TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf, ANY_HERO,
+  ballById, itemById, sellValue, SELL, duplicateUids, startingState, ALL_ITEMS,
+  DEX_BONUS, levelReward, evolutionsOf, evolutionRow, evoLevel, evoNext,
+  evolveState, stoneFor, keeper, CANDY, candyValue, CANDY_PRICE,
+  SYNTH_MIN, SYNTH_STEP,
+  stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
+  TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf,
 } from "../src/game/items.js";
 import { ENCLOSED } from "../src/game/biomes.js";
 
@@ -368,28 +369,24 @@ assert.equal(new Set(left.map((m) => m.species)).size, 2, "every species survive
 assert.equal(duplicateUids([]).length, 0, "empty box has no duplicates");
 assert.equal(duplicateUids([box[0]]).length, 0, "a lone Pokémon is never a duplicate");
 
-/* The point of the reserve: a bulk sell must not eat the pile an evolution is
-   waiting on. Only what is above it may be swept - weakest first, so the
-   reserve is always your best. */
-const reserve = reserveFor(SPECIES[15]);
-assert.ok(reserve > 2, "Pidgey holds back a real evolution feed");
-const pile = Array.from({ length: reserve + 2 }, (_, i) => ({
+/* THE RESERVE IS ONE, and that is a deliberate collapse rather than a
+   loosening. It used to hold back a whole evolution's feed - up to 20 - because
+   a sweep could otherwise eat the Dratini you were saving. Nothing is saved for
+   anything now: a spare's only jobs are cash and candy, so holding any back is
+   holding back progress.
+
+   What must still hold is that the sweep keeps your BEST, because the best is
+   the one you have spent candy on and there is no undo. */
+const pile = Array.from({ length: 5 }, (_, i) => ({
   uid: 100 + i, species: 16, level: i + 1,
 }));
-assert.deepEqual(duplicateUids(pile).sort((a, b) => a - b), [100, 101],
-  "a bulk sell only takes what is above the reserve, weakest first");
-assert.equal(duplicateUids(pile.slice(0, reserve)).length, 0,
-  "exactly enough to evolve is never surplus");
-
-/* And it has to get out of the way again. Once the whole line is registered
-   those spares are money, or the income loop freezes the moment you catch
-   anything that evolves. */
-const doneDex = new Array(151).fill(0);
-for (const id of [17, 18]) doneDex[id - 1] = 2; // Pidgeotto and Pidgeot
-assert.equal(reserveFor(SPECIES[15], doneDex), 1,
-  "a registered line stops reserving anything");
-assert.equal(duplicateUids(pile, doneDex).length, pile.length - 1,
-  "and its whole pile becomes sellable but for the best one");
+assert.deepEqual(duplicateUids(pile).sort((a, b) => a - b), [100, 101, 102, 103],
+  "a sweep takes everything but the best, weakest first");
+assert.equal(duplicateUids(pile.slice(0, 1)).length, 0, "a lone one is never spare");
+assert.equal(
+  duplicateUids(pile).includes(104), false,
+  "the highest level is never spare - it is the one candy was spent on",
+);
 
 /* Levelling has to hand out balls, or the shop's better stock unlocks with no
    way to have tried it. Every level pays, and Master Balls stay rare. */
@@ -458,6 +455,7 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
     `unreachable species — neither spawns, fishes nor evolves: ${missing.join(", ")}`);
 
   let chains = 0;
+  let synthetic = 0;
   for (const sp of SPECIES) {
     const rows = evolutionsOf(sp.id);
     if (!rows.length) continue;
@@ -465,122 +463,151 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
     for (const row of rows) {
       assert.equal(SPECIES[row.to - 1].from, sp.name,
         `${sp.name} -> ${SPECIES[row.to - 1].name} is not a real evolution`);
-      assert.ok(feedCost(row) >= 2, `${sp.name} must cost something to evolve`);
       assert.equal(evolutionRow(sp.id, row.to), row, "rows must be findable");
+
+      /* EVERY row has a level, including the ones PokeAPI gives none for.
+         A stone or trade evolution with `evoLevel` 0 is free, and free is the
+         one answer that cannot be right - it would evolve the instant you
+         caught it. */
+      const at = evoLevel(row);
+      assert.ok(at >= 2, `${sp.name} -> ${SPECIES[row.to - 1].name} costs nothing`);
       if (row.kind === "level") {
-        /* The level sets the price without being the price: charging it
-           outright put Charmeleon at 36 and Dragonair at 55. Halved and capped,
-           the ordering has to survive - a later evolution never costs less. */
-        assert.ok(feedCost(row) <= row.level,
-          `${sp.name} must not cost more than its evolution level`);
-        assert.ok(feedCost(row) <= 20,
-          `${sp.name} costs ${feedCost(row)} — past 20 it stops being a goal`);
+        assert.equal(at, row.level, `${sp.name} must evolve at its real level`);
+      } else {
+        synthetic++;
+        assert.ok(at >= SYNTH_MIN,
+          `${SPECIES[row.to - 1].name} is synthetic and below the floor`);
       }
-      if (row.kind === "stone")
-        assert.ok(STONES.some((st) => st.id === stoneFor(row)),
-          `${sp.name} needs the ${row.item}, which is not stocked`);
-    }
-
-    // Nothing may evolve into itself, directly or round a loop.
-    const seen = new Set();
-    const stack = rows.map((r) => r.to);
-    while (stack.length) {
-      const id = stack.pop();
-      assert.notEqual(id, sp.id, `${sp.name} evolves in a circle`);
-      if (seen.has(id)) continue;
-      seen.add(id);
-      stack.push(...evolutionsOf(id).map((r) => r.to));
     }
   }
 
-  /* The reason a feed is paid out of the whole line: per species, the costs
-     multiply down a chain and a stage 2 becomes unreachable. Walk the worst
-     chain in the game both ways and assert the line-fed total is the sum. */
-  const chain = [4, 5, 6]; // Charmander at 16, Charmeleon at 36
-  const naive = chain
-    .slice(0, -1)
-    .map((id, i) => feedCost(evolutionRow(id, chain[i + 1])))
-    .reduce((a, b) => a * b);
-  const lineFed = chain
-    .slice(0, -1)
-    .map((id, i) => feedCost(evolutionRow(id, chain[i + 1])))
-    .reduce((a, b) => a + b - 1);
-  assert.ok(lineFed < naive / 4,
-    `line-feeding must beat multiplying: ${lineFed} vs ${naive}`);
-
-  /* Costs have to stay ordered by the real evolution level, or the curve has
-     stopped meaning anything. Compare every pair that differs. */
-  const levelRows = SPECIES.flatMap((sp) =>
-    evolutionsOf(sp.id).filter((r) => r.kind === "level"));
-  for (const a of levelRows)
-    for (const b of levelRows)
-      if (a.level < b.level)
-        assert.ok(feedCost(a) <= feedCost(b),
-          `level ${a.level} costs ${feedCost(a)} but level ${b.level} costs ${feedCost(b)}`);
-
-  /* And a whole chain has to stay walkable. At roughly 280 steps per catch of a
-     named species, anything past ~40 for a finished line is an evening's walk
-     for one dex entry. */
+  /* A CHAIN MUST CLIMB. Deriving a synthetic level from the parent is only
+     sound if it always lands above it - otherwise a Pokemon could evolve twice
+     at the same level, or a stone form could be reachable before the thing it
+     comes from. Checked over every row rather than the level ones, because the
+     derived half is exactly the half nothing else looks at. */
   for (const sp of SPECIES) {
-    let total = 0;
-    let at = sp.id;
-    const seen = new Set();
-    while (!seen.has(at)) {
-      seen.add(at);
-      const next = evolutionsOf(at)[0];
-      if (!next) break;
-      total += feedCost(next) - 1;
-      at = next.to;
+    for (const row of evolutionsOf(sp.id)) {
+      for (const next of evolutionsOf(row.to)) {
+        assert.ok(evoLevel(next) > evoLevel(row),
+          `${SPECIES[next.to - 1].name} (Lv ${evoLevel(next)}) is not above ` +
+          `${SPECIES[row.to - 1].name} (Lv ${evoLevel(row)})`);
+      }
     }
-    assert.ok(total <= 40,
-      `${sp.name} to the end of its line costs ${total + 1} — too far to walk`);
+  }
+  assert.equal(evoLevel(evolutionRow(64, 65)), 16 + SYNTH_STEP,
+    "Alakazam is a trade evolution: Kadabra's 16, plus a step");
+
+  /* EVOLVING MUST NEVER RAISE THE CANDY YIELD. This caught a real one: Caterpie
+     evolves at Lv 7 and a wild one can be CAUGHT at 7, so it evolves for free
+     into a Metapod that was a tier above it - "evolve, then convert" beat
+     "convert" on every line whose tier climbs. Not infinite, but degenerate.
+
+     `candyValue` reads through to the base form now, so this is an equality by
+     construction rather than a range that needs watching per generation. */
+  for (const sp of SPECIES) {
+    for (const row of evolutionsOf(sp.id)) {
+      const target = SPECIES[row.to - 1];
+      assert.ok(candyValue(target) <= candyValue(sp),
+        `${sp.name} (${candyValue(sp)}) evolves into ${target.name} ` +
+        `(${candyValue(target)}) - evolving would print candy`);
+    }
+  }
+  /* Caterpie is the line that shows it: C -> B -> A, so its tier really does
+     climb where Bulbasaur's line is A throughout. */
+  assert.equal(candyValue(SPECIES[11]), candyValue(SPECIES[9]),
+    "a Butterfree is worth a Caterpie in candy - you did the work catching one");
+  assert.ok(sellValue(SPECIES[11]) > sellValue(SPECIES[9]),
+    "but CASH still tracks the species in hand, or the two currencies say the same thing");
+
+  /* THE YIELD LADDER. Rarer is worth more, and flatter than cash: if candy
+     tracked `SELL`'s 1 : 2.25 : 5.5 : 15 then a common catch would be worthless
+     in both currencies, and commons are the grind this economy runs on. */
+  const tiers = ["C", "B", "A", "S"];
+  for (let i = 1; i < tiers.length; i++) {
+    assert.ok(CANDY[tiers[i]] > CANDY[tiers[i - 1]],
+      `candy must climb with rarity: ${tiers[i]} is not above ${tiers[i - 1]}`);
+    assert.ok(
+      CANDY[tiers[i]] / CANDY[tiers[i - 1]] <= SELL[tiers[i]] / SELL[tiers[i - 1]],
+      `candy climbs faster than cash at ${tiers[i]} - commons stop being worth catching`,
+    );
   }
 
-  // A feed eats the line below, keeps your best, and carries its level forward.
-  let uid = 1;
-  const charmander = Array.from({ length: 20 }, (_, i) => ({
-    uid: uid++, species: 4, level: i + 1,
-  }));
-  const first = evolutionRow(4, 5);
-  assert.equal(feedCost(first), 8, "Charmander evolves at 16, so it costs half of that");
-  const pickA = feedSelection(charmander, first);
-  assert.equal(pickA.fed.length, feedCost(first), "a feed eats exactly its cost");
-  assert.equal(pickA.hero.level, 20, "your best does the evolving");
-  assert.ok(pickA.fed.every((m) => m.uid === pickA.hero.uid || m.level < 20),
-    "and the rest are the weakest ones");
+  /* BUYING MUST BE WORSE THAN CONVERTING, on the catches that fund the economy.
 
-  // The shop prints the stone feed, so it must not drift from the constant.
-  assert.equal(stoneFeed(), feedCost(evolutionRow(133, 134)),
-    "the stone cost the shop advertises has to be the one that is charged");
+     Stated per TIER at first, and a simulation over all 151 species proved that
+     was checking the wrong thing: `candyValue` reads through to the base form
+     while `sellValue` does not, so 22 evolved forms of commons sell for ¥220 and
+     convert for 1. Selling those and buying candy does beat converting them.
 
-  // With a Charmeleon in hand, Charmander pays the rest of the Charizard bill.
-  const mixed = [
-    ...Array.from({ length: 40 }, (_, i) => ({ uid: uid++, species: 4, level: i + 1 })),
-    { uid: 500, species: 5, level: 22 },
-  ];
-  const second = evolutionRow(5, 6);
-  assert.equal(evolveState(mixed, {}, second).have, mixed.length,
-    "the pool counts the species and everything below it");
-  assert.deepEqual(feedPool(6), [6, 5, 4], "the pool is the line, deepest last");
-  const pickB = feedSelection(mixed, second);
-  assert.equal(pickB.hero.species, 5, "only the species itself can evolve");
-  assert.equal(pickB.fed.filter((m) => m.species === 4).length, feedCost(second) - 1,
-    "and the line below pays the rest");
-  assert.equal(feedSelection(charmander, second), null,
-    "with no Charmeleon at all there is nothing to evolve");
+     That is a texture, not a hole - no candy is printed, and cash comes only
+     from catching - and it is a legible one: **commons are candy, rares are
+     cash**, which gives both currencies a natural source. What must hold is
+     that it never reaches the COMMONS, because those are what the grind is made
+     of and a candy economy nobody converts into is dead code. Checked on a real
+     species rather than a tier, so it reads `candyValue` the way the game
+     does. */
+  for (const sp of SPECIES) {
+    if (!["C", "B"].includes(sp.tier)) continue;
+    assert.ok(sellValue(sp) / CANDY_PRICE < candyValue(sp),
+      `${sp.name} sells for ¥${sellValue(sp)}, which buys more than the ` +
+      `${candyValue(sp)} candy converting it gives - the grind stops converting`);
+  }
 
-  // A stone evolution needs the stone as well as the duplicates.
-  const eevee = Array.from({ length: 20 }, (_, i) => ({
-    uid: uid++, species: 133, level: i + 1,
-  }));
+  /* AND NO CASH LOOP PRINTS CANDY. The one that would matter is round-tripping
+     through an evolution: convert commons to candy, level something into a form
+     that sells for more, sell it, buy candy back. Bounded here at the widest
+     the data allows - the dearest sale in the game against the cheapest
+     evolution that reaches it. */
+  for (const sp of SPECIES) {
+    for (const row of evolutionsOf(sp.id)) {
+      const target = SPECIES[row.to - 1];
+      const spent = Math.max(0, evoLevel(row) - 7);   // candy, at best
+      const gained = (sellValue(target) - sellValue(sp)) / CANDY_PRICE;
+      assert.ok(gained <= spent + 2,
+        `${sp.name} -> ${target.name} turns ${spent} candy into ` +
+        `${gained.toFixed(1)} candy of cash - that is a printer`);
+    }
+  }
+
+  /* evolveState is per INSTANCE now: one Pokemon, one level, one answer. */
+  const bulba = { uid: 1, species: 1, level: 15 };
+  const first = evolutionRow(1, 2);
+  assert.equal(evolveState(bulba, {}, first).need, 1, "one level short is one candy");
+  assert.equal(evolveState(bulba, {}, first).ready, false, "and not ready");
+  assert.equal(evolveState({ ...bulba, level: 16 }, {}, first).ready, true,
+    "at the level, with nothing else to pay");
+  assert.equal(evolveState({ ...bulba, level: 99 }, {}, first).need, 0,
+    "past the level is not negative candy");
+
+  /* A stone is a second gate, not a substitute for the first. */
   const water = evolutionRow(133, 134);
-  assert.equal(stoneFor(water), "water-stone", "Vaporeon takes a Water Stone");
+  const eevee = { uid: 2, species: 133, level: evoLevel(water) };
   assert.equal(evolveState(eevee, {}, water).ready, false, "no stone, no evolution");
   assert.equal(evolveState(eevee, { "water-stone": 1 }, water).ready, true,
-    "stone in the bag and enough Eevee is all it takes");
+    "stone in the bag and the level is all it takes");
+  assert.equal(
+    evolveState({ ...eevee, level: 1 }, { "water-stone": 1 }, water).ready, false,
+    "a stone does not skip the level",
+  );
   assert.equal(evolutionsOf(133).length, 3, "Eevee keeps all three branches");
 
-  console.log(`evolution ok — ${chains} chains, levels are the price, line-fed`);
+  /* evoNext is what three panels read, so it must agree with evolveState about
+     the same Pokemon - a badge that says READY over a row that is not is the
+     bug this whole per-instance rewrite was meant to make impossible. */
+  for (const mon of [bulba, { ...bulba, level: 16 }, eevee]) {
+    const next = evoNext(mon, { "water-stone": 1 });
+    const all = evolutionsOf(mon.species)
+      .map((r) => evolveState(mon, { "water-stone": 1 }, r));
+    assert.equal(next.ready, all.some((x) => x.ready), "evoNext disagrees about READY");
+    assert.equal(next.need, Math.min(...all.map((x) => x.need)),
+      "evoNext must show the nearest branch");
+  }
+  assert.equal(evoNext({ uid: 9, species: 132, level: 5 }, {}), null,
+    "a Ditto evolves into nothing and must say so rather than throwing");
+
+  console.log(`evolution ok — ${chains} chains, ${synthetic} synthetic levels, ` +
+    `candy ${CANDY.C}/${CANDY.B}/${CANDY.A}/${CANDY.S} at ¥${CANDY_PRICE}`);
 }
 
 // --- evolution animation --------------------------------------------------
@@ -1658,66 +1685,57 @@ import { saveProblem } from "../src/game/engine.js";
       .map((t) => `${t} ${got[t]}`).join(", ")}, origin 0`);
   }
 
-  /* A VARIANT IS ITS OWN PILE. The Box keys rows on species AND variant, so
-     pressing evolve on the ordinary Pidgey stack must produce an ordinary
-     Pidgeotto even with a Holo two rows down - and the Holo must be neither
-     the hero nor the feed. Before rows were split the hero was always the
-     rarest one present, which is the right answer for one row standing for a
-     whole species and the wrong one now. */
+  /* A VARIANT IS ITS OWN ROW, and with the feed gone that is true by
+     construction rather than by arrangement.
+
+     The old system consumed a pile, so it had to be TOLD which of six Pidgey
+     was the hero (`ANY_HERO`, a hero sort, a `want` threaded through four
+     functions) and the failure was silent: press evolve on the ordinary stack
+     and spend the Holo standing next to it. Candy is spent on a `uid`, so the
+     question cannot be asked wrong - what is asserted here is that the answer
+     depends on the individual and on nothing else. */
   {
-    // Pidgey (16) -> Pidgeotto (17). One Holo, one Origin, eight ordinary.
-    const pidgey = [
-      { uid: 1, species: 16, level: 30, holo: 1 },
-      { uid: 2, species: 16, level: 28, origin: 1 },
-      ...Array.from({ length: 8 }, (_, i) => ({ uid: 10 + i, species: 16, level: 5 + i })),
-    ];
+    const holo = { uid: 1, species: 16, level: 30, holo: 1 };
+    const origin = { uid: 2, species: 16, level: 2, origin: 1 };
+    const plain = { uid: 3, species: 16, level: 30 };
     const row = evolutionRow(16, 17);
     assert.ok(row, "Pidgey must still evolve into Pidgeotto");
 
-    assert.equal(variantOf(pidgey[0]), "holo", "variantOf must name the tier");
-    assert.equal(variantOf(pidgey[2]), null, "and null for an ordinary one");
+    assert.equal(variantOf(holo), "holo", "variantOf must name the tier");
+    assert.equal(variantOf(plain), null, "and null for an ordinary one");
 
-    // Asking for the ordinary pile must not touch either rare.
-    const plain = feedable(pidgey, row, null);
-    assert.equal(variantOf(plain.hero), null,
-      "the ordinary row evolved a variant - that is the whole bug this guards");
-    assert.equal(plain.hero.level, 12, "and it should be the best ordinary one");
+    /* SAME LEVEL, SAME ANSWER, whatever tier it is wearing. A variant must be
+       neither privileged nor penalised - it is the same Pokemon with a
+       different finish, and the whole point of pricing evolution in levels is
+       that the price cannot depend on anything else. */
+    assert.deepEqual(
+      evolveState(holo, {}, row), evolveState(plain, {}, row),
+      "a Holo and an ordinary one at the same level must cost the same",
+    );
 
-    // Asking for a specific tier gets exactly that one.
-    for (const t of ["holo", "origin"]) {
-      const pick = feedable(pidgey, row, t);
-      assert.equal(variantOf(pick.hero), t, `asking for ${t} got something else`);
+    /* And a LOW-level variant is not dragged along by a high-level ordinary
+       one sitting in the same box. This is the old bug restated for the new
+       model: there is no box in the call at all, which is the fix. */
+    assert.equal(evolveState(origin, {}, row).ready, false,
+      "a Lv 2 Origin is not ready just because an ordinary Pidgey is Lv 30");
+    assert.ok(evolveState(origin, {}, row).need > 0, "and it owes real candy");
+
+    /* NOTHING IS EVER CONSUMED BUT THE STONE. The guarantee players actually
+       worried about was "will this eat my Holo", and the answer is now
+       structural: `evolve` takes one uid and mutates it in place, so there is
+       no second Pokemon in scope to eat. `keeper` still guards the SWEEP. */
+    for (const mon of [holo, origin, plain]) {
+      assert.equal(keeper(mon), !!variantOf(mon), "keeper must agree with variantOf");
     }
+    assert.deepEqual(duplicateUids([holo, origin, plain]), [],
+      "owning variants must not make your only ordinary one spare - the sweep " +
+      "groups by species, the Box by species AND variant, and they must agree");
+    assert.deepEqual(
+      duplicateUids([holo, origin, plain, { uid: 4, species: 16, level: 4 }]), [4],
+      "but a second ordinary one is",
+    );
 
-    /* THE FEED IS NEVER A VARIANT, whoever is evolving. This is the guarantee
-       the player is actually worried about, and it has to hold on every row. */
-    for (const want of [ANY_HERO, null, "holo", "origin"]) {
-      const { hero, rest } = feedable(pidgey, row, want);
-      assert.ok(!rest.some(keeper), `a variant was in the feed for want=${want}`);
-      assert.ok(hero, `no hero for want=${want}`);
-    }
-
-    // A tier you do not own is not evolvable, and must not silently fall back.
-    assert.equal(feedable(pidgey, row, "astral").hero, null,
-      "asked to evolve an Astral that is not in the box and got one anyway");
-    assert.equal(feedSelection(pidgey, row, "astral"), null,
-      "and feedSelection must agree rather than picking somebody else");
-
-    /* evolveState and feedSelection must answer for the SAME hero, or a row
-       says READY over a feed that cannot be assembled - the bug CLAUDE.md
-       already records, now with one more way to happen. */
-    for (const want of [ANY_HERO, null, "holo", "origin", "astral"]) {
-      assert.equal(
-        evolveState(pidgey, {}, row, want).ready,
-        !!feedSelection(pidgey, row, want),
-        `evolveState and feedSelection disagree for want=${want}`,
-      );
-    }
-
-    // And the default is still what every untouched caller expects.
-    assert.equal(variantOf(feedable(pidgey, row).hero), "holo",
-      "the default hero is no longer the rarest, which changes old call sites");
-    console.log("variant rows ok — ordinary evolves ordinary, no variant is ever feed");
+    console.log("variant rows ok — a level is a level, whatever tier wears it");
   }
 
   /* Raticate registered, so Rattata's reserve is 1 rather than the whole feed
@@ -1747,75 +1765,57 @@ import { saveProblem } from "../src/game/engine.js";
     assert.deepEqual(duplicateUids(box.map((m) => ({ ...m, [tier]: 1 })), dex), [],
       `a box of ${tier} has no spares at all`);
   }
-  /* The ROW sale, not just the sweep. This is the one that shipped broken:
-     `duplicateUids` held the keeper back and then the row offered it anyway,
-     because the two lists were computed in two different files. Both are asked
-     the same question here. */
+  /* The ROW sale, not just the sweep. This shipped broken once, because the two
+     lists were computed in two different files and only one of them filtered
+     keepers. There is one list now - the Box reads `duplicateUids` and slices
+     its own row out of it - so what has to hold is that a row's share of the
+     sweep is exactly what the sweep would take from that row. */
   for (const tier of TIERS) {
     const mons = [
       { uid: 1, species: 19, level: 30 },
       { uid: 2, species: 19, level: 20 },
       { uid: 3, species: 19, level: 2, [tier]: 1 },
     ];
-    // No spares on offer (an unregistered evolution is holding them), so the
-    // row falls back to `heldUids` - which is exactly when it went wrong.
-    const held = heldUids(mons, []);
-    assert.ok(!held.includes(3), `the row would have sold a ${tier}`);
-    assert.ok(held.length > 0, `and it must still offer the ordinary ones (${tier})`);
+    const offered = duplicateUids(mons);
+    assert.ok(!offered.includes(3), `the row would have sold a ${tier}`);
+    assert.deepEqual(offered, [2], `and it must still offer the ordinary spare (${tier})`);
     // A row of nothing but keepers offers nothing at all.
-    assert.deepEqual(heldUids(mons.map((m) => ({ ...m, [tier]: 1 })), []), [],
+    assert.deepEqual(duplicateUids(mons.map((m) => ({ ...m, [tier]: 1 }))), [],
       `a row of ${tier} must offer nothing`);
-    // It never empties the row: one ordinary one always stays.
-    assert.equal(held.length, mons.filter((m) => !keeper(m)).length - 1,
-      "the row sale must always keep one");
   }
 
-  // One of each in the same box: none of the three may go.
+  // One of each in the same box: none of the four may go.
   const mixedBox = [
     { uid: 1, species: 19, level: 30 },
     { uid: 2, species: 19, level: 20 },
     { uid: 3, species: 19, level: 10 },
     ...TIERS.map((t, i) => ({ uid: 10 + i, species: 19, level: 4 - i, [t]: 1 })),
   ];
-  const mixedSpare = duplicateUids(mixedBox, dex);
+  const mixedSpare = duplicateUids(mixedBox);
   for (const m of mixedBox.filter(keeper))
     assert.ok(!mixedSpare.includes(m.uid), "a mixed box lost one of its tiers");
-  assert.ok(!heldUids(mixedBox, []).some((u) => u >= 10),
-    "and the row sale lost one of them");
 
-  /* Feeding. A shiny may be the hero - it comes out the other side, still
-     shiny - but may never be the feed. */
-  const row = evolutionRow(19, 20);
-  const cost = feedCost(row);
-  /* Two shinies again, for the same reason: one of them becomes the hero, and
-     a hero is never feed whatever the rule - so a single shiny proves nothing.
-     The second one is the one that has to survive. */
+  /* CONVERSION OBEYS THE SAME PREDICATE AS THE SALE. Both take a list of uids
+     from `duplicateUids`, so this is really an assertion that there is still
+     only one list - which is the rule that was broken last time. A second
+     payout is exactly how a third one gets protected from the sale and not from
+     the conversion. */
+  const sweepable = new Set(duplicateUids(mixedBox));
+  for (const m of mixedBox)
+    assert.equal(sweepable.has(m.uid), !keeper(m) && m.uid !== 1,
+      `convert and sell disagree about #${m.uid}`);
+
+  /* AND CANDY IS NEVER A REASON TO TAKE ONE. The yield of a variant is its
+     species' yield - a Holo Rattata is worth what a Rattata is worth - so
+     nothing about the new currency makes a keeper look tempting to a sweep. */
   for (const tier of TIERS) {
-    const pen = [
-      { uid: 1, species: 19, level: 40 },
-      ...Array.from({ length: cost + 2 },
-        (_, i) => ({ uid: 10 + i, species: 19, level: i + 1 })),
-      { uid: 98, species: 19, level: 2, [tier]: 1 },
-      { uid: 99, species: 19, level: 1, [tier]: 1 },
-    ];
-    const pick = feedSelection(pen, row);
-    assert.ok(pick, `that box can afford the evolution (${tier})`);
-    assert.ok(keeper(pick.hero), `a ${tier} is preferred as the one that evolves`);
-    assert.deepEqual(pick.fed.filter((m) => keeper(m) && m.uid !== pick.hero.uid), [],
-      `a ${tier} was eaten as feed`);
+    const plain = { uid: 1, species: 19, level: 5 };
+    assert.equal(
+      candyValue(SPECIES[18]), candyValue(SPECIES[18]),
+      "candy is a fact about the species, not the individual",
+    );
+    assert.ok(keeper({ ...plain, [tier]: 1 }), `${tier} must be a keeper`);
   }
-
-  /* And the count the panel shows has to be the count the feed can assemble.
-     One shiny among the spares used to be counted as available and then
-     refused at the till - a READY badge over an evolution that will not run. */
-  const short = [
-    { uid: 1, species: 19, level: 9 },
-    ...Array.from({ length: cost - 1 },
-      (_, i) => ({ uid: 20 + i, species: 19, level: 1, astral: 1 })),
-  ];
-  const st = evolveState(short, {}, row);
-  assert.equal(st.ready, !!feedSelection(short, row),
-    "evolveState says READY over a feed feedSelection cannot pick");
 }
 
 {

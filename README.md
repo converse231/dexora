@@ -1693,6 +1693,108 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### Rare Candy: duplicates became fungible
+
+The old system was already "spend duplicates to evolve" — `feedCost` was
+`clamp(evolutionLevel / 2, 3, 20)`, paid out of the line. Candy changes exactly
+one thing about it: **a spare Zubat used to be worthless unless you wanted a
+Golbat, and is now one candy toward anything.**
+
+That is the real argument for it, and it is not the familiar-levels one: it
+makes every ball thrown at every species pay. Ball demand goes *up*.
+
+**1 candy = 1 level, flat, forever.** A rising curve was considered and dropped
+— it is a second table to keep in step, and the curve already exists in the
+evolution levels themselves (Metapod at 7, Dragonair at 55). It is also why this
+scales to 1,025 species with nothing typed in per species: PokéAPI has the level.
+
+| | old | new |
+|---|---|---|
+| Dragonite | 20 **Dratini**, ~1,600 encounters | ~48 candy, any species |
+| Butterfree | 3 Caterpie | 3 candy |
+| walls | one bad species stops the line | none — candy is fungible |
+
+Measured over the real tables: **the whole dex costs 1,343 candy, about 910
+encounters, ~26% of one 50,000-step playthrough's catching.**
+
+### The yield must not be flat, and that is the load-bearing decision
+
+A flat rate makes the optimal play "farm the highest encounters-per-minute
+species and ignore the other seven maps" — here a weight-22 Pidgey in Tall
+Grass, no travel, biggest table. Weighting by the tier each species already
+carries closes it:
+
+```
+CANDY = { C: 1, B: 2, A: 4, S: 8 }
+```
+
+Measured spread across the eight maps: **1.48 – 2.58 candy per encounter, a
+1.75× range.** Every map is worth walking. Deliberately flatter than `SELL`'s
+1 : 2.25 : 5.5 : 15, because cash is optional and candy is progression — if
+candy tracked cash, a common catch would be worthless in both.
+
+### A Pokémon is worth what its BASE FORM is worth
+
+Found by assertion, not by reasoning. Caterpie evolves at **Lv 7** and a wild one
+can be caught **at 7** — so it evolves for nothing, and Metapod is a tier above
+it. "Evolve, then convert" beat "convert" on every line whose tier climbs: a free
+multiplier on every catch.
+
+Capping the yield or raising the cheap evolution levels both fix Caterpie and
+leave the class open for Gen 2 to reopen. Reading through to the base form closes
+it *structurally* — evolving cannot raise the yield, because the yield never
+depended on the form. It is also the honest measure: **candy is a wage for
+catching, and evolving is not catching.**
+
+A simulation then found the side effect, which is kept deliberately: `sellValue`
+does *not* read through, so 22 evolved forms of commons sell for ¥220 and convert
+for 1. Selling those and buying candy does beat converting them. No candy is
+printed and cash still comes only from catching, so it is a texture rather than a
+hole — and a legible one: **commons are candy, rares are cash.** Both currencies
+get a natural source. The suite pins the part that matters: it must never reach
+the commons, because those are what the grind is made of.
+
+### Buying candy, and why it needs no cap
+
+¥120, three times what a common duplicate sells for. Buying is always worse than
+catching — that ordering is the rule, the number is a starting value.
+
+**No purchase cap, and it needs none:** cash comes from selling duplicates, so
+cash-bought candy is gated by catching anyway. The sink is self-limiting because
+its input is the same input. It also puts candy in competition with Poké Balls
+for one wallet, which is the choice that makes the shop interesting.
+
+### Non-level evolutions are derived, not tabled
+
+About twenty Gen 1 species evolve by stone or trade, and PokéAPI gives those rows
+no level at all. The obvious fix is `SYNTH = {stone: 25, trade: 30, ...}`, and
+the obvious fix is wrong: that table grows every generation and every new method
+needs a row in it.
+
+Derived from the chain instead — **parent's level + 10, floored at 16.** Kadabra
+evolves at 16, so Alakazam is 26. A Gen 5 trade-with-held-item evolution gets a
+sane number on the day it lands with nothing edited. `check.mjs` asserts **a
+chain must climb**, over every row, because the derived half is exactly the half
+nothing else looks at.
+
+### What the feed took with it when it went
+
+The evolution feed consumed a pile, and every hard part of it was a consequence
+of that: which of six Pidgey is the hero, does the Holo get spent to make an
+ordinary Pidgeotto, does the panel agree with the selection about what is
+available. **Candy is spent on a `uid`, so the question cannot be asked wrong.**
+
+Deleted: `feedCost`, `feedPool`, `feedable`, `feedSelection`, `heldUids`,
+`reserveFor`, `ANY_HERO`, `SPENT_ON`, `stoneFeed`, and the Box's "dig into what
+an evolution is saving" branch with its `risky` button. `items.js` got shorter.
+
+**The reserve collapsed to one**, and that is a deliberate collapse: it used to
+hold back a whole feed (up to 20) because a sweep could otherwise eat the Dratini
+you were saving. Nothing is saved for anything now. The one kept back is the best
+*ordinary* one — counting variants against the reserve meant owning a Holo Pidgey
+made your only ordinary Pidgey spare, because the sweep grouped by species while
+the Box groups by species **and** variant. Same rule on both sides now.
+
 **Your calls, answered:** generous rewards, and kinder odds.
 
 ---

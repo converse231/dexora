@@ -16,7 +16,7 @@ const parcelLabel = (items) => {
 };
 
 export default function TopBar({
-  caught, total, steps, money, deltas = [], parcel = null, xp, onReset,
+  caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
 }) {
   const { level, into, need, frac } = levelProgress(xp);
 
@@ -51,6 +51,13 @@ export default function TopBar({
               </em>
             ))}
           </span>
+        </span>
+
+        {/* Beside the money, because it is the other half of the same
+            decision: a spare is one or the other and you pick every time. */}
+        <span className="tb-stat">
+          <i>CANDY</i>
+          <b>{candy.toLocaleString()}</b>
         </span>
 
         <span className="tb-stat">

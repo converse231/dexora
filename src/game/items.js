@@ -261,11 +261,74 @@ export const DEX_BONUS = 100;
 
 export const sellValue = (sp) => SELL[sp.tier] ?? SELL.C;
 
+/* THE OTHER THING A DUPLICATE IS WORTH.
+
+   A spare is sold for cash OR converted to Rare Candy - the player picks at the
+   point of sale, which is the whole reason candy can never become a dead
+   resource: you only ever mint what you are about to spend.
+
+   **The yield is rarity-weighted, and that is the load-bearing decision.** A
+   flat rate makes the optimal play "farm the highest encounters-per-minute
+   species and ignore the other seven maps" - which here is a weight-22 Pidgey
+   in Tall Grass, no travel, biggest table. Weighting by tier means an hour
+   anywhere pays about the same:
+
+     C at weight 22 is 15.7% of a table -> 15.7 candy per 100 encounters
+     S at weight  1 is  0.7% of a table ->  5.7 candy per 100 encounters
+
+   2.7 : 1 rather than the 22 : 1 a flat rate would give. Commons stay the
+   reliable grind; rares stay prizes. Deliberately FLATTER than `SELL`'s
+   1 : 2.25 : 5.5 : 15, because cash is optional and candy is progression - if
+   candy tracked cash exactly, a common catch would be worthless in both. */
+export const CANDY = { C: 1, B: 2, A: 4, S: 8 };
+
+/* A POKEMON IS WORTH WHAT ITS BASE FORM IS WORTH, and that is the rule that
+   closes the exploit rather than out-tuning it.
+
+   Found by assertion, not by thought: Caterpie evolves at Lv 7 and a wild one
+   can be caught AT 7, so it evolves for nothing - and Metapod is a tier above
+   it. "Evolve, then convert" was strictly better than "convert", a free
+   multiplier on every catch of every line whose tier rises. Not infinite, but
+   degenerate: the optimal play would have been to evolve everything you meant
+   to throw away.
+
+   Capping the yield, or raising the cheap evolution levels, both fix the
+   Caterpie and leave the class open for the next generation to reopen. Reading
+   through to the base form closes it structurally: evolving cannot raise the
+   yield, because the yield never depended on the form.
+
+   It is also the honest measure. Candy is a wage for CATCHING, and evolving is
+   not catching - you did the work when you caught the Caterpie. Cash still
+   tracks the species in your hand (`sellValue`), so a wild Venusaur is still
+   worth what a Venusaur is worth; the two currencies measure different things
+   on purpose. */
+const BASE_OF = new Map();
+for (const r of EVO_ROWS) BASE_OF.set(r.to, r.from);
+const baseForm = (id) => {
+  let at = id;
+  for (let up = BASE_OF.get(at); up; up = BASE_OF.get(at)) at = up;
+  return at;
+};
+
+export const candyValue = (sp) =>
+  CANDY[SPECIES[baseForm(sp?.id ?? 0) - 1]?.tier ?? sp?.tier] ?? CANDY.C;
+
+/* Candy is also buyable, at 3x what selling the same duplicate pays. That
+   ordering is the rule, not the number: buying must always be worse than
+   catching, so this is the impatient option rather than the efficient one.
+
+   No purchase cap, and that falls out rather than being decided - cash comes
+   from selling duplicates, so cash-bought candy is gated by catching anyway.
+   The sink is self-limiting because its input is the same input. It also puts
+   candy in competition with balls for one wallet, which is a real choice. */
+export const CANDY_PRICE = 120;
+
 export function startingState() {
   return {
     money: 300,
     bag: { "poke-ball": 10, "great-ball": 0, "ultra-ball": 0, "master-ball": 0 },
     box: [],
+    candy: 0,
   };
 }
 
@@ -274,43 +337,58 @@ export const boxValue = (box, species) =>
 
 // ---------------------------------------------------------------- evolution
 
-/* Nothing gains levels here - there are no battles - so evolution spends the
-   resource the game actually floods you with, and the real evolution level sets
-   the price: a Charmander line costs more than a Caterpie line because that is
-   how the games rank them.
+/* LEVELS ARE REAL, AND CANDY BUYS THEM.
 
-   It sets the price rather than being the price. Charging the level outright put
-   Dragonair at 55 and Charmeleon at 36, and those are not goals, they are walls -
-   at roughly 280 steps per catch of a given species, 36 of anything is an
-   evening of walking for one dex entry. Halved and capped it stays ordered the
-   same way and stays walkable.
+   This replaced a feed: you used to spend N duplicates OF THE LINE, priced at
+   `clamp(evolutionLevel / 2, 3, 20)`. That worked, and it walled - a Dragonite
+   was 20 Dratini specifically, which at 1.2% of the Pond table is about 1,600
+   encounters for one dex entry, and no amount of Pidgey helped.
 
-   Two things then keep a chain from compounding. A feed is paid out of the whole
-   line below the target - a Charizard eats Charmeleon *or* Charmander - so the
-   costs add rather than multiply. And the cap stops the last step of a long
-   chain from dwarfing everything before it. */
+   The change is exactly one thing: **duplicates became fungible.** A spare
+   Zubat used to be worthless unless you wanted a Golbat; it is now one candy
+   toward anything. That is what makes every ball thrown pay, which is the real
+   argument for candy - the familiar "evolves at Lv 16" rule is a bonus.
 
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+   1 candy = 1 level, flat, forever. A rising curve was considered and rejected:
+   it is a second table to keep in step, and the curve already EXISTS in the
+   evolution levels themselves - Metapod at 7, Dragonair at 55. A flat rate over
+   real levels is that curve. It is also why this scales to 1,025 species with
+   nothing typed in per species: PokeAPI hands us the level. */
 
-const LEVEL_DIVISOR = 2;
-const MIN_FEED = 3;   // Caterpie evolves at 7; 3 still has to be earned
-const MAX_FEED = 20;  // Dragonair evolves at 55; 20 is a trophy, 28 is a chore
+/* The level a row evolves at, INCLUDING the rows that have no level.
 
-const STONE_FEED = 8; // plus the stone itself, which is the real cost
-// Nobody to trade with in a single-player game, and no link-cable sprite in the
-// PokeAPI set either, so the four trade evolutions cost duplicates instead.
-const TRADE_FEED = 10;
+   A stone, trade or friendship evolution carries no level in PokeAPI - there is
+   none to carry - and about twenty Gen 1 species evolve that way. The obvious
+   fix is a table of synthetic levels per method, and the obvious fix is wrong:
+   that table grows every generation and every new method needs a row in it.
 
-export const evolutionsOf = (id) => EVO_ROWS.filter((r) => r.from === id);
+   Derived from the chain instead. Kadabra evolves at 16, so Alakazam is 26. A
+   Gen 5 trade-with-held-item evolution gets a sane number on the day it lands
+   with nothing edited. The floor stops a stone evolution hanging off a base
+   form from being free - an Eevee has no level below it at all.
 
-export function feedCost(row) {
-  if (row.kind === "trade") return TRADE_FEED;
-  if (row.kind === "stone") return STONE_FEED;
-  return clamp(Math.round(row.level / LEVEL_DIVISOR), MIN_FEED, MAX_FEED);
+   Memoised because the Box asks per row per render, and a chain walk that
+   returns the same answer forever should be walked once. */
+export const SYNTH_STEP = 10;
+export const SYNTH_MIN = 16;
+
+const PARENT_ROW = new Map(EVO_ROWS.map((r) => [r.to, r]));
+const EVO_LEVEL = new Map();
+
+export function evoLevel(row) {
+  if (!row) return 0;
+  const hit = EVO_LEVEL.get(row.to);
+  if (hit !== undefined) return hit;
+  let at = row.level;
+  if (!at) {
+    const up = PARENT_ROW.get(row.from);
+    at = Math.max(SYNTH_MIN, (up ? evoLevel(up) : 0) + SYNTH_STEP);
+  }
+  EVO_LEVEL.set(row.to, at);
+  return at;
 }
 
-// The shop prints this, so it comes from the constant rather than a typed-in 15.
-export const stoneFeed = () => STONE_FEED;
+export const evolutionsOf = (id) => EVO_ROWS.filter((r) => r.from === id);
 
 export const stoneFor = (row) => (row.kind === "stone" ? row.item : null);
 
@@ -322,40 +400,6 @@ export const speciesNeedingStone = (id) => [
 
 export const evolutionRow = (from, to) =>
   EVO_ROWS.find((r) => r.from === from && r.to === to) ?? null;
-
-const PARENT = new Map(EVO_ROWS.map((r) => [r.to, r.from]));
-
-/* The species itself first, then everything it evolved from. Order matters:
-   it is also the order a feed eats them in, so the earliest stage goes first. */
-export function feedPool(id) {
-  const pool = [id];
-  for (let p = PARENT.get(id); p; p = PARENT.get(p)) pool.push(p);
-  return pool;
-}
-
-// Every evolution a given species can be spent on - its own, and any later step
-// whose feed pool it belongs to. Charmander is fuel for Charizard too.
-const SPENT_ON = (() => {
-  const out = new Map();
-  for (const row of EVO_ROWS)
-    for (const id of feedPool(row.from)) {
-      if (!out.has(id)) out.set(id, []);
-      out.get(id).push(row);
-    }
-  return out;
-})();
-
-/* How many of a species a bulk sell holds back. Only evolutions you have not
-   registered yet count: once a Raticate is in the Pokédex your spare Rattata
-   are money again, so the reserve gets out of the way instead of freezing the
-   income loop forever. */
-export function reserveFor(sp, dex) {
-  if (!sp) return 1; // a save with an id we do not know: keep one, sell the rest
-  const pending = (SPENT_ON.get(sp.id) ?? []).filter(
-    (r) => !dex || dex[r.to - 1] !== 2,
-  );
-  return pending.length ? Math.max(...pending.map(feedCost)) + 1 : 1;
-}
 
 /* A Pokemon no bulk action may ever take: any rare tier at all.
 
@@ -372,128 +416,66 @@ export const keeper = (mon) => !!mon && TIERS.some((t) => mon[t]);
    every other panel reads. */
 export const variantOf = (mon) => TIERS.find((t) => mon?.[t]) ?? null;
 
-/* "Whichever one is best" - the answer every caller wanted before the Box
-   split its rows by variant, and still the right answer for a badge that only
-   asks whether ANYTHING can evolve.
+/* Everything the UI needs about ONE Pokemon and ONE of its evolutions.
 
-   A string, and one that cannot be a tier name, because the other two answers
-   are a tier name and `null` (meaning the ordinary one, specifically). Using
-   `undefined` for "any" and `null` for "ordinary" would have worked and would
-   have been one typo away from silently evolving the wrong Pokemon. */
-export const ANY_HERO = "*";
+   Per INSTANCE, not per species, and that deletes a whole class of bug with it.
+   The feed had to answer "which of these six Pidgey is the one that evolves"
+   (`ANY_HERO`, the hero sort, the variant-row threading) because it consumed a
+   pile. Candy is spent on a `uid`, so the question cannot be asked wrong: a
+   Holo levels up and a Holo comes out, with nothing to choose between.
 
-/* Who can be fed to an evolution, and who evolves. One function, because
-   `evolveState` counting the pool one way while `feedSelection` picked from it
-   another is exactly how a panel comes to say READY over a feed that cannot be
-   assembled.
-
-   **No rare tier is ever feed.** That is not a nicety: the sweep picks the cheapest
-   N to consume, and it would happily eat a rare-tier Pidgey to make an ordinary
-   Pidgeotto with nothing to undo it. A shiny CAN be the hero - the hero is the
-   one that comes out the other side, still shiny, which is what the real games
-   do - and it is preferred as hero for the same reason. */
-export function feedable(box, row, want = ANY_HERO) {
-  const pool = feedPool(row.from);
-  const rank = new Map(pool.map((id, i) => [id, i])); // 0 is the species itself
-  const mine = box.filter((m) => rank.has(m.species));
-
-  /* WHICH ONE EVOLVES. The Box shows a species' variants as separate rows now,
-     so "evolve" has to mean the row you pressed - press it on the ordinary
-     Pidgey pile and you get an ordinary Pidgeotto, even though a Holo is
-     sitting two rows down. Before this the hero was always the rarest one
-     present, which was the only sensible answer while one row stood for the
-     whole species and is the wrong one now.
-
-     `keeper` still leads the sort, and that is not redundant: with ANY_HERO it
-     is what keeps the old behaviour, and with a tier named every candidate is
-     a keeper anyway so it costs nothing. */
-  const hero = mine
-    .filter((m) => m.species === row.from
-      && (want === ANY_HERO || variantOf(m) === want))
-    .sort((a, b) =>
-      (keeper(b) ? 1 : 0) - (keeper(a) ? 1 : 0) || b.level - a.level || a.uid - b.uid)[0] ?? null;
-
-  /* The feed is unchanged and deliberately so: `!keeper` means NO variant is
-     ever eaten, whichever one is doing the evolving. A Holo evolves by
-     consuming ordinary duplicates, which is the only way a Holo Pidgeotto can
-     ever exist. */
-  const rest = mine
-    .filter((m) => m.uid !== hero?.uid && !keeper(m))
-    .sort(
-      (a, b) =>
-        rank.get(b.species) - rank.get(a.species) || // ancestors first
-        a.level - b.level ||
-        a.uid - b.uid,
-    );
-  return { hero, rest };
-}
-
-/* Everything the UI needs to describe one evolution without doing sums itself. */
-export function evolveState(box, bag, row, want = ANY_HERO) {
-  const cost = feedCost(row);
-  const { hero, rest } = feedable(box, row, want);
-  // The hero is spent too, so it counts towards the bill.
-  const have = hero ? 1 + rest.length : 0;
+   `need` is candy, because 1 candy = 1 level. */
+export function evolveState(mon, bag, row) {
+  const at = evoLevel(row);
   const stone = stoneFor(row);
   const hasStone = !stone || (bag?.[stone] ?? 0) > 0;
-  return { cost, have, stone, hasStone, ready: !!hero && have >= cost && hasStone };
+  const need = Math.max(0, at - (mon?.level ?? 0));
+  return { at, need, stone, hasStone, ready: !!mon && need === 0 && hasStone };
 }
 
-/* What a feed actually eats. The best of the species does the evolving and
-   carries its level forward; the rest of the bill is paid from the line below
-   it, earliest stage and weakest first, so your good ones are the last to go. */
-export function feedSelection(box, row, want = ANY_HERO) {
-  const cost = feedCost(row);
-  const { hero, rest } = feedable(box, row, want);
-  if (!hero || 1 + rest.length < cost) return null;
-  return { hero, fed: [hero, ...rest.slice(0, cost - 1)] };
+/* The cheapest way forward for one Pokemon, for a panel that only has room to
+   say one thing. Ready beats near, and near is measured in candy. */
+export function evoNext(mon, bag) {
+  const rows = evolutionsOf(mon?.species ?? 0);
+  if (!rows.length) return null;
+  const all = rows.map((row) => ({ row, ...evolveState(mon, bag, row) }));
+  return all.find((st) => st.ready) ?? all.reduce((a, b) => (b.need < a.need ? b : a));
 }
 
-/* What a deliberate row sale may take, when there are no spares left: the
-   surplus an unregistered evolution is holding back.
+/* Which box entries a bulk sell may take: everything but the best of each
+   species, and never a variant.
 
-   This lived inside the Box panel, which is why it shipped with a hole in it -
-   `duplicateUids` refuses to offer a keeper, and then this list sorted by level
-   and took all but the highest, so a shiny at Lv 2 behind an ordinary one at
-   Lv 30 was the one thing the row offered to sell, labelled "1 × Rattata". One
-   click, no undo. It is here now so check.mjs can hold it to the same rule as
-   the sweep, because a rule enforced in one of two places is not a rule. */
-export function heldUids(mons, spareUids = []) {
-  const spare = new Set(spareUids);
-  const sellable = mons.filter((m) => !keeper(m));
-  // Keep one of the species whatever happens - the row is not for emptying.
-  return sellable
-    .slice()
-    .sort((a, b) => a.level - b.level || a.uid - b.uid)
-    .slice(0, Math.max(0, sellable.length - 1))
-    .map((m) => m.uid)
-    .filter((uid) => !spare.has(uid));
-}
+   **The reserve collapsed to one when the feed was deleted.** It used to hold
+   back a whole evolution's worth of material - up to 20 - because a sweep could
+   otherwise eat the Dratini you were saving. Nothing is saved for anything now:
+   a spare's only jobs are cash and candy, so holding any back is holding back
+   progress. `reserveFor`, `heldUids` and the Box's "dig into what an evolution
+   is saving" branch all went with it.
 
-/* Which box entries a bulk sell may take. Each species keeps its reserve - the
-   highest-level ones, so selling never costs you your best - and for anything
-   an unregistered evolution still needs, the reserve is the whole feed. You can
-   still sell those individually; this only stops the one-button sweep from
-   eating material you were saving. */
-export function duplicateUids(box, dex) {
+   The best is the HIGHEST LEVEL one, which now means the one you have spent
+   candy on - so a sweep can never sell your investment. */
+export function duplicateUids(box) {
   const bySpecies = new Map();
   for (const mon of box) {
     if (!bySpecies.has(mon.species)) bySpecies.set(mon.species, []);
     bySpecies.get(mon.species).push(mon);
   }
   const spare = [];
-  for (const [id, mons] of bySpecies) {
-    const keep = reserveFor(SPECIES[id - 1], dex);
-    /* A shiny is never spare, whatever its level and however many you hold.
-       The reserve keeps the highest levels, so a shiny Rattata at level 3
-       behind four ordinary ones was in the sweep - one button, and a
-       rare-tier catch is money. Held out of the list entirely rather than
-       sorted to the front, because sorting only protects the first `keep`
-       of them. Selling one on purpose, from its own row, still works. */
-    const keepers = mons.filter(keeper);
+  for (const mons of bySpecies.values()) {
+    /* A variant is never spare, whatever its level and however many you hold.
+       Held out of the list ENTIRELY rather than sorted to the front, because
+       sorting only ever protects the first of them. Selling one deliberately,
+       from its own row, still works.
+
+       The one kept back is the best ORDINARY one, not the best of the species.
+       Counting keepers against the reserve meant that owning a Holo Pidgey made
+       your only ordinary Pidgey spare - the sweep grouped by species while the
+       Box groups by species AND variant, so it offered to empty a row that the
+       row itself considered full. Same rule on both sides now: every row you
+       can see keeps one. */
     const rest = mons.filter((m) => !keeper(m))
       .sort((a, b) => b.level - a.level || a.uid - b.uid);
-    spare.push(...rest.slice(Math.max(0, keep - keepers.length)).map((m) => m.uid));
+    spare.push(...rest.slice(1).map((m) => m.uid));
   }
   return spare;
 }

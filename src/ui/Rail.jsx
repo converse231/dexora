@@ -17,7 +17,7 @@ import Box from "./Box.jsx";
 import Shop from "./Shop.jsx";
 import Travel from "./Travel.jsx";
 import Trainer from "./Trainer.jsx";
-import { evolutionsOf, evolveState } from "../game/items.js";
+import { evoNext, variantOf } from "../game/items.js";
 import { freePoints } from "../game/trainer.js";
 
 /* Drawn icons, not glyphs. They were unicode characters - a grid, a ball, a
@@ -37,23 +37,29 @@ const TABS = ["dex", "box", "shop", "map", "you"];
 /* How many species could evolve this second. Cheap enough to do every render -
    it is one pass over the box, and only species that actually evolve are
    costed. Doing it here rather than in Box is what lets the tab say so. */
+/* The badge on the BOX tab: how many rows could evolve right now.
+
+   Counted per species AND variant, and over each row's BEST, because that is
+   what the Box itself does - a badge that says 3 over a panel showing 2 is
+   worse than no badge. `evoNext` picks the nearest branch, so an Eevee with one
+   stone counts once rather than three times. */
 function readyToEvolve(box, bag) {
   if (!box?.length) return 0;
-  const seen = new Set();
-  let n = 0;
+  const best = new Map();
   for (const mon of box) {
-    if (seen.has(mon.species)) continue;
-    seen.add(mon.species);
-    for (const row of evolutionsOf(mon.species)) {
-      if (evolveState(box, bag, row).ready) { n++; break; }
-    }
+    const key = `${mon.species}:${variantOf(mon) ?? ""}`;
+    const held = best.get(key);
+    if (!held || mon.level > held.level) best.set(key, mon);
   }
+  let n = 0;
+  for (const mon of best.values()) if (evoNext(mon, bag)?.ready) n++;
   return n;
 }
 
 export default function Rail({
   state, caught, level, busy,
-  onSelect, onSell, onBuy, onEvolve, onTravel, onSpend, onBike, save,
+  onSelect, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
+  onTravel, onSpend, onBike, save,
 }) {
   const [tab, setTab] = useState("dex");
 
@@ -119,12 +125,16 @@ export default function Rail({
           stats={state?.stats}
           busy={busy}
           onSell={onSell}
+          onConvert={onConvert}
+          onLevelUp={onLevelUp}
           onEvolve={onEvolve}
+          candy={state?.candy ?? 0}
         />
       )}
       {tab === "shop" && (
         <Shop money={state?.money ?? 0} bag={bag} level={level}
-              stats={state?.stats} onBuy={onBuy} />
+              stats={state?.stats} onBuy={onBuy}
+              candy={state?.candy ?? 0} onBuyCandy={onBuyCandy} />
       )}
       {tab === "map" && (
         <Travel areaId={state?.areaId} busy={busy} onTravel={onTravel} />

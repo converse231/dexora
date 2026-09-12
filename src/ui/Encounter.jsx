@@ -6,7 +6,7 @@
    is a readout of how close the losing roll came, so three shakes then a
    break-out really was a near miss. Click anywhere to skip to the result. */
 
-import { BALLS, evolutionsOf, evolveState, itemById } from "../game/items.js";
+import { BALLS, evoNext, itemById } from "../game/items.js";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import Types from "./Types.jsx";
@@ -22,13 +22,15 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
      count matters - it decides whether this one is the one you spend an Ultra
      Ball on - and until now you had to leave the encounter to find out. */
   const progress = (() => {
-    const rows = evolutionsOf(enc.speciesId);
-    if (!rows.length || !box) return null;
-    const states = rows.map((row) => ({ row, ...evolveState(box, bag, row) }));
-    const ready = states.find((st) => st.ready);
-    if (ready) return { ready: true, ...ready };
-    // The nearest branch is the honest one to show against.
-    return states.reduce((a, b) => (b.cost < a.cost ? b : a));
+    if (!box) return null;
+    /* The BEST one you hold, because that is the one carrying the levels and
+       the one that would evolve. Absent from the box entirely means there is
+       nothing to report - "Lv 0 / 16" for a species you have never caught is
+       noise on a screen that is about the one in front of you. */
+    const mine = box.filter((m) => m.species === enc.speciesId);
+    if (!mine.length) return null;
+    const hero = mine.reduce((a, b) => (b.level > a.level ? b : a));
+    return evoNext(hero, bag);
   })();
 
   const animating = ["throw", "suck", "drop", "wait", "shake"].includes(phase);
@@ -223,8 +225,12 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
             {progress.ready ? "READY" : "EVOLUTION"}
           </span>
           <span className="ec-line">
+            {/* The LEVEL of the best one you hold against the level it needs.
+                It counted duplicates before - "9/16 caught" - and the number
+                that matters is now a level you bought with candy. */}
             <strong className="ec-count">
-              {progress.have}<span>/{progress.cost}</span>
+              {Math.min(progress.at, progress.at - progress.need)}
+              <span>/{progress.at}</span>
             </strong>
             <span className="ec-sub">
               {progress.stone && !progress.hasStone

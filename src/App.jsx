@@ -221,6 +221,7 @@ export default function App() {
         total={st?.caught ?? 0}
         steps={st?.steps ?? 0}
         money={st?.money ?? 0}
+        candy={st?.candy ?? 0}
         deltas={deltas}
         xp={st?.xp ?? 0}
         onReset={() => engine?.reset()}
@@ -354,8 +355,11 @@ export default function App() {
           onTravel={(id) => engine.travel(id)}
           onSelect={setEntry}
           onSell={(uids) => engine.sell(uids)}
+          onConvert={(uids) => engine.convert(uids)}
+          onLevelUp={(uid, n) => engine.levelUp(uid, n)}
           onBuy={(id, n) => engine.buy(id, n)}
-          onEvolve={(from, to, hero) => engine.evolve(from, to, hero)}
+          onBuyCandy={(n) => engine.buyCandy(n)}
+          onEvolve={(uid, to) => engine.evolve(uid, to)}
           onSpend={(id) => engine.spend(id)}
           onBike={() => engine.toggleBike()}
           /* The three save-file calls, handed over as one object so the panel

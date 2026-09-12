@@ -10,7 +10,9 @@
    price goes, because a wall you can read is a goal. */
 
 import { useState } from "react";
-import { SHOP_BALLS, STONES, stoneFeed, speciesNeedingStone } from "../game/items.js";
+import {
+  SHOP_BALLS, STONES, CANDY_PRICE, speciesNeedingStone,
+} from "../game/items.js";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import { pricedAt } from "../game/trainer.js";
@@ -18,7 +20,7 @@ import Confirm from "./Confirm.jsx";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export default function Shop({ money, bag, level, stats, onBuy }) {
+export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCandy }) {
   const [pending, setPending] = useState(null);
   // The row whose buy controls are showing. Starts on the ball everyone owns,
   // so the shop opens explaining itself rather than as a list of closed doors.
@@ -28,6 +30,8 @@ export default function Shop({ money, bag, level, stats, onBuy }) {
 
   // Haggle discounts the shelf; the engine charges the same number.
   const priceOf = (item) => pricedAt(item.price, stats);
+  // Through the same discount as everything else, or Haggle has two rules.
+  const candyPrice = pricedAt(CANDY_PRICE, stats);
 
   const confirmBuy = (item, n) => {
     const cost = priceOf(item) * n;
@@ -163,9 +167,51 @@ export default function Shop({ money, bag, level, stats, onBuy }) {
 
         <p className="shop-note">Better balls raise the odds, not the reward.</p>
 
+        {/* RARE CANDY, and it is priced to lose. ¥120 against the ¥40 a common
+            duplicate sells for means three sold to buy one candy, where
+            converting that same duplicate gives one outright - so buying is
+            always the impatient option and catching is always the efficient
+            one. That ordering is the rule; the number is a starting value.
+
+            No purchase cap, and it needs none: cash comes from selling
+            duplicates, so cash-bought candy is gated by catching anyway. The
+            sink is self-limiting because its input is the same input - and it
+            puts candy in competition with Poké Balls for one wallet, which is
+            the choice that makes the shop interesting.
+
+            Its own row rather than an entry in the shelf above, because candy
+            is a currency and not a bag item: it has no sprite, it is spent per
+            level rather than selected and used, and it belongs beside the money
+            in the top bar, which is where it is. */}
+        <div className="sh-head">
+          <span>RARE CANDY</span>
+          <span>YOU HAVE {candy}</span>
+        </div>
+
+        <div className="candyrow">
+          <span className="cr-star">★</span>
+          <span className="cr-copy">
+            <b>Rare Candy</b>
+            <i>1 candy = 1 level</i>
+          </span>
+          <span className="cr-price">¥{candyPrice.toLocaleString()}</span>
+          {[1, 5, 10].map((n) => (
+            <button
+              key={n}
+              type="button"
+              className="cr-buy"
+              disabled={money < candyPrice * n}
+              onClick={() => onBuyCandy(n)}
+              title={`¥${(candyPrice * n).toLocaleString()}`}
+            >
+              +{n}
+            </button>
+          ))}
+        </div>
+
         <div className="sh-head">
           <span>EVOLUTION STONES</span>
-          <span>+{stoneFeed()} DUPLICATES</span>
+          <span>+ THE LEVEL</span>
         </div>
 
         <div className="shoplist">{shelf(STONES)}</div>

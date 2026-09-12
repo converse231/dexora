@@ -23,9 +23,9 @@ import { resolveThrow } from "../catch.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { medalsFor, milestoneAt } from "./medals.js";
 import {
-  ballById, liveMult, itemById, forSale, sellValue, startingState, DEX_BONUS, levelReward,
-  evolutionRow, evolveState, feedSelection, bestRod, holding, canRun, RUN_LEVEL,
-  ANY_HERO,
+  ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE,
+  evolveState, evoLevel, startingState, DEX_BONUS, levelReward,
+  evolutionRow, bestRod, holding, canRun, RUN_LEVEL,
   stepReward,
 } from "./items.js";
 
@@ -148,6 +148,10 @@ function loadState() {
       // A save from before stats existed has none, and a hand-edited one could
       // hold anything; the trainer module clamps each rank as it reads it.
       stats: { ...emptyStats(), ...(s.stats ?? {}) },
+      /* A save from before candy existed simply has none. No migration and no
+         back-pay: the duplicates it was hoarding for the old feed are still in
+         its box and convert at the same rate as anyone else's. */
+      candy: Math.max(0, Math.floor(Number(s.candy) || 0)),
       /* MIGRATION. Running was a level check before it was an item, so a save
          written then is past level 15 with an empty shoe slot - and would
          have silently LOST the ability to run, which is the one change a
@@ -882,67 +886,63 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
-  /* Feed the line to evolve. The bill is the real evolution level - 16 for a
-     Charmeleon - paid out of the species and everything below it, and a stone
-     evolution takes its stone from the bag as well. The animation is cosmetic:
-     the state change has already happened by the time it plays, so there is no
-     half-applied evolution to recover from if the tab is closed mid-flash. */
-  function evolve(speciesId, targetId, hero = ANY_HERO) {
-    /* `hero` is which variant of `speciesId` is doing the evolving - the Box
-       passes the row you pressed, so an ordinary pile never spends the Holo
-       standing next to it. Defaults to the old "whichever is best" so any
-       caller that has not been taught about rows still works. */
+  /* Evolve ONE Pokemon, named by uid.
+
+     It used to take (speciesId, targetId, whichVariant) and consume a pile, and
+     every hard part of it was a consequence of that: which of six Pidgey is the
+     hero, does the Holo get spent to make an ordinary Pidgeotto, does the panel
+     agree with the selection about how many are available. A uid has none of
+     those questions in it. The Pokemon that goes in is the Pokemon that comes
+     out, carrying its own level and its own tier.
+
+     The animation stays cosmetic - the state change has already happened by the
+     time it plays, so a tab closed mid-flash has nothing half-applied. */
+  function evolve(uid, targetId) {
     if (state.encounter || state.evolution) return null;
 
-    const row = evolutionRow(speciesId, targetId);
+    const mon = state.box.find((m) => m.uid === uid);
+    if (!mon) return null;
+    const row = evolutionRow(mon.species, targetId);
     if (!row) return null;
-    const want = evolveState(state.box, state.bag, row, hero);
-    if (!want.ready) return null;
-    const pick = feedSelection(state.box, row, hero);
-    if (!pick) return null;
+    const st = evolveState(mon, state.bag, row);
+    if (!st.ready) return null;
 
-    const eaten = new Set(pick.fed.map((m) => m.uid));
-    state.box = state.box.filter((m) => !eaten.has(m.uid));
-    if (want.stone) state.bag[want.stone] -= 1;
+    if (st.stone) state.bag[st.stone] -= 1;
 
     const target = SPECIES[targetId - 1];
     const isNew = state.dex[targetId - 1] !== 2;
     state.dex[targetId - 1] = 2;
     state.caught++;
-    /* Shininess carries through an evolution, the way it does in the real
-       games: the hero is the one that came out the other side, and
-       `feedable()` prefers a keeper as hero precisely so it is never the feed. */
-    // Rarest first, so a hero carrying more than one (which cannot happen, but
-    // a hand-edited save could) is described by its best. `TIERS` is already in
-    // that order, which is the whole reason it is a list and not four ternaries
-    // that have to be reordered by hand every time a tier is added.
-    const heroRoll = TIERS.find((t) => pick.hero[t]) ?? null;
-    if (heroRoll) state[heroRoll][targetId - 1] = 1;
-    state.box.push({
-      uid: state.nextUid++,
-      species: targetId,
-      level: pick.hero.level,
-      ...(heroRoll ? { [heroRoll]: 1 } : {}),
-      at: Date.now(),
-    });
-    if (isNew) checkDexRewards(targetId);
 
-    if (isNew) state.money += DEX_BONUS;
+    /* The tier travels with the creature, because it IS the creature - rarest
+       first so a hand-edited save carrying two is described by its best. */
+    const roll = TIERS.find((t) => mon[t]) ?? null;
+    if (roll) state[roll][targetId - 1] = 1;
+
+    /* Mutated in place rather than removed and re-pushed. The uid survives an
+       evolution, which is what makes it a Pokemon rather than a slot - and it
+       is what a future trade or battle log would need to refer to. */
+    mon.species = targetId;
+    mon.at = Date.now();
+
+    if (isNew) {
+      checkDexRewards(targetId);
+      state.money += DEX_BONUS;
+    }
     const gained = gainXp(xpForCatch(target, isNew));
 
     state.evolution = {
-      from: speciesId,
+      from: row.from,
       to: targetId,
-      fromName: label(SPECIES[speciesId - 1]).toUpperCase(),
+      fromName: label(SPECIES[row.from - 1]).toUpperCase(),
       toName: label(target).toUpperCase(),
-      level: pick.hero.level,
-      /* The scene has to wear the tier too. Shininess carries through an
-         evolution, so without this you feed a shiny Charmander, watch an
-         ordinary Charmander become an ordinary Charmeleon, and then find a
-         shiny Charmeleon in the box - the one moment the game shows you the
-         change is the one moment it was showing the wrong sprite. */
-      variant: heroRoll,
-      cost: want.cost,
+      level: mon.level,
+      /* The scene has to wear the tier too. Without it you level a shiny
+         Charmander, watch an ordinary one become an ordinary Charmeleon, and
+         then find a shiny Charmeleon in the box - the one moment the game
+         shows you the change is the one moment it showed the wrong sprite. */
+      variant: roll,
+      at: evoLevel(row),
       isNew,
       levelUp: gained?.level ?? null,
       reward: gained?.items ?? null,
@@ -957,6 +957,57 @@ export function createEngine(canvas, onChange, mini = null) {
     state.evolution = null;
     held.clear();
     changed();
+  }
+
+  /* The other half of a sale. Deliberately a near-twin of `sell` rather than a
+     shared helper with a flag: they differ only in which number goes up, and
+     one function that sometimes pays cash and sometimes pays candy is one
+     `if` away from paying both. Neither is affected by Haggle - that stat
+     prices cash, and candy is not cash. */
+  function convert(uids) {
+    const wanted = new Set(uids);
+    if (!wanted.size) return 0;
+    let got = 0;
+    state.box = state.box.filter((mon) => {
+      if (!wanted.has(mon.uid)) return true;
+      got += candyValue(SPECIES[mon.species - 1]);
+      return false;
+    });
+    state.candy += got;
+    save();
+    changed();
+    return got;
+  }
+
+  /* Candy into levels, on ONE named Pokemon. 1 candy = 1 level.
+
+     `n` is clamped to what is actually held rather than refused, so the Box can
+     offer "raise it as far as this will go" without doing the sum twice and
+     disagreeing with the engine about the answer. Returns the levels bought, so
+     0 reads as "nothing happened" at every call site. */
+  function levelUp(uid, n = 1) {
+    const mon = state.box.find((m) => m.uid === uid);
+    const spend = Math.min(Math.floor(n), state.candy);
+    if (!mon || spend < 1) return 0;
+    state.candy -= spend;
+    mon.level += spend;
+    save();
+    changed();
+    return spend;
+  }
+
+  /* Cash into candy. Priced through `priceOf` like everything else in the shop,
+     so Haggle discounts it - candy is bought with money, and the stat that
+     makes money go further has to make it go further here too or the shop has
+     two rules. */
+  function buyCandy(qty = 1) {
+    const cost = pricedAt(CANDY_PRICE, state.stats) * Math.max(1, Math.floor(qty));
+    if (qty < 1 || state.money < cost) return false;
+    state.money -= cost;
+    state.candy += Math.floor(qty);
+    save();
+    changed();
+    return true;
   }
 
   function sell(uids) {
@@ -978,7 +1029,10 @@ export function createEngine(canvas, onChange, mini = null) {
     state,
     travel,
     buy,
+    buyCandy,
     sell,
+    convert,
+    levelUp,
     spend,
     fish,
     toggleBike,
@@ -1040,6 +1094,7 @@ export function createEngine(canvas, onChange, mini = null) {
         rare: TIERS.reduce((n, t) => n + registered(obj[t]), 0),
         level: levelFromXp(obj.xp ?? 0),
         money: obj.money,
+        candy: obj.candy ?? 0,
         box: obj.box.length,
         savedAt: obj.savedAt ?? null,
       };

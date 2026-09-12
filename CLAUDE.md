@@ -626,6 +626,35 @@ exactly what rank 10 used to be: `catchMult` .06→.03, `rarityPower` .04→.02
 anything failing — the numbers stay monotone, which is all the suite checks.
 The design number is **49 points against 100 ranks**, asserted directly.
 
+**EVOLUTION IS CANDY AND A LEVEL, and there is no feed any more.** `evolve`
+takes ONE `uid`, checks `evolveState(mon, bag, row)`, and mutates that entry in
+place - the uid survives, which is what makes it a Pokemon rather than a slot.
+1 candy = 1 level, `evoLevel(row)` is the real PokeAPI number, and nothing is
+consumed but the stone. Do not reintroduce a pile: `feedable`/`feedSelection`/
+`ANY_HERO` existed only to answer "which of these six is the hero", and a uid
+cannot be asked that wrong.
+
+**`candyValue` reads through to the BASE FORM, and that is load-bearing.**
+Caterpie evolves at Lv 7 and a wild one can be caught at 7 - it evolves for free
+into a Metapod a tier above it, so "evolve then convert" beat "convert" on every
+line whose tier climbs. Reading through makes evolving unable to raise the yield
+at all, which closes the class rather than out-tuning one case. `sellValue`
+deliberately does NOT read through: cash tracks the species in hand, candy is a
+wage for catching. The two measuring different things is the design, and
+check.mjs pins both directions.
+
+**The candy yield must never be flat.** Flat makes one map strictly best to
+grind and the other seven scenery. `CANDY` is tiered 1/2/4/8 and must stay
+FLATTER than `SELL` - if candy tracked cash, a common catch would be worthless
+in both currencies, and commons are what the economy runs on. Measured spread
+across the eight maps is 1.48-2.58 candy per encounter.
+
+**A synthetic evolution level is derived, never tabled.** A stone or trade row
+has no level in PokeAPI; `evoLevel` gives it the parent's plus `SYNTH_STEP`,
+floored at `SYNTH_MIN`. A table of per-method levels grows every generation and
+this does not. check.mjs asserts a chain always climbs, because that is the only
+thing making the derivation sound.
+
 **Evolved forms are appended to every biome table by rule too, and for the
 same reason.** 41 of the 151 were in no table and on no rod - every third stage
 but Dragonite's - and the fix is `encounterTable(biome, level)`, which walks the

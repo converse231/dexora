@@ -1602,6 +1602,56 @@ canvas {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- candy -------------------------------------------------------------
+   One accent, used for exactly one idea. Candy is a second currency and it has
+   to be told from money at a glance in four places - the top bar, the sweep,
+   a row button and the shop - so it gets a colour of its own rather than the
+   path green everything else in this panel wears. */
+:root { --candy: #a45cc0; --candy-soft: #f0e3f6; }
+
+/* `.bigbtn` is `display: block; width: 100%`, and a flex item's `auto` basis
+   is its width - so `flex: 0 1 auto` on the candy half resolved to the WHOLE
+   row and squeezed the sell half to a sliver. Both get an explicit basis and
+   `width: auto`; the ratio is the two grow numbers, not the content. */
+.bx-sweep { display: flex; gap: 8px; }
+.bx-sweep .bigbtn { flex: 2 1 0; width: auto; min-width: 0; }
+.bx-sweep .bigbtn.candy {
+  flex: 1 1 0;
+  background: var(--candy); border-color: var(--candy); color: #fff;
+  box-shadow: 0 3px 0 #6c3b82;
+}
+.bx-acts .candy {
+  background: var(--candy-soft); border-color: var(--candy); color: var(--candy);
+}
+.bx-acts .raisebtn {
+  background: var(--candy); border-color: var(--candy); color: #fff;
+}
+
+.candyrow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 11px; margin-bottom: 10px;
+  background: var(--candy-soft); border: 1px solid var(--candy);
+  border-radius: 10px;
+}
+.cr-star { color: var(--candy); font-size: 17px; line-height: 1; }
+.cr-copy { flex: 1; min-width: 0; display: grid; }
+.cr-copy b { font-size: 13px; }
+.cr-copy i {
+  font-style: normal; font-size: 10.5px; color: var(--ink-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cr-price {
+  font-family: var(--pixel); font-size: 9px; color: var(--candy);
+  font-variant-numeric: tabular-nums;
+}
+.cr-buy {
+  flex: none; min-width: 34px; padding: 5px 7px;
+  font-family: var(--pixel); font-size: 9px;
+  background: var(--candy); color: #fff;
+  border: 1px solid var(--candy); border-radius: 7px; cursor: pointer;
+}
+.cr-buy:disabled { opacity: .4; cursor: default; }
+
 .cf-note {
   font-size: 12px; line-height: 1.45; color: var(--ink-soft);
   margin: 0 0 10px; padding-left: 9px; border-left: 3px solid var(--sand);
