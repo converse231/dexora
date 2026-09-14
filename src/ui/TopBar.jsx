@@ -7,6 +7,7 @@
    are only there when you need to check what one means. */
 
 import { levelProgress } from "../game/biomes.js";
+import { SPECIES } from "../data/species.js";
 
 /* "+3 +2 balls" - the whole parcel in one short line, because four separate
    floating numbers over one counter is confetti, not information. */
@@ -65,7 +66,12 @@ export default function TopBar({
 
         <span className="tb-stat">
           <i>POKÉDEX</i>
-          <b>{caught}<u>/151</u></b>
+          {/* The dex SIZE, not 151 - which was typed in, survived two
+              generations, and told every player they had finished at 151 of
+              358. Read off SPECIES rather than threaded as a prop, because
+              `total` already means "catches made" two rows down and one word
+              meaning two things is how this sort of bug gets made twice. */}
+          <b>{caught}<u>/{SPECIES.length}</u></b>
         </span>
 
         <span className="tb-stat">

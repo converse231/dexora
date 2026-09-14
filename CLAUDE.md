@@ -981,6 +981,16 @@ a save. `importSave` writes and reloads rather than swapping state in place: the
 engine closes over the map rows and their dimensions, and a reload is the one
 path that is certainly consistent.
 
+**`normalise` IS FOR ONE-BIT ROWS; THE DEX IS THREE-VALUED.** `padDex` for the
+dex, `normalise` for the tier rows. They are the same function one value apart,
+and using the wrong one demotes every CAUGHT species in every save to SEEN - it
+shipped to a dev server for twenty minutes and cost a real collection.
+`repairDex` puts back what a save can still prove: anything in the BOX was
+caught, and any registered VARIANT was caught (tier rows are one-bit, so they
+could not be damaged). It only ever raises a 1 to a 2. **A source edit reaches a
+running dev server immediately - a save-format change is live the moment it is
+typed, not when it is committed.**
+
 **A DEX ID IS NOT AN ARRAY INDEX.** `speciesById(id)` for the species,
 `dexIndex(id)` for its POSITION - which is what `dex` and every per-tier byte
 row are keyed on. `SPECIES[id - 1]` and `dex[id - 1]` are correct only for a

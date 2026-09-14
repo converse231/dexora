@@ -13,7 +13,9 @@
 import { useState } from "react";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
-import { LEGENDARY, TIERS, dexIndex } from "../game/biomes.js";
+import {
+  LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS,
+} from "../game/biomes.js";
 import FilterBar from "./FilterBar.jsx";
 import Sprite, { VariantFx } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
@@ -43,6 +45,10 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
   const [only, setOnly] = useState("all");
   const [type, setType] = useState("any");
   const [sort, setSort] = useState("number");
+  /* "kanto" rather than "all" as the default would hide 207 entries behind a
+     control nobody has touched yet. A region is a way to stop scrolling, not a
+     way to start. */
+  const [region, setRegion] = useState("all");
   const [find, setFind] = useState("");
 
   const at = (id) => dex?.[dexIndex(id)] ?? 0;
@@ -61,6 +67,7 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
 
   const shown = SPECIES.filter((sp) => {
     const state = at(sp.id);
+    if (region !== "all" && genOf(sp.id) !== Number(region)) return false;
     if (only === "caught" && state !== 2) return false;
     if (only === "missing" && state === 2) return false;
     if (only === "seen" && state !== 1) return false;
@@ -93,7 +100,10 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
         find={find}
         onFind={setFind}
         placeholder="Find a name, type or number…"
-        onReset={() => { setOnly("all"); setType("any"); setSort("number"); setFind(""); }}
+        onReset={() => {
+          setOnly("all"); setType("any"); setSort("number"); setFind("");
+          setRegion("all");
+        }}
         selects={[
           {
             id: "show", label: "SHOW", value: only, onChange: setOnly,
@@ -111,6 +121,26 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
                  same direction the marks on a tile do. */
               ...MARKS.map((t) => [t, t[0].toUpperCase() + t.slice(1), count(t)]),
               ["complete", "Complete", completed],
+            ],
+          },
+          /* ONE REGION AT A TIME. 358 cells is nine screens of scrolling and
+             the question you arrive with is almost always about one of them -
+             and it only gets worse: Hoenn alone is another 135.
+
+             Built from `GENERATIONS`, which is derived from what actually
+             shipped, so a region appears here the day it is fetched and the gap
+             where Hoenn is does not show up as an empty tab. The counts are
+             what you have CAUGHT in each, because "Johto 12" is a progress bar
+             you can read at a glance and "Johto 100" is a fact about Pokemon. */
+          {
+            id: "region", label: "REGION", value: region, onChange: setRegion,
+            options: [
+              ["all", "All regions", SPECIES.length],
+              ...GENERATIONS.map((g) => [
+                String(g.gen),
+                g.name,
+                SPECIES.filter((sp) => genOf(sp.id) === g.gen && at(sp.id) === 2).length,
+              ]),
             ],
           },
           {
