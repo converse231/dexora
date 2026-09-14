@@ -981,6 +981,52 @@ a save. `importSave` writes and reloads rather than swapping state in place: the
 engine closes over the map rows and their dimensions, and a reload is the one
 path that is certainly consistent.
 
+**A DEX ID IS NOT AN ARRAY INDEX.** `speciesById(id)` for the species,
+`dexIndex(id)` for its POSITION - which is what `dex` and every per-tier byte
+row are keyed on. `SPECIES[id - 1]` and `dex[id - 1]` are correct only for a
+contiguous 1..N dex, and Gen 3 does not ship: ids run 1-251 then 387-493 across
+358 entries, so every Sinnoh catch was writing off the end. Both lookups are
+Maps, built once, because the Dex grid asks per cell per render. **Gen 3's
+absence is deliberate** - a contiguous dex hides this entire class, so the hole
+is the test.
+
+**Kanto is the first 151 positions of `SPECIES`, and saves depend on it.** A
+save written before Johto keyed its bytes by `id - 1`; padding it works only
+because position and `id - 1` agree for Kanto. check.mjs asserts that alignment
+- insert a generation BEFORE Kanto and it is the only thing that will notice.
+`loadState` pads a short dex rather than rejecting it (rejecting deleted every
+existing collection) and uses `padDex`, NOT `normalise`: the dex is three-valued
+and `normalise` coerces `? 1 : 0`, which demotes every caught species to seen.
+
+**Legendaries are a SHARE of the table, never a fixed weight.** `LEGEND_SHARE`
+is 1% of whatever the table comes to, split by type match, added by
+`encounterTable` after the residents and the evolved overlay - so it cannot be
+in `BIOMES[i].table`, and `foundIn`/check.mjs read the assembled table instead.
+Fixed weights survive exactly one dex size: 5 legendaries became 24 and the
+tables tripled, which would have multiplied the rate by five. Adding a
+generation, a legendary or a map now moves nothing.
+
+**A generation ARRIVES, on `GEN_UNLOCK`.** Johto at 22, Sinnoh at 35, filtered
+inside `encounterTable` by the level it already took. Pouring 207 species into
+the tables on day one would have halved every measured weight in `RESIDENTS` by
+arithmetic nobody chose. A generation with no entry is open from the start,
+which is the right default for the hole.
+
+**Origin is DEBUT artwork, not Gen 1 artwork.** `DEBUT` in build_origin.py maps
+each range to its own source set - Yellow/Red-Blue, Crystal/Gold, Diamond-Pearl.
+Reading the tier as "the Gen 1 sprite" would have left 207 of 358 without one.
+Every sprite - ordinary, shiny, Origin - is normalised to a 64x64 canvas;
+Sinnoh's HGSS art is 80x80 and is reframed, or it is simply a different SIZE
+from everything beside it in a row.
+
+**Every non-level evolution method is `bond`.** Happiness, time of day, a held
+item on a trade, a move, a place: a game with no clock, no moves and no map
+transitions cannot express any of them, and a per-method table grows every
+generation. `evoLevel` gives the row a synthetic level from its parent, so a
+third of Johto needed no new code. **But a `stone` row needs its stone ON THE
+SHELF** - check.mjs asserts `STONES` against `EVOLUTIONS` both ways, because an
+unbuyable stone is not a hard evolution, it is an impossible one.
+
 **A generation is derived from the dex id.** `GEN_LAST` in `biomes.js` holds the
 last national dex number of each generation and `genOf()` reads it; nothing is
 stored per species, because it already is a fact about the id and 151 copies of

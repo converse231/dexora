@@ -166,7 +166,9 @@ import {
   stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
   TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf,
 } from "../src/game/items.js";
-import { ENCLOSED } from "../src/game/biomes.js";
+import {
+  ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
+} from "../src/game/biomes.js";
 
 const poke = ballById("poke-ball");
 const ultra = ballById("ultra-ball");
@@ -487,7 +489,12 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
      (Tauros, Ditto, Farfetch'd, Lickitung, Porygon) with nowhere else at all,
      and this is what said so. */
   const reach = new Set();
-  for (const b of BIOMES) for (const [id] of b.table) reach.add(id);
+  /* `encounterTable` at the cap, not `b.table`. Legendaries are no longer baked
+     into the biome - their weight is a SHARE of whatever the table comes to, so
+     they are added when it is assembled - and the evolved-form overlay lives
+     there too. Reading the raw table declared all 23 legendaries unreachable. */
+  for (const b of BIOMES)
+    for (const [id] of encounterTable(b, MAX_LEVEL)) reach.add(id);
   for (const rod of RODS) for (const [id] of rod.table) reach.add(id);
   for (let pass = 0; pass < 3; pass++)
     for (const id of [...reach])
@@ -504,8 +511,8 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
     if (!rows.length) continue;
     chains++;
     for (const row of rows) {
-      assert.equal(SPECIES[row.to - 1].from, sp.name,
-        `${sp.name} -> ${SPECIES[row.to - 1].name} is not a real evolution`);
+      assert.equal(speciesById(row.to).from, sp.name,
+        `${sp.name} -> ${speciesById(row.to).name} is not a real evolution`);
       assert.equal(evolutionRow(sp.id, row.to), row, "rows must be findable");
 
       /* EVERY row has a level, including the ones PokeAPI gives none for.
@@ -513,13 +520,13 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
          one answer that cannot be right - it would evolve the instant you
          caught it. */
       const at = evoLevel(row);
-      assert.ok(at >= 2, `${sp.name} -> ${SPECIES[row.to - 1].name} costs nothing`);
+      assert.ok(at >= 2, `${sp.name} -> ${speciesById(row.to).name} costs nothing`);
       if (row.kind === "level") {
         assert.equal(at, row.level, `${sp.name} must evolve at its real level`);
       } else {
         synthetic++;
         assert.ok(at >= SYNTH_MIN,
-          `${SPECIES[row.to - 1].name} is synthetic and below the floor`);
+          `${speciesById(row.to).name} is synthetic and below the floor`);
       }
     }
   }
@@ -533,8 +540,8 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
     for (const row of evolutionsOf(sp.id)) {
       for (const next of evolutionsOf(row.to)) {
         assert.ok(evoLevel(next) > evoLevel(row),
-          `${SPECIES[next.to - 1].name} (Lv ${evoLevel(next)}) is not above ` +
-          `${SPECIES[row.to - 1].name} (Lv ${evoLevel(row)})`);
+          `${speciesById(next.to).name} (Lv ${evoLevel(next)}) is not above ` +
+          `${speciesById(row.to).name} (Lv ${evoLevel(row)})`);
       }
     }
   }
@@ -550,7 +557,7 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
      construction rather than a range that needs watching per generation. */
   for (const sp of SPECIES) {
     for (const row of evolutionsOf(sp.id)) {
-      const target = SPECIES[row.to - 1];
+      const target = speciesById(row.to);
       assert.ok(candyValue(target) <= candyValue(sp),
         `${sp.name} (${candyValue(sp)}) evolves into ${target.name} ` +
         `(${candyValue(target)}) - evolving would print candy`);
@@ -558,9 +565,9 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
   }
   /* Caterpie is the line that shows it: C -> B -> A, so its tier really does
      climb where Bulbasaur's line is A throughout. */
-  assert.equal(candyValue(SPECIES[11]), candyValue(SPECIES[9]),
+  assert.equal(candyValue(speciesById(12)), candyValue(speciesById(10)),
     "a Butterfree is worth a Caterpie in candy - you did the work catching one");
-  assert.ok(sellValue(SPECIES[11]) > sellValue(SPECIES[9]),
+  assert.ok(sellValue(speciesById(12)) > sellValue(speciesById(10)),
     "but CASH still tracks the species in hand, or the two currencies say the same thing");
 
   /* THE YIELD LADDER. Rarer is worth more, and flatter than cash: if candy
@@ -604,13 +611,29 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
      evolution that reaches it. */
   for (const sp of SPECIES) {
     for (const row of evolutionsOf(sp.id)) {
-      const target = SPECIES[row.to - 1];
+      const target = speciesById(row.to);
       const spent = Math.max(0, evoLevel(row) - 7);   // candy, at best
       const gained = (sellValue(target) - sellValue(sp)) / CANDY_PRICE;
       assert.ok(gained <= spent + 2,
         `${sp.name} -> ${target.name} turns ${spent} candy into ` +
         `${gained.toFixed(1)} candy of cash - that is a printer`);
     }
+  }
+
+  /* EVERY STONE AN EVOLUTION ASKS FOR IS ON THE SHELF. A stone that is not
+     buyable is not a hard evolution, it is an impossible one - and nothing on
+     screen would say so. Johto brought the Sun Stone and Shiny Stone and Sinnoh
+     the Dusk Stone; all three were missing on the day the species arrived. */
+  {
+    const wanted = new Set(EVOLUTIONS.filter((r) => r.item).map((r) => r.item));
+    for (const id of wanted) {
+      const stone = STONES.find((x) => x.id === id);
+      assert.ok(stone, `${id} is needed by an evolution and is not in STONES`);
+      assert.ok(forSale(stone), `${id} is not purchasable`);
+      assert.ok(stone.level <= MAX_LEVEL, `${id} unlocks past the level cap`);
+    }
+    const spare = STONES.filter((x) => !wanted.has(x.id)).map((x) => x.id);
+    assert.deepEqual(spare, [], `stones nothing evolves with: ${spare.join(", ")}`);
   }
 
   /* evolveState is per INSTANCE now: one Pokemon, one level, one answer. */
@@ -633,7 +656,15 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
     evolveState({ ...eevee, level: 1 }, { "water-stone": 1 }, water).ready, false,
     "a stone does not skip the level",
   );
-  assert.equal(evolutionsOf(133).length, 3, "Eevee keeps all three branches");
+  /* Eevee keeps EVERY branch its data has - three in Kanto, five once Johto
+     ships Espeon and Umbreon, seven with Sinnoh's Leafeon and Glaceon. Pinned
+     to 3 it was a literal standing in for "a species may evolve more than one
+     way and none of them is dropped". */
+  assert.ok(evolutionsOf(133).length >= 3,
+    `Eevee has ${evolutionsOf(133).length} branches - the multi-branch case is gone`);
+  assert.equal(
+    new Set(evolutionsOf(133).map((r) => r.to)).size, evolutionsOf(133).length,
+    "Eevee lists a branch twice");
 
   /* evoNext is what three panels read, so it must agree with evolveState about
      the same Pokemon - a badge that says READY over a row that is not is the
@@ -856,7 +887,7 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
     assert.ok(rod.table.length >= prev, `${rod.id} should not be narrower than the last`);
     prev = rod.table.length;
     for (const [id, w] of rod.table) {
-      assert.ok(SPECIES[id - 1], `${rod.id} lists a species that does not exist: ${id}`);
+      assert.ok(speciesById(id), `${rod.id} lists a species that does not exist: ${id}`);
       assert.ok(w > 0, `${rod.id} has a zero weight`);
     }
     assert.ok(rodTable(rod.id), `${rod.id} must be findable`);
@@ -1429,7 +1460,7 @@ for (const b of BIOMES) {
   for (const t of b.types)
     assert.ok(KNOWN_TYPES.has(t), `${b.id} lists an unknown type "${t}"`);
   for (const [id, w] of b.table) {
-    assert.ok(SPECIES[id - 1], `${b.id} table has a dex id that does not exist: ${id}`);
+    assert.ok(speciesById(id), `${b.id} table has a dex id that does not exist: ${id}`);
     assert.ok(w > 0, `${b.id} table has a zero weight`);
   }
   assert.equal(new Set(b.table.map((e) => e[0])).size, b.table.length,
@@ -1446,22 +1477,46 @@ assert.equal(biomeFor("nowhere"), null, "an unknown area has no biome");
    one by hand as well is the mistake this catches, and it would show up as a
    species appearing twice in one table with two different odds. */
 for (const b of BIOMES) {
+  /* NOT in the resident table any more - their weight depends on how big the
+     table turns out to be, so `encounterTable` adds them last. A legendary
+     listed here as well would be one appearing twice with two sets of odds,
+     which is the mistake this has always been for. */
   for (const id of LEGENDARY) {
-    const rows = b.table.filter((e) => e[0] === id);
-    assert.equal(rows.length, 1,
-      `${b.id} lists legendary #${id} ${rows.length} times - hard-coded in the table?`);
-    const matched = SPECIES[id - 1].types.some((t) => b.types.includes(t));
-    assert.equal(rows[0][1], matched ? LEGEND_MATCHED : LEGEND_STRAY,
-      `${b.id} weights #${id} wrong for a ${matched ? "matching" : "mismatched"} biome`);
+    assert.equal(b.table.filter((e) => e[0] === id).length, 0,
+      `${b.id} hard-codes legendary #${id} - legendsFor() adds them`);
   }
-  /* And they have to stay a garnish. Five legendaries in every table is exactly
-     how you end up meeting one a session: the old Zapdos-in-his-own-plant sat
-     near 1% of finds and no map should now be far off it. */
-  const total = b.table.reduce((n, e) => n + e[1], 0);
-  const share = b.table.filter((e) => LEGENDARY.includes(e[0]))
-    .reduce((n, e) => n + e[1], 0) / total;
-  assert.ok(share > 0 && share < 0.02,
-    `${b.id}: legendaries are ${(share * 100).toFixed(1)}% of finds`);
+
+  /* THE SHARE IS CONSTANT, and that is a far stronger claim than the weights
+     this used to pin. Going from 5 legendaries to 24 in tables that tripled
+     would have multiplied the old fixed weights' share by about five; as a
+     share of the table it cannot move at all. Checked at every level a
+     generation or a map arrives, because those are what change the total. */
+  for (const lv of [1, 10, GEN_UNLOCK[2], 30, GEN_UNLOCK[4], MAX_LEVEL]) {
+    const t = encounterTable(b, lv);
+    const total = t.reduce((n, e) => n + e[1], 0);
+    const share = t.filter((e) => LEGENDARY.includes(e[0]))
+      .reduce((n, e) => n + e[1], 0) / total;
+    assert.ok(Math.abs(share - LEGEND_SHARE) < 1e-9,
+      `${b.id} at Lv ${lv}: legendaries are ${(share * 100).toFixed(2)}% of finds, ` +
+      `not ${(LEGEND_SHARE * 100).toFixed(2)}% - the share must not move when the ` +
+      "table grows, which is the whole reason it is a share");
+    // exactly once each, whatever else was added
+    for (const id of LEGENDARY) {
+      if (!genOpen(id, lv)) continue;
+      assert.equal(t.filter((e) => e[0] === id).length, 1,
+        `${b.id} at Lv ${lv} rolls legendary #${id} more than once`);
+    }
+  }
+
+  // A biome sharing a legendary's type is still the better place to hunt it.
+  const full = encounterTable(b, MAX_LEVEL);
+  const wOf = (id) => full.find((e) => e[0] === id)?.[1] ?? 0;
+  const mine = LEGENDARY.filter((id) => speciesById(id).types.some((t) => b.types.includes(t)));
+  const away = LEGENDARY.filter((id) => !mine.includes(id));
+  if (mine.length && away.length) {
+    assert.ok(wOf(mine[0]) > wOf(away[0]),
+      `${b.id}: a legendary that matches it is no likelier than one that does not`);
+  }
 }
 assert.ok(LEGEND_STRAY < LEGEND_MATCHED,
   "a biome sharing a legendary's type must be the better place to hunt it");
@@ -1546,9 +1601,10 @@ assert.ok(LEGEND_STRAY < LEGEND_MATCHED,
     if (legendary) continue;
     for (const a of areas) {
       const gate = BIOMES.find((b) => b.id === a.id).level;
-      assert.ok(a.from >= (gate > MAP_FIRST ? gate : 0),
-        `${sp.name}'s entry names ${a.name} (opens Lv ${gate}) as "Lv ${a.from}+" - ` +
-        "the panel is hiding a locked door");
+      const genGate = GEN_UNLOCK[genOf(sp.id)] ?? 0;
+      assert.ok(a.from >= Math.max(gate > MAP_FIRST ? gate : 0, genGate),
+        `${sp.name}'s entry names ${a.name} as "Lv ${a.from}+" but the map opens ` +
+        `at ${gate} and its generation at ${genGate} - the panel is hiding a door`);
     }
   }
 
@@ -1622,7 +1678,7 @@ import { saveProblem } from "../src/game/engine.js";
     assert.ok(m.need.length > 0, `${m.id} asks for nothing`);
     assert.equal(new Set(m.need).size, m.need.length, `${m.id} lists a species twice`);
     for (const id of m.need)
-      assert.ok(SPECIES[id - 1], `${m.id} wants species ${id}, which does not exist`);
+      assert.ok(speciesById(id), `${m.id} wants species ${id}, which does not exist`);
     assert.ok(m.money > 0, `${m.id} pays nothing`);
     for (const [item, n] of Object.entries(m.items ?? {})) {
       assert.ok(itemById(item), `${m.id} pays in ${item}, which is not an item`);
@@ -1646,7 +1702,7 @@ import { saveProblem } from "../src/game/engine.js";
   const balls = {};
   let milestonesHit = 0;
   for (const sp of SPECIES) {
-    dex[sp.id - 1] = 2;
+    dex[dexIndex(sp.id)] = 2;
     for (const m of medalsFor(sp.id, dex, earned)) {
       earned.push(m.id);
       money += m.money;
@@ -1673,10 +1729,16 @@ import { saveProblem } from "../src/game/engine.js";
   /* The payout, as one number. Not a limit - "be generous" was the brief - but
      a number that cannot drift without this line changing, because a reward
      table is exactly the sort of thing that grows a zero by accident. */
-  assert.ok(money > 50000 && money < 250000,
-    `medals and milestones total ¥${money} over a whole game`);
-  assert.ok(balls["master-ball"] <= 3,
-    `${balls["master-ball"]} Master Balls from the dex - that is not a hoard`);
+  const per = money / SPECIES.length;
+  assert.ok(per > 300 && per < 1500,
+    `medals and milestones pay ¥${Math.round(per)} per species (¥${money} over ` +
+    `${SPECIES.length}) - the total is allowed to grow with the dex, the RATE is not`);
+  /* Scaled the same way. Two generations brought 19 more legendaries, so the
+     same number of Master Balls would have been a real tightening; one per
+     seventy species keeps the pressure where it was. */
+  assert.ok(balls["master-ball"] <= Math.ceil(SPECIES.length / 70),
+    `${balls["master-ball"]} Master Balls from the dex over ${SPECIES.length} ` +
+    "species - that is a hoard");
   console.log(`medals ok — ${MEDALS.length} (${
     ["line", "type", "biome", "dex"].map((k) =>
       `${MEDALS.filter((m) => m.kind === k).length} ${k}`).join(", ")
@@ -1804,12 +1866,33 @@ import { saveProblem } from "../src/game/engine.js";
     assert.ok(!genComplete(seen, 1), "SEEN is not CAUGHT");
     assert.ok(genComplete(full, 1), "a full dex must open the gate");
     // One short is still short - the off-by-one this kind of loop invites.
+    // Flipped by POSITION of a known Gen 1 species, not by the last slot: the
+    // last slot is Arceus now, and Gen 1 does not care about Arceus.
     const nearly = [...full];
-    nearly[SPECIES.length - 1] = 1;
-    assert.ok(!genComplete(nearly, 1), "150 of 151 must not open the gate");
+    nearly[dexIndex(1)] = 1;                              // Bulbasaur, met only
+    assert.ok(!genComplete(nearly, 1), "one short must not open the gate");
     assert.ok(!genComplete(undefined, 1), "no dex at all is not complete");
-    // A generation this save has never heard of cannot be complete either.
-    assert.ok(!genComplete(full, 2), "Gen 2 is not complete on a 151-entry dex");
+
+    /* PER GENERATION, and three of them is the first time that could be tested.
+       Finishing Kanto must not hand out Johto's Origins and it must not take
+       Kanto's away either - the whole reason the gate is per generation rather
+       than global is that adding a generation would otherwise revoke what a
+       player had already earned. */
+    const kantoOnly = SPECIES.map((sp) => (genOf(sp.id) === 1 ? 2 : 0));
+    assert.ok(genComplete(kantoOnly, 1), "a finished Kanto must open Kanto");
+    assert.ok(!genComplete(kantoOnly, 2), "a finished Kanto must not open Johto");
+    assert.ok(!genComplete(kantoOnly, 4), "a finished Kanto must not open Sinnoh");
+    assert.ok(originReady(kantoOnly, 1), "Kanto's Origins are earned");
+    assert.ok(!originReady(kantoOnly, 152), "Johto's are not");
+    assert.ok(genComplete(full, 2) && genComplete(full, 4),
+      "a full dex opens every generation that ships");
+
+    /* THE HOLE. Gen 3 ships no species, so "is Gen 3 complete" is vacuously
+       true - and that is the right answer rather than a bug: there is nothing
+       to catch and nothing to gate. Asserted so the day Hoenn lands, this line
+       fails and somebody reads it. */
+    assert.ok(genComplete(empty, 3),
+      "a generation with no species in it has nothing left to catch");
 
     assert.ok(!originReady(empty, 1) && originReady(full, 1),
       "originReady must follow its generation's dex");
@@ -1968,7 +2051,7 @@ import { saveProblem } from "../src/game/engine.js";
   for (const tier of TIERS) {
     const plain = { uid: 1, species: 19, level: 5 };
     assert.equal(
-      candyValue(SPECIES[18]), candyValue(SPECIES[18]),
+      candyValue(speciesById(19)), candyValue(speciesById(19)),
       "candy is a fact about the species, not the individual",
     );
     assert.ok(keeper({ ...plain, [tier]: 1 }), `${tier} must be a keeper`);
@@ -2062,12 +2145,30 @@ import { saveProblem } from "../src/game/engine.js";
   assert.equal(saveProblem(ok), null, "a plain save must load");
   for (const [bad, why] of [
     [null, "null"], [[], "an array"], ["{}", "a string"], [{}, "no dex"],
-    [{ dex: [1, 2, 3], box: [], money: 0 }, "a dex of the wrong length"],
+    /* A dex LONGER than this game knows, which is a save from a newer build and
+       cannot be padded into meaning. A shorter one is an older save and is now
+       accepted on purpose - see padDex. */
+    [{ dex: new Array(SPECIES.length + 1).fill(0), box: [], money: 0 },
+      "a dex longer than the game knows"],
     [{ dex: ok.dex, money: 0 }, "no box"],
     [{ dex: ok.dex, box: [], money: "lots" }, "money that is not a number"],
     [{ dex: ok.dex, box: [], money: NaN }, "money that is NaN"],
   ])
     assert.ok(saveProblem(bad), `an import accepted ${why}`);
+
+  /* AND AN OLDER, SHORTER SAVE IS ACCEPTED, because rejecting it is how an
+     update deletes somebody's collection. It only works because Gen 1 sits at
+     the front of SPECIES in id order, so a byte written at `id - 1` by the old
+     build is already at the right POSITION for the new one - asserted here
+     rather than trusted, since inserting a generation before Kanto would break
+     it silently and this is the only thing that would notice. */
+  for (let i = 0; i < 151; i++) {
+    assert.equal(dexIndex(i + 1), i,
+      `Kanto is no longer the first 151 positions of SPECIES - every save ` +
+      "written before this change now points at the wrong species");
+  }
+  assert.equal(saveProblem({ dex: new Array(151).fill(2), box: [], money: 0 }), null,
+    "a 151-entry save from the Kanto-only build must still open");
 }
 
 {
@@ -2171,9 +2272,19 @@ import { saveProblem } from "../src/game/engine.js";
   }
 
   // 2. nothing evolved before its level, and the base table is untouched at Lv 1.
+  /* The rule is "nothing EVOLVED at Lv 1", and it used to be written as
+     `encounterTable(b, 1)` deep-equalling `b.table`. That held while the two
+     were the same list; the table now also carries residents whose generation
+     has not arrived (filtered out) and gains the legendaries (added on). A
+     derived row is the one tagged with a depth, so ask that. */
   for (const b of BIOMES) {
-    assert.deepEqual(encounterTable(b, 1), b.table,
-      `${b.id} spawns something derived at Lv 1 - the early game is base forms only`);
+    const early = encounterTable(b, 1);
+    assert.equal(early.filter((e) => e[2]).length, 0,
+      `${b.id} spawns an evolved form at Lv 1 - the early game is base forms only`);
+    for (const [id] of early) {
+      assert.ok(genOpen(id, 1) || LEGENDARY.includes(id),
+        `${b.id} spawns #${id} at Lv 1 before its generation has arrived`);
+    }
   }
   for (let depth = 1; depth <= EVO_DEPTH; depth++) {
     assert.equal(evoScale(evoUnlock(depth) - 1, depth), 0,
@@ -2193,16 +2304,26 @@ import { saveProblem } from "../src/game/engine.js";
       "exists only inside the Box is a species the Dex cannot honestly place");
   }
 
-  // 4. an evolution is never commoner than what it evolves from, in its own map.
+  /* 4. a DERIVED evolution is never commoner than what it evolves from.
+
+     Only the derived ones - the rows the overlay invents, which carry a depth
+     tag. This used to check every pair and Johto broke it honestly: Igglybuff
+     evolves INTO Jigglypuff, and Jigglypuff is a hand-placed Tall Grass common
+     at 7 while Igglybuff is a derived rarity at 5. A baby being rarer than the
+     thing it becomes is correct - that is what a baby Pokemon IS - and the rule
+     was never about those. It is about the overlay not inventing a Venusaur
+     commoner than a Bulbasaur. */
   const pre = new Map();
   for (const e of EVOLUTIONS) pre.set(e.to, e.from);
   for (const b of BIOMES) {
-    const w = new Map(encounterTable(b, MAX_LEVEL).map(([id, x]) => [id, x]));
+    const t = encounterTable(b, MAX_LEVEL);
+    const w = new Map(t.map(([id, x]) => [id, x]));
+    const derived = new Set(t.filter((e) => e[2]).map((e) => e[0]));
     for (const [to, from] of pre) {
-      if (!w.has(to) || !w.has(from)) continue;
+      if (!derived.has(to) || !w.has(from)) continue;
       assert.ok(w.get(to) <= w.get(from) || w.get(to) <= EVO_FLOOR + 1e-9,
-        `${b.id}: ${SPECIES[to - 1].name} (${w.get(to)}) is commoner than ` +
-        `${SPECIES[from - 1].name} (${w.get(from)})`);
+        `${b.id}: derived ${speciesById(to).name} (${w.get(to)}) is commoner than ` +
+        `${speciesById(from).name} (${w.get(from)})`);
     }
   }
 
@@ -2222,7 +2343,7 @@ import { saveProblem } from "../src/game/engine.js";
         creature's own dex entry reads as a rendering fault rather than a roll. */
   for (const [to, from] of pre) {
     assert.ok(bornLevel(to) > bornLevel(from),
-      `${SPECIES[to - 1].name} is born no later than ${SPECIES[from - 1].name} ` +
+      `${speciesById(to).name} is born no later than ${speciesById(from).name} ` +
       `(${bornLevel(to)} vs ${bornLevel(from)}) - a chain must climb`);
   }
   assert.equal(bornLevel(1), 0, "a base form is born at 0");

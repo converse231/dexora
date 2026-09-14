@@ -1391,7 +1391,14 @@ canvas {
   max-height: 440px; overflow-y: auto; padding-right: 4px;
   align-content: start;
 }
+/* `content-visibility` was the noted lever for a grid of animated cells, and
+   358 entries is what made it worth pulling: a full variant dex is 358 masked,
+   animating layers, of which a dozen are ever on screen. Offscreen cells skip
+   rendering entirely - animations included - and `grid-auto-rows` already fixes
+   the row height, so `contain-intrinsic-size` costs no scrollbar jump. */
 .cell {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 84px;
   position: relative; border-radius: 8px;
   border: 2px solid var(--line-firm); background: var(--surface);
   display: grid; place-items: center; overflow: hidden;

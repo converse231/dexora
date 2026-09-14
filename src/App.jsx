@@ -6,7 +6,9 @@ import Rail from "./ui/Rail.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import { BALLS, canRun, stepReward } from "./game/items.js";
-import { biomeFor, levelFromXp, TIERS, originReady } from "./game/biomes.js";
+import {
+  biomeFor, levelFromXp, TIERS, originReady, dexIndex,
+} from "./game/biomes.js";
 import DexSheet from "./ui/DexSheet.jsx";
 import { modalOpen } from "./ui/modal.js";
 import Cheer from "./ui/Cheer.jsx";
@@ -58,7 +60,7 @@ const typing = (ev) => {
    `TIERS` is rarest first and comes from `biomes.js`, so this agrees with the
    roll, the Box and the Dex by construction rather than by four files
    happening to have been edited on the same day. */
-const rarestOf = (st, id) => TIERS.find((t) => st?.[t]?.[id - 1]) ?? null;
+const rarestOf = (st, id) => TIERS.find((t) => st?.[t]?.[dexIndex(id)]) ?? null;
 
 const DPAD = [
   { dir: "up", glyph: "▲", label: "Walk up" },
@@ -374,7 +376,7 @@ export default function App() {
       {entry !== null && (
         <DexSheet
           id={entry}
-          state={st?.dex[entry - 1] ?? 0}
+          state={st?.dex[dexIndex(entry)] ?? 0}
           variant={rarestOf(st, entry)}
           /* Which variants of THIS species are registered. Built from the
              list so the sheet grows a column when a tier is added and nothing

@@ -23,7 +23,7 @@ import { useModalLock } from "./modal.js";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
-import { foundIn, howOften } from "../game/biomes.js";
+import { foundIn, howOften, speciesById } from "../game/biomes.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
 
@@ -69,7 +69,7 @@ function whereToFind(id) {
     for (const row of from) {
       out.push({
         key: `evo-${row.from}`,
-        where: `Evolve ${label(SPECIES[row.from - 1])}`,
+        where: `Evolve ${label(speciesById(row.from))}`,
         how: row.kind === "level" ? `at Lv ${row.level}`
           : row.kind === "stone" ? "with a stone" : "by trade",
       });
@@ -99,7 +99,7 @@ function Where({ id }) {
 export default function DexSheet({
   id, state, variant = null, held = {}, originLocked = false, onClose,
 }) {
-  const sp = SPECIES[id - 1];
+  const sp = speciesById(id);
   const caught = state === 2;
   const seen = state >= 1;
   /* Which of the four you actually hold. The ordinary one is simply "caught";

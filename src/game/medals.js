@@ -27,7 +27,7 @@
 
 import { SPECIES } from "../data/species.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
-import { BIOMES } from "./biomes.js";
+import { BIOMES, speciesById, dexIndex } from "./biomes.js";
 import { label } from "./map.js";
 
 /* Evolution families, by union-find over the evolution edges. A family is the
@@ -51,7 +51,7 @@ function families() {
 const line = (need) => ({
   id: `line-${need[0]}`,
   kind: "line",
-  name: `${label(SPECIES[need[0] - 1]).toUpperCase()} LINE`,
+  name: `${label(speciesById(need[0])).toUpperCase()} LINE`,
   sub: `${need.length} entries, end to end.`,
   need,
   // A four-stage family is rarer and dearer than a two, so it pays by length.
@@ -126,7 +126,7 @@ export function medalsFor(speciesId, dex, earned = []) {
   const out = [];
   for (const m of BY_SPECIES.get(speciesId) ?? []) {
     if (earned.includes(m.id)) continue;
-    if (m.need.every((id) => dex[id - 1] === 2)) out.push(m);
+    if (m.need.every((id) => dex[dexIndex(id)] === 2)) out.push(m);
   }
   return out;
 }
@@ -142,7 +142,22 @@ export const MILESTONES = [
   { at: 75, money: 4000, items: { "ultra-ball": 8 } },
   { at: 100, money: 6000, items: { "ultra-ball": 12 } },
   { at: 125, money: 9000, items: { "ultra-ball": 16, "master-ball": 1 } },
+  /* 151 is KANTO FINISHED and keeps its reward for that reason - it stopped
+     being the end of the dex when Johto shipped, and it is still the moment a
+     player who grew up on this one feels something. */
   { at: 151, money: 15000, items: { "ultra-ball": 25, "master-ball": 1 } },
+  { at: 200, money: 20000, items: { "ultra-ball": 30 } },
+  { at: 251, money: 30000, items: { "ultra-ball": 40, "master-ball": 1 } },
+  { at: 300, money: 40000, items: { "ultra-ball": 50 } },
+  /* The last one is the dex itself, whatever size that turns out to be. Typed
+     in as 151 it silently stopped being reachable the day a generation was
+     added, and a milestone nobody can reach is the one kind of reward that
+     costs nothing to leave broken. */
+  {
+    at: SPECIES.length,
+    money: 60000,
+    items: { "ultra-ball": 60, "master-ball": 2 },
+  },
 ];
 
 export const milestoneAt = (n) => MILESTONES.find((m) => m.at === n) ?? null;

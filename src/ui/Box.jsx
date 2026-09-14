@@ -31,7 +31,7 @@ import Mark from "./Marks.jsx";
 
 // Rarest first: the order the Box, the Dex and the encounter all read in -
 // one array, in biomes.js, beside the odds that define it.
-import { TIERS as RARE } from "../game/biomes.js";
+import { TIERS as RARE, speciesById } from "../game/biomes.js";
 
 /* The order rows of one species sit in: the ordinary pile, then its variants
    kindest first - the same order the Dex sheet lists its FORMS in, so the two
@@ -130,10 +130,10 @@ export default function Box({
       spareUids: [...spare],
       spareValue: box
         .filter((m) => spare.has(m.uid))
-        .reduce((sum, m) => sum + worth(SPECIES[m.species - 1]), 0),
+        .reduce((sum, m) => sum + worth(speciesById(m.species)), 0),
       spareCandy: box
         .filter((m) => spare.has(m.uid))
-        .reduce((sum, m) => sum + candyValue(SPECIES[m.species - 1]), 0),
+        .reduce((sum, m) => sum + candyValue(speciesById(m.species)), 0),
     };
     // `rev` is what actually changes: the engine mutates box, bag and dex in
     // place, so their references alone would keep this memo stale forever.
@@ -163,9 +163,9 @@ export default function Box({
   const SORTS = {
     ready: () => 0,                                   // the built-in order
     dex: (a, b) => a.species - b.species,
-    name: (a, b) => label(SPECIES[a.species - 1]).localeCompare(label(SPECIES[b.species - 1])),
+    name: (a, b) => label(speciesById(a.species)).localeCompare(label(speciesById(b.species))),
     count: (a, b) => b.count - a.count,
-    value: (a, b) => worth(SPECIES[b.species - 1]) - worth(SPECIES[a.species - 1]),
+    value: (a, b) => worth(speciesById(b.species)) - worth(speciesById(a.species)),
     level: (a, b) => b.best - a.best,
   };
 
@@ -174,7 +174,7 @@ export default function Box({
      term would be work for nothing. */
   const needle = find.trim().toLowerCase();
   const shown = groups.filter((g) => {
-    const sp = SPECIES[g.species - 1];
+    const sp = speciesById(g.species);
     if (only === "ready" && !g.ready) return false;
     if (only === "spare" && !g.spares.length) return false;
     if (only === "evolves" && !g.paths.length) return false;
@@ -200,11 +200,11 @@ export default function Box({
       .sort((a, b) => a[0] - b[0])
       .map(([id, levels]) => ({
         key: id,
-        candy: levels.length * candyValue(SPECIES[id - 1]),
+        candy: levels.length * candyValue(speciesById(id)),
         /* No variant: `duplicateUids` holds every keeper out of the spare list
            entirely, so nothing in a sweep is ever anything but ordinary. */
         icon: { id },
-        label: `${levels.length} × ${label(SPECIES[id - 1])}`,
+        label: `${levels.length} × ${label(speciesById(id))}`,
         sub: `Lv ${levels.sort((a, b) => a - b).join(", ")}`,
       }));
   }, [box, spareUids, rev]);
@@ -255,7 +255,7 @@ export default function Box({
      is nothing held back to dig into. That deleted the `risky` button, its
      warning copy, and `heldUids` with them. */
   const confirmSellOne = (group, candyPayout) => {
-    const sp = SPECIES[group.species - 1];
+    const sp = speciesById(group.species);
     const uids = group.spares;
     const value = uids.length * worth(sp);
     const gain = uids.length * candyValue(sp);
@@ -297,8 +297,8 @@ export default function Box({
   };
 
   const confirmEvolve = (group, path) => {
-    const sp = SPECIES[group.species - 1];
-    const target = SPECIES[path.row.to - 1];
+    const sp = speciesById(group.species);
+    const target = speciesById(path.row.to);
     const stone = path.stone && itemById(path.stone);
     setPending({
       title: `Evolve into ${label(target)}?`,
@@ -330,7 +330,7 @@ export default function Box({
      times is not a decision, it is a chore, and the clamp is in the engine so
      the button and the charge cannot disagree about how many it could afford. */
   const confirmRaise = (group) => {
-    const sp = SPECIES[group.species - 1];
+    const sp = speciesById(group.species);
     const spend = Math.min(group.need, candy);
     setPending({
       title: `Raise ${label(sp)} to Lv ${group.hero.level + spend}?`,
@@ -455,7 +455,7 @@ export default function Box({
 
       <div className="boxlist">
         {shown.map((group) => {
-          const sp = SPECIES[group.species - 1];
+          const sp = speciesById(group.species);
           const spare = group.spares.length;
           return (
             <div
@@ -522,7 +522,7 @@ export default function Box({
                       {path.stone && (
                         <img src={`items/${path.stone}.png`} alt="" />
                       )}
-                      ▲ {label(SPECIES[path.row.to - 1])}
+                      ▲ {label(speciesById(path.row.to))}
                       {blocked && <em>{blocked}</em>}
                     </button>
                   );

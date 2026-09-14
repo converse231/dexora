@@ -1693,6 +1693,135 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### Johto and Sinnoh, and the hole where Hoenn is
+
+**358 species: Kanto, Johto, Sinnoh — and no Hoenn, deliberately.** Gen 3 is
+skipped so the dex is *not* contiguous, because a dex that runs 1..N with
+nothing missing hides every assumption that a species id is an array index. The
+hole is the test.
+
+It found the big one immediately.
+
+#### A dex id is not an array index
+
+`SPECIES[id - 1]` and `dex[id - 1]` were everywhere — 44 of the first, 17 of the
+second — and both are correct for exactly one shape of dex. Ids now run 1–251
+and then 387–493 while the array holds 358 entries, so `SPECIES[486]` is
+`undefined` and `dex[486]` is off the end of a 358-byte row. **Every catch,
+every dex mark and every variant byte for a Sinnoh species was writing into
+nowhere.**
+
+Two lookups replace them, built once as Maps because the Dex grid asks per cell
+per render:
+
+| | |
+|---|---|
+| `speciesById(id)` | the species, by national number |
+| `dexIndex(id)` | its **position**, which is what every per-species byte array is keyed on |
+
+#### The saves nearly died twice
+
+`loadState` read `s.dex.length !== 151` and returned `freshState()` — so the
+update that added two generations **would have silently deleted every collection
+that existed.** It pads now.
+
+And the first padding fix used `normalise`, which exists for the one-bit tier
+rows and coerces with `? 1 : 0` — it would have quietly demoted every *caught*
+species in every save to merely *seen*. `padDex` is the same function one value
+apart.
+
+Padding is exactly right rather than merely adequate, and it is worth knowing
+why: **Kanto sits at the front of `SPECIES` in id order**, so position and
+`id − 1` agree for the first 151 and old bytes land where they already were.
+`check.mjs` asserts that alignment — insert a generation before Kanto one day
+and that assertion is the only thing that will notice.
+
+#### Origin is *debut* artwork
+
+The tier was written as "the Generation I sprite" because Gen 1 was all that
+shipped. Its identity — *the drawing from before anyone had drawn it a second
+time* — generalises without changing a word: Johto debuted in Gold/Silver,
+Sinnoh in Diamond/Pearl. Read literally as "Gen 1 art" it would have made the
+second-rarest tier a Kanto-only curiosity for 207 of the 358.
+
+All 1,074 sprites (ordinary, shiny, Origin) now land on one 64×64 canvas.
+FireRed drew 1–386 at that size already; Sinnoh comes from HeartGold/SoulSilver
+at 80×80 and is reframed, because an 80px sprite in a 64px slot is not "a big
+Pokémon", it is a different size from everything beside it in a Box row.
+
+#### Legendaries are a *share*, not a weight
+
+This is the anti-dilution answer, and it arrived the hard way. The old weights
+were absolute — 0.5 matched, 0.03 stray — which works for a fixed number of
+legendaries in a fixed-size table and nothing else. Going from **5 legendaries
+to 24** in tables that roughly tripled would have multiplied the legendary rate
+per map by about five: the rarest thing in the game becoming commonplace purely
+through the arithmetic of adding content.
+
+`LEGEND_SHARE` is **1% of whatever the table turns out to be**, split among the
+legendaries by whether the biome matches their types. Add a generation, a
+legendary or a map and the rate a player experiences does not move — by
+construction, not by re-tuning. Measured at every level on every map: 1.00%.
+
+#### A generation *arrives*
+
+207 species could have been poured into the eight tables on day one, and that
+would have wrecked the thing this game is actually tuned around: the first hour.
+A new trainer would meet Bidoof before Pidgey, and every measured weight in
+`RESIDENTS` would have been halved by arithmetic nobody chose.
+
+So a generation arrives on the same clock the maps do — Johto at **Lv 22**, once
+the map ladder is finished and you have seen the whole world; Sinnoh at
+**Lv 35**. It reuses `encounterTable`'s existing level argument, so it is a
+filter rather than a mechanism, and it turns "we added 200 Pokémon" from a
+dilution into an event.
+
+| | species reachable |
+|---|---|
+| Lv 1 | 98 |
+| Lv 21 | 171 |
+| **Lv 22** — Johto | **266** |
+| **Lv 35** — Sinnoh | **358** |
+
+#### Homes by rule, and one new evolution kind
+
+The eight hand-measured Gen 1 tables are untouched. The 207 newcomers get homes
+from their **types** — each to the single biome it overlaps most, ties by map
+order, anything matching nothing to Tall Grass. Only species with no shipped
+pre-evolution need one; the rest are reached by evolving. That rule quietly
+handles the hole too: Roserade evolves from a Gen 3 Roselia that does not ship,
+so nothing evolves into it, so it needs a table entry — and gets one without
+anybody noticing the gap.
+
+Gen 2 brought happiness and time-of-day; Gen 4 brought held items on trades,
+moves in the moveset, places on the map and three new stones. A game with no
+clock, no moves and no map transitions cannot express any of them, and a table
+of per-method rules grows every generation forever. They collapse to one kind,
+**`bond`** — "keep raising it" — and `evoLevel` already gives any row without a
+level a synthetic one derived from its parent. **The design held: a third of
+Johto's evolutions arrived needing no new code at all.**
+
+The three new stones *are* real, though, and were missing from the shop on the
+day the species arrived — a stone that is not buyable is not a hard evolution,
+it is an impossible one. `check.mjs` now asserts `STONES` against `EVOLUTIONS`
+in both directions.
+
+#### What else moved
+
+- **`MILESTONES` stopped at 151** and is now a ladder to `SPECIES.length`, with
+  151 keeping its reward as *Kanto finished*. A milestone nobody can reach is
+  the one kind of reward that costs nothing to leave broken.
+- **`content-visibility: auto`** on the Dex cell — the lever noted two passes
+  ago, pulled now that a full variant dex is 358 animating masked layers of
+  which a dozen are ever on screen.
+- Payout and Master Ball bounds became **rates** rather than totals, because the
+  totals are allowed to grow with the dex and the rates are not.
+- Dark, Steel, Fairy and Dragon joined the biome type lists — not decoration:
+  both the home-finder and `legendsFor` match on them.
+
+Bundle: 108 KB gzipped JS, 4.7 MB of assets for 1,074 sprites. 20 suites, clean
+boot, no console errors.
+
 ### QA pass: three findings, one of them mine
 
 A sweep over the joins the unit suites do not cover — map ladder against spawn

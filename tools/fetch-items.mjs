@@ -16,6 +16,10 @@ const BALLS = [
 // item - see TRADE_FEED in src/game/items.js.
 const TOOLS = [
   "fire-stone", "water-stone", "thunder-stone", "leaf-stone", "moon-stone",
+  // Johto and Sinnoh. check.mjs asserts every stone an evolution needs has a
+  // sprite AND a shop row, so a missing one here fails loudly rather than
+  // shipping as a grey square beside a price.
+  "sun-stone", "shiny-stone", "dusk-stone",
 ];
 /* Key items: earned at a trainer level, never bought, never used up.
 
