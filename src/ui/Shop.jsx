@@ -13,7 +13,7 @@ import { useState } from "react";
 import {
   SHOP_BALLS, STONES, CANDY_PRICE, speciesNeedingStone,
 } from "../game/items.js";
-import { SPECIES } from "../data/species.js";
+import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import { pricedAt } from "../game/trainer.js";
 import Confirm from "./Confirm.jsx";
@@ -59,7 +59,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
        it is right, and the hint is when that is. */
     if (item.boost) return `×${item.boost.toFixed(1)} ${item.hint}`;
     if (item.mult) return item.mult >= 100 ? "never fails" : `×${item.mult.toFixed(1)} odds`;
-    return speciesNeedingStone(item.id).map((id) => label(SPECIES[id - 1])).join(" · ");
+    return speciesNeedingStone(item.id).map((id) => label(speciesById(id))).join(" · ");
   };
 
   const shelf = (items) =>

@@ -1,11 +1,28 @@
 // Run once:  node tools/fetch-species.mjs
-// Pulls the Gen 1 facts we need from PokeAPI (no key, no account) and saves the
-// FireRed/LeafGreen sprites locally so the game works offline.
+// Pulls the facts we need from PokeAPI (no key, no account) and saves the
+// sprites locally so the game works offline.
+//
+// THE RANGES ARE A LIST, AND GEN 3 IS DELIBERATELY ABSENT. Nothing downstream
+// may assume the dex is contiguous or that it starts at 1 and ends at its own
+// length - `genOf` reads GEN_LAST, `dex` is indexed by position rather than by
+// id, and check.mjs asserts both. Skipping a generation is the cheapest
+// possible test of that, which is why it is skipped.
 import { writeFile, mkdir } from "node:fs/promises";
 
 const API = "https://pokeapi.co/api/v2";
 const GH = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
 const FRLG = `${GH}/versions/generation-iii/firered-leafgreen`;
+const HGSS = `${GH}/versions/generation-iv/heartgold-soulsilver`;
+
+/* Which generations ship, and where each one's ART comes from.
+
+   FireRed drew the whole National Dex of its day, so 1-251 is one consistent
+   set of 64x64 sprites and Gen 2 costs nothing to match. Gen 4 did not exist
+   yet; HeartGold/SoulSilver is the closest 2D set and is 80x80, so those get
+   reframed to 64 by build_origin.py - the same fit the Origin art already
+   goes through, for the same reason. */
+const RANGES = [[1, 151], [152, 251], [387, 493]];
+const artFor = (id) => (id <= 386 ? FRLG : HGSS);
 
 const tierOf = (r) => (r >= 200 ? "C" : r >= 100 ? "B" : r >= 45 ? "A" : "S");
 
@@ -16,7 +33,7 @@ const clean = (t) => t.replace(/­/g, "").replace(/\s+/g, " ").trim();
    FireRed's own art first, so a shiny matches the game the tiles came from, then
    the generic sprite as a fallback - both exist for all 151. */
 async function sprite(id, where = "") {
-  for (const url of [`${FRLG}/${where}${id}.png`, `${GH}/${where}${id}.png`]) {
+  for (const url of [`${artFor(id)}/${where}${id}.png`, `${GH}/${where}${id}.png`]) {
     const res = await fetch(url);
     if (res.ok) return Buffer.from(await res.arrayBuffer());
   }
@@ -33,9 +50,13 @@ async function one(id) {
   await writeFile(`public/sprites/${id}.png`, png);
   await writeFile(`public/sprites/shiny/${id}.png`, shiny);
 
-  // Prefer the FireRed entry so the flavour text matches the sprites.
+  /* Prefer the entry from the game the sprites came from, so the words and the
+     picture are from the same place. Falls through to anything English: a Gen 4
+     species has no FireRed entry to find. */
   const en = sp.flavor_text_entries.filter((e) => e.language.name === "en");
-  const entry = en.find((e) => /firered|leafgreen/.test(e.version.name)) ?? en[0];
+  const entry = en.find((e) => /firered|leafgreen/.test(e.version.name))
+    ?? en.find((e) => /heartgold|soulsilver|platinum|diamond|pearl/.test(e.version.name))
+    ?? en[0];
   const stat = (n) => pk.stats.find((s) => s.stat.name === n)?.base_stat ?? 0;
 
   return {
@@ -60,12 +81,12 @@ await mkdir("public/sprites/shiny", { recursive: true });
 await mkdir("src/data", { recursive: true });
 
 const out = [];
-for (let i = 1; i <= 151; i += 8) {
+const ids = RANGES.flatMap(([lo, hi]) =>
+  Array.from({ length: hi - lo + 1 }, (_, i) => lo + i));
+for (let i = 0; i < ids.length; i += 8) {
   // ponytail: batches of 8, polite to a free API. Raise it if you get impatient.
-  const batch = [];
-  for (let id = i; id < i + 8 && id <= 151; id++) batch.push(one(id));
-  out.push(...(await Promise.all(batch)));
-  process.stdout.write(`\rfetched ${out.length}/151`);
+  out.push(...(await Promise.all(ids.slice(i, i + 8).map(one))));
+  process.stdout.write(`\rfetched ${out.length}/${ids.length}`);
 }
 
 await writeFile("src/data/species.js", `export const SPECIES = ${JSON.stringify(out)};\n`);

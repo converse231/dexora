@@ -8,7 +8,8 @@ import {
   AREAS, AREA_IDS, areaOf, walkable, label, MINI, MINI_UNKNOWN,
 } from "./map.js";
 import {
-  biomeFor, tableFor, bornLevel, areaOpen, levelFromXp, xpForCatch,
+  biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex,
+  levelFromXp, xpForCatch,
   rodTable, rodBite,
   rollVariant, TIERS,
   lockedTiers, originReady,
@@ -60,7 +61,8 @@ function freshState() {
   return {
     areaId: START_AREA,
     player: { ...areaOf(START_AREA).spawn, dir: "up" },
-    dex: new Array(151).fill(0), // 0 unseen, 1 seen, 2 caught
+    // One byte per SHIPPED species, keyed by position - see dexIndex.
+    dex: new Array(SPECIES.length).fill(0), // 0 unseen, 1 seen, 2 caught
     caught: 0,
     steps: 0,
     xp: 0,
@@ -100,6 +102,20 @@ function normalise(arr, len) {
   return out;
 }
 
+/* The dex is THREE-VALUED - 0 unseen, 1 seen, 2 caught - so it cannot go
+   through `normalise`, which exists for the one-bit tier rows and coerces with
+   `? 1 : 0`. Padding the dex with it would have quietly demoted every caught
+   species in every save to merely seen: the whole collection still listed, and
+   every entry greyed out. Same shape of function, one value apart. */
+function padDex(arr, len) {
+  const out = new Array(len).fill(0);
+  if (Array.isArray(arr))
+    for (let i = 0; i < len && i < arr.length; i++) {
+      out[i] = arr[i] === 2 ? 2 : arr[i] === 1 ? 1 : 0;
+    }
+  return out;
+}
+
 /* Is this object a save we could actually load?
 
    `loadState` already answers this for localStorage, and an imported file has
@@ -112,7 +128,10 @@ function normalise(arr, len) {
 export function saveProblem(s) {
   if (!s || typeof s !== "object" || Array.isArray(s)) return "That is not a save file.";
   if (!Array.isArray(s.dex)) return "No Pokédex in that file.";
-  if (s.dex.length !== SPECIES.length)
+  /* An older, SHORTER dex is fine - `loadState` pads it. Only a longer one is
+     rejected, because that is a save from a game that knows more than this one
+     does and padding cannot invent what it means. */
+  if (s.dex.length > SPECIES.length)
     return `That save holds ${s.dex.length} species; this game knows ${SPECIES.length}.`;
   if (!Array.isArray(s.box)) return "No storage box in that file.";
   if (typeof s.money !== "number" || !Number.isFinite(s.money))
@@ -125,7 +144,22 @@ function loadState() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return freshState();
     const s = JSON.parse(raw);
-    if (!Array.isArray(s.dex) || s.dex.length !== 151) return freshState();
+    if (!Array.isArray(s.dex)) return freshState();
+    /* A SHORTER DEX IS AN OLDER SAVE, NOT A BROKEN ONE.
+
+       This read `s.dex.length !== 151` and threw the whole save away - so the
+       update that added Johto and Sinnoh would have silently deleted every
+       collection that existed, which is the worst thing this file could do.
+
+       Padding is exactly right rather than merely adequate, and it is worth
+       saying why: `dex` is keyed by POSITION in `SPECIES`, and Gen 1 sits at
+       the front of that list in id order - so position and `id - 1` agree for
+       the first 151 and the old bytes land where they already were. New
+       species arrive as zeroes at the end, which is what "not seen yet" is.
+       check.mjs asserts that alignment rather than trusting it; if a future
+       generation is ever inserted BEFORE Kanto, this stops being true and that
+       assertion is what will say so. */
+    if (s.dex.length > SPECIES.length) return freshState();
     return {
       ...freshState(), ...s, rev: 0,
       /* A save from before shinies existed has neither of these, and a
@@ -135,6 +169,7 @@ function loadState() {
          never heard of: a file written before Holo existed simply has no
          `holo`, and `normalise(undefined)` is a fresh row of zeroes. That is
          what makes adding a tier a non-event for saves. */
+      dex: padDex(s.dex, SPECIES.length),
       ...Object.fromEntries(
         TIERS.map((t) => [t, normalise(s[t], SPECIES.length)])),
       /* MIGRATION, and it has to run AFTER the line above or it is overwritten.
@@ -417,8 +452,8 @@ export function createEngine(canvas, onChange, mini = null) {
     const rolled = weighted(table, state.stats);
     const total = rolled.reduce((n, e) => n + e[1], 0);
     let r = Math.random() * total;
-    for (const [id, w] of rolled) if ((r -= w) < 0) return SPECIES[id - 1];
-    return SPECIES[table[0][0] - 1];
+    for (const [id, w] of rolled) if ((r -= w) < 0) return speciesById(id);
+    return speciesById(table[0][0]);
   }
 
   function startEncounter(table, source = "wild") {
@@ -429,8 +464,9 @@ export function createEngine(canvas, onChange, mini = null) {
        because the panel would then read live state: settling a catch sets the
        dex to 2, so a brand new species would sprout a CAUGHT badge halfway
        through its own capture animation. A snapshot cannot do that. */
-    const known = state.dex[sp.id - 1] === 2;
-    if (state.dex[sp.id - 1] === 0) state.dex[sp.id - 1] = 1;
+    const at = dexIndex(sp.id);
+    const known = state.dex[at] === 2;
+    if (state.dex[at] === 0) state.dex[at] = 1;
     /* Rolled once, here, so every screen that draws this encounter agrees -
        and so a re-render cannot roll it again into a different answer.
        `rollVariant` owns the precedence: rarest wins, and nothing is ever two
@@ -662,14 +698,15 @@ export function createEngine(canvas, onChange, mini = null) {
     const phase = settlePhase(e.pending);
 
     if (phase === "caught") {
-      e.isNew = state.dex[e.speciesId - 1] !== 2;
-      state.dex[e.speciesId - 1] = 2;
+      const at = dexIndex(e.speciesId);
+      e.isNew = state.dex[at] !== 2;
+      state.dex[at] = 2;
       state.caught++;
       /* A first shiny - or a first Astral - of a species is its own event, even
          for one you already had. That is most of the point of both. */
       const roll = e.variant;
-      e.newVariant = !!roll && !state[roll][e.speciesId - 1];
-      if (roll) state[roll][e.speciesId - 1] = 1;
+      e.newVariant = !!roll && !state[roll][at];
+      if (roll) state[roll][at] = 1;
       state.box.push({
         uid: state.nextUid++,
         species: e.speciesId,
@@ -696,7 +733,7 @@ export function createEngine(canvas, onChange, mini = null) {
       }
       // After the box push, so a medal cheer queues behind the shiny one.
       if (e.isNew) checkDexRewards(e.speciesId);
-      const sp = SPECIES[e.speciesId - 1];
+      const sp = speciesById(e.speciesId);
       const gained = gainXp(xpForCatch(sp, e.isNew));
 
       if (e.isNew) {
@@ -945,15 +982,16 @@ export function createEngine(canvas, onChange, mini = null) {
 
     if (st.stone) state.bag[st.stone] -= 1;
 
-    const target = SPECIES[targetId - 1];
-    const isNew = state.dex[targetId - 1] !== 2;
-    state.dex[targetId - 1] = 2;
+    const target = speciesById(targetId);
+    const at = dexIndex(targetId);
+    const isNew = state.dex[at] !== 2;
+    state.dex[at] = 2;
     state.caught++;
 
     /* The tier travels with the creature, because it IS the creature - rarest
        first so a hand-edited save carrying two is described by its best. */
     const roll = TIERS.find((t) => mon[t]) ?? null;
-    if (roll) state[roll][targetId - 1] = 1;
+    if (roll) state[roll][at] = 1;
 
     /* Mutated in place rather than removed and re-pushed. The uid survives an
        evolution, which is what makes it a Pokemon rather than a slot - and it
@@ -970,7 +1008,7 @@ export function createEngine(canvas, onChange, mini = null) {
     state.evolution = {
       from: row.from,
       to: targetId,
-      fromName: label(SPECIES[row.from - 1]).toUpperCase(),
+      fromName: label(speciesById(row.from)).toUpperCase(),
       toName: label(target).toUpperCase(),
       level: mon.level,
       /* The scene has to wear the tier too. Without it you level a shiny
@@ -1006,7 +1044,7 @@ export function createEngine(canvas, onChange, mini = null) {
     let got = 0;
     state.box = state.box.filter((mon) => {
       if (!wanted.has(mon.uid)) return true;
-      got += candyValue(SPECIES[mon.species - 1]);
+      got += candyValue(speciesById(mon.species));
       return false;
     });
     state.candy += got;
@@ -1052,7 +1090,7 @@ export function createEngine(canvas, onChange, mini = null) {
     let earned = 0;
     state.box = state.box.filter((mon) => {
       if (!wanted.has(mon.uid)) return true;
-      earned += valueOf(SPECIES[mon.species - 1]);
+      earned += valueOf(speciesById(mon.species));
       return false;
     });
     state.money += earned;

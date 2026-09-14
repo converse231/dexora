@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
-import { LEGENDARY, TIERS } from "../game/biomes.js";
+import { LEGENDARY, TIERS, dexIndex } from "../game/biomes.js";
 import FilterBar from "./FilterBar.jsx";
 import Sprite, { VariantFx } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
@@ -45,8 +45,8 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
   const [sort, setSort] = useState("number");
   const [find, setFind] = useState("");
 
-  const at = (id) => dex?.[id - 1] ?? 0;
-  const has = (t, id) => !!tiers?.[t]?.[id - 1];
+  const at = (id) => dex?.[dexIndex(id)] ?? 0;
+  const has = (t, id) => !!tiers?.[t]?.[dexIndex(id)];
   const count = (t) => SPECIES.filter((sp) => has(t, sp.id)).length;
   /* Which art a tile wears: the rarest registered. */
   const rarest = (id) => TIERS.find((t) => has(t, id)) ?? null;

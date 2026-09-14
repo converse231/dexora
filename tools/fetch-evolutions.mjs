@@ -7,13 +7,23 @@
 
    PokeAPI reports today's requirements, not Red/Blue's, which is what we want -
    Pikachu takes a Thunder Stone in both, but the API is the one that also knows
-   Eevee has three stone branches. Anything pointing outside 1-151 is dropped:
-   Crobat and Espeon are not in this game. */
+   Eevee has three stone branches. Anything pointing outside the SHIPPED ids is
+   dropped, and that list has a hole in it - Gen 3 is not in this game, so
+   Roserade keeps its row only if Roselia ships, which it does not. Those
+   species are not lost; they need a wild table entry instead, and check.mjs is
+   what says so. */
 
 import { writeFile } from "node:fs/promises";
 
 const API = "https://pokeapi.co/api/v2";
-const MAX = 151;
+/* The same ranges fetch-species.mjs uses. Duplicated rather than imported
+   because these two scripts are run independently and a missing import would
+   fail at the wrong moment; check.mjs asserts the two agree by checking every
+   evolution row points at a species that exists. */
+const RANGES = [[1, 151], [152, 251], [387, 493]];
+const SHIPPED = new Set(RANGES.flatMap(([lo, hi]) =>
+  Array.from({ length: hi - lo + 1 }, (_, i) => lo + i)));
+const ids = [...SHIPPED];
 
 const get = async (url) => {
   const res = await fetch(url);
@@ -23,18 +33,33 @@ const get = async (url) => {
 
 const idOf = (url) => Number(url.match(/\/(\d+)\/?$/)[1]);
 
-// Every chain a Gen 1 species belongs to, fetched once each.
+// Every chain a shipped species belongs to, fetched once each.
 const chainUrls = new Set();
-for (let id = 1; id <= MAX; id++) {
-  const sp = await get(`${API}/pokemon-species/${id}`);
-  chainUrls.add(sp.evolution_chain.url);
-  if (id % 25 === 0) console.log(`  species ${id}/${MAX}`);
+for (let i = 0; i < ids.length; i += 8) {
+  const batch = await Promise.all(
+    ids.slice(i, i + 8).map((id) => get(`${API}/pokemon-species/${id}`)));
+  for (const sp of batch) chainUrls.add(sp.evolution_chain.url);
+  process.stdout.write(`\r  species ${Math.min(i + 8, ids.length)}/${ids.length}`);
 }
+console.log();
 console.log(`  ${chainUrls.size} distinct evolution chains`);
 
 /* One row per edge. `kind` is what the player has to do about it; everything
    else is the detail that kind needs. */
 const rows = [];
+
+/* PokeAPI's chains are not all evolutions. Phione and Manaphy share a chain
+   because one can be BRED from the other, and the walk below reads that as
+   Phione -> Manaphy. The species record is the authority: if the target does
+   not name the source as what it evolves from, the edge is not an evolution.
+
+   Checked against the species file we just wrote rather than by another
+   request, and check.mjs asserts the same thing independently - which is how
+   this was found. */
+const { SPECIES } = await import("../src/data/species.js");
+const spById = new Map(SPECIES.map((sp) => [sp.id, sp]));
+const realEdge = (from, to) =>
+  spById.get(to)?.from === spById.get(from)?.name;
 
 function walk(node) {
   const from = idOf(node.species.url);
@@ -44,7 +69,7 @@ function walk(node) {
     const d = next.evolution_details[0] ?? {};
     const trigger = d.trigger?.name ?? "level-up";
 
-    if (from <= MAX && to <= MAX) {
+    if (SHIPPED.has(from) && SHIPPED.has(to) && realEdge(from, to)) {
       if (trigger === "use-item" && d.item) {
         rows.push({ from, to, kind: "stone", item: d.item.name });
       } else if (trigger === "trade") {
@@ -52,9 +77,24 @@ function walk(node) {
       } else if (d.min_level) {
         rows.push({ from, to, kind: "level", level: d.min_level });
       } else {
-        // Happiness, time of day, and the rest: nothing in Gen 1 needs them,
-        // but fail loudly rather than silently dropping an evolution.
-        throw new Error(`${from}->${to}: unhandled trigger ${trigger}`);
+        /* EVERYTHING ELSE IS ONE KIND, and that is the whole scalability
+           answer for evolution methods.
+
+           Gen 2 brought happiness and time of day, Gen 4 brought a held item
+           on a trade, a move in the moveset, a place on the map, and the
+           Sinnoh stones. A game with no clock, no moves and no map transitions
+           cannot express any of them, and a table of per-method rules grows
+           every generation forever.
+
+           So they collapse to `bond` - "keep raising it" - and `evoLevel`
+           already gives any row without a level a synthetic one derived from
+           its parent. A Gen 5 method nobody has thought of yet lands here on
+           the day it ships, with nothing edited.
+
+           This used to throw. Throwing was right while Gen 1 was all that
+           shipped and nothing could reach this branch; it would now reject
+           about a third of Johto. */
+        rows.push({ from, to, kind: "bond" });
       }
     }
     walk(next);

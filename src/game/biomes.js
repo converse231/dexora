@@ -50,6 +50,25 @@ import { EVOLUTIONS } from "../data/evolutions.js";
    day one appears. Added late it would just be a label. */
 export const GEN_LAST = [151, 251, 386, 493, 649, 721, 809, 905, 1025];
 
+/* WHEN A GENERATION SHOWS UP.
+
+   207 new species could have been poured into the eight tables on day one, and
+   that would have wrecked the thing this game is actually tuned around: the
+   first hour. A new trainer in Tall Grass would meet Bidoof before Pidgey, and
+   every weight in `RESIDENTS` - measured, argued over, and correct - would have
+   been quietly halved by arithmetic nobody chose.
+
+   So a generation ARRIVES, on the same clock the maps do. Gen 1 from the first
+   minute; Johto once the map ladder is finished (20) and you have seen the
+   whole world; Sinnoh later still. It reuses `encounterTable`'s existing level
+   argument, so it is a filter rather than a mechanism - and it turns "we added
+   200 Pokemon" from a dilution into an event.
+
+   A generation with no entry here is open from the start, which is the right
+   default for a hole: Gen 3 does not ship, and if it ever does it will want a
+   number rather than special-casing. */
+export const GEN_UNLOCK = { 1: 1, 2: 22, 4: 35 };
+
 export const genOf = (id) => {
   const i = GEN_LAST.findIndex((last) => id <= last);
   return i < 0 ? GEN_LAST.length : i + 1;
@@ -69,7 +88,11 @@ export const genOf = (id) => {
    everywhere else. The Power Plant is still the best place to hunt Zapdos and
    is no longer the only one. And this is a rule, not a table - a Gen 2 Suicune
    needs one dex number added here and nothing else. */
-export const LEGENDARY = [144, 145, 146, 150, 151];
+export const LEGENDARY = [
+  144, 145, 146, 150, 151,                               // Kanto
+  243, 244, 245, 249, 250, 251,                          // Johto
+  480, 481, 482, 483, 484, 485, 486, 487, 488, 490, 491, 492, 493,  // Sinnoh
+];
 
 /* The areas with a roof over them: four caves and a building, against three
    maps of open country. It is a fact about places, so it lives beside them
@@ -205,7 +228,16 @@ export function foundIn(speciesId) {
         id: b.id,
         name: b.name,
         share: row[1] / total,
-        from: Math.max(row[2] ? evoUnlock(row[2]) : 0, b.level > MAP_FIRST ? b.level : 0),
+        /* THREE things can hold a line back now, and they are still one
+           number: an evolved form's own unlock, the map's, and the GENERATION's
+           - Johto does not appear until 22 and Sinnoh until 35. A Gen 4 entry
+           saying "Tall Grass, common" to a Lv 10 trainer is the same hidden
+           door the map ladder opened, one layer further out. */
+        from: Math.max(
+          row[2] ? evoUnlock(row[2]) : 0,
+          b.level > MAP_FIRST ? b.level : 0,
+          GEN_UNLOCK[genOf(speciesId)] ?? 0,
+        ),
       });
     }
   }
@@ -263,10 +295,19 @@ export function rollVariant(random = Math.random, locked = null) {
    `dex` is the caught/seen byte array; 2 is caught. A generation whose last
    number is past the end of the array is simply not complete, which is the
    right answer for a save from before that generation shipped. */
+/* OVER THE SPECIES THAT SHIP, not over a numeric range.
+
+   This walked `GEN_LAST[gen-2]+1 .. GEN_LAST[gen-1]` and indexed `dex[id-1]`,
+   and both halves broke the day the dex stopped being 1..151 contiguous. Gen 4
+   spans 387-493 while the array has 358 entries and no Gen 3 in it at all, so
+   the range walk read past the end and every Sinnoh Origin would have been
+   locked forever behind species that do not exist.
+
+   `SPECIES` is the list of what ships and `dex` is indexed by POSITION in it -
+   that is the only relationship that survives a hole. */
 export function genComplete(dex, gen) {
-  const from = gen <= 1 ? 1 : GEN_LAST[gen - 2] + 1;
-  for (let id = from; id <= GEN_LAST[gen - 1]; id++) {
-    if (dex?.[id - 1] !== 2) return false;
+  for (let i = 0; i < SPECIES.length; i++) {
+    if (genOf(SPECIES[i].id) === gen && dex?.[i] !== 2) return false;
   }
   return true;
 }
@@ -280,10 +321,26 @@ const ORIGIN_ONLY = new Set(["origin"]);
 export const lockedTiers = (dex, speciesId) =>
   (originReady(dex, speciesId) ? null : ORIGIN_ONLY);
 
-/* Both weights are small on purpose. Five legendaries in every table would
-   otherwise make the legendary rate per map five times what one used to be;
-   at these numbers each map finds one about once in a hundred encounters,
-   which is where Zapdos-in-his-own-plant already sat. */
+/* A FIXED SHARE OF THE TABLE, not a fixed weight - and that is the whole
+   anti-dilution answer, arrived at the hard way.
+
+   These were absolute weights, 0.5 matched and 0.03 stray, which works
+   perfectly for a fixed number of legendaries in a fixed-size table and for
+   nothing else. Going from 5 legendaries to 24, in tables that roughly tripled,
+   would have multiplied the legendary rate per map by about five - so the
+   rarest thing in the game would have become commonplace by the arithmetic of
+   adding content, which is exactly the failure a growing dex is supposed to
+   avoid.
+
+   `LEGEND_SHARE` is the answer: legendaries are 1% of whatever the table turns
+   out to be, split among themselves by whether the biome matches their types.
+   Add a generation, a legendary or a map and the rate a player experiences does
+   not move, by construction rather than by re-tuning. check.mjs asserts it
+   holds across every map and every level.
+
+   The RATIO between a matched and a stray legendary is what is tuned here now;
+   the overall rate is a property of the design, not of the table. */
+export const LEGEND_SHARE = 0.01;
 export const LEGEND_MATCHED = 0.5;
 /* A STRAY IS MEANT TO BE A STORY, and at 0.08 it was merely uncommon.
 
@@ -300,13 +357,40 @@ export const LEGEND_MATCHED = 0.5;
    the signal the rule was always supposed to send. */
 export const LEGEND_STRAY = 0.03;
 
-const legendsFor = (types) =>
-  LEGENDARY.map((id) => [
-    id,
-    SPECIES[id - 1].types.some((t) => types.includes(t))
-      ? LEGEND_MATCHED
-      : LEGEND_STRAY,
-  ]);
+/* A DEX ID IS NOT AN ARRAY INDEX, and the whole codebase assumed it was.
+
+   `speciesById(id)` and `dex[id - 1]` are correct for exactly one shape of
+   dex: 1..N with nothing missing. Gen 3 does not ship, so ids run 1-251 and
+   then 387-493 while the array holds 358 entries - `SPECIES[486]` is undefined
+   and `dex[486]` is off the end of a 358-byte row. Every catch, every dex mark
+   and every variant byte for a Sinnoh species was writing into nowhere.
+
+   Two lookups, built once:
+     `speciesById(id)`  - the species, by its national number
+     `dexIndex(id)`     - its POSITION, which is what every per-species byte
+                          array is keyed on: dex, and one row per rare tier
+
+   Both are Maps rather than `findIndex`, because `medalsFor` and the Dex grid
+   ask per species per render. This is the single thing that makes a dex with a
+   hole in it work, and it is why the hole exists: nothing else would have
+   proved these were needed. */
+const byId = new Map(SPECIES.map((sp) => [sp.id, sp]));
+const byIndex = new Map(SPECIES.map((sp, i) => [sp.id, i]));
+export const speciesById = (id) => byId.get(id) ?? null;
+export const dexIndex = (id) => byIndex.get(id) ?? -1;
+
+/* Scaled so the legendaries together come to `LEGEND_SHARE` of the FINAL table
+   - hence `total / (1 - share)`, which is the weight that makes a share of the
+   whole rather than a share of the rest. */
+const legendsFor = (types, total, open = () => true) => {
+  const live = LEGENDARY.filter(open);
+  if (!live.length || total <= 0) return [];
+  const raw = live.map((id) => (speciesById(id)?.types ?? [])
+    .some((t) => types.includes(t)) ? LEGEND_MATCHED : LEGEND_STRAY);
+  const sum = raw.reduce((n, w) => n + w, 0);
+  const budget = (total * LEGEND_SHARE) / (1 - LEGEND_SHARE);
+  return live.map((id, i) => [id, (budget * raw[i]) / sum]);
+};
 
 /* Types are ids, not a display string. They were "Normal / Flying / Bug" - fine
    to print, impossible to colour - and a type is exactly the kind of thing that
@@ -319,7 +403,7 @@ const RESIDENTS = [
     id: "meadow",
     level: 1,  // where you start, so it cannot be anything else
     name: "Tall Grass",
-    types: ["normal", "flying", "bug"],
+    types: ["normal", "flying", "bug", "fairy"],
     // [dexId, weight] — Eevee and Chansey near 0.5%, so a find means something.
     // The Flower Clearing's Normal-types came here when it was removed. They
     // arrive at 2, not at the 10-12 they had there: that map had no commons to
@@ -368,7 +452,7 @@ const RESIDENTS = [
     id: "ridge",
     level: 9,
     name: "Rock Ridge",
-    types: ["rock", "ground", "fighting"],
+    types: ["rock", "ground", "fighting", "steel", "dragon"],
     table: [
       [74, 20], [41, 16], [50, 10], [66, 10], [27, 9], [95, 7], [104, 6],
       [111, 6], [75, 4], [67, 4], [35, 4], [106, 2], [107, 2],
@@ -379,7 +463,7 @@ const RESIDENTS = [
     id: "power",
     level: 12,  // the Ultra Ball's level: the first map worth one
     name: "Power Plant",
-    types: ["electric"],
+    types: ["electric", "steel"],
     table: [
       [81, 20], [100, 18], [25, 16], [82, 9], [101, 9], [88, 7], [125, 5],
       [26, 3], [135, 2],
@@ -409,7 +493,7 @@ const RESIDENTS = [
     id: "tower",
     level: 20,  // MAP_LAST. The tower is the end of the ladder
     name: "Haunted Tower",
-    types: ["ghost", "psychic"],
+    types: ["ghost", "psychic", "dark"],
     table: [
       [92, 22], [63, 16], [96, 14], [93, 10], [64, 8], [97, 6],
       [105, 5], [94, 3], [122, 2],
@@ -423,9 +507,58 @@ const RESIDENTS = [
 export const MAP_FIRST = 1;
 export const MAP_LAST = 20;
 
+/* WHERE EVERYTHING ELSE LIVES, decided by a rule rather than by hand.
+
+   The eight Gen 1 tables above are measured and stay exactly as they are. The
+   207 species that arrived with Johto and Sinnoh get homes from their TYPES:
+   each one goes to the single biome it overlaps most, ties broken by the order
+   the maps are listed in, and anything that matches nothing lands in Tall Grass
+   - which is what a meadow is for.
+
+   ONE home each, unlike the Gen 1 species that appear in two or three. A table
+   you can read is worth more than a perfectly distributed one, and 207 species
+   sprayed across eight maps would put roughly everything roughly everywhere.
+
+   Only species with no shipped PRE-EVOLUTION need a home; the rest are reached
+   by evolving, which is what `candyValue` and the feed were always for. That
+   rule also quietly handles the hole in the middle of the dex: Roserade evolves
+   from a Gen 3 Roselia that does not ship, so nothing evolves into it, so it
+   needs a table entry - and it gets one without anybody noticing the gap.
+
+   Weights come from the tier already on every species, and they sit BELOW the
+   Gen 1 commons on purpose: a Pidgey at 22 still leads its map after Johto
+   arrives. */
+const DERIVED_WEIGHT = { C: 8, B: 5, A: 3, S: 1 };
+
+const derivedHomes = () => {
+  const placed = new Set(RESIDENTS.flatMap((b) => b.table.map(([id]) => id)));
+  const evolvesInto = new Set(EVOLUTIONS.map((e) => e.to));
+  const homes = new Map(RESIDENTS.map((b) => [b.id, []]));
+
+  for (const sp of SPECIES) {
+    if (placed.has(sp.id) || evolvesInto.has(sp.id) || LEGENDARY.includes(sp.id)) continue;
+    let best = RESIDENTS[0], score = -1;
+    for (const b of RESIDENTS) {
+      const n = sp.types.filter((t) => b.types.includes(t)).length;
+      if (n > score) { score = n; best = b; }
+    }
+    homes.get(best.id).push([sp.id, DERIVED_WEIGHT[sp.tier] ?? 4]);
+  }
+  return homes;
+};
+
+const HOMES = derivedHomes();
+
+/* `table` is RESIDENTS ONLY now - the hand-written Gen 1 rows plus the derived
+   ones. The legendaries are no longer baked in, because their weight depends on
+   how big the table turns out to be AFTER the level filter, and a level is not
+   known here. `encounterTable` adds them.
+
+   Anything reading `BIOMES[i].table` therefore sees who LIVES here, which is
+   what `medals.js` wanted from it all along. */
 export const BIOMES = RESIDENTS.map((b) => ({
   ...b,
-  table: [...b.table, ...legendsFor(b.types)],
+  table: [...b.table, ...(HOMES.get(b.id) ?? [])],
 }));
 
 
@@ -541,17 +674,22 @@ export const bornLevel = (speciesId) => BORN_AT.get(speciesId) ?? 0;
    gets no derived row - the `weight.has(to)` guard - but it still seeds the
    next step, so Ember's hand-placed Charmeleon is what Charizard is measured
    against. One weight per species per map, which is the whole invariant. */
+/* Has this species' generation arrived yet? */
+export const genOpen = (id, level) => level >= (GEN_UNLOCK[genOf(id)] ?? 1);
+
 export function encounterTable(biome, level = 1) {
-  const weight = new Map(biome.table);
+  const open = biome.table.filter(([id]) => genOpen(id, level));
+  const weight = new Map(open);
   const extra = [];
-  let front = biome.table.map(([id]) => id);
+  let front = open.map(([id]) => id);
 
   for (let depth = 1; depth <= EVO_DEPTH && front.length; depth++) {
     const scale = evoScale(level, depth);
     const next = [];
     for (const id of front) {
       for (const to of NEXT.get(id) ?? []) {
-        if (!weight.has(to)) {
+        // An evolution cannot outrun its own generation either.
+        if (!weight.has(to) && genOpen(to, level)) {
           const w = Math.max(weight.get(id) * EVO_SHARE, EVO_FLOOR);
           weight.set(to, w);
           if (scale > 0) extra.push([to, w * scale, depth]);
@@ -561,7 +699,12 @@ export function encounterTable(biome, level = 1) {
     }
     front = next;
   }
-  return extra.length ? [...biome.table, ...extra] : biome.table;
+  /* Residents, then the evolved overlay, and the legendaries LAST - scaled to
+     whatever the first two came to, so their share of the roll is the same on
+     every map at every level whatever else has been added. */
+  const rolled = extra.length ? [...open, ...extra] : open;
+  const total = rolled.reduce((n, e) => n + e[1], 0);
+  return [...rolled, ...legendsFor(biome.types, total, (id) => genOpen(id, level))];
 }
 
 /* Asked on every step that starts an encounter, and the answer only changes on

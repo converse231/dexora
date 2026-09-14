@@ -1,7 +1,7 @@
 import { SPECIES } from "../data/species.js";
 import { EVOLUTIONS as EVO_ROWS } from "../data/evolutions.js";
 import { GUARANTEED } from "../catch.js";
-import { TIERS, ENCLOSED } from "./biomes.js";
+import { TIERS, ENCLOSED, speciesById } from "./biomes.js";
 
 /* The economy and evolution, free of DOM so tools/check.mjs can test them.
 
@@ -158,12 +158,22 @@ export const PLAIN_BALLS = BALLS.filter((b) => !b.bonus);
 /* The five Gen 1 evolution stones. One price for all of them: which stone you
    need is decided by what you caught, not by how good the evolution is, so
    charging different amounts would only tax you for your luck. */
+/* Every stone an evolution asks for must be BUYABLE, and check.mjs asserts the
+   list against `EVOLUTIONS` rather than trusting it. Johto and Sinnoh brought
+   three more, and a stone that is not on this shelf is not a hard evolution -
+   it is an impossible one, with nothing on screen to say so.
+
+   The three new ones unlock later than the Kanto five, because the species
+   that want them belong to generations that have not arrived yet at Lv 8. */
 export const STONES = [
   { id: "fire-stone", name: "Fire Stone", price: 1200, level: 8 },
   { id: "water-stone", name: "Water Stone", price: 1200, level: 8 },
   { id: "thunder-stone", name: "Thunder Stone", price: 1200, level: 8 },
   { id: "leaf-stone", name: "Leaf Stone", price: 1200, level: 8 },
   { id: "moon-stone", name: "Moon Stone", price: 1200, level: 8 },
+  { id: "sun-stone", name: "Sun Stone", price: 1400, level: 22 },
+  { id: "shiny-stone", name: "Shiny Stone", price: 1400, level: 22 },
+  { id: "dusk-stone", name: "Dusk Stone", price: 1400, level: 35 },
 ];
 
 /* Key items: earned at a trainer level, never bought, never used up. They are
@@ -352,7 +362,7 @@ const baseForm = (id) => {
 };
 
 export const candyValue = (sp) =>
-  CANDY[SPECIES[baseForm(sp?.id ?? 0) - 1]?.tier ?? sp?.tier] ?? CANDY.C;
+  CANDY[speciesById(baseForm(sp?.id ?? 0))?.tier ?? sp?.tier] ?? CANDY.C;
 
 /* Candy is also buyable, at 3x what selling the same duplicate pays. That
    ordering is the rule, not the number: buying must always be worse than

@@ -13,7 +13,7 @@
    here can fail into a half-evolved Pokémon; it is pure theatre. */
 
 import { useEffect, useRef, useState } from "react";
-import { SPECIES } from "../data/species.js";
+import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import { evoCycleFrames, SCALE_MAX } from "../game/evocycle.js";
 import { spriteUrl, VariantFx } from "./Sprite.jsx";
@@ -132,8 +132,8 @@ export default function Evolve({ evo, onDone }) {
     return () => removeEventListener("keydown", onKey);
   }, [phase]);
 
-  const before = SPECIES[evo.from - 1];
-  const after = SPECIES[evo.to - 1];
+  const before = speciesById(evo.from);
+  const after = speciesById(evo.to);
 
   return (
     <div
