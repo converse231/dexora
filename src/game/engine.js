@@ -8,7 +8,8 @@ import {
   AREAS, AREA_IDS, areaOf, walkable, label, MINI, MINI_UNKNOWN,
 } from "./map.js";
 import {
-  biomeFor, tableFor, bornLevel, levelFromXp, xpForCatch, rodTable, rodBite,
+  biomeFor, tableFor, bornLevel, areaOpen, levelFromXp, xpForCatch,
+  rodTable, rodBite,
   rollVariant, TIERS,
   lockedTiers, originReady,
 } from "./biomes.js";
@@ -195,6 +196,11 @@ export function createEngine(canvas, onChange, mini = null) {
 
   const state = loadState();
   if (!AREAS[state.areaId]) state.areaId = START_AREA;
+  /* MIGRATION. Maps were all open once, so a save can be standing on one its
+     trainer has not earned - and without this it would be stranded there, since
+     `travel` now refuses to move it and every other map is a lock away. Sent
+     home rather than granted the map: the ladder is the point. */
+  if (!areaOpen(state.areaId, levelFromXp(state.xp ?? 0))) state.areaId = START_AREA;
 
   // The tile grid of whichever area you are standing in.
   let rows = areaOf(state.areaId).rows;
@@ -383,6 +389,9 @@ export function createEngine(canvas, onChange, mini = null) {
 
   function travel(areaId) {
     if (!AREAS[areaId] || state.encounter || state.evolution) return false;
+    // The gate, enforced where the move actually happens rather than only in
+    // the panel that offers it.
+    if (!areaOpen(areaId, levelFromXp(state.xp))) return false;
     state.areaId = areaId;
     rows = areaOf(areaId).rows;
     fixed = areaOf(areaId).tiles ?? null;

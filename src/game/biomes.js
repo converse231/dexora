@@ -16,11 +16,24 @@ import { EVOLUTIONS } from "../data/evolutions.js";
    table toward its tail, so hunting rares is a thing you build a trainer to do
    rather than a place you walk to.
 
-   Nothing is locked. The ball economy paces you instead: a Lapras needs roughly
-   four Ultra Balls to land, so at 300 yen and a pocket of Poke Balls you can
-   walk into Frost Hollow freely and simply not be able to farm it yet. That is
-   a gate that never says no - it says not yet, and shows you why. Trainer level
-   spends itself on the shop instead, unlocking better balls.
+   THE WORLD OPENS AS YOU LEVEL, and that reverses a decision this file used to
+   argue for. It said nothing was locked and the ball economy paced you instead:
+   walk into Frost Hollow at level one and simply fail to afford the throws. The
+   argument was that a gate which says "not yet, and here is why" beats one that
+   says no.
+
+   It is still a good argument and it lost to a better one. A new player handed
+   eight maps at once has no idea which of them is for them, and the honest
+   answer - "all of them, but seven will waste your balls" - is something you
+   can only act on after you have wasted them. A ladder says the same thing in
+   advance. `level` is the last thing a map asks of you and the first thing it
+   tells you.
+
+   Tall Grass is open at 1 and the Haunted Tower at 20, with the six between
+   spaced across that; `MAP_LAST` is asserted against the real table so the
+   number in a design document cannot drift from the number in the game. The
+   ball economy still paces you INSIDE a map - this only decides which maps are
+   on the menu.
 
    Every walkable tile in an area spawns, the way DelugeRPG does it - there is
    no safe ground to stand on and no special grass to hunt for. That is also why
@@ -290,6 +303,7 @@ const legendsFor = (types) =>
 const RESIDENTS = [
   {
     id: "meadow",
+    level: 1,  // where you start, so it cannot be anything else
     name: "Tall Grass",
     types: ["normal", "flying", "bug"],
     // [dexId, weight] — Eevee and Chansey near 0.5%, so a find means something.
@@ -305,6 +319,7 @@ const RESIDENTS = [
   },
   {
     id: "woods",
+    level: 3,  // the second map, and early enough that the ladder is visible
     name: "Deep Woods",
     types: ["bug", "grass", "poison"],
     table: [
@@ -315,6 +330,7 @@ const RESIDENTS = [
   },
   {
     id: "pond",
+    level: 6,  // arrives with the Old Rod's reach and the Great Ball
     name: "Pond & Shore",
     /* GRASS, not just water. Half this map is bank: sand, grass and a stand of
        trees, and a lake with nothing living on its shore is a swimming pool.
@@ -336,6 +352,7 @@ const RESIDENTS = [
   },
   {
     id: "ridge",
+    level: 9,
     name: "Rock Ridge",
     types: ["rock", "ground", "fighting"],
     table: [
@@ -346,6 +363,7 @@ const RESIDENTS = [
   },
   {
     id: "power",
+    level: 12,  // the Ultra Ball's level: the first map worth one
     name: "Power Plant",
     types: ["electric"],
     table: [
@@ -355,6 +373,7 @@ const RESIDENTS = [
   },
   {
     id: "ember",
+    level: 15,
     name: "Ember Caldera",
     types: ["fire"],
     table: [
@@ -364,6 +383,7 @@ const RESIDENTS = [
   },
   {
     id: "frost",
+    level: 18,  // Lapras and Articuno - the map the old design let you waste a whole bag on
     name: "Frost Hollow",
     types: ["ice", "water"],
     table: [
@@ -373,6 +393,7 @@ const RESIDENTS = [
   },
   {
     id: "tower",
+    level: 20,  // MAP_LAST. The tower is the end of the ladder
     name: "Haunted Tower",
     types: ["ghost", "psychic"],
     table: [
@@ -381,6 +402,12 @@ const RESIDENTS = [
     ],
   },
 ];
+
+/* The last map's level, and the shape of the ladder. Asserted against the table
+   rather than trusted: a level typed into one row and a number quoted in a
+   design document are two places for the same fact. */
+export const MAP_FIRST = 1;
+export const MAP_LAST = 20;
 
 export const BIOMES = RESIDENTS.map((b) => ({
   ...b,
@@ -539,6 +566,12 @@ export function tableFor(biome, level) {
 
 // A biome id is an area id: one map, one biome.
 export const biomeFor = (areaId) => BIOMES.find((b) => b.id === areaId) ?? null;
+
+/* Can you walk here yet? One function, so the engine's refusal and the Travel
+   panel's padlock cannot disagree - a menu that offers a map the engine will
+   not travel to is worse than no menu. */
+export const areaLevel = (areaId) => biomeFor(areaId)?.level ?? MAP_FIRST;
+export const areaOpen = (areaId, level) => level >= areaLevel(areaId);
 
 // ---------------------------------------------------------------- trainer level
 

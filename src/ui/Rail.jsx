@@ -137,7 +137,7 @@ export default function Rail({
               candy={state?.candy ?? 0} onBuyCandy={onBuyCandy} />
       )}
       {tab === "map" && (
-        <Travel areaId={state?.areaId} busy={busy} onTravel={onTravel} />
+        <Travel areaId={state?.areaId} level={level} busy={busy} onTravel={onTravel} />
       )}
       {tab === "you" && (
         <Trainer

@@ -52,6 +52,9 @@ export default function Evolve({ evo, onDone }) {
   const postRef = useRef(null);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
+  /* A ref rather than state: the loop below reads it every frame and a state
+     change would restart the effect and the animation with it. */
+  const skipRef = useRef(false);
 
   useEffect(() => {
     const paint = (i) => {
@@ -77,6 +80,21 @@ export default function Evolve({ evo, onDone }) {
       owed = Math.min(owed + (now - last), FRAME * 6); // don't catch up a tab switch
       last = now;
 
+      /* SKIP. The catch animation has had one for a long time and this did
+         not, and the two sit in the same place in the loop - you are watching
+         a thing you already know the result of. Checked before the step rather
+         than inside it, so it lands on whatever phase is on screen.
+
+         It jumps to the END of the cycle rather than cancelling: `paint()` has
+         to run the last pair or the two sprites hold whatever scale the flash
+         caught them at, and the reveal opens on a half-grown Pokemon. */
+      if (skipRef.current) {
+        paint(CYCLE.length - 1);
+        setPhase("reveal");
+        cancelAnimationFrame(raf);
+        return;
+      }
+
       while (owed >= FRAME) {
         owed -= FRAME;
         frame++;
@@ -99,15 +117,16 @@ export default function Evolve({ evo, onDone }) {
     return () => cancelAnimationFrame(raf);
   }, [evo.from, evo.to]);
 
-  /* Only the final beat is dismissible: skipping the flashes would skip the one
-     thing this screen exists to show. */
+  /* One key, two meanings, decided by where you are: during the animation it
+     skips to the result, on the result it closes. Same as the encounter, which
+     is the point - a player should not have to learn two rules for "I have seen
+     enough". */
   useEffect(() => {
-    if (phase !== "reveal") return;
     const onKey = (e) => {
-      if ([" ", "Enter", "Escape"].includes(e.key)) {
-        e.preventDefault();
-        doneRef.current();
-      }
+      if (![" ", "Enter", "Escape"].includes(e.key)) return;
+      e.preventDefault();
+      if (phase === "reveal") doneRef.current();
+      else skipRef.current = true;
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
@@ -122,7 +141,8 @@ export default function Evolve({ evo, onDone }) {
       role="dialog"
       aria-live="polite"
       aria-label={`${label(before)} is evolving`}
-      onClick={phase === "reveal" ? onDone : undefined}
+      onClick={phase === "reveal" ? onDone : () => { skipRef.current = true; }}
+      title={phase === "reveal" ? undefined : "Click to skip"}
     >
       <div className="evo-bg" />
       <div className="evo-rings" />

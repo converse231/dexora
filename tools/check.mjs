@@ -50,9 +50,24 @@ assert.ok(catchChance(3, 1.8) > catchChance(3, 1),
   "the top - a Great Ball has to beat a Poke Ball on a legendary too");
 assert.ok(near(catchChance(45, 1), 0.176), "dratini pokeball");
 assert.ok(near(catchChance(45, 3), 0.529), "ultra roughly triples mid-tier");
-assert.ok(near(fleeChance(255), 0.2), "commons wait around");
-assert.ok(near(fleeChance(30), 0.553), "chansey bolts");
-assert.ok(fleeChance(3) > fleeChance(255), "rares flee more than commons");
+/* FLEEING IS A SHAPE, not three numbers. These pinned 0.2 and 0.553 literally,
+   and the literals were only ever standing in for "a common waits around, a
+   rare bolts, and neither is certain" - so retuning the curve broke a test that
+   had no opinion about the curve. Written as the rule it cannot rot.
+
+   The BOUNDS are the design: nothing flees more often than it stays, or a rare
+   is decided by the roll before your first throw rather than by your ball. */
+assert.ok(fleeChance(3) > fleeChance(30), "rarer must flee more");
+assert.ok(fleeChance(30) > fleeChance(255), "rares flee more than commons");
+assert.ok(fleeChance(255) > 0, "nothing is guaranteed to wait");
+assert.ok(fleeChance(3) < 0.5,
+  `a legendary flees ${fleeChance(3).toFixed(2)} of the time - past half and the ` +
+  "encounter is decided before you have thrown anything");
+/* And it must be KINDER than the catch is hard, or the two nerfs compound: the
+   Poke Ball got 20% weaker in the same pass this curve came down, deliberately
+   pointing the other way so an encounter lasts longer rather than ending. */
+assert.ok(fleeChance(255) < 0.2 && fleeChance(30) < 0.553,
+  "the flee curve must stay at or below what it was when the Poke Ball was full strength");
 
 // --- shake readout --------------------------------------------------------
 assert.equal(shakesFor(0.20, 0.18), 3, "just barely missed -> 3 shakes");
@@ -263,7 +278,10 @@ for (let i = 1; i < SHOP_BALLS.length; i++)
 
   // The Timer Ball's curve: nothing on the first throw, capped after five.
   const timer = ballById("timer-ball");
-  assert.equal(liveMult(timer, { throws: 0 }), 1,
+  /* "Nothing extra" means EQUAL TO A PLAIN THROW, which was 1 and is now
+     PLAIN_MULT. Pinned to the literal it broke the moment the plain throw was
+     retuned, while the rule it stood for had not changed at all. */
+  assert.equal(liveMult(timer, { throws: 0 }), timer.mult,
     "a Timer Ball must be worth nothing extra on the first throw");
   assert.ok(liveMult(timer, { throws: 2 }) > liveMult(timer, { throws: 1 }),
     "a Timer Ball has to climb");
@@ -1342,7 +1360,8 @@ import {
 } from "../src/game/biomes.js";
 import { AREAS, AREA_IDS, SOLID, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
 import {
-  encounterTable, evoScale, evoUnlock, bornLevel, EVO_DEPTH, EVO_STEP, EVO_FLOOR,
+  encounterTable, evoScale, evoUnlock, bornLevel, areaOpen, MAP_FIRST, MAP_LAST,
+  EVO_DEPTH, EVO_STEP, EVO_FLOOR,
 } from "../src/game/biomes.js";
 import { EVOLUTIONS } from "../src/data/evolutions.js";
 
@@ -1473,9 +1492,48 @@ assert.ok(LEGEND_STRAY < LEGEND_MATCHED,
       `#${sp.id} ${sp.name} falls outside every generation`);
 }
 
-// Nothing gates a place any more; levels gate shop stock instead. The tiers
-// themselves are asserted with the rest of the economy above.
-assert.ok(BIOMES.every((b) => !("level" in b)), "areas must not be level-locked");
+/* THE MAP LADDER. This asserted the opposite until the ladder was added - that
+   no area carried a `level` at all - which is worth leaving a trace of: the old
+   design paced you with the price of balls rather than with locked doors, and
+   the assertion was the design written down.
+
+   What has to hold now is the SHAPE, not eight numbers. Somewhere to start,
+   somewhere to finish, nothing out of order, and nothing past the cap. */
+{
+  const levels = BIOMES.map((b) => b.level);
+  for (const b of BIOMES) {
+    assert.equal(typeof b.level, "number", `${b.id} has no unlock level`);
+    assert.ok(b.level >= 1 && b.level <= MAX_LEVEL,
+      `${b.id} unlocks at Lv ${b.level}, outside 1..${MAX_LEVEL}`);
+  }
+  assert.equal(levels[0], MAP_FIRST, "the first map must be open from the start");
+  assert.equal(Math.max(...levels), MAP_LAST,
+    `the last map must open at Lv ${MAP_LAST} - the number the design quotes`);
+  for (let i = 1; i < levels.length; i++) {
+    assert.ok(levels[i] >= levels[i - 1],
+      `${BIOMES[i].id} opens before the map listed above it - the list IS the ladder`);
+  }
+
+  /* `areaOpen` is what the engine refuses on AND what the Travel panel draws,
+     so a menu cannot offer a map the engine will not travel to. */
+  for (const b of BIOMES) {
+    assert.equal(areaOpen(b.id, b.level), true, `${b.id} is shut at its own level`);
+    // Only where there IS a level below: nobody is ever level 0, so "shut at 0"
+    // is not a claim about the first map.
+    if (b.level > MAP_FIRST) {
+      assert.equal(areaOpen(b.id, b.level - 1), false, `${b.id} is open a level early`);
+    }
+  }
+
+  /* AND THE LADDER MUST NOT STRAND ANYTHING. Every species still has to be
+     gettable by the cap - locking a map behind Lv 20 is a delay, and it would
+     be a dead end if the cap were ever lowered under the last unlock. */
+  assert.ok(MAP_LAST < MAX_LEVEL,
+    `the last map opens at ${MAP_LAST} and the cap is ${MAX_LEVEL} - a player ` +
+    "must reach the end of the ladder with levelling left to do");
+
+  console.log(`map ladder ok — ${levels.join(", ")} (Lv ${MAP_FIRST} to ${MAP_LAST})`);
+}
 assert.equal(shelf[0].level, 1, "the starting ball must be buyable at level one");
 assert.ok(shelf[shelf.length - 1].level <= MAX_LEVEL, "the best ball must be reachable");
 
@@ -2153,4 +2211,4 @@ import { saveProblem } from "../src/game/engine.js";
     `${late.size} at Lv ${MAX_LEVEL}; legendaries no easier anywhere; nothing born below its own evolution level`);
 }
 
-console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, none locked, ${sizes[0]} … ${sizes.at(-1)}`);
+console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);

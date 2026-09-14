@@ -45,16 +45,35 @@ import { TIERS, ENCLOSED } from "./biomes.js";
 
    A fifth, the Quick Ball, is 4x on the first turn - which in a game where the
    first throw is the one everybody makes is just the best ball, always. */
+/* WHAT A PLAIN THROW IS WORTH, and it is 0.8 rather than 1.0.
+
+   Asked for as "a bit harder to catch with a Poke Ball". Done here rather than
+   by scaling `rate` in catch.js, or by putting a handicap inside
+   `catchChance`: both of those move EVERY ball at once and re-tune the rare
+   economy that file exists to defend. The cheap throw is the only thing that
+   should get worse.
+
+   It is a shared constant and not a number typed into one row, because the
+   four situational balls carry the same baseline: a Net Ball thrown at
+   something that is not a Water type IS a Poke Ball, and that has to stay true
+   or the expensive ball is quietly better than the cheap one even when its
+   condition fails. Their `boost` is untouched, so the condition is worth more
+   than it was.
+
+   It also WIDENS the plain ladder from below - 0.8 / 1.8 / 3.0 - which is the
+   direction the Great Ball wanted anyway. */
+export const PLAIN_MULT = 0.8;
+
 export const BALLS = [
-  { id: "poke-ball", name: "Poké Ball", short: "POKÉ", mult: 1.0, price: 25, level: 1 },
+  { id: "poke-ball", name: "Poké Ball", short: "POKÉ", mult: PLAIN_MULT, price: 25, level: 1 },
   { id: "great-ball", name: "Great Ball", short: "GREAT", mult: 1.8, price: 90, level: 6 },
   {
-    id: "net-ball", hideWhenEmpty: true, boost: 3.5, name: "Net Ball", short: "NET", mult: 1.0, price: 150, level: 8,
+    id: "net-ball", hideWhenEmpty: true, boost: 3.5, name: "Net Ball", short: "NET", mult: PLAIN_MULT, price: 150, level: 8,
     hint: "on Bug and Water",
-    bonus: (enc) => (enc.types.some((t) => t === "bug" || t === "water") ? 3.5 : 1.0),
+    bonus: (enc) => (enc.types.some((t) => t === "bug" || t === "water") ? 3.5 : PLAIN_MULT),
   },
   {
-    id: "repeat-ball", hideWhenEmpty: true, boost: 3.5, name: "Repeat Ball", short: "REPEAT", mult: 1.0, price: 170, level: 10,
+    id: "repeat-ball", hideWhenEmpty: true, boost: 3.5, name: "Repeat Ball", short: "REPEAT", mult: PLAIN_MULT, price: 170, level: 10,
     /* The best-fitting ball in the game and it was not designed for it: this
        whole game is re-catching species you already own to find their Origin,
        Holo, Shiny and Astral. `known` is the dex snapshot taken when the
@@ -62,16 +81,16 @@ export const BALLS = [
        species, and reading it live would make the ball change value halfway
        through its own throw. */
     hint: "on ones you know",
-    bonus: (enc) => (enc.known ? 3.5 : 1.0),
+    bonus: (enc) => (enc.known ? 3.5 : PLAIN_MULT),
   },
   { id: "ultra-ball", name: "Ultra Ball", short: "ULTRA", mult: 3.0, price: 250, level: 12 },
   {
-    id: "dusk-ball", hideWhenEmpty: true, boost: 3.5, name: "Dusk Ball", short: "DUSK", mult: 1.0, price: 190, level: 14,
+    id: "dusk-ball", hideWhenEmpty: true, boost: 3.5, name: "Dusk Ball", short: "DUSK", mult: PLAIN_MULT, price: 190, level: 14,
     hint: "out of daylight",
-    bonus: (enc) => (ENCLOSED.has(enc.areaId) ? 3.5 : 1.0),
+    bonus: (enc) => (ENCLOSED.has(enc.areaId) ? 3.5 : PLAIN_MULT),
   },
   {
-    id: "timer-ball", hideWhenEmpty: true, boost: 4, name: "Timer Ball", short: "TIMER", mult: 1.0, price: 70, level: 16,
+    id: "timer-ball", hideWhenEmpty: true, boost: 4, name: "Timer Ball", short: "TIMER", mult: PLAIN_MULT, price: 70, level: 16,
     /* Canon is (turns + 10) / 10, capping at 4x after THIRTY turns. There are
        no turns here and a throw costs a ball, so nobody was ever going to
        reach thirty: rescaled to reach the same 4x cap after five misses, which
@@ -91,7 +110,7 @@ export const BALLS = [
     /* Counts every throw at this Pokemon, not every Timer Ball - so softening
        one up with cheap Poke Balls and then switching is a real tactic rather
        than an exploit to close. */
-    bonus: (enc) => Math.min(4, 1 + 0.6 * (enc.throws ?? 0)),
+    bonus: (enc) => Math.min(4, PLAIN_MULT + 0.6 * (enc.throws ?? 0)),
   },
   /* Never fails, and never for sale. A price is only ever a delay - grind long
      enough and you could hold twenty - so the only thing that can keep this
@@ -115,6 +134,13 @@ export const ballById = (id) => BALLS.find((b) => b.id === id);
    field a condition needs is already on it, and a second shape to keep in step
    is a second thing to forget. No encounter (standing on the map, or a shop
    shelf) means no condition can hold, so the base multiplier is the answer. */
+/* An unboosted situational ball IS a Poke Ball, and every `bonus()` above
+   falls back to `PLAIN_MULT` rather than to a typed-in 1.0 for that reason.
+   They did type it in, and the day the plain throw was weakened to 0.8 that
+   made a Net Ball out of water strictly better than the cheap ball at six times
+   the price - the exact thing the shared constant exists to prevent. check.mjs
+   asserts `min(bonus over every encounter) === ball.mult`, which is what
+   caught it. */
 export const liveMult = (ball, enc) =>
   (enc && ball.bonus ? ball.bonus(enc) : ball.mult);
 

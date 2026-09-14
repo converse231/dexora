@@ -23,7 +23,7 @@ there beats opening a ticket, because a ticket loses the reason.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   node tools/check.mjs (19 suites)
+npm run dev        vite dev server           npm run check   node tools/check.mjs (20 suites)
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
                                              npm run layout  composition metrics
@@ -615,7 +615,7 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 [tools/check.mjs](tools/check.mjs) adds seventeen suites — catch odds, phase
 machine, balls, economy, evolution, evolution animation, trainer stats,
 casting, tileset, player, medals, origin gate, variant rows, steps, minimap,
-battle scene, spawn ladder, master balls, areas.
+battle scene, spawn ladder, master balls, map ladder, areas.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
 crown is whole. Biome ground and solid lists must be disjoint (an "invisible
@@ -697,6 +697,33 @@ on every step that spawns. And **anything that grows a table dilutes the
 legendaries**, whose weights are fixed: check.mjs asserts their share can only
 fall as the level rises, because a floor applied carelessly could raise it and
 nothing else would say so.
+
+**MAPS ARE ON A LEVEL LADDER, and this file used to assert the opposite.**
+`BIOMES[i].level` gates travel: Tall Grass at 1, the Haunted Tower at `MAP_LAST`
+(20). The old design paced you with the price of balls and check.mjs asserted no
+area carried a `level` at all - a good argument that lost to a better one, since
+a new player cannot act on "all eight are open but seven will waste your balls"
+until after they have wasted them. **`areaOpen()` is the single answer**, used by
+the engine's refusal AND the Travel panel's padlock; a menu that offers a map the
+engine will not travel to is worse than no menu. `loadState` sends a save home if
+it is standing somewhere it has not earned, or a pre-ladder save is stranded.
+The suite asserts the SHAPE - starts at `MAP_FIRST`, ends at `MAP_LAST`,
+non-decreasing, and `MAP_LAST < MAX_LEVEL` so the ladder always finishes with
+levelling left.
+
+**`PLAIN_MULT` is what a plain throw is worth, and the four situational balls
+share it.** An unboosted Net Ball IS a Poke Ball - and every `bonus()` used to
+return a typed-in `1.0` for its unboosted case, so dropping the plain throw to
+0.8 silently made an out-of-water Net Ball strictly better than the cheap ball at
+six times the price. check.mjs's `min(bonus) === ball.mult` caught it. Never type
+the unboosted value into a `bonus()`.
+
+**Catching got harder and fleeing got kinder, deliberately in opposite
+directions.** Both in one pass: `PLAIN_MULT` 1.0 -> 0.8 and `fleeChance`
+`0.2 + .4x` -> `0.12 + .3x`. Two nerfs pointing the same way would have made
+encounters shorter AND less winnable; pointing them apart makes an encounter
+last longer so a failed throw is a setback rather than the end of it. If either
+is retuned alone, check that the pair still points apart.
 
 **Legendaries are appended to every biome table by rule, never listed in one.**
 `LEGENDARY` holds the dex ids; `legendsFor()` adds each to every table at
@@ -1310,6 +1337,14 @@ Overlay `SOLID` in red to see what is walkable.
   `mapdata.js` held the last good output to diff against, which is what proved
   the restoration: every map but the intended one came back byte-identical.
   Replace the function, not the gap between two of them.
+- **A LITERAL IN AN ASSERTION IS NOT A RULE.** Three broke in one pass and all
+  three for the same reason: `fleeChance(255) === 0.2` meant "a common waits
+  around", `liveMult(timer, {throws: 0}) === 1` meant "nothing extra on the first
+  throw", and `mb <= 3` meant "walking must not out-give levelling". Every one
+  failed on a retune that did not touch what it cared about. Write the
+  relationship (`fleeChance(3) > fleeChance(30)`, `=== timer.mult`,
+  `walked <= fromLevels`); keep a number only as a BOUND with its reason
+  attached.
 - `assert s != o` is **not enough** when a script makes several replacements —
   one can silently no-op while the others succeed. Assert each replacement
   landed. Two canopy assertions were dead for a whole session this way.

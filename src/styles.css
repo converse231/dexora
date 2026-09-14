@@ -1504,6 +1504,11 @@ canvas {
   cursor: pointer; font: inherit;
 }
 .arearow:hover:not(:disabled) { border-color: var(--path); transform: translateY(-1px); }
+/* A locked row is legible, not hidden: the name and the types are the reason
+   to look ahead at all. Only the action reads as unavailable. */
+.arearow.locked { opacity: .55; cursor: default; }
+.arearow.locked em { color: var(--ink-faint); }
+
 .arearow.here { background: var(--path-soft); border-color: var(--path); cursor: default; }
 .arearow:disabled { cursor: default; }
 .ar-name { grid-column: 1; grid-row: 1; font-size: 16px; font-weight: 700; }

@@ -41,9 +41,19 @@ export function catchChance(rate, ballMult) {
   return Math.min(ceiling, Math.max(NEVER_HOPELESS, (rate / 255) * ballMult));
 }
 
-// Rarer species flee more. The line that makes rarity feel like rarity.
+/* Rarer species flee more. The line that makes rarity feel like rarity - and
+   the SHAPE is the part that matters, so both numbers came down together
+   rather than the slope being flattened.
+
+   It was `0.2 + (1 - rate/255) * 0.4`: a common fled one throw in five and a
+   legendary nearly three in five. Paired with a Poke Ball that is now 20%
+   weaker (see `PLAIN_MULT`) that would have been two nerfs pointing the same
+   way. They deliberately point opposite ways instead: an encounter is HARDER
+   to finish and LASTS LONGER, so a failed throw is a setback rather than the
+   end of it. Losing a rare to a flee on throw two is the version of this game
+   nobody wants to play. */
 export function fleeChance(rate) {
-  return 0.2 + (1 - rate / 255) * 0.4;
+  return 0.12 + (1 - rate / 255) * 0.3;
 }
 
 /* How close was a losing roll? 3 shakes = agonising, 0 = never had a chance.

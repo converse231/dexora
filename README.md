@@ -1693,6 +1693,102 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### The world opens as you level
+
+This reverses a decision the design document argued for, and the old argument is
+worth keeping because it was a good one:
+
+> Nothing is locked. The ball economy paces you instead — walk into Frost Hollow
+> at level one and simply fail to afford the throws. A gate that says "not yet,
+> and here is why" beats one that says no.
+
+It lost to a better one. **A new player handed eight maps at once has no idea
+which of them is for them**, and the honest answer — *all of them, but seven will
+waste your balls* — is something you can only act on after you have wasted them.
+A ladder says the same thing in advance.
+
+| | | | |
+|---|---|---|---|
+| Tall Grass | 1 | Power Plant | 12 |
+| Deep Woods | 3 | Ember Caldera | 15 |
+| Pond & Shore | 6 | Frost Hollow | 18 |
+| Rock Ridge | 9 | **Haunted Tower** | **20** |
+
+A locked row still shows its **name and its types**. That is the whole reason to
+draw it rather than hide it: the ladder is a thing to read ahead on, and a list
+that grows out of nowhere teaches nothing about where you are going.
+
+`areaOpen()` is one function, used by the engine's refusal *and* the Travel
+panel's padlock — a menu that offers a map the engine will not travel to is worse
+than no menu. And `loadState` sends a save home if it is standing somewhere its
+trainer has not earned, because maps were all open once and without that a Lv 5
+save parked in the tower would be stranded: `travel` now refuses to move it and
+every other map is a lock away.
+
+The suite asserts the **shape** rather than eight numbers — somewhere to start,
+somewhere to finish, nothing out of order, nothing past the cap, and `MAP_LAST`
+strictly under `MAX_LEVEL` so you always reach the end of the ladder with
+levelling left to do. Inside a map nothing is gated; the ball economy still paces
+you there.
+
+### A harder throw that runs away less
+
+Two changes pointing deliberately **opposite** ways.
+
+`PLAIN_MULT` is **0.8**, down from 1.0. Done on the ball rather than by scaling
+`rate` or putting a handicap inside `catchChance`, because both of those move
+every ball at once and re-tune the rare economy `catch.js` exists to defend. The
+cheap throw is the only thing that should get worse — and it widens the plain
+ladder from below, which is the direction the Great Ball wanted anyway:
+
+| | was | now |
+|---|---|---|
+| Poké at rate 255 | 0.80 | **0.75** |
+| Poké at rate 45 | 0.176 | **0.141** |
+| Great at rate 45 | 0.318 | 0.318 |
+| Ultra at rate 45 | 0.529 | 0.529 |
+
+And fleeing came **down**: `0.2 + (1 − rate/255) × 0.4` → `0.12 + … × 0.3`. A
+common now waits around eight times in nine and a legendary flees two in five
+rather than three. Both numbers moved together so the *shape* — rarer flees more
+— survives intact. The point of pairing them is that an encounter is **harder to
+finish and lasts longer**: a failed throw is a setback rather than the end of it.
+Losing a rare to a flee on throw two is the version of this game nobody wants.
+
+**The assertion earned its keep immediately.** `PLAIN_MULT` is shared with the
+four situational balls, because a Net Ball thrown at something that is not a
+Water type *is* a Poké Ball — but each `bonus()` returned a typed-in `1.0` for
+its unboosted case. So the moment the plain throw dropped to 0.8, an unboosted
+Net Ball became **strictly better than a Poké Ball at six times the price**. The
+suite already asserted `min(bonus over every encounter) === ball.mult`, and that
+is what caught it.
+
+### Skipping the evolution
+
+The catch animation has had a skip for a long time and this did not, and they sit
+in the same place in the loop — you are watching something whose result you
+already know. Click or press Space/Enter/Escape during the sequence to jump to
+the reveal; the same key on the reveal closes it, so there is one rule rather than
+two.
+
+It jumps to the **end of the cycle** rather than cancelling: `paint()` has to run
+the last pair or the two sprites hold whatever scale the flash caught them at, and
+the reveal opens on a half-grown Pokémon.
+
+### A literal is not a rule
+
+Three assertions broke this pass, and all three for the same reason: they pinned a
+*number* that was only ever standing in for a *rule*.
+
+- `fleeChance(255) === 0.2` meant "a common waits around".
+- `liveMult(timer, {throws: 0}) === 1` meant "nothing extra on the first throw".
+- `mb <= 3`, last pass, meant "walking must not out-give levelling".
+
+Every one of them failed on a retune that did not touch the thing it cared about.
+They are written as relationships now — `fleeChance(3) > fleeChance(30)`,
+`liveMult(timer, …) === timer.mult` — and the numeric ones that remain are
+*bounds* with a reason attached, not snapshots.
+
 ### The Dex grid was a wall of stills
 
 "The animations don't run in the dex tab" — right, and the reason was a claim in
