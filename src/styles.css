@@ -2658,41 +2658,6 @@ button:disabled { transition: none; }
   border-color: #e2c6ff; background: linear-gradient(#653a88, #402759);
 }
 
-/* How close this species is to evolving - the number the throw actually turns
-   on, so it gets its own card opposite the nameplate rather than a grey line
-   underneath it. Only while you are choosing; the catch banner takes this
-   corner once the ball has landed. */
-.evocard {
-  position: absolute; top: 4%; right: 3%; z-index: 6;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 0;
-  padding: .8cqw 1.3cqw .7cqw;
-  background: var(--surface); border: 3px solid var(--line-firm);
-  border-radius: 11px; box-shadow: 0 3px 0 rgba(60, 80, 65, .22);
-  animation: cheer-drop 380ms cubic-bezier(.2, 1.4, .4, 1) both;
-}
-.evocard.on {
-  border-color: var(--gold); background: #fdf6e6;
-  animation: cheer-drop 380ms cubic-bezier(.2, 1.4, .4, 1) both,
-             ready-glow 2.4s ease-in-out 400ms infinite;
-}
-.ec-label {
-  font-family: var(--pixel); font-size: 1.05cqw; letter-spacing: .12em;
-  color: var(--ink-faint); line-height: 1.4;
-}
-.evocard.on .ec-label { color: var(--gold); }
-/* The count and what it is for share a line. Stacked on three rows the card was
-   mostly padding, and the long form - "NEEDS A WATER STONE" - set a width the
-   two rows above it then had to leave empty. */
-.ec-line { display: flex; align-items: baseline; gap: .7cqw; }
-.ec-count {
-  font-family: var(--display); font-weight: 600; font-size: 2.4cqw;
-  line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums;
-}
-.ec-count span { font-size: 1.6cqw; color: var(--ink-faint); }
-.ec-sub {
-  font-family: var(--pixel); font-size: 1.2cqw; color: var(--ink-soft);
-  white-space: nowrap;
-}
 
 /* ================================================= responsive, last on purpose
 

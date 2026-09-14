@@ -777,6 +777,16 @@ Astral do not, because neither is about artwork - they fall through to `""` in
 `Sprite.jsx`'s `FOLDER`, and CSS does the rest. That fall-through is now
 behaviour rather than an omission.
 
+**A READOUT CAN OUTLIVE ITS SYSTEM TWICE.** The encounter's evolution card was
+built for the feed, where catching one more of a species moved its bar - the
+throw was what the number was about. Under candy a catch is fungible progress
+toward anything, so the card implied a relationship that no longer existed, and
+it put the level of a Pokemon you OWN a hand's width from the level of the one
+you are looking at. It was relabelled `Lv 5/16` first, which fixed the wording
+and kept the false implication; it is deleted now. **When a system goes, audit
+what READ it, not just what called it** - and a panel that no longer has a
+question to answer should go rather than be reworded.
+
 **A READOUT OUTLIVES THE SYSTEM THAT WROTE IT.** The encounter's evolution card
 said `5/16`, which under the feed meant five duplicates of sixteen and now means
 level five of sixteen - same shape, same corner, different meaning, and it was

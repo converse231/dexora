@@ -1693,6 +1693,33 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### The evolution card was the feed's last survivor
+
+Reported as confusing, and it was — but "confusing" is the kind half of it.
+
+The card showed the level of the best one you already **own**, on a screen whose
+nameplate shows the level of the one **in front of you**. Two `Lv` numbers about
+two different individuals, a hand's width apart. And I made that worse two passes
+ago by *adding* the `Lv` prefix to disambiguate it from the old merge counter —
+I fixed one ambiguity and manufactured another.
+
+The reason to delete rather than relabel is one step behind that: **under candy
+the throw no longer decides it.** The card was built for the feed, where catching
+one more of the species genuinely moved the bar — "9/16 caught" was a number the
+throw was about. Candy is fungible, so this Growlithe is two candy toward
+*anything* and has no special relationship with the Growlithe in your box at all.
+The card did not merely read oddly; it implied a link that no longer exists.
+
+So this was the real remnant of merge-to-evolve in the wild encounter, spotted
+two passes ago and patched too shallowly — the label was a symptom and the card
+was the thing.
+
+Nothing is lost with it. The stone it sometimes named belongs where you act on
+it, which is the Box; the odds per ball are on the rail; and **the one level that
+does matter here is still on the nameplate**, because a wild evolved form arrives
+grown and a Lv 34 Venusaur is thirty candy of progress you did not have to pay
+for. `box` is no longer passed to `Encounter` at all.
+
 ### The world opens as you level
 
 This reverses a decision the design document argued for, and the old argument is

@@ -307,7 +307,6 @@ export default function App() {
               <Encounter
                 enc={enc}
                 bag={st?.bag}
-                box={st?.box}
                 onFlee={() => engine.flee()}
                 onSkip={() => engine.skip()}
               />

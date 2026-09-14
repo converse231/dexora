@@ -6,32 +6,35 @@
    is a readout of how close the losing roll came, so three shakes then a
    break-out really was a near miss. Click anywhere to skip to the result. */
 
-import { BALLS, evoNext, itemById } from "../game/items.js";
-import { SPECIES } from "../data/species.js";
+import { BALLS } from "../game/items.js";
 import { label } from "../game/map.js";
 import Types from "./Types.jsx";
 import Gen from "./Gen.jsx";
 import Sprite, { spriteUrl } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 
-export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
-  const { phase } = enc;
+  /* THE EVOLUTION CARD IS GONE, and "confusing" was the kind half of it.
 
-  /* How close this species is to evolving, worked out from the box you are
-     already carrying. Standing in front of a Rattata is exactly the moment the
-     count matters - it decides whether this one is the one you spend an Ultra
-     Ball on - and until now you had to leave the encounter to find out. */
-  const progress = (() => {
-    if (!box) return null;
-    /* The BEST one you hold, because that is the one carrying the levels and
-       the one that would evolve. Absent from the box entirely means there is
-       nothing to report - "Lv 0 / 16" for a species you have never caught is
-       noise on a screen that is about the one in front of you. */
-    const mine = box.filter((m) => m.species === enc.speciesId);
-    if (!mine.length) return null;
-    const hero = mine.reduce((a, b) => (b.level > a.level ? b : a));
-    return evoNext(hero, bag);
-  })();
+     It showed the level of the best one you already OWN, on a screen whose
+     nameplate shows the level of the one in front of you - two `Lv` numbers
+     about two different individuals, a hand's width apart. That is what got
+     reported, and removing it is the right answer for a reason one step
+     behind that: **under candy the throw no longer decides it.**
+
+     The card was built for the feed, where catching one more of the species
+     genuinely moved the bar - "9/16 caught" was a number the throw was
+     about. Candy is fungible, so this Growlithe is two candy toward
+     anything and has no special relationship with the Growlithe in your box
+     at all. The card did not just read oddly, it implied a link that no
+     longer exists.
+
+     Nothing is lost with it. The stone it sometimes named belongs where you
+     act on it, which is the Box; the odds per ball are on the rail; and the
+     one level that DOES matter here is still on the nameplate, because a
+     wild evolved form arrives grown and a Lv 34 Venusaur is thirty candy of
+     progress you did not have to pay for. */
+export default function Encounter({ enc, bag, onFlee, onSkip }) {
+  const { phase } = enc;
 
   const animating = ["throw", "suck", "drop", "wait", "shake"].includes(phase);
   /* The ball stays on screen for the break-out now. It used to vanish the
@@ -215,37 +218,6 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
           </span>
         )}
       </div>
-
-      {/* Its own card opposite the nameplate, because this is the number the
-          throw decides on and a grey line under the name was easy to miss. Only
-          while you are choosing: the catch banner claims this corner afterwards. */}
-      {idle && progress && (
-        <div className={`evocard${progress.ready ? " on" : ""}`}>
-          <span className="ec-label">
-            {progress.ready ? "READY" : "EVOLUTION"}
-          </span>
-          <span className="ec-line">
-            {/* **`Lv` IS LOAD-BEARING.** This counted duplicates before -
-                "9/16 caught" - and the new number is a level you bought with
-                candy. The two look identical without the prefix, and a bare
-                "5/16" over a card labelled EVOLUTION was read from play as the
-                old merge counter still being there: same shape, same place,
-                entirely different meaning. */}
-            <strong className="ec-count">
-              Lv {Math.min(progress.at, progress.at - progress.need)}
-              <span>/{progress.at}</span>
-            </strong>
-            {/* The stone only when it is the ONLY thing left. Shown whenever
-                one was missing, it said "FIRE STONE" to somebody eleven levels
-                away - naming the last obstacle as though it were the next. */}
-            <span className="ec-sub">
-              {progress.need === 0 && !progress.hasStone
-                ? itemById(progress.stone)?.name
-                : label(SPECIES[progress.row.to - 1])}
-            </span>
-          </span>
-        </div>
-      )}
 
       {/* Message and RUN share one row. The balls left this box for the rail
           down the left edge - see BallRail - which is most of why the battle
