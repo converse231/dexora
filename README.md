@@ -1693,6 +1693,37 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### The Dex grid was a wall of stills
+
+"The animations don't run in the dex tab" — right, and the reason was a claim in
+`CLAUDE.md` that had been wrong for months: *a Dex cell is one image with
+nowhere to hang a layer.* `.cell` is a `position: relative` button with
+`overflow: hidden`. It is a container. The claim was true of the **sprite** and
+got written down about the **cell**, and a note like that is self-fulfilling —
+nobody puts a layer somewhere the documentation says there is no room.
+
+Every screen that draws a variant now draws its treatment: **grid cell, sheet
+portrait**, FORMS strip, Box row, encounter, evolution reveal.
+
+Two details that are not nudges:
+
+- **`inset: 6%` on the grid cell's foil.** The sprite is drawn at 88% of the
+  cell and centred, so a layer at `inset: 0` masks itself to a silhouette 14%
+  larger than the sprite it is supposed to be sheening — close enough to look
+  like a rendering fault rather than a misalignment.
+- **`z-index: 4` on the marks, the number and the rosette.** The foil is 3 and
+  they carried none, so a Holo tile had a rainbow travelling over its own entry
+  number.
+
+`rarest()` only ever names a tier you have **registered**, so the grid cannot
+leak an unearned treatment the way the FORMS strip did — and it draws at most
+one layer per cell, because it shows the rarest tier rather than all of them.
+
+If 151 animated cells ever costs anything, the lever is one line —
+`content-visibility: auto` on `.cell`, which `grid-auto-rows` already makes safe.
+It is not there yet, because a realistic save holds a few dozen variants and not
+151.
+
 ### "5/16" was the merge counter's ghost
 
 Reported from play as a remnant of the old merge-to-evolve system still living

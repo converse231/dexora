@@ -1399,6 +1399,33 @@ canvas {
 }
 /* `:not(.mark)` so the rarity badges keep their own size - see Marks.jsx. */
 .cell img:not(.mark) { width: 88%; height: 88%; object-fit: contain; image-rendering: pixelated; }
+
+/* ---- a tier moves in the grid too -------------------------------------
+   `inset: 6%` on the foil, and it is not a nudge: the sprite is drawn at 88%
+   of the cell and centred, so a layer at `inset: 0` masks itself to a
+   silhouette 14% larger than the sprite it is supposed to be sheening. Same
+   box, same `contain`, and the two register exactly.
+
+   The aura is pulled in hard for the same reason in reverse - at the -14% it
+   wears in a battle scene it would be a wash across an 84px tile with
+   `overflow: hidden` clipping the falloff, which reads as a coloured cell
+   rather than a glow coming off a creature. */
+.cell .holo-foil { inset: 6%; }
+.cell .astral-aura { inset: -2%; }
+.cell .shiny-spark i { width: 6px; height: 6px; box-shadow: 0 0 4px rgba(255, 226, 150, .95); }
+.cell .shiny-spark i:nth-child(2),
+.cell .shiny-spark i:nth-child(4),
+.cell .shiny-spark i:nth-child(5) { width: 4px; height: 4px; }
+
+/* The number, the marks and the rosette sit ABOVE the sheen. The foil is
+   z-index 3 and these carried none, so a Holo tile had a rainbow travelling
+   over its own entry number. */
+.cell-marks, .cell-no, .cell-full { z-index: 4; }
+
+/* The sheet's portrait, which needed a positioned wrapper to hang a layer on
+   at all - `.sheet-art` is the img itself. */
+.sheet-portrait { position: relative; display: block; }
+.sheet-portrait .astral-aura { inset: -6%; }
 .cell-no {
   position: absolute; bottom: 2px; right: 4px;
   font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);

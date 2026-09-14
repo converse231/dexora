@@ -767,12 +767,29 @@ phase is a white silhouette and a foil band over a white shape is a rainbow with
 no creature in it. A Dex GRID cell still gets none, deliberately - see the next
 note, which is the reason it can afford to.
 
-**A tier's look must survive as a bare `<img>`.** A Dex cell is one image with
-nowhere to hang a layer, so whatever identifies the tier there has to come from
-`filter` alone - which is why Holo's rim is three drop-shadows and NOT a
-`hue-rotate`. The travelling foil band is a second element and exists only where
-there is a container: the encounter and the Forms strip. Astral splits the same
-way (duotone everywhere, sky and aura and orbit only in the encounter).
+**A tier's look must survive as a bare `<img>`** - still the rule, and still
+why Holo's rim is three drop-shadows and NOT a `hue-rotate`: a 52px sprite with
+nothing animating has to be identifiable from `filter` alone, and any screen may
+end up drawing one that way.
+
+**But "the Dex cell has nowhere to hang a layer" was wrong, and this file said
+it for months.** `.cell` is a `position: relative` button with `overflow:
+hidden` - a container. The claim was true of the SPRITE and got written down
+about the cell, and it is what kept the grid a wall of stills: reported from
+play as "the animations don't run in the dex tab", which was exactly right.
+Every screen that draws a variant now draws its layer - grid cell, sheet
+portrait, FORMS strip, Box row, encounter, evolution reveal.
+
+`inset: 6%` on the grid cell's foil is not a nudge: the sprite is drawn at 88%
+of the cell and centred, so a layer at `inset: 0` masks itself to a silhouette
+14% bigger than the sprite it is sheening. And `.cell-marks` / `.cell-no` /
+`.cell-full` needed a `z-index` - the foil is 3 and they had none, so a Holo
+tile had a rainbow travelling over its own entry number.
+
+**The lever, if 151 animated cells ever costs anything:** `content-visibility:
+auto` on `.cell`. `grid-auto-rows` already fixes the row height, so it is safe
+to add and has not been, because a realistic save holds a few dozen variants
+rather than 151.
 
 **A TIER IS TWO THINGS, and a second copy of `FOLDER` only ever gets one.**
 Shiny and Origin have their own artwork; **Holo and Astral have no folder** and

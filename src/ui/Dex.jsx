@@ -15,7 +15,7 @@ import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import { LEGENDARY, TIERS } from "../game/biomes.js";
 import FilterBar from "./FilterBar.jsx";
-import Sprite from "./Sprite.jsx";
+import Sprite, { VariantFx } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 
 const STATE = ["unseen", "seen", "caught"];
@@ -191,6 +191,20 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
                   height is fixed by `grid-auto-rows`, so the cell keeps its
                   shape with no image in it. */}
               {state > 0 && <Sprite id={sp.id} variant={rarest(sp.id)} />}
+
+              {/* AND ITS TREATMENT, MOVING. This file used to say a Dex cell
+                  was one image with nowhere to hang a layer - it is a
+                  `position: relative` button with `overflow: hidden`, which is
+                  a container, and the claim was about the SPRITE rather than
+                  the cell. The grid is where a collection is actually looked
+                  at, and a wall of stills is the one place a Holo has nothing
+                  to say for itself.
+
+                  `rarest()` only ever names a tier you have REGISTERED, so an
+                  unearned treatment cannot leak here the way it did in the
+                  FORMS strip. One layer per cell at most, because the grid
+                  shows the rarest tier rather than all of them. */}
+              {state > 0 && <VariantFx id={sp.id} variant={rarest(sp.id)} />}
 
               {/* One mark per variant held, kindest first, so the row reads as
                   progress. `!!` is not needed here because `marks` is already a

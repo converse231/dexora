@@ -132,11 +132,16 @@ export default function DexSheet({
         <div className="sheet-top">
           {/* The rarest one you have registered claims the entry's portrait:
               the dex should show you the one you actually own. */}
-          <Sprite
-            id={id}
-            variant={caught ? variant : null}
-            className={`sheet-art${caught ? "" : " locked"}`}
-          />
+          <span className={`sheet-portrait${caught ? "" : " locked"}`}>
+            <Sprite
+              id={id}
+              variant={caught ? variant : null}
+              className={`sheet-art${caught ? "" : " locked"}`}
+            />
+            {/* The portrait is the biggest the entry ever draws this Pokemon,
+                so it is the worst place for the treatment to be missing. */}
+            {caught && <VariantFx id={id} variant={variant} />}
+          </span>
           <div>
             <div className="sheet-no">#{String(id).padStart(3, "0")}</div>
             <h3 className="sheet-name">{seen ? label(sp) : "???"}</h3>
