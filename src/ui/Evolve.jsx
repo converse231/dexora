@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import { evoCycleFrames, SCALE_MAX } from "../game/evocycle.js";
-import { spriteUrl } from "./Sprite.jsx";
+import { spriteUrl, VariantFx } from "./Sprite.jsx";
 
 const FRAME = 1000 / 60; // the GBA's frame, which every number below counts in
 const CYCLE = evoCycleFrames();
@@ -142,6 +142,19 @@ export default function Evolve({ evo, onDone }) {
           src={art(evo.to)}
           alt=""
         />
+
+        {/* The tier's own treatment, on the REVEAL only.
+
+            Not during the cycle: the whole point of that phase is a white
+            silhouette, and a foil band travelling over a white shape is a
+            rainbow with no creature in it. This is the frame the player is
+            actually looking at when they find out what they got, and it was
+            the frame where the animation stopped. */}
+        {phase === "reveal" && (
+          <span className="evo-fx" aria-hidden="true">
+            <VariantFx id={evo.to} variant={evo.variant} />
+          </span>
+        )}
 
         {phase === "reveal" &&
           SPARKS.map((i) => (

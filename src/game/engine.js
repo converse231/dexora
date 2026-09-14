@@ -808,8 +808,46 @@ export function createEngine(canvas, onChange, mini = null) {
     drawMini(camX, camY, wx, wy);
   }
 
+  /* WHAT COUNTS AS A STALL. A real frame is 16ms, a janky one 100, a slow
+     asset decode maybe 250. Anything past this is not a frame, it is the tab
+     coming back. Pushing deadlines forward on a merely slow frame would cost a
+     few milliseconds of encounter timer and nothing else, so the threshold is
+     deliberately generous. */
+  const STALL = 400;
+  let lastFrame = performance.now();
+
   function frame() {
     const now = performance.now();
+
+    /* THE GAP, FROM ANY CAUSE - and "any cause" is the fix.
+
+       This was a `visibilitychange` listener, which handles exactly one of the
+       ways the clock runs on without us: a hidden TAB. It does not fire when
+       you alt-tab to another window, or when the window is merely occluded by
+       another one, and Chrome throttles or stops rAF in both of those - so the
+       engine came back to a `now` far past every deadline with no compensation
+       at all, and the phase machine fired one step per frame until it caught
+       up. A throw left mid-air resolved in six frames. That is what "the game
+       stops when I switch windows" actually was: it did not stop, it
+       fast-forwarded the moment you came back.
+
+       Measured in the loop instead, so it needs no event and cannot miss one.
+       A debugger pause, a sleeping laptop and a backgrounded window all look
+       the same from here, because they are the same thing. */
+    const gap = now - lastFrame;
+    lastFrame = now;
+    if (gap > STALL) {
+      if (move.active) move.startedAt += gap;
+      if (state.encounter?.until) state.encounter.until += gap;
+      if (state.fishing?.until) state.fishing.until += gap;
+      /* Keys are dropped because a keyup fired while we were away never
+         reached us, and a held direction would walk the trainer on his own.
+         `running` with it, or the rail shows RUN over somebody standing still.
+         `changed()` because React has been told nothing for however long. */
+      held.clear();
+      state.running = false;
+      changed();
+    }
 
     if (move.active && now - move.startedAt >= move.ms) {
       move.active = false;
@@ -843,26 +881,6 @@ export function createEngine(canvas, onChange, mini = null) {
      window switch, but moving to another TAB in the same window does not
      always blur, and a key held through that would walk the trainer the
      moment you returned. */
-  let hiddenAt = 0;
-  function visibility() {
-    if (document.hidden) {
-      hiddenAt = performance.now();
-      held.clear();
-      state.running = false;
-      return;
-    }
-    if (!hiddenAt) return;
-    const gap = performance.now() - hiddenAt;
-    hiddenAt = 0;
-    if (move.active) move.startedAt += gap;
-    if (state.encounter?.until) state.encounter.until += gap;
-    if (state.fishing?.until) state.fishing.until += gap;
-    /* `running` was cleared on the way out without telling React - there was
-       nothing on screen to tell. It has to be told on the way back in, or the
-       rail keeps showing RUN over a trainer who is walking. */
-    changed();
-  }
-  document.addEventListener("visibilitychange", visibility);
 
   bakeMini();
   raf = requestAnimationFrame(frame);
@@ -1115,7 +1133,6 @@ export function createEngine(canvas, onChange, mini = null) {
     destroy() {
       cancelAnimationFrame(raf);
       clearTimeout(saveTimer);
-      document.removeEventListener("visibilitychange", visibility);
     },
   };
 }

@@ -258,7 +258,20 @@ export const lockedTiers = (dex, speciesId) =>
    at these numbers each map finds one about once in a hundred encounters,
    which is where Zapdos-in-his-own-plant already sat. */
 export const LEGEND_MATCHED = 0.5;
-export const LEGEND_STRAY = 0.08;
+/* A STRAY IS MEANT TO BE A STORY, and at 0.08 it was merely uncommon.
+
+   Reported from play as a bug: "why is Articuno showing up in Ember Caldera?"
+   It is not a bug - it is this rule, and the rule earns its keep, because it
+   is the same one that means no map is the map you HAVE to grind. But an ice
+   bird in a volcano is the worst pairing the game can produce, and four stray
+   legendaries at 0.08 apiece came to one in every 290 encounters in Ember:
+   often enough to read as a mistake rather than as a miracle.
+
+   At 0.03 a given stray is about one in 3,000 and the whole stray pool about
+   one in 800, while a MATCHED legendary is untouched. That widens the gap
+   between hunting where it lives and hunting anywhere from 6x to 17x, which is
+   the signal the rule was always supposed to send. */
+export const LEGEND_STRAY = 0.03;
 
 const legendsFor = (types) =>
   LEGENDARY.map((id) => [

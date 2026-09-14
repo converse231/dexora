@@ -1693,6 +1693,123 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### The causeway was a bridge with a shelf attached
+
+Reported as "the bridge is misaligned in Ember". It was not drawn wrong — it was
+**two tiles wide with only its left column landing**. The right column ran into
+solid rock at both ends, so half the span was a shelf welded to a cliff, which
+is what a one-tile offset looks like.
+
+The cause is ordering. `lava_banks()` makes a pool's bank out of the floor beside
+it, and in the caldera it runs **four more times after the causeway is laid**,
+inside the join loop. A crossing that landed on floor at both ends when it was
+placed had one of its landing tiles turned to rock afterwards.
+
+`spans_clear()` was supposed to catch exactly this — it exists because "a bridge
+can be broken by something placed after it" — but it asked whether the blob had
+walkable ground *somewhere* on its north edge and *somewhere* on its south edge.
+One tile of landing passed. It now requires **every column of a vertical span to
+land, every row of a horizontal one**, and it runs in `check()` for every map
+rather than only where `place_lava` happened to call it.
+
+The repair is `heal_spans()`, and extending is right rather than moving: what the
+bank *is*, is the pool's shore, and a bridge is supposed to cross the shore. It
+pushes a span out a tile at a time (capped at two — more than that is tunnelling
+through a mountain) and eats only bank rock.
+
+The half that took two goes: the whole **width** has to move together. The first
+version only extended when every end cell was rock, and the causeway had one
+column on floor and one on rock — so it refused to touch it and left the bridge
+exactly as broken as it found it. A bridge is one object; it cannot be a tile
+longer on one side.
+
+### A tier animates wherever it is shown
+
+Reported as "holo, astral and shiny animations don't work on previews or after
+the evolution — it has the filters but the animation stops". Correct, and it was
+never anything else: the moving layers existed **only in the encounter**, plus
+one hand-rolled copy of the foil in the Dex's FORMS strip. A Holo in the Box was
+a still picture with a filter on it.
+
+`VariantFx` is one component now — Holo's travelling foil, Astral's breathing
+aura, Shiny's sparks — used by the Box row, the FORMS strip and the evolution
+**reveal**. Not during the evolution cycle: that phase is a white silhouette
+morphing, and a foil band travelling over a white shape is a rainbow with no
+creature in it.
+
+A Dex **grid** cell still gets nothing, and that stays deliberate rather than
+forgotten: it is one `<img>` in a four-column grid with nowhere to hang a layer,
+which is the whole reason a tier's identity has to survive `filter` alone.
+
+Two false trails on the way, both worth keeping because both looked like bugs:
+
+- Freeze-framing `holo-sweep` at −1.1s showed **no foil at all** on the Box's
+  cream background, and it showed on a dark one — which reads exactly like
+  `mix-blend-mode: color-dodge` failing on a light ground. Three blend modes and
+  an `isolation: isolate` later, an unmasked layer at 0.6 opacity was *still*
+  invisible, which is impossible. It was the harness: the sweep runs
+  `background-position: 220% → -80%`, and −1.1s is a moment when the band has
+  swept off the element. Sampled across the whole 3.6s it is plainly there. The
+  glow on the dark background was Holo's **rim** — three drop-shadows — not the
+  foil.
+- The sparks looked broken for the same reason: `spark` holds `opacity: 0` for
+  most of its cycle, so a freeze-frame at the wrong offset shows nothing.
+
+**Sample an animation across its whole cycle before judging it** — this file
+already said so, and one frame is not a sample.
+
+### Master Balls, and a bound that was standing in for a rule
+
+Five in a whole playthrough made the Master Ball a museum piece: with five
+legendaries in the dex, spending one always felt like a mistake you would regret
+at the sixth. It is **ten** now — six from levelling (`MASTER_EVERY` 8 into a cap
+of 50) and four from walking (every fifth haul, 12,500 steps, from Lv 15).
+
+Enough to cover every legendary and a few over, which is the point where the item
+becomes a decision rather than something to hoard.
+
+The interesting part was the assertion. `mb <= 3` sat beside a levelling count of
+three, and it was never really about three — it was standing in for **"walking
+must not out-give levelling"**. Raising both halves broke a bound that had no
+opinion of its own. It compares the two sources directly now, and a second
+assertion pins the *combined* total, because neither half alone is the number a
+player experiences.
+
+### Articuno in a volcano
+
+Not a bug — `legendsFor()` appends every legendary to every table, at
+`LEGEND_MATCHED` where the biome shares one of its types and `LEGEND_STRAY`
+everywhere else. The rule earns its keep: it is what stops any one map being the
+map you *have* to grind, and it means a Gen 2 legendary needs one dex number and
+nothing else.
+
+But an ice bird in a volcano is the worst pairing the game can produce, and four
+strays at 0.08 apiece came to **one encounter in 290** in Ember — often enough to
+read as a mistake rather than as a miracle. `LEGEND_STRAY` is 0.03, so a given
+stray is about one in 3,000 and a matched legendary is untouched. The gap between
+hunting where it lives and hunting anywhere goes from 6× to 17×, which is the
+signal the rule was always meant to send.
+
+### "The game stops when I switch tabs"
+
+It never stopped. It **fast-forwarded**, and the fix for that was already in —
+for exactly one of the ways it happens.
+
+Every deadline in the engine is an absolute `performance.now()` stamp, so time
+that passes while `requestAnimationFrame` is not running has to be paid back. A
+`visibilitychange` listener did that for a hidden **tab**. It does not fire when
+you alt-tab to another window, or when the window is merely occluded by another
+one — and Chrome throttles or stops rAF in both. So the engine came back to a
+`now` far past every deadline with no compensation at all, and the phase machine
+fired one step per frame until it caught up: a throw left mid-air resolved in six
+frames.
+
+The gap is measured **in the frame loop** now, so it needs no event and cannot
+miss one. Anything past 400ms between frames is not a frame, it is the tab coming
+back — and a hidden tab, an unfocused window, a debugger pause and a sleeping
+laptop all look the same from there, because they are the same thing. The
+listener is gone.
+
 ### An Astral evolved into an ordinary Pokémon
 
 Reported from play: evolving a variant "produces a normal one and an astral

@@ -22,7 +22,7 @@ import { useEffect } from "react";
 import { useModalLock } from "./modal.js";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
-import Sprite, { spriteUrl } from "./Sprite.jsx";
+import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
 import { foundIn, howOften } from "../game/biomes.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
@@ -175,19 +175,14 @@ export default function DexSheet({
                 {VARIANTS.map(([t, name, blurb]) => (
                   <div key={name} className={`sf-one${got(t) ? " got" : ""}`}>
                     <div className="sf-art">
+                      {/* This strip is where someone comes to SEE what a
+                          variant looks like, so every tier gets its real
+                          treatment rather than the filter on its own. It was a
+                          hand-rolled copy of the foil for Holo only - the same
+                          duplicated-constant shape that lost Astral its art in
+                          the evolution scene. `VariantFx` is the one list. */}
                       <Sprite id={id} variant={t} alt={`${name} ${label(sp)}`} />
-                      {/* Holo is the one tier whose tell does not survive as a
-                          bare <img> - the sheen is a second layer. This strip
-                          is where someone comes to SEE what a variant looks
-                          like, so it gets the real thing rather than the
-                          filter on its own. */}
-                      {t === "holo" && (
-                        <span
-                          className="holo-foil"
-                          style={{ "--art": `url(${spriteUrl(id)})` }}
-                          aria-hidden="true"
-                        />
-                      )}
+                      <VariantFx id={id} variant={t} />
                       {t && <Mark tier={t} size={12} className="sf-badge" />}
                     </div>
                     <span className="sf-name">{name}</span>

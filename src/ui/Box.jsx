@@ -462,7 +462,7 @@ export default function Box({
               key={`${group.species}:${group.variant ?? ""}`}
               className={`boxrow${group.ready ? " ready" : group.spares.length ? " spare" : ""}`}
             >
-              <Sprite id={group.species} variant={group.variant} />
+              <Sprite id={group.species} variant={group.variant} fx />
               {/* The drawn mark, not a star glyph: the same icon the Dex tile
                   and the encounter badge use, so one tier looks like itself
                   everywhere. */}

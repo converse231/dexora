@@ -46,7 +46,64 @@ const FOLDER = { shiny: "shiny/", origin: "origin/" };
 export const spriteUrl = (id, variant = null) =>
   new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png`, document.baseURI).href;
 
-export default function Sprite({ id, variant = null, className = "", alt = "" }) {
+/* THE MOVING HALF OF A TIER, as one component.
+
+   Two of the four tiers are nothing but artwork (Origin's 1996 sprite, Shiny's
+   palette) and read correctly as a bare `<img>`. The other two are a treatment,
+   and a treatment needs a layer: Holo's foil travels, Astral's aura breathes.
+   Shiny gets its sparks here too - the palette alone is a few pixels of hue and
+   is the one tier people miss.
+
+   These existed ONLY in the encounter, plus a hand-rolled copy of the foil in
+   the Dex's FORMS strip. So the Box showed a Holo Nidoqueen as a still picture
+   with a filter on it, and the moment an evolution finished the animation
+   stopped - which is exactly what it looked like: "it has the filters but the
+   animation stops working". One component now, used by every screen that has
+   somewhere to hang a layer.
+
+   A Dex GRID cell still gets nothing, and that is deliberate rather than
+   forgotten: it is one `<img>` in a four-column grid with no container, which
+   is why a tier's identity has to survive `filter` alone in the first place. */
+export function VariantFx({ id, variant }) {
+  if (variant === "holo") {
+    return (
+      <span
+        className="holo-foil"
+        style={{ "--art": `url(${spriteUrl(id)})` }}
+        aria-hidden="true"
+      />
+    );
+  }
+  if (variant === "astral") return <span className="astral-aura" aria-hidden="true" />;
+  if (variant === "shiny") {
+    return (
+      <span className="shiny-spark" aria-hidden="true">
+        <i /><i /><i /><i /><i />
+      </span>
+    );
+  }
+  return null;
+}
+
+/* `fx` wraps the image so the layers have something to be absolute inside.
+   Off by default, because the wrapper changes the DOM shape and every existing
+   caller is laid out against a bare `<img>`. */
+export default function Sprite({
+  id, variant = null, className = "", alt = "", fx = false,
+}) {
+  if (fx && variant) {
+    return (
+      <span className={`sprite-fx ${className}`.trim()}>
+        <img
+          className={variant ? `sprite-${variant}` : ""}
+          src={spriteUrl(id, variant)}
+          alt={alt}
+          loading="lazy"
+        />
+        <VariantFx id={id} variant={variant} />
+      </span>
+    );
+  }
   return (
     <img
       className={`${variant ? `sprite-${variant} ` : ""}${className}`.trim()}

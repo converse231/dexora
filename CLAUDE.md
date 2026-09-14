@@ -23,7 +23,7 @@ there beats opening a ticket, because a ticket loses the reason.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   node tools/check.mjs (18 suites)
+npm run dev        vite dev server           npm run check   node tools/check.mjs (19 suites)
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
                                              npm run layout  composition metrics
@@ -588,6 +588,19 @@ screenshot:
   the black void would abut the purple panel); a wall grave with wall above and
   floor below; the ward exactly one 3×3 block; graves 20–40% of the room
 
+**A BRIDGE LANDS ACROSS ITS WHOLE WIDTH, and `lava_banks()` runs after it.**
+The bank is made out of the floor beside a pool, and in the caldera it runs four
+more times after the causeway is laid - so a crossing placed onto floor at both
+ends had a landing tile turned to rock afterwards, and shipped two wide with
+only its left column landing. `spans_clear()` asked whether the blob had ground
+SOMEWHERE on each side, which one tile of landing satisfies; it checks every
+column of a vertical span now, and runs in `check()` for every map rather than
+only where `place_lava` calls it. `heal_spans()` is the repair, and it EXTENDS
+rather than moves, because the bank is the shore and a bridge crosses its shore.
+The whole width moves together - a version that only extended when every end
+cell was rock refused to touch a span with one column on floor and one on rock,
+which is precisely the broken case.
+
 **Draw a bridge exactly 2 across.** The plank set is baked from Route 12, whose
 own bridge is two wide, so `bridge` in `route.json` holds a left half and a
 right half and nothing else. `bridgeId()` picks by the parity of the distance
@@ -602,7 +615,7 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 [tools/check.mjs](tools/check.mjs) adds seventeen suites — catch odds, phase
 machine, balls, economy, evolution, evolution animation, trainer stats,
 casting, tileset, player, medals, origin gate, variant rows, steps, minimap,
-battle scene, spawn ladder, areas.
+battle scene, spawn ladder, master balls, areas.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
 crown is whole. Biome ground and solid lists must be disjoint (an "invisible
@@ -736,6 +749,16 @@ change needs more than that, the list has been bypassed somewhere.
 Astral do not, because neither is about artwork - they fall through to `""` in
 `Sprite.jsx`'s `FOLDER`, and CSS does the rest. That fall-through is now
 behaviour rather than an omission.
+
+**`VariantFx` is the moving half of a tier, and there is one of it.** Holo's
+travelling foil, Astral's breathing aura and Shiny's sparks existed ONLY in the
+encounter, plus a hand-rolled copy of the foil in the Dex FORMS strip - so a
+Holo in the Box was a still picture with a filter on it. `Sprite fx` wraps the
+image so the layers have something to be absolute inside; the Box row, the FORMS
+strip and the evolution REVEAL all use it. Not during the evolution cycle: that
+phase is a white silhouette and a foil band over a white shape is a rainbow with
+no creature in it. A Dex GRID cell still gets none, deliberately - see the next
+note, which is the reason it can afford to.
 
 **A tier's look must survive as a bare `<img>`.** A Dex cell is one image with
 nowhere to hang a layer, so whatever identifies the tier there has to come from
@@ -1113,10 +1136,22 @@ invisible; the break-out held frame 27, the catch's own flash. Use
 `steps(n, jump-none)` and end the range on the real last frame. A looping
 animation still wants plain `steps()` - a loop needs equal frames that wrap.
 
-**Sample an animation before judging it.** A negative `animation-delay` plus
-`animation-play-state: paused` freezes an animation at a chosen time, so N
-copies of the real markup lay the whole sequence out as a strip. Both frame
-bugs above were invisible in the code and obvious in one screenshot.
+**Sample an animation ACROSS ITS WHOLE CYCLE before judging it.** A negative
+`animation-delay` plus `animation-play-state: paused` freezes an animation at a
+chosen time, so N copies of the real markup lay the whole sequence out as a
+strip. Both frame bugs above were invisible in the code and obvious in one
+screenshot.
+
+**One frame is not a sample, and that cost a whole detour.** `holo-sweep` runs
+`background-position: 220% -> -80%`, so a freeze at -1.1s of 3.6s catches the
+band already off the element and the foil looks entirely absent. It looked like
+`mix-blend-mode: color-dodge` failing on a light background - it showed on dark,
+after all - and three blend modes and an `isolation: isolate` went by before an
+UNMASKED layer at 0.6 opacity was still invisible, which is impossible and is
+what finally indicted the harness. The glow on the dark background was Holo's
+rim (three drop-shadows), not the foil. Sampled across the full 3.6s it is
+plainly there. Same story for `spark`, which holds `opacity: 0` for most of its
+cycle.
 
 **`Array.prototype.sort` never calls the comparator on 0 or 1 elements**, and
 that hid a crash for weeks. Box.jsx declared `const SORTS` six lines BELOW the
@@ -1145,6 +1180,19 @@ true once something has FLED, so from the moment the ball opened they went on
 playing over an empty patch of grass. Gate on `monHere` (`!monCaptured &&
 !monGone`). Anything new that decorates the Pokemon has to be gated the same
 way; Holo is just the one people notice, because a moving rainbow is.
+
+**A STALL IS A STALL, WHATEVER CAUSED IT - measure it in the frame loop.**
+Every deadline is an absolute `performance.now()` stamp, so time that passes
+while rAF is not running has to be paid back. This was a `visibilitychange`
+listener, which covers a hidden TAB and nothing else: it does not fire when you
+alt-tab to another window or when the window is occluded, and Chrome throttles
+or stops rAF in both - so the engine came back past every deadline with no
+compensation and the phase machine fired one step per frame until it caught up.
+`frame()` compares `now` against the last frame and pushes `move.startedAt`,
+`encounter.until` and `fishing.until` forward by any gap over `STALL` (400ms),
+drops held keys and calls `changed()`. No event to miss, and a debugger pause
+and a sleeping laptop are handled by the same three lines. Keep that deadline
+list complete if a fourth timer is ever added.
 
 **A hidden tab freezes and then fast-forwards.** `requestAnimationFrame` stops
 while the page is hidden - fine - but every deadline in the engine is an

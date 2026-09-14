@@ -290,6 +290,11 @@ def check(area, rows, spawn):
     assert all(len(r) == W for r in rows), f"{aid}: ragged rows"
     assert rows[spawn[1]][spawn[0]] not in SOLID, f"{aid}: spawn is inside a wall"
 
+    # Every bridge on every map, not just the ones place_lava happened to test.
+    # Ember's causeway is hand-laid and was never asked, which is how it shipped
+    # two wide with only its left column landing.
+    assert spans_clear([list(r) for r in rows]),         f"{aid}: a bridge does not land across its whole width at both ends"
+
     for y in range(H):
         for x in range(W):
             if rows[y][x] != "T":
@@ -1680,16 +1685,11 @@ def ladders_clear(g):
     return True
 
 
-def spans_clear(g):
-    """Has every bridge still got dry ground at both ends?
-
-    Same fault as ladders_clear, and found the same way: a pool sunk north of
-    the caldera's causeway merged with the lake, drowned the approach, and left
-    a span you could walk onto from the south and never leave. Nothing was
-    disconnected by it - the bridge was still reachable - so only this catches
-    it, and the pool is what gets put back."""
+def span_blobs(g):
+    """Every bridge on the map, as (char, set of cells). Shared by the healer and
+    the checker so the two cannot disagree about where a bridge is."""
     H, W = len(g), len(g[0])
-    seen = set()
+    seen, out = set(), []
     for y in range(H):
         for x in range(W):
             if g[y][x] not in ("n", "N") or (x, y) in seen:
@@ -1704,17 +1704,85 @@ def spans_clear(g):
                 blob.add((cx, cy))
                 stack += [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
             seen |= blob
-            sides = set()
-            for cx, cy in blob:
-                for dx, dy, side in ((0, -1, "N"), (0, 1, "S"),
-                                     (-1, 0, "W"), (1, 0, "E")):
-                    nx, ny = cx + dx, cy + dy
-                    if (0 <= nx < W and 0 <= ny < H
-                            and g[ny][nx] != ch and g[ny][nx] not in SOLID):
-                        sides.add(side)
-            if not (("N" in sides and "S" in sides)
-                    or ("W" in sides and "E" in sides)):
-                return False
+            out.append((ch, blob))
+    return out
+
+
+def heal_spans(g, limit=2):
+    """Push each bridge out until its whole width lands on ground again.
+
+    `lava_banks()` makes a pool's bank out of the floor beside it, and it runs
+    AFTER the bridges - four more times in the caldera, inside the join loop. So
+    a causeway that landed on floor at both ends when it was laid can find one
+    of its landing tiles turned to rock afterwards. Ember shipped exactly that:
+    a two-wide causeway whose RIGHT column ran into solid rock at both ends, so
+    half of it was a shelf welded to a cliff and the whole thing read as drawn
+    one tile out of place.
+
+    Extending is the right repair rather than moving it, because what the bank
+    actually is, is the pool's SHORE - and a bridge is supposed to cross the
+    shore. One or two tiles is a bridge reaching dry ground; more than that is
+    tunnelling through a mountain, so `limit` stops it.
+
+    The whole WIDTH moves out together, and that is the half this got wrong
+    first: the caldera's causeway had one column landing on floor and the other
+    on bank rock, so a rule that only extended when EVERY end cell was rock
+    refused to touch it and left the bridge exactly as broken as it found it. A
+    bridge is one object - it cannot be a tile longer on one side - so a step is
+    taken when ANY cell is blocked, as long as every cell is either bank rock or
+    ground. Walking over the floor tile it absorbs costs nothing: a bridge tile
+    is walkable too.
+
+    Only bank rock is eaten ("M"), never the map's outer wall or anything else,
+    and never a tile on the border."""
+    H, W = len(g), len(g[0])
+    walk = lambda x, y: (0 <= x < W and 0 <= y < H and g[y][x] not in SOLID)
+    for ch, blob in span_blobs(g):
+        xs = sorted({cx for cx, _ in blob})
+        ys = sorted({cy for _, cy in blob})
+        vert = len(ys) >= len(xs)
+        # (the cells one step past each end, as a function of how far out we are)
+        ends = ([lambda d: [(cx, min(ys) - d) for cx in xs],
+                 lambda d: [(cx, max(ys) + d) for cx in xs]] if vert else
+                [lambda d: [(min(xs) - d, cy) for cy in ys],
+                 lambda d: [(max(xs) + d, cy) for cy in ys]])
+        for end in ends:
+            for step in range(1, limit + 1):
+                cells = end(step)
+                if all(walk(x, y) for x, y in cells):
+                    break                       # this end already lands
+                if not all(1 <= x < W - 1 and 1 <= y < H - 1
+                           and (g[y][x] == "M" or walk(x, y)) for x, y in cells):
+                    break                       # not bank rock: leave it alone
+                for x, y in cells:
+                    g[y][x] = ch
+
+
+def spans_clear(g):
+    """Has every bridge still got dry ground across its WHOLE width, both ends?
+
+    Same fault as ladders_clear, and found the same way: a pool sunk north of
+    the caldera's causeway merged with the lake, drowned the approach, and left
+    a span you could walk onto from the south and never leave.
+
+    It used to ask whether the blob had walkable ground somewhere on its north
+    edge and somewhere on its south edge, and Ember's causeway passed that while
+    being visibly broken - two wide, and only its left column landed. One tile
+    of landing is not a bridge, it is a bridge with a shelf attached, and that
+    is what "misaligned" looked like on screen. Every column of a vertical span
+    has to land, every row of a horizontal one."""
+    for ch, blob in span_blobs(g):
+        H, W = len(g), len(g[0])
+        walk = lambda x, y: (0 <= x < W and 0 <= y < H
+                             and g[y][x] != ch and g[y][x] not in SOLID)
+        xs = sorted({cx for cx, _ in blob})
+        ys = sorted({cy for _, cy in blob})
+        vert = (all(walk(cx, min(ys) - 1) for cx in xs)
+                and all(walk(cx, max(ys) + 1) for cx in xs))
+        horz = (all(walk(min(xs) - 1, cy) for cy in ys)
+                and all(walk(max(xs) + 1, cy) for cy in ys))
+        if not (vert or horz):
+            return False
     return True
 
 
@@ -1962,9 +2030,14 @@ def volcano():
     for _ in range(4):
         join_islands(g, "m", rng, keep=("V", "n"))
         lava_banks(g)
+        # Banking eats floor, and a causeway's landing tile is floor. Put the
+        # bridge back over its own shore before asking whether the map joins up,
+        # or the answer is measured against a crossing that has been cut.
+        heal_spans(g)
         if all_connected(g):
             break
     assert all_connected(g), "ember: the caldera would not join up"
+    assert spans_clear(g), "ember: the causeway does not land across its width"
 
     # More pools for texture. There was a pass that hunted for anywhere a bridge
     # would save a walk; it put a second crossing six tiles from the causeway and

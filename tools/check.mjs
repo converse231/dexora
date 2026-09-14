@@ -145,7 +145,7 @@ console.log("phase machine ok — all paths terminate, shakes match the roll");
 import {
   BALLS, SHOP_BALLS, SHOP_ITEMS, STONES, KEY_ITEMS, forSale, bestRod,
   ballById, itemById, sellValue, SELL, duplicateUids, startingState, ALL_ITEMS,
-  DEX_BONUS, levelReward, evolutionsOf, evolutionRow, evoLevel, evoNext,
+  DEX_BONUS, levelReward, MASTER_EVERY, evolutionsOf, evolutionRow, evoLevel, evoNext,
   evolveState, stoneFor, keeper, CANDY, candyValue, CANDY_PRICE,
   SYNTH_MIN, SYNTH_STEP,
   stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
@@ -412,8 +412,33 @@ for (const key of KEY_ITEMS) {
   assert.ok(keysSeen.has(key.id), `${key.id} is never awarded`);
   assert.ok(!forSale(key), `${key.id} must not be purchasable`);
 }
-assert.ok(masters > 0 && masters <= 4,
-  `Master Balls over a whole game: ${masters} — enough to matter, few enough to hoard`);
+/* MASTER BALLS ARE COUNTED ACROSS BOTH SOURCES, because neither alone is the
+   number a player experiences. Levelling pays one every `MASTER_EVERY`; walking
+   pays one every `STEP_TREASURE` hauls past `TREASURE_LEVEL`. Pinning only the
+   levelling half is how the total quietly doubles when the step half is tuned.
+
+   It was five in a whole playthrough, which made the Master Ball a museum
+   piece: with five legendaries in the dex, spending one always felt like a
+   mistake you would regret at the sixth. The band is the design - enough to
+   cover every legendary and a few over, not so many that a Snorlax is worth
+   one. */
+{
+  let walked = 0;
+  for (let steps = STEP_PARCEL; steps <= 50000; steps += STEP_PARCEL) {
+    walked += stepReward(steps, MAX_LEVEL)?.items?.["master-ball"] ?? 0;
+  }
+  const total = masters + walked;
+  assert.ok(masters > 0, "levelling must pay at least one Master Ball");
+  assert.ok(walked > 0, "walking must pay at least one Master Ball");
+  assert.ok(total >= 8 && total <= 12,
+    `Master Balls over a whole game: ${total} (${masters} levelling + ${walked} ` +
+    "walking) — enough to cover the legendaries and a few over, not so many " +
+    "that a Snorlax is worth one");
+  assert.equal(masters, Math.floor(MAX_LEVEL / MASTER_EVERY),
+    "the levelling count must be derived from the cap, not typed in");
+  console.log(`master balls ok — ${total} in a playthrough ` +
+    `(${masters} from levels, ${walked} from walking)`);
+}
 
 // Stones are single-use evolution keys; they must all exist and be buyable.
 assert.ok(STONES.length >= 5, "the five Gen 1 stones must be on the shelf");
@@ -1920,11 +1945,19 @@ import { saveProblem } from "../src/game/engine.js";
   assert.ok(ultra < 100, `${ultra} Ultra Balls from walking - rares stop costing`);
   /* Master Balls are deliberately left OUT of `worth`: they have no price, and
      pricing the unpriceable is how a budget check starts approving them. They
-     are counted instead, and the count is the assertion. Levelling pays three
-     over a whole game; walking must not out-give that, or the reward stops
-     being "for the distance" and starts being the main supply. */
-  assert.ok(mb >= 1 && mb <= 3,
-    `${mb} Master Balls from 50,000 steps - walking is not the main supply`);
+     are counted instead.
+
+     The assertion is a RELATIONSHIP, not a number, and that is the repair: it
+     was `mb <= 3` beside a levelling count of three, so raising both halves
+     broke a bound that was only ever standing in for "walking must not
+     out-give levelling". Written that way it cannot rot when either is
+     retuned. */
+  const fromLevels = Array.from({ length: MAX_LEVEL }, (_, i) =>
+    levelReward(i + 1)["master-ball"] ?? 0).reduce((a, b) => a + b, 0);
+  assert.ok(mb >= 1, "walking must pay at least one Master Ball");
+  assert.ok(mb <= fromLevels,
+    `${mb} Master Balls from 50,000 steps against ${fromLevels} from levelling - ` +
+    "walking is the reward for distance, not the main supply");
   console.log(`steps ok — a parcel every ${STEP_PARCEL}, a haul every ${
     STEP_PARCEL * STEP_HAUL}, a Master Ball every ${
     STEP_PARCEL * STEP_HAUL * STEP_TREASURE} from Lv ${TREASURE_LEVEL}; ` +

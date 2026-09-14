@@ -195,15 +195,27 @@ export const itemById = (id) => ALL_ITEMS.find((i) => i.id === id);
 
 /* Levelling pays out in balls. It is the same pacing the old area locks were
    doing, but it hands you something instead of taking somewhere away. */
+/* Every this many levels pays a Master Ball: 50 / 8 is six over the cap.
+   A divisor rather than a list, so the cap is the only number that decides. */
+export const MASTER_EVERY = 8;
+
 export function levelReward(level) {
   const items = { "poke-ball": 5 };
   if (level >= 12) items["ultra-ball"] = 2;
   else if (level >= 6) items["great-ball"] = 3;
-  /* The only source of Master Balls there is. Three in a whole game - and that
-     is a count, not a cadence, which is why this divisor moved from 10 to 15
-     when the level cap went from 30 to 50. Left alone it would have quietly
-     handed out five. */
-  if (level % 15 === 0) items["master-ball"] = 1;
+  /* A COUNT, NOT A CADENCE - still the rule, and the count moved.
+
+     It was three from levelling and two from walking, five in a whole
+     playthrough, which made the Master Ball a thing you read about rather than
+     a thing you used: with five legendaries in the dex, spending one always
+     felt like a mistake you would regret at the sixth. Ten across the two
+     sources is enough to cover every legendary and leave a few over, which is
+     the point at which the item becomes a decision instead of a museum piece.
+
+     Derived from the cap, as before: `MASTER_EVERY` levels into `MAX_LEVEL` is
+     the count, so moving the cap moves this and nothing has to be remembered.
+     check.mjs asserts the total rather than the divisor. */
+  if (level % MASTER_EVERY === 0) items["master-ball"] = 1;
   for (const key of keyItemsAt(level)) items[key.id] = 1;
   return items;
 }
@@ -233,8 +245,11 @@ export function levelReward(level) {
    numbers. */
 export const STEP_PARCEL = 250;
 export const STEP_HAUL = 10;            // every tenth parcel is a bigger one
-export const STEP_TREASURE = 10;        // every tenth HAUL carries a Master Ball
-export const TREASURE_LEVEL = 20;
+/* Every fifth HAUL carries a Master Ball - 12,500 steps, so four over a
+   50,000-step playthrough where it used to be two. Walking is the slower of the
+   two sources and it is the one a player who is not levelling still has. */
+export const STEP_TREASURE = 5;
+export const TREASURE_LEVEL = 15;
 
 export function stepReward(steps, level) {
   if (!steps || steps % STEP_PARCEL !== 0) return null;
