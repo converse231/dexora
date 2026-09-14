@@ -2299,24 +2299,54 @@ the Box groups by species **and** variant. Same rule on both sides now.
 
 **Your calls, answered:** generous rewards, and kinder odds.
 
-### Phase 3 — Make it feel like a game
+### Phase 3 — The senses
 
-*Goal: the loop is mechanically complete and completely silent.*
+*Goal: it is mechanically complete and completely silent. Fix the silence.*
+
+Split out of the old Phase 3 because it is one coherent job — **everything here
+is about the same second of play**, the moment a Pokémon appears and you throw
+at it. None of it needs new systems, new data or new maps; all of it is felt
+immediately.
 
 | | Why now |
 |---|---|
-| **Audio** | There is **none** — no throw, no catch, no encounter sting, no music. This is the single largest gap between what this is and what it feels like, and it is a small amount of code against a large amount of feel. |
-| **Encounter variety** | Every Pidgey is the same Pidgey: level 2–7 uniformly, everywhere, forever. Per-biome level bands, and the height/weight already in `species.js` used for a "small/large" flavour, cost almost nothing. |
-| **Session structure** | Nothing brings you back tomorrow. A daily quest and a streak are the standard answer and they fit the existing XP/money economy without new systems. |
-| **Lures and repels** | Bias the encounter table for a while. Interesting because it collides with **Fortune** — two things reshaping the same table need one rule, not two. |
+| **Audio** | There is **none**: no throw, no catch, no encounter sting, no music. The single largest gap between what this is and what it feels like, and a small amount of code against a large amount of feel. Everything else in this phase is finishing; this is the hole. |
+| **Encounter variety** | Every Pidgey is the same Pidgey — level 2–7 uniformly, everywhere. `bornLevel` already does exactly this job for evolved forms, so per-biome level bands are a small change to one function that would make Frost Hollow *feel* like a late map rather than merely contain later species. |
+| **Flavour on the nameplate** | `species.js` already carries height and weight and nothing reads them. A "small / large" tell costs one line and gives two identical Rattata a reason to differ. |
+| **The candy watch-list** | Four judgement calls made three commits ago and never played for an hour — see *Deferred on purpose*. Cheap to fix now, expensive once audio and quests sit on top of them. |
 
-**Your calls:** where audio comes from (the same decompilation the tiles came
-from, which is consistent with the standing constraint, or something original),
-and whether a daily quest is a *quest* or just a login bonus.
+**Your call, and it gates the phase:** where audio comes from. The same
+decompilation the tiles came from is consistent with the standing constraint and
+already credited; something original is more work but yours. Decide before
+starting, not during.
 
 ---
 
-### Phase 4 — More world
+### Phase 4 — Coming back tomorrow
+
+*Goal: nothing currently brings you back. Everything here is about the session
+after this one.*
+
+The other half of the old Phase 3. Separated because it is a different kind of
+work with a different risk: Phase 3 is felt in a second and is hard to get
+wrong, and **every item here touches the encounter table or the reward curve**,
+which are the two things this project has repeatedly proven it can break
+quietly.
+
+| | Why now |
+|---|---|
+| **Session structure** | A daily quest and a streak are the standard answer and fit the existing XP / money / candy economy without new systems. |
+| **Band budgets** | Now genuinely earned rather than deferred: legendaries are already a fixed share, but an *individual* species still thins as a band fills. See *Deferred on purpose* for the pseudocode and the honest cost. |
+| **Pity for the rare tiers** | Bad luck against a 1/480 Astral is miserable and invisible. Most of the work is updating the 400k-roll assertions it invalidates. |
+| **Lures and repels** | Bias the table for a while — interesting because it collides with **Fortune** and with band budgets. Three things reshaping one table need one rule, not three, so this goes **last** in the phase. |
+
+**Your calls:** whether a daily is a *quest* ("catch three Water-types") or a
+login bonus — the former uses machinery that already exists, the latter is a
+number — and whether pity is visible to the player or silent.
+
+---
+
+### Phase 5 — More world
 
 *Goal: your first stated want — more maps, or bigger ones.*
 
@@ -2333,14 +2363,22 @@ per encounter), and whether the world connects or stays a menu.
 
 ---
 
-### Phase 5 — More generations
+### Phase 6 — The rest of the generations
 
-*Goal: your second stated want. Last because it is the largest job, not the least
-wanted.*
+*Goal: what is left of your second stated want. **Johto and Sinnoh already
+shipped** — see "Johto and Sinnoh, and the hole where Hoenn is" above — so this
+phase is now much smaller than it was, and the hard parts are done.*
+
+**What the first two generations proved, and what is therefore no longer work:**
+a dex id is not an array index and both lookups exist; Origin means debut
+artwork and the source list is data; legendaries are a share so their rate
+cannot drift; a generation arrives on a level; homes come from types by rule;
+and every evolution method that is not a level is `bond`. **Hoenn is the next
+one, and the hole in the middle of the dex is already sized for it.**
 
 | | Why now |
 |---|---|
-| **Gen 2 (+100 species)** | `npm run assets` already pulls from PokéAPI, and `genOf`/`GEN_LAST` already know about generations 2–9 — the GEN chip on every encounter was built for exactly this day. |
+| **Gen 3 (+135 species)** | The hole in the middle of the dex is exactly Hoenn-shaped, and `fetch-species.mjs` takes a range list — it is one line plus a run. |
 | **New types** | Dark and Steel arrive with Gen 2 and need badge colours; `KNOWN_TYPES` in `check.mjs` will fail loudly on the first one it does not recognise, which is the point. |
 | **New evolution kinds** | Happiness, time-of-day, trade-with-held-item. The evolution graph handles `level`/`stone`/`trade` today and every new kind needs a price rule of its own. |
 | **The dex at scale** | The Dex and Box share one `FilterBar` with search and counted chips, which is fine at 151 and will not be at 500. Per-generation filtering, and a look at 1,025 sprites — 405 KB today, roughly 2.8 MB then. |
