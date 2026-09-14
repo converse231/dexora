@@ -750,6 +750,13 @@ Astral do not, because neither is about artwork - they fall through to `""` in
 `Sprite.jsx`'s `FOLDER`, and CSS does the rest. That fall-through is now
 behaviour rather than an omission.
 
+**A READOUT OUTLIVES THE SYSTEM THAT WROTE IT.** The encounter's evolution card
+said `5/16`, which under the feed meant five duplicates of sixteen and now means
+level five of sixteen - same shape, same corner, different meaning, and it was
+read from play as the merge system still being there. It says `Lv 5/16`. When a
+number changes what it COUNTS, change how it reads, or the old meaning is what
+people will see.
+
 **`VariantFx` is the moving half of a tier, and there is one of it.** Holo's
 travelling foil, Astral's breathing aura and Shiny's sparks existed ONLY in the
 encounter, plus a hand-rolled copy of the foil in the Dex FORMS strip - so a

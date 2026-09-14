@@ -1693,6 +1693,44 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### "5/16" was the merge counter's ghost
+
+Reported from play as a remnant of the old merge-to-evolve system still living
+in the wild encounter. The **logic** was gone — there is no live `feedable`,
+`feedSelection`, `feedCost` or `reserveFor` anywhere in `src/`, only comments
+naming them — but the READOUT was not.
+
+The evolution card said `5/16` over the word EVOLUTION. Under the feed that
+meant *five duplicates of sixteen*; it now means *level five of sixteen*. Same
+shape, same corner of the same screen, entirely different meaning, and nothing
+on it said which. It reads **`Lv 5/16`** now, and the prefix is the whole fix.
+
+The card had a second fault the same size: it printed the stone's name whenever
+one was missing, so a Growlithe eleven levels away was told **FIRE STONE** — the
+last obstacle named as though it were the next. The stone shows only when it is
+genuinely the only thing left.
+
+### A treatment you have not earned
+
+Adding the aura and the sparks to the Dex's FORMS strip quietly started giving
+two of them away. An unheld variant is a flat silhouette on purpose — the shape
+is a hint and the colours are the reward — and the rule that enforced it named
+`.holo-foil` alone, because Holo was the only tier with a moving layer when it
+was written. `VariantFx` grew from one layer to three and the rule did not.
+
+`check.mjs` asserts every layer is hidden for `:not(.got)`, over the list rather
+than by name, which is the same shape as `keeper()` reading `TIERS`: a rule that
+enumerates is a rule that falls behind.
+
+**What animates where**, since this keeps coming up:
+
+| | |
+|---|---|
+| Encounter | everything, at full size |
+| Box row, FORMS strip, evolution reveal | the tier's own layer |
+| Dex **grid** cell | nothing, deliberately — one `<img>`, no container |
+| An ordinary Pokémon | nothing anywhere. Three of the four tiers are a treatment; ordinary is not one |
+
 ### The causeway was a bridge with a shelf attached
 
 Reported as "the bridge is misaligned in Ember". It was not drawn wrong — it was

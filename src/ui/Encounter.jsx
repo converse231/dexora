@@ -225,15 +225,21 @@ export default function Encounter({ enc, bag, box, onFlee, onSkip }) {
             {progress.ready ? "READY" : "EVOLUTION"}
           </span>
           <span className="ec-line">
-            {/* The LEVEL of the best one you hold against the level it needs.
-                It counted duplicates before - "9/16 caught" - and the number
-                that matters is now a level you bought with candy. */}
+            {/* **`Lv` IS LOAD-BEARING.** This counted duplicates before -
+                "9/16 caught" - and the new number is a level you bought with
+                candy. The two look identical without the prefix, and a bare
+                "5/16" over a card labelled EVOLUTION was read from play as the
+                old merge counter still being there: same shape, same place,
+                entirely different meaning. */}
             <strong className="ec-count">
-              {Math.min(progress.at, progress.at - progress.need)}
+              Lv {Math.min(progress.at, progress.at - progress.need)}
               <span>/{progress.at}</span>
             </strong>
+            {/* The stone only when it is the ONLY thing left. Shown whenever
+                one was missing, it said "FIRE STONE" to somebody eleven levels
+                away - naming the last obstacle as though it were the next. */}
             <span className="ec-sub">
-              {progress.stone && !progress.hasStone
+              {progress.need === 0 && !progress.hasStone
                 ? itemById(progress.stone)?.name
                 : label(SPECIES[progress.row.to - 1])}
             </span>

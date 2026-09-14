@@ -659,6 +659,19 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
        here an Astral would stay blue through a transformation whose entire
        point is a white silhouette. */
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+
+    /* THE FORMS STRIP MUST NOT GIVE A TREATMENT AWAY. An unheld variant is a
+       flat silhouette on purpose - the shape is a hint and the colours are the
+       reward - so every moving layer has to be hidden there, not just the one
+       that happened to exist when the rule was written. `VariantFx` grew from
+       one layer to three and this hid exactly one of them. */
+    const fxLayers = [".holo-foil", ".astral-aura", ".shiny-spark"];
+    for (const layer of fxLayers) {
+      assert.ok(css.includes(`.sf-one:not(.got) ${layer}`),
+        `an unheld ${layer} is still animating in the FORMS strip - the strip ` +
+        "would be showing a treatment nobody has earned yet");
+    }
+
     for (const sel of [".evo-whiten .evo-mon", ".evo-cycle .evo-mon"]) {
       const at = css.indexOf(sel);
       assert.ok(at >= 0, `${sel} is gone`);

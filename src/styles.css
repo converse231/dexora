@@ -1836,8 +1836,12 @@ canvas {
 .sf-one:not(.got) .sprite-holo { filter: brightness(0) opacity(.22) !important; }
 /* A silhouette with a rainbow travelling over it would be showing you the
    treatment you have not earned yet, which is the one thing the strip must
-   not do. */
-.sf-one:not(.got) .holo-foil { display: none; }
+   not do. EVERY layer, not just the foil: this listed `.holo-foil` alone back
+   when Holo was the only tier here with one, and adding the aura and the
+   sparks to the strip quietly started giving two more of them away. */
+.sf-one:not(.got) .holo-foil,
+.sf-one:not(.got) .astral-aura,
+.sf-one:not(.got) .shiny-spark { display: none; }
 .sf-badge {
   position: absolute; right: -2px; bottom: -2px;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, .9));
