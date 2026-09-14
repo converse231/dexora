@@ -1693,6 +1693,60 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### The twenty minutes that demoted everybody's dex
+
+Reported as "why is the dex misty, and I think I lost my data". Both halves are
+right, and the second one is mine.
+
+**Misty is the *seen but not caught* state** — `.cell.seen img { filter:
+brightness(0); opacity: .3 }` — working exactly as designed. The whole dex looked
+like that because the whole dex really had been demoted to *seen*.
+
+The cause was a build that existed for about twenty minutes. Padding the dex for
+the new generations first used `normalise`, which exists for the one-bit tier
+rows and coerces `? 1 : 0` — so every **caught** species in every save that
+loaded under it became merely **seen**, and was written straight back out. The
+code was fixed before it was committed. The saves were not, because a dev server
+picks up a source edit the moment it is made.
+
+**`repairDex` recovers what the file can still prove.** Two things in a save
+cannot be wrong about a catch:
+
+- a Pokémon **in the Box** was caught — there is no other way for it to be there;
+- a registered **variant** was caught — `rollVariant` only ever fires on a catch,
+  and the tier rows are one-bit, so `normalise` could not damage them.
+
+It runs on load, only ever raises a 1 to a 2, and is a no-op on a healthy save.
+It is **not complete**, and that is worth stating plainly: a species caught,
+registered, and then sold or evolved away with no variant left no trace, and
+nothing can bring those back.
+
+Two smaller things in the same report:
+
+- **The top bar said `/151`.** Typed in, survived two generations, and told every
+  player they had finished at 151 of 358. It reads `SPECIES.length` — off the
+  data rather than threaded as a prop, because `total` already means "catches
+  made" two rows down, and one word meaning two things is how this gets made
+  twice.
+- **Origin gating was already correct.** Completing Kanto opens Kanto's Origins
+  and leaves Johto's and Sinnoh's locked; `check.mjs` asserts all three
+  directions. Nothing to change — verified rather than assumed.
+
+### One region at a time
+
+358 cells is nine screens of scrolling, and Hoenn alone would be another 135. The
+Dex filter row gains a **REGION** select — *All / Kanto / Johto / Sinnoh* — and
+the counts on it are what you have **caught** in each, because "Johto 12" is a
+progress bar you can read at a glance where "Johto 100" is a fact about Pokémon.
+
+`GENERATIONS` is derived from what actually shipped, so a region appears the day
+it is fetched and **the gap where Hoenn is never shows up as an empty tab**.
+`check.mjs` asserts the regions add up to the dex and that none of them is empty.
+
+It also had to move below `genOf`: it is an IIFE, it runs at module init, and
+placed above it the whole module threw `Cannot access 'genOf' before
+initialization` — the same temporal dead zone that once blanked the BOX tab.
+
 ### Johto and Sinnoh, and the hole where Hoenn is
 
 **358 species: Kanto, Johto, Sinnoh — and no Hoenn, deliberately.** Gen 3 is

@@ -107,6 +107,39 @@ function normalise(arr, len) {
    `? 1 : 0`. Padding the dex with it would have quietly demoted every caught
    species in every save to merely seen: the whole collection still listed, and
    every entry greyed out. Same shape of function, one value apart. */
+/* WHAT THE SAVE CAN STILL PROVE IT CAUGHT.
+
+   A build that lived for about twenty minutes padded the dex with `normalise`,
+   which coerces `? 1 : 0` - so every CAUGHT species in every save that loaded
+   under it was demoted to merely SEEN, and then written straight back out. The
+   code was fixed before it shipped; the saves were not, because a dev server
+   picks up a source edit the moment it is made.
+
+   Two things in a save cannot be wrong about this:
+     - a Pokemon IN THE BOX was caught. There is no other way for it to be there.
+     - a registered VARIANT was caught. `rollVariant` only ever fires on a catch,
+       and the tier rows are one-bit so `normalise` could not damage them.
+
+   So the dex is repaired from both. It is not complete - a species caught,
+   registered and then sold with no variant leaves no trace - but it is
+   everything the file still knows, and it is the difference between a
+   collection and an empty screen.
+
+   Idempotent and cheap: it only ever raises a 1 to a 2, so it is a no-op on a
+   healthy save and runs once per load either way. */
+export function repairDex(dex, s) {
+  for (const mon of Array.isArray(s.box) ? s.box : []) {
+    const at = dexIndex(mon?.species);
+    if (at >= 0) dex[at] = 2;
+  }
+  for (const tier of TIERS) {
+    const row = s[tier];
+    if (!Array.isArray(row)) continue;
+    for (let i = 0; i < row.length && i < dex.length; i++) if (row[i]) dex[i] = 2;
+  }
+  return dex;
+}
+
 function padDex(arr, len) {
   const out = new Array(len).fill(0);
   if (Array.isArray(arr))
@@ -169,7 +202,7 @@ function loadState() {
          never heard of: a file written before Holo existed simply has no
          `holo`, and `normalise(undefined)` is a fresh row of zeroes. That is
          what makes adding a tier a non-event for saves. */
-      dex: padDex(s.dex, SPECIES.length),
+      dex: repairDex(padDex(s.dex, SPECIES.length), s),
       ...Object.fromEntries(
         TIERS.map((t) => [t, normalise(s[t], SPECIES.length)])),
       /* MIGRATION, and it has to run AFTER the line above or it is overwritten.

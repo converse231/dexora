@@ -168,6 +168,7 @@ import {
 } from "../src/game/items.js";
 import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
+  GENERATIONS,
 } from "../src/game/biomes.js";
 
 const poke = ballById("poke-ball");
@@ -1666,7 +1667,7 @@ import {
   SHINY_ODDS, ORIGIN_ODDS, ASTRAL_ODDS, HOLO_ODDS, TIER_ODDS, TIERS, rollVariant,
   genComplete, originReady, lockedTiers,
 } from "../src/game/biomes.js";
-import { saveProblem } from "../src/game/engine.js";
+import { saveProblem, repairDex } from "../src/game/engine.js";
 
 {
   // Every medal is real, unique, and asks for species that exist.
@@ -2169,6 +2170,51 @@ import { saveProblem } from "../src/game/engine.js";
   }
   assert.equal(saveProblem({ dex: new Array(151).fill(2), box: [], money: 0 }), null,
     "a 151-entry save from the Kanto-only build must still open");
+
+  /* AND A DEMOTED DEX IS REPAIRED FROM WHAT THE SAVE CAN STILL PROVE.
+
+     A build that lived about twenty minutes padded the dex with `normalise`,
+     which coerces `? 1 : 0`, so every CAUGHT species in every save that loaded
+     under it became merely SEEN and was written back that way. The code was
+     fixed before it shipped and the saves were not.
+
+     Two things in a save cannot be wrong about a catch: a Pokemon in the BOX,
+     and a registered VARIANT (the tier rows are one-bit, so `normalise` could
+     not damage them). Repairing from both is not complete - a species caught,
+     registered and then sold leaves no trace - and it is everything the file
+     still knows. */
+  {
+    const demoted = new Array(SPECIES.length).fill(1);
+    const shiny = new Array(SPECIES.length).fill(0);
+    shiny[dexIndex(25)] = 1;                          // a shiny Pikachu, once
+    const fixed = repairDex([...demoted], {
+      box: [{ uid: 1, species: 6, level: 40 }],       // a Charizard in the box
+      shiny,
+    });
+    assert.equal(fixed[dexIndex(6)], 2, "a Pokemon in the box was caught");
+    assert.equal(fixed[dexIndex(25)], 2, "a registered variant was caught");
+    assert.equal(fixed[dexIndex(150)], 1,
+      "nothing else may be promoted - the repair reads evidence, not hope");
+
+    // Idempotent, and a no-op on a healthy save.
+    const healthy = new Array(SPECIES.length).fill(2);
+    assert.deepEqual(repairDex([...healthy], { box: [], }), healthy,
+      "the repair must never lower anything");
+  }
+
+  /* THE REGION FILTER IS DERIVED FROM WHAT SHIPS. An empty region in the Dex
+     menu is a tab that filters to nothing, and Hoenn is exactly that hazard. */
+  {
+    assert.ok(GENERATIONS.length > 0, "no regions at all");
+    assert.equal(GENERATIONS.reduce((n, g) => n + g.count, 0), SPECIES.length,
+      "the regions do not add up to the dex");
+    for (const g of GENERATIONS) {
+      assert.ok(g.count > 0, `${g.name} is an empty region in the Dex filter`);
+      assert.ok(g.name && !/^Gen /.test(g.name), `region ${g.gen} has no name`);
+    }
+    assert.ok(!GENERATIONS.some((g) => g.gen === 3),
+      "Hoenn does not ship and must not appear as a region");
+  }
 }
 
 {

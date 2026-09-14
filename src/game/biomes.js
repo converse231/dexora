@@ -69,10 +69,35 @@ export const GEN_LAST = [151, 251, 386, 493, 649, 721, 809, 905, 1025];
    number rather than special-casing. */
 export const GEN_UNLOCK = { 1: 1, 2: 22, 4: 35 };
 
+/* The regions that actually ship, in dex order, with the count in each - built
+   from `SPECIES` rather than listed, so a generation appears in the Dex filter
+   on the day it is fetched and a generation that is NOT fetched (Hoenn) never
+   shows up as an empty tab. */
+export const REGION_NAME = {
+  1: "Kanto", 2: "Johto", 3: "Hoenn", 4: "Sinnoh", 5: "Unova",
+  6: "Kalos", 7: "Alola", 8: "Galar", 9: "Paldea",
+};
+
+
 export const genOf = (id) => {
   const i = GEN_LAST.findIndex((last) => id <= last);
   return i < 0 ? GEN_LAST.length : i + 1;
 };
+
+/* AFTER `genOf`, and that is not tidiness. This is an IIFE - it runs at module
+   init - and `genOf` is a `const` declared below it, so placed above it the
+   whole module threw "Cannot access 'genOf' before initialization" on import.
+   Same temporal dead zone that once blanked the BOX tab. */
+export const GENERATIONS = (() => {
+  const n = new Map();
+  for (const sp of SPECIES) n.set(genOf(sp.id), (n.get(genOf(sp.id)) ?? 0) + 1);
+  return [...n.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([gen, count]) => ({
+      gen, count, name: REGION_NAME[gen] ?? `Gen ${gen}`,
+    }));
+})();
+
 
 /* Legendaries live in no table below. They are added to every one of them.
 
