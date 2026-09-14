@@ -189,9 +189,23 @@ export function foundIn(speciesId) {
     const total = full.reduce((n, [, w]) => n + w, 0);
     const row = full.find(([id]) => id === speciesId);
     if (row) {
+      /* ONE NUMBER FOR "NOT BEFORE THIS LEVEL", whatever is holding it back.
+
+         Two different things can gate a line in this panel: an evolved form
+         does not start spawning until `evoUnlock(depth)`, and a MAP does not
+         open until `b.level`. They were not the same field, so the sheet
+         happily told a Lv 3 trainer that Lapras is common in Frost Hollow and
+         said nothing about the door - 117 of the 151 entries named a gated map
+         with no level on it.
+
+         They are the same KIND of number from the player's side ("come back at
+         Lv N"), so the later of the two is the honest one to print and a second
+         line would only be two numbers to reconcile. */
       areas.push({
-        id: b.id, name: b.name, share: row[1] / total,
-        from: row[2] ? evoUnlock(row[2]) : 0,
+        id: b.id,
+        name: b.name,
+        share: row[1] / total,
+        from: Math.max(row[2] ? evoUnlock(row[2]) : 0, b.level > MAP_FIRST ? b.level : 0),
       });
     }
   }
@@ -458,10 +472,10 @@ for (const e of EVOLUTIONS) {
    should be the story of a session, not the way the dex gets filled. The
    evolution feed stays the reliable path, which is the point - a lottery you can
    opt out of beats a lottery you depend on. */
-export const EVO_SHARE = 0.12;  // an eighth as common as what it evolves from
+const EVO_SHARE = 0.12;  // an eighth as common as what it evolves from
 export const EVO_FLOOR = 0.2;   // ...but never rarer than this
 export const EVO_STEP = 10;     // one more step of a line per this many levels
-export const EVO_RAMP = 24;     // and this many levels from first sighting to full
+const EVO_RAMP = 24;     // and this many levels from first sighting to full
 export const EVO_DEPTH = 2;     // no Gen 1 line is longer than this from a base
 
 /* 0 until the level that opens this depth, then a straight ramp to 1.
@@ -570,7 +584,7 @@ export const biomeFor = (areaId) => BIOMES.find((b) => b.id === areaId) ?? null;
 /* Can you walk here yet? One function, so the engine's refusal and the Travel
    panel's padlock cannot disagree - a menu that offers a map the engine will
    not travel to is worse than no menu. */
-export const areaLevel = (areaId) => biomeFor(areaId)?.level ?? MAP_FIRST;
+const areaLevel = (areaId) => biomeFor(areaId)?.level ?? MAP_FIRST;
 export const areaOpen = (areaId, level) => level >= areaLevel(areaId);
 
 // ---------------------------------------------------------------- trainer level

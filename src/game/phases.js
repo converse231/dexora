@@ -2,7 +2,7 @@
    in tools/check.mjs. A bug here means an encounter hangs forever with the
    buttons disabled, which is exactly the kind of thing a test should catch. */
 
-export const PHASES = ["idle", "throw", "suck", "drop", "wait", "shake", "caught", "broke", "fled", "ran"];
+const PHASES = ["idle", "throw", "suck", "drop", "wait", "shake", "caught", "broke", "fled", "ran"];
 export const TERMINAL = ["caught", "fled", "ran"];
 
 /* What should happen to this encounter at time `now`? Returns null while the

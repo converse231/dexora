@@ -1360,7 +1360,8 @@ import {
 } from "../src/game/biomes.js";
 import { AREAS, AREA_IDS, SOLID, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
 import {
-  encounterTable, evoScale, evoUnlock, bornLevel, areaOpen, MAP_FIRST, MAP_LAST,
+  encounterTable, evoScale, evoUnlock, bornLevel, areaOpen, foundIn,
+  MAP_FIRST, MAP_LAST,
   EVO_DEPTH, EVO_STEP, EVO_FLOOR,
 } from "../src/game/biomes.js";
 import { EVOLUTIONS } from "../src/data/evolutions.js";
@@ -1531,6 +1532,25 @@ assert.ok(LEGEND_STRAY < LEGEND_MATCHED,
   assert.ok(MAP_LAST < MAX_LEVEL,
     `the last map opens at ${MAP_LAST} and the cap is ${MAX_LEVEL} - a player ` +
     "must reach the end of the ladder with levelling left to do");
+
+  /* THE DEX MUST NOT HIDE A DOOR. `foundIn` feeds the WHERE TO LOOK panel, and
+     before the ladder every map it named was open - so nothing carried a level
+     and nothing needed to. 117 of the 151 entries then started naming a gated
+     map with no hint of the gate, which is worse than saying nothing: it sends
+     a Lv 3 trainer to Frost Hollow for a Lapras.
+
+     `from` is one number meaning "not before this level", whichever of the two
+     causes is later - the map's own unlock, or an evolved form's. */
+  for (const sp of SPECIES) {
+    const { legendary, areas } = foundIn(sp.id);
+    if (legendary) continue;
+    for (const a of areas) {
+      const gate = BIOMES.find((b) => b.id === a.id).level;
+      assert.ok(a.from >= (gate > MAP_FIRST ? gate : 0),
+        `${sp.name}'s entry names ${a.name} (opens Lv ${gate}) as "Lv ${a.from}+" - ` +
+        "the panel is hiding a locked door");
+    }
+  }
 
   console.log(`map ladder ok — ${levels.join(", ")} (Lv ${MAP_FIRST} to ${MAP_LAST})`);
 }

@@ -15,7 +15,7 @@
    decorative: "shiny" is the whole reason a row exists, and a screen reader that
    reads out the number and not that is reading out the wrong half. */
 
-export const TIER_ART = {
+const TIER_ART = {
   origin: { src: "marks/origin.png", name: "Origin" },
   shiny: { src: "marks/shiny.png", name: "Shiny" },
   holo: { src: "marks/holo.png", name: "Holo" },

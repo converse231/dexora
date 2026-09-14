@@ -1693,6 +1693,37 @@ the real art — the per-row one at the variant it is actually selling, the swee
 always ordinary, because `duplicateUids` holds every keeper out of the spare list
 entirely.
 
+### QA pass: three findings, one of them mine
+
+A sweep over the joins the unit suites do not cover — map ladder against spawn
+ladder, item unlocks against map unlocks, the economy per map at its own unlock
+level, and a scan for exports nothing imports.
+
+**The Dex was hiding locked doors.** 138 mentions across the entries named a map
+that is gated, with no hint of the gate — the panel cheerfully told a Lv 3
+trainer that Lapras is common in Frost Hollow. Two different things can hold a
+line back (a map's unlock, an evolved form's), and they are the same *kind* of
+number from the player's side, so `foundIn` prints the later of the two: **one
+number meaning "not before this level"**, and the sheet needed no change at all.
+`check.mjs` asserts no entry names a gated map with a level below its gate.
+
+**66 tiles of water you could not fish.** `castable()` tested `"wW"` — outdoor
+water and the Rock Ridge spring — and Frost Hollow's water is `k`, because that
+map is transcribed from Seafoam and carries its own ids. So you stood at the
+edge of an ice lake, pressed F, and nothing happened and nothing said why. That
+reads as a broken rod rather than a rule, because there was no rule. `K` stays
+out: it is the waterfall, which is falling.
+
+**And one finding that was mine, not the game's.** The probe reported the Old Rod
+(Lv 4) as unusable until Pond & Shore (Lv 6) — it had asked which biomes have
+`"water"` in their *type list* rather than which maps have water *tiles*. Tall
+Grass has 24 of them and is open from the first minute. The harness was wrong;
+measuring the thing itself is the only reason that was caught.
+
+Everything else came back clean: **151/151 species obtainable by Lv 20**, no
+levelling stall (~2,500 steps to the last map), no export nothing imports, and a
+boot with no console errors.
+
 ### The evolution card was the feed's last survivor
 
 Reported as confusing, and it was — but "confusing" is the kind half of it.

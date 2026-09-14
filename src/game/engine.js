@@ -503,8 +503,17 @@ export function createEngine(canvas, onChange, mini = null) {
 
   function castable() {
     if (state.encounter || state.evolution || state.fishing || move.active) return null;
-    // Outdoor water and the pools in Rock Ridge both take a line.
-    if (!"wW".includes(facing())) return null;
+    /* Every kind of water takes a line: `w` outdoors, `W` the Rock Ridge
+       spring, `k` the pools in Frost Hollow.
+
+       `k` was missing, and Frost Hollow has SIXTY-SIX tiles of it - a whole map
+       where you stand at the edge of the water, press F, and nothing happens
+       and nothing says why. It reads as a broken rod rather than as a rule,
+       because there is no rule: the character differs only because the map was
+       transcribed from Seafoam and carries its own ids.
+
+       `K` stays out on purpose. That is the waterfall, which is falling. */
+    if (!"wWk".includes(facing())) return null;
     return bestRod(state.bag);
   }
 

@@ -33,7 +33,7 @@ export const NEVER_CERTAIN = 0.2;
    at a Pidgey. At 0.01 the floor binds for no species in the dex - the
    rawest of them, rate 3, computes 1.2% / 2.1% / 3.5% and differentiates on
    its own - while a throw still cannot be worth nothing. */
-export const NEVER_HOPELESS = 0.01;
+const NEVER_HOPELESS = 0.01;
 
 export function catchChance(rate, ballMult) {
   if (ballMult >= GUARANTEED) return 1;

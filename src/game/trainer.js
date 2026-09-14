@@ -71,7 +71,7 @@ export const STATS = [
   },
 ];
 
-export const statById = (id) => STATS.find((s) => s.id === id) ?? null;
+const statById = (id) => STATS.find((s) => s.id === id) ?? null;
 
 export const emptyStats = () =>
   Object.fromEntries(STATS.map((s) => [s.id, 0]));

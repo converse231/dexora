@@ -182,7 +182,7 @@ export const KEY_ITEMS = [
     blurb: "Reaches the deep water, where the rare things are." },
 ];
 
-export const keyItemsAt = (level) => KEY_ITEMS.filter((k) => k.level === level);
+const keyItemsAt = (level) => KEY_ITEMS.filter((k) => k.level === level);
 
 /* Running Shoes, granted rather than carried. Gen 3 hands them over as an
    invisible key item - there is no bag sprite for them anywhere in the PokeAPI
@@ -373,8 +373,6 @@ export function startingState() {
   };
 }
 
-export const boxValue = (box, species) =>
-  box.reduce((sum, m) => sum + sellValue(species[m.species - 1]), 0);
 
 // ---------------------------------------------------------------- evolution
 
