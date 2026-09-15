@@ -1,8 +1,8 @@
 # Dexora
 
-An eight-map, 358-species collecting game: walk, meet, throw, bank the
-duplicates, evolve. Kanto, Johto and Sinnoh, with the Hoenn-shaped hole in the
-middle of the dex left open on purpose.
+An eight-map, 493-species collecting game: walk, meet, throw, bank the
+duplicates, evolve. Kanto, Johto, Hoenn and Sinnoh — the whole National Dex to
+Arceus.
 
 **Phase 1 asked one question** — *does "commons fund rares" hold up over an hour,
 or is it a grind?* — and it was answered yes: a common nets **+¥14** and a rare
@@ -2805,6 +2805,45 @@ more maps means more biome identities to invent, bigger maps means more walking
 per encounter), and whether the world connects or stays a menu.
 
 ---
+
+### Hoenn, and the migration it forced
+
+*Phase 6. 358 species to 493, and the hole in the middle of the dex is filled.*
+
+**Almost all of it was free**, which is the payoff for rules written as rules:
+
+| | what it took |
+|---|---|
+| species + sprites | one range in `fetch-species.mjs` |
+| the region filter | nothing — `GENERATIONS` is derived from `SPECIES` |
+| homes in the biome tables | nothing — `encounterTable` places newcomers by type |
+| Origin | nothing — `hasOrigin` already said no, because Hoenn debuts in Gen III and its art IS Gen III |
+| evolutions | nothing — every non-level method is already `bond` |
+| medals | nothing — all derived from the evolution graph and the type lists |
+| legendaries | ten dex numbers |
+| the arrival level | one entry in `GEN_UNLOCK` (28) |
+
+**What was not free is the one that could have ruined real collections.** A
+save's dex and every variant row are keyed on POSITION in `SPECIES`. Hoenn goes
+in the middle, so position 251 — Turtwig — became a Hoenn species, and a save
+loaded by position would show every Sinnoh Pokémon somebody had ever caught as a
+different one. Silently. No error anywhere.
+
+Padding is the right answer when a generation is *appended* and exactly the
+wrong one when it is *inserted*. So every shape `SPECIES` has ever shipped in is
+recorded, and a save whose length matches an old one is rebuilt **by id**.
+
+**And the first version of that fix was still wrong.** `repairDex` recovers
+caught status from registered variants, and it was reading the raw save's tier
+rows — old positions into a new dex. A shiny Turtwig marked Treecko as caught.
+It takes the rebuilt rows now, and `tools/play` loads a genuine pre-Hoenn save
+through the real loader to prove it end to end: Sinnoh intact, its shinies
+intact, Hoenn empty.
+
+**Two assertions were written to fail on this day and did.** One said Gen 3 was
+vacuously complete because it shipped no species; the other said Hoenn must not
+appear as a region. Both were left in place years of commits ago precisely so
+somebody would read them when the hole was filled.
 
 ### Phase 6 — The rest of the generations
 

@@ -187,7 +187,7 @@ import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
   LIFT_CEILING, hasOrigin, tiersFor, ART_GEN, baseArtGen,
-  LEGEND_HOME, LEGEND_HAUNT, legendTier,
+  LEGEND_HOME, LEGEND_HAUNT, legendTier, LAYOUTS, layoutIds,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
   SIZE_MIN, SIZE_MAX,
 } from "../src/game/biomes.js";
@@ -1924,15 +1924,18 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.ok(!genComplete(kantoOnly, 4), "a finished Kanto must not open Sinnoh");
     assert.ok(originReady(kantoOnly, 1), "Kanto's Origins are earned");
     assert.ok(!originReady(kantoOnly, 152), "Johto's are not");
-    assert.ok(genComplete(full, 2) && genComplete(full, 4),
+    assert.ok(genComplete(full, 2) && genComplete(full, 3) && genComplete(full, 4),
       "a full dex opens every generation that ships");
 
-    /* THE HOLE. Gen 3 ships no species, so "is Gen 3 complete" is vacuously
-       true - and that is the right answer rather than a bug: there is nothing
-       to catch and nothing to gate. Asserted so the day Hoenn lands, this line
-       fails and somebody reads it. */
-    assert.ok(genComplete(empty, 3),
-      "a generation with no species in it has nothing left to catch");
+    /* THE HOLE IS FILLED, and this line is the one that said so. It used to
+       assert that Gen 3 was vacuously complete because it shipped no species,
+       and it was written to fail the day Hoenn landed so somebody would read
+       it. It failed. Hoenn ships now, so an empty dex leaves it incomplete
+       like every other generation - and the dex is contiguous 1-493 for the
+       first time, which is why `layoutIds` exists. */
+    assert.ok(!genComplete(empty, 3),
+      "Hoenn ships now - an empty dex cannot have finished it");
+    assert.ok(SPECIES.some((sp) => genOf(sp.id) === 3), "no Hoenn species shipped");
 
     assert.ok(!originReady(empty, 1) && originReady(full, 1),
       "originReady must follow its generation's dex");
@@ -2360,8 +2363,15 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
       assert.equal(g.name, `Gen ${g.gen} (${g.region})`,
         `region ${g.gen}'s menu label must name both the number and the place`);
     }
-    assert.ok(!GENERATIONS.some((g) => g.gen === 3),
-      "Hoenn does not ship and must not appear as a region");
+    /* HOENN SHIPS NOW. `GENERATIONS` is derived from `SPECIES`, so it arrived
+       in the Dex's region filter the day the species were fetched and nothing
+       here had to be edited to put it there - which is what that derivation is
+       for. This line used to assert the opposite. */
+    const hoenn = GENERATIONS.find((g) => g.gen === 3);
+    assert.ok(hoenn, "Hoenn ships and must appear as a region");
+    assert.equal(hoenn.region, "Hoenn", "Hoenn's region has the wrong name");
+    assert.ok(hoenn.count > 100, `Hoenn shipped only ${hoenn.count} species`);
+    assert.equal(GENERATIONS.length, 4, "a generation appeared or vanished");
   }
 }
 
@@ -3442,6 +3452,76 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
 
   console.log(`habitat ok — ${checked} legendaries, each likeliest where its ` +
     `primary type lives (home ${LEGEND_HOME}, haunt ${LEGEND_HAUNT}, stray ${LEGEND_STRAY})`);
+}
+
+/* A GENERATION INSERTED IN THE MIDDLE MOVES EVERY POSITION AFTER IT, and a
+   save is keyed on position. This is the assertion that stands between Hoenn
+   and every existing collection.
+
+   Before Hoenn, `SPECIES` was [1-251, 387-493] and position 251 was Turtwig.
+   After it, position 251 is a Hoenn species - so a save loaded by position
+   would show every Sinnoh Pokemon somebody has ever caught as a different one,
+   silently, with no error anywhere. Padding is the right answer for a
+   generation APPENDED and exactly the wrong one for a generation inserted. */
+{
+  const ids358 = layoutIds(358);
+  assert.ok(ids358, "the 358-entry layout is not recorded - saves cannot migrate");
+  assert.equal(ids358.length, 358, "the old layout is not 358 entries");
+  assert.equal(ids358[0], 1, "the old layout did not start at Bulbasaur");
+  assert.equal(ids358[250], 251, "position 250 was not Celebi");
+  assert.equal(ids358[251], 387, "position 251 was not Turtwig - the whole point");
+
+  // The current shape needs no migration, and an unknown one gets none.
+  assert.equal(layoutIds(SPECIES.length), null, "the current layout was remapped");
+  assert.equal(layoutIds(999), null, "an unknown layout was remapped anyway");
+
+  /* AND EVERY OLD LAYOUT HAS TO BE A PREFIX-COMPATIBLE STORY. Each one is what
+     `SPECIES` was at some point, so every id it lists must still exist and
+     Kanto must still be the first 151 - the thing padding relied on. */
+  for (const l of LAYOUTS) {
+    const ids = [];
+    for (const [lo, hi] of l.ranges) for (let i = lo; i <= hi; i++) ids.push(i);
+    assert.equal(ids.length, l.len, `layout ${l.len} lists ${ids.length} ids`);
+    for (const id of ids) {
+      assert.ok(speciesById(id), `layout ${l.len} lists #${id}, which no longer ships`);
+    }
+    for (let i = 0; i < Math.min(151, ids.length); i++) {
+      assert.equal(ids[i], i + 1, `layout ${l.len} does not start with Kanto in order`);
+    }
+  }
+
+  /* THE REMAP ITSELF, on a save that looks like a real one: mark a Kanto, a
+     Johto and a Sinnoh species caught in the OLD positions and check all three
+     come back as themselves. */
+  {
+    const old = new Array(358).fill(0);
+    const was = (id) => ids358.indexOf(id);
+    old[was(25)] = 2;        // Pikachu
+    old[was(251)] = 2;       // Celebi, the last of the old contiguous run
+    old[was(387)] = 2;       // Turtwig, the first id after the hole
+    old[was(493)] = 1;       // Arceus, seen but not caught
+
+    const now = new Array(SPECIES.length).fill(0);
+    for (let i = 0; i < ids358.length; i++) {
+      const at = dexIndex(ids358[i]);
+      if (at >= 0) now[at] = old[i];
+    }
+    for (const [id, want] of [[25, 2], [251, 2], [387, 2], [493, 1]]) {
+      assert.equal(now[dexIndex(id)], want,
+        `#${id} came back as ${now[dexIndex(id)]}, not ${want}`);
+    }
+    // And nothing bled into Hoenn, which nobody could have caught yet.
+    const hoenn = SPECIES.filter((sp) => genOf(sp.id) === 3);
+    assert.ok(hoenn.every((sp) => now[dexIndex(sp.id)] === 0),
+      "a pre-Hoenn save came back with Hoenn species already registered");
+    // The naive read is what this exists to prevent: position 251 is no longer
+    // Turtwig, so padding would have put Turtwig's 2 on a Hoenn species.
+    assert.notEqual(SPECIES[251].id, 387,
+      "position 251 is still Turtwig - this migration is not needed after all");
+  }
+
+  console.log(`save migration ok — ${LAYOUTS.length} layouts recorded; a 358-entry ` +
+    `save remaps onto ${SPECIES.length} by id, Sinnoh intact and Hoenn empty`);
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);
