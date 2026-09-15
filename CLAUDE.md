@@ -1151,11 +1151,47 @@ arithmetic nobody chose. A generation with no entry is open from the start,
 which is the right default for the hole.
 
 **Origin is DEBUT artwork, not Gen 1 artwork.** `DEBUT` in build_origin.py maps
-each range to its own source set - Yellow/Red-Blue, Crystal/Gold, Diamond-Pearl.
-Reading the tier as "the Gen 1 sprite" would have left 207 of 358 without one.
-Every sprite - ordinary, shiny, Origin - is normalised to a 64x64 canvas;
-Sinnoh's HGSS art is 80x80 and is reframed, or it is simply a different SIZE
-from everything beside it in a row.
+each range to its own source set - Yellow/Red-Blue for Kanto, Crystal/Gold for
+Johto. Reading the tier as "the Gen 1 sprite" would have left 207 of 358
+without one. Every sprite - ordinary, shiny, Origin - is normalised to a 64x64
+canvas; Sinnoh's HGSS art is 80x80 and is reframed, or it is simply a different
+SIZE from everything beside it in a row.
+
+**BUT DEBUT ARTWORK IS ONLY A TELL WHILE IT IS OLDER, and for a third of the
+dex it is not.** Sinnoh shipped with Diamond/Pearl as its Origin and that was
+wrong: our ordinary Sinnoh sprite is HeartGold/SoulSilver, both are Gen IV, and
+one of the three fallbacks was literally the base sprite. Reported from play as
+"the Gen 4 Origins look the same as the normal ones", which was exactly right.
+
+Measured, per sprite: **a Kanto or Johto Origin uses a median of 4 colours
+against the ordinary art's 13** - that is the Game Boy and Game Boy Color
+palette, and it IS what reads as ancient. Sinnoh gave 13 against **14**. Not
+older, and not even fewer.
+
+So `hasOrigin(id)` is `genOf(id) < baseArtGen(id)` - **a species can wear Origin
+only if it debuted in an older generation than the one its ordinary art comes
+from.** Derived, not listed, which also settles Hoenn before it ships:
+Ruby/Sapphire and FireRed/LeafGreen are both Gen III, so a Hoenn species gets
+no Origin either, and nothing has to be edited on the day. `ART_GEN` is the one
+place saying where base art comes from and check.mjs asserts it against
+`artFor()` in fetch-species.mjs, because two copies would drift the day a base
+set changes and the symptom would be Origins that are the same picture.
+
+**`tiersFor(id)` is what both the Dex grid and the sheet count through**, and
+it exists because the completion rosette would otherwise have become
+IMPOSSIBLE for 107 species rather than merely hard - the one mark in the game
+that is supposed to be earnable by playing long enough. A Sinnoh entry drops
+the Origin column from FORMS entirely rather than showing a silhouette nobody
+can fill: a slot that cannot be earned reads as a bug in the collection.
+
+**A MEDIAN OVER THE WHOLE DEX HID A FAULT IN A THIRD OF IT.** The first palette
+assertion in build_origin.py compared medians, and putting the Gen 4 set back
+left the median at 4 - 251 four-colour sprites outvote 107 fourteen-colour
+ones. It is **per sprite** now, and two assertions catch different halves: the
+relational one (fewer colours than this creature's own ordinary art) catches 92
+of the 107, and `PALETTE_MAX` catches the rest. That bound is measured, not
+picked: Kanto's worst is 7 and Sinnoh's best is 8, so the two sets do not
+overlap anywhere.
 
 **Every non-level evolution method is `bond`.** Happiness, time of day, a held
 item on a trade, a move, a place: a game with no clock, no moves and no map

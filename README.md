@@ -2598,6 +2598,40 @@ tomorrow* rather than kept as pseudocode here: the band drift ran the **opposite
 way** from the one this section predicted, and pity had to boost the whole
 ladder rather than one tier.
 
+### A second art tier, for the species that cannot have Origin
+
+**Trigger: if Sinnoh players report the tier ladder feeling thinner than
+Kanto's.** It is one tier short for them and that is a real asymmetry, not a
+bug - see *Origin needs an older drawing* above.
+
+There is no OLDER drawing of a Sinnoh Pokémon, so Origin cannot be rescued. But
+PokéAPI's sprite repository carries several sets that cover **all 358 of ours,
+Sinnoh included**, and each is a genuinely different medium rather than a
+different cartridge:
+
+| set | what it is |
+|---|---|
+| `other/dream-world` | flat vector SVG - a completely different drawing style |
+| `other/official-artwork` | Sugimori's illustrations, high-res |
+| `other/home` | Pokémon HOME's 3D renders |
+| `versions/generation-v/black-white/animated` | animated GIFs, the last 2D sprite set |
+| `other/showdown` | Showdown's own animated sprites |
+
+The whole catalogue, checked rather than assumed: Gen I ships red-blue, yellow
+and red-green-japan; Gen II crystal, gold, silver; Gen III ruby-sapphire,
+firered-leafgreen, emerald; Gen IV diamond-pearl, platinum,
+heartgold-soulsilver; Gen V black-white (still and animated); Gen VI x-y and
+omegaruby-alphasapphire; Gen VII ultra-sun-ultra-moon; Gen VIII
+brilliant-diamond-shining-pearl; Gen IX scarlet-violet and champions. Most of
+the later ones are 3D renders and would not sit beside our 2D sprites.
+
+**The two worth having are `dream-world` and `black-white/animated`**, for
+opposite reasons: the vector one is unmistakably a different hand, and the
+animated one moves, which no other tier does. Both need the same reframing
+`build_origin.py` already does. Do not build either until the asymmetry is
+actually felt - a fifth tier changes the completion rosette for every species,
+and the ladder's SPREAD is the thing that took two attempts to get right.
+
 ### The hybrid data model
 
 **Trigger: a box that is slow to render or slow to save. Not a species count.**

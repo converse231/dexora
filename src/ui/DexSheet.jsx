@@ -23,7 +23,7 @@ import { useModalLock } from "./modal.js";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
-import { foundIn, howOften, speciesById } from "../game/biomes.js";
+import { foundIn, howOften, speciesById, hasOrigin } from "../game/biomes.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
 
@@ -106,7 +106,11 @@ export default function DexSheet({
   /* Which of the four you actually hold. The ordinary one is simply "caught";
      the rest come from their own dex arrays. */
   const got = (t) => (t === null ? caught : !!held[t]);
-  const every = VARIANTS.every(([t]) => got(t));
+  /* Only the forms this species can have. A Sinnoh entry drops the Origin
+     column entirely rather than showing a silhouette nobody can ever fill:
+     a slot that cannot be earned reads as a bug in the collection. */
+  const forms = VARIANTS.filter(([t]) => t === null || t !== "origin" || hasOrigin(id));
+  const every = forms.every(([t]) => got(t));
 
   useModalLock();
 
@@ -178,7 +182,7 @@ export default function DexSheet({
                 )}
               </div>
               <div className="sf-row">
-                {VARIANTS.map(([t, name, blurb]) => (
+                {forms.map(([t, name, blurb]) => (
                   <div key={name} className={`sf-one${got(t) ? " got" : ""}`}>
                     <div className="sf-art">
                       {/* This strip is where someone comes to SEE what a
