@@ -2669,7 +2669,7 @@ def haunted_tower():
     return ["".join(r) for r in g], spawn
 
 
-def seafoam_b3f():
+def seafoam_floor(floor="B3F"):
     """Seafoam Islands B3F, read out of its own map.bin. Returns (rows, ids).
 
     Two channels, because a copy needs both. The characters are ours - they are
@@ -2706,9 +2706,11 @@ def seafoam_b3f():
     FALL_PRIM = {295, 303, 311}
     MOUTH = {12}
 
-    binf = BA.fetch("data/layouts/SeafoamIslands_B3F/map.bin", "SeafoamIslands_B3F.bin")
+    binf = BA.fetch("data/layouts/SeafoamIslands_%s/map.bin" % floor,
+                    "SeafoamIslands_%s.bin" % floor)
     lay = json.load(io.open(os.path.join(BA.SRC, "layouts.json")))
-    L = next(x for x in lay["layouts"] if x.get("name") == "SeafoamIslands_B3F_Layout")
+    L = next(x for x in lay["layouts"]
+             if x.get("name") == "SeafoamIslands_%s_Layout" % floor)
     w, h = L["width"], L["height"]
     raw = np.frombuffer(io.open(binf, "rb").read(), dtype="<u2")[: w * h]
     ids = (raw & 0x3FF).reshape(h, w)
@@ -2766,21 +2768,49 @@ def seafoam_b3f():
 
 
 def frost_hollow():
-    """Frost Hollow: Seafoam Islands B3F, copied tile for tile.
+    """Frost Hollow: four floors of Seafoam Islands, each copied tile for tile.
 
-    The one thing added is the bridge. The river runs from the waterfall in the
-    north down the middle of the cave and out of the south wall, and in Seafoam
-    you cross it by surfing - which this game does not have. Without a crossing
-    the whole east side is map you can see and never stand on, so a plank bridge
-    goes over the narrowest reach of it.
+    THE MAP COULD NOT SIMPLY BE SCALED, and that is the whole shape of this
+    one. Every other map here grew by drawing more of itself; this one IS
+    Seafoam Islands B3F, read out of its own map.bin, and a transcription
+    stretched to twice the size is not a transcription any more. So it grew the
+    only way a copy honestly can: by copying MORE. Seafoam has five floors, all
+    38x24, all in the one tileset - four of them laid in a square is four times
+    the cave and not one invented tile.
 
-    Two chambers on the east had a ladder for their only way in, so taking the
-    ladders out left them stranded - which the reachability check caught. A
-    staircase does on this floor what the ladder did between floors.
+    Each floor keeps its own ids, so each quadrant is exactly the room Game
+    Freak drew. What we author is the joins: the rock between the quadrants is
+    ours, and so are the passages cut through it, which are SEARCHED for rather
+    than placed - the four floors have their own ideas about where their walls
+    are and a fixed coordinate would open onto rock.
+
+    The one thing added inside a quadrant is a bridge on B3F. Its river runs
+    from the waterfall in the north, down the middle and out of the south wall,
+    and in Seafoam you cross it by surfing - which this game does not have.
 
     Everything we author gets an id of -1 and is drawn by the rules; everything
-    copied keeps the real map's own tile. 38x22."""
-    g, tiles, base = seafoam_b3f()
+    copied keeps the real map's own tile. 78x46."""
+    FLOORS = ("1F", "B1F", "B2F", "B3F")
+    GUT = 2                      # rows and columns of our own rock between them
+
+    quads = [seafoam_floor(f) for f in FLOORS]
+    base = quads[0][2]
+    qh = len(quads[0][0])
+    qw = len(quads[0][0][0])
+
+    W = qw * 2 + GUT
+    H = qh * 2 + GUT
+    g = [["I" for _ in range(W)] for _ in range(H)]
+    tiles = [[-1 for _ in range(W)] for _ in range(H)]
+
+    # Top-left 1F, top-right B1F, bottom-left B2F, bottom-right B3F - which is
+    # the order you would walk them, so the cave reads as a descent.
+    corners = ((0, 0), (qw + GUT, 0), (0, qh + GUT), (qw + GUT, qh + GUT))
+    for (ox, oy), (qg, qt, _) in zip(corners, quads):
+        for y in range(qh):
+            for x in range(qw):
+                g[oy + y][ox + x] = qg[y][x]
+                tiles[oy + y][ox + x] = qt[y][x]
 
     def author(x0, y0, x1, y1, ch):
         rect(g, ch, x0, y0, x1, y1)
@@ -2788,12 +2818,107 @@ def frost_hollow():
             for x in range(x0, x1 + 1):
                 tiles[y][x] = -1
 
-    author(24, 15, 27, 16, "N")      # the bridge, over the narrowest reach
-    author(28, 7, 29, 7, "s")        # a stair into the north-east chamber
-    author(31, 17, 32, 17, "s")      # and into the south-east one
+    # --- B3F's bridge, in its own quadrant --------------------------------
+    bx, by = corners[3]
+    author(bx + 24, by + 15, bx + 27, by + 16, "N")
 
-    # Standing in the lower hall at the foot of the cave, the river to the east.
-    return ["".join(r) for r in g], (4, 19), [i for row in tiles for i in row], base
+    # --- the joins, searched ----------------------------------------------
+    # A passage is cut where BOTH sides of the gutter already have ice to walk
+    # on, which is a fact about four different rooms and not something to read
+    # off a drawing. Three per seam, spread out, so the cave is one place
+    # several times over rather than by a single thread.
+    # A SEAM TUNNELS TO THE NEAREST ICE rather than needing ice right beside it.
+    # Every Seafoam floor is drawn with a solid border, so the columns either
+    # side of a gutter are always wall - a passage that asked for floor there
+    # found nowhere at all, on any of the four seams. What it asks now is how
+    # far it would have to dig, and it digs when that is short.
+    REACH = 6
+
+    def seam_v(gx, want=4):
+        """East-west passages through the vertical gutter at column gx."""
+        made = []
+        for y in range(3, H - 3):
+            if len(made) >= want:
+                break
+            if any(abs(y - m) < 6 for m in made):
+                continue
+            lx = next((x for x in range(gx - 1, max(0, gx - 1 - REACH), -1)
+                       if g[y][x] == "i"), None)
+            rx = next((x for x in range(gx + GUT, min(W, gx + GUT + REACH))
+                       if g[y][x] == "i"), None)
+            if lx is None or rx is None:
+                continue
+            author(lx, y, rx, y, "i")
+            made.append(y)
+        return made
+
+    def seam_h(gy, want=4):
+        """North-south passages through the horizontal gutter at row gy."""
+        made = []
+        for x in range(3, W - 3):
+            if len(made) >= want:
+                break
+            if any(abs(x - m) < 8 for m in made):
+                continue
+            ty = next((y for y in range(gy - 1, max(0, gy - 1 - REACH), -1)
+                       if g[y][x] == "i"), None)
+            by = next((y for y in range(gy + GUT, min(H, gy + GUT + REACH))
+                       if g[y][x] == "i"), None)
+            if ty is None or by is None:
+                continue
+            author(x, ty, x, by, "i")
+            made.append(x)
+        return made
+
+    cuts = seam_v(qw) + seam_h(qh)
+    assert len(cuts) >= 4, f"frost: only {len(cuts)} passages between quadrants"
+
+    # --- and whatever is still stranded -----------------------------------
+    # Four rooms that were never meant to meet do not always meet on eight
+    # passages: a quadrant whose wall runs the length of a gutter has nowhere
+    # for one to land. `join_islands` carves the rest.
+    #
+    # ANYTHING IT CARVES STOPS BEING A COPY. The ids are the whole reason this
+    # map is transcribed rather than drawn, and a tile turned from wall into
+    # floor is not the tile Game Freak put there - left with its own id it would
+    # draw a wall you can walk through. Snapshot, carve, and hand every changed
+    # cell to the rules with -1.
+    # --- repairs the crop leaves behind -----------------------------------
+    # Each floor is 24 rows and is taken at 22, which was tuned for B3F. The
+    # other three put different things on the rows that get cut, and a shelf
+    # whose neighbours were in row 22 comes out standing on its own - which the
+    # renderer has no piece for. It becomes lower ice, and loses its id with it:
+    # a tile we changed is not a tile Game Freak drew.
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] != "j":
+                continue
+            near = [(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))]
+            if not any(0 <= nx < W and 0 <= ny < H and g[ny][nx] == "j"
+                       for nx, ny in near):
+                g[y][x] = "i"
+                tiles[y][x] = -1
+
+    import random as _r
+    before = [row[:] for row in g]
+    join_islands(g, "i", _r.Random(20260916),
+                 keep=("k", "K", "t", "d", "N", "j", "s"))
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] != before[y][x]:
+                tiles[y][x] = -1
+
+    # Standing in the north-west room, at the top of the cave.
+    spawn = None
+    for y in range(2, H - 2):
+        for x in range(2, W - 2):
+            if g[y][x] == "i" and g[y + 1][x] == "i":
+                spawn = (x, y)
+                break
+        if spawn:
+            break
+    assert spawn, "frost: nowhere to stand"
+    return ["".join(r) for r in g], spawn, [i for row in tiles for i in row], base
 
 
 def bank(g, x0, x1, y, consoles=()):
@@ -3006,7 +3131,14 @@ def power_plant():
             if x1 - x < 3:                      # a bank needs two caps and a middle
                 break
             # Nudged a row off its neighbours, so a rank is not a ruled line.
-            yy = y + rng.choice((0, 0, 1))
+            # NO ROW NUDGE. At pitch 5 a bank is three rows plus its foot and
+            # the next rank starts two rows later, so there is exactly one free
+            # row between them - and a barrel standing on the foot already uses
+            # it. Nudging a rank either way closes that gap and two banks plus a
+            # barrel read as one six-row wall, which the bank set cannot draw.
+            # The irregularity comes from where each segment STARTS and how long
+            # it is, which is where it came from on the real map too.
+            yy = y
             con = x + (x1 - x) // 2 if rng.random() < 0.45 else None
             foot = bank(g, x, x1, yy, consoles=(con,) if con else ())
             if rng.random() < 0.55:
