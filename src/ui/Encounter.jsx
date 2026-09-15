@@ -115,6 +115,12 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
     <div
       className={`battle ${phase}`}
       data-area={enc.areaId ?? "meadow"}
+      /* ON THE SAME ELEMENT AS `data-area`, because the phase OVERRIDES the
+         area's sky and a custom property only inherits downwards - set one
+         level lower and `.battle-sky`, which is a sibling of the field rather
+         than a child of it, would never see it. That is the exact mistake the
+         area colours made once. */
+      data-phase={enc.phaseId ?? "day"}
       style={{
         "--ground": `url(${new URL(
           `battle/${enc.areaId ?? "ground"}.png`, document.baseURI).href})`,

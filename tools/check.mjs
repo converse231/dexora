@@ -11,6 +11,9 @@ import {
 import {
   catchChance, fleeChance, shakesFor, resolveThrow, NEVER_CERTAIN, GUARANTEED,
 } from "../src/catch.js";
+import {
+  DAY_STEPS, PHASES, hourAt, phaseAt, isNight, intoPhase, timeLabel,
+} from "../src/game/clock.js";
 
 const near = (a, b) => Math.abs(a - b) < 0.005;
 
@@ -3245,6 +3248,108 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
 
   console.log(`spawn ladder ok — ${early.size} species in the wild at Lv 1, ` +
     `${late.size} at Lv ${MAX_LEVEL}; legendaries no easier anywhere; nothing born below its own evolution level`);
+}
+
+/* THE WORLD'S CLOCK. Pure, and driven by steps rather than by `new Date()` -
+   which is what lets this walk a whole day without waiting for one, and what
+   stops a player who only plays at lunch from never seeing night. */
+{
+  // Every phase must actually happen, and be reachable by walking.
+  {
+    const seen = new Map();
+    for (let st = 0; st < DAY_STEPS; st++) {
+      const ph = phaseAt(st);
+      seen.set(ph.id, (seen.get(ph.id) ?? 0) + 1);
+    }
+    assert.equal(seen.size, PHASES.length,
+      `${seen.size} of ${PHASES.length} phases happen in a whole day`);
+    for (const [id, n] of seen) {
+      assert.ok(n > DAY_STEPS * 0.05,
+        `${id} lasts ${n} steps of ${DAY_STEPS} - too short to notice`);
+    }
+    /* NIGHT IS A CONDITION SOMETHING HANGS OFF, so it has to be a real slice of
+       the day: rare enough that a Dusk Ball is situational, common enough that
+       you can plan around it. */
+    const night = seen.get("night") / DAY_STEPS;
+    assert.ok(night > 0.2 && night < 0.5,
+      `night is ${(night * 100).toFixed(0)}% of the day - a Dusk Ball is either ` +
+      "useless or always on");
+  }
+
+  /* IT WRAPS, and the phase spanning midnight is the one that gets this wrong:
+     `phaseAt` walks the table backwards, so hour 0 has to land on the LAST
+     phase rather than falling off the front of the list. */
+  assert.equal(phaseAt(0).id, PHASES.at(-1).id, "midnight is not the wrapping phase");
+  assert.equal(phaseAt(0).id, phaseAt(DAY_STEPS).id, "the day does not wrap cleanly");
+  assert.equal(hourAt(DAY_STEPS), hourAt(0), "the hour does not wrap");
+  assert.ok(hourAt(DAY_STEPS / 2) > 11 && hourAt(DAY_STEPS / 2) < 13,
+    "half a day is not midday");
+  assert.equal(isNight(0), true, "midnight is not night");
+
+  // The boundaries in the table are where the phases actually change.
+  for (const ph of PHASES) {
+    const at = Math.ceil((ph.from / 24) * DAY_STEPS);
+    assert.equal(phaseAt(at).id, ph.id, `${ph.id} does not start at ${ph.from}:00`);
+    assert.notEqual(phaseAt(at - 1).id, ph.id, `${ph.id} starts before ${ph.from}:00`);
+  }
+
+  // `intoPhase` runs 0 to 1 within a phase and never leaves it.
+  for (let st = 0; st < DAY_STEPS; st += 7) {
+    const t = intoPhase(st);
+    assert.ok(t >= 0 && t <= 1, `intoPhase(${st}) is ${t}`);
+  }
+  assert.ok(/^\d\d:\d\d$/.test(timeLabel(0)), `timeLabel gave "${timeLabel(0)}"`);
+
+  /* THE DUSK BALL KEYS OFF TWO THINGS NOW, and both must still reach its
+     headline - a ball that cannot deliver its printed boost is the worst bug
+     available here, because nothing about it looks wrong. */
+  {
+    const dusk = ballById("dusk-ball");
+    const open = { types: ["normal"], known: false, areaId: "meadow", throws: 0 };
+    assert.equal(liveMult(dusk, { ...open, night: false }), dusk.mult,
+      "a Dusk Ball is boosted in an open field in daylight");
+    assert.equal(liveMult(dusk, { ...open, night: true }), dusk.boost,
+      "a Dusk Ball is NOT boosted at night - that is what it is for");
+    assert.equal(liveMult(dusk, { ...open, areaId: "ridge", night: false }), dusk.boost,
+      "a Dusk Ball stopped being boosted in a cave");
+    /* AND THE TWO CONDITIONS MUST NOT COLLAPSE INTO ONE. A cave is dark round
+       the clock, so the ball has to be boosted there in daylight too -
+       otherwise "night and caves" is only "night". */
+    assert.equal(liveMult(dusk, { ...open, areaId: "ridge", night: true }), dusk.boost,
+      "a cave at night should still be boosted");
+  }
+
+  /* AND THE ENCOUNTER FREEZES IT. Everything a throw depends on is fixed when
+     the Pokemon appears; a clock read at throw time would change a ball's value
+     because you took a step mid-animation. */
+  {
+    const eng = readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8");
+    assert.ok(/night: isNight\(state\.steps\),/.test(eng),
+      "the encounter must freeze whether it is night");
+    assert.ok(/phaseId: phaseAt\(state\.steps\)\.id,/.test(eng),
+      "the encounter must freeze the phase for the scene");
+    const src = readFileSync(new URL("../src/game/items.js", import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.ok(/enc\.night/.test(src) && !/isNight/.test(src),
+      "items.js must read the FROZEN flag, never call the clock itself");
+  }
+
+  /* THE SCENE HAS A FACE FOR EVERY PHASE on the open maps. A phase with no sky
+     of its own is a phase nobody can see. */
+  {
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    for (const ph of PHASES) {
+      if (ph.id === "day") continue;    // day is the area's own sky, untinted
+      assert.ok(css.includes(`[data-phase="${ph.id}"]`),
+        `${ph.id} has no sky of its own in styles.css`);
+    }
+  }
+
+  const nightShare = Array.from({ length: DAY_STEPS }, (_, i) => isNight(i))
+    .filter(Boolean).length / DAY_STEPS;
+  console.log(`clock ok — ${PHASES.length} phases over ${DAY_STEPS} steps ` +
+    `(night ${(nightShare * 100).toFixed(0)}% of it); the Dusk Ball reaches its ` +
+    "boost two different ways");
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);
