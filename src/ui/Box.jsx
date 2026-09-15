@@ -444,14 +444,14 @@ export default function Box({
           <button
             className="bigbtn"
             onClick={() => confirmSweep(false)}
-            title="Cash. Keeps the best of each species and every variant."
+            data-tip="Cash. Keeps the best of each species and every variant."
           >
             SELL {spareUids.length} · +¥{spareValue.toLocaleString()}
           </button>
           <button
             className="bigbtn candy"
             onClick={() => confirmSweep(true)}
-            title="Rare Candy. 1 candy = 1 level, on any Pokémon you hold."
+            data-tip="Rare Candy. 1 candy = 1 level, on any Pokémon you hold."
           >
             <img src="items/rare-candy.png" alt="" />
             +{spareCandy}
@@ -532,7 +532,7 @@ export default function Box({
                       className="evobtn"
                       disabled={!path.ready || busy}
                       onClick={() => confirmEvolve(group, path)}
-                      title={blockedWhy(group, path)}
+                      data-tip={blockedWhy(group, path)}
                     >
                       {path.stone && (
                         <img src={`items/${path.stone}.png`} alt="" />
@@ -560,7 +560,7 @@ export default function Box({
                     <button
                       className="candy"
                       onClick={() => confirmSellOne(group, true)}
-                      title={`${spare * candyValue(sp)} Rare Candy`}
+                      data-tip={`${spare * candyValue(sp)} Rare Candy`}
                     >
                       <img src="items/rare-candy.png" alt="" />
                       {spare * candyValue(sp)}
@@ -575,7 +575,7 @@ export default function Box({
 
       {pending && (
         <Confirm
-          title={pending.title}
+          data-tip={pending.title}
           lines={pending.lines}
           manifest={pending.manifest}
           note={pending.note}

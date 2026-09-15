@@ -20,7 +20,7 @@ export default function Daily({ daily, onClaim, note }) {
         {/* The streak only appears once there is one. A "×1.00" on day one is
             a multiplier explaining that nothing is being multiplied. */}
         {streak > 0 && (
-          <span className="dy-streak" title={`${streak} days running`}>
+          <span className="dy-streak" data-tip={`${streak} days running`}>
             {streak}-DAY STREAK · ×{streakMult(streak).toFixed(2)}
           </span>
         )}

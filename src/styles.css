@@ -1757,6 +1757,13 @@ canvas {
 .fieldrow.locked, .fieldrow:disabled { cursor: default; }
 .fieldrow.locked, .fieldrow:disabled:not(.on) { opacity: .5; }
 
+/* What is still behind the wall, said once. Quieter than a shop-note, because
+   it is a promise rather than a rule. */
+.shop-more {
+  margin: 5px 0 12px; text-align: center;
+  font-family: var(--pixel); font-size: 8.5px; color: var(--ink-faint);
+}
+
 .candyrow {
   display: flex; align-items: center; gap: 8px;
   padding: 9px 11px; margin-bottom: 10px;
@@ -1991,6 +1998,44 @@ canvas {
   background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
 }
 .sheet-close:hover { border-color: var(--path); color: var(--path); }
+
+/* ---------- the tooltip ----------
+
+   One element at the app root, `position: fixed` so no scroller can clip it -
+   which is the whole reason it is not a wrapper beside its trigger. `left`/`top`
+   are set inline from the trigger's rect; everything about how it LOOKS is
+   here, so every tip in the game is the same object.
+
+   `pointer-events: none` is load-bearing: a bubble that sits under the pointer
+   and eats its own hover flickers on and off forever. */
+.tip {
+  position: fixed; z-index: 90; pointer-events: none;
+  max-width: 260px; padding: 7px 10px;
+  transform: translate(-50%, -100%);
+  border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--ink); color: var(--surface);
+  font-size: 12px; line-height: 1.35; text-align: center;
+  text-wrap: balance;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .28);
+  animation: tip-in 90ms ease-out both;
+}
+/* Flipped under the trigger when there is no room above it. */
+.tip.below { transform: translate(-50%, 0); }
+
+/* The nib, drawn as a rotated corner of the same box so it cannot disagree
+   with the bubble about its colour or its border. */
+.tip::after {
+  content: ""; position: absolute; left: 50%; width: 9px; height: 9px;
+  background: var(--ink);
+  border: 2px solid var(--line-firm);
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+  top: 100%;
+}
+.tip.below::after { top: 0; border-width: 2px 0 0 2px; }
+
+@keyframes tip-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tip { animation: none; } }
 
 /* ---------- touch dpad ---------- */
 .dpad {

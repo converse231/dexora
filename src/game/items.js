@@ -252,7 +252,7 @@ export const FIELD = [
      what makes it worth four times the price when you are hunting one thing. */
   {
     id: "honey", family: "variant", name: "Honey", price: 1200, level: 14,
-    steps: 300, lift: 2, blurb: "Every rare tier, twice as likely",
+    steps: 300, lift: 2, blurb: "Every rare tier, ×2 likely",
   },
   {
     id: "honey-holo", art: "honey", tier: "holo", family: "variant",
@@ -294,11 +294,11 @@ export const FAMILIES = [...new Set(FIELD.map((f) => f.family))];
 export const BERRIES = [
   {
     id: "razz-berry", name: "Razz Berry", price: 260, level: 10,
-    catchMult: 1.5, blurb: "×1.5 catch odds, all encounter",
+    catchMult: 1.5, blurb: "×1.5 odds, whole encounter",
   },
   {
     id: "nanab-berry", name: "Nanab Berry", price: 190, level: 10,
-    calm: 0.35, blurb: "It settles, and rarely flees",
+    calm: 0.35, blurb: "It settles; rarely flees",
   },
   {
     id: "pinap-berry", name: "Pinap Berry", price: 230, level: 14,
@@ -365,6 +365,34 @@ export const SHOP_BALLS = BALLS.filter(forSale);
 export const ALL_ITEMS = [...BALLS, ...STONES, ...KEY_ITEMS, ...FIELD, ...BERRIES];
 export const SHOP_ITEMS = [...SHOP_BALLS, ...BERRIES, ...FIELD, ...STONES];
 export const itemById = (id) => ALL_ITEMS.find((i) => i.id === id);
+
+/* WHAT A SHELF SHOWS AT A GIVEN LEVEL, and this reverses a decision the shop
+   used to make loudly.
+
+   It showed everything, always, greyed with its level printed where the price
+   goes - "nothing is hidden, because a wall you can read is a goal". That was
+   right when the shop was nine items. It is twenty-seven now, and at level one
+   twenty-four of them are grey: the wall stopped being a goal and became the
+   shop. You cannot aim at twenty-four things.
+
+   So: everything you can buy, plus the NEXT thing to open, and a count of the
+   rest. That keeps the original argument exactly - a wall you can read is a
+   goal - and gives you one wall instead of a row of them.
+
+   ORDER IS PRESERVED rather than sorted, because a shelf's order is its own:
+   FIELD is grouped by family (repel, repel, repel, flute, honey...) and is
+   deliberately NOT in level order, so appending the next unlock at the end
+   would move an item out of the family it belongs to. The next goal is found
+   by level and then shown where it already sits. */
+export function onShelf(items, level) {
+  const shut = items.filter((i) => level < i.level);
+  if (!shut.length) return { rows: items, later: 0 };
+  const next = shut.reduce((a, b) => (b.level < a.level ? b : a));
+  return {
+    rows: items.filter((i) => level >= i.level || i === next),
+    later: shut.length - 1,
+  };
+}
 
 /* Levelling pays out in balls. It is the same pacing the old area locks were
    doing, but it hands you something instead of taking somewhere away. */

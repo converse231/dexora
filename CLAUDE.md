@@ -1328,6 +1328,59 @@ column silently re-maps. A new tier arrives as its own single file, and a single
 file always beats the sheet. Missing art generates a placeholder and says so
 loudly - a 404 on a Dex tile is worse than a plain icon.
 
+## One tooltip, and it is an attribute
+
+**`data-tip="..."`, never `title="..."`.** `Tip.jsx` renders ONE element at the
+app root and a single set of listeners fills it from whatever is hovered or
+focused. Every tip in the game is therefore the same object, which is the whole
+point: the native `title` takes about a second to appear, cannot be styled at
+all, and is most often explaining text that has been CLIPPED - which is how the
+shop shipped descriptions cut off with the rest behind a tooltip nobody waits
+for.
+
+**A wrapper component was the other option and it loses on the case that
+matters.** The shop and the ball rail are inside `overflow: hidden` scrollers,
+so a bubble rendered beside its trigger is clipped by the trigger's own
+container. The singleton is `position: fixed`, so nothing can clip it, and
+converting a call site is one word with no layout consequence.
+
+Three things to know when adding one:
+
+- **Anything labelled ONLY by its title needs an `aria-label`.** A native title
+  is an accessible name for free and `data-tip` is not. Controls with visible
+  text or an `alt` already have theirs; an icon-only button does not, which is
+  why the rail's kit tiles carry one.
+- **A `title:` KEY IN A SPREAD is not a `title=` attribute**, and the sweep that
+  converted all twenty-five call sites missed exactly one for that reason - the
+  ball rail's tab builds its props in an object literal. Grep for both.
+- `pointer-events: none` on `.tip` is load-bearing: a bubble under the pointer
+  eats its own hover and flickers forever.
+
+**The shop's description slot fits 27 characters**, measured off a rendered row
+at the tightest it ever gets (169px, next to "you have 12") rather than
+estimated - the same mistake the 21-character ball hint made, for the same
+reason: the count's digits share the line. `BLURB_FITS` in check.mjs pins it.
+A stone's blurb is a list of species names and overruns by design; that is what
+the tooltip is for, and it is why the bound applies to blurbs we WRITE.
+
+## The shop opens as you level
+
+**It used to show everything, always** - greyed, with the level printed where
+the price goes, on the argument that "nothing is hidden, because a wall you can
+read is a goal". That was right when the shop was nine items. It is
+twenty-seven now, and at level one twenty-four of them are grey: the wall
+stopped being a goal and became the shop.
+
+`onShelf(items, level)` returns everything you can buy plus the NEXT thing to
+open, and a count of the rest, printed once under the shelf. The original
+argument survives intact - one wall you can read, instead of a row of them.
+
+**Order is preserved rather than sorted**, and that is not cosmetic: `FIELD` is
+grouped by family (three repels, then the flute, then four honeys) and is
+deliberately NOT in level order, so appending the next unlock at the end would
+move an item out of the family it belongs to. The next goal is found by level
+and then shown where it already sits.
+
 ## Balls
 
 **`liveMult(ball, enc)` is the single answer to "what is this ball worth".** The

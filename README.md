@@ -2456,6 +2456,36 @@ now: bought in quantity from the same shelf as the balls, used from the floating
 rail, counted down in steps beside the minimap because an effect paid for in
 steps belongs where the steps happen.
 
+### The shop grew past the argument that kept it open
+
+The shop showed every item at every level, greyed with its unlock level printed
+where the price goes, and the reasoning was written down: *nothing is hidden,
+because a wall you can read is a goal.*
+
+That was written when the shop held nine items. Balls, berries, field items and
+stones make **twenty-seven**, and a new trainer saw one row they could buy and
+twenty-four they could not. The argument did not become wrong — it stopped
+applying. You can aim at one wall. You cannot aim at twenty-four; that is just
+the shop being grey.
+
+So a shelf shows what you can buy, plus **the next thing to open**, plus a
+count of what is behind it. One goal per shelf, which is what the original
+sentence was actually describing.
+
+### The description slot fits 27 characters
+
+Measured off a rendered row rather than estimated, and at the tightest the row
+ever gets — 169px, next to "you have 12". Three of the new blurbs overran it
+and were cut; the stones' species lists overrun it by design and always have,
+which is what the tooltip is for.
+
+That tooltip is now one element at the app root rather than the browser's own:
+`title` takes a second to appear, cannot be styled, and the thing it is usually
+explaining is text that has been clipped. Every hint in the game is the same
+object now — and it had to be a singleton rather than a component beside each
+trigger, because the shop and the rail are inside scrollers that would clip
+their own bubbles.
+
 ### Berries, and the three rolls they are allowed to touch
 
 Fed to the Pokémon standing in front of you, and chosen on the test the four

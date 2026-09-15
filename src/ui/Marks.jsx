@@ -38,7 +38,7 @@ export default function Mark({ tier, size = 12, className = "", title }) {
          one thing a stylesheet rule cannot outrank. */
       style={{ width: size, height: size }}
       alt={art.name}
-      title={title ?? art.name}
+      data-tip={title ?? art.name}
     />
   );
 }

@@ -142,7 +142,7 @@ export default function Evolve({ evo, onDone }) {
       aria-live="polite"
       aria-label={`${label(before)} is evolving`}
       onClick={phase === "reveal" ? onDone : () => { skipRef.current = true; }}
-      title={phase === "reveal" ? undefined : "Click to skip"}
+      data-tip={phase === "reveal" ? undefined : "Click to skip"}
     >
       <div className="evo-bg" />
       <div className="evo-rings" />
