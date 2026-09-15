@@ -879,6 +879,15 @@ fills 0.34-0.58 of a 96px canvas where ours fills 0.53-1.00 of 64px, so a raw
 is two different drawings (Gen 1 head-on and narrow, FireRed angled and wide),
 both 25px tall. The right test is that the `min()` fit touches one axis.
 
+**Pity is a MULTIPLIER on the whole ladder, and capped.** `pityBoost(dry)` is
+1 until `PITY_AFTER` and then ramps to `PITY_CAP`; `state.dry` counts encounters
+since the last variant of ANY tier and resets on the ROLL, not the catch - the
+misery is not meeting one. Boosting a single tier would re-sort `TIER_ODDS`,
+which is walked rarest-first, for the same reason the ratio moves as a unit.
+Uncapped it stops being a mercy and becomes a farm: park at 3,000 dry
+encounters and every throw is a variant. `rollVariant`'s `boost` defaults to 1
+so the 400k-roll rate test still measures the unaided odds.
+
 **Origin is gated on the generation's dex.** `rollVariant` takes a `locked`
 Set and `lockedTiers(dex, speciesId)` supplies it - Origin cannot roll until
 `genComplete` says every ordinary Pokemon of that generation is CAUGHT (state
@@ -1007,6 +1016,30 @@ because position and `id - 1` agree for Kanto. check.mjs asserts that alignment
 `loadState` pads a short dex rather than rejecting it (rejecting deleted every
 existing collection) and uses `padDex`, NOT `normalise`: the dex is three-valued
 and `normalise` coerces `? 1 : 0`, which demotes every caught species to seen.
+
+**A MAP'S RARITY MIX IS FROZEN FROM ITS OWN TABLE.** `BAND_SHAPE` is computed
+per biome from `RESIDENTS` - the hand-written rows - and `balance()` rescales
+each rarity band back to it. Per map and not globally, because one global mix
+would flatten Tall Grass (78/13/5) and the Haunted Tower (18/51/30) into the
+same map and that difference IS the design. Measured before it existed: adding
+Johto and Sinnoh TRIPLED Tall Grass's rare band, 5.1% -> 15.4%, because
+newcomers arrive on a flat tier weight while the Gen 1 commons are hand-tuned
+at 22.
+
+**A derived evolution is banded with its PARENT, and the band travels the whole
+chain.** Slot 3 of a row is the band it competes in. Banding by its own tier
+splits Tangela (B) from Tangrowth (A) and rescaling then makes the evolution
+commoner than the thing it evolves from; carrying it only one step fixes that
+pair and leaves Mareep -> Flaaffy -> Ampharos broken. Inside one band the scale
+is uniform, so `parent x EVO_SHARE` survives exactly. `BAND_FLOOR` is what stops
+a band with no Gen 1 members (Rock Ridge has no S-tier) from giving a newcomer a
+zero weight and making it unreachable.
+
+**The guarantee is about RESIDENTS, not the whole table.** The evolved-form
+overlay is supposed to enrich a map as you level, so check.mjs measures the mix
+with depth-tagged rows filtered out - counting them would assert that the
+feature does not work. Residents hold to half a point; the overlay moves meadow
+to 69.8/18.2/9.6 and that is progression.
 
 **Legendaries are a SHARE of the table, never a fixed weight.** `LEGEND_SHARE`
 is 1% of whatever the table comes to, split by type match, added by

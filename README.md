@@ -2362,17 +2362,17 @@ is about the same second of play**, the moment a Pokémon appears and you throw
 at it. None of it needs new systems, new data or new maps; all of it is felt
 immediately.
 
+**Audio was the headline here and has moved to Phase 7**, at your call. It is
+the only item in the whole roadmap gated on a decision you have not made (where
+the sound comes from), and a phase that cannot start until a question is
+answered is a phase that blocks the ones behind it. Everything else here is
+unblocked, so it goes first and audio goes last.
+
 | | Why now |
 |---|---|
-| **Audio** | There is **none**: no throw, no catch, no encounter sting, no music. The single largest gap between what this is and what it feels like, and a small amount of code against a large amount of feel. Everything else in this phase is finishing; this is the hole. |
 | **Encounter variety** | Every Pidgey is the same Pidgey — level 2–7 uniformly, everywhere. `bornLevel` already does exactly this job for evolved forms, so per-biome level bands are a small change to one function that would make Frost Hollow *feel* like a late map rather than merely contain later species. |
 | **Flavour on the nameplate** | `species.js` already carries height and weight and nothing reads them. A "small / large" tell costs one line and gives two identical Rattata a reason to differ. |
-| **The candy watch-list** | Four judgement calls made three commits ago and never played for an hour — see *Deferred on purpose*. Cheap to fix now, expensive once audio and quests sit on top of them. |
-
-**Your call, and it gates the phase:** where audio comes from. The same
-decompilation the tiles came from is consistent with the standing constraint and
-already credited; something original is more work but yours. Decide before
-starting, not during.
+| **The candy watch-list** | Four judgement calls never played for an hour — see *Deferred on purpose*. Cheap to fix now, expensive once quests sit on top of them. |
 
 ---
 
@@ -2543,6 +2543,30 @@ again with a controller in hand.
 - **A same-line conversion bonus** (a duplicate fed to its own family worth 2×)
   is the tuning lever held in reserve if generic candy ends up feeling flat. Do
   not build it until playtesting asks for it.
+
+---
+
+### Phase 7 — Sound
+
+*Goal: it is mechanically complete and completely silent. Fix the silence.*
+
+Last, and **not because it matters least** — it is the single largest gap
+between what this is and what it feels like, and a small amount of code against
+a large amount of feel. It is last because it is the only item in the roadmap
+gated on a decision rather than on work.
+
+| | |
+|---|---|
+| **The throw** | The one sound the game most obviously wants: a click, an arc, three shakes, a set. The animation is already frame-accurate; the audio would sit straight on top of it. |
+| **The catch sting** | And a different one per rare tier — Astral already gets a whole visual treatment nobody hears. |
+| **The encounter cue** | Enough to make a legendary land differently from a Pidgey without a word on screen. |
+| **Music, per area** | Eight maps with eight identities that currently differ only by eye. |
+
+**Your call, and it is the whole gate:** where the audio comes from. The same
+decompilation the tiles and the evolution animation came from is consistent with
+the standing constraint and is already credited; something original is more work
+but yours. Nothing here can start before that is answered — which is exactly why
+it sits at the end rather than in front of four phases that can.
 
 ---
 

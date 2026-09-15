@@ -303,10 +303,37 @@ export const howOften = (share) =>
    Forms strip lists them in: the drawing before the finish over it. Ordered the
    other way, the marks under a Dex tile and the strip inside it disagreed, and
    a screenshot is the only thing that would ever have said so. */
-export function rollVariant(random = Math.random, locked = null) {
+/* BAD LUCK IS INVISIBLE, and at 1/480 it is also long.
+
+   Nothing about a dry run tells you it is a dry run - the odds are the odds,
+   and a player three hundred encounters past their last Astral has no way to
+   tell that from a player who met one an hour ago. Pity is the standard answer
+   and it is the honest one here: the tiers stay in their order, the ladder
+   keeps its shape, and the only thing that changes is that a long enough
+   drought ends.
+
+   It is a MULTIPLIER on the whole ladder rather than a bonus to one tier,
+   because `TIER_ODDS` is walked rarest-first and boosting one alone would
+   re-sort it - the same reason the ratio moves as a unit when the tiers are
+   retuned.
+
+   Capped, because a boost that keeps climbing turns a drought into a
+   guarantee and then into a farm: park at 3,000 dry encounters and every
+   throw is a variant. `PITY_CAP` is the ceiling and 10x is already generous -
+   at that point an Astral is 1 in 48. */
+export const PITY_AFTER = 300;
+export const PITY_RAMP = 100;
+export const PITY_CAP = 10;
+
+export const pityBoost = (dry = 0) =>
+  Math.min(PITY_CAP, 1 + Math.max(0, dry - PITY_AFTER) / PITY_RAMP);
+
+/* `boost` defaults to 1 so every existing caller - and the 400k-roll test that
+   pins each tier's rate - is measuring the unaided odds. */
+export function rollVariant(random = Math.random, locked = null, boost = 1) {
   for (const [tier, odds] of TIER_ODDS) {
     if (locked?.has(tier)) continue;
-    if (random() < odds) return tier;
+    if (random() < odds * boost) return tier;
   }
   return null;
 }
@@ -707,6 +734,87 @@ export const bornLevel = (speciesId) => BORN_AT.get(speciesId) ?? 0;
    gets no derived row - the `weight.has(to)` guard - but it still seeds the
    next step, so Ember's hand-placed Charmeleon is what Charizard is measured
    against. One weight per species per map, which is the whole invariant. */
+/* BAND BUDGETS: a map's rarity mix is a property of the map.
+
+   Measured before this existed, and the drift was the opposite of the one that
+   was expected. Adding Johto and Sinnoh did not thin the rares out - it
+   TRIPLED them. Tall Grass went from 5.1% A-tier at Lv 1 to 15.4% at Lv 50,
+   because the newcomers arrive on a flat tier-derived weight while the Gen 1
+   commons that hold a route together are hand-tuned up at 22. So the gentlest
+   map in the game quietly became a third rare, by arithmetic nobody chose -
+   the same class of failure as the legendary share, one band up.
+
+   The fix is the same shape and the reason it is per-map matters: a single
+   global band mix would flatten Tall Grass (78/13/5) and the Haunted Tower
+   (18/51/30) into the same map, and that difference IS the design. So each
+   biome's mix is frozen from its OWN hand-written table - the one that was
+   measured and argued over - and everything added afterwards redistributes
+   inside a band rather than resizing it. A newcomer competes with its own
+   rarity class for a share that was already spoken for.
+
+   `BAND_FLOOR` is what keeps that from being a trap: Rock Ridge has no S-tier
+   resident at all, so its frozen S share is zero, and a Sinnoh S-tier landing
+   there would inherit a zero weight and be unreachable. A band with members in
+   it is never worth less than this. */
+export const BAND_FLOOR = 0.015;
+
+/* A row's band. A DERIVED evolution carries its parent's band in slot 3 and
+   that is load-bearing, not bookkeeping: the overlay's entire model is "an
+   evolution is a fifth as common as what it comes from", and banding by its own
+   tier breaks that the moment the two differ. Tangela is B and Tangrowth is A,
+   so rescaling them separately made the evolution commoner than the thing it
+   evolves from - you would meet more Tangrowth than Tangela in Deep Woods.
+   Inside one band the scale is uniform, so `parent x EVO_SHARE` survives it
+   exactly. */
+const bandOf = (row) => {
+  const id = Array.isArray(row) ? row[0] : row;
+  if (LEGENDARY.includes(id)) return "L";
+  if (Array.isArray(row) && row[3]) return row[3];
+  return speciesById(id)?.tier ?? "C";
+};
+
+/* The shape of a biome's ORIGINAL table, as a share per band. Computed from
+   `RESIDENTS` - the hand-written rows only - because the derived homes are
+   exactly what must not be allowed to move it. */
+const BAND_SHAPE = new Map(RESIDENTS.map((b) => {
+  const total = b.table.reduce((n, [, w]) => n + w, 0);
+  const shape = {};
+  for (const [id, w] of b.table) {
+    shape[bandOf(id)] = (shape[bandOf(id)] ?? 0) + w / total;
+  }
+  return [b.id, shape];
+}));
+
+/* Rescale so each band holds the share the map was tuned to give it.
+
+   Uniform within a band, so nothing about the designer's ordering inside a
+   rarity class is touched - a weight-22 Pidgey still leads the commons. Only
+   the boundaries between classes are held still. */
+function balance(rows, shape) {
+  if (!rows.length) return rows;
+  const bands = new Map();
+  for (const r of rows) {
+    const k = bandOf(r);
+    if (!bands.has(k)) bands.set(k, []);
+    bands.get(k).push(r);
+  }
+  let budget = 0;
+  const want = new Map();
+  for (const k of bands.keys()) {
+    const share = Math.max(shape[k] ?? 0, BAND_FLOOR);
+    want.set(k, share);
+    budget += share;
+  }
+  const total = rows.reduce((n, r) => n + r[1], 0);
+  const out = [];
+  for (const [k, members] of bands) {
+    const have = members.reduce((n, r) => n + r[1], 0);
+    const scale = ((want.get(k) / budget) * total) / have;
+    for (const r of members) out.push([r[0], r[1] * scale, r[2], r[3]]);
+  }
+  return out;
+}
+
 /* Has this species' generation arrived yet? */
 export const genOpen = (id, level) => level >= (GEN_UNLOCK[genOf(id)] ?? 1);
 
@@ -714,20 +822,28 @@ export function encounterTable(biome, level = 1) {
   const open = biome.table.filter(([id]) => genOpen(id, level));
   const weight = new Map(open);
   const extra = [];
-  let front = open.map(([id]) => id);
+  /* `[id, band]`, not just the id: the band has to travel the WHOLE chain.
+     Carrying it one step only fixed Tangela -> Tangrowth and left
+     Mareep -> Flaaffy -> Ampharos broken, because the third link read
+     Flaaffy's own tier instead of the band Flaaffy had inherited. */
+  let front = open.map((r) => [r[0], bandOf(r)]);
 
   for (let depth = 1; depth <= EVO_DEPTH && front.length; depth++) {
     const scale = evoScale(level, depth);
     const next = [];
-    for (const id of front) {
+    for (const [id, band] of front) {
       for (const to of NEXT.get(id) ?? []) {
+        const known = weight.has(to);
         // An evolution cannot outrun its own generation either.
-        if (!weight.has(to) && genOpen(to, level)) {
+        if (!known && genOpen(to, level)) {
           const w = Math.max(weight.get(id) * EVO_SHARE, EVO_FLOOR);
           weight.set(to, w);
-          if (scale > 0) extra.push([to, w * scale, depth]);
+          // Slot 3 is the band it competes in: its PARENT's, so `balance`
+          // cannot separate an evolution from what it evolves from.
+          if (scale > 0) extra.push([to, w * scale, depth, band]);
         }
-        next.push(to);
+        // A hand-written row keeps its own band, and passes THAT on.
+        next.push([to, known ? bandOf(to) : band]);
       }
     }
     front = next;
@@ -735,7 +851,8 @@ export function encounterTable(biome, level = 1) {
   /* Residents, then the evolved overlay, and the legendaries LAST - scaled to
      whatever the first two came to, so their share of the roll is the same on
      every map at every level whatever else has been added. */
-  const rolled = extra.length ? [...open, ...extra] : open;
+  const rolled = balance(extra.length ? [...open, ...extra] : open,
+                         BAND_SHAPE.get(biome.id) ?? {});
   const total = rolled.reduce((n, e) => n + e[1], 0);
   return [...rolled, ...legendsFor(biome.types, total, (id) => genOpen(id, level))];
 }
