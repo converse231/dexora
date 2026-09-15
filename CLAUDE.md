@@ -1,8 +1,15 @@
 # Dexora
 
-A personal, non-commercial browser game: catch, collect and evolve the 151 Gen 1
-Pokémon across eight hand-made areas. Inspired by DelugeRPG's loop — walk, meet,
-throw, bank the duplicates, evolve.
+A personal, non-commercial browser game: catch, collect and evolve 358 Pokémon
+across eight hand-made areas. Kanto, Johto and Sinnoh — the Hoenn-shaped hole in
+the middle of the dex is deliberate, and it is the test that keeps a dex id from
+being used as an array index. Inspired by DelugeRPG's loop — walk, meet, throw,
+bank the duplicates, evolve.
+
+Evolution is paid for in **Rare Candy**, one candy per level, on a single
+Pokémon named by `uid`. If you find a doc anywhere describing a *feed* that
+spends a pile of duplicates, it is describing a system that was deleted — see
+"EVOLUTION IS CANDY AND A LEVEL" below.
 
 **Standing constraint: this stays personal and non-commercial.** No ads, no
 payments, no store listing, no distribution. It uses Nintendo's characters and

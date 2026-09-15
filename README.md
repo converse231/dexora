@@ -1,15 +1,17 @@
 # Dexora
 
-An eight-map, 151-species collecting game: walk, meet, throw, bank the
-duplicates, evolve.
+An eight-map, 358-species collecting game: walk, meet, throw, bank the
+duplicates, evolve. Kanto, Johto and Sinnoh, with the Hoenn-shaped hole in the
+middle of the dex left open on purpose.
 
 **Phase 1 asked one question** — *does "commons fund rares" hold up over an hour,
 or is it a grind?* — and it was answered yes: a common nets **+¥14** and a rare
 caught with Ultras **costs ¥252 more than it sells for**, both asserted. What was
 built to answer it (money, four ball tiers, a shop, storage, selling duplicates)
 is all still here, and a good deal more has landed on top: eight hand-made maps
-with their tile grammars decoded from the real games, evolution by feeding
-duplicates, fishing, trainer stats, and legendaries placed by type rule.
+with their tile grammars decoded from the real games, three generations,
+evolution paid for in Rare Candy, four rare tiers, fishing, trainer stats, a
+daily quest, field items and berries, and legendaries placed by type rule.
 
 **The roadmap is at the bottom.** Everything between here and there is *what is
 built and why*, which is the part worth reading before changing behaviour.
@@ -25,7 +27,8 @@ npm run dev      # http://localhost:5173
 |---|---|
 | `npm run dev` | Dev server with hot reload |
 | `npm run build` | Production build into `dist/` |
-| `npm run check` | Eight suites: catch math, phase machine, economy, evolution graph, evolution animation, trainer stats, tileset sanity, map geometry |
+| `npm run check` | 27 suites over the pure logic, then `tools/play.mjs` — which drives the real engine in Node on a hand-cranked frame clock |
+| `npm run play` | Just the engine harness: walk, throw, feed a berry, start a field item |
 | `npm run assets` | Re-pulls species, sprites, item sprites and evolution requirements from PokéAPI |
 | `npm run art` | Rebuilds map tiles, player sheet and encounter ground (needs Python + Pillow) |
 | `npm run map` | Regenerates the route from the region definitions in `tools/build_map.py` |
@@ -52,9 +55,10 @@ src/
     map.js           the route, encounter table
     tileset.js       sprite-sheet loading + fallback drawing
   ui/                TopBar, Dex, DexSheet, Encounter
-  data/species.js    151 species from PokéAPI (generated)
+  data/species.js    358 species from PokéAPI (generated)
 public/
-  sprites/           151 FireRed/LeafGreen sprites (generated)
+  sprites/           358 sprites: FireRed art to Lv 251, HGSS above (generated)
+  sprites/origin/    251 debut sprites - only where an older drawing exists
   items/             ball sprites (generated)
   tilesets/          drop your art here — see below
 ```
@@ -594,75 +598,65 @@ The evolution scene's own message box had the same problem from the other
 direction: a fixed `min-height: 24%` for three short lines and a button. It and
 the sprite stage above it each gave up 5%, so they still meet flush.
 
-## Evolution: the level sets the price
+## Evolution: a level, paid in Rare Candy
 
-Nothing gains levels here — there are no battles — so evolution spends the
-resource the game actually floods you with, and **the real evolution level sets
-the price**: a Charmander line costs more than a Caterpie line because that is
-how the games rank them. Those levels (7 to 55) come straight from PokéAPI via
-`tools/fetch-evolutions.mjs` into `src/data/evolutions.js`.
+Nothing gains levels here — there are no battles — so evolution spends a
+currency instead, and **the real evolution level sets the price**. Those levels
+come straight from PokéAPI via `tools/fetch-evolutions.mjs` into
+`src/data/evolutions.js`.
 
-The level *sets* the price rather than *being* it. Charging it outright put
-Charmeleon at 36 and Dragonair at 55, and at roughly 280 steps per catch of a
-named species that is an evening of walking for one dex entry. Halved and capped
-at 20, the ordering survives and the walk does too.
+**One candy is one level, and the bill is the gap.** A Lv 9 Charmander needs
+`16 - 9 = 7` candy to become a Charmeleon. Candy comes from converting
+duplicates (`CANDY` is tiered 1/2/4/8 by rarity) or from the shop at ¥120,
+which is deliberately the worse deal — three common duplicates sold buys one
+candy where converting the same duplicate gives one outright, so buying is
+always the impatient option.
 
-| Kind | Cost | Count |
-|---|---|---|
-| Level-up | half its evolution level, 3–20 | 52 |
-| Stone | 8 duplicates **and** the stone | 16 |
-| Trade | 10 duplicates | 4 |
+| Kind | What it costs |
+|---|---|
+| Level-up | `evoLevel - this Pokémon's level`, in candy |
+| Stone | the same, **and** the stone off the shop shelf |
+| Everything else | the same, against a *synthetic* level — see below |
 
-Trade evolutions — Kadabra, Machoke, Graveler, Haunter — have nobody to trade
-with in a single-player game, and there is no link-cable sprite in the PokéAPI
-set either, so they cost extra duplicates instead of an item.
+**Every non-level method is `bond`.** Happiness, time of day, a held item on a
+trade, a move, a place: a game with no clock, no moves and no map transitions
+cannot express any of them, and a per-method table grows every generation.
+`evoLevel` gives such a row its parent's level plus `SYNTH_STEP`, floored at
+`SYNTH_MIN` — derived, never tabled, and `npm run check` asserts a chain always
+climbs, because that is the only thing making the derivation sound.
 
-`npm run check` asserts the curve keeps its meaning: no cost above its own
-evolution level, none above 20, costs ordered the same way the levels are, and
-no complete line costing more than 40 from scratch.
+**This replaced a feed**, where evolving spent a pile of duplicates of the same
+species. Candy is spent on one `uid`, so the questions that made the feed hard —
+which of these six Pidgey is the hero, does the Holo get eaten — cannot be asked
+wrong. See *Rare Candy: duplicates became fungible* and *What the feed took with
+it when it went* below for why it changed and what went with it.
 
-### Why a feed eats the whole line
-
-Halving is not enough on its own, because per species the costs *multiply* down a
-chain: 8 Charmander for a Charmeleon and then 18 Charmeleon for a Charizard is
-144 Charmander. That is not a goal, it is a wall.
-
-So a feed is paid out of the **species and everything below it** — a Charizard
-takes 18 from the Charmeleon-or-Charmander pool, one of which has to be the
-Charmeleon that actually evolves. The chain adds up instead of multiplying:
-
-| Line | Steps | From scratch |
-|---|---|---|
-| Caterpie → Butterfree | 4, 5 | **8** Caterpie |
-| Rattata → Raticate | 10 | **10** Rattata |
-| Abra → Alakazam | 8, 10 | **17** Abra |
-| Charmander → Charizard | 8, 18 | **25** Charmander |
-| Dratini → Dragonite | 15, 20 | **34** Dratini |
-
-Steep where it should be, walkable everywhere. `npm run check` asserts
-line-feeding stays at least four times cheaper than the naive reading.
-
-Your best one does the evolving and carries its level forward; the bill is paid
-from the earliest stage and the weakest levels first, so your good ones are the
-last to go.
+**`candyValue` reads through to the base form, and that is load-bearing.**
+Caterpie evolves at Lv 7 and a wild one can be caught at 7, so it becomes a
+Metapod a tier above it for free — "evolve then convert" beat "convert" on every
+line whose tier climbs. Reading through makes evolving unable to raise the yield
+at all, which closes the class rather than out-tuning one case. `sellValue`
+deliberately does **not** read through: cash tracks the species in hand, candy is
+a wage for catching, and the two measuring different things is the design.
 
 ### Not selling what you were saving
 
-Evolution is the only way to reach the **68 species that never spawn**, so the
-BOX row shows the bill as a bar — `6 / 8 to evolve` — and never makes you count
-your own Rattata. A stone evolution prints which stone it wants right on the
-button, and says so when you do not have one.
+Evolution is the only way to reach the species that never spawn as a first
+stage, so the BOX row shows how much candy the next step wants and a stone
+evolution prints which stone it needs right on the button.
 
-**Selling never blocks you, but it never surprises you either.** The bulk *sell
-spares* button holds back the whole feed for any evolution you have not registered
-yet. Those held-back ones can still be sold from their own row; the confirm dialog
-just tells you first how far back it puts you. Hard-blocking would have been
-easier and worse: the useful thing is not being told *no*, it is being told *what
-it costs*.
+**No rare tier is ever taken by a bulk action.** The *sell spares* sweep keeps
+the best ordinary one of each species and holds every variant out of the spare
+list entirely — sorting them to the front only ever protects the first few.
+`keeper()` is the single predicate for it, and `npm run check` runs every case
+over the `TIERS` list rather than naming two of them: two answers to "which
+ones are precious" is exactly how a third tier ships protected from one sweep
+and not the other.
 
-The reserve also gets out of the way. Once the whole line is in the Pokédex it
-drops to one — otherwise catching anything that evolves would freeze your income
-behind a pile you are no longer saving for.
+**The reserve is one, and it collapsed to one deliberately.** It used to hold
+back a whole feed, because a sweep could otherwise eat the Dratini you were
+saving. Nothing is saved for anything now, and counting variants against the
+reserve meant owning a Holo Pidgey made your only ordinary Pidgey a spare.
 
 ## Tall Grass: drawn, not generated
 
@@ -863,15 +857,23 @@ to `LEGENDARY` and nothing else — which matters, because Gen 1 has no grass,
 water or rock legendary, so those three maps are carrying only strays until a
 later generation fills them in.
 
-### Nothing is locked
+### The world opens as you level
 
-Every area is open from the first minute. **The ball economy paces you instead**:
-a Lapras needs roughly four Ultra Balls to land, so at ¥300 and a pocket of Poké
-Balls you can walk into Frost Hollow and simply not be able to farm it yet. That
-is a gate that never says *no* — it says *not yet*, and shows you why.
+**This section used to say the opposite**, and the argument it made was a good
+one that lost to a better one — kept here because the reversal is the
+interesting part, and written up in full under *The world opens as you level*
+below.
 
-Trainer level spends itself on the shop rather than on doors: Great Balls unlock
-at Lv 6, Ultra Balls at Lv 12. Same pacing, stated as a reward instead of a wall.
+It said every area was open from the first minute and the ball economy paced
+you: walk into Frost Hollow at Lv 1 and simply fail to afford the throws, a gate
+that says *not yet* rather than *no*. The trouble is that a new player cannot
+act on "all eight are open but seven will waste your balls" until after they
+have wasted them.
+
+So `BIOMES[i].level` gates travel — Tall Grass at 1, the Haunted Tower at 20 —
+and **`areaOpen()` is the single answer**, asked by the engine's own refusal,
+the Travel panel's padlock and the Dex sheet's WHERE TO LOOK. The ball economy
+still paces you *inside* a map, which is what it was always best at.
 
 ### Maps are generated, and organic
 
@@ -894,12 +896,11 @@ map to pace, so it now has four lakes.
 
 ### Evolution — built
 
-There are no battles, so a caught Pokémon never gains levels. Evolution
-**feeds duplicates**, like Pokémon GO candy: spend N spares of a species to evolve
-one. That gives duplicates a second job besides selling and creates a real
-decision every time — cash the spare Pidgeys, or feed them for a new dex entry.
-See **Evolution: the level sets the price** above for how the bill is worked out,
-and `npm run check` walks all 70 chains.
+There are no battles, so a caught Pokémon never gains levels. Evolution spends
+**Rare Candy**, one candy per level, on a single Pokémon named by `uid`. That
+gives duplicates a second job besides selling and creates a real decision every
+time — cash the spare Pidgeys, or convert them toward anything. See
+**Evolution: a level, paid in Rare Candy** above for how the bill is worked out.
 
 ### Community tilesets
 
@@ -1017,44 +1018,48 @@ what is running. The file is checked by `saveProblem()`, which is the **same**
 function `loadState` uses — an imported file clears exactly the bar a stored one
 does, and there is only ever one answer to "is this loadable".
 
-**Dex medals.** 80 of them, plus the seven counting milestones, and every one is
-**derived rather than listed** — so a new species or a new map grows the set with
-nothing edited by hand:
+**Dex medals.** 105 of them, plus 11 counting milestones, and every one is
+**derived rather than listed** — which is the point: Johto and Sinnoh grew the
+set from 80 to 105 with nothing edited by hand.
 
-| | | pays |
-|---|---|---|
-| **line** | an evolution family, end to end | 54 | ¥250 × members + balls |
-| **type** | every species carrying one type | 17 | ¥1,000 + 3 Ultra |
+| | | | pays |
+|---|---|---|---|
+| **line** | an evolution family, end to end | 78 | ¥250 × members + balls |
+| **type** | every species carrying one type | 18 | ¥1,000 + 3 Ultra |
 | **biome** | every species on one map's table | 8 | ¥2,000 + 5 Ultra |
-| **dex** | all 151 | 1 | ¥25,000 + a Master Ball |
+| **dex** | the whole thing, all 358 | 1 | ¥25,000 + a Master Ball |
 
 A species that never evolves is **not** a line — a medal for owning one
 Farfetch'd is a participation trophy. Rewards lean on **balls over money**,
 because balls are the real bottleneck: a rare costs about four Ultras and money
 can already be ground out of duplicates. Over a full dex that totals
-**¥127,500 and 191 Ultra Balls**, which `npm run check` prints on every run so
-the figure cannot drift quietly. It is deliberately generous; it is also one
+**¥328,750 and 400 Ultra Balls**, which `npm run check` prints on every run so
+the figure cannot drift quietly — and which is exactly how the older numbers in
+this paragraph were caught after two generations landed. It is deliberately generous; it is also one
 table to change.
 
-**Shinies, at 1 in 1,024.** Kinder than the real games (1/8192, or 1/4096 since
+**Shinies, at 1 in 240.** Kinder than the real games (1/8192, or 1/4096 since
 Gen 6) on purpose — a full run is a few thousand encounters, so that is a
 handful in a playthrough: rare enough to be a story, common enough not to be a
-rumour. `npm run assets` now pulls FireRed's shiny palettes too (151 more
-sprites, 405 KB), the roll is snapshotted onto the encounter so no re-render can
-change the answer, and shininess **carries through evolution** the way it does
-in the real games.
+rumour. It started at 1/1,024 and came down when the tier ladder was
+*compressed* rather than scaled; see *The spread was the problem, not the rate*
+below, which is the reasoning and supersedes any looser figure above it.
+
+`npm run assets` pulls the shiny palettes too, the roll is snapshotted onto the
+encounter so no re-render can change the answer, and shininess **carries
+through evolution** the way it does in the real games.
 
 The important half of shinies is not the palette:
 
-> **No rare tier is ever sold as a spare, or eaten as feed.**
-> Both are bulk actions with no undo, and at these odds there is no farming
-> another. The sweep holds them out of the spare list entirely rather than
-> sorting them to the front — sorting only protects the first `keep` of them —
-> and `feedable()` excludes them from the feed while *preferring* one as the
-> hero, since the hero is the one that survives (and comes out the far side
-> still whatever it was). `evolveState` and `feedSelection` count through
-> that one function, because a panel saying READY over a feed that cannot be
-> assembled is the bug that split counting creates.
+> **No rare tier is ever taken by a bulk action.**
+> Selling spares and converting spares are both one button with no undo, and at
+> these odds there is no farming another. The sweep holds them out of the spare
+> list entirely rather than sorting them to the front — sorting only protects
+> the first `keep` of them.
+>
+> *(This paragraph used to name `feedable()`, which was deleted with the feed.
+> Under candy nothing is consumed but the stone, so "eaten as feed" is not a
+> risk that exists any more — the sweep is.)*
 >
 > One predicate, `keeper()`, decides it for both tiers. Shipping the second tier
 > protected from one of the two bulk actions and not the other is exactly the
@@ -1173,17 +1178,18 @@ only the third needed new code:
 
 - **It cannot be sold.** `duplicateUids` and `heldUids` both filter keepers, so
   a variant row has no spares and renders no SELL button at all.
-- **It cannot be eaten.** The feed in `feedable` is `!keeper`, unchanged.
 - **It cannot be evolved by accident.** This one was real: the hero was always
   the *rarest one present*, which is the right answer when one row stands for a
   whole species and the wrong one the moment rows split — press evolve on the
-  ordinary pile and your Holo would be what evolved. `feedable(box, row, want)`
-  takes the row's own variant now, and `evolveState`/`feedSelection` thread the
-  same answer so a row cannot say READY over a feed it cannot assemble.
+  ordinary pile and your Holo would be what evolved.
 
-A variant row can still evolve, feeding on ordinary duplicates, and the hero
-comes out the other side still Holo — that was always the design and it would
-have been a real loss to break it in the name of safety.
+**And candy settled the third one for good.** Evolving takes a single `uid` now,
+so "which of these is the hero" is not a question the code can be asked, let
+alone answered wrongly — the Pokémon that goes in is the Pokémon that comes out,
+carrying its own level and its own tier. The machinery that used to answer it
+(`feedable`, `feedSelection`, `ANY_HERO`) is gone; see *What the feed took with
+it when it went*. A variant still evolves and still comes out the far side
+Holo, which was always the design.
 
 ### Origin is earned, not found
 
@@ -1873,8 +1879,9 @@ in both directions.
 - Dark, Steel, Fairy and Dragon joined the biome type lists — not decoration:
   both the home-finder and `legendsFor` match on them.
 
-Bundle: 108 KB gzipped JS, 4.7 MB of assets for 1,074 sprites. 20 suites, clean
-boot, no console errors.
+Bundle at the end of that pass: 108 KB gzipped JS, 4.7 MB of assets for 1,074
+sprites, 20 suites, clean boot, no console errors. (A snapshot of that day, not
+of now — `npm run check` prints the current figures.)
 
 ### QA pass: three findings, one of them mine
 
