@@ -16,9 +16,26 @@
 
    It collapses to a tab when the map matters more than the count. */
 
-import { BALLS, liveMult, forSale } from "../game/items.js";
+import { BALLS, BERRIES, FIELD, liveMult, forSale } from "../game/items.js";
+import { ItemIcon } from "./Sprite.jsx";
 
-export default function BallRail({ bag, enc, onThrow, open, onToggle, pinned }) {
+export default function BallRail({
+  bag, enc, field, onThrow, onUseField, onUseBerry, open, onToggle, pinned,
+}) {
+  /* THE OTHER HALF OF THE BAG, and it is the same rail because it is the same
+     question at two different moments. Out on the map the useful stack is the
+     field items - is a repel worth starting before I cross this. In front of a
+     Pokemon it is the berries, and the field items are no longer a decision
+     you can act on. So the strip swaps rather than growing: one row of things
+     you can press right now, never a row of things you cannot.
+
+     Owned-only, like the situational balls above them. Eleven greyed-out tiles
+     is not an inventory readout, it is a shop you cannot buy from. */
+  const useful = (enc ? BERRIES : FIELD).filter((i) => (bag?.[i.id] ?? 0) > 0);
+  const fed = enc?.berry ?? null;
+  // Which family slot each field item would land in, so a running one can say
+  // so rather than looking like an ordinary unused stack.
+  const busy = (item) => field?.[item.family]?.id === item.id;
   /* A ball you have never owned stays hidden - the Master Ball always did, and
      the four situational ones joined it, because seven tiles of zeroes is not a
      bag readout. The hotkey is read off BALLS rather than off what is on
@@ -114,6 +131,36 @@ export default function BallRail({ bag, enc, onThrow, open, onToggle, pinned }) 
               );
             })}
           </ul>
+
+          {/* A second strip under the balls, and only when there is something
+              in it. An empty rule with nothing beneath it reads as a thing
+              that failed to load. */}
+          {useful.length > 0 && (
+            <ul className="br-list br-kit">
+              {useful.map((item) => {
+                const owned = bag?.[item.id] ?? 0;
+                const on = enc ? fed === item.id : busy(item);
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className={`br-ball br-item${on ? " on" : ""}`}
+                      title={`${item.name} — ${item.blurb}` +
+                             `${on ? "  (running)" : ""}`}
+                      onClick={() => (enc ? onUseBerry?.(item.id) : onUseField?.(item.id))}
+                      /* During an encounter the berries are live only while a
+                         throw is available: feeding something mid-flight would
+                         change the odds of a roll that has already happened. */
+                      disabled={enc ? !onThrow : false}
+                    >
+                      <ItemIcon item={item} />
+                      <em>{owned}</em>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
     </div>

@@ -141,8 +141,18 @@ export const ballById = (id) => BALLS.find((b) => b.id === id);
    the price - the exact thing the shared constant exists to prevent. check.mjs
    asserts `min(bonus over every encounter) === ball.mult`, which is what
    caught it. */
-export const liveMult = (ball, enc) =>
-  (enc && ball.bonus ? ball.bonus(enc) : ball.mult);
+/* A RAZZ BERRY GOES THROUGH HERE, and that is the whole reason it is not an
+   argument to `resolveThrow`. This function is the single answer to "what is
+   this ball worth against this Pokemon" - the engine rolls with it and the
+   rail prints it - so a berry that multiplied the roll somewhere else would
+   make the rail advertise 3.0 over a throw that quietly used 4.5. The berry
+   is a fact about the encounter and the encounter is already the argument. */
+export const liveMult = (ball, enc) => {
+  const base = enc && ball.bonus ? ball.bonus(enc) : ball.mult;
+  // Never the Master Ball: it is already past certain and scaling it is noise.
+  if (!enc?.berry || base >= GUARANTEED) return base;
+  return base * (berryById(enc.berry)?.catchMult ?? 1);
+};
 
 /* `boost` is the HEADLINE: the most a ball can ever be worth, which is what the
    shop shelf prints because "×1.0 odds" is a true and useless thing to say
@@ -176,52 +186,132 @@ export const STONES = [
   { id: "dusk-stone", name: "Dusk Stone", price: 1400, level: 35 },
 ];
 
-/* FIELD ITEMS, and the two of them deliberately pull different levers.
+/* FIELD ITEMS, in three families, and the families are the design.
 
    The note this was deferred behind said it plainly: **three things reshaping
-   one encounter table need one rule, not three.** Fortune already reshapes it
-   and the band budgets now hold its mix, so a lure written as a third weight
-   transform would be the exact pile-up that warning was about.
+   one encounter table need one rule, not three.** So each family pulls exactly
+   one lever, and no two families pull the same one:
 
-   So Honey does not invent a mechanism - it borrows Fortune's. Both feed the
-   same exponent in `rarityPower`, so there is one place in the codebase where
-   the odds of meeting something rare are decided, and a Honey on a
-   Fortune-maxed trainer composes instead of fighting.
+     repel    HOW OFTEN something appears   - scales the encounter rate
+     rarity   WHICH SPECIES appears         - Fortune's own exponent
+     variant  WHICH TIER it wears           - the variant roll
 
-   And Repel does not touch the table AT ALL. It is on the other axis: HOW
-   OFTEN an encounter happens, not what it is. That is the honest reading of
-   what a repel is for - crossing a map you have already farmed - and it keeps
-   the second item off the one thing the first is already moving.
+   That is the whole reason a lure could not just be "a weight transform": one
+   already existed. Nothing here invents a mechanism; each borrows the one the
+   game already had, which is why they compose instead of fighting.
 
-   BOUGHT IS USED. They are not bag items and there is no inventory screen to
-   build: you can only have one running at a time, so stockpiling a consumable
-   you cannot stack is a UI for nothing. `use` charges and starts the clock. */
-/* `HONEY_TILT` and `RARITY_FLOOR` live in trainer.js beside `rarityPower`,
-   which is the only thing that reads them - trainer.js has no imports at all
-   and giving it an edge to this file, which already reaches into biomes.js,
-   would be a dependency bought for two numbers. */
-export const REPEL_SCALE = 0.35;
+   ONE PER FAMILY RUNS AT A TIME, which is structural rather than enforced:
+   `state.field` is keyed on the family, so a Max Repel replaces a Repel by
+   being written to the same slot. Two honeys at once would be two variant
+   tilts, and then which one is the odds is a question with two answers.
 
+   Counted in STEPS, not seconds, so an effect you paid for is not burned by
+   walking away from the keyboard.
+
+   THE COLOURED HONEYS HAVE NO ART AND WANT NONE. `art: "honey"` points all
+   four at the one jar, and `tier` is what makes a Holo Honey look like a Holo:
+   the same foil travelling over the same picture. It is the cheapest possible
+   drawing of exactly the right idea, and it means adding a fifth tier adds a
+   honey for free.
+
+   THERE IS NO ORIGIN HONEY, deliberately. Origin is gated on catching every
+   ordinary Pokemon of a generation, and an item that shortcuts a gate is the
+   gate deleted. The other three tiers are luck, and luck is a thing you are
+   allowed to buy help with. */
 export const FIELD = [
+  /* --- repel: how OFTEN ------------------------------------------------
+     Canon durations are 100 / 200 / 250 steps. Ours are longer because a step
+     here is a tile on a 30-wide map rather than a step in a whole region, and
+     100 of them is one crossing. The RATIO is what was copied. */
   {
-    id: "honey",
-    name: "Honey",
-    price: 800,
-    level: 10,
-    steps: 500,
-    blurb: "Rare Pokémon come out",
+    id: "repel", family: "repel", name: "Repel", price: 200, level: 8,
+    steps: 200, rate: 0.55, blurb: "Fewer wild Pokémon",
   },
   {
-    id: "repel",
-    name: "Repel",
-    price: 400,
-    level: 10,
-    steps: 800,
-    blurb: "Far fewer encounters",
+    id: "super-repel", family: "repel", name: "Super Repel", price: 450, level: 12,
+    steps: 400, rate: 0.35, blurb: "Far fewer wild Pokémon",
+  },
+  {
+    id: "max-repel", family: "repel", name: "Max Repel", price: 800, level: 16,
+    steps: 700, rate: 0.2, blurb: "Almost none at all",
+  },
+
+  /* --- rarity: WHICH SPECIES -------------------------------------------
+     The White Flute, under its own name and doing its own job: in Gen 3 it is
+     already the item that brings out rarer wild Pokemon. `tilt` is subtracted
+     from `rarityPower`'s exponent - the SAME number Fortune moves - so there
+     is one place in the codebase where how rare the world is gets decided. */
+  {
+    id: "white-flute", family: "rarity", name: "White Flute", price: 900, level: 12,
+    steps: 400, tilt: 0.15, blurb: "Rarer Pokémon come out",
+  },
+
+  /* --- variant: WHICH TIER ---------------------------------------------
+     `lift` multiplies the variant roll. Plain Honey lifts every tier a little;
+     a coloured one lifts its own tier a lot and leaves the rest alone, which is
+     what makes it worth four times the price when you are hunting one thing. */
+  {
+    id: "honey", family: "variant", name: "Honey", price: 1200, level: 14,
+    steps: 300, lift: 2, blurb: "Every rare tier, twice as likely",
+  },
+  {
+    id: "honey-holo", art: "honey", tier: "holo", family: "variant",
+    name: "Holo Honey", price: 2400, level: 18,
+    steps: 300, lift: 6, blurb: "Holo, six times as likely",
+  },
+  {
+    id: "honey-shiny", art: "honey", tier: "shiny", family: "variant",
+    name: "Shiny Honey", price: 3000, level: 20,
+    steps: 300, lift: 6, blurb: "Shiny, six times as likely",
+  },
+  {
+    id: "honey-astral", art: "honey", tier: "astral", family: "variant",
+    name: "Astral Honey", price: 4200, level: 24,
+    steps: 300, lift: 6, blurb: "Astral, six times as likely",
   },
 ];
 
 export const fieldById = (id) => FIELD.find((f) => f.id === id) ?? null;
+/* The families, in the order they should be read and drawn. Derived, so adding
+   a family is one row above and nothing here. */
+export const FAMILIES = [...new Set(FIELD.map((f) => f.family))];
+
+/* BERRIES, fed to the Pokemon standing in front of you.
+
+   The Pokemon GO trio, and they were picked on the same test the four
+   situational balls had to pass: each one must key off a DIFFERENT system, or
+   two of them are one item with two prices. Razz moves the catch roll, Nanab
+   moves the flee roll, Pinap moves the XP award - three different numbers in
+   three different functions.
+
+   ONE AT A TIME, replacing. That is what makes them a choice rather than a
+   checklist: safety, odds, or reward, on the Pokemon in front of you, with no
+   way to have all three. It is also Pokemon GO's own rule.
+
+   A berry lasts the ENCOUNTER, not a throw. A berry you had to re-feed after
+   every miss would be a berry nobody could afford to use on the long fights
+   that are the only ones worth using it on. */
+export const BERRIES = [
+  {
+    id: "razz-berry", name: "Razz Berry", price: 260, level: 10,
+    catchMult: 1.5, blurb: "×1.5 catch odds, all encounter",
+  },
+  {
+    id: "nanab-berry", name: "Nanab Berry", price: 190, level: 10,
+    calm: 0.35, blurb: "It settles, and rarely flees",
+  },
+  {
+    id: "pinap-berry", name: "Pinap Berry", price: 230, level: 14,
+    xpMult: 2, blurb: "Double XP if you catch it",
+  },
+];
+
+export const berryById = (id) => BERRIES.find((b) => b.id === id) ?? null;
+
+/* Which picture an item is drawn with. Only the coloured honeys need this -
+   everything else is its own id - and it exists so no screen has to know that:
+   `items/${artOf(item)}.png` is right for all of them. */
+export const artOf = (item) => item?.art ?? item?.id ?? "";
 
 /* Key items: earned at a trainer level, never bought, never used up. They are
    held in the same bag as everything else - a count of 1 means you have it -
@@ -272,8 +362,8 @@ export const forSale = (item) => item.price > 0 && item.level !== null;
 export const SHOP_BALLS = BALLS.filter(forSale);
 
 // Everything the game can name, whether or not it is for sale.
-export const ALL_ITEMS = [...BALLS, ...STONES, ...KEY_ITEMS, ...FIELD];
-export const SHOP_ITEMS = [...SHOP_BALLS, ...STONES];
+export const ALL_ITEMS = [...BALLS, ...STONES, ...KEY_ITEMS, ...FIELD, ...BERRIES];
+export const SHOP_ITEMS = [...SHOP_BALLS, ...BERRIES, ...FIELD, ...STONES];
 export const itemById = (id) => ALL_ITEMS.find((i) => i.id === id);
 
 /* Levelling pays out in balls. It is the same pacing the old area locks were

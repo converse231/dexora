@@ -22,6 +22,8 @@
    `loading="lazy"` on all of them: the Dex grid alone is 151 images and only a
    screenful is ever visible. */
 
+import { artOf } from "../game/items.js";
+
 const FOLDER = { shiny: "shiny/", origin: "origin/" };
 
 /* The same path as a bare string, for the one thing that needs it: an effect
@@ -64,12 +66,15 @@ export const spriteUrl = (id, variant = null) =>
    A Dex GRID cell still gets nothing, and that is deliberate rather than
    forgotten: it is one `<img>` in a four-column grid with no container, which
    is why a tier's identity has to survive `filter` alone in the first place. */
-export function VariantFx({ id, variant }) {
+export function VariantFx({ id, variant, art = null }) {
   if (variant === "holo") {
     return (
       <span
         className="holo-foil"
-        style={{ "--art": `url(${spriteUrl(id)})` }}
+        /* `art` overrides the species sprite, and the only thing that uses it
+           is a coloured honey: the foil has to follow the honey JAR's outline
+           there, not a Pokemon's. Same layer, same animation, different mask. */
+        style={{ "--art": `url(${art ?? spriteUrl(id)})` }}
         aria-hidden="true"
       />
     );
@@ -111,5 +116,30 @@ export default function Sprite({
       alt={alt}
       loading="lazy"
     />
+  );
+}
+
+/* AN ITEM'S ICON, WEARING ITS TIER IF IT HAS ONE.
+
+   Three screens draw one - the shop shelf, the floating rail and the on-screen
+   effect readout - and the coloured honeys are the reason this is a component
+   rather than an `<img>` in each of them. A Holo Honey has no art of its own
+   and is not supposed to: it is the honey jar with the same foil travelling
+   over it that a Holo Pokemon wears, which is exactly what the item means and
+   costs nothing to draw. `artOf` is what knows they share one picture, so no
+   screen has to.
+
+   An item with no `tier` stays a bare `<img>`, because that is what every
+   other item is and a wrapper it does not need would change its layout. */
+export function ItemIcon({ item, className = "" }) {
+  const url = new URL(`items/${artOf(item)}.png`, document.baseURI).href;
+  if (!item?.tier) {
+    return <img className={className} src={url} alt="" />;
+  }
+  return (
+    <span className={`sprite-fx item-fx ${className}`.trim()}>
+      <img className={`sprite-${item.tier}`} src={url} alt="" />
+      <VariantFx variant={item.tier} art={url} />
+    </span>
   );
 }

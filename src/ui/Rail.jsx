@@ -63,7 +63,6 @@ export default function Rail({
   state, caught, level, busy,
   onSelect, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
   onTravel, onSpend, onBike, save, jumpTo, onJumped, daily, onClaimDaily,
-  onUseField,
 }) {
   const [tab, setTab] = useState("dex");
 
@@ -173,8 +172,7 @@ export default function Rail({
       {tab === "shop" && (
         <Shop money={state?.money ?? 0} bag={bag} level={level}
               stats={state?.stats} onBuy={onBuy}
-              candy={state?.candy ?? 0} onBuyCandy={onBuyCandy}
-              field={state?.field} onUseField={onUseField} />
+              candy={state?.candy ?? 0} onBuyCandy={onBuyCandy} />
       )}
       {tab === "map" && (
         <Travel areaId={state?.areaId} level={level} busy={busy} onTravel={onTravel} />

@@ -35,15 +35,32 @@ const KEYS = ["bicycle", "old-rod", "good-rod", "super-rod"];
    its real sprite: the shop row and the Box buttons were drawing a text star,
    and a drawn star next to eight real item icons reads as a placeholder. */
 const CURRENCY = ["rare-candy"];
-/* Field items. `honey` is Gen 4's own attract-Pokemon item, which is both the
-   right mechanic and a sprite that already exists - there is no `lure` in the
-   PokeAPI set at all, which is the sort of thing to check before naming a
-   feature after it. */
-const FIELD = ["honey", "repel"];
+/* Field items, in three families.
+
+   `lure`, `super-lure` and `max-lure` are NOT in the PokeAPI sprite set - all
+   three 404 - which is the sort of thing to check before naming a feature after
+   it. The `white-flute` IS there, and in Gen 3 it is already the item that
+   brings out rarer wild Pokemon, so it takes that job under its own name.
+
+   The repel line is real and really tiered, which is why it is the family that
+   gets tiers. And the three COLOURED HONEYS have no sprite here and want none:
+   a Holo Honey is the honey jar with the same foil travelling over it that a
+   Holo Pokemon wears, so they carry `art: "honey"` in items.js and are drawn
+   from this one file. Do not go looking for `honey-holo.png`. */
+const FIELD = [
+  "repel", "super-repel", "max-repel",
+  "white-flute",
+  "honey",
+];
+/* Berries, fed to the Pokemon standing in front of you. The Pokemon GO trio,
+   picked because each one keys off a DIFFERENT system already in this game -
+   the catch roll, the flee roll and the XP award - which is the same test the
+   four situational balls had to pass. */
+const BERRIES = ["razz-berry", "nanab-berry", "pinap-berry"];
 
 await mkdir("public/items", { recursive: true });
 const missing = [];
-for (const name of [...BALLS, ...TOOLS, ...KEYS, ...CURRENCY, ...FIELD]) {
+for (const name of [...BALLS, ...TOOLS, ...KEYS, ...CURRENCY, ...FIELD, ...BERRIES]) {
   const res = await fetch(`${BASE}/${name}.png`);
   if (!res.ok) {
     missing.push(`${name} (${res.status})`);

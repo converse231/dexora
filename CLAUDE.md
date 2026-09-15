@@ -23,7 +23,7 @@ there beats opening a ticket, because a ticket loses the reason.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   node tools/check.mjs (24 suites)
+npm run dev        vite dev server           npm run check   node tools/check.mjs (25 suites)
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
                                              npm run layout  composition metrics
@@ -615,9 +615,9 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 [tools/check.mjs](tools/check.mjs) adds twenty-four suites — catch rules, phase
 machine, balls, master balls, economy, evolution, evolution scene, trainer
 stats, casting, tileset, player, map ladder, medals, origin gate, variant rows,
-steps, minimap, battle scene, band budgets, pity, daily, field items, spawn
-ladder, areas. The count in the command table above is the same number; both
-are printed by the run, so a new suite means editing both.
+steps, minimap, battle scene, band budgets, pity, daily, field items, berries,
+spawn ladder, areas. The count in the command table above is the same number;
+both are printed by the run, so a new suite means editing both.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
 crown is whole. Biome ground and solid lists must be disjoint (an "invisible
@@ -1043,42 +1043,86 @@ with depth-tagged rows filtered out - counting them would assert that the
 feature does not work. Residents hold to half a point; the overlay moves meadow
 to 69.8/18.2/9.6 and that is progression.
 
-**ONE EXPONENT DECIDES HOW RARE THE WORLD IS, and it has two contributors.**
-`rarityPower(stats, honey)` is the only thing in the game that reshapes an
-encounter table by rarity: Fortune is a permanent investment in it and Honey is
-five hundred steps of one. They are the same number rather than two transforms
-stacked on one table - which is what the "three things reshaping one table need
-one rule, not three" note was about, and the pile-up it was warning against is
-a second `w ** q` pass anywhere. **Never add one.** The test that holds this has
-no literal in it: if Honey IS Fortune's exponent then what it is worth cannot
-depend on your Fortune rank, so check.mjs asserts the delta is the same at
-every rank. A second transform would compound and fail it.
+**THREE FIELD FAMILIES, THREE LEVERS, AND NO TWO ON THE SAME ONE.** `repel`
+scales how OFTEN an encounter happens, `rarity` (the White Flute) moves WHICH
+SPECIES through Fortune's own exponent, `variant` (the honeys) moves WHICH TIER
+through the variant roll. That separation is the whole answer to "three things
+reshaping one table need one rule, not three" - nothing here invents a
+mechanism, each borrows one the game already had. check.mjs asserts every item
+declares exactly ONE of `rate`/`tilt`/`lift`, that a family never mixes two, and
+that no two families share one; two families on one lever are one family with
+two names. **A new field item belongs to a family or it needs a new lever.**
+
+**`state.field` IS KEYED ON THE FAMILY, NOT THE ITEM ID.** That is what makes
+"one of each kind at a time" structural rather than a rule somebody enforces: a
+Max Repel replaces a Repel by being written to the same slot. Keyed on the id,
+two honeys could run at once and "what are the odds" would have two answers.
+
+**ONE EXPONENT DECIDES HOW RARE THE WORLD IS, and `tilt` is a NUMBER.**
+`rarityPower(stats, tilt)` is the only thing in the game that reshapes an
+encounter table by rarity: Fortune is a permanent investment in it and a White
+Flute is four hundred steps of one. They are the same number rather than two
+transforms stacked on one table, and the pile-up being guarded against is a
+second `w ** q` pass ANYWHERE. **Never add one.** The test has no literal in it:
+if the flute IS Fortune's exponent then what it is worth cannot depend on your
+Fortune rank, so check.mjs asserts the delta is the same at every rank. A
+second transform would compound and fail it.
 
 `RARITY_FLOOR` is insurance against a future retune, not a description of this
-one: maxed Fortune plus a Honey is 0.45 against a floor of 0.4, so the clamp
+one: maxed Fortune plus a flute is 0.45 against a floor of 0.4, so the clamp
 never fires today. Its assertion is therefore written against the CONSTANT -
 `22 ** RARITY_FLOOR > 2` - because what it exists to catch is somebody moving
 the coefficients above it. At exponent 0 every row in the table is worth the
 same and rarity stops existing.
 
-**REPEL IS ON THE OTHER AXIS AND MUST STAY THERE.** It scales `ENCOUNTER_RATE`
-and never touches the table - which is the honest reading of what a repel is
-for, crossing a map you have already farmed, and is what keeps the second field
-item off the thing the first one is already moving. check.mjs asserts the word
-`repel` appears in NEITHER `trainer.js` NOR `biomes.js`, which is a crude
-assertion and exactly the right one: the failure it guards is somebody giving
-it "a small table effect too".
+**REPEL IS ON ITS OWN AXIS AND MUST STAY THERE.** check.mjs asserts the word
+`repel` appears in the CODE of neither `trainer.js` nor `biomes.js` - comments
+stripped first, because the prose should absolutely name it and the first
+version of that assertion failed on the comment explaining the rule. Crude, and
+exactly right: the failure it guards is somebody giving it "a small table
+effect too".
 
-**BOUGHT IS USED, and that is why there is no bag screen.** Only one of each
-field item can run at a time, so stockpiling a consumable you cannot stack is
-an inventory for nothing. `useField(id)` charges through `pricedAt` - the same
-discount the shelf prints, or the row advertises a price nobody is charged -
-and ASSIGNS `state.field[id] = item.steps`. Assigning, not adding: `+=` makes
-the price of a long effect the price of a short one typed twice. Steps, not
-seconds, so an effect you paid for is not burned by walking away from the
-keyboard. The Shop row is the whole button and shows the steps left instead of
-the price while it runs; the on-screen readout sits opposite the minimap,
-because an effect paid for in steps belongs where the steps happen.
+**A COLOURED HONEY IS THE JAR PLUS THE TIER'S OWN TREATMENT.** `art: "honey"`
+points all four at one picture and `tier` is what makes a Holo Honey look like
+a Holo - the same foil, the same layer, masked to the jar instead of a
+creature. So `ItemIcon` is the one thing that draws an item (shop shelf,
+floating rail, effect readout) and `artOf(item)` is what knows they share art:
+the sprite assertion goes through it, or three correct items fail for missing
+files that should not exist. Adding a fifth tier adds its honey for free.
+**There is deliberately no Origin honey** - Origin is gated on catching every
+ordinary Pokemon of a generation, and an item that shortcuts a gate is the gate
+deleted. check.mjs asserts that absence, so it reads as a decision.
+
+**BOUGHT IS NO LONGER USED, and the reversal is the note.** These were
+buy-and-start in one click with no inventory, which was right while there were
+two of them and wrong the moment there were eight: you cannot carry a Max Repel
+for the cave you are about to enter if buying it starts it in the field you are
+standing in. They are ordinary bag items now - same shelf as the balls, same
+`buy()` - and `useField(id)` spends one out of `state.bag` and charges nothing.
+It ASSIGNS the step count; `+=` would make the price of a long effect the price
+of a short one typed twice. Steps, not seconds, so an effect is not burned by
+walking away from the keyboard. The readout sits opposite the minimap, because
+an effect paid for in steps belongs where the steps happen.
+
+**A BERRY MOVES ONE ROLL, AND THE THREE MOVE THREE DIFFERENT ONES** - the same
+test the four situational balls had to pass, and here it is checkable directly
+because each effect is its own field: Razz is `catchMult`, Nanab is `calm`,
+Pinap is `xpMult`. Two berries moving one number are one berry with two prices.
+
+**A RAZZ BERRY GOES THROUGH `liveMult`, NOT THROUGH `resolveThrow`.** That is
+the load-bearing half: `liveMult` is the single answer to "what is this ball
+worth against this Pokemon", the engine rolls with it and the rail prints it,
+so a berry applied anywhere else would make the rail advertise 3.0 over a throw
+that quietly used 4.5. Going through the ball also means going through
+`catchChance`'s own ceiling, so no berry can push anything to certainty and the
+ball ladder cannot invert - check.mjs sweeps every catch rate in the dex for
+both. The Master Ball is exempt: it is already past certain.
+
+**`fleeChance`'s `calm` is a MULTIPLIER, not a subtraction.** Subtracting
+flattens the slope this function exists to have, and takes the commonest
+species below zero - which is how "nothing ever flees at rate 255" became an
+assertion. A multiplier is worth most exactly where a berry gets spent: on the
+legendary that keeps running away.
 
 **A DAILY QUEST MUST BE FINISHABLE IN THE MAP YOU ARE STANDING IN.**
 `QUEST_TYPES` is derived from the STARTING map by weight share (>= `QUEST_SHARE`
@@ -1156,6 +1200,15 @@ so the next change to money cancelled the *previous* delta's removal: every one
 but the last stayed on screen for the rest of the session, stacked on one spot,
 and the array grew with it. Pruning by age on insert makes it self-healing and
 the timer only has to clear the last one.
+
+**A margin that belonged to the row was on one button.** `.sheet-close` carried
+`margin-top: 18px` from when it was the only control on the dex sheet. Put in a
+flex row beside SEE IN BOX, that margin pushed CLOSE down while its
+`align-items: stretch` sibling grew to the full line height - so SEE IN BOX came
+out as a tall square next to a short wide bar, with its label wrapped over two
+lines for good measure. The margin is the ROW's now, the label is `nowrap`, and
+both buttons measure 45px high on the same baseline. **When two things in a flex
+row are different heights, look for a margin that predates the row.**
 
 **Unseen dex cells fetched a sprite in order to hide it.** Every cell rendered an
 `<img>` and `.cell.unseen img { opacity: 0 }` hid it - a screenful of requests on

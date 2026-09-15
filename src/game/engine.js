@@ -27,7 +27,8 @@ import { medalsFor, milestoneAt } from "./medals.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE,
   evolveState, evoLevel, startingState, DEX_BONUS, levelReward,
-  evolutionRow, bestRod, holding, canRun, RUN_LEVEL, fieldById, REPEL_SCALE,
+  evolutionRow, bestRod, holding, canRun, RUN_LEVEL,
+  fieldById, berryById, FAMILIES,
   stepReward,
 } from "./items.js";
 import {
@@ -76,7 +77,11 @@ function freshState() {
     daily: { key: null, done: 0, claimed: false, streak: 0, last: null },
     /* Steps left on each field item. Counted in STEPS rather than seconds so
        an effect you paid for is not burned by walking away from the keyboard. */
-    field: { honey: 0, repel: 0 },
+    /* One RUNNING field item per family, `{ id, steps }` or null. Keyed on the
+       family rather than on the item id, so a Max Repel replaces a Repel by
+       being written to the same slot - "only one at a time" is then structural
+       rather than a rule somebody has to remember to enforce. */
+    field: Object.fromEntries(FAMILIES.map((f) => [f, null])),
     ...startingState(),
     rev: 0,
     /* One byte per species: has a SHINY of this one ever been registered. A
@@ -234,7 +239,17 @@ function loadState() {
       dry: Math.max(0, Math.floor(Number(s.dry) || 0)),
       // A save from before dailies simply has none, and gets today's.
       daily: { ...freshState().daily, ...(s.daily ?? {}) },
-      field: { ...freshState().field, ...(s.field ?? {}) },
+      /* FIELD EFFECTS CHANGED SHAPE. They were a step COUNT per item id and
+         are now one running item per family, so anything that is not the new
+         shape is DROPPED rather than coerced: a save can lose an effect it
+         paid for, but it cannot be allowed to carry a number where the rest of
+         the engine reads `.id` and `.steps`. */
+      field: Object.fromEntries(FAMILIES.map((fam) => {
+        const run = s.field?.[fam];
+        const ok = run && typeof run === "object"
+          && fieldById(run.id)?.family === fam && run.steps > 0;
+        return [fam, ok ? { id: run.id, steps: run.steps } : null];
+      })),
       /* MIGRATION. Running was a level check before it was an item, so a save
          written then is past level 15 with an empty shoe slot - and would
          have silently LOST the ability to run, which is the one change a
@@ -478,9 +493,10 @@ export function createEngine(canvas, onChange, mini = null) {
     walkFrame++;
     state.steps++;
     noteDaily({ steps: 1 });
-    // One step off every running effect, floored at zero.
-    for (const f of Object.keys(state.field)) {
-      if (state.field[f] > 0) state.field[f]--;
+    // One step off every running effect; the slot empties when it runs out.
+    for (const fam of FAMILIES) {
+      const run = state.field[fam];
+      if (run && --run.steps <= 0) state.field[fam] = null;
     }
 
     /* Walking pays. `stepReward` is pure and the panel calls it too, on the
@@ -512,11 +528,11 @@ export function createEngine(canvas, onChange, mini = null) {
        tile already proves it is walkable, so there is nothing left to test -
        anywhere you can put your feet, something can appear. */
     const biome = biomeFor(state.areaId);
-    /* REPEL IS THE OTHER AXIS. It changes how often an encounter happens and
-       never what it is - which is what keeps it off the table Fortune and
-       Honey are already moving, and is the honest reading of what a repel is
-       for: crossing a map you have already farmed. */
-    const rate = ENCOUNTER_RATE * (state.field.repel > 0 ? REPEL_SCALE : 1);
+    /* REPEL IS ITS OWN AXIS. It changes how OFTEN an encounter happens and
+       never what it is - which is what keeps it off the table the White Flute
+       and Fortune are already moving, and is the honest reading of what a
+       repel is for: crossing a map you have already farmed. */
+    const rate = ENCOUNTER_RATE * (running("repel")?.rate ?? 1);
     if (biome && !state.evolution && Math.random() < rate) {
       /* The level is part of the table, not a modifier on the roll: past Lv 8
          a map starts turning up the evolved forms of what already lives there.
@@ -554,8 +570,8 @@ export function createEngine(canvas, onChange, mini = null) {
   /* Fortune reshapes the table before the roll rather than after it, so the
      odds still sum to one and no entry can ever be dropped or invented. */
   function pickSpecies(table) {
-    // Honey feeds the SAME exponent Fortune does - see `rarityPower`.
-    const rolled = weighted(table, state.stats, state.field.honey > 0);
+    // The flute feeds the SAME exponent Fortune does - see `rarityPower`.
+    const rolled = weighted(table, state.stats, running("rarity")?.tilt ?? 0);
     const total = rolled.reduce((n, e) => n + e[1], 0);
     let r = Math.random() * total;
     for (const [id, w] of rolled) if ((r -= w) < 0) return speciesById(id);
@@ -586,8 +602,15 @@ export function createEngine(canvas, onChange, mini = null) {
        it resets on the ROLL rather than on the catch: the misery is not meeting
        one, and a player who met an Astral and lost it to a flee has still had
        the moment this exists to give them. */
+    /* A HONEY IS A SECOND KIND OF LUCK, so it is a second argument. Plain
+       Honey has no `tier` and lifts the whole ladder like pity does; a
+       coloured one names the tier it is for and leaves the rest alone. */
+    const honey = running("variant");
     const variant = rollVariant(
-      Math.random, lockedTiers(state.dex, sp.id), pityBoost(state.dry));
+      Math.random,
+      lockedTiers(state.dex, sp.id),
+      pityBoost(state.dry) * (honey && !honey.tier ? honey.lift : 1),
+      honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
 
     state.encounter = {
@@ -611,6 +634,9 @@ export function createEngine(canvas, onChange, mini = null) {
       /* Throws already made at THIS Pokemon. The Timer Ball reads it, and it
          is why a ball that breaks free is not simply a wasted ball. */
       throws: 0,
+      /* The berry it is eating, if any. On the encounter and not on `state`,
+         so it cannot outlive the Pokemon it was fed to. */
+      berry: null,
       /* Wild levels are 2-7, EXCEPT that nothing may appear below the level
          it evolves at: a wild Venusaur is a Lv 32 Venusaur. Rolled on top of
          that floor rather than replaced by it, so a found evolution is not
@@ -721,7 +747,14 @@ export function createEngine(canvas, onChange, mini = null) {
        same function - so what you were shown is what was rolled. Read BEFORE
        the throw is counted, because the Timer Ball's step is "throws that have
        already failed" and counting this one first would pay it a turn early. */
-    const result = resolveThrow(e.rate, liveMult(ball, e) * catchMult(state.stats));
+    /* The Razz Berry is already inside `liveMult` - see there for why. Only
+       the Nanab has to come through separately, because the flee roll is a
+       different roll and nothing else was ever going to carry it. */
+    const result = resolveThrow(
+      e.rate,
+      liveMult(ball, e) * catchMult(state.stats),
+      Math.random,
+      berryById(e.berry)?.calm ?? 1);
     e.throws += 1;
     e.pending = result;
     e.shakesTotal = result.shakes;
@@ -847,7 +880,12 @@ export function createEngine(canvas, onChange, mini = null) {
       // After the box push, so a medal cheer queues behind the shiny one.
       if (e.isNew) checkDexRewards(e.speciesId);
       const sp = speciesById(e.speciesId);
-      const gained = gainXp(xpForCatch(sp, e.isNew));
+      /* And the Pinap pays here, on the third of the three rolls a berry can
+         reach. Rounded, because XP is whole and a half-point that only ever
+         appears with a berry in play is a rounding difference nobody can
+         explain. */
+      const gained = gainXp(Math.round(
+        xpForCatch(sp, e.isNew) * (berryById(e.berry)?.xpMult ?? 1)));
 
       if (e.isNew) {
         state.money += DEX_BONUS;
@@ -1192,13 +1230,49 @@ export function createEngine(canvas, onChange, mini = null) {
      stack is an inventory for nothing. Buying starts the clock, and buying
      again while one is running REPLACES it rather than adding - otherwise the
      price of a long effect is just the price of a short one typed twice. */
+  /* WHAT IS RUNNING IN THIS FAMILY, as the item row rather than as a save
+     record - so every reader asks for the thing it actually wants (`.rate`,
+     `.tilt`, `.lift`) and none of them has to look the id up itself. One
+     function, because three copies of that lookup is three places for a
+     retired item id to survive in a save and read as `undefined`. */
+  function running(family) {
+    const run = state.field[family];
+    return run ? fieldById(run.id) : null;
+  }
+
+  /* USING one is spending one out of the bag. These used to be bought-and-
+     started in a single click with no inventory at all, which was right while
+     there were two of them and wrong the moment there were eight: you cannot
+     carry a Max Repel for the cave you are about to enter if buying it starts
+     it in the field you are standing in. They are ordinary bag items now, sold
+     by the same shelf as the balls and used from the same floating rail.
+
+     Starting one while another of its FAMILY runs replaces it, and the steps
+     on the old one are lost - the slot is the family, and a player who wants
+     both effects can have a repel and a honey, just not two honeys. */
   function useField(id) {
     const item = fieldById(id);
-    if (!item || levelFromXp(state.xp) < item.level) return false;
-    const cost = pricedAt(item.price, state.stats);
-    if (state.money < cost) return false;
-    state.money -= cost;
-    state.field[id] = item.steps;
+    if (!item || (state.bag[item.id] ?? 0) <= 0) return false;
+    state.bag[item.id] -= 1;
+    state.field[item.family] = { id: item.id, steps: item.steps };
+    save();
+    changed();
+    return true;
+  }
+
+  /* FEEDING one is the same shape, on the encounter instead of the map. One
+     berry at a time and feeding another replaces it, so the three are a choice
+     rather than a checklist you work through before every throw. It costs no
+     turn and risks nothing: a berry that could scare the Pokemon off would be
+     a berry nobody uses on the rare they bought it for. */
+  function useBerry(id) {
+    const e = state.encounter;
+    const berry = berryById(id);
+    if (!e || e.phase !== "idle") return false;
+    if (!berry || (state.bag[berry.id] ?? 0) <= 0) return false;
+    state.bag[berry.id] -= 1;
+    e.berry = berry.id;
+    e.msg = `${e.name} is eating the ${berry.name}.`;
     save();
     changed();
     return true;
@@ -1235,6 +1309,7 @@ export function createEngine(canvas, onChange, mini = null) {
     buy,
     buyCandy,
     useField,
+    useBerry,
     claimDaily,
     /* Read by the rail every render, so it is a function rather than a field:
        the day can turn over between two renders and a field would not know. */
