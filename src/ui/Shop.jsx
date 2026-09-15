@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import {
-  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, BERRIES, speciesNeedingStone,
+  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, BERRIES, onShelf, speciesNeedingStone,
 } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
@@ -67,7 +67,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
     return speciesNeedingStone(item.id).map((id) => label(speciesById(id))).join(" · ");
   };
 
-  const shelf = (items) =>
+  const rowsOf = (items) =>
     items.map((item) => {
       const locked = level < item.level;
       const afford = Math.floor(money / priceOf(item));
@@ -94,7 +94,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
             <ItemIcon item={item} />
             <span className="sh-title">
               <b>{item.name}</b>
-              <i title={blurb(item)}>{blurb(item)}</i>
+              <i data-tip={blurb(item)}>{blurb(item)}</i>
             </span>
             <span className="sh-tail">
               <b>{locked ? `LV ${item.level}` : `¥${priceOf(item).toLocaleString()}`}</b>
@@ -135,7 +135,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
               <button
                 type="button"
                 className="sh-max"
-                title={`Buy all ${afford} you can afford`}
+                data-tip={`Buy all ${afford} you can afford`}
                 disabled={afford < 1 || n === afford}
                 onClick={() => set(afford)}
               >
@@ -157,6 +157,29 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
         </div>
       );
     });
+
+  /* BELOW `rowsOf`, DELIBERATELY. It calls it, and a `const` arrow declared
+     above the one it calls is the shape that blanked the whole BOX tab once -
+     see the `SORTS` note in CLAUDE.md. It happens to be safe here (both are
+     initialised before render reaches either) and that is exactly how the last
+     one looked too. */
+  /* A shelf is the rows you can buy plus the one wall to aim at - see
+     `onShelf`. The count of what is behind that wall is printed under it, so
+     "there is more later" is said once instead of twenty-four times. */
+  const shelf = (items) => {
+    const { rows, later } = onShelf(items, level);
+    return (
+      <>
+        <div className="shoplist">{rowsOf(rows)}</div>
+        {later > 0 && (
+          <p className="shop-more">
+            +{later} more {later === 1 ? "unlocks" : "unlock"} as you level
+          </p>
+        )}
+      </>
+    );
+  };
+
 
   return (
     <div className="panel">
@@ -203,7 +226,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
               className="cr-buy"
               disabled={money < candyPrice * n}
               onClick={() => onBuyCandy(n)}
-              title={`¥${(candyPrice * n).toLocaleString()}`}
+              data-tip={`¥${(candyPrice * n).toLocaleString()}`}
             >
               +{n}
             </button>
@@ -216,7 +239,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
           <span>TO THROW</span>
         </div>
 
-        <div className="shoplist">{shelf(SHOP_BALLS)}</div>
+        {shelf(SHOP_BALLS)}
 
         <p className="shop-note">Better balls raise the odds, not the reward.</p>
 
@@ -236,7 +259,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
           <span>FED IN THE WILD</span>
         </div>
 
-        <div className="shoplist">{shelf(BERRIES)}</div>
+        {shelf(BERRIES)}
 
         <p className="shop-note">One berry at a time — the next one replaces it.</p>
 
@@ -245,7 +268,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
           <span>WHILE YOU WALK</span>
         </div>
 
-        <div className="shoplist">{shelf(FIELD)}</div>
+        {shelf(FIELD)}
 
         <p className="shop-note">
           One of each kind runs at a time, and they are spent in steps.
@@ -256,7 +279,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
           <span>+ THE LEVEL</span>
         </div>
 
-        <div className="shoplist">{shelf(STONES)}</div>
+        {shelf(STONES)}
 
         <p className="shop-note">
           A stone is used up by the evolution it makes.
@@ -265,7 +288,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
 
       {pending && (
         <Confirm
-          title={pending.title}
+          data-tip={pending.title}
           lines={pending.lines}
           confirmLabel={pending.confirmLabel}
           tone="buy"

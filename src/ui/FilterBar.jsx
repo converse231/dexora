@@ -198,7 +198,7 @@ export default function FilterBar({
             className={`fb-sel${s.value !== s.options[0][0] ? " on" : ""}`}
             value={s.value}
             aria-label={s.label}
-            title={s.label}
+            data-tip={s.label}
             onChange={(e) => s.onChange(e.target.value)}
           >
             {s.options.map(([value, text, n]) => (

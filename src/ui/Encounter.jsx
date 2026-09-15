@@ -78,7 +78,7 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           `battle/${enc.areaId ?? "ground"}.png`, document.baseURI).href})`,
       }}
       onClick={animating ? onSkip : undefined}
-      title={animating ? "Click to skip" : undefined}
+      data-tip={animating ? "Click to skip" : undefined}
       role="dialog"
       aria-label={`Wild ${enc.name} encounter`}
     >
@@ -213,7 +213,7 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
             - a Poke Ball beside a name has meant "registered" since 1996, and
             the tooltip and the label carry it for anyone it does not. */}
         {enc.known && (
-          <span className="np-caught" title="Already in the Pokédex">
+          <span className="np-caught" data-tip="Already in the Pokédex">
             <img src="items/poke-ball.png" alt="Already caught" />
           </span>
         )}

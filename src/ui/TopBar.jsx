@@ -32,7 +32,7 @@ export default function TopBar({
 
       <div
         className="tb-lv"
-        title={need ? `${into} / ${need} XP to Lv ${level + 1}` : "Max level"}
+        data-tip={need ? `${into} / ${need} XP to Lv ${level + 1}` : "Max level"}
       >
         <span className="tb-lv-num">LV <b>{level}</b></span>
         <span className="xpbar"><i style={{ width: `${Math.round(frac * 100)}%` }} /></span>

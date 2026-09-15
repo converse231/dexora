@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { createEngine, VIEW_W, VIEW_H } from "./game/engine.js";
 import { TILE } from "./game/tileset.js";
 import TopBar from "./ui/TopBar.jsx";
+import Tip from "./ui/Tip.jsx";
 import Rail from "./ui/Rail.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
@@ -222,6 +223,11 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* ONE of these, at the root, for the whole app - see Tip.jsx for why it
+          is an attribute rather than a wrapper. It renders nothing until
+          something is hovered or focused. */}
+      <Tip />
+
       {/* Above every other overlay: it can land during an encounter or an
           evolution, and both of those already own the middle of the screen. */}
       {cheer && <Cheer cheer={cheer} onDone={() => engine.dropCheer()} />}
@@ -278,7 +284,7 @@ export default function App() {
                   return (
                     <span
                       key={fam}
-                      title={`${item.name} — ${item.blurb}. ${run.steps} steps left.`}
+                      data-tip={`${item.name} — ${item.blurb}. ${run.steps} steps left.`}
                     >
                       <ItemIcon item={item} />
                       {run.steps}

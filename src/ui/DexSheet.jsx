@@ -253,7 +253,7 @@ export default function DexSheet({
             <button
               className="sheet-inbox"
               onClick={() => onFindInBox(id)}
-              title={`Find your ${owned > 1 ? `${owned} ` : ""}${label(sp)} in the Box`}
+              data-tip={`Find your ${owned > 1 ? `${owned} ` : ""}${label(sp)} in the Box`}
             >
               SEE IN BOX{owned > 1 ? ` · ${owned}` : ""}
             </button>

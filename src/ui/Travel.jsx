@@ -26,7 +26,7 @@ export default function Travel({ areaId, level = 1, onTravel, busy }) {
               className={`arearow${here ? " here" : ""}${open ? "" : " locked"}`}
               disabled={here || busy || !open}
               onClick={() => onTravel(b.id)}
-              title={open ? undefined : `Opens at level ${b.level}`}
+              data-tip={open ? undefined : `Opens at level ${b.level}`}
             >
               <span className="ar-name">{b.name}</span>
               <Types of={b.types} className="ar-types" />

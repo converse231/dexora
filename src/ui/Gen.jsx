@@ -16,7 +16,7 @@ import { genOf } from "../game/biomes.js";
 export default function Gen({ id, className = "" }) {
   const gen = genOf(id);
   return (
-    <span className={`gen ${className}`.trim()} title={`Generation ${gen}`}>
+    <span className={`gen ${className}`.trim()} data-tip={`Generation ${gen}`}>
       GEN {gen}
     </span>
   );

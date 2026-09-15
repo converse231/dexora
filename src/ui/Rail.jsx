@@ -129,7 +129,7 @@ export default function Rail({
             <span className="tab-name">{id.toUpperCase()}</span>
             {badges[id] ? (
               <em
-                title={id === "you"
+                data-tip={id === "you"
                   ? (badges.you === "!" ? "today's quest is ready" : "points to spend")
                   : "ready to evolve"}
               >

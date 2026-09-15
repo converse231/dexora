@@ -81,7 +81,7 @@ export default function Trainer({ stats, level, bag, biking, onSpend, onBike, sa
           showing what arrives rather than asking "are you sure" about nothing. */}
       {offer && (
         <Confirm
-          title="Load this save?"
+          data-tip="Load this save?"
           tone="warn"
           lines={[
             ["File", offer.name],
@@ -163,7 +163,7 @@ export default function Trainer({ stats, level, bag, biking, onSpend, onBike, sa
                   className="tr-add"
                   disabled={!can}
                   onClick={() => spend(stat.id)}
-                  title={
+                  data-tip={
                     maxed ? "Already at maximum"
                       : free < 1 ? "No points to spend"
                         : `${stat.name} ${r + 1}: ${stat.effect(r + 1)}`

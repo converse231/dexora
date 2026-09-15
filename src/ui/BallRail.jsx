@@ -69,7 +69,10 @@ export default function BallRail({
                 onClick: onToggle,
                 "aria-expanded": expanded,
                 "aria-label": expanded ? "Hide the ball rail" : "Show the ball rail",
-                title: expanded
+                /* A KEY IN A SPREAD, not an attribute - which is why the
+                   sweep that converted every `title=` in the app missed this
+                   one. It already carries its own `aria-label`. */
+                "data-tip": expanded
                   ? "Hide the balls"
                   : `${total} balls in the bag — click to show`,
               })}
@@ -111,7 +114,7 @@ export default function BallRail({
                   <Tag
                     className={`br-ball${earned ? " master" : ""}` +
                                `${boosted ? " boosted" : ""}`}
-                    title={`${ball.name} — ${odds}` +
+                    data-tip={`${ball.name} — ${odds}` +
                            `${ball.hint ? ` ${ball.hint}` : ""}` +
                            `${live ? `  (key ${key})` : ""}`}
                     {...(live
@@ -145,7 +148,12 @@ export default function BallRail({
                     <button
                       type="button"
                       className={`br-ball br-item${on ? " on" : ""}`}
-                      title={`${item.name} — ${item.blurb}` +
+                      /* Its icon is decorative (alt=""), so without this the
+                         button has no accessible name at all - `data-tip` is a
+                         visual, where the native `title` it replaced was also
+                         a label. Anything icon-only needs one back. */
+                      aria-label={item.name}
+                      data-tip={`${item.name} — ${item.blurb}` +
                              `${on ? "  (running)" : ""}`}
                       onClick={() => (enc ? onUseBerry?.(item.id) : onUseField?.(item.id))}
                       /* During an encounter the berries are live only while a

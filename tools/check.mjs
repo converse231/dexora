@@ -14,6 +14,12 @@ import {
 
 const near = (a, b) => Math.abs(a - b) < 0.005;
 
+/* How many characters the shop's description slot actually holds. Measured in
+   a rendered shop at the tightest the row ever gets (169px, next to "you have
+   12"), not estimated - the same mistake the 21-character ball hint made, and
+   for the same reason: the COUNT'S DIGITS share the line. */
+const BLURB_FITS = 27;
+
 // --- odds -----------------------------------------------------------------
 /* THE CEILING BELONGS TO THE BALL, NOT THE GAME. A single flat 0.95 made
    every ball identical against the fifteen commonest species in the dex - a
@@ -2863,7 +2869,13 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
       assert.ok(forSale(f), `${f.id} is not buyable`);
       assert.ok(f.level > 1 && f.level < MAX_LEVEL, `${f.id} is gated off the ladder`);
       assert.ok(f.steps > 100, `${f.id} runs out before you have walked anywhere`);
-      assert.ok(f.blurb.length <= 32, `${f.id}'s blurb will clip in the row`);
+      /* MEASURED, not chosen: the shop's description slot is 169px and fits
+         27 characters at that font, taken off the rendered row rather than
+         estimated. A stone's blurb is a list of species names and overruns it
+         by design - that is what the tooltip is for - but a blurb we WRITE
+         should fit the box it is printed in. */
+      assert.ok(f.blurb.length <= BLURB_FITS,
+        `${f.id}'s blurb is ${f.blurb.length} chars and the row fits ${BLURB_FITS}`);
       assert.ok(pricedAt(f.price, { ...emptyStats(), haggle: MAX_RANK }) < f.price,
         `${f.id} ignores Haggle`);
     }
@@ -2959,7 +2971,8 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
       used.push(mine[0]);
       assert.ok(forSale(b), `${b.id} is not buyable`);
       assert.ok(b.level > 1 && b.level < MAX_LEVEL, `${b.id} is gated off the ladder`);
-      assert.ok(b.blurb.length <= 32, `${b.id}'s blurb will clip in the row`);
+      assert.ok(b.blurb.length <= BLURB_FITS,
+        `${b.id}'s blurb is ${b.blurb.length} chars and the row fits ${BLURB_FITS}`);
     }
     assert.equal(new Set(used).size, used.length,
       "two berries move the same number - then they are one berry");
