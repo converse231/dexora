@@ -568,6 +568,22 @@ canvas {
 }
 .np-name { font-family: var(--display); font-weight: 600; font-size: 17px; font-size: 3.2cqw; }
 .np-lv { font-family: var(--pixel); font-size: 10px; font-size: 1.7cqw; color: var(--ink-soft); }
+/* HOW BIG THIS ONE IS, and it is deliberately the quietest thing on the plate.
+   The name, the level and the types are what a throw is decided on; this is
+   flavour, and flavour that competes with the decision is noise. The XS/XL tag
+   is the only part allowed to shout, and only about one in ten has one. */
+.np-size {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--pixel); font-size: 1cqw; color: var(--ink-faint);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.np-size b {
+  padding: .15cqw .35cqw; border-radius: 4px;
+  background: var(--ink-faint); color: var(--surface); font-weight: 400;
+}
+.np-size.np-xl b { background: var(--gold); color: #3a2c05; }
+.np-size.np-xs b { background: var(--path); color: #fff; }
+
 .np-types { display: flex; gap: 4px; }
 .np-gen { font-size: 1.35cqw; }
 /* Green because green already means "this one is done" here - it is what a

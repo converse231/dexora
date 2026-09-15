@@ -67,6 +67,9 @@ function tick(ms = 16, steps = 1) {
 
 const { createEngine } = await import("../src/game/engine.js");
 const { BALLS } = await import("../src/game/items.js");
+const {
+  wildBand, biomeFor, bornLevel, SIZE_MIN, SIZE_MAX,
+} = await import("../src/game/biomes.js");
 
 // --------------------------------------------------------------- the harness
 function boot(save) {
@@ -155,12 +158,29 @@ function until(e, what, label, max = 2000) {
   assert.ok(caught, "forty Ultra Balls and nothing was ever caught");
   assert.ok(caught.species > 0 && caught.level > 0, "a caught Pokémon with no species or level");
 
+  /* THE SIZE HAS TO SURVIVE THE CATCH. It is rolled on the encounter and
+     copied onto the box entry, and the failure is silent in the worst way: the
+     enormous Rattata you threw six balls at is an ordinary one in the Box,
+     because `sizeOf` quietly falls back to the uid hash when nothing was
+     stored. Only a real catch goes through that copy. */
+  assert.ok(caught.size >= SIZE_MIN && caught.size <= SIZE_MAX,
+    `a caught Pokémon came out of the ball with size ${caught.size}`);
+
+  /* AND IT MUST BE IN THE MAP'S OWN BAND. The band is computed from the biome
+     the encounter started in, which nothing but the engine knows. */
+  {
+    const [lo, hi] = wildBand(biomeFor(e.state.areaId));
+    const floor = Math.max(bornLevel(caught.species) + 2, lo);
+    assert.ok(caught.level >= floor && caught.level <= floor + (hi - lo),
+      `caught at Lv ${caught.level}, outside ${floor}-${floor + hi - lo} for this map`);
+  }
+
   /* AND THE ENCOUNTER HAS TO CLOSE. A catch that registers but leaves the
      overlay up is the same bug wearing a different face. */
   until(e, (s) => !s.encounter, "the encounter to close after a catch", 4000);
   assert.equal(e.state.caught > 0, true, "the catch counter never moved");
-  console.log(`catch ok — caught #${caught.species} at Lv ${caught.level}, ` +
-    `box ${e.state.box.length}, encounter closed`);
+  console.log(`catch ok — caught #${caught.species} at Lv ${caught.level} ` +
+    `(size ${caught.size}), box ${e.state.box.length}, encounter closed`);
 }
 
 /* A BERRY MUST NOT BREAK THE THROW. Each of the three touches a different roll

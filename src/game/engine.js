@@ -12,7 +12,7 @@ import {
   levelFromXp, xpForCatch,
   rodTable, rodBite,
   rollVariant, pityBoost, TIERS,
-  lockedTiers, originReady,
+  lockedTiers, originReady, wildBand, rollSize,
 } from "./biomes.js";
 import {
   emptyStats, canSpend, catchMult, weighted, stepScale,
@@ -645,11 +645,22 @@ export function createEngine(canvas, onChange, mini = null) {
       /* The berry it is eating, if any. On the encounter and not on `state`,
          so it cannot outlive the Pokemon it was fed to. */
       berry: null,
-      /* Wild levels are 2-7, EXCEPT that nothing may appear below the level
-         it evolves at: a wild Venusaur is a Lv 32 Venusaur. Rolled on top of
-         that floor rather than replaced by it, so a found evolution is not
-         pinned to exactly its threshold. */
-      level: bornLevel(sp.id) + 2 + Math.floor(Math.random() * 6),
+      /* THE MAP'S OWN BAND, so a late map feels late instead of merely
+         containing later species - `wildBand` reads it off the ladder.
+         Whichever is higher wins: nothing may appear below the level it
+         evolves at (a wild Venusaur is a Lv 32 Venusaur wherever you meet it),
+         and the `+ 2` on that floor is why a found evolution is not pinned to
+         exactly its own threshold. */
+      level: (() => {
+        const [lo, hi] = wildBand(biomeFor(state.areaId));
+        const floor = Math.max(bornLevel(sp.id) + 2, lo);
+        return floor + Math.floor(Math.random() * (hi - lo + 1));
+      })(),
+      /* How big THIS one is, as a percentage of the species' own figures.
+         Rolled here so every screen agrees and a re-render cannot change it,
+         and carried onto the box entry so the Rattata you caught for being
+         enormous is still enormous when you go and look at it. */
+      size: rollSize(),
       phase: "idle",
       shakesDone: 0,
       shakesTotal: 0,
@@ -865,6 +876,7 @@ export function createEngine(canvas, onChange, mini = null) {
         uid: state.nextUid++,
         species: e.speciesId,
         level: e.level,
+        size: e.size,
         ...(roll ? { [roll]: 1 } : {}),
         at: Date.now(),
       });
