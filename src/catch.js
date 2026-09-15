@@ -53,6 +53,17 @@ export function catchChance(rate, ballMult) {
    end of it. Losing a rare to a flee on throw two is the version of this game
    nobody wants to play.
 
+   HALVED AGAIN, and in the same direction as before. `0.12 + .3x` still lost a
+   legendary two encounters in five, which is the number that hurts: the maps
+   are four times the size now, so meeting one is four times the walk, and a
+   coin flip at the end of that walk is not a challenge, it is the session. A
+   common now waits through twenty throws and a legendary through five.
+
+   THE SLOPE IS THE PART THAT MATTERS and both numbers moved together, so
+   rarity still flees more - which is what stops this from being "nothing ever
+   runs". If either half is retuned alone, check the pair still points apart
+   from `PLAIN_MULT`, and check `fleeChance(3) > fleeChance(255)` still holds.
+
    `calm` is a Nanab Berry, and it is a MULTIPLIER on the whole line rather
    than a subtraction from it. Subtracting would flatten the slope - the thing
    this function exists to have - and would take the commonest species to a
@@ -60,7 +71,7 @@ export function catchChance(rate, ballMult) {
    multiplier keeps rarity feeling like rarity and is worth most exactly where
    you would spend a berry: on the legendary that keeps running away. */
 export function fleeChance(rate, calm = 1) {
-  return (0.12 + (1 - rate / 255) * 0.3) * calm;
+  return (0.05 + (1 - rate / 255) * 0.15) * calm;
 }
 
 /* How close was a losing roll? 3 shakes = agonising, 0 = never had a chance.
