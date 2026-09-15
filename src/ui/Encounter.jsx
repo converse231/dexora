@@ -48,7 +48,9 @@ import Mark from "./Marks.jsx";
    a SECOND berry replay it: remounting is the only way to restart a CSS
    animation, and a boolean that is already true cannot say "again". */
 function Eating({ enc }) {
-  const berry = enc.berry && berryById(enc.berry.id);
+  // The one most recently fed - `e.ate` is bumped for every feed, and what
+  // tosses in is whichever slot was written last.
+  const berry = enc.lastAte && berryById(enc.lastAte);
   if (!berry || !enc.ate) return null;
   return (
     <img

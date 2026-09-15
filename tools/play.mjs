@@ -199,15 +199,19 @@ function until(e, what, label, max = 2000) {
     const { e } = boot(SAVE);
     assert.ok(walkToEncounter(e), `met nothing while testing ${berry}`);
     assert.equal(e.useBerry(berry), true, `${berry} refused to be fed`);
-    assert.equal(e.state.encounter.berry?.id, berry, `${berry} did not land on the encounter`);
-    assert.equal(e.state.encounter.berry.stage, 1, `${berry} landed at the wrong depth`);
+    const eff = berryById(berry).effect;
+    assert.equal(e.state.encounter.berries?.[eff]?.id, berry,
+      `${berry} did not land in its own effect slot`);
+    assert.equal(e.state.encounter.berries[eff].stage, 1,
+      `${berry} landed at the wrong depth`);
     /* FEEDING THE SAME ONE AGAIN either deepens it or is refused outright, and
        which of the two is a fact about the berry - never "spent and ignored". */
     const cap = berryById(berry).stages;
     const again = e.useBerry(berry);
     if (cap > 1) {
       assert.equal(again, true, `a second ${berry} was refused below its cap`);
-      assert.equal(e.state.encounter.berry.stage, 2, `a second ${berry} did not deepen it`);
+      assert.equal(e.state.encounter.berries[eff].stage, 2,
+        `a second ${berry} did not deepen it`);
     } else {
       assert.equal(again, false, `a second ${berry} was eaten for nothing`);
     }

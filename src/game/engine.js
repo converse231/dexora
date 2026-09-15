@@ -653,7 +653,10 @@ export function createEngine(canvas, onChange, mini = null) {
       throws: 0,
       /* The berry it is eating, if any. On the encounter and not on `state`,
          so it cannot outlive the Pokemon it was fed to. */
-      berry: null,
+      /* One slot per EFFECT, so a Razz cannot take a Nanab away - see
+         `berryRoom`. The three move three different rolls and nothing about
+         them collides. */
+      berries: {},
       /* THE MAP'S OWN BAND, so a late map feels late instead of merely
          containing later species - `wildBand` reads it off the ladder.
          Whichever is higher wins: nothing may appear below the level it
@@ -782,7 +785,7 @@ export function createEngine(canvas, onChange, mini = null) {
       e.rate,
       liveMult(ball, e) * catchMult(state.stats),
       Math.random,
-      berryCalm(e.berry));
+      berryCalm(e.berries));
     e.throws += 1;
     e.pending = result;
     e.shakesTotal = result.shakes;
@@ -913,7 +916,7 @@ export function createEngine(canvas, onChange, mini = null) {
          reach. Rounded, because XP is whole and a half-point that only ever
          appears with a berry in play is a rounding difference nobody can
          explain. */
-      const gained = gainXp(Math.round(xpForCatch(sp, e.isNew) * berryXp(e.berry)));
+      const gained = gainXp(Math.round(xpForCatch(sp, e.isNew) * berryXp(e.berries)));
 
       if (e.isNew) {
         state.money += DEX_BONUS;
@@ -1307,15 +1310,18 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!berry || (state.bag[berry.id] ?? 0) <= 0) return false;
     /* A BERRY AT ITS CAP IS NOT EATEN. Feeding a fourth Razz used to spend one
        and change nothing; "cannot stack" should cost a click, not a berry. */
-    if (!berryRoom(e.berry, id)) return false;
+    if (!berryRoom(e.berries, id)) return false;
     state.bag[berry.id] -= 1;
-    // Same berry deepens; a different one replaces, at stage 1.
-    const stage = e.berry?.id === id ? (e.berry.stage ?? 1) + 1 : 1;
-    e.berry = { id, stage };
+    // Same berry deepens; a different one of the SAME EFFECT replaces it; one
+    // of a different effect joins it.
+    const held = e.berries[berry.effect];
+    const stage = held?.id === id ? (held.stage ?? 1) + 1 : 1;
+    e.berries = { ...e.berries, [berry.effect]: { id, stage } };
     /* The one frame the UI hangs the "it was used" animation off. Bumped every
        feed, so a second Razz replays it - a counter, not a flag, because a flag
        that is already true cannot say "again". */
     e.ate = (e.ate ?? 0) + 1;
+    e.lastAte = id;      // which one to draw tossing in
     e.msg = stage > 1
       ? `${e.name} is eating another ${berry.name}!`
       : `${e.name} is eating the ${berry.name}.`;
