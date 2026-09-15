@@ -288,7 +288,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
 
       {pending && (
         <Confirm
-          data-tip={pending.title}
+          title={pending.title}
           lines={pending.lines}
           confirmLabel={pending.confirmLabel}
           tone="buy"

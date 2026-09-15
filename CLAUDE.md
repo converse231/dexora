@@ -36,7 +36,7 @@ there beats opening a ticket, because a ticket loses the reason.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   check.mjs (31) + play.mjs
+npm run dev        vite dev server           npm run check   check.mjs (30) + play.mjs
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
 npm run play       drive the engine in Node
@@ -687,11 +687,12 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 `ladders_clear()`, whenever a pool is placed.
 - spawn not inside a wall; ≥200 walkable tiles; ≥90% reachable (directed)
 
-[tools/check.mjs](tools/check.mjs) adds thirty-one suites — catch rules, phase
+[tools/check.mjs](tools/check.mjs) adds thirty suites — catch rules, phase
 machine, balls, master balls, economy, evolution, evolution scene, trainer
 stats, casting, tileset, player, map ladder, medals, origin gate, variant rows,
 steps, minimap, battle scene, band budgets, pity, daily, field items, berries,
-origin art, senses, spawn ladder, clock, habitat, save migration, areas. The count in the command table above is the same number;
+origin art, senses, spawn ladder, clock, habitat, save migration, confirm,
+areas. The count in the command table above is the same number;
 both are printed by the run, so a new suite means editing both.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
@@ -1094,6 +1095,30 @@ never at all eighty. `state.medals` banks the ids so nothing can pay twice, and
 check.mjs walks a whole dex asserting every medal fires **exactly once** and
 prints the total payout, because a reward table is exactly the sort of thing
 that grows a zero by accident.
+
+**A SAVE THAT FAILS TO LOAD MUST SURVIVE THE SESSION THAT COULD NOT READ IT.**
+`loadState` catches everything and falls back to `freshState()`, which is right
+— a save you cannot read should not stop you playing. What was wrong is what
+happened NEXT: the first step called `save()` and wrote the fresh state straight
+over the file that had failed. One bad parse and a real collection was gone,
+with nothing anywhere to recover from and no message saying so. It has now cost
+two.
+
+Three keys, and the other two exist because of that. **BROKEN** is the raw text
+of anything that failed, kept verbatim by `stash()` on EVERY failure path and
+never parsed — the one thing you want from a file you cannot read is the file.
+**BACKUP** is the last save that loaded cleanly, written at LOAD time and not at
+save time, so it is always a whole previous session rather than a copy of
+whatever went wrong a moment ago. `recoverable()` is what the Trainer panel
+reads, so the offer only appears when there is something behind it, and
+`restore()` validates through `saveProblem` and reloads — the same path
+`importSave` takes, for the same reason.
+
+It does not take a bug in this file to trigger it: a dev server hot-reloads a
+source edit the moment it is typed, so a half-applied change to the save shape
+is live in an open tab before it is finished. tools/play drives a real session
+over a truncated save and asserts the overwrite HAPPENED (or the test proves
+nothing) and that the original survived it anyway.
 
 **One validator for a save, wherever it came from.** `saveProblem()` is used by
 both `loadState` (localStorage) and `importSave` (a chosen file). It is
