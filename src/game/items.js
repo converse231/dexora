@@ -227,17 +227,23 @@ export const FIELD = [
      Canon durations are 100 / 200 / 250 steps. Ours are longer because a step
      here is a tile on a 30-wide map rather than a step in a whole region, and
      100 of them is one crossing. The RATIO is what was copied. */
+  /* A REPEL IS TOTAL, and the tiers are DURATION rather than strength. It used
+     to scale the encounter rate to 0.55 / 0.35 / 0.20, which is a repel that
+     mostly works - and "mostly" is the one thing it must not be, because the
+     entire reason to carry one is crossing ground you have already farmed
+     without being stopped. Nothing appears while one is running; what you pay
+     more for is how far it gets you. */
   {
     id: "repel", family: "repel", name: "Repel", price: 200, level: 8,
-    steps: 200, rate: 0.55, blurb: "Fewer wild Pokémon",
+    steps: 200, rate: 0, blurb: "No wild Pokémon, 200 steps",
   },
   {
     id: "super-repel", family: "repel", name: "Super Repel", price: 450, level: 12,
-    steps: 400, rate: 0.35, blurb: "Far fewer wild Pokémon",
+    steps: 450, rate: 0, blurb: "No wild Pokémon, 450 steps",
   },
   {
     id: "max-repel", family: "repel", name: "Max Repel", price: 800, level: 16,
-    steps: 700, rate: 0.2, blurb: "Almost none at all",
+    steps: 900, rate: 0, blurb: "No wild Pokémon, 900 steps",
   },
 
   /* --- rarity: WHICH SPECIES -------------------------------------------

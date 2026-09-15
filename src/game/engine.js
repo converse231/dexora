@@ -1282,6 +1282,13 @@ export function createEngine(canvas, onChange, mini = null) {
     const item = fieldById(id);
     if (!item || (state.bag[item.id] ?? 0) <= 0) return false;
     state.bag[item.id] -= 1;
+    /* ONE EFFECT AT A TIME, whatever family it belongs to. The families are
+       still what stops two of the same KIND colliding - see items.js - but a
+       repel and a honey running together is a contradiction a player can buy:
+       one says "meet nothing" and the other says "what you meet is rarer".
+       Starting anything cancels everything, so the readout can only ever have
+       one thing to say and the two cannot argue. */
+    for (const fam of FAMILIES) state.field[fam] = null;
     state.field[item.family] = { id: item.id, steps: item.steps };
     save();
     changed();

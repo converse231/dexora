@@ -121,9 +121,18 @@ export default function Box({
         ...evolveState(g.hero, bag, row),
       }));
       g.ready = g.paths.some((p) => p.ready);
-      // The bar tracks the nearest branch, so it always shows real progress.
-      g.at = g.paths.length ? Math.min(...g.paths.map((x) => x.at)) : 0;
-      g.need = g.paths.length ? Math.min(...g.paths.map((x) => x.need)) : 0;
+      /* THE NEAREST BRANCH YOU HAVE NOT REACHED YET, not the nearest branch.
+         Slowpoke evolves into Slowbro at 37 and into Slowking on a trade, which
+         `evoLevel` gives a synthetic 16 - so `min` was 16, and the moment you
+         passed it `need` became 0, the RAISE button hid itself (it only shows
+         while `need > 0`) and Slowbro was unreachable for the rest of the game.
+         Reported as "Slowking is blocking Slowbro", which is exactly what it
+         was doing. Every branch you have already reached is dropped from the
+         reckoning, so RAISE goes on offering the next one you have not. */
+      const far = g.paths.filter((x) => x.need > 0);
+      g.at = far.length ? Math.min(...far.map((x) => x.at))
+        : (g.paths.length ? Math.max(...g.paths.map((x) => x.at)) : 0);
+      g.need = far.length ? Math.min(...far.map((x) => x.need)) : 0;
       // Only a stone stands between you and it: a different sentence entirely.
       g.stoneOnly = g.paths.some((x) => x.need === 0 && !x.hasStone);
     }

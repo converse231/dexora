@@ -478,6 +478,35 @@ export const LEGEND_MATCHED = 0.5;
    the signal the rule was always supposed to send. */
 export const LEGEND_STRAY = 0.03;
 
+/* A HOME IS THE PRIMARY TYPE, and matching on any type was not enough.
+
+   Articuno is Ice/Flying, and the starting map is Normal/Flying - so it was
+   exactly as likely in Tall Grass as in Frost Hollow, which is the opposite of
+   the thing "hunt where it lives" is supposed to mean. Same for Zapdos and
+   Moltres: all three birds shared a type with the map you start on, so none of
+   them had a home at all.
+
+   A Pokemon's FIRST type is its primary one, which is a fact already in the
+   data and needs no per-species table. Three tiers now: the map that shares the
+   primary type is the home, a map that shares only a later one is a haunt, and
+   everywhere else is a stray. Articuno is 0.5 in Frost Hollow, 0.15 in Tall
+   Grass and 0.03 elsewhere - so the ice bird lives in the ice cave and can
+   still turn up anywhere, which is what this rule was always for. */
+export const LEGEND_HOME = 0.5;
+export const LEGEND_HAUNT = 0.15;
+
+/* What one legendary is worth in one place. Exported because it is the RULE,
+   and the rule is the only thing worth asserting: a legendary's share of a
+   finished table is confounded twice over - by how big that map's table is,
+   and by how many other legendaries call the same map home. Celebi looked
+   commoner in Deep Woods than in its own Haunted Tower on both of those
+   measures, and was correctly weighted the whole time. */
+export const legendTier = (speciesId, types) => {
+  const mine = speciesById(speciesId)?.types ?? [];
+  if (mine.length && types.includes(mine[0])) return LEGEND_HOME;
+  return mine.some((t) => types.includes(t)) ? LEGEND_HAUNT : LEGEND_STRAY;
+};
+
 /* A DEX ID IS NOT AN ARRAY INDEX, and the whole codebase assumed it was.
 
    `speciesById(id)` and `dex[id - 1]` are correct for exactly one shape of
@@ -506,8 +535,7 @@ export const dexIndex = (id) => byIndex.get(id) ?? -1;
 const legendsFor = (types, total, open = () => true) => {
   const live = LEGENDARY.filter(open);
   if (!live.length || total <= 0) return [];
-  const raw = live.map((id) => (speciesById(id)?.types ?? [])
-    .some((t) => types.includes(t)) ? LEGEND_MATCHED : LEGEND_STRAY);
+  const raw = live.map((id) => legendTier(id, types));
   const sum = raw.reduce((n, w) => n + w, 0);
   const budget = (total * LEGEND_SHARE) / (1 - LEGEND_SHARE);
   return live.map((id, i) => [id, (budget * raw[i]) / sum]);
