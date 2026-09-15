@@ -138,6 +138,67 @@ Two traps that tool hit, both worth knowing:
   "these look like there repeating but they're actually not". Resolving them
   took the interior from 83% to 99%.
 
+## Four times the map: what scaling one actually breaks
+
+Every area is four times the area it was - 10,068 tiles to 40,740, which is
+4.05x - and almost nothing about that was a matter of changing W and H. What it
+was, over and over, was **a rule that held for one of a thing and not for four**.
+Worth reading before growing anything else here.
+
+**PLACE NOTHING ON GENERATED GROUND.** Three separate faults, all the same one:
+staircases hard-coded onto composed cave floor came down into rock; ledges
+placed by coordinate were cut to two tiles by a path column, a tree wall, a pond
+corner and a tree `fill_the_empty` had stood on the approach - four different
+obstacles on one map; and spawns typed in by hand landed inside a trunk.
+`stair_cols`, `ledge_in` and the spawn searches all answer the same way the
+spring and the craters already did. **If the ground under a thing is derived,
+the thing has to be searched for.**
+
+**AND LAY IT LAST.** `ledge_in` runs after every tree is standing, because
+`fill_the_empty` puts trees where the map is emptiest and "emptiest" is exactly
+where a ledge was just given its approach.
+
+**ORDER IS A DESIGN DECISION, NOT A TIDINESS ONE.** Eight tree masses were added
+to the meadow and `open` went UP, because they were painted before the fields
+and the fields cut them to pieces. A mass beats grass and loses to the path - a
+wood with a route through it - and that is the order the three are painted in.
+
+**`turns` AND `tight` PULL APART, AND THE CLUMP SIZE IS THE LEVER.** A 2x3 clump
+is six tiles of adjacency for eight corners; a 2x5 is ten for the same eight. The
+meadow wanted mass (turns 0.25 -> 0.14) and got `tight` back at the same count by
+going taller. Pond & Shore wanted the opposite - it came out at turns 0.08, BELOW
+the band, because a lake is already one enormous straight-edged mass - and took
+eighty short clumps instead of thirty-eight tall ones.
+
+**A COMB IS ONE CORRIDOR.** Deep Woods is a comb of canopy teeth, and seven cross
+walls - each a correct odd run - cut off 2,746 of 3,061 tiles between them. A wall
+across a lane is not a wall in a maze, it is the end of the maze. What breaks up
+long runs there is clearings and ponds: holes in the floor cannot disconnect
+anything.
+
+**A CONNECTIVITY TEST THAT ASKS A BOOLEAN CANNOT COUNT.** `punch_ladders` kept a
+ladder only if the map went from broken to whole, which is right for two levels
+and wrong for three - no single ladder can finish the job while another band is
+solid, so every one looked useless and was reverted. `islands()` counts, and a
+ladder earns its place by lowering that count.
+
+**`join_islands` CARVES THROUGH WHATEVER IS STAMPED**, so `keep` is not optional
+once there is more than one set piece: a cliff became floor and the plateau above
+it dropped onto open ground. And **anything it carves on a transcribed map stops
+being a copy** - a tile turned from wall into floor is not the tile Game Freak
+put there, and left with its own id it draws a wall you can walk through.
+
+**A COPY CANNOT BE STRETCHED.** Frost Hollow IS Seafoam Islands B3F. It grew the
+only way a copy honestly can: by copying more of Seafoam - four floors, in a
+square, joined by passages that tunnel to the nearest ice because every Seafoam
+floor is drawn with a solid border and nothing is ever adjacent to a seam.
+
+**AND A GENERATOR CAP IS A MAP SIZE IN DISGUISE.** `forestId` walked down at most
+64 tiles to find where its mass ended, which was twice the tallest canopy that
+had ever existed - and then a map was 89 rows tall and every border tile above
+row 24 paired from the wrong foot. Sliced crowns down both edges. **Grep for
+bounded loops before growing a map.**
+
 ## Composition: the part that was still done by eye
 
 Tiles are measured; layout was not, and it showed - the Power Plant and Ember

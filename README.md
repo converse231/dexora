@@ -2750,6 +2750,45 @@ same `Daily.jsx` the rail used to, rather than a second smaller copy that would
 drift — and the claim moved with it, because two places to claim from would be
 two sources for one number.
 
+### Four times the world
+
+*Phase 5's main item. No new maps, no weather, travel stays a menu — the eight
+that exist, four times the size, with four times in them.*
+
+| | was | is | walkable |
+|---|---|---|---|
+| Tall Grass | 32x40 | **64x80** | 762 → 2,724 |
+| Deep Woods | 36x45 | **72x89** | 609 → 3,452 |
+| Pond & Shore | 42x34 | **84x68** | 768 → 2,524 |
+| Rock Ridge | 42x32 | **84x64** | ~1,000 → 2,799 |
+| Power Plant | 40x30 | **80x60** | 546 → 2,584 |
+| Ember Caldera | 44x32 | **88x64** | 453 → 2,175 |
+| Frost Hollow | 38x22 | **78x46** | 332 → 1,829 |
+| Haunted Tower | 34x28 | **76x54** | 309 → 1,280 |
+
+10,068 tiles to 40,740 — 4.05x — and the composition flag list went **down**,
+from nine to six, on maps four times the size. The Power Plant had been flagged
+on three of its six numbers since the tooling was written and cleared all of
+them; Pond & Shore cleared two of three; the meadow cleared `open` and `turns`.
+
+**The extra space is not spent on more field.** Every map that measured "too
+open with nothing near you" got tree masses, machine ranks or pillars rather
+than more ground — because `open`, `turns` and `tight` are the numbers that say
+"this feels empty", and they are the numbers that moved.
+
+**Almost none of it was changing W and H.** What it was, over and over, was a
+rule that held for one of a thing and not for four — a staircase placed on
+generated floor, a ledge derived by hand against four layers of painting, a
+connectivity test that asked a boolean where it needed a count, a generator cap
+set at twice the tallest map that had ever existed. Those are written up in
+CLAUDE.md under *Four times the map*, because they are what the next person
+growing something here will hit.
+
+**And one map could not be scaled at all.** Frost Hollow *is* Seafoam Islands
+B3F, read out of its own map.bin, so it grew the only way a copy honestly can:
+by copying more of Seafoam. Four floors, in a square, in the order you would
+walk them.
+
 ### Phase 5 — More world
 
 *Goal: your first stated want — more maps, or bigger ones.*
