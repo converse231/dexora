@@ -1403,8 +1403,10 @@ Fixed weights survive exactly one dex size: 5 legendaries became 24 and the
 tables tripled, which would have multiplied the rate by five. Adding a
 generation, a legendary or a map now moves nothing.
 
-**A generation ARRIVES, on `GEN_UNLOCK`.** Johto at 22, Sinnoh at 35, filtered
-inside `encounterTable` by the level it already took. Pouring 207 species into
+**A generation ARRIVES, on `GEN_UNLOCK`.** Johto at 22, Hoenn at 28, Sinnoh at
+35, filtered inside `encounterTable` by the level it already took. Measured in
+the starting map: 52 species and 100% Kanto at Lv 15, then 109 species and 29%
+Johto the moment 22 lands. Pouring 207 species into
 the tables on day one would have halved every measured weight in `RESIDENTS` by
 arithmetic nobody chose. A generation with no entry is open from the start,
 which is the right default for the hole.
