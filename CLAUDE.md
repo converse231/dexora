@@ -1403,13 +1403,34 @@ Fixed weights survive exactly one dex size: 5 legendaries became 24 and the
 tables tripled, which would have multiplied the rate by five. Adding a
 generation, a legendary or a map now moves nothing.
 
-**A generation ARRIVES, on `GEN_UNLOCK`.** Johto at 22, Hoenn at 28, Sinnoh at
-35, filtered inside `encounterTable` by the level it already took. Measured in
-the starting map: 52 species and 100% Kanto at Lv 15, then 109 species and 29%
-Johto the moment 22 lands. Pouring 207 species into
-the tables on day one would have halved every measured weight in `RESIDENTS` by
-arithmetic nobody chose. A generation with no entry is open from the start,
-which is the right default for the hole.
+**A generation ARRIVES, and `GEN_UNLOCK` IS DERIVED FROM `GEN_LAST`.** Gen 1
+from the first minute, then one every `GEN_STEP` (5) levels from `GEN_FIRST`
+(10): Johto 10, Hoenn 15, Sinnoh 20, and the five that have not shipped already
+paced through Paldea at 45. Filtered inside `encounterTable` by the level it
+already took, so it is a filter and not a mechanism.
+
+**Derived, because the default is the dangerous one.** `genOpen` treats a
+generation with no entry as open from the FIRST minute - right for a hole in the
+dex, and exactly wrong for a generation somebody forgot to add a gate for. A
+table would have to be remembered on the day Unova ships; this cannot be.
+check.mjs asserts one gate per entry in `GEN_LAST`, that they climb, and that
+the last lands under `MAX_LEVEL` - the same shape as `MAP_LAST < MAX_LEVEL`,
+and what pins `GEN_STEP`: at 8 the ladder runs to Lv 66 and the last three
+generations ship unreachable.
+
+**THE LEVELS CAME DOWN FROM 22/28/35, AND HALF THE ARGUMENT FOR THEM WAS STALE.**
+They were justified by "every weight in `RESIDENTS` would be quietly halved",
+measured back when adding Johto and Sinnoh tripled Tall Grass's rare band
+(5.1% -> 15.4%). That was before `BAND_SHAPE` and `balance()`. Measured now,
+Lv 1 to Lv 50 in Tall Grass: the C band moves **78.2% -> 71.8%** and the S band
+**3.2% -> 3.3%**. The mix those levels were defending is already defended, by
+the thing whose job it is.
+
+**What a generation actually dilutes is one species' FINDABILITY**, and that is
+the number to watch when this moves: Pidgey, the weight-22 anchor of the
+starting table, goes 12.4% of encounters at Lv 1 to 5.4% at Lv 50. A daily quest
+and a specific hunt both feel that, and nothing else measures it. It is why the
+ladder is spread rather than front-loaded.
 
 **Origin is DEBUT artwork, not Gen 1 artwork.** `DEBUT` in build_origin.py maps
 each range to its own source set - Yellow/Red-Blue for Kanto, Crystal/Gold for

@@ -50,24 +50,41 @@ import { EVOLUTIONS } from "../data/evolutions.js";
    day one appears. Added late it would just be a label. */
 export const GEN_LAST = [151, 251, 386, 493, 649, 721, 809, 905, 1025];
 
-/* WHEN A GENERATION SHOWS UP.
+/* WHEN A GENERATION SHOWS UP - DERIVED FROM `GEN_LAST`, NOT TABLED.
 
-   207 new species could have been poured into the eight tables on day one, and
-   that would have wrecked the thing this game is actually tuned around: the
-   first hour. A new trainer in Tall Grass would meet Bidoof before Pidgey, and
-   every weight in `RESIDENTS` - measured, argued over, and correct - would have
-   been quietly halved by arithmetic nobody chose.
+   A generation ARRIVES rather than being poured in: Gen 1 from the first
+   minute, one more every `GEN_STEP` levels after `GEN_FIRST`. It reuses
+   `encounterTable`'s existing level argument, so it is a filter rather than a
+   mechanism - and it turns "we added 200 Pokemon" from a dilution into an
+   event.
 
-   So a generation ARRIVES, on the same clock the maps do. Gen 1 from the first
-   minute; Johto once the map ladder is finished (20) and you have seen the
-   whole world; Sinnoh later still. It reuses `encounterTable`'s existing level
-   argument, so it is a filter rather than a mechanism - and it turns "we added
-   200 Pokemon" from a dilution into an event.
+   THE LEVELS CAME DOWN, AND THE OLD ARGUMENT FOR THEM WAS HALF WRONG. They
+   were 22/28/35, justified by "every weight in `RESIDENTS` would be quietly
+   halved" - which was measured before `balance()` existed and is no longer what
+   happens. Measured now, in Tall Grass, from Lv 1 to Lv 50: the C band moves
+   78.2% -> 71.8% and the S band 3.2% -> 3.3%. `BAND_SHAPE` and `balance()`
+   hold the rarity mix almost exactly, which is their whole job, so the dilution
+   the old levels were defending against is already defended.
 
-   A generation with no entry here is open from the start, which is the right
-   default for a hole: Gen 3 does not ship, and if it ever does it will want a
-   number rather than special-casing. */
-export const GEN_UNLOCK = { 1: 1, 2: 22, 3: 28, 4: 35 };
+   WHAT ACTUALLY DILUTES IS ONE SPECIES' FINDABILITY, and that is the number to
+   watch when this moves: Pidgey, the weight-22 anchor of the starting table,
+   goes 12.4% of encounters at Lv 1 to 5.4% at Lv 50. That is the real cost of a
+   generation and it is the thing a daily quest and a specific hunt both feel.
+   It is also why the ladder is spread rather than front-loaded.
+
+   DERIVED SO THE REST OF THE NATIONAL DEX IS ALREADY PACED. `GEN_LAST` carries
+   all nine generations, so this builds all nine gates: Johto at 10 through
+   Paldea at 45, with `MAX_LEVEL` 50 leaving room past the last one. Shipping
+   Unova is then a fetch range and nothing here - the alternative is a table
+   that has to be remembered on the day, and a generation with no entry in it
+   opens from the FIRST minute, which is the one failure mode that dumps 156
+   species into a new trainer's first hour. check.mjs asserts the last gate
+   still lands below the cap. */
+export const GEN_FIRST = 10;   // Johto
+export const GEN_STEP = 5;     // and one more every this many levels
+
+export const GEN_UNLOCK = Object.fromEntries(GEN_LAST.map(
+  (_, i) => [i + 1, i === 0 ? 1 : GEN_FIRST + (i - 1) * GEN_STEP]));
 
 /* EVERY SHAPE `SPECIES` HAS EVER HAD, newest last.
 

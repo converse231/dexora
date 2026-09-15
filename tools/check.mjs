@@ -188,6 +188,7 @@ import {
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
   LIFT_CEILING, hasOrigin, tiersFor, ART_GEN, baseArtGen,
   LEGEND_HOME, LEGEND_HAUNT, legendTier, LAYOUTS, layoutIds,
+  GEN_FIRST, GEN_STEP,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
   SIZE_MIN, SIZE_MAX,
 } from "../src/game/biomes.js";
@@ -3606,6 +3607,48 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     }
   }
   console.log(`confirm ok — all ${dialogs} dialogs pass a title Confirm actually reads`);
+}
+
+/* THE GENERATION LADDER IS DERIVED, so the thing to assert is the SHAPE - and
+   the one failure that is silent. `genOpen` treats a generation with no entry
+   as open from the first minute, which is the right default for a hole in the
+   dex and exactly wrong for a generation nobody got round to adding a gate for:
+   ship Unova that way and 156 species land in a new trainer's first hour. */
+{
+  assert.equal(Object.keys(GEN_UNLOCK).length, GEN_LAST.length,
+    "a generation in GEN_LAST has no arrival level - it would open at Lv 1");
+  assert.equal(GEN_UNLOCK[1], 1, "Gen 1 must be there from the first minute");
+
+  let prev = 0;
+  for (let g = 1; g <= GEN_LAST.length; g++) {
+    assert.ok(GEN_UNLOCK[g] > prev, `generation ${g} does not arrive after ${g - 1}`);
+    prev = GEN_UNLOCK[g];
+  }
+  /* AND THE LAST ONE HAS TO BE REACHABLE. A gate at or above the cap is a
+     generation that ships and can never be met - the same shape as MAP_LAST <
+     MAX_LEVEL, and it is why the step is what it is. */
+  assert.ok(prev < MAX_LEVEL,
+    `the last generation opens at Lv ${prev} against a cap of ${MAX_LEVEL} - ` +
+    `at GEN_STEP ${GEN_STEP} the ladder has outgrown the level curve`);
+
+  /* The mix the old levels were defending is defended by `balance()`, not by
+     the gates - measured, because this is the claim that let them come down. */
+  const band = (lv) => {
+    const out = {}; let total = 0;
+    for (const [id, w] of encounterTable(BIOMES[0], lv)) {
+      const t = speciesById(id)?.tier;
+      if (!t) continue;
+      out[t] = (out[t] ?? 0) + w; total += w;
+    }
+    return { C: out.C / total, S: out.S / total };
+  };
+  const day1 = band(1), endgame = band(MAX_LEVEL);
+  assert.ok(Math.abs(day1.C - endgame.C) < 0.12,
+    `the starting map's common band moves ${((day1.C - endgame.C) * 100).toFixed(1)} ` +
+    "points across the whole ladder - balance() is no longer holding the mix");
+  console.log(`generations ok — Gen 1 at 1, then every ${GEN_STEP} from ${GEN_FIRST}; ` +
+    `${GEN_LAST.length} gates ending at Lv ${prev} under a cap of ${MAX_LEVEL}; ` +
+    `Tall Grass commons ${(day1.C * 100).toFixed(1)}% → ${(endgame.C * 100).toFixed(1)}%`);
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);
