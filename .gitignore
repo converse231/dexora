@@ -20,3 +20,6 @@ __pycache__/
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# Vite writes these beside the config while the dev server reloads it.
+vite.config.js.timestamp-*
