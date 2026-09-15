@@ -1278,7 +1278,7 @@ def overhang(g):
 
 
 def deep_woods():
-    """Deep Woods: a maze of canopy, after Viridian Forest.
+    """Deep Woods: four times the forest, after Viridian Forest.
 
     The opposite composition to Tall Grass. A route is an open field with a path
     threading through it; a forest is the other way round - the trees are the
@@ -1287,89 +1287,168 @@ def deep_woods():
     solid rectangles, corridors between masses run two to four tiles wide, and
     sand appears as open clearings rather than as a path.
 
-    36x45, of which 30x35 is playable. The odd height is not arbitrary - see
-    canopy(). Every mass below is annotated with the run it actually forms once
-    the border is counted in, because that run is what has to come out odd."""
-    W, H = 36, 45
+    72x90, of which 66x80 is playable.
+
+    THE MAZE IS GENERATED, AND THE PARITY IS WHY. A canopy column is
+    `crown + (midA, midB) x n + trunk + shadow` and so is ALWAYS an odd number
+    of rows; even leaves half a crown stranded, which check() refuses. At
+    fourteen hand-listed walls that was a comment per wall counting the run it
+    forms once the border is merged in. At thirty it is a mistake waiting to
+    happen, so the walls are laid by a rule that cannot get it wrong: a comb,
+    alternately hanging off the top border and the bottom one, with every run
+    worked out from H rather than typed.
+
+    A comb is also the right SHAPE for a forest - it is one corridor that
+    doubles back on itself the length of the map, which is what makes Viridian
+    Forest feel like somewhere you get lost rather than a grid of blocks."""
+    # H IS ODD, and that is not a rounding choice: the left and right borders
+    # are canopy columns the full height of the map, so H itself has to be an
+    # odd run or the frame stalls the build before anything else is drawn.
+    W, H = 72, 89
     g = [["." for _ in range(W)] for _ in range(H)]
 
     # --- the frame -------------------------------------------------------
     # Five deep, so an edge with nothing hanging off it still reads as two rows
     # of trees over a trunk: crown, upper, lower, trunk, shadow.
-    canopy(g, 0, 0, W - 1, 4)             # runs 0..4   h=5
-    canopy(g, 0, H - 5, W - 1, H - 1)     # runs 40..44 h=5
-    canopy(g, 0, 0, 2, H - 1)             # runs 0..44  h=45
-    canopy(g, W - 3, 0, W - 1, H - 1)     # runs 0..44  h=45
+    canopy(g, 0, 0, W - 1, 4)
+    canopy(g, 0, H - 5, W - 1, H - 1)
+    canopy(g, 0, 0, 2, H - 1)
+    canopy(g, W - 3, 0, W - 1, H - 1)
 
-    # --- the maze: 3-wide walls, corridors of three between them ---------
-    # Read as a spiral inward from the north-west, which is what keeps a forest
-    # feeling like it doubles back on itself rather than like a grid of blocks.
-    # The three that start at row 5 hang off the north border and merge with it.
-    canopy(g, 6, 5, 8, 14)                # merges to 0..14  h=15
-    canopy(g, 12, 5, 14, 12)              # merges to 0..12  h=13
-    canopy(g, 24, 5, 26, 12)              # merges to 0..12  h=13
+    # --- the comb ---------------------------------------------------------
+    # Teeth three wide on the three-column grid, three-wide corridors between
+    # them. A tooth hanging off the top merges with rows 0..4, so its run is
+    # 0..end and `end` has to be EVEN for an odd length; one hanging off the
+    # bottom runs start..H-1, so `start` has to make H-start odd. Both are
+    # derived, and `assert` says so rather than a comment claiming it.
+    # TWO CORRIDOR WIDTHS, and that is what the clearings need. Teeth spaced
+    # evenly six apart leave nothing but three-wide lanes, and a clearing or a
+    # pond wider than three punches straight through a tooth - which showed up
+    # as a canopy column 62 tall where the arithmetic said 77. Alternating the
+    # spacing leaves a three-wide lane to thread and a six-wide one to stand in,
+    # which is also the range Viridian Forest's own corridors run at.
+    teeth = []
+    for k, x in enumerate((6, 12, 21, 27, 36, 42, 51, 57)):
+        if k % 2 == 0:
+            end = H - 12 if k % 4 == 0 else H - 24    # long tooth, short tooth
+            end -= end % 2                            # run 0..end must be odd
+            teeth.append((x, 5, end))
+        else:
+            start = 11 if k % 4 == 1 else 23
+            start += (H - start) % 2 == 0             # run start..H-1 odd
+            teeth.append((x, start, H - 6))
+    for x, y0, y1 in teeth:
+        canopy(g, x, y0, x + 2, y1)
 
-    canopy(g, 18, 9, 20, 21)              # h=13
-    canopy(g, 30, 9, 32, 19)              # h=11
-    canopy(g, 3, 17, 5, 27)               # h=11
-    canopy(g, 9, 17, 14, 23)              # h=7,  six across
-    canopy(g, 24, 17, 26, 25)             # h=9
-    canopy(g, 18, 25, 20, 33)             # h=9
-    canopy(g, 24, 29, 32, 33)             # h=5,  a long east-west wall
-    canopy(g, 12, 27, 14, 37)             # h=11
-    canopy(g, 6, 30, 8, 39)               # merges to 30..44 h=15
-    canopy(g, 27, 36, 29, 39)             # merges to 36..44 h=9
+    # --- no cross walls, and that is a finding ---------------------------
+    # Seven were tried, each an odd run of its own, and every one SEALED the
+    # lane it crossed: the comb is a single serpentine corridor, so a wall
+    # spanning a lane is not a wall in a maze, it is the end of the maze. 2,746
+    # of 3,061 walkable tiles were cut off. What breaks up the long runs here is
+    # the clearings and the ponds, which are holes in the floor rather than
+    # walls across it, and they cannot disconnect anything.
 
     # --- clearings: open sand, wide enough to read as somewhere ----------
     # Viridian Forest's sand is a clearing, not a path - a broad rectangle you
-    # walk out into. Placed in the corridors, never over a mass, because these
-    # overwrite whatever is under them.
-    rect(g, "#", 21, 5, 23, 10)
-    rect(g, "#", 15, 23, 17, 26)
-    rect(g, "#", 21, 35, 26, 39)
-    rect(g, "#", 21, 33, 23, 34)
+    # walk out into. Placed in the corridors, never over a mass.
+    # Every one of these sits inside a six-wide lane: x 15-20, 30-35, 45-50 or
+    # 60-68. A clearing that overlaps a tooth is a canopy column with a hole in
+    # it, and the column assertion is what catches that.
+    for x0, y0, x1, y1 in (
+            (15, 8, 20, 14), (30, 20, 35, 26), (45, 10, 50, 16),
+            (60, 30, 66, 36), (15, 44, 20, 50), (45, 46, 50, 52),
+            (30, 60, 35, 66), (60, 66, 66, 72), (15, 70, 20, 76),
+    ):
+        rect(g, "#", x0, y0, x1, y1)
 
-    # --- a pool in a clearing --------------------------------------------
-    rect(g, "w", 28, 20, 32, 22)
-    rect(g, "b", 28, 23, 32, 23)
+    # --- two pools, each in its own clearing ------------------------------
+    # In the wide lanes too, for the same reason.
+    rect(g, "w", 30, 8, 35, 12)
+    rect(g, "b", 30, 13, 35, 13)
+
+    rect(g, "w", 45, 68, 50, 72)
+    rect(g, "b", 45, 73, 50, 73)
+
+    # --- and the steps that stop a tooth being a comb tooth ---------------
+    # Measured: the first version came out at `straight 18.9` where Viridian
+    # Forest's own canopy runs 7.1, which is the number for "this reads as a
+    # row of combs". A real canopy mass is big - its masses are few and its fill
+    # is 0.90 - and its EDGE is stepped, so the fix is not smaller masses, it is
+    # a shoulder every few rows.
+    #
+    # A spur is its own column, three wide on the three-column grid, with its
+    # own odd run, so it steps the edge without touching the parity of the tooth
+    # it hangs off. AFTER the clearings and the ponds, and only onto plain
+    # floor: drawn before them, a clearing cut one in half and left a canopy
+    # column two tall, which is a thing the tileset has no pieces for.
+    # ONLY INTO THE SIX-WIDE LANES. A spur is three wide, so one reaching into
+    # a three-wide lane IS the lane - the first version sealed the forest down
+    # to 183 walkable tiles. These are the columns where three tiles of corridor
+    # are left over, derived from the tooth spacing above.
+    # ONE SIDE PER LANE. With both, two spurs from neighbouring teeth reach
+    # into the same six-wide lane at the same height and fill it between them -
+    # 2,786 of 3,407 tiles cut off. Each lane takes its steps from its western
+    # wall only, so three tiles of it always survive.
+    WIDE = {15, 30, 45, 60}
+    import random as _r
+    rng = _r.Random(20260916)
+    for k, (x, y0, y1) in enumerate(teeth):
+        side = 3 if k % 2 == 0 else -3
+        y = y0 + 4
+        while y < y1 - 8:
+            h = rng.choice((3, 5, 5, 7))          # odd runs only
+            sx = x + side
+            # The row above and below must be clear too, or two spurs from
+            # neighbouring teeth that meet in the same column merge into one
+            # run - and two odd runs end to end are an even one.
+            if (sx in WIDE and y + h - 1 < y1
+                    and all(g[yy][xx] == "."
+                            for yy in range(y - 1, y + h + 1)
+                            for xx in range(sx, sx + 3))):
+                canopy(g, sx, y, sx + 2, y + h - 1)
+            y += h + rng.choice((4, 6, 8))
+            side = -side
 
     # --- tall grass: solid rectangles over whatever floor is left --------
     # A fifth of Viridian Forest's floor is tall grass. Painted with the guard
     # so a field can never eat a clearing or the pond it runs up against.
-    onto_grass(g, ",", 9, 5, 11, 14)
-    onto_grass(g, ",", 15, 5, 17, 8)
-    onto_grass(g, ",", 27, 5, 29, 16)
-    onto_grass(g, ",", 21, 11, 23, 16)
-    onto_grass(g, ",", 6, 17, 8, 27)
-    onto_grass(g, ",", 15, 17, 17, 22)
-    onto_grass(g, ",", 21, 18, 23, 24)
-    onto_grass(g, ",", 27, 24, 32, 28)
-    onto_grass(g, ",", 3, 28, 11, 29)
-    onto_grass(g, ",", 9, 33, 11, 39)
-    onto_grass(g, ",", 15, 29, 17, 34)
-    onto_grass(g, ",", 18, 35, 20, 39)
-    onto_grass(g, ",", 30, 35, 32, 39)
-    onto_grass(g, ",", 3, 35, 5, 39)
+    # These use the guard, so they can be laid over anything and will only take
+    # the floor - a field can never eat a clearing, a pond or a tooth.
+    for x0, y0, x1, y1 in (
+            (9, 6, 11, 24), (15, 18, 20, 30), (24, 6, 26, 20),
+            (30, 30, 35, 44), (39, 8, 41, 22), (45, 20, 50, 34),
+            (54, 6, 56, 24), (60, 10, 66, 24), (3, 20, 5, 40),
+            (9, 38, 11, 56), (15, 54, 20, 68), (24, 50, 26, 70),
+            (30, 70, 35, 82), (39, 34, 41, 52), (45, 76, 50, 82),
+            (54, 30, 56, 50), (60, 42, 66, 60), (3, 60, 5, 80),
+            (24, 24, 26, 36), (39, 58, 41, 76),
+    ):
+        onto_grass(g, ",", x0, y0, x1, y1)
 
     # --- ledges, where a corridor doubles back ---------------------------
-    ledge(g, 21, 23, 17)
-    ledge(g, 6, 8, 28)
-    ledge(g, 15, 17, 28)
+    # Searched rather than placed - see `ledge_in`. A forest corridor is three
+    # wide, so most rows have nowhere to put one; the ones that do are the
+    # corners where the comb turns back, which is exactly where a shortcut
+    # belongs.
+    for row in range(14, H - 10, 8):
+        ledge_in(g, row, 3, W - 4, most=8)
 
-    # --- flowers, in loose handfuls on whatever grass is left ------------
-    flowers(g, (4, 7), (5, 9), (3, 11), (4, 14))
-    flowers(g, (16, 10), (17, 13), (15, 15))
-    flowers(g, (28, 25), (30, 26), (29, 34))
-    flowers(g, (4, 36), (3, 38), (5, 33))
-    flowers(g, (19, 22), (20, 23), (12, 25), (13, 24))
+    repair_trees(g, W, H, ".")
 
-    shore(g)
-    overhang(g)
-
-    # Standing in the southern clearing, facing into the trees.
-
-    make_nooks(g, want=3)            # a few corners with one way in
-    return ["".join(r) for r in g], (22, 37)
+    # SEARCHED, like everything else on a map this size. The comb's teeth are
+    # derived from H, so which tile is floor near the bottom edge is a
+    # consequence of that arithmetic rather than something to read off a
+    # drawing - and a spawn typed in by hand landed inside a trunk.
+    spawn = None
+    for y in range(H - 6, 5, -1):
+        for x in range(4, W - 4):
+            if g[y][x] not in SOLID and g[y - 1][x] not in SOLID:
+                spawn = (x, y)
+                break
+        if spawn:
+            break
+    assert spawn, "woods: nowhere to stand"
+    return ["".join(r) for r in g], spawn
 
 
 def pier(g, x0, y0, x1, y1):
