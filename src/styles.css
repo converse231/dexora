@@ -1239,10 +1239,7 @@ canvas {
 .ts-file { position: relative; overflow: hidden; }
 .ts-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .ts-file.off { opacity: .45; cursor: default; }
-.ts-note {
-  margin: 0; font-family: var(--pixel); font-size: 10px; line-height: 1.5;
-  color: var(--path);
-}
+
 
 .tr-add {
   grid-area: add;
@@ -1900,6 +1897,22 @@ canvas {
   font-family: var(--pixel); font-size: 11px; color: var(--ink-faint);
   text-align: center; padding: 26px 0; line-height: 2;
 }
+/* The sheet's footer is two buttons now: a way onward and a way out. CLOSE
+   stays the wide one - it is what most people press - and SEE IN BOX takes
+   only what it needs. */
+.sheet-actions { display: flex; gap: 8px; }
+.sheet-actions .sheet-close { flex: 1; }
+/* GREEN, not the path rose. Rose is what SELL wears in the confirm dialog and
+   what a caught cell is tinted with - beside a green CLOSE it read as the
+   destructive half of the pair, which is backwards: this is the way onward. */
+.sheet-inbox {
+  flex: none;
+  font-family: var(--pixel); font-size: 10px; padding: 11px 13px 9px;
+  border: 2px solid var(--canopy); border-radius: 10px;
+  background: var(--canopy); color: #f4faf2; cursor: pointer;
+}
+.sheet-inbox:hover { filter: brightness(1.12); }
+
 .sheet-close {
   display: block; width: 100%; margin-top: 18px;
   font-family: var(--pixel); font-size: 11px; padding: 12px;
@@ -1996,15 +2009,24 @@ canvas {
    the same button as selling junk. */
 .boxrow button.risky { border-style: dashed; color: var(--ink-soft); }
 
-.bx-flash {
-  margin: 0;
-  padding: 9px 12px;
+/* One alert for the whole game - see Note.jsx. It replaced `.bx-flash`, a pink
+   bordered slab, and `.ts-note`, a line of small green pixel text: two ways of
+   saying "that worked", neither wrong alone and obviously wrong together.
+
+   Quieter than the slab was. This sits above a list you are reading, not over
+   it, so it announces without taking the eye off the thing it is about. */
+.note {
+  margin: 0 0 8px;
+  padding: 7px 11px;
   border-radius: 8px;
-  background: var(--path-soft);
-  border: 1px solid var(--path);
-  font-size: 13.5px;
+  border: 1px solid var(--line-firm);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-size: 12.5px;
   animation: shout-in 300ms ease both;
 }
+.note-ok { border-color: var(--path); color: var(--path); }
+.note-warn { border-color: var(--gold); color: var(--ink); }
 
 /* ---------------------------------------------------------------- evolution
 

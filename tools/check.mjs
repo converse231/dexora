@@ -2210,7 +2210,14 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       "the regions do not add up to the dex");
     for (const g of GENERATIONS) {
       assert.ok(g.count > 0, `${g.name} is an empty region in the Dex filter`);
-      assert.ok(g.name && !/^Gen /.test(g.name), `region ${g.gen} has no name`);
+      /* `region` is the place; `name` is the menu label, "Gen 1 (Kanto)". This
+         tested `name` for a "Gen " prefix as the sign of the unnamed fallback,
+         and the label legitimately starts that way now - so it asks `region`,
+         which is the field that actually falls back. */
+      assert.ok(g.region && !/^\d+$/.test(g.region),
+        `region ${g.gen} has no name of its own`);
+      assert.equal(g.name, `Gen ${g.gen} (${g.region})`,
+        `region ${g.gen}'s menu label must name both the number and the place`);
     }
     assert.ok(!GENERATIONS.some((g) => g.gen === 3),
       "Hoenn does not ship and must not appear as a region");

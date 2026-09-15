@@ -75,6 +75,11 @@ export default function App() {
   const [engine, setEngine] = useState(null);
   const [, force] = useReducer((n) => n + 1, 0);
   const [entry, setEntry] = useState(null);
+  /* "See in Box" crosses two components that do not know each other: the sheet
+     lives here and the tab lives in the Rail. A species id parked here is the
+     smallest thing that can travel between them, and the Rail clears it once it
+     has acted so pressing the button twice works twice. */
+  const [boxJump, setBoxJump] = useState(null);
   // The key handler is installed once, so it reads the open entry from a ref
   // rather than closing over stale state.
   const entryRef = useRef(null);
@@ -361,6 +366,8 @@ export default function App() {
           onBuy={(id, n) => engine.buy(id, n)}
           onBuyCandy={(n) => engine.buyCandy(n)}
           onEvolve={(uid, to) => engine.evolve(uid, to)}
+          jumpTo={boxJump}
+          onJumped={() => setBoxJump(null)}
           onSpend={(id) => engine.spend(id)}
           onBike={() => engine.toggleBike()}
           /* The three save-file calls, handed over as one object so the panel
@@ -381,11 +388,17 @@ export default function App() {
           /* Which variants of THIS species are registered. Built from the
              list so the sheet grows a column when a tier is added and nothing
              here has to be remembered. */
+          /* `dexIndex`, not `entry - 1`. The sweep that replaced every id-as-
+             index missed this one, so a Johto or Sinnoh entry read its variant
+             marks out of whichever species happens to sit at that POSITION -
+             Arceus' row answering for Chikorita. */
           held={Object.fromEntries(
-            TIERS.map((t) => [t, !!st?.[t]?.[entry - 1]]))}
+            TIERS.map((t) => [t, !!st?.[t]?.[dexIndex(entry)]]))}
           /* So the sheet can say "finish the dex" rather than "not yet" for a
              variant that cannot currently spawn at all. */
           originLocked={!originReady(st?.dex, entry)}
+          owned={st?.box?.filter((m) => m.species === entry).length ?? 0}
+          onFindInBox={(id) => { setBoxJump(id); setEntry(null); }}
           onClose={() => setEntry(null)}
         />
       )}

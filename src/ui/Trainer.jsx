@@ -20,6 +20,7 @@ import {
 } from "../game/trainer.js";
 import { KEY_ITEMS, holding } from "../game/items.js";
 import Confirm from "./Confirm.jsx";
+import Note from "./Note.jsx";
 
 export default function Trainer({ stats, level, bag, biking, onSpend, onBike, save }) {
   // Which row just changed, so the click has something to show for itself.
@@ -198,7 +199,7 @@ export default function Trainer({ stats, level, bag, biking, onSpend, onBike, sa
                      onChange={offerFile} disabled={!save} />
             </label>
           </div>
-          {saveNote && <p className="ts-note" role="status">{saveNote}</p>}
+          <Note>{saveNote}</Note>
         </div>
 
         <div className="panel-head tr-head">
