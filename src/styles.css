@@ -1885,40 +1885,64 @@ canvas {
   color: var(--ink-faint); margin-bottom: 6px;
 }
 .sheet-where ul {
-  list-style: none; margin: 0; padding: 0; display: grid; gap: 3px;
+  list-style: none; margin: 0; padding: 0;
+  /* 1px, not 3. Three rows at a 3px gap plus a stretched hover box read as a
+     menu with room to spare; this is a short reference list and should look
+     like one. */
+  display: grid; gap: 1px;
 }
+
+/* TWO COLUMNS, NOT A FLEX ROW. `1fr auto` right-aligns the rarity note without
+   anything having to stretch to push it there - which is what went wrong: the
+   label was `flex: 1`, so the one interactive thing on the row grew to fill
+   every pixel up to the note and lit up the entire width on hover. A target
+   should be the size of the thing you are aiming at. */
 .sheet-where li {
-  display: flex; align-items: baseline; gap: 10px;
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: 12px; min-height: 21px;
   font-size: 13px; color: var(--ink-soft);
 }
-.sheet-where li span { flex: 1; min-width: 0; }
+.sheet-where li > span,
+.sheet-where li > button {
+  justify-self: start; max-width: 100%; min-width: 0;
+  display: inline-flex; align-items: center; gap: 5px;
+}
 
 /* A ROW THAT GOES SOMEWHERE LOOKS LIKE IT DOES. The rest of this list is
-   reference - a rod, an evolution, a legendary's one honest sentence - so the
-   only rows that get a control are the ones that are actually a place you can
-   reach right now, and the chevron is what separates them at a glance from the
-   ones that are only telling you something. */
+   reference - a rod, an evolution, a legendary's one honest sentence - so only
+   the rows that are a place you can reach right now get a control, and the
+   chevron separates them at a glance from the ones merely telling you
+   something.
+
+   Pulled left by its own padding so the label sits on the same line as the
+   plain rows above and below it: a list whose interactive rows are indented
+   and whose inert ones are not reads as two lists. */
 .sheet-where li button {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
-  margin: -3px -7px; padding: 3px 7px;
+  margin-left: -8px; padding: 2px 9px 2px 8px;
   font: inherit; text-align: left; color: var(--path); cursor: pointer;
-  background: transparent; border: 2px solid transparent; border-radius: 8px;
+  background: transparent; border: 0; border-radius: 999px;
+  transition: background-color 110ms ease;
 }
 .sheet-where li button i {
-  font-style: normal; font-size: 15px; line-height: 1; opacity: .55;
-  transition: transform 120ms ease;
+  font-style: normal; font-size: 13px; line-height: 1; opacity: .5;
+  transition: transform 110ms ease;
 }
-.sheet-where li button:hover,
+.sheet-where li button:hover { background: var(--surface-2); }
+.sheet-where li button:hover i { transform: translateX(2px); opacity: 1; }
+/* The border is gone from the resting and hover states, so focus needs a ring
+   of its own or a keyboard user gets nothing at all. */
 .sheet-where li button:focus-visible {
-  background: var(--surface-2); border-color: var(--line);
+  background: var(--surface-2);
+  outline: 2px solid var(--path); outline-offset: 1px;
 }
-.sheet-where li button:hover i { transform: translateX(3px); opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
+  .sheet-where li button,
   .sheet-where li button i { transition: none; }
 }
+
 .sheet-where li em {
-  font-style: normal; font-family: var(--pixel); font-size: 8px;
-  color: var(--ink-faint); letter-spacing: .04em;
+  font-style: normal; font-family: var(--pixel); font-size: 7.5px;
+  color: var(--ink-faint); letter-spacing: .04em; white-space: nowrap;
 }
 
 /* THE DEX TEXT. No coloured bar down the side - it was the only accent on the
