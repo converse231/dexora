@@ -168,7 +168,7 @@ import {
 } from "../src/game/items.js";
 import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
-  GENERATIONS,
+  GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
 } from "../src/game/biomes.js";
 
 const poke = ballById("poke-ball");
@@ -2400,6 +2400,139 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `(${bornLevel(to)} vs ${bornLevel(from)}) - a chain must climb`);
   }
   assert.equal(bornLevel(1), 0, "a base form is born at 0");
+
+  /* BAND BUDGETS: a map's rarity mix must not move when content is added.
+
+     Measured before this existed and the drift was the opposite of the
+     expected one - adding two generations TRIPLED Tall Grass's rare band,
+     5.1% to 15.4%, because newcomers arrive on a flat tier-derived weight
+     while the Gen 1 commons that hold a route together are hand-tuned at 22.
+     The gentlest map in the game quietly became a third rare.
+
+     Frozen PER MAP from its own hand-written table, because a single global
+     mix would flatten Tall Grass (78/13/5) and the Haunted Tower (18/51/30)
+     into the same map and that difference is the design. */
+  {
+    const bandOf = (id) =>
+      (LEGENDARY.includes(id) ? "L" : speciesById(id).tier);
+    for (const b of BIOMES) {
+      /* RESIDENTS ONLY, by their OWN tier. Two halves of that matter.
+
+         Own tier, because `balance` bands a derived evolution with its PARENT
+         and a check that reads the same field is only `balance` agreeing with
+         itself.
+
+         Residents only, because the guarantee is about who LIVES here. The
+         evolved-form overlay is supposed to enrich a map as you level - that
+         is the whole point of it - and counting it here would assert that the
+         feature does not work. Measured: meadow's residents hold 79.0/13.6/
+         5.1/2.3 at Lv 1 and 78.5/13.8/5.3/2.4 at Lv 35, while the same map
+         WITH the overlay drifts to 69.8/18.2/9.6. The first is the promise;
+         the second is progression. Before band budgets the rare band went
+         5.1% -> 15.4%, and that was neither. */
+      const mix = (lv) => {
+        const t = encounterTable(b, lv)
+          .filter((e) => !e[2] && !LEGENDARY.includes(e[0]));
+        const total = t.reduce((n, e) => n + e[1], 0);
+        const acc = {};
+        for (const [id, w] of t) acc[bandOf(id)] = (acc[bandOf(id)] ?? 0) + w / total;
+        return acc;
+      };
+      const base = mix(1);
+      for (const lv of [GEN_UNLOCK[2], GEN_UNLOCK[4], MAX_LEVEL]) {
+        const now = mix(lv);
+        for (const k of new Set([...Object.keys(base), ...Object.keys(now)])) {
+          const drift = Math.abs((now[k] ?? 0) - (base[k] ?? 0));
+          assert.ok(drift < 0.02,
+            `${b.id}: the ${k} band moved ${(drift * 100).toFixed(1)} points ` +
+            `between Lv 1 and Lv ${lv} (${((base[k] ?? 0) * 100).toFixed(1)}% -> ` +
+            `${((now[k] ?? 0) * 100).toFixed(1)}%) - a map's rarity mix is a ` +
+            "property of the map and adding content must not resize it");
+        }
+      }
+
+      /* And the overlay's own enrichment has to stay enrichment. It is allowed
+         to move the mix; it is not allowed to turn a gentle map into a rare
+         one, which is the failure that started this. */
+      const withEvo = (lv) => {
+        const t = encounterTable(b, lv).filter((e) => !LEGENDARY.includes(e[0]));
+        const total = t.reduce((n, e) => n + e[1], 0);
+        return t.filter((e) => ["A", "S"].includes(bandOf(e[0])))
+          .reduce((n, e) => n + e[1], 0) / total;
+      };
+      assert.ok(withEvo(MAX_LEVEL) < withEvo(1) * 2.2 + 0.02,
+        `${b.id}: the rare share goes ${(withEvo(1) * 100).toFixed(1)}% -> ` +
+        `${(withEvo(MAX_LEVEL) * 100).toFixed(1)}% once everything has arrived - ` +
+        "the overlay is meant to enrich a map, not re-rank it");
+
+      /* AND A BAND WITH MEMBERS IS NEVER WORTH NOTHING. Rock Ridge has no
+         S-tier resident, so its frozen S share is zero - without the floor a
+         Sinnoh S-tier landing there would inherit a zero weight and be
+         unreachable, which `every species is gettable` would catch only
+         because it happens to look at the same table. */
+      const t = encounterTable(b, MAX_LEVEL);
+      for (const [id, w] of t) {
+        assert.ok(w > 0, `${b.id}: #${id} is in the table at weight zero`);
+      }
+    }
+    console.log("band budgets ok — every map holds its own rarity mix at every level");
+  }
+
+  /* PITY: a drought ends, and nothing else moves.
+
+     Three silent failures, and the middle one is the reason this is capped:
+     a ramp that never opens, a ramp that boosts before it should, and a ramp
+     that keeps climbing - park at 3,000 dry encounters and every throw is a
+     variant, which is a farm rather than a mercy. */
+  {
+    assert.equal(pityBoost(0), 1, "pity must not help on the first encounter");
+    assert.equal(pityBoost(PITY_AFTER), 1, "pity must not open early");
+    assert.ok(pityBoost(PITY_AFTER + PITY_RAMP) > 1, "pity must open at all");
+    assert.equal(pityBoost(1e9), PITY_CAP, "pity must be capped");
+    for (let d = 0; d < 5000; d += 137) {
+      assert.ok(pityBoost(d) >= pityBoost(Math.max(0, d - 137)),
+        "pity must never go backwards");
+    }
+
+    /* The ladder keeps its ORDER under the boost. It is a multiplier on the
+       whole thing for exactly this reason: boosting one tier alone would
+       re-sort `TIER_ODDS`, which is walked rarest-first. */
+    for (const boost of [1, 2, PITY_CAP]) {
+      let seed = 99;
+      const rng = () => {
+        seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        seed = (seed + Math.imul(seed ^ (seed >>> 7), 61 | seed)) ^ seed;
+        return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
+      };
+      const hit = {};
+      for (let i = 0; i < 200000; i++) {
+        const t = rollVariant(rng, null, boost);
+        if (t) hit[t] = (hit[t] ?? 0) + 1;
+      }
+      const rarest = TIER_ODDS[0][0];
+      const commonest = TIER_ODDS[TIER_ODDS.length - 1][0];
+      assert.ok((hit[rarest] ?? 0) < (hit[commonest] ?? 0),
+        `at ${boost}x the ladder re-sorted: ${rarest} ${hit[rarest]} vs ` +
+        `${commonest} ${hit[commonest]}`);
+    }
+
+    // And a long enough drought really does end.
+    let seed = 5;
+    const rng = () => {
+      seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      seed = (seed + Math.imul(seed ^ (seed >>> 7), 61 | seed)) ^ seed;
+      return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
+    };
+    let dry = 0, got = 0;
+    for (let i = 0; i < 20000; i++) {
+      if (rollVariant(rng, null, pityBoost(dry))) { got++; dry = 0; } else dry++;
+    }
+    assert.ok(dry < 900,
+      `a drought reached ${dry} encounters with pity on - it is not ending them`);
+    assert.ok(got > 0, "pity produced no variants at all over 20,000 encounters");
+    console.log(`pity ok — opens at ${PITY_AFTER}, caps at ${PITY_CAP}x, ` +
+      "ladder keeps its order");
+  }
 
   console.log(`spawn ladder ok — ${early.size} species in the wild at Lv 1, ` +
     `${late.size} at Lv ${MAX_LEVEL}; legendaries no easier anywhere; nothing born below its own evolution level`);

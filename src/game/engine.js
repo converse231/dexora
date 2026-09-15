@@ -11,7 +11,7 @@ import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex,
   levelFromXp, xpForCatch,
   rodTable, rodBite,
-  rollVariant, TIERS,
+  rollVariant, pityBoost, TIERS,
   lockedTiers, originReady,
 } from "./biomes.js";
 import {
@@ -67,6 +67,7 @@ function freshState() {
     steps: 0,
     xp: 0,
     nextUid: 1,
+    dry: 0,               // encounters since the last rare tier - see pityBoost
     ...startingState(),
     rev: 0,
     /* One byte per species: has a SHINY of this one ever been registered. A
@@ -221,6 +222,7 @@ function loadState() {
          back-pay: the duplicates it was hoarding for the old feed are still in
          its box and convert at the same rate as anyone else's. */
       candy: Math.max(0, Math.floor(Number(s.candy) || 0)),
+      dry: Math.max(0, Math.floor(Number(s.dry) || 0)),
       /* MIGRATION. Running was a level check before it was an item, so a save
          written then is past level 15 with an empty shoe slot - and would
          have silently LOST the ability to run, which is the one change a
@@ -509,7 +511,13 @@ export function createEngine(canvas, onChange, mini = null) {
        see `lockedTiers`. It is passed in rather than checked inside the roll
        so the roll stays a pure function of its arguments, which is what lets
        check.mjs drive it 400,000 times with a seeded clock. */
-    const variant = rollVariant(Math.random, lockedTiers(state.dex, sp.id));
+    /* PITY. `state.dry` is encounters since the last variant of any tier, and
+       it resets on the ROLL rather than on the catch: the misery is not meeting
+       one, and a player who met an Astral and lost it to a flee has still had
+       the moment this exists to give them. */
+    const variant = rollVariant(
+      Math.random, lockedTiers(state.dex, sp.id), pityBoost(state.dry));
+    state.dry = variant ? 0 : (state.dry ?? 0) + 1;
 
     state.encounter = {
       speciesId: sp.id,
