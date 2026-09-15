@@ -1876,6 +1876,30 @@ canvas {
   font-size: 13px; color: var(--ink-soft);
 }
 .sheet-where li span { flex: 1; min-width: 0; }
+
+/* A ROW THAT GOES SOMEWHERE LOOKS LIKE IT DOES. The rest of this list is
+   reference - a rod, an evolution, a legendary's one honest sentence - so the
+   only rows that get a control are the ones that are actually a place you can
+   reach right now, and the chevron is what separates them at a glance from the
+   ones that are only telling you something. */
+.sheet-where li button {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+  margin: -3px -7px; padding: 3px 7px;
+  font: inherit; text-align: left; color: var(--path); cursor: pointer;
+  background: transparent; border: 2px solid transparent; border-radius: 8px;
+}
+.sheet-where li button i {
+  font-style: normal; font-size: 15px; line-height: 1; opacity: .55;
+  transition: transform 120ms ease;
+}
+.sheet-where li button:hover,
+.sheet-where li button:focus-visible {
+  background: var(--surface-2); border-color: var(--line);
+}
+.sheet-where li button:hover i { transform: translateX(3px); opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .sheet-where li button i { transition: none; }
+}
 .sheet-where li em {
   font-style: normal; font-family: var(--pixel); font-size: 8px;
   color: var(--ink-faint); letter-spacing: .04em;

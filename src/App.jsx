@@ -440,6 +440,13 @@ export default function App() {
           originLocked={!originReady(st?.dex, entry)}
           owned={st?.box?.filter((m) => m.species === entry).length ?? 0}
           onFindInBox={(id) => { setBoxJump(id); setEntry(null); }}
+          /* Travelling closes the sheet, because the answer to "where do I
+             find one" has been acted on and leaving the entry open over the
+             map you just arrived at is a dialog with nothing left to say. */
+          level={level}
+          here={st?.areaId}
+          busy={Boolean(enc || evo)}
+          onTravel={(id) => { if (engine.travel(id)) setEntry(null); }}
           onClose={() => setEntry(null)}
         />
       )}

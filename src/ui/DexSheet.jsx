@@ -23,7 +23,9 @@ import { useModalLock } from "./modal.js";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
-import { foundIn, howOften, speciesById, hasOrigin } from "../game/biomes.js";
+import {
+  foundIn, howOften, speciesById, hasOrigin, areaOpen, BIOMES,
+} from "../game/biomes.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
 
@@ -59,6 +61,9 @@ function whereToFind(id) {
      sending them somewhere nothing will happen. */
   const out = areas.map((a) => ({
     key: a.id,
+    // The biome id, which is what makes a row a PLACE rather than a sentence -
+    // a rod row and an "evolve X" row are neither, and must not offer to go.
+    area: a.id,
     where: a.name,
     how: a.from ? `${howOften(a.share)} · Lv ${a.from}+` : howOften(a.share),
   }));
@@ -78,19 +83,46 @@ function whereToFind(id) {
   return out;
 }
 
-function Where({ id }) {
+/* AND IT TAKES YOU THERE. This panel answered "where do I find one" and then
+   made you close it, open MAP, and find the same name in a second list - which
+   is the whole journey the answer was supposed to save you.
+
+   `areaOpen` is the single answer to whether a map is reachable and it is asked
+   here for the same reason the Travel panel asks it: an offer the engine will
+   refuse is worse than no offer. A locked row prints the level it opens at
+   instead, and stays a plain row rather than a dead button.
+
+   Rows that are not places - a rod, an "evolve Bulbasaur" - never become
+   buttons at all: `area` is what says a row IS somewhere. */
+function Where({ id, level = 1, busy = false, here = null, onTravel = null }) {
   const rows = whereToFind(id);
   if (!rows.length) return null;
   return (
     <div className="sheet-where">
       <div className="sw-head">WHERE TO LOOK</div>
       <ul>
-        {rows.map((r) => (
-          <li key={r.key}>
-            <span>{r.where}</span>
-            <em>{r.how}</em>
-          </li>
-        ))}
+        {rows.map((r) => {
+          const open = r.area ? areaOpen(r.area, level) : false;
+          const go = r.area && onTravel && open && r.area !== here && !busy;
+          const shut = r.area && !open;
+          return (
+            <li key={r.key} className={go ? "sw-go" : ""}>
+              {go ? (
+                <button type="button" onClick={() => onTravel(r.area)}>
+                  {r.where}
+                  <i aria-hidden="true">›</i>
+                </button>
+              ) : (
+                <span>{r.where}</span>
+              )}
+              <em>
+                {r.area === here ? "you are here"
+                  : shut ? `opens at Lv ${BIOMES.find((b) => b.id === r.area)?.level}`
+                    : r.how}
+              </em>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -98,7 +130,8 @@ function Where({ id }) {
 
 export default function DexSheet({
   id, state, variant = null, held = {}, originLocked = false, owned = 0,
-  onClose, onFindInBox,
+  level = 1, here = null, busy = false,
+  onClose, onFindInBox, onTravel,
 }) {
   const sp = speciesById(id);
   const caught = state === 2;
@@ -212,7 +245,13 @@ export default function DexSheet({
             {/* Shown whether or not it is caught - see the `seen` branch
                 below, which shows it too. An entry you have never filled in is
                 exactly the one that needs to say where to go. */}
-            <Where id={id} />
+            <Where
+              id={id}
+              level={level}
+              here={here}
+              busy={busy}
+              onTravel={onTravel}
+            />
 
             <p className="sheet-flavor">{sp.flavor}</p>
 
@@ -240,7 +279,13 @@ export default function DexSheet({
             </p>
             {/* The whole point. A silhouette with no information is a locked
                 door; a silhouette that tells you which map to walk is a lead. */}
-            <Where id={id} />
+            <Where
+              id={id}
+              level={level}
+              here={here}
+              busy={busy}
+              onTravel={onTravel}
+            />
           </>
         )}
 
