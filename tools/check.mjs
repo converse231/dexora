@@ -174,6 +174,7 @@ import {
   stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
   TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf,
   FIELD, FAMILIES, fieldById, BERRIES, berryById, artOf,
+  berryCatch, berryCalm, berryXp, berryRoom,
 } from "../src/game/items.js";
 import {
   dailyFor, describe, advance, isYesterday, streakMult, reward,
@@ -2977,14 +2978,14 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
 
   /* BERRIES. The same test the four situational balls had to pass: each must
      key off a DIFFERENT system, or two of them are one item with two prices.
-     Here that is checkable directly, because each effect is a named field. */
+     Here that is checkable directly, because `effect` names which one. */
   {
-    const EFFECTS = ["catchMult", "calm", "xpMult"];
-    const used = [];
+    const EFFECTS = ["catch", "flee", "xp"];
+    const used = BERRIES.map((b) => b.effect);
     for (const b of BERRIES) {
-      const mine = EFFECTS.filter((k) => b[k] !== undefined);
-      assert.equal(mine.length, 1, `${b.id} has ${mine.length} effects, not one`);
-      used.push(mine[0]);
+      assert.ok(EFFECTS.includes(b.effect), `${b.id} has effect "${b.effect}"`);
+      assert.ok(b.per > 0, `${b.id} moves its number by ${b.per}`);
+      assert.ok(b.stages >= 1, `${b.id} cannot be fed at all`);
       assert.ok(forSale(b), `${b.id} is not buyable`);
       assert.ok(b.level > 1 && b.level < MAX_LEVEL, `${b.id} is gated off the ladder`);
       assert.ok(b.blurb.length <= BLURB_FITS,
@@ -2994,17 +2995,72 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
       "two berries move the same number - then they are one berry");
     assert.equal(berryById("nope"), null, "an unknown id is null, not undefined");
 
-    const razz = BERRIES.find((b) => b.catchMult);
-    const nanab = BERRIES.find((b) => b.calm);
-    const pinap = BERRIES.find((b) => b.xpMult);
+    const razz = BERRIES.find((b) => b.effect === "catch");
+    const nanab = BERRIES.find((b) => b.effect === "flee");
+    const pinap = BERRIES.find((b) => b.effect === "xp");
+    const fed = (b, stage = 1) => ({ id: b.id, stage });
 
-    /* A BERRY IS PRICED AGAINST THE BALLS IT HELPS. Dearer than the cheap ball
-       or it is simply always correct and stops being a decision; no dearer
-       than the dear one, or the answer is always "buy an Ultra instead". */
+    /* NOTHING AT ALL WITHOUT A BERRY. Every one of these is a bare multiply at
+       its call site, so "no berry" has to be exactly 1 or the roll moves for
+       everyone. */
+    for (const none of [null, undefined, { id: "nope", stage: 9 }]) {
+      assert.equal(berryCatch(none), 1, "catch moved with no berry fed");
+      assert.equal(berryCalm(none), 1, "flee moved with no berry fed");
+      assert.equal(berryXp(none), 1, "XP moved with no berry fed");
+    }
+    // And a berry only moves its OWN number.
+    assert.equal(berryCalm(fed(razz)), 1, "a Razz Berry touched the flee roll");
+    assert.equal(berryXp(fed(razz)), 1, "a Razz Berry touched the XP award");
+    assert.equal(berryCatch(fed(nanab)), 1, "a Nanab Berry touched the catch roll");
+
+    /* FEEDING ANOTHER DEEPENS IT. This is the whole change: a second Razz used
+       to replace the first and be worth exactly nothing, which is a berry you
+       stop carrying - the long encounter that needs help is precisely where
+       doubling down should be possible. */
+    for (let n = 2; n <= razz.stages; n++) {
+      assert.ok(berryCatch(fed(razz, n)) > berryCatch(fed(razz, n - 1)),
+        `a ${n}-deep Razz is worth no more than a ${n - 1}-deep one`);
+      assert.ok(berryXp(fed(pinap, n)) > berryXp(fed(pinap, n - 1)),
+        `a ${n}-deep Pinap is worth no more than a ${n - 1}-deep one`);
+    }
+
+    /* AND IT STOPS. `berryRoom` is what both the tile greys on and `useBerry`
+       refuses on, so the two cannot disagree about a berry being wasted. */
+    assert.equal(berryRoom(null, razz.id), true, "an empty encounter has room");
+    assert.equal(berryRoom(fed(razz, razz.stages), razz.id), false,
+      "a capped Razz says there is room for another");
+    assert.equal(berryRoom(fed(razz, razz.stages), nanab.id), true,
+      "a capped Razz must not block a DIFFERENT berry");
+    assert.equal(berryRoom(fed(nanab), nanab.id), false,
+      "a Nanab is total at one - a second one must be refused, not eaten");
+
+    /* A NANAB IS A LOCK, NOT A DISCOUNT. It is the strongest single thing any
+       item does here, so it is asserted as an absolute rather than as "lower":
+       the point of it is the legendary that keeps getting away. */
+    assert.equal(berryCalm(fed(nanab)), 0,
+      "a Nanab Berry leaves a flee chance - it is supposed to be a lock");
+    for (const rate of [3, 45, 190, 255]) {
+      assert.equal(fleeChance(rate, berryCalm(fed(nanab))), 0,
+        `something can still flee at rate ${rate} with a Nanab eaten`);
+    }
+    // Through the real roll, not just the arithmetic: nothing may flee at all.
+    for (let i = 0; i < 2000; i++) {
+      const r = resolveThrow(3, 0.001, () => 0.999, berryCalm(fed(nanab)));
+      assert.equal(r.fled, false, "a Nanab-fed Pokémon fled");
+    }
+    // And with no berry the flee roll is untouched - the slope still exists.
+    assert.ok(fleeChance(3) > fleeChance(255), "rarity must still flee more");
+
+    /* PRICED AGAINST THE BALLS THEY HELP. Dearer than the cheap ball, or a
+       berry is simply always correct and stops being a decision; no dearer
+       than TWO Ultra Balls, or the answer is always "buy better balls". The
+       Nanab sits near that ceiling on purpose - a guaranteed lock is a
+       different product from a multiplier, and it is the one you reach for
+       when losing the encounter outright is the alternative. */
     for (const b of BERRIES) {
       assert.ok(b.price > poke.price,
         `${b.id} costs less than a Poké Ball - then you always use one`);
-      assert.ok(b.price <= ultra.price * 1.5,
+      assert.ok(b.price <= ultra.price * 2,
         `${b.id} at ¥${b.price} is dearer than buying better balls`);
     }
 
@@ -3013,85 +3069,64 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
        anywhere else would make the rail advertise a number nobody used. */
     {
       const enc = { types: ["normal"], known: false, areaId: "meadow", throws: 0 };
-      const fed = { ...enc, berry: razz.id };
-      for (const ball of BALLS) {
-        const dry = liveMult(ball, enc), wet = liveMult(ball, fed);
-        if (ball.mult >= GUARANTEED) {
-          assert.equal(wet, dry, "a Razz Berry must not touch the Master Ball");
-          continue;
+      for (const stage of [1, razz.stages]) {
+        const wet = { ...enc, berry: fed(razz, stage) };
+        for (const ball of BALLS) {
+          const dry = liveMult(ball, enc), now = liveMult(ball, wet);
+          if (ball.mult >= GUARANTEED) {
+            assert.equal(now, dry, "a Razz Berry must not touch the Master Ball");
+            continue;
+          }
+          assert.ok(near(now, dry * berryCatch(fed(razz, stage))),
+            `${ball.id} ignored a ${stage}-deep berry`);
         }
-        assert.ok(near(wet, dry * razz.catchMult), `${ball.id} ignored the berry`);
       }
-      // And with no berry on the encounter, nothing at all changes.
       for (const ball of BALLS) {
         assert.equal(liveMult(ball, enc), liveMult(ball, { ...enc, berry: null }),
           `${ball.id} moved with no berry fed`);
       }
     }
 
-    /* AND IT STILL CANNOT REACH CERTAINTY, for any ball at any catch rate the
-       dex actually contains - because it multiplies the ball and therefore
-       passes through `catchChance`'s own ceiling rather than round it. */
+    /* AND IT STILL CANNOT REACH CERTAINTY OR INVERT THE LADDER, at any depth,
+       for any ball, at any catch rate the dex contains - because it multiplies
+       the ball and therefore passes through `catchChance`'s own ceiling rather
+       than round it. */
     {
       const rates = [...new Set(SPECIES.map((sp) => sp.rate))];
-      // The Master Ball is on PLAIN_BALLS and is already past certain; a berry
-      // cannot make it more so, and liveMult above asserts it is left alone.
       const ladder = PLAIN_BALLS.filter((b) => b.mult < GUARANTEED);
+      const deepest = berryCatch(fed(razz, razz.stages));
       for (const rate of rates) {
         for (const ball of ladder) {
-          const with_ = catchChance(rate, ball.mult * razz.catchMult);
-          assert.ok(with_ < 1, `${ball.id} + Razz is certain at rate ${rate}`);
+          const with_ = catchChance(rate, ball.mult * deepest);
+          assert.ok(with_ < 1, `${ball.id} + a full Razz is certain at rate ${rate}`);
           assert.ok(with_ >= catchChance(rate, ball.mult),
             `${ball.id} + Razz is WORSE than ${ball.id} at rate ${rate}`);
         }
-        /* THE BALL LADDER MUST NOT INVERT. A berry that let the cheap ball
-           overtake the dear one would make the shop's own ladder a lie, and
-           nothing else here would notice - the numbers all still climb. */
         for (let k = 1; k < ladder.length; k++) {
-          const lo = ladder[k - 1], hi = ladder[k];
-          assert.ok(catchChance(rate, lo.mult * razz.catchMult)
-            <= catchChance(rate, hi.mult * razz.catchMult) + 1e-12,
-            `a Razzed ${lo.id} beats a Razzed ${hi.id} at rate ${rate}`);
+          assert.ok(catchChance(rate, ladder[k - 1].mult * deepest)
+            <= catchChance(rate, ladder[k].mult * deepest) + 1e-12,
+            `a Razzed ${ladder[k - 1].id} beats a Razzed ${ladder[k].id} at rate ${rate}`);
         }
       }
     }
 
-    /* NANAB is a multiplier on the whole flee line, so the SLOPE survives: a
-       rare still flees more than a common with one eaten. Subtracting would
-       have flattened it, which is the version of this berry that makes rarity
-       stop meaning anything. */
-    {
-      assert.ok(nanab.calm > 0 && nanab.calm < 1, "a Nanab that stops flight entirely is not a berry");
-      for (const rate of [3, 45, 190, 255]) {
-        assert.ok(fleeChance(rate, nanab.calm) < fleeChance(rate),
-          `Nanab did nothing at rate ${rate}`);
-        assert.ok(fleeChance(rate, nanab.calm) > 0, `nothing ever flees at rate ${rate}`);
-      }
-      assert.ok(fleeChance(3, nanab.calm) > fleeChance(255, nanab.calm),
-        "with a Nanab eaten a legendary must still flee more than a Pidgey");
-      // And it reaches the roll: resolveThrow has to take it, not just accept it.
-      const never = resolveThrow(3, 0.0001, () => 0.99, 0);
-      assert.equal(never.fled, false, "calm 0 must stop the flee roll");
-      const always = resolveThrow(3, 0.0001, () => 0.00009999, 1);
-      assert.ok(always.caught || always.fled !== undefined, "resolveThrow still resolves");
-    }
-
-    assert.ok(pinap.xpMult > 1, "a Pinap that pays no extra XP is a berry that does nothing");
     {
       const eng = readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8");
-      assert.ok(/xpForCatch\(sp, e\.isNew\) \* \(berryById\(e\.berry\)\?\.xpMult \?\? 1\)/.test(eng),
+      assert.ok(/xpForCatch\(sp, e\.isNew\) \* berryXp\(e\.berry\)/.test(eng),
         "the Pinap must reach the XP award");
-      assert.ok(/berryById\(e\.berry\)\?\.calm \?\? 1/.test(eng),
-        "the Nanab must reach the flee roll");
-      assert.ok(/e\.berry = berry\.id;/.test(eng) && /state\.bag\[berry\.id\] -= 1;/.test(eng),
-        "feeding a berry must spend it and land on the ENCOUNTER, not on state");
+      assert.ok(/berryCalm\(e\.berry\)/.test(eng), "the Nanab must reach the flee roll");
+      assert.ok(/if \(!berryRoom\(e\.berry, id\)\) return false;/.test(eng),
+        "a berry at its cap must be refused, not eaten for nothing");
+      assert.ok(/e\.ate = \(e\.ate \?\? 0\) \+ 1;/.test(eng),
+        "feeding must bump a counter the UI can hang an animation off - a flag " +
+        "that is already true cannot say 'again'");
     }
 
-    console.log(`berries ok — ${BERRIES.length} berries on ${new Set(used).size} systems ` +
-      `(×${razz.catchMult} catch, ×${nanab.calm} flee, ×${pinap.xpMult} XP); ` +
+    console.log(`berries ok — ${BERRIES.length} on ${new Set(used).size} systems; ` +
+      `Razz ×${berryCatch(fed(razz))}-×${berryCatch(fed(razz, razz.stages))}, ` +
+      `Nanab locks it, Pinap ×${berryXp(fed(pinap))}-×${berryXp(fed(pinap, pinap.stages))}; ` +
       "the ball ladder survives all of them");
   }
-
 
   /* THE SENSES: a map's own level band, and a Pokémon's own size. Both are
      flavour with a tail - one of them prices every evolution bought with what

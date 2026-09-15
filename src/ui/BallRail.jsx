@@ -16,7 +16,10 @@
 
    It collapses to a tab when the map matters more than the count. */
 
-import { BALLS, BERRIES, FIELD, liveMult, forSale } from "../game/items.js";
+import { useState } from "react";
+import {
+  BALLS, BERRIES, FIELD, liveMult, forSale, berryById, berryRoom,
+} from "../game/items.js";
 import { ItemIcon } from "./Sprite.jsx";
 
 export default function BallRail({
@@ -36,6 +39,24 @@ export default function BallRail({
   // Which family slot each field item would land in, so a running one can say
   // so rather than looking like an ordinary unused stack.
   const busy = (item) => field?.[item.family]?.id === item.id;
+
+  /* USING SOMETHING HAS TO LOOK LIKE USING SOMETHING. A field item's only
+     feedback was a chip appearing in the far corner of the screen and a berry's
+     was a line of text - so on a fast click neither read as "that worked", and
+     the honest failure mode is a player feeding a second one because they are
+     not sure the first landed. The tile pops.
+
+     A COUNTER, NOT A FLAG: a flag that is already true cannot say "again", and
+     re-feeding the same berry is exactly the case that needs to. It keys the
+     popped element, so React remounts it and the animation restarts. */
+  const [pop, setPop] = useState({ id: null, n: 0 });
+  const use = (item) => {
+    const ok = enc ? onUseBerry?.(item.id) : onUseField?.(item.id);
+    /* Only when the engine actually spent one. A Razz at its cap is refused
+       and must not pop - an animation that plays when nothing happened is
+       worse than no animation, because it is a lie about state. */
+    if (ok !== false) setPop((p) => ({ id: item.id, n: p.n + 1 }));
+  };
   /* A ball you have never owned stays hidden - the Master Ball always did, and
      the four situational ones joined it, because seven tiles of zeroes is not a
      bag readout. The hotkey is read off BALLS rather than off what is on
@@ -142,27 +163,40 @@ export default function BallRail({
             <ul className="br-list br-kit">
               {useful.map((item) => {
                 const owned = bag?.[item.id] ?? 0;
-                const on = enc ? fed === item.id : busy(item);
+                const on = enc ? fed?.id === item.id : busy(item);
+                // How many of this berry are already in it, and whether another
+                // would do anything - the tile greys on the same answer
+                // `useBerry` refuses on, so the two cannot disagree.
+                const deep = on && enc ? (fed.stage ?? 1) : 0;
+                const room = enc ? berryRoom(fed, item.id) : true;
                 return (
                   <li key={item.id}>
                     <button
                       type="button"
-                      className={`br-ball br-item${on ? " on" : ""}`}
+                      className={`br-ball br-item${on ? " on" : ""}`
+                        + `${!room ? " full" : ""}`}
                       /* Its icon is decorative (alt=""), so without this the
                          button has no accessible name at all - `data-tip` is a
                          visual, where the native `title` it replaced was also
                          a label. Anything icon-only needs one back. */
                       aria-label={item.name}
                       data-tip={`${item.name} — ${item.blurb}` +
-                             `${on ? "  (running)" : ""}`}
-                      onClick={() => (enc ? onUseBerry?.(item.id) : onUseField?.(item.id))}
+                             `${deep ? `  (${deep} eaten)` : on ? "  (running)" : ""}` +
+                             `${!room ? " — it will not eat another" : ""}`}
+                      onClick={() => use(item)}
                       /* During an encounter the berries are live only while a
                          throw is available: feeding something mid-flight would
                          change the odds of a roll that has already happened. */
-                      disabled={enc ? !onThrow : false}
+                      disabled={enc ? (!onThrow || !room) : false}
                     >
                       <ItemIcon item={item} />
+                      {/* How deep it is, not how many you hold - that is the
+                          number below. A single one says nothing extra. */}
+                      {deep > 1 && <b className="br-boost">×{deep}</b>}
                       <em>{owned}</em>
+                      {pop.id === item.id && (
+                        <i className="br-pop" key={pop.n} aria-hidden="true" />
+                      )}
                     </button>
                   </li>
                 );

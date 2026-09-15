@@ -2493,6 +2493,69 @@ object now — and it had to be a singleton rather than a component beside each
 trigger, because the shop and the rail are inside scrollers that would clip
 their own bubbles.
 
+### A Piplup the size of a Dialga
+
+`normalise()` puts Sinnoh's 80×80 HeartGold art on the 64px canvas the rest of
+the game draws on, and its first version cropped to the art's bounding box and
+scaled *that* to fill. Every sprite ends up on the right canvas — and every
+sprite also ends up the same size.
+
+Measured across the build: Gen 1 and Gen 2 fill a **median 0.73** of their
+canvas, because a Caterpie is small and a Snorlax is not. Every Sinnoh sprite
+came out at **1.00**. The raw art had the scale all along — Piplup fills 0.44 of
+its 80px canvas against Dialga's 0.99 — so the only correct operation was to
+resize the *canvas* and leave everything inside it alone.
+
+**Resize the canvas, never the creature.** `build_origin.py` asserts the median
+fill and the completely-full count now, because nothing measured relative size
+and every other number looked fine.
+
+### A berry you can spend twice
+
+A second Razz Berry used to replace the first and be worth exactly nothing —
+which is a berry you stop carrying, because the long encounter that actually
+needs help is precisely where doubling down should be possible. Feeding the
+same berry again **deepens** it (Razz ×1.5 → ×2.5, Pinap ×2 → ×4, three deep);
+a *different* berry still replaces, at stage one, because one-at-a-time is what
+makes them a choice rather than a checklist.
+
+**A berry at its cap is refused rather than eaten.** "Cannot stack" should cost
+a click, not a berry, and `berryRoom()` is the single answer that the tile greys
+on and that `useBerry` refuses on.
+
+**And a Nanab Berry is a lock.** Not a reduction — zero. A Pokémon that has
+eaten one does not run, full stop, which makes it the strongest single thing any
+item does here and is why it sits at the top of the berry band at ¥450. What it
+is *for* is the legendary that keeps getting away, where the alternative is
+losing the encounter outright rather than losing a ball.
+
+### Using something looks like using something
+
+A field item's only feedback was a chip appearing in the far corner of the
+screen; a berry's was a line of text in the same box every other message uses.
+Neither reads as "that worked" on a fast click, and the honest failure mode is
+feeding a second one because you are not sure the first landed. The rail tile
+pops, and the berry itself tosses into the scene and settles at the Pokémon's
+feet.
+
+Both key off a **counter, not a flag** — remounting is the only way to restart a
+CSS animation, and a flag that is already true cannot say "again", which is
+exactly what re-feeding needs it to say. The pop only plays when the engine
+really spent one: an animation that fires when nothing happened is worse than no
+animation, because it is a lie about state.
+
+### Legendaries wear a mark
+
+Twenty-four of the 358 are legendary and nothing said so — you found out by
+looking at the catch rate, or by losing one. There is a badge on the encounter
+nameplate and in the corner of the Dex tile now.
+
+**It is deliberately not in the row of tier marks.** Those are four things you
+can earn; this is a fact about the species, and among them it would read as a
+fifth tier. On a Dex tile it only appears on an entry you have at least *seen* —
+spoiling which of the unseen silhouettes are the legendaries would hand over the
+most interesting thing the grid has left to tell you.
+
 ### Berries, and the three rolls they are allowed to touch
 
 Fed to the Pokémon standing in front of you, and chosen on the test the four

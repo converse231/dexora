@@ -8,7 +8,10 @@
 
 import { BALLS } from "../game/items.js";
 import { label } from "../game/map.js";
-import { speciesById, sizeOf, sizeTag, measured } from "../game/biomes.js";
+import {
+  speciesById, sizeOf, sizeTag, measured, isLegendary,
+} from "../game/biomes.js";
+import { berryById, artOf } from "../game/items.js";
 import Types from "./Types.jsx";
 import Gen from "./Gen.jsx";
 import Sprite, { spriteUrl } from "./Sprite.jsx";
@@ -34,6 +37,30 @@ import Mark from "./Marks.jsx";
      one level that DOES matter here is still on the nameplate, because a
      wild evolved form arrives grown and a Lv 34 Venusaur is thirty candy of
      progress you did not have to pay for. */
+/* THE BERRY, ON SCREEN, WHERE THE POKEMON IS.
+
+   A line of text in the box under the scene was the only sign a berry had been
+   eaten, and the box is also where every other message goes - so on a fast
+   click it did not read as "that worked", and the honest failure is feeding a
+   second one because you are not sure the first landed.
+
+   Keyed on `enc.ate`, which the engine bumps on every feed. That is what makes
+   a SECOND berry replay it: remounting is the only way to restart a CSS
+   animation, and a boolean that is already true cannot say "again". */
+function Eating({ enc }) {
+  const berry = enc.berry && berryById(enc.berry.id);
+  if (!berry || !enc.ate) return null;
+  return (
+    <img
+      key={enc.ate}
+      className="berry-toss"
+      src={`items/${artOf(berry)}.png`}
+      alt=""
+      aria-hidden="true"
+    />
+  );
+}
+
 function Size({ enc }) {
   const sp = speciesById(enc.speciesId);
   if (!sp?.height) return null;
@@ -104,6 +131,8 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
         <div className="mon-slot">
           {/* Dust kicked up where it lands when it first appears. */}
           <span className="land-ring" aria-hidden="true" />
+          {/* In the slot, so it arcs to where the Pokémon actually is. */}
+          <Eating enc={enc} />
 
           <div className={`mon-shadow${monCaptured ? " hidden" : ""}`} />
           {/* Both of the big tiers put something BEHIND the sprite - an
@@ -207,6 +236,12 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
       </div>
 
       <div className="nameplate">
+        {/* A FACT ABOUT THE SPECIES, not something you earned, so it sits with
+            the name rather than in the row of tier marks - a badge that cannot
+            be collected next to four that can would read as a fifth tier. */}
+        {isLegendary(enc.speciesId) && (
+          <Mark tier="legendary" size={16} className="np-legend" />
+        )}
         <span className="np-name">{enc.name}</span>
         <span className="np-lv">Lv {enc.level}</span>
         {/* HOW BIG THIS ONE IS. `species.js` has carried height and weight

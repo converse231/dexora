@@ -14,7 +14,7 @@ import { useMemo, useState } from "react";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import {
-  LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor,
+  LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor, isLegendary,
 } from "../game/biomes.js";
 import FilterBar from "./FilterBar.jsx";
 import Sprite, { VariantFx } from "./Sprite.jsx";
@@ -270,6 +270,15 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
                 <span className="cell-marks">
                   {marks.map((t) => <Mark key={t} tier={t} size={12} />)}
                 </span>
+              )}
+
+              {/* OPPOSITE CORNER FROM THE TIER MARKS, deliberately. Those are
+                  four things you can earn and this is a fact about the species,
+                  so a legendary badge sitting in that row would read as a fifth
+                  tier - and it is the same mistake as putting it beside the
+                  rosette, which is the one mark you cannot simply be given. */}
+              {isLegendary(sp.id) && at(sp.id) >= 1 && (
+                <Mark tier="legendary" size={13} className="cell-legend" />
               )}
 
               {full && <Mark tier="complete" size={16} className="cell-full" />}

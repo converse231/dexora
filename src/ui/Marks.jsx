@@ -21,6 +21,12 @@ const TIER_ART = {
   holo: { src: "marks/holo.png", name: "Holo" },
   astral: { src: "marks/astral.png", name: "Astral" },
   complete: { src: "marks/complete.png", name: "Every variant" },
+  /* NOT A TIER, and it sits here anyway because it is the same object: a small
+     drawn badge on a sprite, in the same set, at the same size. Legendary is a
+     fact about the SPECIES rather than about the one in front of you - every
+     other mark here is something you earned - so it never appears in a row of
+     tier marks, only on its own. */
+  legendary: { src: "marks/legendary.png", name: "Legendary" },
 };
 
 export default function Mark({ tier, size = 12, className = "", title }) {

@@ -1115,12 +1115,61 @@ of a short one typed twice. Steps, not seconds, so an effect is not burned by
 walking away from the keyboard. The readout sits opposite the minimap, because
 an effect paid for in steps belongs where the steps happen.
 
-**A BERRY MOVES ONE ROLL, AND THE THREE MOVE THREE DIFFERENT ONES** - the same
-test the four situational balls had to pass, and here it is checkable directly
-because each effect is its own field: Razz is `catchMult`, Nanab is `calm`,
-Pinap is `xpMult`. Two berries moving one number are one berry with two prices.
+**RESIZE THE CANVAS, NEVER THE CREATURE.** `normalise()` in build_origin.py
+puts Sinnoh's 80x80 HGSS art on the 64px canvas everything else uses, and its
+first version cropped to the art's bounding box and scaled THAT to fill - which
+does put every sprite on the right canvas and destroys relative size doing it.
+Measured: Gen 1 and Gen 2 fill a median 0.73 of their canvas (a Caterpie is
+small, a Snorlax is not) and every Sinnoh sprite came out at 1.00. Reported from
+play as a Piplup drawn the size of a Dialga, which is exactly what it was. The
+raw art already carries the scale - Piplup fills 0.44 of its 80px canvas and
+Dialga 0.99 - so the only correct operation is a uniform canvas resize.
+build_origin.py asserts the median fill and the completely-full count now,
+because nothing measured relative size and the numbers all looked fine.
 
-**A RAZZ BERRY GOES THROUGH `liveMult`, NOT THROUGH `resolveThrow`.** That is
+**A BERRY MOVES ONE ROLL, AND THE THREE MOVE THREE DIFFERENT ONES** - the same
+test the four situational balls had to pass. `effect` names which (`catch`,
+`flee`, `xp`) and `per` is what one of them is worth, so two berries moving one
+number are one berry with two prices and check.mjs can say so directly.
+
+**FEEDING THE SAME BERRY AGAIN DEEPENS IT; A DIFFERENT ONE REPLACES.** The
+encounter holds `{ id, stage }`, not an id. The first version replaced in both
+cases, so a second Razz was worth exactly nothing - and the long encounter that
+needs help is precisely where doubling down should be possible. **A berry at its
+cap is REFUSED, not eaten**: "cannot stack" should cost a click, not a berry,
+and `berryRoom()` is the single answer that both the tile greys on and
+`useBerry` refuses on, so the two cannot disagree about a wasted berry.
+
+**A NANAB IS A LOCK, NOT A DISCOUNT.** `per: 1, stages: 1` takes the flee
+multiplier to zero: a Pokemon that has eaten one does not run, full stop. It is
+the strongest single thing any item does here and is priced at the top of the
+berry band because of it - the thing it is for is the legendary that keeps
+getting away, where the alternative is losing the encounter outright. Asserted
+as an absolute (`berryCalm === 0`, and 2,000 real `resolveThrow` rolls) rather
+than as "lower", because "lower" is what it used to be.
+
+**USING SOMETHING HAS TO LOOK LIKE USING SOMETHING.** A field item's only
+feedback was a chip in the far corner of the screen and a berry's was a line of
+text in the same box every other message uses - so on a fast click neither read
+as "that worked", and the honest failure is feeding a second one because you are
+not sure the first landed. The rail tile pops and the berry itself tosses into
+the encounter. Both are keyed on a COUNTER, not a flag: `e.ate` is bumped on
+every feed, because remounting is the only way to restart a CSS animation and a
+flag that is already true cannot say "again". The pop only plays when the engine
+actually spent one - an animation that fires when nothing happened is worse than
+none, because it is a lie about state.
+
+**THE LEGENDARY MARK IS NOT A TIER**, and it is kept out of the row of tier
+marks for that reason: those are four things you can earn and this is a fact
+about the species, so sitting among them it would read as a fifth tier. It goes
+beside the name on the nameplate and in the opposite corner of a Dex tile - and
+only on an entry you have at least SEEN, because spoiling which silhouettes are
+the legendaries hands over the most interesting thing the grid has left to say.
+`build_marks.py` generates a placeholder and says so loudly until the drawn one
+lands at `.assets-src/marks/legendary.png`.
+
+**A RAZZ BERRY GOES THROUGH `liveMult`, NOT THROUGH `resolveThrow`.** (At every
+depth - check.mjs sweeps the full stack against every catch rate in the dex.) That is
 the load-bearing half: `liveMult` is the single answer to "what is this ball
 worth against this Pokemon", the engine rolls with it and the rail prints it,
 so a berry applied anywhere else would make the rail advertise 3.0 over a throw
@@ -1130,10 +1179,9 @@ ball ladder cannot invert - check.mjs sweeps every catch rate in the dex for
 both. The Master Ball is exempt: it is already past certain.
 
 **`fleeChance`'s `calm` is a MULTIPLIER, not a subtraction.** Subtracting
-flattens the slope this function exists to have, and takes the commonest
-species below zero - which is how "nothing ever flees at rate 255" became an
-assertion. A multiplier is worth most exactly where a berry gets spent: on the
-legendary that keeps running away.
+flattens the slope this function exists to have and takes the commonest species
+below zero. A multiplier reaches 0 cleanly, which is what lets a Nanab be a
+lock, and it is worth most exactly where a berry gets spent.
 
 **A DAILY QUEST MUST BE FINISHABLE IN THE MAP YOU ARE STANDING IN.**
 `QUEST_TYPES` is derived from the STARTING map by weight share (>= `QUEST_SHARE`
