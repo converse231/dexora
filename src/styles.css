@@ -572,6 +572,50 @@ canvas {
    The name, the level and the types are what a throw is decided on; this is
    flavour, and flavour that competes with the decision is noise. The XS/XL tag
    is the only part allowed to shout, and only about one in ten has one. */
+/* On a Dex tile, bottom-left - the one corner the entry number, the tier marks
+   and the rosette all leave alone. Only on an entry you have at least SEEN:
+   spoiling which of the unseen silhouettes are the legendaries would hand over
+   the most interesting thing the grid has left to tell you. */
+.cell-legend { position: absolute; left: 3px; bottom: 3px; z-index: 4; }
+
+/* The legendary badge, beside the name. Not in the row of tier marks: those are
+   four things you can earn and this is a fact about the species, so putting it
+   among them would read as a fifth tier. */
+.np-legend {
+  flex: none; margin-right: .3cqw;
+  filter: drop-shadow(0 0 3px rgba(255, 214, 102, .85));
+  animation: legend-glow 2.4s ease-in-out infinite;
+}
+@keyframes legend-glow {
+  50% { filter: drop-shadow(0 0 6px rgba(255, 214, 102, 1)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .np-legend { animation: none; }
+}
+
+/* THE BERRY ARRIVING. It tosses in from the left and settles at the Pokémon's
+   feet before fading - the same half-second the message box takes to say so,
+   so the two land together rather than one explaining the other afterwards. */
+.berry-toss {
+  position: absolute; left: 50%; top: 58%; z-index: 3;
+  width: 7cqw; image-rendering: pixelated; pointer-events: none;
+  animation: berry-toss 900ms cubic-bezier(.2, .9, .3, 1) forwards;
+}
+@keyframes berry-toss {
+  0%   { transform: translate(-260%, -180%) scale(.6) rotate(-40deg); opacity: 0; }
+  35%  { transform: translate(-50%, -30%) scale(1.15) rotate(8deg); opacity: 1; }
+  55%  { transform: translate(-50%, 0) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, 10%) scale(.85) rotate(0deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .berry-toss { animation: berry-fade 900ms ease-out forwards; }
+  @keyframes berry-fade {
+    0% { opacity: 0; transform: translate(-50%, 0); }
+    30% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, 0); }
+  }
+}
+
 .np-size {
   display: inline-flex; align-items: center; gap: 4px;
   font-family: var(--pixel); font-size: 1cqw; color: var(--ink-faint);
@@ -2868,6 +2912,27 @@ button:disabled { transition: none; }
 .br-item .sprite-fx { width: 3.6cqw; min-width: 18px; aspect-ratio: 1; }
 /* Running, or fed. The same gold the shop row uses for a live effect. */
 .br-item.on { border-color: var(--gold); background: rgba(255, 214, 102, .14); }
+/* At its cap: it will not eat another, and the tile says so before the click
+   rather than swallowing one silently. */
+.br-item.full { opacity: .55; cursor: default; }
+
+/* THE POP. One ring, 320ms, that says "that landed" - the whole reason it
+   exists is that a field item's only feedback was a chip in the far corner and
+   a berry's was a line of text, neither of which reads on a fast click.
+   `pointer-events: none` so it cannot eat the next one. */
+.br-pop {
+  position: absolute; inset: -2px; border-radius: 11px;
+  border: 2px solid var(--gold); pointer-events: none;
+  animation: br-pop 320ms ease-out forwards;
+}
+@keyframes br-pop {
+  from { transform: scale(.72); opacity: 1; }
+  to   { transform: scale(1.35); opacity: 0; }
+}
+.br-item { position: relative; }
+@media (prefers-reduced-motion: reduce) {
+  .br-pop { animation-duration: 1ms; }
+}
 .br-ball em {
   flex: 1 1 auto; font-style: normal; font-size: 1.55cqw;
   color: var(--ink); font-variant-numeric: tabular-nums; text-align: right;

@@ -137,6 +137,11 @@ export const LEGENDARY = [
    Dusk Ball in caves and at night, not under trees, and "anywhere shady" would
    make the ball good in six areas out of eight - which is not a condition, it
    is a discount. */
+/* One Set, built once, because the encounter asks per Pokemon and the Dex grid
+   asks per cell per render. `LEGENDARY` stays the list - this is the lookup. */
+const LEGEND_SET = new Set(LEGENDARY);
+export const isLegendary = (id) => LEGEND_SET.has(id);
+
 export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower"]);
 
 /* Shiny odds, per encounter. The real games use 1 in 8192, and 1 in 4096 since

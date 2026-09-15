@@ -138,6 +138,18 @@ def normalise(dex_id):
     SIZE from everything beside it in a Box row or a Dex cell, which reads as a
     rendering fault rather than as a big Pokemon.
 
+    RESIZE THE CANVAS, NEVER THE CREATURE, and that distinction is the whole
+    function. The first version cropped to the art's bounding box and scaled
+    THAT to fill 64 - which does put every sprite on the right canvas, and
+    destroys relative size while doing it. Measured across the build: Gen 1 and
+    Gen 2 art fills a median 0.73 of its canvas (a Caterpie is small, a Snorlax
+    is not), and every Sinnoh sprite came out at 1.00. Reported from play as a
+    Piplup drawn the size of a Dialga, which is exactly what it was.
+
+    The raw art already carries the scale - Piplup fills 0.44 of its 80px
+    canvas and Dialga fills 0.99 - so the only thing to do is take the canvas
+    from 80 to 64 and leave everything inside it alone.
+
     Rewritten in place, and idempotent: a sprite already on the canvas is
     returned untouched, so running this twice cannot shrink anything twice."""
     path = "public/sprites/%d.png" % dex_id
@@ -147,18 +159,10 @@ def normalise(dex_id):
     for where in ("", "shiny/"):
         src = "public/sprites/%s%d.png" % (where, dex_id)
         one = Image.open(src).convert("RGBA")
-        box = one.getbbox()
-        if box is None:
-            one = one.resize((CANVAS, CANVAS), Image.NEAREST)
-        else:
-            crop = one.crop(box)
-            fit = min(CANVAS / float(crop.width), CANVAS / float(crop.height))
-            crop = crop.resize((max(1, int(round(crop.width * fit))),
-                                max(1, int(round(crop.height * fit)))), Image.NEAREST)
-            out = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
-            out.paste(crop, ((CANVAS - crop.width) // 2,
-                             (CANVAS - crop.height) // 2), crop)
-            one = out
+        # The whole canvas, uniformly. NEAREST because these are pixel art and
+        # a smooth filter would leave a soft sprite beside 251 hard ones;
+        # 80 -> 64 is 4:5, so it drops one row in five rather than blurring.
+        one = one.resize((CANVAS, CANVAS), Image.NEAREST)
         one.save(src)
         if where == "":
             art = one
@@ -212,6 +216,25 @@ def main():
     mb = sorted(x[1] for x in palettes)[len(palettes) // 2]
     print("palette: origin median %d colours against %d ordinary, worst %d"
           % (mo, mb, max(x[0] for x in palettes)))
+
+    # RELATIVE SIZE IS THE POINT OF A SPRITE SET, and nothing measured it.
+    fills = []
+    for dex_id in IDS:
+        im = Image.open("public/sprites/%d.png" % dex_id).convert("RGBA")
+        box = im.getbbox()
+        if box:
+            fills.append(((box[3] - box[1]) / float(im.size[1]), dex_id))
+    med = sorted(f for f, _ in fills)[len(fills) // 2]
+    full = [i for f, i in fills if f > 0.995]
+    print("canvas fill: median %.2f, %d of %d fill it completely"
+          % (med, len(full), len(fills)))
+    assert med < 0.9, (
+        "the median sprite fills %.2f of its canvas - art that has been scaled "
+        "to fill has lost its size, and a Piplup comes out as big as a Dialga"
+        % med)
+    assert len(full) < len(fills) * 0.2, (
+        "%d of %d sprites fill their canvas completely; only the genuinely huge "
+        "ones should" % (len(full), len(fills)))
 
     same = [i for o, b, i in palettes if o >= b]
     assert not same, (

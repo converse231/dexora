@@ -47,7 +47,7 @@ SIZE = 24
 # drawing on disk, so it does NOT grow when a tier is added.
 SHEET_ORDER = ["origin", "shiny", "astral", "complete"]
 # Everything the game asks for. `src/ui/Marks.jsx` names the same set.
-ICONS = ["origin", "shiny", "holo", "astral", "complete"]
+ICONS = ["origin", "shiny", "holo", "astral", "complete", "legendary"]
 
 
 def columns(im, gap=4):
@@ -91,6 +91,30 @@ def square(im, size=SIZE, margin=1):
     out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     out.paste(small, ((size - small.width) // 2, (size - small.height) // 2), small)
     return out
+
+
+def placeholder_legendary(size=256):
+    """A stand-in until the drawn one lands in .assets-src/marks/legendary.png.
+
+    An eight-point star with a bright core - the one shape in this set that is
+    not about a finish or a palette, because legendary is about the SPECIES.
+    Deliberately plain: a placeholder that looks finished is a placeholder that
+    never gets replaced."""
+    import math
+    from PIL import ImageDraw
+
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    c, r = size / 2.0, size * 0.46
+    pts = []
+    for i in range(16):
+        a = math.pi * i / 8.0 - math.pi / 2
+        rad = r if i % 2 == 0 else r * 0.40
+        pts.append((c + math.cos(a) * rad, c + math.sin(a) * rad))
+    d.polygon(pts, fill=(247, 196, 62, 255), outline=(120, 82, 8, 255))
+    d.ellipse([c - r * 0.20, c - r * 0.20, c + r * 0.20, c + r * 0.20],
+              fill=(255, 245, 205, 255))
+    return img
 
 
 def placeholder_holo(size=256):
@@ -167,6 +191,9 @@ def main():
     if "holo" not in made:
         made["holo"] = placeholder_holo()
         stood_in.append("holo")
+    if "legendary" not in made:
+        made["legendary"] = placeholder_legendary()
+        stood_in.append("legendary")
 
     missing = [n for n in ICONS if n not in made]
     if missing:

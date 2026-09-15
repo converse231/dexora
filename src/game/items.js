@@ -151,7 +151,7 @@ export const liveMult = (ball, enc) => {
   const base = enc && ball.bonus ? ball.bonus(enc) : ball.mult;
   // Never the Master Ball: it is already past certain and scaling it is noise.
   if (!enc?.berry || base >= GUARANTEED) return base;
-  return base * (berryById(enc.berry)?.catchMult ?? 1);
+  return base * berryCatch(enc.berry);
 };
 
 /* `boost` is the HEADLINE: the most a ball can ever be worth, which is what the
@@ -280,33 +280,89 @@ export const FAMILIES = [...new Set(FIELD.map((f) => f.family))];
 
    The Pokemon GO trio, and they were picked on the same test the four
    situational balls had to pass: each one must key off a DIFFERENT system, or
-   two of them are one item with two prices. Razz moves the catch roll, Nanab
-   moves the flee roll, Pinap moves the XP award - three different numbers in
-   three different functions.
+   two of them are one item with two prices. `effect` names which, and there is
+   exactly one per berry so nothing has to infer it: `catch` moves the catch
+   roll, `flee` moves the flee roll, `xp` moves the XP award.
 
-   ONE AT A TIME, replacing. That is what makes them a choice rather than a
-   checklist: safety, odds, or reward, on the Pokemon in front of you, with no
-   way to have all three. It is also Pokemon GO's own rule.
+   FEEDING THE SAME BERRY AGAIN DEEPENS IT, and that is a change from the first
+   version, where a second Razz simply replaced the first and was worth nothing
+   at all. A berry you cannot usefully spend twice is a berry you stop carrying:
+   the long encounter that actually needs help is exactly where you would want
+   to double down, and the answer was "that does nothing". `stage` counts how
+   many are in it and every effect reads it.
 
-   A berry lasts the ENCOUNTER, not a throw. A berry you had to re-feed after
-   every miss would be a berry nobody could afford to use on the long fights
-   that are the only ones worth using it on. */
+   A DIFFERENT berry still replaces, at stage 1 - one at a time is what makes
+   them a choice (safety, odds, or reward) rather than a checklist you work
+   through before every throw.
+
+   AND A BERRY AT ITS CAP REFUSES TO BE FED, rather than being eaten for
+   nothing. "Cannot stack" should cost you a click, not a berry.
+
+   A berry lasts the ENCOUNTER, not a throw. One you had to re-feed after every
+   miss is one nobody can afford to use on the long fights that are the only
+   ones worth using it on. */
 export const BERRIES = [
   {
-    id: "razz-berry", name: "Razz Berry", price: 260, level: 10,
-    catchMult: 1.5, blurb: "×1.5 odds, whole encounter",
+    id: "razz-berry", name: "Razz Berry", price: 300, level: 10,
+    effect: "catch", per: 0.5, stages: 3,
+    blurb: "Easier to catch; stacks ×3",
   },
   {
-    id: "nanab-berry", name: "Nanab Berry", price: 190, level: 10,
-    calm: 0.35, blurb: "It settles; rarely flees",
+    /* ONE STAGE, BECAUSE ONE IS ALL IT TAKES. `per: 1` takes the flee
+       multiplier to zero: a Pokemon that has eaten a Nanab does not run, full
+       stop. That is the strongest single thing any item does in this game and
+       it is priced like it - the whole point of it is the legendary that keeps
+       getting away, where the alternative is losing the encounter outright. */
+    id: "nanab-berry", name: "Nanab Berry", price: 450, level: 10,
+    effect: "flee", per: 1, stages: 1,
+    blurb: "It will not run. At all.",
   },
   {
-    id: "pinap-berry", name: "Pinap Berry", price: 230, level: 14,
-    xpMult: 2, blurb: "Double XP if you catch it",
+    id: "pinap-berry", name: "Pinap Berry", price: 280, level: 14,
+    effect: "xp", per: 1, stages: 3,
+    blurb: "Double XP; stacks ×3",
   },
 ];
 
 export const berryById = (id) => BERRIES.find((b) => b.id === id) ?? null;
+
+/* WHAT IS BEING EATEN, AS A NUMBER, and one function per system so no screen
+   or roll has to know how a stage becomes a multiplier.
+
+   `fed` is the encounter's `{ id, stage }` or nothing. Every one of these
+   answers 1 - "no change" - when there is no berry of its kind in play, which
+   is what lets the call sites stay a single multiply. */
+const stageOf = (fed, effect) => {
+  const b = fed && berryById(fed.id);
+  return b?.effect === effect ? Math.max(1, fed.stage ?? 1) : 0;
+};
+
+// Multiplies the ball, so it goes through catchChance's own ceiling.
+export const berryCatch = (fed) => {
+  const n = stageOf(fed, "catch");
+  return n ? 1 + berryById(fed.id).per * n : 1;
+};
+
+/* Multiplies the whole flee line, and may reach 0 - a Nanab is a lock, not a
+   discount. Floored there, because a negative flee chance is not a kinder
+   berry, it is a number that means nothing. */
+export const berryCalm = (fed) => {
+  const n = stageOf(fed, "flee");
+  return n ? Math.max(0, 1 - berryById(fed.id).per * n) : 1;
+};
+
+export const berryXp = (fed) => {
+  const n = stageOf(fed, "xp");
+  return n ? 1 + berryById(fed.id).per * n : 1;
+};
+
+// Whether another one would do anything. The UI greys on it and `useBerry`
+// refuses on it, so the two cannot disagree about a wasted berry.
+export const berryRoom = (fed, id) => {
+  const b = berryById(id);
+  if (!b) return false;
+  return fed?.id !== id || (fed.stage ?? 1) < b.stages;
+};
 
 /* Which picture an item is drawn with. Only the coloured honeys need this -
    everything else is its own id - and it exists so no screen has to know that:

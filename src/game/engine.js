@@ -28,7 +28,7 @@ import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE,
   evolveState, evoLevel, startingState, DEX_BONUS, levelReward,
   evolutionRow, bestRod, holding, canRun, RUN_LEVEL,
-  fieldById, berryById, FAMILIES,
+  fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
   stepReward,
 } from "./items.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
@@ -773,7 +773,7 @@ export function createEngine(canvas, onChange, mini = null) {
       e.rate,
       liveMult(ball, e) * catchMult(state.stats),
       Math.random,
-      berryById(e.berry)?.calm ?? 1);
+      berryCalm(e.berry));
     e.throws += 1;
     e.pending = result;
     e.shakesTotal = result.shakes;
@@ -904,8 +904,7 @@ export function createEngine(canvas, onChange, mini = null) {
          reach. Rounded, because XP is whole and a half-point that only ever
          appears with a berry in play is a rounding difference nobody can
          explain. */
-      const gained = gainXp(Math.round(
-        xpForCatch(sp, e.isNew) * (berryById(e.berry)?.xpMult ?? 1)));
+      const gained = gainXp(Math.round(xpForCatch(sp, e.isNew) * berryXp(e.berry)));
 
       if (e.isNew) {
         state.money += DEX_BONUS;
@@ -1290,9 +1289,20 @@ export function createEngine(canvas, onChange, mini = null) {
     const berry = berryById(id);
     if (!e || e.phase !== "idle") return false;
     if (!berry || (state.bag[berry.id] ?? 0) <= 0) return false;
+    /* A BERRY AT ITS CAP IS NOT EATEN. Feeding a fourth Razz used to spend one
+       and change nothing; "cannot stack" should cost a click, not a berry. */
+    if (!berryRoom(e.berry, id)) return false;
     state.bag[berry.id] -= 1;
-    e.berry = berry.id;
-    e.msg = `${e.name} is eating the ${berry.name}.`;
+    // Same berry deepens; a different one replaces, at stage 1.
+    const stage = e.berry?.id === id ? (e.berry.stage ?? 1) + 1 : 1;
+    e.berry = { id, stage };
+    /* The one frame the UI hangs the "it was used" animation off. Bumped every
+       feed, so a second Razz replays it - a counter, not a flag, because a flag
+       that is already true cannot say "again". */
+    e.ate = (e.ate ?? 0) + 1;
+    e.msg = stage > 1
+      ? `${e.name} is eating another ${berry.name}!`
+      : `${e.name} is eating the ${berry.name}.`;
     save();
     changed();
     return true;
