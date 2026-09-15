@@ -1435,6 +1435,13 @@ def deep_woods():
 
     repair_trees(g, W, H, ".")
 
+    # The walkable fringe you pass behind, run LAST and over open grass only -
+    # a mass butting a clearing or a field keeps its solid crown. Dropping this
+    # in the rewrite cost the forest the one thing that makes its canopy read as
+    # canopy rather than as wall, and check.mjs said so: "nothing to walk
+    # behind".
+    overhang(g)
+
     # SEARCHED, like everything else on a map this size. The comb's teeth are
     # derived from H, so which tile is floor near the bottom edge is a
     # consequence of that arithmetic rather than something to read off a

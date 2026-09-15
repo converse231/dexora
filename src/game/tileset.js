@@ -154,8 +154,17 @@ export function forestId(forest, x, y, at) {
   const isF = (dx, dy) => at(x + dx, y + dy) === "F";
   const col = ((x % 3) + 3) % 3;
 
+  /* HOW FAR THE MASS GOES DOWN, and the cap has to clear the tallest column
+     any map can have. It was 64, which was over twice the tallest canopy that
+     existed - and then Deep Woods became 89 rows tall, its border columns went
+     with it, and every tile above row 24 of them counted 64 instead of the
+     truth. 64 is even, so the whole column paired from the wrong foot: row 1
+     came out as a crown's LOWER half with the crown itself above it. Sliced
+     crowns down the entire left edge of the map.
+     A map is 256 tiles at the outside, and this is a walk up a single column
+     over the handful of tiles actually on screen. */
   let below = 0;
-  while (below < 64 && isF(0, below + 1)) below++;
+  while (below < 256 && isF(0, below + 1)) below++;
 
   if (below === 0) return forest.shadow[col];
   if (below === 1) return forest.trunk[col];
