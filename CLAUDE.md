@@ -1,10 +1,16 @@
 # Dexora
 
-A personal, non-commercial browser game: catch, collect and evolve 358 Pokémon
-across eight hand-made areas. Kanto, Johto and Sinnoh — the Hoenn-shaped hole in
-the middle of the dex is deliberate, and it is the test that keeps a dex id from
-being used as an array index. Inspired by DelugeRPG's loop — walk, meet, throw,
-bank the duplicates, evolve.
+A personal, non-commercial browser game: catch, collect and evolve 493 Pokémon
+across eight hand-made areas — Kanto, Johto, Hoenn and Sinnoh, the whole
+National Dex to Arceus. Inspired by DelugeRPG's loop — walk, meet, throw, bank
+the duplicates, evolve.
+
+**The dex is contiguous again, and that is a loss.** The Hoenn-shaped hole used
+to be the test that stopped a dex id being used as an array index — the one
+thing that made `SPECIES[id - 1]` fail loudly. Nothing enforces that by accident
+now, so `speciesById(id)` and `dexIndex(id)` have to be used on purpose. See
+*A DEX ID IS NOT AN ARRAY INDEX* below; it is the same rule with its safety net
+removed.
 
 Evolution is paid for in **Rare Candy**, one candy per level, on a single
 Pokémon named by `uid`. If you find a doc anywhere describing a *feed* that
@@ -30,7 +36,7 @@ there beats opening a ticket, because a ticket loses the reason.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   check.mjs (29) + play.mjs
+npm run dev        vite dev server           npm run check   check.mjs (31) + play.mjs
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
 npm run play       drive the engine in Node
@@ -681,11 +687,11 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 `ladders_clear()`, whenever a pool is placed.
 - spawn not inside a wall; ≥200 walkable tiles; ≥90% reachable (directed)
 
-[tools/check.mjs](tools/check.mjs) adds twenty-nine suites — catch rules, phase
+[tools/check.mjs](tools/check.mjs) adds thirty-one suites — catch rules, phase
 machine, balls, master balls, economy, evolution, evolution scene, trainer
 stats, casting, tileset, player, map ladder, medals, origin gate, variant rows,
 steps, minimap, battle scene, band budgets, pity, daily, field items, berries,
-origin art, senses, spawn ladder, clock, areas. The count in the command table above is the same number;
+origin art, senses, spawn ladder, clock, habitat, save migration, areas. The count in the command table above is the same number;
 both are printed by the run, so a new suite means editing both.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
@@ -1115,6 +1121,26 @@ contiguous 1..N dex, and Gen 3 does not ship: ids run 1-251 then 387-493 across
 Maps, built once, because the Dex grid asks per cell per render. **Gen 3's
 absence is deliberate** - a contiguous dex hides this entire class, so the hole
 is the test.
+
+**A GENERATION INSERTED IN THE MIDDLE MOVES EVERY POSITION AFTER IT.** A save's
+`dex` and every per-tier row are keyed on POSITION in `SPECIES`, which is
+correct, compact, and survives exactly as long as nothing is inserted before the
+end. Hoenn is inserted before the end: position 251 was Turtwig and is now a
+Hoenn species, so a save loaded by position shows every Sinnoh Pokemon somebody
+ever caught as a different one — silently, with no error anywhere.
+
+**Padding is right for a generation APPENDED and wrong for one INSERTED.**
+`LAYOUTS` records every shape `SPECIES` has shipped in, `layoutIds(len)` returns
+the ids that shape was keyed on, and `remap()` rebuilds the row BY ID. Add a
+generation anywhere but the end and add its old layout there, or the next hole
+is silent.
+
+**And `repairDex` takes the REBUILT rows, not the save.** It recovers caught
+status from the box and from registered variants, and reading `s[tier]` meant
+reading OLD positions into a NEW dex: a shiny Turtwig at old position 251 marked
+whatever now sits there as caught, which after Hoenn is Treecko. The box loop is
+safe either way because a box entry carries its species id; the tier rows are
+not. tools/play loads a real pre-Hoenn save through `loadState` to prove it.
 
 **Kanto is the first 151 positions of `SPECIES`, and saves depend on it.** A
 save written before Johto keyed its bytes by `id - 1`; padding it works only

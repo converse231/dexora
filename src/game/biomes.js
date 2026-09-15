@@ -67,7 +67,40 @@ export const GEN_LAST = [151, 251, 386, 493, 649, 721, 809, 905, 1025];
    A generation with no entry here is open from the start, which is the right
    default for a hole: Gen 3 does not ship, and if it ever does it will want a
    number rather than special-casing. */
-export const GEN_UNLOCK = { 1: 1, 2: 22, 4: 35 };
+export const GEN_UNLOCK = { 1: 1, 2: 22, 3: 28, 4: 35 };
+
+/* EVERY SHAPE `SPECIES` HAS EVER HAD, newest last.
+
+   A save's `dex` and every per-tier row are keyed on POSITION in `SPECIES`, not
+   on the dex id - which is correct, compact, and survives exactly as long as
+   nothing is ever inserted in the middle. Hoenn is inserted in the middle.
+   Before it, position 251 was Turtwig (387); after it, position 251 is a Hoenn
+   species, so a save loaded by position would show every Sinnoh Pokemon you
+   have ever caught as a different one.
+
+   The fix cannot be "pad and hope": padding is right when a generation is
+   APPENDED and wrong when one is inserted. So every layout the game has
+   shipped is recorded here by the ranges it held, and a save whose length
+   matches an old one is rebuilt BY ID. Add a generation anywhere but the end
+   and add its old layout here, or the next hole is silent. */
+export const LAYOUTS = [
+  { len: 151, ranges: [[1, 151]] },
+  { len: 251, ranges: [[1, 251]] },
+  { len: 358, ranges: [[1, 251], [387, 493]] },
+];
+
+/* The ids a save of this length was keyed on, in order - or null if we have
+   never shipped one that shape, in which case `padDex` is the right answer. */
+export function layoutIds(len) {
+  if (len === SPECIES.length) return null;          // the current one
+  const was = LAYOUTS.find((l) => l.len === len);
+  if (!was) return null;
+  const out = [];
+  for (const [lo, hi] of was.ranges) {
+    for (let id = lo; id <= hi; id++) out.push(id);
+  }
+  return out;
+}
 
 /* The regions that actually ship, in dex order, with the count in each - built
    from `SPECIES` rather than listed, so a generation appears in the Dex filter
@@ -124,6 +157,7 @@ export const GENERATIONS = (() => {
 export const LEGENDARY = [
   144, 145, 146, 150, 151,                               // Kanto
   243, 244, 245, 249, 250, 251,                          // Johto
+  377, 378, 379, 380, 381, 382, 383, 384, 385, 386,      // Hoenn
   480, 481, 482, 483, 484, 485, 486, 487, 488, 490, 491, 492, 493,  // Sinnoh
 ];
 

@@ -252,4 +252,34 @@ function until(e, what, label, max = 2000) {
   console.log("field ok — counts down while walking, and one per family");
 }
 
+/* A PRE-HOENN SAVE, THROUGH THE REAL LOADER. check.mjs proves the remap
+   arithmetic; only this proves `loadState` actually calls it - and getting that
+   wrong turns somebody's Sinnoh collection into somebody else's, silently, with
+   no error anywhere to notice. */
+{
+  const { layoutIds, dexIndex: at, speciesById: by } =
+    await import("../src/game/biomes.js");
+  const ids = layoutIds(358);
+  const dex = new Array(358).fill(0);
+  const shiny = new Array(358).fill(0);
+  for (const id of [25, 151, 251, 387, 448, 493]) dex[ids.indexOf(id)] = 2;
+  shiny[ids.indexOf(387)] = 1;                 // a shiny Turtwig, the real test
+
+  const { e } = boot({ ...SAVE, dex, shiny, box: [], caught: 6 });
+  for (const [id, want] of [[25, 2], [151, 2], [251, 2], [387, 2], [448, 2], [493, 2]]) {
+    assert.equal(e.state.dex[at(id)], want,
+      `#${id} (${by(id).name}) loaded as ${e.state.dex[at(id)]}, not ${want}`);
+  }
+  assert.equal(e.state.shiny[at(387)], 1, "the shiny Turtwig did not survive the move");
+  const hoenn = [252, 300, 386];
+  for (const id of hoenn) {
+    assert.equal(e.state.dex[at(id)], 0,
+      `#${id} (${by(id).name}) came back registered in a save written before Hoenn`);
+  }
+  assert.equal(e.state.dex.length, (await import("../src/data/species.js")).SPECIES.length,
+    "the loaded dex is not the current size");
+  console.log(`save ok — a 358-entry save loads onto ${e.state.dex.length} entries, ` +
+    "Sinnoh and its shinies intact, Hoenn empty");
+}
+
 console.log("play ok — the frame loop never stopped");

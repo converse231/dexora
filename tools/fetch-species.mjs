@@ -21,7 +21,7 @@ const HGSS = `${GH}/versions/generation-iv/heartgold-soulsilver`;
    yet; HeartGold/SoulSilver is the closest 2D set and is 80x80, so those get
    reframed to 64 by build_origin.py - the same fit the Origin art already
    goes through, for the same reason. */
-const RANGES = [[1, 151], [152, 251], [387, 493]];
+const RANGES = [[1, 151], [152, 251], [252, 386], [387, 493]];
 const artFor = (id) => (id <= 386 ? FRLG : HGSS);
 
 const tierOf = (r) => (r >= 200 ? "C" : r >= 100 ? "B" : r >= 45 ? "A" : "S");

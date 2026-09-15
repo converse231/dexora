@@ -8,7 +8,7 @@ import {
   AREAS, AREA_IDS, areaOf, walkable, label, MINI, MINI_UNKNOWN,
 } from "./map.js";
 import {
-  biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex,
+  biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
   levelFromXp, xpForCatch,
   rodTable, rodBite,
   rollVariant, pityBoost, TIERS,
@@ -151,17 +151,44 @@ function normalise(arr, len) {
 
    Idempotent and cheap: it only ever raises a 1 to a 2, so it is a no-op on a
    healthy save and runs once per load either way. */
-export function repairDex(dex, s) {
+export function repairDex(dex, s, tiers = s) {
   for (const mon of Array.isArray(s.box) ? s.box : []) {
     const at = dexIndex(mon?.species);
     if (at >= 0) dex[at] = 2;
   }
+  /* THE ROWS, NOT THE SAVE. `tiers` is what `loadState` has already rebuilt -
+     remapped where a generation was inserted, padded where one was appended -
+     and reading `s[tier]` instead was reading OLD positions into a NEW dex. A
+     shiny Turtwig at old position 251 marked whatever now sits there caught,
+     which after Hoenn is Treecko. The box loop above is safe either way
+     because a box entry carries its species ID. */
   for (const tier of TIERS) {
-    const row = s[tier];
+    const row = tiers?.[tier];
     if (!Array.isArray(row)) continue;
     for (let i = 0; i < row.length && i < dex.length; i++) if (row[i]) dex[i] = 2;
   }
   return dex;
+}
+
+/* Rebuild a position-keyed row from a layout we no longer use.
+
+   Returns null when the row is already the right shape, or when its length
+   matches nothing we have shipped - both of which `padDex` and `normalise`
+   handle correctly on their own. Anything this DOES rebuild is placed by the
+   id it belonged to, which is the only thing about a save that does not move.
+
+   `keep` is what a value means: the dex is three-valued and a tier row is one
+   bit, so the caller passes the same coercion it would have used anyway. */
+function remap(arr, len, keep) {
+  if (!Array.isArray(arr) || arr.length === len) return null;
+  const ids = layoutIds(arr.length);
+  if (!ids) return null;
+  const out = new Array(len).fill(0);
+  for (let i = 0; i < ids.length && i < arr.length; i++) {
+    const at = dexIndex(ids[i]);
+    if (at >= 0 && at < len) out[at] = keep(arr[i]);
+  }
+  return out;
 }
 
 function padDex(arr, len) {
@@ -217,6 +244,16 @@ function loadState() {
        generation is ever inserted BEFORE Kanto, this stops being true and that
        assertion is what will say so. */
     if (s.dex.length > SPECIES.length) return freshState();
+
+    /* Built once, and BEFORE the dex, because `repairDex` reads them. Every
+       tier rebuilt to the right shape - remapped where a generation was
+       inserted, padded where one was appended - including tiers the save has
+       never heard of: a file written before Holo has no `holo`, and a fresh row
+       of zeroes is what that should mean. */
+    const rows = Object.fromEntries(TIERS.map((t) => [t,
+      remap(s[t], SPECIES.length, (v) => (v ? 1 : 0))
+        ?? normalise(s[t], SPECIES.length)]));
+
     return {
       ...freshState(), ...s, rev: 0,
       /* A save from before shinies existed has neither of these, and a
@@ -226,9 +263,15 @@ function loadState() {
          never heard of: a file written before Holo existed simply has no
          `holo`, and `normalise(undefined)` is a fresh row of zeroes. That is
          what makes adding a tier a non-event for saves. */
-      dex: repairDex(padDex(s.dex, SPECIES.length), s),
-      ...Object.fromEntries(
-        TIERS.map((t) => [t, normalise(s[t], SPECIES.length)])),
+      /* REMAPPED BEFORE PADDED. Padding is right when a generation is appended
+         and wrong when one is inserted in the middle - see `LAYOUTS`. Hoenn
+         moved every Sinnoh position by 135, so a save written before it has to
+         be rebuilt by id or a player's Sinnoh collection comes back as somebody
+         else's. `remap` returns null for a save that never needs it. */
+      dex: repairDex(
+        remap(s.dex, SPECIES.length, (v) => (v === 2 ? 2 : v === 1 ? 1 : 0))
+          ?? padDex(s.dex, SPECIES.length), s, rows),
+      ...rows,
       /* MIGRATION, and it has to run AFTER the line above or it is overwritten.
          `astral` used to mean the Generation I sprite - what is now called
          Origin - so a save written before the split has its Origins filed under
