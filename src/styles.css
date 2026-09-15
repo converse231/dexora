@@ -2107,6 +2107,131 @@ canvas {
 }
 .sheet-close:hover { border-color: var(--path); color: var(--path); }
 
+/* ---------- the world's clock ----------
+
+   A readout beside the level, not a control: the only thing that moves it is
+   walking. Each phase tints its own chip, which is the smallest possible
+   version of the thing the scene does at full size. */
+.tb-clock {
+  flex: none; display: grid; gap: 1px; padding: 4px 10px 3px;
+  border: 2px solid var(--line-firm); border-radius: 10px;
+  background: var(--surface); font-variant-numeric: tabular-nums;
+}
+.tb-clock i {
+  font-style: normal; font-family: var(--pixel); font-size: 7.5px;
+  letter-spacing: .1em; color: var(--ink-faint);
+}
+.tb-clock b { font-family: var(--pixel); font-size: 11px; font-weight: 400; }
+.tb-clock.ph-dawn  { background: #fdf1e4; border-color: #e8b98a; }
+.tb-clock.ph-day   { background: var(--surface); }
+.tb-clock.ph-dusk  { background: #f6e8f0; border-color: #c493b4; }
+.tb-clock.ph-night { background: #26304a; border-color: #47557a; }
+.tb-clock.ph-night i { color: #93a3c9; }
+.tb-clock.ph-night b { color: #eef2ff; }
+
+/* THE ENCOUNTER SCENE, AT FOUR TIMES OF DAY.
+
+   `--sky` and `--light` are already set per area on `.battle`; a phase is a
+   second declaration on the SAME element, which is why `[data-phase]` is
+   written to beat `[data-area]` by specificity rather than by order - an area
+   added later must not quietly out-rank the clock.
+
+   A cave has no sky, and the phases deliberately leave the enclosed areas
+   alone: the Dusk Ball is boosted there around the clock precisely because
+   what is overhead never changes. Handled by listing the OPEN areas rather
+   than by excluding the closed ones, so a ninth area has to opt in. */
+.battle[data-phase="dawn"][data-area="meadow"],
+.battle[data-phase="dawn"][data-area="woods"],
+.battle[data-phase="dawn"][data-area="pond"] {
+  --sky: linear-gradient(#f6c98f, #ffe9cd 62%, #fff6ea);
+  --light: rgba(255, 188, 120, .22);
+}
+.battle[data-phase="dusk"][data-area="meadow"],
+.battle[data-phase="dusk"][data-area="woods"],
+.battle[data-phase="dusk"][data-area="pond"] {
+  --sky: linear-gradient(#6b5a95, #d98f8f 55%, #f6c48c);
+  --light: rgba(120, 78, 150, .26);
+}
+.battle[data-phase="night"][data-area="meadow"],
+.battle[data-phase="night"][data-area="woods"],
+.battle[data-phase="night"][data-area="pond"] {
+  --sky: linear-gradient(#141c33, #26304a 60%, #38456b);
+  --light: rgba(40, 56, 110, .42);
+}
+/* The ground takes the light too, or a night sky sits over a sunlit field. */
+.battle[data-phase="dusk"] .battle-ground,
+.battle[data-phase="night"] .battle-ground { filter: brightness(.72) saturate(.85); }
+.battle[data-phase="dawn"] .battle-ground { filter: brightness(1.04) saturate(1.05); }
+/* Never the enclosed ones - see above. */
+.battle[data-area="ridge"] .battle-ground,
+.battle[data-area="power"] .battle-ground,
+.battle[data-area="ember"] .battle-ground,
+.battle[data-area="frost"] .battle-ground,
+.battle[data-area="tower"] .battle-ground { filter: none; }
+
+/* ---------- today's quest, in the top bar ----------
+
+   It lived one tab deep behind a dot and was reported as impossible to find.
+   The top bar is the one thing on screen in every state of the game, so the
+   summary sits here and the card opens over it - collapsed by default, because
+   the count is what you glance at and the card is what you open once a day. */
+.missions { position: relative; flex: none; }
+.ms-tab {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 5px 11px 4px; cursor: pointer;
+  border: 2px solid var(--line-firm); border-radius: 10px;
+  background: var(--surface); color: var(--ink);
+}
+.ms-tab i {
+  font-style: normal; font-family: var(--pixel); font-size: 7.5px;
+  letter-spacing: .1em; color: var(--ink-faint);
+}
+.ms-tab b {
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--pixel); font-size: 11px; font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.ms-tab:hover { border-color: var(--path); }
+/* Ready to claim is the one state worth interrupting for, and it is the only
+   one that gets colour. "In progress" is most of the time. */
+.ms-tab.ready { border-color: var(--gold); background: #fdf8e8; }
+.ms-tab.done i, .ms-tab.done b { color: var(--ink-faint); }
+.ms-dot {
+  display: grid; place-items: center; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--gold); color: #3a2c05;
+  font-style: normal; font-size: 9px;
+  animation: ms-nudge 1.6s ease-in-out infinite;
+}
+@keyframes ms-nudge { 50% { transform: scale(1.18); } }
+@media (prefers-reduced-motion: reduce) { .ms-dot { animation: none; } }
+
+/* The card, over everything, anchored under its own button. `min-width` rather
+   than a fixed width so a longer goal line does not wrap to four rows. */
+.ms-pop {
+  position: absolute; top: calc(100% + 7px); left: 0; z-index: 60;
+  min-width: 268px; padding: 11px;
+  border: 2px solid var(--line-firm); border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .22);
+  animation: ms-drop 130ms ease-out both;
+}
+@keyframes ms-drop {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .ms-pop { animation: none; } }
+/* The card already carries its own margin on the rail; inside the popover it
+   is the only thing there. */
+.ms-pop .daily { margin: 0; }
+
+/* On a phone the bar is tight, so the button keeps its count and drops its
+   label, and the card hangs off the right edge instead of the left. */
+@media (max-width: 720px) {
+  .ms-tab { padding: 5px 8px 4px; }
+  .ms-tab i { display: none; }
+  .ms-pop { left: auto; right: 0; min-width: min(268px, 86vw); }
+}
+
 /* ---------- the tooltip ----------
 
    One element at the app root, `position: fixed` so no scroller can clip it -

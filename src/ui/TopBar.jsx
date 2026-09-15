@@ -6,7 +6,10 @@
    faint label over a large value, so the numbers are what you see and the labels
    are only there when you need to check what one means. */
 
+import { useEffect, useRef, useState } from "react";
 import { levelProgress } from "../game/biomes.js";
+import Daily from "./Daily.jsx";
+import { phaseAt, timeLabel } from "../game/clock.js";
 import { SPECIES } from "../data/species.js";
 
 /* "+3 +2 balls" - the whole parcel in one short line, because four separate
@@ -16,8 +19,71 @@ const parcelLabel = (items) => {
   return `+${n} ball${n === 1 ? "" : "s"}`;
 };
 
+/* TODAY'S QUEST, WHERE IT CAN BE FOUND.
+
+   It lived on the YOU tab behind a `!` on the tab badge, which is a fine place
+   to READ it and a bad place to discover it: reported as "I am not sure where
+   to see the missions", which is the whole verdict on a feature hidden one tab
+   deep behind a dot. The top bar is the one thing on screen in every state of
+   the game, so that is where a thing you are meant to track goes.
+
+   COLLAPSED BY DEFAULT and summarised on the button - the count is the part you
+   glance at, and the card is the part you open once a day. There is ONE card:
+   this renders `Daily.jsx`, the same component the YOU tab used to, rather than
+   a second smaller copy of it that would drift. */
+function Missions({ daily, onClaim, note }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  const goal = daily?.goal;
+  const done = Math.min(daily?.done ?? 0, goal?.need ?? 0);
+  const ready = goal && !daily.claimed && done >= goal.need;
+
+  /* Click away and Escape, because this is a popover over a game that reads
+     the keyboard - and a panel you cannot dismiss without finding its button
+     again is a panel people leave open. */
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (ev) => { if (!box.current?.contains(ev.target)) setOpen(false); };
+    const esc = (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); setOpen(false); } };
+    addEventListener("pointerdown", away);
+    addEventListener("keydown", esc, true);
+    return () => {
+      removeEventListener("pointerdown", away);
+      removeEventListener("keydown", esc, true);
+    };
+  }, [open]);
+
+  if (!goal) return null;
+  return (
+    <div className={`missions${open ? " open" : ""}`} ref={box}>
+      <button
+        type="button"
+        className={`ms-tab${ready ? " ready" : ""}${daily.claimed ? " done" : ""}`}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        data-tip={ready ? "Today's quest is ready to claim"
+          : daily.claimed ? "Claimed - come back tomorrow"
+            : "Today's quest"}
+      >
+        <i>QUEST</i>
+        <b>
+          {daily.claimed ? "DONE" : `${done}/${goal.need}`}
+          {ready && <em className="ms-dot" aria-hidden="true">!</em>}
+        </b>
+      </button>
+
+      {open && (
+        <div className="ms-pop" role="dialog" aria-label="Today's quest">
+          <Daily daily={daily} onClaim={onClaim} note={note} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
+  daily, onClaimDaily, claimNote,
 }) {
   const { level, into, need, frac } = levelProgress(xp);
 
@@ -38,6 +104,19 @@ export default function TopBar({
         <span className="xpbar"><i style={{ width: `${Math.round(frac * 100)}%` }} /></span>
         <span className="tb-lv-xp">{need ? `${into}/${need} XP` : "MAX"}</span>
       </div>
+
+      {/* THE CLOCK RUNS ON STEPS, so it belongs beside the step counter's own
+          system rather than anywhere a real time would go. It is a readout, not
+          a control: the only thing that moves it is walking. */}
+      <div
+        className={`tb-clock ph-${phaseAt(steps).id}`}
+        data-tip={`${phaseAt(steps).name} — the world's clock runs as you walk`}
+      >
+        <i>{phaseAt(steps).name.toUpperCase()}</i>
+        <b>{timeLabel(steps)}</b>
+      </div>
+
+      <Missions daily={daily} onClaim={onClaimDaily} note={claimNote} />
 
       <span className="spacer" />
 

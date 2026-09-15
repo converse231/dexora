@@ -23,6 +23,7 @@ import {
 } from "./tileset.js";
 import { resolveThrow } from "../catch.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
+import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt } from "./medals.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE,
@@ -633,6 +634,14 @@ export function createEngine(canvas, onChange, mini = null) {
          in, and a forgotten `holo: false` reads as "ordinary" everywhere. */
       ...Object.fromEntries(TIERS.map((t) => [t, variant === t])),
       rate: sp.rate,
+      /* Whether it is night, frozen the same way and for the same reason as
+         `areaId` below - the Dusk Ball reads it, and a throw that changed
+         value because the clock ticked mid-animation would be unfalsifiable
+         from the outside. */
+      night: isNight(state.steps),
+      // And which phase it is, for the scene. Frozen with everything else, so
+      // the sky cannot change colour halfway through a throw.
+      phaseId: phaseAt(state.steps).id,
       /* Which map this happened on, so a Dusk Ball can ask. Copied onto the
          encounter rather than read off `state` when the ball rolls, for the
          same reason `known` is: everything a throw depends on is fixed at the
@@ -1365,6 +1374,10 @@ export function createEngine(canvas, onChange, mini = null) {
       state.running = want;
       changed();
     },
+    /* The world's clock, read by the top bar and the encounter scene. A
+       function rather than a field: it moves every step, and a field would be
+       a second copy of `state.steps` that could disagree with the first. */
+    clock: () => phaseAt(state.steps),
     priceOf,
     valueOf,
     evolve,

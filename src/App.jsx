@@ -219,6 +219,25 @@ export default function App() {
 
   const caught = st ? st.dex.filter((v) => v === 2).length : 0;
   const level = levelFromXp(st?.xp ?? 0);
+
+  /* The claim says what it paid, in the one alert the game uses. Without it a
+     claim is a button that greys itself out and three numbers that moved
+     somewhere else on screen. */
+  const [claimNote, setClaimNote] = useState("");
+  const claimDaily = () => {
+    const won = engine?.claimDaily();
+    if (!won) return null;
+    setClaimNote(
+      `+¥${won.money.toLocaleString()} · +${won.candy} candy · ` +
+      `+${won.items["great-ball"]} Great Balls`);
+    return won;
+  };
+  // Clears itself, and only ever the last one - see the money-delta bug.
+  useEffect(() => {
+    if (!claimNote) return undefined;
+    const t = setTimeout(() => setClaimNote(""), 4200);
+    return () => clearTimeout(t);
+  }, [claimNote]);
   const biome = biomeFor(st?.areaId);
 
   return (
@@ -233,6 +252,12 @@ export default function App() {
       {cheer && <Cheer cheer={cheer} onDone={() => engine.dropCheer()} />}
 
       <TopBar
+        /* The quest lives here now rather than on the YOU tab - see Missions in
+           TopBar.jsx. The claim and its note live here too, because the top bar
+           is the only thing on screen in every state of the game. */
+        daily={engine?.daily?.()}
+        onClaimDaily={claimDaily}
+        claimNote={claimNote}
         caught={caught}
         total={st?.caught ?? 0}
         steps={st?.steps ?? 0}
@@ -405,8 +430,6 @@ export default function App() {
           onBuy={(id, n) => engine.buy(id, n)}
           onBuyCandy={(n) => engine.buyCandy(n)}
           onEvolve={(uid, to) => engine.evolve(uid, to)}
-          daily={engine?.daily?.()}
-          onClaimDaily={() => engine.claimDaily()}
           jumpTo={boxJump}
           onJumped={() => setBoxJump(null)}
           onSpend={(id) => engine.spend(id)}

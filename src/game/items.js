@@ -86,8 +86,12 @@ export const BALLS = [
   { id: "ultra-ball", name: "Ultra Ball", short: "ULTRA", mult: 3.0, price: 250, level: 12 },
   {
     id: "dusk-ball", hideWhenEmpty: true, boost: 3.5, name: "Dusk Ball", short: "DUSK", mult: PLAIN_MULT, price: 190, level: 14,
-    hint: "out of daylight",
-    bonus: (enc) => (ENCLOSED.has(enc.areaId) ? 3.5 : PLAIN_MULT),
+    /* CANON IS NIGHT AND CAVES, and until there was a clock it could only be
+       caves. `enc.night` is frozen onto the encounter when the Pokemon appears,
+       like `known` and `areaId` and for the same reason: a throw must not
+       change value because you took a step mid-animation. */
+    hint: "night and caves",
+    bonus: (enc) => (enc.night || ENCLOSED.has(enc.areaId) ? 3.5 : PLAIN_MULT),
   },
   {
     id: "timer-ball", hideWhenEmpty: true, boost: 4, name: "Timer Ball", short: "TIMER", mult: PLAIN_MULT, price: 70, level: 16,

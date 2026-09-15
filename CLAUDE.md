@@ -30,7 +30,7 @@ there beats opening a ticket, because a ticket loses the reason.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   check.mjs (25) + play.mjs
+npm run dev        vite dev server           npm run check   check.mjs (29) + play.mjs
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
 npm run play       drive the engine in Node
@@ -620,11 +620,11 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 `ladders_clear()`, whenever a pool is placed.
 - spawn not inside a wall; ≥200 walkable tiles; ≥90% reachable (directed)
 
-[tools/check.mjs](tools/check.mjs) adds twenty-seven suites — catch rules, phase
+[tools/check.mjs](tools/check.mjs) adds twenty-nine suites — catch rules, phase
 machine, balls, master balls, economy, evolution, evolution scene, trainer
 stats, casting, tileset, player, map ladder, medals, origin gate, variant rows,
 steps, minimap, battle scene, band budgets, pity, daily, field items, berries,
-origin art, senses, spawn ladder, areas. The count in the command table above is the same number;
+origin art, senses, spawn ladder, clock, areas. The count in the command table above is the same number;
 both are printed by the run, so a new suite means editing both.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
@@ -1158,6 +1158,40 @@ every feed, because remounting is the only way to restart a CSS animation and a
 flag that is already true cannot say "again". The pop only plays when the engine
 actually spent one - an animation that fires when nothing happened is worse than
 none, because it is a lie about state.
+
+**THE WORLD'S CLOCK RUNS ON STEPS, NOT ON `new Date()`.** A real clock means a
+player who plays at lunch never sees night, never meets the one condition the
+Dusk Ball exists for, and is told about a feature they cannot reach - which is
+the complaint Gold and Silver actually got. Steps are a counter the game already
+keeps and already saves, so everybody sees the whole cycle in the order it was
+designed. `clock.js` is pure for the same reason `daily.js` is: check.mjs walks
+a whole day without waiting for one.
+
+**THE PHASE IS FROZEN ONTO THE ENCOUNTER**, exactly like `known` and `areaId`
+and for exactly the same reason - a ball that read the clock at throw time would
+change value because you took a step mid-animation. `items.js` reads `enc.night`
+and must NEVER import the clock; check.mjs asserts both halves, because a live
+read is invisible from the outside.
+
+**A CAVE IS DARK ROUND THE CLOCK.** The Dusk Ball is boosted at night OR in an
+`ENCLOSED` area, and those must not collapse into one condition: drop the cave
+case and "night and caves" is only "night", which costs the ball half of what
+makes it different from the other three. The phase tints skip the enclosed areas
+for the same reason - what is overhead there never changes.
+
+**`data-phase` GOES ON THE SAME ELEMENT AS `data-area`.** The phase overrides
+the area's `--sky`, and a custom property only inherits downwards: `.battle-sky`
+is a SIBLING of the field, so a phase set one level lower would never reach it.
+That is the exact mistake the area colours made once.
+
+**TODAY'S QUEST LIVES IN THE TOP BAR.** It was on the YOU tab behind a `!` on
+the tab badge, which is a fine place to read it and a bad place to discover it -
+reported as "I am not sure where to see the missions", which is the whole
+verdict on a feature one tab deep behind a dot. The top bar is the only thing on
+screen in every state of the game. There is ONE card: `Missions` in TopBar.jsx
+renders `Daily.jsx`, the same component the rail used to, rather than a second
+smaller copy that would drift - and the claim moved to App.jsx with it, because
+two places to claim from would be two sources for one number.
 
 **THE LEGENDARY MARK IS NOT A TIER**, and it is kept out of the row of tier
 marks for that reason: those are four things you can earn and this is a fact

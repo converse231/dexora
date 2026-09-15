@@ -2697,6 +2697,59 @@ a visible counter would make the drought the thing you are playing.
 
 ---
 
+### Day and night, on the step counter
+
+*Phase 5's first item, and the one the roadmap said had a dependency: "if
+generations are coming, this wants to land first". They came.*
+
+**A real clock was the obvious choice and it is the wrong one.** Tie the sky to
+`new Date()` and a player who plays at lunch never sees night, never meets the
+one condition the Dusk Ball exists for, and is told about a feature they cannot
+reach — which is the complaint Gold and Silver actually got. The clock runs on
+**steps** instead: a counter the game already keeps and already saves, so
+everybody sees the whole cycle in the order it was designed.
+
+A full day is 1,200 steps — about five parcels of walking — so a session crosses
+into night a few times rather than once an hour or once a playthrough. Four
+phases, and the two short ones are the point: dawn and dusk are three hours each
+against nine for day and night, because a transition as long as the thing it
+transitions between is not a transition.
+
+**Night is 38% of the day, and that number is asserted.** It is the one phase
+with a mechanic hanging off it, so it has to be a real slice: rare enough that a
+Dusk Ball is situational, common enough that you can plan around it.
+
+| | |
+|---|---|
+| **The Dusk Ball** | boosted at night **or** in a cave — canon, and until there was a clock it could only be the cave half |
+| **The scene** | dawn, dusk and night each get their own sky and light over every open map |
+| **The readout** | a chip in the top bar that tints with the phase |
+
+**The two Dusk Ball conditions must not collapse into one.** A cave is dark
+round the clock, so the ball stays boosted in one at midday — drop that and
+"night and caves" is only "night", and the ball loses half of what makes it
+different from the other three. The phase tints skip the enclosed maps for the
+same reason.
+
+**And the phase is frozen onto the encounter**, exactly like `known` and
+`areaId`: a ball that read the clock at throw time would change value because
+you took a step mid-animation. `items.js` reads the frozen flag and never
+imports the clock, and both halves are asserted, because a live read is
+invisible from the outside.
+
+### Today's quest moved to the top bar
+
+It lived on the YOU tab behind a `!` on the tab badge — a fine place to read it,
+a bad place to discover it. Reported as *"I am not sure where to see the
+missions"*, which is the whole verdict on a feature one tab deep behind a dot.
+
+It is a collapsible chip in the top bar now: the count is what you glance at,
+the card is what you open once a day, and the top bar is the only thing on
+screen in every state of the game. There is **one** card — the chip renders the
+same `Daily.jsx` the rail used to, rather than a second smaller copy that would
+drift — and the claim moved with it, because two places to claim from would be
+two sources for one number.
+
 ### Phase 5 — More world
 
 *Goal: your first stated want — more maps, or bigger ones.*
@@ -2705,7 +2758,7 @@ a visible counter would make the drought the thing you are playing.
 |---|---|
 | **More maps, or bigger ones** | The generator and the measurement tooling exist: `compose.py` composes against measured bands, `npm run layout`/`npm run shape` flag anything that reads wrong, and adding an area is a spec plus a biome table. This is the cheapest content in the project *per map*. |
 | **Do maps connect?** | Today they are switched from a menu, deliberately — no transition tiles between biomes, so every zone would be a hard rectangle butted against grass. Connecting them is a real piece of tile work, not a wiring change. |
-| **Day / night** | Changes which table rolls without needing a single new map. **This is the dependency:** Gen 2 has evolutions that only happen at a time of day, so if generations are coming, this wants to land first. |
+| **Day / night** | ✅ **shipped** — see *Day and night, on the step counter* above. The clock exists and the Dusk Ball uses it; what it deliberately does *not* do yet is change which table rolls, because that needs real per-species time data rather than an invented type→time mapping, and inventing one is the eyeballing this project exists to avoid. |
 | **Weather** | Same idea, one layer up, and it gives the eight existing maps a second face. |
 
 **Your calls:** more maps *or* bigger maps (they pull in opposite directions —

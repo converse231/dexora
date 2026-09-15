@@ -67,6 +67,7 @@ function tick(ms = 16, steps = 1) {
 
 const { createEngine } = await import("../src/game/engine.js");
 const { BALLS, berryById } = await import("../src/game/items.js");
+const { PHASES, phaseAt } = await import("../src/game/clock.js");
 const {
   wildBand, biomeFor, bornLevel, SIZE_MIN, SIZE_MAX,
 } = await import("../src/game/biomes.js");
@@ -166,6 +167,13 @@ function until(e, what, label, max = 2000) {
   assert.ok(caught.size >= SIZE_MIN && caught.size <= SIZE_MAX,
     `a caught Pokémon came out of the ball with size ${caught.size}`);
 
+  /* THE CLOCK IS FROZEN ONTO THE ENCOUNTER, and only a real one goes through
+     that copy. A ball that read the clock at throw time would change value
+     because you took a step mid-animation. */
+  assert.equal(typeof enc.night, "boolean", "the encounter carries no night flag");
+  assert.ok(PHASES.some((p) => p.id === enc.phaseId),
+    `the encounter froze phase "${enc.phaseId}", which is not one`);
+
   /* AND IT MUST BE IN THE MAP'S OWN BAND. The band is computed from the biome
      the encounter started in, which nothing but the engine knows. */
   {
@@ -220,6 +228,12 @@ function until(e, what, label, max = 2000) {
   for (let i = 0; i < 400 && left() > 0; i++) { e.press("right"); tick(16); }
   e.clearHeld();
   assert.ok(left() < start, `a repel ran ${start} -> ${left()} steps - it is not counting down`);
+  /* AND THE WORLD'S CLOCK MOVES WITH THE WALK. It is derived from the step
+     counter, so this is really asserting that the counter itself advances -
+     which nothing else here does directly. */
+  assert.ok(e.state.steps > SAVE.steps, "walking did not advance the step counter");
+  assert.ok(PHASES.some((p) => p.id === phaseAt(e.state.steps).id),
+    "the clock landed outside every phase");
   assert.equal(e.useField("honey"), true, "a honey refused to start");
   assert.equal(e.state.field.variant.id, "honey", "the honey did not land in its family slot");
   assert.equal(e.useField("honey-shiny"), true, "a shiny honey refused to start");
