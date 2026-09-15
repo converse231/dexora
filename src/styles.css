@@ -1669,6 +1669,41 @@ canvas {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- today's quest ------------------------------------------------------
+   A card, not a panel: it sits above the trainer's stats on the YOU tab and
+   has to read as one thing you can finish rather than as a second screen. */
+.daily {
+  border: 2px solid var(--line-firm); border-radius: 12px;
+  padding: 11px 12px 10px; margin-bottom: 12px;
+  background: var(--surface);
+}
+.daily.ready { border-color: var(--gold); background: #fdf8e8; }
+.daily.done { opacity: .72; }
+.dy-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--pixel); font-size: 8.5px; letter-spacing: .1em;
+  color: var(--ink-faint); margin-bottom: 5px;
+}
+.dy-streak { color: var(--gold); }
+.dy-goal { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+/* The dex bar, reused whole - one progress track in the game, not two. */
+.daily .bar { margin-bottom: 8px; }
+.dy-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dy-count {
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.dy-done { font-family: var(--pixel); font-size: 8.5px; color: var(--ink-faint); font-style: normal; }
+.dy-claim {
+  font-family: var(--pixel); font-size: 10px; padding: 9px 14px 7px;
+  border: 2px solid var(--gold); border-radius: 9px;
+  background: var(--gold); color: #3b2f10; cursor: pointer;
+}
+.dy-claim:disabled {
+  background: var(--surface-2); border-color: var(--line-firm);
+  color: var(--ink-faint); cursor: default;
+}
+
 /* ---- candy -------------------------------------------------------------
    One accent, used for exactly one idea. Candy is a second currency and it has
    to be told from money at a glance in four places - the top bar, the sweep,
@@ -1693,6 +1728,33 @@ canvas {
 .bx-acts .raisebtn {
   background: var(--candy); border-color: var(--candy); color: #fff;
 }
+
+/* One row per field item, and the whole row is the button: there is nothing to
+   configure - no quantity, no target - so a separate BUY control beside a
+   description would be a click target next to a click target. */
+.fieldlist { display: grid; gap: 7px; margin-bottom: 12px; }
+.fieldrow {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 11px; text-align: left; font: inherit; cursor: pointer;
+  border: 2px solid var(--line-firm); border-radius: 10px;
+  background: var(--surface);
+}
+.fieldrow img { width: 26px; height: 26px; image-rendering: pixelated; }
+.fr-copy { flex: 1; min-width: 0; display: grid; }
+.fr-copy b { font-size: 13px; }
+.fr-copy i {
+  font-style: normal; font-size: 10.5px; color: var(--ink-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fr-tail {
+  flex: none; font-family: var(--pixel); font-size: 9px; color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+/* Running: the row says how much is left instead of what it costs. */
+.fieldrow.on { border-color: var(--gold); background: #fdf8e8; }
+.fieldrow.on .fr-tail { color: var(--gold); }
+.fieldrow.locked, .fieldrow:disabled { cursor: default; }
+.fieldrow.locked, .fieldrow:disabled:not(.on) { opacity: .5; }
 
 .candyrow {
   display: flex; align-items: center; gap: 8px;
@@ -2386,6 +2448,19 @@ button:disabled { transition: none; }
    `display` is deliberately absent too: a phone has no room for a map of the
    map, so the base is `none` and the wide layout at the end of this file turns
    it on. Layout overrides go last, the same rule the rail follows. */
+/* Same pill as the minimap, opposite corner: both are glanced at over the
+   route rather than read, so they should not look like two systems. */
+.fieldbox {
+  position: absolute; left: 10px; top: 10px; z-index: 3;
+  display: flex; gap: 8px; padding: 4px 7px; border-radius: 7px;
+  background: rgba(18, 26, 16, .62);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .35) inset;
+  font-family: var(--pixel); font-size: 9px; color: #fff;
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.fieldbox span { display: flex; align-items: center; gap: 3px; }
+.fieldbox img { width: 15px; height: 15px; image-rendering: pixelated; }
+
 .minimap {
   display: none;
   position: absolute; left: 10px; bottom: 10px; z-index: 3;

@@ -6,7 +6,7 @@ import { evoCycleFrames, EVO_SWAPS, SCALE_MAX } from "../src/game/evocycle.js";
 import {
   STATS, MAX_RANK, emptyStats, rank, spentPoints, freePoints, earnedPoints,
   canSpend, catchMult, stepScale, xpScale, pricedAt, valuedAt, weighted,
-  rarityPower, sellScale, priceScale,
+  rarityPower, sellScale, priceScale, HONEY_TILT, RARITY_FLOOR,
 } from "../src/game/trainer.js";
 import { catchChance, fleeChance, shakesFor, resolveThrow, NEVER_CERTAIN } from "../src/catch.js";
 
@@ -165,7 +165,12 @@ import {
   SYNTH_MIN, SYNTH_STEP,
   stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
   TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf,
+  FIELD, fieldById, REPEL_SCALE,
 } from "../src/game/items.js";
+import {
+  dailyFor, describe, advance, isYesterday, streakMult, reward,
+  QUEST_TYPES, QUEST_SHARE, GOALS, STREAK_CAP,
+} from "../src/game/daily.js";
 import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
@@ -2532,6 +2537,185 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.ok(got > 0, "pity produced no variants at all over 20,000 encounters");
     console.log(`pity ok — opens at ${PITY_AFTER}, caps at ${PITY_CAP}x, ` +
       "ladder keeps its order");
+  }
+
+  /* TODAY'S QUEST. Everything in daily.js is pure and takes the day as an
+     argument, which is the only way to test something keyed on the date
+     without waiting a day - and the reason it is written that way.
+
+     Four things have to hold, and three of them are silent: a quest nobody can
+     finish, a quest that rerolls when you reload, a streak that survives a gap
+     it should not, and a streak that pays forever. */
+  {
+    /* COMPLETABLE. This is the one that shipped wrong: the type pool was the
+       union of every biome's `types` list, and a biome lists "dragon" because
+       legendaries match against it, not because dragons live there. There are
+       TWO Dragon-type species in every table in the game. Asserted against the
+       starting map, which is the only place open to every player. */
+    const start = BIOMES[0];
+    const total = start.table.reduce((n, [, w]) => n + w, 0);
+    for (const t of QUEST_TYPES) {
+      const share = start.table
+        .filter(([id]) => speciesById(id).types.includes(t))
+        .reduce((n, [, w]) => n + w, 0) / total;
+      assert.ok(share >= QUEST_SHARE,
+        `a daily can ask for ${t} but it is ${(share * 100).toFixed(1)}% of the ` +
+        "starting map - that is a quest nobody can finish today");
+    }
+    assert.ok(QUEST_TYPES.length >= 3,
+      `only ${QUEST_TYPES.length} askable types - the type quest is always the same`);
+
+    /* DETERMINISTIC, or two tabs open at midnight write two different quests
+       and the second overwrites the first's progress. */
+    for (const key of ["20260101", "20260915", "20271231"]) {
+      assert.deepEqual(dailyFor(key), dailyFor(key), `${key} rerolls`);
+      const g = dailyFor(key);
+      assert.ok(g.need > 0 && describe(g), `${key} produced no readable goal`);
+    }
+    // And it is not the same quest every day.
+    const kinds = new Set(Array.from({ length: 60 }, (_, i) =>
+      dailyFor(String(20260101 + i)).kind));
+    assert.ok(kinds.size > 1, "every day draws the same kind of quest");
+
+    /* PROGRESS counts only what the goal asked for. */
+    const water = { kind: "type", need: 4, type: "water" };
+    assert.equal(advance(water, { species: { types: ["water"] } }), 1, "a match counts");
+    assert.equal(advance(water, { species: { types: ["fire"] } }), 0, "a miss does not");
+    assert.equal(advance(water, { steps: 50 }), 0, "steps do not advance a catch quest");
+    assert.equal(advance({ kind: "walk", need: 10 }, { steps: 7 }), 7, "steps count");
+    assert.equal(advance(null, { steps: 7 }), 0, "no goal, no progress");
+
+    /* THE STREAK survives exactly one day's gap - including across a month
+       boundary, which is why both keys go through a real Date rather than
+       being subtracted as numbers. */
+    assert.equal(isYesterday("20260914", "20260915"), true, "a day apart");
+    assert.equal(isYesterday("20260831", "20260901"), true, "across a month");
+    assert.equal(isYesterday("20261231", "20270101"), true, "across a year");
+    assert.equal(isYesterday("20260913", "20260915"), false, "two days is a reset");
+    assert.equal(isYesterday("20260915", "20260915"), false, "today is not yesterday");
+    assert.equal(isYesterday(null, "20260915"), false, "no history is not a streak");
+
+    /* AND IT STOPS PAYING. Uncapped, day sixty is worth more than the first
+       fifty together and missing one leaves nothing to come back for. */
+    assert.equal(streakMult(0), 1, "day one multiplies nothing");
+    assert.ok(streakMult(STREAK_CAP) > streakMult(0), "a streak must be worth something");
+    assert.equal(streakMult(STREAK_CAP), streakMult(9999), "the streak must cap");
+    const low = reward(dailyFor("20260101"), 0);
+    const high = reward(dailyFor("20260101"), 9999);
+    assert.ok(high.money > low.money && high.money < low.money * 3,
+      `a maxed streak pays ¥${high.money} against ¥${low.money} - that is not a bonus`);
+    assert.ok(low.money > 0 && low.candy > 0, "a claim must pay something on day one");
+
+    console.log(`daily ok — ${GOALS.length} kinds, ${QUEST_TYPES.length} askable types, ` +
+      `streak caps at ${STREAK_CAP} (×${streakMult(STREAK_CAP).toFixed(2)})`);
+  }
+
+
+  /* FIELD ITEMS, and the whole suite is about the collision they were nearly
+     built into. Fortune, the band budgets and a lure all want to reshape one
+     encounter table, and three transforms on one table is a mix nobody chose.
+
+     So there are two claims to hold, and both fail silently: Honey is the SAME
+     exponent Fortune is - composition, not a second pass - and Repel is not on
+     that axis at all. */
+  {
+    const maxed = { ...emptyStats(), fortune: MAX_RANK };
+
+    /* ONE EXPONENT, and this is what says so without a literal in it: if Honey
+       IS Fortune's exponent, what it is worth cannot depend on your Fortune
+       rank. A second transform stacked on the first would not have that
+       property - it would compound. Checked at every rank, because the floor
+       is the only thing allowed to break it. */
+    const tilt = (r) => rarityPower({ ...emptyStats(), fortune: r }, false)
+      - rarityPower({ ...emptyStats(), fortune: r }, true);
+    for (let r = 0; r <= MAX_RANK; r++) {
+      assert.ok(near(tilt(r), tilt(0)),
+        `Honey is worth ${tilt(r).toFixed(3)} at Fortune ${r} against ` +
+        `${tilt(0).toFixed(3)} at nothing - it is compounding, not composing`);
+      assert.ok(rarityPower({ ...emptyStats(), fortune: r }, true) >= RARITY_FLOOR,
+        `Fortune ${r} with a Honey running sank under the floor`);
+    }
+    /* And a consumable must not out-buy the whole investment it borrows. */
+    const ranks = HONEY_TILT / (rarityPower(emptyStats()) - rarityPower({ ...emptyStats(), fortune: 1 }));
+    assert.ok(ranks > 0 && ranks < MAX_RANK,
+      `Honey is worth ${ranks.toFixed(1)} Fortune ranks against a track of ${MAX_RANK}`);
+
+    /* THE FLOOR IS WHY THERE IS A FLOOR. At exponent 0 every row is worth the
+       same and rarity stops existing, so the worst case in the game - maxed
+       Fortune with a Honey running - still has to sort a common above a rare. */
+    {
+      const p = rarityPower(maxed, true);
+      assert.ok(22 ** p > 2 * 1 ** p,
+        `at exponent ${p.toFixed(2)} a weight-22 Pidgey is not even twice a ` +
+        "weight-1 Snorlax - the table has flattened into noise");
+      /* And the floor has to do that job on its own, whatever the
+         coefficients above it are retuned to - it is insurance against a
+         future Fortune, not a description of this one. */
+      assert.ok(22 ** RARITY_FLOOR > 2 * 1 ** RARITY_FLOOR,
+        `a floor of ${RARITY_FLOOR} does not keep a common ahead of a rare`);
+    }
+
+    /* MEASURED ON A REAL TABLE, and exactly, because `weighted` returns the
+       reweighted rows rather than a pick: Honey must raise what the rare rows
+       get and lower what the commons do, at BOTH ends of the Fortune track. */
+    {
+      const table = [["common", 22], ["mid", 8], ["rare", 3], ["legend", 0.5]];
+      const shares = (stats, honey) => {
+        const rows = weighted(table, stats, honey);
+        const sum = rows.reduce((t, [, w]) => t + w, 0);
+        return Object.fromEntries(rows.map(([id, w]) => [id, w / sum]));
+      };
+      for (const [what, stats] of [["a new trainer", emptyStats()], ["a maxed one", maxed]]) {
+        const off = shares(stats, false), on = shares(stats, true);
+        assert.ok(on.legend > off.legend,
+          `Honey left the rarest row at ${(on.legend * 100).toFixed(2)}% for ${what}`);
+        assert.ok(on.rare > off.rare, `and the rare row, for ${what}`);
+        assert.ok(on.common < off.common,
+          `the commonest row has to give the ground back, for ${what}`);
+      }
+    }
+
+    /* REPEL IS THE OTHER AXIS, and this is what keeps it there: nothing in the
+       two files that decide WHAT you meet may know the word. */
+    for (const f of ["trainer.js", "biomes.js"]) {
+      const src = readFileSync(new URL(`../src/game/${f}`, import.meta.url), "utf8");
+      assert.ok(!/REPEL|repel/.test(src),
+        `${f} mentions repel - a repel that reshapes the table is the pile-up ` +
+        "this design exists to avoid");
+    }
+    {
+      const eng = readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8");
+      assert.ok(/ENCOUNTER_RATE \* \(state\.field\.repel > 0 \? REPEL_SCALE : 1\)/.test(eng),
+        "Repel must scale the encounter RATE, which is the only thing it does");
+      /* Charged through the same discount the shelf prints, or Haggle has two
+         rules and the row is advertising a price nobody is charged. */
+      assert.ok(/pricedAt\(item\.price, state\.stats\)/.test(eng),
+        "a field item must be charged through pricedAt like everything else");
+      // Buying replaces the clock; anything that ADDS is a stackable item.
+      assert.ok(/state\.field\[id\] = item\.steps;/.test(eng),
+        "buying a field item must replace its timer, never extend it");
+    }
+    assert.ok(REPEL_SCALE > 0 && REPEL_SCALE < 1,
+      "a repel that stops encounters outright is a mode switch, not an item");
+
+    /* THE SHELF. Both gated, both discounted, and the one that changes your
+       odds costs more per step than the one that only saves you time. */
+    const honey = fieldById("honey"), repel = fieldById("repel");
+    assert.ok(honey && repel, "both field items must be findable by id");
+    assert.equal(fieldById("nope"), null, "an unknown id is null, not undefined");
+    for (const f of FIELD) {
+      assert.ok(f.level > 1 && f.level < MAX_LEVEL, `${f.id} is gated off the ladder`);
+      assert.ok(f.steps > 100, `${f.id} runs out before you have walked anywhere`);
+      assert.ok(pricedAt(f.price, { ...emptyStats(), haggle: MAX_RANK }) < f.price,
+        `${f.id} ignores Haggle`);
+      assert.ok(f.blurb.length <= 24, `${f.id}'s blurb will clip in the row`);
+    }
+    assert.ok(honey.price / honey.steps > repel.price / repel.steps,
+      "Honey changes the odds and Repel only saves time - the odds must cost more");
+
+    console.log(`field ok — Honey is ${ranks.toFixed(1)} Fortune ranks on the same ` +
+      `exponent (floor ${RARITY_FLOOR}), Repel is x${REPEL_SCALE} on the rate and ` +
+      "nowhere near the table");
   }
 
   console.log(`spawn ladder ok — ${early.size} species in the wild at Lv 1, ` +

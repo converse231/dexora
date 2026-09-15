@@ -17,6 +17,7 @@ import Box from "./Box.jsx";
 import Shop from "./Shop.jsx";
 import Travel from "./Travel.jsx";
 import Trainer from "./Trainer.jsx";
+import Daily from "./Daily.jsx";
 import { evoNext, variantOf } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
@@ -61,7 +62,8 @@ function readyToEvolve(box, bag) {
 export default function Rail({
   state, caught, level, busy,
   onSelect, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
-  onTravel, onSpend, onBike, save, jumpTo, onJumped,
+  onTravel, onSpend, onBike, save, jumpTo, onJumped, daily, onClaimDaily,
+  onUseField,
 }) {
   const [tab, setTab] = useState("dex");
 
@@ -70,13 +72,37 @@ export default function Rail({
   useEffect(() => { if (jumpTo) setTab("box"); }, [jumpTo]);
   const seed = jumpTo ? label(speciesById(jumpTo)) : "";
 
+  /* The claim says what it paid, in the one alert the game uses. Without it a
+     claim is a button that greys itself out and three numbers that moved
+     somewhere else on screen. */
+  const [claimNote, setClaimNote] = useState("");
+  const claim = () => {
+    const won = onClaimDaily?.();
+    if (!won) return;
+    setClaimNote(
+      `+¥${won.money.toLocaleString()} · +${won.candy} candy · ` +
+      `+${won.items["great-ball"]} Great Balls`);
+  };
+  // Clears itself, and only ever the last one - see the money-delta bug.
+  useEffect(() => {
+    if (!claimNote) return;
+    const t = setTimeout(() => setClaimNote(""), 4200);
+    return () => clearTimeout(t);
+  }, [claimNote]);
+
+  /* A quest finished and unclaimed is the one thing on this rail worth
+     interrupting for, so it gets the same dot the BOX tab uses for "something
+     can evolve". Nothing shows while it is merely in progress: a badge that is
+     always on is a badge nobody reads. */
+  const dailyReady = daily?.goal && !daily.claimed && daily.done >= daily.goal.need;
+
   const box = state?.box ?? [];
   const bag = state?.bag ?? {};
   /* Only what is actionable, so a badge always clears once you have dealt with
      it. Everything else a tab could say about itself is already on its panel. */
   const badges = {
     box: readyToEvolve(box, bag) || null,
-    you: freePoints(state?.stats, level) || null,
+    you: freePoints(state?.stats, level) || (dailyReady ? "!" : null),
   };
 
   return (
@@ -103,7 +129,11 @@ export default function Rail({
             />
             <span className="tab-name">{id.toUpperCase()}</span>
             {badges[id] ? (
-              <em title={id === "you" ? "points to spend" : "ready to evolve"}>
+              <em
+                title={id === "you"
+                  ? (badges.you === "!" ? "today's quest is ready" : "points to spend")
+                  : "ready to evolve"}
+              >
                 {badges[id]}
               </em>
             ) : null}
@@ -143,21 +173,25 @@ export default function Rail({
       {tab === "shop" && (
         <Shop money={state?.money ?? 0} bag={bag} level={level}
               stats={state?.stats} onBuy={onBuy}
-              candy={state?.candy ?? 0} onBuyCandy={onBuyCandy} />
+              candy={state?.candy ?? 0} onBuyCandy={onBuyCandy}
+              field={state?.field} onUseField={onUseField} />
       )}
       {tab === "map" && (
         <Travel areaId={state?.areaId} level={level} busy={busy} onTravel={onTravel} />
       )}
       {tab === "you" && (
-        <Trainer
-          stats={state?.stats}
-          level={level}
-          bag={bag}
-          biking={!!state?.biking}
-          onSpend={onSpend}
-          onBike={onBike}
-          save={save}
-        />
+        <>
+          <Daily daily={daily} onClaim={claim} note={claimNote} />
+          <Trainer
+            stats={state?.stats}
+            level={level}
+            bag={bag}
+            biking={!!state?.biking}
+            onSpend={onSpend}
+            onBike={onBike}
+            save={save}
+          />
+        </>
       )}
     </div>
   );

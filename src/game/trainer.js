@@ -106,7 +106,23 @@ export const catchMult = (stats) => 1 + 0.03 * rank(stats, "precision");
    bites hardest on the legendaries, whose weights are now well below 1 (see
    biomes.js): raising 0.08 to the power 0.6 more than doubles it while a
    weight-22 Pidgey falls to a quarter of itself. That is the stat working. */
-export const rarityPower = (stats) => 1 - 0.02 * rank(stats, "fortune");
+/* ONE EXPONENT, TWO CONTRIBUTORS. Fortune is a permanent investment and Honey
+   is five hundred steps of one, and they are the same KIND of thing - so they
+   are the same number rather than two transforms stacked on one table. The
+   note this was deferred behind said three things reshaping one table need one
+   rule; this is that rule, and Repel stays off it entirely by moving how OFTEN
+   an encounter happens rather than what it is.
+
+   Floored, because the exponent is what separates a weight-22 Pidgey from a
+   weight-1 Snorlax: at 0 every row is worth the same and rarity stops
+   existing. A maxed Fortune with a Honey running lands at 0.45, which is the
+   most compressed this table is ever meant to get. */
+export const HONEY_TILT = 0.15;
+export const RARITY_FLOOR = 0.4;
+
+export const rarityPower = (stats, honey = false) =>
+  Math.max(RARITY_FLOOR,
+    1 - 0.02 * rank(stats, "fortune") - (honey ? HONEY_TILT : 0));
 
 // Fraction of a representative table that is weight <= 2, at a given rank.
 function rareShareAt(r) {
@@ -133,7 +149,7 @@ export const valuedAt = (base, stats) => Math.round(base * sellScale(stats));
 
 /* Applying a weight curve to an encounter table. Kept here rather than in the
    engine so the tests can roll against it without a canvas. */
-export function weighted(table, stats) {
-  const p = rarityPower(stats);
+export function weighted(table, stats, honey = false) {
+  const p = rarityPower(stats, honey);
   return table.map(([id, w]) => [id, w ** p]);
 }

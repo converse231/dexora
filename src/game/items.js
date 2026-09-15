@@ -176,6 +176,53 @@ export const STONES = [
   { id: "dusk-stone", name: "Dusk Stone", price: 1400, level: 35 },
 ];
 
+/* FIELD ITEMS, and the two of them deliberately pull different levers.
+
+   The note this was deferred behind said it plainly: **three things reshaping
+   one encounter table need one rule, not three.** Fortune already reshapes it
+   and the band budgets now hold its mix, so a lure written as a third weight
+   transform would be the exact pile-up that warning was about.
+
+   So Honey does not invent a mechanism - it borrows Fortune's. Both feed the
+   same exponent in `rarityPower`, so there is one place in the codebase where
+   the odds of meeting something rare are decided, and a Honey on a
+   Fortune-maxed trainer composes instead of fighting.
+
+   And Repel does not touch the table AT ALL. It is on the other axis: HOW
+   OFTEN an encounter happens, not what it is. That is the honest reading of
+   what a repel is for - crossing a map you have already farmed - and it keeps
+   the second item off the one thing the first is already moving.
+
+   BOUGHT IS USED. They are not bag items and there is no inventory screen to
+   build: you can only have one running at a time, so stockpiling a consumable
+   you cannot stack is a UI for nothing. `use` charges and starts the clock. */
+/* `HONEY_TILT` and `RARITY_FLOOR` live in trainer.js beside `rarityPower`,
+   which is the only thing that reads them - trainer.js has no imports at all
+   and giving it an edge to this file, which already reaches into biomes.js,
+   would be a dependency bought for two numbers. */
+export const REPEL_SCALE = 0.35;
+
+export const FIELD = [
+  {
+    id: "honey",
+    name: "Honey",
+    price: 800,
+    level: 10,
+    steps: 500,
+    blurb: "Rare Pokémon come out",
+  },
+  {
+    id: "repel",
+    name: "Repel",
+    price: 400,
+    level: 10,
+    steps: 800,
+    blurb: "Far fewer encounters",
+  },
+];
+
+export const fieldById = (id) => FIELD.find((f) => f.id === id) ?? null;
+
 /* Key items: earned at a trainer level, never bought, never used up. They are
    held in the same bag as everything else - a count of 1 means you have it -
    because a second bag for four things is a second thing to keep in sync. */
@@ -225,7 +272,7 @@ export const forSale = (item) => item.price > 0 && item.level !== null;
 export const SHOP_BALLS = BALLS.filter(forSale);
 
 // Everything the game can name, whether or not it is for sale.
-export const ALL_ITEMS = [...BALLS, ...STONES, ...KEY_ITEMS];
+export const ALL_ITEMS = [...BALLS, ...STONES, ...KEY_ITEMS, ...FIELD];
 export const SHOP_ITEMS = [...SHOP_BALLS, ...STONES];
 export const itemById = (id) => ALL_ITEMS.find((i) => i.id === id);
 

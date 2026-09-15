@@ -27,9 +27,12 @@ import { medalsFor, milestoneAt } from "./medals.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE,
   evolveState, evoLevel, startingState, DEX_BONUS, levelReward,
-  evolutionRow, bestRod, holding, canRun, RUN_LEVEL,
+  evolutionRow, bestRod, holding, canRun, RUN_LEVEL, fieldById, REPEL_SCALE,
   stepReward,
 } from "./items.js";
+import {
+  dayKey, dailyFor, advance, reward as dailyReward, isYesterday,
+} from "./daily.js";
 
 export const VIEW_W = 15;
 export const VIEW_H = 11;
@@ -68,6 +71,12 @@ function freshState() {
     xp: 0,
     nextUid: 1,
     dry: 0,               // encounters since the last rare tier - see pityBoost
+    /* One quest a day. `key` is the local date it belongs to, so a new day is
+       detected by comparing rather than by any timer having to fire. */
+    daily: { key: null, done: 0, claimed: false, streak: 0, last: null },
+    /* Steps left on each field item. Counted in STEPS rather than seconds so
+       an effect you paid for is not burned by walking away from the keyboard. */
+    field: { honey: 0, repel: 0 },
     ...startingState(),
     rev: 0,
     /* One byte per species: has a SHINY of this one ever been registered. A
@@ -223,6 +232,9 @@ function loadState() {
          its box and convert at the same rate as anyone else's. */
       candy: Math.max(0, Math.floor(Number(s.candy) || 0)),
       dry: Math.max(0, Math.floor(Number(s.dry) || 0)),
+      // A save from before dailies simply has none, and gets today's.
+      daily: { ...freshState().daily, ...(s.daily ?? {}) },
+      field: { ...freshState().field, ...(s.field ?? {}) },
       /* MIGRATION. Running was a level check before it was an item, so a save
          written then is past level 15 with an empty shoe slot - and would
          have silently LOST the ability to run, which is the one change a
@@ -414,9 +426,62 @@ export function createEngine(canvas, onChange, mini = null) {
     p.y = ny;
   }
 
+  /* ROLLING OVER IS A READ, NOT A TIMER. Asked whenever anything might advance
+     the quest, which is cheaper and more robust than a midnight timer: a tab
+     open across midnight, a laptop asleep for a week and a first visit in
+     months all take the same path.
+
+     A streak survives exactly one day's gap. Missing two is a reset, and that
+     is checked against the day the last quest was CLAIMED rather than the day
+     it was set - opening the game and not finishing it is not a day played. */
+  function today() {
+    const key = dayKey();
+    const d = state.daily;
+    if (d.key === key) return d;
+    d.key = key;
+    d.done = 0;
+    d.claimed = false;
+    if (!isYesterday(d.last, key)) d.streak = 0;
+    return d;
+  }
+
+  /* One funnel for both events the quest can count, so a kind added to
+     `GOALS` needs no new call site. */
+  function noteDaily(event) {
+    const d = today();
+    if (d.claimed) return;
+    const goal = dailyFor(d.key);
+    const add = advance(goal, event);
+    if (!add) return;
+    d.done = Math.min(goal.need, d.done + add);
+  }
+
+  function claimDaily() {
+    const d = today();
+    const goal = dailyFor(d.key);
+    if (d.claimed || d.done < goal.need) return null;
+    const won = dailyReward(goal, d.streak);
+    d.claimed = true;
+    d.streak = isYesterday(d.last, d.key) ? d.streak + 1 : 1;
+    d.last = d.key;
+    state.money += won.money;
+    state.candy += won.candy;
+    for (const [id, n] of Object.entries(won.items)) {
+      state.bag[id] = (state.bag[id] ?? 0) + n;
+    }
+    save();
+    changed();
+    return { ...won, streak: d.streak };
+  }
+
   function onArrive() {
     walkFrame++;
     state.steps++;
+    noteDaily({ steps: 1 });
+    // One step off every running effect, floored at zero.
+    for (const f of Object.keys(state.field)) {
+      if (state.field[f] > 0) state.field[f]--;
+    }
 
     /* Walking pays. `stepReward` is pure and the panel calls it too, on the
        same step count, so the balls granted here and the +N that floats over
@@ -447,7 +512,12 @@ export function createEngine(canvas, onChange, mini = null) {
        tile already proves it is walkable, so there is nothing left to test -
        anywhere you can put your feet, something can appear. */
     const biome = biomeFor(state.areaId);
-    if (biome && !state.evolution && Math.random() < ENCOUNTER_RATE) {
+    /* REPEL IS THE OTHER AXIS. It changes how often an encounter happens and
+       never what it is - which is what keeps it off the table Fortune and
+       Honey are already moving, and is the honest reading of what a repel is
+       for: crossing a map you have already farmed. */
+    const rate = ENCOUNTER_RATE * (state.field.repel > 0 ? REPEL_SCALE : 1);
+    if (biome && !state.evolution && Math.random() < rate) {
       /* The level is part of the table, not a modifier on the roll: past Lv 8
          a map starts turning up the evolved forms of what already lives there.
          `tableFor` caches, because this is asked on every step that spawns. */
@@ -484,7 +554,8 @@ export function createEngine(canvas, onChange, mini = null) {
   /* Fortune reshapes the table before the roll rather than after it, so the
      odds still sum to one and no entry can ever be dropped or invented. */
   function pickSpecies(table) {
-    const rolled = weighted(table, state.stats);
+    // Honey feeds the SAME exponent Fortune does - see `rarityPower`.
+    const rolled = weighted(table, state.stats, state.field.honey > 0);
     const total = rolled.reduce((n, e) => n + e[1], 0);
     let r = Math.random() * total;
     for (const [id, w] of rolled) if ((r -= w) < 0) return speciesById(id);
@@ -742,6 +813,7 @@ export function createEngine(canvas, onChange, mini = null) {
       const at = dexIndex(e.speciesId);
       e.isNew = state.dex[at] !== 2;
       state.dex[at] = 2;
+      noteDaily({ species: speciesById(e.speciesId) });
       state.caught++;
       /* A first shiny - or a first Astral - of a species is its own event, even
          for one you already had. That is most of the point of both. */
@@ -1115,6 +1187,23 @@ export function createEngine(canvas, onChange, mini = null) {
      so Haggle discounts it - candy is bought with money, and the stat that
      makes money go further has to make it go further here too or the shop has
      two rules. */
+  /* BOUGHT IS USED. There is no bag screen for these and no reason for one:
+     only one of each can run at a time, so stockpiling a consumable you cannot
+     stack is an inventory for nothing. Buying starts the clock, and buying
+     again while one is running REPLACES it rather than adding - otherwise the
+     price of a long effect is just the price of a short one typed twice. */
+  function useField(id) {
+    const item = fieldById(id);
+    if (!item || levelFromXp(state.xp) < item.level) return false;
+    const cost = pricedAt(item.price, state.stats);
+    if (state.money < cost) return false;
+    state.money -= cost;
+    state.field[id] = item.steps;
+    save();
+    changed();
+    return true;
+  }
+
   function buyCandy(qty = 1) {
     const cost = pricedAt(CANDY_PRICE, state.stats) * Math.max(1, Math.floor(qty));
     if (qty < 1 || state.money < cost) return false;
@@ -1145,6 +1234,15 @@ export function createEngine(canvas, onChange, mini = null) {
     travel,
     buy,
     buyCandy,
+    useField,
+    claimDaily,
+    /* Read by the rail every render, so it is a function rather than a field:
+       the day can turn over between two renders and a field would not know. */
+    daily: () => {
+      const d = today();
+      const goal = dailyFor(d.key);
+      return { goal, done: d.done, claimed: d.claimed, streak: d.streak };
+    },
     sell,
     convert,
     levelUp,
