@@ -11,13 +11,15 @@
    left only ever appears when pressing the tab would achieve something: a
    Pokémon ready to evolve, a stat point unspent. */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Dex from "./Dex.jsx";
 import Box from "./Box.jsx";
 import Shop from "./Shop.jsx";
 import Travel from "./Travel.jsx";
 import Trainer from "./Trainer.jsx";
 import { evoNext, variantOf } from "../game/items.js";
+import { speciesById } from "../game/biomes.js";
+import { label } from "../game/map.js";
 import { freePoints } from "../game/trainer.js";
 
 /* Drawn icons, not glyphs. They were unicode characters - a grid, a ball, a
@@ -59,9 +61,14 @@ function readyToEvolve(box, bag) {
 export default function Rail({
   state, caught, level, busy,
   onSelect, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
-  onTravel, onSpend, onBike, save,
+  onTravel, onSpend, onBike, save, jumpTo, onJumped,
 }) {
   const [tab, setTab] = useState("dex");
+
+  /* Arriving from the Dex's "See in Box". The tab lives here, so the switch
+     does too; the Box takes the NAME as a search seed and clears the id. */
+  useEffect(() => { if (jumpTo) setTab("box"); }, [jumpTo]);
+  const seed = jumpTo ? label(speciesById(jumpTo)) : "";
 
   const box = state?.box ?? [];
   const bag = state?.bag ?? {};
@@ -124,6 +131,8 @@ export default function Rail({
           rev={state?.rev}
           stats={state?.stats}
           busy={busy}
+          findSeed={seed}
+          onSeedUsed={onJumped}
           onSell={onSell}
           onConvert={onConvert}
           onLevelUp={onLevelUp}

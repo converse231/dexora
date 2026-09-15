@@ -97,7 +97,8 @@ function Where({ id }) {
 }
 
 export default function DexSheet({
-  id, state, variant = null, held = {}, originLocked = false, onClose,
+  id, state, variant = null, held = {}, originLocked = false, owned = 0,
+  onClose, onFindInBox,
 }) {
   const sp = speciesById(id);
   const caught = state === 2;
@@ -239,7 +240,22 @@ export default function DexSheet({
           </>
         )}
 
-        <button className="sheet-close" onClick={onClose}>CLOSE</button>
+        <div className="sheet-actions">
+          {/* Only when you actually hold one. A button that jumps to an empty
+              search is worse than no button: it answers "where is mine" with a
+              blank list, which reads as a broken filter rather than as "you do
+              not have one". The entry already says whether it is caught. */}
+          {owned > 0 && onFindInBox && (
+            <button
+              className="sheet-inbox"
+              onClick={() => onFindInBox(id)}
+              title={`Find your ${owned > 1 ? `${owned} ` : ""}${label(sp)} in the Box`}
+            >
+              SEE IN BOX{owned > 1 ? ` · ${owned}` : ""}
+            </button>
+          )}
+          <button className="sheet-close" onClick={onClose}>CLOSE</button>
+        </div>
       </div>
     </div>
   );

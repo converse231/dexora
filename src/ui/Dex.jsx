@@ -10,7 +10,7 @@
    three variant marks and a completion badge now, and at 52px those were fighting
    each other; at ~76px they each have a place. */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import {
@@ -63,6 +63,21 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
   const completed = SPECIES.filter((sp) => complete(sp.id)).length;
 
   const seen = SPECIES.filter((sp) => at(sp.id) >= 1).length;
+
+  /* What the progress bar is measuring: the chosen region, or the whole dex.
+     One object so the three readings - total, seen, caught - cannot come from
+     three different filters, which is exactly how "113 / 358" ended up over a
+     grid of 151. */
+  const scope = useMemo(() => {
+    const mine = region === "all"
+      ? SPECIES
+      : SPECIES.filter((sp) => genOf(sp.id) === Number(region));
+    return {
+      total: mine.length,
+      seen: mine.filter((sp) => at(sp.id) >= 1).length,
+      caught: mine.filter((sp) => at(sp.id) === 2).length,
+    };
+  }, [region, dex, tiers]);
   const needle = find.trim().toLowerCase();
 
   const shown = SPECIES.filter((sp) => {
@@ -134,13 +149,13 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
              you can read at a glance and "Johto 100" is a fact about Pokemon. */
           {
             id: "region", label: "REGION", value: region, onChange: setRegion,
+            /* No counts in this one. `GENERATIONS[].name` is already
+               "Gen 1 (Kanto)", and the progress bar above says how far through
+               it you are - a count here would be the same number twice, and the
+               one in the menu would move under you as you played. */
             options: [
-              ["all", "All regions", SPECIES.length],
-              ...GENERATIONS.map((g) => [
-                String(g.gen),
-                g.name,
-                SPECIES.filter((sp) => genOf(sp.id) === g.gen && at(sp.id) === 2).length,
-              ]),
+              ["all", "All regions", null],
+              ...GENERATIONS.map((g) => [String(g.gen), g.name, null]),
             ],
           },
           {
@@ -170,9 +185,16 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
         }}
       />
 
+      {/* THE BAR MEANS WHAT THE REGION SELECT SAYS. It read `caught / 358`
+          whatever was chosen, so picking Kanto left "113 / 358" over a grid of
+          151 - a progress bar measuring something you are not looking at.
+
+          Scoped to the REGION only, deliberately, and not to the search box or
+          the SHOW filter: this is a progression readout, and "2 / 3" because
+          you typed "pika" is a result count wearing a progress bar's clothes. */}
       <div className="count">
-        <b>{caught}</b> <span>/ {SPECIES.length}</span>
-        <em>{Math.round((caught / SPECIES.length) * 100)}%</em>
+        <b>{scope.caught}</b> <span>/ {scope.total}</span>
+        <em>{Math.round((scope.caught / Math.max(1, scope.total)) * 100)}%</em>
       </div>
       {/* Two fills in one track: everything met, and everything caught. `seen`
           already counts entries at state 1 OR 2, so it is the outer bound and
@@ -181,12 +203,12 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
         className="bar"
         role="progressbar"
         aria-valuemin={0}
-        aria-valuemax={SPECIES.length}
-        aria-valuenow={caught}
-        aria-label={`${caught} caught and ${seen} seen of ${SPECIES.length}`}
+        aria-valuemax={scope.total}
+        aria-valuenow={scope.caught}
+        aria-label={`${scope.caught} caught and ${scope.seen} seen of ${scope.total}`}
       >
-        <b style={{ width: `${(seen / SPECIES.length) * 100}%` }} />
-        <i style={{ width: `${(caught / SPECIES.length) * 100}%` }} />
+        <b style={{ width: `${(scope.seen / Math.max(1, scope.total)) * 100}%` }} />
+        <i style={{ width: `${(scope.caught / Math.max(1, scope.total)) * 100}%` }} />
       </div>
 
       {!shown.length && <p className="empty">Nothing matches that.</p>}

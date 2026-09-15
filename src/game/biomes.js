@@ -94,7 +94,15 @@ export const GENERATIONS = (() => {
   return [...n.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([gen, count]) => ({
-      gen, count, name: REGION_NAME[gen] ?? `Gen ${gen}`,
+      gen,
+      count,
+      region: REGION_NAME[gen] ?? `Gen ${gen}`,
+      /* "Gen 1 (Kanto)" rather than "Kanto 99". The count was a progress
+         reading hiding inside a label - it changed as you played, so the menu
+         item you were looking for moved its own name, and the one number a
+         player wants (how much of THIS region is done) belongs on the progress
+         bar rather than in a dropdown. */
+      name: `Gen ${gen} (${REGION_NAME[gen] ?? gen})`,
     }));
 })();
 

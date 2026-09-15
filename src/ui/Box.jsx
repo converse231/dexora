@@ -26,6 +26,7 @@ import Types from "./Types.jsx";
 import FilterBar from "./FilterBar.jsx";
 import { valuedAt } from "../game/trainer.js";
 import Confirm from "./Confirm.jsx";
+import Note from "./Note.jsx";
 import Sprite from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 
@@ -40,7 +41,8 @@ const VARIANT_ORDER = [null, ...[...RARE].reverse()];
 const variantRank = (v) => VARIANT_ORDER.indexOf(v);
 
 export default function Box({
-  box, bag, dex, candy, rev, stats, busy, onSell, onConvert, onLevelUp, onEvolve,
+  box, bag, dex, candy, rev, stats, busy, findSeed, onSeedUsed,
+  onSell, onConvert, onLevelUp, onEvolve,
 }) {
   const [pending, setPending] = useState(null);
   const [flash, setFlash] = useState(null);
@@ -48,6 +50,19 @@ export default function Box({
   const [only, setOnly] = useState("all");
   const [sort, setSort] = useState("ready");
   const [find, setFind] = useState("");
+
+  /* ARRIVING FROM THE DEX. "See in Box" hands over a name, which becomes the
+     search - the Box already filters by name, so the jump costs no new
+     mechanism and leaves the player somewhere they can type their way out of.
+
+     Consumed once and cleared by the parent, or pressing it twice for the same
+     species after clearing the box search would do nothing the second time. */
+  useEffect(() => {
+    if (!findSeed) return;
+    setFind(findSeed);
+    setOnly("all");
+    onSeedUsed?.();
+  }, [findSeed, onSeedUsed]);
 
   useEffect(() => {
     if (!flash) return;
@@ -446,7 +461,7 @@ export default function Box({
         <button className="bigbtn quiet" disabled>NOTHING SPARE</button>
       )}
 
-      {flash && <p className="bx-flash" role="status">{flash}</p>}
+      <Note>{flash}</Note>
 
       {!box.length && <p className="empty">Nothing caught yet.</p>}
       {box.length > 0 && !shown.length && (
