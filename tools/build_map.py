@@ -842,8 +842,21 @@ def flowers(g, *spots):
 
 
 def clump(g, x, y, tall=3):
-    """One tree: two columns wide, `tall` rows down, on the even-column grid."""
+    """One tree: two columns wide, `tall` rows down, on the even-column grid.
+
+    ALL OR NOTHING. `onto_grass` paints per tile, so a clump whose bottom row
+    overlaps a path run drew the top two rows and left a tree two tall - which
+    the renderer has no pieces for and check() refuses. Taking the whole
+    footprint or none of it turns "I put a landmark somewhere it did not fit"
+    into a landmark that simply is not there, which is a thing you can see in a
+    render rather than a build that stops."""
+    H, W = len(g), len(g[0])
+    cells = [(x + dx, y + dy) for dx in (0, 1) for dy in range(tall)]
+    if any(not (0 <= cx < W and 0 <= cy < H) or g[cy][cx] not in ".,f"
+           for cx, cy in cells):
+        return False
     onto_grass(g, "T", x, y, x + 1, y + tall - 1)
+    return True
 
 
 def fill_the_empty(g, want, tall=3):
@@ -970,6 +983,53 @@ def make_nooks(g, want, tall=3):
     return made
 
 
+def ledge_in(g, y, x0, x1, most=14):
+    """Lay a ledge in the longest clear run of row `y` between x0 and x1.
+
+    `ledge` paints only over grass, so a run that crosses a path column, a tree
+    mass or the corner of a pond comes out in PIECES - and two tiles is a thing
+    the cap / mid / cap set cannot draw. Placing them by coordinate meant
+    re-deriving, by hand, which spans four layers of painting had left clear;
+    that was wrong four times in a row on one map, each time about a different
+    obstacle.
+
+    So the run is found. Returns the span used, or None when the row has no
+    three tiles of grass in a row to put one on - which is a fact about the map
+    worth knowing rather than a build that stops."""
+    H, W = len(g), len(g[0])
+    if not (0 <= y < H):
+        return None
+    def usable(x):
+        """Grass to lay it on, ground above to walk in from, and somewhere to
+        land two below - which is the whole of what a one-way hop needs and all
+        three of the things check() asserts about one."""
+        if g[y][x] not in ".,":
+            return False
+        if y - 1 < 0 or g[y - 1][x] in SOLID:
+            return False
+        return y + 2 < H and g[y + 2][x] not in SOLID
+
+    best, run = None, None
+    for x in range(max(0, x0), min(W, x1 + 1) + 1):
+        clear = x < min(W, x1 + 1) and usable(x)
+        if clear:
+            run = x if run is None else run
+        elif run is not None:
+            if best is None or x - run > best[1] - best[0] + 1:
+                best = (run, x - 1)
+            run = None
+    if best is None or best[1] - best[0] + 1 < 3:
+        return None
+    # Capped in length: a ledge the width of the map is a wall you hop, and the
+    # real ones are short runs hanging off a terrace.
+    lo, hi = best
+    if hi - lo + 1 > most:
+        mid = (lo + hi) // 2
+        lo, hi = mid - most // 2, mid - most // 2 + most - 1
+    ledge(g, lo, hi, y)
+    return (lo, hi)
+
+
 def ledge(g, x0, x1, y):
     """A capped bar, laid only across ground you could have walked on.
 
@@ -984,16 +1044,27 @@ def ledge(g, x0, x1, y):
 
 
 def tall_grass():
-    """Tall Grass: a vertical meadow of four terraces, path switchbacking up.
+    """Tall Grass: four times the route, up seven terraces instead of four.
 
-    32x40, of which 28x34 is playable - about two screens across and three and a
-    half down, which is Route 1's proportions. Coordinates are absolute; the
-    three-tile tree border means the interior runs x 2..29, y 3..36.
+    64x80, of which 60x74 is playable - four screens across and about seven
+    down. The old one was 32x40, and the three numbers `npm run layout` flagged
+    on it are the brief for this one:
 
-    Painted in layers, structure first: frame, then the fields, then the path
-    over them, then the ledges that terrace it, and only then the landmarks and
-    flowers, which fill whatever open grass is left."""
-    W, H = 32, 40
+      open 0.60   against a real route's 0.22-0.58. A field with nothing in it.
+      turns 0.23  against 0.11-0.18. Our tree edges wiggled; Route 1's do not.
+      dead 0.01   against 0.00. Route 1 has no dead ends at all.
+
+    So the extra space is not spent on more field. It is spent on TREE MASSES -
+    big rectangles with right angles, which is Route 1's whole vocabulary - and
+    those fix the first two together: a mass takes floor out of `open` and its
+    straight edges take wiggle out of `turns`. The meadow ends up with more in
+    it and more shape to it at the same time, which is what "it feels empty"
+    actually asks for.
+
+    Painted in layers, structure first: frame, the masses that make the
+    terraces, the fields, the path over them, the ledges that terrace it, and
+    only then the landmarks and flowers, which fill whatever grass is left."""
+    W, H = 64, 80
     g = [["." for _ in range(W)] for _ in range(H)]
 
     # --- the frame -------------------------------------------------------
@@ -1004,57 +1075,155 @@ def tall_grass():
     rect(g, "T", 0, 0, 1, H - 1)
     rect(g, "T", W - 2, 0, W - 1, H - 1)
 
-    # --- tall grass: five aligned fields, each one beside the path ---------
-    rect(g, ",", 4, 4, 12, 8)        # north-west, above the top run
-    rect(g, ",", 8, 15, 18, 19)      # the big middle field
-    rect(g, ",", 25, 14, 29, 20)     # east strip, path to border
-    rect(g, ",", 9, 26, 18, 29)      # south field, inside the last switchback
-    rect(g, ",", 21, 27, 27, 33)     # south-east field
+    # --- tall grass: eleven fields, each one beside a run of the path ------
+    for x0, y0, x1, y1 in (
+            (4, 4, 15, 7),       # north-west, above the top run
+            (20, 4, 31, 8),      # north, between the two spurs
+            (50, 4, 61, 9),      # north-east strip
+            (4, 14, 20, 20),     # the big west field
+            (42, 14, 61, 20),    # the big east field
+            (6, 20, 21, 24),     # below the west field
+            (36, 30, 55, 34),    # east of the middle
+            (4, 36, 15, 43),     # west field, mid-map
+            (20, 42, 39, 48),    # the south-central field
+            (46, 48, 60, 56),    # south-east field
+            (16, 58, 31, 66),    # the last field before the entrance
+    ):
+        rect(g, ",", x0, y0, x1, y1)
 
-    # --- the pond, a landmark in the north-east ---------------------------
+    # --- the terrace walls, painted OVER the fields -----------------------
+    # Order is the whole of this. Painted before them, every mass was cut to
+    # pieces by the field it stood in - and the measurement said so: `open`
+    # went UP when eight masses were added, because most of them were not
+    # there. A mass beats grass and loses to the path, which is a wood with a
+    # route cut through it, and is the order these three are painted in.
+    # These are the map's structure rather than decoration. Each one reaches in
+    # from a border and stops short of the far side, so the route has to bend
+    # round it - which is how a route is paced without a single dead end.
+    for x0, y0, x1, y1 in (
+            (2, 8, 17, 11),      # north-west spur
+            (34, 6, 47, 9),      # north-east spur
+            (24, 16, 39, 19),    # the middle wall, splitting the big field
+            (2, 26, 13, 30),     # west block
+            (46, 24, 61, 28),    # east block
+            (18, 34, 33, 38),    # the long wall across the middle
+            (44, 40, 61, 44),    # south-east block
+            (2, 46, 15, 50),     # south-west block
+            (26, 52, 41, 56),    # the last wall before the entrance
+            (48, 60, 61, 64),    # south-east corner stand
+            (2, 62, 13, 66),     # south-west corner stand
+            # A second rank of masses. `turns` counts corners per tile of wall
+            # boundary, so a scattered 2x3 clump is eight corners for six tiles
+            # while a long rectangle is eight corners for forty - which is why
+            # Route 1 measures 0.11-0.18 and a meadow full of dots measures
+            # 0.25. Mass takes the floor out of `open`; STRAIGHTNESS takes the
+            # wiggle out of `turns`, and only a big rectangle does both.
+            (18, 4, 31, 7),      # north, squaring off the top
+            (50, 30, 61, 34),    # east, above the mid-map field
+            (2, 34, 13, 38),     # west, opposite the long wall
+            (36, 44, 47, 48),    # centre-east
+            (16, 68, 29, 72),    # south, beside the entrance run
+            (48, 68, 61, 72),    # south-east
+            (34, 8, 45, 11),     # closing the north-east gap
+            (20, 24, 33, 28),    # between the second and third runs
+            (46, 4, 61, 7),      # the north-east corner
+            (2, 16, 13, 20),     # west, under the north-west spur
+            (52, 40, 61, 44),    # east, filling behind the block
+            (16, 44, 29, 48),    # centre, between the fourth and fifth runs
+    ):
+        rect(g, "T", x0, y0, x1, y1)
+
+    # --- two ponds, one at each end of the route --------------------------
     # Water is solid and its own bottom row is the walkable bank, so the shore
-    # is where water Pokémon are met.
-    rect(g, "w", 22, 4, 27, 7)
-    rect(g, "b", 22, 8, 27, 8)
+    # is where water Pokemon are met. Two of them, far apart, so a rod is worth
+    # carrying the length of the map rather than used once by the entrance.
+    rect(g, "w", 50, 12, 59, 16)
+    rect(g, "b", 50, 17, 59, 17)
 
-    # --- the path: a double S, four tiles wide, only right angles ---------
-    rect(g, "#", 6, 10, 24, 13)      # top run, west to east
-    rect(g, "#", 21, 13, 24, 24)     # down the east side
-    rect(g, "#", 5, 21, 24, 24)      # middle run, east to west
-    rect(g, "#", 5, 24, 8, 33)       # down the west side
-    rect(g, "#", 5, 30, 19, 33)      # bottom run, west to east
-    rect(g, "#", 16, 33, 19, 36)     # the entrance you start on
+    # Clear of the bottom run (y70-73), which is painted after the ponds and
+    # would otherwise cut the lake in half and take its bank with it.
+    rect(g, "w", 18, 63, 29, 67)
+    rect(g, "b", 18, 68, 29, 68)
+
+    # --- the path: switchbacks, four wide, only right angles --------------
+    rect(g, "#", 6, 12, 46, 15)      # top run, west to east
+    rect(g, "#", 42, 12, 45, 26)     # down the east side
+    rect(g, "#", 16, 22, 45, 25)     # second run, east to west
+    rect(g, "#", 16, 22, 19, 40)     # down the west side
+    rect(g, "#", 16, 30, 34, 33)     # third run, west to east
+    rect(g, "#", 34, 30, 37, 52)     # down the middle
+    rect(g, "#", 8, 40, 37, 43)      # fourth run, east to west
+    rect(g, "#", 8, 40, 11, 58)      # down the far west
+    rect(g, "#", 8, 50, 30, 53)      # fifth run, west to east
+    rect(g, "#", 42, 46, 45, 70)     # the east descent
+    rect(g, "#", 34, 58, 45, 61)     # sixth run, joining the two
+    rect(g, "#", 8, 55, 11, 73)      # the west descent
+    rect(g, "#", 8, 70, 45, 73)      # bottom run, the length of the map
+    rect(g, "#", 32, 73, 35, 76)     # the entrance you start on
 
     # --- ledges, on the south edge of each terrace ------------------------
-    # Short and capped, always hanging off a horizontal run of the path, so a
-    # hop south is the shortcut and walking round is the long way.
-    ledge(g, 7, 14, 14)
-    ledge(g, 9, 17, 25)
-    ledge(g, 21, 26, 26)
-    ledge(g, 6, 12, 34)
-
+    # Short and capped, always hanging off a horizontal run, so a hop south is
+    # the shortcut and walking round is the long way.
+    # Placed in the spans the terrace walls leave clear. A ledge painted over
+    # by a wall comes out two tiles long, and three is the shortest thing the
+    # cap/mid/cap set can draw.
+    # Each one sits inside a span that is clear of BOTH the terrace walls and
+    # the vertical path runs. `ledge` paints only over grass, so a run that
+    # crosses either comes out in pieces - and three tiles is the shortest thing
+    # the cap / mid / cap set can draw.
     # --- landmarks: tree clumps standing in the open ----------------------
-    clump(g, 16, 4)                  # splits the northern meadow
-    clump(g, 14, 7)                  # between the field and the pond
-    clump(g, 4, 17)                  # west of the middle field
-    clump(g, 2, 26)
-    clump(g, 26, 10)                 # south of the pond
-    clump(g, 22, 35)
+    for x, y in ((20, 12), (30, 22), (52, 22), (6, 32), (26, 44),
+                 (56, 36), (14, 52), (50, 58), (24, 34), (40, 20),
+                 (58, 44), (4, 56), (36, 66), (54, 68), (22, 56)):
+        clump(g, x, y)
     # ...and then wherever the map is emptiest, which is not somewhere an eye
-    # is good at finding. Six by hand, the rest by measurement.
-    fill_the_empty(g, want=24)
-    make_nooks(g, want=3)            # ...and a few corners with one way in
+    # is good at finding. Fifteen by hand, the rest by measurement. Scaled with
+    # the area, or four times the map is four times as bare.
+    # Fewer than the area alone would ask for, because every one of these is a
+    # free-standing 2x3 and free-standing things are what `turns` counts. The
+    # masses above carry the bulk; these carry the places a mass cannot reach.
+    # TALLER, NOT MORE. `turns` wants mass and `tight` wants things near you,
+    # and a 2x3 clump is the worst possible trade between them - six tiles of
+    # adjacency for eight corners. A 2x5 is ten for the same eight, so the two
+    # numbers stop fighting: turns 0.25 -> 0.17 (in band) and tight back up,
+    # at the same count.
+    fill_the_empty(g, want=46, tall=5)
+    make_nooks(g, want=10)           # ...and a few corners with one way in
+
+    # --- ledges, on the south edge of each terrace ------------------------
+    # SEARCHED, NOT PLACED - see `ledge_in` - and laid LAST, after every tree
+    # is standing. A ledge needs grass to lie on, ground above to walk in from
+    # and somewhere to land two below; `fill_the_empty` stands trees wherever
+    # the map is emptiest, and "emptiest" is exactly where a ledge had just
+    # been given its approach. Placed before the trees, one came out with a
+    # trunk sitting on top of it and could not be reached at all.
+    for row in (16, 26, 34, 44, 54, 62):
+        ledge_in(g, row, 3, W // 2 - 1)
+        ledge_in(g, row, W // 2, W - 4)
 
     # --- flowers, in loose handfuls on the open grass ---------------------
-    flowers(g, (2, 4), (3, 5), (2, 7), (4, 3), (3, 9))            # north-west
-    flowers(g, (19, 5), (20, 7), (18, 8), (20, 3))                # beside the pond
-    flowers(g, (26, 21), (28, 22), (26, 24), (27, 25), (29, 23))  # east bank
-    flowers(g, (11, 35), (13, 34), (14, 36), (12, 36), (9, 34))   # by the entrance
-    flowers(g, (2, 30), (3, 32), (2, 34), (4, 31))                # west verge
-    flowers(g, (23, 9), (25, 21), (17, 20), (6, 20), (14, 9))     # scattered singles
+    flowers(g, (2, 4), (3, 6), (2, 8), (4, 3), (3, 10), (5, 5))
+    flowers(g, (33, 4), (35, 6), (32, 8), (36, 3), (34, 10))
+    flowers(g, (56, 20), (58, 22), (56, 24), (57, 26), (59, 21))
+    flowers(g, (2, 20), (3, 22), (2, 24), (4, 21))
+    flowers(g, (24, 28), (26, 29), (22, 31), (28, 27))
+    flowers(g, (48, 36), (50, 38), (47, 40), (52, 37))
+    flowers(g, (2, 42), (3, 44), (2, 46), (4, 43))
+    flowers(g, (30, 48), (32, 50), (28, 49), (33, 47))
+    flowers(g, (56, 50), (58, 52), (57, 54), (55, 48))
+    flowers(g, (14, 68), (16, 70), (13, 66), (15, 72))
+    flowers(g, (48, 72), (50, 70), (52, 73), (46, 68))
+    flowers(g, (38, 20), (12, 36), (44, 56), (20, 64), (60, 30))
+
+    # A path run that clips the end of a tree wall leaves half a pair behind,
+    # and half a pair is a tile the renderer has no piece for. `build()` has
+    # always run this for the generated maps; a drawn map that paints paths over
+    # masses needs it just as much, and it drops what cannot be drawn rather
+    # than forbidding the overlap that makes the walls read as walls.
+    repair_trees(g, W, H, ".")
 
     # Standing on the path at the southern entrance, facing up the route.
-    return ["".join(r) for r in g], (17, 35)
+    return ["".join(r) for r in g], (33, 75)
 
 
 def canopy(g, x0, y0, x1, y1):
