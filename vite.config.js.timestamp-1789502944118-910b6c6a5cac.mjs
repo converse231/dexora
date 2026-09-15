@@ -1,0 +1,19 @@
+// vite.config.js
+import { defineConfig } from "file:///C:/Users/admin/Desktop/mini-games/pokemon-collect/node_modules/vite/dist/node/index.js";
+import react from "file:///C:/Users/admin/Desktop/mini-games/pokemon-collect/node_modules/@vitejs/plugin-react/dist/index.js";
+var vite_config_default = defineConfig({
+  plugins: [react()],
+  base: "./",
+  // ponytail: relative base so `vite build` output opens from any path
+  /* A SAVE LIVES ON AN ORIGIN, AND A PORT IS PART OF ONE. Vite's default is to
+     pick the next free port when 5173 is busy - so a second `npm run dev` with
+     a stale one still running serves the whole game from 5174, where there is
+     no localStorage and therefore no save. The dex looks deleted and nothing is
+     wrong. `strictPort` makes that collision an error you can read instead of a
+     fresh game you cannot explain. */
+  server: { port: 5173, strictPort: true }
+});
+export {
+  vite_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidml0ZS5jb25maWcuanMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9kaXJuYW1lID0gXCJDOlxcXFxVc2Vyc1xcXFxhZG1pblxcXFxEZXNrdG9wXFxcXG1pbmktZ2FtZXNcXFxccG9rZW1vbi1jb2xsZWN0XCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ZpbGVuYW1lID0gXCJDOlxcXFxVc2Vyc1xcXFxhZG1pblxcXFxEZXNrdG9wXFxcXG1pbmktZ2FtZXNcXFxccG9rZW1vbi1jb2xsZWN0XFxcXHZpdGUuY29uZmlnLmpzXCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ltcG9ydF9tZXRhX3VybCA9IFwiZmlsZTovLy9DOi9Vc2Vycy9hZG1pbi9EZXNrdG9wL21pbmktZ2FtZXMvcG9rZW1vbi1jb2xsZWN0L3ZpdGUuY29uZmlnLmpzXCI7aW1wb3J0IHsgZGVmaW5lQ29uZmlnIH0gZnJvbSBcInZpdGVcIjtcclxuaW1wb3J0IHJlYWN0IGZyb20gXCJAdml0ZWpzL3BsdWdpbi1yZWFjdFwiO1xyXG5cclxuZXhwb3J0IGRlZmF1bHQgZGVmaW5lQ29uZmlnKHtcclxuICBwbHVnaW5zOiBbcmVhY3QoKV0sXHJcbiAgYmFzZTogXCIuL1wiLCAvLyBwb255dGFpbDogcmVsYXRpdmUgYmFzZSBzbyBgdml0ZSBidWlsZGAgb3V0cHV0IG9wZW5zIGZyb20gYW55IHBhdGhcclxuXHJcbiAgLyogQSBTQVZFIExJVkVTIE9OIEFOIE9SSUdJTiwgQU5EIEEgUE9SVCBJUyBQQVJUIE9GIE9ORS4gVml0ZSdzIGRlZmF1bHQgaXMgdG9cclxuICAgICBwaWNrIHRoZSBuZXh0IGZyZWUgcG9ydCB3aGVuIDUxNzMgaXMgYnVzeSAtIHNvIGEgc2Vjb25kIGBucG0gcnVuIGRldmAgd2l0aFxyXG4gICAgIGEgc3RhbGUgb25lIHN0aWxsIHJ1bm5pbmcgc2VydmVzIHRoZSB3aG9sZSBnYW1lIGZyb20gNTE3NCwgd2hlcmUgdGhlcmUgaXNcclxuICAgICBubyBsb2NhbFN0b3JhZ2UgYW5kIHRoZXJlZm9yZSBubyBzYXZlLiBUaGUgZGV4IGxvb2tzIGRlbGV0ZWQgYW5kIG5vdGhpbmcgaXNcclxuICAgICB3cm9uZy4gYHN0cmljdFBvcnRgIG1ha2VzIHRoYXQgY29sbGlzaW9uIGFuIGVycm9yIHlvdSBjYW4gcmVhZCBpbnN0ZWFkIG9mIGFcclxuICAgICBmcmVzaCBnYW1lIHlvdSBjYW5ub3QgZXhwbGFpbi4gKi9cclxuICBzZXJ2ZXI6IHsgcG9ydDogNTE3Mywgc3RyaWN0UG9ydDogdHJ1ZSB9LFxyXG59KTtcclxuIl0sCiAgIm1hcHBpbmdzIjogIjtBQUFpVixTQUFTLG9CQUFvQjtBQUM5VyxPQUFPLFdBQVc7QUFFbEIsSUFBTyxzQkFBUSxhQUFhO0FBQUEsRUFDMUIsU0FBUyxDQUFDLE1BQU0sQ0FBQztBQUFBLEVBQ2pCLE1BQU07QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBLEVBUU4sUUFBUSxFQUFFLE1BQU0sTUFBTSxZQUFZLEtBQUs7QUFDekMsQ0FBQzsiLAogICJuYW1lcyI6IFtdCn0K
