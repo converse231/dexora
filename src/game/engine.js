@@ -31,8 +31,16 @@ import {
   fieldById, berryById, FAMILIES,
   stepReward,
 } from "./items.js";
+/* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
+   that froze every catch in the game. `createEngine` has its own
+   `function advance(now)` driving the phase machine, declared INSIDE the
+   closure, so it shadowed this import rather than colliding with it: no
+   syntax error, no warning. `noteDaily` then called the phase machine instead
+   of the quest counter, which called `settle`, which called `noteDaily` - and
+   a catch died of a stack overflow the moment the ball stopped shaking.
+   **Alias anything imported into this file whose name a local might reuse.** */
 import {
-  dayKey, dailyFor, advance, reward as dailyReward, isYesterday,
+  dayKey, dailyFor, advance as advanceGoal, reward as dailyReward, isYesterday,
 } from "./daily.js";
 
 export const VIEW_W = 15;
@@ -466,7 +474,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const d = today();
     if (d.claimed) return;
     const goal = dailyFor(d.key);
-    const add = advance(goal, event);
+    const add = advanceGoal(goal, event);
     if (!add) return;
     d.done = Math.min(goal.need, d.done + add);
   }
