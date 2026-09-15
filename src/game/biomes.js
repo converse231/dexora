@@ -330,10 +330,27 @@ export const pityBoost = (dry = 0) =>
 
 /* `boost` defaults to 1 so every existing caller - and the 400k-roll test that
    pins each tier's rate - is measuring the unaided odds. */
-export function rollVariant(random = Math.random, locked = null, boost = 1) {
+/* NOTHING BECOMES A CERTAINTY. `boost` and `favour` both multiply, and they
+   are meant to: pity for the drought you are in, a honey for the one you are
+   hunting. Multiplied together and left alone they would eventually hand you a
+   tier on every encounter, and a tier you are guaranteed is not a rare - it is
+   the ordinary sprite with extra steps. One clamp covers every combination
+   that exists and every one that gets added. It does not bind today: pity
+   alone caps at 10x, which is 1/48 on Astral. */
+export const LIFT_CEILING = 0.2;
+
+/* `favour` is `{ tier, mult }` and lifts ONE tier - a Shiny Honey - where
+   `boost` lifts them all. Two arguments rather than one table of multipliers
+   because the two have different lifetimes and different owners: `boost` is
+   the game apologising for a drought, `favour` is something you bought.
+   Multiplied, so a Shiny Honey during a drought is worth both. */
+export function rollVariant(
+  random = Math.random, locked = null, boost = 1, favour = null,
+) {
   for (const [tier, odds] of TIER_ODDS) {
     if (locked?.has(tier)) continue;
-    if (random() < odds * boost) return tier;
+    const lift = boost * (favour?.tier === tier ? favour.mult : 1);
+    if (random() < Math.min(LIFT_CEILING, odds * lift)) return tier;
   }
   return null;
 }

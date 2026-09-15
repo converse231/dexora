@@ -1557,6 +1557,7 @@ canvas {
 }
 .sh-pick:disabled { cursor: default; }
 .sh-pick:not(:disabled):hover b { color: var(--path); }
+.sh-pick .item-fx { width: 30px; }
 .sh-pick img { width: 30px; height: 30px; image-rendering: pixelated; }
 
 .sh-title, .sh-tail { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
@@ -1962,14 +1963,22 @@ canvas {
 /* The sheet's footer is two buttons now: a way onward and a way out. CLOSE
    stays the wide one - it is what most people press - and SEE IN BOX takes
    only what it needs. */
-.sheet-actions { display: flex; gap: 8px; }
-.sheet-actions .sheet-close { flex: 1; }
+/* THE MARGIN BELONGED TO THE ROW, NOT TO ONE BUTTON. `.sheet-close` carries
+   `margin-top: 18px` from when it was the only thing here, and in a flex row
+   that pushed it down while its `align-items: stretch` sibling grew to the
+   full height of the line - so SEE IN BOX came out as a tall square next to a
+   short bar. The gap is the row's now and both buttons are the same height,
+   which is what they looked like they were supposed to be. */
+.sheet-actions { display: flex; align-items: stretch; gap: 8px; margin-top: 18px; }
+.sheet-actions .sheet-close { flex: 1; margin-top: 0; }
 /* GREEN, not the path rose. Rose is what SELL wears in the confirm dialog and
    what a caught cell is tinted with - beside a green CLOSE it read as the
    destructive half of the pair, which is backwards: this is the way onward. */
 .sheet-inbox {
-  flex: none;
-  font-family: var(--pixel); font-size: 10px; padding: 11px 13px 9px;
+  /* And it must not wrap. "SEE IN BOX" broke over two lines at this width,
+     which is the other half of why the button was square. */
+  flex: none; white-space: nowrap;
+  font-family: var(--pixel); font-size: 9px; padding: 0 14px;
   border: 2px solid var(--canopy); border-radius: 10px;
   background: var(--canopy); color: #f4faf2; cursor: pointer;
 }
@@ -2448,6 +2457,12 @@ button:disabled { transition: none; }
    `display` is deliberately absent too: a phone has no room for a map of the
    map, so the base is `none` and the wide layout at the end of this file turns
    it on. Layout overrides go last, the same rule the rail follows. */
+/* AN ITEM WEARING A TIER. The coloured honeys are the honey jar plus the same
+   CSS treatment the Pokémon of that tier wears, so the wrapper only has to
+   give those layers something to be absolute inside and a size to fill. Every
+   other item is a bare `<img>` and never reaches this rule. */
+.item-fx { width: 26px; aspect-ratio: 1; flex: none; }
+
 /* Same pill as the minimap, opposite corner: both are glanced at over the
    route rather than read, so they should not look like two systems. */
 .fieldbox {
@@ -2460,6 +2475,7 @@ button:disabled { transition: none; }
 }
 .fieldbox span { display: flex; align-items: center; gap: 3px; }
 .fieldbox img { width: 15px; height: 15px; image-rendering: pixelated; }
+.fieldbox .item-fx { width: 15px; }
 
 .minimap {
   display: none;
@@ -2728,6 +2744,21 @@ button:disabled { transition: none; }
 }
 .br-ball:disabled { opacity: .4; cursor: default; }
 .br-ball img { width: 3.6cqw; min-width: 18px; image-rendering: pixelated; }
+
+/* THE KIT STRIP: berries in an encounter, field items on the map. Ruled off
+   from the balls because it answers a different question - the balls are
+   "which throw", these are "anything else first" - and an unruled second run
+   of tiles reads as more balls. */
+.br-kit {
+  margin-top: .5cqw; padding-top: .5cqw;
+  border-top: 2px solid rgba(255, 255, 255, .18);
+}
+/* A tier's own layers need a box to be absolute inside, and `.sprite-fx` is
+   `display: block` with no size of its own - so the wrapper takes the width
+   the bare `<img>` would have had. */
+.br-item .sprite-fx { width: 3.6cqw; min-width: 18px; aspect-ratio: 1; }
+/* Running, or fed. The same gold the shop row uses for a live effect. */
+.br-item.on { border-color: var(--gold); background: rgba(255, 214, 102, .14); }
 .br-ball em {
   flex: 1 1 auto; font-style: normal; font-size: 1.55cqw;
   color: var(--ink); font-variant-numeric: tabular-nums; text-align: right;

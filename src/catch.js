@@ -51,9 +51,16 @@ export function catchChance(rate, ballMult) {
    way. They deliberately point opposite ways instead: an encounter is HARDER
    to finish and LASTS LONGER, so a failed throw is a setback rather than the
    end of it. Losing a rare to a flee on throw two is the version of this game
-   nobody wants to play. */
-export function fleeChance(rate) {
-  return 0.12 + (1 - rate / 255) * 0.3;
+   nobody wants to play.
+
+   `calm` is a Nanab Berry, and it is a MULTIPLIER on the whole line rather
+   than a subtraction from it. Subtracting would flatten the slope - the thing
+   this function exists to have - and would take the commonest species to a
+   flee chance of nearly nothing, which is a berry wasted on a Pidgey. A
+   multiplier keeps rarity feeling like rarity and is worth most exactly where
+   you would spend a berry: on the legendary that keeps running away. */
+export function fleeChance(rate, calm = 1) {
+  return (0.12 + (1 - rate / 255) * 0.3) * calm;
 }
 
 /* How close was a losing roll? 3 shakes = agonising, 0 = never had a chance.
@@ -68,14 +75,20 @@ export function shakesFor(roll, need) {
 }
 
 /* One roll decides everything. The animation is a readout of that roll,
-   never a second chance to change it. */
-export function resolveThrow(rate, ballMult, rng = Math.random) {
+   never a second chance to change it.
+
+   A Razz Berry arrives folded into `ballMult` at the call site rather than as
+   an argument here, and that is deliberate: it multiplies the ball, so it goes
+   through `catchChance`'s own ceiling and cannot push any ball to certainty.
+   A separate argument would have been a second place for the cap to be
+   forgotten. */
+export function resolveThrow(rate, ballMult, rng = Math.random, calm = 1) {
   const need = catchChance(rate, ballMult);
   const roll = rng();
   if (roll < need) return { caught: true, shakes: 3, fled: false };
   return {
     caught: false,
     shakes: shakesFor(roll, need),
-    fled: rng() < fleeChance(rate),
+    fled: rng() < fleeChance(rate, calm),
   };
 }

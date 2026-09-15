@@ -6,9 +6,11 @@ import { evoCycleFrames, EVO_SWAPS, SCALE_MAX } from "../src/game/evocycle.js";
 import {
   STATS, MAX_RANK, emptyStats, rank, spentPoints, freePoints, earnedPoints,
   canSpend, catchMult, stepScale, xpScale, pricedAt, valuedAt, weighted,
-  rarityPower, sellScale, priceScale, HONEY_TILT, RARITY_FLOOR,
+  rarityPower, sellScale, priceScale, RARITY_FLOOR,
 } from "../src/game/trainer.js";
-import { catchChance, fleeChance, shakesFor, resolveThrow, NEVER_CERTAIN } from "../src/catch.js";
+import {
+  catchChance, fleeChance, shakesFor, resolveThrow, NEVER_CERTAIN, GUARANTEED,
+} from "../src/catch.js";
 
 const near = (a, b) => Math.abs(a - b) < 0.005;
 
@@ -165,7 +167,7 @@ import {
   SYNTH_MIN, SYNTH_STEP,
   stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
   TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf,
-  FIELD, fieldById, REPEL_SCALE,
+  FIELD, FAMILIES, fieldById, BERRIES, berryById, artOf,
 } from "../src/game/items.js";
 import {
   dailyFor, describe, advance, isYesterday, streakMult, reward,
@@ -174,6 +176,7 @@ import {
 import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
+  LIFT_CEILING,
 } from "../src/game/biomes.js";
 
 const poke = ballById("poke-ball");
@@ -353,8 +356,12 @@ for (let i = 1; i < SHOP_BALLS.length; i++)
      from a list that is not this one, so the two drift silently - and a ball
      with no sprite is a broken image on the rail AND in the shop, which is the
      first thing anyone sees. */
+  /* `artOf`, not `i.id`: the three coloured honeys share the one honey jar on
+     purpose - a Holo Honey is that picture wearing the foil a Holo Pokemon
+     wears - so asking for `honey-holo.png` would fail on art that is correct
+     and complete. Everything else is still its own id. */
   const missing = ALL_ITEMS
-    .filter((i) => !existsSync(new URL(`../public/items/${i.id}.png`, import.meta.url)))
+    .filter((i) => !existsSync(new URL(`../public/items/${artOf(i)}.png`, import.meta.url)))
     .map((i) => i.id);
   assert.deepEqual(missing, [],
     `no sprite for: ${missing.join(", ")} - add them to tools/fetch-items.mjs and re-run it`);
@@ -2615,107 +2622,343 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      built into. Fortune, the band budgets and a lure all want to reshape one
      encounter table, and three transforms on one table is a mix nobody chose.
 
-     So there are two claims to hold, and both fail silently: Honey is the SAME
-     exponent Fortune is - composition, not a second pass - and Repel is not on
-     that axis at all. */
+     The answer was three FAMILIES pulling three different levers, so the
+     assertions are mostly about that separation holding. */
   {
     const maxed = { ...emptyStats(), fortune: MAX_RANK };
+    const LEVERS = ["rate", "tilt", "lift"];
 
-    /* ONE EXPONENT, and this is what says so without a literal in it: if Honey
-       IS Fortune's exponent, what it is worth cannot depend on your Fortune
-       rank. A second transform stacked on the first would not have that
-       property - it would compound. Checked at every rank, because the floor
-       is the only thing allowed to break it. */
-    const tilt = (r) => rarityPower({ ...emptyStats(), fortune: r }, false)
-      - rarityPower({ ...emptyStats(), fortune: r }, true);
-    for (let r = 0; r <= MAX_RANK; r++) {
-      assert.ok(near(tilt(r), tilt(0)),
-        `Honey is worth ${tilt(r).toFixed(3)} at Fortune ${r} against ` +
-        `${tilt(0).toFixed(3)} at nothing - it is compounding, not composing`);
-      assert.ok(rarityPower({ ...emptyStats(), fortune: r }, true) >= RARITY_FLOOR,
-        `Fortune ${r} with a Honey running sank under the floor`);
+    /* ONE FAMILY, ONE LEVER, and no two families sharing one. Two families on
+       the same lever would be one family with two names, and the whole point
+       of the split is that a repel, a flute and a honey cannot collide. */
+    {
+      const byFamily = new Map();
+      for (const f of FIELD) {
+        const mine = LEVERS.filter((k) => f[k] !== undefined);
+        assert.equal(mine.length, 1,
+          `${f.id} pulls ${mine.length} levers (${mine.join(", ")}) - it must pull exactly one`);
+        const seen = byFamily.get(f.family);
+        assert.ok(seen === undefined || seen === mine[0],
+          `family ${f.family} pulls both ${seen} and ${mine[0]}`);
+        byFamily.set(f.family, mine[0]);
+      }
+      assert.equal(new Set(byFamily.values()).size, byFamily.size,
+        "two families pull the same lever - then they are one family");
+      assert.deepEqual([...byFamily.keys()].sort(), [...FAMILIES].sort(),
+        "FAMILIES must be exactly the families the items declare");
     }
-    /* And a consumable must not out-buy the whole investment it borrows. */
-    const ranks = HONEY_TILT / (rarityPower(emptyStats()) - rarityPower({ ...emptyStats(), fortune: 1 }));
+
+    /* A TIER MUST BEAT THE ONE BELOW IT, on duration AND on effect AND on
+       price. A Super Repel that costs more and does no more is a price with no
+       product, and nothing else in the suite would say so. */
+    for (const fam of FAMILIES) {
+      const line = FIELD.filter((f) => f.family === fam);
+      for (let k = 1; k < line.length; k++) {
+        const lo = line[k - 1], hi = line[k];
+        assert.ok(hi.price > lo.price, `${hi.id} costs no more than ${lo.id}`);
+        assert.ok(hi.level >= lo.level, `${hi.id} unlocks before ${lo.id}`);
+        // `rate` is the one lever where SMALLER is stronger - fewer encounters.
+        if (hi.rate !== undefined) {
+          assert.ok(hi.rate < lo.rate, `${hi.id} repels no harder than ${lo.id}`);
+          assert.ok(hi.steps > lo.steps, `${hi.id} runs no longer than ${lo.id}`);
+        }
+        if (hi.lift !== undefined) {
+          assert.ok(hi.lift > lo.lift || hi.tier,
+            `${hi.id} lifts no harder than ${lo.id} and favours nothing`);
+        }
+      }
+    }
+
+    /* ONE EXPONENT, and this is what says so without a literal in it: if a
+       flute's tilt IS Fortune's exponent, what it is worth cannot depend on
+       your Fortune rank. A second transform stacked on the first would
+       compound. Checked at every rank; the floor is the only thing allowed to
+       break it. */
+    const flute = FIELD.find((f) => f.family === "rarity");
+    const tiltAt = (r) => rarityPower({ ...emptyStats(), fortune: r }, 0)
+      - rarityPower({ ...emptyStats(), fortune: r }, flute.tilt);
+    for (let r = 0; r <= MAX_RANK; r++) {
+      assert.ok(near(tiltAt(r), tiltAt(0)),
+        `the flute is worth ${tiltAt(r).toFixed(3)} at Fortune ${r} against ` +
+        `${tiltAt(0).toFixed(3)} at nothing - it is compounding, not composing`);
+      assert.ok(rarityPower({ ...emptyStats(), fortune: r }, flute.tilt) >= RARITY_FLOOR,
+        `Fortune ${r} with a flute running sank under the floor`);
+    }
+    const ranks = flute.tilt / (rarityPower(emptyStats()) - rarityPower({ ...emptyStats(), fortune: 1 }));
     assert.ok(ranks > 0 && ranks < MAX_RANK,
-      `Honey is worth ${ranks.toFixed(1)} Fortune ranks against a track of ${MAX_RANK}`);
+      `the flute is worth ${ranks.toFixed(1)} Fortune ranks against a track of ` +
+      `${MAX_RANK} - a consumable must not out-buy the whole investment`);
 
     /* THE FLOOR IS WHY THERE IS A FLOOR. At exponent 0 every row is worth the
        same and rarity stops existing, so the worst case in the game - maxed
-       Fortune with a Honey running - still has to sort a common above a rare. */
+       Fortune with a flute running - still has to sort a common above a rare.
+       And the floor has to do that job whatever the coefficients above it are
+       later retuned to, which is why the second assertion is on the CONSTANT:
+       it does not bind today, and what it exists to catch is somebody moving
+       the numbers above it. */
     {
-      const p = rarityPower(maxed, true);
+      const p = rarityPower(maxed, flute.tilt);
       assert.ok(22 ** p > 2 * 1 ** p,
         `at exponent ${p.toFixed(2)} a weight-22 Pidgey is not even twice a ` +
         "weight-1 Snorlax - the table has flattened into noise");
-      /* And the floor has to do that job on its own, whatever the
-         coefficients above it are retuned to - it is insurance against a
-         future Fortune, not a description of this one. */
       assert.ok(22 ** RARITY_FLOOR > 2 * 1 ** RARITY_FLOOR,
         `a floor of ${RARITY_FLOOR} does not keep a common ahead of a rare`);
     }
 
     /* MEASURED ON A REAL TABLE, and exactly, because `weighted` returns the
-       reweighted rows rather than a pick: Honey must raise what the rare rows
-       get and lower what the commons do, at BOTH ends of the Fortune track. */
+       reweighted rows rather than a pick: the flute must raise what the rare
+       rows get and lower what the commons do, at BOTH ends of Fortune. */
     {
       const table = [["common", 22], ["mid", 8], ["rare", 3], ["legend", 0.5]];
-      const shares = (stats, honey) => {
-        const rows = weighted(table, stats, honey);
+      const shares = (stats, tilt) => {
+        const rows = weighted(table, stats, tilt);
         const sum = rows.reduce((t, [, w]) => t + w, 0);
         return Object.fromEntries(rows.map(([id, w]) => [id, w / sum]));
       };
       for (const [what, stats] of [["a new trainer", emptyStats()], ["a maxed one", maxed]]) {
-        const off = shares(stats, false), on = shares(stats, true);
-        assert.ok(on.legend > off.legend,
-          `Honey left the rarest row at ${(on.legend * 100).toFixed(2)}% for ${what}`);
-        assert.ok(on.rare > off.rare, `and the rare row, for ${what}`);
+        const off = shares(stats, 0), on = shares(stats, flute.tilt);
+        assert.ok(on.legend > off.legend && on.rare > off.rare,
+          `the flute did nothing for the rare rows for ${what}`);
         assert.ok(on.common < off.common,
           `the commonest row has to give the ground back, for ${what}`);
       }
     }
 
-    /* REPEL IS THE OTHER AXIS, and this is what keeps it there: nothing in the
+    /* REPEL IS ITS OWN AXIS, and this is what keeps it there: nothing in the
        two files that decide WHAT you meet may know the word. */
     for (const f of ["trainer.js", "biomes.js"]) {
-      const src = readFileSync(new URL(`../src/game/${f}`, import.meta.url), "utf8");
-      assert.ok(!/REPEL|repel/.test(src),
-        `${f} mentions repel - a repel that reshapes the table is the pile-up ` +
-        "this design exists to avoid");
+      /* COMMENTS STRIPPED FIRST. The rule is that no CODE in these two files
+         knows about repel; the prose absolutely should, and the first version
+         of this assertion failed on the comment that explains the rule. A test
+         that forbids documenting itself is a test nobody keeps. */
+      const src = readFileSync(new URL(`../src/game/${f}`, import.meta.url), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      assert.ok(!/repel/i.test(src),
+        `${f} has repel in its CODE - a repel that reshapes the table is the ` +
+        "pile-up this design exists to avoid");
     }
     {
       const eng = readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8");
-      assert.ok(/ENCOUNTER_RATE \* \(state\.field\.repel > 0 \? REPEL_SCALE : 1\)/.test(eng),
+      /* Each family has to reach its own lever and only its own. Three source
+         assertions because there is no way to drive the engine headlessly, and
+         each of the three failures is silent: an item you bought that does
+         nothing looks exactly like bad luck. */
+      assert.ok(/ENCOUNTER_RATE \* \(running\("repel"\)\?\.rate \?\? 1\)/.test(eng),
         "Repel must scale the encounter RATE, which is the only thing it does");
-      /* Charged through the same discount the shelf prints, or Haggle has two
-         rules and the row is advertising a price nobody is charged. */
-      assert.ok(/pricedAt\(item\.price, state\.stats\)/.test(eng),
-        "a field item must be charged through pricedAt like everything else");
-      // Buying replaces the clock; anything that ADDS is a stackable item.
-      assert.ok(/state\.field\[id\] = item\.steps;/.test(eng),
-        "buying a field item must replace its timer, never extend it");
+      assert.ok(/weighted\(table, state\.stats, running\("rarity"\)\?\.tilt \?\? 0\)/.test(eng),
+        "the flute must reach the table through rarityPower's own exponent");
+      assert.ok(/running\("variant"\)/.test(eng) && /honey\?\.tier/.test(eng),
+        "a honey must reach the variant roll, and a coloured one must name its tier");
+      // Using one spends a BAG item; it must not charge money a second time.
+      assert.ok(/state\.bag\[item\.id\] -= 1;/.test(eng) && !/function useField[\s\S]{0,400}state\.money/.test(eng),
+        "useField must spend from the bag - these are bought in the shop now");
+      assert.ok(/state\.field\[item\.family\] = \{ id: item\.id, steps: item\.steps \};/.test(eng),
+        "a field item must be written to its FAMILY slot, or two honeys can run at once");
     }
-    assert.ok(REPEL_SCALE > 0 && REPEL_SCALE < 1,
-      "a repel that stops encounters outright is a mode switch, not an item");
 
-    /* THE SHELF. Both gated, both discounted, and the one that changes your
-       odds costs more per step than the one that only saves you time. */
-    const honey = fieldById("honey"), repel = fieldById("repel");
-    assert.ok(honey && repel, "both field items must be findable by id");
-    assert.equal(fieldById("nope"), null, "an unknown id is null, not undefined");
+    /* THE SHELF. All of them bought, all of them gated, all of them drawn. */
     for (const f of FIELD) {
+      assert.ok(forSale(f), `${f.id} is not buyable`);
       assert.ok(f.level > 1 && f.level < MAX_LEVEL, `${f.id} is gated off the ladder`);
       assert.ok(f.steps > 100, `${f.id} runs out before you have walked anywhere`);
+      assert.ok(f.blurb.length <= 32, `${f.id}'s blurb will clip in the row`);
       assert.ok(pricedAt(f.price, { ...emptyStats(), haggle: MAX_RANK }) < f.price,
         `${f.id} ignores Haggle`);
-      assert.ok(f.blurb.length <= 24, `${f.id}'s blurb will clip in the row`);
     }
-    assert.ok(honey.price / honey.steps > repel.price / repel.steps,
-      "Honey changes the odds and Repel only saves time - the odds must cost more");
+    assert.equal(fieldById("nope"), null, "an unknown id is null, not undefined");
 
-    console.log(`field ok — Honey is ${ranks.toFixed(1)} Fortune ranks on the same ` +
-      `exponent (floor ${RARITY_FLOOR}), Repel is x${REPEL_SCALE} on the rate and ` +
-      "nowhere near the table");
+    /* THE COLOURED HONEYS. Each names a real tier, each is drawn from the one
+       jar, and no two name the same tier - two Shiny Honeys at two prices is
+       the same bug as two weights for one species. */
+    {
+      const honeys = FIELD.filter((f) => f.tier);
+      const named = honeys.map((h) => h.tier);
+      assert.equal(new Set(named).size, named.length, "two honeys favour one tier");
+      for (const h of honeys) {
+        assert.ok(TIERS.includes(h.tier), `${h.id} favours "${h.tier}", which is not a tier`);
+        assert.equal(artOf(h), "honey", `${h.id} should be drawn from the one jar`);
+        assert.ok(h.lift > 1, `${h.id} favours a tier by a factor of ${h.lift}`);
+      }
+      /* NO ORIGIN HONEY, and that is the assertion rather than an omission:
+         Origin is gated on catching every ordinary Pokémon of a generation,
+         and an item that shortcuts a gate is the gate deleted. */
+      assert.ok(!named.includes("origin"),
+        "an Origin honey would sell a way past the one gate in the game");
+      assert.deepEqual(
+        TIERS.filter((t) => t !== "origin").sort(), [...named].sort(),
+        "every tier but Origin should have a honey, and only those");
+    }
+
+    /* THE VARIANT ROLL, measured. A favoured honey must lift ITS tier and
+       leave the others where they were - a "shiny honey" that also makes
+       Astrals commoner is a plain honey with a misleading name. */
+    {
+      const rng = (seed) => () => {
+        seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      const count = (favour, boost = 1) => {
+        const r = rng(99);
+        const seen = Object.fromEntries(TIERS.map((t) => [t, 0]));
+        for (let i = 0; i < 200000; i++) {
+          const got = rollVariant(r, null, boost, favour);
+          if (got) seen[got]++;
+        }
+        return seen;
+      };
+      const plain = count(null);
+      const shiny = count({ tier: "shiny", mult: 6 });
+      assert.ok(shiny.shiny > plain.shiny * 3,
+        `a x6 Shiny Honey moved shiny ${plain.shiny} -> ${shiny.shiny} - it is not working`);
+      /* Astral is rolled BEFORE shiny (rarest first), so lifting shiny cannot
+         raise it, and holo sits after shiny so it can only lose ground. What
+         must not happen is astral moving at all. */
+      assert.ok(Math.abs(shiny.astral - plain.astral) < plain.astral * 0.25,
+        `a Shiny Honey moved Astral ${plain.astral} -> ${shiny.astral} - it is favouring more than one tier`);
+      // And a plain honey is a boost with no favour: everything must move.
+      const all = count(null, 2);
+      for (const t of TIERS) {
+        if (!plain[t]) continue;
+        assert.ok(all[t] > plain[t], `a plain honey left ${t} at ${all[t]}`);
+      }
+    }
+
+    /* NOTHING BECOMES A CERTAINTY, however the multipliers pile up - and the
+       ceiling must not bind on pity alone, or it would have quietly changed
+       behaviour that was already measured and shipped. */
+    assert.ok(LIFT_CEILING > 0 && LIFT_CEILING < 1, "a certain tier is not a tier");
+    for (const [tier, odds] of TIER_ODDS) {
+      assert.ok(odds * PITY_CAP < LIFT_CEILING,
+        `the ceiling binds on ${tier} at full pity - it would be changing the ` +
+        "pity rates this suite already pins");
+    }
+    {
+      const r = () => 0.0001;   // a roll that beats anything reachable
+      assert.ok(rollVariant(r, null, 1e9, { tier: "astral", mult: 1e9 }),
+        "an absurd lift must still roll SOMETHING rather than throwing");
+    }
+
+    console.log(`field ok — ${FAMILIES.length} families on ${FAMILIES.length} levers, ` +
+      `${FIELD.length} items; the flute is ${ranks.toFixed(1)} Fortune ranks on ` +
+      `the same exponent, honeys favour ${FIELD.filter((f) => f.tier).length} tiers`);
+  }
+
+  /* BERRIES. The same test the four situational balls had to pass: each must
+     key off a DIFFERENT system, or two of them are one item with two prices.
+     Here that is checkable directly, because each effect is a named field. */
+  {
+    const EFFECTS = ["catchMult", "calm", "xpMult"];
+    const used = [];
+    for (const b of BERRIES) {
+      const mine = EFFECTS.filter((k) => b[k] !== undefined);
+      assert.equal(mine.length, 1, `${b.id} has ${mine.length} effects, not one`);
+      used.push(mine[0]);
+      assert.ok(forSale(b), `${b.id} is not buyable`);
+      assert.ok(b.level > 1 && b.level < MAX_LEVEL, `${b.id} is gated off the ladder`);
+      assert.ok(b.blurb.length <= 32, `${b.id}'s blurb will clip in the row`);
+    }
+    assert.equal(new Set(used).size, used.length,
+      "two berries move the same number - then they are one berry");
+    assert.equal(berryById("nope"), null, "an unknown id is null, not undefined");
+
+    const razz = BERRIES.find((b) => b.catchMult);
+    const nanab = BERRIES.find((b) => b.calm);
+    const pinap = BERRIES.find((b) => b.xpMult);
+
+    /* A BERRY IS PRICED AGAINST THE BALLS IT HELPS. Dearer than the cheap ball
+       or it is simply always correct and stops being a decision; no dearer
+       than the dear one, or the answer is always "buy an Ultra instead". */
+    for (const b of BERRIES) {
+      assert.ok(b.price > poke.price,
+        `${b.id} costs less than a Poké Ball - then you always use one`);
+      assert.ok(b.price <= ultra.price * 1.5,
+        `${b.id} at ¥${b.price} is dearer than buying better balls`);
+    }
+
+    /* RAZZ GOES THROUGH `liveMult`, and that is load-bearing: it is the one
+       function the engine rolls with and the rail prints, so a berry applied
+       anywhere else would make the rail advertise a number nobody used. */
+    {
+      const enc = { types: ["normal"], known: false, areaId: "meadow", throws: 0 };
+      const fed = { ...enc, berry: razz.id };
+      for (const ball of BALLS) {
+        const dry = liveMult(ball, enc), wet = liveMult(ball, fed);
+        if (ball.mult >= GUARANTEED) {
+          assert.equal(wet, dry, "a Razz Berry must not touch the Master Ball");
+          continue;
+        }
+        assert.ok(near(wet, dry * razz.catchMult), `${ball.id} ignored the berry`);
+      }
+      // And with no berry on the encounter, nothing at all changes.
+      for (const ball of BALLS) {
+        assert.equal(liveMult(ball, enc), liveMult(ball, { ...enc, berry: null }),
+          `${ball.id} moved with no berry fed`);
+      }
+    }
+
+    /* AND IT STILL CANNOT REACH CERTAINTY, for any ball at any catch rate the
+       dex actually contains - because it multiplies the ball and therefore
+       passes through `catchChance`'s own ceiling rather than round it. */
+    {
+      const rates = [...new Set(SPECIES.map((sp) => sp.rate))];
+      // The Master Ball is on PLAIN_BALLS and is already past certain; a berry
+      // cannot make it more so, and liveMult above asserts it is left alone.
+      const ladder = PLAIN_BALLS.filter((b) => b.mult < GUARANTEED);
+      for (const rate of rates) {
+        for (const ball of ladder) {
+          const with_ = catchChance(rate, ball.mult * razz.catchMult);
+          assert.ok(with_ < 1, `${ball.id} + Razz is certain at rate ${rate}`);
+          assert.ok(with_ >= catchChance(rate, ball.mult),
+            `${ball.id} + Razz is WORSE than ${ball.id} at rate ${rate}`);
+        }
+        /* THE BALL LADDER MUST NOT INVERT. A berry that let the cheap ball
+           overtake the dear one would make the shop's own ladder a lie, and
+           nothing else here would notice - the numbers all still climb. */
+        for (let k = 1; k < ladder.length; k++) {
+          const lo = ladder[k - 1], hi = ladder[k];
+          assert.ok(catchChance(rate, lo.mult * razz.catchMult)
+            <= catchChance(rate, hi.mult * razz.catchMult) + 1e-12,
+            `a Razzed ${lo.id} beats a Razzed ${hi.id} at rate ${rate}`);
+        }
+      }
+    }
+
+    /* NANAB is a multiplier on the whole flee line, so the SLOPE survives: a
+       rare still flees more than a common with one eaten. Subtracting would
+       have flattened it, which is the version of this berry that makes rarity
+       stop meaning anything. */
+    {
+      assert.ok(nanab.calm > 0 && nanab.calm < 1, "a Nanab that stops flight entirely is not a berry");
+      for (const rate of [3, 45, 190, 255]) {
+        assert.ok(fleeChance(rate, nanab.calm) < fleeChance(rate),
+          `Nanab did nothing at rate ${rate}`);
+        assert.ok(fleeChance(rate, nanab.calm) > 0, `nothing ever flees at rate ${rate}`);
+      }
+      assert.ok(fleeChance(3, nanab.calm) > fleeChance(255, nanab.calm),
+        "with a Nanab eaten a legendary must still flee more than a Pidgey");
+      // And it reaches the roll: resolveThrow has to take it, not just accept it.
+      const never = resolveThrow(3, 0.0001, () => 0.99, 0);
+      assert.equal(never.fled, false, "calm 0 must stop the flee roll");
+      const always = resolveThrow(3, 0.0001, () => 0.00009999, 1);
+      assert.ok(always.caught || always.fled !== undefined, "resolveThrow still resolves");
+    }
+
+    assert.ok(pinap.xpMult > 1, "a Pinap that pays no extra XP is a berry that does nothing");
+    {
+      const eng = readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8");
+      assert.ok(/xpForCatch\(sp, e\.isNew\) \* \(berryById\(e\.berry\)\?\.xpMult \?\? 1\)/.test(eng),
+        "the Pinap must reach the XP award");
+      assert.ok(/berryById\(e\.berry\)\?\.calm \?\? 1/.test(eng),
+        "the Nanab must reach the flee roll");
+      assert.ok(/e\.berry = berry\.id;/.test(eng) && /state\.bag\[berry\.id\] -= 1;/.test(eng),
+        "feeding a berry must spend it and land on the ENCOUNTER, not on state");
+    }
+
+    console.log(`berries ok — ${BERRIES.length} berries on ${new Set(used).size} systems ` +
+      `(×${razz.catchMult} catch, ×${nanab.calm} flee, ×${pinap.xpMult} XP); ` +
+      "the ball ladder survives all of them");
   }
 
   console.log(`spawn ladder ok — ${early.size} species in the wild at Lv 1, ` +

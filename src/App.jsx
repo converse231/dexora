@@ -5,7 +5,10 @@ import TopBar from "./ui/TopBar.jsx";
 import Rail from "./ui/Rail.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
-import { BALLS, FIELD, canRun, stepReward } from "./game/items.js";
+import {
+  BALLS, FAMILIES, fieldById, canRun, stepReward,
+} from "./game/items.js";
+import { ItemIcon } from "./ui/Sprite.jsx";
 import {
   biomeFor, levelFromXp, TIERS, originReady, dexIndex,
 } from "./game/biomes.js";
@@ -266,14 +269,22 @@ export default function App() {
                 always there saying "no" is a readout nobody reads - and it
                 hides with the minimap for an encounter, because the count
                 cannot move while you are not walking. */}
-            {!enc && !evo && FIELD.some((f) => (st?.field?.[f.id] ?? 0) > 0) && (
+            {!enc && !evo && FAMILIES.some((f) => st?.field?.[f]) && (
               <div className="fieldbox" role="status">
-                {FIELD.filter((f) => (st?.field?.[f.id] ?? 0) > 0).map((f) => (
-                  <span key={f.id} title={`${f.name}: ${st.field[f.id]} steps left`}>
-                    <img src={`items/${f.id}.png`} alt={f.name} />
-                    {st.field[f.id]}
-                  </span>
-                ))}
+                {FAMILIES.map((fam) => {
+                  const run = st.field[fam];
+                  const item = run && fieldById(run.id);
+                  if (!item) return null;
+                  return (
+                    <span
+                      key={fam}
+                      title={`${item.name} — ${item.blurb}. ${run.steps} steps left.`}
+                    >
+                      <ItemIcon item={item} />
+                      {run.steps}
+                    </span>
+                  );
+                })}
               </div>
             )}
 
@@ -288,6 +299,11 @@ export default function App() {
             {!evo && (
               <BallRail
                 bag={st?.bag}
+                /* Which effects are already running, so a field item that is
+                   up says so rather than looking like an unused stack. */
+                field={st?.field}
+                onUseField={(id) => engine.useField(id)}
+                onUseBerry={(id) => engine.useBerry(id)}
                 /* The rail prices each ball against what is standing there,
                    so it needs the encounter, not just the bag. */
                 enc={enc}
@@ -383,7 +399,6 @@ export default function App() {
           onBuy={(id, n) => engine.buy(id, n)}
           onBuyCandy={(n) => engine.buyCandy(n)}
           onEvolve={(uid, to) => engine.evolve(uid, to)}
-          onUseField={(id) => engine.useField(id)}
           daily={engine?.daily?.()}
           onClaimDaily={() => engine.claimDaily()}
           jumpTo={boxJump}

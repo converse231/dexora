@@ -11,18 +11,17 @@
 
 import { useState } from "react";
 import {
-  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, speciesNeedingStone,
+  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, BERRIES, speciesNeedingStone,
 } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import { pricedAt } from "../game/trainer.js";
 import Confirm from "./Confirm.jsx";
+import { ItemIcon } from "./Sprite.jsx";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export default function Shop({
-  money, bag, level, stats, candy, field = {}, onBuy, onBuyCandy, onUseField,
-}) {
+export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCandy }) {
   const [pending, setPending] = useState(null);
   // The row whose buy controls are showing. Starts on the ball everyone owns,
   // so the shop opens explaining itself rather than as a list of closed doors.
@@ -59,6 +58,10 @@ export default function Shop({
        "×1.0 odds" beside a Net Ball is true, useless, and reads as a worse
        Poké Ball for six times the money. The headline is what it is worth when
        it is right, and the hint is when that is. */
+    /* A field item or a berry carries its own sentence, because none of them
+       is a multiplier on the catch roll and "×1.0 odds" would be a lie about
+       three different systems at once. */
+    if (item.blurb) return item.blurb;
     if (item.boost) return `×${item.boost.toFixed(1)} ${item.hint}`;
     if (item.mult) return item.mult >= 100 ? "never fails" : `×${item.mult.toFixed(1)} odds`;
     return speciesNeedingStone(item.id).map((id) => label(speciesById(id))).join(" · ");
@@ -88,7 +91,7 @@ export default function Shop({
             aria-expanded={isOpen}
             onClick={() => setOpen(isOpen ? null : item.id)}
           >
-            <img src={`items/${item.id}.png`} alt="" />
+            <ItemIcon item={item} />
             <span className="sh-title">
               <b>{item.name}</b>
               <i title={blurb(item)}>{blurb(item)}</i>
@@ -165,63 +168,6 @@ export default function Shop({
       {/* One scroller for the whole shop, like every other tab has. Two lists
           each scrolling on their own would be worse than one long page. */}
       <div className="shopscroll">
-        <div className="shoplist">{shelf(SHOP_BALLS)}</div>
-
-        <p className="shop-note">Better balls raise the odds, not the reward.</p>
-
-        {/* FIELD ITEMS. Bought is used - there is no bag screen for these and
-            no reason for one, since only one of each can run at a time and
-            stockpiling a consumable you cannot stack is an inventory for
-            nothing. A running one shows its steps instead of its price, so the
-            row answers "is it on" without a second readout somewhere else. */}
-        <div className="sh-head">
-          <span>FIELD</span>
-          <span>WHILE YOU WALK</span>
-        </div>
-
-        <div className="fieldlist">
-          {FIELD.map((f) => {
-            const left = field[f.id] ?? 0;
-            const price = pricedAt(f.price, stats);
-            const locked = level < f.level;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                className={`fieldrow${left > 0 ? " on" : ""}${locked ? " locked" : ""}`}
-                disabled={locked || money < price}
-                onClick={() => setPending({
-                  title: `Use ${f.name}?`,
-                  lines: [
-                    ["Cost", `¥${price.toLocaleString()}`],
-                    ["Money left", `¥${(money - price).toLocaleString()}`],
-                    ["Lasts", `${f.steps.toLocaleString()} steps`],
-                    ...(left > 0
-                      ? [["Replaces", `${left.toLocaleString()} steps left`]]
-                      : []),
-                  ],
-                  confirmLabel: `USE · ¥${price.toLocaleString()}`,
-                  run: () => onUseField(f.id),
-                })}
-                title={locked
-                  ? `Unlocks at level ${f.level}`
-                  : `${f.steps} steps · ¥${price.toLocaleString()}`}
-              >
-                <img src={`items/${f.id}.png`} alt="" />
-                <span className="fr-copy">
-                  <b>{f.name}</b>
-                  <i>{f.blurb}</i>
-                </span>
-                <span className="fr-tail">
-                  {locked ? `LV ${f.level}`
-                    : left > 0 ? `${left} STEPS`
-                      : `¥${price.toLocaleString()}`}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
         {/* RARE CANDY, and it is priced to lose. ¥120 against the ¥40 a common
             duplicate sells for means three sold to buy one candy, where
             converting that same duplicate gives one outright - so buying is
@@ -263,6 +209,47 @@ export default function Shop({
             </button>
           ))}
         </div>
+
+
+        <div className="sh-head">
+          <span>POKÉ BALLS</span>
+          <span>TO THROW</span>
+        </div>
+
+        <div className="shoplist">{shelf(SHOP_BALLS)}</div>
+
+        <p className="shop-note">Better balls raise the odds, not the reward.</p>
+
+        {/* BERRIES, then the field items, then the stones: the shelves are in
+            the order you reach for them - the thing you use on the Pokémon in
+            front of you, the thing you start before you set off, and the thing
+            you go home and use on something you already own.
+
+            Ordinary shelves now, not the one-click rows these two started as.
+            "Buying is using" was right while there were two field items and
+            wrong the moment there were eight: you cannot carry a Max Repel for
+            the cave you are about to enter if buying it starts it in the field
+            you are standing in. They are bag items, bought here in quantity and
+            used from the floating rail. */}
+        <div className="sh-head">
+          <span>BERRIES</span>
+          <span>FED IN THE WILD</span>
+        </div>
+
+        <div className="shoplist">{shelf(BERRIES)}</div>
+
+        <p className="shop-note">One berry at a time — the next one replaces it.</p>
+
+        <div className="sh-head">
+          <span>FIELD ITEMS</span>
+          <span>WHILE YOU WALK</span>
+        </div>
+
+        <div className="shoplist">{shelf(FIELD)}</div>
+
+        <p className="shop-note">
+          One of each kind runs at a time, and they are spent in steps.
+        </p>
 
         <div className="sh-head">
           <span>EVOLUTION STONES</span>

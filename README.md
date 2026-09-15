@@ -2412,34 +2412,91 @@ rerolled by reloading. Two details are load-bearing:
 **And the lures went last, because they were the collision.** Fortune already
 reshapes the encounter table and the band budgets now hold its mix, so a lure
 written as a third weight transform is exactly the pile-up the deferred note
-warned about. Two items, two different levers:
+warned about. The answer was not to tune one — it was to notice that "make
+rares commoner" is three different wishes wearing one word, and to give each of
+them its own lever:
 
-- **Honey does not invent a mechanism — it borrows Fortune's.** Both feed the
-  same exponent in `rarityPower`, so there is one place in the codebase where
-  the odds of meeting something rare are decided. It is worth 7.5 Fortune ranks
-  against a track of 20, so it composes with a maxed trainer instead of fighting
-  one. The test that says so has no literal in it: if Honey *is* Fortune's
-  exponent, what it is worth cannot depend on your Fortune rank, and a second
-  transform stacked on the first would compound instead.
-- **Repel does not touch the table at all.** It scales how *often* an encounter
-  happens (`×0.35`) and never what it is — the honest reading of what a repel is
-  for, which is crossing a map you have already farmed. check.mjs asserts the
-  word does not appear in either file that decides what you meet.
-- **`RARITY_FLOOR` is insurance, not a description.** At exponent 0 every row is
-  worth the same and rarity stops existing. Maxed Fortune plus a Honey lands at
-  0.45, comfortably above the 0.4 floor — so the floor does nothing today, and
-  the assertion on it is written against the floor constant rather than against
-  the current coefficients, so it is the *retune* it catches.
+| family | what it moves | how |
+|---|---|---|
+| **repel** | how OFTEN something appears | scales the encounter rate |
+| **rarity** | WHICH SPECIES appears | Fortune's own exponent |
+| **variant** | WHICH TIER it wears | the variant roll |
 
-**Bought is used.** There is no bag screen for these and no reason for one: only
-one of each can run at a time, so stockpiling a consumable you cannot stack is
-an inventory for nothing. Buying starts the clock, and buying again while one is
-running **replaces** it rather than adding, or the price of a long effect is the
-price of a short one typed twice. The shop row is the whole button, and it shows
-the steps left instead of the price while it runs — so the row answers "is it
-on" without a second readout somewhere else. The one that is on screen while you
-walk sits opposite the minimap, because **an effect paid for in steps is counted
-down where the steps happen**, not on the shelf that sold it.
+Nothing there invents a mechanism; each one borrows the mechanism the game
+already had, which is why they compose instead of fighting. `state.field` is
+keyed on the family rather than the item id, so "one of each kind at a time" is
+structural — a Max Repel replaces a Repel by landing in the same slot, and two
+honeys at once is not a state the game can represent.
+
+**The names came out of what actually exists.** `lure`, `super-lure` and
+`max-lure` all 404 in the PokéAPI sprite set, which is the sort of thing to
+check before naming a feature after it. The `white-flute` is there, and in Gen 3
+it already *is* the item that brings out rarer wild Pokémon — so it takes the
+rarity job under its own name, and Honey is freed to be the variant family. The
+repel line is real and really tiered (100/200/250 steps in canon; ours are
+longer because a step here is a tile, and the ratio is what was copied).
+
+**A coloured honey is the jar plus the tier's own treatment, and that is the
+whole art budget.** Holo Honey, Shiny Honey and Astral Honey have no sprite and
+want none: `art: "honey"` points all four at one picture and `tier` puts the
+same travelling foil over it that a Holo Pokémon wears. It is the cheapest
+possible drawing of exactly the right idea — you can see what the jar is for —
+and it means a fifth tier would arrive with its honey already drawn. There is
+deliberately **no Origin honey**: Origin is gated on catching every ordinary
+Pokémon of a generation, and an item that shortcuts a gate is the gate deleted.
+check.mjs asserts that absence so it reads as a decision rather than an
+oversight.
+
+**Bought is no longer used, and the reversal is worth recording.** The first
+version had no inventory at all — one click bought and started an effect, on the
+argument that stockpiling a consumable you cannot stack is a UI for nothing.
+That was right for two items and wrong for eight the moment you try to carry a
+Max Repel for the cave you are *about* to enter. They are ordinary bag items
+now: bought in quantity from the same shelf as the balls, used from the floating
+rail, counted down in steps beside the minimap because an effect paid for in
+steps belongs where the steps happen.
+
+### Berries, and the three rolls they are allowed to touch
+
+Fed to the Pokémon standing in front of you, and chosen on the test the four
+situational balls had to pass: **each must key off a different system**, or two
+of them are one item with two prices. The Pokémon GO trio lands exactly on three
+numbers this game already had.
+
+| | what it moves | where |
+|---|---|---|
+| **Razz Berry** | ×1.5 catch odds, all encounter | the catch roll |
+| **Nanab Berry** | flee chance ×0.35 | the flee roll |
+| **Pinap Berry** | double XP on the catch | the XP award |
+
+One at a time, replacing — which is what makes them a choice (safety, odds, or
+reward) rather than a checklist you work through before every throw. A berry
+lasts the encounter rather than the throw, because a berry you had to re-feed
+after every miss is a berry nobody can afford to use on the long fights that are
+the only ones worth using it on. Feeding costs no turn and risks nothing: a
+berry that could scare the Pokémon off would be a berry nobody spends on the
+rare they bought it for.
+
+**The Razz Berry goes through `liveMult`, and that is the load-bearing half.**
+`liveMult` is the single answer to "what is this ball worth against this
+Pokémon" — the engine rolls with it and the rail prints it — so a berry applied
+anywhere else would have the rail advertising ×3.0 over a throw that quietly
+used ×4.5, which is unfalsifiable from outside. Going through the ball also
+means going through `catchChance`'s own ceiling, so no berry can push anything
+to certainty and the ball ladder cannot invert; check.mjs sweeps every catch
+rate in the dex for both, and the Master Ball is left alone because it is
+already past certain.
+
+**Nanab is a multiplier on the flee line, not a subtraction from it.**
+Subtracting flattens the slope that makes rarity *feel* like rarity, and takes
+the commonest species below zero — which is how "nothing ever flees at rate 255"
+ended up as an assertion. A multiplier is worth most exactly where a berry gets
+spent: on the legendary that keeps running away.
+
+**Prices are bounded from both sides, and the reason is on each side.** Dearer
+than a Poké Ball or the berry is simply always correct and stops being a
+decision; no dearer than half again an Ultra Ball, or the answer is always "buy
+better balls instead".
 
 ### Phase 3 — The senses
 
@@ -2477,7 +2534,7 @@ ledger.
 | **Session structure** | A dated quest with a seven-day streak, on the YOU tab with a `!` on the existing tab badge. Three kinds, six askable types, no unfinishable day. |
 | **Band budgets** | `BAND_SHAPE` frozen per map from its own hand-written table, `balance()` rescaling whatever the table grows into, `BAND_FLOOR` for a band with no residents. A derived evolution is banded with its parent, the whole chain. |
 | **Pity for the rare tiers** | `state.dry`, opening at 300 encounters, ramping over 100 and capped at 10× on the whole ladder. Silent — your other call. |
-| **Lures and repels** | Honey on Fortune's own exponent, Repel on the encounter rate. Two levers, deliberately, so nothing is reshaping one table twice. |
+| **Lures and repels** | Three families on three levers — repel on the encounter rate, the White Flute on Fortune's exponent, the honeys on the variant roll — plus three berries on the catch, flee and XP rolls. Nothing reshapes one table twice. |
 
 **Your calls, answered:** a quest rather than a login bonus, and pity silent —
 a visible counter would make the drought the thing you are playing.
