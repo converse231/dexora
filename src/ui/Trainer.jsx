@@ -28,7 +28,18 @@ export default function Trainer({ stats, level, bag, biking, onSpend, onBike, sa
   // A file that has been read and checked, waiting on the confirm step.
   const [offer, setOffer] = useState(null);
   const [saveNote, setSaveNote] = useState("");
+  // Which recovery is waiting on the confirm step: "backup" or "broken".
+  const [recover, setRecover] = useState(null);
   const free = freePoints(stats, level);
+
+  /* WHAT IS STILL RECOVERABLE, READ ONCE. This is the offer that exists only
+     when something is behind it: the engine keeps the last save that loaded
+     cleanly and the raw text of anything that failed, and neither is worth a
+     word on screen when there is nothing there. Read at mount rather than per
+     render - both keys are written at load time and cannot change while the
+     panel is open, and restoring reloads the page. */
+  const [lost] = useState(() => (save ? save.recover() : null));
+  const canRestore = lost && (lost.backup || (lost.broken && !lost.broken.unreadable));
 
   /* Download the save as a file. A Blob and an object URL rather than a data:
      URI - a finished dex is tens of kilobytes of JSON and a data: URI that
@@ -79,9 +90,33 @@ export default function Trainer({ stats, level, bag, biking, onSpend, onBike, sa
       {/* Loading a file throws away the game that is running, and there is no
           undo for it - so it goes through the same dialog that selling does,
           showing what arrives rather than asking "are you sure" about nothing. */}
+      {/* Same dialog as loading a file, for the same reason: it throws away the
+          game that is running and there is no undo. */}
+      {recover && (
+        <Confirm
+          title="Restore this save?"
+          tone="warn"
+          lines={[
+            ["From", recover === "backup" ? "Last clean load" : "The save that failed"],
+            ["Pokédex", `${lost[recover].caught} caught`],
+            ["Box", `${lost[recover].box} held`],
+            ["Money", `¥${lost[recover].money.toLocaleString()}`],
+          ]}
+          confirmLabel="RESTORE"
+          onConfirm={() => {
+            if (!save.restore(recover)) {
+              setRecover(null);
+              setSaveNote("That save could not be restored.");
+            }
+            // On success the page reloads; nothing after this runs.
+          }}
+          onCancel={() => setRecover(null)}
+        />
+      )}
+
       {offer && (
         <Confirm
-          data-tip="Load this save?"
+          title="Load this save?"
           tone="warn"
           lines={[
             ["File", offer.name],
@@ -201,6 +236,33 @@ export default function Trainer({ stats, level, bag, biking, onSpend, onBike, sa
           </div>
           <Note>{saveNote}</Note>
         </div>
+
+        {/* THE OFFER ONLY APPEARS WHEN THERE IS SOMETHING BEHIND IT. A save
+            that failed to load used to be overwritten by the first step of the
+            session that could not read it; both halves are kept now, and this
+            is where a player gets one back. An unreadable one is still listed,
+            because knowing it survived is what makes exporting it worth doing -
+            it just cannot be loaded from here. */}
+        {canRestore && (
+          <div className="trsave trlost">
+            <p className="ts-why">
+              An earlier save is still in this browser. Restoring replaces the
+              game you are playing now.
+            </p>
+            <div className="ts-row">
+              {lost.backup && (
+                <button className="ts-btn" onClick={() => setRecover("backup")}>
+                  {`LAST GOOD · ${lost.backup.caught} CAUGHT`}
+                </button>
+              )}
+              {lost.broken && !lost.broken.unreadable && (
+                <button className="ts-btn" onClick={() => setRecover("broken")}>
+                  {`FAILED SAVE · ${lost.broken.caught} CAUGHT`}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="panel-head tr-head">
           <span>KEY ITEMS</span>

@@ -3524,4 +3524,33 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     `save remaps onto ${SPECIES.length} by id, Sinnoh intact and Hoenn empty`);
 }
 
+/* A PROP THE COMPONENT DOES NOT TAKE IS A PROP THAT SILENTLY DOES NOTHING, and
+   React will not say so. Every `<Confirm>` in the app passed `data-tip` where
+   the component destructures `title` - so every confirm dialog in the game,
+   including the two with no undo behind them, rendered an empty `<h3>` and an
+   empty `aria-label`. It looked fine: the dialog has a headline of its own in
+   `lines`, so the missing one reads as a design choice rather than a fault.
+   Asserted against the source because there is nothing to catch it at runtime. */
+{
+  const files = ["Box.jsx", "Shop.jsx", "Trainer.jsx", "Confirm.jsx"];
+  let dialogs = 0;
+  for (const f of files) {
+    const src = readFileSync(new URL(`../src/ui/${f}`, import.meta.url), "utf8");
+    if (f === "Confirm.jsx") {
+      assert.ok(/^\s*title,\s*$/m.test(src),
+        "Confirm no longer takes `title` - every caller below is now wrong");
+      continue;
+    }
+    for (const call of src.split("<Confirm").slice(1)) {
+      dialogs++;
+      const props = call.slice(0, call.indexOf("/>"));
+      assert.ok(/(^|\s)title=/.test(props),
+        `a <Confirm> in ${f} has no title - it will render an empty heading`);
+      assert.ok(!/data-tip=/.test(props),
+        `a <Confirm> in ${f} still passes data-tip, which Confirm ignores`);
+    }
+  }
+  console.log(`confirm ok — all ${dialogs} dialogs pass a title Confirm actually reads`);
+}
+
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);

@@ -468,6 +468,8 @@ export default function App() {
             read: () => engine.exportSave(),
             inspect: (obj) => engine.inspectSave(obj),
             write: (obj) => engine.importSave(obj),
+            recover: () => engine.recoverable(),
+            restore: (which) => engine.restore(which),
           }}
         />
       </div>

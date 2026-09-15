@@ -27,7 +27,7 @@ npm run dev      # http://localhost:5173
 |---|---|
 | `npm run dev` | Dev server with hot reload |
 | `npm run build` | Production build into `dist/` |
-| `npm run check` | 27 suites over the pure logic, then `tools/play.mjs` — which drives the real engine in Node on a hand-cranked frame clock |
+| `npm run check` | 30 suites over the pure logic, then `tools/play.mjs` — which drives the real engine in Node on a hand-cranked frame clock |
 | `npm run play` | Just the engine harness: walk, throw, feed a berry, start a field item |
 | `npm run assets` | Re-pulls species, sprites, item sprites and evolution requirements from PokéAPI |
 | `npm run art` | Rebuilds map tiles, player sheet and encounter ground (needs Python + Pillow) |

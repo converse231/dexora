@@ -66,6 +66,28 @@ export const T = { throw: 560, suck: 460, drop: 560, wait: 520, shake: 720, resu
 export const F = { cast: 620, wait: 1500, bite: 620, miss: 1250 };
 
 const SAVE_KEY = "meadow-route";
+
+/* THREE KEYS, AND THE OTHER TWO EXIST BECAUSE A COLLECTION WAS LOST.
+
+   `loadState` catches everything and falls back to a fresh state, which is the
+   right thing for it to do - a save that cannot be read should not stop you
+   playing. What was wrong is what happened NEXT: the first step called `save()`
+   and wrote the fresh state straight over the file that had failed to load. One
+   bad parse and a real collection was gone, with nothing anywhere to recover
+   from and no message saying so.
+
+   It does not take a bug in this file to trigger that. A dev server hot-reloads
+   a source edit the moment it is typed, so a half-applied change to the save
+   shape is live in an open tab before it is finished - which this codebase has
+   already recorded costing one collection, and has now cost a second.
+
+   BACKUP is the last save that loaded cleanly, written at LOAD time rather than
+   at save time - so it is always a whole previous session rather than a copy of
+   whatever went wrong a moment ago. BROKEN is the raw text of anything that
+   failed, kept verbatim and never parsed, because the one thing you want from a
+   file you cannot read is the file. */
+const BACKUP_KEY = "meadow-route.backup";
+const BROKEN_KEY = "meadow-route.broken";
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 const START_AREA = AREA_IDS[0];
@@ -223,12 +245,45 @@ export function saveProblem(s) {
   return null;
 }
 
-function loadState() {
+/* Put a save beyond the reach of the next `save()`. Never throws: it runs on
+   the failure path, and a failure to preserve must not become a failure to
+   start. */
+function stash(key, raw) {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) localStorage.setItem(key, raw);
+  } catch { /* private mode, or full - nothing useful to do about it */ }
+}
+
+/* What a player could still get back. Read by the trainer panel, so the offer
+   only appears when there is something behind it. */
+export function recoverable() {
+  try {
+    const backup = localStorage.getItem(BACKUP_KEY);
+    const broken = localStorage.getItem(BROKEN_KEY);
+    const read = (raw) => {
+      if (!raw) return null;
+      try {
+        const o = JSON.parse(raw);
+        return { caught: o.caught ?? 0, box: o.box?.length ?? 0, money: o.money ?? 0 };
+      } catch { return { unreadable: true }; }
+    };
+    return { backup: read(backup), broken: read(broken) };
+  } catch { return { backup: null, broken: null }; }
+}
+
+function loadState() {
+  const raw = (() => {
+    try { return localStorage.getItem(SAVE_KEY); } catch { return null; }
+  })();
+  try {
     if (!raw) return freshState();
     const s = JSON.parse(raw);
-    if (!Array.isArray(s.dex)) return freshState();
+    /* ANYTHING THAT FAILS IS KEPT BEFORE WE WALK AWAY FROM IT. `freshState()`
+       here used to be the last moment that save existed. */
+    if (!Array.isArray(s.dex)) {
+      stash(BROKEN_KEY, raw);
+      return freshState();
+    }
     /* A SHORTER DEX IS AN OLDER SAVE, NOT A BROKEN ONE.
 
        This read `s.dex.length !== 151` and threw the whole save away - so the
@@ -243,13 +298,22 @@ function loadState() {
        check.mjs asserts that alignment rather than trusting it; if a future
        generation is ever inserted BEFORE Kanto, this stops being true and that
        assertion is what will say so. */
-    if (s.dex.length > SPECIES.length) return freshState();
+    if (s.dex.length > SPECIES.length) {
+      stash(BROKEN_KEY, raw);
+      return freshState();
+    }
 
     /* Built once, and BEFORE the dex, because `repairDex` reads them. Every
        tier rebuilt to the right shape - remapped where a generation was
        inserted, padded where one was appended - including tiers the save has
        never heard of: a file written before Holo has no `holo`, and a fresh row
        of zeroes is what that should mean. */
+    /* IT PARSED AND IT IS THE RIGHT SHAPE, so this is the last text we know
+       was good. Written at LOAD time on purpose: a backup taken at save time is
+       a copy of the state you are already in, which is no help at all when that
+       state is the problem. */
+    stash(BACKUP_KEY, raw);
+
     const rows = Object.fromEntries(TIERS.map((t) => [t,
       remap(s[t], SPECIES.length, (v) => (v ? 1 : 0))
         ?? normalise(s[t], SPECIES.length)]));
@@ -313,6 +377,7 @@ function loadState() {
       encounter: null, evolution: null, cheers: [],
     };
   } catch {
+    stash(BROKEN_KEY, raw);
     return freshState();
   }
 }
@@ -1458,6 +1523,27 @@ export function createEngine(canvas, onChange, mini = null) {
        excluded from the on-disk save is excluded here too - an encounter or a
        half-played cheer is not part of who you are - so what comes out is
        exactly what goes back in. */
+    /* PUT BACK WHATEVER SURVIVED. `which` is "backup" or "broken" - the last
+       clean load, or the raw text of the thing that failed. Writes and reloads
+       rather than swapping state in place, for the same reason `importSave`
+       does: the engine closes over the map rows and their dimensions, and a
+       reload is the one path that is certainly consistent. */
+    restore(which = "backup") {
+      const key = which === "broken" ? BROKEN_KEY : BACKUP_KEY;
+      const raw = localStorage.getItem(key);
+      if (!raw) return false;
+      /* BROKEN IS RAW TEXT AND MAY NOT BE JSON AT ALL - that is why it was
+         kept. Parsing it outside a try here would throw out of the click that
+         was trying to recover from it. */
+      let obj;
+      try { obj = JSON.parse(raw); } catch { return false; }
+      if (saveProblem(obj)) return false;
+      localStorage.setItem(SAVE_KEY, raw);
+      location.reload();
+      return true;
+    },
+    recoverable,
+
     exportSave() {
       const { encounter, evolution, fishing, running, cheers, rev, ...rest } = state;
       return { ...rest, savedAt: new Date().toISOString(), species: SPECIES.length };

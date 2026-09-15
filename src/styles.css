@@ -1283,6 +1283,10 @@ canvas {
    one row - export is not the "primary" of the pair, and styling it as one
    would suggest importing is the risky half when the opposite is true. */
 .trsave { padding: 10px 12px 12px; display: grid; gap: 9px; }
+/* The recovery offer is the same block with a gold rule over it - it is not a
+   different control, it is the save block saying there is an older one. Gold
+   because `.note-warn` already means "this is not undoable" here. */
+.trlost { border-top: 2px solid var(--gold); margin-top: 2px; }
 .ts-why { margin: 0; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
 .ts-row { display: flex; gap: 8px; }
 .ts-btn {

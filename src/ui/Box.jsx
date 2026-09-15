@@ -584,7 +584,7 @@ export default function Box({
 
       {pending && (
         <Confirm
-          data-tip={pending.title}
+          title={pending.title}
           lines={pending.lines}
           manifest={pending.manifest}
           note={pending.note}

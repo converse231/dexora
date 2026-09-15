@@ -282,4 +282,57 @@ function until(e, what, label, max = 2000) {
     "Sinnoh and its shinies intact, Hoenn empty");
 }
 
+/* A SAVE THAT CANNOT BE READ MUST SURVIVE THE SESSION THAT COULD NOT READ IT.
+   `loadState` falls back to a fresh state, which is right; what was wrong is
+   that the first step then wrote that fresh state straight over the file. One
+   bad parse and a real collection was gone, with nothing to recover from. */
+{
+  const { recoverable } = await import("../src/game/engine.js");
+  // One wait, named once: the debounce is 400ms and a margin on top of it.
+  const saved = () => new Promise((r) => setTimeout(r, 600));
+  const MANGLED = '{"dex":[2,2,2],"box":[{"uid":1,"species":25,"level":30}],'
+    + '"money":9999,"caught":42,"nextUid":2,';        // truncated - unparseable
+  store.clear();
+  store.set("meadow-route", MANGLED);
+  raf.length = 0;
+  const e = createEngine(canvas(), () => {}, canvas());
+
+  // Play a while - this is what used to destroy it.
+  for (let i = 0; i < 300; i++) { e.press("right"); tick(16); }
+  e.clearHeld();
+  for (let i = 0; i < 60; i++) tick(16);
+  /* `save()` is debounced on a REAL timer (400ms), and `tick` only moves the
+     fake clock the frame loop reads - so this has to wait on the wall clock,
+     longer than the debounce, or the write never happens and the test proves
+     nothing. It has to be the real write that fails to destroy the file. */
+  await saved();
+
+  assert.notEqual(store.get("meadow-route"), MANGLED,
+    "the session never saved at all - this test is not exercising the overwrite");
+  assert.equal(store.get("meadow-route.broken"), MANGLED,
+    "the unreadable save was not kept - this is the bug that cost a collection");
+  const got = recoverable();
+  assert.ok(got.broken?.unreadable, "recoverable() cannot see the broken save");
+
+  /* AND A GOOD SAVE IS BACKED UP AT LOAD TIME, so the backup is a whole
+     previous session rather than a copy of whatever just went wrong. */
+  store.clear();
+  const good = JSON.stringify({ ...SAVE, caught: 77, money: 4242 });
+  store.set("meadow-route", good);
+  raf.length = 0;
+  const e2 = createEngine(canvas(), () => {}, canvas());
+  assert.equal(store.get("meadow-route.backup"), good,
+    "a clean load left no backup behind");
+  for (let i = 0; i < 200; i++) { e2.press("down"); tick(16); }
+  e2.clearHeld();
+  for (let i = 0; i < 60; i++) tick(16);
+  await saved();
+  assert.notEqual(store.get("meadow-route"), good, "the session never saved");
+  assert.equal(store.get("meadow-route.backup"), good,
+    "the backup was overwritten by the session that followed it");
+  assert.equal(recoverable().backup.caught, 77, "the backup does not read back");
+  console.log("save guard ok — an unreadable save is kept, and a good one is " +
+    "backed up at load time and not touched again");
+}
+
 console.log("play ok — the frame loop never stopped");
