@@ -2919,6 +2919,24 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
         assert.equal(artOf(h), "honey", `${h.id} should be drawn from the one jar`);
         assert.ok(h.lift > 1, `${h.id} favours a tier by a factor of ${h.lift}`);
       }
+      /* A HONEY HAS TO LAND. `x6` over 300 steps is about 21 encounters at the
+         encounter rate, which put an Astral Honey at 23% for ¥4,200 - a jar
+         that usually does nothing, and it was reported as not working because
+         it had never once fired. The lift is set per tier so all three come out
+         near three-in-four over their own run. */
+      const RATE = 0.07;
+      for (const h of honeys) {
+        const odds = TIER_ODDS.find(([t]) => t === h.tier)[1] * h.lift;
+        const met = h.steps * RATE;
+        const p = 1 - (1 - odds) ** met;
+        assert.ok(p > 0.5,
+          `a ${h.name} lands ${(p * 100).toFixed(0)}% of the time over its own ` +
+          "run - at these prices a jar has to do something more often than not");
+        assert.ok(p < 0.95,
+          `a ${h.name} lands ${(p * 100).toFixed(0)}% of the time - a tier you ` +
+          "are all but promised is not a rare any more");
+      }
+
       /* NO ORIGIN HONEY, and that is the assertion rather than an omission:
          Origin is gated on catching every ordinary Pokémon of a generation,
          and an item that shortcuts a gate is the gate deleted. */
@@ -3007,7 +3025,8 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     const razz = BERRIES.find((b) => b.effect === "catch");
     const nanab = BERRIES.find((b) => b.effect === "flee");
     const pinap = BERRIES.find((b) => b.effect === "xp");
-    const fed = (b, stage = 1) => ({ id: b.id, stage });
+    // One slot per effect - see `berryRoom`.
+    const fed = (b, stage = 1) => ({ [b.effect]: { id: b.id, stage } });
 
     /* NOTHING AT ALL WITHOUT A BERRY. Every one of these is a bare multiply at
        its call site, so "no berry" has to be exactly 1 or the roll moves for
@@ -3040,6 +3059,21 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
       "a capped Razz says there is room for another");
     assert.equal(berryRoom(fed(razz, razz.stages), nanab.id), true,
       "a capped Razz must not block a DIFFERENT berry");
+
+    /* AND A DIFFERENT BERRY MUST NOT TAKE THE FIRST ONE AWAY. Feeding a Nanab
+       to a legendary so it cannot run and then a Razz to land it used to remove
+       the Nanab - reported as "Raikou ran after eating a Nanab", which is
+       exactly what happened. The three move three different rolls, so there is
+       no reason they cannot all be in play. */
+    {
+      const both = { ...fed(nanab), ...fed(razz) };
+      assert.equal(berryCalm(both), 0, "a Razz took the Nanab's lock away");
+      assert.ok(berryCatch(both) > 1, "a Nanab took the Razz's odds away");
+      assert.equal(berryXp(both), 1, "something moved the XP award");
+      const all = { ...both, ...fed(pinap) };
+      assert.equal(berryCalm(all), 0, "three at once lost the lock");
+      assert.ok(berryCatch(all) > 1 && berryXp(all) > 1, "three at once lost an effect");
+    }
     assert.equal(berryRoom(fed(nanab), nanab.id), false,
       "a Nanab is total at one - a second one must be refused, not eaten");
 
@@ -3079,7 +3113,7 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     {
       const enc = { types: ["normal"], known: false, areaId: "meadow", throws: 0 };
       for (const stage of [1, razz.stages]) {
-        const wet = { ...enc, berry: fed(razz, stage) };
+        const wet = { ...enc, berries: fed(razz, stage) };
         for (const ball of BALLS) {
           const dry = liveMult(ball, enc), now = liveMult(ball, wet);
           if (ball.mult >= GUARANTEED) {
@@ -3091,7 +3125,7 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
         }
       }
       for (const ball of BALLS) {
-        assert.equal(liveMult(ball, enc), liveMult(ball, { ...enc, berry: null }),
+        assert.equal(liveMult(ball, enc), liveMult(ball, { ...enc, berries: {} }),
           `${ball.id} moved with no berry fed`);
       }
     }
@@ -3121,11 +3155,13 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
 
     {
       const eng = readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8");
-      assert.ok(/xpForCatch\(sp, e\.isNew\) \* berryXp\(e\.berry\)/.test(eng),
+      assert.ok(/xpForCatch\(sp, e\.isNew\) \* berryXp\(e\.berries\)/.test(eng),
         "the Pinap must reach the XP award");
-      assert.ok(/berryCalm\(e\.berry\)/.test(eng), "the Nanab must reach the flee roll");
-      assert.ok(/if \(!berryRoom\(e\.berry, id\)\) return false;/.test(eng),
+      assert.ok(/berryCalm\(e\.berries\)/.test(eng), "the Nanab must reach the flee roll");
+      assert.ok(/if \(!berryRoom\(e\.berries, id\)\) return false;/.test(eng),
         "a berry at its cap must be refused, not eaten for nothing");
+      assert.ok(/e\.berries = \{ \.\.\.e\.berries, \[berry\.effect\]/.test(eng),
+        "a berry must land in its own effect slot, never replace the others");
       assert.ok(/e\.ate = \(e\.ate \?\? 0\) \+ 1;/.test(eng),
         "feeding must bump a counter the UI can hang an animation off - a flag " +
         "that is already true cannot say 'again'");

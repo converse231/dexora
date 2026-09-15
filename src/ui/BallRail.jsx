@@ -35,7 +35,8 @@ export default function BallRail({
      Owned-only, like the situational balls above them. Eleven greyed-out tiles
      is not an inventory readout, it is a shop you cannot buy from. */
   const useful = (enc ? BERRIES : FIELD).filter((i) => (bag?.[i.id] ?? 0) > 0);
-  const fed = enc?.berry ?? null;
+  // One slot per effect, so several can be in play at once.
+  const fed = enc?.berries ?? null;
   // Which family slot each field item would land in, so a running one can say
   // so rather than looking like an ordinary unused stack.
   const busy = (item) => field?.[item.family]?.id === item.id;
@@ -163,11 +164,11 @@ export default function BallRail({
             <ul className="br-list br-kit">
               {useful.map((item) => {
                 const owned = bag?.[item.id] ?? 0;
-                const on = enc ? fed?.id === item.id : busy(item);
+                const on = enc ? fed?.[item.effect]?.id === item.id : busy(item);
                 // How many of this berry are already in it, and whether another
                 // would do anything - the tile greys on the same answer
                 // `useBerry` refuses on, so the two cannot disagree.
-                const deep = on && enc ? (fed.stage ?? 1) : 0;
+                const deep = on && enc ? (fed[item.effect].stage ?? 1) : 0;
                 const room = enc ? berryRoom(fed, item.id) : true;
                 return (
                   <li key={item.id}>

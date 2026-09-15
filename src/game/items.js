@@ -154,8 +154,8 @@ export const ballById = (id) => BALLS.find((b) => b.id === id);
 export const liveMult = (ball, enc) => {
   const base = enc && ball.bonus ? ball.bonus(enc) : ball.mult;
   // Never the Master Ball: it is already past certain and scaling it is noise.
-  if (!enc?.berry || base >= GUARANTEED) return base;
-  return base * berryCatch(enc.berry);
+  if (!enc?.berries || base >= GUARANTEED) return base;
+  return base * berryCatch(enc.berries);
 };
 
 /* `boost` is the HEADLINE: the most a ball can ever be worth, which is what the
@@ -260,24 +260,34 @@ export const FIELD = [
      `lift` multiplies the variant roll. Plain Honey lifts every tier a little;
      a coloured one lifts its own tier a lot and leaves the rest alone, which is
      what makes it worth four times the price when you are hunting one thing. */
+  /* MEASURED AGAINST WHAT ONE JAR ACTUALLY BUYS, which is the only honest way
+     to price these. 300 steps at a 7% encounter rate is about 21 encounters, so
+     a x6 Astral Honey - 6/480 - landed one 23% of the time. For ¥4,200 that is
+     a jar that usually does nothing, and it was reported as not working at all.
+     The user had simply never seen it fire.
+     600 steps is about 42 encounters, and the lift is set PER TIER so all three
+     come out at roughly the same three-in-four: x5 on Holo (1/160), x8 on Shiny
+     (1/240), x16 on Astral (1/480). Equal effectiveness at their own tier means
+     the price difference is about which tier you want rather than about which
+     jar works, which is the honest thing for it to be about. */
   {
-    id: "honey", family: "variant", name: "Honey", price: 1200, level: 14,
-    steps: 300, lift: 2, blurb: "Every rare tier, ×2 likely",
+    id: "honey", family: "variant", name: "Honey", price: 1400, level: 14,
+    steps: 600, lift: 3, blurb: "Every rare tier, ×3 likely",
   },
   {
     id: "honey-holo", art: "honey", tier: "holo", family: "variant",
-    name: "Holo Honey", price: 2400, level: 18,
-    steps: 300, lift: 6, blurb: "Holo, six times as likely",
+    name: "Holo Honey", price: 2600, level: 18,
+    steps: 600, lift: 5, blurb: "Holo, ×5 as likely",
   },
   {
     id: "honey-shiny", art: "honey", tier: "shiny", family: "variant",
-    name: "Shiny Honey", price: 3000, level: 20,
-    steps: 300, lift: 6, blurb: "Shiny, six times as likely",
+    name: "Shiny Honey", price: 3200, level: 20,
+    steps: 600, lift: 8, blurb: "Shiny, ×8 as likely",
   },
   {
     id: "honey-astral", art: "honey", tier: "astral", family: "variant",
-    name: "Astral Honey", price: 4200, level: 24,
-    steps: 300, lift: 6, blurb: "Astral, six times as likely",
+    name: "Astral Honey", price: 4800, level: 24,
+    steps: 600, lift: 16, blurb: "Astral, ×16 as likely",
   },
 ];
 
@@ -301,9 +311,13 @@ export const FAMILIES = [...new Set(FIELD.map((f) => f.family))];
    to double down, and the answer was "that does nothing". `stage` counts how
    many are in it and every effect reads it.
 
-   A DIFFERENT berry still replaces, at stage 1 - one at a time is what makes
-   them a choice (safety, odds, or reward) rather than a checklist you work
-   through before every throw.
+   ONE PER EFFECT, NOT ONE AT A TIME. A different berry used to replace the one
+   being eaten, and that was wrong in the way that matters: feed a Nanab to a
+   Raikou so it cannot run, then a Razz to land it, and the Razz silently took
+   the Nanab away - reported as "Raikou ran after eating a Nanab", which is
+   exactly what happened. The three move three different rolls and nothing about
+   them collides, so there is no mechanical reason they cannot all be in play.
+   A berry replaces only another of its OWN effect.
 
    AND A BERRY AT ITS CAP REFUSES TO BE FED, rather than being eaten for
    nothing. "Cannot stack" should cost you a click, not a berry.
@@ -342,15 +356,17 @@ export const berryById = (id) => BERRIES.find((b) => b.id === id) ?? null;
    `fed` is the encounter's `{ id, stage }` or nothing. Every one of these
    answers 1 - "no change" - when there is no berry of its kind in play, which
    is what lets the call sites stay a single multiply. */
+/* `fed` is the encounter's `{ [effect]: { id, stage } }`, so each of these
+   reads only its own slot and the three cannot take each other away. */
 const stageOf = (fed, effect) => {
-  const b = fed && berryById(fed.id);
-  return b?.effect === effect ? Math.max(1, fed.stage ?? 1) : 0;
+  const one = fed?.[effect];
+  return one && berryById(one.id) ? Math.max(1, one.stage ?? 1) : 0;
 };
 
 // Multiplies the ball, so it goes through catchChance's own ceiling.
 export const berryCatch = (fed) => {
   const n = stageOf(fed, "catch");
-  return n ? 1 + berryById(fed.id).per * n : 1;
+  return n ? 1 + berryById(fed["catch"].id).per * n : 1;
 };
 
 /* Multiplies the whole flee line, and may reach 0 - a Nanab is a lock, not a
@@ -358,12 +374,12 @@ export const berryCatch = (fed) => {
    berry, it is a number that means nothing. */
 export const berryCalm = (fed) => {
   const n = stageOf(fed, "flee");
-  return n ? Math.max(0, 1 - berryById(fed.id).per * n) : 1;
+  return n ? Math.max(0, 1 - berryById(fed.flee.id).per * n) : 1;
 };
 
 export const berryXp = (fed) => {
   const n = stageOf(fed, "xp");
-  return n ? 1 + berryById(fed.id).per * n : 1;
+  return n ? 1 + berryById(fed["xp"].id).per * n : 1;
 };
 
 // Whether another one would do anything. The UI greys on it and `useBerry`
@@ -371,7 +387,10 @@ export const berryXp = (fed) => {
 export const berryRoom = (fed, id) => {
   const b = berryById(id);
   if (!b) return false;
-  return fed?.id !== id || (fed.stage ?? 1) < b.stages;
+  const one = fed?.[b.effect];
+  // Room if this effect is empty, if something else of the same effect is in
+  // it (a replace), or if the same berry has not reached its cap.
+  return !one || one.id !== id || (one.stage ?? 1) < b.stages;
 };
 
 /* Which picture an item is drawn with. Only the coloured honeys need this -
