@@ -1843,18 +1843,32 @@ would have wrecked the thing this game is actually tuned around: the first hour.
 A new trainer would meet Bidoof before Pidgey, and every measured weight in
 `RESIDENTS` would have been halved by arithmetic nobody chose.
 
-So a generation arrives on the same clock the maps do — Johto at **Lv 22**, once
-the map ladder is finished and you have seen the whole world; Sinnoh at
-**Lv 35**. It reuses `encounterTable`'s existing level argument, so it is a
-filter rather than a mechanism, and it turns "we added 200 Pokémon" from a
-dilution into an event.
+So a generation arrives on the same clock the maps do. It reuses
+`encounterTable`'s existing level argument, so it is a filter rather than a
+mechanism, and it turns "we added 200 Pokémon" from a dilution into an event.
 
-| | species reachable |
-|---|---|
-| Lv 1 | 98 |
-| Lv 21 | 171 |
-| **Lv 22** — Johto | **266** |
-| **Lv 35** — Sinnoh | **358** |
+**The ladder is derived, not listed** — Gen 1 from the first minute, then one
+every `GEN_STEP` (5) levels from `GEN_FIRST` (10). `GEN_LAST` already carries
+all nine generations, so all nine gates exist today and the five that have not
+shipped are already paced, out to Paldea at Lv 45. That matters because the
+default is the dangerous one: a generation with no gate opens from the *first
+minute*, so a table would have to be remembered on the day Unova ships.
+
+| | Tall Grass holds | the mix |
+|---|---|---|
+| Lv 1 | 31 species | all Kanto |
+| **Lv 10** — Johto | 98 | 71% gen 1 · 29% gen 2 |
+| **Lv 15** — Hoenn | 148 | 46 / 17 / 37 |
+| **Lv 20** — Sinnoh | 206 | 42 / 15 / 32 / 11 |
+
+**These were 22 / 28 / 35, and they came down because half their justification
+had gone stale.** The argument above — that every measured weight in `RESIDENTS`
+would be halved — was written before `BAND_SHAPE` and `balance()` existed. Now
+the rarity mix is held by the thing whose job that is: across the *entire*
+ladder, Lv 1 to Lv 50, Tall Grass's common band moves 78.2% → 71.8% and its S
+band 3.2% → 3.3%. What a generation really costs is the findability of any one
+species — Pidgey goes from 12.4% of encounters to 5.4% — and that is the number
+to watch, because a daily quest and a specific hunt both feel it.
 
 #### Homes by rule, and one new evolution kind
 
