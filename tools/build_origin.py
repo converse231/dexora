@@ -45,14 +45,36 @@ instead would have meant no Origin at all for 207 of the 358, which would have
 made the rarest-but-one tier a Kanto-only curiosity.
 
 Yellow before Red/Blue for Kanto: it is the redrawn set, closer to the art
-everyone remembers. Crystal before Gold for Johto, for the same reason."""
+everyone remembers. Crystal before Gold for Johto, for the same reason.
+
+AND SINNOH IS NOT HERE, which is the whole of what this table now says. It was
+here, pointing at Diamond/Pearl, and the result was reported from play as "the
+Gen 4 Origins look the same as the normal ones" - which was exactly right. Our
+ordinary Sinnoh sprite is HeartGold/SoulSilver and its debut is Diamond/Pearl:
+both Gen IV, both the same era, and one of the three fallbacks was literally
+the base sprite. Measured over every sprite in the build, a Kanto or Johto
+Origin drops from a median of 13 colours to 4 - the Game Boy and Game Boy Color
+palette, which IS the thing that reads as ancient - while Sinnoh gave 13
+against 14. Not older, and not even fewer.
+
+So a generation belongs here only when its debut art is genuinely older than
+the art we draw it in ordinarily. `hasOrigin` in biomes.js is the same rule on
+the game side, and check.mjs holds the two together. THE PALETTE DROP IS
+ASSERTED BELOW rather than trusted, because a set that turns out to be modern
+is exactly this bug happening again with a different generation."""
 DEBUT = [
     (1, 151, ["generation-i/yellow/transparent", "generation-i/red-blue/transparent"]),
     (152, 251, ["generation-ii/crystal/transparent", "generation-ii/gold/transparent",
                 "generation-ii/silver/transparent"]),
-    (387, 493, ["generation-iv/diamond-pearl", "generation-iv/platinum",
-                "generation-iv/heartgold-soulsilver"]),
 ]
+
+# The most colours a debut sprite may use and still read as an older drawing.
+# A BOUND WITH ITS REASON, not a snapshot: Game Boy art is four shades and Game
+# Boy Color art a handful, and 7 is the worst case measured across all 251 that
+# qualify. Sinnoh's Diamond/Pearl art STARTS at 8 and medians at 14, so the two
+# sets do not overlap anywhere - which is what makes this a boundary rather
+# than a threshold somebody picked.
+PALETTE_MAX = 7
 OUT = "public/sprites/origin"
 
 IDS = sorted(int(n[:-4]) for n in os.listdir("public/sprites") if n.endswith(".png"))
@@ -63,7 +85,12 @@ def sources_for(dex_id):
     for lo, hi, where in DEBUT:
         if lo <= dex_id <= hi:
             return where
-    raise SystemExit("#%d belongs to no shipped generation" % dex_id)
+    return None       # no older drawing exists - see DEBUT
+
+
+def palette(img):
+    """How many colours the visible pixels use. The tell of an old sprite."""
+    return len({px[:3] for px in img.convert("RGBA").getdata() if px[3] > 40})
 
 
 def fetch(dex_id):
@@ -140,12 +167,23 @@ def normalise(dex_id):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    fits, heights = [], []
+    fits, heights, palettes = [], [], []
+    skipped = []
     for n, dex_id in enumerate(IDS, 1):
         ours = normalise(dex_id)
+        if sources_for(dex_id) is None:
+            # A generation with no older drawing gets no Origin file, and any
+            # left over from when it did is deleted - 107 duplicate pictures
+            # rode along in every build.
+            stale = os.path.join(OUT, "%d.png" % dex_id)
+            if os.path.exists(stale):
+                os.remove(stale)
+            skipped.append(dex_id)
+            continue
         made = reframe(fetch(dex_id), ours)
         assert made.size == ours.size, "#%d came out %s" % (dex_id, made.size)
         made.save(os.path.join(OUT, "%d.png" % dex_id))
+        palettes.append((palette(made), palette(ours), dex_id))
         b, o = made.getbbox(), ours.getbbox()
         hr = (b[3] - b[1]) / float(o[3] - o[1])
         wr = (b[2] - b[0]) / float(o[2] - o[0])
@@ -157,6 +195,34 @@ def main():
     med = sorted(heights)[len(heights) // 2]
     print("\nwrote %s (%d sprites, median height %.2f of the ordinary art)"
           % (OUT, len(fits), med))
+    if skipped:
+        print("skipped %d with no older drawing (#%d-#%d) - see DEBUT"
+              % (len(skipped), skipped[0], skipped[-1]))
+
+    # THE TIER IS THE OLD PALETTE, AND IT IS ASSERTED PER SPRITE.
+    #
+    # A median was the first version of this check and it proved nothing:
+    # putting the Gen 4 set back left the median at 4, because 251 four-colour
+    # sprites outvote 107 fourteen-colour ones. The thing that was wrong was
+    # wrong about a THIRD of the dex, and a statistic over all of it hid that
+    # completely. Two assertions now, and each catches a different half of the
+    # failure: the relational one (fewer colours than this creature's own
+    # ordinary art) catches 92 of the 107, and the bound catches the rest.
+    mo = sorted(x[0] for x in palettes)[len(palettes) // 2]
+    mb = sorted(x[1] for x in palettes)[len(palettes) // 2]
+    print("palette: origin median %d colours against %d ordinary, worst %d"
+          % (mo, mb, max(x[0] for x in palettes)))
+
+    same = [i for o, b, i in palettes if o >= b]
+    assert not same, (
+        "%d origin sprites use no fewer colours than their own ordinary art "
+        "(first #%d) - nothing about them will read as older" % (len(same), same[0]))
+
+    rich = [(i, o) for o, b, i in palettes if o > PALETTE_MAX]
+    assert not rich, (
+        "%d origin sprites use more than %d colours (worst #%d at %d) - that is "
+        "not an older drawing, it is the same era from a different cartridge"
+        % (len(rich), PALETTE_MAX, rich[0][0], max(r[1] for r in rich)))
 
     # What matters is APPARENT SIZE, and the honest test of it is that the fit
     # touches: `min()` scaling means one dimension should land on the FireRed

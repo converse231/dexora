@@ -176,7 +176,7 @@ import {
 import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
-  LIFT_CEILING,
+  LIFT_CEILING, hasOrigin, tiersFor, ART_GEN, baseArtGen,
 } from "../src/game/biomes.js";
 
 const poke = ballById("poke-ball");
@@ -1934,7 +1934,109 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(got[tier] > want * 0.6 && got[tier] < want * 1.4,
         `with Origin locked, ${tier} came up ${got[tier]}, expected about ${Math.round(want)}`);
     }
-    console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
+    /* ORIGIN NEEDS AN OLDER DRAWING, AND A THIRD OF THE DEX HAS NONE.
+
+   The tier's tell is the ARTWORK, which only works while the ordinary sprite
+   is a LATER drawing than the debut one. Kanto and Johto ship FireRed art over
+   a Gen I/II debut and the gap is real - measured, a Kanto Origin drops from 13
+   colours to 4, which is the Game Boy palette. Sinnoh ships HeartGold art over
+   a Diamond/Pearl debut: same era, 13 colours against 14, and it was reported
+   from play as "the Gen 4 Origins look the same as the normal ones".
+
+   These assertions exist because that failure was invisible from inside the
+   game: the tier rolled, the sprite loaded, the mark appeared, and the only
+   thing wrong was that the picture was the same one. */
+{
+  const originIds = SPECIES.filter((sp) => hasOrigin(sp.id)).map((sp) => sp.id);
+  const withoutIds = SPECIES.filter((sp) => !hasOrigin(sp.id)).map((sp) => sp.id);
+  assert.ok(originIds.length && withoutIds.length,
+    "either every species can wear Origin or none can - neither is this design");
+
+  /* THE RULE MUST MATCH THE ART ON DISK. build_origin.py writes a file only
+     for a generation whose debut art is genuinely older, so the set of files
+     IS the answer - and if the two ever disagree, one side is handing out a
+     tier whose picture does not exist or withholding one that does. */
+  const drawn = (id) =>
+    existsSync(new URL(`../public/sprites/origin/${id}.png`, import.meta.url));
+  const missing = originIds.filter((id) => !drawn(id));
+  const spare = withoutIds.filter((id) => drawn(id));
+  assert.deepEqual(missing, [],
+    `hasOrigin says yes but there is no art: ${missing.slice(0, 5).join(", ")} - run npm run assets`);
+  assert.deepEqual(spare, [],
+    `art exists for species that cannot wear Origin: ${spare.slice(0, 5).join(", ")} - ` +
+    "build_origin.py should have deleted these");
+
+  /* AND `ART_GEN` MUST MATCH WHERE THE BASE SPRITES ACTUALLY COME FROM.
+     `hasOrigin` compares a species' debut generation against the generation of
+     its ordinary art, and the second half of that is a fact about
+     fetch-species.mjs. Two copies of it would drift the day a base-art set
+     changes, and the symptom would be Origins that are the same picture. */
+  {
+    const src = readFileSync(new URL("../tools/fetch-species.mjs", import.meta.url), "utf8");
+    const split = ART_GEN[0][0];
+    assert.ok(src.includes(`id <= ${split} ? FRLG : HGSS`),
+      `ART_GEN splits at ${split} but fetch-species.mjs does not - one of them is wrong`);
+    assert.ok(/generation-iii\/firered-leafgreen/.test(src)
+      && baseArtGen(1) === 3, "ART_GEN says Gen III art below the split; the fetcher disagrees");
+    assert.ok(/generation-iv\/heartgold-soulsilver/.test(src)
+      && baseArtGen(SPECIES.at(-1).id) === 4,
+      "ART_GEN says Gen IV art above the split; the fetcher disagrees");
+  }
+
+  // The rule itself, stated rather than sampled: older debut, or no Origin.
+  for (const sp of SPECIES) {
+    assert.equal(hasOrigin(sp.id), genOf(sp.id) < baseArtGen(sp.id),
+      `#${sp.id} disagrees with its own rule`);
+  }
+
+  /* THE ROSETTE MUST STAY REACHABLE. Completion is "caught plus every variant",
+     and the moment a tier stopped existing for 107 species that became
+     impossible rather than hard - which is the one mark in the game that is
+     supposed to be earnable by playing long enough. `tiersFor` is what both
+     the Dex grid and the sheet count through. */
+  for (const sp of SPECIES) {
+    const mine = tiersFor(sp.id);
+    assert.ok(mine.length >= TIERS.length - 1 && mine.length <= TIERS.length,
+      `#${sp.id} can wear ${mine.length} tiers`);
+    assert.ok(mine.every((t) => TIERS.includes(t)), `#${sp.id} claims a tier that is not one`);
+    assert.equal(mine.includes("origin"), hasOrigin(sp.id),
+      `#${sp.id} disagrees with itself about Origin`);
+  }
+  assert.ok(tiersFor(withoutIds[0]).length > 0,
+    "a species with no Origin must still have tiers to collect");
+
+  /* AND THE ROLL MUST HONOUR IT even on a finished dex - `lockedTiers` is what
+     `rollVariant` is handed, so this is the only thing standing between a
+     Sinnoh player and an Origin that is the ordinary picture. */
+  {
+    const full = SPECIES.map(() => 2);
+    assert.equal(lockedTiers(full, originIds[0]), null,
+      "a completed generation must open Origin for a species that has one");
+    assert.ok(lockedTiers(full, withoutIds[0])?.has("origin"),
+      "a completed dex must NOT open Origin for a species with no older art");
+    const rolled = new Set();
+    const rng = (() => { let t = 5; return () => {
+      t |= 0; t = (t + 0x6D2B79F5) | 0;
+      let r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    }; })();
+    for (let i = 0; i < 200000; i++) {
+      const got = rollVariant(rng, lockedTiers(full, withoutIds[0]));
+      if (got) rolled.add(got);
+    }
+    assert.ok(!rolled.has("origin"),
+      "Origin rolled for a species that has no older drawing to show");
+    assert.ok(rolled.size >= TIERS.length - 1,
+      `locking Origin also took ${TIERS.length - 1 - rolled.size} other tier(s) with it`);
+  }
+
+  console.log(`origin art ok — ${originIds.length} species have an older drawing, ` +
+    `${withoutIds.length} do not (Gen ${genOf(withoutIds[0])} art is Gen ` +
+    `${baseArtGen(withoutIds[0])} on both sides); the rosette stays reachable for all`);
+}
+
+console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
       .map((t) => `${t} ${got[t]}`).join(", ")}, origin 0`);
   }
 

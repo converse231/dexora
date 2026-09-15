@@ -391,12 +391,51 @@ export function genComplete(dex, gen) {
 
 export const originReady = (dex, speciesId) => genComplete(dex, genOf(speciesId));
 
+/* ORIGIN NEEDS AN OLDER DRAWING TO EXIST, and for a third of the dex there
+   isn't one.
+
+   The tier's tell is the ARTWORK: the drawing from before anyone had drawn the
+   creature a second time. That works because our ordinary sprite is a later
+   drawing than its debut one - Kanto and Johto ship FireRed/LeafGreen art
+   (Gen III) over a Gen I or Gen II debut, and the gap between them is the
+   whole point. Measured across every sprite in the build: a Kanto or Johto
+   Origin drops from a median of 13 colours to 4, which IS the Game Boy and
+   Game Boy Color palette and is exactly what reads as ancient.
+
+   Sinnoh does not have that gap. Its ordinary sprite is HeartGold/SoulSilver
+   and its debut is Diamond/Pearl - both Gen IV, both the same era - and the
+   same measurement gives 13 colours against 14. Not older. Not even fewer. It
+   was reported from play as "the Gen 4 Origins look the same as the normal
+   ones", which was exactly right.
+
+   So the rule is derived rather than listed: a species can wear Origin only if
+   it DEBUTED in an older generation than the one its ordinary art comes from.
+   `ART_GEN` is the one place that says where that art comes from, and it has
+   to agree with `artFor()` in tools/fetch-species.mjs - check.mjs asserts the
+   two against each other, because a base-art change that forgot this would
+   silently hand out Origins that are the same picture.
+
+   It settles Hoenn in advance, too: Ruby/Sapphire and FireRed/LeafGreen are
+   both Gen III, so a Hoenn species gets no Origin either. That is the right
+   answer for the same reason, and nothing has to be edited on the day. */
+export const ART_GEN = [[386, 3], [Infinity, 4]];
+export const baseArtGen = (id) => ART_GEN.find(([hi]) => id <= hi)[1];
+export const hasOrigin = (id) => genOf(id) < baseArtGen(id);
+
+/* The tiers a species can ever wear. The Dex's completion rosette and the
+   sheet's FORMS strip both read it, so a species that cannot have an Origin is
+   not asked for one twice in two different ways - and the rosette stays
+   reachable for every species rather than becoming impossible for 107 of them
+   the moment Sinnoh lost the tier. */
+export const tiersFor = (id) =>
+  (hasOrigin(id) ? TIERS : TIERS.filter((t) => t !== "origin"));
+
 /* What `rollVariant` must skip right now. One Set, reused, because this is
    asked once per encounter and allocating a Set per wild Pidgey to say
    "nothing new here" is the sort of thing that adds up. */
 const ORIGIN_ONLY = new Set(["origin"]);
 export const lockedTiers = (dex, speciesId) =>
-  (originReady(dex, speciesId) ? null : ORIGIN_ONLY);
+  (hasOrigin(speciesId) && originReady(dex, speciesId) ? null : ORIGIN_ONLY);
 
 /* A FIXED SHARE OF THE TABLE, not a fixed weight - and that is the whole
    anti-dilution answer, arrived at the hard way.

@@ -14,7 +14,7 @@ import { useMemo, useState } from "react";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import {
-  LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS,
+  LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor,
 } from "../game/biomes.js";
 import FilterBar from "./FilterBar.jsx";
 import Sprite, { VariantFx } from "./Sprite.jsx";
@@ -59,7 +59,11 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
   /* Every variant, plus the ordinary one. The completion badge is the whole
      point of showing the marks at all — it is the only thing on this screen
      that cannot be got by simply playing for long enough. */
-  const complete = (id) => at(id) === 2 && MARKS.every((t) => has(t, id));
+  /* THE TIERS THIS SPECIES CAN ACTUALLY WEAR, not all four. A Sinnoh Pokémon
+     has no Origin to find - see `hasOrigin` - so asking it for one would make
+     the rosette impossible for 107 entries rather than merely hard. */
+  const complete = (id) =>
+    at(id) === 2 && tiersFor(id).every((t) => has(t, id));
   const completed = SPECIES.filter((sp) => complete(sp.id)).length;
 
   const seen = SPECIES.filter((sp) => at(sp.id) >= 1).length;
