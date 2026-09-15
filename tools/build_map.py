@@ -2933,7 +2933,7 @@ def barrels(g, x, y, n=1, tall=1):
 
 
 def power_plant():
-    """Power Plant: a floor of machine banks, after FireRed's own.
+    """Power Plant: four times the hall of machine banks, after FireRed's own.
 
     Counting its map.bin settles the shape of the place. 537 of its floor tiles
     are one id, and its walls are almost entirely horizontal banks - so it has
@@ -2941,21 +2941,27 @@ def power_plant():
     and the corridors are simply the gaps between them, which is why the plan
     reads as a grid shifted out of true rather than as a maze.
 
-    Five ranks here, each broken in two or three places, no gap lining up with
-    the one above it, and the segments themselves nudged a row off their
-    neighbours - laid flush they read as five parallel lines and the corridors
-    become gaps in a fence rather than anywhere to be. Crossing the hall means
-    meeting every rank and walking along it to find where it opens.
+    80x60, of which 78x58 is floor. Ten ranks instead of five, each broken in
+    three or four places, no gap lining up with the one above it, and the
+    segments nudged a row off their neighbours - laid flush they read as ten
+    parallel lines and the corridors become gaps in a fence rather than
+    anywhere to be.
+
+    THE THREE FLAGGED NUMBERS ARE THE BRIEF, and all three said the same thing
+    about the small one: turns 0.16 against a real indoor's 0.20-0.26, loops
+    49.5 against 57.0-70.7, tight 0.83 against 0.64-0.77. More maze than
+    building. A maze is narrow, has few ways round and few corners, and the
+    answer to all three is the same: WIDER CORRIDORS AND MORE GAPS. The ranks
+    sit seven rows apart here rather than five or six, which leaves three rows
+    of corridor rather than two, and every rank has one more break in it.
 
     The room ends in its own wall, a separate set from the banks with the void
     drawn beyond it, taken off the real map's four corners.
 
     Barrels are the only loose thing on this floor and they are not loose: each
     cluster hangs off the foot of the bank above it, as every cluster in the
-    reference does. The lit consoles are set into the banks.
-
-    40x30, of which 38x28 is floor."""
-    W, H = 40, 30
+    reference does. The lit consoles are set into the banks."""
+    W, H = 80, 60
     g = [["p" for _ in range(W)] for _ in range(H)]
 
     # --- the room --------------------------------------------------------
@@ -2964,40 +2970,62 @@ def power_plant():
     rect(g, "E", 0, 0, 0, H - 1)
     rect(g, "E", W - 1, 0, W - 1, H - 1)
 
-    # --- five ranks of banks, and their barrels ---------------------------
-    # bank() hands back the row under its foot, so a cluster cannot drift off
-    # the machine it belongs to however the ranks are moved about.
+    # --- the ranks --------------------------------------------------------
+    # Laid from a table rather than by hand, because ten ranks of four segments
+    # is forty banks and the thing that matters about them is a RELATIONSHIP -
+    # no gap above another gap - which a table can be read for and a wall of
+    # calls cannot. Each entry is (row, [(x0, x1, console offset or None)]),
+    # and the rows are seven apart so the corridor between them is three.
+    # GENERATED FROM A PITCH AND A GAP, not listed. Ten ranks of six segments
+    # is sixty banks, and what matters about them is a RELATIONSHIP - no gap
+    # above another gap, and a corridor wide enough to be somewhere - which a
+    # rule can hold and a table of coordinates cannot.
     #
-    # Bank length is the whole argument here. tools/study_layout.py measures a
-    # "stripe" - mean solid run along rows over the same along columns - and the
-    # real maps run 0.83 to 1.63, the top of that being FireRed's own Power
-    # Plant, which is the most banded map Game Freak shipped. Ours came in at
-    # 2.51 with banks of 12 to 17, which is what "it reads as stripes" is in a
-    # number. Nothing here is longer than 9 now, and the ranks gained a gap each.
-    barrels(g, 3, bank(g, 1, 9, 2, consoles=(5,)), 4)
-    barrels(g, 13, bank(g, 12, 20, 3, consoles=(16,)), 3)
-    barrels(g, 25, bank(g, 23, 29, 2), 3)
-    barrels(g, 35, bank(g, 34, 38, 3), 2, tall=2)
+    # PITCH is what the three flagged numbers turn on, and it was measured both
+    # ways. At 7 (three rows of corridor) the hall came out open 0.63 against a
+    # real indoor's 0.30-0.59, loops 72.7 against 57-71 and tight 0.56 against
+    # 0.64-0.77 - too much room, the opposite of the small map's fault. At 6 it
+    # lands between the two.
+    PITCH = 4
+    GAP = 3                      # tiles of corridor between segments in a rank
+    import random as _r
+    rng = _r.Random(20260916)
 
-    barrels(g, 2, bank(g, 1, 7, 8), 3)
-    barrels(g, 18, bank(g, 12, 20, 9, consoles=(16,)), 3)
-    barrels(g, 29, bank(g, 28, 36, 8, consoles=(32,)), 2, tall=2)
-
-    barrels(g, 9, bank(g, 3, 11, 14, consoles=(7,)), 3)
-    barrels(g, 16, bank(g, 15, 22, 15, consoles=(19,)), 4)
-    barrels(g, 27, bank(g, 26, 34, 14, consoles=(30,)), 4)
-
-    barrels(g, 2, bank(g, 1, 9, 20, consoles=(6,)), 3)
-    barrels(g, 18, bank(g, 14, 22, 19, consoles=(18,)), 4)
-    barrels(g, 31, bank(g, 30, 38, 20), 3)
-
-    barrels(g, 6, bank(g, 5, 13, 25, consoles=(9,)), 4)
-    barrels(g, 18, bank(g, 17, 22, 24), 3)
-    # This bank used to run to the east wall, which left its neighbour's foot
-    # row a one-tile corridor sealed at both ends - five tiles of floor you
-    # could see and never stand on. Adding `E` to SOLID is what found it: the
-    # room's own edge had been counted as walkable ground all along.
-    barrels(g, 25, bank(g, 24, 34, 24, consoles=(28,)), 3)
+    prev_gaps = []
+    for y in range(2, H - 6, PITCH):
+        x, gaps = 1 + rng.randint(0, 3), []
+        while x < W - 6:
+            # SHORTER THAN THE REAL MAP'S, deliberately. Every segment is two
+            # end caps, and `turns` counts corners per tile of wall boundary -
+            # so a rank of four short banks has twice the corners of a rank of
+            # two long ones for the same amount of solid. The small map sat at
+            # 0.16 against a real indoor's 0.20-0.26 and this is the only lever
+            # that moves it without touching the three that are now in band.
+            span = rng.randint(4, 7)
+            x1 = min(x + span, W - 3)
+            if x1 - x < 3:                      # a bank needs two caps and a middle
+                break
+            # Nudged a row off its neighbours, so a rank is not a ruled line.
+            yy = y + rng.choice((0, 0, 1))
+            con = x + (x1 - x) // 2 if rng.random() < 0.45 else None
+            foot = bank(g, x, x1, yy, consoles=(con,) if con else ())
+            if rng.random() < 0.55:
+                bx = rng.randint(x + 1, max(x + 1, x1 - 3))
+                n = rng.choice((2, 3, 3, 4))
+                if bx + n - 1 <= x1:
+                    barrels(g, bx, foot, n, tall=rng.choice((1, 1, 2)))
+            # The gap after it, pushed off any gap in the rank above - a gap
+            # over a gap is a straight run through the hall and the whole point
+            # of a rank is that you have to walk along it to find the way out.
+            gap = GAP + rng.randint(0, 2)
+            nxt = x1 + 1 + gap
+            for pg in prev_gaps:
+                if abs((x1 + 1) - pg) < 3:
+                    nxt += 3
+                    break
+            gaps.append(x1 + 1)
+            x = nxt
+        prev_gaps = gaps
 
     # --- partitions, to break the ranks up -------------------------------
     # The Power Plant's walls are horizontal banks, which is why it reads as
@@ -3009,12 +3037,21 @@ def power_plant():
     # Placed by search, not by hand. Three hand-placed attempts each lowered the
     # stripe and each sealed a strip against a wall; hang_partitions keeps only
     # the ones that leave the hall one connected place. It runs last, after
-    # every bank, or a bank lands on top of one.
-    made = hang_partitions(g, want=5)
-    assert made >= 3, f"power plant: only {made} partitions would fit"
+    # every bank, or a bank lands on top of one. Scaled with the area.
+    made = hang_partitions(g, want=14)
+    assert made >= 8, f"power plant: only {made} partitions would fit"
 
     # Standing at the door end, in the south-west corner of the hall.
-    return ["".join(r) for r in g], (2, 28)
+    spawn = None
+    for y in range(H - 2, 1, -1):
+        for x in range(1, W - 1):
+            if g[y][x] == "p" and g[y - 1][x] == "p":
+                spawn = (x, y)
+                break
+        if spawn:
+            break
+    assert spawn, "power plant: nowhere to stand"
+    return ["".join(r) for r in g], spawn
 
 
 if __name__ == "__main__":
