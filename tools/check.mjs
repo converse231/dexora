@@ -183,6 +183,8 @@ import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
   LIFT_CEILING, hasOrigin, tiersFor, ART_GEN, baseArtGen,
+  wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
+  SIZE_MIN, SIZE_MAX,
 } from "../src/game/biomes.js";
 
 const poke = ballById("poke-ball");
@@ -3088,6 +3090,122 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     console.log(`berries ok — ${BERRIES.length} berries on ${new Set(used).size} systems ` +
       `(×${razz.catchMult} catch, ×${nanab.calm} flee, ×${pinap.xpMult} XP); ` +
       "the ball ladder survives all of them");
+  }
+
+
+  /* THE SENSES: a map's own level band, and a Pokémon's own size. Both are
+     flavour with a tail - one of them prices every evolution bought with what
+     you catch, and the other goes in every save. */
+  {
+    /* A LATE MAP HAS TO FEEL LATE. Non-decreasing along the ladder, and the
+       last map plainly above the first - a band that climbs by one over eight
+       maps is a constant with extra steps. */
+    const bands = BIOMES.map((b) => wildBand(b));
+    for (let i = 1; i < bands.length; i++) {
+      assert.ok(bands[i][0] >= bands[i - 1][0],
+        `${BIOMES[i].name} spawns lower than ${BIOMES[i - 1].name}`);
+    }
+    assert.ok(bands.at(-1)[0] >= bands[0][0] * 2,
+      `the last map opens at Lv ${bands.at(-1)[0]} against the first's ` +
+      `${bands[0][0]} - that is not a ladder`);
+    for (const [i, [lo, hi]] of bands.entries()) {
+      assert.equal(hi - lo + 1, WILD_SPAN,
+        `${BIOMES[i].name}'s band is not ${WILD_SPAN} wide`);
+      assert.ok(lo >= 2, `${BIOMES[i].name} spawns below Lv 2`);
+      assert.ok(hi < MAX_LEVEL, `${BIOMES[i].name} spawns at the level cap`);
+    }
+
+    /* AND IT MUST NOT GUT THE CANDY SINK. Evolving costs `evoLevel - level`,
+       so the band is a price control whether or not it was meant as one: at a
+       full step per gate the late maps handed out free evolutions 45-50% of
+       the time, which is the flat-candy failure seen from the other side.
+       The ceiling is a BOUND with its reason - Deep Woods already sat at 7%
+       and nobody objected; 45% is the economy going away. */
+    const FREE_CEILING = 0.15;
+    const rng = (() => { let t = 11; return () => {
+      t |= 0; t = (t + 0x6D2B79F5) | 0;
+      let r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    }; })();
+    let worst = { share: 0, name: "-" };
+    let tagShare = 0;
+    for (const b of BIOMES) {
+      const [lo, hi] = wildBand(b);
+      const table = encounterTable(b, MAX_LEVEL);
+      let free = 0, n = 0;
+      for (let i = 0; i < 8000; i++) {
+        const [id] = table[(rng() * table.length) | 0];
+        const rows = evolutionsOf(id);
+        if (!rows.length) continue;
+        const lv = Math.max(bornLevel(id) + 2, lo) + Math.floor(rng() * WILD_SPAN);
+        n++;
+        if (evoLevel(rows[0]) - lv <= 0) free++;
+      }
+      const share = n ? free / n : 0;
+      if (share > worst.share) worst = { share, name: b.name };
+    }
+    assert.ok(worst.share <= FREE_CEILING,
+      `${worst.name} evolves ${(worst.share * 100).toFixed(0)}% of what you catch ` +
+      `there for nothing - past ${FREE_CEILING * 100}% the candy sink is gone ` +
+      "in the map people spend the most time in");
+
+    /* SIZE. In range, centred, and the tag rare enough to be worth noticing -
+       a tell on every Pokémon is wallpaper. */
+    {
+      const seen = [];
+      let tagged = 0;
+      for (let i = 0; i < 40000; i++) {
+        const v = rollSize(rng);
+        assert.ok(v >= SIZE_MIN && v <= SIZE_MAX, `rolled a size of ${v}`);
+        seen.push(v);
+        if (sizeTag(v)) tagged++;
+      }
+      seen.sort((a, b) => a - b);
+      const mid = (SIZE_MIN + SIZE_MAX) / 2;
+      assert.ok(Math.abs(seen[seen.length >> 1] - mid) < 3,
+        `sizes centre on ${seen[seen.length >> 1]}, not ${mid} - the average one ` +
+        "should be average");
+      const share = tagged / seen.length;
+      tagShare = share;
+      assert.ok(share > 0.02 && share < 0.25,
+        `${(share * 100).toFixed(1)}% get an XS/XL tag - a tell on everything is wallpaper`);
+      assert.equal(sizeTag(mid), null, "the middle of the range must be untagged");
+    }
+
+    /* A SAVE WITHOUT SIZES IS NOT A BOX OF IDENTICAL CREATURES. `sizeOf` falls
+       back to a hash of the uid, which has to be stable, in range, and spread -
+       a fallback that returns the same number for everyone is the thing it
+       exists to avoid. */
+    {
+      const old = Array.from({ length: 500 }, (_, i) => ({ uid: i + 1 }));
+      const got = old.map(sizeOf);
+      for (const v of got) assert.ok(v >= SIZE_MIN && v <= SIZE_MAX, `hashed out of range: ${v}`);
+      assert.ok(new Set(got).size > 20,
+        `500 old entries hash to ${new Set(got).size} sizes - that is not a spread`);
+      assert.equal(sizeOf({ uid: 7 }), sizeOf({ uid: 7 }), "the fallback must be stable");
+      assert.equal(sizeOf({ uid: 7, size: 123 }), 123, "a stored size must win over the hash");
+    }
+
+    /* THE NUMBERS IT PRINTS have to be the species' own, in the units a person
+       reads - PokéAPI stores decimetres and hectograms, which is why nothing
+       ever printed them raw - and weight scales with the CUBE of length,
+       because that is what volume does. */
+    {
+      const sp = speciesById(19);          // Rattata: 0.3 m, 3.5 kg
+      const mid = measured(sp, 100);
+      assert.ok(near(mid.m, sp.height / 10), "a size-100 Pokémon is not its own height");
+      assert.ok(near(mid.kg, sp.weight / 10), "a size-100 Pokémon is not its own weight");
+      const big = measured(sp, SIZE_MAX);
+      assert.ok(big.m > mid.m && big.kg > mid.kg, "bigger is not bigger");
+      assert.ok(big.kg / mid.kg > big.m / mid.m,
+        "weight must grow faster than length - a longer animal is thicker too");
+    }
+
+    console.log(`senses ok — bands ${bands[0].join("-")} to ${bands.at(-1).join("-")} ` +
+      `(${WILD_STEP} per gate, worst free evolutions ${(worst.share * 100).toFixed(0)}% ` +
+      `in ${worst.name}); sizes ${SIZE_MIN}-${SIZE_MAX}, ` +
+      `${(tagShare * 100).toFixed(1)}% wear an XS/XL tag`);
   }
 
   console.log(`spawn ladder ok — ${early.size} species in the wild at Lv 1, ` +

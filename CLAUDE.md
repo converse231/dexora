@@ -613,11 +613,11 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 `ladders_clear()`, whenever a pool is placed.
 - spawn not inside a wall; ≥200 walkable tiles; ≥90% reachable (directed)
 
-[tools/check.mjs](tools/check.mjs) adds twenty-four suites — catch rules, phase
+[tools/check.mjs](tools/check.mjs) adds twenty-seven suites — catch rules, phase
 machine, balls, master balls, economy, evolution, evolution scene, trainer
 stats, casting, tileset, player, map ladder, medals, origin gate, variant rows,
 steps, minimap, battle scene, band budgets, pity, daily, field items, berries,
-spawn ladder, areas. The count in the command table above is the same number;
+origin art, senses, spawn ladder, areas. The count in the command table above is the same number;
 both are printed by the run, so a new suite means editing both.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
@@ -1330,6 +1330,38 @@ order; `SHEET_ORDER` therefore does NOT grow when a tier is added, or every
 column silently re-maps. A new tier arrives as its own single file, and a single
 file always beats the sheet. Missing art generates a placeholder and says so
 loudly - a 404 on a Dex tile is worse than a plain icon.
+
+**A WILD LEVEL IS A PRICE, NOT ONLY A FLAVOUR.** Evolving costs
+`evoLevel - level` in candy, so `wildBand` sets what an evolution bought with
+what you catch there COSTS. That is why `WILD_STEP` is 0.5 and not 1: at a full
+level of band per level of map gate the ladder ran 2-7 to 21-26 and the late
+maps handed out free evolutions 45-50% of the time, which is the flat-candy
+failure seen from the other side - one map becomes strictly best and the other
+seven are scenery. Measured across every biome table before choosing. check.mjs
+pins a 15% ceiling on the free share in any map, because every number stays
+monotone while this goes wrong and nothing else would say so. **Retuning the
+band or the map ladder means re-measuring that share.**
+
+`bornLevel` is still the floor and still wins: a wild Venusaur is a Lv 32
+Venusaur wherever you meet it, and the band can only lift a Pokemon above its
+own floor. The `+ 2` on that floor is why an evolved form is not pinned to
+exactly its own threshold.
+
+**A SIZE IS STORED, AND OLD SAVES HASH THEIR UID.** `species.js` has carried
+`height` and `weight` since the first fetch and nothing read them; `measured()`
+does, scaled by this individual's own roll, so two Rattata are 0.22m and 0.38m.
+The roll happens ON THE ENCOUNTER and is copied to the box entry - both halves
+are needed, and the failure if the copy is dropped is silent in the worst way:
+the enormous Rattata you threw six balls at is an ordinary one in the Box,
+because `sizeOf` falls back to the uid hash when nothing was stored. tools/play
+asserts it survives a real catch for exactly that reason.
+
+That fallback is what stops a pre-size save being a box of identical creatures,
+and it has to be stable, in range and SPREAD - a fallback returning one number
+is the thing it exists to avoid. Stored as a small integer, because it goes in
+every box entry. **Weight scales with the CUBE of the size**, because that is
+what volume does; halving it to make the number look tamer would be printing a
+measurement that is wrong.
 
 ## One tooltip, and it is an attribute
 

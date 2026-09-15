@@ -779,6 +779,112 @@ for (let again = true; again; ) {
 }
 export const bornLevel = (speciesId) => BORN_AT.get(speciesId) ?? 0;
 
+/* A MAP'S OWN LEVEL BAND, derived from where it sits on the ladder.
+
+   Every wild Pokemon in the game was Lv 2-7, everywhere, so Frost Hollow
+   CONTAINED later species without ever FEELING like a later map - the thing
+   you actually meet there arrived at the same level as the first Pidgey of the
+   game. The map ladder already says how far along a map is (`BIOMES[i].level`,
+   1 to 20), so the band is read off that rather than hand-typed per biome:
+   add a map and it gets a band the day it gets a gate.
+
+   `WILD_SPAN` stays constant across the ladder on purpose. Widening the band
+   in later maps would make a late map a lottery on TOP of being late, and the
+   thing that is supposed to vary there is which species turns up - that is
+   `encounterTable`'s job and it is already doing it.
+
+   THE FLOOR IS STILL `bornLevel`, and it still wins. A wild Venusaur is a Lv 32
+   Venusaur wherever you meet it, because that is the level it would have had to
+   be raised to; the band can only ever lift a Pokemon above its own floor, not
+   push one below it. The `+ 2` on that floor is why an evolved form is not
+   pinned to exactly its own threshold. */
+export const WILD_SPAN = 6;
+
+/* HALF A LEVEL OF BAND PER LEVEL OF GATE, and the half is measured rather than
+   chosen. A wild level is not only flavour: evolving costs `evoLevel - level`
+   in candy, so raising the band lowers the price of every evolution bought
+   with what you catch there.
+
+   At a FULL step the ladder ran 2-7 to 21-26 and the late maps handed out free
+   evolutions 45-50% of the time - which guts the candy sink in exactly the
+   maps a player spends the most time in, and is the same failure as a flat
+   candy yield seen from the other side: one map becomes strictly best and the
+   rest are scenery. Measured across every biome table:
+
+     step  Tall Grass        Haunted Tower     free evolutions
+     1.0   2-7               21-26             3% ... 45%
+     0.6   2-7               13-18             3% ... 15%
+     0.5   2-7               12-17             3% ... 10%
+     0.4   2-7               10-15             3% ... 0%
+
+   0.5 is where a late map still plainly FEELS late - the last map's wild
+   Pokemon are twice the level of the first's - while the free-evolution rate
+   stays at or under the 7% Deep Woods already had and nobody objected to.
+   check.mjs pins that ceiling, because the failure is invisible: every number
+   stays monotone and the economy simply stops mattering. */
+export const WILD_STEP = 0.5;
+
+export function wildBand(biome) {
+  const lo = 2 + Math.round(
+    Math.max(0, (biome?.level ?? MAP_FIRST) - MAP_FIRST) * WILD_STEP);
+  return [lo, lo + WILD_SPAN - 1];
+}
+
+/* What this individual is, rolled once and then remembered.
+
+   `species.js` has carried `height` and `weight` since the first fetch and
+   nothing has ever read them. This is what reads them: a scale on the species'
+   own numbers, so two Rattata are 0.28m and 0.39m rather than both being "a
+   Rattata", and the dex's own figures finally mean something.
+
+   STORED AS A SMALL INTEGER (percent), because it goes in every box entry and
+   a float per Pokemon is bytes in a save for no gain at this precision.
+
+   A save written before sizes existed has none, so `sizeOf` falls back to a
+   hash of the uid: stable forever, costs nothing, and means an old collection
+   is not a collection of identical creatures. The uid is the only thing about
+   an old entry that is both unique and permanent. */
+export const SIZE_MIN = 75;
+export const SIZE_MAX = 125;
+
+export const rollSize = (random = Math.random) => {
+  /* Triangular, not flat: the average Rattata should be an average Rattata,
+     and a flat roll makes "unusually large" as common as "ordinary", which is
+     what turns a tell into wallpaper. Two rolls averaged is the cheapest
+     triangular distribution there is. */
+  const t = (random() + random()) / 2;
+  return Math.round(SIZE_MIN + t * (SIZE_MAX - SIZE_MIN));
+};
+
+export function sizeOf(mon) {
+  if (mon?.size) return mon.size;
+  // Fowler/Noll/Vo over the uid: any stable spread will do, and this one is
+  // three lines and has no state.
+  let h = 2166136261;
+  for (const ch of String(mon?.uid ?? 0)) {
+    h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  }
+  return SIZE_MIN + ((h >>> 0) % (SIZE_MAX - SIZE_MIN + 1));
+}
+
+/* The bands worth naming, and only the ends of the range get a word. A tag on
+   every Pokemon is a tag nobody reads; a tag on one in eight is a thing you
+   notice. `null` is the ordinary case and most of them are. */
+export const sizeTag = (size) =>
+  (size >= 118 ? "XL" : size <= 82 ? "XS" : null);
+
+/* This individual's real numbers, in the units a person reads. PokeAPI stores
+   height in decimetres and weight in hectograms, which is why nothing has ever
+   printed them raw.
+
+   WEIGHT SCALES WITH THE CUBE of the linear size, because that is what volume
+   does - a Pokemon 25% longer is nearly twice the animal, and halving that to
+   make the number look tamer would be printing a measurement that is wrong. */
+export function measured(sp, size) {
+  const k = size / 100;
+  return { m: (sp.height / 10) * k, kg: (sp.weight / 10) * k ** 3 };
+}
+
 /* The table an encounter actually rolls on: the biome's own rows, plus every
    evolution of them that the trainer's level has opened.
 

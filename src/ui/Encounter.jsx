@@ -8,6 +8,7 @@
 
 import { BALLS } from "../game/items.js";
 import { label } from "../game/map.js";
+import { speciesById, sizeOf, sizeTag, measured } from "../game/biomes.js";
 import Types from "./Types.jsx";
 import Gen from "./Gen.jsx";
 import Sprite, { spriteUrl } from "./Sprite.jsx";
@@ -33,6 +34,20 @@ import Mark from "./Marks.jsx";
      one level that DOES matter here is still on the nameplate, because a
      wild evolved form arrives grown and a Lv 34 Venusaur is thirty candy of
      progress you did not have to pay for. */
+function Size({ enc }) {
+  const sp = speciesById(enc.speciesId);
+  if (!sp?.height) return null;
+  const size = sizeOf(enc);
+  const { m, kg } = measured(sp, size);
+  const tag = sizeTag(size);
+  return (
+    <span className={`np-size${tag ? ` np-${tag.toLowerCase()}` : ""}`}>
+      {tag && <b>{tag}</b>}
+      {m.toFixed(2)} m · {kg.toFixed(1)} kg
+    </span>
+  );
+}
+
 export default function Encounter({ enc, bag, onFlee, onSkip }) {
   const { phase } = enc;
 
@@ -194,6 +209,13 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
       <div className="nameplate">
         <span className="np-name">{enc.name}</span>
         <span className="np-lv">Lv {enc.level}</span>
+        {/* HOW BIG THIS ONE IS. `species.js` has carried height and weight
+            since the first fetch and nothing read them; this is what reads
+            them, scaled by this individual's own roll - so two Rattata are
+            0.28m and 0.39m rather than both being "a Rattata". The XS/XL tag
+            appears on about one in eight, because a tag on every Pokémon is a
+            tag nobody reads. */}
+        <Size enc={enc} />
         <Types of={enc.types} className="np-types" />
         <Gen id={enc.speciesId} className="np-gen" />
         {/* Already in the dex. The one thing you want to know before deciding

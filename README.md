@@ -2528,9 +2528,65 @@ than a Poké Ball or the berry is simply always correct and stops being a
 decision; no dearer than half again an Ultra Ball, or the answer is always "buy
 better balls instead".
 
-### Phase 3 — The senses
+### The senses: a map that feels late, and a Pokémon that is its own size
 
-*Goal: it is mechanically complete and completely silent. Fix the silence.*
+**Every wild Pokémon in the game was Lv 2-7, everywhere.** Frost Hollow
+*contained* later species without ever *feeling* like a later map — the thing
+you met there arrived at the level of the first Pidgey of the game. `wildBand`
+reads a band off the map ladder that already exists, so adding a map gets it a
+band the day it gets a gate, and the span stays constant across the ladder:
+widening it later would make a late map a lottery on top of being late, and
+which species turns up is already `encounterTable`'s job.
+
+**The tuning is the interesting part, because a wild level is a PRICE.**
+Evolving costs `evoLevel - level` in candy, so raising the band lowers what
+every evolution bought with what you catch there costs. At a full level of band
+per level of gate:
+
+| per gate | Tall Grass | Haunted Tower | free evolutions |
+|---|---|---|---|
+| 1.0 | 2-7 | 21-26 | 3% … **45%** |
+| 0.6 | 2-7 | 13-18 | 3% … 15% |
+| **0.5** | **2-7** | **12-17** | **3% … 10%** |
+| 0.4 | 2-7 | 10-15 | 3% … 0% |
+
+A full step gutted the candy sink in exactly the maps a player spends the most
+time in — which is the flat-candy failure from the other side: one map becomes
+strictly best to grind and the other seven are scenery. **0.5 is where a late
+map still plainly feels late** (its Pokémon are twice the level of the first
+map's) while the free-evolution rate stays at or under the 7% Deep Woods
+already had and nobody objected to. check.mjs pins a 15% ceiling, because every
+number stays monotone while this goes wrong.
+
+**And `species.js` has carried height and weight since the first fetch with
+nothing reading them.** Now the nameplate does: a scale rolled per individual,
+so two Rattata are 0.22 m / 1.5 kg and 0.38 m / 6.8 kg rather than both being
+"a Rattata". Triangular rather than flat, because the average Rattata should be
+an average Rattata — flat makes "unusually large" as common as ordinary, which
+is what turns a tell into wallpaper. About **9%** wear an XS or XL tag; the
+rest just have their own numbers. Weight scales with the cube of length,
+because that is what volume does.
+
+A save written before sizes existed hashes the uid instead — stable, free, and
+the difference between an old collection and a box of identical creatures.
+
+**The candy watch-list: three of four stay as they are, and that is the
+finding.** Caterpie and Weedle still evolve for free, and that is still the
+right call — it happens in the first ten minutes and teaches the mechanic —
+and the general class it belongs to is now guarded by the free-evolution
+ceiling above rather than by nothing. Charmander is still weight 10 where
+Bulbasaur and Squirtle are 8, and trimming it would make Charmander rarer in
+the only map it lives in, which is the opposite of the kinder game that was
+asked for. Commons-are-candy-rares-are-cash is still a solved decision for 22
+species and still gives both currencies a natural source. The same-line
+conversion bonus is still held in reserve and still should not be built until
+playtesting asks. **None of the four was a defect; the list was a list of
+things to look at again, and looking was the work.**
+
+### Phase 3 — The senses — **shipped**
+
+*Goal: the same second of play — the moment a Pokémon appears and you throw
+at it.*
 
 Split out of the old Phase 3 because it is one coherent job — **everything here
 is about the same second of play**, the moment a Pokémon appears and you throw
@@ -2543,11 +2599,11 @@ the sound comes from), and a phase that cannot start until a question is
 answered is a phase that blocks the ones behind it. Everything else here is
 unblocked, so it goes first and audio goes last.
 
-| | Why now |
+| | What shipped |
 |---|---|
-| **Encounter variety** | Every Pidgey is the same Pidgey — level 2–7 uniformly, everywhere. `bornLevel` already does exactly this job for evolved forms, so per-biome level bands are a small change to one function that would make Frost Hollow *feel* like a late map rather than merely contain later species. |
-| **Flavour on the nameplate** | `species.js` already carries height and weight and nothing reads them. A "small / large" tell costs one line and gives two identical Rattata a reason to differ. |
-| **The candy watch-list** | Four judgement calls never played for an hour — see *Deferred on purpose*. Cheap to fix now, expensive once quests sit on top of them. |
+| **Encounter variety** | `wildBand` reads a level band off the map ladder — 2-7 in Tall Grass, 12-17 in the Haunted Tower. Tuned against the free-evolution rate, not by eye, because a wild level is a price. |
+| **Flavour on the nameplate** | Height and weight, scaled per individual and finally read. ~9% carry an XS/XL tag; a save without sizes hashes its uid. |
+| **The candy watch-list** | Looked at, and three of four deliberately stand. The one class that was a real risk — free evolutions — now has a measured ceiling in check.mjs instead of a note. |
 
 ---
 
