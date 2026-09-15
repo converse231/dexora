@@ -1040,12 +1040,34 @@ the mask lands; the degenerate sequence never returned a value below 1/4096, so
 test had been passing on luck. `mulberry32` uses `Math.imul` throughout and
 loses nothing to float precision.
 
-**Master Balls come from two places now, and both are pinned.** `levelReward`
-pays one every fifteenth level (three over the cap) and `stepReward` pays one
-every tenth haul - 25,000 steps - gated at level 20, which is two over a
-50,000-step playthrough. Five in a whole game. The step one is counted, never
-priced: a Master Ball has no price, and pricing the unpriceable is how a budget
-assertion starts approving them.
+**Master Balls come from THREE places now, and all three are pinned.**
+`levelReward` pays one every `MASTER_EVERY` levels and `stepReward` pays one
+every fifth haul, gated at `TREASURE_LEVEL`. The third is the shop.
+
+**AND THE PRICE IS THE ONLY THING BALANCING IT.** It never fails, so it cannot
+be balanced by odds; it used to be balanced by being unbuyable at all, on the
+grounds that "a price is only ever a delay - grind long enough and you could
+hold twenty". That is still the risk, and it is now bounded by two MEASURED
+numbers rather than by refusing to have the conversation:
+
+- **Floor.** The cheapest honest route to a rate-3 legendary measures ~¥1,500
+  (Timer Balls at their best case). The Master Ball must cost a large multiple
+  of that or it IS the cheap way to catch a legendary and the whole ball ladder
+  inverts. At ¥50,000 it is 34x.
+- **Ceiling.** It must stay reachable. The best map nets ~¥42 a head and a
+  50,000-step playthrough is ~3,500 encounters, so it is 34% of everything a
+  whole game earns. **A ball nobody can afford is the unbuyable one again,
+  wearing a number.**
+
+Both are computed in check.mjs from the live tables, not typed in, because they
+move whenever the economy is retuned. Retune `SELL`, the ball prices, the
+encounter rate or `fleeChance` and re-read what it prints.
+
+**The step reward is still counted, never priced.** `worth` in the steps suite
+sums the three priced balls by hand and leaves the Master Ball out, which was
+right when it had no price and is still right now that it has one: what walking
+pays is a count, and folding a ¥50,000 item into that total would make a step
+budget approve anything.
 
 **A variant is its own row in the Box, and its own hero.** Rows key on
 species AND variant. That is a UI change with a logic tail: `feedable(box,

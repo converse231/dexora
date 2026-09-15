@@ -116,14 +116,37 @@ export const BALLS = [
        than an exploit to close. */
     bonus: (enc) => Math.min(4, PLAIN_MULT + 0.6 * (enc.throws ?? 0)),
   },
-  /* Never fails, and never for sale. A price is only ever a delay - grind long
-     enough and you could hold twenty - so the only thing that can keep this
-     scarce is that money cannot buy it. It arrives every tenth trainer level,
-     three times in a whole game. Hidden from the encounter until you own one,
-     so it reads as something you earned rather than a greyed-out button. */
+  /* NEVER FAILS, AND NOW IT HAS A PRICE - which reverses what this comment
+     used to say, so here is the old argument and what changed.
+
+     It was unbuyable on the grounds that "a price is only ever a delay - grind
+     long enough and you could hold twenty". That is true, and it is still the
+     risk. What it missed is that an unbuyable item has no dial at all: the only
+     way to tune it was `MASTER_EVERY`, which moves how many the game HANDS you,
+     and a player who wants one more than the schedule allows has nothing to do
+     about it. A price is a delay, but a delay is exactly what an economy is for.
+
+     SO THE PRICE IS SET AGAINST THE CHEAPEST HONEST ROUTE, not picked. Landing
+     a rate-3 legendary the hard way measures at ~1,500 in balls (Timer Balls,
+     at its best case, over about five encounters with it). Anything near that
+     and the Master Ball becomes the CHEAP way to catch a legendary, which
+     inverts the ball ladder the whole shelf is built on. At 50,000 it is
+     thirty-three times the cheapest route: never the efficient choice, only the
+     certain one. That is the thing it should be bought for - the legendary you
+     have already watched run away, where the alternative is losing it again.
+
+     And it is priced against income, not against the other balls. The best map
+     nets about 42 a head and a 50,000-step playthrough is ~3,500 encounters, so
+     this is roughly a third of everything a whole game earns, for one ball.
+     check.mjs measures both of those and fails if either stops being true.
+
+     Level 30 is well past the last shop unlock (Astral Honey at 24): it opens
+     when a player has an income to spend rather than a hole to save into.
+     Hidden from the ENCOUNTER until you own one, which is unchanged - that is
+     about the ball rail, not the shelf. */
   {
     id: "master-ball", name: "Master Ball", short: "MASTER", mult: GUARANTEED,
-    price: 0, level: null, hideWhenEmpty: true,
+    price: 50000, level: 30, hideWhenEmpty: true, hint: "never fails",
   },
 ];
 
