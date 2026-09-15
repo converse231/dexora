@@ -35,10 +35,15 @@ const KEYS = ["bicycle", "old-rod", "good-rod", "super-rod"];
    its real sprite: the shop row and the Box buttons were drawing a text star,
    and a drawn star next to eight real item icons reads as a placeholder. */
 const CURRENCY = ["rare-candy"];
+/* Field items. `honey` is Gen 4's own attract-Pokemon item, which is both the
+   right mechanic and a sprite that already exists - there is no `lure` in the
+   PokeAPI set at all, which is the sort of thing to check before naming a
+   feature after it. */
+const FIELD = ["honey", "repel"];
 
 await mkdir("public/items", { recursive: true });
 const missing = [];
-for (const name of [...BALLS, ...TOOLS, ...KEYS, ...CURRENCY]) {
+for (const name of [...BALLS, ...TOOLS, ...KEYS, ...CURRENCY, ...FIELD]) {
   const res = await fetch(`${BASE}/${name}.png`);
   if (!res.ok) {
     missing.push(`${name} (${res.status})`);

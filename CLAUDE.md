@@ -23,7 +23,7 @@ there beats opening a ticket, because a ticket loses the reason.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   node tools/check.mjs (20 suites)
+npm run dev        vite dev server           npm run check   node tools/check.mjs (24 suites)
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
                                              npm run layout  composition metrics
@@ -612,10 +612,12 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 `ladders_clear()`, whenever a pool is placed.
 - spawn not inside a wall; ≥200 walkable tiles; ≥90% reachable (directed)
 
-[tools/check.mjs](tools/check.mjs) adds seventeen suites — catch odds, phase
-machine, balls, economy, evolution, evolution animation, trainer stats,
-casting, tileset, player, medals, origin gate, variant rows, steps, minimap,
-battle scene, spawn ladder, master balls, map ladder, areas.
+[tools/check.mjs](tools/check.mjs) adds twenty-four suites — catch rules, phase
+machine, balls, master balls, economy, evolution, evolution scene, trainer
+stats, casting, tileset, player, map ladder, medals, origin gate, variant rows,
+steps, minimap, battle scene, band budgets, pity, daily, field items, spawn
+ladder, areas. The count in the command table above is the same number; both
+are printed by the run, so a new suite means editing both.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
 crown is whole. Biome ground and solid lists must be disjoint (an "invisible
@@ -1040,6 +1042,54 @@ overlay is supposed to enrich a map as you level, so check.mjs measures the mix
 with depth-tagged rows filtered out - counting them would assert that the
 feature does not work. Residents hold to half a point; the overlay moves meadow
 to 69.8/18.2/9.6 and that is progression.
+
+**ONE EXPONENT DECIDES HOW RARE THE WORLD IS, and it has two contributors.**
+`rarityPower(stats, honey)` is the only thing in the game that reshapes an
+encounter table by rarity: Fortune is a permanent investment in it and Honey is
+five hundred steps of one. They are the same number rather than two transforms
+stacked on one table - which is what the "three things reshaping one table need
+one rule, not three" note was about, and the pile-up it was warning against is
+a second `w ** q` pass anywhere. **Never add one.** The test that holds this has
+no literal in it: if Honey IS Fortune's exponent then what it is worth cannot
+depend on your Fortune rank, so check.mjs asserts the delta is the same at
+every rank. A second transform would compound and fail it.
+
+`RARITY_FLOOR` is insurance against a future retune, not a description of this
+one: maxed Fortune plus a Honey is 0.45 against a floor of 0.4, so the clamp
+never fires today. Its assertion is therefore written against the CONSTANT -
+`22 ** RARITY_FLOOR > 2` - because what it exists to catch is somebody moving
+the coefficients above it. At exponent 0 every row in the table is worth the
+same and rarity stops existing.
+
+**REPEL IS ON THE OTHER AXIS AND MUST STAY THERE.** It scales `ENCOUNTER_RATE`
+and never touches the table - which is the honest reading of what a repel is
+for, crossing a map you have already farmed, and is what keeps the second field
+item off the thing the first one is already moving. check.mjs asserts the word
+`repel` appears in NEITHER `trainer.js` NOR `biomes.js`, which is a crude
+assertion and exactly the right one: the failure it guards is somebody giving
+it "a small table effect too".
+
+**BOUGHT IS USED, and that is why there is no bag screen.** Only one of each
+field item can run at a time, so stockpiling a consumable you cannot stack is
+an inventory for nothing. `useField(id)` charges through `pricedAt` - the same
+discount the shelf prints, or the row advertises a price nobody is charged -
+and ASSIGNS `state.field[id] = item.steps`. Assigning, not adding: `+=` makes
+the price of a long effect the price of a short one typed twice. Steps, not
+seconds, so an effect you paid for is not burned by walking away from the
+keyboard. The Shop row is the whole button and shows the steps left instead of
+the price while it runs; the on-screen readout sits opposite the minimap,
+because an effect paid for in steps belongs where the steps happen.
+
+**A DAILY QUEST MUST BE FINISHABLE IN THE MAP YOU ARE STANDING IN.**
+`QUEST_TYPES` is derived from the STARTING map by weight share (>= `QUEST_SHARE`
+of Tall Grass), not from a biome's `types` list - the first version used the
+list and asked for four Dragon-types, of which the entire game holds two. Six
+types qualify. Everything in `daily.js` is pure and takes the day key as an
+argument, which is the only way to test something keyed on the date without
+waiting a day, and is why it is written that way: `dailyFor(key)` hashes the
+key, so a quest cannot be rerolled by reloading. The streak caps at
+`STREAK_CAP`; uncapped, day sixty is worth more than the first fifty together
+and missing one leaves nothing to come back for.
 
 **Legendaries are a SHARE of the table, never a fixed weight.** `LEGEND_SHARE`
 is 1% of whatever the table comes to, split by type match, added by

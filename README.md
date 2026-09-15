@@ -2353,6 +2353,94 @@ the Box groups by species **and** variant. Same rule on both sides now.
 
 **Your calls, answered:** generous rewards, and kinder odds.
 
+### Coming back tomorrow
+
+Phase 4 was four items and one shared risk: **every one of them touches the
+encounter table or the reward curve**, which are the two things this project has
+repeatedly broken quietly. They are written up here in the order they shipped,
+which is also the order of increasing collision.
+
+**The band budgets went in first, and the drift was the opposite of the expected
+one.** The deferred note assumed a growing dex would *thin* the rares out.
+Measured, adding Johto and Sinnoh **tripled** them: Tall Grass went 5.1% A-tier
+to 15.4%, because a newcomer arrives on a flat tier-derived weight while the Gen
+1 commons that hold a route together are hand-tuned at 22. The gentlest map in
+the game had quietly become a third rare. `BAND_SHAPE` is frozen **per map** out
+of its own hand-written table — one global mix would flatten Tall Grass
+(78/13/5) and the Haunted Tower (18/51/30) into the same map, and that
+difference is the design — and `balance()` rescales whatever the table has grown
+into back onto it. `BAND_FLOOR` exists because Rock Ridge has no S-tier resident
+at all, and a band with no members would otherwise hand a newcomer a zero and
+make it unreachable.
+
+**A derived evolution is banded with its PARENT, and the band travels the whole
+chain.** Banding by own tier split Tangela (B) from Tangrowth (A), and the
+rescale then made the evolution commoner than the thing it evolves from. Fixing
+that pair by carrying the band one step left Mareep → Flaaffy → Ampharos
+broken, which is what says the band has to travel the chain rather than a link
+of it. Inside one band the scale is uniform, so `parent × EVO_SHARE` survives
+the rescale exactly.
+
+**The guarantee is about the residents.** The evolved-form overlay is *meant* to
+enrich a map as you level, so the assertion filters depth-tagged rows out —
+counting them would be asserting that the feature does not work. Residents hold
+to half a point (79.0 → 78.5); with the overlay, Tall Grass reaches
+69.8/18.2/9.6, and that is progression rather than drift.
+
+**Pity counts the drought, not the misses.** `state.dry` resets on the **roll**
+rather than on the catch, because what is miserable is not meeting one — a
+variant that flees still ended the drought. It multiplies the whole ladder
+rather than one tier, because `rollVariant` walks `TIER_ODDS` rarest first and
+boosting one tier alone re-sorts it. Capped at 10×, or a long drought stops
+being a mercy and becomes the efficient way to farm. `rollVariant`'s `boost`
+defaults to 1 so the 400k-roll rate assertions still measure unaided odds.
+
+**The daily is a quest, not a login bonus** — your call, and the cheaper one:
+everything a quest needs already exists (`advance` reads the same catch event
+the medals do). Three kinds, keyed on the date through a hash, so it cannot be
+rerolled by reloading. Two details are load-bearing:
+
+- **A quest must be finishable in the map you are standing in.** The first
+  version drew its "catch 4 <type>" from the biome's own `types` list, and
+  dragon has **two species in the entire game**. `QUEST_TYPES` is derived from
+  the starting map by weight share instead — a type has to be at least 5% of
+  Tall Grass to be askable — which gives six types and no unfinishable day.
+- **The streak caps at seven.** Uncapped, day sixty is worth more than the first
+  fifty together, and missing one leaves nothing to come back for — which is the
+  opposite of what a streak is for.
+
+**And the lures went last, because they were the collision.** Fortune already
+reshapes the encounter table and the band budgets now hold its mix, so a lure
+written as a third weight transform is exactly the pile-up the deferred note
+warned about. Two items, two different levers:
+
+- **Honey does not invent a mechanism — it borrows Fortune's.** Both feed the
+  same exponent in `rarityPower`, so there is one place in the codebase where
+  the odds of meeting something rare are decided. It is worth 7.5 Fortune ranks
+  against a track of 20, so it composes with a maxed trainer instead of fighting
+  one. The test that says so has no literal in it: if Honey *is* Fortune's
+  exponent, what it is worth cannot depend on your Fortune rank, and a second
+  transform stacked on the first would compound instead.
+- **Repel does not touch the table at all.** It scales how *often* an encounter
+  happens (`×0.35`) and never what it is — the honest reading of what a repel is
+  for, which is crossing a map you have already farmed. check.mjs asserts the
+  word does not appear in either file that decides what you meet.
+- **`RARITY_FLOOR` is insurance, not a description.** At exponent 0 every row is
+  worth the same and rarity stops existing. Maxed Fortune plus a Honey lands at
+  0.45, comfortably above the 0.4 floor — so the floor does nothing today, and
+  the assertion on it is written against the floor constant rather than against
+  the current coefficients, so it is the *retune* it catches.
+
+**Bought is used.** There is no bag screen for these and no reason for one: only
+one of each can run at a time, so stockpiling a consumable you cannot stack is
+an inventory for nothing. Buying starts the clock, and buying again while one is
+running **replaces** it rather than adding, or the price of a long effect is the
+price of a short one typed twice. The shop row is the whole button, and it shows
+the steps left instead of the price while it runs — so the row answers "is it
+on" without a second readout somewhere else. The one that is on screen while you
+walk sits opposite the minimap, because **an effect paid for in steps is counted
+down where the steps happen**, not on the shelf that sold it.
+
 ### Phase 3 — The senses
 
 *Goal: it is mechanically complete and completely silent. Fix the silence.*
@@ -2376,27 +2464,23 @@ unblocked, so it goes first and audio goes last.
 
 ---
 
-### Phase 4 — Coming back tomorrow
+### Phase 4 — Coming back tomorrow — **shipped**
 
 *Goal: nothing currently brings you back. Everything here is about the session
 after this one.*
 
-The other half of the old Phase 3. Separated because it is a different kind of
-work with a different risk: Phase 3 is felt in a second and is hard to get
-wrong, and **every item here touches the encounter table or the reward curve**,
-which are the two things this project has repeatedly proven it can break
-quietly.
+All four items are in. The write-up is *Coming back tomorrow* above; this is the
+ledger.
 
-| | Why now |
+| | What shipped |
 |---|---|
-| **Session structure** | A daily quest and a streak are the standard answer and fit the existing XP / money / candy economy without new systems. |
-| **Band budgets** | Now genuinely earned rather than deferred: legendaries are already a fixed share, but an *individual* species still thins as a band fills. See *Deferred on purpose* for the pseudocode and the honest cost. |
-| **Pity for the rare tiers** | Bad luck against a 1/480 Astral is miserable and invisible. Most of the work is updating the 400k-roll assertions it invalidates. |
-| **Lures and repels** | Bias the table for a while — interesting because it collides with **Fortune** and with band budgets. Three things reshaping one table need one rule, not three, so this goes **last** in the phase. |
+| **Session structure** | A dated quest with a seven-day streak, on the YOU tab with a `!` on the existing tab badge. Three kinds, six askable types, no unfinishable day. |
+| **Band budgets** | `BAND_SHAPE` frozen per map from its own hand-written table, `balance()` rescaling whatever the table grows into, `BAND_FLOOR` for a band with no residents. A derived evolution is banded with its parent, the whole chain. |
+| **Pity for the rare tiers** | `state.dry`, opening at 300 encounters, ramping over 100 and capped at 10× on the whole ladder. Silent — your other call. |
+| **Lures and repels** | Honey on Fortune's own exponent, Repel on the encounter rate. Two levers, deliberately, so nothing is reshaping one table twice. |
 
-**Your calls:** whether a daily is a *quest* ("catch three Water-types") or a
-login bonus — the former uses machinery that already exists, the latter is a
-number — and whether pity is visible to the player or silent.
+**Your calls, answered:** a quest rather than a login bonus, and pity silent —
+a visible counter would make the drought the thing you are playing.
 
 ---
 
@@ -2448,54 +2532,14 @@ Designed, costed, and **not built** — each with the trigger that should bring 
 back. They are here rather than in a tracker because every one of them is a
 design decision with a reason, and a one-line ticket loses the reason.
 
-### Band budgets — the anti-dilution guarantee
+### Band budgets, and pity — **both built, see above**
 
-**Trigger: the day a second generation lands. Not before.**
-
-Spawns are per-biome tables that each sum to 1, so Dexora is already immune to
-the global-pool dilution that would make every Gen 1 species rarer at 1,025
-species. Two local risks remain, and the first is the dangerous one:
-
-1. **Sprinkling a new generation into the eight existing tables.** The rule is
-   *a new generation is a new region with new tables* — never add a species to a
-   shipped table without removing weight.
-2. **A table growing from within**, which ours already does: the evolved-form
-   overlay took Tall Grass legendaries from 0.93% → 0.77%. Small now, structural
-   at scale.
-
-The fix for (2) is to reserve a fixed share per rarity band and normalise
-*within* the band:
-
-```
-BANDS = { common: .62, uncommon: .26, rare: .10, legendary: .02 }   # fixed forever
-
-pick(table, level):
-    band    = weightedChoice(BANDS)                    # never changes
-    members = table.filter(b => b.band == band && unlockedAt(level))
-    if members.empty: return pick from nearest non-empty band
-    return weightedChoice(members)                     # normalised inside the band
-```
-
-The legendary rate is then 2% in every region, at every level, in every
-generation, **by construction** — provable rather than measured. The honest cost:
-an individual species does get rarer as its band fills, which is unavoidable and
-is what rarity means. The guarantee is about the band, which is what a player
-feels.
-
-### Pity for the rare tiers
-
-**Trigger: a playtest where someone goes a long session with no variant.**
-
-Bad luck against a 1/480 Astral is genuinely miserable and completely invisible.
-One counter in save state:
-
-```
-if encountersSinceVariant > 300:
-    oddsMultiplier = 1 + (encountersSinceVariant - 300) / 100
-```
-
-It changes the measured rates `check.mjs` pins over 400k rolls, so it has to land
-with those assertions updated in the same commit — that is most of the work.
+Both were deferred here with a trigger, both triggers fired, and both shipped in
+Phase 4. The designs survived contact with one correction each and the
+corrections are the interesting part, so they are written up in *Coming back
+tomorrow* rather than kept as pseudocode here: the band drift ran the **opposite
+way** from the one this section predicted, and pity had to boost the whole
+ladder rather than one tier.
 
 ### The hybrid data model
 

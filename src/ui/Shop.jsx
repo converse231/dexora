@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import {
-  SHOP_BALLS, STONES, CANDY_PRICE, speciesNeedingStone,
+  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, speciesNeedingStone,
 } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
@@ -20,7 +20,9 @@ import Confirm from "./Confirm.jsx";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCandy }) {
+export default function Shop({
+  money, bag, level, stats, candy, field = {}, onBuy, onBuyCandy, onUseField,
+}) {
   const [pending, setPending] = useState(null);
   // The row whose buy controls are showing. Starts on the ball everyone owns,
   // so the shop opens explaining itself rather than as a list of closed doors.
@@ -166,6 +168,59 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
         <div className="shoplist">{shelf(SHOP_BALLS)}</div>
 
         <p className="shop-note">Better balls raise the odds, not the reward.</p>
+
+        {/* FIELD ITEMS. Bought is used - there is no bag screen for these and
+            no reason for one, since only one of each can run at a time and
+            stockpiling a consumable you cannot stack is an inventory for
+            nothing. A running one shows its steps instead of its price, so the
+            row answers "is it on" without a second readout somewhere else. */}
+        <div className="sh-head">
+          <span>FIELD</span>
+          <span>WHILE YOU WALK</span>
+        </div>
+
+        <div className="fieldlist">
+          {FIELD.map((f) => {
+            const left = field[f.id] ?? 0;
+            const price = pricedAt(f.price, stats);
+            const locked = level < f.level;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                className={`fieldrow${left > 0 ? " on" : ""}${locked ? " locked" : ""}`}
+                disabled={locked || money < price}
+                onClick={() => setPending({
+                  title: `Use ${f.name}?`,
+                  lines: [
+                    ["Cost", `¥${price.toLocaleString()}`],
+                    ["Money left", `¥${(money - price).toLocaleString()}`],
+                    ["Lasts", `${f.steps.toLocaleString()} steps`],
+                    ...(left > 0
+                      ? [["Replaces", `${left.toLocaleString()} steps left`]]
+                      : []),
+                  ],
+                  confirmLabel: `USE · ¥${price.toLocaleString()}`,
+                  run: () => onUseField(f.id),
+                })}
+                title={locked
+                  ? `Unlocks at level ${f.level}`
+                  : `${f.steps} steps · ¥${price.toLocaleString()}`}
+              >
+                <img src={`items/${f.id}.png`} alt="" />
+                <span className="fr-copy">
+                  <b>{f.name}</b>
+                  <i>{f.blurb}</i>
+                </span>
+                <span className="fr-tail">
+                  {locked ? `LV ${f.level}`
+                    : left > 0 ? `${left} STEPS`
+                      : `¥${price.toLocaleString()}`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
         {/* RARE CANDY, and it is priced to lose. ¥120 against the ¥40 a common
             duplicate sells for means three sold to buy one candy, where

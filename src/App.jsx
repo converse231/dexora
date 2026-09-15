@@ -5,7 +5,7 @@ import TopBar from "./ui/TopBar.jsx";
 import Rail from "./ui/Rail.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
-import { BALLS, canRun, stepReward } from "./game/items.js";
+import { BALLS, FIELD, canRun, stepReward } from "./game/items.js";
 import {
   biomeFor, levelFromXp, TIERS, originReady, dexIndex,
 } from "./game/biomes.js";
@@ -260,6 +260,23 @@ export default function App() {
                 rather than assumed. The tag says where you are; this says
                 where in it, and saying the first thing twice was the only
                 thing on it that was not information. */}
+            {/* A RUNNING EFFECT IS SPENT IN STEPS, so it is counted down
+                where the steps happen rather than on the shelf that sold it.
+                Nothing is drawn when nothing is running - a readout that is
+                always there saying "no" is a readout nobody reads - and it
+                hides with the minimap for an encounter, because the count
+                cannot move while you are not walking. */}
+            {!enc && !evo && FIELD.some((f) => (st?.field?.[f.id] ?? 0) > 0) && (
+              <div className="fieldbox" role="status">
+                {FIELD.filter((f) => (st?.field?.[f.id] ?? 0) > 0).map((f) => (
+                  <span key={f.id} title={`${f.name}: ${st.field[f.id]} steps left`}>
+                    <img src={`items/${f.id}.png`} alt={f.name} />
+                    {st.field[f.id]}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div className={`minimap${enc || evo ? " gone" : ""}`}>
               <canvas ref={miniRef} aria-hidden="true" />
             </div>
@@ -366,6 +383,9 @@ export default function App() {
           onBuy={(id, n) => engine.buy(id, n)}
           onBuyCandy={(n) => engine.buyCandy(n)}
           onEvolve={(uid, to) => engine.evolve(uid, to)}
+          onUseField={(id) => engine.useField(id)}
+          daily={engine?.daily?.()}
+          onClaimDaily={() => engine.claimDaily()}
           jumpTo={boxJump}
           onJumped={() => setBoxJump(null)}
           onSpend={(id) => engine.spend(id)}
