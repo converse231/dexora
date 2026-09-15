@@ -1470,39 +1470,34 @@ def pier(g, x0, y0, x1, y1):
 
 
 def pond_shore():
-    """Pond & Shore: one lake, walked around and walked across.
+    """Pond & Shore: one great lake, walked around and walked across.
 
-    The old version scattered four small lakes over a field, because water is
-    solid and only its edge was worth walking - which gave a map with no
-    subject. This one has a single subject and everything else serves it.
+    84x68, of which 80x62 is playable. The old one was 42x34 and had a single
+    lake with one island; this has the same subject at four times the size,
+    which means the lake can do what a real one does - reach into bays, break
+    into islands, and leave a shore that is worth following rather than a rim
+    you cross in six steps.
 
-    The first draft of *this* had the fault at the other extreme: lake centred,
-    island centred in the lake, one straight pier through both, sand ringing the
-    whole thing at an even width. Every piece was drawn correctly and it read as
-    a diagram. Symmetry is as good a way to look unconsidered as randomness is.
+    Everything the small one got right is kept, and it is all about asymmetry:
 
-    So the composition is deliberately off-balance:
+      * the lake is widest along its north edge and tapers south-west in
+        right-angled steps, the way FireRed shapes water. Water carries its rim
+        on its top and sides only - the foot of a lake simply meets the grass -
+        so every step in the outline has to be a right angle or the rim has
+        nothing to turn on.
+      * the islands are not centred and the bridges do not line up. You arrive
+        from the south beach, cross to the big island, walk its length, and take
+        a second span north - a dog-leg, so the crossing is a route rather than
+        a line drawn through the middle of the map.
+      * going round is always open, so a bridge is a shortcut you choose and
+        never a gate.
 
-      * the lake is widest along its north edge and tapers to the south-west in
-        right-angled steps, the way FireRed shapes water. It sits east of
-        centre, which leaves the west a meadow rather than a margin.
-      * the island is not in the middle of it, and the two piers do not line up.
-        You arrive from the south beach, cross to the island, walk east past the
-        tree standing on it, and take the second pier north. A dog-leg, so the
-        crossing has three beats instead of one.
-      * a headland reaches into the lake from the east shore, which gives the
-        far bank a shape of its own and somewhere quiet to put flowers.
-      * sand only where you walk: a strip along the north, a path down the west
-        bank, the beach the pier lands on, and the lane south to where you
-        start. The east shore is left as grass, so the water is not framed.
-      * two ledges terrace the south meadow with a gap between them. The gap is
-        the way up, the ledges are the way back down.
-
-    Going round is always open, so the pier is a shortcut you choose, not a
-    gate - which is the only reason a bridge is worth building on a small map.
-
-    42x34, of which 38x28 is playable."""
-    W, H = 42, 34
+    The three numbers the layout tool flagged on the small one are the brief for
+    this one: loops 76.7 against a real route's 71.0-75.1, tight 0.48 against
+    0.50-0.57, and dead 0.00. All three say the same thing - too much open
+    ground with nothing near you - so the extra space goes to tree masses and
+    fields rather than to more water."""
+    W, H = 84, 68
     g = [["." for _ in range(W)] for _ in range(H)]
 
     # --- the frame -------------------------------------------------------
@@ -1511,86 +1506,121 @@ def pond_shore():
     rect(g, "T", 0, 0, 1, H - 1)
     rect(g, "T", W - 2, 0, W - 1, H - 1)
 
-    # --- the lake, in four steps ------------------------------------------
-    # Water carries its rim on its top and sides only - the foot of a lake
-    # simply meets the grass, the way FireRed draws it - so every step in the
-    # outline has to be a right angle or the rim has nothing to turn on.
-    rect(g, "w", 16, 5, 36, 7)
-    rect(g, "w", 12, 8, 36, 12)
-    rect(g, "w", 15, 13, 33, 15)
-    rect(g, "w", 18, 16, 30, 18)
+    # --- the lake, in right-angled steps ----------------------------------
+    rect(g, "w", 30, 6, 74, 10)
+    rect(g, "w", 24, 11, 74, 22)
+    rect(g, "w", 20, 23, 68, 32)
+    rect(g, "w", 26, 33, 62, 40)
+    rect(g, "w", 34, 41, 54, 46)
 
-    # --- what stands in the water ----------------------------------------
+    # --- what stands in the water -----------------------------------------
     # Carved back out rather than drawn on top, so the lake stays one shape with
     # holes in it and the rim wraps each hole by itself.
-    rect(g, ".", 20, 9, 29, 12)         # the island - bridges only
-    rect(g, ".", 31, 13, 33, 15)        # a headland, off the east shore
-    rect(g, ".", 33, 5, 36, 6)          # and a spur off the north, making a bay
+    rect(g, ".", 36, 14, 55, 20)        # the big island - bridges only
+    rect(g, ".", 30, 27, 39, 31)        # the west island
+    # Stopping at 65, not 66: the lake reaches x68 here, so a headland ending
+    # at 66 leaves a two-tile channel behind it and water runs three wide at
+    # the least - anything narrower has no rim to draw.
+    rect(g, ".", 58, 25, 65, 30)        # a headland off the east shore
+    rect(g, ".", 66, 6, 74, 9)          # a spur off the north, making a bay
+    # NO SHOAL IN THE SOUTHERN REACH. There was one, and it was exactly the 36
+    # tiles the reachability count could not get to: an island with no bridge is
+    # scenery you can see and never stand on, which is the fault that check
+    # exists for. Left as open water.
 
-    # --- the crossing, in two spans that do not line up ------------------
-    # BRIDGES, not piers. These were `pier()` - the `D` deck - and they were
-    # the wrong art for what they are: a pier is a JETTY, it runs out from
-    # land and stops, and its outer ring is drawn to meet sand, so laying it
-    # across open water fringed both spans in beach. Every tile of these two
-    # runs has water on both sides and dry ground at each end, which is a
-    # bridge, and the bridge planks are baked for exactly that.
-    #
-    # Two across, not three. Route 12's own bridge is two wide so the plank
-    # set is a left half and a right half and nothing else; `bridgeId()` picks
-    # by parity, so a third column comes out left/right/left and draws a rail
-    # down the middle of its own deck.
-    bridge(g, 26, 5, 27, 8, over="water")    # island -> north shore
-    bridge(g, 21, 13, 22, 18, over="water")  # south beach -> island
+    # --- the crossings, in spans that do not line up ----------------------
+    # BRIDGES, not piers. A pier is a JETTY - it runs out from land and stops,
+    # and its outer ring is drawn to meet sand, so laying it across open water
+    # fringes the span in beach. Every tile of these has water on both sides and
+    # dry ground at each end, which is a bridge, and the planks are baked for
+    # exactly that. Two across, never three: Route 12's own bridge is two wide,
+    # so the set is a left half and a right half and `bridgeId()` picks by
+    # parity - a third column comes out left/right/left and draws a rail down
+    # the middle of its own deck.
+    bridge(g, 44, 6, 45, 13, over="water")    # big island -> north shore
+    bridge(g, 38, 21, 39, 26, over="water")   # big island -> west island
+    bridge(g, 32, 32, 33, 40, over="water")   # west island -> south shore
+    # NORTH-SOUTH, like every other span here, and that is structural rather
+    # than stylistic: water carries its rim on its top and sides only, so the
+    # row under a body of water has to be a bank. An east-west bridge puts its
+    # own planks there and the lake above it ends on nothing - which is exactly
+    # what check() said when one was tried.
+    # At x58, not x60: the lake's south-east reach ends at x62, so a span two
+    # columns further east leaves a single tile of water behind it.
+    bridge(g, 58, 31, 59, 40, over="water")   # east headland -> south shore
 
     # --- sand, only where you walk ---------------------------------------
-    rect(g, "#", 11, 3, 39, 4)          # the north shore
-    rect(g, "#", 8, 3, 11, 22)          # down the west bank
-    rect(g, "#", 8, 20, 30, 22)         # the beach the bridge lands on
-    rect(g, "#", 19, 23, 22, 30)        # the lane south
+    rect(g, "#", 14, 4, 78, 5)           # the north shore
+    rect(g, "#", 14, 4, 17, 51)          # down the west bank
+    # ONE ROW CLEAR OF THE WATER'S FOOT. A lake carries no rim along its
+    # bottom - the tile below it is the walkable bank, and `shore()` makes one
+    # out of grass. Sand painted on that row leaves the water ending on beach
+    # with no bank at all, which is what check() catches.
+    rect(g, "#", 14, 48, 60, 51)         # the southern beach
+    rect(g, "#", 75, 6, 78, 46)          # the east bank
+    rect(g, "#", 40, 51, 43, 62)         # the lane south, where you come in
 
-    # --- trees standing in the open --------------------------------------
-    clump(g, 2, 3)
-    clump(g, 4, 12)
-    clump(g, 2, 19)
-    clump(g, 24, 10)                    # on the island, clear of its shore row
-    clump(g, 10, 26)
-    clump(g, 6, 28)
-    clump(g, 28, 28)
-    clump(g, 34, 22)
-    clump(g, 34, 27)
+    # --- tree masses, which are what the three flags actually asked for ---
+    # Rectangles with right angles, like Route 1's own. A mass takes floor out
+    # of `open` and its straight edges keep `turns` down, and both of those are
+    # what turns a shore into somewhere rather than a margin.
+    for x0, y0, x1, y1 in (
+            (2, 6, 11, 10), (2, 18, 11, 22), (2, 30, 11, 34),
+            (2, 42, 11, 46), (2, 54, 13, 58), (18, 54, 29, 58),
+            (46, 54, 57, 58), (62, 52, 73, 56), (20, 6, 27, 9),
+            (62, 58, 73, 62), (30, 58, 37, 62), (76, 50, 81, 60),
+    ):
+        rect(g, "T", x0, y0, x1, y1)
 
     # --- tall grass, in rectangles of several sizes ----------------------
-    onto_grass(g, ",", 2, 5, 7, 11)
-    onto_grass(g, ",", 2, 14, 7, 18)
-    onto_grass(g, ",", 12, 13, 14, 18)
-    onto_grass(g, ",", 31, 16, 36, 20)
-    onto_grass(g, ",", 37, 8, 39, 15)
-    onto_grass(g, ",", 3, 23, 9, 27)
-    onto_grass(g, ",", 12, 24, 17, 28)
-    onto_grass(g, ",", 24, 23, 30, 27)
-    onto_grass(g, ",", 33, 23, 39, 26)
+    for x0, y0, x1, y1 in (
+            (2, 12, 11, 16), (2, 24, 11, 28), (2, 36, 11, 40),
+            (2, 48, 13, 52), (18, 51, 38, 53), (44, 51, 60, 53),
+            (62, 46, 74, 50), (18, 60, 29, 64), (44, 60, 60, 64),
+            (66, 12, 74, 18), (70, 26, 78, 34), (38, 16, 53, 19),
+            (32, 28, 37, 30), (60, 26, 65, 29), (18, 6, 19, 22),
+    ):
+        onto_grass(g, ",", x0, y0, x1, y1)
+
+    # --- trees standing in the open --------------------------------------
+    for x, y in ((4, 4), (44, 17), (34, 29), (62, 27), (14, 60),
+                 (72, 20), (24, 48), (52, 48), (68, 42), (8, 62)):
+        clump(g, x, y)
+    # ...and then wherever the map is emptiest. Taller than they are wide, for
+    # the reason the meadow records: a 2x5 buys the same `turns` as a 2x3 and
+    # nearly twice the `tight`.
+    # SHORTER AND MORE OF THEM, which is the opposite of the meadow's answer
+    # and for the opposite reason. This map came out at turns 0.08 against a
+    # real route's 0.11-0.18 - BELOW the band, not above it - and tight 0.38
+    # against 0.50: all big rectangles and nothing near you. A lake is already
+    # one enormous straight-edged mass, so the trees here have to supply the
+    # texture the water cannot.
+    fill_the_empty(g, want=80, tall=3)
+    make_nooks(g, want=8)
 
     # --- ledges: the way back down, the gap between them the way up ------
-    ledge(g, 12, 17, 23)
-    ledge(g, 24, 30, 23)
-    ledge(g, 3, 7, 21)
+    # Searched rather than placed - see `ledge_in` - and laid after the trees,
+    # because `fill_the_empty` stands them wherever the map is emptiest and
+    # "emptiest" is exactly where a ledge was given its approach.
+    for row in (23, 35, 47, 59):
+        ledge_in(g, row, 3, W // 2 - 1)
+        ledge_in(g, row, W // 2, W - 4)
 
     # --- flowers, in loose handfuls on whatever grass is left ------------
-    flowers(g, (3, 4), (5, 6), (2, 9), (4, 10))
-    flowers(g, (6, 15), (3, 17), (7, 13))
-    flowers(g, (32, 13), (31, 15), (33, 14))
-    flowers(g, (12, 6), (13, 7), (14, 14))
-    flowers(g, (21, 10), (27, 11), (23, 12), (28, 9))   # on the island
-    flowers(g, (34, 5), (35, 6))                        # on the north spur
-    flowers(g, (10, 24), (11, 29), (16, 30))
-    flowers(g, (32, 29), (36, 24), (35, 30))
+    flowers(g, (4, 4), (6, 7), (3, 11), (5, 14))
+    flowers(g, (8, 26), (4, 31), (9, 35), (6, 39))
+    flowers(g, (40, 18), (46, 17), (50, 19), (43, 16))   # on the big island
+    flowers(g, (33, 29), (36, 30), (34, 31))             # on the west island
+    flowers(g, (69, 8), (72, 7), (70, 9))                # on the north spur
+    flowers(g, (20, 52), (26, 53), (33, 52), (48, 53))
+    flowers(g, (66, 48), (70, 47), (73, 49))
+    flowers(g, (16, 62), (22, 63), (52, 62), (58, 61))
 
+    repair_trees(g, W, H, ".")
     shore(g)
 
     # Standing in the south lane, looking up it towards the water.
-
-    make_nooks(g, want=3)            # a few corners with one way in
-    return ["".join(r) for r in g], (20, 28)
+    return ["".join(r) for r in g], (41, 61)
 
 
 def cave_wall(g, x0, y0, x1, y1):
