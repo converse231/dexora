@@ -239,7 +239,12 @@ function until(e, what, label, max = 2000) {
   assert.equal(e.useField("honey-shiny"), true, "a shiny honey refused to start");
   assert.equal(e.state.field.variant.id, "honey-shiny",
     "a second honey did not REPLACE the first - two variant tilts can run at once");
-  assert.equal(e.state.field.repel?.id, "repel", "starting a honey cleared the repel");
+  /* ONE EFFECT AT A TIME, whatever family it is. A repel says "meet nothing"
+     and a honey says "what you meet is rarer", and a player can buy both - so
+     starting either cancels the other and the readout only ever has one thing
+     to say. */
+  assert.equal(e.state.field.repel, null,
+    "a honey left the repel running - they contradict each other");
   console.log("field ok — counts down while walking, and one per family");
 }
 

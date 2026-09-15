@@ -799,6 +799,39 @@ encounters shorter AND less winnable; pointing them apart makes an encounter
 last longer so a failed throw is a setback rather than the end of it. If either
 is retuned alone, check that the pair still points apart.
 
+**A LEGENDARY'S HOME IS ITS PRIMARY TYPE.** Matching on ANY type gave half of
+them no home at all: Articuno is Ice/Flying and the starting map is
+Normal/Flying, so it was exactly as likely in Tall Grass as in Frost Hollow -
+the opposite of what "hunt where it lives" means. Three tiers now, off the type
+ORDER, which is already in the data: `LEGEND_HOME` for the primary,
+`LEGEND_HAUNT` for a later one, `LEGEND_STRAY` everywhere else.
+
+**And `legendTier` is exported because the RULE is the only thing worth
+asserting.** A legendary's share of a finished table is confounded twice - by
+how big that map's table is (Deep Woods has the smallest in the game, so every
+legendary looks commoner there) and by how many others call the same map home
+(the Tower is home to Mewtwo AND Mew, which dilutes Celebi's slice). Both
+measures said Celebi belonged in Deep Woods while it was weighted correctly the
+whole time.
+
+**ONE FIELD EFFECT AT A TIME, whatever family it is in.** The families still
+stop two of the same KIND colliding, but a repel and a honey running together
+is a contradiction a player can buy: one says "meet nothing" and the other says
+"what you meet is rarer". Starting anything cancels everything.
+
+**A REPEL IS TOTAL, and its tiers are DURATION.** It used to scale the encounter
+rate to 0.55/0.35/0.20 - a repel that mostly works, and "mostly" is the one
+thing it must not be, since the whole reason to carry one is crossing farmed
+ground without being stopped.
+
+**A BRANCH YOU HAVE REACHED MUST LEAVE THE RECKONING.** The Box's RAISE button
+showed while `need > 0`, and `need` was the minimum over ALL branches. Slowpoke
+evolves into Slowbro at 37 and into Slowking on a trade, which `evoLevel` gives
+a synthetic 16 - so past 16 the minimum was 0, RAISE hid itself, and Slowbro was
+unreachable for the rest of the game. Reported as "Slowking is blocking
+Slowbro", which is exactly what it was doing. **Any panel that reduces over
+branches has to drop the ones already satisfied.**
+
 **Legendaries are appended to every biome table by rule, never listed in one.**
 `LEGENDARY` holds the dex ids; `legendsFor()` adds each to every table at
 `LEGEND_MATCHED` (0.5) where the biome shares one of its types and

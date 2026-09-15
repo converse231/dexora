@@ -187,6 +187,7 @@ import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
   LIFT_CEILING, hasOrigin, tiersFor, ART_GEN, baseArtGen,
+  LEGEND_HOME, LEGEND_HAUNT, legendTier,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
   SIZE_MIN, SIZE_MAX,
 } from "../src/game/biomes.js";
@@ -2785,9 +2786,14 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
         const lo = line[k - 1], hi = line[k];
         assert.ok(hi.price > lo.price, `${hi.id} costs no more than ${lo.id}`);
         assert.ok(hi.level >= lo.level, `${hi.id} unlocks before ${lo.id}`);
-        // `rate` is the one lever where SMALLER is stronger - fewer encounters.
+        /* A REPEL IS TOTAL, so its tiers are DURATION and nothing else. It
+           used to scale the rate to 0.55/0.35/0.20 and the tier test asked for
+           a smaller number each rung; "mostly stops encounters" is the one
+           thing a repel must not be, because the whole reason to carry one is
+           crossing farmed ground without being stopped. What you pay more for
+           is how far it gets you. */
         if (hi.rate !== undefined) {
-          assert.ok(hi.rate < lo.rate, `${hi.id} repels no harder than ${lo.id}`);
+          assert.equal(hi.rate, 0, `${hi.id} lets something through`);
           assert.ok(hi.steps > lo.steps, `${hi.id} runs no longer than ${lo.id}`);
         }
         if (hi.lift !== undefined) {
@@ -3350,6 +3356,56 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   console.log(`clock ok — ${PHASES.length} phases over ${DAY_STEPS} steps ` +
     `(night ${(nightShare * 100).toFixed(0)}% of it); the Dusk Ball reaches its ` +
     "boost two different ways");
+}
+
+/* A LEGENDARY HAS A HOME, and matching on any type was not enough to give it
+   one. Articuno is Ice/Flying and the starting map is Normal/Flying, so it was
+   exactly as likely in Tall Grass as in Frost Hollow - which is the opposite of
+   what "hunt where it lives" is supposed to mean. The primary type is the home;
+   a later type is a haunt. */
+{
+  assert.ok(LEGEND_HOME > LEGEND_HAUNT && LEGEND_HAUNT > LEGEND_STRAY,
+    "the three legendary tiers are not in order");
+
+  /* ITS SHARE OF THE LEGENDARY POOL, not of the table. `LEGEND_SHARE` is a
+     fixed slice of whatever the table comes to, so a map with a small table
+     gives every legendary a bigger slice of ITSELF - Deep Woods has the
+     smallest table in the game and made Celebi look commoner there than in its
+     own home. Dividing by the pool takes the table's size out and leaves the
+     only thing this rule decides: how the pool is split. */
+  /* ON THE RULE, not on a finished table. A legendary's share of a table is
+     confounded twice - by the size of that map's table, and by how many other
+     legendaries call the same map home - and Celebi looked commoner in Deep
+     Woods than in the Haunted Tower on both measures while being correctly
+     weighted the whole time. `legendTier` is what the rule actually is. */
+  let checked = 0;
+  for (const id of LEGENDARY) {
+    const sp = speciesById(id);
+    const homes = BIOMES.filter((b) => b.types.includes(sp.types[0]));
+    if (!homes.length) continue;
+    for (const b of BIOMES) {
+      const tier = legendTier(id, b.types);
+      const want = homes.includes(b) ? LEGEND_HOME
+        : sp.types.some((t) => b.types.includes(t)) ? LEGEND_HAUNT : LEGEND_STRAY;
+      assert.equal(tier, want,
+        `${sp.name} in ${b.name} is worth ${tier}, not ${want}`);
+    }
+    checked++;
+  }
+  assert.ok(checked >= 8, `only ${checked} legendaries have a home to test`);
+
+  /* THE ONE THAT WAS WRONG, named directly: an ice bird belongs in the ice
+     cave, and sharing Flying with the starting map must not make that map its
+     equal. */
+  const frost = BIOMES.find((b) => b.id === "frost");
+  const meadow = BIOMES.find((b) => b.id === "meadow");
+  assert.equal(legendTier(144, frost.types), LEGEND_HOME, "Articuno has no home");
+  assert.ok(legendTier(144, meadow.types) < legendTier(144, frost.types),
+    "Articuno is as likely in Tall Grass as in Frost Hollow - it shares Flying " +
+    "with the meadow and Ice with the cave, and only one of those is where it lives");
+
+  console.log(`habitat ok — ${checked} legendaries, each likeliest where its ` +
+    `primary type lives (home ${LEGEND_HOME}, haunt ${LEGEND_HAUNT}, stray ${LEGEND_STRAY})`);
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);

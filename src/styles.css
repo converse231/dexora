@@ -2107,6 +2107,26 @@ canvas {
 }
 .sheet-close:hover { border-color: var(--path); color: var(--path); }
 
+/* The clock, on the map rather than in the bar of counters. Under the effect
+   readout in the same corner, so the two stack instead of competing. */
+.worldclock {
+  position: absolute; right: 10px; top: 10px; z-index: 3;
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 7px;
+  background: rgba(18, 26, 16, .62);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .35) inset;
+  font-family: var(--pixel); font-size: 9px; color: #fff;
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.worldclock b { font-size: 12px; line-height: 1; font-weight: 400; }
+.worldclock i { font-style: normal; }
+.worldclock.ph-dawn  { background: rgba(120, 72, 26, .72); }
+.worldclock.ph-day   { background: rgba(28, 64, 96, .62); }
+.worldclock.ph-dusk  { background: rgba(78, 40, 88, .72); }
+.worldclock.ph-night { background: rgba(14, 20, 44, .82); }
+/* When an effect is running the clock sits under it rather than over it. */
+.fieldbox ~ .worldclock { top: 40px; }
+
 /* ---------- the world's clock ----------
 
    A readout beside the level, not a control: the only thing that moves it is
@@ -2364,6 +2384,12 @@ canvas {
 
    Quieter than the slab was. This sits above a list you are reading, not over
    it, so it announces without taking the eye off the thing it is about. */
+/* A claim pays in three things and two of them have icons everywhere else in
+   the game. This was the one place they arrived as text. */
+.note img { width: 13px; height: 13px; image-rendering: pixelated; vertical-align: -2px; }
+.note span { display: inline-flex; align-items: center; gap: 2px; margin-left: 7px; }
+.note b { font-weight: 700; }
+
 .note {
   margin: 0 0 8px;
   padding: 7px 11px;
@@ -2743,8 +2769,12 @@ button:disabled { transition: none; }
 
 /* Same pill as the minimap, opposite corner: both are glanced at over the
    route rather than read, so they should not look like two systems. */
+/* TOP RIGHT, not top left. The biome tag and its row of type badges live in
+   the top-left corner of the viewport and were sitting straight on top of this
+   - the one readout whose whole job is to be glanced at. The right corner is
+   empty in every state of the game. */
 .fieldbox {
-  position: absolute; left: 10px; top: 10px; z-index: 3;
+  position: absolute; right: 10px; top: 10px; z-index: 3;
   display: flex; gap: 8px; padding: 4px 7px; border-radius: 7px;
   background: rgba(18, 26, 16, .62);
   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .35) inset;

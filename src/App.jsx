@@ -3,6 +3,7 @@ import { createEngine, VIEW_W, VIEW_H } from "./game/engine.js";
 import { TILE } from "./game/tileset.js";
 import TopBar from "./ui/TopBar.jsx";
 import Tip from "./ui/Tip.jsx";
+import { phaseAt, timeLabel } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
@@ -227,9 +228,18 @@ export default function App() {
   const claimDaily = () => {
     const won = engine?.claimDaily();
     if (!won) return null;
+    /* WHAT IT PAID, WITH THE THINGS IT PAID IN. Three numbers and two words
+       is a sentence you have to parse; the candy and the balls have icons
+       everywhere else in the game and this was the one place they arrived as
+       text. `Note` renders it, so the parts come through as nodes. */
     setClaimNote(
-      `+¥${won.money.toLocaleString()} · +${won.candy} candy · ` +
-      `+${won.items["great-ball"]} Great Balls`);
+      <>
+        <b>+¥{won.money.toLocaleString()}</b>
+        <span><img src="items/rare-candy.png" alt="candy" />+{won.candy}</span>
+        {Object.entries(won.items ?? {}).map(([id, n]) => (
+          <span key={id}><img src={`items/${id}.png`} alt={id} />+{n}</span>
+        ))}
+      </>);
     return won;
   };
   // Clears itself, and only ever the last one - see the money-delta bug.
@@ -316,6 +326,24 @@ export default function App() {
                     </span>
                   );
                 })}
+              </div>
+            )}
+
+            {/* THE CLOCK, OVER THE WORLD IT LIGHTS. It sat in the top bar
+                among the money and the step count, which is a row of things you
+                read; the time of day is a thing you SEE, and the sky it belongs
+                to is on this screen. Hidden with everything else for an
+                encounter - the phase is frozen on the encounter itself by then,
+                so a clock ticking over a paused world would be lying. */}
+            {!enc && !evo && (
+              <div
+                className={`worldclock ph-${phaseAt(st?.steps ?? 0).id}`}
+                data-tip={`${phaseAt(st?.steps ?? 0).name} — the world's clock runs as you walk`}
+              >
+                <b aria-hidden="true">
+                  {["dusk", "night"].includes(phaseAt(st?.steps ?? 0).id) ? "☾" : "☀"}
+                </b>
+                <i>{timeLabel(st?.steps ?? 0)}</i>
               </div>
             )}
 

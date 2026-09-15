@@ -9,7 +9,6 @@
 import { useEffect, useRef, useState } from "react";
 import { levelProgress } from "../game/biomes.js";
 import Daily from "./Daily.jsx";
-import { phaseAt, timeLabel } from "../game/clock.js";
 import { SPECIES } from "../data/species.js";
 
 /* "+3 +2 balls" - the whole parcel in one short line, because four separate
@@ -103,17 +102,6 @@ export default function TopBar({
         <span className="tb-lv-num">LV <b>{level}</b></span>
         <span className="xpbar"><i style={{ width: `${Math.round(frac * 100)}%` }} /></span>
         <span className="tb-lv-xp">{need ? `${into}/${need} XP` : "MAX"}</span>
-      </div>
-
-      {/* THE CLOCK RUNS ON STEPS, so it belongs beside the step counter's own
-          system rather than anywhere a real time would go. It is a readout, not
-          a control: the only thing that moves it is walking. */}
-      <div
-        className={`tb-clock ph-${phaseAt(steps).id}`}
-        data-tip={`${phaseAt(steps).name} — the world's clock runs as you walk`}
-      >
-        <i>{phaseAt(steps).name.toUpperCase()}</i>
-        <b>{timeLabel(steps)}</b>
       </div>
 
       <Missions daily={daily} onClaim={onClaimDaily} note={claimNote} />
