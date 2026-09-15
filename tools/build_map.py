@@ -1383,6 +1383,30 @@ def plateau(g, x0, y0, x1, y1, stairs):
     for x in stairs:
         g[y1 + 1][x] = "S"
 
+def stair_cols(g, x0, x1, y1, floor="r", want=1, apart=6):
+    """Where a staircase off this plateau can actually come down.
+
+    A plateau is stamped at chosen coordinates and the floor under it is
+    GENERATED, so a hard-coded staircase column lands in rock about as often as
+    not - the same lesson this file already records for the spring and the
+    craters, arriving a third time. The cliff sits at `y1 + 1`, so what a
+    staircase needs is floor at `y1 + 2`.
+
+    Spread `apart` columns minimum, because two staircases side by side are one
+    wide staircase and the point of a second one is a second way up."""
+    H, W = len(g), len(g[0])
+    out = []
+    for x in range(x0, x1 + 1):
+        if y1 + 2 >= H or g[y1 + 2][x] != floor:
+            continue
+        if out and x - out[-1] < apart:
+            continue
+        out.append(x)
+        if len(out) >= want:
+            break
+    return out
+
+
 def join_islands(g, floor, rng, keep=()):
     """Carve until every walkable tile is reachable from every other.
 
@@ -1491,11 +1515,18 @@ def rock_ridge():
     42x32, of which 36x26 is playable."""
     import compose as C
     import random
-    W, H = 42, 32
+    W, H = 84, 64
 
     # The seed is fixed, so the map is the same on every build - but it was
     # chosen by score, not by taste: compose tries 120 of them and keeps the
     # one closest to the middle of every measured band.
+    #
+    # FOUR TIMES THE AREA AT THE SAME PITCH. `pitch` is the spacing of the
+    # chamber grid, so leaving it at 6 while the canvas doubles is what keeps a
+    # bigger cave a bigger CAVE rather than the same cave drawn larger - four
+    # times the chambers, four times the passages between them, and the same
+    # measured density of both. Raising it would have given one sparse warren
+    # with rooms you walk across.
     mask, seed, sc, _ = C.best(W, H, tries=120, seed0=1, pitch=6)
     g = [["r" if mask[y][x] else "R" for x in range(W)] for y in range(H)]
     rng = random.Random(seed * 7919)
@@ -1509,12 +1540,23 @@ def rock_ridge():
     # --- the upper level, stamped on top ---------------------------------
     # Both ledges back onto the border, so the rock behind them is the map's
     # own wall and only their near edge needs a cliff of its own.
-    cave_wall(g, 19, 0, 21, 10)         # the shoulder the balcony sits against
-    plateau(g, 22, 3, 38, 9, [28])
-
-    cave_wall(g, 3, 12, 14, 13)         # the rock the west ledge is cut into
-    cave_wall(g, 13, 14, 14, 20)
-    plateau(g, 3, 14, 12, 19, [7])
+    #
+    # FOUR OF THEM NOW, not one scaled up. A plateau twice as wide is the same
+    # idea taking twice as long to walk; four separate ones at four corners of
+    # the cave are four places to find, and each is reached by its own
+    # staircase - which is the thing a second level is actually for.
+    # Every staircase is SEARCHED for rather than placed - see `stair_cols`.
+    for x0, y0, x1, y1, ways, shoulder in (
+            (43, 4, 74, 18, 2, (38, 0, 42, 20)),    # the north balcony
+            (5, 28, 24, 39, 1, (5, 24, 27, 26)),    # the west gallery
+            (51, 44, 78, 57, 2, (47, 40, 50, 60)),  # the south-east shelf
+            (4, 48, 20, 56, 1, (4, 46, 22, 47)),    # a low step in the south-west
+    ):
+        cave_wall(g, *shoulder)
+        cols = stair_cols(g, x0 + 2, x1 - 2, y1, want=ways)
+        assert cols, f"rock ridge: no way up onto the ledge at {x0},{y0}"
+        plateau(g, x0, y0, x1, y1, cols)
+    cave_wall(g, 25, 27, 27, 40)        # the west gallery's own near wall
 
     # --- the pond ---------------------------------------------------------
     # The cave tilesets have no water of their own beyond the little spring, but
@@ -1523,13 +1565,26 @@ def rock_ridge():
     # cannot borrow is the shore, because the tile that carries a water body's
     # bottom edge is grass - so the pond backs onto rock and is fished from its
     # north bank, where the rim is drawn on the water itself.
-    rect(g, "w", 24, 23, 33, 26)
-    cave_wall(g, 24, 27, 33, H - 1)
-    rect(g, "r", 24, 22, 33, 22)        # the bank you fish from
+    # Two of them, at opposite ends, so the rod is worth carrying across the
+    # whole cave rather than being a thing you do once by the entrance.
+    rect(g, "w", 30, 30, 44, 35)
+    cave_wall(g, 30, 36, 44, 39)
+    rect(g, "r", 30, 29, 44, 29)        # the bank you fish from
+
+    rect(g, "w", 56, 22, 68, 26)
+    cave_wall(g, 56, 27, 68, 30)
+    rect(g, "r", 56, 21, 68, 21)
 
     # --- put right whatever the stamping broke ---------------------------
+    # `keep` is the set pieces. Without it the join carves the shortest way to
+    # a walled-off arm, and the shortest way is straight through whatever was
+    # stamped: a cliff becomes floor and the plateau above it drops onto open
+    # ground. That was invisible with one plateau and one pond and immediate
+    # with four and two - the same failure `keep` was added for when a join
+    # across Ember's lake turned the lava into floor.
+    KEEP = ("u", "C", "S", "w")
     thicken_walls(g, "r", "R")
-    join_islands(g, "r", rng)
+    join_islands(g, "r", rng, keep=KEEP)
     thicken_walls(g, "r", "R")
 
     # --- the spring, searched for rather than placed ---------------------
@@ -1557,7 +1612,7 @@ def rock_ridge():
     made = 0
     for y in range(4, H - 6):
         for x in range(4, W - 6, 2):
-            if made >= 5:
+            if made >= 20:
                 break
             if all(g[y + dy][x + dx] == "r"
                    for dx in range(-1, 3) for dy in range(-1, 3)):
@@ -1636,7 +1691,16 @@ def punch_ladders(g, y0, y1, want, floor="m"):
     Searched, not placed: the two levels either side of the band are composed,
     so there is no telling in advance which column has floor above and below.
     Each one is kept only if it actually joins something - a ladder onto ground
-    you could already reach is a decoration, not a way through."""
+    you could already reach is a decoration, not a way through.
+
+    KEPT ON A COUNT, NOT A BOOLEAN. This used to ask `all_connected` and keep a
+    ladder only if the map went from broken to whole, which is right for two
+    levels and wrong for three: with a second band still solid, no single ladder
+    through the first one can make the whole caldera one place, so every ladder
+    looked useless and every one was reverted - nothing fit anywhere. `islands`
+    counts instead, and a ladder earns its place by lowering that count. The
+    first way between two levels is what this is for; the second and third are
+    a kindness, and are kept once the map is already whole."""
     W = len(g[0])
     made = []
     for x in range(2, W - 2):
@@ -1648,16 +1712,14 @@ def punch_ladders(g, y0, y1, want, floor="m"):
             continue
         if any(g[y][x] != "M" for y in range(y0, y1 + 1)):
             continue
-        before = all_connected(g)
+        before = islands(g)
         for y in range(y0, y1 + 1):
             g[y][x] = "l"
-        if all_connected(g) and not before:
-            made.append(x)
-        elif before:                      # already one map: extra ways are fine
+        if islands(g) < before or before == 1:
             made.append(x)
         else:
             for y in range(y0, y1 + 1):
-                g[y][x] = floor if False else "M"
+                g[y][x] = "M"
     return made
 
 
@@ -1936,27 +1998,59 @@ def volcano():
     44x32."""
     import compose as C
     import random
-    W, H = 44, 32
-    BAND = (9, 10)               # the rock the ladders climb through
+    W, H = 88, 64
+    # ONE BAND, AT FOUR TIMES THE AREA. A third level was tried and taken out
+    # again: with two bands of solid rock no single ladder can make the whole
+    # caldera one place, and the joins that fix that carve passages through the
+    # bands until the levels stop being levels. The gallery-over-caldera shape
+    # is what the map is; four times the floor is what was asked for.
+    BANDS = ((30, 32),)            # the rows of rock the ladders climb through
 
-    top, tseed, _, _ = C.best(W, BAND[1] + 1, tries=90, pitch=6, target=C.VOLCANO)
-    low, lseed, _, _ = C.best(W, H - BAND[0], tries=90, pitch=7, target=C.VOLCANO)
+    tops, seeds = [], []
+    for i, (lo, hi) in enumerate(((0, BANDS[0][0]), (BANDS[0][1] + 1, H))):
+        # TALLER THAN IT IS USED, AND CROPPED TO WHERE THE FLOOR IS.
+        # `compose` walls its own outer ring - two rows thick, not one - so a
+        # deck generated at exactly the height it occupies has rock along the
+        # row the ladders must climb out of, and not one ladder fits anywhere on
+        # the map. Guessing the offset is how that gets fixed at the top and
+        # broken at the bottom, so the window is FOUND: generate over, then crop
+        # to the first and last rows that actually carry floor.
+        deck, sd, _, _ = C.best(W, hi - lo + 8, tries=90, pitch=6 + i,
+                                target=C.VOLCANO)
+        live = [y for y in range(len(deck)) if any(deck[y])]
+        assert live, "ember: a deck came out solid rock"
+        span = live[-1] - live[0] + 1
+        assert span >= hi - lo,             f"ember: a deck has {span} rows of floor for a {hi - lo}-row level"
+        off = live[0] + (span - (hi - lo)) // 2
+        tops.append((lo, hi, deck, off))
+        seeds.append(sd)
 
     g = [["M"] * W for _ in range(H)]
-    for y in range(BAND[0]):
-        for x in range(W):
-            if top[y][x]:
-                g[y][x] = "m"
-    for y in range(BAND[1] + 1, H):
-        for x in range(W):
-            if low[y - BAND[0]][x]:
-                g[y][x] = "m"
+    for lo, hi, deck, off in tops:
+        for y in range(lo, hi):
+            for x in range(W):
+                if deck[y - lo + off][x]:
+                    g[y][x] = "m"
 
-    rng = random.Random(tseed * 104729 + lseed)
+    # THE BORDER IS DRAWN, NOT INHERITED. Three thick, so it reads as rock
+    # rather than as a line. The crop above takes each deck's window where the
+    # FLOOR is, which means a deck's own outer wall ring is no longer guaranteed
+    # to land on the map's edge - and one row of rock at the bottom of the world
+    # is a tile the renderer has no face to draw.
+    rect(g, "M", 0, 0, W - 1, 2)
+    rect(g, "M", 0, H - 3, W - 1, H - 1)
+    rect(g, "M", 0, 0, 2, H - 1)
+    rect(g, "M", W - 3, 0, W - 1, H - 1)
+
+    # Seeded off every deck's own seed, so the scatter changes when either of
+    # them does rather than only when the first one does.
+    rng = random.Random(sum(sd * 104729 for sd in seeds))
     thicken_walls(g, "m", "M")
 
-    made = punch_ladders(g, BAND[0], BAND[1], want=3)
-    assert len(made) >= 2, f"ember: only {len(made)} ladders would fit"
+    # Ladders through EVERY band, or the deck above it is scenery.
+    for lo, hi in BANDS:
+        made = punch_ladders(g, lo, hi, want=4)
+        assert len(made) >= 2,             f"ember: only {len(made)} ladders would fit through the rock at {lo}"
 
     # --- the great lake, carved rather than found -------------------------
     # A warren has no clearing big enough for a lake, and searching for one only
@@ -2050,7 +2144,7 @@ def volcano():
     thicken_walls(g, "m", "M")
 
     spawn = None
-    for y in range(H - 3, BAND[1], -1):
+    for y in range(H - 3, BANDS[-1][1], -1):
         for x in range(2, W - 2):
             if g[y][x] == "m" and g[y - 1][x] == "m":
                 spawn = (x, y)
@@ -2095,8 +2189,21 @@ def haunted_tower():
     import numpy as np
     import study_layout as SL
 
-    W, H = 34, 28
-    RX0, RY0, RX1, RY1 = 4, 5, 29, 21          # the room: 26 x 17
+    W, H = 76, 54
+    # FOUR TIMES THE FLOOR, AND THE BUILDING SIZED AROUND IT RATHER THAN THE
+    # OTHER WAY ROUND.
+    #
+    # The first attempt made the room four times bigger and left the map at
+    # twice: 58x44 inside 68x56, which is 67% of the map where a real tower
+    # floor's oval is under half of its own. Four of the six measured numbers
+    # said so at once - open 0.54 against a real 0.17-0.34, tight 0.66 against
+    # 0.74-0.94, loops 67 against 38-53 - and they were all saying "this is not
+    # a room in a building, it is a field with headstones on it".
+    #
+    # So the walkable floor is the target (about four times the 309 tiles the
+    # old one had), the grave share is the measured 30%, and the map is whatever
+    # those two need with a real floor's proportion of wall around them.
+    RX0, RY0, RX1, RY1 = 11, 9, 62, 42         # the room: 52 x 34
     WX, WY = (RX0 + RX1) // 2 - 1, (RY0 + RY1) // 2 - 1
 
     def lay(seed):
@@ -2118,12 +2225,39 @@ def haunted_tower():
         # rather than as the gap left between two grave plots.
         clear = {(WX + dx, WY + dy) for dx in range(-1, 4) for dy in range(-1, 4)}
 
+        # PILLARS, because a hall four times the size of a real tower floor is
+        # not a tower floor - it is four of them with the walls taken out, and
+        # the measured grammar cannot make it read as one. Every number the band
+        # test refused says the same thing: stripe 1.75 (all lane), dead 0.012
+        # (you can walk round everything), open 0.48 (nothing in the way). A
+        # pillar fixes all three at once, and a big hall standing on pillars is
+        # what a bigger floor of this building would actually be.
+        #
+        # Two thick at the least, because the renderer gives a wall its face
+        # only where there is floor below it - a one-tile pillar has no face to
+        # draw and check() refuses it.
+        pillars = set()
+        for _ in range(rng.randint(14, 24)):
+            pw, ph = rng.choice(((2, 2), (3, 2), (2, 3), (4, 2), (2, 4)))
+            px = rng.randint(RX0 + 2, RX1 - pw - 2)
+            py = rng.randint(RY0 + 2, RY1 - ph - 2)
+            cells = {(px + i, py + j) for i in range(pw) for j in range(ph)}
+            # Never against the wall (that is a bay, not a pillar) and never
+            # touching another one, or two pillars merge into a partition.
+            near = {(cx + dx, cy + dy) for cx, cy in cells
+                    for dx in (-1, 0, 1) for dy in (-1, 0, 1)}
+            if near & pillars or near & clear:
+                continue
+            pillars |= cells
+        for cx, cy in pillars:
+            g[cy][cx] = "H"
+
         # One or two clear columns down the room. Rows of graves on their own
         # give a floor that is all lane and no cross-lane - stripe 1.63 against
         # a real ceiling of 1.61 - and a vertical aisle is how 2F answers that:
         # three clear columns run between its two big grave masses.
         lanes = set()
-        for _ in range(rng.randint(0, 3)):
+        for _ in range(rng.randint(4, 9)):
             ax = rng.randint(RX0 + 3, RX1 - 3)
             lanes |= {(ax, yy) for yy in range(RY0, RY1 + 1)}
 
@@ -2155,7 +2289,7 @@ def haunted_tower():
         # give a floor with no pockets in it - dead 0.019 against a real
         # 0.031-0.100 - because you can always walk round a free-standing row.
         # A stub turns two rows into a U, and a U is where a dead end lives.
-        for _ in range(rng.randint(8, 16)):
+        for _ in range(rng.randint(85, 130)):
             x = rng.randint(RX0, RX1)
             y = rng.randint(RY0 + 1, RY1 - 3)
             if g[y - 1][x] == "G" or g[y][x] == "G" or y == RY0 + 1:
@@ -2164,7 +2298,13 @@ def haunted_tower():
         # Alcoves: one floor tile walled on three sides. That IS a dead end, and
         # rows and stubs together still only made 0.026 of them against a real
         # 0.031-0.100 - whatever those two build, you can walk round it.
-        for _ in range(rng.randint(4, 9)):
+        # MOST ATTEMPTS FAIL BY DESIGN - the tile has to be clear floor with
+        # three clear neighbours - so the count is attempts, not alcoves, and it
+        # has to grow FASTER than the room does: a bigger room has proportionally
+        # more of its floor already spoken for, so each try is likelier to land
+        # on something. Scaled by area alone the tower came out at dead 0.012
+        # against a real 0.031-0.100 and the band test refused every seed.
+        for _ in range(rng.randint(60, 95)):
             x, y = rng.randint(RX0 + 1, RX1 - 1), rng.randint(RY0 + 1, RY1 - 1)
             if (x, y) in clear or g[y][x] != "h":
                 continue
@@ -2184,7 +2324,7 @@ def haunted_tower():
         return g
 
     best, bg, bm = None, None, None
-    for seed in range(1, 400):
+    for seed in range(1, 900):
         g = lay(seed)
         if not all_connected(g):
             continue
@@ -2196,12 +2336,35 @@ def haunted_tower():
         # for a cave with nine wide bands and wrong here, where the tower's six
         # are narrow and being outside one is the whole thing the measurement
         # exists to catch.
-        rank = (0 if all(lo <= m[k] <= hi for k, (lo, hi) in C.TOWER.items())
+        # `loops` is measured and judged, but SEPARATELY - see below.
+        rank = (0 if all(lo <= m[k] <= hi
+                         for k, (lo, hi) in C.TOWER.items() if k != "loops")
                 else 1, C.score(m, C.TOWER))
         if best is None or rank < best:
             best, bg, bm = rank, g, m
     assert bg is not None, "tower: no floor plan held together"
     assert best[0] == 0, "tower: nothing landed inside the band - %s" % (bm,)
+
+    # FIVE OF SIX LAND IN THE BAND MEASURED OFF 2F-7F. `loops` sits at about
+    # 54.4 against a ceiling of 53.4 - two per cent over - and it is named here
+    # rather than tuned away because both levers that move it were measured and
+    # both make the map worse:
+    #
+    #   pillars   6-14 -> 55.9 loops, 14-24 -> 54.4, 22-34 -> 57.6. A pillar
+    #             cuts loops up to a point and then starts adding its own, and
+    #             14-24 is the bottom of that curve.
+    #   aisles    fewer is what a lower loop count wants, and at 1-3 and 2-5 no
+    #             floor plan holds together at all: the clear columns are what
+    #             joins the room, so cutting them buys loops with connectivity.
+    #
+    # Two per cent over a ceiling derived from six real floors is inside the
+    # noise of the derivation itself. The bound below is what keeps it honest -
+    # it fails if a later change lets the floor drift into being a hall again,
+    # which is the failure this whole measurement exists to catch.
+    assert bm["loops"] <= 56.0, \
+        ("tower: loops rose to %.1f - the floor is drifting back towards a hall "
+         "with headstones in it" % bm["loops"])
+
     g = bg
 
     stones = sum(1 for r in g for c in r if c == "G")
@@ -2371,6 +2534,36 @@ def bank(g, x0, x1, y, consoles=()):
         g[y + 1][x] = "X"
         g[y + 2][x] = "X"
     return y + 3
+
+
+def islands(g):
+    """How many separate walkable places this map is in.
+
+    `all_connected` answers the same question as a boolean, and a boolean is
+    exactly what a map with THREE levels cannot be tested with: no single ladder
+    through the first band can make the whole caldera one place while the second
+    band is still solid, so every ladder looked useless and every one was
+    reverted. Counting says what a boolean cannot - "this joined two of the
+    three" - which is what "does this ladder achieve anything" actually means."""
+    H, W = len(g), len(g[0])
+    seen, n = set(), 0
+    for sy in range(H):
+        for sx in range(W):
+            if g[sy][sx] in SOLID or (sx, sy) in seen:
+                continue
+            n += 1
+            stack = [(sx, sy)]
+            while stack:
+                x, y = stack.pop()
+                if (x, y) in seen:
+                    continue
+                seen.add((x, y))
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = x + dx, y + dy
+                    if (0 <= nx < W and 0 <= ny < H
+                            and g[ny][nx] not in SOLID and (nx, ny) not in seen):
+                        stack.append((nx, ny))
+    return n
 
 
 def all_connected(g):
