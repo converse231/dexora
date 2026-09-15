@@ -23,9 +23,10 @@ there beats opening a ticket, because a ticket loses the reason.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   node tools/check.mjs (25 suites)
+npm run dev        vite dev server           npm run check   check.mjs (25) + play.mjs
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
+npm run play       drive the engine in Node
                                              npm run layout  composition metrics
                                              npm run shape   structural metrics
                                              npm run assets  PokéAPI species/items/evolutions
@@ -1171,6 +1172,47 @@ stored per species, because it already is a fact about the id and 151 copies of
 that ships and it therefore says nothing — that is the point. A badge that
 arrives the same day as the thing it distinguishes reads as a label; one that was
 always there reads as information.
+
+## The engine itself: tools/play.mjs
+
+**Twenty-five suites tested every function the engine calls and nothing tested
+the engine.** It owns mutable state behind a `requestAnimationFrame` loop and
+draws to a canvas, so `check.mjs` could only ever reach the pure functions
+around it - and a catch that froze mid-animation got through all of them,
+because every function it called was individually correct.
+
+`npm run play` stubs the six DOM things `createEngine` touches (canvas,
+`localStorage`, `performance.now`, `requestAnimationFrame`, `document`,
+`Image`) and drives the frame clock BY HAND. That fake clock is the whole
+trick: `tick(ms)` advances `performance.now()` and runs exactly the callbacks
+that were registered, so a 3.2-second catch animation resolves in a few dozen
+synchronous frames, the run takes milliseconds, and **if the loop ever stops
+asking for a frame, `tick` runs out of callbacks and says so** rather than
+hanging. It walks a real map with held keys, throws real balls, feeds real
+berries and starts real field items - never `startEncounter()` directly, since
+that skips the code an encounter bug lives in.
+
+It runs as part of `npm run check`. Add to it whenever a change touches the
+loop, `settle`, the phase machine or the step handler.
+
+**Do not try to do this in the browser.** `chrome-headless-shell` throttles rAF
+while `--virtual-time-budget` fires timers instantly, so a seeded iframe
+harness releases held keys before the engine has run one frame and the trainer
+never moves - which reads exactly like "the keys are not registering". The
+headless shell is for looking at the DOM and at pixels; the engine is for Node.
+
+**AN IMPORT CAN BE SHADOWED BY A LOCAL, SILENTLY, AND IT FROZE EVERY CATCH.**
+`engine.js` imports `advance` from `daily.js` (quest progress) and
+`createEngine` declares its own `function advance(now)` for the phase machine.
+Because the local one is inside the closure it SHADOWS the import instead of
+colliding with it - no syntax error, no warning, and `noteDaily` called the
+phase machine instead of the quest counter. That re-entered `settle`, which
+called `noteDaily`, which called `advance`: a catch died of a stack overflow
+the instant the ball stopped shaking, and what a player saw was the animation
+freezing before the Gotcha. It is `advance as advanceGoal` now. **Alias
+anything imported into a file whose name a local function might reuse** - the
+existing `reward as dailyReward` on the same line is the pattern, and it was
+aliased only because `reward` obviously clashed.
 
 ## QA findings worth keeping
 
