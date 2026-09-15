@@ -175,7 +175,7 @@ import {
   evolveState, stoneFor, keeper, CANDY, candyValue, CANDY_PRICE,
   SYNTH_MIN, SYNTH_STEP,
   stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
-  TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf,
+  TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf, PLAIN_MULT,
   FIELD, FAMILIES, fieldById, BERRIES, berryById, artOf,
   berryCatch, berryCalm, berryXp, berryRoom,
 } from "../src/game/items.js";
@@ -391,14 +391,65 @@ for (let i = 1; i < SHOP_BALLS.length; i++)
     "tools/build_balls.py and re-run it");
 }
 
-/* The Master Ball never fails, so nothing but scarcity can balance it - and a
-   price is only ever a delay. It must not be purchasable at any level, and the
-   level table must be the only place one can come from. */
+/* THE MASTER BALL IS BUYABLE, AND THE PRICE IS THE ONLY THING BALANCING IT.
+   It never fails, so it cannot be balanced by odds; it used to be balanced by
+   being unbuyable at all. Now it is balanced by costing more than any other way
+   of getting the same result, and that is a claim about two numbers that move
+   whenever the economy is retuned - so both are measured here rather than
+   asserted as literals.
+
+   FLOOR: the cheapest honest route to a rate-3 legendary. Whatever the shelf
+   costs to grind a legendary out of, the Master Ball has to cost a large
+   multiple of it - at or below that price it is simply the efficient way to
+   catch a legendary and the entire ball ladder inverts. */
 const master = ballById("master-ball");
 assert.equal(catchChance(1, master.mult), 1, "a Master Ball always catches");
 assert.equal(catchChance(255, master.mult), 1, "even against a legendary");
-assert.ok(!forSale(master), "the Master Ball must never be for sale");
-assert.ok(!SHOP_BALLS.includes(master), "and must not reach the shelf");
+{
+  // Each conditional ball at its best case, the way the ball suite prices them.
+  const best = { areaId: [...ENCLOSED][0], types: ["water"], known: true, level: 4, throws: 9 };
+  let cheapest = Infinity, via = null;
+  for (const b of SHOP_BALLS) {
+    if (b === master) continue;
+    const hit = catchChance(3, liveMult(b, best));
+    const flee = fleeChance(3);
+    const resolve = hit + (1 - hit) * flee;
+    const money = (1 / resolve / (hit / resolve)) * b.price;
+    if (money < cheapest) { cheapest = money; via = b.short; }
+  }
+  const over = master.price / cheapest;
+  assert.ok(over > 10,
+    `a Master Ball is only ${over.toFixed(1)}x the cheapest route to a legendary ` +
+    `(${via}, ¥${Math.round(cheapest)}) - at that price it IS the cheap route`);
+
+  /* CEILING: it still has to be reachable. Priced against what the game
+     actually pays, not against the other balls - the best map nets `perEnc` a
+     head and a whole playthrough is STEP_TOTAL steps at ENCOUNTER_RATE. A ball
+     nobody can afford is the unbuyable one again, wearing a number. */
+  const ENCOUNTER_RATE = 0.07;             // engine.js; the only copy that matters
+  let perEnc = 0;
+  for (const b of BIOMES) {
+    let tot = 0, w = 0;
+    for (const [id, weight] of encounterTable(b, MAX_LEVEL)) {
+      const sp = speciesById(id);
+      if (!sp) continue;
+      const hit = catchChance(sp.rate, PLAIN_MULT);
+      const flee = fleeChance(sp.rate);
+      const resolve = hit + (1 - hit) * flee;
+      tot += weight * ((hit / resolve) * sellValue(sp) - (1 / resolve) * poke.price);
+      w += weight;
+    }
+    perEnc = Math.max(perEnc, tot / w);
+  }
+  const lifetime = 50000 * ENCOUNTER_RATE * perEnc;
+  const share = master.price / lifetime;
+  assert.ok(share < 0.5,
+    `a Master Ball costs ${(share * 100).toFixed(0)}% of everything a whole ` +
+    `playthrough earns (¥${Math.round(lifetime)}) - that is not expensive, that is unbuyable`);
+  console.log(`master ball price ok — ¥${master.price} is ${over.toFixed(0)}x the ` +
+    `cheapest route to a legendary (${via}, ¥${Math.round(cheapest)}) and ` +
+    `${(share * 100).toFixed(0)}% of a playthrough's income`);
+}
 assert.ok(SHOP_ITEMS.every(forSale), "the shop must only stock sellable items");
 
 /* Selling duplicates must never empty out a species and must keep the best one.
@@ -882,7 +933,11 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
 
   /* Precision must not break the ceiling the catch suite guards: 95% is the cap
      for anything but a Master Ball, however good the trainer gets. */
-  const best = SHOP_BALLS[SHOP_BALLS.length - 1];
+  /* The best ball that is not the guaranteed one - the Master Ball is on the
+     shelf now, and asking whether IT breaks a 95% ceiling is asking whether it
+     still works. */
+  const plain = SHOP_BALLS.filter((b) => b.mult < GUARANTEED);
+  const best = plain[plain.length - 1];
   const boosted = catchChance(255, best.mult * catchMult(at("precision", MAX_RANK)));
   assert.ok(boosted <= 0.95, `Precision broke the 95% ceiling (${boosted})`);
   assert.equal(catchChance(1, master.mult * catchMult(at("precision", MAX_RANK))), 1,

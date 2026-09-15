@@ -234,7 +234,7 @@ price in a way that breaks it and the tests fail rather than the play session:
 |---|---|
 | Poké / Great / Ultra Ball | ¥25 / ¥90 / ¥250 — ×1.0 / ×1.8 / ×3.0 odds |
 | Net / Repeat / Dusk / Timer Ball | ¥150 / ¥170 / ¥190 / ¥70 — ×1.0 until their condition holds |
-| Master Ball | **not for sale at any price** — never fails, so only scarcity can balance it |
+| Master Ball | **¥50,000**, Lv 30 — never fails, so only the price balances it |
 | Duplicate sells for | ¥40 C · ¥90 B · ¥220 A · ¥600 S |
 | New dex entry | ¥100, once per species |
 | A common, caught and sold | **nets about +¥14** |
@@ -328,19 +328,32 @@ an economy.
 
 **Levelling pays out in balls**, not permission. Every trainer level hands you 5
 Poké Balls, plus 3 Great Balls from Lv 6 and 2 Ultra Balls from Lv 12, and every
-**fifteenth** level a **Master Ball** — three across the whole curve. That divisor
-is derived from the cap, not chosen: it was every tenth level while the cap was
-30, and extending the cap to 50 without touching it would have quietly handed out
-five. **Three in a whole game is the design; the cadence is arithmetic.** The
-shop unlocking a
+`MASTER_EVERY` levels a **Master Ball** — six across the whole curve, with four
+more from walking. That divisor is derived from the cap, not chosen: it was every
+tenth level while the cap was 30, and extending the cap to 50 without touching it
+would have quietly changed the count. **The total is the design; the cadence is
+arithmetic**, so `npm run check` prints the count rather than pinning a literal.
+The shop unlocking a
 tier and the game handing you a few of it land together, so a new ball is
 something you get to try before you have to fund it.
 
-The Master Ball is the one thing money cannot reach. A price is only ever a
-delay — grind long enough and you could hold twenty — so the only thing that can
-keep a ball that *never fails* scarce is that it is not for sale. Three arrive in
-a whole game, at levels 10, 20 and 30. `npm run check` asserts it never reaches
-the shelf and that the level table is its only source. It stays hidden from the
+**The Master Ball reached the shelf, and the price is what balances it.** It was
+unbuyable, on the grounds that a price is only ever a delay — grind long enough
+and you could hold twenty. True, and still the risk. What that missed is that an
+unbuyable item has no dial at all: the only way to tune it was to change how many
+the game *hands* you, and a player who wants one more than the schedule allows
+had nothing to do about it. A price is a delay, and a delay is what an economy is
+for.
+
+So it is **¥50,000, from Lv 30**, and neither number was picked. Landing a
+rate-3 legendary the hard way measures at about ¥1,500 in balls — so at anything
+near that the Master Ball becomes the *cheap* way to catch a legendary, which
+inverts the whole shelf. At 50,000 it is **34× the cheapest route**: never the
+efficient choice, only the certain one. That is what it should be bought for —
+the legendary you have already watched run away. Measured the other way, it is
+**34% of everything a whole playthrough earns**, which is the other bound: a
+ball nobody can afford is the unbuyable one again, wearing a number. `npm run
+check` computes both from the live tables and prints them. It stays hidden from the
 encounter until you own one: four ball buttons plus RUN is a crowded row, and a
 permanently greyed-out button teaches nothing the shop does not.
 
