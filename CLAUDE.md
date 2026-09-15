@@ -707,8 +707,11 @@ nothing else would say so.
 area carried a `level` at all - a good argument that lost to a better one, since
 a new player cannot act on "all eight are open but seven will waste your balls"
 until after they have wasted them. **`areaOpen()` is the single answer**, used by
-the engine's refusal AND the Travel panel's padlock; a menu that offers a map the
-engine will not travel to is worse than no menu. `loadState` sends a save home if
+the engine's refusal, the Travel panel's padlock AND the Dex sheet's WHERE TO
+LOOK - which is a way to GO to the map rather than only the name of it, so it
+is a third screen offering travel and check.mjs asserts all three ask. A menu
+that offers a map the engine will not travel to is worse than no menu, and the
+failure is silent: the button is there, it is pressed, and nothing happens. `loadState` sends a save home if
 it is standing somewhere it has not earned, or a pre-ladder save is stranded.
 The suite asserts the SHAPE - starts at `MAP_FIRST`, ends at `MAP_LAST`,
 non-decreasing, and `MAP_LAST < MAX_LEVEL` so the ladder always finishes with

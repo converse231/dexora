@@ -1627,7 +1627,21 @@ assert.ok(LEGEND_STRAY < LEGEND_MATCHED,
     }
   }
 
-  console.log(`map ladder ok — ${levels.join(", ")} (Lv ${MAP_FIRST} to ${MAP_LAST})`);
+  /* EVERY SCREEN THAT OFFERS TRAVEL ASKS `areaOpen`, and there are three of
+     them now: the engine's own refusal, the Travel panel's padlock, and the Dex
+     sheet's WHERE TO LOOK - which became a way to GO there rather than only a
+     place name. A menu that offers a map the engine will refuse is worse than
+     no menu, and the failure is silent: the button is there, it is pressed,
+     and nothing happens. */
+  for (const f of ["ui/Travel.jsx", "ui/DexSheet.jsx", "game/engine.js"]) {
+    const src = readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    assert.ok(/areaOpen\(/.test(src),
+      `${f} offers or performs travel without asking areaOpen`);
+  }
+
+  console.log(`map ladder ok — ${levels.join(", ")} (Lv ${MAP_FIRST} to ${MAP_LAST}), ` +
+    "three screens through one gate");
 }
 assert.equal(shelf[0].level, 1, "the starting ball must be buyable at level one");
 assert.ok(shelf[shelf.length - 1].level <= MAX_LEVEL, "the best ball must be reachable");
