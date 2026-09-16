@@ -34,9 +34,15 @@ const canvas = () => ({
 });
 
 const store = new Map();
+// Set to a DOMException-shaped error to make the next write fail, as a full
+// quota does. Null means writes succeed.
+let writeFails = null;
 globalThis.localStorage = {
   getItem: (k) => store.get(k) ?? null,
-  setItem: (k, v) => store.set(k, String(v)),
+  setItem: (k, v) => {
+    if (writeFails) throw writeFails;
+    store.set(k, String(v));
+  },
   removeItem: (k) => store.delete(k),
 };
 globalThis.performance = { now: () => now };
@@ -333,6 +339,98 @@ function until(e, what, label, max = 2000) {
   assert.equal(recoverable().backup.caught, 77, "the backup does not read back");
   console.log("save guard ok — an unreadable save is kept, and a good one is " +
     "backed up at load time and not touched again");
+}
+
+/* A BULK ACTION MUST NOT TAKE A KEEPER, EVEN IF IT IS HANDED ONE.
+
+   `duplicateUids` already refuses to put a variant on the spare list, and that
+   was the whole protection - a rule in one of two places, which this codebase
+   has already watched fail once when the Box built a SECOND list that offered a
+   Lv 2 shiny as the single thing to sell. Driven through the real engine with
+   the uids passed in DELIBERATELY, which is the case the caller-side filter
+   cannot cover. */
+{
+  store.clear();
+  store.set("meadow-route", JSON.stringify({
+    ...SAVE,
+    box: [
+      { uid: 1, species: 19, level: 5 },                  // ordinary Rattata
+      { uid: 2, species: 19, level: 5, shiny: 1 },        // and a shiny one
+      { uid: 3, species: 19, level: 5, astral: 1 },
+    ],
+    nextUid: 4,
+  }));
+  raf.length = 0;
+  const e = createEngine(canvas(), () => {}, canvas());
+
+  const earned = e.sell([1, 2, 3]);                       // every uid, on purpose
+  const left = e.state.box.map((m) => m.uid).sort();
+  assert.deepEqual(left, [2, 3],
+    `sell() took a keeper: box holds ${JSON.stringify(left)}, expected the shiny ` +
+    "and the Astral to survive being named directly");
+  assert.ok(earned > 0, "the ordinary one should still have sold");
+
+  const got = e.convert([2, 3]);
+  assert.equal(got, 0, "convert() paid candy for keepers");
+  assert.equal(e.state.box.length, 2, "convert() ate a keeper");
+  console.log("keeper guard ok — sell and convert refuse a variant handed to them directly");
+}
+
+/* AN EVOLUTION IS NOT A CATCH. `state.caught` renders in the top bar under the
+   word CAUGHT and means throws that landed; `evolve` incremented it anyway, and
+   unconditionally, so re-evolving a species already owned counted too. */
+{
+  store.clear();
+  store.set("meadow-route", JSON.stringify({
+    ...SAVE,
+    // Caterpie at Lv 20, well past its Lv 7 evolution.
+    box: [{ uid: 1, species: 10, level: 20 }],
+    nextUid: 2,
+    caught: 7,
+  }));
+  raf.length = 0;
+  const e = createEngine(canvas(), () => {}, canvas());
+  const before = e.state.caught;
+  const dexBefore = e.state.dex.filter((v) => v === 2).length;
+  const out = e.evolve(1, 11);                            // Caterpie -> Metapod
+  assert.ok(out, "the evolution did not run - this test is asserting nothing");
+  assert.equal(e.state.caught, before,
+    `evolving moved the CAUGHT counter ${before} -> ${e.state.caught}`);
+  assert.ok(e.state.dex.filter((v) => v === 2).length > dexBefore,
+    "evolving must still register the species in the dex");
+  console.log("caught counter ok — an evolution fills a dex slot without counting as a catch");
+}
+
+/* A SAVE THAT STOPS WORKING MUST SAY SO. `save()` swallowed every write error
+   under a comment naming only private mode, so a full quota meant an hour of
+   catching went nowhere with nothing on screen to say it had. */
+{
+  store.clear();
+  store.set("meadow-route", JSON.stringify({ ...SAVE, money: 4242 }));
+  raf.length = 0;
+  const e = createEngine(canvas(), () => {}, canvas());
+  assert.ok(!e.state.stale, "a healthy session must not warn");
+
+  writeFails = Object.assign(new Error("quota"), { name: "QuotaExceededError" });
+  for (let i = 0; i < 60; i++) { e.press("right"); tick(16); }
+  e.clearHeld();
+  await new Promise((r) => setTimeout(r, 600));           // past the 400ms debounce
+  assert.equal(e.state.stale, "full",
+    `a failed write left stale=${JSON.stringify(e.state.stale)} - the player is ` +
+    "not being told the game has stopped saving");
+
+  // And it clears itself when writes start working again.
+  writeFails = null;
+  for (let i = 0; i < 60; i++) { e.press("left"); tick(16); }
+  e.clearHeld();
+  await new Promise((r) => setTimeout(r, 600));
+  assert.ok(!e.state.stale, "the warning latched after saving recovered");
+
+  /* The flag is SESSION state and must never reach the file - a saved warning
+     would come back on every load and could not be cleared. */
+  assert.ok(!("stale" in JSON.parse(store.get("meadow-route"))),
+    "the stale flag was written into the save");
+  console.log("save warning ok — a failed write is surfaced, clears on recovery, never persisted");
 }
 
 console.log("play ok — the frame loop never stopped");

@@ -511,8 +511,28 @@ export const lockedTiers = (dex, speciesId) =>
    holds across every map and every level.
 
    The RATIO between a matched and a stray legendary is what is tuned here now;
-   the overall rate is a property of the design, not of the table. */
-export const LEGEND_SHARE = 0.01;
+   the overall rate is a property of the design, not of the table.
+
+   BUT A FIXED TOTAL SHARE IS THE WRONG CONSTANT, and it fails the other way.
+   One percent split among all of them means each one's odds fall linearly as
+   the roster grows: measured in Tall Grass at Lv 50, a named legendary is 1 in
+   3,400 encounters at 34 of them and would be 1 in 9,000 at the ~90 a full
+   National Dex carries. At `ENCOUNTER_RATE` 0.07 that is 128,000 steps to find
+   one particular legendary, against a 50,000-step playthrough - so "hunt where
+   it lives", which is the whole point of `legendTier`, stops being possible.
+
+   That is the same dilution this comment is about, one level down: the fix for
+   the TOTAL was to make it a share, and the fix for EACH ONE is to make the
+   share follow the roster. `LEGEND_EACH` is what a single legendary is worth,
+   so meeting a named one does not get rarer because an unrelated generation
+   shipped. `LEGEND_CEIL` is what stops the other failure - at 90 legendaries an
+   uncapped per-head share is 2.7% of every table, and a world where one
+   encounter in 37 is legendary has no legendaries in it. Under the ceiling,
+   hunting is preserved exactly; over it, everything scales down together and
+   the RATIO still holds. */
+export const LEGEND_EACH = 0.0003;   // ~1% across today's 34, and it stays put
+export const LEGEND_CEIL = 0.025;    // the world must not fill with them
+export const LEGEND_SHARE = 0.01;    // what it comes to today; read, never set
 export const LEGEND_MATCHED = 0.5;
 /* A STRAY IS MEANT TO BE A STORY, and at 0.08 it was merely uncommon.
 
@@ -588,7 +608,11 @@ const legendsFor = (types, total, open = () => true) => {
   if (!live.length || total <= 0) return [];
   const raw = live.map((id) => legendTier(id, types));
   const sum = raw.reduce((n, w) => n + w, 0);
-  const budget = (total * LEGEND_SHARE) / (1 - LEGEND_SHARE);
+  /* PER HEAD, then capped - see LEGEND_EACH. Only the legendaries OPEN at this
+     level count, so a generation that has not arrived cannot dilute the ones
+     that have. */
+  const share = Math.min(LEGEND_CEIL, LEGEND_EACH * live.length);
+  const budget = (total * share) / (1 - share);
   return live.map((id, i) => [id, (budget * raw[i]) / sum]);
 };
 

@@ -36,7 +36,7 @@ there beats opening a ticket, because a ticket loses the reason.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   check.mjs (30) + play.mjs
+npm run dev        vite dev server           npm run check   check.mjs (32) + play.mjs
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
 npm run play       drive the engine in Node
@@ -687,7 +687,7 @@ disconnected by it, so `spans_clear()` is what catches that, alongside
 `ladders_clear()`, whenever a pool is placed.
 - spawn not inside a wall; ≥200 walkable tiles; ≥90% reachable (directed)
 
-[tools/check.mjs](tools/check.mjs) adds thirty suites — catch rules, phase
+[tools/check.mjs](tools/check.mjs) adds thirty-two suites — catch rules, phase
 machine, balls, master balls, economy, evolution, evolution scene, trainer
 stats, casting, tileset, player, map ladder, medals, origin gate, variant rows,
 steps, minimap, battle scene, band budgets, pity, daily, field items, berries,
@@ -1395,13 +1395,35 @@ key, so a quest cannot be rerolled by reloading. The streak caps at
 `STREAK_CAP`; uncapped, day sixty is worth more than the first fifty together
 and missing one leaves nothing to come back for.
 
-**Legendaries are a SHARE of the table, never a fixed weight.** `LEGEND_SHARE`
-is 1% of whatever the table comes to, split by type match, added by
-`encounterTable` after the residents and the evolved overlay - so it cannot be
+**Legendaries are a SHARE of the table, never a fixed weight** - added by
+`encounterTable` after the residents and the evolved overlay, so it cannot be
 in `BIOMES[i].table`, and `foundIn`/check.mjs read the assembled table instead.
 Fixed weights survive exactly one dex size: 5 legendaries became 24 and the
-tables tripled, which would have multiplied the rate by five. Adding a
-generation, a legendary or a map now moves nothing.
+tables tripled, which would have multiplied the rate by five.
+
+**BUT A FIXED TOTAL SHARE FAILS THE OTHER WAY, and that took an audit to see.**
+One percent split among all of them means each one's odds fall linearly as the
+roster grows: measured in Tall Grass at Lv 50, a named legendary is 1 in 3,400
+encounters at 34 of them and would be **1 in 9,000** at the ~90 a full National
+Dex carries - 128,000 steps at `ENCOUNTER_RATE`, against a 50,000-step
+playthrough. "Hunt where it lives", which is the entire point of `legendTier`,
+stops being possible.
+
+So the share follows the roster: **`LEGEND_EACH` (0.0003) is what ONE legendary
+is worth** and `LEGEND_CEIL` (2.5%) is where it saturates. Under the ceiling a
+named legendary's odds cannot move when an unrelated generation ships; over it
+everything scales down together, because 90 legendaries at a flat per-head share
+is one encounter in 37 and a world that full has none in it. `LEGEND_SHARE` is
+kept as what it comes to TODAY - read it, never set it.
+
+**The assertion is the equation, and it carries both halves**: share ==
+`min(CEIL, EACH x open)` at every level in every map, which pins independence
+from the TABLE's size (the original claim) and proportionality to the ROSTER at
+once. And the monotonicity check is now **per head** - it compared the pool's
+share at Lv 1 against Lv 50, which was right while every legendary was open from
+the start and wrong once they arrive on `GEN_UNLOCK`: the pool climbs 0.15% ->
+1.02% purely because there are more of them. Levelling must buy you more
+legendaries to hunt, never a cheaper hunt for the one you are after.
 
 **A generation ARRIVES, and `GEN_UNLOCK` IS DERIVED FROM `GEN_LAST`.** Gen 1
 from the first minute, then one every `GEN_STEP` (5) levels from `GEN_FIRST`
