@@ -176,11 +176,57 @@ going taller. Pond & Shore wanted the opposite - it came out at turns 0.08, BELO
 the band, because a lake is already one enormous straight-edged mass - and took
 eighty short clumps instead of thirty-eight tall ones.
 
-**A COMB IS ONE CORRIDOR.** Deep Woods is a comb of canopy teeth, and seven cross
-walls - each a correct odd run - cut off 2,746 of 3,061 tiles between them. A wall
-across a lane is not a wall in a maze, it is the end of the maze. What breaks up
-long runs there is clearings and ponds: holes in the floor cannot disconnect
-anything.
+**A COMB IS ONE CORRIDOR, AND THAT IS WHY DEEP WOODS IS NOT ONE ANY MORE.**
+It was a comb of canopy teeth, and two separate findings killed it. First: seven
+cross walls - each a correct odd run - cut off 2,746 of 3,061 tiles between them,
+because a wall across a lane is not a wall in a maze, it is the end of the maze.
+Second, and fatal: a comb is ONE serpentine corridor, so getting back to where
+you came in means walking the whole map in reverse. Reported from play as not
+being able to go back at all.
+
+**A through-corridor cannot be patched into it.** Three attempts, all reverted:
+each either sealed a few hundred tiles into pockets you could see and never
+reach, or measured `open 0.67` against a real forest's 0.32-0.43. The comb was
+load-bearing for the canopy parity AND for connectivity at once, so cutting it
+meant rebuilding both.
+
+**So the canopy is GENERATED AND TESTED, over masses rather than corridors** -
+the same shape `haunted_tower` takes, and for the same reason: `compose()` carves
+free-form passages and a canopy column must be three wide, on the 3-column grid,
+and an ODD number of rows measured on the MERGED run. `forest_masses` throws
+rectangles at the map in random order and keeps what fits, tallest variant first;
+`best_forest` ranks 200 seeds against `FOREST`, measured off ViridianForest and
+ThreeIsland_BerryForest.
+
+**Every mass keeps 3 clear of every other mass AND of the frame**, which buys
+three things at once: no two masses merge, so each one's own height is the run
+height and the parity is decided where it is written; every corridor is at least
+three wide, which the autotile needs; and **the floor is connected by
+construction** - the walkable part is the complement of disjoint rectangles
+inside a frame, which cannot be disconnected. That last one is the property the
+hand patches kept losing.
+
+| | comb | generated | Viridian | Berry |
+|---|---|---|---|---|
+| stripe | 0.32 | **0.96** | 0.822 | 1.025 |
+| turns | 0.03 | **0.09** | 0.077 | 0.168 |
+| tight | 0.44 | **0.47** | 0.426 | 0.653 |
+| open | 0.54 | **0.46** | 0.429 | 0.321 |
+
+`stripe 0.32` is what "reads as vertical banding" looks like as a number, and a
+comb is exactly that. Five of the six now sit inside the real range.
+
+**A LATTICE THAT MATCHES EVERY BAND STILL READS AS AN ORCHARD.** The first
+generated version placed masses on a jittered grid and scored *better* than what
+shipped - and rendered as rows of identical blocks, because nothing in the bands
+measures REGULARITY. The same lesson `compose.py` records about wall masses.
+Widening the jitter made it worse (collisions thinned the canopy from 21 masses
+to 14); removing the lattice entirely fixed it. **Look at the render.**
+
+And the clearings and ponds are **searched for, in a shuffled order**. A
+top-left scan put all five clearings in the first gaps it met - a row along the
+top edge, with no room left for the ponds at all - which reads as typed-in
+precisely because it is the most orderly placement available.
 
 **A CONNECTIVITY TEST THAT ASKS A BOOLEAN CANNOT COUNT.** `punch_ladders` kept a
 ladder only if the map went from broken to whole, which is right for two levels
