@@ -615,4 +615,60 @@ function until(e, what, label, max = 2000) {
   console.log(`trainer ok — ${CHARS.join("/")}, chosen, saved, and validated on load`);
 }
 
+/* A TIP ARRIVES ONCE AND NEVER AGAIN, driven through the real engine. The
+   "once" is the entire feature - a hint you have already read is the one thing
+   that makes the rest of them annoying - and it has to survive a reload, which
+   is the only part a pure test of `nextHint` cannot show. */
+{
+  const { HINT_IDS, nextHint } = await import("../src/game/hints.js");
+
+  // Pure first: at most one, ranked, and never one already shown.
+  const both = nextHint({ kind: "encounter", variant: "holo" }, []);
+  assert.equal(both.id, "throw", "the first encounter should teach the throw first");
+  const rare = nextHint({ kind: "encounter", variant: "holo" }, ["throw"]);
+  assert.equal(rare.id, "variant", "the rare form is not taught after the throw");
+  assert.ok(rare.text.includes("HOLO"), `the tip does not name the tier: ${rare.text}`);
+  assert.equal(nextHint({ kind: "encounter", variant: null }, HINT_IDS), null,
+    "a hint came back after every id had been shown");
+
+  // Then through the engine, which is where "once ever" actually lives.
+  store.clear();
+  store.set("meadow-route", JSON.stringify({ ...SAVE, hints: [] }));
+  raf.length = 0;
+  let e = createEngine(canvas(), () => {}, canvas());
+  assert.equal(e.state.hint, null, "a tip was showing before anything happened");
+
+  for (let i = 0; i < 200 && !e.state.hint; i++) { e.press("right"); tick(16); }
+  e.clearHeld();
+  assert.ok(e.state.hint, "walking taught nothing at all");
+  const first = e.state.hint.id;
+  assert.ok(e.state.hints.includes(first), "the tip was shown without being banked");
+
+  e.clearHint();
+  assert.equal(e.state.hint, null, "dismissing did not clear it");
+
+  /* AND IT DOES NOT COME BACK. Banked on the save, so a reload is the real
+     test - `hint` itself is screen state and must NOT be in the file, or a tip
+     would be showing on every load with no way to get rid of it. */
+  await new Promise((r) => setTimeout(r, 600));
+  const raw = JSON.parse(store.get("meadow-route"));
+  assert.ok(raw.hints.includes(first), "the banked tip did not reach the save");
+  assert.ok(!("hint" in raw), "the live tip was written into the save");
+
+  raf.length = 0;
+  e = createEngine(canvas(), () => {}, canvas());
+  assert.equal(e.state.hint, null, "a tip was showing again straight after a reload");
+  for (let i = 0; i < 200; i++) { e.press("right"); tick(16); }
+  e.clearHeld();
+  assert.notEqual(e.state.hint?.id, first, `"${first}" was taught twice`);
+
+  // A retired id in an old save cannot sit there blocking its own slot.
+  store.set("meadow-route", JSON.stringify({ ...SAVE, hints: ["gone", first] }));
+  raf.length = 0;
+  e = createEngine(canvas(), () => {}, canvas());
+  assert.deepEqual(e.state.hints, [first], "an unknown hint id survived a load");
+  console.log(`hints ok — ${HINT_IDS.length} tips, one at a time, banked on sight ` +
+    "and never repeated");
+}
+
 console.log("play ok — the frame loop never stopped");

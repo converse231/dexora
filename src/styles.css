@@ -1293,6 +1293,29 @@ canvas {
 /* SAVE FILE. Two buttons that are peers, so they are the same size and sit on
    one row - export is not the "primary" of the pair, and styling it as one
    would suggest importing is the risky half when the opposite is true. */
+/* THE CONTEXTUAL TIP. Gold, like every other "this is worth your attention"
+   surface here (`.note-warn`, `.tb-stale`), and in the flow under the top bar
+   rather than floating over the map - it is describing the thing on screen, so
+   covering that would be the one thing it must not do. */
+.hintbar {
+  display: flex; align-items: center; gap: 12px;
+  margin: -4px 0 12px; padding: 9px 12px;
+  border: 2px solid var(--gold); border-radius: 11px;
+  background: var(--surface); box-shadow: 0 2px 0 var(--line-firm);
+}
+.hintbar p { margin: 0; flex: 1; font-size: 13px; line-height: 1.4; color: var(--ink); }
+.hintbar button {
+  flex: none; cursor: pointer;
+  font-family: var(--pixel); font-size: 10px; padding: 7px 11px 6px;
+  border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--surface-2); color: var(--ink-soft);
+}
+.hintbar button:hover { background: var(--path-soft); color: var(--ink); }
+@media (max-width: 560px) {
+  .hintbar { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .hintbar button { align-self: flex-end; }
+}
+
 /* WHO YOU PLAY. Two tiles drawing the real down-facing walk frame out of the
    same strip the map renders from - `player.png` is 8 rows of 32 at 2x, so a
    character is a 128px vertical offset and the walk set is the first 16 columns.

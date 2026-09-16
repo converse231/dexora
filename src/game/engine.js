@@ -12,11 +12,11 @@ import {
   levelFromXp, xpForCatch,
   rodTable, rodBite,
   rollVariant, pityBoost, TIERS,
-  lockedTiers, originReady, wildBand, rollSize,
+  lockedTiers, originReady, wildBand, rollSize, BIOMES,
 } from "./biomes.js";
 import {
   emptyStats, canSpend, catchMult, weighted, stepScale,
-  pricedAt, valuedAt, xpScale,
+  pricedAt, valuedAt, xpScale, freePoints,
 } from "./trainer.js";
 import {
   TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawBobber, fishFrame,
@@ -72,6 +72,7 @@ export const CHARS = ["red", "leaf"];
 
 /* Where the save lives is `store.js`'s business, not this file's. */
 import { SAVE_KEY, BACKUP_KEY, BROKEN_KEY, read, write, keep } from "./store.js";
+import { nextHint, HINT_IDS } from "./hints.js";
 
 /* THREE KEYS, AND THE OTHER TWO EXIST BECAUSE A COLLECTION WAS LOST.
 
@@ -109,6 +110,11 @@ function freshState() {
        the save rather than anything cleverer. "red" is the default for every
        save written before the choice existed. */
     char: "red",
+    /* WHICH ONE-LINE TIPS HAVE ALREADY BEEN SHOWN. Ids, not a step number:
+       there is no sequence to be partway through, so there is nothing to
+       resume and nothing to get stuck in. Saved, so "once" means once ever. */
+    hints: [],
+    hint: null,
     steps: 0,
     xp: 0,
     nextUid: 1,
@@ -374,6 +380,11 @@ function loadState() {
          indexes into the art, and an unknown one would draw four rows off the
          end of the strip - which is empty, so the trainer would vanish. */
       char: CHARS.includes(s.char) ? s.char : "red",
+      /* A save from before hints gets them - it has probably seen all of these
+         moments already, but a stray tip is a smaller cost than a new player
+         silently getting none. Filtered to ids that still exist so a retired
+         hint cannot sit in a save forever blocking its own slot. */
+      hints: (Array.isArray(s.hints) ? s.hints : []).filter((h) => HINT_IDS.includes(h)),
       dry: Math.max(0, Math.floor(Number(s.dry) || 0)),
       // A save from before dailies simply has none, and gets today's.
       daily: { ...freshState().daily, ...(s.daily ?? {}) },
@@ -550,7 +561,8 @@ export function createEngine(canvas, onChange, mini = null) {
   function save() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      const { encounter, evolution, fishing, running, cheers, rev, stale, ...rest } = state;
+      const { encounter, evolution, fishing, running, cheers, rev, stale, hint,
+        ...rest } = state;
       /* `write` reports whether it stuck rather than throwing - which cause it
          was is its business, not this file's. What happens NEXT is this file's:
          play on either way, and latch it so the top bar can say NOT SAVING. */
@@ -644,6 +656,7 @@ export function createEngine(canvas, onChange, mini = null) {
   function onArrive() {
     walkFrame++;
     state.steps++;
+    teach({ kind: "step", steps: state.steps });
     noteDaily({ steps: 1 });
     // One step off every running effect; the slot empties when it runs out.
     for (const fam of FAMILIES) {
@@ -829,6 +842,7 @@ export function createEngine(canvas, onChange, mini = null) {
       until: 0,
     };
     save();
+    teach({ kind: "encounter", variant });
   }
 
   /* The tile you are facing, which is the only thing fishing cares about. */
@@ -950,6 +964,20 @@ export function createEngine(canvas, onChange, mini = null) {
     changed();
   }
 
+  /* ONE HINT AT A TIME, AND ONLY THE FIRST TIME. Everything that can teach
+     something calls this with what just happened; `nextHint` is pure and picks
+     at most one, or none. Banked immediately so a reload cannot repeat it -
+     the tip is cheap and being told twice is what makes one annoying. */
+  function teach(event) {
+    if (state.hint) return;                 // one on screen is the whole rule
+    const hit = nextHint(event, state.hints);
+    if (!hit) return;
+    state.hints = [...state.hints, hit.id];
+    state.hint = hit;
+    save();
+    changed();
+  }
+
   function cheer(entry) {
     state.cheers.push(entry);
   }
@@ -1020,6 +1048,15 @@ export function createEngine(canvas, onChange, mini = null) {
        about the shop. */
     const sub = "New stock in the shop.";
     cheer({ kind: "level", title: `TRAINER LEVEL ${after}`, sub, items: won });
+    /* A level can teach two different things and they are ranked in `HINTS`: a
+       spendable point, or a map that just opened. `opened` is the NAME rather
+       than a flag, because the tip says which one. */
+    const opened = BIOMES.find((b) => b.level > before && b.level <= after);
+    teach({
+      kind: "level",
+      free: freePoints(state.stats, after),
+      opened: opened?.name ?? null,
+    });
     return { level: after, items: won };
   }
 
@@ -1038,6 +1075,9 @@ export function createEngine(canvas, onChange, mini = null) {
       const roll = e.variant;
       e.newVariant = !!roll && !state[roll][at];
       if (roll) state[roll][at] = 1;
+      /* BEFORE the push, so "do I already hold one" is about the ones that were
+         there first rather than about the one being added. */
+      const dupe = state.box.some((m) => m.species === e.speciesId);
       state.box.push({
         uid: state.nextUid++,
         species: e.speciesId,
@@ -1070,6 +1110,7 @@ export function createEngine(canvas, onChange, mini = null) {
          reach. Rounded, because XP is whole and a half-point that only ever
          appears with a berry in play is a rounding difference nobody can
          explain. */
+      teach({ kind: "caught", duplicate: dupe });
       const gained = gainXp(Math.round(xpForCatch(sp, e.isNew) * berryXp(e.berries)));
 
       if (e.isNew) {
@@ -1084,6 +1125,7 @@ export function createEngine(canvas, onChange, mini = null) {
       }
       save();
     } else if (phase === "fled") {
+      teach({ kind: "fled" });
       e.msg = `${e.name} fled!`;
     } else {
       e.msg = "It broke free!";
@@ -1561,6 +1603,14 @@ export function createEngine(canvas, onChange, mini = null) {
     fish,
     toggleBike,
     setChar,
+    /* Dismissing is not the same as banking it - the id went into `hints` the
+       moment it was shown, so closing it is only about the screen. It can never
+       come back, which is the point. */
+    clearHint() {
+      if (!state.hint) return;
+      state.hint = null;
+      changed();
+    },
     // Read by the UI every render: what a cast would use, and what things cost.
     castable,
     /* Shift is held, not toggled, so this is driven from keydown and keyup and

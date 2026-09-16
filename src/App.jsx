@@ -253,6 +253,25 @@ export default function App() {
           evolution, and both of those already own the middle of the screen. */}
       {cheer && <Cheer cheer={cheer} onDone={() => engine.dropCheer()} />}
 
+      {/* A TIP, NOT A TUTORIAL. One line, the first time you reach the thing it
+          is about, never again - see hints.js for why there is no sequence. It
+          sits under the top bar rather than over the map: it is worth reading
+          and never worth blocking a throw for, so it must not cover the scene
+          it is describing. `role="status"` because it arrives unprompted and
+          is not worth stealing focus for. */}
+      {st?.hint && (
+        <div className="hintbar" role="status">
+          <p>{st.hint.text}</p>
+          <button
+            type="button"
+            aria-label="Dismiss this tip"
+            onClick={() => engine.clearHint()}
+          >
+            GOT IT
+          </button>
+        </div>
+      )}
+
       <TopBar
         /* The quest lives here now rather than on the YOU tab - see Missions in
            TopBar.jsx. The claim and its note live here too, because the top bar
