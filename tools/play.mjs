@@ -297,7 +297,7 @@ function until(e, what, label, max = 2000) {
     assert.equal(e.state.dex[at(id)], 0,
       `#${id} (${by(id).name}) came back registered in a save written before Hoenn`);
   }
-  assert.equal(e.state.dex.length, (await import("../src/data/species.js")).SPECIES.length,
+  assert.equal(e.state.dex.length, (await import("../src/data/dex.js")).SPECIES.length,
     "the loaded dex is not the current size");
   console.log(`save ok — a 358-entry save loads onto ${e.state.dex.length} entries, ` +
     "Sinnoh and its shinies intact, Hoenn empty");
@@ -484,6 +484,100 @@ function until(e, what, label, max = 2000) {
   assert.ok(css.slice(css.indexOf(gate)).includes(".pad {"),
     "the touch pad is no longer gated on a coarse pointer");
   console.log(`pad ok — ${new Set(called).size} engine calls behind the touch controls all exist`);
+}
+
+/* A 493-ENTRY SAVE IS WHAT EVERY CURRENT PLAYER HOLDS, and the dex just went to
+   1145. Appending cannot move a position, so `padDex` is the right answer and
+   `remap` correctly declines - but "cannot" is the kind of claim that wants a
+   real save driven through the real loader rather than an argument. */
+{
+  const { SPECIES } = await import("../src/data/dex.js");
+  const { dexIndex, speciesById } = await import("../src/game/biomes.js");
+  const NOW = SPECIES.length;
+
+  const dex = new Array(493).fill(0);
+  const shiny = new Array(493).fill(0);
+  // Position and id agree below Hoenn, and these are the edges that matter:
+  // the first, the last of the old dex, and one either side of a boundary.
+  const held = [1, 25, 151, 251, 386, 387, 493];
+  for (const id of held) dex[id - 1] = 2;
+  shiny[492] = 1;                                   // a shiny Arceus, at the very end
+  store.clear();
+  store.set("meadow-route", JSON.stringify({
+    ...SAVE, dex, shiny, caught: held.length, box: [], nextUid: 1,
+  }));
+  raf.length = 0;
+  const e = createEngine(canvas(), () => {}, canvas());
+
+  assert.equal(e.state.dex.length, NOW, `a 493 save loaded onto ${e.state.dex.length}, not ${NOW}`);
+  for (const id of held) {
+    assert.equal(e.state.dex[dexIndex(id)], 2,
+      `#${id} (${speciesById(id).name}) was lost when the dex grew to ${NOW}`);
+  }
+  assert.equal(e.state.shiny[dexIndex(493)], 1, "the shiny Arceus did not survive");
+  // And nothing new came back pre-registered.
+  const fresh = [494, 800, 1025].filter((id) => e.state.dex[dexIndex(id)] !== 0);
+  assert.deepEqual(fresh, [], `new species arrived already caught: ${fresh}`);
+  const forms = SPECIES.filter((sp) => sp.id >= 10000)
+    .filter((sp) => e.state.dex[dexIndex(sp.id)] !== 0);
+  assert.equal(forms.length, 0, `${forms.length} forms arrived already registered`);
+  console.log(`save growth ok — a 493-entry save pads onto ${NOW} with every ` +
+    "position still meaning what it meant");
+}
+
+/* A FORM IS A HUNDRED LEVELS AND A CHOICE, driven through the real engine.
+
+   Mega, Primal and Gigantamax needed no new evolution machinery - `evoLevel`
+   already honours a row's own `level` and `evolveState` already gates on the
+   Pokemon's - so what is worth asserting is that the whole path actually runs:
+   refused under 100, offered as a BRANCH at 100, permanent once taken, and the
+   dex slot filled. */
+{
+  const { EVOLUTIONS } = await import("../src/data/evolutions.js");
+  const { evolutionsOf, evoLevel } = await import("../src/game/items.js");
+  const { speciesById, dexIndex, isForm } = await import("../src/game/biomes.js")
+    .then(async (b) => ({ ...b, isForm: (await import("../src/data/dex.js")).isForm }));
+
+  // Charizard: the one species with three forms, so the branch is real.
+  const CHARIZARD = 6;
+  const forms = evolutionsOf(CHARIZARD).filter((r) => isForm(r.to));
+  assert.ok(forms.length >= 2,
+    `Charizard offers ${forms.length} forms - this test needs a branch to be a test`);
+  for (const r of forms) {
+    assert.equal(evoLevel(r), 100, `${speciesById(r.to).name} is not a Lv 100 evolution`);
+  }
+
+  const boot99 = (level) => {
+    store.clear();
+    store.set("meadow-route", JSON.stringify({
+      ...SAVE, box: [{ uid: 1, species: CHARIZARD, level }], nextUid: 2, candy: 0,
+    }));
+    raf.length = 0;
+    return createEngine(canvas(), () => {}, canvas());
+  };
+
+  // Ninety-nine is not a hundred.
+  const e99 = boot99(99);
+  assert.equal(e99.evolve(1, forms[0].to), null,
+    "a form evolved at Lv 99 - the hundred is the whole price");
+  assert.equal(e99.state.box[0].species, CHARIZARD, "the Pokemon changed anyway");
+
+  // A hundred is.
+  const e = boot99(100);
+  const target = forms[0].to;
+  assert.ok(e.evolve(1, target), `evolving into ${speciesById(target).name} was refused at Lv 100`);
+  const mon = e.state.box[0];
+  assert.equal(mon.species, target, "the box entry did not become the form");
+  assert.equal(mon.uid, 1, "the uid did not survive - a form is the same Pokemon");
+  assert.equal(e.state.dex[dexIndex(target)], 2, "the form did not register in the dex");
+
+  /* AND IT IS PERMANENT AND EXCLUSIVE. The other branch is gone, because the
+     Pokemon is no longer a Charizard - which is what "choose one" means here
+     and is the same shape Slowpoke's branch already had. */
+  assert.equal(e.evolve(1, forms[1].to), null,
+    "the second form was still reachable after taking the first");
+  console.log(`form evolution ok — ${speciesById(CHARIZARD).name} offers ` +
+    `${forms.length} forms at Lv 100, refuses at 99, and keeps its uid`);
 }
 
 console.log("play ok — the frame loop never stopped");

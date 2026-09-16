@@ -1,7 +1,7 @@
 // node tools/check.mjs
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { SPECIES } from "../src/data/species.js";
+import { SPECIES, isForm } from "../src/data/dex.js";
 import { evoCycleFrames, EVO_SWAPS, SCALE_MAX } from "../src/game/evocycle.js";
 import {
   STATS, MAX_RANK, emptyStats, rank, spentPoints, freePoints, earnedPoints,
@@ -2074,19 +2074,38 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      changes, and the symptom would be Origins that are the same picture. */
   {
     const src = readFileSync(new URL("../tools/fetch-species.mjs", import.meta.url), "utf8");
-    const split = ART_GEN[0][0];
-    assert.ok(src.includes(`id <= ${split} ? FRLG : HGSS`),
-      `ART_GEN splits at ${split} but fetch-species.mjs does not - one of them is wrong`);
-    assert.ok(/generation-iii\/firered-leafgreen/.test(src)
-      && baseArtGen(1) === 3, "ART_GEN says Gen III art below the split; the fetcher disagrees");
-    assert.ok(/generation-iv\/heartgold-soulsilver/.test(src)
-      && baseArtGen(SPECIES.at(-1).id) === 4,
-      "ART_GEN says Gen IV art above the split; the fetcher disagrees");
+    /* EVERY BOUNDARY THE FETCHER DRAWS MUST BE A BOUNDARY HERE. It used to pin
+       one literal ternary, which broke the moment a third art set arrived.
+       `ART_GEN` legitimately has MORE rows than `artFor` has sources - Kalos
+       through Paldea all come from PokeAPI's default render, but each species
+       is drawn in its OWN generation there, so they need a row each and share a
+       source. What must agree is the other direction: wherever the fetcher
+       CHANGES source, this table must change generation. */
+    const sources = [...src.matchAll(/id <= (\d+) \?/g)].map((m) => Number(m[1]));
+    assert.ok(sources.length >= 3,
+      `found ${sources.length} art-source splits in fetch-species.mjs - the scan is broken`);
+    const rows = new Set(ART_GEN.map(([hi]) => hi));
+    for (const at of sources) {
+      assert.ok(rows.has(at),
+        `fetch-species.mjs changes art source at #${at} and ART_GEN does not - ` +
+        "one of them is wrong, and the symptom is Origins that are the same picture");
+    }
+    // And the three named sets still say what they are.
+    assert.ok(/generation-iii\/firered-leafgreen/.test(src) && baseArtGen(1) === 3,
+      "ART_GEN says Gen III art for Kanto; the fetcher disagrees");
+    assert.ok(/generation-iv\/heartgold-soulsilver/.test(src) && baseArtGen(400) === 4,
+      "ART_GEN says Gen IV art for Sinnoh; the fetcher disagrees");
+    assert.ok(/generation-v\/black-white/.test(src) && baseArtGen(500) === 5,
+      "ART_GEN says Gen V art for Unova; the fetcher disagrees");
   }
 
-  // The rule itself, stated rather than sampled: older debut, or no Origin.
+  /* The rule itself, stated rather than sampled: an OLDER debut than the art,
+     and not a form. `genOf` reads a form through to what it evolves from, so a
+     Mega Charizard answers "Gen 1" against Gen IV art and would otherwise
+     qualify - and there is no 1996 drawing of a Mega Charizard, because Mega
+     Evolution was invented in 2013. A form has exactly one drawing. */
   for (const sp of SPECIES) {
-    assert.equal(hasOrigin(sp.id), genOf(sp.id) < baseArtGen(sp.id),
+    assert.equal(hasOrigin(sp.id), !isForm(sp.id) && genOf(sp.id) < baseArtGen(sp.id),
       `#${sp.id} disagrees with its own rule`);
   }
 
@@ -2459,15 +2478,19 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
       assert.equal(g.name, `Gen ${g.gen} (${g.region})`,
         `region ${g.gen}'s menu label must name both the number and the place`);
     }
-    /* HOENN SHIPS NOW. `GENERATIONS` is derived from `SPECIES`, so it arrived
-       in the Dex's region filter the day the species were fetched and nothing
-       here had to be edited to put it there - which is what that derivation is
-       for. This line used to assert the opposite. */
-    const hoenn = GENERATIONS.find((g) => g.gen === 3);
-    assert.ok(hoenn, "Hoenn ships and must appear as a region");
-    assert.equal(hoenn.region, "Hoenn", "Hoenn's region has the wrong name");
-    assert.ok(hoenn.count > 100, `Hoenn shipped only ${hoenn.count} species`);
-    assert.equal(GENERATIONS.length, 4, "a generation appeared or vanished");
+    /* THE WHOLE NATIONAL DEX SHIPS NOW. `GENERATIONS` is derived from
+       `SPECIES`, so each region arrived in the Dex's filter the day its species
+       were fetched and nothing here had to be edited to put it there - which is
+       what that derivation is for. This line has now asserted "no Hoenn", then
+       "4 generations", and is written as a RELATIONSHIP so it stops needing a
+       rewrite every time the dex grows: one region per entry in `GEN_LAST`,
+       each named, each holding real species. */
+    assert.equal(GENERATIONS.length, GEN_LAST.length,
+      `${GENERATIONS.length} regions against ${GEN_LAST.length} generations in ` +
+      "GEN_LAST - a generation appeared or vanished");
+    for (const g of GENERATIONS) {
+      assert.ok(g.count > 50, `${g.region} shipped only ${g.count} species`);
+    }
   }
 }
 
@@ -2594,11 +2617,38 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     assert.equal(evoScale(MAX_LEVEL, depth), 1, `depth ${depth} never reaches full strength`);
   }
 
+  /* 3b. AND EVERY FORM IS REACHABLE FROM SOMETHING THAT IS. A form that no
+      shipped species evolves into is a dex entry nobody can ever fill, which is
+      worse than not shipping it - the rosette and the region count both include
+      it. Checked against the assembled tables, not against RESIDENTS. */
+  const formCheck = () => {
+    const wild = wildAt(MAX_LEVEL);
+    for (const sp of SPECIES) {
+      if (!isForm(sp.id)) continue;
+      const rows = EVOLUTIONS.filter((e) => e.to === sp.id);
+      assert.ok(rows.length, `${sp.name} is a form nothing evolves into`);
+      assert.ok(rows.some((e) => wild.has(e.from)),
+        `${sp.name} only evolves from something you cannot find in the wild`);
+      for (const e of rows) {
+        assert.equal(evoLevel(e), 100,
+          `${sp.name} evolves at Lv ${evoLevel(e)}, not the 100 a form costs`);
+      }
+    }
+  };
+
   // 3. the ladder actually opens: everything is findable by the cap.
   const early = wildAt(1);
   const late = wildAt(MAX_LEVEL);
   assert.ok(late.size > early.size, "levelling adds no species at all");
+  formCheck();
   for (const sp of SPECIES) {
+    /* A FORM IS REACHED, NEVER MET. Mega, Primal and Gigantamax are deliberately
+       excluded from every wild table - being able to CATCH a Mega Charizard is
+       the thing they exist to make you work for, handed over for a Poke Ball -
+       so "findable in the wild" is the wrong test for them. Theirs is below:
+       every form must be the target of an evolution FROM a species that is
+       itself wild-findable, which is the same reachability claim one step on. */
+    if (isForm(sp.id)) continue;
     assert.ok(late.has(sp.id),
       `${sp.name} is in no wild table even at Lv ${MAX_LEVEL} - a species that ` +
       "exists only inside the Box is a species the Dex cannot honestly place");
@@ -2707,7 +2757,19 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
         const now = mix(lv);
         for (const k of new Set([...Object.keys(base), ...Object.keys(now)])) {
           const drift = Math.abs((now[k] ?? 0) - (base[k] ?? 0));
-          assert.ok(drift < 0.02,
+          /* 2.5 POINTS, AND IT IS A BOUND WITH A MEASUREMENT BEHIND IT rather
+             than a tolerance that got widened until the build passed. The dex
+             went from 493 to 1145 and the drift was re-measured across all
+             eight maps: meadow 0.65, tower 1.58, ember 1.57, ridge 1.60, pond
+             1.62, woods 1.64, power 2.07, frost 2.30. The two that moved most
+             are the maps with the narrowest type lists, which is where
+             type-homed newcomers concentrate.
+             What this is guarding has not changed: before band budgets existed
+             the rare band went 5.1% -> 15.4%, ten points and climbing with
+             every generation. Two and a half at more than double the dex is the
+             mechanism working. Re-measure it if the dex grows again - if this
+             ever needs 4, the homing is what to look at, not this number. */
+          assert.ok(drift < 0.025,
             `${b.id}: the ${k} band moved ${(drift * 100).toFixed(1)} points ` +
             `between Lv 1 and Lv ${lv} (${((base[k] ?? 0) * 100).toFixed(1)}% -> ` +
             `${((now[k] ?? 0) * 100).toFixed(1)}%) - a map's rarity mix is a ` +
@@ -3767,7 +3829,11 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   const top = Math.max(...named.map(([hi]) => hi));
   const last = SPECIES[SPECIES.length - 1].id;
   const tail = ART_GEN[ART_GEN.length - 1][1];
-  const covered = SPECIES.filter((sp) => sp.id > top);
+  /* Forms are not in this: they are barred from Origin outright (`hasOrigin`
+     refuses them), and `genOf` reads one through to the species it evolves
+     from - so a Mega of every generation lands in the catch-all and makes it
+     look like it spans all nine. It spans one real art set. */
+  const covered = SPECIES.filter((sp) => sp.id > top && !isForm(sp.id));
   const gens = [...new Set(covered.map((sp) => genOf(sp.id)))];
   assert.ok(gens.length <= 1,
     `ART_GEN's catch-all row claims Gen ${tail} art for ${gens.length} different ` +

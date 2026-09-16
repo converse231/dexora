@@ -25,7 +25,7 @@
 
    Pure and DOM-free: check.mjs asserts the whole set without a canvas. */
 
-import { SPECIES } from "../data/species.js";
+import { SPECIES } from "../data/dex.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import { BIOMES, speciesById, dexIndex } from "./biomes.js";
 import { label } from "./map.js";

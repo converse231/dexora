@@ -1,4 +1,4 @@
-import { SPECIES } from "../data/species.js";
+import { SPECIES, isForm } from "../data/dex.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 
 /* The eight areas: what each one is, and what spawns there.
@@ -104,6 +104,14 @@ export const LAYOUTS = [
   { len: 151, ranges: [[1, 151]] },
   { len: 251, ranges: [[1, 251]] },
   { len: 358, ranges: [[1, 251], [387, 493]] },
+  /* 493 was the whole National Dex to Arceus, before Unova through Paldea and
+     the Mega/Gigantamax forms appended onto the end. Recorded for completeness
+     rather than need: everything since has been APPENDED, so no position moved
+     and `padDex` is the correct answer - `layoutIds` returns null for it and
+     tools/play drives a real 493-entry save through `loadState` to prove it. It
+     is here so that if a generation is ever inserted BEFORE the end again, this
+     shape is already written down. */
+  { len: 493, ranges: [[1, 493]] },
 ];
 
 /* The ids a save of this length was keyed on, in order - or null if we have
@@ -129,8 +137,14 @@ export const REGION_NAME = {
 };
 
 
+/* A FORM HAS NO GENERATION. Its id is in the 10000s, so a plain `findIndex`
+   falls off the end and reports the LAST generation - which would file every
+   Mega under Paldea in the region filter and gate them on Paldea's arrival
+   level. They belong to the species they evolve from, which is what `of` on the
+   form says, so `genOf` reads through to it. */
 export const genOf = (id) => {
-  const i = GEN_LAST.findIndex((last) => id <= last);
+  const of = isForm(id) ? (SPECIES.find((sp) => sp.id === id)?.of ?? id) : id;
+  const i = GEN_LAST.findIndex((last) => of <= last);
   return i < 0 ? GEN_LAST.length : i + 1;
 };
 
@@ -169,14 +183,24 @@ export const GENERATIONS = (() => {
    So every legendary can turn up anywhere, and its own types decide how often:
    the full share where the biome shares one of them, a fraction of it
    everywhere else. The Power Plant is still the best place to hunt Zapdos and
-   is no longer the only one. And this is a rule, not a table - a Gen 2 Suicune
-   needs one dex number added here and nothing else. */
-export const LEGENDARY = [
-  144, 145, 146, 150, 151,                               // Kanto
-  243, 244, 245, 249, 250, 251,                          // Johto
-  377, 378, 379, 380, 381, 382, 383, 384, 385, 386,      // Hoenn
-  480, 481, 482, 483, 484, 485, 486, 487, 488, 490, 491, 492, 493,  // Sinnoh
-];
+   is no longer the only one.
+
+   DERIVED FROM THE SPECIES DATA, NOT LISTED. This was 34 hand-written dex
+   numbers under a comment promising "a Gen 2 Suicune needs one dex number added
+   here and nothing else" - which is true, and is exactly why it failed: five
+   generations arrived at once and none of their sixty legendaries were added,
+   so every Unova and Paldea legendary spawned at an ordinary S-tier weight
+   instead of the legendary share. A list that needs one edit per generation
+   gets that edit skipped eventually.
+
+   `fetch-species` now records the flag PokeAPI already knows. Mythicals count
+   with them, because this game draws no distinction and a Mew that is not rare
+   is not a Mew. Forms are excluded: a Mega is never wild, so it can have no
+   spawn weight to scale, and counting one would dilute the real legendaries'
+   per-head share for nothing. */
+export const LEGENDARY = SPECIES
+  .filter((sp) => sp.legendary && !isForm(sp.id))
+  .map((sp) => sp.id);
 
 /* The areas with a roof over them: four caves and a building, against three
    maps of open country. It is a fact about places, so it lives beside them
@@ -438,9 +462,18 @@ export function rollVariant(
 
    `SPECIES` is the list of what ships and `dex` is indexed by POSITION in it -
    that is the only relationship that survives a hole. */
+/* FORMS DO NOT COUNT TOWARD A GENERATION BEING COMPLETE, and this is the one
+   place that mattered most. Origin unlocks when every ORDINARY Pokemon of a
+   generation is caught; a Mega is not one, it is a hundred levels of Rare Candy
+   spent on one you already own. Counting them would have put 33 forms x 100
+   levels between a Kanto player and the tier - which is not a harder gate, it
+   is a deleted one. `hasOrigin` already refuses a form its own Origin, so this
+   is the same rule read from the other end. */
 export function genComplete(dex, gen) {
   for (let i = 0; i < SPECIES.length; i++) {
-    if (genOf(SPECIES[i].id) === gen && dex?.[i] !== 2) return false;
+    const sp = SPECIES[i];
+    if (isForm(sp.id)) continue;
+    if (genOf(sp.id) === gen && dex?.[i] !== 2) return false;
   }
   return true;
 }
@@ -474,9 +507,23 @@ export const originReady = (dex, speciesId) => genComplete(dex, genOf(speciesId)
    It settles Hoenn in advance, too: Ruby/Sapphire and FireRed/LeafGreen are
    both Gen III, so a Hoenn species gets no Origin either. That is the right
    answer for the same reason, and nothing has to be edited on the day. */
-export const ART_GEN = [[386, 3], [Infinity, 4]];
+/* A ROW PER GENERATION, because the catch-all cannot be wrong loudly. Mirrors
+   `artFor` in fetch-species.mjs, which check.mjs asserts against this: FireRed
+   art to the end of Hoenn, HeartGold for Sinnoh, Black/White for Unova, and
+   PokeAPI's default render from Kalos on - which for those is the only art
+   there has ever been, so each is drawn in its own generation and none of them
+   can wear Origin. */
+export const ART_GEN = [
+  [386, 3], [493, 4], [649, 5], [721, 6], [809, 7], [905, 8], [Infinity, 9],
+];
 export const baseArtGen = (id) => ART_GEN.find(([hi]) => id <= hi)[1];
-export const hasOrigin = (id) => genOf(id) < baseArtGen(id);
+
+/* A FORM NEVER WEARS ORIGIN. `genOf` reads a form through to the species it
+   evolves from, so a Mega Charizard would otherwise answer "Gen 1" against
+   art from Gen 4 and qualify - and there is no 1996 drawing of a Mega
+   Charizard, because Mega Evolution was invented in 2013. The tier's tell is
+   an OLDER drawing; a form has exactly one. */
+export const hasOrigin = (id) => !isForm(id) && genOf(id) < baseArtGen(id);
 
 /* The tiers a species can ever wear. The Dex's completion rosette and the
    sheet's FORMS strip both read it, so a species that cannot have an Origin is
@@ -1103,6 +1150,15 @@ export function encounterTable(biome, level = 1) {
     const next = [];
     for (const [id, band] of front) {
       for (const to of NEXT.get(id) ?? []) {
+        /* A FORM IS NEVER WILD. Mega, Primal and Gigantamax are evolution
+           targets, and this overlay walks the evolution graph out from whatever
+           a map already spawns - so without this they would appear in the grass
+           like any other third stage, and you could CATCH a Mega Charizard
+           instead of spending a hundred levels making one. That is the whole
+           thing they are for, handed over for a Poke Ball. It also has to stop
+           the walk rather than just skip the row, or a form's own evolutions
+           (there are none today) would ride in behind it. */
+        if (isForm(to)) continue;
         const known = weight.has(to);
         // An evolution cannot outrun its own generation either.
         if (!known && genOpen(to, level)) {

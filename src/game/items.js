@@ -1,4 +1,4 @@
-import { SPECIES } from "../data/species.js";
+import { SPECIES } from "../data/dex.js";
 import { EVOLUTIONS as EVO_ROWS } from "../data/evolutions.js";
 import { GUARANTEED } from "../catch.js";
 import { TIERS, ENCLOSED, speciesById } from "./biomes.js";

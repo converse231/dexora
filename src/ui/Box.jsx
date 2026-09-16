@@ -16,7 +16,7 @@
    what they are about to take before they take it. */
 
 import { useEffect, useMemo, useState } from "react";
-import { SPECIES } from "../data/species.js";
+import { SPECIES } from "../data/dex.js";
 import {
   sellValue, candyValue, duplicateUids, evolutionsOf, evolveState, itemById,
   variantOf,

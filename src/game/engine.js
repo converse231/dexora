@@ -3,7 +3,7 @@
    re-renders per frame — the engine calls onChange() only when something the
    UI actually shows has changed (a step, a dex entry, an encounter phase). */
 
-import { SPECIES } from "../data/species.js";
+import { SPECIES } from "../data/dex.js";
 import {
   AREAS, AREA_IDS, areaOf, walkable, label, MINI, MINI_UNKNOWN,
 } from "./map.js";
