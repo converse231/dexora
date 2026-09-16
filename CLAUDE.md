@@ -1543,6 +1543,14 @@ that skips the code an encounter bug lives in.
 It runs as part of `npm run check`. Add to it whenever a change touches the
 loop, `settle`, the phase machine or the step handler.
 
+**DO NOT WALK TO TRIGGER A SAVE - OR ANYTHING ELSE THAT IS NOT THE ENCOUNTER.**
+Every step carries a 7% chance of starting one, an encounter stops movement, and
+a leg that never moves never reaches `onArrive` - so a test that walks in order
+to make some OTHER thing happen is a coin toss. The save-warning test walked 60
+frames to provoke a write and failed 6 times in 12; `buyCandy` saves
+unconditionally and it is 0 in 15. Walk when the walking is the subject; call
+the engine directly when it is not.
+
 **Do not try to do this in the browser.** `chrome-headless-shell` throttles rAF
 while `--virtual-time-budget` fires timers instantly, so a seeded iframe
 harness releases held keys before the engine has run one frame and the trainer
