@@ -411,19 +411,25 @@ function until(e, what, label, max = 2000) {
   const e = createEngine(canvas(), () => {}, canvas());
   assert.ok(!e.state.stale, "a healthy session must not warn");
 
+  /* SAVE THROUGH A DIRECT MUTATION, NOT BY WALKING. The first version walked
+     60 frames to make `onArrive` call `save()` and was flaky half the time:
+     every step has a 7% chance of starting an encounter, an encounter stops
+     movement, and a leg that never moves never saves - so the flag under test
+     simply never changed. Anything that walks is a coin toss unless the
+     encounter is what is being tested. `buyCandy` saves unconditionally. */
+  const flush = () => new Promise((r) => setTimeout(r, 600));  // past the 400ms debounce
+
   writeFails = Object.assign(new Error("quota"), { name: "QuotaExceededError" });
-  for (let i = 0; i < 60; i++) { e.press("right"); tick(16); }
-  e.clearHeld();
-  await new Promise((r) => setTimeout(r, 600));           // past the 400ms debounce
+  assert.ok(e.buyCandy(1), "the buy did not happen - this test is asserting nothing");
+  await flush();
   assert.equal(e.state.stale, "full",
     `a failed write left stale=${JSON.stringify(e.state.stale)} - the player is ` +
     "not being told the game has stopped saving");
 
   // And it clears itself when writes start working again.
   writeFails = null;
-  for (let i = 0; i < 60; i++) { e.press("left"); tick(16); }
-  e.clearHeld();
-  await new Promise((r) => setTimeout(r, 600));
+  assert.ok(e.buyCandy(1), "the second buy did not happen");
+  await flush();
   assert.ok(!e.state.stale, "the warning latched after saving recovered");
 
   /* The flag is SESSION state and must never reach the file - a saved warning
