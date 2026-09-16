@@ -88,5 +88,23 @@ const NAME_FIX = {
   "nidoran-f": "Nidoran\u2640", "nidoran-m": "Nidoran\u2642",
   "mr-mime": "Mr. Mime", farfetchd: "Farfetch'd",
 };
-export const label = (s) =>
-  NAME_FIX[s.name] ?? s.name[0].toUpperCase() + s.name.slice(1);
+const cap = (w) => w[0].toUpperCase() + w.slice(1);
+
+/* A FORM IS NAMED THE WAY THE GAMES NAME IT, not the way PokeAPI keys it.
+   Its `name` is a slug - "charizard-mega-x", "venusaur-gmax" - and title-casing
+   that gives "Charizard-mega-x", which is a database row rather than a
+   Pokemon. The prefix goes in front and the X/Y stays behind, because that is
+   what Mega Charizard X is called. Driven off the `form` field rather than off
+   the string, so a species that simply has a hyphen in its real name (tapu-koko,
+   mr-mime) is untouched. */
+const FORM_WORD = { mega: "Mega", primal: "Primal", gmax: "Gigantamax" };
+
+export const label = (s) => {
+  if (s.form) {
+    const base = s.name.replace(/-(mega|primal|gmax|eternamax)(-[xy])?$/, "");
+    const tail = s.name.match(/-(x|y)$/)?.[1];
+    const name = NAME_FIX[base] ?? cap(base);
+    return `${FORM_WORD[s.form] ?? cap(s.form)} ${name}${tail ? ` ${tail.toUpperCase()}` : ""}`;
+  }
+  return NAME_FIX[s.name] ?? cap(s.name);
+};
