@@ -1513,6 +1513,24 @@ third of Johto needed no new code. **But a `stone` row needs its stone ON THE
 SHELF** - check.mjs asserts `STONES` against `EVOLUTIONS` both ways, because an
 unbuyable stone is not a hard evolution, it is an impossible one.
 
+**BEFORE THE REST OF THE NATIONAL DEX SHIPS, `ART_GEN` NEEDS A ROW PER
+GENERATION.** Its last row is `[Infinity, 4]` - everything past Hoenn is
+declared to be drawn in Generation IV art, which is true of the four that ship
+and is a claim about all nine. `fetch-species.mjs`'s `artFor` is the other half
+(`id <= 386 ? FRLG : HGSS`) and the two are asserted against each other, so both
+move together. Ship Unova against them and every Unova species is recorded as
+wearing Gen IV art while its sprite comes from a Gen V set; the thing that reads
+this is `hasOrigin`, so the symptom is an Origin tier silently wrong for a whole
+region - the exact fault that shipped for Sinnoh once already.
+
+check.mjs asserts the catch-all never covers more than ONE generation, so the
+day a second one falls into it the build says so. It does not demand the rows
+exist today; it demands nobody adds a generation without looking. Two older
+guards happen to catch the same class earlier (the generation census, and
+"hasOrigin says yes but there is no art"), so this is the third net rather than
+the first - it is the one that still fires when a generation arrives WITH
+correct art and no row.
+
 **A generation is derived from the dex id.** `GEN_LAST` in `biomes.js` holds the
 last national dex number of each generation and `genOf()` reads it; nothing is
 stored per species, because it already is a fact about the id and 151 copies of

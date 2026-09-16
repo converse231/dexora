@@ -3748,4 +3748,36 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     "every tier's layer fits it by construction");
 }
 
+/* THE ART TABLE MUST NAME EVERY GENERATION, because its last row is a catch-all
+   and a catch-all cannot be wrong loudly.
+
+   `ART_GEN` is `[[386, 3], [Infinity, 4]]`: everything past Hoenn is declared to
+   be drawn in Generation IV art, which is true of the four generations that
+   ship and is a claim about all nine. Ship Unova against it and every Unova
+   species is recorded as wearing Gen IV art when `fetch-species` actually pulls
+   it from a Gen V set - and the thing that reads this is `hasOrigin`, so the
+   symptom would be an Origin tier that is silently wrong for a whole region,
+   which is exactly the fault that shipped for Sinnoh once already.
+
+   This does not demand the rows exist today. It demands that the catch-all
+   never covers a generation that has SHIPPED without somebody having looked:
+   the highest id `ART_GEN` names explicitly must reach the end of the dex. */
+{
+  const named = ART_GEN.filter(([hi]) => Number.isFinite(hi));
+  const top = Math.max(...named.map(([hi]) => hi));
+  const last = SPECIES[SPECIES.length - 1].id;
+  const tail = ART_GEN[ART_GEN.length - 1][1];
+  const covered = SPECIES.filter((sp) => sp.id > top);
+  const gens = [...new Set(covered.map((sp) => genOf(sp.id)))];
+  assert.ok(gens.length <= 1,
+    `ART_GEN's catch-all row claims Gen ${tail} art for ${gens.length} different ` +
+    `generations (${gens.join(", ")}) - species past #${top} do not share a base ` +
+    "art set, so hasOrigin() is wrong for at least one of them. Add a row.");
+  assert.ok(gens.length === 0 || gens[0] >= tail,
+    `ART_GEN says species past #${top} are drawn in Gen ${tail} art, but Gen ` +
+    `${gens[0]} debuts after it - a species cannot predate its own artwork`);
+  console.log(`art table ok — every one of ${SPECIES.length} species has a base ` +
+    `art generation, the catch-all covering Gen ${gens[0] ?? tail} only (to #${last})`);
+}
+
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);
