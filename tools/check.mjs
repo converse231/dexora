@@ -1,6 +1,6 @@
 // node tools/check.mjs
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { SPECIES, isForm } from "../src/data/dex.js";
 import { evoCycleFrames, EVO_SWAPS, SCALE_MAX } from "../src/game/evocycle.js";
 import {
@@ -3948,6 +3948,54 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     "player can act on");
   console.log(`storage ok — ${files.length} files go through store.js; nothing else ` +
     "names localStorage");
+}
+
+/* THE RULES RUN WITHOUT A BROWSER, and that is the whole reason a server can
+   ever be trusted with them.
+
+   Shared leaderboards and trading need the outcome of a catch decided somewhere
+   a player cannot edit. That is only affordable if the rules can MOVE - if
+   deciding a throw means shipping `catch.js` and `items.js` to an edge function
+   rather than rewriting them in another language, against another copy of the
+   tables, which would then drift from this one exactly the way every other
+   second copy in this codebase has.
+
+   Measured today: of thirteen modules in `src/game`, only three touch the
+   browser at all - `engine.js` (the frame loop), `tileset.js` (drawing) and
+   `store.js` (where the save lives). Everything that DECIDES anything - the
+   catch roll, the tables, the economy, the evolution graph, the medals, the
+   daily quest, the clock - is already pure. That was not planned for a server;
+   it fell out of `tools/play.mjs` needing to drive the engine in Node and
+   check.mjs needing to roll 400,000 variants without a canvas.
+
+   So this asserts an absence, and it is the load-bearing one for that whole
+   path: a `document` reference added to `biomes.js` breaks the port silently,
+   months before anyone tries it. Comments are stripped first - the prose
+   mentions `document` in the ordinary English sense and should be free to. */
+{
+  const HOST = ["engine.js", "tileset.js", "store.js"];
+  const BROWSER = /\b(document|window|localStorage|sessionStorage|navigator|location|requestAnimationFrame|HTMLElement|Image)\b/;
+
+  const dir = new URL("../src/game/", import.meta.url);
+  const mods = readdirSync(dir).filter((f) => f.endsWith(".js"));
+  const pure = mods.filter((f) => !HOST.includes(f));
+  assert.ok(pure.length >= 8, `only ${pure.length} portable modules - the scan is broken`);
+
+  for (const f of pure) {
+    const code = stripComments(readFileSync(new URL(f, dir), "utf8"));
+    const hit = code.match(BROWSER)?.[0];
+    assert.ok(!hit,
+      `src/game/${f} names \`${hit}\` in its CODE. Everything outside ` +
+      `${HOST.join("/")} has to run in an edge function unchanged, or deciding a ` +
+      "catch on the server means a second copy of these rules");
+  }
+
+  // And the three that do touch it are the three that are SUPPOSED to.
+  for (const f of HOST) {
+    assert.ok(mods.includes(f), `${f} is gone - update the host list`);
+  }
+  console.log(`portable ok — ${pure.length} of ${mods.length} rule modules are ` +
+    `browser-free; only ${HOST.join(", ")} need one`);
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);
