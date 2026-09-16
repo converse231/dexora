@@ -71,7 +71,10 @@ export const F = { cast: 620, wait: 1500, bite: 620, miss: 1250 };
 export const CHARS = ["red", "leaf"];
 
 /* Where the save lives is `store.js`'s business, not this file's. */
-import { SAVE_KEY, BACKUP_KEY, BROKEN_KEY, read, write, keep } from "./store.js";
+import {
+  SAVE_KEY, BACKUP_KEY, BROKEN_KEY, read, write, keep, mirror,
+} from "./store.js";
+import { push as pushCloud } from "../net/cloud.js";
 import { nextHint, HINT_IDS } from "./hints.js";
 
 /* THREE KEYS, AND THE OTHER TWO EXIST BECAUSE A COLLECTION WAS LOST.
@@ -107,9 +110,14 @@ function freshState() {
     /* WHICH TRAINER YOU PLAY. Both are on the one sheet (see `build_player`),
        so this is a row offset rather than a second set of art, and it is the
        only cosmetic choice in the game - which is why it is a plain string on
-       the save rather than anything cleverer. "red" is the default for every
-       save written before the choice existed. */
-    char: "red",
+       the save rather than anything cleverer.
+
+       NULL MEANS NOT YET ASKED, and that is why it is not "red": a default
+       indistinguishable from an answer means the question can never be asked
+       once. Boot shows the trainer screen exactly while this is null, so an
+       existing save is asked the first time and never again, and the renderer
+       falls back to Red for the frames in between. */
+    char: null,
     /* WHICH ONE-LINE TIPS HAVE ALREADY BEEN SHOWN. Ids, not a step number:
        there is no sequence to be partway through, so there is nothing to
        resume and nothing to get stuck in. Saved, so "once" means once ever. */
@@ -379,7 +387,7 @@ function loadState() {
          Validated against the sheet's own list rather than trusted: the value
          indexes into the art, and an unknown one would draw four rows off the
          end of the strip - which is empty, so the trainer would vanish. */
-      char: CHARS.includes(s.char) ? s.char : "red",
+      char: CHARS.includes(s.char) ? s.char : null,
       /* A save from before hints gets them - it has probably seen all of these
          moments already, but a stray tip is a smaller cost than a new player
          silently getting none. Filtered to ids that still exist so a retired
@@ -566,13 +574,18 @@ export function createEngine(canvas, onChange, mini = null) {
       /* `write` reports whether it stuck rather than throwing - which cause it
          was is its business, not this file's. What happens NEXT is this file's:
          play on either way, and latch it so the top bar can say NOT SAVING. */
-      const got = write(SAVE_KEY, JSON.stringify(rest));
+      const raw = JSON.stringify(rest);
+      const got = write(SAVE_KEY, raw);
       if (got.ok) {
         if (state.stale) { state.stale = null; changed(); }
       } else if (state.stale !== got.why) {
         state.stale = got.why;
         changed();
       }
+      /* AND UPWARD, on its own clock. Local is what the next frame reads, so it
+         is never waited on; the account's copy trails it by a few seconds. With
+         no account configured this is a no-op - see cloud.js. */
+      mirror(raw, pushCloud);
     }, 400);
   }
 

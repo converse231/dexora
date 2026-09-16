@@ -1293,51 +1293,156 @@ canvas {
 /* SAVE FILE. Two buttons that are peers, so they are the same size and sit on
    one row - export is not the "primary" of the pair, and styling it as one
    would suggest importing is the risky half when the opposite is true. */
-/* THE CONTEXTUAL TIP. Gold, like every other "this is worth your attention"
-   surface here (`.note-warn`, `.tb-stale`), and in the flow under the top bar
-   rather than floating over the map - it is describing the thing on screen, so
-   covering that would be the one thing it must not do. */
-.hintbar {
-  display: flex; align-items: center; gap: 12px;
-  margin: -4px 0 12px; padding: 9px 12px;
-  border: 2px solid var(--gold); border-radius: 11px;
-  background: var(--surface); box-shadow: 0 2px 0 var(--line-firm);
+/* ---------- the tip dialog ----------
+
+   It began as a bar in the flow, on the theory that a tip must never cover the
+   thing it describes. That was wrong about what a tip is for: one somebody
+   scrolls past is one nobody read. It is a dialog now, on the same scrim and
+   the same card as `Confirm`, so it reads as a thing this app already does. */
+.hintwrap {
+  position: fixed; inset: 0; z-index: 80;
+  display: grid; place-items: center; padding: 20px;
+  background: rgba(18, 26, 16, .45);
+  animation: sheet-in 120ms ease-out;
 }
-.hintbar p { margin: 0; flex: 1; font-size: 13px; line-height: 1.4; color: var(--ink); }
-.hintbar button {
-  flex: none; cursor: pointer;
-  font-family: var(--pixel); font-size: 10px; padding: 7px 11px 6px;
-  border: 2px solid var(--line-firm); border-radius: 9px;
-  background: var(--surface-2); color: var(--ink-soft);
+.hintbox {
+  width: min(360px, 100%);
+  display: grid; gap: 10px; justify-items: start;
+  padding: 18px 20px 20px;
+  background: var(--surface); border: 3px solid var(--gold);
+  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
 }
-.hintbar button:hover { background: var(--path-soft); color: var(--ink); }
-@media (max-width: 560px) {
-  .hintbar { align-items: flex-start; flex-direction: column; gap: 8px; }
-  .hintbar button { align-self: flex-end; }
+.hint-tag {
+  font-family: var(--pixel); font-size: 9px; letter-spacing: .14em;
+  padding: 4px 8px 3px; border-radius: 7px;
+  background: var(--gold); color: var(--ink);
+}
+.hintbox p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); }
+.hint-go {
+  justify-self: stretch; cursor: pointer;
+  font-family: var(--pixel); font-size: 11px; padding: 11px 10px 9px;
+  border: 2px solid var(--canopy); border-radius: 10px;
+  background: var(--canopy); color: var(--surface);
+}
+.hint-go:hover { filter: brightness(1.08); }
+.hint-go:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- the gate: account, then trainer ----------
+
+   The whole window until the game starts, so it owns the background rather than
+   sitting on the app's. One card at one width across both steps - built
+   separately they drift in exactly the way a player notices. */
+.gate {
+  position: fixed; inset: 0; z-index: 100;
+  display: grid; place-items: center;
+  padding: 20px; overflow-y: auto;
+  background: var(--paper);
+}
+.gate-card {
+  width: min(400px, 100%);
+  display: grid; gap: 4px;
+  padding: 24px 26px 26px;
+  background: var(--surface); border: 3px solid var(--canopy);
+  border-radius: 18px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+}
+.gate-brand { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.gate-brand .title { font-family: var(--display); font-size: 22px; font-weight: 600; color: var(--ink); }
+.gate-step {
+  font-family: var(--pixel); font-size: 8px; letter-spacing: .12em;
+  color: var(--ink-faint);
+}
+.gate-title {
+  margin: 10px 0 0; font-family: var(--display); font-weight: 600;
+  font-size: 23px; line-height: 1.2; color: var(--ink); text-wrap: balance;
+}
+.gate-blurb { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
+.gate-warn {
+  margin: 12px 0 0; padding: 8px 10px;
+  border: 2px solid var(--gold); border-radius: 9px;
+  font-size: 12px; line-height: 1.4; color: var(--ink);
 }
 
-/* WHO YOU PLAY. Two tiles drawing the real down-facing walk frame out of the
-   same strip the map renders from - `player.png` is 8 rows of 32 at 2x, so a
-   character is a 128px vertical offset and the walk set is the first 16 columns.
-   Reading the actual art means the picker cannot drift from what walks. */
-.trchar { display: flex; gap: 8px; padding: 10px 12px 0; }
-.trchar-one {
-  flex: 1; display: flex; align-items: center; gap: 9px; cursor: pointer;
-  padding: 7px 10px; border-radius: 10px;
-  border: 2px solid var(--line-firm); background: var(--surface);
-  font-family: var(--pixel); color: var(--ink-soft);
+.gate-form { display: grid; gap: 12px; margin-top: 16px; }
+.gate-field { display: grid; gap: 5px; }
+.gate-field span {
+  font-family: var(--pixel); font-size: 8.5px; letter-spacing: .1em;
+  color: var(--ink-faint);
 }
-.trchar-one.on { border-color: var(--canopy); background: var(--path-soft); color: var(--ink); }
-.trchar-one i { font-style: normal; font-size: 11px; }
-.trchar-art {
-  width: 32px; height: 64px; flex: none;
+/* 16px so iOS does not zoom the page when a field takes focus - below that it
+   treats the form as too small to read and scales the whole viewport. */
+.gate-field input {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 12px; font: inherit; font-size: 16px;
+  color: var(--ink); background: var(--surface-2);
+  border: 2px solid var(--line-firm); border-radius: 10px;
+}
+.gate-field input:focus-visible { outline: 2px solid var(--canopy); outline-offset: 1px; }
+
+/* Reserves its line whether or not there is anything to say, so the button
+   does not jump down the card the first time something goes wrong. */
+.gate-note {
+  margin: 0; min-height: 1.2em;
+  font-size: 12.5px; line-height: 1.3; color: var(--path);
+}
+.gate-go {
+  cursor: pointer; font-family: var(--pixel); font-size: 12px;
+  padding: 13px 12px 11px;
+  border: 2px solid var(--canopy); border-radius: 11px;
+  background: var(--canopy); color: var(--surface);
+}
+.gate-go:hover:not(:disabled) { filter: brightness(1.08); }
+.gate-go:disabled { opacity: .45; cursor: default; }
+.gate-go:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.gate-foot { margin-top: 14px; display: flex; justify-content: center; }
+.gate-link {
+  cursor: pointer; background: none; border: 0; padding: 4px;
+  font: inherit; font-size: 12.5px; color: var(--canopy);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+
+/* The two trainers, drawn out of the same strip the map renders from. */
+.gate-chars { display: flex; gap: 12px; margin: 18px 0 16px; }
+.gate-char {
+  flex: 1; cursor: pointer;
+  display: grid; justify-items: center; gap: 6px;
+  padding: 14px 10px 11px;
+  border: 2px solid var(--line-firm); border-radius: 12px;
+  background: var(--surface-2); color: var(--ink-soft);
+  font-family: var(--pixel);
+}
+.gate-char.on { border-color: var(--canopy); background: var(--path-soft); color: var(--ink); }
+.gate-char:focus-visible { outline: 2px solid var(--canopy); outline-offset: 2px; }
+.gate-char i { font-style: normal; font-size: 11px; }
+/* CROPPED TO THE ART, NOT TO THE CELL. A walk frame is 16x32 but the trainer
+   only occupies y 13-31 of it - the empty top is headroom the taller bike and
+   fishing frames need, and the figure is anchored to the bottom so it stands on
+   a 16px tile. Showing the whole cell put each trainer in a box half made of
+   nothing. Measured off player.png rather than eyeballed; 19 rows at 3x is 57. */
+.gate-art {
+  width: 48px; height: 57px;
   image-rendering: pixelated;
   background-image: url("tilesets/player.png");
-  background-size: 512px 512px;          /* 256x256 at 2x */
+  /* 256x256 at 3x, so a 16x32 frame reads at 48x96. */
+  background-size: 768px 768px;
   background-repeat: no-repeat;
 }
-.ch-red { background-position: 0 0; }
-.ch-leaf { background-position: 0 -256px; }   /* row 4 of 8, at 2x */
+/* Row block x 32 rows x 3, plus the 13-row inset above the art, negated. */
+.gate-art.ch-red { background-position: 0 -39px; }
+.gate-art.ch-leaf { background-position: 0 -423px; }
+
+.gate-wait { justify-items: center; gap: 10px; text-align: center; }
+.gate-wait p { margin: 0; font-size: 13px; color: var(--ink-soft); }
+
+/* Leaving is not destroying, so it does not wear the destructive colour - it
+   is the same quiet key RESET was. */
+.tb-out { color: var(--ink-soft); }
+
+@media (max-width: 420px) {
+  .gate { padding: 12px; align-content: start; }
+  .gate-card { padding: 20px 18px 22px; }
+  .gate-title { font-size: 20px; }
+}
 
 .trsave { padding: 10px 12px 12px; display: grid; gap: 9px; }
 /* The recovery offer is the same block with a gold rule over it - it is not a

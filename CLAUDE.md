@@ -42,10 +42,26 @@ Pokémon named by `uid`. If you find a doc anywhere describing a *feed* that
 spends a pile of duplicates, it is describing a system that was deleted — see
 "EVOLUTION IS CANDY AND A LEVEL" below.
 
-**Standing constraint: this stays personal and non-commercial.** No ads, no
-payments, no store listing, no distribution. It uses Nintendo's characters and
-Game Freak's art. Community tilesets marked ☆ in the README require crediting
-the artist before anything ships.
+**Standing constraint: this stays non-commercial.** No ads, no payments, no
+store listing. It uses Nintendo's characters and Game Freak's art, and community
+tilesets marked ☆ in the README require crediting the artist.
+
+**It is no longer personal-only, and that changed the security model.** There
+are accounts now, saves live on a server, and other people are meant to play it.
+Two consequences worth having in front of you before touching anything below:
+
+- **The IP position got sharper, not softer.** A fan game on one machine and a
+  fan game with public sign-ups are different things to a rights holder, and
+  everything in `src/data` and `public/sprites` is Nintendo's and Game Freak's.
+  That is a decision the owner has made; it is recorded here because the risk
+  belongs with distribution rather than with the code.
+- **THERE IS STILL NO TRUST BOUNDARY.** Every roll, price and dex write happens
+  in the browser and the server stores the result. Row-level security means
+  nobody can touch anyone else's save; it does not mean a save is honest. **So
+  there is no leaderboard, and adding one on today's architecture would be
+  publishing numbers that cannot be trusted.** The ten browser-free modules in
+  `src/game` are what makes the fix affordable when it is wanted - see
+  *THE RULES RUN WITHOUT A BROWSER* in check.mjs.
 
 `README.md` is the design document — economy, trainer stats, evolution pricing,
 UI rationale, per-screen decisions. Read it before changing behaviour. This file
@@ -57,6 +73,55 @@ about before — band budgets for rarity dilution, pity for the rare tiers, the
 hybrid data model, and a watch-list of things decided one way that may want
 revisiting. Each carries the TRIGGER that should bring it back. Adding something
 there beats opening a ticket, because a ticket loses the reason.
+
+## The account, and what runs before the game
+
+**`Boot.jsx` asks three questions and mounts `App` once, at the end.** Is there
+a session, is there a trainer, and has the save been brought down. The game
+knows about none of it, and that is structural rather than tidy: the engine
+closes over the map rows at construction, so a save arriving later cannot be
+applied to a running engine. Boot exists to make sure it never arrives later -
+which is why picking a trainer writes straight into the save rather than calling
+`setChar`, and why `App` is keyed, so replacing the save underneath remounts it.
+
+**`net/cloud.js` is the only file that may import the Supabase client**, and
+check.mjs asserts it. With no credentials `CLOUD` is false and every function in
+it answers "no account" instead of throwing - the game is then exactly what it
+was before any of this, which keeps it playable offline, keeps a dropped
+connection from being a dead screen, and lets the suite drive every path with no
+network. **Local mode is not a fallback, it is the game.**
+
+**LOCAL FIRST, CLOUD AFTER, never the other way round.** `write` stays
+synchronous and local because the game writes on every step and the network must
+never sit in the middle of the walk cycle. `mirror` trails it. It is COALESCED
+every few seconds rather than debounced, and the difference is the point: a
+debounce that resets on every write never fires while somebody is walking, which
+is exactly when there is most to lose.
+
+**WHICHEVER HAS WALKED FURTHER WINS.** Two devices, one account, and no way to
+ask which save the player meant. `steps` is the only counter in the game that
+cannot go down, so more steps is strictly more play and taking the larger can
+only discard the shorter session. A timestamp would be wrong: a slow clock, or a
+tab left open overnight, both beat a real afternoon. Ties go to remote, because a
+tie is the same save and the remote copy is the account's record.
+
+**`char` IS NULL UNTIL ASKED, not "red".** A default indistinguishable from an
+answer means the question can never be asked once - so null is what puts the
+trainer screen up, and the renderer falls back to Red for the frames in between.
+The question lives in the gate and NOT on the YOU panel: the handhelds ask it
+before you have a save, and asked in a menu it is a costume change.
+
+**LOG OUT REPLACED RESET.** Reset wiped the save, which was the only way out
+when the save WAS the account. With one it is a button that destroys a synced
+collection and calls it a preference. Reset survives only in local mode, where
+there is nothing to log out of.
+
+**A TIP IS A DIALOG, NOT A BAR.** The hints started in the flow, on the theory
+that a tip should never cover what it describes - and a tip somebody scrolls
+past is a tip nobody read. It takes the modal lock, which is what makes it
+unmissable: `App` bails on `modalOpen()`, so the arrow keys stop walking the
+trainer while it is up. `SUPABASE.md` is the setup, including the RLS policies,
+which are the entire server-side security model.
 
 ## Commands
 

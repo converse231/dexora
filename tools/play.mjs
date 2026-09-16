@@ -592,7 +592,9 @@ function until(e, what, label, max = 2000) {
   store.set("meadow-route", JSON.stringify({ ...SAVE }));   // written before the choice
   raf.length = 0;
   let e = createEngine(canvas(), () => {}, canvas());
-  assert.equal(e.state.char, "red", "a save from before the choice is not Red");
+  assert.equal(e.state.char, null,
+    "a save from before the choice must be NULL, not a default - a default that " +
+    "looks like an answer means the question can never be asked");
 
   assert.equal(e.setChar("leaf"), true, "picking the other trainer was refused");
   assert.equal(e.state.char, "leaf", "the choice did not stick");
@@ -609,7 +611,7 @@ function until(e, what, label, max = 2000) {
   store.set("meadow-route", JSON.stringify({ ...SAVE, char: "nobody" }));
   raf.length = 0;
   e = createEngine(canvas(), () => {}, canvas());
-  assert.equal(e.state.char, "red",
+  assert.equal(e.state.char, null,
     "a save naming a trainer that does not exist loaded it anyway - that is four " +
     "rows off the end of the strip, and an invisible trainer");
   console.log(`trainer ok — ${CHARS.join("/")}, chosen, saved, and validated on load`);

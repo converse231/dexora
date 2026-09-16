@@ -22,15 +22,13 @@ import { KEY_ITEMS, holding } from "../game/items.js";
 import Confirm from "./Confirm.jsx";
 import Note from "./Note.jsx";
 
-/* The two trainers, in the order `build_player` stacks them into player.png.
-   The label is what the games call them; the id is the row block. */
-const CHARS = [
-  ["red", "Red"],
-  ["leaf", "Leaf"],
-];
-
+/* THE TRAINER QUESTION IS NOT HERE ANY MORE. It was two tiles on this panel,
+   which is where a SETTING goes - and it is not one. The handhelds ask it once,
+   before you have a save, and asked there it is part of becoming a trainer
+   rather than a costume change. It lives in the onboarding gate now; see
+   Gate.jsx. One question, one place. */
 export default function Trainer({
-  stats, level, bag, biking, onSpend, onBike, save, char = "red", onChar,
+  stats, level, bag, biking, onSpend, onBike, save,
 }) {
   // Which row just changed, so the click has something to show for itself.
   const [lit, setLit] = useState(null);
@@ -150,30 +148,6 @@ export default function Trainer({
         <span>TRAINER · LV {level}</span>
         <span>{spentPoints(stats)} / {earnedPoints(level)} SPENT</span>
       </div>
-
-      {/* WHO YOU ARE, and it is the one choice in the game you may change your
-          mind about freely - cosmetic, reversible, no cost and no confirm. Both
-          trainers were always in the rip (it is titled "Playable CharacterS");
-          only one had ever been cut out of it. The tile draws the real
-          down-facing walk frame straight out of the strip the map uses, so what
-          you pick here is literally what walks. */}
-      {onChar && (
-        <div className="trchar" role="radiogroup" aria-label="Trainer">
-          {CHARS.map(([id, name]) => (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={char === id}
-              className={`trchar-one${char === id ? " on" : ""}`}
-              onClick={() => onChar(id)}
-            >
-              <span className={`trchar-art ch-${id}`} aria-hidden="true" />
-              <i>{name}</i>
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className={`tr-points${free > 0 ? " has" : ""}`}>
         {free > 0 ? (
