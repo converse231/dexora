@@ -2261,6 +2261,55 @@ canvas {
 }
 .tb-stale b { font-family: var(--pixel); font-size: 11px; }
 
+/* ---------- the top bar on a narrow screen ----------
+
+   It wrapped into three ragged rows: brand and level, then five stat tiles
+   squeezed against each other, then RESET alone on the last line looking like
+   the primary action on the page. Three problems, all from the same cause -
+   a single flex row with `wrap` has no idea which of its children belong
+   together.
+
+   So on a phone it is a GRID with named rows: identity across the top, the
+   five figures in an even row of their own underneath. The tiles stop being
+   right-aligned and divider-ruled (which only reads when they are on one line
+   with room) and become evenly-spaced centred columns, which is what a row of
+   five small numbers wants. */
+@media (max-width: 560px) {
+  .topbar {
+    display: grid; grid-template-columns: auto 1fr auto;
+    gap: 8px 10px; padding: 9px 11px; align-items: center;
+  }
+  /* Placed by class, never by sibling order - the bar has six children and
+     which one follows which is not a thing to build a layout on. */
+  .tb-brand { grid-column: 1; grid-row: 1; }
+  .topbar .title { font-size: 18px; }
+  .topbar .tb-lv { grid-column: 2; grid-row: 1; }
+  .topbar .missions { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+  .topbar .spacer { display: none; }
+
+  .tb-stats {
+    grid-column: 1 / -1; grid-row: 3;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
+  }
+  .tb-stat {
+    align-items: center; padding: 3px 2px;
+    border-left: 2px solid var(--line);
+  }
+  .tb-stat i { font-size: 7px; letter-spacing: .06em; }
+  .tb-stat b { font-size: 15px; }
+  .tb-stat b u { font-size: 10px; }
+
+  /* RESET IS NOT THE PRIMARY ACTION ON THIS PAGE, and on its own row it looked
+     like one. It is the only destructive control in the game, so it goes back
+     to the size of what it is: a corner key, top right, out of the reading
+     order of the figures. */
+  .topbar > button {
+    grid-column: 3; grid-row: 1; justify-self: end;
+    padding: 5px 9px 4px; font-size: 9px;
+  }
+  .tb-stale { grid-column: 1 / -1; grid-row: 4; margin: 0; }
+}
+
 @media (max-width: 720px) {
   .ms-tab { padding: 5px 8px 4px; }
   .ms-tab i { display: none; }
@@ -2863,17 +2912,34 @@ button:disabled { transition: none; }
    the top-left corner of the viewport and were sitting straight on top of this
    - the one readout whose whole job is to be glanced at. The right corner is
    empty in every state of the game. */
+/* THE RUNNING-EFFECT CARDS. Bigger than they were, and the reason is that they
+   became worth reading: a rarity and a variant effect can run together now, so
+   this is two numbers you are actually deciding against rather than one chip
+   confirming the only thing you could have started. At 9px on a 15px icon it
+   was a tally mark. Each is its own card now with the count as the figure and
+   the steps spelled out under it. */
 .fieldbox {
   position: absolute; right: 10px; top: 10px; z-index: 3;
-  display: flex; gap: 8px; padding: 4px 7px; border-radius: 7px;
-  background: rgba(18, 26, 16, .62);
-  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .35) inset;
-  font-family: var(--pixel); font-size: 9px; color: #fff;
-  font-variant-numeric: tabular-nums; pointer-events: none;
+  display: flex; gap: 7px; pointer-events: none;
+  font-family: var(--pixel); font-variant-numeric: tabular-nums; color: #fff;
 }
-.fieldbox span { display: flex; align-items: center; gap: 3px; }
-.fieldbox img { width: 15px; height: 15px; image-rendering: pixelated; }
-.fieldbox .item-fx { width: 15px; }
+.fieldbox span {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 9px 4px; border-radius: 9px;
+  background: rgba(18, 26, 16, .72);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .35) inset;
+}
+.fieldbox img { width: 22px; height: 22px; image-rendering: pixelated; }
+.fieldbox .item-fx { width: 22px; }
+/* The number is the thing being read; the word is what it counts. */
+.fieldbox b { font-size: 13px; font-weight: 400; line-height: 1.1; }
+.fieldbox i { font-style: normal; font-size: 7.5px; letter-spacing: .08em; opacity: .75; }
+.fieldbox u { text-decoration: none; display: grid; }
+
+@media (hover: none) and (pointer: coarse) {
+  .fieldbox img, .fieldbox .item-fx { width: 26px; height: 26px; }
+  .fieldbox b { font-size: 15px; }
+}
 
 .minimap {
   display: none;

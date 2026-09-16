@@ -250,13 +250,27 @@ function until(e, what, label, max = 2000) {
   assert.equal(e.useField("honey-shiny"), true, "a shiny honey refused to start");
   assert.equal(e.state.field.variant.id, "honey-shiny",
     "a second honey did not REPLACE the first - two variant tilts can run at once");
-  /* ONE EFFECT AT A TIME, whatever family it is. A repel says "meet nothing"
-     and a honey says "what you meet is rarer", and a player can buy both - so
-     starting either cancels the other and the readout only ever has one thing
-     to say. */
+  /* A REPEL IS EXCLUSIVE, because it is total: it stops every encounter, so a
+     honey burning its 600 steps underneath one is buying odds on encounters
+     that cannot happen. Starting the honey therefore cancelled the repel. */
   assert.equal(e.state.field.repel, null,
-    "a honey left the repel running - they contradict each other");
-  console.log("field ok — counts down while walking, and one per family");
+    "a honey left the repel running - it would burn its steps on nothing");
+
+  /* BUT RARITY AND VARIANT STACK, and that is the point of owning both. The
+     flute moves WHICH SPECIES and a honey moves WHICH TIER - different levers
+     by construction - so "a rarer species, and a better chance it is a variant"
+     is coherent, and blocking it made the two dearest items in the shop
+     mutually exclusive for no reason a player could act on. */
+  assert.equal(e.useField("white-flute"), true, "a flute refused to start");
+  assert.equal(e.state.field.rarity.id, "white-flute", "the flute did not land in its slot");
+  assert.ok(e.state.field.variant,
+    "the flute cancelled the honey - these two move different levers and must stack");
+
+  // And a repel started on top of both still clears them, in that direction too.
+  assert.equal(e.useField("repel"), true, "a repel refused to start over the others");
+  assert.equal(e.state.field.variant, null, "a repel left a honey running underneath it");
+  assert.equal(e.state.field.rarity, null, "a repel left a flute running underneath it");
+  console.log("field ok — counts down while walking; rarity and variant stack, repel is exclusive");
 }
 
 /* A PRE-HOENN SAVE, THROUGH THE REAL LOADER. check.mjs proves the remap
