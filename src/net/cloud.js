@@ -65,15 +65,46 @@ export const email = () => session?.user?.email ?? null;
 
 /* Read once at boot. Returns the session or null; never throws, because a
    backend that is down must not stop the game starting. */
+/* A TOKEN OUTLIVES THE USER IT NAMES, and `getSession` cannot tell.
+
+   It reads the JWT out of localStorage and hands it back without asking
+   anybody: the token stays structurally valid until it expires, so an account
+   deleted in the meantime - on another device, by the owner, or by somebody
+   clearing the table - comes back as a perfectly good session pointing at a row
+   that is gone. What happens next is not a clean failure. `getProfile` finds
+   nothing, so the app asks who you are, and then the insert dies on a foreign
+   key to `auth.users` with a message no player can act on, on a screen with no
+   way out. Which is exactly what shipped.
+
+   `getUser` asks the server, so it is the one that knows. One extra request at
+   boot, once, and it is the difference between a stale token being a non-event
+   and being a trap. A NETWORK failure must not sign anybody out, though - being
+   offline is not the same as being deleted - so only an explicit rejection
+   counts. */
 export async function restore() {
   if (!CLOUD) return null;
   try {
     const { data } = await supabase.auth.getSession();
     session = data?.session ?? null;
+    if (!session) return null;
+
+    const { data: live, error } = await supabase.auth.getUser();
+    if (live?.user) return session;
+
+    /* OFFLINE IS NOT DELETED, and the difference is the error's CLASS, not its
+       wording. auth-js raises `AuthRetryableFetchError` for a dropped
+       connection, a 5xx and a 429 - everything it would retry - and an
+       `AuthApiError` for a rejection the server meant. Matching on the message
+       would have signed out anybody on a train, because the text of a failed
+       fetch is whatever the browser felt like saying. */
+    if (!error || error.name === "AuthRetryableFetchError") return session;
+
+    // The server says this user is not there. The token is worthless.
+    await signOut();
+    return null;
   } catch {
-    session = null;
+    return session;
   }
-  return session;
 }
 
 /* Supabase refreshes tokens on its own and signs out in other tabs; both arrive
@@ -242,6 +273,15 @@ export async function createProfile(username, char) {
     }
     if (error.code === "23514") {
       return { ok: false, error: "Letters, numbers, spaces and dashes only." };
+    }
+    /* 23503 IS A FOREIGN KEY TO A USER THAT IS NOT THERE. The session is a
+       token for a deleted account - see `restore`, which catches this at boot -
+       and the only way out is a new one. `gone` tells Boot to drop back to the
+       login screen rather than leaving somebody staring at the word
+       "constraint". */
+    if (error.code === "23503") {
+      await signOut();
+      return { ok: false, gone: true, error: "That account no longer exists. Please sign up again." };
     }
     return { ok: false, error: say(error) || "Could not save that name." };
   } catch (e) {
