@@ -317,7 +317,10 @@ export default function App() {
                       data-tip={`${item.name} — ${item.blurb}. ${run.steps} steps left.`}
                     >
                       <ItemIcon item={item} />
-                      {run.steps}
+                      <u>
+                        <b>{run.steps}</b>
+                        <i>STEPS</i>
+                      </u>
                     </span>
                   );
                 })}

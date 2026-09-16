@@ -1419,13 +1419,28 @@ export function createEngine(canvas, onChange, mini = null) {
     const item = fieldById(id);
     if (!item || (state.bag[item.id] ?? 0) <= 0) return false;
     state.bag[item.id] -= 1;
-    /* ONE EFFECT AT A TIME, whatever family it belongs to. The families are
-       still what stops two of the same KIND colliding - see items.js - but a
-       repel and a honey running together is a contradiction a player can buy:
-       one says "meet nothing" and the other says "what you meet is rarer".
-       Starting anything cancels everything, so the readout can only ever have
-       one thing to say and the two cannot argue. */
-    for (const fam of FAMILIES) state.field[fam] = null;
+    /* A REPEL IS EXCLUSIVE; THE OTHER TWO STACK - and this is narrower than the
+       rule it replaces, deliberately.
+
+       "One effect at a time, whatever family" was right about exactly one pair.
+       A repel is total: it stops every encounter, so a honey burning its 600
+       steps underneath one is paying for odds on encounters that cannot happen.
+       That is a contradiction a player can buy, and it stays blocked.
+
+       It is NOT true of the other two. The White Flute moves WHICH SPECIES and
+       a honey moves WHICH TIER - different levers, by construction (see THREE
+       FIELD FAMILIES in CLAUDE.md), so running both is "a rarer species, and a
+       better chance it is a variant", which is a coherent thing to want and the
+       obvious reason to own both. Blocking it made the dearest two items in the
+       shop mutually exclusive for no reason anybody could act on.
+
+       The family slot still stops two of the SAME kind - a Max Repel replaces a
+       Repel by being written to the same key - so nothing about that changed. */
+    if (item.family === "repel") {
+      for (const fam of FAMILIES) state.field[fam] = null;
+    } else if (state.field.repel) {
+      state.field.repel = null;
+    }
     state.field[item.family] = { id: item.id, steps: item.steps };
     save();
     changed();
