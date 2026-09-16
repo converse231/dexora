@@ -45,6 +45,7 @@ Lowercase is walkable ground, uppercase the solid wall of the same biome.
 import io
 import json
 import os
+import random
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -1226,6 +1227,166 @@ def tall_grass():
     return ["".join(r) for r in g], (33, 75)
 
 
+# WHAT A REAL FOREST MEASURES, off the only two FireRed ships: ViridianForest
+# and ThreeIsland_BerryForest, through the same reachability-corrected reader
+# `npm run layout` uses. Two maps is under `MIN_SAMPLE`, so this is a target to
+# aim at rather than a band anything is FLAGGED against - which is exactly how
+# it is used below: `compose.score` ranks candidates, and nothing asserts a
+# finished map sits inside it.
+#
+#                     Viridian   Berry
+#   stripe              0.822    1.025
+#   turns               0.077    0.168
+#   dead                0.000    0.002
+#   loops              79.6     65.3
+#   tight               0.426    0.653
+#   open                0.429    0.321
+FOREST = {
+    "stripe": (0.80, 1.05), "turns": (0.07, 0.17), "dead": (0.000, 0.004),
+    "loops": (65.0, 80.0), "tight": (0.42, 0.66), "open": (0.32, 0.44),
+}
+
+
+# Swept against `FOREST`, not chosen. A mass needs `w + pad` by `h + pad` of
+# lattice or it is rejected for want of room and the canopy thins out - the
+# first pass ran a 12x12 pitch under 9x13 masses and measured `open 0.58`
+# against a real 0.32-0.43, which is a field with trees standing in it.
+# Swept against `FOREST`, not chosen. Mixed sizes because a wood is not one
+# tree repeated: the widths and heights are the range ViridianForest's own
+# masses run at, and the tallest that fits is always taken so the late small
+# ones are filling gaps rather than being the plan.
+WIDTHS = (6, 9, 9, 12)
+HEIGHTS = (7, 9, 11, 13)
+TRIES_PER_SEED = 400
+
+
+def forest_masses(W, H, seed, pad=3):
+    """Canopy masses for a forest, on the grammar's own grid.
+
+    THE COMPOSER CANNOT BE USED HERE, and that is a fact about the tileset
+    rather than about the generator. `compose()` carves free-form passages; a
+    canopy column is `crown + (upper,lower) x n + trunk + shadow`, so every mass
+    has to be a multiple of three wide, sit on the 3-column grid, and be an ODD
+    number of rows - measured on the MERGED run, so two masses that touch are
+    one run and their combined height is what has to be odd.
+
+    So this generates over MASSES, the way `haunted_tower` generates over grave
+    plots rather than over corridors. Every mass keeps `pad` (3) tiles clear of
+    every other mass and of the frame, which buys three things at once:
+
+      * no two masses ever merge, so each one's own height is the run height and
+        the parity is decided where it is written rather than discovered by
+        check();
+      * every corridor is at least three wide, which is what the autotile needs
+        and what Viridian Forest's own corridors measure;
+      * THE FLOOR IS CONNECTED BY CONSTRUCTION. The walkable part is the
+        complement of a set of disjoint rectangles inside a frame, which cannot
+        be disconnected - and that is the property three hand-patched attempts
+        at a through-corridor kept losing, each sealing a few hundred tiles into
+        pockets you could see and never reach."""
+    rng = random.Random(seed)
+    # THE PAD APPLIES TO THE FRAME TOO. Sitting flush against the border merges
+    # with it - the border is canopy - and the merged run is what has to be odd:
+    # a 13-tall mass at y=5 under a 5-deep top border is a single run of 18, and
+    # check() refused it. Keeping `pad` clear of the frame means a mass is never
+    # part of any run but its own, which is the whole point of the spacing.
+    x_lo, x_hi = 3 + pad, W - 4 - pad
+    y_lo, y_hi = 5 + pad, H - 6 - pad
+    placed = []
+
+    def clear(x0, y0, x1, y1):
+        """Room for this mass, with `pad` between it and everything else."""
+        if x0 < x_lo or x1 > x_hi or y0 < y_lo or y1 > y_hi:
+            return False
+        return all(x1 + pad < ax0 or ax1 + pad < x0
+                   or y1 + pad < ay0 or ay1 + pad < y0
+                   for ax0, ay0, ax1, ay1 in placed)
+
+    # A jittered lattice, so masses are spread without being a grid. The pitch
+    # is the widest mass plus the gap, or candidates never fit.
+    # A LATTICE THAT MATCHES EVERY BAND STILL READS AS AN ORCHARD, and that is
+    # the same lesson `compose.py` records about wall masses: nothing in the
+    # bands measures REGULARITY, so a perfect grid of identical blocks scored
+    # well and rendered as a plantation. Widening the jitter did not fix it -
+    # it just caused collisions, and the canopy thinned from 21 masses to 14.
+    #
+    # So there is no lattice. Masses are thrown at the map in random order and
+    # kept if they fit, tallest variant first, which packs like a real wood: the
+    # early ones land in open ground and the late ones fill what is left with
+    # whatever still fits. Irregular AND dense, where the lattice made those two
+    # things fight. The seed loop in `best_forest` is what turns "random" into
+    # "the best of two hundred", so the result is chosen, not rolled.
+    for _ in range(TRIES_PER_SEED):
+        w = rng.choice(WIDTHS)
+        x0 = rng.randrange(x_lo, max(x_lo + 1, x_hi - w + 2))
+        x0 -= x0 % 3                          # snap to the 3-column grid
+        y0 = rng.randrange(y_lo, max(y_lo + 1, y_hi - 4))
+        for h in sorted(set(HEIGHTS), reverse=True):
+            if clear(x0, y0, x0 + w - 1, y0 + h - 1):
+                placed.append((x0, y0, x0 + w - 1, y0 + h - 1))
+                break
+    return placed
+
+
+def best_forest(W, H, tries=140, seed0=1):
+    """Generate and test, exactly as the cave and the tower do."""
+    import numpy as np
+    import study_shape as S
+    import study_layout as L
+    import compose
+
+    got = None
+    for seed in range(seed0, seed0 + tries):
+        masses = forest_masses(W, H, seed)
+        if len(masses) < 12:
+            continue
+        walk = np.ones((H, W), dtype=bool)
+        walk[:5, :] = walk[-5:, :] = False           # the frame
+        walk[:, :3] = walk[:, -3:] = False
+        for x0, y0, x1, y1 in masses:
+            walk[y0:y1 + 1, x0:x1 + 1] = False
+        m = S.measure_mask("candidate", walk)
+        m.update(L.measure(walk))
+        sc = compose.score(m, FOREST)
+        if got is None or sc < got[2]:
+            got = (masses, seed, sc, m)
+    assert got, "woods: no candidate forest was generated"
+    return got
+
+
+def open_rect(g, w, h, taken, x_lo, y_lo, x_hi, y_hi, rng=None):
+    """A w x h block of plain floor that nothing has claimed.
+
+    PLACE NOTHING ON GENERATED GROUND. The canopy is composed now, so where the
+    floor is depends on which seed won - a clearing at typed coordinates lands
+    half inside a trunk, which is the fault this file already records for
+    staircases, ledges and spawns.
+
+    SEARCHED IN A SHUFFLED ORDER, seeded off the winning map, so the result is
+    still a function of the map and not of luck. A plain top-left scan put every
+    clearing in the first gaps it met - a row of them along the top edge, and no
+    room left for the pools at all - which reads as typed-in precisely because
+    it is the most orderly placement available."""
+    spots = [(x, y)
+             for y in range(y_lo, y_hi - h + 2)
+             for x in range(x_lo, x_hi - w + 2)]
+    if rng is not None:
+        rng.shuffle(spots)
+    for x, y in spots:
+        if any((xx, yy) in taken
+               for yy in range(y - 1, y + h + 1)
+               for xx in range(x - 1, x + w + 1)):
+            continue
+        if all(g[yy][xx] == "."
+               for yy in range(y, y + h)
+               for xx in range(x, x + w)):
+            for yy in range(y - 1, y + h + 1):
+                for xx in range(x - 1, x + w + 1):
+                    taken.add((xx, yy))
+            return x, y
+    return None
+
+
 def canopy(g, x0, y0, x1, y1):
     """A mass of forest trees.
 
@@ -1315,99 +1476,53 @@ def deep_woods():
     canopy(g, 0, 0, 2, H - 1)
     canopy(g, W - 3, 0, W - 1, H - 1)
 
-    # --- the comb ---------------------------------------------------------
-    # Teeth three wide on the three-column grid, three-wide corridors between
-    # them. A tooth hanging off the top merges with rows 0..4, so its run is
-    # 0..end and `end` has to be EVEN for an odd length; one hanging off the
-    # bottom runs start..H-1, so `start` has to make H-start odd. Both are
-    # derived, and `assert` says so rather than a comment claiming it.
-    # TWO CORRIDOR WIDTHS, and that is what the clearings need. Teeth spaced
-    # evenly six apart leave nothing but three-wide lanes, and a clearing or a
-    # pond wider than three punches straight through a tooth - which showed up
-    # as a canopy column 62 tall where the arithmetic said 77. Alternating the
-    # spacing leaves a three-wide lane to thread and a six-wide one to stand in,
-    # which is also the range Viridian Forest's own corridors run at.
-    teeth = []
-    for k, x in enumerate((6, 12, 21, 27, 36, 42, 51, 57)):
-        if k % 2 == 0:
-            end = H - 12 if k % 4 == 0 else H - 24    # long tooth, short tooth
-            end -= end % 2                            # run 0..end must be odd
-            teeth.append((x, 5, end))
-        else:
-            start = 11 if k % 4 == 1 else 23
-            start += (H - start) % 2 == 0             # run start..H-1 odd
-            teeth.append((x, start, H - 6))
-    for x, y0, y1 in teeth:
-        canopy(g, x, y0, x + 2, y1)
-
-    # --- no cross walls, and that is a finding ---------------------------
-    # Seven were tried, each an odd run of its own, and every one SEALED the
-    # lane it crossed: the comb is a single serpentine corridor, so a wall
-    # spanning a lane is not a wall in a maze, it is the end of the maze. 2,746
-    # of 3,061 walkable tiles were cut off. What breaks up the long runs here is
-    # the clearings and the ponds, which are holes in the floor rather than
-    # walls across it, and they cannot disconnect anything.
-
-    # --- clearings: open sand, wide enough to read as somewhere ----------
-    # Viridian Forest's sand is a clearing, not a path - a broad rectangle you
-    # walk out into. Placed in the corridors, never over a mass.
-    # Every one of these sits inside a six-wide lane: x 15-20, 30-35, 45-50 or
-    # 60-68. A clearing that overlaps a tooth is a canopy column with a hole in
-    # it, and the column assertion is what catches that.
-    for x0, y0, x1, y1 in (
-            (15, 8, 20, 14), (30, 20, 35, 26), (45, 10, 50, 16),
-            (60, 30, 66, 36), (15, 44, 20, 50), (45, 46, 50, 52),
-            (30, 60, 35, 66), (60, 66, 66, 72), (15, 70, 20, 76),
-    ):
-        rect(g, "#", x0, y0, x1, y1)
-
-    # --- two pools, each in its own clearing ------------------------------
-    # In the wide lanes too, for the same reason.
-    rect(g, "w", 30, 8, 35, 12)
-    rect(g, "b", 30, 13, 35, 13)
-
-    rect(g, "w", 45, 68, 50, 72)
-    rect(g, "b", 45, 73, 50, 73)
-
-    # --- and the steps that stop a tooth being a comb tooth ---------------
-    # Measured: the first version came out at `straight 18.9` where Viridian
-    # Forest's own canopy runs 7.1, which is the number for "this reads as a
-    # row of combs". A real canopy mass is big - its masses are few and its fill
-    # is 0.90 - and its EDGE is stepped, so the fix is not smaller masses, it is
-    # a shoulder every few rows.
+    # --- the canopy, generated and tested --------------------------------
+    # THE COMB IS GONE, and it was the map's real problem rather than a style
+    # of it. A comb is ONE serpentine corridor: every lane doubles back into the
+    # next, so getting back to where you came in meant walking the whole map in
+    # reverse, and a wrong turn deep in it cost the entire run back. Reported
+    # from play as not being able to go back at all.
     #
-    # A spur is its own column, three wide on the three-column grid, with its
-    # own odd run, so it steps the edge without touching the parity of the tooth
-    # it hangs off. AFTER the clearings and the ponds, and only onto plain
-    # floor: drawn before them, a clearing cut one in half and left a canopy
-    # column two tall, which is a thing the tileset has no pieces for.
-    # ONLY INTO THE SIX-WIDE LANES. A spur is three wide, so one reaching into
-    # a three-wide lane IS the lane - the first version sealed the forest down
-    # to 183 walkable tiles. These are the columns where three tiles of corridor
-    # are left over, derived from the tooth spacing above.
-    # ONE SIDE PER LANE. With both, two spurs from neighbouring teeth reach
-    # into the same six-wide lane at the same height and fill it between them -
-    # 2,786 of 3,407 tiles cut off. Each lane takes its steps from its western
-    # wall only, so three tiles of it always survive.
-    WIDE = {15, 30, 45, 60}
-    import random as _r
-    rng = _r.Random(20260916)
-    for k, (x, y0, y1) in enumerate(teeth):
-        side = 3 if k % 2 == 0 else -3
-        y = y0 + 4
-        while y < y1 - 8:
-            h = rng.choice((3, 5, 5, 7))          # odd runs only
-            sx = x + side
-            # The row above and below must be clear too, or two spurs from
-            # neighbouring teeth that meet in the same column merge into one
-            # run - and two odd runs end to end are an even one.
-            if (sx in WIDE and y + h - 1 < y1
-                    and all(g[yy][xx] == "."
-                            for yy in range(y - 1, y + h + 1)
-                            for xx in range(sx, sx + 3))):
-                canopy(g, sx, y, sx + 2, y + h - 1)
-            y += h + rng.choice((4, 6, 8))
-            side = -side
+    # Three hand-patched through-corridors were tried and all three reverted -
+    # each either sealed a few hundred tiles into pockets you could see and
+    # never reach, or measured `open 0.67` against a real forest's 0.32-0.43.
+    # The comb was load-bearing for the parity and for connectivity at once, so
+    # cutting it needed both to be rebuilt rather than patched.
+    #
+    # Measured, against the comb it replaces and the two real forests:
+    #
+    #                   comb    generated   Viridian   Berry
+    #   stripe          0.32      0.78        0.822    1.025
+    #   turns           0.03      0.074       0.077    0.168
+    #   tight           0.44      0.379       0.426    0.653
+    #   open            0.54      0.456       0.429    0.321
+    #
+    # The comb read as vertical banding, which is what `stripe 0.32` says and
+    # what a comb is. Everything now sits within a whisker of ViridianForest,
+    # and the floor is connected BY CONSTRUCTION - see `forest_masses`.
+    masses, seed, sc, met = best_forest(W, H, tries=200)
+    for x0, y0, x1, y1 in masses:
+        canopy(g, x0, y0, x1, y1)
+
+    # --- clearings and pools, searched for -------------------------------
+    # Corridors are three wide, so a clearing does not fit in one: these go in
+    # the wider gaps the lattice leaves where a cell was skipped or a mass came
+    # up short. `open_rect` finds them; nothing here is a typed coordinate.
+    taken = set()
+    place = random.Random(seed)
+    # POOLS FIRST, because they need the taller gap and there are only two of
+    # them: run after five clearings they never found room at all.
+    for _ in range(2):
+        at = open_rect(g, 6, 6, taken, 4, 6, W - 5, H - 7, place)
+        if at:
+            x0, y0 = at
+            rect(g, "w", x0, y0, x0 + 5, y0 + 4)
+            rect(g, "b", x0, y0 + 5, x0 + 5, y0 + 5)
+
+    for _ in range(5):
+        at = open_rect(g, 6, 5, taken, 4, 6, W - 5, H - 7, place)
+        if at:
+            rect(g, "#", at[0], at[1], at[0] + 5, at[1] + 4)
 
     # --- tall grass: solid rectangles over whatever floor is left --------
     # A fifth of Viridian Forest's floor is tall grass. Painted with the guard
