@@ -23,3 +23,6 @@ Thumbs.db
 
 # Vite writes these beside the config while the dev server reloads it.
 vite.config.js.timestamp-*
+
+# Throwaway measuring scripts at the repo root (need to sit beside src/ to import it).
+_*.mjs
