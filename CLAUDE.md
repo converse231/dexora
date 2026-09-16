@@ -1448,6 +1448,14 @@ Lv 1 to Lv 50 in Tall Grass: the C band moves **78.2% -> 71.8%** and the S band
 **3.2% -> 3.3%**. The mix those levels were defending is already defended, by
 the thing whose job it is.
 
+**AND A SILENT GATE IS INDISTINGUISHABLE FROM A BUG.** Nothing on screen said
+generations arrive on a level, so a player at Lv 15 meeting only Kanto asked
+whether the game was broken - which is the whole verdict on an invisible rule.
+The Dex's REGION filter says it now (`Gen 2 (Johto) — from Lv 10`), because that
+menu already lists every region; the option still WORKS, since browsing a locked
+region's dex is fine and only meeting one is gated. check.mjs asserts it against
+the source, as nothing fails at runtime when a label quietly stops saying it.
+
 **What a generation actually dilutes is one species' FINDABILITY**, and that is
 the number to watch when this moves: Pidgey, the weight-22 anchor of the
 starting table, goes 12.4% of encounters at Lv 1 to 5.4% at Lv 50. A daily quest

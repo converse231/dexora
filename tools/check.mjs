@@ -3678,6 +3678,20 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   assert.ok(Math.abs(day1.C - endgame.C) < 0.12,
     `the starting map's common band moves ${((day1.C - endgame.C) * 100).toFixed(1)} ` +
     "points across the whole ladder - balance() is no longer holding the mix");
+  /* AND THE GATE HAS TO BE VISIBLE SOMEWHERE. It was not, anywhere, and the
+     verdict on that arrived from play as "I am level 15 and only meeting Gen 1,
+     is this supposed to happen?" - a silent gate is indistinguishable from a
+     bug. The Dex's REGION filter is where it says so, because that menu already
+     lists every region. Asserted against the source: nothing fails at runtime
+     when a label quietly stops mentioning it. */
+  {
+    const src = readFileSync(new URL("../src/ui/Dex.jsx", import.meta.url), "utf8");
+    assert.ok(src.includes("GEN_UNLOCK"),
+      "the Dex no longer reads GEN_UNLOCK - a locked region cannot say when it opens");
+    assert.ok(/from Lv \$\{at\}/.test(src),
+      "the region filter stopped printing the level a generation arrives at");
+  }
+
   console.log(`generations ok — Gen 1 at 1, then every ${GEN_STEP} from ${GEN_FIRST}; ` +
     `${GEN_LAST.length} gates ending at Lv ${prev} under a cap of ${MAX_LEVEL}; ` +
     `Tall Grass commons ${(day1.C * 100).toFixed(1)}% → ${(endgame.C * 100).toFixed(1)}%`);

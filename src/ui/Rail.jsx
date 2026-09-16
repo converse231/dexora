@@ -125,6 +125,7 @@ export default function Rail({
              one - the Dex reads `tiers[t]` off the list instead. */
           tiers={state}
           caught={caught}
+          level={level}
           onSelect={onSelect}
         />
       )}
