@@ -3697,4 +3697,30 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     `Tall Grass commons ${(day1.C * 100).toFixed(1)}% → ${(endgame.C * 100).toFixed(1)}%`);
 }
 
+/* AN EFFECT LAYER IS SIZED BY ITS WRAPPER, so the wrapper must be the size of
+   the picture. Every tier's extras are `position: absolute; inset: 0` and mask
+   with `contain`, which fits the sprite to WHATEVER box they are given - so a
+   wrapper that is wider than the art draws a Holo sheen with no relationship to
+   the creature it travels over. `.sheet-portrait` was `display: block` around a
+   fixed 108px tile, i.e. the full width of the card, and it was reported from
+   play as the Holo effect being "so big not matching the sprite".
+
+   The tell it had been seen and mistaken for a nudge: `.astral-aura` carried a
+   hand-tuned `inset: -6%` there, which made ONE layer look right on ONE screen
+   while the other two stayed wrong. Both halves are asserted, because fixing
+   the box and leaving the nudge would over-correct that one layer instead. */
+{
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const block = css.slice(css.indexOf(".sheet-portrait {"));
+  const rule = block.slice(0, block.indexOf("}"));
+  assert.ok(/width:\s*\d/.test(rule) && /height:\s*\d/.test(rule),
+    ".sheet-portrait has no fixed size - its effect layers will be drawn to the " +
+    "width of the whole card instead of to the sprite");
+  assert.ok(!/\.sheet-portrait\s+\.astral-aura\s*\{[^}]*inset/.test(css),
+    "a per-layer inset nudge is back on the sheet portrait - if one layer needs " +
+    "it the WRAPPER is the wrong size and the other two are wrong too");
+  console.log("variant layers ok — the sheet portrait is sized to its art, so " +
+    "every tier's layer fits it by construction");
+}
+
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);

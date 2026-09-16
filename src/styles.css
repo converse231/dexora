@@ -1490,10 +1490,30 @@ canvas {
    over its own entry number. */
 .cell-marks, .cell-no, .cell-full { z-index: 4; }
 
-/* The sheet's portrait, which needed a positioned wrapper to hang a layer on
-   at all - `.sheet-art` is the img itself. */
-.sheet-portrait { position: relative; display: block; }
-.sheet-portrait .astral-aura { inset: -6%; }
+/* THE WRAPPER MUST BE THE SIZE OF THE PICTURE, or every layer it exists to hold
+   is drawn to the wrong size.
+
+   `.sheet-portrait` was `display: block`, so it filled the row's whole width
+   while `.sheet-art` inside it was a fixed 108px tile. Every effect layer is
+   `position: absolute; inset: 0` against that wrapper, and a `contain` mask
+   fits the sprite to whatever box it is given - so the foil was drawn across
+   the full width of the card and the Holo sheen had no relationship to the
+   creature it was supposed to be travelling over. Reported from play as the
+   Holo effect being "so big not matching the sprite", which is exactly it.
+
+   The tell that this had been seen and mistaken for a nudge: `.astral-aura`
+   carried a hand-tuned `inset: -6%` here, which made ONE of the three layers
+   look right on ONE screen. It is gone - the box is correct now, so every
+   layer fits by construction, which is what `inset: 0` was always assuming.
+
+   The frame moves to the wrapper so the img is the bare picture: a layer at
+   `inset: 0` then matches the sprite's own box rather than the border around
+   it. */
+.sheet-portrait {
+  position: relative; display: block; flex: none;
+  width: 108px; height: 108px;
+  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px;
+}
 .cell-no {
   position: absolute; bottom: 2px; right: 4px;
   font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
@@ -1911,10 +1931,10 @@ canvas {
   padding-bottom: 16px; margin-bottom: 16px;
   border-bottom: 2px solid var(--line);
 }
+/* The picture only - the frame is the wrapper's, above. */
 .sheet-art {
-  width: 108px; height: 108px; object-fit: contain; image-rendering: pixelated;
-  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px;
-  flex: none;
+  width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;
+  display: block;
 }
 .sheet-art.locked { filter: brightness(0); opacity: .22; }
 .sheet-no { font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
@@ -2044,7 +2064,12 @@ canvas {
   padding: 7px 1px 6px; border-radius: 9px;
   border: 2px solid var(--line); background: var(--paper);
 }
-.sf-one.got { border-color: var(--path); background: var(--path-soft); }
+.sf-one.got { border-color: var(--path); background: var(--path-soft); cursor: pointer; }
+/* Which one the portrait is currently showing. A held tile is a control now,
+   so it needs a resting state that says which is selected - the ring, not a
+   colour change, because the tile's colour already means "you have this". */
+.sf-one.picked { box-shadow: 0 0 0 2px var(--canopy); }
+.sf-one.got:focus-visible { outline: 2px solid var(--canopy); outline-offset: 2px; }
 .sf-art { position: relative; width: 38px; height: 38px; display: grid; place-items: center; }
 .sf-art img:not(.mark) { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 /* Not held: a flat silhouette, so the shape is a hint and the colours are not

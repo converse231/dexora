@@ -18,7 +18,7 @@
    is no battling - so they were six rows of precise numbers that could not
    affect a single decision, and they were the largest block on the card. */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useModalLock } from "./modal.js";
 import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
@@ -145,6 +145,19 @@ export default function DexSheet({
   const forms = VARIANTS.filter(([t]) => t === null || t !== "origin" || hasOrigin(id));
   const every = forms.every(([t]) => got(t));
 
+  /* WHICH FORM THE PORTRAIT IS SHOWING. It was fixed at the rarest one held,
+     which is the right thing to OPEN on and the wrong thing to be stuck with:
+     the strip below is where you go to see what a variant looks like, and the
+     portrait is the biggest this entry ever draws the creature - so picking a
+     form there and having the big picture ignore you is the whole strip's
+     point missed. Held forms only; a silhouette is not something to promote.
+
+     Keyed on `id` so opening a different entry starts from its own rarest
+     again rather than remembering a tier the new one may not even have. */
+  const [picked, setPicked] = useState(variant);
+  useEffect(() => { setPicked(variant); }, [id, variant]);
+  const shown = got(picked) ? picked : variant;
+
   useModalLock();
 
   useEffect(() => {
@@ -171,14 +184,19 @@ export default function DexSheet({
           {/* The rarest one you have registered claims the entry's portrait:
               the dex should show you the one you actually own. */}
           <span className={`sheet-portrait${caught ? "" : " locked"}`}>
+            {/* `shown` rather than `variant`: the strip below can change it.
+                Keyed so React rebuilds the layers on a swap - a CSS animation
+                does not restart on a prop change, and a foil that carries on
+                mid-sweep reads as the picture not having changed at all. */}
             <Sprite
+              key={shown ?? "plain"}
               id={id}
-              variant={caught ? variant : null}
+              variant={caught ? shown : null}
               className={`sheet-art${caught ? "" : " locked"}`}
             />
             {/* The portrait is the biggest the entry ever draws this Pokemon,
                 so it is the worst place for the treatment to be missing. */}
-            {caught && <VariantFx id={id} variant={variant} />}
+            {caught && <VariantFx key={shown ?? "plain"} id={id} variant={shown} />}
           </span>
           <div>
             <div className="sheet-no">#{String(id).padStart(3, "0")}</div>
@@ -216,7 +234,28 @@ export default function DexSheet({
               </div>
               <div className="sf-row">
                 {forms.map(([t, name, blurb]) => (
-                  <div key={name} className={`sf-one${got(t) ? " got" : ""}`}>
+                  /* A held form is a BUTTON - it promotes itself to the
+                     portrait. One you have not got stays a plain div: there is
+                     nothing to show, and a control that does nothing is worse
+                     than no control. */
+                  <div
+                    key={name}
+                    className={`sf-one${got(t) ? " got" : ""}${
+                      got(t) && t === shown ? " picked" : ""}`}
+                    {...(got(t) ? {
+                      role: "button",
+                      tabIndex: 0,
+                      "aria-pressed": t === shown,
+                      "aria-label": `Show the ${name} ${label(sp)}`,
+                      onClick: () => setPicked(t),
+                      onKeyDown: (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setPicked(t);
+                        }
+                      },
+                    } : {})}
+                  >
                     <div className="sf-art">
                       {/* This strip is where someone comes to SEE what a
                           variant looks like, so every tier gets its real
