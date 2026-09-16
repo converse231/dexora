@@ -509,7 +509,7 @@ export function onShelf(items, level) {
 export const MASTER_EVERY = 8;
 
 export function levelReward(level) {
-  const items = { "poke-ball": 5 };
+  const items = { "poke-ball": plain(5, level) };
   if (level >= 12) items["ultra-ball"] = 2;
   else if (level >= 6) items["great-ball"] = 3;
   /* A COUNT, NOT A CADENCE - still the rule, and the count moved.
@@ -560,6 +560,31 @@ export const STEP_HAUL = 10;            // every tenth parcel is a bigger one
 export const STEP_TREASURE = 5;
 export const TREASURE_LEVEL = 15;
 
+/* HOW MUCH OF THE CHEAPEST BALL IS STILL WORTH HANDING OVER.
+
+   Both reward paths paid a FLAT Poke Ball grant at every level, which is right
+   while it is the only ball you have and wrong the moment it is not: past Lv 12
+   you are catching with Ultras and the plain ones bank up untouched. Reported
+   from play at Lv 30 holding 122 of them - "I rarely see myself buying Poke
+   Balls", which is the cheapest ball in the game having become a dead resource
+   AND the shop losing its entry-level customer at the same time.
+
+   The grant is a SAMPLE of the tier you just unlocked - that is the whole
+   design of paying out in balls (see README) - so the plain one should fade as
+   better ones arrive. Derived from the plain ladder's OWN unlock levels rather
+   than typed, so retuning `BALLS` moves this with it instead of leaving two
+   numbers to disagree. One function, called by both payers, because a taper
+   applied in one of two places is the pile-up again at half speed. */
+export const plainShare = (level) => {
+  const ladder = PLAIN_BALLS.filter(forSale).map((b) => b.level);
+  const great = ladder[1] ?? 6;
+  const ultra = ladder[2] ?? 12;
+  return level >= ultra ? 0.2 : level >= great ? 0.6 : 1;
+};
+
+// Never zero: the cheapest ball is the floor of the economy, not a retired one.
+const plain = (n, level) => Math.max(1, Math.round(n * plainShare(level)));
+
 export function stepReward(steps, level) {
   if (!steps || steps % STEP_PARCEL !== 0) return null;
   const parcels = steps / STEP_PARCEL;
@@ -569,7 +594,7 @@ export function stepReward(steps, level) {
   const treasure = haul
     && parcels % (STEP_HAUL * STEP_TREASURE) === 0
     && level >= TREASURE_LEVEL;
-  const items = { "poke-ball": haul ? 10 : 3 };
+  const items = { "poke-ball": plain(haul ? 10 : 3, level) };
   if (level >= 12) items["great-ball"] = haul ? 5 : 2;
   else if (level >= 6) items["great-ball"] = haul ? 3 : 1;
   if (haul && level >= 12) items["ultra-ball"] = 2;

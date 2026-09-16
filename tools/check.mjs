@@ -2283,10 +2283,35 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   assert.equal(stepReward(STEP_PARCEL - 1, 30), null, "nor does one step short");
   assert.ok(stepReward(STEP_PARCEL, 1), "and the first parcel lands on time");
 
-  // It scales, or a parcel of Poke Balls at level 40 is a rounding error.
-  const at = (lv) => Object.values(stepReward(STEP_PARCEL, lv).items)
-    .reduce((a, b) => a + b, 0);
-  assert.ok(at(30) > at(8) && at(8) > at(1), "a parcel has to grow with the trainer");
+  /* IT SCALES BY WHAT IT IS WORTH, NOT BY HOW MANY THINGS ARE IN IT.
+
+     This summed the item COUNT, which read correctly only while every parcel
+     was mostly Poke Balls. The plain ball tapers as better ones unlock now (see
+     `plainShare`), so a late parcel holds FEWER things and more valuable ones -
+     3 Poke Balls at Lv 1 against 1 Poke and 2 Great at Lv 30, which is three
+     items either way and 75 against 205 in money. Counting units said the
+     reward had stopped growing; it had changed denomination.
+
+     Priced through `itemById` so it cannot drift from the shop. */
+  const at = (lv) => Object.entries(stepReward(STEP_PARCEL, lv).items)
+    .reduce((n, [id, qty]) => n + (itemById(id)?.price ?? 0) * qty, 0);
+  assert.ok(at(30) > at(8) && at(8) > at(1),
+    `a parcel has to grow with the trainer: ¥${at(1)} -> ¥${at(8)} -> ¥${at(30)}`);
+
+  /* AND THE CHEAPEST BALL TAPERS, or it is a dead resource and the shop loses
+     its entry-level customer. Flat grants meant a Lv 30 trainer holding 122
+     Poke Balls they were never going to throw, because by then everything worth
+     catching is worth an Ultra. Asserted from BOTH payers, since a taper
+     applied in one of two places is the same pile-up at half speed - and as a
+     RELATIONSHIP, so retuning the amounts cannot quietly flatten it. */
+  const plainAt = (lv) => levelReward(lv)["poke-ball"]
+    + (stepReward(STEP_PARCEL, lv)?.items?.["poke-ball"] ?? 0);
+  assert.ok(plainAt(1) > plainAt(8) && plainAt(8) > plainAt(30),
+    `the plain ball grant is flat across the ladder (${plainAt(1)} / ${plainAt(8)} ` +
+    `/ ${plainAt(30)}) - it banks up unspent and nobody buys the cheap ball`);
+  assert.ok(plainAt(MAX_LEVEL) >= 2,
+    "the plain ball grant reached zero - it is the floor of the economy, not a " +
+    "retired ball");
 
   // Only the haul reaches Ultras: commons fund rares, and walking must not
   // shortcut the funding.
