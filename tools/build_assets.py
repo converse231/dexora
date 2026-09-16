@@ -746,22 +746,40 @@ def build_player():
         return
 
     sheet = np.array(Image.open(src).convert("RGBA"))
-    FH, PITCH_Y, OY, ROWS = 32, 33, 42, 4
+    FH, PITCH_Y, ROWS = 32, 33, 4
     #        name     first x  pitch  width  frames
     SETS = [("walk",        8,    17,    16,      3),
             ("run",        68,    17,    16,      3),
             ("fish",      236,    33,    32,      4),
             ("jump",      527,    33,    32,      1)]
 
+    # BOTH PLAYABLE CHARACTERS ARE ON THIS SHEET, and only one was ever cut out
+    # of it. The rip is titled "Playable CharacterS" and is 638px tall, where the
+    # four rows read here end at 173 - the rest is not padding. Measured off its
+    # own backing rectangles, the marker bands sit at y 42-172, 183-288, 309-439,
+    # 448-555 and 566-629, and the THIRD is the same 131px four-row grid as the
+    # first: Red at 42, Leaf at 309, same pitch, same columns, every set in the
+    # same place across.
+    #
+    # So the only thing that differs between them is the origin row, and both go
+    # into ONE strip - Red's four facings, then Leaf's - with the row each starts
+    # at recorded in `chars`. One image and one fetch, and the renderer adds an
+    # offset instead of choosing a file.
+    CHARS = {"red": 42, "leaf": 309}
+
     width = sum(w * n for _, _, _, w, n in SETS)
-    out = np.zeros((ROWS * FH, width, 4), np.uint8)
-    meta, ox = {}, 0
+    rows_all = ROWS * len(CHARS)
+    out = np.zeros((rows_all * FH, width, 4), np.uint8)
+    meta, ox, chars = {}, 0, {}
     for name, sx, pitch, fw, n in SETS:
-        for r in range(ROWS):
-            for c in range(n):
-                y, x = OY + r * PITCH_Y, sx + c * pitch
-                out[r * FH:(r + 1) * FH, ox + c * fw:ox + (c + 1) * fw] = \
-                    sheet[y:y + FH, x:x + fw]
+        for ci, (cname, oy) in enumerate(CHARS.items()):
+            chars[cname] = ci * ROWS
+            for r in range(ROWS):
+                for c in range(n):
+                    y, x = oy + r * PITCH_Y, sx + c * pitch
+                    row = ci * ROWS + r
+                    out[row * FH:(row + 1) * FH, ox + c * fw:ox + (c + 1) * fw] = \
+                        sheet[y:y + FH, x:x + fw]
         meta[name] = {"x": ox, "y": 0, "w": fw, "h": FH, "frames": n}
         ox += fw * n
 
@@ -775,9 +793,13 @@ def build_player():
     with io.open(os.path.join(PUB, "tilesets", "player.json"), "w") as f:
         json.dump({"scale": 2, "rowH": FH,
                    "dirs": {"down": 0, "up": 1, "left": 2, "right": 3},
+                   # Which block of four rows a character starts at; the
+                   # renderer adds this to the facing's own row.
+                   "chars": chars,
                    "sets": meta}, f, indent=2)
     opaque = int((out[:, :, 3] > 0).sum())
-    print(f"  player.png {width}x{ROWS * FH}  ({opaque} opaque px)  "
+    print(f"  player.png {width}x{rows_all * FH}  ({opaque} opaque px)  "
+          + f"chars:{'/'.join(chars)}  "
           + " ".join(f"{k}:{v['frames']}" for k, v in meta.items()))
 
     build_shoes(out, meta)

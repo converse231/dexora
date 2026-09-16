@@ -1293,6 +1293,29 @@ canvas {
 /* SAVE FILE. Two buttons that are peers, so they are the same size and sit on
    one row - export is not the "primary" of the pair, and styling it as one
    would suggest importing is the risky half when the opposite is true. */
+/* WHO YOU PLAY. Two tiles drawing the real down-facing walk frame out of the
+   same strip the map renders from - `player.png` is 8 rows of 32 at 2x, so a
+   character is a 128px vertical offset and the walk set is the first 16 columns.
+   Reading the actual art means the picker cannot drift from what walks. */
+.trchar { display: flex; gap: 8px; padding: 10px 12px 0; }
+.trchar-one {
+  flex: 1; display: flex; align-items: center; gap: 9px; cursor: pointer;
+  padding: 7px 10px; border-radius: 10px;
+  border: 2px solid var(--line-firm); background: var(--surface);
+  font-family: var(--pixel); color: var(--ink-soft);
+}
+.trchar-one.on { border-color: var(--canopy); background: var(--path-soft); color: var(--ink); }
+.trchar-one i { font-style: normal; font-size: 11px; }
+.trchar-art {
+  width: 32px; height: 64px; flex: none;
+  image-rendering: pixelated;
+  background-image: url("tilesets/player.png");
+  background-size: 512px 512px;          /* 256x256 at 2x */
+  background-repeat: no-repeat;
+}
+.ch-red { background-position: 0 0; }
+.ch-leaf { background-position: 0 -256px; }   /* row 4 of 8, at 2x */
+
 .trsave { padding: 10px 12px 12px; display: grid; gap: 9px; }
 /* The recovery offer is the same block with a gold rule over it - it is not a
    different control, it is the save block saying there is an older one. Gold

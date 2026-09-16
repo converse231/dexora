@@ -455,6 +455,7 @@ export default function App() {
           onJumped={() => setBoxJump(null)}
           onSpend={(id) => engine.spend(id)}
           onBike={() => engine.toggleBike()}
+          onChar={(id) => engine.setChar(id)}
           /* The three save-file calls, handed over as one object so the panel
              does not need the engine itself. */
           save={engine && {
