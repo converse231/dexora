@@ -987,6 +987,15 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!hit) return;
     state.hints = [...state.hints, hit.id];
     state.hint = hit;
+    /* AND THE TRAINER STOPS. A tip is the only modal that opens UNPROMPTED,
+       which on a touch screen means it can open mid-stride: the dialog's scrim
+       covers the whole viewport, so the finger lifts onto the scrim and the
+       d-pad button never receives its `pointerup`. The direction stays held and
+       the trainer walks on behind the dialog. Dropping held keys here is the
+       same thing the stall handler does when the tab comes back, and for the
+       same reason - the release is never going to arrive. */
+    held.clear();
+    state.running = false;
     save();
     changed();
   }
@@ -1619,6 +1628,19 @@ export function createEngine(canvas, onChange, mini = null) {
     /* Dismissing is not the same as banking it - the id went into `hints` the
        moment it was shown, so closing it is only about the screen. It can never
        come back, which is the point. */
+    /* THE ACCOUNT'S COPY IS BEHIND, which is not the same failure as the local
+       write dying and must not shout as loudly. A local failure means this
+       session is at risk right now; this one means it is safe on the machine
+       and has not reached the server yet. Local always wins the slot: it is the
+       worse news, and showing the milder one over it would hide it. */
+    syncTrouble(why) {
+      const soft = why ? "offline" : null;
+      if (state.stale === "full" || state.stale === "blocked") return;
+      if (state.stale === soft) return;
+      state.stale = soft;
+      changed();
+    },
+
     clearHint() {
       if (!state.hint) return;
       state.hint = null;

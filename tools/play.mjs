@@ -640,11 +640,23 @@ function until(e, what, label, max = 2000) {
   let e = createEngine(canvas(), () => {}, canvas());
   assert.equal(e.state.hint, null, "a tip was showing before anything happened");
 
+  /* NOT cleared here, deliberately. The direction stays held exactly as it
+     would on a touch screen when the scrim swallows the `pointerup`, which is
+     the case the assertion below exists for - releasing it first would test
+     nothing. */
   for (let i = 0; i < 200 && !e.state.hint; i++) { e.press("right"); tick(16); }
-  e.clearHeld();
   assert.ok(e.state.hint, "walking taught nothing at all");
   const first = e.state.hint.id;
   assert.ok(e.state.hints.includes(first), "the tip was shown without being banked");
+
+  /* A TIP OPENS UNPROMPTED, so it can open mid-stride - and on a touch screen
+     the dialog's scrim then takes the `pointerup` the d-pad was waiting for.
+     The direction has to be dropped here or the trainer walks on behind it. */
+  assert.equal(e.state.running, false, "a tip left the trainer running");
+  const before = { ...e.state.player };
+  for (let i = 0; i < 90; i++) tick(16);
+  assert.deepEqual({ ...e.state.player }, before,
+    "the trainer kept moving while a tip was up - the held direction was not dropped");
 
   e.clearHint();
   assert.equal(e.state.hint, null, "dismissing did not clear it");
@@ -671,6 +683,54 @@ function until(e, what, label, max = 2000) {
   assert.deepEqual(e.state.hints, [first], "an unknown hint id survived a load");
   console.log(`hints ok — ${HINT_IDS.length} tips, one at a time, banked on sight ` +
     "and never repeated");
+}
+
+/* A FAILED UPLOAD IS KEPT, NOT DROPPED - the bug this exists for lost a whole
+   session. `flush` cleared `pending` before awaiting the push, so a dropped
+   request threw the payload away; the game only recovered because the next
+   write repopulated it, which means stopping play right after a failed request
+   lost that session from the account permanently.
+
+   Driven through `flushNow`, which pushes immediately, so the property is
+   asserted with no timers at all - the backoff schedule is a separate concern
+   and not worth ten seconds of suite time to watch tick. */
+{
+  const { mirror, flushNow, onSyncTrouble } = await import("../src/game/store.js");
+  let down = true;
+  const seen = [];
+  const push = async (raw) => {
+    seen.push(JSON.parse(raw).steps);
+    return down ? { ok: false, why: "offline" } : { ok: true };
+  };
+  const told = [];
+  onSyncTrouble((why) => told.push(why));
+
+  mirror(JSON.stringify({ steps: 10 }), push);
+  const first = await flushNow(push);
+  assert.equal(first.ok, false, "flushNow claimed a failed upload landed");
+  assert.deepEqual(seen, [10], `the first attempt sent ${seen}`);
+
+  // THE POINT: it is still queued, and it is the same save.
+  down = false;
+  const second = await flushNow(push);
+  assert.equal(second.ok, true, "the retry did not land");
+  assert.deepEqual(seen, [10, 10],
+    `a failed upload was discarded instead of retried - attempts were ${seen}`);
+
+  // And a newer save supersedes a failed one rather than queueing behind it.
+  down = true;
+  seen.length = 0;
+  mirror(JSON.stringify({ steps: 20 }), push);
+  await flushNow(push);
+  mirror(JSON.stringify({ steps: 21 }), push);
+  down = false;
+  await flushNow(push);
+  assert.equal(seen.at(-1), 21, `a newer save was not preferred: ${seen}`);
+
+  // Nothing queued is not a failure.
+  assert.equal((await flushNow(push)).ok, true, "an empty flush reported trouble");
+  onSyncTrouble(null);
+  console.log("sync ok — a failed upload is kept and retried, a newer one supersedes it");
 }
 
 console.log("play ok — the frame loop never stopped");

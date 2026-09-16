@@ -67,7 +67,7 @@ const typing = (ev) => {
    happening to have been edited on the same day. */
 const rarestOf = (st, id) => TIERS.find((t) => st?.[t]?.[dexIndex(id)]) ?? null;
 
-export default function App({ onLogOut = null }) {
+export default function App({ onLogOut = null, onEngine = null }) {
   const canvasRef = useRef(null);
   const miniRef = useRef(null);
   const [engine, setEngine] = useState(null);
@@ -93,6 +93,8 @@ export default function App({ onLogOut = null }) {
   useEffect(() => {
     const e = createEngine(canvasRef.current, force, miniRef.current);
     setEngine(e);
+    // Boot needs a handle to report a failed upload into - see onSyncTrouble.
+    onEngine?.(e);
 
     const down = (ev) => {
       if (typing(ev)) return;                // a search box has the keyboard

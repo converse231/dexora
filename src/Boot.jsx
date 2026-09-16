@@ -13,7 +13,7 @@
    the trainer. The game is then exactly what it was before any of this: one
    save, this browser. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import App from "./App.jsx";
 import { Account, Trainer } from "./ui/Gate.jsx";
 import {
@@ -44,6 +44,8 @@ export default function Boot() {
   /* Bumped when the save underneath is replaced, so `App` remounts and builds
      a new engine around it rather than trying to adopt one mid-flight. */
   const [gen, setGen] = useState(0);
+  // The live engine, so a sync failure has somewhere to be reported to.
+  const engineRef = useRef(null);
 
   const decide = useCallback(async () => {
     const raw = await settle();
@@ -69,9 +71,13 @@ export default function Boot() {
     return () => { live = false; off(); };
   }, [decide]);
 
-  // A failed upload says the same thing a failed local write does.
+  /* A FAILED UPLOAD HAS TO REACH THE SCREEN. This was wired to a no-op - the
+     reporting channel built and then thrown away - so a save that never made it
+     to the account looked exactly like one that did. The engine owns the slot
+     the top bar reads, so it is handed over as soon as there is an engine; the
+     ref is because Boot mounts App rather than being inside it. */
   useEffect(() => {
-    onSyncTrouble(() => {});
+    onSyncTrouble((why) => engineRef.current?.syncTrouble?.(why));
     return () => onSyncTrouble(null);
   }, []);
 
@@ -137,5 +143,11 @@ export default function Boot() {
     );
   }
 
-  return <App key={gen} onLogOut={CLOUD ? out : null} />;
+  return (
+    <App
+      key={gen}
+      onLogOut={CLOUD ? out : null}
+      onEngine={(e) => { engineRef.current = e; }}
+    />
+  );
 }
