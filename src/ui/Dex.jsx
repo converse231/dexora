@@ -15,6 +15,7 @@ import { SPECIES } from "../data/species.js";
 import { label } from "../game/map.js";
 import {
   LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor, isLegendary,
+  GEN_UNLOCK,
 } from "../game/biomes.js";
 import FilterBar from "./FilterBar.jsx";
 import Sprite, { VariantFx } from "./Sprite.jsx";
@@ -41,7 +42,7 @@ const SORTS = {
   rarity: (a, b) => "SABC".indexOf(a.tier) - "SABC".indexOf(b.tier),
 };
 
-export default function Dex({ dex, tiers, caught, onSelect }) {
+export default function Dex({ dex, tiers, caught, level = 1, onSelect }) {
   const [only, setOnly] = useState("all");
   const [type, setType] = useState("any");
   const [sort, setSort] = useState("number");
@@ -156,10 +157,23 @@ export default function Dex({ dex, tiers, caught, onSelect }) {
             /* No counts in this one. `GENERATIONS[].name` is already
                "Gen 1 (Kanto)", and the progress bar above says how far through
                it you are - a count here would be the same number twice, and the
-               one in the menu would move under you as you played. */
+               one in the menu would move under you as you played.
+
+               BUT A REGION THAT HAS NOT ARRIVED SAYS WHEN, and that is the one
+               thing this menu was missing. Generations gate on `GEN_UNLOCK`, and
+               NOTHING anywhere on screen said so - reported from play as "I am
+               level 15 and only meeting Gen 1, is this supposed to happen?",
+               which is exactly what a silent gate feels like from the inside.
+               The entry still works: you can browse a locked region's dex, you
+               just cannot meet one yet, so the label says so rather than the
+               option being removed. */
             options: [
               ["all", "All regions", null],
-              ...GENERATIONS.map((g) => [String(g.gen), g.name, null]),
+              ...GENERATIONS.map((g) => {
+                const at = GEN_UNLOCK[g.gen] ?? 1;
+                return [String(g.gen),
+                  level >= at ? g.name : `${g.name} — from Lv ${at}`, null];
+              }),
             ],
           },
           {
