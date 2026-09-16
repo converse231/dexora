@@ -3846,4 +3846,27 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     `art generation, the catch-all covering Gen ${gens[0] ?? tail} only (to #${last})`);
 }
 
+/* TWO SIBLINGS MUST NOT SHARE A KEY, and React does not say so - it silently
+   stops reconciling them. The dex sheet's portrait gave `<Sprite>` and
+   `<VariantFx>` the same `key={shown}` so the layer would remount and restart
+   its animation on a swap; the duplicate meant the OLD `<img>` stayed mounted
+   beside the new one, two 108px pictures in a 108px box, the second spilling
+   over the FORMS strip. Reported as the preview not changing, which is exactly
+   what it looks like when the stale one is drawn on top.
+
+   The rule is narrower than "no duplicate keys": an `<img>` never needs one at
+   all, because a new `src` IS the update. Only a layer carrying a CSS animation
+   does. Asserted against the source, since nothing fails at runtime. */
+{
+  const src = readFileSync(new URL("../src/ui/DexSheet.jsx", import.meta.url), "utf8");
+  const portrait = src.slice(src.indexOf("sheet-portrait"), src.indexOf("sheet-no"));
+  const keys = [...portrait.matchAll(/key=\{([^}]*)\}/g)].map((m) => m[1].trim());
+  assert.equal(new Set(keys).size, keys.length,
+    `the dex portrait gives ${keys.length} siblings only ${new Set(keys).size} distinct ` +
+    "keys - React stops reconciling them and the old sprite stays mounted");
+  assert.ok(!/<Sprite[^>]*key=/s.test(portrait),
+    "the portrait's <Sprite> is keyed - an image needs no key, a new src is the update");
+  console.log(`dex portrait ok — ${keys.length} keyed layer(s), all distinct, image unkeyed`);
+}
+
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);

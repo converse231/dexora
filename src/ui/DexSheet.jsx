@@ -185,18 +185,28 @@ export default function DexSheet({
               the dex should show you the one you actually own. */}
           <span className={`sheet-portrait${caught ? "" : " locked"}`}>
             {/* `shown` rather than `variant`: the strip below can change it.
-                Keyed so React rebuilds the layers on a swap - a CSS animation
-                does not restart on a prop change, and a foil that carries on
-                mid-sweep reads as the picture not having changed at all. */}
+
+                THE IMAGE IS NOT KEYED AND THE LAYER IS, and they must not share
+                a key. Both carried `key={shown}` at first - two SIBLINGS with
+                the same key, which is a duplicate in React's implicit child
+                array, and it stopped reconciling them: swapping the form left
+                the old `<img>` mounted next to the new one, two 108px pictures
+                stacked in a 108px box, the second spilling out over the FORMS
+                strip below. Reported as the preview not changing, which is what
+                it looks like when the stale one is on top.
+
+                Only the LAYER needs remounting - a CSS animation does not
+                restart on a prop change, so a foil carrying on mid-sweep reads
+                as the picture not having changed. An `<img>` needs nothing: a
+                new `src` is the whole update. */}
             <Sprite
-              key={shown ?? "plain"}
               id={id}
               variant={caught ? shown : null}
               className={`sheet-art${caught ? "" : " locked"}`}
             />
             {/* The portrait is the biggest the entry ever draws this Pokemon,
                 so it is the worst place for the treatment to be missing. */}
-            {caught && <VariantFx key={shown ?? "plain"} id={id} variant={shown} />}
+            {caught && <VariantFx key={`fx-${shown ?? "plain"}`} id={id} variant={shown} />}
           </span>
           <div>
             <div className="sheet-no">#{String(id).padStart(3, "0")}</div>

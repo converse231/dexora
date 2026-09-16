@@ -272,9 +272,20 @@ canvas {
   position: absolute; left: 0; right: 0; top: 9%; bottom: 19%;
   display: grid; place-items: center;
 }
+/* SCALE THE SLOT, NEVER THE SPRITE. `.mon` runs `mon-appear` and `mon-idle`,
+   both of which own `transform` - so a `transform: scale()` here would be
+   overridden the instant either plays, and this file already records that an
+   animation beats a plain declaration. Sizing the slot moves the sprite, the
+   ball, the landing ring and every tier's effect layer together, because they
+   are all inside it. That last part is the same lesson as the dex portrait: a
+   layer is sized by its wrapper, so shrink the wrapper and the foil still fits.
+
+   62%, because the Pokemon was filling its whole band and reading as pressed
+   against the nameplate. It is a creature standing in a field, and a field
+   needs some air above it. */
 .mon-slot {
   position: relative; display: grid; place-items: center;
-  height: 100%; aspect-ratio: 1 / 1;
+  height: 62%; aspect-ratio: 1 / 1;
 }
 
 /* Dust kicked up where it lands, on appearing. */
@@ -2614,9 +2625,14 @@ canvas {
   display: grid; place-items: center;
 }
 
+/* 30cqw, down from 34. The evolution scene draws the sprite bigger than the
+   encounter does, which is right - it is the moment the screen exists for - but
+   the two were far enough apart that the same creature looked like two sizes.
+   Scaled here rather than on a transform for the same reason `.mon-slot` is:
+   `.evo-mon` is driven by the cycle's own keyframes. */
 .evo-mon {
   grid-area: 1 / 1;
-  width: 34cqw; height: 34cqw;
+  width: 30cqw; height: 30cqw;
   object-fit: contain;
   image-rendering: pixelated;
   transform-origin: 50% 50%;
