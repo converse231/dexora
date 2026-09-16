@@ -167,10 +167,12 @@ export default function TopBar({
           it appears mid-session rather than on load: it has to interrupt. */}
       {stale && (
         <p className="tb-stale" role="alert">
-          <b>NOT SAVING</b>
-          {stale === "full"
-            ? " — this browser's storage is full. Sell some spares, or export from the YOU tab."
-            : " — this browser is blocking storage. Export from the YOU tab to keep this game."}
+          <b>{stale === "offline" ? "NOT SYNCED" : "NOT SAVING"}</b>
+          {stale === "offline"
+            ? " — your game is safe on this device but has not reached your account yet. It will retry."
+            : stale === "full"
+              ? " — this browser's storage is full. Sell some spares, or export from the YOU tab."
+              : " — this browser is blocking storage. Export from the YOU tab to keep this game."}
         </p>
       )}
 

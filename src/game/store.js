@@ -93,6 +93,15 @@ export function keep(key, raw) {
    somebody is walking, which is exactly when there is most to lose. A trailing
    push always follows the last write, so the final state always lands. */
 const SYNC_MS = 4000;
+/* A FAILED UPLOAD IS RETRIED, NOT DROPPED. The first version cleared `pending`
+   before awaiting the push, so a failure threw the save away: the game only
+   recovered because the next write repopulated it, which means stopping play
+   right after a dropped request lost that session from the account for good.
+   The payload goes back now, and the wait backs off so a flapping connection is
+   not hammered - capped, because a save that is minutes stale is the thing this
+   exists to avoid. */
+const SYNC_MAX_MS = 60000;
+let wait = SYNC_MS;
 let pending = null;
 let timer = null;
 let inflight = false;
@@ -107,7 +116,7 @@ export function onSyncTrouble(fn) {
 export function mirror(raw, push) {
   pending = raw;
   if (timer || inflight) return;
-  timer = setTimeout(() => flush(push), SYNC_MS);
+  timer = setTimeout(() => flush(push), wait);
 }
 
 async function flush(push) {
@@ -116,26 +125,44 @@ async function flush(push) {
   const raw = pending;
   pending = null;
   inflight = true;
+  let ok = false;
   try {
     const got = await push(raw);
-    report(got?.ok === false ? (got.why ?? "offline") : null);
+    ok = got?.ok !== false;
+    report(ok ? null : (got.why ?? "offline"));
   } catch {
     report("offline");
   } finally {
     inflight = false;
-    // Anything written while that was in the air gets its own turn.
-    if (pending != null && !timer) timer = setTimeout(() => flush(push), SYNC_MS);
+    if (ok) {
+      wait = SYNC_MS;
+    } else if (pending == null) {
+      /* Put it back - but only if nothing newer arrived while it was in the
+         air, because a newer save already contains everything this one did. */
+      pending = raw;
+      wait = Math.min(wait * 2, SYNC_MAX_MS);
+    }
+    if (pending != null && !timer) timer = setTimeout(() => flush(push), wait);
   }
 }
 
 /* Everything outstanding, now - for logging out, where the next thing that
-   happens is the save being unreachable. */
+   happens is the save being unreachable. Reports whether it landed, so the
+   caller can decide whether leaving is safe; the local copy is untouched
+   either way, so the worst case is the account being one session behind. */
 export async function flushNow(push) {
   if (timer) { clearTimeout(timer); timer = null; }
-  if (pending == null) return;
+  if (pending == null) return { ok: true };
   const raw = pending;
   pending = null;
-  try { await push(raw); } catch { /* leaving anyway */ }
+  try {
+    const got = await push(raw);
+    if (got?.ok === false) pending = raw;      // keep it for a later session
+    return { ok: got?.ok !== false };
+  } catch {
+    pending = raw;
+    return { ok: false };
+  }
 }
 
 /* WHICHEVER HAS WALKED FURTHER WINS, and that is the whole merge.
