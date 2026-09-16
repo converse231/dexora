@@ -1680,6 +1680,49 @@ every box entry. **Weight scales with the CUBE of the size**, because that is
 what volume does; halving it to make the number look tamer would be printing a
 measurement that is wrong.
 
+## The touch pad is a GBA, and it is context rather than more buttons
+
+**Directions LEFT, actions RIGHT, nothing in the middle.** That is the whole
+ergonomic idea and it is why the strip is `space-between` across the full width:
+it puts each cluster under a thumb that is already holding the device. The pad
+it replaced was four arrows CENTRED under the map - the one place neither thumb
+reaches - and it could walk and do nothing else, so every other action on a
+phone meant reaching up into the rail with the hand holding the phone.
+
+**A sits low and right of B.** That is the handheld's own diagonal, and it is
+not styling: offsetting them is what stops a thumb rolling off one onto the
+other.
+
+**A AND B ARE CONTEXTUAL, so the pad stays four face buttons instead of growing
+a row per situation** - in front of a Pokemon A is THROW (drawn as the ball it
+will actually throw, cheapest held, exactly what Space does) and B is RUN; out
+on the map A is FISH and B is DASH, **held** rather than toggled because it is
+Shift and because a toggle leaves the trainer sprinting after the thumb has
+gone. Mid-animation both are SKIP, which is what the keyboard already does with
+any key at all.
+
+**IT ADDS NO ACTION THE KEYBOARD DOES NOT HAVE**, and that is what keeps the two
+from drifting - every button re-dials a call `App.jsx`'s key handler already
+makes. The BAG button is the same `BallRail` the map already has, toggled, not
+a second inventory: the rail already knows to show field items on the map and
+berries in an encounter.
+
+**NO `setPointerCapture`.** Capturing would keep a thumb that slid off the
+button still steering, which sounds like an improvement and is not: while a
+pointer is captured the spec routes boundary events at the capturing element, so
+whether `pointerleave` fires is exactly what varies between engines - and the
+failure is a trainer who never stops walking. The three plain handlers
+(`up`/`leave`/`cancel`) are unambiguous and are what the old pad did correctly.
+
+**Gated on `(hover: none) and (pointer: coarse)`, never on width.** A width query
+puts a d-pad on a narrow desktop window, where it is useless, and hides it on a
+landscape tablet, where it is the only control there is.
+
+**And tools/play asserts every `engine.x()` the pad calls exists**, against a
+LIVE engine. Nothing else can see it: the pad renders only on a coarse pointer,
+so a mistyped method is invisible on every machine this is developed on and is a
+dead button on the one device it ships to.
+
 ## One tooltip, and it is an attribute
 
 **`data-tip="..."`, never `title="..."`.** `Tip.jsx` renders ONE element at the

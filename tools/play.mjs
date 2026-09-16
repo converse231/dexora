@@ -20,6 +20,7 @@
    reaches `caught`, that a caught Pokémon lands in the box, that the encounter
    closes, and that nothing throws on the way. */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 // ---------------------------------------------------------------- the stubs
 let now = 1000;
@@ -437,6 +438,38 @@ function until(e, what, label, max = 2000) {
   assert.ok(!("stale" in JSON.parse(store.get("meadow-route"))),
     "the stale flag was written into the save");
   console.log("save warning ok — a failed write is surfaced, clears on recovery, never persisted");
+}
+
+/* EVERY BUTTON ON THE TOUCH PAD MUST CALL SOMETHING THAT EXISTS.
+
+   `Pad.jsx` renders only under `(hover: none) and (pointer: coarse)`, so a
+   mistyped engine method is invisible on every machine this is developed on and
+   is a dead button on the one device it ships to. Nothing else in the suite can
+   see it: the pad adds no action of its own, it only re-dials the keyboard's,
+   so checking the names against a LIVE engine is the whole test. */
+{
+  const src = readFileSync(new URL("../src/ui/Pad.jsx", import.meta.url), "utf8");
+  const called = [...src.matchAll(/engine\.([a-zA-Z]+)\(/g)].map((m) => m[1]);
+  assert.ok(called.length >= 6,
+    `only found ${called.length} engine calls in Pad.jsx - the scan is not working`);
+
+  store.clear();
+  raf.length = 0;
+  const e = createEngine(canvas(), () => {}, canvas());
+  const missing = [...new Set(called)].filter((fn) => typeof e[fn] !== "function");
+  assert.equal(missing.length, 0,
+    `Pad.jsx calls engine.${missing.join("(), engine.")}() which the engine does ` +
+    "not have - a dead button on touch devices only");
+
+  /* And it must stay touch-gated. A width query here would put a d-pad on a
+     narrow desktop window, where it is useless, and hide it on a landscape
+     tablet, where it is the only control there is. */
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const gate = "@media (hover: none) and (pointer: coarse) {";
+  assert.ok(css.includes(gate), "the touch pad's media gate is gone");
+  assert.ok(css.slice(css.indexOf(gate)).includes(".pad {"),
+    "the touch pad is no longer gated on a coarse pointer");
+  console.log(`pad ok — ${new Set(called).size} engine calls behind the touch controls all exist`);
 }
 
 console.log("play ok — the frame loop never stopped");
