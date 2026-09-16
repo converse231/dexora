@@ -42,8 +42,6 @@ caller sees zero rows.
 <details>
 <summary>The SQL, for a fresh project</summary>
 
-
-
 **SQL Editor → New query**, paste all of this, **Run**:
 
 ```sql
@@ -141,7 +139,6 @@ the client starts sending the throw rather than the outcome.
 |---|---|
 | `over_email_send_rate_limit` on sign-up | Confirmation is still on and the built-in mailer is capped at a few per hour — see step 4 |
 | `email_address_invalid` on sign-up | Supabase rejects obviously fake domains, `example.com` among them |
-|---|---|
 | Login screen never appears, game loads straight in | `.env` is missing or misnamed, or the dev server was not restarted after creating it — Vite reads `.env` at startup only |
 | "Cannot reach the server" | URL typo, or the project is paused (free projects pause after inactivity — open the dashboard to wake it) |
 | Sign-up works, login says "email not confirmed" | Confirmation is on and the email has not been clicked — see step 4 |
