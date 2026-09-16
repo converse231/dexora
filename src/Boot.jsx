@@ -42,9 +42,22 @@ import {
    An UNOWNED save is still adopted: that is genuine offline progress from
    before there were accounts. One owned by a different account is not. */
 async function settle(uid) {
+  /* ONLY A CACHE THIS ACCOUNT WROTE COUNTS. This read `!owner || owner === uid`
+     - an UNOWNED save treated as yours - which was meant to rescue somebody who
+     played offline and then signed up. What it actually did was hand every
+     account whatever the browser happened to be holding, and the deployed build
+     is full of localStorage from before there were accounts at all: logging in
+     on it produced a dex nobody had earned, and no amount of clearing the
+     database fixed it, because the data was never in the database.
+
+     Signed in, the server is the only source. The one thing local may still win
+     is being AHEAD of it - offline play whose uploads have not landed - and
+     that is settled by step count, which cannot go down. Somebody who really
+     did play as a guest and wants to keep it has EXPORT on the YOU panel; a
+     silent adoption is the wrong way to offer that, because it cannot tell the
+     difference between your game and a stranger's. */
   const owner = read(OWNER_KEY);
-  const mine = !owner || owner === uid;
-  const local = mine ? read(SAVE_KEY) : null;
+  const local = owner === uid ? read(SAVE_KEY) : null;
   const remote = await pull();
 
   const keep = newer(local, remote);

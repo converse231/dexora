@@ -733,4 +733,39 @@ function until(e, what, label, max = 2000) {
   console.log("sync ok — a failed upload is kept and retried, a newer one supersedes it");
 }
 
+/* A CACHE IS ONLY YOURS IF YOU WROTE IT. `settle` treated an UNOWNED local save
+   as the signed-in player's, meant to rescue somebody who played offline and
+   then signed up - and what it did was hand every account whatever the browser
+   happened to be holding. The deployed build is full of localStorage from
+   before accounts existed, so logging in there produced a dex nobody earned,
+   and clearing the database did not help because the data was never in it.
+
+   `settle` needs a network, so the RULE is asserted rather than the function:
+   the four ownership cases, and that the source still states them. */
+{
+  const owned = (owner, uid) => owner === uid;
+  assert.equal(owned(null, null), true, "local mode must use the local save");
+  assert.equal(owned("abc", "abc"), true, "your own cache must be used");
+  assert.equal(owned(null, "abc"), false,
+    "an UNOWNED cache was adopted by an account - this is the production bug");
+  assert.equal(owned("xyz", "abc"), false, "another account's cache was adopted");
+
+  /* COMMENTS STRIPPED FIRST. The first version of this matched the comment
+     INSIDE `settle` that explains the old rule - the prose quotes
+     `!owner || owner === uid` to say why it was wrong, and the assertion read
+     that as the code still doing it. This file already records the same trap
+     for the repel check: a test that forbids documenting itself is a test
+     nobody keeps. */
+  const src = readFileSync(new URL("../src/Boot.jsx", import.meta.url), "utf8");
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+  const settle = code.slice(code.indexOf("async function settle"), code.indexOf("const fieldOf"));
+  assert.ok(/owner === uid \? read\(SAVE_KEY\)/.test(settle),
+    "settle no longer requires the cache to belong to this account");
+  assert.ok(!/!owner \|\| owner === uid/.test(settle),
+    "settle is adopting unowned local data again - that is the production bug");
+  console.log("cache ownership ok — only a cache this account wrote is ever adopted");
+}
+
 console.log("play ok — the frame loop never stopped");

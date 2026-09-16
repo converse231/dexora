@@ -115,6 +115,44 @@ $$;
 revoke all on function public.delete_own_account() from public;
 revoke all on function public.delete_own_account() from anon;
 grant execute on function public.delete_own_account() to authenticated;
+
+-- SUMMARY COLUMNS, DERIVED BY THE DATABASE. The save stays one jsonb document
+-- because nothing queries INTO it - but a leaderboard or a friends list needs
+-- four numbers, and reading those out of everybody's whole save is exactly the
+-- thing to avoid. A trigger keeps them in step, so they cannot drift the way a
+-- second copy written by the client would.
+alter table public.profiles
+  add column if not exists dex_count int not null default 0,
+  add column if not exists caught    int not null default 0,
+  add column if not exists steps     int not null default 0,
+  add column if not exists xp        int not null default 0,
+  add column if not exists played_at timestamptz;
+
+create or replace function public.sync_profile_summary()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.profiles p set
+    -- 2 is "caught", 1 is "seen".
+    dex_count = coalesce((
+      select count(*) from jsonb_array_elements_text(new.data->'dex') d
+       where d = '2'), 0),
+    caught    = coalesce((new.data->>'caught')::int, 0),
+    steps     = coalesce((new.data->>'steps')::int, 0),
+    xp        = coalesce((new.data->>'xp')::int, 0),
+    played_at = new.updated_at
+  where p.user_id = new.user_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists saves_sync_summary on public.saves;
+create trigger saves_sync_summary
+  after insert or update on public.saves
+  for each row execute function public.sync_profile_summary();
 ```
 
 </details>
@@ -171,6 +209,29 @@ this project by impersonating one player and trying to reach another's row.
 key, and does *not* contain `DATABASE_PASSWORD`. Vite only inlines variables
 prefixed `VITE_`, so the database password in `.env` stays on your machine —
 but it is a real credential, so `.env` must never be committed. It is gitignored.
+
+### Why the save is one JSONB column and not thirty tables
+
+Worth setting out, because "put it all in Postgres" sounds more integrated than
+it is.
+
+**Nothing queries into a save.** The whole document is read once at login and
+written on change. A box of 500 Pokémon normalised into rows is 500 upserts
+every few seconds instead of one; a dex is 1,145 small integers per player.
+Splitting them would make the game measurably slower and buy nothing, because
+no query ever asks "which Pokémon are in this box" across players.
+
+**What does belong in its own table is anything the database can do that a blob
+cannot** - and there are three such things, two of which are already here:
+
+| | why it is a table |
+|---|---|
+| `profiles.username` | uniqueness is an index; a blob cannot promise it |
+| summary columns | a leaderboard reads four numbers, not 200 saves |
+| box entries *(not yet)* | trading needs server-owned rows so nothing duplicates |
+
+The third is deliberately absent: trading is deferred, and box rows are only
+worth their cost when something other than the owner has to move them.
 
 **Not protected.** Every number in the save is computed in the browser and
 uploaded — the catch roll, the money, the dex. Someone determined can edit their
