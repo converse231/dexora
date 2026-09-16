@@ -270,6 +270,7 @@ export default function App() {
         claimNote={claimNote}
         caught={caught}
         total={st?.caught ?? 0}
+        stale={st?.stale ?? null}
         steps={st?.steps ?? 0}
         money={st?.money ?? 0}
         candy={st?.candy ?? 0}

@@ -30,7 +30,7 @@ import {
   evolveState, evoLevel, startingState, DEX_BONUS, levelReward,
   evolutionRow, bestRod, holding, canRun, RUN_LEVEL,
   fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
-  stepReward,
+  stepReward, keeper,
 } from "./items.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
    that froze every catch in the game. `createEngine` has its own
@@ -517,15 +517,29 @@ export function createEngine(canvas, onChange, mini = null) {
     onChange();
   };
 
+  /* A SAVE THAT STOPS WORKING MUST SAY SO. This swallowed every error with the
+     comment "private mode - play on, just don't persist", which names one cause
+     and catches all of them: a full quota, a serialisation fault, a browser
+     that revoked storage mid-session. Playing on is right - losing the session
+     to a failed write would be worse - but doing it SILENTLY means a player
+     goes on catching for an hour with nothing being kept and no way to know.
+     `state.stale` is what the top bar reads; it latches, because the warning
+     belongs to the session rather than to one write. */
   function save() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
+      const { encounter, evolution, fishing, running, cheers, rev, stale, ...rest } = state;
       try {
-        // running is a held key, not a setting - restoring it true would have
-        // the trainer sprinting with nothing pressed.
-        const { encounter, evolution, fishing, running, cheers, rev, ...rest } = state;
         localStorage.setItem(SAVE_KEY, JSON.stringify(rest));
-      } catch { /* private mode — play on, just don't persist */ }
+        if (state.stale) { state.stale = null; changed(); }
+      } catch (err) {
+        /* Quota is the one worth naming: it is the only cause a player can
+           act on, by selling spares or exporting and starting fresh. */
+        const full = err?.name === "QuotaExceededError"
+          || err?.name === "NS_ERROR_DOM_QUOTA_REACHED";
+        const why = full ? "full" : "blocked";
+        if (state.stale !== why) { state.stale = why; changed(); }
+      }
     }, 400);
   }
 
@@ -1276,7 +1290,11 @@ export function createEngine(canvas, onChange, mini = null) {
     const at = dexIndex(targetId);
     const isNew = state.dex[at] !== 2;
     state.dex[at] = 2;
-    state.caught++;
+    /* NO `state.caught++` HERE, and it used to be. That counter renders in the
+       top bar under the word CAUGHT, where it means throws that landed - and
+       an evolution is not a throw. It was incremented unconditionally, so it
+       also counted re-evolving a species already owned. The DEX slot above is
+       right to fill either way: evolving into something does register it. */
 
     /* The tier travels with the creature, because it IS the creature - rarest
        first so a hand-edited save carrying two is described by its best. */
@@ -1328,12 +1346,20 @@ export function createEngine(canvas, onChange, mini = null) {
      one function that sometimes pays cash and sometimes pays candy is one
      `if` away from paying both. Neither is affected by Haggle - that stat
      prices cash, and candy is not cash. */
+  /* `keeper()` IS CHECKED HERE, not only in the list the caller built.
+
+     `duplicateUids` already refuses to offer a variant, and that was the whole
+     protection: a rule living in one of two places, which this codebase has
+     already watched fail once - the Box computed a SECOND list (`held`) that
+     sorted by level and offered a Lv 2 shiny as the single thing to sell. Both
+     of these are one click with no undo, and at 1/480 an Astral cannot be
+     farmed again, so the engine refuses rather than trusting its callers. */
   function convert(uids) {
     const wanted = new Set(uids);
     if (!wanted.size) return 0;
     let got = 0;
     state.box = state.box.filter((mon) => {
-      if (!wanted.has(mon.uid)) return true;
+      if (!wanted.has(mon.uid) || keeper(mon)) return true;
       got += candyValue(speciesById(mon.species));
       return false;
     });
@@ -1448,12 +1474,13 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
+  // Same backstop as `convert` - see the note there.
   function sell(uids) {
     const wanted = new Set(uids);
     if (!wanted.size) return 0;
     let earned = 0;
     state.box = state.box.filter((mon) => {
-      if (!wanted.has(mon.uid)) return true;
+      if (!wanted.has(mon.uid) || keeper(mon)) return true;
       earned += valueOf(speciesById(mon.species));
       return false;
     });

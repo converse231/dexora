@@ -82,6 +82,7 @@ function Missions({ daily, onClaim, note }) {
 
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
+  stale = null,
   daily, onClaimDaily, claimNote,
 }) {
   const { level, into, need, frac } = levelProgress(xp);
@@ -157,6 +158,20 @@ export default function TopBar({
           </span>
         </span>
       </div>
+
+      {/* A SAVE THAT STOPPED WORKING SAYS SO, HERE. The engine plays on when a
+          write fails - losing the session to a failed write would be worse -
+          but it used to do it in silence, so an hour of catching could go
+          nowhere with nothing on screen to say it had. `role="alert"` because
+          it appears mid-session rather than on load: it has to interrupt. */}
+      {stale && (
+        <p className="tb-stale" role="alert">
+          <b>NOT SAVING</b>
+          {stale === "full"
+            ? " — this browser's storage is full. Sell some spares, or export from the YOU tab."
+            : " — this browser is blocking storage. Export from the YOU tab to keep this game."}
+        </p>
+      )}
 
       <button onClick={onReset}>RESET</button>
     </div>

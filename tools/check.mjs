@@ -185,6 +185,7 @@ import {
 } from "../src/game/daily.js";
 import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
+  LEGEND_EACH, LEGEND_CEIL,
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
   LIFT_CEILING, hasOrigin, tiersFor, ART_GEN, baseArtGen,
   LEGEND_HOME, LEGEND_HAUNT, legendTier, LAYOUTS, layoutIds,
@@ -1568,20 +1569,34 @@ for (const b of BIOMES) {
       `${b.id} hard-codes legendary #${id} - legendsFor() adds them`);
   }
 
-  /* THE SHARE IS CONSTANT, and that is a far stronger claim than the weights
-     this used to pin. Going from 5 legendaries to 24 in tables that tripled
-     would have multiplied the old fixed weights' share by about five; as a
-     share of the table it cannot move at all. Checked at every level a
-     generation or a map arrives, because those are what change the total. */
+  /* WHAT ONE LEGENDARY IS WORTH CANNOT DEPEND ON HOW MANY OTHERS EXIST.
+
+     This used to pin the TOTAL share to a constant, which is the right claim
+     against a growing TABLE and the wrong one against a growing ROSTER: one
+     percent split among everybody means each one's odds fall linearly, so a
+     named legendary went from 1 in 3,400 encounters to 1 in 9,000 at a full
+     National Dex - more steps than a whole playthrough, for one creature you
+     are meant to be able to hunt.
+
+     The equation below is the rule and it carries both halves: the share is
+     independent of how big the TABLE got (the original claim, still true) AND
+     proportional to how many legendaries are actually OPEN, so per-head odds
+     hold. Above `LEGEND_CEIL` it saturates and everything scales down together,
+     which is the other failure - 90 legendaries at a fixed per-head share is
+     one encounter in 37, and a world that full has none in it. */
   for (const lv of [1, 10, GEN_UNLOCK[2], 30, GEN_UNLOCK[4], MAX_LEVEL]) {
     const t = encounterTable(b, lv);
     const total = t.reduce((n, e) => n + e[1], 0);
     const share = t.filter((e) => LEGENDARY.includes(e[0]))
       .reduce((n, e) => n + e[1], 0) / total;
-    assert.ok(Math.abs(share - LEGEND_SHARE) < 1e-9,
-      `${b.id} at Lv ${lv}: legendaries are ${(share * 100).toFixed(2)}% of finds, ` +
-      `not ${(LEGEND_SHARE * 100).toFixed(2)}% - the share must not move when the ` +
-      "table grows, which is the whole reason it is a share");
+    const open = LEGENDARY.filter((id) => genOpen(id, lv)).length;
+    const want = Math.min(LEGEND_CEIL, LEGEND_EACH * open);
+    assert.ok(Math.abs(share - want) < 1e-9,
+      `${b.id} at Lv ${lv}: legendaries are ${(share * 100).toFixed(2)}% of finds ` +
+      `over ${open} open, not the ${(want * 100).toFixed(2)}% the per-head rule asks`);
+    assert.ok(share <= LEGEND_CEIL + 1e-9,
+      `${b.id} at Lv ${lv}: legendaries are ${(share * 100).toFixed(2)}% of every ` +
+      "encounter - past the ceiling there is nothing rare about one");
     // exactly once each, whatever else was added
     for (const id of LEGENDARY) {
       if (!genOpen(id, lv)) continue;
@@ -2587,15 +2602,32 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     }
   }
 
-  // 5. legendaries only ever get rarer as the table grows.
+  /* 5. A NAMED LEGENDARY MUST NOT GET EASIER AS YOU LEVEL - measured per head,
+        not over the pool.
+
+        This compared the POOL's share at Lv 1 against Lv 50, which was the
+        right reading while every legendary was open from the start and only
+        the table grew. It is the wrong reading now: legendaries arrive on
+        `GEN_UNLOCK` like everything else, so the pool's share climbs from
+        0.15% (five Kanto legendaries at Lv 1) to 1.02% simply because there
+        are more of them to meet - which is content arriving, not the rate
+        being farmed.
+
+        What must not move is what ONE of them is worth. Levelling buys you
+        more legendaries to hunt, never a cheaper hunt for the one you are
+        already after. */
   for (const b of BIOMES) {
-    const share = (level) => {
+    const perHead = (level) => {
       const t = encounterTable(b, level);
       const total = t.reduce((n, [, x]) => n + x, 0);
-      return LEGENDARY.reduce((n, id) => n + (t.find(([i]) => i === id)?.[1] ?? 0), 0) / total;
+      const open = LEGENDARY.filter((id) => genOpen(id, level));
+      if (!open.length) return 0;
+      const pool = open.reduce((n, id) => n + (t.find(([i]) => i === id)?.[1] ?? 0), 0);
+      return pool / total / open.length;
     };
-    assert.ok(share(MAX_LEVEL) <= share(1) + 1e-9,
-      `${b.id}: legendaries are easier at Lv ${MAX_LEVEL} than at Lv 1`);
+    assert.ok(perHead(MAX_LEVEL) <= perHead(1) + 1e-9,
+      `${b.id}: one named legendary is easier to find at Lv ${MAX_LEVEL} than at ` +
+      "Lv 1 - levelling must buy more of them to hunt, not a cheaper hunt");
   }
 
   /* 6. nothing spawns below the level it evolves at. A wild Venusaur is a Lv 32

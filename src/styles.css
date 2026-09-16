@@ -2250,6 +2250,17 @@ canvas {
 
 /* On a phone the bar is tight, so the button keeps its count and drops its
    label, and the card hangs off the right edge instead of the left. */
+/* The save-failure warning. Gold on the warm ground `.note-warn` already uses
+   for "this is not undoable", because it is the same register: something needs
+   your attention and the game will not fix it for you. */
+.tb-stale {
+  flex: 1 1 100%; order: 99; margin: 6px 0 0;
+  padding: 7px 10px; border: 2px solid var(--gold); border-radius: 9px;
+  background: var(--surface); color: var(--ink);
+  font-size: 12px; line-height: 1.4;
+}
+.tb-stale b { font-family: var(--pixel); font-size: 11px; }
+
 @media (max-width: 720px) {
   .ms-tab { padding: 5px 8px 4px; }
   .ms-tab i { display: none; }
