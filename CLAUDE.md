@@ -1,16 +1,41 @@
 # Dexora
 
-A personal, non-commercial browser game: catch, collect and evolve 493 Pokémon
-across eight hand-made areas — Kanto, Johto, Hoenn and Sinnoh, the whole
-National Dex to Arceus. Inspired by DelugeRPG's loop — walk, meet, throw, bank
-the duplicates, evolve.
+A personal, non-commercial browser game: catch, collect and evolve **1,145
+Pokémon** across eight hand-made areas — the whole National Dex from Kanto to
+Paldea, plus every Mega, Primal and Gigantamax form. Inspired by DelugeRPG's
+loop — walk, meet, throw, bank the duplicates, evolve.
 
-**The dex is contiguous again, and that is a loss.** The Hoenn-shaped hole used
-to be the test that stopped a dex id being used as an array index — the one
-thing that made `SPECIES[id - 1]` fail loudly. Nothing enforces that by accident
-now, so `speciesById(id)` and `dexIndex(id)` have to be used on purpose. See
-*A DEX ID IS NOT AN ARRAY INDEX* below; it is the same rule with its safety net
-removed.
+**`SPECIES` IS TWO GENERATED FILES MERGED IN `src/data/dex.js`** — the 1,025
+National Dex from `fetch-species`, then 120 forms from `fetch-forms`, appended.
+Import from `dex.js`, never from `species.js`: the latter is the National Dex
+alone and is what the fetchers themselves read.
+
+**The dex is contiguous to 1025 and then jumps to 10033.** The Hoenn-shaped hole
+used to be the test that stopped a dex id being used as an array index; the
+forms are that test now, and a harsher one — `SPECIES[id - 1]` for a Mega is
+nine thousand entries off the end. `speciesById(id)` for the species,
+`dexIndex(id)` for its POSITION. See *A DEX ID IS NOT AN ARRAY INDEX* below.
+
+**A FORM IS A SPECIES, NOT A FIFTH TIER**, and it has to be: `mon.species` is a
+dex id, `evolve(uid, targetId)` mutates it in place, and every table, medal and
+dex row keys on it. A tier would have put them in `TIERS`, which is the roll's
+precedence and the save's byte arrays — and they are neither. A tier HAPPENS to
+a Pokémon you meet; a form is a hundred levels of Rare Candy spent on purpose.
+`isForm(id)` (id >= 10000) is the single predicate, and four systems ask it:
+
+| | why |
+|---|---|
+| `encounterTable` | **never wild.** The overlay walks the evolution graph, so without this you could CATCH a Mega Charizard — the thing they exist to make you work for |
+| `genOf` | reads a form through to what it evolves from, or every Mega files under Paldea and gates on Paldea's arrival level |
+| `genComplete` | forms do not count. Origin unlocks on catching every ORDINARY Pokémon of a generation; 33 Kanto forms × 100 levels is not a harder gate, it is a deleted one |
+| `hasOrigin` | never. There is no 1996 drawing of a Mega Charizard |
+
+**They needed no new evolution machinery**, which is the whole argument for
+doing it this way: `evoLevel` already honours a row's own `level` and
+`evolveState` already gates on the Pokémon's, so a form is simply the dearest
+row in the game. Six species offer a real choice and it is permanent — Charizard
+becomes Mega X, Mega Y or Gigantamax, never two — which the Box's branch UI
+already handled because Slowpoke taught it to.
 
 Evolution is paid for in **Rare Candy**, one candy per level, on a single
 Pokémon named by `uid`. If you find a doc anywhere describing a *feed* that
@@ -983,10 +1008,11 @@ of the cell and centred, so a layer at `inset: 0` masks itself to a silhouette
 `.cell-full` needed a `z-index` - the foil is 3 and they had none, so a Holo
 tile had a rainbow travelling over its own entry number.
 
-**The lever, if 151 animated cells ever costs anything:** `content-visibility:
-auto` on `.cell`. `grid-auto-rows` already fixes the row height, so it is safe
-to add and has not been, because a realistic save holds a few dozen variants
-rather than 151.
+**The lever was pulled.** `content-visibility: auto` on `.cell`, with
+`contain-intrinsic-size`. This note used to say it was safe to add and had not
+been, "because a realistic save holds a few dozen variants rather than 151" -
+the grid is **1,145** cells now, so the condition it was waiting for arrived.
+`grid-auto-rows` fixing the row height is what makes it safe.
 
 **A TIER IS TWO THINGS, and a second copy of `FOLDER` only ever gets one.**
 Shiny and Origin have their own artwork; **Holo and Astral have no folder** and
@@ -1441,6 +1467,20 @@ key, so a quest cannot be rerolled by reloading. The streak caps at
 `STREAK_CAP`; uncapped, day sixty is worth more than the first fifty together
 and missing one leaves nothing to come back for.
 
+**AND `LEGENDARY` IS DERIVED, NOT LISTED.** It was 34 hand-written dex numbers
+under a comment promising "a Gen 2 Suicune needs one dex number added here and
+nothing else" - which was true, and is exactly why it failed: five generations
+arrived at once and none of their sixty legendaries were added, so every Unova
+and Paldea legendary spawned at an ordinary S-tier weight. `fetch-species`
+records the flag PokeAPI already knows; mythicals count, because this game draws
+no distinction and a Mew that is not rare is not a Mew. **A list that needs one
+edit per generation gets that edit skipped eventually.**
+
+That took 34 legendaries to **94**, which is where the per-head share earns its
+keep: 94 x `LEGEND_EACH` is 2.82%, it saturates at `LEGEND_CEIL` 2.5%, and a
+NAMED legendary is **1 in 3,760** encounters against 1 in 3,333 at 34. Under the
+old fixed 1% pooled share it would have been 1 in 9,400.
+
 **Legendaries are a SHARE of the table, never a fixed weight** - added by
 `encounterTable` after the residents and the evolved overlay, so it cannot be
 in `BIOMES[i].table`, and `foundIn`/check.mjs read the assembled table instead.
@@ -1550,6 +1590,26 @@ relational one (fewer colours than this creature's own ordinary art) catches 92
 of the 107, and `PALETTE_MAX` catches the rest. That bound is measured, not
 picked: Kanto's worst is 7 and Sinnoh's best is 8, so the two sets do not
 overlap anywhere.
+
+**A SECOND COPY OF THE RANGES DRIFTED, AND HOENN SHIPPED WITH NO EVOLUTIONS AT
+ALL.** `fetch-evolutions.mjs` held its own `RANGES` literal under a comment
+explaining the duplication - "run independently, a missing import would fail at
+the wrong moment" - and it still read `[[1,151],[152,251],[387,493]]` long after
+Phase 6. So 135 Hoenn species had **zero** evolution rows: Treecko could not
+become Grovyle, for two phases, and nothing failed. The gettable-check is
+satisfied by a species being in a biome table and every Hoenn species is homed
+by type, so it never noticed. It reads the shipped `species.js` now; 177 rows
+became 483. **A second copy of anything in this codebase drifts - this file says
+so four times and it happened anyway.**
+
+**AND A STONE ROW IS ONLY A STONE IF THE SHOP SELLS THE STONE.** The classifier
+emitted `kind: "stone"` for any held-item trigger, which was safe while the only
+ones that existed were the eight on the shelf. The rest of the dex brings twelve
+more - `black-augurite`, `tart-apple`, `malicious-armor`, a `cracked-pot` - and
+each would have been an evolution gated on an item that is not in the game,
+which check.mjs correctly calls impossible. It reads `STONES` now, so the shop
+decides, and adding a stone to the shelf is what promotes its evolutions out of
+`bond`.
 
 **Every non-level evolution method is `bond`.** Happiness, time of day, a held
 item on a trade, a move, a place: a game with no clock, no moves and no map
