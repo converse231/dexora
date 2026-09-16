@@ -41,7 +41,7 @@ function Shell({ step, title, blurb, children, foot }) {
 
 /* --------------------------------------------------------------- the account */
 
-export function Account({ onSignUp, onSignIn, offline }) {
+export function Account({ onSignUp, onSignIn, offline, notice = "" }) {
   const [mode, setMode] = useState("in");        // "in" | "up"
   const [addr, setAddr] = useState("");
   const [pw, setPw] = useState("");
@@ -120,6 +120,11 @@ export function Account({ onSignUp, onSignIn, offline }) {
         </button>
       }
     >
+      {/* WHY YOU ARE BACK HERE. Being bounced to the login screen with no
+          reason is the same screen as having simply arrived at it, and the two
+          need different things from the player. */}
+      {notice && <p className="gate-warn" role="alert">{notice}</p>}
+
       {offline && (
         <p className="gate-warn" role="alert">
           No account server is configured, so this build saves to this browser
@@ -175,7 +180,7 @@ export function Account({ onSignUp, onSignIn, offline }) {
 /* NAME AND TRAINER TOGETHER, because they are one question - who are you -
    and splitting them would make a two-field form into two screens. The rules
    themselves live in `game/name.js`, with the other pure rules. */
-export function Trainer({ onPick, busy, askName = false, error = null }) {
+export function Trainer({ onPick, busy, askName = false, error = null, onOut = null }) {
   const [pick, setPick] = useState(null);
   const [name, setName] = useState("");
   const [touched, setTouched] = useState(false);
@@ -198,6 +203,15 @@ export function Trainer({ onPick, busy, askName = false, error = null }) {
       blurb={askName
         ? "Your name is how other trainers will see you. The rest only changes who you see walking."
         : "It only changes who you see walking. You can start either way."}
+      /* A WAY OUT OF EVERY SIGNED-IN SCREEN. This one is reached with a session
+         already in hand, so anything that goes wrong with it - a name that will
+         not save, an account that no longer exists - otherwise leaves somebody
+         on a card whose only control is to try the thing that just failed. */
+      foot={onOut && (
+        <button type="button" className="gate-link" onClick={onOut}>
+          Use a different account
+        </button>
+      )}
     >
       {askName && (
         <label className="gate-field gate-name">

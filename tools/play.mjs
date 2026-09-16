@@ -768,4 +768,63 @@ function until(e, what, label, max = 2000) {
   console.log("cache ownership ok — only a cache this account wrote is ever adopted");
 }
 
+/* A TOKEN OUTLIVES THE USER IT NAMES. `restore` read the session out of
+   localStorage and trusted it, and `getSession` never asks the server - so an
+   account deleted since the token was issued came back as a perfectly good
+   session for a row that is gone. `getProfile` then found nothing, the app
+   asked who you are, and the insert died on `profiles_user_id_fkey`: a
+   database word, on a screen whose only control was the button that had just
+   failed. It shipped to production and trapped the owner.
+
+   This needs a live project, so the RULES are asserted over the source with
+   comments stripped - the same shape as the ownership suite above, and for the
+   same reason the repel check strips them: the prose here quotes the very
+   calls the assertions forbid. */
+{
+  const bare = (f) => f
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+
+  const cloud = bare(readFileSync(new URL("../src/net/cloud.js", import.meta.url), "utf8"));
+  const at = (name) => {
+    const i = cloud.indexOf(`export async function ${name}(`);
+    assert.ok(i >= 0, `${name} is gone from cloud.js`);
+    return cloud.slice(i, cloud.indexOf("\nexport ", i + 1));
+  };
+
+  const restore = at("restore");
+  assert.ok(/getUser\(\)/.test(restore),
+    "restore trusts the cached token again - getSession cannot tell a deleted user from a live one");
+  assert.ok(/signOut\(\)/.test(restore),
+    "restore no longer drops a session the server has rejected");
+
+  /* OFFLINE IS NOT DELETED, and that is the half that is easy to lose: a
+     restore that signs out on any failed request logs out everybody whose
+     train goes into a tunnel. auth-js says which kind it was by CLASS. */
+  assert.ok(/AuthRetryableFetchError/.test(restore),
+    "restore cannot tell a dropped connection from a deleted account - it will sign out offline players");
+  assert.ok(restore.indexOf("AuthRetryableFetchError") < restore.indexOf("signOut"),
+    "restore signs out before checking whether the failure was merely a network one");
+
+  /* THE SAME FAILURE ARRIVING FROM THE OTHER DIRECTION. A session can die
+     while somebody is sitting on the trainer screen, so the insert has to
+     answer for it too - 23503 is that foreign key, and a retry cannot fix it. */
+  const made = at("createProfile");
+  assert.ok(/23503/.test(made),
+    "createProfile does not recognise the foreign-key violation a deleted user produces");
+  assert.ok(/gone: true/.test(made),
+    "createProfile reports a dead session as an ordinary error, so the screen offers a retry that cannot work");
+
+  /* AND NO GATE SCREEN MAY BE A ROOM WITH NO DOOR. Both signed-in screens are
+     reached with a token in hand, so whatever goes wrong with it, the way out
+     has to be on the card. */
+  const gate = bare(readFileSync(new URL("../src/ui/Gate.jsx", import.meta.url), "utf8"));
+  assert.ok(/onOut/.test(gate), "the trainer gate has no way back to the account screen");
+  const boot = bare(readFileSync(new URL("../src/Boot.jsx", import.meta.url), "utf8"));
+  assert.ok(/onOut=\{out\}/.test(boot), "the trainer gate is rendered without its way out");
+  assert.ok(/got\.gone/.test(boot), "Boot ignores a dead session reported by createProfile");
+
+  console.log("ghost session ok — a token for a deleted user signs out instead of trapping the gate");
+}
+
 console.log("play ok — the frame loop never stopped");

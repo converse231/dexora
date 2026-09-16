@@ -39,8 +39,7 @@ import {
    account whatever was already in the browser - reported as signing up and
    landing straight in the game with the trainer question skipped, and the worse
    version is signing up on somebody else's machine and inheriting their dex.
-   An UNOWNED save is still adopted: that is genuine offline progress from
-   before there were accounts. One owned by a different account is not. */
+   Only a cache THIS account wrote is ever adopted; see `settle`. */
 async function settle(uid) {
   /* ONLY A CACHE THIS ACCOUNT WROTE COUNTS. This read `!owner || owner === uid`
      - an UNOWNED save treated as yours - which was meant to rescue somebody who
@@ -83,6 +82,8 @@ export default function Boot() {
   // The trainer's name, off the profile row. Shown in game; null in local mode.
   const [name, setName] = useState(null);
   const [whoError, setWhoError] = useState(null);
+  // Why the account screen is showing, when it is showing for a reason.
+  const [gateNote, setGateNote] = useState("");
   // The live engine, so a sync failure has somewhere to be reported to.
   const engineRef = useRef(null);
 
@@ -154,7 +155,8 @@ export default function Boot() {
      outstanding goes up FIRST, because the token is about to stop working, and
      only then is the cache dropped. Leaving it behind would hand the next
      person at this machine somebody else's dex - and the account has it. */
-  const out = async () => {
+  const out = async (why = "") => {
+    setGateNote(typeof why === "string" ? why : "");
     setBusy(true);
     const sent = await flushNow(push);
     await signOut();
@@ -182,6 +184,7 @@ export default function Boot() {
     return (
       <Account
         offline={!CLOUD}
+        notice={gateNote}
         onSignUp={async (a, p) => afterAuth(await signUp(a, p))}
         onSignIn={async (a, p) => afterAuth(await signIn(a, p))}
       />
@@ -198,10 +201,16 @@ export default function Boot() {
         askName
         busy={busy}
         error={whoError}
+        onOut={out}
         onPick={async (id, username) => {
           setBusy(true);
           setWhoError(null);
           const got = await createProfile(username, id);
+          /* `gone` is a session that has outlived its own user - a token for a
+             deleted account. There is nothing to retry: every attempt dies on
+             the same foreign key, so the screen hands back the only thing that
+             can work, which is a new sign-in, and says why. */
+          if (got.gone) { await out(got.error); return; }
           if (!got.ok) { setWhoError(got.error); setBusy(false); return; }
           setName(username);
           const raw = read(SAVE_KEY);

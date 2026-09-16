@@ -254,4 +254,5 @@ the client starts sending the throw rather than the outcome.
 | "Cannot reach the server" | URL typo, or the project is paused (free projects pause after inactivity — open the dashboard to wake it) |
 | Sign-up works, login says "email not confirmed" | Confirmation is on and the email has not been clicked — see step 4 |
 | Logged in, but the save does not appear in the table | RLS policies missing; re-run step 3 |
+| `violates foreign key constraint "profiles_user_id_fkey"` | The browser is holding a token for a user row that has been deleted — emptying `auth.users` while somebody is logged in does this. Fixed at the root: `restore()` validates the session with `getUser()` at boot and signs out when the server says the user is gone, so this can only be seen on a build older than that |
 | `NOT SAVING` in the top bar | The local write failed (full or blocked storage). The cloud sync is separate and fails quietly |
