@@ -105,7 +105,25 @@ function say(e) {
   if (/password.*(6|short|least)/i.test(m)) {
     return "Passwords need at least six characters.";
   }
+  /* TWO DIFFERENT RATE LIMITS, AND TELLING THEM APART IS THE WHOLE POINT.
+     Both say "rate limit" and the first version collapsed them into "Too many
+     tries. Wait a minute." - which is true of one and actively misleading about
+     the other. The EMAIL cap is per project per hour and is spent by the
+     confirmation mail every sign-up sends: waiting a minute does nothing, and
+     it will block every new player until confirmation is turned off or real
+     SMTP is configured. Sending somebody away to wait on that is sending them
+     away forever. */
+  if (/email.*rate limit|over_email_send_rate_limit/i.test(m)) {
+    return "The account server has hit its hourly email limit, so sign-up is "
+      + "blocked. Turn off “Confirm email” in Supabase, or set up SMTP.";
+  }
   if (/rate|too many/i.test(m)) return "Too many tries. Wait a minute.";
+  /* Supabase rejects domains it considers fake, `example.com` among them, and
+     says so in a sentence that quotes the address back - which reads like the
+     address is malformed rather than the domain being refused. */
+  if (/email.*invalid|email_address_invalid/i.test(m)) {
+    return "That email was rejected. Some domains are not accepted - try another.";
+  }
   if (/fetch|network|Failed to fetch/i.test(m)) {
     return "Cannot reach the server. Check your connection.";
   }
