@@ -8,6 +8,7 @@ import Rail from "./ui/Rail.jsx";
 import { RAIL_KEY, read, write } from "./game/store.js";
 import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
+import Confirm from "./ui/Confirm.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import {
@@ -67,12 +68,17 @@ const typing = (ev) => {
    happening to have been edited on the same day. */
 const rarestOf = (st, id) => TIERS.find((t) => st?.[t]?.[dexIndex(id)]) ?? null;
 
-export default function App({ onLogOut = null, onEngine = null }) {
+export default function App({ onLogOut = null, onEngine = null, trainerName = null }) {
   const canvasRef = useRef(null);
   const miniRef = useRef(null);
   const [engine, setEngine] = useState(null);
   const [, force] = useReducer((n) => n + 1, 0);
   const [entry, setEntry] = useState(null);
+  /* LOGGING OUT ASKS FIRST. It is not destructive - the account keeps the save
+     - but it does end the session and wipe this browser's copy, and it sits one
+     slip away from the stat buttons. The dialog also carries the one fact worth
+     knowing before leaving: whether everything reached the server. */
+  const [leaving, setLeaving] = useState(false);
   /* "See in Box" crosses two components that do not know each other: the sheet
      lives here and the tab lives in the Rail. A species id parked here is the
      smallest thing that can travel between them, and the Rail clears it once it
@@ -254,6 +260,22 @@ export default function App({ onLogOut = null, onEngine = null }) {
 
       {/* Above every other overlay: it can land during an encounter or an
           evolution, and both of those already own the middle of the screen. */}
+      {leaving && (
+        <Confirm
+          title="Log out?"
+          tone="warn"
+          lines={[
+            ["Trainer", trainerName ?? "—"],
+            ["Pokédex", `${caught} caught`],
+            ["Saved to", "your account"],
+          ]}
+          note="Your game stays on your account. This browser's copy is cleared, so log back in to carry on."
+          confirmLabel="LOG OUT"
+          onCancel={() => setLeaving(false)}
+          onConfirm={() => { setLeaving(false); onLogOut(); }}
+        />
+      )}
+
       {cheer && <Cheer cheer={cheer} onDone={() => engine.dropCheer()} />}
 
       {/* A TIP, NOT A TUTORIAL - one line, the first time you reach the thing
@@ -286,7 +308,8 @@ export default function App({ onLogOut = null, onEngine = null }) {
            and the data stays. Reset survives only in local mode, where there is
            nothing to log out of. */
         onReset={onLogOut ? null : () => engine?.reset()}
-        onLogOut={onLogOut}
+        onLogOut={onLogOut ? () => setLeaving(true) : null}
+        trainerName={trainerName}
       />
 
       <div className="stage">

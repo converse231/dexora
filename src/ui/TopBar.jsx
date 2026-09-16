@@ -82,7 +82,7 @@ function Missions({ daily, onClaim, note }) {
 
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
-  onLogOut = null,
+  onLogOut = null, trainerName = null,
   stale = null,
   daily, onClaimDaily, claimNote,
 }) {
@@ -95,6 +95,9 @@ export default function TopBar({
           only ever be right by coincidence. The roadmap lives in README.md. */}
       <div className="tb-brand">
         <span className="title">Dexora</span>
+        {/* Who you are, where you can always see it. Only with an account -
+            in local mode there is no name to have. */}
+        {trainerName && <span className="tb-who">{trainerName}</span>}
       </div>
 
       <div
