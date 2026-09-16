@@ -1457,6 +1457,36 @@ canvas {
 }
 
 .trsave { padding: 10px 12px 12px; display: grid; gap: 9px; }
+
+/* The account block. The name field shares the save row's shape so RENAME sits
+   on the same baseline as EXPORT and IMPORT one block up. */
+.ts-name {
+  flex: 1; min-width: 0; box-sizing: border-box;
+  padding: 9px 10px; font: inherit; font-size: 16px;
+  color: var(--ink); background: var(--surface-2);
+  border: 2px solid var(--line-firm); border-radius: 9px;
+}
+.ts-name:focus-visible { outline: 2px solid var(--canopy); outline-offset: 1px; }
+
+/* The one destructive control in the game, and it is separated rather than
+   coloured red: a red button in a settings list reads as an accent, and this
+   needs to read as a different KIND of thing to the export beside it. */
+.trdanger { border-top: 2px solid var(--line); margin-top: 4px; padding-top: 12px; }
+.ts-kill { border-color: var(--path); color: var(--path); }
+.ts-kill:hover { background: var(--path-soft); }
+
+/* Type-to-confirm, for the one dialog that has it. */
+.cf-type { display: grid; gap: 5px; margin: 4px 0 2px; text-align: left; }
+.cf-type span { font-size: 12px; color: var(--ink-soft); }
+.cf-type b { font-family: var(--pixel); font-size: 11px; color: var(--ink); }
+.cf-type input {
+  width: 100%; box-sizing: border-box;
+  padding: 9px 10px; font: inherit; font-size: 16px;
+  color: var(--ink); background: var(--surface-2);
+  border: 2px solid var(--line-firm); border-radius: 9px;
+}
+.cf-type input:focus-visible { outline: 2px solid var(--path); outline-offset: 1px; }
+.cf-yes:disabled { opacity: .4; cursor: default; }
 /* The recovery offer is the same block with a gold rule over it - it is not a
    different control, it is the save block saying there is an older one. Gold
    because `.note-warn` already means "this is not undoable" here. */

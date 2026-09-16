@@ -68,7 +68,9 @@ const typing = (ev) => {
    happening to have been edited on the same day. */
 const rarestOf = (st, id) => TIERS.find((t) => st?.[t]?.[dexIndex(id)]) ?? null;
 
-export default function App({ onLogOut = null, onEngine = null, trainerName = null }) {
+export default function App({
+  onLogOut = null, onEngine = null, trainerName = null, account = null,
+}) {
   const canvasRef = useRef(null);
   const miniRef = useRef(null);
   const [engine, setEngine] = useState(null);
@@ -494,6 +496,10 @@ export default function App({ onLogOut = null, onEngine = null, trainerName = nu
           onJumped={() => setBoxJump(null)}
           onSpend={(id) => engine.spend(id)}
           onBike={() => engine.toggleBike()}
+          /* The account block on the YOU panel, or null in local mode where
+             there is nothing to rename and nothing to delete. `caught` comes
+             from here rather than being counted twice inside the panel. */
+          account={account && { ...account, caught }}
           /* The three save-file calls, handed over as one object so the panel
              does not need the engine itself. */
           save={engine && {

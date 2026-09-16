@@ -5,7 +5,7 @@
    what arrives, and what you are left holding - because the useful question is
    never "are you sure" but "what will this cost me". */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useModalLock } from "./modal.js";
 
 import Sprite from "./Sprite.jsx";
@@ -20,11 +20,23 @@ export default function Confirm({
      about a single named thing and a manifest of one is noise. */
   manifest = [],
   note,
+  /* TYPE IT TO MEAN IT. For the one or two actions where "are you sure" is not
+     enough - deleting an account takes the dex, the profile and the save with
+     it and there is no undo anywhere. Pass the word that has to be typed; the
+     confirm button stays disabled until it matches. Everything else leaves this
+     unset and keeps a plain two-button dialog. */
+  typeToConfirm = null,
   confirmLabel = "CONFIRM",
   tone = "",
   onConfirm,
   onCancel,
 }) {
+  const [typed, setTyped] = useState("");
+  /* Case- and space-insensitive: this is a speed bump against a mis-click, not
+     a password. Demanding exact case would only teach people to paste it. */
+  const armed = !typeToConfirm
+    || typed.trim().toLowerCase() === String(typeToConfirm).trim().toLowerCase();
+
   // Stops the map walking under the dialog while it is open.
   useModalLock();
 
@@ -35,12 +47,15 @@ export default function Confirm({
         onCancel();
       } else if (e.key === "Enter") {
         e.preventDefault();
-        onConfirm();
+        /* GATED THE SAME WAY THE BUTTON IS. Enter went straight through, which
+           would have made the typed confirmation decorative: a stray Return
+           with the dialog open deletes the account the field was guarding. */
+        if (armed) onConfirm();
       }
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [onConfirm, onCancel]);
+  }, [onConfirm, onCancel, armed]);
 
   return (
     <div className="sheet" onClick={onCancel}>
@@ -91,15 +106,40 @@ export default function Confirm({
 
         {note && <p className="cf-note">{note}</p>}
 
+        {typeToConfirm && (
+          <label className="cf-type">
+            <span>Type <b>{typeToConfirm}</b> to confirm</span>
+            <input
+              type="text"
+              value={typed}
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              onChange={(e) => setTyped(e.target.value)}
+              aria-label={`Type ${typeToConfirm} to confirm`}
+            />
+          </label>
+        )}
+
         <div className="cf-actions">
-          <button className={`cf-yes ${tone}`} onClick={onConfirm} autoFocus>
+          <button
+            className={`cf-yes ${tone}`}
+            onClick={onConfirm}
+            disabled={!armed}
+            /* Focus the confirm button only when it can actually be used -
+               autofocusing a disabled control puts focus nowhere, and when
+               there is a word to type that field is where a hand should land. */
+            autoFocus={!typeToConfirm}
+          >
             {confirmLabel}
           </button>
           <button className="cf-no" onClick={onCancel}>
             CANCEL
           </button>
         </div>
-        <p className="cf-keys">ENTER to confirm · ESC to cancel</p>
+        <p className="cf-keys">
+          {armed ? "ENTER to confirm · ESC to cancel" : "ESC to cancel"}
+        </p>
       </div>
     </div>
   );

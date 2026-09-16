@@ -249,6 +249,46 @@ export async function createProfile(username, char) {
   }
 }
 
+/* RENAMING IS THE SAME INSERT ONE STEP LATER, so it fails the same way: the
+   unique index is what answers "is this taken", and 23505 is that answer. */
+export async function renameTrainer(username) {
+  if (!CLOUD || !session) return { ok: false, error: "No account server is configured." };
+  try {
+    const { error } = await supabase
+      .from(PROFILES)
+      .update({ username: username.trim() })
+      .eq("user_id", session.user.id);
+    if (!error) return { ok: true };
+    if (error.code === "23505") return { ok: false, error: "That name is taken. Try another." };
+    if (error.code === "23514") return { ok: false, error: "Letters, numbers, spaces and dashes only." };
+    return { ok: false, error: say(error) || "Could not change that name." };
+  } catch (e) {
+    return { ok: false, error: say(e) || "Could not change that name." };
+  }
+}
+
+/* DELETING AN ACCOUNT IS A PRIVILEGE THE BROWSER MUST NOT HAVE. Removing a row
+   from `auth.users` is an admin action and the only key shipped to a browser is
+   the public one, so the privilege lives in one SECURITY DEFINER function
+   instead of in a key. It takes no argument - there is nothing to point at
+   somebody else - and its body can only reach `auth.uid()`. The profile and the
+   save go with it on the foreign key's cascade.
+
+   The session is dropped afterwards whatever happened: if the row is gone the
+   token refers to nobody, and holding on to it would leave the app signed in as
+   a user that does not exist. */
+export async function deleteAccount() {
+  if (!CLOUD || !session) return { ok: false, error: "No account server is configured." };
+  try {
+    const { error } = await supabase.rpc("delete_own_account");
+    if (error) return { ok: false, error: say(error) || "Could not delete the account." };
+    await signOut();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: say(e) || "Could not delete the account." };
+  }
+}
+
 /* Push reports like `store.write` does - `{ ok, why }` - because the caller
    needs to say NOT SAVING when it fails, and for the same reason: a write that
    silently does nothing is the failure that costs a collection. */
