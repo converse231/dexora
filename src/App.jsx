@@ -5,6 +5,7 @@ import TopBar from "./ui/TopBar.jsx";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
+import Pad from "./ui/Pad.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import {
@@ -66,13 +67,6 @@ const typing = (ev) => {
    roll, the Box and the Dex by construction rather than by four files
    happening to have been edited on the same day. */
 const rarestOf = (st, id) => TIERS.find((t) => st?.[t]?.[dexIndex(id)]) ?? null;
-
-const DPAD = [
-  { dir: "up", glyph: "▲", label: "Walk up" },
-  { dir: "left", glyph: "◀", label: "Walk left" },
-  { dir: "down", glyph: "▼", label: "Walk down" },
-  { dir: "right", glyph: "▶", label: "Walk right" },
-];
 
 export default function App() {
   const canvasRef = useRef(null);
@@ -429,21 +423,16 @@ export default function App() {
             </div>
           )}
 
-          <div className="dpad">
-            {DPAD.map(({ dir, glyph, label }) => (
-              <button
-                key={dir}
-                className={`dpad-${dir}`}
-                aria-label={label}
-                onPointerDown={(ev) => { ev.preventDefault(); engine?.press(dir); }}
-                onPointerUp={() => engine?.release(dir)}
-                onPointerLeave={() => engine?.release(dir)}
-                onPointerCancel={() => engine?.release(dir)}
-              >
-                {glyph}
-              </button>
-            ))}
-          </div>
+          {/* Touch only - see `.pad` in styles.css. It drives the same engine
+              calls the keyboard does and adds no action of its own. */}
+          <Pad
+            engine={engine}
+            state={st}
+            enc={enc}
+            level={level}
+            bagOpen={ballsOpen}
+            onBag={toggleBalls}
+          />
         </div>
 
         <Rail
