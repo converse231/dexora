@@ -621,7 +621,14 @@ export function drawPlayer(ctx, sheet, px, py, dir, step, moving, progress = 1, 
   if (sheet?.sets) {
     const set = sheet.sets[mode.set] ?? sheet.sets.walk;
     const scale = sheet.scale ?? 2;
-    const row = (sheet.dirs ?? DIR_ROW)[dir] ?? 0;
+    /* WHICH CHARACTER, as a row offset rather than a second sheet. The rip
+       carries both playable trainers and `build_player` cuts them into one
+       strip - Red's four facings then Leaf's - so choosing one is adding four
+       rows, not loading a different image. `?? 0` keeps a player.json built
+       before this (or a sheet that failed to load) drawing Red rather than
+       drawing nothing. */
+    const base = sheet.chars?.[mode.char] ?? 0;
+    const row = base + ((sheet.dirs ?? DIR_ROW)[dir] ?? 0);
     const col = (mode.frame != null
       ? mode.frame
       : (!moving || progress >= STRIDE

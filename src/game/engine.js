@@ -65,6 +65,11 @@ export const T = { throw: 560, suck: 460, drop: 560, wait: 520, shake: 720, resu
    resolved the instant you pressed F read as a menu, not as fishing. */
 export const F = { cast: 620, wait: 1500, bite: 620, miss: 1250 };
 
+/* The two playable trainers, in the order `build_player` stacks them into
+   player.png. A string on the save indexes the art, so it is checked against
+   this on load - see `loadState`. */
+export const CHARS = ["red", "leaf"];
+
 const SAVE_KEY = "meadow-route";
 
 /* THREE KEYS, AND THE OTHER TWO EXIST BECAUSE A COLLECTION WAS LOST.
@@ -99,6 +104,12 @@ function freshState() {
     // One byte per SHIPPED species, keyed by position - see dexIndex.
     dex: new Array(SPECIES.length).fill(0), // 0 unseen, 1 seen, 2 caught
     caught: 0,
+    /* WHICH TRAINER YOU PLAY. Both are on the one sheet (see `build_player`),
+       so this is a row offset rather than a second set of art, and it is the
+       only cosmetic choice in the game - which is why it is a plain string on
+       the save rather than anything cleverer. "red" is the default for every
+       save written before the choice existed. */
+    char: "red",
     steps: 0,
     xp: 0,
     nextUid: 1,
@@ -352,6 +363,11 @@ function loadState() {
          back-pay: the duplicates it was hoarding for the old feed are still in
          its box and convert at the same rate as anyone else's. */
       candy: Math.max(0, Math.floor(Number(s.candy) || 0)),
+      /* A save from before the choice is Red, which is who it was playing.
+         Validated against the sheet's own list rather than trusted: the value
+         indexes into the art, and an unknown one would draw four rows off the
+         end of the strip - which is empty, so the trainer would vanish. */
+      char: CHARS.includes(s.char) ? s.char : "red",
       dry: Math.max(0, Math.floor(Number(s.dry) || 0)),
       // A save from before dailies simply has none, and gets today's.
       daily: { ...freshState().daily, ...(s.daily ?? {}) },
@@ -862,6 +878,17 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
+  /* Cosmetic and reversible, so no confirm and no cost: it is the one choice in
+     the game you are allowed to change your mind about. Refuses an unknown name
+     for the same reason `loadState` validates it - the string indexes the art. */
+  function setChar(name) {
+    if (!CHARS.includes(name) || state.char === name) return false;
+    state.char = name;
+    save();
+    changed();
+    return true;
+  }
+
   function toggleBike() {
     if (!holding(state.bag, "bicycle")) return false;
     state.biking = !state.biking;
@@ -1157,6 +1184,8 @@ export function createEngine(canvas, onChange, mini = null) {
           : state.running && move.active ? "run" : "walk",
         frame: cast ? fishFrame(p.dir, cast.phase) : undefined,
         lift: hopping ? Math.sin(Math.PI * t) * 11 : 0,
+        // Which trainer. A row offset into the same strip - see drawPlayer.
+        char: state.char,
       },
     );
 
@@ -1526,6 +1555,7 @@ export function createEngine(canvas, onChange, mini = null) {
     spend,
     fish,
     toggleBike,
+    setChar,
     // Read by the UI every render: what a cast would use, and what things cost.
     castable,
     /* Shift is held, not toggled, so this is driven from keydown and keyup and

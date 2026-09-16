@@ -22,7 +22,16 @@ import { KEY_ITEMS, holding } from "../game/items.js";
 import Confirm from "./Confirm.jsx";
 import Note from "./Note.jsx";
 
-export default function Trainer({ stats, level, bag, biking, onSpend, onBike, save }) {
+/* The two trainers, in the order `build_player` stacks them into player.png.
+   The label is what the games call them; the id is the row block. */
+const CHARS = [
+  ["red", "Red"],
+  ["leaf", "Leaf"],
+];
+
+export default function Trainer({
+  stats, level, bag, biking, onSpend, onBike, save, char = "red", onChar,
+}) {
   // Which row just changed, so the click has something to show for itself.
   const [lit, setLit] = useState(null);
   // A file that has been read and checked, waiting on the confirm step.
@@ -141,6 +150,30 @@ export default function Trainer({ stats, level, bag, biking, onSpend, onBike, sa
         <span>TRAINER · LV {level}</span>
         <span>{spentPoints(stats)} / {earnedPoints(level)} SPENT</span>
       </div>
+
+      {/* WHO YOU ARE, and it is the one choice in the game you may change your
+          mind about freely - cosmetic, reversible, no cost and no confirm. Both
+          trainers were always in the rip (it is titled "Playable CharacterS");
+          only one had ever been cut out of it. The tile draws the real
+          down-facing walk frame straight out of the strip the map uses, so what
+          you pick here is literally what walks. */}
+      {onChar && (
+        <div className="trchar" role="radiogroup" aria-label="Trainer">
+          {CHARS.map(([id, name]) => (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={char === id}
+              className={`trchar-one${char === id ? " on" : ""}`}
+              onClick={() => onChar(id)}
+            >
+              <span className={`trchar-art ch-${id}`} aria-hidden="true" />
+              <i>{name}</i>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className={`tr-points${free > 0 ? " has" : ""}`}>
         {free > 0 ? (

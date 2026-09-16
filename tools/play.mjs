@@ -580,4 +580,39 @@ function until(e, what, label, max = 2000) {
     `${forms.length} forms at Lv 100, refuses at 99, and keeps its uid`);
 }
 
+/* WHICH TRAINER YOU PLAY, through the real engine. The value indexes into the
+   art - a character is a block of four rows in one strip - so an unknown one
+   would draw four rows off the end of `player.png`, which is empty, and the
+   trainer would simply vanish. Both the setter and the loader refuse it. */
+{
+  const { CHARS } = await import("../src/game/engine.js");
+  assert.ok(CHARS.length >= 2, `only ${CHARS.length} trainer(s) - there is no choice to make`);
+
+  store.clear();
+  store.set("meadow-route", JSON.stringify({ ...SAVE }));   // written before the choice
+  raf.length = 0;
+  let e = createEngine(canvas(), () => {}, canvas());
+  assert.equal(e.state.char, "red", "a save from before the choice is not Red");
+
+  assert.equal(e.setChar("leaf"), true, "picking the other trainer was refused");
+  assert.equal(e.state.char, "leaf", "the choice did not stick");
+  assert.equal(e.setChar("leaf"), false, "picking the one already chosen counted as a change");
+  assert.equal(e.setChar("pikachu"), false, "an unknown trainer was accepted");
+  assert.equal(e.state.char, "leaf", "a refused pick changed it anyway");
+
+  // It survives a reload, and a corrupt one comes back as Red rather than blank.
+  await new Promise((r) => setTimeout(r, 600));
+  raf.length = 0;
+  e = createEngine(canvas(), () => {}, canvas());
+  assert.equal(e.state.char, "leaf", "the trainer did not survive a reload");
+
+  store.set("meadow-route", JSON.stringify({ ...SAVE, char: "nobody" }));
+  raf.length = 0;
+  e = createEngine(canvas(), () => {}, canvas());
+  assert.equal(e.state.char, "red",
+    "a save naming a trainer that does not exist loaded it anyway - that is four " +
+    "rows off the end of the strip, and an invisible trainer");
+  console.log(`trainer ok — ${CHARS.join("/")}, chosen, saved, and validated on load`);
+}
+
 console.log("play ok — the frame loop never stopped");

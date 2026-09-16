@@ -3869,4 +3869,46 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   console.log(`dex portrait ok — ${keys.length} keyed layer(s), all distinct, image unkeyed`);
 }
 
+/* THE PICKER MUST DRAW THE SAME ART THE MAP DOES. Both trainers live in one
+   strip - `build_player` stacks Red's four facings then Leaf's - so the tiles in
+   the YOU panel are a background offset into `player.png` rather than separate
+   images. That is the point: a second copy of the art is a second thing to
+   regenerate, and it would drift silently, showing a trainer you do not play.
+
+   So the offset is checked against the sheet's own manifest instead of trusted.
+   `chars.leaf` is a row index; the CSS offset is that many rows of `rowH` at
+   `scale`, negative. */
+{
+  const sheet = JSON.parse(readFileSync(
+    new URL("../public/tilesets/player.json", import.meta.url), "utf8"));
+  assert.ok(sheet.chars, "player.json has no `chars` - run npm run art");
+  const names = Object.keys(sheet.chars);
+  assert.ok(names.length >= 2, `player.png carries ${names.length} trainer(s)`);
+  assert.equal(sheet.chars.red, 0, "Red is not the first block of rows");
+
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  for (const name of names) {
+    const want = sheet.chars[name] * sheet.rowH * (sheet.scale ?? 2);
+    // Sliced, not matched: a regex built inside a template literal is one
+    // escaping mistake from silently matching nothing, and this one was -
+    // it collapsed to `.ch-reds*{...}` and reported the rule missing.
+    const head = css.indexOf(`.ch-${name} {`);
+    const rule = head < 0 ? null : css.slice(head, css.indexOf('}', head) + 1);
+    assert.ok(rule, `.ch-${name} has no rule - the picker cannot draw ${name}`);
+    // `px` is optional because a zero offset carries no unit - `0 0` is what
+    // the first character's rule says, and demanding the unit read it as NaN.
+    const at = Number(
+      rule.match(/background-position:\s*0\s+(-?\d+)(?:px)?/)?.[1] ?? NaN);
+    // `-want || 0` because the first character's offset is zero and
+    // `assert.equal` is SameValue: Object.is(0, -0) is false, so negating a
+    // zero offset failed an assertion about two identical rows.
+    assert.equal(at, -want || 0,
+      `.ch-${name} reads row ${-at / (sheet.rowH * (sheet.scale ?? 2))} of the strip, ` +
+      `but player.json puts ${name} at row ${sheet.chars[name]} - the picker would ` +
+      "show a trainer you do not play");
+  }
+  console.log(`trainer art ok — ${names.join("/")} picked from one strip, ` +
+    "the picker's offsets match player.json");
+}
+
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);

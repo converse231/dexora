@@ -7,6 +7,10 @@
     "left": 2,
     "right": 3
   },
+  "chars": {
+    "red": 0,
+    "leaf": 4
+  },
   "sets": {
     "walk": {
       "x": 0,
