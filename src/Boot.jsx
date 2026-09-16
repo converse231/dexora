@@ -18,7 +18,7 @@ import App from "./App.jsx";
 import { Account, Trainer } from "./ui/Gate.jsx";
 import {
   CLOUD, restore, signIn, signUp, signOut, onAuth, pull, push,
-  getProfile, createProfile,
+  getProfile, createProfile, renameTrainer, deleteAccount, email as accountEmail,
 } from "./net/cloud.js";
 import {
   SAVE_KEY, OWNER_KEY, read, write, drop, newer, onSyncTrouble, flushNow,
@@ -232,6 +232,30 @@ export default function Boot() {
       key={gen}
       onLogOut={CLOUD ? out : null}
       trainerName={name}
+      /* Everything the YOU panel needs to manage the account, assembled here
+         because this is the only component that knows there IS one. */
+      account={CLOUD ? {
+        name,
+        email: accountEmail(),
+        onRename: async (next) => {
+          const got = await renameTrainer(next);
+          if (got.ok) setName(next);
+          return got;
+        },
+        /* DELETING TAKES THE BROWSER'S COPY WITH IT. The row is gone, so a
+           cache of it is a dex belonging to nobody - and leaving it behind
+           would let the next sign-up on this machine adopt it. */
+        onDelete: async () => {
+          const got = await deleteAccount();
+          if (!got.ok) return got;
+          drop(SAVE_KEY);
+          drop(OWNER_KEY);
+          setName(null);
+          setPhase("account");
+          setGen((n) => n + 1);
+          return got;
+        },
+      } : null}
       onEngine={(e) => { engineRef.current = e; }}
     />
   );

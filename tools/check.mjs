@@ -4130,4 +4130,30 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     `${NAME_MIN}-${NAME_MAX} matching the SQL constraint`);
 }
 
+/* THE TYPED CONFIRMATION MUST GATE THE KEYBOARD TOO. `Confirm` fires
+   `onConfirm` on Enter, which went straight through the typed field the first
+   time this was wired - a stray Return with the dialog open would have deleted
+   the account the field exists to guard, making it decorative. Asserted
+   against the source because there is no DOM here to press a key in. */
+{
+  const src = readFileSync(new URL("../src/ui/Confirm.jsx", import.meta.url), "utf8");
+  assert.ok(/typeToConfirm/.test(src), "Confirm lost its typed confirmation");
+
+  const onKey = src.slice(src.indexOf('e.key === "Enter"'), src.indexOf("addEventListener"));
+  assert.ok(/if \(armed\)/.test(onKey),
+    "Enter in Confirm is not gated on the typed word - the field is decorative");
+
+  const yes = src.slice(src.indexOf("cf-yes"), src.indexOf("confirmLabel}"));
+  assert.ok(/disabled=\{!armed\}/.test(yes),
+    "the confirm button is not disabled until the word is typed");
+
+  /* AND THE ONE CALLER THAT USES IT IS THE ONE THAT SHOULD. Account deletion
+     is the only action in the game that destroys something no amount of play
+     can get back; if a second caller appears, it wants thinking about. */
+  const panel = readFileSync(new URL("../src/ui/Trainer.jsx", import.meta.url), "utf8");
+  assert.ok(/typeToConfirm=\{account\.name\}/.test(panel),
+    "deleting an account no longer asks for the name to be typed");
+  console.log("typed confirm ok — the word gates the button AND the Enter key");
+}
+
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);

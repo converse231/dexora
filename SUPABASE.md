@@ -94,6 +94,27 @@ create policy "insert own profile" on public.profiles for insert
   with check (auth.uid() = user_id);
 create policy "update own profile" on public.profiles for update
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- DELETING YOUR OWN ACCOUNT NEEDS RIGHTS THE BROWSER MUST NOT HAVE. Removing a
+-- row from auth.users is an admin action and the only key a browser may carry
+-- is the public one, so the privilege lives in one function rather than in a
+-- key. It takes no argument - there is nothing to point at somebody else - and
+-- the body can only reach auth.uid(). The profile and the save follow on the
+-- foreign key cascade.
+create or replace function public.delete_own_account()
+returns void
+language sql
+security definer
+-- NOT OPTIONAL on a security definer function: without it a caller can put
+-- their own schema in front and have this run against their table instead.
+set search_path = ''
+as $$
+  delete from auth.users where id = auth.uid();
+$$;
+
+revoke all on function public.delete_own_account() from public;
+revoke all on function public.delete_own_account() from anon;
+grant execute on function public.delete_own_account() to authenticated;
 ```
 
 </details>
