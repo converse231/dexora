@@ -13,6 +13,7 @@ const API = "https://pokeapi.co/api/v2";
 const GH = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
 const FRLG = `${GH}/versions/generation-iii/firered-leafgreen`;
 const HGSS = `${GH}/versions/generation-iv/heartgold-soulsilver`;
+const BW = `${GH}/versions/generation-v/black-white`;
 
 /* Which generations ship, and where each one's ART comes from.
 
@@ -21,8 +22,19 @@ const HGSS = `${GH}/versions/generation-iv/heartgold-soulsilver`;
    yet; HeartGold/SoulSilver is the closest 2D set and is 80x80, so those get
    reframed to 64 by build_origin.py - the same fit the Origin art already
    goes through, for the same reason. */
-const RANGES = [[1, 151], [152, 251], [252, 386], [387, 493]];
-const artFor = (id) => (id <= 386 ? FRLG : HGSS);
+/* AND GENS 6-9 HAVE NO PIXEL ART TO FIND. Black/White is the last 2D set Game
+   Freak drew - everything from X/Y on is a render of a 3D model, and PokeAPI's
+   default sprite IS that render. So the style breaks at #650 and there is no
+   choice in it: the alternative is no art at all. They are the same 96x96 the
+   other sets are, so they reframe to our 64x64 canvas exactly like Sinnoh's
+   HGSS art does, and nothing downstream can tell the difference. The visible
+   difference is a rendered creature standing next to a drawn one. */
+const RANGES = [
+  [1, 151], [152, 251], [252, 386], [387, 493],
+  [494, 649], [650, 721], [722, 809], [810, 905], [906, 1025],
+];
+const artFor = (id) =>
+  id <= 386 ? FRLG : id <= 493 ? HGSS : id <= 649 ? BW : GH;
 
 const tierOf = (r) => (r >= 200 ? "C" : r >= 100 ? "B" : r >= 45 ? "A" : "S");
 
@@ -66,6 +78,15 @@ async function one(id) {
     rate: sp.capture_rate,
     tier: tierOf(sp.capture_rate),
     from: sp.evolves_from_species?.name ?? null,
+    /* WHETHER IT IS A LEGENDARY, FETCHED RATHER THAN LISTED. `LEGENDARY` in
+       biomes.js was a hand-written set of dex numbers with a comment promising
+       "a Gen 2 Suicune needs one dex number added here and nothing else" - and
+       then five generations arrived at once and sixty of them were not added,
+       so every Unova and Paldea legendary was spawning at an ordinary S-tier
+       weight instead of the legendary share. PokeAPI knows the answer for all
+       of them; mythicals count, because the game makes no distinction and a
+       Mew that is not rare is not a Mew. */
+    legendary: Boolean(sp.is_legendary || sp.is_mythical),
     genus: clean(sp.genera.find((g) => g.language.name === "en")?.genus ?? ""),
     flavor: clean(entry?.flavor_text ?? ""),
     height: pk.height, // decimetres

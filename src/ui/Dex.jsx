@@ -11,7 +11,7 @@
    each other; at ~76px they each have a place. */
 
 import { useMemo, useState } from "react";
-import { SPECIES } from "../data/species.js";
+import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
 import {
   LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor, isLegendary,

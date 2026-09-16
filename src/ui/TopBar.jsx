@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { levelProgress } from "../game/biomes.js";
 import Daily from "./Daily.jsx";
-import { SPECIES } from "../data/species.js";
+import { SPECIES } from "../data/dex.js";
 
 /* "+3 +2 balls" - the whole parcel in one short line, because four separate
    floating numbers over one counter is confetti, not information. */

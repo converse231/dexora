@@ -9,7 +9,7 @@
    Everything here is PURE. The engine calls `dailyFor`, `advance` and `reward`;
    check.mjs calls the same three with a fake clock, which is the only way to
    test something keyed on the date without waiting a day. */
-import { SPECIES } from "../data/species.js";
+import { SPECIES } from "../data/dex.js";
 import { BIOMES } from "./biomes.js";
 
 /* The local day, as a string. Local rather than UTC on purpose: a daily that

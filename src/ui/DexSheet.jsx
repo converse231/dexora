@@ -20,7 +20,7 @@
 
 import { useEffect, useState } from "react";
 import { useModalLock } from "./modal.js";
-import { SPECIES } from "../data/species.js";
+import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
 import {
