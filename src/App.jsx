@@ -7,6 +7,7 @@ import { phaseAt, timeLabel } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
 import { RAIL_KEY, read, write } from "./game/store.js";
 import Pad from "./ui/Pad.jsx";
+import Hint from "./ui/Hint.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import {
@@ -66,7 +67,7 @@ const typing = (ev) => {
    happening to have been edited on the same day. */
 const rarestOf = (st, id) => TIERS.find((t) => st?.[t]?.[dexIndex(id)]) ?? null;
 
-export default function App() {
+export default function App({ onLogOut = null }) {
   const canvasRef = useRef(null);
   const miniRef = useRef(null);
   const [engine, setEngine] = useState(null);
@@ -253,23 +254,12 @@ export default function App() {
           evolution, and both of those already own the middle of the screen. */}
       {cheer && <Cheer cheer={cheer} onDone={() => engine.dropCheer()} />}
 
-      {/* A TIP, NOT A TUTORIAL. One line, the first time you reach the thing it
-          is about, never again - see hints.js for why there is no sequence. It
-          sits under the top bar rather than over the map: it is worth reading
-          and never worth blocking a throw for, so it must not cover the scene
-          it is describing. `role="status"` because it arrives unprompted and
-          is not worth stealing focus for. */}
+      {/* A TIP, NOT A TUTORIAL - one line, the first time you reach the thing
+          it is about, never again. See hints.js for why there is no sequence,
+          and Hint.jsx for why it is a dialog rather than the bar it started as:
+          a tip somebody scrolls past is a tip nobody read. */}
       {st?.hint && (
-        <div className="hintbar" role="status">
-          <p>{st.hint.text}</p>
-          <button
-            type="button"
-            aria-label="Dismiss this tip"
-            onClick={() => engine.clearHint()}
-          >
-            GOT IT
-          </button>
-        </div>
+        <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 
       <TopBar
@@ -287,7 +277,14 @@ export default function App() {
         candy={st?.candy ?? 0}
         deltas={deltas}
         xp={st?.xp ?? 0}
-        onReset={() => engine?.reset()}
+        /* LOG OUT REPLACES RESET once there is an account. Reset wiped the
+           save, which was the only way out when the save WAS the account; with
+           one it is a button that destroys a synced collection and calls it a
+           preference. The account owns the save now, so leaving is logging out
+           and the data stays. Reset survives only in local mode, where there is
+           nothing to log out of. */
+        onReset={onLogOut ? null : () => engine?.reset()}
+        onLogOut={onLogOut}
       />
 
       <div className="stage">
@@ -472,7 +469,6 @@ export default function App() {
           onJumped={() => setBoxJump(null)}
           onSpend={(id) => engine.spend(id)}
           onBike={() => engine.toggleBike()}
-          onChar={(id) => engine.setChar(id)}
           /* The three save-file calls, handed over as one object so the panel
              does not need the engine itself. */
           save={engine && {

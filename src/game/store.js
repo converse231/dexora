@@ -78,3 +78,81 @@ export function write(key, raw) {
 export function keep(key, raw) {
   if (raw) write(key, raw);
 }
+
+/* ------------------------------------------------------- the account's copy */
+
+/* LOCAL FIRST, CLOUD AFTER, and never the other way round.
+
+   The game writes on every step. Waiting for a round trip before the next frame
+   would put the network in the middle of the walk cycle, and a dropped
+   connection would stop the game rather than stop the sync. So `write` above
+   stays synchronous and local, and this mirrors it upward on its own clock.
+
+   The push is coalesced to one every `SYNC_MS` rather than debounced, and the
+   difference matters: a debounce that resets on every write never fires while
+   somebody is walking, which is exactly when there is most to lose. A trailing
+   push always follows the last write, so the final state always lands. */
+const SYNC_MS = 4000;
+let pending = null;
+let timer = null;
+let inflight = false;
+let report = () => {};
+
+/* Told once, at boot, how to say a sync failed. Kept out of this module's
+   business - it knows the write did not land, not what the top bar should say. */
+export function onSyncTrouble(fn) {
+  report = typeof fn === "function" ? fn : () => {};
+}
+
+export function mirror(raw, push) {
+  pending = raw;
+  if (timer || inflight) return;
+  timer = setTimeout(() => flush(push), SYNC_MS);
+}
+
+async function flush(push) {
+  timer = null;
+  if (pending == null) return;
+  const raw = pending;
+  pending = null;
+  inflight = true;
+  try {
+    const got = await push(raw);
+    report(got?.ok === false ? (got.why ?? "offline") : null);
+  } catch {
+    report("offline");
+  } finally {
+    inflight = false;
+    // Anything written while that was in the air gets its own turn.
+    if (pending != null && !timer) timer = setTimeout(() => flush(push), SYNC_MS);
+  }
+}
+
+/* Everything outstanding, now - for logging out, where the next thing that
+   happens is the save being unreachable. */
+export async function flushNow(push) {
+  if (timer) { clearTimeout(timer); timer = null; }
+  if (pending == null) return;
+  const raw = pending;
+  pending = null;
+  try { await push(raw); } catch { /* leaving anyway */ }
+}
+
+/* WHICHEVER HAS WALKED FURTHER WINS, and that is the whole merge.
+
+   Two devices, one account: at login there can be a local save and a remote one
+   and no way to ask a player which they meant. `steps` is the only counter in
+   the game that cannot go down - it is incremented once per tile and never
+   reset - so more steps is strictly more play, and taking the larger can only
+   ever discard the shorter session. A timestamp would be wrong here: a clock
+   that is slow, or a tab left open for a day, both beat a real afternoon.
+
+   Ties go to REMOTE, because a tie means the same save and the remote one is
+   the account's own record. */
+export function newer(localRaw, remoteRaw) {
+  const steps = (raw) => {
+    if (!raw) return -1;
+    try { return Number(JSON.parse(raw).steps) || 0; } catch { return -1; }
+  };
+  return steps(localRaw) > steps(remoteRaw) ? localRaw : (remoteRaw ?? localRaw);
+}

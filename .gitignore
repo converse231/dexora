@@ -27,3 +27,7 @@ vite.config.js.timestamp-*
 # Throwaway measuring scripts at the repo root (need to sit beside src/ to import it).
 _*.mjs
 _*.py
+
+# Local Supabase credentials - never committed. See .env.example.
+.env
+.env.local

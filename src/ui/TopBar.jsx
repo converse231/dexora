@@ -82,6 +82,7 @@ function Missions({ daily, onClaim, note }) {
 
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
+  onLogOut = null,
   stale = null,
   daily, onClaimDaily, claimNote,
 }) {
@@ -173,7 +174,10 @@ export default function TopBar({
         </p>
       )}
 
-      <button onClick={onReset}>RESET</button>
+      {/* One or the other, never both - see App. */}
+      {onLogOut
+        ? <button className="tb-out" onClick={onLogOut}>LOG OUT</button>
+        : <button onClick={onReset}>RESET</button>}
     </div>
   );
 }

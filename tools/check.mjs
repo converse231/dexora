@@ -3895,26 +3895,45 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   assert.equal(sheet.chars.red, 0, "Red is not the first block of rows");
 
   const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
-  for (const name of names) {
-    const want = sheet.chars[name] * sheet.rowH * (sheet.scale ?? 2);
-    // Sliced, not matched: a regex built inside a template literal is one
-    // escaping mistake from silently matching nothing, and this one was -
-    // it collapsed to `.ch-reds*{...}` and reported the rule missing.
-    const head = css.indexOf(`.ch-${name} {`);
-    const rule = head < 0 ? null : css.slice(head, css.indexOf('}', head) + 1);
-    assert.ok(rule, `.ch-${name} has no rule - the picker cannot draw ${name}`);
-    // `px` is optional because a zero offset carries no unit - `0 0` is what
-    // the first character's rule says, and demanding the unit read it as NaN.
+
+  /* THE GAP IS WHAT CAN BE WRONG, not the origin. The tiles are cropped to the
+     art rather than to the cell - a walk frame is 16x32 and the trainer only
+     fills the bottom 19 of it - so both rules carry the same inset, and
+     asserting an absolute offset would be asserting that crop rather than the
+     thing that matters. What matters is that the two tiles are a whole
+     character block apart: get that wrong and the picker shows a trainer you do
+     not play, which is the failure this exists for. */
+  const offsetOf = (name) => {
+    const head = css.indexOf(`.gate-art.ch-${name} {`);
+    assert.ok(head >= 0, `.gate-art.ch-${name} has no rule - the gate cannot draw ${name}`);
+    const rule = css.slice(head, css.indexOf("}", head) + 1);
     const at = Number(
       rule.match(/background-position:\s*0\s+(-?\d+)(?:px)?/)?.[1] ?? NaN);
-    // `-want || 0` because the first character's offset is zero and
-    // `assert.equal` is SameValue: Object.is(0, -0) is false, so negating a
-    // zero offset failed an assertion about two identical rows.
-    assert.equal(at, -want || 0,
-      `.ch-${name} reads row ${-at / (sheet.rowH * (sheet.scale ?? 2))} of the strip, ` +
-      `but player.json puts ${name} at row ${sheet.chars[name]} - the picker would ` +
-      "show a trainer you do not play");
+    assert.ok(Number.isFinite(at), `.gate-art.ch-${name} has no readable offset`);
+    return at;
+  };
+
+  /* Read out of `.gate-art` itself, not the first `background-size` in the
+     whole stylesheet - which is what the first version did, and it matched an
+     icon somewhere else and made the gap come out at 8.5px. */
+  const artHead = css.indexOf(".gate-art {");
+  assert.ok(artHead >= 0, ".gate-art has no rule");
+  const artRule = css.slice(artHead, css.indexOf("}", artHead) + 1);
+  const sheetPx = Number(artRule.match(/background-size:\s*(\d+)px/)?.[1] ?? 0);
+  const wide = 256;                       // player.png is square, 256 at 1x
+  const scale = sheetPx / wide;
+  assert.ok(scale > 0, "the gate art has no background-size to scale from");
+
+  for (let i = 1; i < names.length; i++) {
+    const rows = sheet.chars[names[i]] - sheet.chars[names[i - 1]];
+    const want = rows * sheet.rowH * scale;
+    const got = offsetOf(names[i - 1]) - offsetOf(names[i]);
+    assert.equal(got, want,
+      `${names[i - 1]} and ${names[i]} sit ${got}px apart in the picker, but ` +
+      `player.json puts them ${want}px apart - the gate would show a trainer ` +
+      "you do not play");
   }
+
   console.log(`trainer art ok — ${names.join("/")} picked from one strip, ` +
     "the picker's offsets match player.json");
 }
@@ -3996,6 +4015,70 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   }
   console.log(`portable ok — ${pure.length} of ${mods.length} rule modules are ` +
     `browser-free; only ${HOST.join(", ")} need one`);
+}
+
+/* THE ACCOUNT LAYER, and the two things about it that can quietly go wrong.
+
+   It cannot be driven end to end from here - that needs a real project and a
+   network - so what is asserted is the part that is pure and the part that is
+   structural: the merge rule, and that nothing in the game requires a backend
+   to exist. Both are the failures that would ship silently. */
+{
+  const { newer } = await import("../src/game/store.js");
+
+  /* WHICHEVER HAS WALKED FURTHER WINS. Two devices, one account, and no way to
+     ask which the player meant. `steps` is the only counter in the game that
+     cannot go down, so more steps is strictly more play and taking the larger
+     can only ever discard the shorter session. */
+  const at = (n) => JSON.stringify({ steps: n, marker: n });
+  assert.equal(newer(at(10), at(4)), at(10), "the longer local save lost");
+  assert.equal(newer(at(4), at(10)), at(10), "the longer remote save lost");
+  assert.equal(newer(null, at(3)), at(3), "a fresh browser did not take the account's save");
+  assert.equal(newer(at(3), null), at(3), "a missing remote save discarded the local one");
+  assert.equal(newer(null, null), null, "two absences produced something");
+  // A tie is the same save; the account's copy is the record.
+  assert.equal(newer(at(7), at(7)), at(7), "a tie did not settle on the remote");
+  /* A save that will not parse never beats one that does. Stated as the
+     BEHAVIOUR, because that is all this can show: `newer` scores an unreadable
+     save -1 rather than 0, which is the safer sentinel, but with ties going to
+     remote the two are indistinguishable from outside. Worth asserting anyway -
+     this is the direction that loses a collection - and worth not pretending it
+     pins the -1. */
+  assert.equal(newer("{not json", at(0)), at(0),
+    "an unparseable save beat a real one - that is the direction that loses a dex");
+
+  /* NOTHING IN THE GAME REQUIRES AN ACCOUNT. `cloud.js` is the only file that
+     may import the Supabase client, and with no credentials every path through
+     it has to answer "no account" rather than throw - the game is playable
+     offline, a dropped connection is not a dead screen, and this suite runs
+     without a network. Asserted as an absence, the only way to say "nobody
+     else does this". */
+  const dir = new URL("../src/", import.meta.url);
+  const walk = (at) => readdirSync(at, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? walk(new URL(`${e.name}/`, at)) : [new URL(e.name, at)]);
+  const offenders = walk(dir)
+    .filter((u) => /\.jsx?$/.test(u.pathname) && !u.pathname.endsWith("net/cloud.js"))
+    .filter((u) => /@supabase\/supabase-js/.test(readFileSync(u, "utf8")))
+    .map((u) => u.pathname.split("/src/")[1]);
+  assert.deepEqual(offenders, [],
+    `${offenders.join(", ")} imports the Supabase client directly - it goes ` +
+    "through net/cloud.js, or the game stops working without an account");
+
+  const cloud = readFileSync(new URL("net/cloud.js", dir), "utf8");
+  assert.ok(/export const CLOUD/.test(cloud), "cloud.js does not say whether it is configured");
+  for (const fn of ["signUp", "signIn", "signOut", "pull", "push", "restore"]) {
+    assert.ok(new RegExp(`(export async function|export function) ${fn}\\b`).test(cloud),
+      `cloud.js has no ${fn} - Boot calls it`);
+  }
+  /* Every call has to survive being made with nothing configured. `CLOUD` is
+     checked in each of them rather than once at the top, because a module that
+     throws on import takes the whole game with it. */
+  const guarded = cloud.split("\n").filter((l) => /!CLOUD/.test(l)).length;
+  assert.ok(guarded >= 5,
+    `only ${guarded} of cloud.js's entry points check CLOUD - one that does not ` +
+    "throws on a build with no credentials");
+  console.log("account ok — the merge takes the longer walk; nothing but " +
+    "net/cloud.js needs a backend");
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);
