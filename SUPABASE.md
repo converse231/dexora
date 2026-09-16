@@ -31,7 +31,18 @@ that belongs here** — it is designed to be public and is safe in a browser
 bundle. The `service_role` key is not: it bypasses every rule below, so it never
 goes in `.env`, in the repo, or in anything shipped to a browser.
 
-## 3. Make the table
+## 3. Make the table — **already done on this project**
+
+Run this only when setting up a *new* project. On the current one the table,
+row-level security and all three policies are in place and were verified: a
+player can read and write their own row, a second player reading the first
+player's row gets nothing back, writing to it is refused, and an anonymous
+caller sees zero rows.
+
+<details>
+<summary>The SQL, for a fresh project</summary>
+
+
 
 **SQL Editor → New query**, paste all of this, **Run**:
 
@@ -58,24 +69,34 @@ create policy "update own save" on public.saves for update
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
+</details>
+
 Check it took: **Table Editor → saves** should show the table with a green
 **RLS enabled** badge. If that badge says *Unrestricted*, stop and re-run the
 `alter table` line — an unrestricted table with a public key is every save in
 the project readable by anyone.
 
-## 4. Decide about email confirmation
+## 4. Turn off email confirmation — **you have to do this one**
 
-**Authentication → Providers → Email.**
+It is the only step that cannot be done from here: the setting lives in GoTrue's
+config rather than in the database, so it needs the dashboard (or a Management
+API token).
 
-- **Confirm email ON** (the default) — safer, and what you want if anyone but
-  you signs up. Sign-up then shows "check your email" rather than logging
-  straight in; the game already handles that path.
-- **Confirm email OFF** — sign-up logs you in immediately. Fine while it is
-  only you, and it makes testing much faster.
+**Authentication → Sign In / Providers → Email → turn OFF "Confirm email" →
+Save.**
 
-While you are there, **Authentication → URL Configuration → Site URL** should be
-wherever the game is actually hosted, or confirmation links will point at
-`localhost`.
+**This is not only about convenience.** With confirmation on, every sign-up
+sends an email, and the built-in mail service allows a *handful per hour* across
+the whole project — verified here, the third test sign-up came back
+`over_email_send_rate_limit`. Real players would hit that within minutes of
+launch and simply be unable to register. So either:
+
+- **turn confirmation off** (what this project is set up for), or
+- **keep it on and configure your own SMTP** under *Authentication → Emails →
+  SMTP Settings*, because the built-in sender is explicitly not for production.
+
+While you are in there, **Authentication → URL Configuration → Site URL** should
+be wherever the game is actually hosted.
 
 ## 5. Run it
 
@@ -95,7 +116,13 @@ seconds, then **Table Editor → saves** — there should be one row, with
 Worth being plain about, because it decides what can safely be built next.
 
 **Protected.** Nobody can read or write anyone else's save. That is RLS, and it
-is enforced by the database rather than by the game.
+is enforced by the database rather than by the game — tested directly against
+this project by impersonating one player and trying to reach another's row.
+
+**Also checked:** the built bundle contains the project URL and the publishable
+key, and does *not* contain `DATABASE_PASSWORD`. Vite only inlines variables
+prefixed `VITE_`, so the database password in `.env` stays on your machine —
+but it is a real credential, so `.env` must never be committed. It is gitignored.
 
 **Not protected.** Every number in the save is computed in the browser and
 uploaded — the catch roll, the money, the dex. Someone determined can edit their
@@ -111,6 +138,9 @@ the client starts sending the throw rather than the outcome.
 ## If something goes wrong
 
 | What you see | What it is |
+|---|---|
+| `over_email_send_rate_limit` on sign-up | Confirmation is still on and the built-in mailer is capped at a few per hour — see step 4 |
+| `email_address_invalid` on sign-up | Supabase rejects obviously fake domains, `example.com` among them |
 |---|---|
 | Login screen never appears, game loads straight in | `.env` is missing or misnamed, or the dev server was not restarted after creating it — Vite reads `.env` at startup only |
 | "Cannot reach the server" | URL typo, or the project is paused (free projects pause after inactivity — open the dashboard to wake it) |
