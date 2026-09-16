@@ -17,6 +17,14 @@ import {
 
 const near = (a, b) => Math.abs(a - b) < 0.005;
 
+/* SOURCE-READING ASSERTIONS STRIP COMMENTS FIRST, always. The rule is
+   about what the CODE does; the prose absolutely should name the thing
+   being forbidden, and the repel assertion below failed on the comment
+   explaining itself the first time it was written. A test that forbids
+   documenting itself is a test nobody keeps. */
+const stripComments = (src) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
 /* How many characters the shop's description slot actually holds. Measured in
    a rendered shop at the tightest the row ever gets (169px, next to "you have
    12"), not estimated - the same mistake the 21-character ball hint made, and
@@ -3050,8 +3058,8 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
          knows about repel; the prose absolutely should, and the first version
          of this assertion failed on the comment that explains the rule. A test
          that forbids documenting itself is a test nobody keeps. */
-      const src = readFileSync(new URL(`../src/game/${f}`, import.meta.url), "utf8")
-        .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      const src = stripComments(
+        readFileSync(new URL(`../src/game/${f}`, import.meta.url), "utf8"));
       assert.ok(!/repel/i.test(src),
         `${f} has repel in its CODE - a repel that reshapes the table is the ` +
         "pile-up this design exists to avoid");
@@ -3909,6 +3917,37 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   }
   console.log(`trainer art ok — ${names.join("/")} picked from one strip, ` +
     "the picker's offsets match player.json");
+}
+
+/* ONE PLACE KNOWS WHERE THE SAVE LIVES, and it is the precondition for the save
+   living anywhere else. Ten bare `localStorage` calls were scattered across
+   engine.js and App.jsx, each with its own try/catch and its own idea of what
+   to do when storage is unavailable - the quota handling existed in one of the
+   five writers and not the other four. A hosted backend cannot be slotted
+   behind twelve call sites; it can be slotted behind one module.
+
+   Asserted as an absence, which is the only way to state "nobody else does
+   this": no file outside store.js may name `localStorage` except to REMOVE a
+   key, which has no failure worth reporting. Comments are stripped first,
+   because the prose absolutely should name it. */
+{
+  const files = ["src/game/engine.js", "src/App.jsx", "src/ui/Trainer.jsx", "src/ui/Rail.jsx"];
+  for (const f of files) {
+    const raw = readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
+    const code = stripComments(raw);
+    const hits = [...code.matchAll(/localStorage\.(\w+)/g)].map((m) => m[1])
+      .filter((fn) => fn !== "removeItem");
+    assert.deepEqual(hits, [],
+      `${f} calls localStorage.${hits.join("/")} directly - it goes through ` +
+      "store.js, or the save can never live anywhere but this browser");
+  }
+  const store = readFileSync(new URL("../src/game/store.js", import.meta.url), "utf8");
+  assert.ok(/export const SAVE_KEY/.test(store), "store.js does not own the save key");
+  assert.ok(/QuotaExceededError/.test(store),
+    "store.js no longer distinguishes a full quota - it is the one cause a " +
+    "player can act on");
+  console.log(`storage ok — ${files.length} files go through store.js; nothing else ` +
+    "names localStorage");
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);
