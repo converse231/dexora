@@ -70,7 +70,8 @@ export const F = { cast: 620, wait: 1500, bite: 620, miss: 1250 };
    this on load - see `loadState`. */
 export const CHARS = ["red", "leaf"];
 
-const SAVE_KEY = "meadow-route";
+/* Where the save lives is `store.js`'s business, not this file's. */
+import { SAVE_KEY, BACKUP_KEY, BROKEN_KEY, read, write, keep } from "./store.js";
 
 /* THREE KEYS, AND THE OTHER TWO EXIST BECAUSE A COLLECTION WAS LOST.
 
@@ -91,8 +92,6 @@ const SAVE_KEY = "meadow-route";
    whatever went wrong a moment ago. BROKEN is the raw text of anything that
    failed, kept verbatim and never parsed, because the one thing you want from a
    file you cannot read is the file. */
-const BACKUP_KEY = "meadow-route.backup";
-const BROKEN_KEY = "meadow-route.broken";
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 const START_AREA = AREA_IDS[0];
@@ -259,32 +258,39 @@ export function saveProblem(s) {
 /* Put a save beyond the reach of the next `save()`. Never throws: it runs on
    the failure path, and a failure to preserve must not become a failure to
    start. */
-function stash(key, raw) {
-  try {
-    if (raw) localStorage.setItem(key, raw);
-  } catch { /* private mode, or full - nothing useful to do about it */ }
-}
-
 /* What a player could still get back. Read by the trainer panel, so the offer
    only appears when there is something behind it. */
 export function recoverable() {
   try {
-    const backup = localStorage.getItem(BACKUP_KEY);
-    const broken = localStorage.getItem(BROKEN_KEY);
-    const read = (raw) => {
+    const backup = read(BACKUP_KEY);
+    const broken = read(BROKEN_KEY);
+    /* `summarise`, NOT `read` - AN IMPORT SHADOWED BY A LOCAL, AGAIN. This
+       helper was called `read`, which was harmless while nothing else in scope
+       was, and the moment `read` came in from store.js the two collided: the
+       local `const` shadows the import for the WHOLE function body, so the two
+       lines above it were suddenly reading a variable in its temporal dead zone.
+       That throws a ReferenceError, which the `catch` below swallows, so
+       `recoverable()` simply started answering "nothing to recover" - the one
+       answer that makes the Trainer panel hide the offer entirely.
+
+       This file already records the same shape freezing every catch in the game
+       (`advance` from daily.js, shadowed by a local `advance`). The rule there
+       was to alias the import; here the local is the one that should never have
+       had a general name. */
+    const summarise = (raw) => {
       if (!raw) return null;
       try {
         const o = JSON.parse(raw);
         return { caught: o.caught ?? 0, box: o.box?.length ?? 0, money: o.money ?? 0 };
       } catch { return { unreadable: true }; }
     };
-    return { backup: read(backup), broken: read(broken) };
+    return { backup: summarise(backup), broken: summarise(broken) };
   } catch { return { backup: null, broken: null }; }
 }
 
 function loadState() {
   const raw = (() => {
-    try { return localStorage.getItem(SAVE_KEY); } catch { return null; }
+    return read(SAVE_KEY);
   })();
   try {
     if (!raw) return freshState();
@@ -292,7 +298,7 @@ function loadState() {
     /* ANYTHING THAT FAILS IS KEPT BEFORE WE WALK AWAY FROM IT. `freshState()`
        here used to be the last moment that save existed. */
     if (!Array.isArray(s.dex)) {
-      stash(BROKEN_KEY, raw);
+      keep(BROKEN_KEY, raw);
       return freshState();
     }
     /* A SHORTER DEX IS AN OLDER SAVE, NOT A BROKEN ONE.
@@ -310,7 +316,7 @@ function loadState() {
        generation is ever inserted BEFORE Kanto, this stops being true and that
        assertion is what will say so. */
     if (s.dex.length > SPECIES.length) {
-      stash(BROKEN_KEY, raw);
+      keep(BROKEN_KEY, raw);
       return freshState();
     }
 
@@ -323,7 +329,7 @@ function loadState() {
        was good. Written at LOAD time on purpose: a backup taken at save time is
        a copy of the state you are already in, which is no help at all when that
        state is the problem. */
-    stash(BACKUP_KEY, raw);
+    keep(BACKUP_KEY, raw);
 
     const rows = Object.fromEntries(TIERS.map((t) => [t,
       remap(s[t], SPECIES.length, (v) => (v ? 1 : 0))
@@ -393,7 +399,7 @@ function loadState() {
       encounter: null, evolution: null, cheers: [],
     };
   } catch {
-    stash(BROKEN_KEY, raw);
+    keep(BROKEN_KEY, raw);
     return freshState();
   }
 }
@@ -545,16 +551,15 @@ export function createEngine(canvas, onChange, mini = null) {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       const { encounter, evolution, fishing, running, cheers, rev, stale, ...rest } = state;
-      try {
-        localStorage.setItem(SAVE_KEY, JSON.stringify(rest));
+      /* `write` reports whether it stuck rather than throwing - which cause it
+         was is its business, not this file's. What happens NEXT is this file's:
+         play on either way, and latch it so the top bar can say NOT SAVING. */
+      const got = write(SAVE_KEY, JSON.stringify(rest));
+      if (got.ok) {
         if (state.stale) { state.stale = null; changed(); }
-      } catch (err) {
-        /* Quota is the one worth naming: it is the only cause a player can
-           act on, by selling spares or exporting and starting fresh. */
-        const full = err?.name === "QuotaExceededError"
-          || err?.name === "NS_ERROR_DOM_QUOTA_REACHED";
-        const why = full ? "full" : "blocked";
-        if (state.stale !== why) { state.stale = why; changed(); }
+      } else if (state.stale !== got.why) {
+        state.stale = got.why;
+        changed();
       }
     }, 400);
   }
@@ -1587,7 +1592,7 @@ export function createEngine(canvas, onChange, mini = null) {
     flee,
     skip,
     reset() {
-      localStorage.removeItem(SAVE_KEY);
+      try { localStorage.removeItem(SAVE_KEY); } catch { /* nothing to clear */ }
       location.reload();
     },
 
@@ -1602,7 +1607,7 @@ export function createEngine(canvas, onChange, mini = null) {
        reload is the one path that is certainly consistent. */
     restore(which = "backup") {
       const key = which === "broken" ? BROKEN_KEY : BACKUP_KEY;
-      const raw = localStorage.getItem(key);
+      const raw = read(key);
       if (!raw) return false;
       /* BROKEN IS RAW TEXT AND MAY NOT BE JSON AT ALL - that is why it was
          kept. Parsing it outside a try here would throw out of the click that
@@ -1610,7 +1615,7 @@ export function createEngine(canvas, onChange, mini = null) {
       let obj;
       try { obj = JSON.parse(raw); } catch { return false; }
       if (saveProblem(obj)) return false;
-      localStorage.setItem(SAVE_KEY, raw);
+      write(SAVE_KEY, raw);
       location.reload();
       return true;
     },
@@ -1653,7 +1658,7 @@ export function createEngine(canvas, onChange, mini = null) {
       const problem = saveProblem(obj);
       if (problem) return problem;
       clearTimeout(saveTimer);          // do not let the old game save over it
-      localStorage.setItem(SAVE_KEY, JSON.stringify(obj));
+      write(SAVE_KEY, JSON.stringify(obj));
       location.reload();
       return null;
     },

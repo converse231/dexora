@@ -5,6 +5,7 @@ import TopBar from "./ui/TopBar.jsx";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
+import { RAIL_KEY, read, write } from "./game/store.js";
 import Pad from "./ui/Pad.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
@@ -41,10 +42,7 @@ const KEYS = {
 // How long a floating counter change stays up. Matches `delta-fly` in the CSS.
 const LIFE = 1200;
 
-const RAIL_KEY = "meadow-route:balls";
-const readRail = () => {
-  try { return localStorage.getItem(RAIL_KEY) !== "0"; } catch { return true; }
-};
+const readRail = () => read(RAIL_KEY) !== "0";
 
 /* The keyboard listeners are on `window`, so they fire wherever focus is - and
    the Dex and Box both have a search field. Typing "pidgey" walked the trainer
@@ -88,7 +86,7 @@ export default function App() {
   const toggleBalls = () => {
     const next = !ballsOpen;
     setBallsOpen(next);
-    try { localStorage.setItem(RAIL_KEY, next ? "1" : "0"); } catch { /* private mode */ }
+    write(RAIL_KEY, next ? "1" : "0");
   };
 
   useEffect(() => {
