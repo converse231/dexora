@@ -4081,4 +4081,53 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     "net/cloud.js needs a backend");
 }
 
+/* THE NAME RULES ARE IN TWO PLACES ON PURPOSE, and they have to agree.
+
+   `nameProblem` runs in the form so a player is told what is wrong while they
+   type instead of after a round trip. The CHECK constraint on `profiles` is the
+   rule, because a form can be bypassed and a table cannot - and because
+   uniqueness is not something a form can promise at all: two people typing the
+   same name at the same moment both pass every check a browser can do, and
+   only the unique index settles it.
+
+   Two copies of a rule drift, which this codebase has been bitten by four
+   times. So the assertion is that the pattern in the SQL and the pattern in the
+   form accept and reject the same strings - not that they are written the same
+   way, because one is Postgres and one is JavaScript. */
+{
+  const { nameProblem, NAME_MIN, NAME_MAX } = await import("../src/game/name.js");
+
+  const good = ["Ash", "Daniel", "red_fox", "Blue-2", "a b c", "x".repeat(NAME_MAX)];
+  for (const v of good) {
+    assert.equal(nameProblem(v), null, `"${v}" should be a valid name`);
+  }
+
+  const bad = [
+    ["", "empty"], ["  ", "spaces only"], ["ab", "too short"],
+    ["x".repeat(NAME_MAX + 1), "too long"],
+    ["a<b>", "angle brackets"], ["drop;table", "semicolon"],
+    ["emoji\u{1F600}", "emoji"], ["tab\there", "tab"],
+  ];
+  for (const [v, why] of bad) {
+    assert.ok(nameProblem(v), `"${v}" (${why}) should be rejected`);
+  }
+
+  // Trimmed before measuring, or " ab " passes a length check it should fail.
+  assert.equal(nameProblem(" Ash "), null, "a padded name should be trimmed and accepted");
+  assert.ok(nameProblem(` ${"x".repeat(NAME_MAX)} x`), "trimming must not rescue an over-long name");
+
+  /* AND THE DOCUMENTED SQL MUST SAY THE SAME THING. The table is created from
+     SUPABASE.md on a fresh project, so a bound changed here and not there ships
+     a database that disagrees with the form. */
+  const doc = readFileSync(new URL("../SUPABASE.md", import.meta.url), "utf8");
+  const shape = doc.match(/username ~ '\^\[([^\]]+)\]\{(\d+),(\d+)\}\$'/);
+  assert.ok(shape, "SUPABASE.md no longer documents the username constraint");
+  assert.equal(Number(shape[2]), NAME_MIN,
+    `SQL allows names from ${shape[2]} characters, the form from ${NAME_MIN}`);
+  assert.equal(Number(shape[3]), NAME_MAX,
+    `SQL allows names up to ${shape[3]} characters, the form up to ${NAME_MAX}`);
+  console.log(`name rules ok — ${good.length} accepted, ${bad.length} refused, ` +
+    `${NAME_MIN}-${NAME_MAX} matching the SQL constraint`);
+}
+
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);

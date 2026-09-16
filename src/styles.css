@@ -1402,7 +1402,10 @@ canvas {
 }
 
 /* The two trainers, drawn out of the same strip the map renders from. */
-.gate-chars { display: flex; gap: 12px; margin: 18px 0 16px; }
+/* The name field sits above the two tiles, so it gets the gap rather than the
+   tiles carrying a top margin that only applies half the time. */
+.gate-name { margin-top: 16px; }
+.gate-chars { display: flex; gap: 12px; margin: 16px 0 6px; }
 .gate-char {
   flex: 1; cursor: pointer;
   display: grid; justify-items: center; gap: 6px;
@@ -1437,6 +1440,15 @@ canvas {
 /* Leaving is not destroying, so it does not wear the destructive colour - it
    is the same quiet key RESET was. */
 .tb-out { color: var(--ink-soft); }
+
+/* The trainer's name beside the brand. Quiet: it is who you are, not a figure
+   to read, so it sits at label weight rather than competing with the title. */
+.tb-who {
+  font-family: var(--pixel); font-size: 10px;
+  padding: 4px 8px 3px; border-radius: 8px;
+  background: var(--surface-2); color: var(--ink-soft);
+  max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 @media (max-width: 420px) {
   .gate { padding: 12px; align-content: start; }

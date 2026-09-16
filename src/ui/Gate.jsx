@@ -12,6 +12,7 @@
    moved, and the panel lost its copy - one question, one place. */
 
 import { useEffect, useRef, useState } from "react";
+import { nameProblem, NAME_MAX } from "../game/name.js";
 
 /* Both trainers, in the order `build_player` stacks them into player.png. The
    tile draws the real down-facing walk frame out of that same strip, so what is
@@ -171,17 +172,53 @@ export function Account({ onSignUp, onSignIn, offline }) {
 
 /* ------------------------------------------------------------- the trainer */
 
-export function Trainer({ onPick, busy }) {
+/* NAME AND TRAINER TOGETHER, because they are one question - who are you -
+   and splitting them would make a two-field form into two screens. The rules
+   themselves live in `game/name.js`, with the other pure rules. */
+export function Trainer({ onPick, busy, askName = false, error = null }) {
   const [pick, setPick] = useState(null);
+  const [name, setName] = useState("");
+  const [touched, setTouched] = useState(false);
+
+  const problem = askName ? nameProblem(name) : null;
+  // Only nag once they have typed something, or once they have tried to submit.
+  const shown = error ?? (touched ? problem : null);
+  const ready = pick && !problem;
+
+  const go = () => {
+    setTouched(true);
+    if (!ready) return;
+    onPick(pick, name.trim());
+  };
 
   return (
     <Shell
       step="STEP 2 OF 2"
-      title="Are you a boy, or a girl?"
-      blurb="It only changes who you see walking. You can start either way."
+      title={askName ? "Who are you?" : "Are you a boy, or a girl?"}
+      blurb={askName
+        ? "Your name is how other trainers will see you. The rest only changes who you see walking."
+        : "It only changes who you see walking. You can start either way."}
     >
+      {askName && (
+        <label className="gate-field gate-name">
+          <span>TRAINER NAME</span>
+          <input
+            type="text"
+            name="username"
+            autoComplete="nickname"
+            maxLength={NAME_MAX}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => setTouched(true)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); go(); } }}
+            placeholder="Ash"
+            aria-invalid={Boolean(shown)}
+          />
+        </label>
+      )}
+
       <div className="gate-chars" role="radiogroup" aria-label="Trainer">
-        {CHARS.map(([id, name]) => (
+        {CHARS.map(([id, label]) => (
           <button
             key={id}
             type="button"
@@ -191,18 +228,23 @@ export function Trainer({ onPick, busy }) {
             onClick={() => setPick(id)}
           >
             <span className={`gate-art ch-${id}`} aria-hidden="true" />
-            <i>{name}</i>
+            <i>{label}</i>
           </button>
         ))}
       </div>
 
-      <button
-        className="gate-go"
-        type="button"
-        disabled={!pick || busy}
-        onClick={() => onPick(pick)}
-      >
-        {busy ? "…" : pick ? "START" : "PICK ONE"}
+      {/* Holds its line either way, so the button does not jump when the first
+          thing goes wrong. */}
+      <p className="gate-note" aria-live="polite">{shown}</p>
+
+      <button className="gate-go" type="button" disabled={busy} onClick={go}>
+        {/* SAYS WHAT IS MISSING. "NAME AND TRAINER" read as a heading,
+            not a control. It stays pressable either way - pressing is how
+            you find out, and the note above carries the detail. */}
+        {busy ? "\u2026"
+          : ready ? "START"
+            : askName && nameProblem(name) ? "ENTER A NAME"
+              : "PICK A TRAINER"}
       </button>
     </Shell>
   );

@@ -195,6 +195,60 @@ export async function pull() {
   }
 }
 
+/* ------------------------------------------------------------- the profile */
+
+/* WHO YOU ARE, kept in its own table rather than inside the save blob.
+
+   The save is one opaque JSON object and nothing queries into it, which is
+   right for a dex and wrong for a name: a username has to be unique across
+   players, and uniqueness is a thing a database does with an index, not
+   something a blob can promise. It is also the row a leaderboard would join
+   against the day there is one, and it survives the save being reset.
+
+   `profiles ( user_id, username, char, created_at )`, with the shape and the
+   case-insensitive uniqueness enforced by constraints - the form checks the
+   same rules first, but the form is a convenience and the table is the rule. */
+const PROFILES = "profiles";
+
+export async function getProfile() {
+  if (!CLOUD || !session) return null;
+  try {
+    const { data, error } = await supabase
+      .from(PROFILES)
+      .select("username, char")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+    return error ? null : data;
+  } catch {
+    return null;
+  }
+}
+
+/* CREATING IT IS WHERE A DUPLICATE NAME IS CAUGHT, not a check beforehand.
+   Asking "is this free?" and then inserting is two round trips with a race
+   between them; the unique index answers both at once, and 23505 is the answer
+   to "somebody took it while you were typing". */
+export async function createProfile(username, char) {
+  if (!CLOUD || !session) return { ok: false, error: "No account server is configured." };
+  try {
+    const { error } = await supabase.from(PROFILES).insert({
+      user_id: session.user.id,
+      username: username.trim(),
+      char,
+    });
+    if (!error) return { ok: true };
+    if (error.code === "23505") {
+      return { ok: false, error: "That name is taken. Try another." };
+    }
+    if (error.code === "23514") {
+      return { ok: false, error: "Letters, numbers, spaces and dashes only." };
+    }
+    return { ok: false, error: say(error) || "Could not save that name." };
+  } catch (e) {
+    return { ok: false, error: say(e) || "Could not save that name." };
+  }
+}
+
 /* Push reports like `store.write` does - `{ ok, why }` - because the caller
    needs to say NOT SAVING when it fails, and for the same reason: a write that
    silently does nothing is the failure that costs a collection. */

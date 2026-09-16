@@ -41,6 +41,19 @@ export const BROKEN_KEY = `${SAVE_KEY}.broken`;
    Namespaced under the same prefix so clearing the game clears all of it. */
 export const RAIL_KEY = `${SAVE_KEY}:balls`;
 
+/* WHOSE SAVE THIS BROWSER IS HOLDING, and it is not a nicety.
+
+   Without it a brand-new account adopts whatever was already in the browser:
+   `newer(local, null)` returns the local save, so signing up after playing
+   offline drops you straight into the game with a trainer already chosen and
+   the onboarding skipped - which is what was reported. The worse version of the
+   same bug is signing up on somebody else's machine and inheriting their dex.
+
+   An unowned save is one made before there were accounts, or in local mode, and
+   it is still adopted - that is somebody's real offline progress. A save owned
+   by a DIFFERENT account is not. */
+export const OWNER_KEY = `${SAVE_KEY}:owner`;
+
 /* Reading never throws. A private window, cleared site data, or a browser that
    has revoked storage all arrive here as "no save", which is the same thing a
    new player is - and starting a fresh game is a better answer than a blank
@@ -70,6 +83,13 @@ export function write(key, raw) {
       || err?.name === "NS_ERROR_DOM_QUOTA_REACHED";
     return { ok: false, why: full ? "full" : "blocked" };
   }
+}
+
+/* Forget a key. Used when the browser's copy belongs to somebody else, and on
+   logging out - the account has it, and leaving it behind is handing the next
+   person at this machine a dex that is not theirs. */
+export function drop(key) {
+  try { localStorage.removeItem(key); } catch { /* nothing to clear */ }
 }
 
 /* Put a save beyond the reach of the next write. Never throws and never

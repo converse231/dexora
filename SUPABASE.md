@@ -65,6 +65,35 @@ create policy "insert own save" on public.saves for insert
   with check (auth.uid() = user_id);
 create policy "update own save" on public.saves for update
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- WHO THE PLAYER IS, in its own table rather than inside the save blob. A name
+-- has to be unique across players, and uniqueness is an index, not something a
+-- JSON blob can promise. It is also the row a leaderboard would join against,
+-- and it survives the save being reset.
+create table if not exists public.profiles (
+  user_id    uuid primary key references auth.users on delete cascade,
+  username   text not null,
+  char       text not null default 'red',
+  created_at timestamptz not null default now(),
+  -- The form checks the same rules first, but the form is a convenience and
+  -- this is the rule. check.mjs asserts the two agree.
+  constraint username_shape check (username ~ '^[A-Za-z0-9 _-]{3,16}$'),
+  constraint char_known     check (char in ('red','leaf'))
+);
+
+-- CASE-INSENSITIVELY UNIQUE. "Ash" and "ash" being two players is a problem the
+-- day anything lists them side by side, and renaming people later is worse.
+create unique index if not exists profiles_username_key
+  on public.profiles (lower(username));
+
+alter table public.profiles enable row level security;
+
+create policy "read own profile"   on public.profiles for select
+  using (auth.uid() = user_id);
+create policy "insert own profile" on public.profiles for insert
+  with check (auth.uid() = user_id);
+create policy "update own profile" on public.profiles for update
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
 </details>
