@@ -403,8 +403,22 @@ def check(area, rows, spawn):
             assert at(x, top - 1) in ("P", "X", "E", "Y"), \
                 f"{aid}: partition at ({x},{top}) hangs from {at(x, top - 1)!r}, not a wall"
 
-    # A barrel stack is one wide, one or two tall, and hangs off the foot of a
-    # bank - the real map has no free-standing barrels and neither do we.
+    # A barrel stack is one wide and one or two tall.
+    #
+    # IT DOES NOT HAVE TO HANG OFF A BANK, and asserting that it did deleted
+    # most of the Power Plant's contents. The note behind it - "41 of the real
+    # map's 54 barrels sit directly under a bank's body" - is true of metatile
+    # 53, the drum's TOP, and 53 is 54 tiles. Nobody counted 54, the drum's
+    # BODY, which is 117 tiles and sits under a bank 3% of the time: 31 of them
+    # stand on plain floor and the rest stand on each other.
+    #
+    # Together they are 171 tiles in 32 irregular clumps of one to thirteen,
+    # 8.7% of the real map, and they are most of what makes it read as a
+    # working plant rather than a plan of one. Ours had none, because this
+    # assertion refused them, and the map was reported as ugly and empty.
+    #
+    # So a stack still may not be TALLER than two, and it must still be one
+    # wide, and it may now stand where the reference stands them.
     for y in range(H):
         for x in range(W):
             if rows[y][x] != "B":
@@ -417,8 +431,8 @@ def check(area, rows, spawn):
                 bot += 1
             assert bot - top + 1 <= 2, \
                 f"{aid}: barrels at ({x},{y}) are {bot-top+1} tall; two is the most"
-            assert at(x, top - 1) in ("P", "X"), \
-                f"{aid}: barrels at ({x},{top}) stand on open floor, not against a bank"
+            assert at(x, top - 1) in ("P", "X", "B", "p", "E"), \
+                f"{aid}: barrels at ({x},{top}) stand on nothing recognisable"
 
     # A lone tile of raised shelf has no inside for the autotile to draw, so it
     # comes out as four corners and reads as a lump rather than as ground.
@@ -3161,15 +3175,88 @@ def hang_partitions(g, want, floor="p", longest=13):
 
 
 def barrels(g, x, y, n=1, tall=1):
-    """n barrel stacks side by side, hanging off the foot of the bank above.
+    """n barrel stacks side by side, hung off the foot of the bank above.
 
-    Never loose on the floor. In the real map 41 of the 54 barrels sit directly
-    under a bank's body row and the rest stand on a plinth; free-standing ones
-    read as scenery nobody attached to anything, which is how ours shipped."""
+    In the real map 41 of the 54 drum TOPS sit directly under a bank's body
+    row. The drum BODY does not - see `drum_clumps`, which is the other 117
+    tiles and the reason this map stopped looking empty."""
     for xx in range(x, x + n):
         assert g[y - 1][xx] in ("P", "X"), \
             f"barrels at ({xx},{y}) hang off nothing - the tile above is a floor"
     rect(g, "B", x, y, x + n - 1, y + tall - 1)
+
+
+def drum_clumps(g, rng, want, floor="p"):
+    """Irregular clumps of drums standing on the floor, as the real map has.
+
+    MEASURED, NOT CHOSEN: 32 clumps of one to thirteen tiles, 8.7% of FireRed's
+    Power Plant. Grown a tile at a time from a seed rather than stamped as
+    rectangles, because the reference's are ragged and a grid of blocks reads
+    as crates in a warehouse.
+
+    Nothing is placed that would cut the floor in two - the same generate-and-
+    test `hang_partitions` uses, for the same reason. A clump never touches a
+    wall either: pinned against one it reads as part of the wall rather than as
+    something standing in the room, and it can seal a corridor."""
+    H, W = len(g), len(g[0])
+
+    def free(x, y):
+        return 0 < x < W - 1 and 0 < y < H - 1 and g[y][x] == floor
+
+    def clear_of_walls(x, y):
+        return all(g[y + dy][x + dx] in (floor, "B")
+                   for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+
+    def connected():
+        start = next(((x, y) for y in range(H) for x in range(W) if g[y][x] == floor), None)
+        if not start:
+            return False
+        want_n = sum(1 for y in range(H) for x in range(W) if g[y][x] == floor)
+        seen, st = set(), [start]
+        while st:
+            x, y = st.pop()
+            if (x, y) in seen or not (0 <= x < W and 0 <= y < H) or g[y][x] != floor:
+                continue
+            seen.add((x, y))
+            st += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+        return len(seen) == want_n
+
+    made = 0
+    tries = 0
+    while made < want and tries < want * 30:
+        tries += 1
+        sx, sy = rng.randint(2, W - 3), rng.randint(2, H - 3)
+        if not (free(sx, sy) and clear_of_walls(sx, sy)):
+            continue
+        # Sizes drawn from the reference's own distribution.
+        target = rng.choice((1, 2, 2, 2, 3, 4, 4, 5, 5, 5, 6, 7, 7, 8, 8, 10, 11, 13))
+        cells, frontier = [], [(sx, sy)]
+        while frontier and len(cells) < target:
+            x, y = frontier.pop(rng.randrange(len(frontier)))
+            if not (free(x, y) and clear_of_walls(x, y)) or (x, y) in cells:
+                continue
+            cells.append((x, y))
+            g[y][x] = "B"
+            frontier += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+        # A stack is at most two tall, so a column of three is trimmed.
+        for (x, y) in list(cells):
+            n = 0
+            yy = y
+            while yy - 1 >= 0 and g[yy - 1][x] == "B":
+                yy -= 1
+            while yy + n < H and g[yy + n][x] == "B":
+                n += 1
+            if n > 2:
+                for k in range(2, n):
+                    if (x, yy + k) in cells:
+                        g[yy + k][x] = floor
+                        cells.remove((x, yy + k))
+        if not cells or not connected():
+            for (x, y) in cells:
+                g[y][x] = floor
+        else:
+            made += 1
+    return made
 
 
 def power_plant():
@@ -3310,6 +3397,18 @@ def power_plant():
     # takes any that would help, and the assertion is on the thing that actually
     # matters rather than on a count of scaffolding.
     made = hang_partitions(g, want=14)
+
+    # THE CLUTTER, AND IT IS 8.7% OF THE REFERENCE. Masking the real Power
+    # Plant settles what its walls are made of: of the solid tiles whose face
+    # you can see - floor directly below them - 85 are the machine bank's body
+    # (local 21), 77 are drums (53/54) and 32 are barrels (89). There is no
+    # interior wall tileset at all, which is why this map is banks and not
+    # rooms, and it is also why the drums matter so much: they are a third of
+    # everything you walk past and we had none of them.
+    import random as _rr
+    clumps = drum_clumps(g, _rr.Random(20260917), want=45)
+    assert clumps >= 30, f"power plant: only {clumps} drum clumps"
+
     solid_rows = sum(1 for y in range(H) for x in range(W) if g[y][x] in "PXB")
     assert solid_rows > W * H * 0.15,         f"power plant: only {solid_rows} tiles of machinery in a {W}x{H} hall"
 
