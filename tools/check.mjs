@@ -2831,6 +2831,63 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   }
   assert.equal(bornLevel(1), 0, "a base form is born at 0");
 
+  /* NO GENERATION IS COMMONER THAN ANY OTHER, and this is the suite that did
+     not exist while it was wildly false.
+
+     Reported from play - Gen 1 felt far commoner than everything else - and it
+     was. Measured at Lv 50 with all nine open, against a fair 11.1%: Gen 1 took
+     23.3% of Tall Grass, 41.8% of the Haunted Tower, 57.8% of the Power Plant
+     and 63.6% of Frost Hollow, and Gen 6 took 0.0% of the Power Plant. Two
+     separate causes, and neither would have been caught by the other's fix:
+     `DERIVED_WEIGHT` sits at 8/5/3/1 against Gen 1 commons hand-tuned at 22,
+     and `derivedHomes` sends a species to ONE best-matching map, so the
+     narrow-typed maps had generations with no residents at all - which no
+     amount of reweighting can give a share to.
+
+     A BOUND WITH A MEASUREMENT BEHIND IT. Swept over all eight maps at every
+     level from 1 to 50, the worst deviation is 24.7% - Ember's Gen 2 at 31.2%
+     against a fair 25% at Lv 20 - and every other map at every other level is
+     inside 15%. Ember is the narrowest map in the game (fire alone) and at
+     Lv 20 only four generations are open, so the four are competing over a
+     handful of residents in a mix that `BAND_SHAPE` is holding still; the fit
+     cannot make both exact and the band mix is the one that is asserted. 40%
+     is the bound, which leaves room for a ninth generation without leaving
+     room for the five-fold skew this replaced.
+
+     PRESENCE IS SEPARATE AND ABSOLUTE. A generation with nothing living in a
+     map is a different failure from one that is merely thin, it is the one
+     that reweighting cannot reach, and it is worth its own assertion. */
+  {
+    const gens = GEN_LAST.map((_, i) => i + 1);
+    let worst = 0, worstAt = "";
+    for (let lv = 1; lv <= MAX_LEVEL; lv++) {
+      for (const b of BIOMES) {
+        if (lv < (b.level ?? 1)) continue;
+        const open = gens.filter((g) => lv >= (GEN_UNLOCK[g] ?? 0));
+        const rows = encounterTable(b, lv).filter((r) => !LEGENDARY.includes(r[0]));
+        const total = rows.reduce((n, r) => n + r[1], 0);
+        const by = new Map();
+        for (const r of rows) by.set(genOf(r[0]), (by.get(genOf(r[0])) ?? 0) + r[1]);
+        for (const g of open) {
+          const share = (by.get(g) ?? 0) / total;
+          assert.ok(share > 0,
+            `${b.id} has no generation ${g} at Lv ${lv} - a generation that ` +
+            "does not live in a map cannot be given a share of it by any weight");
+          const off = Math.abs(share - 1 / open.length) * open.length;
+          if (off > worst) {
+            worst = off;
+            worstAt = `${b.id} gen ${g} at Lv ${lv} (${(share * 100).toFixed(1)}%` +
+              ` against a fair ${(100 / open.length).toFixed(1)}%)`;
+          }
+        }
+      }
+    }
+    assert.ok(worst < 0.40,
+      `a generation is ${(worst * 100).toFixed(0)}% off its fair share - ${worstAt}`);
+    console.log(`gen share ok — every one within ${(worst * 100).toFixed(0)}% of ` +
+      `fair in all ${BIOMES.length} maps, worst is ${worstAt}`);
+  }
+
   /* BAND BUDGETS: a map's rarity mix must not move when content is added.
 
      Measured before this existed and the drift was the opposite of the
