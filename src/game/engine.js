@@ -12,7 +12,7 @@ import {
   levelFromXp, xpForCatch,
   rodTable, rodBite,
   rollVariant, pityBoost, TIERS,
-  lockedTiers, wildBand, rollSize, BIOMES,
+  lockedTiers, wildBand, rollSize, BIOMES, ENCOUNTER_RATE,
 } from "./biomes.js";
 import {
   emptyStats, canSpend, catchMult, weighted, stepScale,
@@ -58,7 +58,7 @@ const RUN_SCALE = 0.7;        // Running Shoes: quicker than walking
 /* Per step, anywhere you can walk. Every walkable tile spawns - there is no
    "safe" ground - so this is far lower than a grass-only rate would be, and the
    two work out to a similar number of encounters per minute of walking. */
-const ENCOUNTER_RATE = 0.07;
+/* ENCOUNTER_RATE moved to biomes.js - see the note there. */
 
 /* Throw animation beats, taken from pret/pokefirered's pokeball.c and converted
    from frames at 60fps: arc to target, ~10f delay then the mon shrinks, ball

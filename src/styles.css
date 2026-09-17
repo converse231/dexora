@@ -158,8 +158,8 @@ body {
   .biome-tag em { font-size: 8px; }
   /* The clock is the other thing pinned to the world, and it is the same
      decision - it says one word and a time. */
-  .worldclock { padding: 4px 7px 3px; font-size: 8.5px; }
-  .worldclock b { font-size: 10px; }
+  .worldclock { padding: 4px 8px 3px; font-size: 9.5px; }
+  .worldclock b { font-size: 12px; }
 }
 
 /* ---------- layout ---------- */
@@ -1784,7 +1784,8 @@ canvas {
   padding: 0; cursor: pointer; font: inherit;
 }
 /* `:not(.mark)` so the rarity badges keep their own size - see Marks.jsx. */
-.cell img:not(.mark) { width: 88%; height: 88%; object-fit: contain; image-rendering: pixelated; }
+.cell img:not(.mark),
+.cell .sprite-showdown { width: 88%; height: 88%; object-fit: contain; image-rendering: pixelated; }
 
 /* ---- a tier moves in the grid too -------------------------------------
    `inset: 6%` on the foil, and it is not a nudge: the sprite is drawn at 88%
@@ -2692,7 +2693,8 @@ canvas {
 .sf-one.picked { box-shadow: 0 0 0 2px var(--canopy); }
 .sf-one.got:focus-visible { outline: 2px solid var(--canopy); outline-offset: 2px; }
 .sf-art { position: relative; width: 46px; height: 46px; display: grid; place-items: center; }
-.sf-art img:not(.mark) { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.sf-art img:not(.mark),
+.sf-art .sprite-showdown { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 /* Not held: a flat silhouette, so the shape is a hint and the colours are not
    given away.
 
@@ -2802,23 +2804,31 @@ canvas {
 
 /* The clock, on the map rather than in the bar of counters. Under the effect
    readout in the same corner, so the two stack instead of competing. */
-.worldclock {
+/* THE TOP-RIGHT STACK. Everything pinned to this corner goes in it, so two
+   things can never print on top of each other again - which they did, because
+   the clock dodged the effect card with a typed `top: 40px` and the card grew
+   past it. A column with a gap needs no number and cannot go stale. */
+.hud-right {
   position: absolute; right: 10px; top: 10px; z-index: 3;
-  display: flex; align-items: center; gap: 5px;
-  padding: 3px 8px; border-radius: 7px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 7px;
+  pointer-events: none;
+}
+
+.worldclock {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px 4px; border-radius: 8px;
   background: rgba(18, 26, 16, .62);
   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .35) inset;
-  font-family: var(--pixel); font-size: 9px; color: #fff;
-  font-variant-numeric: tabular-nums; pointer-events: none;
+  font-family: var(--pixel); font-size: 10.5px; color: #fff;
+  font-variant-numeric: tabular-nums;
 }
-.worldclock b { font-size: 12px; line-height: 1; font-weight: 400; }
+.worldclock b { font-size: 14px; line-height: 1; font-weight: 400; }
 .worldclock i { font-style: normal; }
 .worldclock.ph-dawn  { background: rgba(120, 72, 26, .72); }
 .worldclock.ph-day   { background: rgba(28, 64, 96, .62); }
 .worldclock.ph-dusk  { background: rgba(78, 40, 88, .72); }
 .worldclock.ph-night { background: rgba(14, 20, 44, .82); }
-/* When an effect is running the clock sits under it rather than over it. */
-.fieldbox ~ .worldclock { top: 40px; }
+/* The stack orders them; nothing here needs to know how tall the other is. */
 
 /* ---------- the world's clock ----------
 
@@ -3726,27 +3736,52 @@ button:disabled { transition: none; }
    confirming the only thing you could have started. At 9px on a 15px icon it
    was a tally mark. Each is its own card now with the count as the figure and
    the steps spelled out under it. */
+/* BIGGER THAN THE CLOCK, because it is the only thing up here that is
+   SPENDING. The time of day is ambient and the step count is a thing you are
+   burning through on something you paid for, so the two should not have been
+   the same weight - and at a 22px icon with a 13px figure the effect was the
+   quieter of the two. */
 .fieldbox {
-  position: absolute; right: 10px; top: 10px; z-index: 3;
-  display: flex; gap: 7px; pointer-events: none;
+  display: flex; gap: 8px;
   font-family: var(--pixel); font-variant-numeric: tabular-nums; color: #fff;
 }
-.fieldbox span {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 9px 4px; border-radius: 9px;
-  background: rgba(18, 26, 16, .72);
-  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .35) inset;
+/* DIRECT CHILDREN ONLY. `ItemIcon` wraps a tiered item in its own `<span>` so
+   the treatment has something to sit in - a Holo Honey is the jar with the
+   foil travelling over it - and a descendant selector styled that wrapper as a
+   second card, so the jar sat inside a little rounded box of its own. The
+   White Flute has no tier, renders a bare `<img>`, and looked fine, which is
+   what made it read as an icon problem rather than a selector one. */
+.fieldbox > span {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px 6px; border-radius: 11px;
+  background: rgba(18, 26, 16, .78);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .42) inset;
+  /* The container is click-through so the map underneath still takes a
+     pointer; the CARD is not, or its `data-tip` never fires and the tooltip
+     explaining what is running has no way to open. */
+  pointer-events: auto;
 }
-.fieldbox img { width: 22px; height: 22px; image-rendering: pixelated; }
-.fieldbox .item-fx { width: 22px; }
+.fieldbox img { width: 30px; height: 30px; image-rendering: pixelated; }
+.fieldbox .item-fx { width: 30px; }
 /* The number is the thing being read; the word is what it counts. */
-.fieldbox b { font-size: 13px; font-weight: 400; line-height: 1.1; }
-.fieldbox i { font-style: normal; font-size: 7.5px; letter-spacing: .08em; opacity: .75; }
+.fieldbox b { font-size: 17px; font-weight: 400; line-height: 1.05; }
+.fieldbox i { font-style: normal; font-size: 8.5px; letter-spacing: .08em; opacity: .8; }
 .fieldbox u { text-decoration: none; display: grid; }
 
 @media (hover: none) and (pointer: coarse) {
+  /* A phone has less room, so the card gives some back - but it stays the
+     louder of the two, which is the point of the size.
+
+     AND THEY STACK RATHER THAN SIT SIDE BY SIDE. Two cards in a row are about
+     206px, which on a 390px map runs the left-hand one straight under the
+     biome tag - measured, not guessed: `.hud-right` and `.biome-tag` overlap
+     at 400px and do not at 1440. A column cannot grow sideways, so there is
+     nothing left for it to reach. */
+  .fieldbox { flex-direction: column; align-items: flex-end; gap: 6px; }
+  .fieldbox > span { padding: 6px 10px 5px; gap: 7px; }
   .fieldbox img, .fieldbox .item-fx { width: 26px; height: 26px; }
   .fieldbox b { font-size: 15px; }
+  .fieldbox i { font-size: 8px; }
 }
 
 .minimap {
@@ -4155,4 +4190,34 @@ button:disabled { transition: none; }
        tall thin one. Pack to the top and let the overflow scroll instead. */
     align-content: start;
   }
+}
+
+
+/* SHOWDOWN: EIGHT FRAMES IN ONE PNG, STEPPED.
+
+   The same mechanism as the ball throw, and the same trap: percentage
+   `background-position` is not "scroll by p%", it aligns the p% point of the
+   IMAGE with the p% point of the BOX. With the strip at `800%` the image is
+   eight box-heights tall, so frame i sits at `100i/7`% - frames 0 to 7 land on
+   0% to 100% exactly.
+
+   `jump-none` is what makes that true: it takes eight values INCLUSIVE of both
+   ends, each held for an eighth of the run, then wraps. Plain `steps(8)` would
+   take 0, 12.5, 25 ... 87.5, which is not where the frames are, and would show
+   seven and a half of them. */
+.sprite-showdown {
+  display: block; width: 100%; height: 100%;
+  background-image: var(--strip);
+  background-repeat: no-repeat;
+  background-size: 100% 800%;
+  background-position: 0 0;
+  image-rendering: pixelated;
+  animation: showdown-idle 900ms steps(8, jump-none) infinite;
+}
+@keyframes showdown-idle {
+  from { background-position-y: 0%; }
+  to { background-position-y: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sprite-showdown { animation: none; }
 }

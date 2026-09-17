@@ -24,27 +24,30 @@
 
 import { artOf } from "../game/items.js";
 
-const FOLDER = { shiny: "shiny/", origin: "origin/" };
+const FOLDER = { shiny: "shiny/", origin: "origin/", showdown: "showdown/" };
 
-/* SHOWDOWN IS THE ONE PICTURE THIS GAME DOES NOT SHIP, and that was measured
-   rather than chosen.
+/* SHOWDOWN SHIPS NOW, AS AN EIGHT-FRAME STRIP.
 
-   It is a real animated GIF - the creature genuinely moves, which no filter
-   can do - and PokeAPI has one for about 1,005 of the dex. They average 67KB.
-   The whole of `public/sprites` is 8.9MB today; bundling these would make it
-   75MB, in the repo and in every deploy. Re-encoding them at 64px makes them
-   BIGGER (77KB), because a naive pass loses the frame diffing the originals
-   already have and there is no gifsicle here to do it properly.
+   It used to be fetched from PokeAPI's CDN at runtime, and that showed twice:
+   it loaded visibly late, and it was drawn at whatever size the source GIF
+   happened to be - so a Showdown Amaura towered over every other sprite and
+   blurred when the layout scaled it down. Both reported from play.
 
-   So they are fetched from PokeAPI's own CDN. That is a runtime dependency
-   this project otherwise does not have, and it is affordable for exactly one
-   reason: Showdown is the RAREST tier at 1/700, so a whole playthrough loads
-   a handful. `onSpriteError` below is the other half - a blocked or dead CDN
-   degrades to the ordinary sprite rather than to a broken-image icon, so the
-   worst case is a Pokemon that looks normal instead of one that looks wrong. */
-const SHOWDOWN_CDN =
-  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/";
+   `tools/build_showdown.py` carries the measurement that chose the format.
+   The short version: the raw GIFs are 78.6 MB over the dex, lossless animated
+   WebP is 35.9 MB and APNG 37.0 MB, and one PNG holding all eight frames is
+   **7.5 MB** - because a single PNG is one zlib stream over one palette and
+   eight frames of the same creature are nearly the same bytes, which per-frame
+   formats cannot exploit. Against the 8.9 MB `public/sprites` already ships,
+   that is affordable, and it buys the runtime dependency away entirely.
 
+   THE COST IS THAT A STRIP IS NOT AN `<img>`. This file's own rule - a tier's
+   look must survive as a bare `<img>` - is about the tiers that are a CSS
+   treatment, and it still holds for all seven of them. Showdown is real
+   artwork that MOVES, so it renders as a span with the strip as a background
+   and `steps()` walking it, which is the same mechanism the ball throw has
+   used since it was written. `.sprite-showdown` has to be sized wherever an
+   `img` was, which is why two rules in styles.css name it alongside `img`. */
 export const onSpriteError = (ev) => {
   const img = ev.currentTarget;
   if (img.dataset.fellBack) return;      // never loop on a second failure
@@ -72,9 +75,7 @@ export const onSpriteError = (ev) => {
    `document.baseURI` rather than a leading slash, because `vite.config.js` sets
    `base: "./"` so a build can be opened from any path. */
 export const spriteUrl = (id, variant = null) =>
-  (variant === "showdown"
-    ? `${SHOWDOWN_CDN}${id}.gif`
-    : new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png`, document.baseURI).href);
+  new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png`, document.baseURI).href;
 
 /* THE MOVING HALF OF A TIER, as one component.
 
@@ -126,6 +127,20 @@ export function VariantFx({ id, variant, art = null }) {
 export default function Sprite({
   id, variant = null, className = "", alt = "", fx = false,
 }) {
+  /* THE ONE TIER THAT IS NOT AN IMAGE. A strip in an `<img>` is eight
+     creatures stacked in a column, so this has to be a box with a background
+     - and it goes BEFORE the `fx` branch, because `VariantFx` returns null for
+     Showdown anyway and wrapping it twice would only nest two boxes. */
+  if (variant === "showdown") {
+    return (
+      <span
+        className={`sprite-showdown ${className}`.trim()}
+        style={{ "--strip": `url(${spriteUrl(id, "showdown")})` }}
+        role="img"
+        aria-label={alt}
+      />
+    );
+  }
   if (fx && variant) {
     return (
       <span className={`sprite-fx ${className}`.trim()}>

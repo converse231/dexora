@@ -854,23 +854,40 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
       assert.ok(/animation:\s*none\s*!important/.test(rule),
         "a Glitched silhouette will stutter in a cell nobody has earned");
 
-      /* 4. AND A SILHOUETTE MUST NOT COST A ROUND TRIP. The FORMS strip is the
-            only screen that draws a tier nobody owns, and exactly one tier is
-            not in this repo - Showdown comes off PokeAPI's CDN, justified in
-            Sprite.jsx by being the rarest thing in the game. Rendering it
-            unheld fetched a 67KB GIF per sheet purely to paint it black,
-            which makes that justification false. Derived from `spriteUrl`
-            rather than named here, so a second remote tier cannot slip past
-            by not being the one this was written about. */
+      /* 4. NOTHING FETCHES ITS ART OVER THE NETWORK. This used to assert that
+            exactly ONE tier did - Showdown, off PokeAPI's CDN - and that the
+            FORMS strip guarded against asking for an unheld one, because doing
+            so pulled a 67KB GIF per sheet purely to paint it black.
+
+            Showdown ships now, as an 8-frame strip (see build_showdown.py for
+            the measurement that chose the format), so the count is zero and
+            the old assertion fired on its own success. What replaces it is the
+            thing worth keeping: a game that plays with no network should not
+            grow a runtime dependency by accident, and a sprite path is exactly
+            where one creeps in. */
       const sprite = readFileSync(new URL("../src/ui/Sprite.jsx", import.meta.url), "utf8");
-      const remote = TIERS.filter((t) =>
-        new RegExp(`variant === "${t}"[\\s\\S]{0,40}CDN`).test(sprite));
-      assert.equal(remote.length, 1,
-        `${remote.length} tiers load their art from a CDN - the strip guards one`);
+      /* THE RAW SOURCE, AND NOT `stripComments` - which is the usual rule here
+         and is wrong for exactly this one check. That helper deletes from `//`
+         to end of line, so it eats the `//` of every URL it is pointed at:
+         inserting `const CDN = "https://example.com/"` to prove this assertion
+         fires left `const CDN = "https:` behind and the assertion passed. A
+         comment naming a host in prose is fine; one containing a URL would
+         trip this, and that is a trade worth making for a check whose whole
+         job is to find a URL. */
+      assert.ok(!/https?:\/\//.test(sprite),
+        "Sprite.jsx fetches art from a URL - every sprite this game draws is " +
+        "in the repo, and local mode is the game rather than a fallback");
+
+      /* AND AN UNHELD SHOWDOWN STILL DRAWS THE ORDINARY SPRITE. The reason
+         changed rather than went away: it was about the round trip, and it is
+         now about the ANIMATION. A strip renders as a span with `steps()`
+         walking it, so the `animation: none` that stops a Glitched silhouette
+         stuttering - which names `img` - cannot reach it, and an entry nobody
+         has caught would have a black shape idling in it. */
       const sheet = readFileSync(new URL("../src/ui/DexSheet.jsx", import.meta.url), "utf8");
-      assert.ok(sheet.includes(`t === "${remote[0]}" && !got(t) ? null : t`),
-        `the FORMS strip asks for an unheld ${remote[0]}, the one picture this ` +
-        "repo does not ship - it fetches a GIF over the network to paint it black");
+      assert.ok(sheet.includes('t === "showdown" && !got(t) ? null : t'),
+        "the FORMS strip asks for an unheld Showdown - a strip animates, so " +
+        "the silhouette would idle in a cell nobody has earned");
 
       /* 5. A MARK IS PROOF OF OWNERSHIP, NEVER A GREYED-OUT LABEL. The strip
             drew all nine marks and desaturated the ones you did not hold
