@@ -1462,10 +1462,6 @@ canvas {
 .gate-wait { justify-items: center; gap: 10px; text-align: center; }
 .gate-wait p { margin: 0; font-size: 13px; color: var(--ink-soft); }
 
-/* Leaving is not destroying, so it does not wear the destructive colour - it
-   is the same quiet key RESET was. */
-.tb-out { color: var(--ink-soft); }
-
 /* THE NAME IS THE TITLE NOW, so it has to survive being one: a trainer name is
    up to 16 characters where "Dexora" is six, and the bar is a flex row whose
    other items are numbers that must not be squeezed. Clipped rather than
@@ -1477,12 +1473,49 @@ canvas {
 /* Icon-only, and sized by the same rules as the text buttons beside it so the
    row keeps one baseline. The glyph is a character rather than an asset: it is
    the one control here that is not part of the game's own vocabulary. */
-.tb-set {
+/* ONE KEY IN THE CORNER, not three. Settings, log out and how-to-play were
+   each their own button up here; on a phone the row wrapped and the gear
+   landed underneath LOG OUT, and on a desktop they crowded the figures they
+   sit beside. None of the three is pressed during play. */
+.tb-menu { position: relative; }
+.tb-burger {
   cursor: pointer; line-height: 1;
   padding: 7px 9px; color: var(--ink-soft);
 }
-.tb-set span { font-size: 15px; }
-.tb-set:hover { color: var(--ink); }
+.tb-burger span { font-size: 15px; }
+.tb-burger:hover, .tb-menu.open .tb-burger { color: var(--ink); }
+
+/* Right-aligned to its button rather than left: it is the last thing in the
+   bar, so a popover growing rightwards grows off the screen. */
+.tb-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
+  min-width: 172px; display: grid;
+  background: var(--surface); border: 2px solid var(--canopy);
+  border-radius: 11px; box-shadow: 0 5px 0 rgba(47, 107, 76, .22);
+  padding: 5px; gap: 1px;
+}
+/* EVERY PROPERTY NAMED, because `.topbar button` is a class and a type and so
+   is this - a tie the cascade settles by order, but only for what is actually
+   declared. `font: inherit` was the first attempt and it inherited the PIXEL
+   font, faithfully: the bar sets it further up the tree, so "inherit" is the
+   wrong question. And an undeclared `border` simply kept the base rule's, which
+   drew a box around each row and made the menu look like three more buttons. */
+.tb-pop button {
+  cursor: pointer; text-align: left; white-space: nowrap;
+  padding: 9px 11px; border: 0; border-radius: 7px;
+  font-family: var(--body); font-size: 13.5px; font-weight: 400;
+  color: var(--ink); background: none;
+}
+.tb-pop button:hover { border-color: transparent; }
+.tb-pop button:hover { background: var(--surface-2); }
+.tb-pop button:focus-visible { outline: 2px solid var(--canopy); outline-offset: -2px; }
+/* Leaving is not destroying - it is the quiet key RESET was - so it is set
+   apart by a rule rather than by colour, and only says the word. */
+.tb-pop button.tb-danger {
+  border-top: 2px solid var(--line); margin-top: 3px; padding-top: 10px;
+  border-radius: 0 0 7px 7px;
+}
+.tb-pop button.tb-danger:hover { color: var(--path); border-top-color: var(--line); }
 
 @media (max-width: 420px) {
   .gate { padding: 12px; align-content: start; }
@@ -1558,13 +1591,6 @@ canvas {
 .tk-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .tk-name { font-family: var(--display); font-weight: 600; font-size: 15px; }
 .tk-blurb { font-size: 11.5px; color: var(--ink-soft); line-height: 1.4; }
-.tk-toggle {
-  font-family: var(--pixel); font-size: 10px; padding: 8px 10px 6px;
-  border: 2px solid var(--line-firm); border-radius: 9px;
-  background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
-}
-.tk-toggle.on { background: var(--canopy); border-color: var(--canopy); color: var(--paper); }
-
 /* A hint that turns into a real button when there is something to press. */
 .hint-act {
   font: inherit; color: var(--ink); cursor: pointer;
@@ -2076,6 +2102,145 @@ canvas {
 @media (max-width: 360px) {
   .set-row { grid-template-columns: 1fr; gap: 6px; }
   .set-hint, .set-row .note { grid-column: 1; }
+}
+
+/* THE BAG, ON TOUCH. A sheet off the bottom edge rather than a centred card:
+   it is opened by a thumb on the pad and it is dismissed by one, so it belongs
+   at the end of the same reach. It also leaves the top of the screen - where
+   the Pokemon is - alone, which is the whole complaint against the rail.
+
+   Its own backdrop rather than `.sheet`, because that one centres its child
+   and this one must sit at the bottom whatever height it comes to. */
+.bagsheet {
+  position: fixed; inset: 0; z-index: 75;
+  display: flex; align-items: flex-end;
+  background: rgba(26, 48, 36, .45);
+  animation: battle-in .16s ease-out;
+}
+/* Hidden on a fine pointer for the same reason the rail is hidden on a coarse
+   one: exactly one of the two is the right control for a device, and the pad
+   that opens this does not exist here anyway. */
+@media (hover: hover) and (pointer: fine) {
+  .bagsheet { display: none; }
+}
+
+.bag-card {
+  width: 100%; max-height: 72vh; overflow-y: auto;
+  background: var(--surface);
+  border-top: 3px solid var(--canopy);
+  border-radius: 18px 18px 0 0;
+  padding: 7px 0 max(14px, env(safe-area-inset-bottom));
+  animation: bag-up .18s ease-out;
+}
+@keyframes bag-up { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .bag-card { animation: none; }
+  .bagsheet { animation: none; }
+}
+
+/* The grab handle every bottom sheet has. Decoration, but the kind that says
+   which edge the thing came from and therefore which way it goes back. */
+.bag-grip {
+  width: 38px; height: 4px; margin: 0 auto 6px;
+  border-radius: 2px; background: var(--line-firm);
+}
+.bag-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px 8px;
+}
+.bag-head h3 {
+  flex: 1; margin: 0; font-family: var(--display); font-weight: 600; font-size: 17px;
+}
+.bag-x {
+  cursor: pointer; padding: 3px 7px; line-height: 1;
+  font-size: 14px; color: var(--ink-soft);
+}
+
+/* SIDEWAYS AND SNAPPING. Eleven balls do not fit across a phone, and stacking
+   them makes the sheet tall enough to cover the Pokemon it is about. A
+   horizontal scroller IS a swipe on a touch screen with no gesture code, and
+   the snap is what stops it resting half on a tile. The side padding is on the
+   list so the first and last tiles can still reach the middle. */
+.bag-row {
+  display: flex; gap: 8px; margin: 0; padding: 2px 14px 12px;
+  list-style: none; overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+}
+.bag-row > li { flex: none; scroll-snap-align: center; }
+.bag-kit { padding-top: 10px; border-top: 2px solid var(--line); }
+
+.bag-tile {
+  position: relative; cursor: pointer;
+  width: 74px; min-height: 84px;
+  display: grid; justify-items: center; align-content: start; gap: 2px;
+  padding: 8px 4px 6px;
+  border: 2px solid var(--line-firm); border-radius: 12px;
+  background: var(--surface-2); color: var(--ink);
+}
+.bag-tile img { width: 30px; height: 30px; image-rendering: pixelated; }
+.bag-name {
+  font-size: 10px; line-height: 1.15; text-align: center; color: var(--ink-soft);
+  /* Two lines, then clipped. "Repel" and "Silver Nanab Berry" share this row. */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bag-tile em {
+  font-style: normal; font-family: var(--pixel); font-size: 10px; color: var(--ink);
+}
+.bag-tile:disabled { opacity: .38; cursor: default; }
+.bag-tile:active:not(:disabled) { transform: translateY(1px); }
+.bag-tile:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.bag-tile.on { border-color: var(--canopy); background: var(--path-soft); }
+.bag-tile.full { opacity: .45; }
+.bag-tile.master { border-color: #b57ae0; }
+.bag-tile.boosted { border-color: var(--canopy); }
+.bag-boost {
+  position: absolute; top: 4px; right: 5px;
+  font-family: var(--pixel); font-size: 8.5px; color: var(--canopy);
+}
+/* Same pop the rail has, and keyed on a counter for the same reason: a flag
+   that is already true cannot say "again". */
+.bag-pop {
+  position: absolute; inset: -3px; border-radius: 13px;
+  border: 2px solid var(--canopy); animation: br-pop .42s ease-out forwards;
+}
+.bag-none {
+  margin: 0; padding: 0 14px 6px;
+  font-size: 12px; line-height: 1.45; color: var(--ink-faint);
+}
+
+/* HOW TO PLAY. Built on `.sheet` and shaped like `.settings`, because it is
+   the menu's other dialog and two dialogs off one menu that look like
+   different apps is how an interface stops being one. */
+.helpcard {
+  width: min(430px, 100%); display: flex; flex-direction: column;
+  max-height: min(86vh, 660px);
+  background: var(--surface); border: 3px solid var(--canopy);
+  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  overflow: hidden;
+}
+.hp-body { overflow-y: auto; padding: 4px 15px 16px; }
+.hp-body h4 {
+  margin: 12px 0 6px; font-family: var(--pixel); font-size: 9.5px;
+  letter-spacing: .06em; color: var(--ink-faint);
+}
+
+/* A definition list, laid out as a grid so every description starts on the
+   same line however wide the keys beside it happen to be - `max-content` over
+   the whole column, which is the one thing a per-row flex cannot do. */
+.hp-list { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 7px 12px; }
+.hp-row { display: contents; }
+.hp-list dt { display: flex; gap: 3px; align-items: center; }
+.hp-list dd { margin: 0; font-size: 13px; line-height: 1.4; color: var(--ink-soft); }
+.hp-list kbd {
+  font-family: var(--pixel); font-size: 9px; line-height: 1;
+  padding: 5px 5px 4px; min-width: 9px; text-align: center;
+  border: 2px solid var(--line-firm); border-radius: 6px;
+  background: var(--surface-2); color: var(--ink);
+}
+.hp-note {
+  margin: 14px 0 0; padding-top: 12px; border-top: 2px solid var(--line);
+  font-size: 12.5px; line-height: 1.5; color: var(--ink-soft);
 }
 
 .confirm {
@@ -2659,51 +2824,74 @@ canvas {
 
 /* ---------- the top bar on a narrow screen ----------
 
-   It wrapped into three ragged rows: brand and level, then five stat tiles
-   squeezed against each other, then RESET alone on the last line looking like
-   the primary action on the page. Three problems, all from the same cause -
-   a single flex row with `wrap` has no idea which of its children belong
-   together.
+   IT WAS FOUR ROWS AND IT IS TWO. Identity, then the quest on a line of its
+   own, then five stat tiles, then whatever button was left over - on a 390px
+   phone that was a third of the screen spent on a header, above a map that
+   had to share what was left with a d-pad. Reported as "so big", with the
+   settings key overlapping LOG OUT underneath it, which was the same fault
+   seen from the other end: the corner held three controls and fits one.
 
-   So on a phone it is a GRID with named rows: identity across the top, the
-   five figures in an even row of their own underneath. The tiles stop being
-   right-aligned and divider-ruled (which only reads when they are on one line
-   with room) and become evenly-spaced centred columns, which is what a row of
-   five small numbers wants. */
+   Two changes carry it. The three corner keys became one menu (`.tb-menu`),
+   which is a component change rather than a CSS one. And the quest moved UP
+   onto the identity row instead of taking a line - it is a chip, it was never
+   a row's worth of content, and it only had one because a flex bar with
+   `wrap` has no idea which of its children belong together.
+
+   So: a GRID with named rows. Name, level, quest and the menu across the top;
+   the five figures in an even row underneath. */
 @media (max-width: 560px) {
   .topbar {
-    display: grid; grid-template-columns: auto 1fr auto;
-    gap: 8px 10px; padding: 9px 11px; align-items: center;
+    display: grid; grid-template-columns: auto 1fr auto auto;
+    gap: 7px 8px; padding: 7px 10px; align-items: center;
   }
   /* Placed by class, never by sibling order - the bar has six children and
      which one follows which is not a thing to build a layout on. */
-  .tb-brand { grid-column: 1; grid-row: 1; }
-  .topbar .title { font-size: 18px; }
-  .topbar .tb-lv { grid-column: 2; grid-row: 1; }
-  .topbar .missions { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+  .tb-brand { grid-column: 1; grid-row: 1; min-width: 0; }
+  .topbar .title { font-size: 16px; max-width: 9ch; }
+  .topbar .tb-lv { grid-column: 2; grid-row: 1; min-width: 0; }
+  .topbar .missions { grid-column: 3; grid-row: 1; }
+  .topbar .tb-menu { grid-column: 4; grid-row: 1; }
   .topbar .spacer { display: none; }
 
+  /* THE LEVEL CHIP IS WHAT GIVES WAY. It is the only thing on the row that can
+     shrink without losing information: the bar is a picture of the number
+     beside it, so it can be as narrow as it likes, and the "/140 XP" tail is
+     the same fact the bar already draws. */
+  .tb-lv { padding: 4px 8px; gap: 6px; }
+  /* NOWRAP, because the chip is allowed to be narrow and "LV" is not allowed
+     to leave its number behind. At 320px it broke onto a second line and took
+     the whole header row's height with it - the one thing this block exists
+     to stop. The bar is what gives way instead; it has a `min-width` and no
+     text to lose. */
+  .tb-lv-num { font-size: 9px; white-space: nowrap; }
+  .tb-lv-xp { display: none; }
+  .xpbar { min-width: 26px; }
+
   .tb-stats {
-    grid-column: 1 / -1; grid-row: 3;
+    grid-column: 1 / -1; grid-row: 2;
     display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
   }
   .tb-stat {
-    align-items: center; padding: 3px 2px;
+    align-items: center; padding: 2px 1px;
     border-left: 2px solid var(--line);
   }
-  .tb-stat i { font-size: 7px; letter-spacing: .06em; }
-  .tb-stat b { font-size: 15px; }
-  .tb-stat b u { font-size: 10px; }
+  .tb-stat i { font-size: 6.5px; letter-spacing: .04em; }
+  .tb-stat b { font-size: 13px; gap: 2px; }
+  .tb-stat b u { font-size: 8.5px; }
+  .tb-candy { width: 12px; height: 12px; }
 
-  /* RESET IS NOT THE PRIMARY ACTION ON THIS PAGE, and on its own row it looked
-     like one. It is the only destructive control in the game, so it goes back
-     to the size of what it is: a corner key, top right, out of the reading
-     order of the figures. */
-  .topbar > button {
-    grid-column: 3; grid-row: 1; justify-self: end;
-    padding: 5px 9px 4px; font-size: 9px;
-  }
-  .tb-stale { grid-column: 1 / -1; grid-row: 4; margin: 0; }
+  .tb-burger { padding: 5px 7px; }
+  .tb-stale { grid-column: 1 / -1; grid-row: 3; margin: 0; }
+}
+
+/* And the narrowest phones still in use are 320px, where five columns of
+   figures is five columns of nothing. The two that are progress rather than
+   a decision stand down - a dex count and a purse are what you act on, and
+   `caught` and `steps` are both on the YOU panel. */
+@media (max-width: 380px) {
+  .topbar .title { max-width: 7ch; font-size: 15px; }
+  .tb-stats { grid-template-columns: repeat(3, 1fr); }
+  .tb-stat.tb-extra { display: none; }
 }
 
 @media (max-width: 720px) {
@@ -2821,9 +3009,28 @@ canvas {
   /* The face labels carry the meaning - "A" alone is only legible to somebody
      who already knows the console - so they are a step up from the mini rows. */
   .pad-a i, .pad-b i { font-size: 9px; }
-  .pad-a { background: var(--canopy); border-color: var(--canopy); color: var(--surface); }
+  /* `button.pad-a`, AND THE EXTRA TYPE IS THE WHOLE POINT. `.pad button` is a
+     class and a type (0,1,1); `.pad-a` alone is one class (0,1,0), so the base
+     rule out-specified it and the A button has been wearing the DISABLED fill
+     since the pad was written - the one control on the screen that is the
+     primary action, drawn as the one that does nothing. Nothing failed, no
+     rule was missing, and it only showed up when somebody measured the
+     computed background instead of looking at a 390px screenshot. */
+  .pad button.pad-a {
+    background: var(--canopy); border-color: var(--canopy); color: var(--surface);
+  }
   .pad-a b, .pad-a i { color: var(--surface); }
-  .pad-a:disabled { background: var(--surface-2); border-color: var(--line-firm); }
+  /* A GESTURE NOBODY IS TOLD ABOUT IS A DELETED FEATURE, and holding A is the
+     only way to throw anything but the cheapest ball now the rail is gone from
+     touch. Three dots is the smallest thing that reads as "there is more
+     here"; the label and `Help` carry the words. */
+  .pad-more {
+    position: absolute; top: 7px; right: 0; left: 0;
+    font-size: 8px; letter-spacing: .12em; line-height: 1;
+    color: var(--surface); opacity: .65; text-decoration: none;
+  }
+  .pad-a { position: relative; }
+  .pad button.pad-a:disabled { background: var(--surface-2); border-color: var(--line-firm); }
   .pad-a:disabled b, .pad-a:disabled i { color: var(--ink-soft); }
 
   /* A TABLET HAS ROOM AND A WIDER GRIP. Bigger targets, pushed further apart -
@@ -3535,6 +3742,15 @@ button:disabled { transition: none; }
 .ballwrap {
   position: absolute; inset: 0; z-index: 12;
   pointer-events: none; container-type: inline-size;
+}
+/* AND IT IS A DESKTOP CONTROL. On a phone the rail is permanently in front of
+   the map, over the third of it a Pokemon stands in, with tiles sized for a
+   mouse - the most screen in the game spent on the thing you look at least.
+   `Bag.jsx` replaces it there, summoned rather than resident. Gated on the
+   pointer and never on width, the same rule `.pad` follows: a width query
+   would strip the rail from a narrow desktop window, where it works fine. */
+@media (hover: none) and (pointer: coarse) {
+  .ballwrap { display: none; }
 }
 .ballrail {
   position: absolute; left: 3%; top: max(92px, 9.5cqw);

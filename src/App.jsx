@@ -10,10 +10,12 @@ import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
 import Settings from "./ui/Settings.jsx";
+import Help from "./ui/Help.jsx";
+import Bag from "./ui/Bag.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import {
-  BALLS, FAMILIES, fieldById, canRun, stepReward,
+  BALLS, FAMILIES, fieldById, stepReward,
 } from "./game/items.js";
 import { ItemIcon } from "./ui/Sprite.jsx";
 import {
@@ -49,9 +51,9 @@ const readRail = () => read(RAIL_KEY) !== "0";
 
 /* The keyboard listeners are on `window`, so they fire wherever focus is - and
    the Dex and Box both have a search field. Typing "pidgey" walked the trainer
-   two tiles left and one down, "b" got on the bicycle, "f" cast a rod into the
-   grass, and holding shift for a capital broke into a run. Encounters would
-   start while you were trying to look something up.
+   two tiles left and one down, "f" cast a rod into the grass, and holding
+   shift for a capital broke into a run. Encounters would start while you were
+   trying to look something up.
 
    So: if the keystroke belongs to a text field, it is not a game input. */
 const typing = (ev) => {
@@ -83,6 +85,14 @@ export default function App({
      knowing before leaving: whether everything reached the server. */
   const [leaving, setLeaving] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [help, setHelp] = useState(false);
+  /* THE TOUCH BAG, and it is deliberately not the rail's `ballsOpen`. That one
+     is a desktop preference and is PERSISTED - the rail remembers whether you
+     left it open. This is a sheet you summon and dismiss, it starts closed
+     every time, and only one of the two is ever on screen: the rail is hidden
+     on a coarse pointer and the pad that opens this only exists there.
+     `null` | `"all"` (the BAG key) | `"balls"` (holding A). */
+  const [bagView, setBagView] = useState(null);
   /* "See in Box" crosses two components that do not know each other: the sheet
      lives here and the tab lives in the Rail. A species id parked here is the
      smallest thing that can travel between them, and the Rail clears it once it
@@ -129,8 +139,8 @@ export default function App({
         /* R for run, as well as Escape. Escape is the correct key for
            "dismiss this" and stays; R is the one a hand already on WASD can
            reach without looking, and it is what the word on the button says.
-           `r` is not a movement key and not taken by fishing (F) or the bike
-           (B), so nothing had to move to make room. */
+           `r` is not a movement key and not taken by fishing (F), so nothing
+           had to move to make room. */
         } else if (enc.phase === "idle"
                    && (ev.key === "Escape" || ev.key === "r" || ev.key === "R")) {
           ev.preventDefault();
@@ -142,15 +152,10 @@ export default function App({
       // A line is out: the cast owns the next second and a half.
       if (e.state.fishing) return;
 
-      // Out on the map: cast a rod, or get on and off the bike.
+      // Out on the map: cast a rod.
       if (ev.key === "f" || ev.key === "F") {
         ev.preventDefault();
         e.fish();
-        return;
-      }
-      if (ev.key === "b" || ev.key === "B") {
-        ev.preventDefault();
-        e.toggleBike();
         return;
       }
 
@@ -301,6 +306,25 @@ export default function App({
         />
       )}
 
+      {/* Touch only - see `.bagsheet` in styles.css, gated on the same coarse
+          pointer the pad is. An encounter does NOT open it by itself the way
+          an encounter pins the rail open: the rail lives down one edge and
+          this covers the bottom third, which is where the Pokemon is. */}
+      {bagView && (
+        <Bag
+          bag={st?.bag}
+          enc={enc}
+          field={st?.field}
+          view={bagView}
+          onThrow={enc?.phase === "idle" ? (id) => engine.throwBall(id) : null}
+          onUseField={(id) => engine.useField(id)}
+          onUseBerry={(id) => engine.useBerry(id)}
+          onClose={() => setBagView(null)}
+        />
+      )}
+
+      {help && <Help onClose={() => setHelp(false)} />}
+
       {settings && account && (
         <Settings
           account={{ ...account, caught }}
@@ -342,6 +366,7 @@ export default function App({
         onReset={onLogOut ? null : () => engine?.reset()}
         onLogOut={onLogOut ? () => setLeaving(true) : null}
         onSettings={account ? () => setSettings(true) : null}
+        onHelp={() => setHelp(true)}
         trainerName={trainerName}
       />
 
@@ -488,15 +513,7 @@ export default function App({
             <button className="hint hint-act" onClick={() => engine.fish()}>
               <b>{rod.name}</b> ready — <kbd>F</kbd> to cast
             </button>
-          ) : (
-            <div className="hint">
-              ARROW KEYS OR WASD TO WALK · ANYWHERE CAN SPAWN
-              {st?.biking && <> · <b>RIDING</b> <kbd>B</kbd></>}
-              {!st?.biking && canRun(level, st?.bag) && (
-                <> · <b className={st?.running ? "lit" : ""}>RUN</b> <kbd>SHIFT</kbd></>
-              )}
-            </div>
-          )}
+          ) : null}
 
           {/* Touch only - see `.pad` in styles.css. It drives the same engine
               calls the keyboard does and adds no action of its own. */}
@@ -505,8 +522,9 @@ export default function App({
             state={st}
             enc={enc}
             level={level}
-            bagOpen={ballsOpen}
-            onBag={toggleBalls}
+            bagOpen={bagView === "all"}
+            onBag={() => setBagView((v) => (v === "all" ? null : "all"))}
+            onPickBall={() => setBagView("balls")}
           />
         </div>
 
@@ -526,7 +544,6 @@ export default function App({
           jumpTo={boxJump}
           onJumped={() => setBoxJump(null)}
           onSpend={(id) => engine.spend(id)}
-          onBike={() => engine.toggleBike()}
           /* The three save-file calls, handed over as one object so the panel
              does not need the engine itself. */
           save={engine && {

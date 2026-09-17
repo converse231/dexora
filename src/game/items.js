@@ -427,8 +427,6 @@ export const artOf = (item) => item?.art ?? item?.id ?? "";
 export const KEY_ITEMS = [
   { id: "old-rod", name: "Old Rod", price: 0, level: 4,
     blurb: "Fish any shoreline. Mostly Magikarp, but it is a start." },
-  { id: "bicycle", name: "Bicycle", price: 0, level: 8,
-    blurb: "Twice the walking speed. Press B to get on and off." },
   { id: "good-rod", name: "Good Rod", price: 0, level: 14,
     blurb: "A wider catch off the same shore." },
   { id: "running-shoes", name: "Running Shoes", price: 0, level: 15,
@@ -471,6 +469,27 @@ export const SHOP_BALLS = BALLS.filter(forSale);
 
 // Everything the game can name, whether or not it is for sale.
 export const ALL_ITEMS = [...BALLS, ...STONES, ...KEY_ITEMS, ...FIELD, ...BERRIES];
+
+/* WHAT THE BAG SHOWS, asked in one place because two screens now ask it.
+
+   The rail down the left edge and the sheet the touch pad opens are the same
+   inventory drawn twice, and the rules about what appears in it are exactly
+   the sort of one-liner that gets copied and then fixed in one copy: this file
+   already records a shiny surviving one bulk action and not its sibling, and
+   Hoenn shipping with no evolutions because a second list of ranges drifted.
+
+   A ball you have never owned stays hidden - the Master Ball always did, and
+   the four situational ones joined it, because seven tiles of zeroes is a shop
+   you cannot buy from rather than a bag readout. */
+export const carriedBalls = (bag) =>
+  BALLS.filter((b) => !b.hideWhenEmpty || (bag?.[b.id] ?? 0) > 0);
+
+/* And the other strip: one row of things you can press RIGHT NOW, never a row
+   of things you cannot. On the map that is the field items - is a repel worth
+   starting before I cross this - and in front of a Pokemon it is the berries,
+   because a repel is no longer a decision you can act on. */
+export const usefulItems = (bag, enc) =>
+  (enc ? BERRIES : FIELD).filter((i) => (bag?.[i.id] ?? 0) > 0);
 export const SHOP_ITEMS = [...SHOP_BALLS, ...BERRIES, ...FIELD, ...STONES];
 export const itemById = (id) => ALL_ITEMS.find((i) => i.id === id);
 

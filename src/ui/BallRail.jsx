@@ -18,7 +18,7 @@
 
 import { useState } from "react";
 import {
-  BALLS, BERRIES, FIELD, liveMult, forSale, berryById, berryRoom,
+  BALLS, liveMult, forSale, berryRoom, carriedBalls, usefulItems,
 } from "../game/items.js";
 import { ItemIcon } from "./Sprite.jsx";
 
@@ -26,15 +26,9 @@ export default function BallRail({
   bag, enc, field, onThrow, onUseField, onUseBerry, open, onToggle, pinned,
 }) {
   /* THE OTHER HALF OF THE BAG, and it is the same rail because it is the same
-     question at two different moments. Out on the map the useful stack is the
-     field items - is a repel worth starting before I cross this. In front of a
-     Pokemon it is the berries, and the field items are no longer a decision
-     you can act on. So the strip swaps rather than growing: one row of things
-     you can press right now, never a row of things you cannot.
-
-     Owned-only, like the situational balls above them. Eleven greyed-out tiles
-     is not an inventory readout, it is a shop you cannot buy from. */
-  const useful = (enc ? BERRIES : FIELD).filter((i) => (bag?.[i.id] ?? 0) > 0);
+     question at two different moments - see `usefulItems`, which the touch
+     sheet asks as well so the two cannot answer differently. */
+  const useful = usefulItems(bag, enc);
   // One slot per effect, so several can be in play at once.
   const fed = enc?.berries ?? null;
   // Which family slot each field item would land in, so a running one can say
@@ -58,11 +52,9 @@ export default function BallRail({
        worse than no animation, because it is a lie about state. */
     if (ok !== false) setPop((p) => ({ id: item.id, n: p.n + 1 }));
   };
-  /* A ball you have never owned stays hidden - the Master Ball always did, and
-     the four situational ones joined it, because seven tiles of zeroes is not a
-     bag readout. The hotkey is read off BALLS rather than off what is on
-     screen, so hiding one never shifts anybody else's. */
-  const carried = BALLS.filter((b) => !b.hideWhenEmpty || (bag?.[b.id] ?? 0) > 0);
+  /* The hotkey is read off BALLS rather than off what is on screen, so hiding
+     one never shifts anybody else's. */
+  const carried = carriedBalls(bag);
   const total = BALLS.reduce((n, b) => n + (bag?.[b.id] ?? 0), 0);
   const live = Boolean(onThrow);
 

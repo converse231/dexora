@@ -202,6 +202,34 @@ when the save WAS the account. With one it is a button that destroys a synced
 collection and calls it a preference. Reset survives only in local mode, where
 there is nothing to log out of.
 
+**THE CORNER HELD THREE BUTTONS AND FITS ONE.** Settings, log out and how-to-play
+were separate keys in the top right; on a phone the row wrapped and the gear
+landed underneath LOG OUT. None of the three is pressed while playing, which is
+the argument: they are the menu, and the menu is one button. **One menu at every
+width** rather than a burger below a breakpoint - the alternative was rendering
+the controls twice and letting CSS choose, and two copies of a thing drift.
+**The quest stays out of it**: that is checked and claimed during play and
+carries a dot when it is ready, and behind a burger it would be the YOU tab
+again, which is where it was when nobody could find it.
+
+**THE HEADER WAS FOUR ROWS ON A PHONE AND IS TWO.** Identity, then the quest on
+a line of its own, then five stat tiles, then whatever button was left over -
+a third of the shortest screen in the game, above a map sharing what was left
+with a d-pad. The menu took one row and the quest moved up onto the identity
+row, where it always fitted: it is a chip, and it only had a line of its own
+because a flex bar with `wrap` has no idea which children belong together. It
+is a GRID with named rows now. Below 380px the two figures that are progress
+rather than a decision (`caught`, `steps`) stand down; both are on the YOU
+panel.
+
+**AND THE CONTROLS CAPTION IS A DIALOG.** "ARROW KEYS OR WASD TO WALK · ANYWHERE
+CAN SPAWN · RUN SHIFT" was three kinds of sentence wearing one style, pinned
+permanently under the map to be read once and looked past forever - and on a
+phone it sat in the gap between the map and the d-pad explaining a keyboard
+nobody there has. The controls are `Help.jsx`, off the menu; the rule about the
+world was already the first contextual hint. **A reference nobody needs twice
+should be reachable, not resident.**
+
 **A TIP IS A DIALOG, NOT A BAR.** The hints started in the flow, on the theory
 that a tip should never cover what it describes - and a tip somebody scrolls
 past is a tip nobody read. It takes the modal lock, which is what makes it
@@ -1852,7 +1880,7 @@ screenshot cannot show you.
 
 **Window key listeners play the game while you type.** The Dex and Box both have
 a search field and the handlers are on `window`: typing "pidgey" walked the
-trainer, `b` got on the bicycle, `f` cast a rod into the grass, and shift for a
+trainer, `f` cast a rod into the grass, and shift for a
 capital broke into a run - encounters started while you were looking something
 up. `typing(ev)` in `App.jsx` bails on INPUT/TEXTAREA/SELECT/contentEditable.
 **Key releases are deliberately NOT gated**: releasing a key that was never
@@ -1976,6 +2004,27 @@ Shift and because a toggle leaves the trainer sprinting after the thumb has
 gone. Mid-animation both are SKIP, which is what the keyboard already does with
 any key at all.
 
+**TAP THROWS, HOLD CHOOSES**, which is how A grew the one action the keyboard
+has and the pad did not: keys 1-9 pick a ball, and with the rail gone from
+touch there was no way to throw anything but the cheapest. A fifth button was
+the alternative, on a pad that has four.
+
+**AND THE HOLD FLAG LIVES IN A REF.** The engine calls `changed()` freely - a
+step lands, an animation ticks - so `Pad` re-renders between the pointer going
+down and coming up. Closing over two locals meant the release read a fresh
+`taken === false` and threw a ball behind the picker it had just opened: two
+actions from one press, on the one control in the game that spends an item.
+`useRef` is declared ABOVE the `if (!engine) return null`, because a hook after
+an early return is a hook that sometimes does not run.
+
+**THE BICYCLE IS GONE.** It was a second answer to "go faster" - a toggle where
+the shoes are held, so two mental models for one idea - it silently won whenever
+both were on, and it cost a face button. `Running Shoes` is the whole speed
+story now. A save that still carries `bicycle` in its bag keeps a key nothing
+reads, which is cheaper than a migration; check.mjs asserts the word appears in
+no CODE (comments stripped, the repel rule's trick), because this repo explains
+its deletions.
+
 **IT ADDS NO ACTION THE KEYBOARD DOES NOT HAVE**, and that is what keeps the two
 from drifting - every button re-dials a call `App.jsx`'s key handler already
 makes. The BAG button is the same `BallRail` the map already has, toggled, not
@@ -1997,6 +2046,33 @@ landscape tablet, where it is the only control there is.
 LIVE engine. Nothing else can see it: the pad renders only on a coarse pointer,
 so a mistyped method is invisible on every machine this is developed on and is a
 dead button on the one device it ships to.
+
+**ONE BAG PER POINTER, AND THEY ARE OPPOSITES.** The rail down the left edge is
+the desktop inventory; `Bag.jsx` - a sheet off the bottom edge, summoned by the
+BAG key or by holding A - is the touch one. On a phone the rail was permanently
+in front of the map, over the third of it a Pokemon stands in, with tiles sized
+for a mouse: the most screen in the game spent on the thing you look at least.
+Both gated on the POINTER and never on width, the rule `.pad` already followed.
+Both on at once is two bags disagreeing; neither is a phone with no way to reach
+a berry, so check.mjs asserts the two gates.
+
+**And they ask `carriedBalls` and `usefulItems`**, which is why those live in
+`items.js`. Which balls hide until owned and which items are worth showing right
+now are one-liners, and a one-liner copied into a second screen is how this repo
+shipped a shiny protected from one bulk action and not its sibling.
+
+**AN ENCOUNTER PINS THE RAIL OPEN AND MUST NOT OPEN THE SHEET.** The rail lives
+down one edge and can afford to; the sheet covers the bottom third, which is
+where the Pokemon is.
+
+**`.pad button` IS A CLASS AND A TYPE, AND `.pad-a` WAS ONE CLASS.** So the base
+rule out-specified it and the A button wore the DISABLED fill from the day the
+pad was written - the primary action on the screen, drawn as the one that does
+nothing. Nothing failed, no rule was missing, and no screenshot at 390px made it
+obvious; it took reading the computed background off a real render. It is
+`.pad button.pad-a` now and check.mjs asserts the extra type. **When a rule
+that plainly exists is not applying, measure the computed value before editing
+the declaration.**
 
 ## One tooltip, and it is an attribute
 

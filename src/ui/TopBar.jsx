@@ -80,9 +80,90 @@ function Missions({ daily, onClaim, note }) {
   );
 }
 
+/* THE CORNER HELD THREE BUTTONS AND FITS ONE.
+
+   Settings, log out and - once there was somewhere to put it - how to play,
+   all as separate keys in the top right. On a phone that row wrapped and the
+   gear ended up underneath LOG OUT, which is the bug this was reported as; on
+   a desktop it merely crowded the figures it sits beside. None of the three is
+   something you press while playing, which is the whole argument: they are the
+   menu, and the menu is one button.
+
+   ONE MENU AT EVERY WIDTH rather than a burger below some breakpoint. The
+   alternative was rendering the controls twice and letting CSS choose, and
+   this file already carries the note about why there is exactly one `Daily`
+   card - two copies of a thing drift, and the second one is always the one
+   nobody updates.
+
+   THE QUEST STAYS OUT OF IT. That is a thing you check and claim during play,
+   and it carries a dot when it is ready; buried behind a burger it would be
+   the YOU tab again, which is where it was when nobody could find it. */
+function Menu({ onSettings, onHelp, onLogOut, onReset }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+
+  // Click away and Escape, the same as `Missions` - this sits over a game that
+  // reads the keyboard, and a panel you cannot dismiss is one people leave up.
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (ev) => { if (!box.current?.contains(ev.target)) setOpen(false); };
+    const esc = (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); setOpen(false); } };
+    addEventListener("pointerdown", away);
+    addEventListener("keydown", esc, true);
+    return () => {
+      removeEventListener("pointerdown", away);
+      removeEventListener("keydown", esc, true);
+    };
+  }, [open]);
+
+  // Every item closes the menu first, so the dialog it opens is not underneath
+  // a popover that is still listening for the click that dismisses it.
+  const run = (fn) => () => { setOpen(false); fn(); };
+
+  return (
+    <div className={`tb-menu${open ? " open" : ""}`} ref={box}>
+      <button
+        type="button"
+        className="tb-burger"
+        aria-expanded={open}
+        aria-label={open ? "Close the menu" : "Menu"}
+        data-tip="Settings, help, log out"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span aria-hidden="true">{open ? "\u2715" : "\u2630"}</span>
+      </button>
+
+      {open && (
+        <div className="tb-pop" role="menu">
+          <button type="button" role="menuitem" onClick={run(onHelp)}>
+            How to play
+          </button>
+          {onSettings && (
+            <button type="button" role="menuitem" onClick={run(onSettings)}>
+              Settings
+            </button>
+          )}
+          {/* One or the other, never both - see App. Reset only survives in
+              local mode, where there is no account to leave. */}
+          {onLogOut
+            ? (
+              <button type="button" role="menuitem" className="tb-danger" onClick={run(onLogOut)}>
+                Log out
+              </button>
+            ) : (
+              <button type="button" role="menuitem" className="tb-danger" onClick={run(onReset)}>
+                Reset this save
+              </button>
+            )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
-  onLogOut = null, onSettings = null, trainerName = null,
+  onLogOut = null, onSettings = null, onHelp = null, trainerName = null,
   stale = null,
   daily, onClaimDaily, claimNote,
 }) {
@@ -146,7 +227,7 @@ export default function TopBar({
           <b>{caught}<u>/{SPECIES.length}</u></b>
         </span>
 
-        <span className="tb-stat">
+        <span className="tb-stat tb-extra">
           <i>CAUGHT</i>
           <b>{total.toLocaleString()}</b>
         </span>
@@ -154,7 +235,7 @@ export default function TopBar({
         {/* Walking pays, and it says so here rather than in a banner. The
             same floating shape the money counter uses, on the counter the
             reward is actually measured in. */}
-        <span className={`tb-stat steps${parcel ? " bump" : ""}`}>
+        <span className={`tb-stat tb-extra steps${parcel ? " bump" : ""}`}>
           <i>STEPS</i>
           <b>{steps.toLocaleString()}</b>
           <span className="deltas" aria-hidden="true">
@@ -184,24 +265,12 @@ export default function TopBar({
         </p>
       )}
 
-      {/* Settings sits beside the way out, because those are the two things
-          here that are about the ACCOUNT rather than about the game. Icon-only,
-          so it needs a worded label of its own - `data-tip` is not one. */}
-      {onSettings && (
-        <button
-          className="tb-set"
-          onClick={onSettings}
-          aria-label="Settings"
-          data-tip="Name, trainer, password"
-        >
-          <span aria-hidden="true">⚙</span>
-        </button>
-      )}
-
-      {/* One or the other, never both - see App. */}
-      {onLogOut
-        ? <button className="tb-out" onClick={onLogOut}>LOG OUT</button>
-        : <button onClick={onReset}>RESET</button>}
+      <Menu
+        onSettings={onSettings}
+        onHelp={onHelp}
+        onLogOut={onLogOut}
+        onReset={onReset}
+      />
     </div>
   );
 }
