@@ -1133,4 +1133,52 @@ function until(e, what, label, max = 2000) {
     "old rows intact, new rows empty, all of them written back");
 }
 
+/* A TIER'S IDLE MUST NEVER OUTRANK THE ANIMATION THAT ENDS AN ENCOUNTER.
+
+   This shipped. An Origin would not go into the ball - reported from play,
+   and the computed `animation-name` on a captured Origin was `origin-form,
+   mon-idle`. `.sprite-origin.mon` names its own animation and is TWO classes,
+   exactly like `.mon.captured`, so the cascade fell through to source order
+   and the tier rule is further down the file. `mon-absorb` never ran. The
+   same tie broke fleeing, and a `!important` animation on Glitched broke the
+   evolution reveal as well.
+
+   It is the THIRD time this file's "naming an `animation` replaces the whole
+   list" note has been paid for, and the first two were fixed one rule at a
+   time. So the assertion is the general rule rather than the three cases:
+   every state that ends an encounter marks its animation `!important`, and no
+   tier does. A CSS cascade cannot be evaluated here, so this reads the
+   declarations - which is the thing that actually decides it. */
+{
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const ruleFor = (sel) => {
+    const at = css.indexOf(`${sel} {`);
+    assert.ok(at >= 0, `${sel} has no rule - the encounter cannot end`);
+    return css.slice(at, css.indexOf("}", at));
+  };
+
+  for (const sel of [".mon.captured", ".mon.gone"]) {
+    const body = ruleFor(sel);
+    assert.ok(/animation:[^;]*!important/.test(body),
+      `${sel}'s animation is not !important - a tier that names one will win on ` +
+      "source order and the Pokemon will never leave the screen");
+  }
+
+  /* AND NO TIER MAY CLAIM ONE. `filter: !important` is required of every tier
+     (an animation outranks a plain declaration, so `mon-appear`'s
+     `filter: none` would erase it) - `animation: !important` is required of
+     none, and any tier that takes it beats a two-class state outright. */
+  const { TIERS } = await import("../src/game/biomes.js");
+  for (const tier of TIERS) {
+    const at = css.indexOf(`.sprite-${tier} {`);
+    if (at < 0) continue;                       // a tier may be pure artwork
+    const body = css.slice(at, css.indexOf("}", at));
+    assert.ok(!/animation:[^;]*!important/.test(body),
+      `.sprite-${tier} marks its animation !important - it will outrank ` +
+      "mon-absorb, mon-flee and the evolution reveal all at once");
+  }
+
+  console.log(`state animation ok — absorb and flee outrank all ${TIERS.length} tier idles`);
+}
+
 console.log("play ok — the frame loop never stopped");

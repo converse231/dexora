@@ -352,11 +352,25 @@ canvas {
 
 /* Absorbed: swells, spins down into the ball, and only whites out at the very
    end. Blowing the highlights early made it vanish instead of visibly shrink. */
+/* `!important`, AND IT IS THE FIX FOR A BUG THAT SHIPPED. An Origin simply
+   did not go into the ball - reported from play, and measured: the computed
+   `animation-name` on a captured Origin was `origin-form, mon-idle`.
+
+   `.sprite-origin.mon` names its own animation and is TWO classes, exactly
+   like `.mon.captured`, so the cascade fell through to source order and the
+   tier rule is further down the file. It won, `mon-absorb` never ran, and the
+   creature stood there breathing while the ball closed on nothing.
+
+   This is the third time this file has been bitten by "naming an `animation`
+   replaces the whole list" and the first two were fixed one rule at a time.
+   The general rule instead: THE ANIMATION THAT ENDS AN ENCOUNTER OUTRANKS ANY
+   TIER'S IDLE, whatever a future tier decides to name. Specificity alone
+   cannot promise that - a tier only has to tie - so it is stated. */
 .mon.captured {
   /* Above the aura and the effect layers, below the ball - it is being drawn
      INTO the ball, so the ball is in front of it as it goes. */
   position: relative; z-index: 2;
-  animation: mon-absorb var(--t-suck) cubic-bezier(.5, 0, .85, .4) forwards;
+  animation: mon-absorb var(--t-suck) cubic-bezier(.5, 0, .85, .4) forwards !important;
 }
 @keyframes mon-absorb {
   0%   { transform: scale(1) rotate(0deg); opacity: 1; filter: none; }
@@ -365,8 +379,12 @@ canvas {
   100% { transform: scale(.04) translateY(10%) rotate(30deg); opacity: 0; filter: brightness(4.5) saturate(0); }
 }
 
-/* Bounds away in hops rather than fading on the spot. */
-.mon.gone { animation: mon-flee 780ms cubic-bezier(.3, 0, .7, 1) forwards; }
+/* Bounds away in hops rather than fading on the spot. `!important` for the
+   reason `.mon.captured` carries one: an Origin that could not be caught also
+   could not be fled from, and both were the same tie. */
+.mon.gone {
+  animation: mon-flee 780ms cubic-bezier(.3, 0, .7, 1) forwards !important;
+}
 @keyframes mon-flee {
   0%   { transform: translate(0, 0) scale(1); opacity: 1; }
   16%  { transform: translate(-7%, -5%) scale(1.05); }
@@ -2978,9 +2996,20 @@ canvas {
    rendering fault where a hard jump reads as damage. It sits clean for most
    of the loop and tears twice, which is what keeps it from being exhausting
    in a Box of eight. */
+/* THE FILTER IS `!important` AND THE ANIMATION IS NOT, and the split is the
+   point. The filter has to be, because `.mon` runs `mon-appear` whose
+   keyframes set `filter: none` and an animation outranks a plain declaration -
+   that is the same reason the Astral duotone carries one.
+
+   The ANIMATION must not be. With it, this single class beat `.mon.captured`,
+   `.mon.gone` and `.evo-reveal .evo-post` outright: a Glitched Pokemon could
+   not be caught, could not run away, and did not pop on the evolution reveal.
+   Measured on all three before and after. Without it the tier still wins the
+   idle - `.mon` is one class too and this rule is further down - and loses to
+   every two-class state, which is exactly the order wanted. */
 .sprite-glitched {
   filter: contrast(1.12) saturate(1.15) !important;
-  animation: glitch-shift 2.6s steps(1, end) infinite !important;
+  animation: glitch-shift 2.6s steps(1, end) infinite;
 }
 @keyframes glitch-shift {
   0%, 44%, 100% { filter: contrast(1.12) saturate(1.15); transform: translate(0, 0); }
