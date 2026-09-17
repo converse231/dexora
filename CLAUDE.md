@@ -1197,14 +1197,48 @@ finish a generation and be handed them. Deleted with both functions.
 stated in the signature; it is an ART check and nothing else, and `tiersFor`
 is derived from it so the two cannot disagree about what a species can hold.
 
-**SHOWDOWN IS THE ONE PICTURE THIS GAME DOES NOT SHIP**, and that was measured.
-Its GIFs average 67KB against `public/sprites`' entire 8.9MB, so bundling them
-would make the repo 75MB; re-encoding at 64px makes them BIGGER (77KB), because
-a naive pass loses the frame diffing the originals already have. They come from
-PokéAPI's CDN, which is affordable for exactly one reason - Showdown is the
-rarest tier, so a whole playthrough loads a handful - and `onSpriteError` falls
-back to the ordinary sprite, so a blocked CDN gives a Pokémon that looks normal
-rather than a broken-image icon.
+**SHOWDOWN SHIPS NOW, AS AN EIGHT-FRAME STRIP, and the conclusion that it could
+not was measured against ONE option.** This used to read "the one picture this
+game does not ship": the GIFs average 78.5KB, bundling them is 78.6MB, and a
+naive re-encode came out BIGGER. All true, and none of it is the question.
+Measured properly over fifteen species spread across the dex, every one
+normalised onto the same 64px canvas:
+
+| | each | over 1025 |
+|---|---|---|
+| raw GIF from the CDN | 78.5 KB | 78.6 MB |
+| lossless animated WebP | 35.9 KB | 35.9 MB |
+| APNG | 37.0 KB | 37.0 MB |
+| **one PNG holding 8 frames** | **7.4 KB** | **7.5 MB** |
+
+The strip is five times smaller than either animated format for a structural
+reason rather than a lucky one: a single PNG is ONE zlib stream over ONE
+palette, and eight frames of the same creature are nearly the same bytes, so the
+window catches the redundancy. WebP and APNG compress each frame separately and
+cannot. 7.5MB against the 8.9MB `public/sprites` already ships is affordable,
+and it removes the only runtime network dependency the game had.
+`tools/build_showdown.py` carries the measurement.
+
+**AND IT FIXED THE SCALE, WHICH WAS THE OTHER HALF OF THE REPORT.** A Showdown
+GIF is whatever size PokeAPI has it at - 156x127 for Suicune against a 64px
+Rattata - so one towered over every sprite beside it and blurred when the layout
+scaled it down. Every frame is normalised by `min(64/w, 64/h)` over the WHOLE
+source canvas, so the creature keeps its relative size: the rule
+`build_origin.py` paid for with a Piplup drawn the size of a Dialga.
+
+**THE COST IS THAT A STRIP IS NOT AN `<img>`.** This file's rule - a tier's look
+must survive as a bare `<img>` - is about the tiers that are a CSS treatment,
+and it still holds for the seven that are. Showdown is real artwork that MOVES,
+so it renders as a span with the strip as a background and
+`steps(8, jump-none)` walking it, the same mechanism the ball throw uses.
+`jump-none` because with `background-size: 100% 800%` frame i sits at `100i/7`%
+- eight values inclusive of both ends - where plain `steps(8)` lands on 0, 12.5,
+25 ... which is not where the frames are.
+
+**`hasShowdown` READS THE FILES, NOT A RULE.** It was `!isForm(id)`, an
+assumption about PokeAPI's coverage; 14 species genuinely have no Showdown
+sprite, and any one of them could have rolled a tier whose picture does not
+exist. `src/data/showdown.js` is generated from what landed on disk.
 
 **The SPREAD matters more than the rate, and that is not obvious.** These were
 1 : 2 : 8 and the completion rosette - caught plus all four variants of ONE
@@ -1581,7 +1615,19 @@ Power Plant. Two independent causes, and neither fix reaches the other:
   A generation with nothing living in a map cannot be given a share of it by
   any weight at all, so the zeroes were structural.
 
-**`GEN_HOME_MIN` (4) is the floor, and four is measured.** Sweeping 1 to 8,
+**A FILLER MUST SHARE A TYPE WITH THE MAP, and leaving that out put the starters
+in the volcano.** Reported from play: Ember was spawning Turtwig, Grotle and
+Piplup. The pick sorted by type overlap alone, so every species with NO overlap
+tied at zero and a stable sort left them in dex order - which for un-evolved
+Pokemon begins each generation with its three starters. Ember took Treecko and
+Mudkip, Turtwig and Piplup, Chespin and Froakie, Grookey and Sobble, Sprigatito
+and Quaxly. **Every single wrong resident was a starter**, which is the tell
+rather than a coincidence. Overlap is a FILTER now and not a sort key: a
+generation with one plausible candidate gets one, and `fitShares` gives it its
+share through whatever does live there. Presence is what the assertion wants; a
+count was never the point.
+
+**`GEN_HOME_MIN` (4) is the ceiling on that fill, and four is measured.** Sweeping 1 to 8,
 generation evenness sits at ~5.5% off fair at every value - presence is all it
 needs - but the BAND mix only converges from four upward (0.10pp at four against
 8.9pp at three). Four costs 60 extra homes where eight costs 223 for the same
@@ -1673,6 +1719,31 @@ stripped first, because the prose should absolutely name it and the first
 version of that assertion failed on the comment explaining the rule. Crude, and
 exactly right: the failure it guards is somebody giving it "a small table
 effect too".
+
+**A JAR FOR EVERY TIER, AND EVERY NUMBER ON ONE IS DERIVED.** There were three,
+written when there were four tiers, so five of the eight had none - reported as
+missing honeys for the new variants. The shelf answers the bloat argument by
+itself: `onShelf` shows what you can buy plus the next thing to open.
+
+**THE LIFT IS COMPUTED, AND IT HAS NOW DRIFTED TWICE IN OPPOSITE DIRECTIONS.** A
+Shiny Honey quietly fell to 43% when Shiny went 1/240 to 1/600; when the ladder
+was compressed the other way they drifted UP, to 82-91%, against a design that
+says three-in-four. Both times a jar changed value because a number in another
+file moved. `honeyLift(odds)` solves for it -
+`(1 - (1 - HONEY_LANDS)^(1/met)) / odds` - so every jar is equally good at its
+own tier BY CONSTRUCTION, which is what the design always claimed.
+
+**PRICE AND LEVEL COME FROM THE RANK, NOT THE LIFT**, and the suite is what said
+so: the lift is an integer ceiling, so Vivid and Noir both round to x4 and
+priced identically - and Origin and Holo share odds EXACTLY, so no function of
+odds could ever separate them. Effectiveness tracks the odds because that is
+what makes a jar work; price tracks ladder position because that is what makes
+it a ladder.
+
+**`ENCOUNTER_RATE` LIVES IN `biomes.js` NOW.** It was in engine.js, which is the
+wrong file twice over: how often the world stops you is a property of the world,
+and `items.js` needs it to price a honey and cannot import the engine - the rule
+modules are browser-free and the engine is not.
 
 **A COLOURED HONEY IS THE JAR PLUS THE TIER'S OWN TREATMENT.** `art: "honey"`
 points all four at one picture and `tier` is what makes a Holo Honey look like
@@ -2728,3 +2799,28 @@ Overlay `SOLID` in red to see what is walkable.
   code changed.
 - Report faithfully: if a test fails, show the output; if a step was skipped,
   say so. When a reading turns out to be wrong, correct it plainly and move on.
+
+
+**THE TOP-RIGHT OVERLAYS ARE ONE STACK.** The clock and the running-effect cards
+were both `position: absolute; right: 10px; top: 10px`, and what kept them apart
+was `.fieldbox ~ .worldclock { top: 40px }` - a typed offset for a card that was
+31px tall when it was written. The card grew, the offset did not, and they
+printed on top of each other. `.hud-right` is a flex column, so nothing needs to
+know how tall anything else is. The effect cards are deliberately the louder of
+the two: the time of day is ambient, a step count is something you paid for and
+are burning through.
+
+**AND `.fieldbox span` HAD TO BECOME `.fieldbox > span`.** `ItemIcon` wraps a
+tiered item in its own span so the treatment has something to sit in, and the
+descendant selector styled that wrapper as a second card - so a Holo Honey sat
+inside a little rounded box of its own. The White Flute has no tier, renders a
+bare `<img>` and looked fine, which is what made it read as an icon problem
+rather than a selector one.
+
+**A NARROW WINDOW IS NOT A PHONE, and it cost a wrong diagnosis here.** Every
+mobile rule in this project is gated on `(hover: none) and (pointer: coarse)`
+and never on width, deliberately. A CDP harness that only sets device metrics
+therefore measures the DESKTOP layout in a small box: the effect cards appeared
+to run side by side under the biome tag at 400px and looked like a real
+collision. With `--blink-settings=primaryPointerType=2,primaryHoverType=1` they
+stack and nothing overlaps. **Emulate the pointer, not just the size.**

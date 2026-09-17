@@ -402,7 +402,19 @@ export default function App({
                 always there saying "no" is a readout nobody reads - and it
                 hides with the minimap for an encounter, because the count
                 cannot move while you are not walking. */}
-            {!enc && !evo && FAMILIES.some((f) => st?.field?.[f]) && (
+            {/* ONE STACK, NOT TWO THINGS PINNED TO THE SAME CORNER. Both of
+                these were `position: absolute; right: 10px; top: 10px`, and
+                what kept them apart was `.fieldbox ~ .worldclock { top: 40px }`
+                - a typed offset for a card that was 31px tall when it was
+                written. The card grew, the offset did not, and they printed on
+                top of each other. Reported from play.
+
+                A column with a gap cannot overlap whatever either one ends up
+                measuring, which is the whole reason to do it this way rather
+                than to measure the card again and type 48. */}
+            {!enc && !evo && (
+              <div className="hud-right">
+            {FAMILIES.some((f) => st?.field?.[f]) && (
               <div className="fieldbox" role="status">
                 {FAMILIES.map((fam) => {
                   const run = st.field[fam];
@@ -430,7 +442,6 @@ export default function App({
                 to is on this screen. Hidden with everything else for an
                 encounter - the phase is frozen on the encounter itself by then,
                 so a clock ticking over a paused world would be lying. */}
-            {!enc && !evo && (
               <div
                 className={`worldclock ph-${phaseAt(st?.steps ?? 0).id}`}
                 data-tip={`${phaseAt(st?.steps ?? 0).name} — the world's clock runs as you walk`}
@@ -439,6 +450,7 @@ export default function App({
                   {["dusk", "night"].includes(phaseAt(st?.steps ?? 0).id) ? "☾" : "☀"}
                 </b>
                 <i>{timeLabel(st?.steps ?? 0)}</i>
+              </div>
               </div>
             )}
 

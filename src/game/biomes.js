@@ -1,4 +1,5 @@
 import { SPECIES, isForm } from "../data/dex.js";
+import { SHOWDOWN_IDS } from "../data/showdown.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 
 /* The eight areas: what each one is, and what spawns there.
@@ -459,6 +460,12 @@ export const pityBoost = (dry = 0) =>
    alone caps at 10x, which is 1/48 on Astral. */
 export const LIFT_CEILING = 0.2;
 
+/* HOW OFTEN THE WORLD STOPS YOU. It lived in engine.js, which is the wrong
+   file for it twice over: it is a property of the world rather than of the
+   frame loop, and `items.js` needs it to price a honey - and cannot import the
+   engine, because the rule modules are browser-free and the engine is not. */
+export const ENCOUNTER_RATE = 0.07;
+
 /* `favour` is `{ tier, mult }` and lifts ONE tier - a Shiny Honey - where
    `boost` lifts them all. Two arguments rather than one table of multipliers
    because the two have different lifetimes and different owners: `boost` is
@@ -551,7 +558,11 @@ export const hasOrigin = (id) => !isForm(id) && genOf(id) < baseArtGen(id);
 /* SHOWDOWN IS A SECOND FILE TOO, and PokeAPI has no animation for a Mega. The
    same shape as `hasOrigin`: a tier a species has no artwork for is a tier it
    can never wear, which is a fact about the art rather than about the player. */
-export const hasShowdown = (id) => !isForm(id);
+/* WHICH SPECIES SHIP ONE, read off what `build_showdown.py` actually wrote.
+   This was `!isForm(id)`, which is an assumption about PokeAPI's coverage
+   rather than a fact - and a species with no strip would have rolled a tier
+   whose picture does not exist. */
+export const hasShowdown = (id) => SHOWDOWN_IDS.has(id);
 
 /* THE ORIGIN GATE IS GONE, and what is left is only the art check.
 
@@ -914,13 +925,29 @@ const derivedHomes = () => {
          have is not a candidate at all. Every map's table has commons, so the
          pool is never empty. */
       const bands = new Set(b.table.map(([id]) => speciesById(id)?.tier ?? "C"));
+      /* IT MUST SHARE A TYPE WITH THE MAP, and leaving that out put the
+         starters in the volcano.
+
+         Reported from play: Ember was spawning Turtwig, Grotle and Piplup.
+         The sort was by type overlap alone, so every species with NO overlap
+         tied at zero, and a stable sort left them in the order `SPECIES` is
+         in - which for un-evolved Pokemon is dex order, which begins each
+         generation with its three starters. Ember took Treecko and Mudkip,
+         Turtwig and Piplup, Chespin and Froakie, Grookey and Sobble,
+         Sprigatito and Quaxly. Every single wrong resident was a starter, and
+         that is not a coincidence, it is the tell.
+
+         A filler is not a way to reach a number, it is a species that has to
+         look like it could live here. So overlap is a FILTER now and not a
+         sort key, and a generation that has only one candidate gets one -
+         `fitShares` gives it its share through whatever does live there, and
+         the assertion that matters is presence rather than count. */
+      const fits = (sp) => sp.types.some((t) => b.types.includes(t));
       const pool = wild
         .filter((sp) => genOf(sp.id) === gen && !here.has(sp.id)
-                     && bands.has(sp.tier))
-        .map((sp) => [sp, sp.types.filter((t) => b.types.includes(t)).length])
-        .sort((x, y) => y[1] - x[1])
+                     && bands.has(sp.tier) && fits(sp))
         .slice(0, short);
-      for (const [sp] of pool) {
+      for (const sp of pool) {
         homes.get(b.id).push([sp.id, DERIVED_WEIGHT[sp.tier] ?? 4]);
       }
     }

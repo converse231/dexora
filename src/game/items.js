@@ -1,7 +1,9 @@
 import { SPECIES } from "../data/dex.js";
 import { EVOLUTIONS as EVO_ROWS } from "../data/evolutions.js";
 import { GUARANTEED } from "../catch.js";
-import { TIERS, ENCLOSED, speciesById } from "./biomes.js";
+import {
+  TIERS, TIER_ODDS, ENCLOSED, ENCOUNTER_RATE, speciesById,
+} from "./biomes.js";
 
 /* The economy and evolution, free of DOM so tools/check.mjs can test them.
 
@@ -245,6 +247,63 @@ export const STONES = [
    ordinary Pokemon of a generation, and an item that shortcuts a gate is the
    gate deleted. The other three tiers are luck, and luck is a thing you are
    allowed to buy help with. */
+/* ONE JAR PER TIER, AND EVERY NUMBER ON ONE IS DERIVED.
+
+   There were three - Holo, Astral, Shiny - written when there were four tiers,
+   so five of the eight had no jar at all. Reported as missing honeys for the
+   new variants. The earlier argument for stopping at three was shelf bloat,
+   and the shelf answers that itself: `onShelf` shows what you can buy plus the
+   NEXT thing to open, so a jar you have not levelled to is not on it.
+
+   THE LIFT IS COMPUTED, NOT TYPED, AND THAT IS THE REAL FIX. These were hand
+   numbers, and hand numbers drift the moment the odds move. It has now
+   happened twice in opposite directions: this file used to record a Shiny
+   Honey quietly falling to 43% when Shiny went 1/240 to 1/600, and when the
+   ladder was compressed the other way they drifted UP, to 82-91% against a
+   design that says three-in-four. Both times a jar changed value because a
+   number in another file changed, which is the one thing a derived value
+   cannot do.
+
+   So solve for it. P(at least one) = 1 - (1 - odds x lift)^met, so the lift
+   that lands `HONEY_LANDS` of the time is (1 - (1 - LANDS)^(1/met)) / odds.
+   Every jar is then equally good at its own tier BY CONSTRUCTION, which is
+   what the design always said: the price says which tier you want, never which
+   jar works.
+
+   PRICE AND LEVEL RIDE THE LIFT, because the lift already IS the rarity - a
+   tier needing a bigger multiplier is a rarer tier. No table to maintain, and
+   it lands within a few hundred of the prices the hand-written three had. */
+export const HONEY_STEPS = 600;
+export const HONEY_LANDS = 0.75;
+
+const HONEY_MET = HONEY_STEPS * ENCOUNTER_RATE;
+export const honeyLift = (odds) =>
+  Math.max(2, Math.ceil((1 - Math.pow(1 - HONEY_LANDS, 1 / HONEY_MET)) / odds));
+
+/* Kindest first, so the shelf reads as a ladder and the cheapest opens first.
+   `TIER_ODDS` is rarest-first, hence the reverse. */
+const TIER_HONEY = [...TIER_ODDS].reverse().map(([tier, odds], rank) => {
+  const lift = honeyLift(odds);
+  const name = tier.charAt(0).toUpperCase() + tier.slice(1);
+  /* PRICE AND LEVEL COME FROM THE RANK, NOT FROM THE LIFT, and the suite is
+     what said so. The lift is an integer ceiling, so Vivid at 1/105 and Noir
+     at 1/118 both round to x4 and priced identically - and a shelf where two
+     jars cost the same breaks the ladder the shop asserts. Origin and Holo are
+     worse than a rounding tie: they share odds exactly, so no function of odds
+     can ever separate them. Position on the ladder can, and is the honest
+     thing for a price to track anyway. Effectiveness is derived from the odds
+     because that is what makes a jar work; price is derived from the rank
+     because that is what makes it a ladder. */
+  return {
+    id: `honey-${tier}`, art: "honey", tier, family: "variant",
+    name: `${name} Honey`,
+    price: 2400 + 300 * rank,
+    level: 16 + rank,
+    steps: HONEY_STEPS, lift,
+    blurb: `${name}, ×${lift} as likely`,
+  };
+});
+
 export const FIELD = [
   /* --- repel: how OFTEN ------------------------------------------------
      Canon durations are 100 / 200 / 250 steps. Ours are longer because a step
@@ -295,30 +354,9 @@ export const FIELD = [
      jar works, which is the honest thing for it to be about. */
   {
     id: "honey", family: "variant", name: "Honey", price: 1400, level: 14,
-    steps: 600, lift: 3, blurb: "Every rare tier, ×3 likely",
+    steps: HONEY_STEPS, lift: 3, blurb: "Every rare tier, ×3 likely",
   },
-  {
-    id: "honey-holo", art: "honey", tier: "holo", family: "variant",
-    name: "Holo Honey", price: 2600, level: 18,
-    steps: 600, lift: 5, blurb: "Holo, ×5 as likely",
-  },
-  /* ASTRAL BEFORE SHINY NOW, AND THE LIFTS MOVED WITH THE LADDER. Shiny went
-     1/240 -> 1/600 and became rarer than Astral, so the jar that favours it
-     is the dearest of the three rather than the middle one - and its lift had
-     to nearly treble or it stopped landing. check.mjs pins that directly: a
-     jar has to do something more often than not over its own 600 steps, and
-     at x8 a Shiny Honey had quietly dropped to 43%. All three sit near
-     three-in-four again. */
-  {
-    id: "honey-astral", art: "honey", tier: "astral", family: "variant",
-    name: "Astral Honey", price: 3200, level: 20,
-    steps: 600, lift: 16, blurb: "Astral, ×16 as likely",
-  },
-  {
-    id: "honey-shiny", art: "honey", tier: "shiny", family: "variant",
-    name: "Shiny Honey", price: 4800, level: 24,
-    steps: 600, lift: 20, blurb: "Shiny, ×20 as likely",
-  },
+  ...TIER_HONEY,
 ];
 
 export const fieldById = (id) => FIELD.find((f) => f.id === id) ?? null;
