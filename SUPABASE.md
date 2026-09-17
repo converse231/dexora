@@ -275,22 +275,68 @@ handful of messages per hour *for the whole project* and is explicitly not for
 production — the same cap that blocked sign-ups in step 4. One player forgetting
 a password would spend it.
 
-**1. Get an SMTP sender.** Any of these has a free tier big enough for this and
-takes about ten minutes: [Resend](https://resend.com),
-[Brevo](https://brevo.com), [Postmark](https://postmarkapp.com),
-[Mailgun](https://mailgun.com). You will need a domain you control — they all
-make you verify it by adding DNS records, because that is what stops the mail
-going to spam. Two records matter:
+**1. Get an SMTP sender — this project uses [Resend](https://resend.com).**
+Free tier, and password resets will never come close to its limits.
 
-| record | what it does |
-|---|---|
-| SPF | says which servers may send as your domain |
-| DKIM | signs each message so the recipient can check it was really you |
+**You need a domain you control, and `dexora-self.vercel.app` is not one.**
+Vercel owns `vercel.app`, so you cannot add DNS records under it, and no mail
+provider will let you send as a domain you cannot prove you own. A domain is
+about £10 a year — [Cloudflare Registrar](https://domains.cloudflare.com) sells
+at cost, [Porkbun](https://porkbun.com) and [Namecheap](https://namecheap.com)
+are the usual alternatives. Point the game at it while you are there; a custom
+domain in Vercel is two minutes and one CNAME.
+
+**Then: Resend → Domains → Add Domain.** Pick the region nearest your players -
+it is baked into the records it generates, and changing it later means
+re-verifying. Resend gives you three records to add at your registrar:
+
+| record | on | what it does |
+|---|---|---|
+| MX | `send.yourdomain.com` | where bounces and complaints come back to |
+| TXT (SPF) | `send.yourdomain.com` | says which servers may send as you |
+| TXT (DKIM) | `resend._domainkey.yourdomain.com` | signs each message so the recipient can check it was really you |
+
+SPF and DKIM together are what stop the mail going to spam; the MX record is
+what stops a bounce disappearing. **Copy the values verbatim from Resend's own
+screen** — they are per-domain and per-region, so any value written down here
+would be wrong for you. Three things go wrong at this step and all three are
+silent:
+
+- **The name field.** Some registrars want `send`, some want the whole
+  `send.yourdomain.com`. Enter the full name at one that auto-appends and you
+  get `send.yourdomain.com.yourdomain.com`.
+- **Cloudflare proxying.** If your DNS is at Cloudflare, the DKIM record must
+  be **DNS only** (grey cloud), not proxied. A proxied TXT record is not
+  resolvable as itself.
+- **The DKIM value is long.** Paste it whole; some registrar forms truncate it
+  without saying so.
+
+Hit **Verify**. It is usually minutes; DNS can take an hour.
+
+**Worth adding while you are in there:** a DMARC record - TXT on
+`_dmarc.yourdomain.com`, value `v=DMARC1; p=none;`. Not required at this volume
+and it changes nothing about delivery on its own, but Gmail and Yahoo both now
+expect one from anybody sending in bulk, and `p=none` commits you to nothing.
+
+**Last, an API key.** *Resend → API Keys → Create*. Copy it once - it is shown
+once - because **the API key is the SMTP password**.
 
 **2. Put it in Supabase.** *Authentication → Emails → SMTP Settings* → **Enable
-Custom SMTP**, then host, port (587), username, password, and a sender address
-**at the domain you just verified**. Sending as a Gmail address you do not own
-is the single commonest reason reset mail silently disappears.
+Custom SMTP**:
+
+| field | value |
+|---|---|
+| Host | `smtp.resend.com` |
+| Port | `587` |
+| Username | `resend` — the literal word, not your email |
+| Password | the `re_…` API key |
+| Sender email | something at the domain you just verified, e.g. `noreply@yourdomain.com` |
+| Sender name | `Dexora` |
+
+Two of those are the usual mistakes. The username really is the string
+`resend`. And **the sender address must be at the verified domain** — sending
+as a Gmail address you do not own is the single commonest reason reset mail
+silently disappears.
 
 **3. Allow the game's address back.** *Authentication → URL Configuration*:
 
