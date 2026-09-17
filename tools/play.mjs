@@ -1181,4 +1181,105 @@ function until(e, what, label, max = 2000) {
   console.log(`state animation ok — absorb and flee outrank all ${TIERS.length} tier idles`);
 }
 
+/* SURF, DRIVEN. It touches `tryStep` and the step handler, which is what this
+   file exists for - and every one of these went wrong at least once while it
+   was being written.
+
+   Surfing is DERIVED from the tile under the player rather than stored, so the
+   thing to assert is that the derivation and the movement rules agree: you
+   cannot walk onto water, you can ride onto it, you can cross it, you can
+   always step off, and you cannot ride at all without the item. */
+{
+  const { AREAS } = await import("../src/game/mapdata.js");
+  const { SURFABLE } = await import("../src/game/map.js");
+  const { SURF_LEVEL } = await import("../src/game/items.js");
+  const { LEVEL_XP } = await import("../src/game/biomes.js");
+
+  /* A BANK, FOUND RATHER THAN TYPED - a coordinate in a generated map is a
+     coordinate that moves the next time the map is generated. Any walkable
+     tile with a rideable one beside it will do. */
+  function bank(areaId) {
+    const rows = AREAS[areaId].rows;
+    const solid = (x, y) => rows[y]?.[x];
+    for (let y = 1; y < rows.length - 1; y++) {
+      for (let x = 1; x < rows[y].length - 1; x++) {
+        if (SURFABLE.includes(solid(x, y))) continue;
+        if (!/[.,f#rmipbh]/.test(solid(x, y) ?? "")) continue;
+        for (const [dx, dy, dir] of [[0, -1, "up"], [0, 1, "down"],
+                                     [-1, 0, "left"], [1, 0, "right"]]) {
+          if (SURFABLE.includes(solid(x + dx, y + dy))) {
+            return { x, y, dir, liquid: solid(x + dx, y + dy), to: [x + dx, y + dy] };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  const pond = bank("pond");
+  assert.ok(pond, "Pond & Shore has no bank beside its water");
+  const ember = bank("ember");
+  assert.ok(ember, "Ember Caldera has no rock beside its lava");
+  assert.equal(ember.liquid, "V", "the lava beside Ember's rock is not lava");
+
+  const ride = (spot, areaId, level) => {
+    const save = {
+      ...SAVE, areaId, xp: LEVEL_XP[level - 1],
+      bag: { "poke-ball": 5 },
+      player: { x: spot.x, y: spot.y, dir: spot.dir },
+    };
+    const { e } = boot(save);
+    return e;
+  };
+
+  /* 1. BELOW THE LEVEL IT IS NOT OFFERED, AND WALKING IN STILL FAILS.
+
+        The bag is NOT the way to test this, and finding that out is worth
+        keeping: `loadState` grants every key item a save is past the level
+        for, so a Lv 20 save handed itself the item and "without it" could not
+        be reached. Below the level is the real gate.
+
+        The second half is the half that matters: if `tryStep` had been relaxed
+        for everyone, the gate would be nothing but a missing prompt. */
+  {
+    const e = ride(pond, "pond", SURF_LEVEL - 1);
+    assert.equal(e.surfable(), null, "surf is offered below its level");
+    assert.equal(e.surf(), false, "surf ran below its level");
+    e.press(pond.dir); for (let i = 0; i < 40; i++) tick(16); e.clearHeld();
+    assert.deepEqual([e.state.player.x, e.state.player.y], [pond.x, pond.y],
+      "walked onto open water on foot");
+  }
+
+  /* 2. WITH IT: onto the water, and the ride is a real move. */
+  for (const [spot, areaId, what] of [[pond, "pond", "water"], [ember, "ember", "lava"]]) {
+    const e = ride(spot, areaId, SURF_LEVEL);
+    assert.equal(e.surfable(), spot.liquid,
+      `surf is not offered at the ${what} - surfable() said ${e.surfable()}`);
+    assert.ok(e.surf(), `surf refused the ${what}`);
+    for (let i = 0; i < 60; i++) tick(16);
+    assert.deepEqual([e.state.player.x, e.state.player.y], spot.to,
+      `the ride onto the ${what} did not land`);
+
+    /* 3. AND IT CANNOT BE CAST FROM. The rod set is drawn standing on a bank
+          and the bobber would land beside a trainer already in the pool. */
+    assert.equal(e.castable(), null, `a line went out from on top of the ${what}`);
+
+    /* 4. ASHORE IS ALWAYS ALLOWED. Stepping back the way you came has to work
+          or the ride is a trap - and this is the case that `tryStep` gets
+          wrong if it asks what you HOLD rather than where you ARE. */
+    const back = { up: "down", down: "up", left: "right", right: "left" }[spot.dir];
+    e.press(back); for (let i = 0; i < 80; i++) tick(16); e.clearHeld();
+    /* ASHORE IS THE PROPERTY, NOT A COORDINATE. The first version asserted the
+       exact tile ridden from and failed at [30,3] against [30,5] - because a
+       key held for eighty ticks lands ashore and then keeps walking inland,
+       which is correct behaviour and not what was being tested. */
+    const tile = AREAS[areaId].rows[e.state.player.y][e.state.player.x];
+    assert.ok(!SURFABLE.includes(tile),
+      `still afloat on ${tile} after riding back off the ${what}`);
+  }
+
+  console.log("surf ok — onto water and lava at Lv " + SURF_LEVEL +
+    ", refused without it, ashore always allowed, no casting afloat");
+}
+
 console.log("play ok — the frame loop never stopped");

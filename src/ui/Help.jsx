@@ -21,7 +21,7 @@
 
 import { useEffect } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
-import { RUN_LEVEL } from "../game/items.js";
+import { RUN_LEVEL, SURF_LEVEL } from "../game/items.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
    lists want identical rows and a second copy of the row is how one of them
@@ -30,6 +30,7 @@ const KEYS = [
   [["↑", "↓", "←", "→"], "Walk. WASD does the same."],
   [["SHIFT"], `Hold to run. Needs the Running Shoes, at Lv ${RUN_LEVEL}.`],
   [["F"], "Cast a rod at the water's edge."],
+  [["S"], `Ride out onto water or lava. Needs Surf, at Lv ${SURF_LEVEL}.`],
   [["SPACE"], "Throw the cheapest ball you are carrying."],
   [["1", "…", "9"], "Throw that ball in particular."],
   [["R"], "Run from a Pokémon. Escape does it too."],
@@ -38,9 +39,10 @@ const KEYS = [
 const TOUCH = [
   [["✛"], "Walk."],
   [["B"], "Hold to dash."],
-  [["A"], "Throw a ball, or cast a rod out on the map."],
+  [["A"], "Throw a ball, cast a rod, or ride out onto lava."],
   [["A", "HOLD"], "Pick which ball to throw."],
   [["BAG"], "Berries in a battle, repels and honey on the map."],
+  [["SURF"], "The prompt at a shoreline rides out onto the water."],
 ];
 
 function Rows({ of }) {

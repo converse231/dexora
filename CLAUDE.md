@@ -806,7 +806,7 @@ Four rows on a 33px pitch from y=42: down / up / left / right. Across:
 | run | 68 | 17 | 16×32 | 3 | same cycle, leaning |
 | bike | 128 | 33 | 32×32 | 3 | **unused** |
 | fish | 236 | 33 | 32×32 | 4 | the cast |
-| surf | 377 | 33 | 32×32 | 2 | **unused** |
+| surf | 377 | 33 | 32×32 | 2 | the paddle — **used now** |
 | surf | 452 | 33 | 32×32 | 2 | on green, **unused** |
 | jump | 527 | 33 | 32×32 | 1 | on green — legs tucked, one pose per facing |
 
@@ -815,6 +815,48 @@ puts the rod's overhang where it belongs with no per-set nudge.
 
 **The jump is one mid-air pose per facing, not a cycle**, so the arc and the
 shadow on the ground are the renderer's job — `drawPlayer`'s `lift`.
+
+**SURFING IS NOT A FLAG, IT IS WHERE YOU ARE STANDING.** The obvious shape is
+`state.surfing`, saved and toggled, and it is the wrong one: a boolean and a
+position can disagree, and every way they can is a bug with nothing under it —
+a save written mid-ride that loses the flag strands you on water you cannot
+leave, one that keeps a stale flag walks you onto land still riding. A liquid
+tile is impassable on foot, which is what `SOLID` has always meant, so BEING on
+one is proof you rode there and is the only proof needed. **No save field,
+nothing to migrate, and a save from before Surf loads correctly by construction
+because its player is standing on ground.**
+
+`SURFABLE` is `wWkV` — the three waters a rod already reaches plus lava, which
+no Pokémon game has ever let you ride and which Ember Caldera is largely made
+of. `K` is out for the same reason fishing excludes it: that is the waterfall,
+and it is falling.
+
+**OFF THE RIDE IS ALWAYS ALLOWED, ONTO IT NEVER IS.** `tryStep` asks where you
+ARE, not what you hold — the permission was checked when you mounted and cannot
+have changed since — so stepping ashore can never be refused. Getting on is
+`surf()` alone, which is what `canSurf(level, bag)` gates, the same two-part
+shape as `canRun`: a level alone is a gate nobody was told about, an item alone
+can be held by a save that never earned it.
+
+**AND NOBODY IS LEFT AFLOAT.** Deriving from the tile means a save standing on
+water without the item would be stuck, so `ashore()` puts it back on the nearest
+bank at engine start — the same shape as `loadState` sending a save home from a
+map it has not earned. A save that is somewhere impossible is moved, never
+refused.
+
+**WHAT LIVES IN WHAT YOU ARE RIDING NEEDED NO NEW TABLE.** On water it is the
+rod's pool, which is what water in this game has always meant and is already
+balanced; on lava it is the map's own table, because the only lava here is Ember
+and every resident of Ember is a Fire type — a separate lava list would be that
+list written twice.
+
+**`grantKeys` REPLACED THE ONE-ITEM MIGRATION.** Running was a level check
+before it was an item, so a save past Lv 15 with an empty shoe slot silently
+lost the ability to run; Surf is the same story one ladder later. It is written
+once now — anything in `KEY_ITEMS` whose level you are past and whose slot is
+empty — so a third costs nothing. It found its own test, too: a Lv 20 save hands
+itself the item, so "without it" cannot be tested through the bag. **Below the
+level is the real gate.**
 
 **Fishing frame order is not uniform.** Each facing runs wind-up → rod-extended,
 except `right`, whose frames sit in reverse order on the rip. `fishFrame()`
@@ -2225,6 +2267,36 @@ nothing.
 **The Dex grid is four columns, not auto-fill.** A tile carries a sprite, a
 number, up to three variant marks and a completion badge; at the ~52px auto-fill
 produced they fought for the same corner. Four fixed columns give ~76px.
+
+**THE ENCOUNTER'S CAUGHT BADGE IS ABOUT THE FORM, NOT THE SPECIES.** `known`
+was answering the wrong question: an ordinary Pikachu was caught and every Holo,
+Shiny and Astral Pikachu afterwards wore a Poké Ball saying it was already in
+the dex. It was not — a tier is its own row in the collection and its own square
+in the FORMS strip. `knownForm` is the badge's fact; `known` is untouched and
+still means the SPECIES, because that is what the **Repeat Ball** was priced
+against and making it per-form would quietly halve a ball nobody asked to
+retune. Two questions, two fields, both frozen on the encounter for the reason
+`known` always was.
+
+**A CAP WITH NO FLOOR IS A BOX THAT CAN BE SQUEEZED TO NOTHING.** The ball
+rail's `max-height` is `100%` of its offset parent less a 92px offset, and in an
+ENCOUNTER both terms measure a different box — `.battle` sets
+`container-type: inline-size`, so `cqw` resolves against the battle rather than
+the viewport. On a short window that left the rail shorter than one row, and
+`.br-list` is `overflow-y: auto`, so a single berry drew a scrollbar with arrows
+on it. `max(170px, …)` gives it four rows to stand on.
+
+**AND THE SAVE PANEL SAID THE SAVE WAS SOMEWHERE IT IS NOT.** "KEPT IN THIS
+BROWSER" and "stored in this browser only" were written when that was the whole
+truth and went on saying it after accounts arrived — a readout outliving its
+system, on the one panel whose job is to say where the dex lives. It reads the
+`account` prop now, which `Rail` was already passing and `Trainer` was not
+destructuring. **The panel itself stays**, and the reason is worth keeping
+because "is this still needed?" is a fair question: EXPORT is a copy the player
+holds themselves, which an account is not — it is the answer to a deleted
+account or a service that goes away — and the recovery offer reads
+`localStorage`, where a save that failed to parse is stashed, which has nothing
+to do with the server. Only import-to-move-machines was made redundant.
 
 **The marks are shapes, not just colours.** Origin is a ring, shiny a four-point
 star, Holo a hexagon, Astral a diamond - a row of coloured dots is unreadable to

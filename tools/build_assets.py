@@ -751,6 +751,12 @@ def build_player():
     SETS = [("walk",        8,    17,    16,      3),
             ("run",        68,    17,    16,      3),
             ("fish",      236,    33,    32,      4),
+            # THE SURF SET WAS ALWAYS ON THIS SHEET AND WAS NEVER CUT OUT. The
+            # rip marks it green - "unused", in its author's opinion - and
+            # green is a backdrop here exactly as the orange is, so the frames
+            # are real art. Two poses, which is a paddle cycle rather than a
+            # walk cycle: the trainer does not stride on water.
+            ("surf",      377,    33,    32,      2),
             ("jump",      527,    33,    32,      1)]
 
     # BOTH PLAYABLE CHARACTERS ARE ON THIS SHEET, and only one was ever cut out
@@ -803,6 +809,32 @@ def build_player():
           + " ".join(f"{k}:{v['frames']}" for k, v in meta.items()))
 
     build_shoes(out, meta)
+    build_surf(out, meta)
+
+
+def build_surf(strip, meta):
+    """The Surf key item's icon, cut from the set it unlocks.
+
+    The same answer the Running Shoes got and for the same reason: there is no
+    official icon for this anywhere - HMs are not items in this game and never
+    were - so it is real art already in this repository rather than an invented
+    picture of a surfboard. It is the trainer on the water, which is what the
+    item does."""
+    st = meta["surf"]
+    # Row 0 is facing DOWN, which reads best small: the trainer faces you.
+    art = Image.fromarray(strip[0:st["h"], st["x"]:st["x"] + st["w"]], "RGBA")
+    box = art.getbbox()
+    assert box, "the surf frame came out empty - the player sheet moved"
+    art = art.crop(box)
+
+    size, margin = 30, 2
+    scale = (size - margin * 2) / max(art.size)
+    small = art.resize((max(1, round(art.width * scale)),
+                        max(1, round(art.height * scale))), Image.NEAREST)
+    icon = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    icon.paste(small, ((size - small.width) // 2, (size - small.height) // 2), small)
+    icon.save(os.path.join(PUB, "items", "surf.png"))
+    print(f"  surf.png {size}x{size}  (surf frame, {art.width}x{art.height} trimmed)")
 
 
 def build_shoes(strip, meta):

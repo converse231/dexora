@@ -159,6 +159,15 @@ export default function App({
         return;
       }
 
+      /* And S rides out onto it. Its own key rather than a second meaning for
+         F, because at a shoreline BOTH are offered and one key that did either
+         depending on what you hold is the kind of control you cannot trust. */
+      if (ev.key === "s" || ev.key === "S") {
+        ev.preventDefault();
+        e.surf();
+        return;
+      }
+
       if (ev.key === "Shift") { e.setRunning(true); return; }
 
       const dir = KEYS[ev.key];
@@ -198,6 +207,10 @@ export default function App({
   /* Recomputed every render rather than stored: it depends on which way you are
      facing, and every step already re-renders. */
   const rod = engine && !enc && !evo && !fishing ? engine.castable() : null;
+  /* Same shape as the rod prompt and for the same reason: the keyboard has S
+     and a touch player would otherwise have no way to ride at all. It returns
+     the character of the liquid, so the prompt can say which. */
+  const ride = engine && !enc && !evo && !fishing ? engine.surfable() : null;
 
   // Announce a genuinely new species, once, when the ball actually clicks shut.
   /* Money is the clearest signal the game has that something worked, so a
@@ -527,6 +540,12 @@ export default function App({
             </button>
           ) : null}
 
+          {ride ? (
+            <button className="hint hint-act" onClick={() => engine.surf()}>
+              <b>Surf</b> the {ride === "V" ? "lava" : "water"} — <kbd>S</kbd> to ride
+            </button>
+          ) : null}
+
           {/* Touch only - see `.pad` in styles.css. It drives the same engine
               calls the keyboard does and adds no action of its own. */}
           <Pad
@@ -534,6 +553,7 @@ export default function App({
             state={st}
             enc={enc}
             level={level}
+            ride={ride}
             bagOpen={bagView === "all"}
             onBag={() => setBagView((v) => (v === "all" ? null : "all"))}
             onPickBall={() => setBagView("balls")}

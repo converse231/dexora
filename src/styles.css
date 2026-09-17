@@ -3997,7 +3997,15 @@ button:disabled { transition: none; }
      eight tiles plus the tab need about 250 under a 92px offset. The cap is
      the parent's height less that same offset, so the two expressions cannot
      drift, and the list scrolls inside it rather than overflowing. */
-  max-height: calc(100% - max(92px, 9.5cqw) - 3%);
+  /* A FLOOR UNDER THE CAP. The cap alone is `100%` of the offset parent less
+     a 92px offset, and in an ENCOUNTER both terms are measured against a
+     different box: `.battle` sets `container-type: inline-size`, so `cqw`
+     resolves against the battle rather than the viewport. On a short window
+     that left the rail shorter than a single row - and `.br-list` is
+     `overflow-y: auto`, so ONE berry drew a scrollbar with arrows on it, which
+     is what was reported. A cap with no floor is a box that can be squeezed to
+     nothing; `max()` gives it four rows to stand on before anything scrolls. */
+  max-height: max(170px, calc(100% - max(92px, 9.5cqw) - 3%));
   display: flex; flex-direction: column; align-items: stretch; gap: 0;
   padding: .7cqw .55cqw; pointer-events: auto;
   background: rgba(255, 255, 255, .84);
