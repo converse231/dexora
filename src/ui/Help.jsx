@@ -20,7 +20,7 @@
    the two lists together are shorter than most dialogs in this game. */
 
 import { useEffect } from "react";
-import { useModalLock } from "./modal.js";
+import { useModalLock, useDismiss } from "./modal.js";
 import { RUN_LEVEL } from "../game/items.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
@@ -66,7 +66,7 @@ export default function Help({ onClose }) {
   }, [onClose]);
 
   return (
-    <div className="sheet" onClick={onClose}>
+    <div className="sheet" {...useDismiss(onClose)}>
       <div
         className="helpcard"
         role="dialog"

@@ -19,7 +19,7 @@
    affect a single decision, and they were the largest block on the card. */
 
 import { useEffect, useState } from "react";
-import { useModalLock } from "./modal.js";
+import { useModalLock, useDismiss } from "./modal.js";
 import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
@@ -172,7 +172,7 @@ export default function DexSheet({
   }, [onClose]);
 
   return (
-    <div className="sheet" onClick={onClose}>
+    <div className="sheet" {...useDismiss(onClose)}>
       <div
         className="sheet-card"
         role="dialog"

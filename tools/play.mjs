@@ -20,7 +20,7 @@
    reaches `caught`, that a caught Pokémon lands in the box, that the encounter
    closes, and that nothing throws on the way. */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 // ---------------------------------------------------------------- the stubs
 let now = 1000;
@@ -1040,7 +1040,42 @@ function until(e, what, label, max = 2000) {
       `${f} still has the bicycle in its CODE`);
   }
 
-  console.log("bag ok — one answer about what is in it, and no bicycle in the code");
+  /* NO SCRIM CLOSES ON A GESTURE IT DID NOT SEE BEGIN.
+
+     `onClick={onClose}` on a backdrop is not "click away to dismiss", and the
+     difference shipped: the BAG key fires on `pointerdown`, the sheet mounts
+     under a thumb that is still down, and the `touchEnd` hit-tests to the
+     scrim that has just appeared there. Driven over CDP with real touch input
+     the sequence read `view = all` then `view = null, closes = 1` - the bag
+     opening and shutting on one tap. Holding A did the same one beat later.
+
+     The same guard fixes a case nobody had reported: a drag that STARTS inside
+     the card and ends outside it fires its click on the nearest common
+     ancestor, which is the scrim. Swiping the ball strip and drifting off shut
+     the bag; selecting text in Settings and releasing past the edge threw away
+     what had been typed.
+
+     Asserted as an absence across every dialog, because the failure is one
+     component being converted and the next one being written the old way. */
+  const scrims = readdirSync(new URL("../src/ui/", import.meta.url))
+    .filter((f) => f.endsWith(".jsx"))
+    .map((f) => [f, readFileSync(new URL(`../src/ui/${f}`, import.meta.url), "utf8")])
+    .filter(([, body]) => /className="(sheet|bagsheet)"/.test(body));
+  assert.ok(scrims.length >= 5, `only ${scrims.length} dialogs found - the scan is not working`);
+  for (const [f, body] of scrims) {
+    assert.ok(/className="(sheet|bagsheet)" \{\.\.\.useDismiss\(/.test(body),
+      `${f}'s backdrop does not use useDismiss - it will close on the tap that opened it`);
+  }
+
+  /* AND THE GUARD ITSELF STARTS CLOSED. `from` beginning true would mean the
+     very first click closes, which is the bug with extra steps. */
+  const modal = readFileSync(new URL("../src/ui/modal.js", import.meta.url), "utf8");
+  assert.ok(/useRef\(false\)/.test(modal), "useDismiss starts armed - the opening tap will close it");
+  assert.ok(/from\.current = e\.target === e\.currentTarget/.test(modal),
+    "useDismiss no longer records where the gesture started");
+
+  console.log(`bag ok — one answer about what is in it, no bicycle in the code, ` +
+    `and ${scrims.length} scrims that ignore a gesture they did not see begin`);
 }
 
 console.log("play ok — the frame loop never stopped");
