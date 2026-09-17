@@ -270,10 +270,16 @@ Until this is configured, **a forgotten password is an account nobody can ever
 get back into**, and the dex with it. The game has the whole flow built; what it
 needs from you is a way to send mail.
 
-**Why the built-in sender will not do.** Supabase's own mailer is capped at a
-handful of messages per hour *for the whole project* and is explicitly not for
-production — the same cap that blocked sign-ups in step 4. One player forgetting
-a password would spend it.
+**Why the built-in sender will not do.** Supabase's own mailer is capped at
+**2 messages per hour for the whole project**, cannot be raised without custom
+SMTP, and carries no delivery guarantee at all — it is the same cap that blocked
+sign-ups in step 4. Two players forgetting a password in the same hour is the
+whole budget, and what does go out lands in spam often enough to read as broken.
+
+**It is not nothing, though, and that matters for sequencing.** Recovery mail
+does send through it, so the flow works from the day it ships; it works
+*badly*. You can distribute before this step is done and turn it on the day the
+domain lands. What you cannot do is rely on it.
 
 **1. Get an SMTP sender — this project uses [Resend](https://resend.com).**
 Free tier, and password resets will never come close to its limits.
@@ -350,6 +356,11 @@ silently disappears.
 
 **4. Check the template.** *Authentication → Emails → Reset Password*. The
 default is fine; the link expires in an hour and works once.
+
+**Once custom SMTP is on, the cap starts at 30/hour**, not unlimited — Supabase
+imposes its own until you raise it under *Authentication → Rate Limits*. Worth
+doing at the same time, or the first busy day looks exactly like a broken
+mailer.
 
 **5. Test it.** Log out, **I have forgotten my password**, enter your address.
 You should get mail within a minute; the link opens the game on *Choose a new
