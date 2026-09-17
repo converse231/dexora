@@ -1992,9 +1992,13 @@ it replaced was four arrows CENTRED under the map - the one place neither thumb
 reaches - and it could walk and do nothing else, so every other action on a
 phone meant reaching up into the rail with the hand holding the phone.
 
-**A sits low and right of B.** That is the handheld's own diagonal, and it is
-not styling: offsetting them is what stops a thumb rolling off one onto the
-other.
+**A sits HIGH and right of B**, and this file said "low" for a year. Look at a
+GBA: the two face buttons are on a diagonal that RISES towards the right hand,
+so A - the one pressed most - is the upper one and the thumb falls back onto B.
+Inverted, it put the primary action at the bottom of the reach instead of the
+top. Corrected against a photograph of the hardware, which is the only source
+for a question like this. The offset itself is not styling either way: it is
+what stops a thumb rolling off one button onto the other.
 
 **A AND B ARE CONTEXTUAL, so the pad stays four face buttons instead of growing
 a row per situation** - in front of a Pokemon A is THROW (drawn as the ball it

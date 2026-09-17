@@ -104,19 +104,23 @@ body {
 
 /* Level reads as one object: the number, the bar it fills, and the figures
    behind the bar - rather than three separate things sharing a gap. */
+/* THINNER. The pill is a readout, not a control - nothing is ever pressed on
+   it - so it does not need a control's height, and next to a 16px name it was
+   the tallest thing in the bar. The padding carries most of the reduction; the
+   bar loses 2px with it so the three stay on one baseline. */
 .tb-lv {
-  display: flex; align-items: center; gap: 9px;
-  padding: 6px 12px 5px; border-radius: 999px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 11px 2px; border-radius: 999px;
   border: 2px solid var(--line); background: var(--surface-2);
 }
-.tb-lv-num { font-family: var(--pixel); font-size: 11px; color: var(--ink-soft); }
-.tb-lv-num b { color: var(--canopy); font-size: 14px; }
+.tb-lv-num { font-family: var(--pixel); font-size: 10px; color: var(--ink-soft); }
+.tb-lv-num b { color: var(--canopy); font-size: 13px; }
 .tb-lv-xp {
   font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 .xpbar {
-  width: 56px; height: 8px; border-radius: 99px;
+  width: 56px; height: 6px; border-radius: 99px;
   background: var(--line); overflow: hidden;
 }
 .xpbar i { display: block; height: 100%; background: var(--canopy); border-radius: 99px; }
@@ -135,6 +139,28 @@ body {
 .biome-tag .types { margin-top: 3px; }
 .biome-tag i { font-style: normal; font-size: 9px; color: var(--ink-faint); }
 .biome-tag em { font-style: normal; font-size: 9.5px; color: var(--path); }
+
+/* SMALLER WHERE THE MAP IS SMALLEST. The tag is a label ON the viewport, so it
+   costs map rather than page - and it was sized for a desktop, where the
+   viewport is three times the area. On a phone the name, four type badges and
+   the border were taking most of the top-left quarter of the world, which is
+   the quarter the trainer walks into first. Gated on the pointer rather than
+   on width, the rule the pad and the two bags follow: this is about how big
+   the map is, and on a coarse pointer it is always the small one. */
+@media (hover: none) and (pointer: coarse) {
+  .biome-tag {
+    top: 7px; padding: 5px 8px 4px; gap: 2px;
+    font-size: 8.5px; border-radius: 7px; border-width: 2px;
+  }
+  .biome-tag .types { margin-top: 2px; gap: 3px; }
+  .biome-tag .type { font-size: 6.5px; padding: 2px 4px 1px; }
+  .biome-tag i { font-size: 7.5px; }
+  .biome-tag em { font-size: 8px; }
+  /* The clock is the other thing pinned to the world, and it is the same
+     decision - it says one word and a time. */
+  .worldclock { padding: 4px 7px 3px; font-size: 8.5px; }
+  .worldclock b { font-size: 10px; }
+}
 
 /* ---------- layout ---------- */
 .stage { display: grid; gap: 12px; align-items: start; }
@@ -1502,10 +1528,21 @@ canvas {
    drew a box around each row and made the menu look like three more buttons. */
 .tb-pop button {
   cursor: pointer; text-align: left; white-space: nowrap;
+  display: flex; align-items: center; gap: 9px;
   padding: 9px 11px; border: 0; border-radius: 7px;
   font-family: var(--body); font-size: 13.5px; font-weight: 400;
   color: var(--ink); background: none;
 }
+/* Stroked, `currentColor`, and `flex: none` so a long label never squeezes the
+   glyph out of round. 1.7 rather than 2: at 16px a 2px stroke on a cog closes
+   its own teeth up. */
+.tb-icon {
+  flex: none; width: 16px; height: 16px;
+  fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
+  opacity: .62;
+}
+.tb-pop button:hover .tb-icon { opacity: 1; }
 .tb-pop button:hover { border-color: transparent; }
 .tb-pop button:hover { background: var(--surface-2); }
 .tb-pop button:focus-visible { outline: 2px solid var(--canopy); outline-offset: -2px; }
@@ -3003,8 +3040,14 @@ canvas {
      offsetting them is what stops a thumb rolling off one onto the other. */
   .pad-face { display: flex; align-items: flex-start; gap: 10px; }
   .pad-a, .pad-b { width: 62px; height: 62px; border-radius: 50%; }
-  .pad-b { margin-top: 0; }
-  .pad-a { margin-top: 16px; }
+  /* A HIGH AND RIGHT, B LOW AND LEFT. Look at a GBA: the two face buttons sit
+     on a diagonal that rises towards the right hand, so A - the one you press
+     most - is the upper one and the thumb falls back onto B. This had the
+     diagonal inverted, which put the primary action at the bottom of the reach
+     rather than the top of it, and the note explaining the choice described
+     the console backwards. Corrected against a photograph of the hardware. */
+  .pad-a { margin-top: 0; }
+  .pad-b { margin-top: 18px; }
   .pad-a b, .pad-b b { font-size: 17px; color: var(--ink); font-weight: 400; }
   /* The face labels carry the meaning - "A" alone is only legible to somebody
      who already knows the console - so they are a step up from the mini rows. */
