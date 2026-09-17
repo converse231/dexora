@@ -3907,9 +3907,17 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     const head = css.indexOf(`.gate-art.ch-${name} {`);
     assert.ok(head >= 0, `.gate-art.ch-${name} has no rule - the gate cannot draw ${name}`);
     const rule = css.slice(head, css.indexOf("}", head) + 1);
+    /* IN SHEET ROWS, NOT PIXELS, and that is the whole reason this got simpler.
+       The rules used to carry four hand-scaled numbers (48/57/768, -39, -423)
+       that all had to agree about a 3x zoom, and the assertion had to divide
+       the background-size by 256 to recover it. They are written as the real
+       measurement times `--z` now - which is what lets the settings list draw
+       the same art at 2x without a second copy of the rule - so the offset
+       reads straight off as a row count and there is no scale to get wrong. */
     const at = Number(
-      rule.match(/background-position:\s*0\s+(-?\d+)(?:px)?/)?.[1] ?? NaN);
-    assert.ok(Number.isFinite(at), `.gate-art.ch-${name} has no readable offset`);
+      rule.match(/background-position:\s*0\s+calc\(\s*(-?\d+)px\s*\*\s*var\(--z\)/)?.[1] ?? NaN);
+    assert.ok(Number.isFinite(at),
+      `.gate-art.ch-${name} has no readable offset - it must be calc(-Npx * var(--z))`);
     return at;
   };
 
@@ -3919,19 +3927,23 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   const artHead = css.indexOf(".gate-art {");
   assert.ok(artHead >= 0, ".gate-art has no rule");
   const artRule = css.slice(artHead, css.indexOf("}", artHead) + 1);
-  const sheetPx = Number(artRule.match(/background-size:\s*(\d+)px/)?.[1] ?? 0);
-  const wide = 256;                       // player.png is square, 256 at 1x
-  const scale = sheetPx / wide;
-  assert.ok(scale > 0, "the gate art has no background-size to scale from");
+
+  /* THE SHEET IS SQUARE AND THE CROP IS READ OFF IT, so the one number the
+     rule may not get wrong is 256: every offset below is a row index into a
+     256-row sheet, and a background-size that is not 256 x --z would slide
+     every trainer by a fraction of a block. */
+  assert.ok(/--z:\s*\d+/.test(artRule),
+    ".gate-art has no --z, so the settings list cannot draw it at a second size");
+  assert.ok(/background-size:\s*calc\(\s*256px\s*\*\s*var\(--z\)/.test(artRule),
+    ".gate-art's background-size is not 256px * var(--z) - the offsets are row indices into that");
 
   for (let i = 1; i < names.length; i++) {
-    const rows = sheet.chars[names[i]] - sheet.chars[names[i - 1]];
-    const want = rows * sheet.rowH * scale;
+    const want = (sheet.chars[names[i]] - sheet.chars[names[i - 1]]) * sheet.rowH;
     const got = offsetOf(names[i - 1]) - offsetOf(names[i]);
     assert.equal(got, want,
-      `${names[i - 1]} and ${names[i]} sit ${got}px apart in the picker, but ` +
-      `player.json puts them ${want}px apart - the gate would show a trainer ` +
-      "you do not play");
+      `${names[i - 1]} and ${names[i]} sit ${got} sheet rows apart in the ` +
+      `picker, but player.json puts them ${want} apart - the gate would show ` +
+      "a trainer you do not play");
   }
 
   console.log(`trainer art ok — ${names.join("/")} picked from one strip, ` +
