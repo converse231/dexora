@@ -2435,6 +2435,18 @@ fails if a better ball is ever worth nothing.
   its own reveal and therefore dropped `mon-idle` as well - Origins formed and
   then stood perfectly still while everything else breathed. If you override
   `animation` on a `.mon`, re-list what you still want.
+- **AND THE STATE THAT ENDS AN ENCOUNTER OUTRANKS ANY TIER'S IDLE.** The same
+  note, paid for a third time and fixed generally this time. **An Origin would
+  not go into the ball** - reported from play, and measured: the computed
+  `animation-name` on a captured Origin was `origin-form, mon-idle`.
+  `.sprite-origin.mon` is TWO classes, exactly like `.mon.captured`, so the
+  cascade fell through to source order and the tier rule is further down the
+  file; `mon-absorb` never ran. The same tie broke fleeing. So `.mon.captured`
+  and `.mon.gone` carry `!important`, because specificity cannot promise it - a
+  tier only has to TIE. A tier's **`filter`** must be `!important` (an
+  animation outranks a plain declaration) and its **`animation`** must not be:
+  Glitched took one and beat absorb, flee and the evolution reveal at once.
+  tools/play asserts both halves across every tier.
 - **`<details open={...}>` in React is a trap.** It is a controlled prop with no
   change event wired up, so React re-asserts it on every render: the filter panel
   slammed shut under the user the moment they typed one letter into the search
