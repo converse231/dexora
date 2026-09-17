@@ -1,15 +1,31 @@
 /* EVERYTHING ABOUT THE PERSON, IN ONE PLACE.
 
    These controls were on the YOU panel, wedged under the stat rows, and that
-   was the wrong room for them twice over: YOU is about what a trainer has
-   EARNED - points, ranks, key items - and the panel is a column in a rail that
-   scrolls, so "delete my account forever" sat one flick below "spend a point".
-   A setting is not a reward, and an irreversible action does not belong in a
-   scroller you flick past.
+   was the wrong room twice over: YOU is about what a trainer has EARNED -
+   points, ranks, key items - and the panel is a column in a rail that scrolls,
+   so "delete my account forever" sat one flick below "spend a point". A setting
+   is not a reward, and an action with no undo does not belong in a scroller you
+   flick past. So it is a dialog off the top bar, where the name it edits is
+   already shown, and it takes the modal lock - the arrow keys must not walk the
+   trainer while somebody is typing a new password into a field.
 
-   So it is a dialog off the top bar, where the name it edits is already shown,
-   and it takes the modal lock - the arrow keys must not walk the trainer while
-   somebody is typing a new password into a field.
+   ONE GRID, LABEL LEFT AND CONTROL RIGHT. It was a stack of sections - a
+   heading, a sentence explaining it, then the control, five times over - which
+   is three lines of vertical space before each input and a dialog twice the
+   height of a phone. Putting the label beside its control instead of above it
+   removes a line per setting, and the labels then form a column you can read
+   down, which a stack of headings never was.
+
+   THE PROSE IS WHAT MADE IT TALL, and most of it was explaining things that do
+   not need explaining: two trainer sprites are not clearer for a sentence
+   underneath them, and neither is a box with your name already in it. Two
+   hints survive, and only because they answer a question the control cannot:
+   why a game is asking for a date of birth, and why changing a password wants
+   the old one. A hint that only repeats its label is noise that costs a line.
+
+   AN ACCORDION WAS TRIED AND REJECTED. It was more compact still - four rows
+   and nothing else until you clicked - but a settings dialog you have to
+   open twice to see what is in it is not easier to understand, it is smaller.
 
    ONE WRITER FOR THE PROFILE. Name, character and birthday all go through
    `onProfile(patch)`, which is one `update` on one row; three functions would
@@ -28,19 +44,6 @@ import { nameProblem, NAME_MAX, ageProblem } from "../game/name.js";
    picked here is literally what walks. */
 const CHARS = [["red", "Boy"], ["leaf", "Girl"]];
 
-/* A section that owns its own "saving" and "what happened" state, because
-   three forms sharing one note is three forms that can contradict each other -
-   rename succeeds, the note says so, and then the birthday fails silently. */
-function Field({ title, why, children }) {
-  return (
-    <section className="set-row">
-      <h4>{title}</h4>
-      {why && <p className="set-why">{why}</p>}
-      {children}
-    </section>
-  );
-}
-
 export default function Settings({ account, onClose }) {
   useModalLock();
 
@@ -52,11 +55,14 @@ export default function Settings({ account, onClose }) {
   const [pw, setPw] = useState("");
   const [again, setAgain] = useState("");
 
-  const [nameNote, setNameNote] = useState("");
-  const [bornNote, setBornNote] = useState("");
-  const [pwNote, setPwNote] = useState("");
+  /* A NOTE PER ROW, because every row is on screen at once. One shared line
+     would report a rename under a birthday that had quietly failed, and it
+     would sit wherever the last success happened to leave it. */
+  const [said, setSaid] = useState({});
   const [busy, setBusy] = useState("");
   const [killing, setKilling] = useState(false);
+
+  const tell = (row, line) => setSaid((was) => ({ ...was, [row]: line }));
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
@@ -64,10 +70,10 @@ export default function Settings({ account, onClose }) {
     return () => removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  /* THE CHARACTER SAVES ON THE CLICK, with no button of its own. It is the one
-     setting here that is instantly visible and instantly reversible - the
-     trainer on the map changes under the dialog - so a SAVE step would be
-     ceremony around something you can simply undo by clicking the other one. */
+  /* THE CHARACTER SAVES ON THE CLICK. It is instantly visible and instantly
+     reversible - the trainer on the map changes behind the dialog - so a SAVE
+     button beside it would be ceremony around something you undo by clicking
+     the other one. */
   const choose = async (id) => {
     if (id === pick || busy) return;
     const was = pick;
@@ -75,7 +81,7 @@ export default function Settings({ account, onClose }) {
     setBusy("char");
     const got = await account.onProfile({ char: id });
     setBusy("");
-    if (!got.ok) setPick(was);             // and back, if the row refused it
+    if (!got.ok) { setPick(was); tell("char", got.error); }
   };
 
   return (
@@ -87,149 +93,140 @@ export default function Settings({ account, onClose }) {
         aria-label="Settings"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="set-head">
+        <div className="set-top">
           <h3>Settings</h3>
-          <span className="set-mail">{account.email}</span>
+          <span className="set-mail" title={account.email}>{account.email}</span>
           <button className="set-x" onClick={onClose} aria-label="Close settings">✕</button>
         </div>
 
         <div className="set-body">
-          <Field
-            title="Trainer name"
-            why="How other trainers see you. Changing it does not touch your Pokédex."
+          <form
+            className="set-row"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const problem = nameProblem(name);
+              if (problem) { tell("name", problem); return; }
+              if (name.trim() === account.name) { tell("name", "That is already your name."); return; }
+              setBusy("name"); tell("name", "");
+              const got = await account.onProfile({ username: name.trim() });
+              setBusy("");
+              tell("name", got.ok ? `You are ${name.trim()} now.` : got.error);
+            }}
           >
-            <form
-              className="set-line"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const problem = nameProblem(name);
-                if (problem) { setNameNote(problem); return; }
-                if (name.trim() === account.name) { setNameNote("That is already your name."); return; }
-                setBusy("name"); setNameNote("");
-                const got = await account.onProfile({ username: name.trim() });
-                setBusy("");
-                setNameNote(got.ok ? `You are ${name.trim()} now.` : got.error);
-              }}
-            >
+            <label className="set-label" htmlFor="set-name">Name</label>
+            <div className="set-ctl">
               <input
-                className="set-in"
-                type="text"
-                value={name}
-                maxLength={NAME_MAX}
+                id="set-name" className="set-in" type="text" value={name} maxLength={NAME_MAX}
                 onChange={(e) => setName(e.target.value)}
-                aria-label="Trainer name"
               />
               <button className="set-go" type="submit" disabled={busy === "name"}>
-                {busy === "name" ? "…" : "RENAME"}
+                {busy === "name" ? "…" : "SAVE"}
               </button>
-            </form>
-            <Note>{nameNote}</Note>
-          </Field>
+            </div>
+            <Note>{said.name}</Note>
+          </form>
 
-          <Field title="Your trainer" why="Only changes who you see walking.">
-            <div className="set-chars" role="radiogroup" aria-label="Trainer">
+          <div className="set-row">
+            <span className="set-label" id="set-char-l">Trainer</span>
+            <div className="set-ctl" role="radiogroup" aria-labelledby="set-char-l">
               {CHARS.map(([id, label]) => (
                 <button
                   key={id}
                   type="button"
                   role="radio"
                   aria-checked={pick === id}
-                  className={`gate-char${pick === id ? " on" : ""}`}
+                  aria-label={label}
+                  data-tip={label}
+                  className={`set-char${pick === id ? " on" : ""}`}
                   onClick={() => choose(id)}
                 >
                   <span className={`gate-art ch-${id}`} aria-hidden="true" />
-                  <i>{label}</i>
                 </button>
               ))}
             </div>
-          </Field>
+            <Note>{said.char}</Note>
+          </div>
 
-          <Field
-            title="Date of birth"
-            why="Used for the age check and to wish you a happy birthday. Never shown to other trainers."
+          <form
+            className="set-row"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const problem = ageProblem(born);
+              if (problem) { tell("born", problem); return; }
+              setBusy("born"); tell("born", "");
+              const got = await account.onProfile({ birthdate: born });
+              setBusy("");
+              tell("born", got.ok ? "Saved." : got.error);
+            }}
           >
-            <form
-              className="set-line"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const problem = ageProblem(born);
-                if (problem) { setBornNote(problem); return; }
-                setBusy("born"); setBornNote("");
-                const got = await account.onProfile({ birthdate: born });
-                setBusy("");
-                setBornNote(got.ok ? "Saved." : got.error);
-              }}
-            >
+            <label className="set-label" htmlFor="set-born">Birthday</label>
+            <div className="set-ctl">
               <input
-                className="set-in"
-                type="date"
-                value={born}
+                id="set-born" className="set-in" type="date" value={born}
                 max={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => setBorn(e.target.value)}
-                aria-label="Date of birth"
               />
               <button className="set-go" type="submit" disabled={busy === "born"}>
                 {busy === "born" ? "…" : "SAVE"}
               </button>
-            </form>
-            <Note>{bornNote}</Note>
-          </Field>
+            </div>
+            {/* One of the two hints that survived: a game asking for a date of
+                birth owes an answer to "why", and the control cannot give it. */}
+            <p className="set-hint">Age check and birthday wishes. Never shown to other trainers.</p>
+            <Note>{said.born}</Note>
+          </form>
 
-          {/* THE EMAIL IS SHOWN AND NOT EDITABLE, deliberately. Changing it is a
-              two-mail confirmation dance - the old address has to approve and
-              the new one has to verify - and half-building that is how an
-              account ends up pointing at an inbox nobody owns. It is also the
-              only handle on the account if the password goes, so it is the last
-              thing to make easy to change by accident. */}
-          <Field
-            title="Password"
-            why="Your current one first — so a borrowed laptop with this tab open is not a stolen account."
+          <form
+            className="set-row"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (pw.length < 6) { tell("pw", "Passwords need at least six characters."); return; }
+              if (pw !== again) { tell("pw", "Those two do not match."); return; }
+              if (pw === cur) { tell("pw", "That is the password you already have."); return; }
+              setBusy("pw"); tell("pw", "");
+              const got = await account.onPassword(cur, pw);
+              setBusy("");
+              if (!got.ok) { tell("pw", got.error); return; }
+              setCur(""); setPw(""); setAgain("");
+              tell("pw", "Changed. Use the new one next time you log in.");
+            }}
           >
-            <form
-              className="set-stack"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (pw.length < 6) { setPwNote("Passwords need at least six characters."); return; }
-                if (pw !== again) { setPwNote("Those two do not match."); return; }
-                if (pw === cur) { setPwNote("That is the password you already have."); return; }
-                setBusy("pw"); setPwNote("");
-                const got = await account.onPassword(cur, pw);
-                setBusy("");
-                if (!got.ok) { setPwNote(got.error); return; }
-                setCur(""); setPw(""); setAgain("");
-                setPwNote("Changed. Use the new one next time you log in.");
-              }}
-            >
+            <label className="set-label" htmlFor="set-cur">Password</label>
+            <div className="set-ctl set-wrap">
               <input
-                className="set-in" type="password" autoComplete="current-password"
-                placeholder="Current password" value={cur}
-                onChange={(e) => setCur(e.target.value)} aria-label="Current password"
+                id="set-cur" className="set-in" type="password" autoComplete="current-password"
+                placeholder="Current" value={cur} onChange={(e) => setCur(e.target.value)}
+              />
+              <input
+                className="set-in" type="password" autoComplete="new-password" minLength={6}
+                placeholder="New" value={pw} onChange={(e) => setPw(e.target.value)}
+                aria-label="New password"
               />
               <input
                 className="set-in" type="password" autoComplete="new-password"
-                placeholder="New password" value={pw} minLength={6}
-                onChange={(e) => setPw(e.target.value)} aria-label="New password"
+                placeholder="Repeat" value={again} onChange={(e) => setAgain(e.target.value)}
+                aria-label="Repeat new password"
               />
-              <input
-                className="set-in" type="password" autoComplete="new-password"
-                placeholder="New password again" value={again}
-                onChange={(e) => setAgain(e.target.value)} aria-label="New password again"
-              />
-              <button className="set-go wide" type="submit" disabled={busy === "pw"}>
-                {busy === "pw" ? "…" : "CHANGE PASSWORD"}
+              <button className="set-go" type="submit" disabled={busy === "pw"}>
+                {busy === "pw" ? "…" : "CHANGE"}
               </button>
-            </form>
-            <Note>{pwNote}</Note>
-          </Field>
+            </div>
+            {/* The other one. Nothing about three password boxes explains why
+                the first is wanted, and "we do not trust your open tab" is the
+                kind of reason worth saying out loud. */}
+            <p className="set-hint">The current one first, so an open tab on a borrowed laptop is not a stolen account.</p>
+            <Note>{said.pw}</Note>
+          </form>
 
-          <Field
-            title="Delete account"
-            why="Your Pokédex, your box and your name all go. It cannot be undone, and the name becomes free for someone else."
-          >
-            <button className="set-go kill" onClick={() => setKilling(true)}>
-              DELETE MY ACCOUNT
+          {/* QUIET, AND LAST. It was a full-width red button, which gave the
+              rarest action in the dialog the loudest thing in it. The weight
+              belongs on the confirmation, which asks for the name to be
+              typed. */}
+          <div className="set-foot">
+            <button className="set-kill" onClick={() => setKilling(true)}>
+              Delete my account
             </button>
-          </Field>
+          </div>
         </div>
       </div>
 

@@ -1442,17 +1442,22 @@ canvas {
    fishing frames need, and the figure is anchored to the bottom so it stands on
    a 16px tile. Showing the whole cell put each trainer in a box half made of
    nothing. Measured off player.png rather than eyeballed; 19 rows at 3x is 57. */
+/* EVERY NUMBER HERE IS THE REAL ONE TIMES `--z`, which is what lets the same
+   art be drawn at a second size without a second copy of the rule - the
+   settings list wants it at 2x where the gate wants 3x, and four hand-scaled
+   magic numbers would have to agree. 16x19 is the crop, 256 the sheet, and 13
+   and 141 the row offsets into it. */
 .gate-art {
-  width: 48px; height: 57px;
+  --z: 3;
+  width: calc(16px * var(--z)); height: calc(19px * var(--z));
   image-rendering: pixelated;
   background-image: url("tilesets/player.png");
-  /* 256x256 at 3x, so a 16x32 frame reads at 48x96. */
-  background-size: 768px 768px;
+  background-size: calc(256px * var(--z)) calc(256px * var(--z));
   background-repeat: no-repeat;
 }
-/* Row block x 32 rows x 3, plus the 13-row inset above the art, negated. */
-.gate-art.ch-red { background-position: 0 -39px; }
-.gate-art.ch-leaf { background-position: 0 -423px; }
+/* Row block x 32 rows, plus the 13-row inset above the art, negated. */
+.gate-art.ch-red { background-position: 0 calc(-13px * var(--z)); }
+.gate-art.ch-leaf { background-position: 0 calc(-141px * var(--z)); }
 
 .gate-wait { justify-items: center; gap: 10px; text-align: center; }
 .gate-wait p { margin: 0; font-size: 13px; color: var(--ink-soft); }
@@ -1930,58 +1935,98 @@ canvas {
    A confirm is read in about a second, so it should be about a second tall. The
    first version set a 23px title, 10px-padded rows and 15px buttons inside 22px
    of card padding, which made three short facts fill half the screen. */
-/* THE SETTINGS DIALOG. Built on `.sheet`, which already owns the backdrop, the
-   centring and the z-index, so this is only the card - and it is the same card
-   `.sheet-card` is, at a different width, because a second dialog that looks
-   like a different app is how an interface stops being one.
+/* THE SETTINGS DIALOG: ONE GRID, label left and control right.
 
-   `max-height` and the scroll live on the BODY rather than the card, so the
-   header with the close button in it cannot scroll away from somebody halfway
-   down a form. */
+   It was a stack of sections - a pixel heading, a sentence explaining it, then
+   the control, five times over - which is three lines of vertical space before
+   each input and a card twice the height of a phone. Beside its control, a
+   label costs no line of its own, and the labels line up into a column you can
+   read down, which a stack of headings never was.
+
+   An accordion was tried in between and rejected: four rows and nothing else
+   until you click is smaller, but a dialog you have to open twice to see what
+   is in it is not easier to understand.
+
+   Built on `.sheet`, which owns the backdrop, the centring and the z-index, so
+   this is only the card - and it is the same card `.sheet-card` is, because a
+   second dialog that looks like a different app is how an interface stops
+   being one. */
 .settings {
   width: min(430px, 100%); display: flex; flex-direction: column;
-  max-height: min(88vh, 720px);
+  max-height: min(88vh, 680px);
   background: var(--surface); border: 3px solid var(--canopy);
   border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
   overflow: hidden;
 }
-.set-head {
-  flex: none; display: flex; align-items: baseline; gap: 10px;
-  padding: 15px 16px 12px; border-bottom: 2px solid var(--line);
+
+/* The header does not scroll: the close button must not go anywhere while
+   somebody is halfway down a form. */
+.set-top {
+  flex: none; display: flex; align-items: baseline; gap: 9px;
+  padding: 13px 15px 11px; border-bottom: 2px solid var(--line);
 }
-.set-head h3 {
-  margin: 0; font-family: var(--display); font-weight: 600; font-size: 19px;
+.set-top h3 {
+  margin: 0; font-family: var(--display); font-weight: 600; font-size: 18px;
 }
 .set-mail {
-  flex: 1; min-width: 0; font-size: 11.5px; color: var(--ink-faint);
+  flex: 1; min-width: 0; font-size: 11px; color: var(--ink-faint);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .set-x {
-  flex: none; cursor: pointer; padding: 3px 7px; line-height: 1;
+  flex: none; cursor: pointer; padding: 2px 6px; line-height: 1;
   font-size: 13px; color: var(--ink-soft);
 }
 .set-x:hover { color: var(--path); }
 
-.set-body { overflow-y: auto; padding: 4px 16px 16px; }
+.set-body { overflow-y: auto; padding: 0 15px 14px; }
 
-/* Each section is a rule and a heading rather than a box. Six cards stacked in
-   a scroller is six borders arguing about which is the outer one. */
-.set-row { padding: 14px 0; border-bottom: 2px solid var(--line); }
-.set-row:last-child { border-bottom: 0; padding-bottom: 4px; }
-.set-row h4 {
-  margin: 0 0 4px; font-family: var(--pixel); font-size: 10.5px;
-  letter-spacing: .06em; color: var(--ink);
+/* TWO COLUMNS, and the label column is sized by its widest label so every
+   control starts on the same line - `max-content` rather than a guessed width,
+   which is what stops "Birthday" and "Password" disagreeing about where the
+   inputs begin.
+
+   A rule between rows rather than a box around each: five bordered cards
+   stacked in a card is five borders arguing about which one is the outer one. */
+.set-row {
+  display: grid; grid-template-columns: max-content 1fr;
+  align-items: center; gap: 5px 12px;
+  padding: 11px 0; border-bottom: 2px solid var(--line);
 }
-.set-why { margin: 0 0 9px; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
+.set-row:last-of-type { border-bottom: 0; }
 
-.set-line { display: flex; gap: 8px; align-items: stretch; }
-.set-stack { display: grid; gap: 8px; }
+/* CENTRED AGAINST ONE LINE, TOP-ALIGNED AGAINST TWO. Every row but the
+   password's is a label beside a single control, where centring is right; that
+   one wraps to two lines of boxes and centring dropped its label into the gap
+   between them, pointing at nothing. `:has` is the only way to ask "does this
+   row wrap" in CSS, and where it is not supported the fallback is the centred
+   version - not ideal, not broken. */
+.set-row:has(.set-wrap) { align-items: start; }
+.set-row:has(.set-wrap) .set-label { padding-top: 12px; }
 
-/* 16px again, for the reason `.gate-field input` carries: below it iOS zooms
-   the whole viewport when a field takes focus, and this one opens over a game. */
+.set-label {
+  font-family: var(--pixel); font-size: 9.5px; letter-spacing: .06em;
+  color: var(--ink-faint);
+}
+
+/* Everything in the right-hand column sits on one line unless it says
+   otherwise - which only the password row does, having three boxes and a
+   button where the others have one and one. */
+.set-ctl { display: flex; gap: 7px; align-items: stretch; min-width: 0; }
+.set-wrap { flex-wrap: wrap; }
+.set-wrap .set-in { flex: 1 1 7rem; }
+
+/* The hint and the note belong under the CONTROL, not under the label, so they
+   line up with the thing they are about. */
+.set-hint, .set-row .note {
+  grid-column: 2;
+  margin: 0; font-size: 11px; line-height: 1.4; color: var(--ink-faint);
+}
+
+/* 16px, for the reason `.gate-field input` carries: below it iOS zooms the
+   whole viewport when a field takes focus, and this one opens over a game. */
 .set-in {
   flex: 1; min-width: 0; box-sizing: border-box;
-  padding: 10px 11px; font: inherit; font-size: 16px;
+  padding: 9px 10px; font: inherit; font-size: 16px;
   color: var(--ink); background: var(--surface-2);
   border: 2px solid var(--line-firm); border-radius: 9px;
 }
@@ -1989,7 +2034,7 @@ canvas {
 
 .set-go {
   flex: none; cursor: pointer; white-space: nowrap;
-  font-family: var(--pixel); font-size: 10.5px; padding: 10px 13px 8px;
+  font-family: var(--pixel); font-size: 10px; padding: 9px 12px 7px;
   border: 2px solid var(--canopy); border-radius: 9px;
   background: var(--surface); color: var(--canopy);
   transition: background 140ms ease, color 140ms ease;
@@ -1997,15 +2042,41 @@ canvas {
 .set-go:hover:not(:disabled) { background: var(--canopy); color: #fff; }
 .set-go:disabled { opacity: .45; cursor: default; }
 .set-go:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
-.set-go.wide { width: 100%; }
-.set-go.kill { width: 100%; border-color: var(--path); color: var(--path); }
-.set-go.kill:hover { background: var(--path); color: #fff; }
 
-.set-chars { display: flex; gap: 10px; }
-/* The tiles are the gate's own, so the question looks the same wherever it is
-   asked - but there it is the only thing on a card and here it is one row of
-   six, so it loses the gate's margins and nothing else. */
-.set-chars .gate-char { margin: 0; }
+/* Small enough to sit on one line beside its label. No caption: at this size
+   the red cap and the white hat are the label, and `aria-label` carries the
+   word for anybody who is not looking at them. */
+.set-char {
+  flex: none; cursor: pointer; display: grid; place-items: center;
+  padding: 3px 10px;
+  border: 2px solid var(--line-firm); border-radius: 10px;
+  background: var(--surface-2);
+}
+.set-char .gate-art { --z: 2; }
+.set-char.on { border-color: var(--canopy); background: var(--path-soft); }
+.set-char:focus-visible { outline: 2px solid var(--canopy); outline-offset: 2px; }
+
+/* QUIET, AND LAST. It was a full-width red button, which gave the rarest
+   action in the dialog the loudest thing in it. The weight belongs on the
+   confirmation, which asks for the trainer's name to be typed. */
+.set-foot { padding-top: 13px; border-top: 2px solid var(--line); }
+.set-kill {
+  cursor: pointer; background: none; border: 0; padding: 2px 0;
+  font: inherit; font-size: 12.5px; color: var(--ink-faint);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.set-kill:hover { color: var(--path); }
+.set-kill:focus-visible { outline: 2px solid var(--path); outline-offset: 2px; }
+
+/* BELOW ABOUT 360px THE TWO COLUMNS STOP FITTING - a pixel label plus an input
+   plus a SAVE button needs more than a narrow phone has, and `max-content`
+   will not shrink a label, so the input is what gets crushed. One column, with
+   the label above, which is the layout this replaced and is the right answer
+   at a width where nothing else fits. */
+@media (max-width: 360px) {
+  .set-row { grid-template-columns: 1fr; gap: 6px; }
+  .set-hint, .set-row .note { grid-column: 1; }
+}
 
 .confirm {
   width: min(400px, 100%);
