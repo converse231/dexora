@@ -567,6 +567,13 @@ export function createEngine(canvas, onChange, mini = null) {
      `state.stale` is what the top bar reads; it latches, because the warning
      belongs to the session rather than to one write. */
   function save() {
+    /* AND A SESSION THAT HAS BEEN TAKEN OVER STOPS WRITING AT ALL - not just to
+       the account, to localStorage too. Two tabs share one localStorage key, so
+       an abandoned tab that goes on writing locally overwrites the copy the
+       LIVE tab is keeping, and on the next boot `newer` can hand the resurrected
+       loser back to the player. Refusing to sync while still writing locally
+       would be a worse bug than the one it fixes. */
+    if (state.stale === "taken") return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       const { encounter, evolution, fishing, running, cheers, rev, stale, hint,
@@ -1634,6 +1641,15 @@ export function createEngine(canvas, onChange, mini = null) {
        and has not reached the server yet. Local always wins the slot: it is the
        worse news, and showing the milder one over it would hide it. */
     syncTrouble(why) {
+      /* ONE OF THESE IS NOT A DEGREE OF THE OTHERS. "full" and "blocked" are
+         local failures and outrank a sync failure, because this session is at
+         risk right now where that one is merely behind. "taken" outranks every
+         one of them and never clears: the account is being played somewhere
+         else, nothing this session does from here can be kept, and a warning
+         that could be cleared by the next successful local write would be a
+         lie about that. */
+      if (state.stale === "taken") return;
+      if (why === "taken") { state.stale = "taken"; changed(); return; }
       const soft = why ? "offline" : null;
       if (state.stale === "full" || state.stale === "blocked") return;
       if (state.stale === soft) return;

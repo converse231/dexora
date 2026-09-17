@@ -112,7 +112,19 @@ export function keep(key, raw) {
    difference matters: a debounce that resets on every write never fires while
    somebody is walking, which is exactly when there is most to lose. A trailing
    push always follows the last write, so the final state always lands. */
-const SYNC_MS = 4000;
+/* MEASURED, THEN RAISED. At 4s a player walking steadily produces 900 uploads
+   an hour, and an upload is not a small thing on this table: the save is a
+   jsonb document that TOASTs past about 8KB (a 600-caught save measures 39KB),
+   so every one rewrites the row and its out-of-line chunks, leaves a dead tuple
+   for autovacuum, and fires a trigger that expands a 1,145-element array to
+   recount the dex. 100 players walking is 25 of those a second.
+
+   15s costs almost nothing in exchange. The local write is still every 400ms
+   and it is the copy the next frame reads, so what this cadence actually
+   decides is how much play is missing if the DEVICE is lost between now and the
+   next flush - and `flushNow` on the way out (below) covers the ordinary way a
+   session ends. */
+const SYNC_MS = 15000;
 /* A FAILED UPLOAD IS RETRIED, NOT DROPPED. The first version cleared `pending`
    before awaiting the push, so a failure threw the save away: the game only
    recovered because the next write repopulated it, which means stopping play
@@ -133,8 +145,27 @@ export function onSyncTrouble(fn) {
   report = typeof fn === "function" ? fn : () => {};
 }
 
+/* LEAVING IS THE COMMONEST WAY A SESSION ENDS, and nothing was listening for
+   it - so up to a whole coalescing window of play only ever existed on the
+   device it was played on. Registered once, on the first mirror, because that
+   is the first moment there is a `push` to call.
+
+   BOTH EVENTS, because they cover different exits. `visibilitychange` to
+   hidden is the reliable one: switching tab or app fires it while the page is
+   still fully alive, which is when a request can actually be made, and it is
+   what a phone does before it backgrounds a browser. `pagehide` is the
+   best-effort one for a closed tab, where the request may or may not survive -
+   it costs nothing to try, and the local copy is untouched either way. */
+let leaving = false;
+
 export function mirror(raw, push) {
   pending = raw;
+  if (!leaving && globalThis.addEventListener) {
+    leaving = true;
+    const out = () => { if (document?.visibilityState !== "visible") flushNow(push); };
+    globalThis.addEventListener("visibilitychange", out);
+    globalThis.addEventListener("pagehide", () => flushNow(push));
+  }
   if (timer || inflight) return;
   timer = setTimeout(() => flush(push), wait);
 }
@@ -146,9 +177,11 @@ async function flush(push) {
   pending = null;
   inflight = true;
   let ok = false;
+  let beaten = false;
   try {
     const got = await push(raw);
     ok = got?.ok !== false;
+    beaten = got?.why === "taken";
     report(ok ? null : (got.why ?? "offline"));
   } catch {
     report("offline");
@@ -156,6 +189,12 @@ async function flush(push) {
     inflight = false;
     if (ok) {
       wait = SYNC_MS;
+    } else if (beaten) {
+      /* ANOTHER SESSION OWNS THE SAVE, so retrying is not slow, it is wrong:
+         every attempt would be refused by the same claim, and the payload it is
+         holding is from a game the account has already moved on from. Drop it
+         and stop. The engine stops writing too - see `stale === "taken"`. */
+      pending = null;
     } else if (pending == null) {
       /* Put it back - but only if nothing newer arrived while it was in the
          air, because a newer save already contains everything this one did. */
@@ -177,10 +216,22 @@ export async function flushNow(push) {
   pending = null;
   try {
     const got = await push(raw);
-    if (got?.ok === false) pending = raw;      // keep it for a later session
-    return { ok: got?.ok !== false };
+    /* IT REPORTS, AND IT DID NOT. This runs on the two paths where a session
+       ENDS - logging out, and the tab going away - so a failure here is the
+       last chance to say the account is behind, and it was the one write in
+       the module that said nothing at all.
+
+       "taken" is dropped rather than kept: every retry would be refused by the
+       same claim, and the payload belongs to a game the account has already
+       moved past. Everything else goes back, because everything else is a
+       connection that may come back. */
+    const ok = got?.ok !== false;
+    report(ok ? null : (got?.why ?? "offline"));
+    if (!ok && got?.why !== "taken") pending = raw;
+    return { ok };
   } catch {
     pending = raw;
+    report("offline");
     return { ok: false };
   }
 }

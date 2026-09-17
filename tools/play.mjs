@@ -827,4 +827,143 @@ function until(e, what, label, max = 2000) {
   console.log("ghost session ok — a token for a deleted user signs out instead of trapping the gate");
 }
 
+/* NEVER OVERWRITE A SAVE YOU HAVE NOT READ, and never let two sessions write.
+
+   Both of these destroy a real collection and neither one fails loudly.
+
+   The first: `pull` returned null for "this account has no save" and null for
+   "the request failed", so a reachable-but-broken backend read as a brand new
+   player - and a free Supabase project PAUSES after a week idle, which makes
+   that an ordinary Tuesday rather than a freak event. Fresh save, four seconds
+   later, uploaded over a finished dex. It is the exact mistake this repo
+   already records twice about the LOCAL save, made again on the way out.
+
+   The second: two tabs or two devices each ran an engine and each upserted the
+   whole save, so last writer won, continuously.
+
+   Both fixes live across a network call, so the RULES are asserted over the
+   source with comments stripped - the same shape as the ownership and ghost
+   suites above. The claim's own behaviour is tested against the live database
+   instead; see SUPABASE.md. */
+{
+  const bare = (f) => f
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+
+  const cloud = bare(readFileSync(new URL("../src/net/cloud.js", import.meta.url), "utf8"));
+  const at = (name) => {
+    const i = cloud.indexOf(`export async function ${name}(`);
+    assert.ok(i >= 0, `${name} is gone from cloud.js`);
+    const j = cloud.indexOf("\nexport ", i + 1);
+    return cloud.slice(i, j < 0 ? undefined : j);
+  };
+
+  /* A READ HAS THREE ANSWERS, and the caller is made to look at which.
+
+     NAMING THE BRANCH, not the string. The first version asserted that
+     `ok: false` appeared anywhere in `pull` - which the `catch` also says, so
+     turning the ERROR branch back into "there is nothing here" passed. Both
+     paths have to be spelt out, because they are two different ways for the
+     same read to fail and only one of them was ever the bug. */
+  const read = at("pull");
+  assert.ok(/if \(error\) return \{ ok: false \};/.test(read),
+    "a rejected save-read reports as an empty account - a paused project empties a dex");
+  assert.ok(/catch \{\s*return \{ ok: false \};/.test(read),
+    "a thrown save-read reports as an empty account");
+  assert.ok(/pulled = true/.test(read), "pull no longer records that it succeeded");
+
+  /* AND THE PROFILE READ IS THE SAME SHAPE, because the same conflation there
+     puts an existing player on the WHO ARE YOU screen after a hiccup - and the
+     insert that follows collides with their own primary key and reports it as
+     a name somebody else has taken. */
+  const who = at("getProfile");
+  assert.ok(/if \(error\) return \{ ok: false \};/.test(who),
+    "a rejected profile-read reports as no profile - an existing player is asked to sign up again");
+
+  // And a write refuses until one of them has been the good one.
+  const write = at("push");
+  assert.ok(/if \(!pulled\)/.test(write),
+    "push will upload without having read - this is the bug that empties a dex");
+  assert.ok(write.indexOf("!pulled") < write.indexOf("rpc"),
+    "push checks whether it has read AFTER it has already sent something");
+
+  /* THE CLAIM IS THE SERVER'S JOB, not a read-then-write from here: two
+     devices can both read "nobody owns this" and both proceed. */
+  assert.ok(/save_game/.test(write),
+    "push is writing directly again - the claim check is no longer part of the write");
+  assert.ok(/why: "taken"/.test(write), "push cannot report losing the save to another session");
+  assert.ok(!/updated_at/.test(write),
+    "push is sending its own updated_at again - a device with a wrong clock writes a wrong time");
+
+  /* THE LATCHES ARE PER USER, or a second login inherits the first one's and
+     writes blind. Two halves, and the first version of this asserted neither:
+     it matched `pulled = false` and so passed on the DECLARATION, with the
+     reset deleted. A test that its own subject cannot break is not a test.
+
+     ONE PLACE ASSIGNS THE SESSION, which is what makes the reset reachable
+     from every path at all - five call sites used to do it directly, and a
+     sixth would simply not have reset anything. And the reset is guarded on
+     the USER rather than the event, because a token refresh is the same person
+     and clearing `pulled` there would block every write until the next
+     reload. */
+  const assigns = (cloud.match(/^\s*session = /gm) ?? []).length;
+  assert.equal(assigns, 1,
+    `${assigns} places assign the session directly - all but \`hold\` skip the latch reset`);
+  assert.ok(/if \(now !== was\) \{ pulled = false; lost = false; \}/.test(cloud),
+    "the read/claim latches are not reset when the user changes, or are reset on every refresh");
+
+  // Boot must act on the failed read rather than treating it as an empty save.
+  const boot = bare(readFileSync(new URL("../src/Boot.jsx", import.meta.url), "utf8"));
+  assert.ok(/if \(!got\.ok\) return \{ ok: false/.test(boot),
+    "settle writes to localStorage on the strength of a read that failed");
+  assert.ok(/await claim\(\)/.test(boot), "Boot never takes the save, so an old tab keeps writing");
+
+  /* AND THE LOSER STOPS WRITING LOCALLY TOO. Two tabs share one localStorage
+     key, so an abandoned tab that keeps writing overwrites the copy the LIVE
+     tab is keeping - and `newer` can then hand the resurrected loser back at
+     the next boot. Syncing off but writing on would be a worse bug than the
+     one it fixes. */
+  /* IN `save`, not merely somewhere in the file - `syncTrouble` latches on the
+     same word one function away, so a version with the local write restored
+     still matched. A guard is only a guard on the path it is on. */
+  const engine = bare(readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8"));
+  const writes = engine.slice(engine.indexOf("function save()"), engine.indexOf("loadArt()"));
+  assert.ok(writes.length > 100 && writes.length < 4000, "save() is not where it was in engine.js");
+  assert.ok(/state\.stale === "taken"\) return/.test(writes),
+    "a session that lost the save still writes to localStorage, over the live tab's copy");
+
+  console.log("write safety ok — never blind, one writer, and the loser stops writing");
+}
+
+/* AND THE STORE GIVES UP WHEN IT IS BEATEN. A refused claim is not a flaky
+   connection: every retry is refused by the same claim, and the payload it is
+   holding belongs to a game the account has already moved past. Retrying it
+   forever would be a background loop uploading a dead session. */
+{
+  const { mirror, flushNow, onSyncTrouble } = await import("../src/game/store.js");
+  const sent = [];
+  const push = async (raw) => {
+    sent.push(JSON.parse(raw).steps);
+    return { ok: false, why: "taken" };
+  };
+  const told = [];
+  onSyncTrouble((why) => told.push(why));
+
+  mirror(JSON.stringify({ steps: 50 }), push);
+  assert.equal((await flushNow(push)).ok, false, "a refused claim reported success");
+  assert.deepEqual(told, ["taken"], `the top bar was told ${told} rather than "taken"`);
+
+  /* AND IT IS NOT QUEUED FOR LATER. An offline payload goes back on the queue
+     and that is right; a refused CLAIM must not, or the tab keeps a dead
+     session's save in hand and offers it again at every opportunity. Asserted
+     by flushing twice: the second call must have nothing left to send. */
+  assert.deepEqual(sent, [50], `the refused attempt sent ${sent}`);
+  const again = await flushNow(push);
+  assert.equal(again.ok, true, "a refused claim was queued for retry");
+  assert.deepEqual(sent, [50], `a refused claim was sent a second time: ${sent}`);
+
+  onSyncTrouble(null);
+  console.log("beaten ok — a lost claim is reported once and not retried forever");
+}
+
 console.log("play ok — the frame loop never stopped");

@@ -105,11 +105,97 @@ only discard the shorter session. A timestamp would be wrong: a slow clock, or a
 tab left open overnight, both beat a real afternoon. Ties go to remote, because a
 tie is the same save and the remote copy is the account's record.
 
+**BUT THAT IS A RULE FOR LOGGING IN, NOT FOR PLAYING**, and for a while it was
+the only rule there was. `newer` runs once, in `settle`. Two sessions LIVE at
+the same time - two tabs, or a phone and a laptop - each ran their own engine
+and each upserted the whole save every few seconds, so last writer won
+continuously and an afternoon could be erased by a tab somebody forgot was
+open. There is no merge to write: two divergent collections cannot be
+reconciled, and guessing is worse than choosing.
+
+**SO ONE SESSION OWNS THE SAVE, AND THE NEWEST ONE TAKES IT.** `saves.session`
+is a random id per tab; `claim()` stamps it at boot, and `save_game(payload,
+sess)` folds the check into the write's own `ON CONFLICT ... WHERE`. That has to
+be one statement - read-then-write from a browser races with itself, and two
+devices can both read "nobody owns this" and both proceed. The loser gets
+`false`, App raises a dialog, and **the engine stops writing to localStorage as
+well**: two tabs share one key, so an abandoned tab that keeps writing
+overwrites the copy the live tab is keeping and `newer` can hand the
+resurrected loser back at the next boot. Syncing off but writing on would be a
+worse bug than the one it fixes.
+
+**AND NEVER OVERWRITE A SAVE YOU FAILED TO READ.** This file already records,
+twice, that a save which fails to LOAD must survive the session that could not
+read it - and the cloud path was written without the lesson. `pull` returned
+null for "this account has no save" and null for "the request failed", so a
+reachable-but-broken backend read as a brand new player. It does not take a bug:
+**a free Supabase project pauses after a week idle**, and a paused project
+answers every select with an error. New phone, failed read, fresh save, four
+seconds later uploaded over a finished dex.
+
+Both reads answer three things now - `{ ok: true, raw }`, `{ ok: true, raw:
+null }`, `{ ok: false }` - and `push` is latched shut until one has come back
+ok. `getProfile` is the same shape for the same reason: conflating there put an
+existing player on the WHO ARE YOU screen after a hiccup, and the insert that
+followed collided with their own primary key and reported it as a name somebody
+else had taken. **The latches are reset when the USER changes and not on a
+token refresh**, which is why exactly one function assigns `session` - five call
+sites used to, and a sixth would simply not have reset anything.
+
+**THE SERVER STAMPS `updated_at`.** It was sent by the browser, so a device with
+a wrong clock wrote a wrong time and a determined one could write any time at
+all - and `profiles.played_at` is a copy of it. Nothing reads either today,
+which is exactly what makes it the sort of column something sorts by later.
+
+**THE CADENCE IS 15s, AND IT WAS MEASURED.** At 4s a player walking steadily
+produced 900 uploads an hour, and the save is a jsonb document that TOASTs past
+8KB (39KB at 600 caught), so each one rewrites the row and its out-of-line
+chunks, leaves a dead tuple, and fires a trigger that expands a 1,145-element
+array. The local write is still every 400ms and is what the next frame reads,
+so the cadence only decides how much play is missing if the DEVICE is lost -
+and `flushNow` now runs on `visibilitychange` and `pagehide`, which is how a
+session ordinarily ends. `flushNow` REPORTS, which it did not: it runs on the
+two paths where a session ends, so it was the one write in the module that
+could fail in silence.
+
 **`char` IS NULL UNTIL ASKED, not "red".** A default indistinguishable from an
 answer means the question can never be asked once - so null is what puts the
 trainer screen up, and the renderer falls back to Red for the frames in between.
 The question lives in the gate and NOT on the YOU panel: the handhelds ask it
 before you have a save, and asked in a menu it is a costume change.
+
+**SETTINGS IS A DIALOG OFF THE TOP BAR, NOT A PANEL.** Name, trainer, date of
+birth, password and delete-account were on the YOU panel, and that was the wrong
+room twice: YOU is what a trainer has EARNED - points, ranks, key items - and it
+is a column in a rail that scrolls, so "delete my account forever" sat one flick
+below "spend a point". One writer for the profile row (`updateProfile(patch)`),
+because a function per column is three copies of the same error mapping and the
+third is where it stops matching. **The email is shown and not editable**:
+changing it is a two-message confirmation and half-built it leaves accounts
+pointing at inboxes nobody owns.
+
+**THE TOP BAR CARRIES THE PLAYER'S NAME, NOT THE GAME'S.** It said "Dexora" with
+the trainer name in a chip beside it, which is the wrong way round - the title is
+identical on every screen for every player and is already on the tab, the login
+card and the loading screen, while the name is the one thing up there that says
+whose game this is. Local mode has no account and keeps the title.
+
+**TWO FIELDS AT SIGN-UP AND NO MORE.** `birthdate` is the age gate - `MIN_AGE`
+is 13 in `name.js`, with the reasoning - and it pays for itself as a birthday
+bonus. `terms_at` is stamped by the insert, because the gate shows what starting
+means directly above the button and that IS the moment. Deliberately absent: a
+real name, a gender, a phone number, a separate display name. Each is a thing to
+store, protect and eventually delete, and none changes what the game can do.
+`ageOn` counts on the calendar rather than dividing milliseconds by 365.25,
+which is wrong for a leap-day birthday and a day out for plenty of others.
+
+**A FORGOTTEN PASSWORD WAS AN UNRECOVERABLE ACCOUNT** until `requestReset`, and
+there is a setup cost the code cannot pay: real SMTP, because Supabase's own
+mailer is capped per project per hour. See SUPABASE.md §4b. Two things about the
+wiring: `detectSessionInUrl` is **true** (a reset link is a token in the URL -
+this file's comment used to say there would never be one), and the flow is
+**implicit rather than PKCE**, because PKCE keeps its verifier in the
+localStorage of the browser that asked, and people open mail on their phone.
 
 **LOG OUT REPLACED RESET.** Reset wiped the save, which was the only way out
 when the save WAS the account. With one it is a button that destroys a synced

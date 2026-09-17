@@ -21,26 +21,25 @@ import {
 import { KEY_ITEMS, holding } from "../game/items.js";
 import Confirm from "./Confirm.jsx";
 import Note from "./Note.jsx";
-import { nameProblem, NAME_MAX } from "../game/name.js";
 
 /* THE TRAINER QUESTION IS NOT HERE ANY MORE. It was two tiles on this panel,
    which is where a SETTING goes - and it is not one. The handhelds ask it once,
    before you have a save, and asked there it is part of becoming a trainer
    rather than a costume change. It lives in the onboarding gate now; see
    Gate.jsx. One question, one place. */
+/* AND THE ACCOUNT BLOCK IS GONE FROM HERE TOO, for the same reason the trainer
+   question was: this panel is what a trainer has EARNED, and a name, a password
+   and "delete everything" are none of those. They were also at the bottom of a
+   column that scrolls, which put an action with no undo one flick below a
+   routine one. They live in Settings.jsx now, in a dialog off the top bar. */
 export default function Trainer({
-  stats, level, bag, biking, onSpend, onBike, save, account = null,
+  stats, level, bag, biking, onSpend, onBike, save,
 }) {
   // Which row just changed, so the click has something to show for itself.
   const [lit, setLit] = useState(null);
   // A file that has been read and checked, waiting on the confirm step.
   const [offer, setOffer] = useState(null);
   const [saveNote, setSaveNote] = useState("");
-  // The name being edited, and whatever the server said about it last.
-  const [name, setName] = useState(account?.name ?? "");
-  const [nameNote, setNameNote] = useState("");
-  const [renaming, setRenaming] = useState(false);
-  const [killing, setKilling] = useState(false);
   // Which recovery is waiting on the confirm step: "backup" or "broken".
   const [recover, setRecover] = useState(null);
   const free = freePoints(stats, level);
@@ -124,30 +123,6 @@ export default function Trainer({
             // On success the page reloads; nothing after this runs.
           }}
           onCancel={() => setRecover(null)}
-        />
-      )}
-
-      {/* TYPED, not just confirmed. This is the only action in the game that
-          destroys something no amount of play can get back, and it sits on the
-          same panel as EXPORT - one row apart from a button somebody presses
-          casually. */}
-      {killing && account && (
-        <Confirm
-          title="Delete your account?"
-          tone="warn"
-          lines={[
-            ["Trainer", account.name],
-            ["Email", account.email],
-            ["Pokédex", `${account.caught} caught`],
-          ]}
-          note="Everything goes: your Pokédex, your box, your name. There is no undo and no copy kept. Export your save first if you want one."
-          typeToConfirm={account.name}
-          confirmLabel="DELETE FOREVER"
-          onCancel={() => setKilling(false)}
-          onConfirm={async () => {
-            setKilling(false);
-            await account.onDelete();
-          }}
         />
       )}
 
@@ -273,63 +248,6 @@ export default function Trainer({
           </div>
           <Note>{saveNote}</Note>
         </div>
-
-        {/* ONLY WITH AN ACCOUNT. In local mode there is nothing to rename and
-            nothing to delete - the save IS the account - so the whole block is
-            absent rather than present and inert. */}
-        {account && (
-          <>
-            <div className="panel-head tr-head">
-              <span>ACCOUNT</span>
-              <span>{account.email}</span>
-            </div>
-
-            <div className="trsave">
-              <p className="ts-why">
-                Your name is how other trainers see you. Changing it does not
-                touch your Pokédex.
-              </p>
-              <form
-                className="ts-row"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const problem = nameProblem(name);
-                  if (problem) { setNameNote(problem); return; }
-                  if (name.trim() === account.name) { setNameNote("That is already your name."); return; }
-                  setRenaming(true);
-                  setNameNote("");
-                  const got = await account.onRename(name.trim());
-                  setRenaming(false);
-                  setNameNote(got.ok ? `You are ${name.trim()} now.` : got.error);
-                }}
-              >
-                <input
-                  className="ts-name"
-                  type="text"
-                  value={name}
-                  maxLength={NAME_MAX}
-                  onChange={(e) => setName(e.target.value)}
-                  aria-label="Trainer name"
-                />
-                <button className="ts-btn" type="submit" disabled={renaming}>
-                  {renaming ? "\u2026" : "RENAME"}
-                </button>
-              </form>
-              <Note>{nameNote}</Note>
-            </div>
-
-            <div className="trsave trdanger">
-              <p className="ts-why">
-                Deleting your account removes your Pokédex, your box and your
-                name. It cannot be undone, and the name becomes free for someone
-                else.
-              </p>
-              <button className="ts-btn ts-kill" onClick={() => setKilling(true)}>
-                DELETE ACCOUNT
-              </button>
-            </div>
-          </>
-        )}
 
         {/* THE OFFER ONLY APPEARS WHEN THERE IS SOMETHING BEHIND IT. A save
             that failed to load used to be overwritten by the first step of the

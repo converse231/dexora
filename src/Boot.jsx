@@ -15,10 +15,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import App from "./App.jsx";
-import { Account, Trainer } from "./ui/Gate.jsx";
+import { Account, Trainer, Trouble, NewPassword } from "./ui/Gate.jsx";
 import {
-  CLOUD, restore, signIn, signUp, signOut, onAuth, pull, push,
-  getProfile, createProfile, renameTrainer, deleteAccount, email as accountEmail,
+  CLOUD, restore, signIn, signUp, signOut, onAuth, pull, push, claim,
+  getProfile, createProfile, updateProfile, deleteAccount, email as accountEmail,
+  changePassword, requestReset, setPassword,
 } from "./net/cloud.js";
 import {
   SAVE_KEY, OWNER_KEY, read, write, drop, newer, onSyncTrouble, flushNow,
@@ -57,15 +58,31 @@ async function settle(uid) {
      difference between your game and a stranger's. */
   const owner = read(OWNER_KEY);
   const local = owner === uid ? read(SAVE_KEY) : null;
-  const remote = await pull();
+  const got = await pull();
 
-  const keep = newer(local, remote);
+  /* A READ THAT FAILED IS NOT AN ACCOUNT WITH NOTHING IN IT, and treating the
+     two alike is how a real collection gets replaced by a fresh one. Nothing
+     is written on this path - not the save, not the owner - because every
+     write here is made on the strength of a comparison that could not be made.
+     `push` is latched shut until a pull succeeds, so what follows is safe: the
+     cache, played offline, uploading nothing. */
+  if (!got.ok) return { ok: false, raw: local };
+
+  const keep = newer(local, got.raw);
   if (keep !== local) {
     if (keep) write(SAVE_KEY, keep); else drop(SAVE_KEY);
   }
   if (uid) write(OWNER_KEY, uid);
-  return keep;
+  return { ok: true, raw: keep };
 }
+
+/* ARRIVING FROM A RESET LINK, read before anything can clean it away.
+   `detectSessionInUrl` consumes the fragment and rewrites the address bar
+   inside the client's own async start-up, so by the time an effect runs there
+   is nothing left to look at. The auth event is the backstop below; this is
+   the half that cannot lose a race. */
+const RECOVERY = typeof location !== "undefined"
+  && /type=recovery/.test(`${location.hash}${location.search}`);
 
 const fieldOf = (raw, key) => {
   if (!raw) return null;
@@ -73,7 +90,8 @@ const fieldOf = (raw, key) => {
 };
 
 export default function Boot() {
-  // "wait" until we know; then "account", "trainer" or "play".
+  // "wait" until we know; then "account", "reset", "who", "trainer",
+  // "down" or "play".
   const [phase, setPhase] = useState("wait");
   const [busy, setBusy] = useState(false);
   /* Bumped when the save underneath is replaced, so `App` remounts and builds
@@ -81,6 +99,10 @@ export default function Boot() {
   const [gen, setGen] = useState(0);
   // The trainer's name, off the profile row. Shown in game; null in local mode.
   const [name, setName] = useState(null);
+  /* The rest of the profile row, for the settings screen to edit. Held here
+     rather than re-fetched when the dialog opens: it is three small fields
+     that were already read at boot, and a second read is a second answer. */
+  const [profile, setProfile] = useState(null);
   const [whoError, setWhoError] = useState(null);
   // Why the account screen is showing, when it is showing for a reason.
   const [gateNote, setGateNote] = useState("");
@@ -93,15 +115,29 @@ export default function Boot() {
      a player who reinstalls, or clears their browser, is not asked again. */
   const decide = useCallback(async (session) => {
     const uid = session?.user?.id ?? null;
-    let raw = await settle(uid);
+    const got = await settle(uid);
+    let raw = got.raw;
 
     if (CLOUD && uid) {
+      /* COULD NOT READ THE ACCOUNT. With a cache from this same account there
+         is a game to play and offline play is a feature, so play it - nothing
+         will be uploaded until a read succeeds. With no cache there is simply
+         nothing to show, and dealing a fresh save to somebody who has a dex is
+         the worst of the available answers. */
+      if (!got.ok) { setPhase(raw ? "play" : "down"); return; }
+
+      /* TAKE THE SAVE. From here this tab is the writer and any older session
+         on any other device stops being able to upload - see `save_game`. */
+      await claim();
+
       const prof = await getProfile();
-      if (!prof) { setPhase("who"); return; }
-      setName(prof.username);
+      if (!prof.ok) { setPhase("down"); return; }
+      if (!prof.profile) { setPhase("who"); return; }
+      setName(prof.profile.username);
+      setProfile(prof.profile);
       // The save is the copy the renderer reads; keep it in step with the row.
-      if (fieldOf(raw, "char") !== prof.char) {
-        const next = JSON.stringify({ ...(raw ? JSON.parse(raw) : {}), char: prof.char });
+      if (fieldOf(raw, "char") !== prof.profile.char) {
+        const next = JSON.stringify({ ...(raw ? JSON.parse(raw) : {}), char: prof.profile.char });
         write(SAVE_KEY, next);
         raw = next;
       }
@@ -118,6 +154,11 @@ export default function Boot() {
     (async () => {
       const session = await restore();
       if (!live) return;
+      /* AWAITED FIRST, DELIBERATELY. A reset link signs you in, and `restore`
+         is what waits for the client to finish consuming the fragment - so by
+         here there is a session for `setPassword` to use, and the screen does
+         not have to guess whether the link has landed yet. */
+      if (CLOUD && session && RECOVERY) { setPhase("reset"); return; }
       if (CLOUD && !session) { setPhase("account"); return; }
       await decide(session);
     })();
@@ -125,8 +166,11 @@ export default function Boot() {
     /* Signing out in another tab, or a refresh token finally expiring, both
        land here - so the game returns to the gate rather than carrying on and
        failing every sync from then on. */
-    const off = onAuth((session) => {
+    const off = onAuth((session, evt) => {
       if (!live) return;
+      /* The backstop for the URL read above: if the event beats the boot
+         effect, this catches it. Either way the destination is the same. */
+      if (evt === "PASSWORD_RECOVERY") { setPhase("reset"); return; }
       if (!session) { setPhase("account"); setGen((n) => n + 1); }
     });
     return () => { live = false; off(); };
@@ -187,6 +231,47 @@ export default function Boot() {
         notice={gateNote}
         onSignUp={async (a, p) => afterAuth(await signUp(a, p))}
         onSignIn={async (a, p) => afterAuth(await signIn(a, p))}
+        onForgot={requestReset}
+      />
+    );
+  }
+
+  /* A NEW PASSWORD, THEN STRAIGHT INTO THE GAME. The link already signed them
+     in, so there is nothing to log in to afterwards - sending them back to the
+     login screen to type the password they set four seconds ago would be
+     asking a question that has just been answered. */
+  if (phase === "reset") {
+    return (
+      <NewPassword
+        busy={busy}
+        onSet={async (pw) => {
+          setBusy(true);
+          const got = await setPassword(pw);
+          if (!got.ok) { setBusy(false); return got; }
+          /* The fragment is gone by now, but the flag read at module load is
+             not - a reload would land back here. Sending the URL back to the
+             bare origin is what makes this a one-time screen. */
+          try { history.replaceState(null, "", location.pathname); } catch { /* fine */ }
+          await decide(await restore());
+          setGen((n) => n + 1);
+          setBusy(false);
+          return got;
+        }}
+      />
+    );
+  }
+
+  /* NOTHING READ, NOTHING CACHED. Deliberately not a fresh game: see `settle`. */
+  if (phase === "down") {
+    return (
+      <Trouble
+        busy={busy}
+        onOut={out}
+        onRetry={async () => {
+          setBusy(true);
+          await decide(await restore());
+          setBusy(false);
+        }}
       />
     );
   }
@@ -202,10 +287,10 @@ export default function Boot() {
         busy={busy}
         error={whoError}
         onOut={out}
-        onPick={async (id, username) => {
+        onPick={async (id, username, birthdate) => {
           setBusy(true);
           setWhoError(null);
-          const got = await createProfile(username, id);
+          const got = await createProfile(username, id, birthdate);
           /* `gone` is a session that has outlived its own user - a token for a
              deleted account. There is nothing to retry: every attempt dies on
              the same foreign key, so the screen hands back the only thing that
@@ -213,6 +298,7 @@ export default function Boot() {
           if (got.gone) { await out(got.error); return; }
           if (!got.ok) { setWhoError(got.error); setBusy(false); return; }
           setName(username);
+          setProfile({ username, char: id, birthdate });
           const raw = read(SAVE_KEY);
           let next;
           try { next = JSON.stringify({ ...(raw ? JSON.parse(raw) : {}), char: id }); }
@@ -259,11 +345,23 @@ export default function Boot() {
       account={CLOUD ? {
         name,
         email: accountEmail(),
-        onRename: async (next) => {
-          const got = await renameTrainer(next);
-          if (got.ok) setName(next);
+        char: profile?.char ?? "red",
+        birthdate: profile?.birthdate ?? "",
+        /* ONE WRITER FOR THE WHOLE ROW, and the local mirror of it moves in the
+           same step. `char` is the one field two things hold: the profile row
+           is the record and the save carries a copy for the renderer, so the
+           engine is told as well - `setChar` is live, which is why changing
+           your trainer redraws the map underneath the dialog instead of
+           waiting for a reload. */
+        onProfile: async (patch) => {
+          const got = await updateProfile(patch);
+          if (!got.ok) return got;
+          if (patch.username) setName(patch.username);
+          if (patch.char) engineRef.current?.setChar?.(patch.char);
+          setProfile((was) => ({ ...(was ?? {}), ...patch }));
           return got;
         },
+        onPassword: changePassword,
         /* DELETING TAKES THE BROWSER'S COPY WITH IT. The row is gone, so a
            cache of it is a dex belonging to nobody - and leaving it behind
            would let the next sign-up on this machine adopt it. */
@@ -273,6 +371,7 @@ export default function Boot() {
           drop(SAVE_KEY);
           drop(OWNER_KEY);
           setName(null);
+          setProfile(null);
           setPhase("account");
           setGen((n) => n + 1);
           return got;
