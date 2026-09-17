@@ -1783,7 +1783,7 @@ import { MEDALS, MILESTONES, medalsFor, medalById } from "../src/game/medals.js"
    a list rather than three copies of the same test. */
 import {
   SHINY_ODDS, ORIGIN_ODDS, ASTRAL_ODDS, HOLO_ODDS, TIER_ODDS, TIERS, rollVariant,
-  genComplete, originReady, lockedTiers,
+  lockedTiers, ROSETTE_NEED,
 } from "../src/game/biomes.js";
 import { saveProblem, repairDex } from "../src/game/engine.js";
 
@@ -1895,21 +1895,50 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     "every tier at the same odds is one tier wearing four names");
   assert.ok(kindest < 0.01, "even the kindest tier has to stay rare");
   assert.ok(TIER_ODDS[0][1] > 0, "the rarest tier still has to be reachable");
-  /* Kindest first is `[...TIERS].reverse()`, and TWO screens order themselves
-     by it: the row of marks under a Dex tile, and the Forms strip inside the
-     entry. They must agree, so the reversal has to start with Origin - the
-     drawing - before Holo, the finish over it. Pinned because the tie between
-     their odds makes the order look free, and it is not. */
+  /* A LITERAL IN AN ASSERTION IS NOT A RULE, and this one was four tier names
+     typed out - so it failed the day the ladder grew, which is the one day it
+     had nothing to say. What it actually guards is two things.
+
+     ONE: Origin and Holo tie on odds, so the order between them looks free and
+     is not - Origin is the DRAWING and Holo is the finish over it, and a row
+     that reads as progress has to put the drawing first.
+
+     TWO: both screens that show a row of tiers must take their order from
+     `TIERS` rather than listing them. The Forms strip had its own copy and it
+     drifted exactly as predicted: four tiers missing and an `origin`-by-name
+     filter that knew about no other absent artwork. */
   const kindestFirst = [...TIERS].reverse();
-  assert.deepEqual(kindestFirst, ["origin", "holo", "shiny", "astral"],
-    `marks would be drawn ${kindestFirst.join(", ")} - the Forms strip lists ` +
-    "origin, holo, shiny, astral and the two have to match");
-  // The named exports stay the way the rest of the game imports them.
-  assert.deepEqual(
-    TIER_ODDS.map(([t, o]) => [t, o]),
-    [["astral", ASTRAL_ODDS], ["shiny", SHINY_ODDS],
-      ["holo", HOLO_ODDS], ["origin", ORIGIN_ODDS]],
-    "TIER_ODDS and the named odds have drifted apart");
+  assert.ok(kindestFirst.indexOf("origin") < kindestFirst.indexOf("holo"),
+    "Holo is drawn before Origin - the finish cannot come before the drawing it sits on");
+  for (const f of ["Dex.jsx", "DexSheet.jsx"]) {
+    const body = readFileSync(new URL(`../src/ui/${f}`, import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.ok(/\[\.\.\.(TIERS|tiersFor\(id\))\]\.reverse\(\)/.test(body),
+      `${f} no longer takes its tier order from TIERS - it will drift`);
+  }
+  /* THE TABLE QUOTES THE CONSTANTS, and that is the rule - not which four
+     constants they happened to be. This was a typed-out list of the tiers as
+     they stood, so the day a fifth arrived it failed for the one reason that
+     is not a bug. What matters is that no row carries a bare number: the
+     named exports are what the rest of the game imports, and a literal in
+     the table is a second place the odds live. */
+  {
+    const src = readFileSync(new URL("../src/game/biomes.js", import.meta.url), "utf8");
+    const table = src.slice(src.indexOf("export const TIER_ODDS = ["));
+    const rows = table.slice(0, table.indexOf("];") + 2)
+      .split("\n").filter((l) => l.includes("[") && l.includes(","));
+    assert.equal(rows.length, TIER_ODDS.length,
+      `TIER_ODDS has ${TIER_ODDS.length} tiers but ${rows.length} readable rows`);
+    for (const row of rows) {
+      assert.ok(/\[\s*"[a-z]+",\s*[A-Z_]+_ODDS\s*\]/.test(row.trim()),
+        `a TIER_ODDS row carries a bare number instead of its named constant: ${row.trim()}`);
+    }
+    // And every named constant is actually reachable from the table.
+    for (const [tier] of TIER_ODDS) {
+      assert.ok(rows.some((r) => r.includes(`"${tier}"`)),
+        `${tier} is in TIER_ODDS at runtime but not in the source table`);
+    }
+  }
 
   for (const tier of TIERS)
     assert.ok(keeper({ [tier]: 1 }), `${tier} must count as a keeper`);
@@ -1967,64 +1996,32 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         `${tier} came up ${seen[tier]} times, expected about ${Math.round(want)}`);
     }
     // Always the rarest when the first draw succeeds, nothing when none does.
-    assert.equal(rollVariant(() => 0), "astral", "a zero roll must be the rarest tier");
+    // Named by POSITION, not by tier: "astral" was typed here and stopped
+    // being the rarest the day two rarer ones arrived.
+    assert.equal(rollVariant(() => 0), TIERS[0], "a zero roll must be the rarest tier");
     assert.equal(rollVariant(() => 1), null, "a one roll must be nothing at all");
   }
 
-  /* ORIGIN IS EARNED. It does not roll until every ordinary Pokemon of that
-     species' generation is caught, which makes finishing the dex the start of
-     a second game rather than the end of the first. Three things have to hold
-     and all three are silent failures: a gate that never opens, a gate that
-     was never closed, and a gate that leaks the tier it is holding back. */
+  /* THE ORIGIN GATE IS GONE, and this suite is what is left of the one that
+     guarded it. It used to assert three silent failures - a gate that never
+     opened, one that was never closed, and one that leaked the tier it held
+     back. There is no gate now: Origin rolls like every other tier.
+
+     ASSERTED AS AN ABSENCE, because that is the only way to state "nobody
+     brought it back". `lockedTiers` still exists and still locks, but only on
+     whether the ARTWORK is there - so its signature is the test: a second
+     argument would mean somebody had reattached it to the dex. */
   {
-    const empty = new Array(SPECIES.length).fill(0);
-    const seen = new Array(SPECIES.length).fill(1);     // met, never caught
-    const full = new Array(SPECIES.length).fill(2);
+    const src = readFileSync(new URL("../src/game/biomes.js", import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+    assert.ok(!/genComplete|originReady/.test(src),
+      "the Origin gate is back in biomes.js - Origin is meant to roll like any other tier");
+    assert.ok(/function lockedTiers\(speciesId\)/.test(src),
+      "lockedTiers takes a dex again, which means the earn-it gate has returned");
 
-    assert.ok(!genComplete(empty, 1), "an empty dex is not a complete one");
-    assert.ok(!genComplete(seen, 1), "SEEN is not CAUGHT");
-    assert.ok(genComplete(full, 1), "a full dex must open the gate");
-    // One short is still short - the off-by-one this kind of loop invites.
-    // Flipped by POSITION of a known Gen 1 species, not by the last slot: the
-    // last slot is Arceus now, and Gen 1 does not care about Arceus.
-    const nearly = [...full];
-    nearly[dexIndex(1)] = 1;                              // Bulbasaur, met only
-    assert.ok(!genComplete(nearly, 1), "one short must not open the gate");
-    assert.ok(!genComplete(undefined, 1), "no dex at all is not complete");
-
-    /* PER GENERATION, and three of them is the first time that could be tested.
-       Finishing Kanto must not hand out Johto's Origins and it must not take
-       Kanto's away either - the whole reason the gate is per generation rather
-       than global is that adding a generation would otherwise revoke what a
-       player had already earned. */
-    const kantoOnly = SPECIES.map((sp) => (genOf(sp.id) === 1 ? 2 : 0));
-    assert.ok(genComplete(kantoOnly, 1), "a finished Kanto must open Kanto");
-    assert.ok(!genComplete(kantoOnly, 2), "a finished Kanto must not open Johto");
-    assert.ok(!genComplete(kantoOnly, 4), "a finished Kanto must not open Sinnoh");
-    assert.ok(originReady(kantoOnly, 1), "Kanto's Origins are earned");
-    assert.ok(!originReady(kantoOnly, 152), "Johto's are not");
-    assert.ok(genComplete(full, 2) && genComplete(full, 3) && genComplete(full, 4),
-      "a full dex opens every generation that ships");
-
-    /* THE HOLE IS FILLED, and this line is the one that said so. It used to
-       assert that Gen 3 was vacuously complete because it shipped no species,
-       and it was written to fail the day Hoenn landed so somebody would read
-       it. It failed. Hoenn ships now, so an empty dex leaves it incomplete
-       like every other generation - and the dex is contiguous 1-493 for the
-       first time, which is why `layoutIds` exists. */
-    assert.ok(!genComplete(empty, 3),
-      "Hoenn ships now - an empty dex cannot have finished it");
-    assert.ok(SPECIES.some((sp) => genOf(sp.id) === 3), "no Hoenn species shipped");
-
-    assert.ok(!originReady(empty, 1) && originReady(full, 1),
-      "originReady must follow its generation's dex");
-    assert.equal(lockedTiers(full, 1), null, "a finished dex locks nothing");
-    assert.ok(lockedTiers(empty, 1).has("origin"), "an unfinished dex locks Origin");
-
-    /* And the roll has to honour it. A locked Origin must never come out, and
-       - the part worth testing - locking one tier must not change what the
-       others are worth, or the gate would quietly retune the whole ladder
-       every time it closed. */
+    /* AND THE ROLL REALLY DOES HAND IT OUT. An unreachable tier is the exact
+       failure the old suite existed for, pointing the other way. */
     let seed = 7;
     const rng = () => {
       seed = (seed + 0x6d2b79f5) | 0;
@@ -2032,17 +2029,27 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-    const lock = lockedTiers(empty, 1);
-    const got = Object.fromEntries(TIERS.map((t) => [t, 0]));
+    let origins = 0;
     const N = 200000;
-    for (let i = 0; i < N; i++) { const v = rollVariant(rng, lock); if (v) got[v]++; }
-    assert.equal(got.origin, 0, `a locked Origin rolled ${got.origin} times`);
-    for (const [tier, odds] of TIER_ODDS) {
-      if (tier === "origin") continue;
-      const want = N * odds;
-      assert.ok(got[tier] > want * 0.6 && got[tier] < want * 1.4,
-        `with Origin locked, ${tier} came up ${got[tier]}, expected about ${Math.round(want)}`);
-    }
+    for (let i = 0; i < N; i++) if (rollVariant(rng) === "origin") origins++;
+    const want = N * ORIGIN_ODDS;
+    assert.ok(origins > want * 0.6 && origins < want * 1.4,
+      `Origin came up ${origins} times in ${N} ungated rolls, expected about ${Math.round(want)}`);
+
+    /* THE ROSETTE IS ANY FOUR, NOT ALL OF THEM. At eight tiers "every one"
+       measured 18,039 encounters for a single species against 8,905 at four -
+       not a harder mark, a deleted one. Four is 2,374. The number is asserted
+       as a BOUND with its reason: below four the mark stops meaning "go wide",
+       and at the full count it stops being reachable. */
+    assert.ok(ROSETTE_NEED >= 3 && ROSETTE_NEED < TIERS.length,
+      `the rosette wants ${ROSETTE_NEED} of ${TIERS.length} tiers - at the full count nobody finishes it`);
+    const dex = readFileSync(new URL("../src/ui/Dex.jsx", import.meta.url), "utf8");
+    assert.ok(/>= ROSETTE_NEED/.test(dex),
+      "the Dex grid is not using ROSETTE_NEED - the rosette and the rule can now disagree");
+    console.log(`origin ok — ungated, ${origins} in ${N} rolls; the rosette wants ` +
+      `any ${ROSETTE_NEED} of ${TIERS.length}`);
+  }
+
     /* ORIGIN NEEDS AN OLDER DRAWING, AND A THIRD OF THE DEX HAS NONE.
 
    The tier's tell is the ARTWORK, which only works while the ordinary sprite
@@ -2117,15 +2124,22 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `#${sp.id} disagrees with its own rule`);
   }
 
-  /* THE ROSETTE MUST STAY REACHABLE. Completion is "caught plus every variant",
-     and the moment a tier stopped existing for 107 species that became
-     impossible rather than hard - which is the one mark in the game that is
-     supposed to be earnable by playing long enough. `tiersFor` is what both
-     the Dex grid and the sheet count through. */
+  /* THE ROSETTE MUST STAY REACHABLE, and that is now a number rather than a
+     feeling. Completion is "caught plus any ROSETTE_NEED variants", so the
+     rule is simply that every species can wear at least that many - the
+     moment one cannot, the mark is impossible for it rather than hard, which
+     is the one badge in the game meant to be earnable by playing long enough.
+
+     It used to read `>= TIERS.length - 1`, which assumed a species could only
+     ever be missing ONE tier. A form is missing two (no 1996 drawing, no
+     Showdown animation), so that bound failed for the right reason and the
+     wrong cause. `tiersFor` is what both the Dex grid and the sheet count
+     through. */
   for (const sp of SPECIES) {
     const mine = tiersFor(sp.id);
-    assert.ok(mine.length >= TIERS.length - 1 && mine.length <= TIERS.length,
-      `#${sp.id} can wear ${mine.length} tiers`);
+    assert.ok(mine.length >= ROSETTE_NEED,
+      `#${sp.id} can wear only ${mine.length} tiers - the rosette wants ${ROSETTE_NEED}`);
+    assert.ok(mine.length <= TIERS.length, `#${sp.id} claims more tiers than exist`);
     assert.ok(mine.every((t) => TIERS.includes(t)), `#${sp.id} claims a tier that is not one`);
     assert.equal(mine.includes("origin"), hasOrigin(sp.id),
       `#${sp.id} disagrees with itself about Origin`);
@@ -2133,15 +2147,15 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   assert.ok(tiersFor(withoutIds[0]).length > 0,
     "a species with no Origin must still have tiers to collect");
 
-  /* AND THE ROLL MUST HONOUR IT even on a finished dex - `lockedTiers` is what
-     `rollVariant` is handed, so this is the only thing standing between a
-     Sinnoh player and an Origin that is the ordinary picture. */
+  /* AND THE ROLL MUST HONOUR IT - `lockedTiers` is what `rollVariant` is
+     handed, so this is the only thing standing between a Sinnoh player and an
+     Origin that is the ordinary picture. It is an ART check now and nothing
+     else; the earn-it gate it used to also carry is gone. */
   {
-    const full = SPECIES.map(() => 2);
-    assert.equal(lockedTiers(full, originIds[0]), null,
-      "a completed generation must open Origin for a species that has one");
-    assert.ok(lockedTiers(full, withoutIds[0])?.has("origin"),
-      "a completed dex must NOT open Origin for a species with no older art");
+    assert.ok(!lockedTiers(originIds[0])?.has("origin"),
+      "a species WITH an older drawing is being refused Origin");
+    assert.ok(lockedTiers(withoutIds[0])?.has("origin"),
+      "a species with no older art is being offered Origin anyway");
     const rolled = new Set();
     const rng = (() => { let t = 5; return () => {
       t |= 0; t = (t + 0x6D2B79F5) | 0;
@@ -2150,11 +2164,16 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
     }; })();
     for (let i = 0; i < 200000; i++) {
-      const got = rollVariant(rng, lockedTiers(full, withoutIds[0]));
+      const got = rollVariant(rng, lockedTiers(withoutIds[0]));
       if (got) rolled.add(got);
     }
     assert.ok(!rolled.has("origin"),
       "Origin rolled for a species that has no older drawing to show");
+    /* Locking one tier must not cost any other. `withoutIds[0]` is an
+       ordinary species with no older art rather than a form, so Origin is the
+       only thing missing - a form would legitimately lose Showdown too. */
+    const alsoOff = lockedTiers(withoutIds[0]).size - 1;
+    assert.equal(alsoOff, 0, `the species under test also has ${alsoOff} other tier(s) locked`);
     assert.ok(rolled.size >= TIERS.length - 1,
       `locking Origin also took ${TIERS.length - 1 - rolled.size} other tier(s) with it`);
   }
@@ -2164,9 +2183,6 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     `${baseArtGen(withoutIds[0])} on both sides); the rosette stays reachable for all`);
 }
 
-console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
-      .map((t) => `${t} ${got[t]}`).join(", ")}, origin 0`);
-  }
 
   /* A VARIANT IS ITS OWN ROW, and with the feed gone that is true by
      construction rather than by arrangement.
@@ -3130,14 +3146,26 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
           "are all but promised is not a rare any more");
       }
 
-      /* NO ORIGIN HONEY, and that is the assertion rather than an omission:
-         Origin is gated on catching every ordinary Pokémon of a generation,
-         and an item that shortcuts a gate is the gate deleted. */
-      assert.ok(!named.includes("origin"),
-        "an Origin honey would sell a way past the one gate in the game");
-      assert.deepEqual(
-        TIERS.filter((t) => t !== "origin").sort(), [...named].sort(),
-        "every tier but Origin should have a honey, and only those");
+      /* A HONEY PER TIER WAS RIGHT AT FOUR TIERS AND IS BLOAT AT EIGHT.
+
+         This used to read "every tier but Origin has one, and only those",
+         which was two rules welded together. The Origin half was there
+         because Origin was gated on finishing a generation and an item that
+         shortcuts a gate is the gate deleted - that gate is gone, so that
+         half goes with it. The other half would now put SEVEN jars on a shelf
+         that already carries twenty-seven items, all at the same price band,
+         for tiers most players are not hunting.
+
+         What survives is the part that can actually go wrong: a jar that
+         favours something which is not a tier, and two jars fighting over
+         one. The tiers without a jar are covered by the plain Honey, which
+         lifts every rare tier at once - so nothing is unreachable, it just
+         does not have its own shelf slot. */
+      assert.equal(new Set(named).size, named.length,
+        `two honeys favour the same tier: ${named.join(", ")}`);
+      const plain = FIELD.find((f) => f.family === "variant" && !f.tier);
+      assert.ok(plain && plain.lift > 1,
+        "there is no plain Honey, so the tiers without their own jar have nothing at all");
     }
 
     /* THE VARIANT ROLL, measured. A favoured honey must lift ITS tier and

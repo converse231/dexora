@@ -1066,10 +1066,19 @@ canvas {
    half their native size so `pixelated` has whole pixels to work with. They were
    CSS shapes - a ring, a star, a diamond - which was defensible at 8px and
    stopped being so when the tile grew. */
+/* EIGHT MARKS DO NOT FIT ON A 76px TILE, and at four they did. Eight at 12px
+   with 2px gaps is 110px on a tile that is 76 - the row simply ran off the
+   side and out from under the entry number. It wraps now, at 9px and 1px, so
+   a full set is two rows of four inside the tile's own width. Measured
+   against the widest case rather than the common one: most players hold two
+   or three, and the one holding all eight is exactly who must not see it
+   break. */
 .cell-marks {
   position: absolute; left: 4px; bottom: 3px;
-  display: flex; gap: 2px; pointer-events: none;
+  display: flex; flex-wrap: wrap-reverse; gap: 1px;
+  max-width: calc(100% - 22px); pointer-events: none;
 }
+.cell-marks .mark { width: 9px !important; height: 9px !important; }
 .mark { image-rendering: pixelated; display: block; }
 
 /* Every variant of one species - the only mark in the game that cannot be had
@@ -2631,7 +2640,15 @@ canvas {
    row would read as a different kind of thing. The art shrank 46 -> 38 to pay
    for the extra column, which is still two whole pixel-doublings of a 64px
    sprite. */
-.sf-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+/* `repeat(5, 1fr)` WAS A LITERAL FOR FOUR TIERS PLUS THE ORDINARY ONE, and
+   the strip is driven by `tiersFor`, which now returns up to eight. Nine
+   columns in five tracks is nine overlapping 36px cells. `auto-fit` with a
+   floor lets it wrap to a second row instead, which is what a strip of nine
+   wants on a 330px rail. */
+.sf-row {
+  display: grid; gap: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
+}
 .sf-one {
   display: grid; justify-items: center; gap: 2px;
   padding: 7px 1px 6px; border-radius: 9px;
@@ -2935,6 +2952,61 @@ canvas {
   .ms-tab { padding: 5px 8px 4px; }
   .ms-tab i { display: none; }
   .ms-pop { left: auto; right: 0; min-width: min(268px, 86vw); }
+}
+
+/* ---------- the three new tiers that are only a filter ----------
+
+   No layer, no mask, nothing animating except Glitched - so each one has to
+   survive being a bare `<img>` at 52px in the Dex, which is the rule this
+   file already records for Holo's rim. `!important` for the same reason the
+   Astral duotone carries one: `.mon` runs `mon-appear`, whose keyframes set
+   `filter: none` with `animation-fill-mode: both`, and an animation outranks
+   a plain declaration. Without it every one of these vanishes the instant a
+   variant lands in an encounter - which is exactly how Astral lost its
+   duotone once already. */
+
+.sprite-vivid { filter: saturate(2.75) contrast(1.18) brightness(1.05) !important; }
+
+/* CONTRAST 1.3, NOT 1.55. Looked at on Pikachu, which is nearly all high
+   luminance: 1.55 pushed the whole body past white and left an outline with
+   nothing in it. A dark sprite survived it and a bright one did not, which is
+   the half of the range a single screenshot of Psyduck never shows. */
+.sprite-noir { filter: grayscale(1) contrast(1.3) brightness(.92) !important; }
+
+/* GLITCHED IS THE ONE THAT MOVES, and it moves on `steps`. Corruption is
+   discrete - the data is wrong or it is not - so an eased wobble reads as a
+   rendering fault where a hard jump reads as damage. It sits clean for most
+   of the loop and tears twice, which is what keeps it from being exhausting
+   in a Box of eight. */
+.sprite-glitched {
+  filter: contrast(1.12) saturate(1.15) !important;
+  animation: glitch-shift 2.6s steps(1, end) infinite !important;
+}
+@keyframes glitch-shift {
+  0%, 44%, 100% { filter: contrast(1.12) saturate(1.15); transform: translate(0, 0); }
+  46% {
+    filter: contrast(1.3) saturate(1.5)
+      drop-shadow(3px 0 0 rgba(255, 0, 72, .9)) drop-shadow(-3px 0 0 rgba(0, 238, 255, .9));
+    transform: translate(-2px, 1px);
+  }
+  51% {
+    filter: contrast(1.12) saturate(1.15)
+      drop-shadow(-4px 0 0 rgba(255, 0, 72, .7)) drop-shadow(4px 0 0 rgba(0, 238, 255, .7));
+    transform: translate(3px, -1px);
+  }
+  56% { filter: contrast(1.12) saturate(1.15); transform: translate(-1px, 0); }
+  78% { filter: contrast(1.5) saturate(.4) brightness(1.4); transform: translate(2px, 0); }
+  81% { filter: contrast(1.12) saturate(1.15); transform: none; }
+}
+
+/* SHOWDOWN HAS NO FILTER AT ALL - it is a different FILE, an animated GIF
+   from PokeAPI's CDN, so the browser plays it and CSS has nothing to add.
+   The rule exists to say so, because an absent class in a list of eight
+   reads as an omission. */
+.sprite-showdown { image-rendering: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-glitched { animation: none !important; }
 }
 
 /* ---------- the tooltip ----------

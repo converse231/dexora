@@ -26,6 +26,32 @@ import { artOf } from "../game/items.js";
 
 const FOLDER = { shiny: "shiny/", origin: "origin/" };
 
+/* SHOWDOWN IS THE ONE PICTURE THIS GAME DOES NOT SHIP, and that was measured
+   rather than chosen.
+
+   It is a real animated GIF - the creature genuinely moves, which no filter
+   can do - and PokeAPI has one for about 1,005 of the dex. They average 67KB.
+   The whole of `public/sprites` is 8.9MB today; bundling these would make it
+   75MB, in the repo and in every deploy. Re-encoding them at 64px makes them
+   BIGGER (77KB), because a naive pass loses the frame diffing the originals
+   already have and there is no gifsicle here to do it properly.
+
+   So they are fetched from PokeAPI's own CDN. That is a runtime dependency
+   this project otherwise does not have, and it is affordable for exactly one
+   reason: Showdown is the RAREST tier at 1/700, so a whole playthrough loads
+   a handful. `onSpriteError` below is the other half - a blocked or dead CDN
+   degrades to the ordinary sprite rather than to a broken-image icon, so the
+   worst case is a Pokemon that looks normal instead of one that looks wrong. */
+const SHOWDOWN_CDN =
+  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/";
+
+export const onSpriteError = (ev) => {
+  const img = ev.currentTarget;
+  if (img.dataset.fellBack) return;      // never loop on a second failure
+  img.dataset.fellBack = "1";
+  img.src = new URL(`sprites/${img.dataset.plain}.png`, document.baseURI).href;
+};
+
 /* The same path as a bare string, for the one thing that needs it: an effect
    layer masked to the sprite's own outline. `mask-image: var(--art)` is how the
    Origin reveal gets a silhouette and a gleam that follow the creature's shape
@@ -46,13 +72,17 @@ const FOLDER = { shiny: "shiny/", origin: "origin/" };
    `document.baseURI` rather than a leading slash, because `vite.config.js` sets
    `base: "./"` so a build can be opened from any path. */
 export const spriteUrl = (id, variant = null) =>
-  new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png`, document.baseURI).href;
+  (variant === "showdown"
+    ? `${SHOWDOWN_CDN}${id}.gif`
+    : new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png`, document.baseURI).href);
 
 /* THE MOVING HALF OF A TIER, as one component.
 
-   Two of the four tiers are nothing but artwork (Origin's 1996 sprite, Shiny's
-   palette) and read correctly as a bare `<img>`. The other two are a treatment,
-   and a treatment needs a layer: Holo's foil travels, Astral's aura breathes.
+   THREE of the eight tiers are nothing but artwork - Origin's 1996 sprite,
+   Shiny's palette, and Showdown, which is an animated GIF and therefore the
+   only tier that moves without a layer at all. Three more are a bare filter
+   (Glitched, Vivid, Noir). Only Holo and Astral need something hung beside
+   the image: Holo's foil travels, Astral's aura breathes.
    Shiny gets its sparks here too - the palette alone is a few pixels of hue and
    is the one tier people miss.
 
@@ -104,6 +134,8 @@ export default function Sprite({
           src={spriteUrl(id, variant)}
           alt={alt}
           loading="lazy"
+          data-plain={id}
+          onError={onSpriteError}
         />
         <VariantFx id={id} variant={variant} />
       </span>
@@ -115,6 +147,8 @@ export default function Sprite({
       src={spriteUrl(id, variant)}
       alt={alt}
       loading="lazy"
+      data-plain={id}
+      onError={onSpriteError}
     />
   );
 }

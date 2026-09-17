@@ -1105,15 +1105,54 @@ quarter of itself.
 rarest item in the game quietly quintuples — which is exactly what the economy
 suite caught when the cap went up.
 
-**Four rare tiers, and each is a different KIND of rare** - which is what lets
-all four stand together instead of being four strengths of the same idea:
+**Eight rare tiers, and each is a different KIND of rare** - which is what lets
+them stand together instead of being eight strengths of the same idea:
 
 | | odds | its tell |
 |---|---|---|
-| **Origin** | 1/160 | the **artwork** - its Generation I sprite, the 1996 drawing |
-| **Holo** | 1/160 | the **finish** - the ordinary art, with foil travelling over it |
-| **Shiny** | 1/240 | the **palette** - the alternate colours |
-| **Astral** | 1/480 | the **substance** - a starlight duotone, no new art at all |
+| **Vivid** | 1/110 | the **palette**, turned up |
+| **Noir** | 1/130 | **no colour at all**, in a game entirely about colour |
+| **Origin** | 1/140 | the **artwork** - its debut sprite, the 1996 drawing |
+| **Holo** | 1/140 | the **finish** - the ordinary art, with foil travelling over it |
+| **Glitched** | 1/260 | **corrupted data** - the only tier that stutters |
+| **Astral** | 1/480 | the **substance** - a starlight duotone, no new art |
+| **Shiny** | 1/600 | the **alternate palette** - a second file |
+| **Showdown** | 1/700 | it **moves** - a real animated GIF, and the only asset not in this repo |
+
+**THE LADDER OPENED AT THE BOTTOM, NOT THE TOP.** Adding tiers to a fixed
+spread makes collecting HARDER, because the rosette waits on the rarest of them
+and a longer list can only raise that maximum - measured, 4,000 runs on the
+starting map's anchor species: four tiers wanting all four is 8,905 encounters,
+eight wanting all eight is 18,039. So Holo and Origin came DOWN (160 -> 140),
+three cheap ones went underneath, and the whole variant rate went 1 in 53 to
+**1 in 25**. Astral is untouched at 480 because it is what the others are
+measured against; Shiny and Showdown went above it, because they are the two
+with real artwork behind them and so the two worth being trophies.
+
+**AND THE ROSETTE IS ANY FOUR** (`ROSETTE_NEED`), not all of them. Kinder odds
+alone do not fix it - that was measured too. Any four of whatever a species can
+wear is **2,374** encounters, inside a single playthrough, and it keeps what the
+mark always meant: go wide rather than get lucky once. The Dex grid and the
+sheet's COMPLETE label both read the constant, or one shows the badge and the
+other does not.
+
+**THE ORIGIN GATE IS GONE.** It used to be locked until every ordinary Pokémon
+of its generation was CAUGHT - `genComplete`, `originReady`, a whole mechanism -
+which made the kindest-looking tier the hardest thing in the game and the one
+tier nobody could hunt: you could not go looking for an Origin, you could only
+finish a generation and be handed them. Deleted with both functions.
+`lockedTiers(speciesId)` survives and takes **no dex**, which is the deletion
+stated in the signature; it is an ART check and nothing else, and `tiersFor`
+is derived from it so the two cannot disagree about what a species can hold.
+
+**SHOWDOWN IS THE ONE PICTURE THIS GAME DOES NOT SHIP**, and that was measured.
+Its GIFs average 67KB against `public/sprites`' entire 8.9MB, so bundling them
+would make the repo 75MB; re-encoding at 64px makes them BIGGER (77KB), because
+a naive pass loses the frame diffing the originals already have. They come from
+PokéAPI's CDN, which is affordable for exactly one reason - Showdown is the
+rarest tier, so a whole playthrough loads a handful - and `onSpriteError` falls
+back to the ordinary sprite, so a blocked CDN gives a Pokémon that looks normal
+rather than a broken-image icon.
 
 **The SPREAD matters more than the rate, and that is not obvious.** These were
 1 : 2 : 8 and the completion rosette - caught plus all four variants of ONE
@@ -1133,8 +1172,23 @@ the roll's precedence, the Box's choice of sprite, the Dex's mark order, the
 encounter badge, the save's byte arrays and `keeper()`. It replaced five
 hand-written copies of `["astral", "shiny", "origin"]` in five files - which is
 exactly how a fourth tier ends up protected from the sell sweep and not from the
-feed. **Adding a fifth is one row in `TIER_ODDS` and one drawn icon**; if a
-change needs more than that, the list has been bypassed somewhere.
+feed. **Adding one is one row in `TIER_ODDS` and one drawn icon**; if a change needs
+more than that, the list has been bypassed somewhere - and it HAS been, twice.
+`DexSheet.jsx` kept its own hand-written `VARIANTS` array and an
+`origin`-by-name filter, so the Forms strip would have shipped missing four
+tiers; it derives from `tiersFor` now. And two assertions in check.mjs were
+typed-out lists of the four tier names, which failed the day the ladder grew -
+the day they had nothing to say. Both are rules now: the marks row and the
+Forms strip must take their order from `TIERS`, and every `TIER_ODDS` row must
+quote its named constant rather than a bare number.
+
+**TWO LAYOUTS WERE SIZED FOR FOUR TIERS.** `.cell-marks` was a no-wrap flex
+row: eight marks at 12px with 2px gaps is 110px on a 76px Dex tile, so the row
+ran off the side and out from under the entry number. It wraps at 9px now, two
+rows of four inside the tile. And `.sf-row` was `repeat(5, 1fr)` - a literal
+for four tiers plus the ordinary one - which put nine columns in five tracks;
+it is `auto-fit` with a floor. **Anything laid out per tier has to be counted,
+not typed.**
 
 **Two tiers wear the ordinary sprite.** Origin and Shiny have folders; Holo and
 Astral do not, because neither is about artwork - they fall through to `""` in
@@ -1253,15 +1307,17 @@ Uncapped it stops being a mercy and becomes a farm: park at 3,000 dry
 encounters and every throw is a variant. `rollVariant`'s `boost` defaults to 1
 so the 400k-roll rate test still measures the unaided odds.
 
-**Origin is gated on the generation's dex.** `rollVariant` takes a `locked`
-Set and `lockedTiers(dex, speciesId)` supplies it - Origin cannot roll until
-`genComplete` says every ordinary Pokemon of that generation is CAUGHT (state
-2, not seen). Per generation, not globally, or adding Gen 2 would take a Gen 1
-player's Origins away. The gate is passed IN rather than checked inside the
-roll, so the roll stays pure and check.mjs can still drive it 400k times on a
-seeded clock. check.mjs asserts all three silent failures: a gate that never
-opens, one that was never closed, and one that leaks the tier it holds back -
-plus that locking a tier does not change what the others are worth.
+**`rollVariant` still takes a `locked` Set, and it is now only about ART.**
+`lockedTiers(speciesId)` supplies it: a species with no older drawing cannot
+roll Origin, and a form with no Showdown animation cannot roll Showdown,
+because the file is not there. Passed IN rather than checked inside the roll,
+so the roll stays pure and check.mjs can drive it 200k times on a seeded clock.
+The four possible answers are memoised Sets - this is asked once per encounter
+and allocating one per wild Pidgey to say "nothing missing" adds up.
+
+check.mjs asserts the gate's ABSENCE (`genComplete` and `originReady` must not
+reappear, and `lockedTiers` must still take one argument), that Origin actually
+rolls at its own rate ungated, and that locking one tier costs no other.
 
 **Tab icons are MASKS, not pictures.** A tab is pale-on-dark when idle and
 dark-on-pale when active, so a fixed-colour icon disappears in one of the two.

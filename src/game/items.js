@@ -302,15 +302,22 @@ export const FIELD = [
     name: "Holo Honey", price: 2600, level: 18,
     steps: 600, lift: 5, blurb: "Holo, ×5 as likely",
   },
-  {
-    id: "honey-shiny", art: "honey", tier: "shiny", family: "variant",
-    name: "Shiny Honey", price: 3200, level: 20,
-    steps: 600, lift: 8, blurb: "Shiny, ×8 as likely",
-  },
+  /* ASTRAL BEFORE SHINY NOW, AND THE LIFTS MOVED WITH THE LADDER. Shiny went
+     1/240 -> 1/600 and became rarer than Astral, so the jar that favours it
+     is the dearest of the three rather than the middle one - and its lift had
+     to nearly treble or it stopped landing. check.mjs pins that directly: a
+     jar has to do something more often than not over its own 600 steps, and
+     at x8 a Shiny Honey had quietly dropped to 43%. All three sit near
+     three-in-four again. */
   {
     id: "honey-astral", art: "honey", tier: "astral", family: "variant",
-    name: "Astral Honey", price: 4800, level: 24,
+    name: "Astral Honey", price: 3200, level: 20,
     steps: 600, lift: 16, blurb: "Astral, ×16 as likely",
+  },
+  {
+    id: "honey-shiny", art: "honey", tier: "shiny", family: "variant",
+    name: "Shiny Honey", price: 4800, level: 24,
+    steps: 600, lift: 20, blurb: "Shiny, ×20 as likely",
   },
 ];
 
