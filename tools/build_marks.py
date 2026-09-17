@@ -47,7 +47,52 @@ SIZE = 24
 # drawing on disk, so it does NOT grow when a tier is added.
 SHEET_ORDER = ["origin", "shiny", "astral", "complete"]
 # Everything the game asks for. `src/ui/Marks.jsx` names the same set.
-ICONS = ["origin", "shiny", "holo", "astral", "complete", "legendary"]
+ICONS = ["origin", "shiny", "holo", "astral", "glitched", "vivid", "noir",
+         "showdown", "complete", "legendary"]
+
+# THE SHAPE HAS TO CARRY IT, NOT THE COLOUR. Eight of these sit in a row on a
+# 76px Dex tile at 9px, and a row of coloured dots is unreadable to anybody who
+# cannot separate the colours - so every mark has to be tellable from every
+# other in greyscale. The four already drawn are a ring, a four-point star, a
+# hexagon and a diamond; these four take a bolt, a burst, a half-disc and a
+# play triangle, which share no silhouette with those or with each other.
+STAND_IN = {
+    "glitched": ((255, 60, 140), [(58, 8), (18, 56), (44, 56), (36, 92),
+                                  (78, 40), (50, 40)]),
+    "vivid":    ((255, 168, 40), [(50, 6), (60, 38), (94, 38), (66, 58),
+                                  (78, 92), (50, 71), (22, 92), (34, 58),
+                                  (6, 38), (40, 38)]),
+    "noir":     ((225, 228, 236), None),          # a half-disc, drawn below
+    "showdown": ((120, 210, 255), [(24, 12), (88, 50), (24, 88)]),
+}
+
+
+def placeholder_shape(name, size=256):
+    """A flat geometric stand-in, deliberately not in the house style.
+
+    It should be obvious in the game that these four have not been drawn yet -
+    a plausible-looking placeholder is one nobody ever replaces. Everything is
+    laid out on a 100-unit grid and scaled, so the shapes stay right whatever
+    `size` is."""
+    from PIL import ImageDraw
+
+    colour, pts = STAND_IN[name]
+    im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    k = size / 100.0
+
+    if pts is None:
+        # Noir: a disc with its right half cut away, which reads as "no colour"
+        # and shares no outline with the ring the Origin mark uses.
+        pad = size // 10
+        d.ellipse([pad, pad, size - pad, size - pad], fill=colour + (255,))
+        d.rectangle([size // 2, 0, size, size], fill=(0, 0, 0, 0))
+        d.ellipse([pad, pad, size - pad, size - pad], outline=colour + (255,),
+                  width=max(2, size // 22))
+        return im
+
+    d.polygon([(x * k, y * k) for (x, y) in pts], fill=colour + (255,))
+    return im
 
 
 def columns(im, gap=4):
@@ -191,6 +236,10 @@ def main():
     if "holo" not in made:
         made["holo"] = placeholder_holo()
         stood_in.append("holo")
+    for name in STAND_IN:
+        if name not in made:
+            made[name] = placeholder_shape(name)
+            stood_in.append(name)
     if "legendary" not in made:
         made["legendary"] = placeholder_legendary()
         stood_in.append("legendary")

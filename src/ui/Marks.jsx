@@ -1,5 +1,7 @@
-/* The rarity badges: Origin, Shiny, Holo, Astral, and the rosette for holding
-   every one of them for a single species.
+/* The rarity badges - eight of them now - and the rosette, which wants any
+   FOUR of whatever a species can wear rather than every one. See
+   `ROSETTE_NEED`: at eight tiers "all of them" stopped being a hard mark and
+   became an unreachable one.
 
    Drawn art rather than CSS shapes. They started as a ring, a star and a diamond
    built from `clip-path` and borders, which was defensible at 8px and stopped
@@ -20,6 +22,10 @@ const TIER_ART = {
   shiny: { src: "marks/shiny.png", name: "Shiny" },
   holo: { src: "marks/holo.png", name: "Holo" },
   astral: { src: "marks/astral.png", name: "Astral" },
+  glitched: { src: "marks/glitched.png", name: "Glitched" },
+  vivid: { src: "marks/vivid.png", name: "Vivid" },
+  noir: { src: "marks/noir.png", name: "Noir" },
+  showdown: { src: "marks/showdown.png", name: "Showdown" },
   complete: { src: "marks/complete.png", name: "Every variant" },
   /* NOT A TIER, and it sits here anyway because it is the same object: a small
      drawn badge on a sprite, in the same set, at the same size. Legendary is a

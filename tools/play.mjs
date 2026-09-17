@@ -1078,4 +1078,59 @@ function until(e, what, label, max = 2000) {
     `and ${scrims.length} scrims that ignore a gesture they did not see begin`);
 }
 
+/* A SAVE WRITTEN AT FOUR TIERS MUST LOAD AT EIGHT, and CLAUDE.md's claim that
+   adding a tier is "a non-event for saves" is exactly the sort of thing that
+   is true right up until it is not. The rows are BUILT from `TIERS` in both
+   `freshState` and `loadState`, so a save that predates a tier simply has no
+   key for it and `normalise(undefined)` gives a fresh row of zeroes - but the
+   failure if that ever stops holding is silent and total: every variant
+   anybody has ever caught, gone, with no error anywhere.
+
+   Driven through the real engine over a real four-tier save, and it checks
+   BOTH directions - the old rows survive, and the new ones are written back
+   out rather than being dropped on the next save. */
+{
+  const { SPECIES } = await import("../src/data/dex.js");
+  const { TIERS } = await import("../src/game/biomes.js");
+  const OLD = ["astral", "shiny", "holo", "origin"];
+  const dex = new Array(SPECIES.length).fill(0);
+  dex[0] = 2; dex[24] = 2;
+  const old = { ...SAVE, dex, caught: 2 };
+  for (const t of TIERS) delete old[t];
+  for (const t of OLD) {
+    const row = new Array(SPECIES.length).fill(0);
+    if (t === "shiny") row[24] = 1;
+    if (t === "holo") row[0] = 1;
+    old[t] = row;
+  }
+
+  store.clear();
+  store.set("meadow-route", JSON.stringify(old));
+  raf.length = 0;
+  const e = createEngine(canvas(), () => {}, canvas());
+
+  for (const t of TIERS) {
+    assert.equal(e.state[t]?.length, SPECIES.length,
+      `"${t}" is missing or the wrong length after loading a ${OLD.length}-tier save`);
+  }
+  assert.equal(e.state.shiny[24], 1, "a shiny did not survive the ladder growing");
+  assert.equal(e.state.holo[0], 1, "a holo did not survive the ladder growing");
+  assert.equal(e.state.dex[24], 2, "a caught species was demoted to seen");
+  for (const t of TIERS.filter((x) => !OLD.includes(x))) {
+    assert.equal(e.state[t].reduce((a, b) => a + b, 0), 0, `"${t}" arrived non-empty`);
+  }
+
+  /* AND BACK OUT AGAIN. `setChar` rather than walking: every step is a 7%
+     chance of an encounter and an encounter stops the leg, so walking to
+     provoke a save is a coin toss - this file already records that. */
+  e.setChar(e.state.char === "red" ? "leaf" : "red");
+  await new Promise((r) => setTimeout(r, 600));
+  const back = JSON.parse(store.get("meadow-route"));
+  const dropped = TIERS.filter((t) => !Array.isArray(back[t]));
+  assert.deepEqual(dropped, [], `the save was written back without: ${dropped.join(", ")}`);
+
+  console.log(`tier growth ok — a ${OLD.length}-tier save loads onto ${TIERS.length}, ` +
+    "old rows intact, new rows empty, all of them written back");
+}
+
 console.log("play ok — the frame loop never stopped");

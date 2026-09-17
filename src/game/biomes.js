@@ -225,7 +225,7 @@ export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower"]);
    handful of shinies in a whole playthrough - rare enough that each one is a
    story, common enough that they are not a rumour. Do not tune this one alone:
    it is one rung of the ladder below, and they move together. */
-export const SHINY_ODDS = 1 / 240;
+export const SHINY_ODDS = 1 / 600;
 
 /* Four rarities above ordinary, and they are not variations on one idea -
    each is a different KIND of rare, which is what lets all four stand together
@@ -277,8 +277,31 @@ export const SHINY_ODDS = 1 / 240;
    reachable at any odds that leave a rare feeling rare, and no number here
    pretends otherwise. */
 export const ASTRAL_ODDS = 1 / 480;
-export const ORIGIN_ODDS = 1 / 160;
-export const HOLO_ODDS = 1 / 160;
+export const ORIGIN_ODDS = 1 / 140;
+export const HOLO_ODDS = 1 / 140;
+
+/* FOUR MORE, AND THE LADDER GOT KINDER RATHER THAN LONGER.
+
+   Adding tiers to a fixed spread makes the collection HARDER, because the
+   completion rosette waits on the rarest of them and a longer list can only
+   raise that maximum. Measured, 4,000 runs on the starting map's anchor
+   species: four tiers wanting all four is 8,905 encounters; eight tiers
+   wanting all eight is 18,039. Twice as long, for twice as many things.
+
+   So the spread opens at the BOTTOM. Holo and Origin come down 160 -> 140 and
+   the three new cheap ones sit under them, which takes the whole variant rate
+   from 1 in 53 encounters to 1 in 25 - a variant is now a thing that happens
+   on an ordinary walk rather than a thing you hear about. Astral is untouched
+   at 480 because it is the one the others are measured against, and Shiny and
+   Showdown go ABOVE it: they are the two with real artwork behind them, so
+   they are the two worth being trophies.
+
+   AND THE ROSETTE CHANGES WITH IT - see `ROSETTE_NEED`. Kinder odds alone do
+   not fix it; that was measured too. */
+export const VIVID_ODDS = 1 / 110;
+export const NOIR_ODDS = 1 / 130;
+export const GLITCH_ODDS = 1 / 260;
+export const SHOWDOWN_ODDS = 1 / 700;
 
 /* THE LADDER, rarest first - and the single source for it.
 
@@ -289,11 +312,28 @@ export const HOLO_ODDS = 1 / 160;
    fourth tier ends up protected from the sell sweep and not from the feed.
    Adding a fifth means adding a row here and drawing an icon. */
 export const TIER_ODDS = [
-  ["astral", ASTRAL_ODDS],
+  ["showdown", SHOWDOWN_ODDS],
   ["shiny", SHINY_ODDS],
+  ["astral", ASTRAL_ODDS],
+  ["glitched", GLITCH_ODDS],
   ["holo", HOLO_ODDS],
   ["origin", ORIGIN_ODDS],
+  ["noir", NOIR_ODDS],
+  ["vivid", VIVID_ODDS],
 ];
+
+/* HOW MANY OF THEM THE ROSETTE WANTS, and it is no longer "all of them".
+
+   At four tiers "every variant of one species" was 8,905 encounters, or about
+   two and a half playthroughs - hard, and reachable. At eight it is 18,039,
+   which is not a harder mark, it is a deleted one: nobody finishes it and the
+   tile stops meaning anything.
+
+   ANY FOUR of whatever a species can wear is 2,374, measured on the same
+   runs - comfortably inside one playthrough, and it keeps the shape of the
+   original idea (you have to go wide, not just get lucky once). Four rather
+   than five because four is what the mark has always meant. */
+export const ROSETTE_NEED = 4;
 
 /* Just the names, rarest first. Kindest-first is `[...TIERS].reverse()`, which
    is what a row of marks reads in - progress towards the rarest. */
@@ -462,23 +502,6 @@ export function rollVariant(
 
    `SPECIES` is the list of what ships and `dex` is indexed by POSITION in it -
    that is the only relationship that survives a hole. */
-/* FORMS DO NOT COUNT TOWARD A GENERATION BEING COMPLETE, and this is the one
-   place that mattered most. Origin unlocks when every ORDINARY Pokemon of a
-   generation is caught; a Mega is not one, it is a hundred levels of Rare Candy
-   spent on one you already own. Counting them would have put 33 forms x 100
-   levels between a Kanto player and the tier - which is not a harder gate, it
-   is a deleted one. `hasOrigin` already refuses a form its own Origin, so this
-   is the same rule read from the other end. */
-export function genComplete(dex, gen) {
-  for (let i = 0; i < SPECIES.length; i++) {
-    const sp = SPECIES[i];
-    if (isForm(sp.id)) continue;
-    if (genOf(sp.id) === gen && dex?.[i] !== 2) return false;
-  }
-  return true;
-}
-
-export const originReady = (dex, speciesId) => genComplete(dex, genOf(speciesId));
 
 /* ORIGIN NEEDS AN OLDER DRAWING TO EXIST, and for a third of the dex there
    isn't one.
@@ -525,20 +548,48 @@ export const baseArtGen = (id) => ART_GEN.find(([hi]) => id <= hi)[1];
    an OLDER drawing; a form has exactly one. */
 export const hasOrigin = (id) => !isForm(id) && genOf(id) < baseArtGen(id);
 
-/* The tiers a species can ever wear. The Dex's completion rosette and the
-   sheet's FORMS strip both read it, so a species that cannot have an Origin is
-   not asked for one twice in two different ways - and the rosette stays
-   reachable for every species rather than becoming impossible for 107 of them
-   the moment Sinnoh lost the tier. */
-export const tiersFor = (id) =>
-  (hasOrigin(id) ? TIERS : TIERS.filter((t) => t !== "origin"));
+/* SHOWDOWN IS A SECOND FILE TOO, and PokeAPI has no animation for a Mega. The
+   same shape as `hasOrigin`: a tier a species has no artwork for is a tier it
+   can never wear, which is a fact about the art rather than about the player. */
+export const hasShowdown = (id) => !isForm(id);
 
-/* What `rollVariant` must skip right now. One Set, reused, because this is
-   asked once per encounter and allocating a Set per wild Pidgey to say
-   "nothing new here" is the sort of thing that adds up. */
-const ORIGIN_ONLY = new Set(["origin"]);
-export const lockedTiers = (dex, speciesId) =>
-  (hasOrigin(speciesId) && originReady(dex, speciesId) ? null : ORIGIN_ONLY);
+/* THE ORIGIN GATE IS GONE, and what is left is only the art check.
+
+   Origin used to be locked until every ordinary Pokemon of its generation was
+   CAUGHT - `genComplete`, `originReady`, a whole mechanism. It made the
+   kindest-looking tier the hardest thing in the game and it made the one tier
+   nobody could plan for: you could not hunt an Origin, you could only finish a
+   generation and be handed them. Deleted, with the two functions that served
+   it. Origin is now what every other tier is - a roll.
+
+   What survives is the half that was never a gate: a species with no older
+   drawing cannot wear Origin, and a form with no Showdown animation cannot
+   wear Showdown, because the file is not there. No `dex` argument any more,
+   which is the deletion stated in the signature.
+
+   THE FOUR ANSWERS ARE MEMOISED. This is asked once per encounter and the
+   result is one of four constant Sets, so allocating one per wild Pidgey to
+   say "nothing missing here" is the sort of thing that adds up. */
+const NO_ORIGIN = new Set(["origin"]);
+const NO_SHOWDOWN = new Set(["showdown"]);
+const NEITHER = new Set(["origin", "showdown"]);
+
+export function lockedTiers(speciesId) {
+  const og = hasOrigin(speciesId);
+  const sd = hasShowdown(speciesId);
+  if (og && sd) return null;
+  if (!og && !sd) return NEITHER;
+  return og ? NO_SHOWDOWN : NO_ORIGIN;
+}
+
+/* The tiers a species can ever wear, DERIVED FROM THE SAME ANSWER the roll
+   uses. Two lists would be two opinions about what a species can hold, and
+   this file already records what that costs: a panel that says READY over a
+   thing it cannot assemble. The rosette and the FORMS strip both read this. */
+export const tiersFor = (id) => {
+  const off = lockedTiers(id);
+  return off ? TIERS.filter((t) => !off.has(t)) : TIERS;
+};
 
 /* A FIXED SHARE OF THE TABLE, not a fixed weight - and that is the whole
    anti-dilution answer, arrived at the hard way.

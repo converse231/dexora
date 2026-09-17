@@ -19,7 +19,7 @@ import {
 } from "./game/items.js";
 import { ItemIcon } from "./ui/Sprite.jsx";
 import {
-  biomeFor, levelFromXp, TIERS, originReady, dexIndex,
+  biomeFor, levelFromXp, TIERS, dexIndex,
 } from "./game/biomes.js";
 import DexSheet from "./ui/DexSheet.jsx";
 import { modalOpen } from "./ui/modal.js";
@@ -572,7 +572,6 @@ export default function App({
             TIERS.map((t) => [t, !!st?.[t]?.[dexIndex(entry)]]))}
           /* So the sheet can say "finish the dex" rather than "not yet" for a
              variant that cannot currently spawn at all. */
-          originLocked={!originReady(st?.dex, entry)}
           owned={st?.box?.filter((m) => m.species === entry).length ?? 0}
           onFindInBox={(id) => { setBoxJump(id); setEntry(null); }}
           /* Travelling closes the sheet, because the answer to "where do I

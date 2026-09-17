@@ -15,6 +15,7 @@ import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
 import {
   LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor, isLegendary,
+  ROSETTE_NEED,
   GEN_UNLOCK,
 } from "../game/biomes.js";
 import FilterBar from "./FilterBar.jsx";
@@ -64,7 +65,13 @@ export default function Dex({ dex, tiers, caught, level = 1, onSelect }) {
      has no Origin to find - see `hasOrigin` - so asking it for one would make
      the rosette impossible for 107 entries rather than merely hard. */
   const complete = (id) =>
-    at(id) === 2 && tiersFor(id).every((t) => has(t, id));
+    /* ANY FOUR, not every one. At four tiers "all of them" was 8,905
+       encounters for one species - hard and reachable. At eight it is 18,039,
+       which is not a harder mark but a deleted one. Four of whatever this
+       species can wear is 2,374, inside a single playthrough, and it keeps
+       what the mark always meant: go wide rather than get lucky once. */
+    at(id) === 2
+    && tiersFor(id).filter((t) => has(t, id)).length >= ROSETTE_NEED;
   const completed = SPECIES.filter((sp) => complete(sp.id)).length;
 
   const seen = SPECIES.filter((sp) => at(sp.id) >= 1).length;

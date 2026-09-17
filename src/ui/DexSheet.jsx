@@ -24,7 +24,7 @@ import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
 import {
-  foundIn, howOften, speciesById, hasOrigin, areaOpen, BIOMES,
+  foundIn, howOften, speciesById, areaOpen, BIOMES, tiersFor, ROSETTE_NEED,
 } from "../game/biomes.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
@@ -32,13 +32,25 @@ import Mark from "./Marks.jsx";
 /* Kindest first, so the row reads as progress toward the rarest. Origin and
    Holo share odds; Origin sits first because its tell is the drawing itself,
    which is the easier of the two to recognise cold. */
-const VARIANTS = [
-  [null, "Ordinary", "the sprite everyone meets"],
-  ["origin", "Origin", "the 1996 artwork"],
-  ["holo", "Holo", "pressed in foil"],
-  ["shiny", "Shiny", "the alternate palette"],
-  ["astral", "Astral", "made of starlight"],
-];
+/* WHAT EACH TIER IS, IN FOUR WORDS. Only the prose lives here - the LIST and
+   its ORDER come from `TIERS`, because a second hand-written list of tiers is
+   exactly how this strip came to be missing four of them the day the ladder
+   grew. It drifted once already: it filtered on `origin` by name and knew
+   nothing about any other tier whose artwork might be absent.
+
+   A tier with no line here still renders; it just has no blurb. That is the
+   right failure - a missing sentence beats a missing column. */
+const BLURB = {
+  origin: "the 1996 artwork",
+  holo: "pressed in foil",
+  shiny: "the alternate palette",
+  astral: "made of starlight",
+  glitched: "corrupted data",
+  vivid: "the colours turned up",
+  noir: "no colour at all",
+  showdown: "it moves",
+};
+const LABEL = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /* Where this one turns up, in a sentence a player can act on.
 
@@ -129,7 +141,7 @@ function Where({ id, level = 1, busy = false, here = null, onTravel = null }) {
 }
 
 export default function DexSheet({
-  id, state, variant = null, held = {}, originLocked = false, owned = 0,
+  id, state, variant = null, held = {}, owned = 0,
   level = 1, here = null, busy = false,
   onClose, onFindInBox, onTravel,
 }) {
@@ -139,11 +151,21 @@ export default function DexSheet({
   /* Which of the four you actually hold. The ordinary one is simply "caught";
      the rest come from their own dex arrays. */
   const got = (t) => (t === null ? caught : !!held[t]);
-  /* Only the forms this species can have. A Sinnoh entry drops the Origin
-     column entirely rather than showing a silhouette nobody can ever fill:
-     a slot that cannot be earned reads as a bug in the collection. */
-  const forms = VARIANTS.filter(([t]) => t === null || t !== "origin" || hasOrigin(id));
-  const every = forms.every(([t]) => got(t));
+  /* Only the forms this species can have, straight out of `tiersFor` - the
+     same answer the ROLL uses, so the strip cannot offer a column the game
+     will never fill. A Sinnoh entry drops Origin and a Mega drops Showdown,
+     rather than showing a silhouette nobody can ever earn: a slot that cannot
+     be filled reads as a bug in the collection.
+
+     Kindest first, which is what makes the row read as progress. */
+  const forms = [
+    [null, "Ordinary", "the sprite everyone meets"],
+    ...[...tiersFor(id)].reverse().map((t) => [t, LABEL(t), BLURB[t] ?? ""]),
+  ];
+  /* THE ROSETTE IS ANY FOUR, and this label has to say the same thing the Dex
+     tile does - two answers to "is this complete" is how one screen shows the
+     badge and the other does not. */
+  const every = forms.filter(([t]) => t !== null && got(t)).length >= ROSETTE_NEED;
 
   /* WHICH FORM THE PORTRAIT IS SHOWING. It was fixed at the rarest one held,
      which is the right thing to OPEN on and the wrong thing to be stuck with:
@@ -278,14 +300,12 @@ export default function DexSheet({
                       {t && <Mark tier={t} size={12} className="sf-badge" />}
                     </div>
                     <span className="sf-name">{name}</span>
-                    {/* A locked Origin is not "not yet" - it is not out there
-                        at all, and telling someone to keep hunting for one is
-                        telling them to waste an afternoon. */}
-                    <span className="sf-note">
-                      {got(t) ? blurb
-                        : t === "origin" && originLocked ? "finish the dex"
-                          : "not yet"}
-                    </span>
+                    {/* Every tier in this strip is one a species CAN wear -
+                        `tiersFor` has already dropped the ones with no artwork
+                        - so the only two states left are held and not held.
+                        The third, "out there but locked behind finishing a
+                        generation", went with the Origin gate. */}
+                    <span className="sf-note">{got(t) ? blurb : "not yet"}</span>
                   </div>
                 ))}
               </div>

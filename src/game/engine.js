@@ -12,7 +12,7 @@ import {
   levelFromXp, xpForCatch,
   rodTable, rodBite,
   rollVariant, pityBoost, TIERS,
-  lockedTiers, originReady, wildBand, rollSize, BIOMES,
+  lockedTiers, wildBand, rollSize, BIOMES,
 } from "./biomes.js";
 import {
   emptyStats, canSpend, catchMult, weighted, stepScale,
@@ -782,7 +782,8 @@ export function createEngine(canvas, onChange, mini = null) {
        of them, because there is no such thing as a shiny Gen 1 sprite.
 
        Origin is held back until this species' generation is fully caught -
-       see `lockedTiers`. It is passed in rather than checked inside the roll
+       see `lockedTiers` - which is now only "is there artwork", the earn-it
+       gate having gone. It is passed in rather than checked inside the roll
        so the roll stays a pure function of its arguments, which is what lets
        check.mjs drive it 400,000 times with a seeded clock. */
     /* PITY. `state.dry` is encounters since the last variant of any tier, and
@@ -795,7 +796,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const honey = running("variant");
     const variant = rollVariant(
       Math.random,
-      lockedTiers(state.dex, sp.id),
+      lockedTiers(sp.id),
       pityBoost(state.dry) * (honey && !honey.tier ? honey.lift : 1),
       honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
