@@ -2061,6 +2061,24 @@ a berry, so check.mjs asserts the two gates.
 now are one-liners, and a one-liner copied into a second screen is how this repo
 shipped a shiny protected from one bulk action and not its sibling.
 
+**A SCRIM THAT APPEARS UNDER A LIVE POINTER INHERITS THE REST OF THAT
+GESTURE**, and `onClick={onClose}` on a backdrop is not "click away to
+dismiss". The BAG key fires on `pointerdown`, the sheet mounts under a thumb
+that is still down, and the `touchEnd` hit-tests to the scrim that has just
+appeared there: driven over CDP with real touch input it read `view = all`
+then `view = null, closes = 1` - the bag opening and shutting on one tap.
+Holding A did the same one beat later. This file already recorded the sibling
+(a tip opening mid-stride, its scrim swallowing the `pointerup` the d-pad was
+waiting for) and the general rule is the same.
+
+`useDismiss` in `modal.js` is the one answer, and every dialog uses it: a
+backdrop closes on a click that ALSO STARTED on the backdrop, so a gesture it
+did not see begin is not one to close on. It fixes a second bug nobody had
+reported - a drag that starts INSIDE the card and ends outside fires its click
+on the nearest common ancestor, which is the scrim, so swiping the ball strip
+and drifting off shut the bag and selecting text in Settings threw away what
+had been typed. **Do not write a bare `onClick` on a scrim.**
+
 **AN ENCOUNTER PINS THE RAIL OPEN AND MUST NOT OPEN THE SHEET.** The rail lives
 down one edge and can afford to; the sheet covers the bottom third, which is
 where the Pokemon is.

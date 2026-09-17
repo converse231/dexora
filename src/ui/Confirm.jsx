@@ -6,7 +6,7 @@
    never "are you sure" but "what will this cost me". */
 
 import { useEffect, useState } from "react";
-import { useModalLock } from "./modal.js";
+import { useModalLock, useDismiss } from "./modal.js";
 
 import Sprite from "./Sprite.jsx";
 
@@ -58,7 +58,7 @@ export default function Confirm({
   }, [onConfirm, onCancel, armed]);
 
   return (
-    <div className="sheet" onClick={onCancel}>
+    <div className="sheet" {...useDismiss(onCancel)}>
       <div
         className="confirm"
         role="dialog"

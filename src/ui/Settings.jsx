@@ -34,7 +34,7 @@
    lives in `auth.users` and changing it takes the old one first. */
 
 import { useEffect, useState } from "react";
-import { useModalLock } from "./modal.js";
+import { useModalLock, useDismiss } from "./modal.js";
 import Confirm from "./Confirm.jsx";
 import Note from "./Note.jsx";
 import { nameProblem, NAME_MAX, ageProblem } from "../game/name.js";
@@ -85,7 +85,7 @@ export default function Settings({ account, onClose }) {
   };
 
   return (
-    <div className="sheet" onClick={onClose}>
+    <div className="sheet" {...useDismiss(onClose)}>
       <div
         className="settings"
         role="dialog"

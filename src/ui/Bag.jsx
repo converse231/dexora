@@ -24,7 +24,7 @@
    it coming to rest half on a tile. */
 
 import { useEffect, useRef, useState } from "react";
-import { useModalLock } from "./modal.js";
+import { useModalLock, useDismiss } from "./modal.js";
 import { carriedBalls, usefulItems, liveMult, forSale, berryRoom } from "../game/items.js";
 import { ItemIcon } from "./Sprite.jsx";
 
@@ -67,7 +67,7 @@ export default function Bag({
   const running = (item) => field?.[item.family]?.id === item.id;
 
   return (
-    <div className="bagsheet" onClick={onClose}>
+    <div className="bagsheet" {...useDismiss(onClose)}>
       <div
         className="bag-card"
         role="dialog"
