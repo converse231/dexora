@@ -1186,9 +1186,18 @@ quote its named constant rather than a bare number.
 row: eight marks at 12px with 2px gaps is 110px on a 76px Dex tile, so the row
 ran off the side and out from under the entry number. It wraps at 9px now, two
 rows of four inside the tile. And `.sf-row` was `repeat(5, 1fr)` - a literal
-for four tiers plus the ordinary one - which put nine columns in five tracks;
-it is `auto-fit` with a floor. **Anything laid out per tier has to be counted,
-not typed.**
+for four tiers plus the ordinary one - which put nine columns in five tracks.
+**Anything laid out per tier has to be counted, not typed.**
+
+**AND `auto-fit` WAS THE WRONG COUNT TOO.** It was the first fix for that, and
+it fitted SEVEN 54px cells across the rail, so nine came out as a ragged 7 + 2
+of squares with 8.5px type in them - smaller and messier than the four-tier
+strip it replaced. It is `repeat(3, 1fr)`: **nine is 3x3**, which is what a
+Kanto species wears (eight tiers plus ordinary), and seven or eight simply
+leave the last row short instead of scattering. Three columns is also what
+bought the size back - art 38 -> 46, label 8 -> 9, blurb 8.5 -> 10. A grid
+that decides its own column count cannot be composed; one that is told the
+count can.
 
 **Two tiers wear the ordinary sprite.** Origin and Shiny have folders; Holo and
 Astral do not, because neither is about artwork - they fall through to `""` in
@@ -1809,6 +1818,36 @@ no Origin either, and nothing has to be edited on the day. `ART_GEN` is the one
 place saying where base art comes from and check.mjs asserts it against
 `artFor()` in fetch-species.mjs, because two copies would drift the day a base
 set changes and the symptom would be Origins that are the same picture.
+
+**THE UNHELD TREATMENT IS ONE RULE, BECAUSE A LIST OF TIERS HAS DRIFTED
+TWICE.** An unheld cell in the FORMS strip is a flat silhouette - the shape is
+the hint and the colour is the reward - and that was written first as
+`.sf-one:not(.got) .holo-foil`, which missed the aura and the sparks when
+`VariantFx` grew to three layers, and then as `.sf-one:not(.got)
+.sprite-astral, .sprite-holo`, which missed Vivid, Noir and Glitched when the
+ladder went to eight. The second one was worse than it looks: **every tier's
+filter carries `!important`**, so those three beat the plain base rule and
+rendered in FULL COLOUR on species nobody had caught. Reported from play.
+
+It is `.sf-one:not(.got) .sf-art img:not(.mark)` - four classes and
+`!important`, so it outranks any tier - plus `.sf-one:not(.got) .sf-art > span`
+for the layers, because `VariantFx` returns a span and `Mark` an img, so "every
+span in the art box" is the whole set whatever a future tier calls its own.
+`animation: none` with the filter, or a Glitched silhouette stutters in a cell
+nobody has earned. check.mjs asserts the SHAPE - no selector under
+`.sf-one:not(.got)` may name a tier or a layer, and the layer names are read
+out of `Sprite.jsx` so the check cannot fall behind the component either.
+
+**AND A SILHOUETTE MUST NOT COST A ROUND TRIP.** The strip is the only screen
+in the game that draws a tier nobody owns, and exactly one tier is not in this
+repo - so opening ANY entry fetched a 67KB GIF from PokeAPI purely to paint it
+black, which makes the "a whole playthrough loads a handful" argument for that
+CDN false on a dex of 1,145. An unheld Showdown draws the ordinary sprite: the
+silhouette is a flat fill of the outline either way, and it also stops the odd
+one out in a grid whose point is one creature nine ways, since a Showdown GIF
+is not framed on the 64px canvas everything else is normalised to and drew
+visibly larger than its eight neighbours. Measured with
+`performance.getEntriesByType("resource")`: 0 requests unheld, 1 held.
 
 **`tiersFor(id)` is what both the Dex grid and the sheet count through**, and
 it exists because the completion rosette would otherwise have become

@@ -796,16 +796,81 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
        point is a white silhouette. */
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 
-    /* THE FORMS STRIP MUST NOT GIVE A TREATMENT AWAY. An unheld variant is a
-       flat silhouette on purpose - the shape is a hint and the colours are the
-       reward - so every moving layer has to be hidden there, not just the one
-       that happened to exist when the rule was written. `VariantFx` grew from
-       one layer to three and this hid exactly one of them. */
-    const fxLayers = [".holo-foil", ".astral-aura", ".shiny-spark"];
-    for (const layer of fxLayers) {
-      assert.ok(css.includes(`.sf-one:not(.got) ${layer}`),
-        `an unheld ${layer} is still animating in the FORMS strip - the strip ` +
-        "would be showing a treatment nobody has earned yet");
+    /* THE FORMS STRIP MUST NOT GIVE A TREATMENT AWAY, AND IT MUST NOT DO IT
+       BY NAME. An unheld variant is a flat silhouette on purpose - the shape
+       is the hint and the colour is the reward - and twice now that has been
+       written as a list of the classes that happened to exist on the day:
+
+         .sf-one:not(.got) .holo-foil { display: none }
+         .sf-one:not(.got) .sprite-astral, .sf-one:not(.got) .sprite-holo { ... }
+
+       The first missed the aura and the sparks when `VariantFx` grew from one
+       layer to three. The second missed Vivid, Noir and Glitched when the
+       ladder went from four tiers to eight - and because every tier's filter
+       carries `!important`, those three beat the plain base rule and rendered
+       in FULL COLOUR on species nobody had caught. Reported from play.
+
+       So this asserts the SHAPE of the fix rather than its contents, which is
+       the only form of it that survives a ninth tier: the strip covers unheld
+       art with one rule that names no tier and no layer. Checking the three
+       cases that are wrong catches every list, however long. */
+    {
+      /* Every selector in the file that speaks for an unheld cell. */
+      const unheld = [...css.matchAll(/\.sf-one:not\(\.got\)[^,{]*/g)].map((m) => m[0]);
+
+      /* 1. NONE OF THEM MAY NAME A TIER. `sprite-<tier>` is the class the
+            enumeration used; a tier's mark class would do the same damage. */
+      for (const sel of unheld) {
+        assert.ok(!/\.(sprite|mark)-/.test(sel),
+          `"${sel.trim()}" names a tier - that list is complete on the day it ` +
+          "is written and silently short every day after. One rule, no names");
+      }
+
+      /* 2. NOR A LAYER, and the layer names are read out of the component so
+            this cannot fall behind it either. */
+      const fx = readFileSync(new URL("../src/ui/Sprite.jsx", import.meta.url), "utf8");
+      const layers = [...fx.matchAll(/className="([a-z-]+)"/g)].map((m) => m[1])
+        .filter((c) => c !== "mark" && !c.startsWith("sprite"));
+      assert.ok(layers.length >= 3, "VariantFx's layers are not where this expects them");
+      for (const sel of unheld) {
+        assert.ok(!layers.some((l) => sel.includes(`.${l}`)),
+          `"${sel.trim()}" hides one named layer - VariantFx has ${layers.length}`);
+      }
+      assert.ok(unheld.some((sel) => /\.sf-art\s*>\s*span\s*$/.test(sel)),
+        "nothing hides an unheld cell's effect layers structurally - a Holo " +
+        "silhouette would have a rainbow travelling over it");
+
+      /* 3. AND THE SILHOUETTE MUST OUTRANK THE TIER. Every tier declares its
+            filter `!important` (an animation outranks a plain declaration, so
+            `mon-appear`'s `filter: none` would erase it), so a base rule
+            without one loses to all of them - which is exactly how three
+            tiers came to show their real colours here. */
+      const art = css.indexOf(".sf-one:not(.got) .sf-art img:not(.mark)");
+      assert.ok(art >= 0, "the FORMS strip no longer greys out what you do not hold");
+      const rule = css.slice(art, css.indexOf("}", art));
+      assert.ok(/filter:[^;]*!important/.test(rule),
+        "the silhouette's filter is not !important - every tier's is, so every " +
+        "tier wins and an uncaught variant shows its real colours");
+      assert.ok(/animation:\s*none\s*!important/.test(rule),
+        "a Glitched silhouette will stutter in a cell nobody has earned");
+
+      /* 4. AND A SILHOUETTE MUST NOT COST A ROUND TRIP. The FORMS strip is the
+            only screen that draws a tier nobody owns, and exactly one tier is
+            not in this repo - Showdown comes off PokeAPI's CDN, justified in
+            Sprite.jsx by being the rarest thing in the game. Rendering it
+            unheld fetched a 67KB GIF per sheet purely to paint it black,
+            which makes that justification false. Derived from `spriteUrl`
+            rather than named here, so a second remote tier cannot slip past
+            by not being the one this was written about. */
+      const sprite = readFileSync(new URL("../src/ui/Sprite.jsx", import.meta.url), "utf8");
+      const remote = TIERS.filter((t) =>
+        new RegExp(`variant === "${t}"[\\s\\S]{0,40}CDN`).test(sprite));
+      assert.equal(remote.length, 1,
+        `${remote.length} tiers load their art from a CDN - the strip guards one`);
+      const sheet = readFileSync(new URL("../src/ui/DexSheet.jsx", import.meta.url), "utf8");
+      assert.ok(sheet.includes(`t === "${remote[0]}" && !got(t) ? null : t`),
+        `the FORMS strip asks for an unheld ${remote[0]}, the one picture this ` +
+        "repo does not ship - it fetches a GIF over the network to paint it black");
     }
 
     for (const sel of [".evo-whiten .evo-mon", ".evo-cycle .evo-mon"]) {
