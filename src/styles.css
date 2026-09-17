@@ -2640,9 +2640,10 @@ canvas {
   margin: 0; font-family: var(--display); font-weight: 600; font-size: 14px;
   color: var(--ink-soft); font-variant-numeric: tabular-nums;
 }
-/* FORMS: the four ways this species comes, and which you hold. The ones you do
-   not are shown as silhouettes rather than hidden - the point of the strip is as
-   much "go and find these" as "look what you have". */
+/* FORMS: every way this species comes, and which you hold. The ones you do not
+   are shown as silhouettes rather than hidden - the point of the strip is as
+   much "go and find these" as "look what you have". (It said "the four ways"
+   for as long as there were four. There are up to nine.) */
 /* Promoted: this sits directly under the name now, because it is what the
    dialog is opened for. The extra breathing room under it separates the
    collection from the reference material that follows. */
@@ -2653,23 +2654,22 @@ canvas {
   color: var(--ink-faint);
 }
 .sf-all { display: inline-flex; align-items: center; gap: 5px; color: var(--gold); }
-/* Five columns, not four: Ordinary plus every tier. `1fr` five times rather
-   than `auto-fit`, because these are one set and a tier wrapping onto its own
-   row would read as a different kind of thing. The art shrank 46 -> 38 to pay
-   for the extra column, which is still two whole pixel-doublings of a 64px
-   sprite. */
-/* `repeat(5, 1fr)` WAS A LITERAL FOR FOUR TIERS PLUS THE ORDINARY ONE, and
-   the strip is driven by `tiersFor`, which now returns up to eight. Nine
-   columns in five tracks is nine overlapping 36px cells. `auto-fit` with a
-   floor lets it wrap to a second row instead, which is what a strip of nine
-   wants on a 330px rail. */
-.sf-row {
-  display: grid; gap: 4px;
-  grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
-}
+/* THREE COLUMNS, FIXED, and the count of tiers is why. This was
+   `repeat(5, 1fr)` - a literal for four tiers plus the ordinary one - and then
+   `auto-fit, minmax(54px, 1fr)`, which fitted SEVEN across the rail and left
+   nine cells as a ragged row of seven and a row of two, each a 54px square
+   with 8.5px type under it. Smaller and messier than the four-tier strip it
+   succeeded, which is the whole complaint.
+
+   Nine is 3x3. A Kanto species wears all eight tiers plus ordinary, so three
+   columns is the one width that makes the common case a clean square; seven or
+   eight simply leave the last row short instead of scattering. It also buys
+   the size back - the art goes 38 -> 46, the label 8 -> 9, the blurb 8.5 -> 10
+   - which is the rest of it. */
+.sf-row { display: grid; gap: 6px; grid-template-columns: repeat(3, 1fr); }
 .sf-one {
-  display: grid; justify-items: center; gap: 2px;
-  padding: 7px 1px 6px; border-radius: 9px;
+  display: grid; justify-items: center; align-content: start; gap: 4px;
+  padding: 10px 6px 9px; border-radius: 10px;
   border: 2px solid var(--line); background: var(--paper);
 }
 .sf-one.got { border-color: var(--path); background: var(--path-soft); cursor: pointer; }
@@ -2678,32 +2678,76 @@ canvas {
    colour change, because the tile's colour already means "you have this". */
 .sf-one.picked { box-shadow: 0 0 0 2px var(--canopy); }
 .sf-one.got:focus-visible { outline: 2px solid var(--canopy); outline-offset: 2px; }
-.sf-art { position: relative; width: 38px; height: 38px; display: grid; place-items: center; }
+.sf-art { position: relative; width: 46px; height: 46px; display: grid; place-items: center; }
 .sf-art img:not(.mark) { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 /* Not held: a flat silhouette, so the shape is a hint and the colours are not
-   given away. The Origin and Astral treatments stay off until you own one. */
-.sf-one:not(.got) .sf-art img { filter: brightness(0) opacity(.22); }
-.sf-one:not(.got) .sprite-astral,
-.sf-one:not(.got) .sprite-holo { filter: brightness(0) opacity(.22) !important; }
+   given away.
+
+   ONE RULE FOR EVERY TIER, and what it replaced named two of them. It read
+   `.sprite-astral, .sprite-holo` - the two CSS-only tiers in the game the day
+   it was written - so when Vivid, Noir and Glitched arrived they rendered in
+   full colour on species nobody had caught. The strip was handing over the
+   exact thing it exists to send you looking for. Reported from play.
+
+   Every tier's filter is `!important` (an animation outranks a plain
+   declaration, so `mon-appear`'s `filter: none` would otherwise erase it), so
+   this has to be `!important` as well - and then it wins on specificity, which
+   is a thing a list of tier names can never do. `animation: none` alongside
+   it, or a Glitched silhouette stutters in the corner of an entry that has
+   never been caught. `:not(.mark)` keeps the badge out of it. */
+.sf-one:not(.got) .sf-art img:not(.mark) {
+  filter: brightness(0) opacity(.22) !important;
+  animation: none !important;
+}
 /* A silhouette with a rainbow travelling over it would be showing you the
-   treatment you have not earned yet, which is the one thing the strip must
-   not do. EVERY layer, not just the foil: this listed `.holo-foil` alone back
-   when Holo was the only tier here with one, and adding the aura and the
-   sparks to the strip quietly started giving two more of them away. */
-.sf-one:not(.got) .holo-foil,
-.sf-one:not(.got) .astral-aura,
-.sf-one:not(.got) .shiny-spark { display: none; }
+   treatment you have not earned yet, which is the one thing the strip must not
+   do. EVERY layer - and this has been written as a list of class names twice
+   now and drifted both times. `VariantFx` returns a `<span>` and `Mark` an
+   `<img>`, so "every span in the art box" is the whole set of them, whatever a
+   future tier decides to call its own. */
+.sf-one:not(.got) .sf-art > span { display: none; }
 .sf-badge {
   position: absolute; right: -2px; bottom: -2px;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, .9));
 }
 .sf-one:not(.got) .sf-badge { opacity: .35; filter: grayscale(1); }
 .sf-name {
-  font-family: var(--pixel); font-size: 8px; letter-spacing: .04em;
-  color: var(--ink-soft);
+  font-family: var(--pixel); font-size: 9px; letter-spacing: .04em;
+  color: var(--ink-soft); text-align: center;
 }
 .sf-one.got .sf-name { color: var(--path); }
-.sf-note { font-size: 8.5px; line-height: 1.2; color: var(--ink-faint); text-align: center; }
+/* WHAT THE TIER IS, on every cell rather than only the held ones. Exactly two
+   lines - clamped above and reserved below - because a cell that grows to fit
+   its own sentence is what made one row taller than the next, and nine cells
+   of three different heights is the "disorganised" this pass is about. The
+   tooltip carries anything the clamp cuts. */
+.sf-note {
+  font-size: 10px; line-height: 1.25; color: var(--ink-faint); text-align: center;
+  min-height: 2.5em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* THE HEADER SAYS HOW FAR OFF THE ROSETTE IS, which is the one thing seven
+   repetitions of "not yet" never managed to say. Held out of how many this
+   species can wear, then the target - `ROSETTE_NEED`, read rather than typed,
+   because it is ANY four now and the day that moves this must move with it. */
+/* THE FRACTION IS ONE FLEX ITEM, and it took a render to see why that
+   matters: with the total as a bare text node beside `<b>`, it became its own
+   anonymous flex item and the row's 7px `gap` opened up inside the number -
+   "1 /8". Every child of a flex container is an item, text nodes included. */
+.sf-tally { display: inline-flex; align-items: baseline; gap: 7px; }
+.sf-tally b {
+  font-family: var(--pixel); font-size: 10px; font-weight: 400;
+  color: var(--path); font-variant-numeric: tabular-nums;
+}
+.sf-tally b i {
+  font-style: normal; font-size: 8.5px; color: var(--ink-faint);
+}
+.sf-tally em {
+  font-style: normal; font-family: var(--body); font-size: 9.5px;
+  letter-spacing: 0; color: var(--ink-faint);
+}
 
 /* The six base-stat bars lived here. Nothing in this game reads `stats` -
    there is no battling - so they were six rows of precise numbers that could

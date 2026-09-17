@@ -165,7 +165,8 @@ export default function DexSheet({
   /* THE ROSETTE IS ANY FOUR, and this label has to say the same thing the Dex
      tile does - two answers to "is this complete" is how one screen shows the
      badge and the other does not. */
-  const every = forms.filter(([t]) => t !== null && got(t)).length >= ROSETTE_NEED;
+  const heldCount = forms.filter(([t]) => t !== null && got(t)).length;
+  const every = heldCount >= ROSETTE_NEED;
 
   /* WHICH FORM THE PORTRAIT IS SHOWING. It was fixed at the rarest one held,
      which is the right thing to OPEN on and the wrong thing to be stuck with:
@@ -258,9 +259,20 @@ export default function DexSheet({
             <div className="sheet-forms">
               <div className="sf-head">
                 <span>FORMS</span>
-                {every && (
+                {/* WHAT THE STRIP IS FOR, AS A NUMBER. Every unheld cell used
+                    to print the words "not yet" - seven times on a Kanto
+                    entry, which is seven lines saying what a silhouette
+                    already says. One count replaces all of them, and it says
+                    the thing they never did: how close the rosette is, now
+                    that it wants ANY four rather than every one. */}
+                {every ? (
                   <span className="sf-all">
-                    <Mark tier="complete" size={16} /> COMPLETE
+                    <Mark tier="complete" size={14} /> COMPLETE
+                  </span>
+                ) : (
+                  <span className="sf-tally">
+                    <b>{heldCount}<i>/{forms.length - 1}</i></b>
+                    <em>{ROSETTE_NEED} for the rosette</em>
                   </span>
                 )}
               </div>
@@ -272,6 +284,10 @@ export default function DexSheet({
                      than no control. */
                   <div
                     key={name}
+                    /* The blurb is clamped to two lines, so the tooltip is
+                       where the rest of a long one lives - the same reason the
+                       shop's descriptions have one. */
+                    data-tip={`${name} \u2014 ${blurb}${got(t) ? "" : " (not found yet)"}`}
                     className={`sf-one${got(t) ? " got" : ""}${
                       got(t) && t === shown ? " picked" : ""}`}
                     {...(got(t) ? {
@@ -295,17 +311,42 @@ export default function DexSheet({
                           hand-rolled copy of the foil for Holo only - the same
                           duplicated-constant shape that lost Astral its art in
                           the evolution scene. `VariantFx` is the one list. */}
-                      <Sprite id={id} variant={t} alt={`${name} ${label(sp)}`} />
+                      {/* AN UNHELD SHOWDOWN DRAWS THE ORDINARY SPRITE, and
+                          this strip is the only place in the game that would
+                          ever ask for a tier nobody owns.
+
+                          Showdown is the single picture this repo does not
+                          ship. It comes from PokeAPI's CDN, and the whole
+                          argument for that is in Sprite.jsx: it is the rarest
+                          tier, so a whole playthrough loads a handful. This
+                          strip renders every tier a species can wear, so
+                          opening ANY entry fetched a 67KB animated GIF in
+                          order to paint it black - which makes that argument
+                          untrue on a dex of 1,145.
+
+                          Nothing is lost: a silhouette is a flat fill of the
+                          outline. It also stops the odd one out in a grid
+                          whose whole point is one creature nine ways - a
+                          Showdown GIF is not framed on the 64px canvas every
+                          other sprite is normalised to, so it drew visibly
+                          larger than its eight neighbours. */}
+                      <Sprite
+                        id={id}
+                        variant={t === "showdown" && !got(t) ? null : t}
+                        alt={`${name} ${label(sp)}`}
+                      />
                       <VariantFx id={id} variant={t} />
                       {t && <Mark tier={t} size={12} className="sf-badge" />}
                     </div>
                     <span className="sf-name">{name}</span>
-                    {/* Every tier in this strip is one a species CAN wear -
-                        `tiersFor` has already dropped the ones with no artwork
-                        - so the only two states left are held and not held.
-                        The third, "out there but locked behind finishing a
-                        generation", went with the Origin gate. */}
-                    <span className="sf-note">{got(t) ? blurb : "not yet"}</span>
+                    {/* THE BLURB SHOWS WHETHER OR NOT YOU HAVE IT. It only
+                        appeared on held cells before, so the seven you are
+                        hunting read "not yet" and the one you already had
+                        explained itself - which is backwards. What a tier
+                        LOOKS like is exactly what you want to know about one
+                        you have not found. The silhouette is what says you
+                        have not got it; it does not need saying twice. */}
+                    <span className="sf-note">{blurb}</span>
                   </div>
                 ))}
               </div>
