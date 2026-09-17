@@ -480,8 +480,42 @@ What it found on its first run, which is the case for keeping it:
 - **`power` stripe 2.51**, against a real ceiling of 1.63 - and that ceiling *is*
   FireRed's own Power Plant, the most banded map Game Freak shipped. That is
   "it reads as stripes" expressed as a number. Banks were 12-17 long; nothing is
-  over 9 now and it measures **1.83**. Closing the last of that gap needs
-  vertical bank segments, which the real map has and our bank grammar does not.
+  over 9 now and it measures **1.18**.
+
+**AND THE CLUTTER WAS 8.7% OF THE REFERENCE, FORBIDDEN BY A HALF-READ RULE.**
+The map was reported as ugly and empty, and it was: masking FireRed's own Power
+Plant, metatile **53** (the drum's top) is 54 tiles of which 41 sit under a
+bank's body - which is the fact this file recorded as "barrels never stand on
+open floor" - but nobody counted **54**, the drum's BODY, which is **117 tiles
+and only 3% bank-attached**. Together they are **171 tiles in 32 irregular
+clumps of one to thirteen**, and `check()` asserted them out of existence.
+`drum_clumps` grows them a tile at a time and keeps only what leaves the floor
+in one piece. It took `open` 0.72 -> 0.50 against the real map's own 0.49,
+`tight` 0.83 -> 0.77 against its 0.77, and `turns` 0.16 -> 0.25 into band - two
+of the three flags this file has carried since the map was written.
+
+**THE POWER PLANT HAS NO INTERIOR WALL TILESET, AND THAT IS WHY IT IS NOT
+ROOMS.** Building it as rooms was tried and reverted, and the measurement is
+the reason to keep: of the real map's solid tiles whose FACE you can see -
+floor directly below them - 85 are the machine bank's body (local 21), 77 are
+drums (53/54), 32 are barrels (89) and 22 are the bank's end caps. **Its walls
+are machinery.** The `edge` set is a one-tile outer rim whose middle piece is
+local 19, the wall's dark body, so a free-standing rectangle of it renders as a
+black barcode - which is exactly how thirty rooms of it rendered. Anything that
+wants real rooms here needs an interior wall baked first; the vocabulary does
+not have one.
+
+**`tools/render_area.mjs` + `render_area.py` is how any of that was seen.** It
+drives the shipped `drawTile` with a stub ctx that records the source rect, so
+what it paints is what the game paints - no browser, and no second copy of the
+tile rules to drift. The barcode was invisible in every measurement and obvious
+in one render: `stripe` 1.13, `turns` 0.27 and `open` 0.67 all said the layout
+was fine, because none of them looks at which tile is drawn. **Look at the
+render.**
+
+`loops` 49.4 against a real 57-71 is the one flag left, and it is the honest
+one: ranks of banks give few ways round. Closing it needs the compartments the
+reference has, which needs the wall tile that does not exist yet.
 - **`dead` = 0.000 on five maps.** Ours had none, because they are composed of
   rectangles, so nooks were added. **Half of that reading was an artefact** - see
   *the ruler was bent* below. Measured honestly, real routes have essentially no
