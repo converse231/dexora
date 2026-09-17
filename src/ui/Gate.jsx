@@ -99,8 +99,14 @@ export function Account({ onSignUp, onSignIn, onForgot = null, offline, notice =
       <Shell
         step="STEP 1 OF 2"
         title={mailed ? "Check your email" : "Forgotten password"}
+        /* "CHECK YOUR SPAM" IS NOT FILLER HERE. Until custom SMTP is
+           configured this mail goes out through Supabase's own sender, which
+           has no delivery guarantee and lands in spam often enough that the
+           honest reading of a silent inbox is "the feature is broken". A new
+           domain has no sending reputation either, so the line stays useful
+           for a while after that. */
         blurb={mailed
-          ? `If ${addr} has an account, a link to set a new password is on its way. It works once and expires in an hour.`
+          ? `If ${addr} has an account, a link to set a new password is on its way — check your spam folder if it has not arrived in a few minutes. It works once and expires in an hour.`
           : "We will email you a link to set a new one. Your Pokédex is untouched."}
         foot={
           <button type="button" className="gate-link" onClick={() => { setMode("in"); setMailed(false); }}>
