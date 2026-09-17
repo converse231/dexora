@@ -1110,14 +1110,32 @@ them stand together instead of being eight strengths of the same idea:
 
 | | odds | its tell |
 |---|---|---|
-| **Vivid** | 1/110 | the **palette**, turned up |
-| **Noir** | 1/130 | **no colour at all**, in a game entirely about colour |
-| **Origin** | 1/140 | the **artwork** - its debut sprite, the 1996 drawing |
-| **Holo** | 1/140 | the **finish** - the ordinary art, with foil travelling over it |
-| **Glitched** | 1/260 | **corrupted data** - the only tier that stutters |
-| **Astral** | 1/480 | the **substance** - a starlight duotone, no new art |
-| **Shiny** | 1/600 | the **alternate palette** - a second file |
-| **Showdown** | 1/700 | it **moves** - a real animated GIF, and the only asset not in this repo |
+| **Vivid** | 1/105 | the **palette**, turned up |
+| **Noir** | 1/118 | **no colour at all**, in a game entirely about colour |
+| **Origin** | 1/125 | the **artwork** - its debut sprite, the 1996 drawing |
+| **Holo** | 1/125 | the **finish** - the ordinary art, with foil travelling over it |
+| **Glitched** | 1/190 | **corrupted data** - the only tier that stutters |
+| **Astral** | 1/300 | the **substance** - a starlight duotone, no new art |
+| **Shiny** | 1/360 | the **alternate palette** - a second file |
+| **Showdown** | 1/400 | it **moves** - a real animated GIF, and the only asset not in this repo |
+
+**THE LADDER WAS COMPRESSED AGAIN, NOT SCALED**, which is the lever this file
+already names: move the RATIO, not the base. The spread went 6.36x -> 3.81x and
+every tier came down with it, so a variant arrives every **1 in 20.9**
+encounters against 1 in 24.9, and a rosette measures **4,450** encounters
+against 5,948 on the same table. The rare end moved most because that is where
+the misery was: Showdown 700 -> 400, Shiny 600 -> 360, Astral 480 -> 300.
+Vivid is at 105 because check.mjs requires the kindest tier stay rarer than
+1-in-100, and that bound is what stops "kinder" turning into "commonplace".
+
+**AND EQUALISING THE GENERATIONS WORKS AGAINST THE ROSETTE**, which is worth
+knowing before either is retuned again. A rosette is four variants of ONE
+species, so it depends on that species' own share of the table - and spreading
+the table evenly over nine generations makes every individual species rarer.
+The anchor species in Tall Grass went from about 5.4% of the table to 3.2%.
+The ladder compression offsets part of that and does not erase it: **the two
+requests pull in opposite directions**, and the levers if it needs to move again
+are `ROSETTE_NEED` and the spread, in that order.
 
 **THE LADDER OPENED AT THE BOTTOM, NOT THE TOP.** Adding tiers to a fixed
 spread makes collecting HARDER, because the rosette waits on the rarest of them
@@ -1513,6 +1531,52 @@ because position and `id - 1` agree for Kanto. check.mjs asserts that alignment
 existing collection) and uses `padDex`, NOT `normalise`: the dex is three-valued
 and `normalise` coerces `? 1 : 0`, which demotes every caught species to seen.
 
+**NO GENERATION IS COMMONER THAN ANY OTHER, AND THAT TOOK TWO FIXES.**
+
+Reported from play as Gen 1 feeling far commoner than everything else, and it
+was. Measured at Lv 50 with all nine generations open, against a fair 11.1%:
+Gen 1 took **23.3%** of Tall Grass, **41.8%** of the Haunted Tower, **57.8%** of
+the Power Plant and **63.6%** of Frost Hollow - and Gen 6 took **0.0%** of the
+Power Plant. Two independent causes, and neither fix reaches the other:
+
+- **The weights.** `DERIVED_WEIGHT` is 8/5/3/1 against Gen 1 commons hand-tuned
+  at 22, under a comment saying they sit below them on purpose. That argument
+  was about ordering INSIDE a map and it cost a five-fold skew to get it.
+- **The homing.** `derivedHomes` sends a species to its one best type match,
+  which is what makes a map feel like somewhere - and starves the narrow ones.
+  A generation with nothing living in a map cannot be given a share of it by
+  any weight at all, so the zeroes were structural.
+
+**`GEN_HOME_MIN` (4) is the floor, and four is measured.** Sweeping 1 to 8,
+generation evenness sits at ~5.5% off fair at every value - presence is all it
+needs - but the BAND mix only converges from four upward (0.10pp at four against
+8.9pp at three). Four costs 60 extra homes where eight costs 223 for the same
+result, and every one of those is a species standing somewhere it does not
+belong. **A filled slot must not bring a band the map does not already have**,
+or `balance` gives it `BAND_FLOOR` and the new band dilutes the mix the map was
+tuned around - that put Ember's A band 2.7 points out against a 2.5 bound whose
+own note says "if this ever needs 4, the homing is what to look at, not this
+number".
+
+**`fitShares` FITS TWO MARGINALS, because neither may give way.** The band mix
+per map is the design and so is an even spread of generations, and no single
+rescale satisfies both - fixing the bands moves the generations and fixing the
+generations moves the bands. Alternating the two converges on the closest table
+honouring both. Measured across all eight maps at every level: every generation
+within **25%** of fair (worst is Ember's Gen 2 at Lv 20, the narrowest map with
+only four generations open) and every band within **0.10pp**. **It always lands
+on the band step**: running out of rounds leaves whichever ran last in force,
+and the band mix is asserted where the generation spread is a target.
+
+**THE GENERATION TRAVELS THE CHAIN, exactly as the band does.** The first
+version scaled each row by its own `genOf`, reasoning that a species and its
+evolution are one line and so one generation. They are not - Gloom is Gen 1 and
+Bellossom is Gen 2, Golbat and Crobat likewise, and every Eeveelution - so the
+two got different scale factors and the evolution came out COMMONER than what it
+evolves from (0.440 against 0.375 in Deep Woods). check.mjs caught it
+immediately. Slot 4 carries the line's generation the way slot 3 carries its
+band, so `parent x EVO_SHARE` survives exactly.
+
 **A MAP'S RARITY MIX IS FROZEN FROM ITS OWN TABLE.** `BAND_SHAPE` is computed
 per biome from `RESIDENTS` - the hand-written rows - and `balance()` rescales
 each rarity band back to it. Per map and not globally, because one global mix
@@ -1787,8 +1851,10 @@ region's dex is fine and only meeting one is gated. check.mjs asserts it against
 the source, as nothing fails at runtime when a label quietly stops saying it.
 
 **What a generation actually dilutes is one species' FINDABILITY**, and that is
-the number to watch when this moves: Pidgey, the weight-22 anchor of the
-starting table, goes 12.4% of encounters at Lv 1 to 5.4% at Lv 50. A daily quest
+the number to watch when this moves - and it moved a long way further when the
+generations were levelled, because that is precisely what levelling them does.
+Pidgey went 12.4% of encounters at Lv 1 to 5.4% at Lv 50 under the old skew;
+the commonest species in Tall Grass is 3.2% now. A daily quest
 and a specific hunt both feel that, and nothing else measures it. It is why the
 ladder is spread rather than front-loaded.
 

@@ -225,7 +225,7 @@ export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower"]);
    handful of shinies in a whole playthrough - rare enough that each one is a
    story, common enough that they are not a rumour. Do not tune this one alone:
    it is one rung of the ladder below, and they move together. */
-export const SHINY_ODDS = 1 / 600;
+export const SHINY_ODDS = 1 / 360;
 
 /* Four rarities above ordinary, and they are not variations on one idea -
    each is a different KIND of rare, which is what lets all four stand together
@@ -276,9 +276,9 @@ export const SHINY_ODDS = 1 / 600;
    trade this is deliberately making - a FULLY complete 151-species dex is not
    reachable at any odds that leave a rare feeling rare, and no number here
    pretends otherwise. */
-export const ASTRAL_ODDS = 1 / 480;
-export const ORIGIN_ODDS = 1 / 140;
-export const HOLO_ODDS = 1 / 140;
+export const ASTRAL_ODDS = 1 / 300;
+export const ORIGIN_ODDS = 1 / 125;
+export const HOLO_ODDS = 1 / 125;
 
 /* FOUR MORE, AND THE LADDER GOT KINDER RATHER THAN LONGER.
 
@@ -298,10 +298,10 @@ export const HOLO_ODDS = 1 / 140;
 
    AND THE ROSETTE CHANGES WITH IT - see `ROSETTE_NEED`. Kinder odds alone do
    not fix it; that was measured too. */
-export const VIVID_ODDS = 1 / 110;
-export const NOIR_ODDS = 1 / 130;
-export const GLITCH_ODDS = 1 / 260;
-export const SHOWDOWN_ODDS = 1 / 700;
+export const VIVID_ODDS = 1 / 105;
+export const NOIR_ODDS = 1 / 118;
+export const GLITCH_ODDS = 1 / 190;
+export const SHOWDOWN_ODDS = 1 / 400;
 
 /* THE LADDER, rarest first - and the single source for it.
 
@@ -847,24 +847,83 @@ export const MAP_LAST = 20;
    from a Gen 3 Roselia that does not ship, so nothing evolves into it, so it
    needs a table entry - and it gets one without anybody noticing the gap.
 
-   Weights come from the tier already on every species, and they sit BELOW the
-   Gen 1 commons on purpose: a Pidgey at 22 still leads its map after Johto
-   arrives. */
+   Weights come from the tier already on every species. They USED to sit below
+   the Gen 1 commons on purpose - "a Pidgey at 22 still leads its map after
+   Johto arrives" - and that bought a five-fold generation skew to protect an
+   ordering inside one map. `fitShares` keeps the ordering and drops the skew:
+   the scale it applies is uniform within a generation, so a Pidgey still leads
+   the Gen 1 commons exactly as it did, while the generations themselves come
+   out level. These numbers are therefore a RELATIVE rarity within a
+   generation now, not a handicap against Gen 1. */
 const DERIVED_WEIGHT = { C: 8, B: 5, A: 3, S: 1 };
+
+/* EVERY GENERATION LIVES IN EVERY MAP, and until this it did not.
+
+   `derivedHomes` sends a species to its single best type match, which is right
+   and is what makes a map feel like somewhere - but it starves the narrow ones.
+   Measured: the Power Plant (electric/steel) had **no Gen 6 residents at all**,
+   Frost Hollow none for Gen 4 or Gen 7, the Haunted Tower none for Gen 7. A
+   generation with nothing living in a map cannot be given a share of it by any
+   amount of rescaling, so no weight fix could have reached them.
+
+   So a floor, in the shape `BAND_FLOOR` already uses: a map is never short of a
+   generation. Filled with that generation's BEST remaining fit for this map, so
+   it is still the most at-home species available rather than a random one.
+
+   FOUR IS MEASURED. Sweeping 1 to 8, generation evenness is ~5.5% off fair at
+   every value - presence is all it needs - but the BAND mix only converges from
+   4 upward (0.10pp at four, 8.9pp at three). Four costs 60 extra homes; eight
+   costs 223 for the same result, and every one of those is a species standing
+   somewhere it does not really belong. */
+export const GEN_HOME_MIN = 4;
 
 const derivedHomes = () => {
   const placed = new Set(RESIDENTS.flatMap((b) => b.table.map(([id]) => id)));
   const evolvesInto = new Set(EVOLUTIONS.map((e) => e.to));
   const homes = new Map(RESIDENTS.map((b) => [b.id, []]));
+  const wild = SPECIES.filter((sp) =>
+    !evolvesInto.has(sp.id) && !LEGENDARY.includes(sp.id));
 
-  for (const sp of SPECIES) {
-    if (placed.has(sp.id) || evolvesInto.has(sp.id) || LEGENDARY.includes(sp.id)) continue;
+  for (const sp of wild) {
+    if (placed.has(sp.id)) continue;
     let best = RESIDENTS[0], score = -1;
     for (const b of RESIDENTS) {
       const n = sp.types.filter((t) => b.types.includes(t)).length;
       if (n > score) { score = n; best = b; }
     }
     homes.get(best.id).push([sp.id, DERIVED_WEIGHT[sp.tier] ?? 4]);
+  }
+
+  for (const b of RESIDENTS) {
+    const here = new Set([...b.table.map(([id]) => id),
+                          ...homes.get(b.id).map(([id]) => id)]);
+    const count = new Map();
+    for (const id of here) count.set(genOf(id), (count.get(genOf(id)) ?? 0) + 1);
+    for (const gen of Object.keys(GEN_UNLOCK).map(Number)) {
+      const short = GEN_HOME_MIN - (count.get(gen) ?? 0);
+      if (short <= 0) continue;
+      /* TYPE FIRST, THEN A BAND THE MAP ALREADY HAS. Filling a generation
+         must not quietly resize the map's rarity mix - `balance` gives a band
+         with no hand-written share only `BAND_FLOOR`, so every NEW band that
+         arrives dilutes the ones the map was tuned around. Ember's A band
+         moved 2.7 points that way, against a 2.5 bound whose own note says
+         "if this ever needs 4, the homing is what to look at, not this
+         number". So it is the homing that looks at it. Type match still
+         decides among the ones that qualify - that is what makes a map feel
+         like somewhere - but a species whose band the map does not already
+         have is not a candidate at all. Every map's table has commons, so the
+         pool is never empty. */
+      const bands = new Set(b.table.map(([id]) => speciesById(id)?.tier ?? "C"));
+      const pool = wild
+        .filter((sp) => genOf(sp.id) === gen && !here.has(sp.id)
+                     && bands.has(sp.tier))
+        .map((sp) => [sp, sp.types.filter((t) => b.types.includes(t)).length])
+        .sort((x, y) => y[1] - x[1])
+        .slice(0, short);
+      for (const [sp] of pool) {
+        homes.get(b.id).push([sp.id, DERIVED_WEIGHT[sp.tier] ?? 4]);
+      }
+    }
   }
   return homes;
 };
@@ -1178,9 +1237,100 @@ function balance(rows, shape) {
   for (const [k, members] of bands) {
     const have = members.reduce((n, r) => n + r[1], 0);
     const scale = ((want.get(k) / budget) * total) / have;
-    for (const r of members) out.push([r[0], r[1] * scale, r[2], r[3]]);
+    for (const r of members) out.push([r[0], r[1] * scale, r[2], r[3], r[4]]);
   }
   return out;
+}
+
+/* EVERY GENERATION IS AS LIKELY AS EVERY OTHER, and it was nowhere near.
+
+   Reported from play as Gen 1 feeling far commoner than anything else, and it
+   was: measured at Lv 50 with all nine generations open, against a fair 11.1%,
+   Gen 1 took 23.3% of the Tall Grass table, 41.8% of the Haunted Tower, 57.8%
+   of the Power Plant and 63.6% of Frost Hollow. Gen 6 took 0.0% of the Power
+   Plant. It was not an accident - `DERIVED_WEIGHT` is 8/5/3/1 against Gen 1
+   commons hand-tuned at 22, under a comment saying they sit below them on
+   purpose so "a Pidgey at 22 still leads its map after Johto arrives".
+
+   That argument was about ORDERING INSIDE A MAP and it bought a five-fold
+   generation skew to get it. The ordering is worth keeping and is kept: the
+   scale below is uniform within a generation, so a Pidgey still leads the Gen 1
+   commons exactly as it did.
+
+   TWO MARGINALS, AND NEITHER MAY GIVE WAY. The band mix per map is the design
+   (`BAND_SHAPE`) and so is an even spread of generations, and no single rescale
+   satisfies both - fixing the bands moves the generations and fixing the
+   generations moves the bands. Alternating the two converges on the closest
+   table that honours both, which is the standard way to fit a matrix to two
+   sets of margins. Measured over all eight maps: every generation lands within
+   5.5% of fair and every band within 0.10pp of the share it was tuned to.
+
+   It cannot always be exact, and where it is not the reason is structural: a
+   generation with no S-tier in a map can only take its share out of the bands
+   it does have members in. That is the right answer rather than an
+   approximation of one.
+
+   The evolved overlay survives untouched. A species and the thing it evolves
+   into are the same line, so the same generation, so the same scale - and
+   `parent x EVO_SHARE` is preserved exactly. Legendaries sit in band "L" and
+   are left out of both steps: their share is its own equation, applied after. */
+/* THE GENERATION TRAVELS THE CHAIN, AND SLOT 4 IS WHERE IT RIDES.
+
+   My first version scaled every row by `genOf(its own id)`, on the reasoning
+   that a species and the thing it evolves into are the same line and therefore
+   the same generation. THEY ARE NOT, and check.mjs said so immediately: Gloom
+   is Gen 1 and Bellossom is Gen 2, so the two got different scale factors and
+   the evolution came out COMMONER than what it evolves from - 0.440 against
+   0.375 in Deep Woods. Golbat to Crobat and every Eeveelution are the same
+   shape of thing.
+
+   This is the identical failure the BAND had, fixed the identical way: the
+   overlay's whole model is "an evolution is a fifth as common as its parent",
+   which only survives a rescale if parent and child are scaled together. Slot 3
+   carries the band down the chain; slot 4 now carries the generation. Inside
+   one generation the scale is uniform, so `parent x EVO_SHARE` is exact again.
+
+   It costs a little evenness - a Gen 2 evolution of a Gen 1 species counts
+   toward Gen 1 here while `genOf` still calls it Gen 2 - and that is the right
+   way round: a cross-generation evolution is reached THROUGH its parent, so it
+   is the parent's map presence that put it there. */
+const lineGen = (r) => r[4] ?? genOf(r[0]);
+
+const FIT_ROUNDS = 40;
+const FIT_TOL = 0.0005;
+
+function fitShares(rows, shape) {
+  if (!rows.length) return rows;
+  let out = rows;
+  for (let round = 0; round < FIT_ROUNDS; round++) {
+    out = balance(out, shape);
+
+    const gens = new Map();
+    let mass = 0;
+    for (const r of out) {
+      const g = lineGen(r);
+      gens.set(g, (gens.get(g) ?? 0) + r[1]);
+      mass += r[1];
+    }
+    if (gens.size < 2) return out;
+
+    const want = mass / gens.size;
+    let worst = 0;
+    for (const have of gens.values()) worst = Math.max(worst, Math.abs(have - want) / mass);
+    if (worst < FIT_TOL) return out;
+
+    out = out.map((r) => {
+      const have = gens.get(lineGen(r));
+      return have > 0 ? [r[0], (r[1] * want) / have, r[2], r[3], r[4]] : r;
+    });
+  }
+  /* ALWAYS LAND ON THE BAND STEP. The loop alternates, so running out of
+     rounds leaves whichever ran last in force - and that was the generation
+     scale, which put Ember's B band 11.9 points away from the mix it was tuned
+     to and failed the band-budget suite. The band mix is an asserted invariant
+     and the generation spread is a target, so when the two cannot both be
+     exact it is the target that gives way. */
+  return balance(out, shape);
 }
 
 /* Has this species' generation arrived yet? */
@@ -1194,12 +1344,12 @@ export function encounterTable(biome, level = 1) {
      Carrying it one step only fixed Tangela -> Tangrowth and left
      Mareep -> Flaaffy -> Ampharos broken, because the third link read
      Flaaffy's own tier instead of the band Flaaffy had inherited. */
-  let front = open.map((r) => [r[0], bandOf(r)]);
+  let front = open.map((r) => [r[0], bandOf(r), genOf(r[0])]);
 
   for (let depth = 1; depth <= EVO_DEPTH && front.length; depth++) {
     const scale = evoScale(level, depth);
     const next = [];
-    for (const [id, band] of front) {
+    for (const [id, band, gen] of front) {
       for (const to of NEXT.get(id) ?? []) {
         /* A FORM IS NEVER WILD. Mega, Primal and Gigantamax are evolution
            targets, and this overlay walks the evolution graph out from whatever
@@ -1217,10 +1367,11 @@ export function encounterTable(biome, level = 1) {
           weight.set(to, w);
           // Slot 3 is the band it competes in: its PARENT's, so `balance`
           // cannot separate an evolution from what it evolves from.
-          if (scale > 0) extra.push([to, w * scale, depth, band]);
+          if (scale > 0) extra.push([to, w * scale, depth, band, gen]);
         }
-        // A hand-written row keeps its own band, and passes THAT on.
-        next.push([to, known ? bandOf(to) : band]);
+        // A hand-written row keeps its own band AND its own generation, and
+        // passes both on - it is a resident here in its own right.
+        next.push([to, known ? bandOf(to) : band, known ? genOf(to) : gen]);
       }
     }
     front = next;
@@ -1228,8 +1379,8 @@ export function encounterTable(biome, level = 1) {
   /* Residents, then the evolved overlay, and the legendaries LAST - scaled to
      whatever the first two came to, so their share of the roll is the same on
      every map at every level whatever else has been added. */
-  const rolled = balance(extra.length ? [...open, ...extra] : open,
-                         BAND_SHAPE.get(biome.id) ?? {});
+  const rolled = fitShares(extra.length ? [...open, ...extra] : open,
+                           BAND_SHAPE.get(biome.id) ?? {});
   const total = rolled.reduce((n, e) => n + e[1], 0);
   return [...rolled, ...legendsFor(biome.types, total, (id) => genOpen(id, level))];
 }
