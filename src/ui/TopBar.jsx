@@ -98,6 +98,32 @@ function Missions({ daily, onClaim, note }) {
    THE QUEST STAYS OUT OF IT. That is a thing you check and claim during play,
    and it carries a dot when it is ready; buried behind a burger it would be
    the YOU tab again, which is where it was when nobody could find it. */
+/* DRAWN HERE RATHER THAN FETCHED. Three 16px glyphs are smaller as markup than
+   as a request, they take `currentColor` so the hover state costs nothing, and
+   they stay sharp at any zoom - which `public/icons` cannot, being pixel masks
+   sized for the tab rail. Stroked rather than filled, because at 16px a filled
+   glyph next to 13px body text reads as a bullet. */
+const ICON = {
+  help: "M9 9a3 3 0 1 1 4 2.8c-.6.3-1 .9-1 1.7M12 17.5v.01",
+  cog: "M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4M19.4 15a1.6 1.6 0 0 0 "
+    + ".3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1v.3a2 2 0 1 1-4 "
+    + "0v-.2a1.6 1.6 0 0 0-2.8-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 "
+    + "3.5 14H3a2 2 0 1 1 0-4h.2A1.6 1.6 0 0 0 4.3 7.2l-.1-.1a2 2 0 1 1 2.8-2.8l"
+    + ".1.1A1.6 1.6 0 0 0 10 3.5V3a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 2.8 1.1l.1-.1a2 "
+    + "2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.8H21a2 2 0 1 1 0 4h-.2a1.6 1.6 "
+    + "0 0 0-1.4 1",
+  out: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
+  reset: "M3 12a9 9 0 1 0 2.6-6.4M3 4v5h5",
+};
+
+function Glyph({ of }) {
+  return (
+    <svg className="tb-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d={ICON[of]} />
+    </svg>
+  );
+}
+
 function Menu({ onSettings, onHelp, onLogOut, onReset }) {
   const [open, setOpen] = useState(false);
   const box = useRef(null);
@@ -136,11 +162,11 @@ function Menu({ onSettings, onHelp, onLogOut, onReset }) {
       {open && (
         <div className="tb-pop" role="menu">
           <button type="button" role="menuitem" onClick={run(onHelp)}>
-            How to play
+            <Glyph of="help" />How to play
           </button>
           {onSettings && (
             <button type="button" role="menuitem" onClick={run(onSettings)}>
-              Settings
+              <Glyph of="cog" />Settings
             </button>
           )}
           {/* One or the other, never both - see App. Reset only survives in
@@ -148,11 +174,11 @@ function Menu({ onSettings, onHelp, onLogOut, onReset }) {
           {onLogOut
             ? (
               <button type="button" role="menuitem" className="tb-danger" onClick={run(onLogOut)}>
-                Log out
+                <Glyph of="out" />Log out
               </button>
             ) : (
               <button type="button" role="menuitem" className="tb-danger" onClick={run(onReset)}>
-                Reset this save
+                <Glyph of="reset" />Reset this save
               </button>
             )}
         </div>
