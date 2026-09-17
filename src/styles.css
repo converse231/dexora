@@ -1394,7 +1394,13 @@ canvas {
 .gate-go:disabled { opacity: .45; cursor: default; }
 .gate-go:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-.gate-foot { margin-top: 14px; display: flex; justify-content: center; }
+/* Two links now, not one - and with no gap they read as a single run of
+   underlined text. Wrapping rather than shrinking, because on a narrow
+   phone "I have forgotten my password" is most of a line by itself. */
+.gate-foot {
+  margin-top: 14px; display: flex; justify-content: center;
+  gap: 6px 18px; flex-wrap: wrap;
+}
 .gate-link {
   cursor: pointer; background: none; border: 0; padding: 4px;
   font: inherit; font-size: 12.5px; color: var(--canopy);
