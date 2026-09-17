@@ -48,8 +48,13 @@ export const VIEW_W = 15;
 export const VIEW_H = 11;
 const SCALE = 2;              // canvas backing store multiplier, for crispness
 const STEP_MS = 150;          // tune: lower feels snappier, higher feels heavier
-const BIKE_SCALE = 0.55;      // the Bicycle, on top of whatever Stride is worth
-const RUN_SCALE = 0.7;        // Running Shoes: quicker than walking, short of a bike
+/* THE BICYCLE IS GONE, and Running Shoes is the whole speed story now. Two key
+   items doing the same job is one too many: the bike was a TOGGLE and the shoes
+   are HELD, so the pair meant two different mental models for "go faster", the
+   bike silently won whenever both were on, and it cost a face button on a pad
+   that only has four. A save that still carries `bicycle` in its bag keeps a
+   key nothing reads - harmless, and cheaper than a migration. */
+const RUN_SCALE = 0.7;        // Running Shoes: quicker than walking
 /* Per step, anywhere you can walk. Every walkable tile spawns - there is no
    "safe" ground - so this is far lower than a grass-only rate would be, and the
    two work out to a similar number of encounters per minute of walking. */
@@ -153,7 +158,6 @@ function freshState() {
     medals: [],
     // Where the levels go. Ranks are spent, never refunded.
     stats: emptyStats(),
-    biking: false,
     running: false,
     encounter: null,
     evolution: null,
@@ -414,7 +418,6 @@ function loadState() {
       bag: levelFromXp(s.xp ?? 0) >= RUN_LEVEL && !holding(s.bag, "running-shoes")
         ? { ...s.bag, "running-shoes": 1 }
         : s.bag,
-      biking: !!s.biking && holding(s.bag, "bicycle"),
       encounter: null, evolution: null, cheers: [],
     };
   } catch {
@@ -546,12 +549,11 @@ export function createEngine(canvas, onChange, mini = null) {
      catch, state.box is the same array object, so a memo keyed on it never
      recomputes and the BOX tab shows the box as it was. Every change bumps this
      instead, and panels put it in their dependency list. */
-  /* How long one step takes right now. Stride shortens it and the Bicycle
-     shortens it again, so the two stack instead of one hiding the other. Read
-     fresh every step rather than cached, because either can change mid-walk. */
+  /* How long one step takes right now. Stride shortens it and running shortens
+     it again, so the two stack instead of one hiding the other. Read fresh
+     every step rather than cached, because either can change mid-walk. */
   const stepMs = () =>
-    STEP_MS * stepScale(state.stats) *
-    (state.biking ? BIKE_SCALE : state.running ? RUN_SCALE : 1);
+    STEP_MS * stepScale(state.stats) * (state.running ? RUN_SCALE : 1);
 
   const changed = () => {
     state.rev++;
@@ -926,14 +928,6 @@ export function createEngine(canvas, onChange, mini = null) {
     save();
     changed();
     return true;
-  }
-
-  function toggleBike() {
-    if (!holding(state.bag, "bicycle")) return false;
-    state.biking = !state.biking;
-    save();
-    changed();
-    return state.biking;
   }
 
   /* Spending a point is one-way. The trainer module owns the rules; this only
@@ -1630,7 +1624,6 @@ export function createEngine(canvas, onChange, mini = null) {
     levelUp,
     spend,
     fish,
-    toggleBike,
     setChar,
     /* Dismissing is not the same as banking it - the id went into `hints` the
        moment it was shown, so closing it is only about the screen. It can never

@@ -61,7 +61,7 @@ function readyToEvolve(box, bag) {
 export default function Rail({
   state, caught, level, busy,
   onSelect, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
-  onTravel, onSpend, onBike, save, account, jumpTo, onJumped,
+  onTravel, onSpend, save, account, jumpTo, onJumped,
 }) {
   const [tab, setTab] = useState("dex");
 
@@ -160,9 +160,7 @@ export default function Rail({
             stats={state?.stats}
             level={level}
             bag={bag}
-            biking={!!state?.biking}
             onSpend={onSpend}
-            onBike={onBike}
             save={save}
             account={account}
           />

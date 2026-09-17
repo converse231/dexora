@@ -483,7 +483,49 @@ function until(e, what, label, max = 2000) {
   assert.ok(css.includes(gate), "the touch pad's media gate is gone");
   assert.ok(css.slice(css.indexOf(gate)).includes(".pad {"),
     "the touch pad is no longer gated on a coarse pointer");
-  console.log(`pad ok — ${new Set(called).size} engine calls behind the touch controls all exist`);
+  /* THE HOLD FLAG MUST OUTLIVE A RENDER. Tapping A throws and holding it opens
+     the ball picker, and the two are told apart by a flag set in a timer. The
+     engine calls `changed()` freely - a step lands, an animation ticks - so the
+     component re-renders between the pointer going down and coming up. Closing
+     over two locals meant the release read a FRESH `taken === false` and threw
+     a ball behind the picker it had just opened: two actions from one press, on
+     the one control in the game that spends an item.
+
+     Asserted on the source because there is no DOM here to press. The shape is
+     the rule - the flag lives in a ref that is passed in, not in the closure. */
+  assert.ok(/function tapOrHold\(ref,/.test(src),
+    "the tap-or-hold handler no longer takes its state from outside itself");
+  assert.ok(/ref\.current\.taken/.test(src),
+    "the hold flag is a local again - a re-render mid-press will throw a ball behind the picker");
+  assert.ok(/const held = useRef\(/.test(src), "Pad has no ref to keep the press in");
+  /* And the hook has to run every time. `Pad` returns early when there is no
+     engine yet, and a hook after that return is a hook that sometimes does not
+     happen - which React answers by throwing the whole app away. */
+  assert.ok(src.indexOf("useRef(") < src.indexOf("if (!engine) return null;"),
+    "the ref is declared after Pad's early return - that is a conditional hook");
+
+  /* EXACTLY ONE OF THE TWO INVENTORIES IS ON SCREEN. The rail down the left
+     edge is the desktop one and the sheet off the bottom is the touch one, and
+     they are opposites on purpose: both at once is two bags disagreeing, and
+     neither is a phone with no way to reach a berry. Gated on the POINTER and
+     never on width, the rule `.pad` already follows. */
+  const railGate = css.slice(css.indexOf(".ballwrap {"));
+  assert.ok(railGate.slice(0, 900).includes("@media (hover: none) and (pointer: coarse)"),
+    "the ball rail is no longer hidden on touch - it will sit on top of the map");
+  assert.ok(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.bagsheet \{ display: none/.test(css),
+    "the touch bag sheet is no longer hidden on a desktop");
+
+  /* AND THE A BUTTON IS THE PRIMARY ACTION, so it has to look like one. It did
+     not: `.pad button` is a class AND a type, `.pad-a` was one class, so the
+     base rule won and the throw button wore the DISABLED fill from the day the
+     pad was written. Nothing failed and no rule was missing - it took reading
+     the computed background off a real render to see it. The extra type is
+     load-bearing, so it is what this asserts. */
+  assert.ok(/\.pad button\.pad-a \{/.test(css),
+    "the A button's fill no longer out-specifies `.pad button` - it will render as disabled");
+
+  console.log(`pad ok — ${new Set(called).size} engine calls, the hold survives a render, ` +
+    "and one bag per pointer");
 }
 
 /* A 493-ENTRY SAVE IS WHAT EVERY CURRENT PLAYER HOLDS, and the dex just went to
@@ -964,6 +1006,41 @@ function until(e, what, label, max = 2000) {
 
   onSyncTrouble(null);
   console.log("beaten ok — a lost claim is reported once and not retried forever");
+}
+
+/* ONE ANSWER ABOUT WHAT IS IN THE BAG. The rail and the touch sheet draw the
+   same inventory, and the rules for it - which balls hide until owned, which
+   items are worth showing right now - are one-liners over `items.js` and
+   exactly the sort of thing that gets copied and then fixed in one copy. This
+   repo has already shipped a shiny protected from one bulk action and not its
+   sibling, and a whole generation with no evolutions because a second list of
+   ranges drifted. So both screens call the same two selectors. */
+{
+  const bare = (f) => f
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+  const rail = bare(readFileSync(new URL("../src/ui/BallRail.jsx", import.meta.url), "utf8"));
+  const sheet = bare(readFileSync(new URL("../src/ui/Bag.jsx", import.meta.url), "utf8"));
+
+  for (const [what, body] of [["BallRail", rail], ["Bag", sheet]]) {
+    assert.ok(/carriedBalls\(/.test(body), `${what} filters the balls itself instead of asking items.js`);
+    assert.ok(/usefulItems\(/.test(body), `${what} filters the kit itself instead of asking items.js`);
+    assert.ok(!/BALLS\.filter\(/.test(body), `${what} has its own copy of the which-balls-show rule`);
+  }
+
+  /* AND THE BICYCLE IS GONE, not merely unreachable. It was a second answer to
+     "go faster" - a toggle where the shoes are held - and it cost a face button
+     on a pad that has four. Comments may absolutely still name it; this repo
+     explains its deletions. Code may not. */
+  const src = ["src/game/engine.js", "src/game/items.js", "src/App.jsx",
+    "src/ui/Pad.jsx", "src/ui/Rail.jsx", "src/ui/Trainer.jsx"];
+  for (const f of src) {
+    const body = bare(readFileSync(new URL(`../${f}`, import.meta.url), "utf8"));
+    assert.ok(!/bicycle|biking|toggleBike/.test(body),
+      `${f} still has the bicycle in its CODE`);
+  }
+
+  console.log("bag ok — one answer about what is in it, and no bicycle in the code");
 }
 
 console.log("play ok — the frame loop never stopped");

@@ -33,7 +33,7 @@ import Note from "./Note.jsx";
    column that scrolls, which put an action with no undo one flick below a
    routine one. They live in Settings.jsx now, in a dialog off the top bar. */
 export default function Trainer({
-  stats, level, bag, biking, onSpend, onBike, save,
+  stats, level, bag, onSpend, save,
 }) {
   // Which row just changed, so the click has something to show for itself.
   const [lit, setLit] = useState(null);
@@ -284,7 +284,6 @@ export default function Trainer({
         <div className="trkeys">
           {KEY_ITEMS.map((key) => {
             const have = holding(bag, key.id);
-            const isBike = key.id === "bicycle";
             return (
               <div key={key.id} className={`trkey${have ? "" : " locked"}`}>
                 <img src={`items/${key.id}.png`} alt="" />
@@ -294,14 +293,6 @@ export default function Trainer({
                     {have ? key.blurb : `Earned at trainer Lv ${key.level}`}
                   </span>
                 </div>
-                {have && isBike && (
-                  <button
-                    className={`tk-toggle${biking ? " on" : ""}`}
-                    onClick={onBike}
-                  >
-                    {biking ? "RIDING" : "WALKING"}
-                  </button>
-                )}
               </div>
             );
           })}
