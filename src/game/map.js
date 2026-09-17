@@ -34,6 +34,20 @@ export { AREAS, AREA_IDS };
 // A ledge is solid to ordinary movement; the engine handles the hop south.
 export const SOLID = "T~wRMIPHLFCWXBEVkKdtYGA";
 
+/* WHAT YOU CAN RIDE, and it is a subset of SOLID rather than a new kind of
+   ground: every one of these is impassable on foot and stays so. `w` is open
+   water, `W` the Rock Ridge spring, `k` the pools in Frost Hollow - the same
+   three a rod reaches, and for the same reason, which is that they are the same
+   water. `V` is lava, which nothing in any Pokemon game has ever let you ride
+   and which this game's own Ember Caldera is two thirds made of.
+
+   `K` is out, exactly as it is for fishing: that is the waterfall, and it is
+   falling. `~` is out because it is the out-of-bounds border, not a place. */
+export const SURFABLE = "wWkV";
+export const rideable = (rows, x, y) =>
+  y >= 0 && y < rows.length && x >= 0 && x < rows[y].length
+  && SURFABLE.includes(rows[y][x]);
+
 /* The minimap's palette, one colour per legend character.
 
    It lives here rather than with the renderer because it IS the legend - the

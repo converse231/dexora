@@ -1512,13 +1512,36 @@ import { canRun, RUN_LEVEL } from "../src/game/items.js";
   const pngW = png.readUInt32BE(16);
   const pngH = png.readUInt32BE(20);
 
-  assert.deepEqual(Object.keys(player.sets).sort(), ["fish", "jump", "run", "walk"],
-    "the player strip must carry walk, run, fish and jump");
+  /* EVERY SET THE RENDERER CAN ASK FOR, READ OUT OF THE RENDERER. This was
+     `deepEqual(keys, ["fish", "jump", "run", "walk"])` - a typed list of the
+     four sets that existed - and it failed the day a fifth was cut from the
+     sheet, which is the day it had nothing to say. The rule it was reaching
+     for is that the strip carries whatever `drawPlayer` is handed: a set the
+     engine names and the sheet lacks falls back to `walk`, so a surfing
+     trainer would silently stride across the water. */
+  {
+    const eng = readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8");
+    const pick = eng.slice(eng.indexOf("set: "), eng.indexOf("frame:"));
+    const asked = [...new Set([...pick.matchAll(/"([a-z]+)"/g)].map((m) => m[1]))];
+    assert.ok(asked.length >= 4, `only found ${asked.length} sets named in the draw call`);
+    for (const name of asked) {
+      assert.ok(player.sets[name],
+        `the engine draws the "${name}" set and the strip has no such set - ` +
+        "drawPlayer falls back to `walk`, so it would look like nothing is wrong");
+    }
+    assert.deepEqual(Object.keys(player.sets).sort(), [...asked].sort(),
+      "the strip carries a set nothing draws, or is missing one that is drawn");
+  }
   assert.deepEqual(
     Object.values(player.dirs).sort((a, b) => a - b), [0, 1, 2, 3],
     "the four facings must be four distinct rows");
 
-  const want = { walk: [16, 3], run: [16, 3], fish: [32, 4], jump: [32, 1] };
+  /* WIDTH AND FRAME COUNT PER SET, measured off the rip's own backing
+     rectangles - see build_player. Surf is two poses because it is a paddle
+     and not a stride. */
+  const want = {
+    walk: [16, 3], run: [16, 3], fish: [32, 4], surf: [32, 2], jump: [32, 1],
+  };
   let widest = 0;
   for (const [name, [w, frames]] of Object.entries(want)) {
     const set = player.sets[name];

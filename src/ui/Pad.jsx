@@ -88,7 +88,9 @@ const DIRS = [
   { dir: "right", glyph: "▶", label: "Walk right" },
 ];
 
-export default function Pad({ engine, state, enc, level, onBag, onPickBall, bagOpen }) {
+export default function Pad({
+  engine, state, enc, level, onBag, onPickBall, bagOpen, ride = null,
+}) {
   // Before the early return: a hook after one is a hook that does not always run.
   const held = useRef({ t: null, taken: false });
   if (!engine) return null;
@@ -120,11 +122,21 @@ export default function Pad({ engine, state, enc, level, onBag, onPickBall, bagO
           ),
           off: !ball,
         }
-      : {
-          label: "A", sub: "FISH",
-          act: tap(() => engine.fish()),
-          off: !rod,
-        };
+      /* SURF WHERE FISHING IS NOT POSSIBLE. Both are offered at a shoreline
+         and A cannot be both, so it stays FISH there and the on-screen prompt
+         carries the ride - that prompt is a real button, so a thumb already
+         has it. At LAVA there is nothing to fish, so an A that said FISH and
+         did nothing was the only dead button on the pad. */
+      : ride && !rod
+        ? {
+            label: "A", sub: "SURF",
+            act: tap(() => engine.surf()),
+          }
+        : {
+            label: "A", sub: "FISH",
+            act: tap(() => engine.fish()),
+            off: !rod,
+          };
 
   const B = facing
     ? { label: "B", sub: "RUN", act: tap(() => engine.flee()) }

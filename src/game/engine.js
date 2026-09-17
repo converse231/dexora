@@ -5,7 +5,7 @@
 
 import { SPECIES } from "../data/dex.js";
 import {
-  AREAS, AREA_IDS, areaOf, walkable, label, MINI, MINI_UNKNOWN,
+  AREAS, AREA_IDS, areaOf, walkable, rideable, SURFABLE, label, MINI, MINI_UNKNOWN,
 } from "./map.js";
 import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
@@ -28,7 +28,7 @@ import { medalsFor, milestoneAt } from "./medals.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE,
   evolveState, evoLevel, startingState, DEX_BONUS, levelReward,
-  evolutionRow, bestRod, holding, canRun, RUN_LEVEL,
+  evolutionRow, bestRod, holding, canRun, canSurf, KEY_ITEMS,
   fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
   stepReward, keeper,
 } from "./items.js";
@@ -55,6 +55,25 @@ const STEP_MS = 150;          // tune: lower feels snappier, higher feels heavie
    that only has four. A save that still carries `bicycle` in its bag keeps a
    key nothing reads - harmless, and cheaper than a migration. */
 const RUN_SCALE = 0.7;        // Running Shoes: quicker than walking
+/* KEY ITEMS A SAVE HAS EARNED BUT NEVER RECEIVED, handed over on load.
+
+   Running was a level check before it was an item, so a save written then is
+   past Lv 15 with an empty shoe slot and would silently LOSE the ability to
+   run - the one change a player feels immediately. Surf arrived later still.
+   Both are the same migration, so it is written once: anything in `KEY_ITEMS`
+   whose level you are past and whose slot is empty. A third one costs nothing.
+
+   It is deliberately NOT a general "give me everything I qualify for" for the
+   bag at large - only key items, which are earned by levelling and never
+   spent. */
+function grantKeys(bag, level) {
+  let out = bag;
+  for (const k of KEY_ITEMS) {
+    if (level >= k.level && !holding(out, k.id)) out = { ...out, [k.id]: 1 };
+  }
+  return out;
+}
+
 /* Per step, anywhere you can walk. Every walkable tile spawns - there is no
    "safe" ground - so this is far lower than a grass-only rate would be, and the
    two work out to a similar number of encounters per minute of walking. */
@@ -415,9 +434,10 @@ function loadState() {
          written then is past level 15 with an empty shoe slot - and would
          have silently LOST the ability to run, which is the one change a
          player would feel immediately. Granted on sight, once. */
-      bag: levelFromXp(s.xp ?? 0) >= RUN_LEVEL && !holding(s.bag, "running-shoes")
-        ? { ...s.bag, "running-shoes": 1 }
-        : s.bag,
+      /* Surf is the same story one level ladder later: a save already past
+         Lv 20 earned it before it existed, and a key item nobody can be given
+         retroactively is a key item half the players never get. */
+      bag: grantKeys(s.bag, levelFromXp(s.xp ?? 0)),
       encounter: null, evolution: null, cheers: [],
     };
   } catch {
@@ -613,8 +633,14 @@ export function createEngine(canvas, onChange, mini = null) {
        which is the whole reason Route 1 has them. From any other direction a
        ledge is simply a wall, which `walkable` already reports. */
     const hop = dir === "down" && at(nx, ny) === "L" && walkable(rows, nx, ny + 1);
+    /* OFF THE RIDE IS ALWAYS ALLOWED, ONTO IT NEVER IS. While you are on the
+       water you may cross to more water or step ashore; from the bank the only
+       way out is `surf()`, which is what the key item gates. So this asks
+       where you ARE rather than what you hold - the permission was checked
+       when you mounted and cannot have changed since. */
+    const riding = rideable(rows, p.x, p.y);
     if (hop) ny += 1;
-    else if (!walkable(rows, nx, ny)) return;
+    else if (!walkable(rows, nx, ny) && !(riding && rideable(rows, nx, ny))) return;
 
     move.fromX = p.x;
     move.fromY = p.y;
@@ -715,6 +741,19 @@ export function createEngine(canvas, onChange, mini = null) {
        tile already proves it is walkable, so there is nothing left to test -
        anywhere you can put your feet, something can appear. */
     const biome = biomeFor(state.areaId);
+    /* WHAT LIVES IN WHAT YOU ARE RIDING, and neither half needed a new table.
+
+       On water it is the rod's pool - the same species a line reaches, which
+       is what water in this game has always meant and is already balanced. On
+       LAVA it is the map's own table, because the only lava here is Ember
+       Caldera and every resident of Ember is a Fire type; a separate lava list
+       would be that list written twice.
+
+       A rod is granted at Lv 4 and Surf at Lv 20, so `bestRod` always answers
+       by the time anyone can be out here. It falls back to the map anyway,
+       because a table that comes back empty should thin the encounters out
+       rather than stop them. */
+    const ride = surfing() ? at(state.player.x, state.player.y) : null;
     /* REPEL IS ITS OWN AXIS. It changes how OFTEN an encounter happens and
        never what it is - which is what keeps it off the table the White Flute
        and Fortune are already moving, and is the honest reading of what a
@@ -724,10 +763,44 @@ export function createEngine(canvas, onChange, mini = null) {
       /* The level is part of the table, not a modifier on the roll: past Lv 8
          a map starts turning up the evolved forms of what already lives there.
          `tableFor` caches, because this is asked on every step that spawns. */
-      startEncounter(tableFor(biome, levelFromXp(state.xp)));
+      const here = tableFor(biome, levelFromXp(state.xp));
+      if (ride && ride !== "V") {
+        const rod = bestRod(state.bag);
+        const pool = rod && rodTable(rod.id);
+        startEncounter(pool && pool.length ? pool : here, "surf");
+      } else {
+        startEncounter(here, ride ? "surf" : undefined);
+      }
     }
     save();
     changed();
+  }
+
+  /* NOBODY IS LEFT AFLOAT WITHOUT THE MEANS TO BE. Surfing is derived from the
+     tile, which is what makes it unable to disagree with itself - but it also
+     means a save standing on water while missing the item would be stuck
+     there, unable to step onto land only because `rideable` says the step off
+     is a ride. It cannot happen from play (the item is never taken away) and a
+     hand-edited or half-migrated save should still open, so: if you are afloat
+     and cannot surf, you are put back on the nearest bank.
+
+     The same shape as `loadState` sending a save home from a map it has not
+     earned - a save that is somewhere impossible is moved, never refused. */
+  function ashore() {
+    const p = state.player;
+    if (!rideable(rows, p.x, p.y)) return;
+    if (canSurf(levelFromXp(state.xp), state.bag)) return;
+    for (let r = 1; r < 40; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          if (walkable(rows, p.x + dx, p.y + dy)) {
+            p.x += dx; p.y += dy;
+            return;
+          }
+        }
+      }
+    }
   }
 
   function travel(areaId) {
@@ -801,11 +874,28 @@ export function createEngine(canvas, onChange, mini = null) {
       honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
 
+    /* WHETHER YOU HAVE THIS FORM, which is a different question from whether
+       you have the species - and the badge was answering the wrong one.
+       Reported from play: an ordinary Pikachu was caught, and every Holo,
+       Shiny and Astral Pikachu afterwards wore a Poke Ball saying it was
+       already in the dex. It was not; a tier is its own row in the collection
+       and its own square in the FORMS strip.
+
+       `known` is untouched and still means the SPECIES, because that is what
+       the Repeat Ball is worth something against - it is the fact the ball was
+       priced on, and making it per-form would quietly halve a ball nobody
+       asked to retune. Two different questions, two fields, both frozen here
+       for the same reason `known` always was. */
+    const knownForm = variant
+      ? (state[variant]?.[at] ?? 0) === 1
+      : known;
+
     state.encounter = {
       speciesId: sp.id,
       name: label(sp).toUpperCase(),
       types: sp.types,
       known,
+      knownForm,
       variant,
       /* The same word as four booleans, so a panel can ask `enc.holo` without
          re-deriving anything. Spread from `TIERS` rather than typed out: the
@@ -868,6 +958,21 @@ export function createEngine(canvas, onChange, mini = null) {
     teach({ kind: "encounter", variant });
   }
 
+  /* SURFING IS NOT A FLAG, IT IS WHERE YOU ARE STANDING.
+
+     The obvious shape for this is `state.surfing`, saved and toggled, and it
+     is the wrong one: a boolean and a position can disagree, and every way
+     they can is a bug with no floor under it. A save written mid-ride that
+     loses the flag strands you on water you cannot leave; one that keeps a
+     stale flag walks you onto land still riding. Neither needs to exist.
+
+     A liquid tile is impassable on foot - that is what `SOLID` means and it
+     has not changed - so BEING on one is proof you rode there, and it is the
+     only proof needed. No new save field, nothing to migrate, and a save from
+     before Surf existed loads correctly by construction because its player is
+     standing on ground. */
+  const surfing = () => rideable(rows, state.player.x, state.player.y);
+
   /* The tile you are facing, which is the only thing fishing cares about. */
   function facing() {
     const { x, y, dir } = state.player;
@@ -899,7 +1004,41 @@ export function createEngine(canvas, onChange, mini = null) {
 
        `K` stays out on purpose. That is the waterfall, which is falling. */
     if (!"wWk".includes(facing())) return null;
+    /* NOT FROM THE WATER. Casting while sitting on it would put the bobber a
+       tile away from a trainer who is already in the pool, and the rod set is
+       drawn standing on a bank. Ride ashore to fish. */
+    if (surfing()) return null;
     return bestRod(state.bag);
+  }
+
+  /* Can you ride the tile you are facing? The same shape as `castable`, and it
+     answers for the prompt as well as for the key. */
+  function surfable() {
+    if (state.encounter || state.evolution || state.fishing || move.active) return null;
+    if (surfing()) return null;                       // already out there
+    if (!canSurf(levelFromXp(state.xp), state.bag)) return null;
+    const [fx, fy] = facingXY();
+    return rideable(rows, fx, fy) ? at(fx, fy) : null;
+  }
+
+  /* Step off the bank onto the water. A ride is a MOVE rather than a state
+     change, so it animates like every other step and `onArrive` rolls for an
+     encounter the moment you are out there - which is what makes the first
+     tile of water feel like a place rather than a mode. */
+  function surf() {
+    if (!surfable()) return false;
+    const [fx, fy] = facingXY();
+    const p = state.player;
+    move.fromX = p.x;
+    move.fromY = p.y;
+    move.active = true;
+    move.startedAt = performance.now();
+    move.ms = stepMs() * 1.4;      // pushing off is slower than a pace
+    move.hop = false;
+    p.x = fx;
+    p.y = fy;
+    changed();
+    return true;
   }
 
   function fish() {
@@ -1250,7 +1389,12 @@ export function createEngine(canvas, onChange, mini = null) {
       ctx, art.player, Math.round(wx - camX), Math.round(wy - camY),
       p.dir, walkFrame, move.active, t,
       {
-        set: cast ? "fish"
+        /* RIDING BEATS EVERY OTHER SET, including running - the shoes do not
+           help on water, and a trainer striding across a lake would be the
+           one thing here that looks like a bug rather than a feature. Two
+           frames, so the paddle reads as a paddle. */
+        set: surfing() ? "surf"
+          : cast ? "fish"
           : hopping ? "jump"
           : state.running && move.active ? "run" : "walk",
         frame: cast ? fishFrame(p.dir, cast.phase) : undefined,
@@ -1341,6 +1485,8 @@ export function createEngine(canvas, onChange, mini = null) {
      always blur, and a key held through that would walk the trainer the
      moment you returned. */
 
+  /* Before the first frame, so nobody ever SEES themselves stuck afloat. */
+  ashore();
   bakeMini();
   raf = requestAnimationFrame(frame);
 
@@ -1625,6 +1771,8 @@ export function createEngine(canvas, onChange, mini = null) {
     levelUp,
     spend,
     fish,
+    surf,
+    surfable,
     setChar,
     /* Dismissing is not the same as banking it - the id went into `hints` the
        moment it was shown, so closing it is only about the screen. It can never

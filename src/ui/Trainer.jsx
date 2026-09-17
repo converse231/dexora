@@ -33,7 +33,7 @@ import Note from "./Note.jsx";
    column that scrolls, which put an action with no undo one flick below a
    routine one. They live in Settings.jsx now, in a dialog off the top bar. */
 export default function Trainer({
-  stats, level, bag, onSpend, save,
+  stats, level, bag, onSpend, save, account = null,
 }) {
   // Which row just changed, so the click has something to show for itself.
   const [lit, setLit] = useState(null);
@@ -223,18 +223,31 @@ export default function Trainer({
           })}
         </div>
 
+        {/* A READOUT OUTLIVES THE SYSTEM THAT WROTE IT, again. "KEPT IN THIS
+            BROWSER" and "stored in this browser only" were written when that
+            was the whole truth, and they went on saying it after accounts
+            arrived - so a signed-in player was told their dex lived somewhere
+            it does not, on the one panel whose job is to tell them where it is.
+
+            The panel itself stays, and it is worth being clear why, because
+            "is this still needed?" is a fair question. Two of its three jobs
+            survive an account intact: EXPORT is a copy the player holds
+            themselves, which an account is not - it is the answer to a deleted
+            account, a lost password or a service that goes away - and the
+            RECOVERY offer below reads `localStorage`, which is where a save
+            that failed to parse is stashed, and has nothing to do with the
+            server. Only IMPORT-to-move-machines was made redundant, and
+            importing is still how a held copy gets back in. */}
         <div className="panel-head tr-head">
           <span>SAVE FILE</span>
-          <span>KEPT IN THIS BROWSER</span>
+          <span>{account ? "SYNCED TO YOUR ACCOUNT" : "KEPT IN THIS BROWSER"}</span>
         </div>
 
-        {/* The whole game lives in one localStorage key. Clearing site data, a
-            private window, a different browser - any of those is the dex, gone,
-            with nothing to restore from. This is the only way back. */}
         <div className="trsave">
           <p className="ts-why">
-            Your game is stored in this browser only. Export a copy to keep it
-            safe, or to carry it to another machine.
+            {account
+              ? "Your game syncs to your account, and this browser keeps a copy. Export one you hold yourself - an account is not a backup."
+              : "Your game is stored in this browser only. Export a copy to keep it safe, or to carry it to another machine."}
           </p>
           <div className="ts-row">
             <button className="ts-btn" onClick={exportSave} disabled={!save}>

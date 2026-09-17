@@ -469,6 +469,12 @@ export const artOf = (item) => item?.art ?? item?.id ?? "";
 /* Key items: earned at a trainer level, never bought, never used up. They are
    held in the same bag as everything else - a count of 1 means you have it -
    because a second bag for four things is a second thing to keep in sync. */
+/* Lv 20, which is where the map ladder finishes (`MAP_LAST`). Every area is
+   open by then, so this is a reward for having seen all eight rather than a key
+   to one of them - and it turns the water and the lava those maps are drawn
+   with from scenery into somewhere to go. */
+export const SURF_LEVEL = 20;
+
 export const KEY_ITEMS = [
   { id: "old-rod", name: "Old Rod", price: 0, level: 4,
     blurb: "Fish any shoreline. Mostly Magikarp, but it is a start." },
@@ -478,7 +484,16 @@ export const KEY_ITEMS = [
     blurb: "Hold Shift to run. Everything after this is faster." },
   { id: "super-rod", name: "Super Rod", price: 0, level: 22,
     blurb: "Reaches the deep water, where the rare things are." },
+  { id: "surf", name: "Surf", price: 0, level: SURF_LEVEL,
+    blurb: "Ride out onto water, and onto lava." },
 ];
+
+/* THE SAME SHAPE AS `canRun`, and for the same reason: a level on its own is a
+   gate nobody was told about, and an item on its own can be held by a save that
+   never earned it. `loadState` hands it to any save already past the level,
+   exactly as it does the Running Shoes. */
+export const canSurf = (level, bag) =>
+  level >= SURF_LEVEL && (bag?.surf ?? 0) > 0;
 
 const keyItemsAt = (level) => KEY_ITEMS.filter((k) => k.level === level);
 

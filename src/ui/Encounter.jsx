@@ -276,9 +276,18 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
         )}
         {/* Just the ball. The word was redundant the moment the icon was there
             - a Poke Ball beside a name has meant "registered" since 1996, and
-            the tooltip and the label carry it for anyone it does not. */}
-        {enc.known && (
-          <span className="np-caught" data-tip="Already in the Pokédex">
+            the tooltip and the label carry it for anyone it does not.
+
+            `knownForm`, NOT `known`: a Holo Pikachu is not the Pikachu you
+            caught, and the badge said it was. See the engine for why the two
+            are separate fields rather than one. */}
+        {enc.knownForm && (
+          <span
+            className="np-caught"
+            data-tip={enc.variant
+              ? `This ${enc.variant} is already in the Pokédex`
+              : "Already in the Pokédex"}
+          >
             <img src="items/poke-ball.png" alt="Already caught" />
           </span>
         )}
