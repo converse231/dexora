@@ -231,7 +231,7 @@ export default function DexSheet({
                 so it is the worst place for the treatment to be missing. */}
             {caught && <VariantFx key={`fx-${shown ?? "plain"}`} id={id} variant={shown} />}
           </span>
-          <div>
+          <div className="sheet-id">
             <div className="sheet-no">#{String(id).padStart(3, "0")}</div>
             <h3 className="sheet-name">{seen ? label(sp) : "???"}</h3>
             {seen ? (
@@ -247,6 +247,44 @@ export default function DexSheet({
               <div className="sheet-genus">No data recorded</div>
             )}
           </div>
+          {/* THE MEASUREMENTS BELONG ON THE NAMEPLATE, and the hole in the
+              header is what said so. The portrait is a fixed 108px and the
+              name beside it is about 150px of content in a 290px track, so the
+              top right of every entry was a tall empty rectangle - reported as
+              "a big white space".
+
+              These three are IDENTITY, exactly like the genus and the types
+              they now sit beside: facts about the species that never change
+              and that you cannot act on. They were at the very bottom behind a
+              rule of their own, the furthest point on the card from the name
+              they describe, and CLAUDE.md already records them being demoted
+              once for shouting. Moving them up costs NOTHING vertically - the
+              row is 108px tall whatever is in it, because the portrait says so
+              - and it takes a whole block plus its border off the bottom, so
+              the card gets shorter. That is what matters on a phone, where it
+              is capped at 88vh and scrolls.
+
+              WHERE TO LOOK was the other candidate and is the wrong one: it is
+              variable height - one to three rows, so it would either overflow
+              the header or leave it ragged - and it is the one thing on this
+              card you can ACT on, with buttons that travel. A header of pure
+              identity is not where a control belongs. */}
+          {caught && (
+            <dl className="sheet-facts">
+              <div className="fact">
+                <dt>HEIGHT</dt>
+                <dd>{(sp.height / 10).toFixed(1)} m</dd>
+              </div>
+              <div className="fact">
+                <dt>WEIGHT</dt>
+                <dd>{(sp.weight / 10).toFixed(1)} kg</dd>
+              </div>
+              <div className="fact">
+                <dt>CATCH RATE</dt>
+                <dd>{sp.rate}</dd>
+              </div>
+            </dl>
+          )}
         </div>
 
         {caught ? (
@@ -336,7 +374,32 @@ export default function DexSheet({
                         alt={`${name} ${label(sp)}`}
                       />
                       <VariantFx id={id} variant={t} />
-                      {t && <Mark tier={t} size={12} className="sf-badge" />}
+                      {/* A MARK ONLY APPEARS ON A CELL YOU HAVE EARNED, and
+                          before this it appeared on all nine, greyed out.
+
+                          Reported as four broken images - holo, glitched,
+                          astral and showdown - and that is exactly what they
+                          looked like. Those four marks are FILLED SOLIDS whose
+                          identity is their colour: a rainbow hexagon, a blue
+                          crystal, a purple bolt, a blue cone. `grayscale(1)`
+                          at .35 opacity left four featureless grey blobs,
+                          which is what a failed image load looks like. The
+                          other four survived because their identity is a
+                          SILHOUETTE - a ring, a four-point star, an eight-
+                          point star, and Noir, which is achromatic already.
+
+                          CLAUDE.md claims "the marks are shapes, not just
+                          colours - these stay distinct in greyscale". That was
+                          true of the four CSS shapes it was written about and
+                          stopped being true the day the art became drawn.
+
+                          Tuning the grey would only postpone it to the next
+                          tier that is a coloured solid. The cell already names
+                          its tier underneath in pixel type, so on an unheld
+                          cell the mark was decoration that had to be
+                          suppressed until it read as a fault. Gone - and the
+                          badge now MEANS something: you own this one. */}
+                      {t && got(t) && <Mark tier={t} size={12} className="sf-badge" />}
                     </div>
                     <span className="sf-name">{name}</span>
                     {/* THE BLURB SHOWS WHETHER OR NOT YOU HAVE IT. It only
@@ -364,21 +427,6 @@ export default function DexSheet({
             />
 
             <p className="sheet-flavor">{sp.flavor}</p>
-
-            <dl className="sheet-facts">
-              <div className="fact">
-                <dt>HEIGHT</dt>
-                <dd>{(sp.height / 10).toFixed(1)} m</dd>
-              </div>
-              <div className="fact">
-                <dt>WEIGHT</dt>
-                <dd>{(sp.weight / 10).toFixed(1)} kg</dd>
-              </div>
-              <div className="fact">
-                <dt>CATCH RATE</dt>
-                <dd>{sp.rate}</dd>
-              </div>
-            </dl>
           </>
         ) : (
           <>

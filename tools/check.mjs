@@ -871,6 +871,33 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs 
       assert.ok(sheet.includes(`t === "${remote[0]}" && !got(t) ? null : t`),
         `the FORMS strip asks for an unheld ${remote[0]}, the one picture this ` +
         "repo does not ship - it fetches a GIF over the network to paint it black");
+
+      /* 5. A MARK IS PROOF OF OWNERSHIP, NEVER A GREYED-OUT LABEL. The strip
+            drew all nine marks and desaturated the ones you did not hold
+            (`opacity: .35; filter: grayscale(1)`), and four of them came back
+            as bug reports - "holo glitched astral and showdown icons are
+            broken image".
+
+            They were not broken. Those four marks are FILLED SOLIDS whose
+            identity is their colour - a rainbow hexagon, a blue crystal, a
+            purple bolt, a blue cone - so greyscale leaves a featureless grey
+            blob, which is what a failed image load looks like. The four that
+            survived are the ones whose identity is a SILHOUETTE: a ring, a
+            four-point star, an eight-point star, and Noir, which is
+            achromatic to begin with.
+
+            So the rule is not "make the grey darker" - that only holds until
+            the next tier that is a coloured solid. It is that an unheld cell
+            draws NO mark: it already names its tier underneath, and a badge
+            that appears on every cell says nothing anyway. Asserted from both
+            ends, because either alone can be undone. */
+      assert.ok(/\{t && got\(t\) && <Mark/.test(sheet),
+        "the FORMS strip draws a mark on cells you do not hold - four of the " +
+        "eight are coloured solids and grey out into something that reads as " +
+        "a broken image");
+      assert.ok(!/\.sf-one:not\(\.got\)[^{]*\.sf-badge/.test(css),
+        "something is styling the badge on an unheld cell again - there is no " +
+        "badge there to style, and a rule for one invites drawing one");
     }
 
     for (const sel of [".evo-whiten .evo-mon", ".evo-cycle .evo-mon"]) {

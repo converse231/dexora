@@ -2526,11 +2526,18 @@ canvas {
    number, name, genus, types. Everything below it is either the collection
    (FORMS) or reference, and both are set quieter on purpose - a card where
    five blocks all shout is a card with no hierarchy, which is what this was. */
+/* THREE THINGS, AND FLEX RATHER THAN GRID BECAUSE ONE OF THEM IS OPTIONAL.
+   Portrait, nameplate, measurements. A grid with a third track leaves a
+   phantom column AND its gap on an entry that is only SEEN, which has no
+   measurements to show; flex simply has one fewer child. `min-width: 0` on the
+   nameplate is what lets a long name shrink rather than shove the numbers off
+   the edge of the card. */
 .sheet-top {
   display: flex; align-items: center; gap: 16px;
   padding-bottom: 16px; margin-bottom: 16px;
   border-bottom: 2px solid var(--line);
 }
+.sheet-id { flex: 1 1 auto; min-width: 0; }
 /* The picture only - the frame is the wrapper's, above. */
 .sheet-art {
   width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;
@@ -2623,15 +2630,21 @@ canvas {
   margin: 0 0 14px; padding: 0 2px;
   max-width: 62ch;
 }
-/* Measurements, last, and read as a row of label/value pairs rather than
+/* Measurements, on the nameplate, and read as label/value pairs rather than
    three cards. They were three filled tiles the same size and weight as the
-   FORMS slots above them, which made a Pokemon's height look as important as
-   whether you own its Astral. One rule, no fills. */
+   FORMS slots, which made a Pokemon's height look as important as whether you
+   own its Astral. No fills, and now no border either - they are part of the
+   header rather than a block of their own.
+
+   STACKED AND RANGED RIGHT. Label over value is the narrower of the two
+   arrangements - about 62px against 95px - and the narrow one is what decides
+   whether the name still fits beside it on a phone. Ranged right so the three
+   values make a clean edge against the card's own margin. */
 .sheet-facts {
-  display: flex; flex-wrap: wrap; gap: 6px 22px;
-  margin: 0; padding-top: 12px; border-top: 2px solid var(--line);
+  flex: none; display: grid; gap: 7px; justify-items: end;
+  margin: 0; text-align: right;
 }
-.fact { display: flex; align-items: baseline; gap: 7px; }
+.fact { display: grid; justify-items: end; gap: 1px; }
 .fact dt {
   font-family: var(--pixel); font-size: 8px; color: var(--ink-faint);
   letter-spacing: .06em;
@@ -2710,7 +2723,6 @@ canvas {
   position: absolute; right: -2px; bottom: -2px;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, .9));
 }
-.sf-one:not(.got) .sf-badge { opacity: .35; filter: grayscale(1); }
 .sf-name {
   font-family: var(--pixel); font-size: 9px; letter-spacing: .04em;
   color: var(--ink-soft); text-align: center;
@@ -4093,6 +4105,25 @@ button:disabled { transition: none; }
    and left a gap underneath. Layout overrides go last. */
 
 /* A wide screen can afford a wider rail, which is where the dense content is. */
+/* THE MEASUREMENTS COME OUT OF THE HEADER BEFORE THE NAME HAS TO WRAP.
+   Measured rather than picked: the row needs the portrait (108) + gap (16) +
+   the facts (about 72) + gap (16), which is 212, and "Caterpie" at 27px is
+   about 135 - so the header stops fitting at roughly 347px of card content,
+   which is a 431px viewport. Below that they take a line of their own under
+   the header and go back to being a row, which is what they were before they
+   moved up. */
+@media (max-width: 430px) {
+  .sheet-top { flex-wrap: wrap; }
+  .sheet-top .sheet-facts {
+    flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 6px 22px;
+    justify-content: flex-start; text-align: left;
+    padding-top: 12px; border-top: 2px solid var(--line);
+  }
+  .sheet-top .fact {
+    display: flex; align-items: baseline; justify-items: start; gap: 7px;
+  }
+}
+
 @media (min-width: 1400px) {
   .stage { grid-template-columns: 1fr 400px; }
 }

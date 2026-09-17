@@ -1997,6 +1997,30 @@ but the last stayed on screen for the rest of the session, stacked on one spot,
 and the array grew with it. Pruning by age on insert makes it self-healing and
 the timer only has to clear the last one.
 
+**THE MEASUREMENTS ARE ON THE NAMEPLATE, AND AN EMPTY CORNER IS WHAT SAID SO.**
+`.sheet-top` is a 108px portrait beside a name block holding about 150px of
+content in a 290px track, so the top right of every dex entry was a tall empty
+rectangle - reported as "a big white space". HEIGHT, WEIGHT and CATCH RATE went
+into it: they are IDENTITY, exactly like the genus and the types they now sit
+beside, and they had been at the very bottom behind a rule of their own, the
+furthest point on the card from the name they describe. It costs nothing
+vertically - the row is 108px tall whatever is in it - and takes a block plus
+its border off the bottom, so the card gets **shorter**, which is what matters
+on a phone where it is capped at 88vh.
+
+**WHERE TO LOOK was the other candidate and is the wrong one**, which is the
+part worth keeping: it is variable height (one to three rows, so it would either
+overflow a fixed header or leave it ragged) and it is the one thing on the card
+you can ACT on, with buttons that travel. A header of pure identity is not where
+a control belongs.
+
+**Flex, not grid, because the third child is optional** - a `seen` but uncaught
+entry has no measurements, and a grid's third track leaves a phantom column and
+its gap behind. Below 430px the facts take a line of their own and go back to
+being a row; that number is measured, not picked - portrait 108 + gap 16 + facts
+72 + gap 16 is 212, and "Caterpie" at 27px is 135, so the header stops fitting
+at about 347px of card content.
+
 **A margin that belonged to the row was on one button.** `.sheet-close` carried
 `margin-top: 18px` from when it was the only control on the dex sheet. Put in a
 flex row beside SEE IN BOX, that margin pushed CLOSE down while its
@@ -2032,12 +2056,40 @@ number, up to three variant marks and a completion badge; at the ~52px auto-fill
 produced they fought for the same corner. Four fixed columns give ~76px.
 
 **The marks are shapes, not just colours.** Origin is a ring, shiny a four-point
-star, Holo a hexagon, Astral a diamond - a row of four coloured dots is
-unreadable to anyone who cannot separate the colours, and these stay distinct in
-greyscale. They are drawn art now, normalised by `tools/build_marks.py`. The
-completion rosette is `.cell-full`, and it is the only mark in the game that
-cannot be had by playing long enough: it needs the ordinary catch **and** all
-four variants of one species.
+star, Holo a hexagon, Astral a diamond - a row of coloured dots is unreadable to
+anyone who cannot separate the colours. They are drawn art now, normalised by
+`tools/build_marks.py`. The completion rosette is `.cell-full`, and it is the
+only mark in the game that cannot be had by playing long enough: it needs the
+ordinary catch **and** `ROSETTE_NEED` of whatever that species can wear.
+
+**BUT "AND THESE STAY DISTINCT IN GREYSCALE" WAS TRUE OF THE CSS SHAPES AND IS
+NOT TRUE OF THE DRAWN ONES.** That sentence sat here as an invariant and quietly
+stopped holding the day the art changed, which is the most expensive kind of
+note to leave standing. Four of the eight are FILLED SOLIDS whose identity is
+their colour - Holo's rainbow hexagon, Astral's blue crystal, Glitched's purple
+bolt, Showdown's blue cone - and `grayscale(1)` leaves four featureless grey
+blobs. The four that survive are the ones whose identity is a SILHOUETTE: the
+ring, the four-point star, Vivid's eight-point star, and Noir, which is
+achromatic to begin with.
+
+It surfaced as a bug report - *"holo glitched astral and showdown icons are
+broken image"* - and they were not broken: the FORMS strip drew all nine marks
+and desaturated the ones you did not hold (`opacity: .35; filter: grayscale(1)`),
+and a soft grey blob is what a failed image load looks like. **An unheld cell
+draws no mark at all now.** Not a darker grey, which only postpones it to the
+next tier that is a coloured solid: the cell already names its tier underneath
+in pixel type, so the badge was decoration that had to be suppressed until it
+read as a fault. It also makes the badge MEAN something - on every cell it said
+nothing; on held cells only it says you own this one. check.mjs asserts both
+ends, because either alone can be undone.
+
+**The first metric for this was the wrong one, which is worth more than the
+fix.** Compositing each badge over `--paper` and measuring its darkest pixel
+said all eight "read" at 35-70 levels of contrast, and all eight passed. Ink is
+not legibility: a big soft grey blob has plenty of the first and none of the
+second. Looking at the render at 14x answered it in one glance. **Measure the
+thing you actually care about, and when a number disagrees with a bug report,
+suspect the number.**
 
 **`build_marks.py`'s contact sheet is a fact about a drawing, not a list of
 tiers.** `complete.png` splits into the four icons it was drawn with, in that
