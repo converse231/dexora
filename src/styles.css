@@ -1405,6 +1405,20 @@ canvas {
 /* The name field sits above the two tiles, so it gets the gap rather than the
    tiles carrying a top margin that only applies half the time. */
 .gate-name { margin-top: 16px; }
+/* The helper under the date field. Not a `.gate-note` - that slot is for what
+   is WRONG and reserves its line for it; this one is always true. */
+.gate-why {
+  font-style: normal; font-size: 11.5px; line-height: 1.4; color: var(--ink-faint);
+}
+
+/* AGAINST THE BUTTON, and quiet enough not to compete with it. Terms set at
+   the size of the thing they qualify would be a wall; set any smaller they
+   would be the fine print this deliberately is not. */
+.gate-terms {
+  margin: 10px 0 0; font-size: 11.5px; line-height: 1.5;
+  color: var(--ink-faint); text-align: left;
+}
+
 .gate-chars { display: flex; gap: 12px; margin: 16px 0 6px; }
 .gate-char {
   flex: 1; cursor: pointer;
@@ -1441,14 +1455,23 @@ canvas {
    is the same quiet key RESET was. */
 .tb-out { color: var(--ink-soft); }
 
-/* The trainer's name beside the brand. Quiet: it is who you are, not a figure
-   to read, so it sits at label weight rather than competing with the title. */
-.tb-who {
-  font-family: var(--pixel); font-size: 10px;
-  padding: 4px 8px 3px; border-radius: 8px;
-  background: var(--surface-2); color: var(--ink-soft);
-  max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* THE NAME IS THE TITLE NOW, so it has to survive being one: a trainer name is
+   up to 16 characters where "Dexora" is six, and the bar is a flex row whose
+   other items are numbers that must not be squeezed. Clipped rather than
+   wrapped, because a two-line brand changes the height of the whole bar. */
+.tb-brand .title {
+  max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* Icon-only, and sized by the same rules as the text buttons beside it so the
+   row keeps one baseline. The glyph is a character rather than an asset: it is
+   the one control here that is not part of the game's own vocabulary. */
+.tb-set {
+  cursor: pointer; line-height: 1;
+  padding: 7px 9px; color: var(--ink-soft);
+}
+.tb-set span { font-size: 15px; }
+.tb-set:hover { color: var(--ink); }
 
 @media (max-width: 420px) {
   .gate { padding: 12px; align-content: start; }
@@ -1460,20 +1483,10 @@ canvas {
 
 /* The account block. The name field shares the save row's shape so RENAME sits
    on the same baseline as EXPORT and IMPORT one block up. */
-.ts-name {
-  flex: 1; min-width: 0; box-sizing: border-box;
-  padding: 9px 10px; font: inherit; font-size: 16px;
-  color: var(--ink); background: var(--surface-2);
-  border: 2px solid var(--line-firm); border-radius: 9px;
-}
-.ts-name:focus-visible { outline: 2px solid var(--canopy); outline-offset: 1px; }
 
 /* The one destructive control in the game, and it is separated rather than
    coloured red: a red button in a settings list reads as an accent, and this
    needs to read as a different KIND of thing to the export beside it. */
-.trdanger { border-top: 2px solid var(--line); margin-top: 4px; padding-top: 12px; }
-.ts-kill { border-color: var(--path); color: var(--path); }
-.ts-kill:hover { background: var(--path-soft); }
 
 /* Type-to-confirm, for the one dialog that has it. */
 .cf-type { display: grid; gap: 5px; margin: 4px 0 2px; text-align: left; }
@@ -1911,6 +1924,83 @@ canvas {
    A confirm is read in about a second, so it should be about a second tall. The
    first version set a 23px title, 10px-padded rows and 15px buttons inside 22px
    of card padding, which made three short facts fill half the screen. */
+/* THE SETTINGS DIALOG. Built on `.sheet`, which already owns the backdrop, the
+   centring and the z-index, so this is only the card - and it is the same card
+   `.sheet-card` is, at a different width, because a second dialog that looks
+   like a different app is how an interface stops being one.
+
+   `max-height` and the scroll live on the BODY rather than the card, so the
+   header with the close button in it cannot scroll away from somebody halfway
+   down a form. */
+.settings {
+  width: min(430px, 100%); display: flex; flex-direction: column;
+  max-height: min(88vh, 720px);
+  background: var(--surface); border: 3px solid var(--canopy);
+  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  overflow: hidden;
+}
+.set-head {
+  flex: none; display: flex; align-items: baseline; gap: 10px;
+  padding: 15px 16px 12px; border-bottom: 2px solid var(--line);
+}
+.set-head h3 {
+  margin: 0; font-family: var(--display); font-weight: 600; font-size: 19px;
+}
+.set-mail {
+  flex: 1; min-width: 0; font-size: 11.5px; color: var(--ink-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set-x {
+  flex: none; cursor: pointer; padding: 3px 7px; line-height: 1;
+  font-size: 13px; color: var(--ink-soft);
+}
+.set-x:hover { color: var(--path); }
+
+.set-body { overflow-y: auto; padding: 4px 16px 16px; }
+
+/* Each section is a rule and a heading rather than a box. Six cards stacked in
+   a scroller is six borders arguing about which is the outer one. */
+.set-row { padding: 14px 0; border-bottom: 2px solid var(--line); }
+.set-row:last-child { border-bottom: 0; padding-bottom: 4px; }
+.set-row h4 {
+  margin: 0 0 4px; font-family: var(--pixel); font-size: 10.5px;
+  letter-spacing: .06em; color: var(--ink);
+}
+.set-why { margin: 0 0 9px; font-size: 12px; line-height: 1.45; color: var(--ink-soft); }
+
+.set-line { display: flex; gap: 8px; align-items: stretch; }
+.set-stack { display: grid; gap: 8px; }
+
+/* 16px again, for the reason `.gate-field input` carries: below it iOS zooms
+   the whole viewport when a field takes focus, and this one opens over a game. */
+.set-in {
+  flex: 1; min-width: 0; box-sizing: border-box;
+  padding: 10px 11px; font: inherit; font-size: 16px;
+  color: var(--ink); background: var(--surface-2);
+  border: 2px solid var(--line-firm); border-radius: 9px;
+}
+.set-in:focus-visible { outline: 2px solid var(--canopy); outline-offset: 1px; }
+
+.set-go {
+  flex: none; cursor: pointer; white-space: nowrap;
+  font-family: var(--pixel); font-size: 10.5px; padding: 10px 13px 8px;
+  border: 2px solid var(--canopy); border-radius: 9px;
+  background: var(--surface); color: var(--canopy);
+  transition: background 140ms ease, color 140ms ease;
+}
+.set-go:hover:not(:disabled) { background: var(--canopy); color: #fff; }
+.set-go:disabled { opacity: .45; cursor: default; }
+.set-go:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.set-go.wide { width: 100%; }
+.set-go.kill { width: 100%; border-color: var(--path); color: var(--path); }
+.set-go.kill:hover { background: var(--path); color: #fff; }
+
+.set-chars { display: flex; gap: 10px; }
+/* The tiles are the gate's own, so the question looks the same wherever it is
+   asked - but there it is the only thing on a card and here it is one row of
+   six, so it loses the gate's margins and nothing else. */
+.set-chars .gate-char { margin: 0; }
+
 .confirm {
   width: min(400px, 100%);
   background: var(--surface); border: 3px solid var(--canopy);

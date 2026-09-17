@@ -4095,7 +4095,8 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
    form accept and reject the same strings - not that they are written the same
    way, because one is Postgres and one is JavaScript. */
 {
-  const { nameProblem, NAME_MIN, NAME_MAX } = await import("../src/game/name.js");
+  const { nameProblem, NAME_MIN, NAME_MAX, ageProblem, ageOn, MIN_AGE } =
+    await import("../src/game/name.js");
 
   const good = ["Ash", "Daniel", "red_fox", "Blue-2", "a b c", "x".repeat(NAME_MAX)];
   for (const v of good) {
@@ -4126,8 +4127,38 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
     `SQL allows names from ${shape[2]} characters, the form from ${NAME_MIN}`);
   assert.equal(Number(shape[3]), NAME_MAX,
     `SQL allows names up to ${shape[3]} characters, the form up to ${NAME_MAX}`);
+  /* THE AGE GATE IS A BOUNDARY, so the test is the day either side of it
+     rather than a date that is obviously too young. `ageOn` counts on the
+     calendar because dividing milliseconds by 365.25 is wrong for anybody born
+     on a leap day and a day out for plenty of others - and "are you 13" is not
+     a question to answer with an off-by-one. */
+  const at = new Date("2026-09-17T12:00:00");
+  const day = (y, m, d) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+  assert.equal(ageProblem(day(2026 - MIN_AGE, 9, 17), at), null,
+    `somebody turning ${MIN_AGE} today is refused`);
+  assert.ok(ageProblem(day(2026 - MIN_AGE, 9, 18), at),
+    `somebody who turns ${MIN_AGE} tomorrow is let in`);
+  assert.ok(ageProblem("", at), "a blank date passes the gate");
+  assert.ok(ageProblem(day(2030, 1, 1), at), "a date in the future passes the gate");
+  assert.ok(ageProblem(day(1850, 1, 1), at), "an impossible year passes the gate");
+
+  // A leap-day birthday counts the same as every other one.
+  assert.equal(ageOn("2012-02-29", new Date("2026-02-28T12:00:00")), 13, "leap day, day before");
+  assert.equal(ageOn("2012-02-29", new Date("2026-03-01T12:00:00")), 14, "leap day, day after");
+
+  /* AND THE TABLE HOLDS ITS OWN BOUNDS, for the reason the name shape does:
+     the form can be bypassed with the public key and the table cannot. It
+     deliberately does NOT hold the age - `current_date` in a CHECK is
+     evaluated at write time, so the constraint would mean something different
+     every day and a restore could fail on rows that were always valid. */
+  assert.ok(/birthdate_sane/.test(doc), "the birthdate has no bounds in the SQL");
+  assert.ok(!/birthdate[^;]*current_date/.test(doc),
+    "the birthdate CHECK uses current_date - it means something different tomorrow");
+
   console.log(`name rules ok — ${good.length} accepted, ${bad.length} refused, ` +
     `${NAME_MIN}-${NAME_MAX} matching the SQL constraint`);
+  console.log(`age gate ok — ${MIN_AGE} exactly, counted on the calendar, bounded in SQL`);
 }
 
 /* THE TYPED CONFIRMATION MUST GATE THE KEYBOARD TOO. `Confirm` fires
@@ -4147,13 +4178,24 @@ console.log(`origin gate ok — locked: ${TIERS.filter((t) => t !== "origin")
   assert.ok(/disabled=\{!armed\}/.test(yes),
     "the confirm button is not disabled until the word is typed");
 
-  /* AND THE ONE CALLER THAT USES IT IS THE ONE THAT SHOULD. Account deletion
-     is the only action in the game that destroys something no amount of play
-     can get back; if a second caller appears, it wants thinking about. */
-  const panel = readFileSync(new URL("../src/ui/Trainer.jsx", import.meta.url), "utf8");
-  assert.ok(/typeToConfirm=\{account\.name\}/.test(panel),
+  /* AND THERE IS EXACTLY ONE CALLER. Account deletion is the only action in
+     the game that destroys something no amount of play can get back; if a
+     second one appears, it wants thinking about rather than copying.
+
+     COUNTED ACROSS THE WHOLE UI, not asserted against a named file - the first
+     version read Trainer.jsx, and when the account controls moved to their own
+     settings dialog the assertion failed for the one reason that is not a bug.
+     A test that has to be edited every time a component moves is a test that
+     gets edited without being read. */
+  const ui = readdirSync(new URL("../src/ui/", import.meta.url))
+    .filter((f) => f.endsWith(".jsx"))
+    .map((f) => [f, readFileSync(new URL(`../src/ui/${f}`, import.meta.url), "utf8")]);
+  const asks = ui.filter(([, body]) => /typeToConfirm=\{/.test(body));
+  assert.equal(asks.length, 1,
+    `${asks.length} dialogs ask for a typed confirmation (${asks.map(([f]) => f).join(", ")}) - there should be one, for deleting an account`);
+  assert.ok(/typeToConfirm=\{account\.name\}/.test(asks[0][1]),
     "deleting an account no longer asks for the name to be typed");
-  console.log("typed confirm ok — the word gates the button AND the Enter key");
+  console.log(`typed confirm ok — the word gates the button AND the Enter key, in ${asks[0][0]}`);
 }
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);

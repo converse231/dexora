@@ -153,6 +153,86 @@ drop trigger if exists saves_sync_summary on public.saves;
 create trigger saves_sync_summary
   after insert or update on public.saves
   for each row execute function public.sync_profile_summary();
+
+-- ONE SESSION OWNS THE SAVE, AND THE NEWEST ONE TAKES IT. Two tabs, or a phone
+-- and a laptop, each ran their own engine and each uploaded the whole save
+-- every few seconds: last writer won, continuously, and an afternoon could be
+-- erased by a tab somebody forgot was open. Two divergent collections cannot be
+-- merged, so the rule is that one session is the writer and the others are told.
+alter table public.saves add column if not exists session text;
+
+-- THE INSERT AND THE CLAIM CHECK HAVE TO BE ONE STATEMENT. Read-then-write from
+-- a browser races with itself: two devices can both read "nobody owns this" and
+-- both go ahead. ON CONFLICT ... WHERE makes the guard part of the write, so the
+-- loser gets zero rows and no error, and finds out from the `false`.
+-- SECURITY INVOKER deliberately: RLS applies exactly as it does to a direct
+-- upsert. This buys atomicity, not privilege.
+create or replace function public.save_game(payload jsonb, sess text)
+returns boolean
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare n int;
+begin
+  insert into public.saves as s (user_id, data, session)
+       values (auth.uid(), payload, sess)
+  on conflict (user_id) do update
+        set data = excluded.data
+      where s.session is null or s.session = excluded.session;
+  get diagnostics n = row_count;
+  return n > 0;
+end;
+$$;
+
+revoke all on function public.save_game(jsonb, text) from public, anon;
+grant execute on function public.save_game(jsonb, text) to authenticated;
+
+-- THE SERVER STAMPS THE TIME. `updated_at` used to be sent by the browser, so a
+-- device with a wrong clock wrote a wrong time and a determined one could write
+-- any time at all - and `played_at` on the profile is a copy of it.
+create or replace function public.stamp_saved_at()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists saves_stamp on public.saves;
+create trigger saves_stamp before insert or update on public.saves
+  for each row execute function public.stamp_saved_at();
+
+-- A NAME IS WHAT IT LOOKS LIKE. The unique index is on lower(username) and the
+-- shape check allows spaces, so " Ash" and "Ash" are two rows that draw
+-- identically. The form trims; anyone can post around the form with the public
+-- key, so the table has to be the rule.
+alter table public.profiles drop constraint if exists username_trimmed;
+alter table public.profiles add constraint username_trimmed
+  check (username = btrim(username));
+
+-- WHO THE PLAYER IS, kept to the two fields that are hard to add later.
+-- `birthdate` is the age gate: a game drawn from Pokémon with open sign-ups
+-- will be found by children, and the rules that attach to a child's account are
+-- triggered by the age whether or not anybody asked. It pays for itself as a
+-- birthday bonus. `terms_at` answers "did they agree, and when".
+-- Deliberately NOT here: a real name, a gender, a phone number, a separate
+-- display name - each is a thing to store, protect and eventually delete, and
+-- none of them changes what the game can do.
+alter table public.profiles
+  add column if not exists birthdate date,
+  add column if not exists terms_at  timestamptz;
+
+-- Immutable bounds only. `current_date` in a CHECK is evaluated at write time,
+-- so the constraint would mean something different every day and a restore
+-- could fail on rows that were always valid. The age itself is checked by the
+-- form; see MIN_AGE in src/game/name.js.
+alter table public.profiles drop constraint if exists birthdate_sane;
+alter table public.profiles add constraint birthdate_sane
+  check (birthdate is null or birthdate between date '1900-01-01' and date '2200-01-01');
 ```
 
 </details>
@@ -183,6 +263,67 @@ launch and simply be unable to register. So either:
 
 While you are in there, **Authentication → URL Configuration → Site URL** should
 be wherever the game is actually hosted.
+
+## 4b. Password reset — **you have to do this one too**
+
+Until this is configured, **a forgotten password is an account nobody can ever
+get back into**, and the dex with it. The game has the whole flow built; what it
+needs from you is a way to send mail.
+
+**Why the built-in sender will not do.** Supabase's own mailer is capped at a
+handful of messages per hour *for the whole project* and is explicitly not for
+production — the same cap that blocked sign-ups in step 4. One player forgetting
+a password would spend it.
+
+**1. Get an SMTP sender.** Any of these has a free tier big enough for this and
+takes about ten minutes: [Resend](https://resend.com),
+[Brevo](https://brevo.com), [Postmark](https://postmarkapp.com),
+[Mailgun](https://mailgun.com). You will need a domain you control — they all
+make you verify it by adding DNS records, because that is what stops the mail
+going to spam. Two records matter:
+
+| record | what it does |
+|---|---|
+| SPF | says which servers may send as your domain |
+| DKIM | signs each message so the recipient can check it was really you |
+
+**2. Put it in Supabase.** *Authentication → Emails → SMTP Settings* → **Enable
+Custom SMTP**, then host, port (587), username, password, and a sender address
+**at the domain you just verified**. Sending as a Gmail address you do not own
+is the single commonest reason reset mail silently disappears.
+
+**3. Allow the game's address back.** *Authentication → URL Configuration*:
+
+- **Site URL** — the production origin, e.g. `https://dexora-self.vercel.app`.
+  This is where a link goes when nothing else matches, so a Site URL still
+  pointing at `localhost` sends every real player's reset link to their own
+  machine, where nothing is running.
+- **Redirect URLs** — add the production origin *and* `http://localhost:5199`
+  for development. The game asks to come back to `window.location.origin`, and
+  an origin that is not on this list is ignored in favour of the Site URL.
+
+**4. Check the template.** *Authentication → Emails → Reset Password*. The
+default is fine; the link expires in an hour and works once.
+
+**5. Test it.** Log out, **I have forgotten my password**, enter your address.
+You should get mail within a minute; the link opens the game on *Choose a new
+password* and drops you straight into your save.
+
+Two things worth knowing about how this is wired:
+
+- **The link works in any browser**, including a phone's mail app on a different
+  device from the one that asked. That is why the client uses GoTrue's implicit
+  flow rather than PKCE — PKCE keeps a verifier in the localStorage of the
+  browser that made the request, and opening the link anywhere else fails with
+  nothing useful to say.
+- **The form always says "check your email"**, whether or not that address has
+  an account. Answering honestly would turn it into a way to ask which
+  addresses are registered here.
+
+**Changing an email address is deliberately not built.** It is a two-message
+confirmation — the old address approves, the new one verifies — and half-built
+it leaves accounts pointing at inboxes nobody owns. The email is also the only
+handle on an account if the password goes.
 
 ## 5. Run it
 

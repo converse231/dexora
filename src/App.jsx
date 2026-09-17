@@ -9,6 +9,7 @@ import { RAIL_KEY, read, write } from "./game/store.js";
 import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
+import Settings from "./ui/Settings.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import {
@@ -81,6 +82,7 @@ export default function App({
      slip away from the stat buttons. The dialog also carries the one fact worth
      knowing before leaving: whether everything reached the server. */
   const [leaving, setLeaving] = useState(false);
+  const [settings, setSettings] = useState(false);
   /* "See in Box" crosses two components that do not know each other: the sheet
      lives here and the tab lives in the Rail. A species id parked here is the
      smallest thing that can travel between them, and the Rail clears it once it
@@ -278,6 +280,34 @@ export default function App({
         />
       )}
 
+      {/* THIS ONE IS NOT A WARNING, IT IS THE END OF THE SESSION - so it is a
+          dialog rather than a line in the top bar. The account is being played
+          somewhere else and has taken the save with it; the engine has already
+          stopped writing, locally as well as upward, because an abandoned tab
+          that keeps writing overwrites the copy the live one is keeping. There
+          is exactly one useful action and this offers only that. */}
+      {st?.stale === "taken" && (
+        <Confirm
+          title="You are playing somewhere else"
+          tone="warn"
+          lines={[
+            ["Trainer", trainerName ?? "—"],
+            ["This tab", "no longer saving"],
+          ]}
+          note="Your game was opened on another device or in another tab, and that one now owns the save. Nothing here is being kept. Reload to pick up where that session is."
+          confirmLabel="RELOAD"
+          onCancel={() => location.reload()}
+          onConfirm={() => location.reload()}
+        />
+      )}
+
+      {settings && account && (
+        <Settings
+          account={{ ...account, caught }}
+          onClose={() => setSettings(false)}
+        />
+      )}
+
       {cheer && <Cheer cheer={cheer} onDone={() => engine.dropCheer()} />}
 
       {/* A TIP, NOT A TUTORIAL - one line, the first time you reach the thing
@@ -311,6 +341,7 @@ export default function App({
            nothing to log out of. */
         onReset={onLogOut ? null : () => engine?.reset()}
         onLogOut={onLogOut ? () => setLeaving(true) : null}
+        onSettings={account ? () => setSettings(true) : null}
         trainerName={trainerName}
       />
 
@@ -496,10 +527,6 @@ export default function App({
           onJumped={() => setBoxJump(null)}
           onSpend={(id) => engine.spend(id)}
           onBike={() => engine.toggleBike()}
-          /* The account block on the YOU panel, or null in local mode where
-             there is nothing to rename and nothing to delete. `caught` comes
-             from here rather than being counted twice inside the panel. */
-          account={account && { ...account, caught }}
           /* The three save-file calls, handed over as one object so the panel
              does not need the engine itself. */
           save={engine && {

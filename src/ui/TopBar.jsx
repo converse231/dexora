@@ -82,7 +82,7 @@ function Missions({ daily, onClaim, note }) {
 
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
-  onLogOut = null, trainerName = null,
+  onLogOut = null, onSettings = null, trainerName = null,
   stale = null,
   daily, onClaimDaily, claimNote,
 }) {
@@ -90,14 +90,14 @@ export default function TopBar({
 
   return (
     <div className="topbar">
-      {/* Just the name. There was a PHASE 1 chip here, hard-coded, and it was
-          still saying PHASE 1 through two phases of work - a label that can
-          only ever be right by coincidence. The roadmap lives in README.md. */}
+      {/* YOUR NAME, NOT THE GAME'S. The bar carried "Dexora" with the trainer
+          name in a small chip beside it, which is the wrong way round: the
+          title is the same on every screen for every player and is already on
+          the tab, the login card and the loading screen, while the name is the
+          one thing here that says whose game this is. Local mode has no
+          account and therefore no name, so it keeps the title. */}
       <div className="tb-brand">
-        <span className="title">Dexora</span>
-        {/* Who you are, where you can always see it. Only with an account -
-            in local mode there is no name to have. */}
-        {trainerName && <span className="tb-who">{trainerName}</span>}
+        <span className="title">{trainerName ?? "Dexora"}</span>
       </div>
 
       <div
@@ -168,7 +168,12 @@ export default function TopBar({
           but it used to do it in silence, so an hour of catching could go
           nowhere with nothing on screen to say it had. `role="alert"` because
           it appears mid-session rather than on load: it has to interrupt. */}
-      {stale && (
+      {/* "taken" is deliberately absent here: it is not a degree of this, it
+          is the end of the session, and App raises a dialog for it. Left to
+          fall through the ternary below it would have claimed the browser was
+          blocking storage, which is a different problem with a different and
+          useless remedy. */}
+      {stale && stale !== "taken" && (
         <p className="tb-stale" role="alert">
           <b>{stale === "offline" ? "NOT SYNCED" : "NOT SAVING"}</b>
           {stale === "offline"
@@ -177,6 +182,20 @@ export default function TopBar({
               ? " — this browser's storage is full. Sell some spares, or export from the YOU tab."
               : " — this browser is blocking storage. Export from the YOU tab to keep this game."}
         </p>
+      )}
+
+      {/* Settings sits beside the way out, because those are the two things
+          here that are about the ACCOUNT rather than about the game. Icon-only,
+          so it needs a worded label of its own - `data-tip` is not one. */}
+      {onSettings && (
+        <button
+          className="tb-set"
+          onClick={onSettings}
+          aria-label="Settings"
+          data-tip="Name, trainer, password"
+        >
+          <span aria-hidden="true">⚙</span>
+        </button>
       )}
 
       {/* One or the other, never both - see App. */}
