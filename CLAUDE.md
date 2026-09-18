@@ -816,6 +816,16 @@ puts the rod's overhang where it belongs with no per-set nudge.
 **The jump is one mid-air pose per facing, not a cycle**, so the arc and the
 shadow on the ground are the renderer's job — `drawPlayer`'s `lift`.
 
+**GETTING ON AND OFF IS A HOP, and the ORDER of the sprite sets is what makes
+it draw.** Mounting was an instant slide onto the water - reported as wanting
+the jump before and after rather than a teleport. `move.hop` is the LEDGE hop
+and moves two tiles, so the mount and the dismount get `move.leap`: one tile,
+purely how it looks. Both draw the mid-air pose on an arc.
+
+The trap is that during a mount the player's coordinates are ALREADY the water
+tile - that is what `surfing()` reads - so with the ride first in the ternary
+the jump never drew at all. **Airborne first, then the ride.**
+
 **SURFING IS NOT A FLAG, IT IS WHERE YOU ARE STANDING.** The obvious shape is
 `state.surfing`, saved and toggled, and it is the wrong one: a boolean and a
 position can disagree, and every way they can is a bug with nothing under it —
@@ -1012,6 +1022,26 @@ the approach, leaving a span you could walk onto and never leave — nothing was
 disconnected by it, so `spans_clear()` is what catches that, alongside
 `ladders_clear()`, whenever a pool is placed.
 - spawn not inside a wall; ≥200 walkable tiles; ≥90% reachable (directed)
+- **the outer ring is solid, on every map**
+
+**AND THAT LAST ONE IS NEW, BECAUSE FROST HOLLOW HAD SEVENTEEN.** A walkable
+tile on the boundary is a wall you can stand in: nothing beyond it stops you,
+the autotile draws its edge facing out of the world, and the camera clamps
+against a tile the player is on. Reported from play as walkable walls.
+
+Every other map was sealed BY CONSTRUCTION - a border ring is the first thing
+each generator draws - which is exactly why nobody wrote the rule down. Frost
+Hollow is the one map that is COMPOSED: four Seafoam floors laid in a square,
+each with its own solid border that is interior to the composition rather than
+the edge of it. The frame was nobody's job.
+
+Sealing it had to clear the fixed id as well. A frost cell keeps the real map's
+metatile unless we authored it, so turning the character to `I` and leaving
+Seafoam's shelf art behind would have drawn a floor you cannot walk on - the
+same bug pointing the other way. And sealing orphaned one tile, so the fill
+runs a flood from the spawn afterwards and closes anything it cut off: a pocket
+you can see and never reach is the thing this file complains about three times
+over Deep Woods.
 
 [tools/check.mjs](tools/check.mjs) adds thirty-two suites — catch rules, phase
 machine, balls, master balls, economy, evolution, evolution scene, trainer
@@ -2436,6 +2466,13 @@ failure is a trainer who never stops walking. The three plain handlers
 puts a d-pad on a narrow desktop window, where it is useless, and hides it on a
 landscape tablet, where it is the only control there is.
 
+**CHECK `KEYS` BEFORE CLAIMING A LETTER.** Surf shipped on **S** for exactly
+one commit, and S is WASD's DOWN. The surf handler runs before the `KEYS`
+lookup in the same function, so it ate the key and walking south stopped
+working - reported immediately. The table is eight lines above the handler. It
+is **C** now. This is the cheapest possible class of bug and the most
+embarrassing: nothing measured it, nothing could, and the answer was on screen.
+
 **And tools/play asserts every `engine.x()` the pad calls exists**, against a
 LIVE engine. Nothing else can see it: the pad renders only on a coarse pointer,
 so a mistyped method is invisible on every machine this is developed on and is a
@@ -2487,6 +2524,17 @@ that plainly exists is not applying, measure the computed value before editing
 the declaration.**
 
 ## One tooltip, and it is an attribute
+
+**A PROMPT IS A BUTTON, AND IT SHOULD LOOK LIKE THIS APP'S BUTTONS.** The two
+shoreline prompts - cast a rod, ride out - were pale pink pills with a `--path`
+border, no depth, no focus ring and no icon. Nothing else in the game looks
+like that, and side by side the two were indistinguishable at a glance: both
+said a few words in the same colour. They are built out of `.ts-btn` and the
+top bar now - the pixel face, the 2px border, the `0 2px 0` lip everything here
+has, hover that FILLS rather than brightens, gold focus ring, and a press that
+drops by exactly the lip. The ICON is what tells them apart, because "Super
+Rod" and "Surf" are both just words until you have read them. Lava tints to
+`--path`: same object, one token different.
 
 **`data-tip="..."`, never `title="..."`.** `Tip.jsx` renders ONE element at the
 app root and a single set of listeners fills it from whatever is hovered or
@@ -2808,6 +2856,15 @@ inherits downwards - set one level too low and every area silently drew the
 default daylight. check.mjs asserts both halves exist for every area in `AREAS`,
 because neither fails loudly on its own, and `--ground` is built against
 `document.baseURI` for the same reason `spriteUrl()` is.
+
+**`tiles` IS ALREADY REBASED, and `render_area.mjs` added the base again.**
+`tileBase` records the base that WAS added when the map was generated; it is
+not a base to add when drawing. Adding it shifted every id by 896 and drew
+Frost Hollow in the volcano's tileset - orange and green stripes, unmistakably
+wrong, and for a few minutes it read as the map being broken rather than the
+harness. The engine passes `fixed[i]` straight through; anything claiming to
+draw what the game draws has to do exactly that. **A harness that differs from
+the engine by one line is a second copy of the tile rules.**
 
 **Rendering a map to look at it** — no browser needed, and no temporary
 viewport edits to forget to revert. Drive the real `drawTile()` from Node with a

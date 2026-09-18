@@ -1655,18 +1655,54 @@ canvas {
 .tk-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .tk-name { font-family: var(--display); font-weight: 600; font-size: 15px; }
 .tk-blurb { font-size: 11.5px; color: var(--ink-soft); line-height: 1.4; }
-/* A hint that turns into a real button when there is something to press. */
-.hint-act {
-  font: inherit; color: var(--ink); cursor: pointer;
-  border: 2px solid var(--path); border-radius: 9px;
-  background: var(--path-soft); padding: 5px 14px 4px;
+/* WHAT YOU CAN DO FROM THIS TILE. Two of these can be offered at once - a
+   shoreline takes both a rod and a ride - so they are a row rather than two
+   things that happen to stack, and the row wraps before either one shrinks. */
+.hint-row {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 8px; margin-top: 10px;
 }
-.hint-act:hover { filter: brightness(1.03); }
-.hint-act b { color: var(--path); }
-.hint kbd {
-  font: inherit; padding: 1px 5px; margin: 0 1px;
-  border: 1px solid var(--line-firm); border-radius: 4px;
-  background: var(--surface); color: var(--ink-soft);
+
+/* BUILT OUT OF THE APP'S BUTTON, NOT A SHAPE OF ITS OWN. These were pale pink
+   pills with a `--path` border and no depth, no focus ring and no icon -
+   nothing else in the game looks like that, and the two of them side by side
+   were indistinguishable at a glance. Everything here is borrowed from
+   `.ts-btn` and the top bar: the pixel face, the 2px border, the `0 2px 0`
+   lip, hover that fills rather than brightens, and the gold focus ring. */
+.hint-act {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 12px 6px; cursor: pointer;
+  font-family: var(--pixel); font-size: 10.5px; letter-spacing: .04em;
+  color: var(--canopy); background: var(--surface);
+  border: 2px solid var(--canopy); border-radius: 10px;
+  box-shadow: 0 2px 0 var(--line-firm);
+  transition: background 140ms ease, color 140ms ease,
+              transform 90ms ease, box-shadow 90ms ease;
+}
+.hint-act img {
+  width: 22px; height: 22px; image-rendering: pixelated; flex: none;
+}
+.hint-act b { font-weight: 400; color: var(--ink); }
+.hint-act kbd {
+  font-family: var(--pixel); font-size: 9px; line-height: 1;
+  padding: 5px 5px 4px; min-width: 9px; text-align: center;
+  border: 2px solid var(--line-firm); border-radius: 6px;
+  background: var(--surface-2); color: var(--ink);
+}
+.hint-act:hover { background: var(--canopy); color: #fff; }
+.hint-act:hover b { color: #fff; }
+/* It PRESSES. The lip is what makes that readable - drop it and move down by
+   exactly the same amount, so the button meets the surface. */
+.hint-act:active { transform: translateY(2px); box-shadow: 0 0 0 var(--line-firm); }
+.hint-act:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* LAVA IS NOT WATER, and the one place that matters is the button offering to
+   ride it. Same object, one token different. */
+.hint-act.hot { color: var(--path); border-color: var(--path); }
+.hint-act.hot:hover { background: var(--path); color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hint-act { transition: none; }
 }
 
 .panel-head {

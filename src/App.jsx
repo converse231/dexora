@@ -159,10 +159,17 @@ export default function App({
         return;
       }
 
-      /* And S rides out onto it. Its own key rather than a second meaning for
-         F, because at a shoreline BOTH are offered and one key that did either
-         depending on what you hold is the kind of control you cannot trust. */
-      if (ev.key === "s" || ev.key === "S") {
+      /* C RIDES OUT ONTO IT, and it was S for exactly one commit - which is
+         WASD's DOWN. This handler runs before the `KEYS` lookup, so it ate the
+         key and walking south simply stopped working. Reported immediately,
+         and it should never have been written: this file's own `KEYS` table is
+         eight lines above.
+
+         Its own key rather than a second meaning for F, because at a shoreline
+         BOTH are offered, and one key that did either depending on what you
+         are carrying is a control you cannot trust. **Check `KEYS` before
+         claiming a letter.** */
+      if (ev.key === "c" || ev.key === "C") {
         ev.preventDefault();
         e.surf();
         return;
@@ -532,19 +539,39 @@ export default function App({
             )}
           </div>
 
-          {rod ? (
-            /* A button, not a caption: the keyboard has F but a touch player
-               had no way to cast at all. */
-            <button className="hint hint-act" onClick={() => engine.fish()}>
-              <b>{rod.name}</b> ready — <kbd>F</kbd> to cast
-            </button>
-          ) : null}
+          {/* WHAT YOU CAN DO FROM WHERE YOU ARE STANDING, as buttons rather
+              than captions: the keyboard has F and C, and a touch player had
+              no other way to reach either.
 
-          {ride ? (
-            <button className="hint hint-act" onClick={() => engine.surf()}>
-              <b>Surf</b> the {ride === "V" ? "lava" : "water"} — <kbd>S</kbd> to ride
-            </button>
-          ) : null}
+              They are built out of the app's own button, not a shape of their
+              own - `--pixel`, a 2px border, the `0 2px 0` lip everything else
+              here has, hover fills, gold focus ring. They were two identical
+              pink pills before, which said nothing about which was which and
+              matched nothing else on screen. The ICON is what tells them
+              apart now, because "Super Rod" and "Surf" are both just words
+              until you have read them. */}
+          {(rod || ride) && (
+            <div className="hint-row">
+              {rod ? (
+                <button className="hint-act" onClick={() => engine.fish()}
+                        data-tip={`Cast the ${rod.name} into the water`}>
+                  <img src={`items/${rod.id}.png`} alt="" />
+                  <span><b>{rod.name}</b> ready</span>
+                  <kbd>F</kbd>
+                </button>
+              ) : null}
+
+              {ride ? (
+                <button className={`hint-act${ride === "V" ? " hot" : ""}`}
+                        onClick={() => engine.surf()}
+                        data-tip={`Ride out onto the ${ride === "V" ? "lava" : "water"}`}>
+                  <img src="items/surf.png" alt="" />
+                  <span>Surf the <b>{ride === "V" ? "lava" : "water"}</b></span>
+                  <kbd>C</kbd>
+                </button>
+              ) : null}
+            </div>
+          )}
 
           {/* Touch only - see `.pad` in styles.css. It drives the same engine
               calls the keyboard does and adds no action of its own. */}
