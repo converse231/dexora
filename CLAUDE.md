@@ -164,6 +164,34 @@ trainer screen up, and the renderer falls back to Red for the frames in between.
 The question lives in the gate and NOT on the YOU panel: the handhelds ask it
 before you have a save, and asked in a menu it is a costume change.
 
+**AN ASSERTION THAT PINS A NUMBER CAN LOCK THE BUG IN.** `.gate-art` draws the
+trainer for the account gate and the settings picker by scaling the whole
+`player.png` strip and windowing one frame out of it, so `background-size` has
+to be the strip's real size. check.mjs asserted it was `256px * var(--z)`,
+under a note reading *"the sheet is square and the one number the rule may not
+get wrong is 256"* - and the day the surf set was cut from the rip the strip
+became **320x256**. The assertion went on passing, because it was checking that
+the CSS SAYS 256 rather than that 256 is right.
+
+A background scaled to 256 draws the strip at 0.8x, so the 16px window showed a
+squashed stand plus four pixels of the next walk frame. Reported as clipped
+sprites, and nothing in the suite could have said so. It is asserted against the
+PNG's own header now - two copies of one number checked against each other, the
+same shape as `tileBase` against `route.json`. **A literal in an assertion is
+not a rule, and this is the version of that lesson where the literal was right
+when it was written.**
+
+The window itself is correct and was never the problem: 16x19 at an offset of
+-13 rows, because the stand frame's content is measurably rows 13..32 of its
+32-row cell. Frame 0 of the walk set IS the idle pose - the set is
+stand / step / step - so the picker already draws a standing trainer rather
+than a walk frame held still.
+
+**AND `overflow: hidden` PLUS A NUDGE IS HOW A SPRITE GETS CLIPPED.** The new
+header avatar had both for one commit - a `-4px` margin inside a clipping box -
+which is the same class of fault wearing different clothes. The box is sized to
+hold the art; there is nothing to hide and nothing to pull.
+
 **SETTINGS IS A DIALOG OFF THE TOP BAR, NOT A PANEL.** Name, trainer, date of
 birth, password and delete-account were on the YOU panel, and that was the wrong
 room twice: YOU is what a trainer has EARNED - points, ranks, key items - and it
@@ -201,6 +229,31 @@ localStorage of the browser that asked, and people open mail on their phone.
 when the save WAS the account. With one it is a button that destroys a synced
 collection and calls it a preference. Reset survives only in local mode, where
 there is nothing to log out of.
+
+**AND THE DIALOG SAYS WHOSE ACCOUNT IT IS.** The header was the word "Settings"
+beside an email address - true, and it could have been anyone's. The trainer is
+the subject of every row below it and the game already has a picture of them,
+so it opens on the sprite, the name, and the address underneath in grey. It
+also gives the trainer picker somewhere for its result to land.
+
+Three more things went with it, all of them the app's own vocabulary rather
+than shapes invented for this one screen. **Fields are the paper colour**: they
+were filled with `--surface-2`, the same pale green as the panels behind them,
+so a row of inputs read as tinted blocks rather than as somewhere to type.
+**Buttons have the lip** - the `0 2px 0` and a press that drops by exactly that
+much, which is what makes the shoreline prompts and the save panel read as
+pressable. **The trainer tiles are pickable tiles**: the old note said "no
+caption: at this size the red cap and the white hat are the label", which was
+an argument about the size, and the size was the problem. Whole sprite at 3x,
+the word underneath, and a selected state that rings rather than only tints.
+
+**THE PASSWORD ROW IS A GRID, NOT A WRAP.** Three boxes and a button in a
+wrapping flex row came out as "Current | New" then "Repeat | CHANGE" - a ragged
+two-and-two that made the third field look like it belonged to the button. Two
+columns with the button full width beneath them, so the three fields read as
+one set. Below 360px the label column collapses and the card is 300px wide with
+no horizontal overflow; measured at 400 and 340 rather than assumed, because
+`width: min(430px, 100%)` being obviously correct is not the same as checking.
 
 **THE CORNER HELD THREE BUTTONS AND FITS ONE.** Settings, log out and how-to-play
 were separate keys in the top right; on a phone the row wrapped and the gear
