@@ -47,14 +47,20 @@ const ctx = {
 
 for (let y = 0; y < H; y++) {
   for (let x = 0; x < W; x++) {
-    const fixed = area.tiles ? area.tiles[y * W + x] : -1;
+    /* `tiles` IS ALREADY REBASED - `tileBase` records the base that was added
+       when the map was generated, it is not a base to add now. Adding it again
+       shifted every id by 896 and drew Frost Hollow in the volcano's tileset,
+       orange stripes and all. The engine passes `fixed[i]` straight through
+       (see engine.js), and this has to do exactly what the engine does or it
+       is a second copy of the tile rules - which is the one thing this harness
+       exists not to be. */
     drawTile(ctx, atlas, at(x, y), x * TILE, y * TILE, x, y, at,
-             fixed >= 0 ? fixed + (area.tileBase ?? 0) : -1);
+             area.tiles ? area.tiles[y * W + x] : -1);
   }
 }
 /* The top-layer pass - what a trainer walks behind. Without it a canopy edge
    is missing from the picture and the render is not what the game shows. */
 try { drawOverhangs(ctx, atlas, 0, 0, W, H, 0, 0, at); } catch { /* not every map has one */ }
 
-writeFileSync(out, JSON.stringify({ id, W, H, tile: TILE, size: s, cols, draws }));
+writeFileSync(out, JSON.stringify({ id, W, H, tile: TILE, size: s, cols, draws, rows }));
 console.log(`${id}: ${W}x${H}, ${draws.length} draws -> ${out}`);

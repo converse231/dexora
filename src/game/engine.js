@@ -557,7 +557,11 @@ export function createEngine(canvas, onChange, mini = null) {
   const held = new Set();
   const move = {
     active: false, fromX: state.player.x, fromY: state.player.y,
-    startedAt: 0, ms: STEP_MS, hop: false,
+    /* `hop` is the LEDGE hop and moves two tiles; `leap` is one tile and is
+       purely how it looks - getting onto the water and back off it. Both draw
+       the jump pose on an arc, and keeping them separate is what stops a
+       mount from also vaulting a tile into the lake. */
+    startedAt: 0, ms: STEP_MS, hop: false, leap: false,
   };
   let art = { atlas: null, player: null };
   let walkFrame = 0;
@@ -649,6 +653,10 @@ export function createEngine(canvas, onChange, mini = null) {
     // A hop covers two tiles, so give it longer or it reads as a teleport.
     move.ms = stepMs() * (hop ? 1.7 : 1);
     move.hop = hop;
+    /* STEPPING ASHORE IS A HOP, because it is one in every game that has ever
+       drawn it and because the alternative reads as sliding out of the water
+       onto dry land. Only at the boundary: crossing open water is paddling. */
+    move.leap = riding && !rideable(rows, nx, ny);
     p.x = nx;
     p.y = ny;
   }
@@ -1035,6 +1043,12 @@ export function createEngine(canvas, onChange, mini = null) {
     move.startedAt = performance.now();
     move.ms = stepMs() * 1.4;      // pushing off is slower than a pace
     move.hop = false;
+    /* AND GETTING ON IS A HOP TOO. It was an instant slide onto the water -
+       reported as needing the jump before and after rather than a teleport,
+       which is right: you are stepping off a bank onto something that floats,
+       and the sprite sheet has the pose for it. */
+    move.leap = true;
+    move.leap = false;
     p.x = fx;
     p.y = fy;
     changed();
@@ -1384,21 +1398,27 @@ export function createEngine(canvas, onChange, mini = null) {
        the renderer still puts it on an arc and leaves the shadow behind.
        Running is its own three frames; a cast is its own four, held by phase. */
     const cast = state.fishing;
-    const hopping = move.active && move.hop;
+    /* Either kind of hop draws the same way: the mid-air pose and an arc. */
+    const airborne = move.active && (move.hop || move.leap);
     drawPlayer(
       ctx, art.player, Math.round(wx - camX), Math.round(wy - camY),
       p.dir, walkFrame, move.active, t,
       {
-        /* RIDING BEATS EVERY OTHER SET, including running - the shoes do not
-           help on water, and a trainer striding across a lake would be the
-           one thing here that looks like a bug rather than a feature. Two
-           frames, so the paddle reads as a paddle. */
-        set: surfing() ? "surf"
+        /* THE HOP OUTRANKS THE RIDE, and the order is the whole fix. During a
+           mount the player's coordinates are ALREADY the water tile - that is
+           what `surfing()` reads - so with the ride first the jump never drew
+           and getting on was an instant slide. Airborne first, and both ends
+           of the ride arc properly.
+
+           Otherwise riding beats everything, including running: the shoes do
+           not help on water, and a trainer striding across a lake is the one
+           thing here that would look like a bug rather than a feature. */
+        set: airborne ? "jump"
+          : surfing() ? "surf"
           : cast ? "fish"
-          : hopping ? "jump"
           : state.running && move.active ? "run" : "walk",
         frame: cast ? fishFrame(p.dir, cast.phase) : undefined,
-        lift: hopping ? Math.sin(Math.PI * t) * 11 : 0,
+        lift: airborne ? Math.sin(Math.PI * t) * 11 : 0,
         // Which trainer. A row offset into the same strip - see drawPlayer.
         char: state.char,
       },

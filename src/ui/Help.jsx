@@ -30,7 +30,7 @@ const KEYS = [
   [["↑", "↓", "←", "→"], "Walk. WASD does the same."],
   [["SHIFT"], `Hold to run. Needs the Running Shoes, at Lv ${RUN_LEVEL}.`],
   [["F"], "Cast a rod at the water's edge."],
-  [["S"], `Ride out onto water or lava. Needs Surf, at Lv ${SURF_LEVEL}.`],
+  [["C"], `Ride out onto water or lava. Needs Surf, at Lv ${SURF_LEVEL}.`],
   [["SPACE"], "Throw the cheapest ball you are carrying."],
   [["1", "…", "9"], "Throw that ball in particular."],
   [["R"], "Run from a Pokémon. Escape does it too."],

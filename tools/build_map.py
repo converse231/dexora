@@ -797,6 +797,19 @@ def check(area, rows, spawn):
     # stand on, which reads as a bug rather than as scenery.
     tiles = [(x, y) for y in range(H) for x in range(W) if rows[y][x] not in SOLID]
     got = [t for t in tiles if t in seen]
+    # THE OUTER RING IS SOLID, ON EVERY MAP. A walkable tile on the boundary is
+    # a wall you can stand in: there is nothing beyond it to stop you, the
+    # autotile draws its edge facing out of the world, and the camera clamps
+    # against a tile the player is standing on. Frost Hollow had seventeen and
+    # nothing said so - every other map was sealed by construction, which is
+    # precisely why nobody wrote this down. Reported from play as walkable
+    # walls.
+    edge = [(x, y) for x in range(W) for y in (0, H - 1)
+            if rows[y][x] not in SOLID]
+    edge += [(x, y) for y in range(H) for x in (0, W - 1)
+             if rows[y][x] not in SOLID]
+    assert not edge,         f"{aid}: {len(edge)} walkable tiles on the boundary, e.g. {edge[:4]}"
+
     assert len(got) >= 200, f"{aid}: only {len(got)} walkable tiles"
     assert len(got) >= 0.9 * len(tiles),         f"{aid}: {len(tiles) - len(got)} of {len(tiles)} walkable tiles are cut off"
     return len(got), len(tiles)
@@ -3037,6 +3050,26 @@ def frost_hollow():
             if g[y][x] != before[y][x]:
                 tiles[y][x] = -1
 
+    # SEAL THE RING. Reported from play as walkable walls, and it was exactly
+    # that: seventeen `j` shelf tiles sat ON the outer boundary, so you could
+    # stand where the wall is with nothing beyond you. Every other map in the
+    # game is sealed; this one was not, because it is COMPOSED - four Seafoam
+    # floors laid in a square - and each floor's own solid border is interior
+    # to the composition, not the edge of it. The frame is ours to draw.
+    #
+    # The fixed id has to go with it. A cell keeps the real map's metatile
+    # unless we authored it, so turning the character to `I` and leaving the
+    # shelf art behind would have drawn a floor you cannot walk on - the same
+    # bug pointing the other way.
+    for x in range(W):
+        for y in (0, H - 1):
+            g[y][x] = "I"
+            tiles[y][x] = -1
+    for y in range(H):
+        for x in (0, W - 1):
+            g[y][x] = "I"
+            tiles[y][x] = -1
+
     # Standing in the north-west room, at the top of the cave.
     spawn = None
     for y in range(2, H - 2):
@@ -3047,6 +3080,26 @@ def frost_hollow():
         if spawn:
             break
     assert spawn, "frost: nowhere to stand"
+
+    # AND FILL WHAT THE SEAL CUT OFF. Sealing the ring left one walkable tile
+    # with no way in - a pocket you can see and never reach, which this repo
+    # complains about three times over Deep Woods. One tile is still one tile,
+    # and it is cheaper to fill it than to explain it.
+    seen, stack = set(), [spawn]
+    while stack:
+        cx, cy = stack.pop()
+        if (cx, cy) in seen or not (0 <= cx < W and 0 <= cy < H):
+            continue
+        if g[cy][cx] in SOLID:
+            continue
+        seen.add((cx, cy))
+        stack += [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] not in SOLID and (x, y) not in seen:
+                g[y][x] = "I"
+                tiles[y][x] = -1
+
     return ["".join(r) for r in g], spawn, [i for row in tiles for i in row], base
 
 
