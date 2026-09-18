@@ -1536,6 +1536,33 @@ import { canRun, RUN_LEVEL } from "../src/game/items.js";
     Object.values(player.dirs).sort((a, b) => a - b), [0, 1, 2, 3],
     "the four facings must be four distinct rows");
 
+  /* THE CSS KNOWS THE SHEET'S SIZE AND CANNOT READ IT. `.gate-art` draws the
+     trainer for the account gate and the settings picker by scaling the whole
+     strip and windowing one frame out of it, so `background-size` has to be
+     the strip's real dimensions. It said 256x256, which was true until a fifth
+     set was cut from the rip and the strip went to 320 wide - and a background
+     scaled to 256 draws everything at 0.8x, so the 16px window showed a
+     squashed stand plus four pixels of the next frame. Reported as clipped
+     sprites, and nothing failed.
+
+     Two copies of one number, so they are asserted against each other - the
+     same reason `tileBase` is checked against `route.json`. */
+  {
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    const at = css.indexOf(".gate-art {");
+    assert.ok(at >= 0, ".gate-art is gone - the trainer picker draws nothing");
+    const rule = css.slice(at, css.indexOf("}", at));
+    /* `[^)]*` stopped at the inner `var(--z)` paren and never reached the
+       second calc. Non-greedy across the lot instead. */
+    const size = rule.match(/background-size:\s*calc\((\d+)px[\s\S]*?calc\((\d+)px/);
+    assert.ok(size, ".gate-art's background-size is not two calc()s of the sheet");
+    assert.equal(Number(size[1]), pngW,
+      `.gate-art scales the strip to ${size[1]}px wide and it is ${pngW}px - ` +
+      "every frame is drawn at the wrong scale and windows onto the next one");
+    assert.equal(Number(size[2]), pngH,
+      `.gate-art scales the strip to ${size[2]}px tall and it is ${pngH}px`);
+  }
+
   /* WIDTH AND FRAME COUNT PER SET, measured off the rip's own backing
      rectangles - see build_player. Surf is two poses because it is a paddle
      and not a stride. */
@@ -4145,14 +4172,23 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   assert.ok(artHead >= 0, ".gate-art has no rule");
   const artRule = css.slice(artHead, css.indexOf("}", artHead) + 1);
 
-  /* THE SHEET IS SQUARE AND THE CROP IS READ OFF IT, so the one number the
-     rule may not get wrong is 256: every offset below is a row index into a
-     256-row sheet, and a background-size that is not 256 x --z would slide
-     every trainer by a fraction of a block. */
+  /* THE SHEET IS NOT SQUARE ANY MORE, AND THIS ASSERTION SAID IT WAS.
+
+     It read "the one number the rule may not get wrong is 256: the sheet is
+     square" and pinned `background-size: calc(256px * var(--z))` - which was
+     true of a 256x256 strip and became false the day a fifth set was cut from
+     the rip and it went to 320 wide. The assertion went on passing, because it
+     was checking that the CSS says 256 rather than that 256 is RIGHT: it
+     locked the bug in instead of catching it. The trainer picker drew every
+     frame at 0.8x with four pixels of the next one showing, and it took a bug
+     report to find.
+
+     The size is asserted against the PNG's own header in the player suite now
+     - two copies of one number checked against each other, not against a
+     memory of what the number used to be. What is left here is the part that
+     is genuinely a property of this rule. */
   assert.ok(/--z:\s*\d+/.test(artRule),
     ".gate-art has no --z, so the settings list cannot draw it at a second size");
-  assert.ok(/background-size:\s*calc\(\s*256px\s*\*\s*var\(--z\)/.test(artRule),
-    ".gate-art's background-size is not 256px * var(--z) - the offsets are row indices into that");
 
   for (let i = 1; i < names.length; i++) {
     const want = (sheet.chars[names[i]] - sheet.chars[names[i - 1]]) * sheet.rowH;

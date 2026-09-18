@@ -94,7 +94,13 @@ export default function Settings({ account, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="set-top">
-          <h3>Settings</h3>
+          {/* The trainer you are playing, which is what every row below is
+              about - and it updates the moment the picker is used, so the
+              choice has somewhere to land. */}
+          <span className="set-face">
+            <span className={`gate-art ch-${pick}`} aria-hidden="true" />
+          </span>
+          <h3>{account.name || "Settings"}</h3>
           <span className="set-mail" title={account.email}>{account.email}</span>
           <button className="set-x" onClick={onClose} aria-label="Close settings">✕</button>
         </div>
@@ -141,6 +147,7 @@ export default function Settings({ account, onClose }) {
                   onClick={() => choose(id)}
                 >
                   <span className={`gate-art ch-${id}`} aria-hidden="true" />
+                  <em>{label}</em>
                 </button>
               ))}
             </div>
