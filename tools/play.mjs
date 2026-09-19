@@ -198,6 +198,54 @@ function until(e, what, label, max = 2000) {
     `(size ${caught.size}), box ${e.state.box.length}, encounter closed`);
 }
 
+/* THE VARIANT BOUNTY IS PAID BY THE ENGINE, AND NOTHING ELSE CAN SEE IT.
+
+   `catchBounty` is pure and check.mjs pins its shape, but the money is added
+   in `settle` - so the whole feature can be correct and disconnected at once,
+   and the symptom is a number that simply never moves. Exactly the shape of
+   the size roll above: computed in one place, copied in another, silent if
+   the copy is dropped.
+
+   Driven over a REAL catch with the tier forced onto the encounter, which is
+   where the engine keeps it anyway - `e.variant` is frozen at spawn and read
+   by `settle`. A Master Ball because it cannot miss, so the test is about the
+   payment and not about the odds; and the dex slot is filled first, because
+   a NEW entry pays too and that is a different stream. Both directions,
+   because a bounty that paid on an ORDINARY catch would inflate the grind
+   and nothing would say so. */
+{
+  const { catchBounty } = await import("../src/game/items.js");
+  const { speciesById, dexIndex } = await import("../src/game/biomes.js");
+  const { e } = boot(SAVE);
+  const paid = {};
+
+  for (const tier of [null, "showdown"]) {
+    let enc = e.state.encounter ?? walkToEncounter(e);
+    assert.ok(enc, "walked a whole map and met nothing");
+    if (enc.phase !== "idle")
+      until(e, (s) => !s.encounter || s.encounter.phase === "idle", "back to idle");
+    enc = e.state.encounter;
+    enc.variant = tier;
+    e.state.dex[dexIndex(enc.speciesId)] = 2;   // not a new entry: that pays too
+    const sp = speciesById(enc.speciesId);
+    const before = e.state.money;
+    e.throwBall("master-ball");
+    until(e, (s) => !s.encounter || s.encounter.phase === "caught",
+      "the master ball to land");
+    const got = e.state.money - before;
+    paid[tier ?? "ordinary"] = got;
+    assert.equal(got, catchBounty(sp, tier),
+      `a ${tier ?? "ordinary"} catch of ${sp.name} paid ¥${got}, not the ` +
+      `¥${catchBounty(sp, tier)} catchBounty says - computed but not wired`);
+    until(e, (s) => !s.encounter, "the encounter to close", 4000);
+  }
+
+  assert.equal(paid.ordinary, 0, "an ordinary catch paid a variant bounty");
+  assert.ok(paid.showdown > 0, "the rarest tier in the game paid nothing");
+  console.log(`bounty ok — an ordinary catch pays ¥0 and a showdown pays ` +
+    `¥${paid.showdown}, both through a real throw`);
+}
+
 /* A BERRY MUST NOT BREAK THE THROW. Each of the three touches a different roll
    and any of them could throw inside the frame loop; the suite in check.mjs
    proves the arithmetic, and this proves the machine survives it. */

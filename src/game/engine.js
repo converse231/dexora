@@ -11,7 +11,7 @@ import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
   levelFromXp, xpForCatch,
   rodTable, rodBite,
-  rollVariant, pityBoost, TIERS,
+  rollVariant, pityBoost, TIERS, TIER_TELL,
   lockedTiers, wildBand, rollSize, BIOMES, ENCOUNTER_RATE,
 } from "./biomes.js";
 import {
@@ -27,7 +27,7 @@ import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt } from "./medals.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE,
-  evolveState, evoLevel, startingState, DEX_BONUS, levelReward,
+  evolveState, evoLevel, startingState, dexBonus, catchBounty, levelReward,
   evolutionRow, bestRod, holding, canRun, canSurf, KEY_ITEMS,
   fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
   stepReward, keeper,
@@ -1252,6 +1252,12 @@ export function createEngine(canvas, onChange, mini = null) {
      whole thing. `medalsFor` only looks at the medals that mention this species
      - the index is built once - so this stays a couple of short scans however
      many medals there are. */
+  /* How much of the dex is done. Read by the milestones and by `dexBonus`,
+     which pays MORE the fuller the dex is - so it has to be the same number
+     in both places or the bonus climbs on a different curve from the one the
+     milestones are celebrating. */
+  const caughtSpecies = () => state.dex.reduce((n, v) => n + (v === 2 ? 1 : 0), 0);
+
   function checkDexRewards(speciesId) {
     for (const medal of medalsFor(speciesId, state.dex, state.medals)) {
       state.medals.push(medal.id);
@@ -1260,7 +1266,7 @@ export function createEngine(canvas, onChange, mini = null) {
       });
     }
 
-    const caught = state.dex.reduce((n, v) => n + (v === 2 ? 1 : 0), 0);
+    const caught = caughtSpecies();
     const stone = milestoneAt(caught);
     if (stone) {
       pay(stone.money, stone.items, {
@@ -1342,15 +1348,16 @@ export function createEngine(canvas, onChange, mini = null) {
            first thing that looked wrong when this was drawn. The line under it
            spends itself on what you actually want to know at that moment:
            nothing can take this one off you by accident. */
+        /* DERIVED FROM `TIER_TELL`, because this table knew FOUR tiers of
+           eight - written when there were four - so meeting a Glitched or a
+           Showdown raised the banner with no line under it at all. Exactly
+           the fault `Cheer.jsx`'s own `KIND` table had, in the file that
+           feeds it, and a missing key in a lookup is a sentence nobody
+           notices is absent. */
         cheer({
           kind: roll,
           title: e.name,
-          sub: {
-            origin: "Drawn the way it was in 1996. Never sold, never fed.",
-            shiny: "A shiny. Never sold as a spare, never eaten as feed.",
-            holo: "The same picture, pressed in foil. Never sold, never fed.",
-            astral: "The rarest thing there is. Never sold, never fed.",
-          }[roll],
+          sub: `${TIER_TELL[roll]} — never sold, never fed.`,
         });
       }
       // After the box push, so a medal cheer queues behind the shiny one.
@@ -1363,12 +1370,34 @@ export function createEngine(canvas, onChange, mini = null) {
       teach({ kind: "caught", duplicate: dupe });
       const gained = gainXp(Math.round(xpForCatch(sp, e.isNew) * berryXp(e.berries)));
 
-      if (e.isNew) {
-        state.money += DEX_BONUS;
-        e.msg = `Gotcha! ${e.name} was caught!  +¥${DEX_BONUS} new entry`;
-      } else {
-        e.msg = `Gotcha! ${e.name} was caught!`;
-      }
+      /* WHAT A CATCH PAYS, AND IT USED TO BE A FLAT ¥100 OR NOTHING.
+
+         The bounty is on EVERY variant catch and not only the first of its
+         kind - `newVariant` gates the banner, deliberately, because a second
+         Holo Pikachu is not an occasion. It is still a 1-in-18 event and
+         still the renewable income the late game was missing, so gating the
+         money on it too would have left the stream one-off exactly like the
+         dex bonus it is there to replace. */
+      const bounty = catchBounty(sp, e.variant);
+      const entry = e.isNew ? dexBonus(caughtSpecies(), SPECIES.length) : 0;
+      state.money += bounty + entry;
+
+      /* ONE FIGURE, BECAUSE THE TEXTBOX IS SIZED AND THE SIZE IS LOAD-BEARING.
+         Both sums itemised reads `+¥25200 showdown  +¥1000 new entry`, which
+         on the longest name in the dex is **78 characters against the 59 the
+         layout was measured at** - and `.ballwrap.fighting` stops at
+         `var(--tb-h)`, so a textbox that wraps past its `min-height` puts the
+         ball rail back on top of the message. Measured before it was changed,
+         which is the same discipline `--tb-h` was set with.
+
+         Nothing is lost by totalling: the nameplate already carries the tier
+         chip, a NEW variant raises its own banner, and the top bar floats the
+         delta. The word survives only where it is the only thing being paid
+         for, which is also the case that stays short. */
+      const tail = bounty
+        ? `  +¥${bounty + entry}`
+        : entry ? `  +¥${entry} new entry` : "";
+      e.msg = `Gotcha! ${e.name} was caught!${tail}`;
       if (gained) {
         e.levelUp = gained.level;
         e.reward = gained.items;
@@ -1674,7 +1703,7 @@ export function createEngine(canvas, onChange, mini = null) {
 
     if (isNew) {
       checkDexRewards(targetId);
-      state.money += DEX_BONUS;
+      state.money += dexBonus(caughtSpecies(), SPECIES.length);
     }
     const gained = gainXp(xpForCatch(target, isNew));
 
