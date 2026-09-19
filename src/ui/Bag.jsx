@@ -25,18 +25,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
-import { carriedBalls, usefulItems, liveMult, forSale, berryRoom } from "../game/items.js";
+import {
+  carriedBalls, usefulItems, liveMult, forSale, berryRoom, ballOrder,
+} from "../game/items.js";
+import { GUARANTEED } from "../catch.js";
 import { ItemIcon } from "./Sprite.jsx";
 
 export default function Bag({
   bag, enc, field, view = "all", onThrow, onUseField, onUseBerry, onClose,
+  order = [], onPromote = null,
 }) {
   /* The same lock every other overlay takes. Without it the arrow keys walk
      the trainer underneath an open sheet - and on a tablet with a keyboard
      that is exactly the person who would hit it. */
   useModalLock();
 
-  const balls = carriedBalls(bag);
+  /* IN YOUR OWN ORDER, so the strip opens on the ball A throws. It scrolls
+     sideways and snaps, so first is the only position that is visible without
+     a swipe - and it is also the whole feedback that a tap assigned anything,
+     since a phone has no key number to change. */
+  const arranged = ballOrder(order);
+  const balls = carriedBalls(bag)
+    .slice()
+    .sort((a, b) => arranged.indexOf(a) - arranged.indexOf(b));
   const useful = view === "all" ? usefulItems(bag, enc) : [];
   const fed = enc?.berries ?? null;
   const live = Boolean(onThrow);
@@ -102,11 +113,24 @@ export default function Bag({
                         type: "button",
                         disabled: !owned,
                         "aria-label": `Throw a ${ball.name}`,
-                        /* Throwing closes it. The next thing on screen is the
-                           ball in the air and the sheet would be covering it -
-                           and there is no second throw to make until that one
-                           has landed. */
-                        onClick: () => { onThrow(ball.id); onClose(); },
+                        /* CHOOSING IS ASSIGNING, which is how touch gets
+                           what the number keys got. There is no room on a
+                           phone for a chip per tile and no keyboard for a
+                           number on one to mean anything, so the gesture is
+                           the control: the ball you last reached past A for
+                           becomes the ball A throws. Reversible by choosing
+                           again, and never a ball that cannot fail -
+                           `defaultBall` refuses one either way, so promoting
+                           it here would be a promise nothing keeps.
+
+                           Then it closes. The next thing on screen is the
+                           ball in the air and the sheet would be over it, and
+                           there is no second throw to make until it lands. */
+                        onClick: () => {
+                          if (ball.mult < GUARANTEED) onPromote?.(ball.id);
+                          onThrow(ball.id);
+                          onClose();
+                        },
                       }
                     : {})}
                 >

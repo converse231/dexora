@@ -5,7 +5,7 @@ import TopBar from "./ui/TopBar.jsx";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
-import { RAIL_KEY, read, write } from "./game/store.js";
+import { RAIL_KEY, ORDER_KEY, read, write } from "./game/store.js";
 import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
@@ -15,7 +15,7 @@ import Bag from "./ui/Bag.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import {
-  BALLS, FAMILIES, fieldById, stepReward,
+  BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall,
 } from "./game/items.js";
 import { ItemIcon } from "./ui/Sprite.jsx";
 import {
@@ -33,7 +33,27 @@ import Evolve from "./ui/Evolve.jsx";
    pressed them. `BallRail` numbers off `BALLS.indexOf`, so this has to as well
    or the label and the key disagree - and check.mjs holds BALLS to nine, which
    is as many as single digits can address. */
+/* One hotkey per ball, derived rather than typed - see the note that was
+   here: the literal "1234" was right for four balls and silently wrong for
+   eight. WHICH ball each one throws is the player's, and lives in
+   `ballOrder`. */
+/* How long the "wore off" card stays. Shorter than a cheer's 3200ms, because
+   there is nothing to read but two words and nothing to do about it. */
+const WORN_HOLD = 2600;
+
 const BALL_KEYS = BALLS.map((_, i) => String(i + 1));
+
+/* The arranged order, read once and kept in state so a promotion re-renders
+   the rail. Parsed defensively for the reason `ballOrder` filters: this is a
+   `localStorage` string and a bad one must cost nothing. */
+const readOrder = () => {
+  try {
+    const raw = JSON.parse(read(ORDER_KEY) ?? "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+};
 
 const KEYS = {
   ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
@@ -103,6 +123,17 @@ export default function App({
   const entryRef = useRef(null);
   entryRef.current = entry;
 
+  const [order, setOrder] = useState(readOrder);
+  const orderRef = useRef(order);
+  orderRef.current = order;
+  /* Promote a ball to slot 1: it takes key 1 and becomes what a bare throw
+     uses, on the keyboard and on the pad alike. */
+  const promote = (id) => {
+    const next = promoteBall(orderRef.current, id);
+    setOrder(next);
+    write(ORDER_KEY, JSON.stringify(next));
+  };
+
   const [ballsOpen, setBallsOpen] = useState(readRail);
   const toggleBalls = () => {
     const next = !ballsOpen;
@@ -129,12 +160,14 @@ export default function App({
           e.skip();
         } else if (enc.phase === "idle" && (ev.key === " " || ev.key === "Enter")) {
           ev.preventDefault();
-          // Space throws whatever you actually have, cheapest first.
-          const ball = BALLS.find((b) => e.state.bag[b.id] > 0);
+          /* Your slot-1 ball if you hold any, else the cheapest you have -
+             which is what this did before the order could be arranged. The
+             pad's A calls the same function, so the two cannot drift. */
+          const ball = defaultBall(e.state.bag, orderRef.current);
           if (ball) e.throwBall(ball.id);
         } else if (enc.phase === "idle" && BALL_KEYS.includes(ev.key)) {
           ev.preventDefault();
-          const pick = BALLS[Number(ev.key) - 1];
+          const pick = ballOrder(orderRef.current)[Number(ev.key) - 1];
           if (pick) e.throwBall(pick.id);
         /* R for run, as well as Escape. Escape is the correct key for
            "dismiss this" and stays; R is the one a hand already on WASD can
@@ -211,6 +244,13 @@ export default function App({
   const evo = st?.evolution ?? null;
   const fishing = st?.fishing ?? null;
   const cheer = st?.cheers?.[0] ?? null;
+  /* WHAT JUST RAN OUT. Not a cheer: a cheer is a celebration that holds the
+     screen for three seconds with sparks on it, and an effect ending is news
+     rather than an occasion. It is the one event in the game with no tell at
+     all - the card in the corner stops being there, which is exactly what
+     "nothing happened" also looks like - so it gets a card of its own, in the
+     same corner the running one was in, and then goes. */
+  const worn = st?.worn?.[0] ?? null;
   /* Recomputed every render rather than stored: it depends on which way you are
      facing, and every step already re-renders. */
   const rod = engine && !enc && !evo && !fishing ? engine.castable() : null;
@@ -218,6 +258,16 @@ export default function App({
      and a touch player would otherwise have no way to ride at all. It returns
      the character of the liquid, so the prompt can say which. */
   const ride = engine && !enc && !evo && !fishing ? engine.surfable() : null;
+
+  /* Keyed on `worn.n` rather than on the item, so using the same repel again
+     and wearing it out again restarts the clock instead of inheriting the
+     tail of the last one's - a flag that is already true cannot say "again",
+     which is the note `e.ate` carries for the same reason. */
+  useEffect(() => {
+    if (!worn) return undefined;
+    const t = setTimeout(() => engine?.dropWorn(), WORN_HOLD);
+    return () => clearTimeout(t);
+  }, [worn?.n, engine]);
 
   // Announce a genuinely new species, once, when the ball actually clicks shut.
   /* Money is the clearest signal the game has that something worked, so a
@@ -336,7 +386,9 @@ export default function App({
           enc={enc}
           field={st?.field}
           view={bagView}
+          order={order}
           onThrow={enc?.phase === "idle" ? (id) => engine.throwBall(id) : null}
+          onPromote={promote}
           onUseField={(id) => engine.useField(id)}
           onUseBerry={(id) => engine.useBerry(id)}
           onClose={() => setBagView(null)}
@@ -434,6 +486,23 @@ export default function App({
                 than to measure the card again and type 48. */}
             {!enc && !evo && (
               <div className="hud-right">
+            {/* IN THE STACK, ABOVE THE RUNNING ONES. It replaces the card it
+                is about - the effect it names has just left this column - so
+                putting it anywhere else would make the player look somewhere
+                new to be told something about here. Long enough to read and
+                gone without a click: there is nothing to decide. */}
+            {worn && (
+              <div className="fieldbox worn" role="status" key={worn.n}>
+                <span>
+                  <ItemIcon item={fieldById(worn.id)} />
+                  <u>
+                    <b>{fieldById(worn.id)?.name ?? "Effect"}</b>
+                    <i>WORE OFF</i>
+                  </u>
+                </span>
+              </div>
+            )}
+
             {FAMILIES.some((f) => st?.field?.[f]) && (
               <div className="fieldbox" role="status">
                 {FAMILIES.map((fam) => {
@@ -495,6 +564,8 @@ export default function App({
                 enc={enc}
                 open={ballsOpen}
                 onToggle={toggleBalls}
+                order={order}
+                onPromote={promote}
                 pinned={Boolean(enc)}
                 onThrow={
                   enc?.phase === "idle" ? (id) => engine.throwBall(id) : null
@@ -581,6 +652,7 @@ export default function App({
             enc={enc}
             level={level}
             ride={ride}
+            order={order}
             bagOpen={bagView === "all"}
             onBag={() => setBagView((v) => (v === "all" ? null : "all"))}
             onPickBall={() => setBagView("balls")}

@@ -10,6 +10,7 @@ import {
 } from "../src/game/trainer.js";
 import {
   catchChance, fleeChance, shakesFor, resolveThrow, NEVER_CERTAIN, GUARANTEED,
+  NEVER_HOPELESS,
 } from "../src/catch.js";
 import {
   DAY_STEPS, PHASES, hourAt, phaseAt, isNight, intoPhase, timeLabel,
@@ -184,8 +185,9 @@ import {
   SYNTH_MIN, SYNTH_STEP,
   stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
   TREASURE_LEVEL, liveMult, PLAIN_BALLS, variantOf, PLAIN_MULT,
+  ballOrder, promoteBall, defaultBall,
   FIELD, FAMILIES, fieldById, BERRIES, berryById, artOf,
-  berryCatch, berryCalm, berryXp, berryRoom,
+  berryCatch, berryCalm, berryXp, berryRoom, HONEY_MEETS,
 } from "../src/game/items.js";
 import {
   dailyFor, describe, advance, isYesterday, streakMult, reward,
@@ -195,7 +197,7 @@ import {
   ENCLOSED, speciesById, dexIndex, GEN_UNLOCK, genOpen, LEGEND_SHARE,
   LEGEND_EACH, LEGEND_CEIL,
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
-  LIFT_CEILING, hasOrigin, tiersFor, ART_GEN, baseArtGen,
+  LIFT_CEILING, hasOrigin, tiersFor, ART_GEN, baseArtGen, bandFor,
   LEGEND_HOME, LEGEND_HAUNT, legendTier, LAYOUTS, layoutIds,
   GEN_FIRST, GEN_STEP,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
@@ -365,6 +367,92 @@ for (let i = 1; i < SHOP_BALLS.length; i++)
     assert.ok(printer(ball) < grind,
       `${ball.id} out-earns grinding with Poké Balls on a rare ` +
       `(${printer(ball).toFixed(0)} against ${grind.toFixed(0)}) - that is income, not a choice`);
+  }
+
+  /* WHICH BALL EACH NUMBER KEY THROWS IS THE PLAYER'S, and the whole feature
+     is three pure functions, so this is where it can be pinned rather than
+     poked at through a rendered rail.
+
+     `ballOrder` is a PREFERENCE applied to the shipped list, not a ranking of
+     every ball - so it has to come back complete and unduplicated whatever it
+     is handed, because it is handed a `localStorage` string that anyone can
+     edit and a half-written value can truncate. A bad entry there taking a
+     key away from a real ball is the failure being bought off here. */
+  {
+    const ids = (list) => list.map((b) => b.id);
+    const junk = [
+      undefined, null, "poke-ball", [], {}, [null, 7, {}],
+      ["not-a-ball", "poke-ball", "poke-ball"],
+      ["timer-ball", "timer-ball", "great-ball"],
+    ];
+    for (const bad of junk) {
+      const got = ballOrder(bad);
+      assert.deepEqual([...ids(got)].sort(), [...ids(BALLS)].sort(),
+        `ballOrder(${JSON.stringify(bad)}) did not return every ball exactly once`);
+    }
+    assert.deepEqual(ballOrder([]), BALLS, "an empty preference is not the shipped order");
+
+    /* PROMOTING MOVES ONE BALL AND NOTHING ELSE. That is what makes repeated
+       presses able to reach any arrangement at all - if the rest resorted,
+       the chip would be a shuffle rather than a control. */
+    for (const ball of BALLS) {
+      const after = ballOrder(promoteBall([], ball.id));
+      assert.equal(after[0], ball, `promoting ${ball.id} did not put it first`);
+      assert.deepEqual(ids(after.slice(1)), ids(BALLS.filter((b) => b !== ball)),
+        `promoting ${ball.id} reordered the balls behind it`);
+    }
+    // And promoting twice is promoting once - no drift, nothing accumulated.
+    const twice = promoteBall(promoteBall([], "timer-ball"), "timer-ball");
+    assert.deepEqual(ballOrder(twice), ballOrder(promoteBall([], "timer-ball")),
+      "promoting the same ball twice is not the same as promoting it once");
+
+    /* WHAT A BARE THROW PICKS UP. Space and the pad's A call this one
+       function, so the two cannot drift - which is the only reason the pad is
+       allowed to have an action the keyboard has. */
+    const held = { "poke-ball": 5, "timer-ball": 3, "master-ball": 2 };
+    assert.equal(defaultBall(held, [])?.id, "poke-ball",
+      "with no preference a bare throw stopped using the cheapest ball held");
+    assert.equal(defaultBall(held, ["timer-ball"])?.id, "timer-ball",
+      "a bare throw ignored the ball on key 1");
+    assert.equal(defaultBall({ "poke-ball": 5 }, ["timer-ball"])?.id, "poke-ball",
+      "a bare throw reached for a key-1 ball the player does not hold");
+    assert.equal(defaultBall({}, ["timer-ball"]), null,
+      "an empty bag produced a ball to throw");
+
+    /* AND NEVER A BALL THAT CANNOT FAIL. Throwing a Master Ball ENDS the
+       encounter, so it is the one press in the game that cannot be taken
+       back - and the arrangement is now settable by tapping a tile on a
+       phone. The first version of this rule said `forSale`, which does
+       nothing, because the shop sells Master Balls; this assertion is what
+       said so. It is still reachable deliberately, and the fallback still
+       finds it when there is genuinely nothing else in the bag. */
+    assert.equal(defaultBall(held, ["master-ball"])?.id, "poke-ball",
+      "the Master Ball became the ball a bare throw uses - one stray tap and " +
+      "the rarest item in the game is gone");
+    assert.equal(defaultBall({ "master-ball": 1 }, [])?.id, "master-ball",
+      "with nothing else in the bag a Master Ball is not throwable at all");
+
+    /* THREE SCREENS, ONE ANSWER. The rail prints the key, the key handler
+       throws on it, and the pad and the touch sheet draw the default - and a
+       rail that advertises key 3 over a key that throws something else is
+       unfalsifiable from the outside. Asserted against the source because
+       nothing fails at runtime when one of them re-derives it. */
+    const reads = {
+      "App.jsx": ["ballOrder", "defaultBall"],
+      "ui/BallRail.jsx": ["ballOrder"],
+      "ui/Pad.jsx": ["defaultBall"],
+      "ui/Bag.jsx": ["ballOrder"],
+    };
+    for (const [f, wants] of Object.entries(reads)) {
+      const src = stripComments(
+        readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8"));
+      for (const fn of wants) {
+        assert.ok(src.includes(fn), `${f} no longer goes through ${fn}`);
+      }
+      assert.ok(!/BALLS\.indexOf/.test(src),
+        `${f} indexes the SHIPPED ball list again - that is everybody's order, ` +
+        `not this player's`);
+    }
   }
 
   console.log(`balls ok — ${shelf.length} plain, ${situational.length} situational ` +
@@ -1491,6 +1579,24 @@ import { F } from "../src/game/engine.js";
   assert.ok(behind > 0, "no overhang anywhere - nothing to walk behind");
   assert.ok(route.forest.fringeTop, "the overhang needs its leaves as their own tile");
 
+  /* THE TWO ATLASES ARE ONE COORDINATE SYSTEM. `route_top.png` is the upper
+     layer of every metatile at the SAME id, which is the whole reason the
+     overlay pass needs no lookup table - and it holds only while the two
+     images are the same size. Let one gain a row the other does not and every
+     id past that point paints somebody else's leaves over the player, which is
+     a wrong picture rather than a crash. Compared as bytes here because the
+     PNG header is the one place both numbers are written down. */
+  {
+    const dims = (p) => {
+      const b = readFileSync(new URL(p, import.meta.url));
+      return `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`;   // IHDR
+    };
+    assert.equal(dims("../public/tilesets/route_top.png"),
+      dims("../public/tilesets/route.png"),
+      "route_top.png is a different size from route.png - the overlay ids no " +
+      "longer line up with the atlas; re-run npm run art");
+  }
+
   console.log(`tileset ok — ${PAIRS.length} biomes, ground and solid disjoint; ` +
               `${capped} canopy tops finished, ${pairs} whole crowns, ` +
               `${behind} to walk behind; ${drawn} water tiles match FireRed, ` +
@@ -1673,6 +1779,16 @@ for (const b of BIOMES) {
     `${b.id} has only ${spawnable} walkable tiles — too small to hunt`);
 
   // Walkable is not reachable: a walled-off pocket is map you can never stand on.
+  /* AND A LADDER IS A WAY THROUGH. Mt Moon is three floors sharing one grid,
+     sealed from each other in rock and joined only by the real cave's own
+     warps - so a fill that only walks reports 1,157 of its 2,391 tiles cut
+     off, which is true about walking and false about the map. Both ends of
+     every pair, because the engine walks them both ways. */
+  const hop = new Map();
+  for (const [ax, ay, bx, by] of area.warps ?? []) {
+    hop.set(`${ax},${ay}`, [bx, by]);
+    hop.set(`${bx},${by}`, [ax, ay]);
+  }
   const seen = new Set();
   const stack = [[area.spawn.x, area.spawn.y]];
   while (stack.length) {
@@ -1680,6 +1796,7 @@ for (const b of BIOMES) {
     const key = x + "," + y;
     if (seen.has(key) || !walkable(rows, x, y)) continue;
     seen.add(key);
+    if (hop.has(key)) stack.push(hop.get(key));
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       // Walking south into a ledge hops it and lands you on the far side.
       const over = dy === 1 && rows[y + dy]?.[x + dx] === "L";
@@ -1694,7 +1811,13 @@ for (const b of BIOMES) {
       assert.ok(!walkable(rows, x, y), `${b.id}: ledge at ${x},${y} must be solid`);
       assert.ok(walkable(rows, x, y + 1),
         `${b.id}: ledge at ${x},${y} has nothing to land on`);
-      assert.ok(walkable(rows, x, y - 1),
+      /* AN APPROACH IS A RULE FOR A LEDGE WE PLACED. A copied one can run out
+         under the treeline - four of the Safari Zone's thirty-six do, the tail
+         of a run Emerald drew into a tree mass - and that is decoration rather
+         than a trap: nobody can stand above them, so nobody hops them, and the
+         rest of the run works. The LANDING above stays unconditional, because
+         a ledge with nothing under it is a hop into a wall. */
+      assert.ok(area.tiles || walkable(rows, x, y - 1),
         `${b.id}: ledge at ${x},${y} cannot be reached from above`);
     }
   }
@@ -1915,21 +2038,48 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
 {
   const route = JSON.parse(
     readFileSync(new URL("../public/tilesets/route.json", import.meta.url), "utf8"));
+  /* WHAT EACH TRANSCRIPTION WAS REBASED AGAINST, and it is per map rather than
+     one number, which is what Route 1 corrected. This asserted every copied map
+     against seafoam's base, because for a while Frost Hollow was the only copy
+     there was. A map built entirely out of PRIMARY metatiles needs no rebasing
+     at all - Route 1 is 49 of its 50, ids unchanged - so it records 0, and 0 is
+     a real answer here rather than a missing one. */
+  const BASE = {
+    frost: () => route.frost.floor - 1,       // seafoam_islands local 1 is the ice
+    power: () => route.power.floor - 31,      // power_plant local 31 is the floor
+    ridge: () => route.cave.floor - 1,        // Mt Moon: cave local 1 is the floor
+    safari: () => route.safari.general,       // Emerald's General, not FireRed's
+    cinder: () => route.safari.general,       // the same primary, and lavaridge
+  };
+  /* The ceiling is the highest id the atlas actually hands out, read off the
+     manifest rather than named. It used to be `forest.fringeTop` because that
+     was the last tile baked; baking the conifer crowns after it made that bound
+     wrong by two, and a bound that quietly stops being the top is worse than no
+     bound - it passes everything. */
+  const top = Math.max(...JSON.stringify(route).match(/\d+/g).map(Number));
   for (const id of AREA_IDS) {
     const area = AREAS[id];
     if (!area.tiles) continue;
     assert.equal(area.tiles.length, area.rows[0].length * area.rows.length,
       `${id}: the transcribed tile ids do not cover the map`);
-    assert.equal(area.tileBase, route.frost.floor - 1,
+    assert.ok(BASE[id], `${id} is transcribed but no expected atlas base is ` +
+      `recorded for it - add one beside frost and power`);
+    assert.equal(area.tileBase, BASE[id](),
       `${id}: transcribed against atlas base ${area.tileBase} but the atlas now ` +
-      `packs seafoam at ${route.frost.floor - 1} - re-run npm run map`);
-    const top = route.forest.fringeTop;
+      `wants ${BASE[id]()} - re-run npm run map`);
     assert.ok(area.tiles.every((t) => t >= -1 && t <= top),
       `${id}: a transcribed tile id falls outside the atlas`);
   }
 }
 
-const sizes = AREA_IDS.map((id) => `${AREAS[id].rows[0].length}x${AREAS[id].rows.length}`);
+/* SORTED, because the print reads as a range. It was AREA_IDS order and
+   showed the first and last map, so "64x80 ... 120x80" hid a 40x109 and a
+   49x40 between them - a log line that states something untrue is worse
+   than one that states nothing. */
+const sizes = AREA_IDS
+  .map((id) => AREAS[id].rows)
+  .sort((a, b) => a.length * a[0].length - b.length * b[0].length)
+  .map((r) => `${r[0].length}x${r.length}`);
 // --- medals, shinies and the save file ------------------------------------
 /* Phase 2. Three things that are each one mistake away from being worse than
    not shipping them: a medal that pays twice, a shiny eaten by a bulk action,
@@ -1942,7 +2092,7 @@ import { MEDALS, MILESTONES, medalsFor, medalById } from "../src/game/medals.js"
    a list rather than three copies of the same test. */
 import {
   SHINY_ODDS, ORIGIN_ODDS, ASTRAL_ODDS, HOLO_ODDS, TIER_ODDS, TIERS, rollVariant,
-  lockedTiers, ROSETTE_NEED,
+  lockedTiers, ROSETTE_NEED, TIER_TELL,
 } from "../src/game/biomes.js";
 import { saveProblem, repairDex } from "../src/game/engine.js";
 
@@ -2715,6 +2865,38 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `${where}'s two walkable levels are ${far(MINI[low], MINI[high])} apart on ` +
       "the minimap - they connect only at a staircase and must not look joined");
 
+  /* AND THE BOX HAS TO FIT ON THE SCREEN. The minimap sizes itself to the map
+     - three pixels a tile, nothing bounding it - so it grows with whatever is
+     drawn, and Cinderpeak at 40x109 came out 327px tall against a 352px
+     viewport: floor to ceiling down the left edge, while every other map sat
+     at 76% or less and so nothing had ever said so. `miniScale` drops the
+     pixels-a-tile for a map that will not fit; this is what proves it did. */
+  {
+    const eng = readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8");
+    const num = (name) => {
+      const m = eng.match(new RegExp("const " + name + " = ([0-9]+)"));
+      assert.ok(m, `engine.js no longer defines ${name} - the minimap cap is gone`);
+      return Number(m[1]);
+    };
+    const [T, MW, MH] = [num("MINI_TILE"), num("MINI_MAX_W"), num("MINI_MAX_H")];
+    /* MEASURED AGAINST THE SCREEN, not against the cap. Comparing the scaled
+       size to MINI_MAX_* is nearly a tautology - `miniScale` derives the scale
+       FROM those - so raising the cap to 999 would pass while the box grew off
+       the viewport. The viewport is what the rule is about. 0.8 is a bound
+       with a reason rather than a target: the widest today is Deep Woods at
+       0.76 of the height, and a minimap past four fifths of the screen has
+       stopped being an inset and become the view. */
+    const VW = num("VIEW_W") * 32, VH = num("VIEW_H") * 32;
+    for (const id of AREA_IDS) {
+      const rows = areaOf(id).rows;
+      const w = rows[0].length, h = rows.length;
+      const s = Math.max(1, Math.min(T, Math.floor(MW / w), Math.floor(MH / h)));
+      assert.ok(w * s <= VW * 0.8 && h * s <= VH * 0.8,
+        `${id}'s minimap is ${w * s}x${h * s} against a ${VW}x${VH} viewport - ` +
+        "past four fifths of the screen it covers the map it is a picture of");
+    }
+  }
+
   const spare = Object.keys(MINI).filter((ch) => !used.has(ch));
   console.log(`minimap ok — ${Object.keys(MINI).length} colours cover ${used.size} ` +
     `map characters${spare.length ? `; unused: ${spare.join(" ")}` : ""}`);
@@ -3344,22 +3526,51 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         assert.equal(artOf(h), "honey", `${h.id} should be drawn from the one jar`);
         assert.ok(h.lift > 1, `${h.id} favours a tier by a factor of ${h.lift}`);
       }
-      /* A HONEY HAS TO LAND. `x6` over 300 steps is about 21 encounters at the
-         encounter rate, which put an Astral Honey at 23% for ¥4,200 - a jar
-         that usually does nothing, and it was reported as not working because
-         it had never once fired. The lift is set per tier so all three come out
-         near three-in-four over their own run. */
+      /* A HONEY IS MEASURED IN WHAT IT HANDS YOU, NOT IN WHETHER IT FIRES.
+
+         This asserted P(at least one) between 0.5 and 0.95, which is the
+         design `HONEY_LANDS` encoded: three-in-four over the run. The trouble
+         with that bound is the other quarter - a jar you paid for up front
+         that does nothing at all, one time in four, which is a lottery ticket
+         rather than an item and is why these read as not worth buying.
+
+         `HONEY_MEETS` is a COUNT now, so the assertion is on the count: every
+         jar hands you about three of its own tier over its own run, whatever
+         that tier's odds are, which is what makes the price about which tier
+         you want rather than about which jar works. A third of a meet of slack
+         each way, because `honeyLift` is an integer ceiling and the rarer
+         tiers round further.
+
+         It follows `HONEY_MEETS` rather than pinning 3, which is deliberate:
+         moving that constant is a design decision and this should move with
+         it. What it catches is a jar that stops agreeing with the others -
+         a hand-typed lift, or a tier whose odds moved without its jar - which
+         is exactly the drift that has already happened twice. Verified by
+         typing a lift into one jar: 1.29 meets against a design of 3. */
       const RATE = 0.07;
       for (const h of honeys) {
         const odds = TIER_ODDS.find(([t]) => t === h.tier)[1] * h.lift;
         const met = h.steps * RATE;
-        const p = 1 - (1 - odds) ** met;
-        assert.ok(p > 0.5,
-          `a ${h.name} lands ${(p * 100).toFixed(0)}% of the time over its own ` +
-          "run - at these prices a jar has to do something more often than not");
-        assert.ok(p < 0.95,
-          `a ${h.name} lands ${(p * 100).toFixed(0)}% of the time - a tier you ` +
-          "are all but promised is not a rare any more");
+        const meets = odds * met;
+        assert.ok(Math.abs(meets - HONEY_MEETS) < 0.34,
+          `a ${h.name} hands you ${meets.toFixed(2)} of its tier over its own ` +
+          `run, against a design of ${HONEY_MEETS} - the jars are supposed to ` +
+          "be equally good at their own tier, so this one is mispriced by odds");
+      }
+
+      /* AND THE FORMULA MUST NOT COLLIDE WITH THE CLAMP. `LIFT_CEILING` caps
+         any tier at 1 in 5 however many multipliers stack, which is what stops
+         a honey plus a drought handing you a tier every encounter. If
+         `HONEY_MEETS` is ever raised far enough, the clamp rather than
+         `honeyLift` becomes what decides how good a jar is - and then the jars
+         stop being equally good at their own tiers silently, because the
+         rarest ones clamp first and nothing else says so. */
+      for (const h of honeys) {
+        const raw = TIER_ODDS.find(([t]) => t === h.tier)[1] * h.lift;
+        assert.ok(raw < LIFT_CEILING,
+          `a ${h.name} asks for ${(raw * 100).toFixed(1)}% against a ` +
+          `${(LIFT_CEILING * 100).toFixed(0)}% clamp - the ceiling, not ` +
+          "honeyLift, is deciding what this jar is worth");
       }
 
       /* A HONEY PER TIER WAS RIGHT AT FOUR TIERS AND IS BLOAT AT EIGHT.
@@ -3385,8 +3596,15 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     }
 
     /* THE VARIANT ROLL, measured. A favoured honey must lift ITS tier and
-       leave the others where they were - a "shiny honey" that also makes
-       Astrals commoner is a plain honey with a misleading name. */
+       push the others DOWN - the share of what you meet is what the jar is
+       sold on, and the old rule here ("leave the others where they were") was
+       what let a Glitched Honey come out 61% on target. A jar that raises its
+       tier and nothing else can never be more than a plurality, because "the
+       others" is seven tiers and their combined odds beat any single one.
+
+       What must still not happen is a second tier going UP: that would be a
+       plain honey with a misleading name, which is the fault the old
+       assertion was really guarding and the only half of it worth keeping. */
     {
       const rng = (seed) => () => {
         seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
@@ -3407,11 +3625,27 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       const shiny = count({ tier: "shiny", mult: 6 });
       assert.ok(shiny.shiny > plain.shiny * 3,
         `a x6 Shiny Honey moved shiny ${plain.shiny} -> ${shiny.shiny} - it is not working`);
-      /* Astral is rolled BEFORE shiny (rarest first), so lifting shiny cannot
-         raise it, and holo sits after shiny so it can only lose ground. What
-         must not happen is astral moving at all. */
-      assert.ok(Math.abs(shiny.astral - plain.astral) < plain.astral * 0.25,
-        `a Shiny Honey moved Astral ${plain.astral} -> ${shiny.astral} - it is favouring more than one tier`);
+      // Not one other tier may RISE. Rarest-first means some sit before shiny
+      // in the walk and some after; the damp has to reach both.
+      for (const t of TIERS) {
+        if (t === "shiny") continue;
+        assert.ok(shiny[t] <= plain[t],
+          `a Shiny Honey raised ${t} ${plain[t]} -> ${shiny[t]} - it is favouring more than one tier`);
+      }
+
+      /* AND THE JAR HAS TO BE MOST OF WHAT YOU MEET. This is the number that
+         was reported: 61% on target read as "it makes variants kinder across
+         the board" rather than as a Glitched Honey. Measured per jar at its
+         own shipped lift, so it cannot pass on a favourable test multiplier. */
+      for (const h of FIELD.filter((f) => f.family === "variant" && f.tier)) {
+        const run = count({ tier: h.tier, mult: h.lift });
+        const tot = TIERS.reduce((n, t) => n + run[t], 0);
+        const share = run[h.tier] / tot;
+        assert.ok(share > 0.8,
+          `a ${h.name} is only ${(share * 100).toFixed(0)}% of the variants it ` +
+          "turns up - a jar named for one tier has to BE that tier, or it reads " +
+          "as a general boost with a colour on it");
+      }
       // And a plain honey is a boost with no favour: everything must move.
       const all = count(null, 2);
       for (const t of TIERS) {
@@ -3723,6 +3957,65 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `(${WILD_STEP} per gate, worst free evolutions ${(worst.share * 100).toFixed(0)}% ` +
       `in ${worst.name}); sizes ${SIZE_MIN}-${SIZE_MAX}, ` +
       `${(tagShare * 100).toFixed(1)}% wear an XS/XL tag`);
+  }
+
+  /* DIFFICULTY IS CHARGED ONCE, ON THE THROW.
+
+     Reported from play as Beldum seeming uncatchable, and it was within a
+     rounding error of it. Its PokeAPI capture rate is 3 - Mewtwo's rate,
+     correct data and not ours to edit - so `catchChance` at a plain throw puts
+     it exactly ON `NEVER_HOPELESS`. This repo's own notes claimed no species
+     in the dex sat on that floor; three do, and they are one line: beldum,
+     metang, metagross. Everything else down there is legendary.
+
+     Measured before the fix, at Lv 50 with an Ultra Ball and a Nanab: Beldum
+     was 0.052% of Mt Moon's table and **1,914 encounters to own, against
+     Mewtwo's 1,318**. A species with no legendary mark, no `legendTier`
+     homing and no "hunt where it lives" was harder to get than the hardest
+     legendary in the game, because the difficulty was being charged twice -
+     once on the throw and again on the spawn.
+
+     `bandFor` drops such a species one band, so the rule is: nothing ordinary
+     is both impossible to catch AND in the rarest band to meet. Derived from
+     the catch math rather than from a list of dex numbers, so a tenth
+     generation's pseudo-legendary is handled on the day it ships - which is
+     the failure mode `LEGENDARY` itself already had once, as 34 hand-written
+     numbers that missed sixty. */
+  {
+    const floored = SPECIES.filter((sp) => !isForm(sp.id) && !LEGENDARY.includes(sp.id)
+      && catchChance(sp.rate, PLAIN_MULT) <= NEVER_HOPELESS);
+    assert.ok(floored.length,
+      "nothing sits on the catch floor any more - if that is real this rule is " +
+      "dead code, but it is far likelier that PLAIN_MULT or NEVER_HOPELESS moved");
+    const stuck = floored.filter((sp) => bandFor(sp.id) === "S");
+    assert.deepEqual(stuck.map((sp) => sp.name), [],
+      `${stuck.length} species are both on the catch floor and in the rarest ` +
+      `band (${stuck.map((sp) => sp.name).join(", ")}) - that is the difficulty ` +
+      "charged twice, and it made Beldum harder to own than Mewtwo");
+    /* AND THE DROP HAS TO REACH THE DERIVED ROWS. The first version changed
+       `bandOf` alone; the derived homes went on reading `sp.tier` straight and
+       Beldum's share did not move a thousandth of a percent. One species-level
+       answer, asked by everything. */
+    for (const sp of floored) {
+      assert.notEqual(bandFor(sp.id), sp.tier,
+        `${sp.name} is on the catch floor and still banded ${sp.tier}`);
+    }
+    /* THE POINT OF ALL THAT: it must now be findable enough to be worth the
+       throws. Against the legendary it shares a catch rate with, in each of
+       their own best maps - a relationship, not a number, so retuning the
+       bands cannot quietly undo it. */
+    const share = (id) => Math.max(...BIOMES.map((b) => {
+      const t = encounterTable(b, MAX_LEVEL);
+      const tot = t.reduce((n, r) => n + r[1], 0);
+      return (t.find(([i]) => i === id)?.[1] ?? 0) / tot;
+    }));
+    const hardest = LEGENDARY.filter((id) => speciesById(id)?.rate === floored[0].rate);
+    const worst = Math.max(...hardest.map(share));
+    assert.ok(share(floored[0].id) > worst,
+      `${floored[0].name} is rarer to MEET than the commonest legendary at its ` +
+      "own catch rate, so it is strictly harder to own than a legendary");
+    console.log(`catch floor ok — ${floored.length} ordinary species on it ` +
+      `(${floored.map((sp) => sp.name).join(", ")}), each banded one kinder`);
   }
 
   console.log(`spawn ladder ok — ${early.size} species in the wild at Lv 1, ` +
@@ -4050,6 +4343,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
    the box and leaving the nudge would over-correct that one layer instead. */
 {
   const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const clean = stripComments(css);
   const block = css.slice(css.indexOf(".sheet-portrait {"));
   const rule = block.slice(0, block.indexOf("}"));
   assert.ok(/width:\s*\d/.test(rule) && /height:\s*\d/.test(rule),
@@ -4058,8 +4352,112 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   assert.ok(!/\.sheet-portrait\s+\.astral-aura\s*\{[^}]*inset/.test(css),
     "a per-layer inset nudge is back on the sheet portrait - if one layer needs " +
     "it the WRAPPER is the wrong size and the other two are wrong too");
+  /* A TIER MAY NOT ANIMATE A PROPERTY IT ALSO DECLARES `!important`, and
+     that is the whole of the Glitched bug expressed as a rule.
+
+     `.sprite-glitched` set `filter` with `!important` - it has to, because
+     `.mon` runs `mon-appear` whose keyframes set `filter: none` and an
+     animation outranks a plain declaration - and then its own `glitch-shift`
+     keyframes tried to animate `filter` too, for the channel split. An
+     IMPORTANT author declaration outranks an animation, so all six of those
+     keyframe filters were discarded and the tier was left as the `transform`
+     jitter alone. Reported from play as "it just shakes".
+
+     Nothing failed. The CSS was valid, the animation ran, the property was
+     simply never the animation's to set - which is why this is a source
+     assertion: there is no runtime symptom short of looking at it.
+
+     Checked for every tier rather than for Glitched, because the trap is the
+     `!important` that every one of them needs. */
+  {
+    const frames = new Map();
+    for (const m of clean.matchAll(/@keyframes\s+([\w-]+)\s*\{/g)) {
+      /* Brace-count to the end of the block - keyframes nest one level, so a
+         lazy `[^}]*` stops at the first inner selector. */
+      let depth = 0, i = m.index + m[0].length - 1;
+      for (; i < clean.length; i++) {
+        if (clean[i] === "{") depth++;
+        else if (clean[i] === "}" && --depth === 0) break;
+      }
+      frames.set(m[1], clean.slice(m.index, i));
+    }
+    const clashes = [];
+    for (const tier of TIERS) {
+      const re = new RegExp(`\\.sprite-${tier}\\s*\\{([^}]*)\\}`, "g");
+      for (const rule of clean.matchAll(re)) {
+        const body = rule[1];
+        const loud = [...body.matchAll(/([\w-]+)\s*:[^;]*!important/g)].map((x) => x[1]);
+        const anim = /animation:\s*([\w-]+)/.exec(body);
+        if (!anim || !loud.length) continue;
+        const kf = frames.get(anim[1]);
+        if (!kf) continue;
+        for (const prop of loud) {
+          if (new RegExp(`[{;]\\s*${prop}\\s*:`).test(kf)) {
+            clashes.push(`${tier}: @keyframes ${anim[1]} animates ${prop}, which .sprite-${tier} declares !important`);
+          }
+        }
+      }
+    }
+    assert.deepEqual(clashes, [],
+      `a tier animates a property its own rule makes !important, so those ` +
+      `keyframes are silently discarded:\n  ${clashes.join("\n  ")}`);
+  }
+
+  /* AND GLITCHED'S LAYERS HAVE TO EXIST. The split, the tears and the noise
+     are what make it corruption rather than a wobble, and they live in
+     `VariantFx` so every screen draws the same four. Masked to `--art` like
+     every other layer here, or they are rectangles of static over the grass
+     behind the creature instead of damage to it. */
+  {
+    const fx = readFileSync(new URL("../src/ui/Sprite.jsx", import.meta.url), "utf8");
+    const layers = ["glitch-ghost red", "glitch-ghost cyan", "glitch-tear", "glitch-blocks"];
+    for (const cls of layers) {
+      assert.ok(fx.includes(cls), `VariantFx no longer draws ${cls}`);
+    }
+    for (const cls of ["glitch-ghost", "glitch-tear", "glitch-blocks"]) {
+      const at = clean.indexOf(`.${cls}`);
+      assert.ok(at > 0, `.${cls} has no rule in styles.css`);
+    }
+    assert.ok(/\.glitch-ghost,\s*\.glitch-tear,\s*\.glitch-blocks\s*\{[^}]*mask:\s*var\(--art\)/.test(clean),
+      "the glitch layers are no longer masked to --art - unmasked they are " +
+      "rectangles of static over the ground, not damage to the creature");
+    /* BEHIND THE SPRITE, which is what makes the split a fringe rather than a
+       flood: a solid fill masked to the outline and laid on top colours the
+       whole creature. */
+    assert.ok(/\.glitch-ghost\s*\{[^}]*z-index:\s*0/.test(clean),
+      "the channel-split silhouettes are no longer behind the sprite");
+  }
+
+  /* EVERY TIER HAS A SENTENCE, AND THERE IS ONE COPY OF IT. There were two -
+     the Dex sheet's FORMS strip had all eight and the catch banner had the
+     four that existed when it was written - so meeting a 1-in-400 Showdown
+     raised a banner headed POKEDEX, which is the fallback for "you filled a
+     dex slot". Nothing failed, because a missing key in a lookup table is a
+     sentence nobody notices is absent.
+
+     Both halves are asserted. The table must be complete, or a tier is
+     nameless in two places at once; and neither screen may keep a literal of
+     its own, because a second copy is what this was. */
+  for (const tier of TIERS) {
+    assert.ok(TIER_TELL[tier], `TIER_TELL has nothing to say about ${tier}`);
+  }
+  assert.deepEqual(Object.keys(TIER_TELL).sort(), [...TIERS].sort(),
+    "TIER_TELL and TIERS name different sets of tiers");
+  for (const f of ["DexSheet.jsx", "Cheer.jsx"]) {
+    const src = stripComments(
+      readFileSync(new URL(`../src/ui/${f}`, import.meta.url), "utf8"));
+    assert.ok(src.includes("TIER_TELL"), `${f} no longer reads TIER_TELL`);
+    /* A literal table keyed on tier names is the shape that drifted. Two or
+       more `tier: "..."` rows in one object is that shape. */
+    const own = TIERS.filter((t) => new RegExp(`\\b${t}\\s*:\\s*["'\`]`).test(src));
+    assert.ok(own.length < 2,
+      `${f} has its own per-tier text table again (${own.join(", ")}) - ` +
+      `that is the copy that shipped a banner saying POKEDEX over a Showdown`);
+  }
+
   console.log("variant layers ok — the sheet portrait is sized to its art, so " +
-    "every tier's layer fits it by construction");
+    `every tier's layer fits it by construction; no tier animates its own ` +
+    `!important property; ${TIERS.length} tiers each have one shared sentence`);
 }
 
 /* THE ART TABLE MUST NAME EVERY GENERATION, because its last row is a catch-all

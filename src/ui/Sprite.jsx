@@ -110,6 +110,34 @@ export function VariantFx({ id, variant, art = null }) {
       />
     );
   }
+  /* GLITCHED IS FOUR LAYERS, and it used to be none.
+
+     The tier was written as one animated `filter` on the sprite, and the
+     filter half of it never ran: `.sprite-glitched` sets `filter` with
+     `!important` (it has to - see styles.css) and an important declaration
+     outranks an animation, so every channel-split keyframe was discarded and
+     only the `transform` jitter survived. Reported as "it just shakes", which
+     is exactly what is left of a glitch when you delete its colour.
+
+     So the split is two SILHOUETTES behind the sprite, offset in opposite
+     directions during the burst - which is what `drop-shadow` was drawing
+     anyway, and it cannot be outranked because nothing else on the element
+     wants those properties. The tears and the noise blocks are the other two
+     and were simply never ported.
+
+     All four are masked to `--art`, the sprite's own PNG: unmasked they are
+     rectangles of static over the grass rather than damage to the creature. */
+  if (variant === "glitched") {
+    const url = `url(${art ?? spriteUrl(id)})`;
+    return (
+      <>
+        <span className="glitch-ghost red" style={{ "--art": url }} aria-hidden="true" />
+        <span className="glitch-ghost cyan" style={{ "--art": url }} aria-hidden="true" />
+        <span className="glitch-tear" style={{ "--art": url }} aria-hidden="true" />
+        <span className="glitch-blocks" style={{ "--art": url }} aria-hidden="true" />
+      </>
+    );
+  }
   if (variant === "astral") return <span className="astral-aura" aria-hidden="true" />;
   if (variant === "shiny") {
     return (
@@ -119,6 +147,54 @@ export function VariantFx({ id, variant, art = null }) {
     );
   }
   return null;
+}
+
+/* THE ENTRANCE, WHICH IS A DIFFERENT JOB FROM THE IDLE.
+
+   `VariantFx` is the layer a tier WEARS - the foil travelling, the aura
+   breathing - and it runs forever, which is exactly why it cannot also be the
+   thing that says "this one is special". A treatment you have been looking at
+   for four seconds is scenery. Origin had a real entrance (`origin-fx`: the
+   creature restoring itself out of its own silhouette) and the other seven had
+   none at all, so a Glitched Pikachu arrived exactly like an ordinary one and
+   you found out by reading the chip on the nameplate.
+
+   ONE MECHANISM, FOUR MOTIONS, A COLOUR EACH - not eight bespoke animations.
+   The motion says what KIND of rare it is, which is the distinction the whole
+   ladder is built on:
+
+     burst    something added   - Vivid's palette, Shiny's sparks
+     implode  something drawn in - Astral's starlight, Noir's colour draining
+     scan     something passing over - Holo's foil, Showdown's signal
+     tear     something broken  - Glitched, and only Glitched
+
+   Origin keeps `origin-fx` and gets nothing here: it already has the best
+   entrance in the game and two would fight.
+
+   It plays ONCE. The element is keyed on the encounter, so React mounts it
+   fresh per Pokemon and never restarts it on the re-render every step causes -
+   the same reason `e.ate` counts instead of flagging, from the other side. */
+const REVEAL = {
+  vivid: "burst", shiny: "burst",
+  astral: "implode", noir: "implode",
+  holo: "scan", showdown: "scan",
+  glitched: "tear",
+};
+
+export function TierReveal({ id, variant }) {
+  const motion = REVEAL[variant];
+  if (!motion) return null;
+  return (
+    <span
+      className={`tv tv-${motion} tv-${variant}`}
+      style={{ "--art": `url(${spriteUrl(id, variant)})` }}
+      aria-hidden="true"
+    >
+      <b className="tv-flash" />
+      <b className="tv-ring" />
+      <i /><i /><i /><i /><i /><i />
+    </span>
+  );
 }
 
 /* `fx` wraps the image so the layers have something to be absolute inside.

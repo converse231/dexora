@@ -14,7 +14,7 @@ import {
 import { berryById, artOf } from "../game/items.js";
 import Types from "./Types.jsx";
 import Gen from "./Gen.jsx";
-import Sprite, { spriteUrl } from "./Sprite.jsx";
+import Sprite, { spriteUrl, VariantFx, TierReveal } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 
   /* THE EVOLUTION CARD IS GONE, and "confusing" was the kind half of it.
@@ -156,6 +156,19 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
             alt={enc.name}
           />
 
+          {/* THE ENTRANCE. Keyed on the encounter so it plays once per
+              Pokemon rather than restarting on the re-render every step
+              causes, and gated on `monHere` like every other layer - a burst
+              over an empty patch of grass after something fled is the bug
+              this file already records for the foil. */}
+          {enc.variant && monHere && (
+            <TierReveal
+              key={`${enc.speciesId}-${enc.variant}`}
+              id={enc.speciesId}
+              variant={enc.variant}
+            />
+          )}
+
           {/* The tell, not just the artwork. A shiny Pidgey and an ordinary one
               differ by a few pixels of hue, which is not something to notice
               while deciding what to throw. */}
@@ -175,6 +188,14 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
               style={{ "--art": `url(${spriteUrl(enc.speciesId)})` }}
               aria-hidden="true"
             />
+          )}
+
+          {/* GLITCHED, through `VariantFx` rather than hand-rolled here like
+              the four above it. Those predate the component; this one has no
+              reason to be a fifth copy, and the four layers it needs are
+              exactly the four the Box and the Dex already draw. */}
+          {enc.glitched && monHere && (
+            <VariantFx id={enc.speciesId} variant="glitched" />
           )}
 
           {/* The sky inside it, clipped to its own outline. */}

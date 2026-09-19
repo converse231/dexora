@@ -230,6 +230,18 @@ canvas {
   --ground-glow: rgba(255, 255, 255, .3);
 }
 
+/* Safari Zone: Hoenn light. Warmer and hazier than Kanto's - the one area in
+   the game drawn from a different decomp, and the sky is where that reads. */
+.battle[data-area="safari"] {
+  --sky: linear-gradient(#86cfe6 0%, #bde7dd 55%, #e2efc4 100%);
+}
+/* Cinderpeak: open sky with a volcano under it. Warm and hazy rather than
+   clear - the one outdoor area in the game where the air is full of ash. */
+.battle[data-area="cinder"] {
+  --sky: linear-gradient(#c9a08a 0%, #e6c4a6 55%, #f0dcc0 100%);
+  --ground-tint: linear-gradient(rgba(255, 230, 200, .10), rgba(70, 34, 22, .30));
+  --ground-lip: rgba(60, 28, 18, .28);
+}
 /* Deep Woods: the same grass, under a canopy. Green light, not blue. */
 .battle[data-area="woods"] {
   --sky: linear-gradient(#7fb069 0%, #a8cf8e 55%, #cfe3b4 100%);
@@ -1850,6 +1862,10 @@ canvas {
    `overflow: hidden` clipping the falloff, which reads as a coloured cell
    rather than a glow coming off a creature. */
 .cell .holo-foil { inset: 6%; }
+/* The same 6% and for the same reason: the cell's sprite is drawn at 88% and
+   centred, so a layer at `inset: 0` masks itself to a silhouette 14% larger
+   than the thing it is meant to be damaging. */
+.cell .glitch-ghost, .cell .glitch-tear, .cell .glitch-blocks { inset: 6%; }
 .cell .astral-aura { inset: -2%; }
 .cell .shiny-spark i { width: 6px; height: 6px; box-shadow: 0 0 4px rgba(255, 226, 150, .95); }
 .cell .shiny-spark i:nth-child(2),
@@ -2451,14 +2467,71 @@ canvas {
 /* What the action is actually taking. Scrolls rather than growing, because a
    full sweep can be forty Pokemon and a dialog taller than the screen has no
    confirm button on it. */
+/* ---- picking what a sweep takes ---------------------------------------
+
+   The manifest was a receipt: here is what is about to go. It is a control
+   now, because a receipt cannot answer the thing it was reported with - two
+   Latios queued for Rare Candy, the dialog doing exactly what it said, and
+   what it said being the problem.
+
+   An unticked row is dimmed rather than hidden or struck through: it is still
+   part of what the sweep is ABOUT, it is simply not part of what the sweep
+   will take, and hiding it would make the list change length under the hand
+   that is reading it. */
+.cf-pickall {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 0 -2px;
+  font-family: var(--pixel); font-size: 9px; letter-spacing: .06em;
+  color: var(--ink-soft);
+}
+.cf-pickall span { flex: 1 1 auto; font-variant-numeric: tabular-nums; }
+.cf-pickall button {
+  font-family: var(--pixel); font-size: 9px; letter-spacing: .08em;
+  padding: 4px 9px 3px; border-radius: 6px; cursor: pointer;
+  border: 2px solid var(--line); background: var(--paper); color: var(--ink);
+  box-shadow: 0 2px 0 var(--line);
+}
+.cf-pickall button:hover { border-color: var(--path); color: var(--path); }
+.cf-pickall button:active { transform: translateY(2px); box-shadow: none; }
+.cf-pickall button:focus-visible { outline: 2px solid var(--canopy); outline-offset: 2px; }
+
+/* The row is the hit target, which is what makes it a `<label>` wrapping a
+   real checkbox rather than a div with a click handler: the text is the
+   accessible name for free, and a keyboard reaches every row by tabbing. */
+.cf-manifest.pick .cf-row { cursor: pointer; border-radius: 7px; }
+.cf-manifest.pick .cf-row:hover { background: var(--surface-2); }
+.cf-tick {
+  flex: none; width: 15px; height: 15px; margin: 0; cursor: pointer;
+  accent-color: var(--canopy);
+}
+/* Dimmed, not struck: it is still what the sweep is about. `:has` is what lets
+   the ROW know its own checkbox is off - no second class to keep in step with
+   the input's real state, which is the shape that drifts. */
+.cf-manifest.pick .cf-row:has(.cf-tick:not(:checked)) { opacity: .45; }
+.cf-manifest.pick .cf-row:has(.cf-tick:focus-visible) {
+  outline: 2px solid var(--canopy); outline-offset: 1px;
+}
+/* Why it arrived unticked, on the row. A default whose reason is only in the
+   note underneath reads as the dialog having lost your place. */
+.cf-why {
+  font-family: var(--pixel); font-size: 7.5px; letter-spacing: .06em;
+  font-weight: 400; padding: 3px 5px 2px; border-radius: 4px;
+  background: var(--gold); color: #3a2a05; white-space: nowrap;
+}
+
 .cf-manifest {
   list-style: none; margin: 0 0 12px; padding: 8px 10px;
   max-height: 168px; overflow-y: auto;
   background: var(--surface-2); border-radius: 9px;
   display: grid; gap: 4px;
 }
-.cf-manifest li {
-  display: flex; align-items: center; gap: 8px;
+/* The `li` is the list item and `.cf-row` is the row: the flex belongs to the
+   thing that holds the sprite and the label, which since the sweep became
+   pickable is a `<label>` wrapping a real checkbox rather than the `li`
+   itself. */
+.cf-manifest li { display: block; }
+.cf-manifest .cf-row {
+  display: flex; align-items: center; gap: 8px; padding: 2px 4px;
   font-size: 12.5px; color: var(--ink-soft);
 }
 /* 28px: the sprites are 64px art, and at 28 a Pidgey and a Spearow are still
@@ -2468,8 +2541,8 @@ canvas {
   flex: none; width: 28px; height: 28px;
   object-fit: contain; image-rendering: pixelated;
 }
-.cf-manifest li span { flex: 1; min-width: 0; }
-.cf-manifest li em {
+.cf-manifest .cf-row span { flex: 1; min-width: 0; }
+.cf-manifest .cf-row em {
   font-style: normal; font-family: var(--pixel); font-size: 8px;
   color: var(--ink-faint); text-align: right;
   font-variant-numeric: tabular-nums;
@@ -3197,21 +3270,109 @@ canvas {
   filter: contrast(1.12) saturate(1.15) !important;
   animation: glitch-shift 2.6s steps(1, end) infinite;
 }
+/* NO `filter` IN HERE, AND THAT IS THE FIX rather than a simplification.
+   Every frame of this used to carry one - a channel split at 46% and 51%, a
+   blown-out flash at 78% - and NOT ONE of them ever drew, because the rule
+   above sets `filter` with `!important` and an important author declaration
+   outranks an animation. (That is the same cascade fact the rule above
+   depends on, read from the other side: it is what protects the tier from
+   `mon-appear`, and it is what killed the tier's own keyframes.) What was
+   left was the jitter on its own - reported from play as "it just shakes",
+   which is precisely what a glitch is without its colour.
+
+   So this animates only what nothing else claims. The split, the tears and
+   the noise are four masked layers from `VariantFx`, on the same 2.6s clock
+   and the same burst frames, where no `!important` can reach them. */
 @keyframes glitch-shift {
-  0%, 44%, 100% { filter: contrast(1.12) saturate(1.15); transform: translate(0, 0); }
-  46% {
-    filter: contrast(1.3) saturate(1.5)
-      drop-shadow(3px 0 0 rgba(255, 0, 72, .9)) drop-shadow(-3px 0 0 rgba(0, 238, 255, .9));
-    transform: translate(-2px, 1px);
-  }
-  51% {
-    filter: contrast(1.12) saturate(1.15)
-      drop-shadow(-4px 0 0 rgba(255, 0, 72, .7)) drop-shadow(4px 0 0 rgba(0, 238, 255, .7));
-    transform: translate(3px, -1px);
-  }
-  56% { filter: contrast(1.12) saturate(1.15); transform: translate(-1px, 0); }
-  78% { filter: contrast(1.5) saturate(.4) brightness(1.4); transform: translate(2px, 0); }
-  81% { filter: contrast(1.12) saturate(1.15); transform: none; }
+  0%, 44%, 100% { transform: translate(0, 0); }
+  46% { transform: translate(-2px, 1px); }
+  51% { transform: translate(3px, -1px); }
+  56% { transform: translate(-1px, 0); }
+  78% { transform: translate(2px, 0); }
+  81% { transform: none; }
+}
+
+/* ---- the four glitch layers -------------------------------------------
+
+   Masked to `--art` - the sprite's own PNG - exactly as the Holo foil and the
+   Astral sky are, so the damage happens to the creature instead of to a
+   rectangle over the grass behind it.
+
+   THE SPLIT IS TWO SILHOUETTES BEHIND THE SPRITE, one red and one cyan,
+   z-index 0 against the sprite's 1. Behind is what makes it a fringe: a solid
+   fill masked to the outline and laid ON TOP would flood the whole creature,
+   where the same fill offset five pixels UNDER it shows only where the sprite
+   is not - which is what the `drop-shadow` pair was drawing before, and the
+   look the tier is named for.
+
+   `steps(1, end)` on all four, on one 2.6s clock (the blocks run at 1.9s so
+   the two noises drift against each other and the loop never repeats
+   exactly). Corruption is discrete - the data is wrong or it is not - and an
+   eased fade reads as a rendering fault where a hard cut reads as damage. */
+.glitch-ghost, .glitch-tear, .glitch-blocks {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+}
+.glitch-ghost { z-index: 0; }
+.glitch-ghost.red  { background: #ff0048; animation: glitch-red 2.6s steps(1, end) infinite; }
+.glitch-ghost.cyan { background: #00eeff; animation: glitch-cyan 2.6s steps(1, end) infinite; }
+@keyframes glitch-red {
+  0%, 44%, 100% { opacity: 0; transform: none; }
+  46% { opacity: .85; transform: translateX(-5px); }
+  51% { opacity: .65; transform: translateX(6px); }
+  56% { opacity: 0; transform: none; }
+  78% { opacity: .5; transform: translateX(-3px); }
+  81% { opacity: 0; transform: none; }
+}
+@keyframes glitch-cyan {
+  0%, 44%, 100% { opacity: 0; transform: none; }
+  46% { opacity: .85; transform: translateX(5px); }
+  51% { opacity: .65; transform: translateX(-6px); }
+  56% { opacity: 0; transform: none; }
+  78% { opacity: .5; transform: translateX(3px); }
+  81% { opacity: 0; transform: none; }
+}
+
+/* Scanline tears: two bands of different periods sliding independently, so
+   the picture reads as losing sync rather than as a pattern moving. */
+.glitch-tear {
+  z-index: 3; mix-blend-mode: screen;
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 5px,
+      rgba(255, 255, 255, .5) 5px 7px, transparent 7px 13px),
+    repeating-linear-gradient(0deg, transparent 0 17px,
+      rgba(0, 238, 255, .55) 17px 21px, transparent 21px 40px);
+  animation: glitch-tear 2.6s steps(1, end) infinite;
+}
+@keyframes glitch-tear {
+  0%, 43%, 100% { opacity: 0; background-position: 0 0, 0 0; }
+  46% { opacity: .9; background-position: 0 -7px, 9px 4px; }
+  50% { opacity: .55; background-position: 0 6px, -11px -9px; }
+  54% { opacity: .95; background-position: 0 -3px, 5px 12px; }
+  58% { opacity: 0; }
+  79% { opacity: .8; background-position: 0 9px, -6px 2px; }
+  82% { opacity: 0; }
+}
+
+/* Corrupt blocks. `difference` rather than `screen`: a bad byte does not add
+   light, it replaces what was there, and inverting the pixels underneath is
+   the closest a blend mode gets to saying so. */
+.glitch-blocks {
+  z-index: 3; mix-blend-mode: difference;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 11px,
+      rgba(255, 60, 140, .9) 11px 23px, transparent 23px 44px),
+    repeating-linear-gradient(0deg, transparent 0 8px,
+      rgba(120, 255, 220, .85) 8px 14px, transparent 14px 37px);
+  animation: glitch-blocks 1.9s steps(1, end) infinite;
+}
+@keyframes glitch-blocks {
+  0%, 25%, 100% { opacity: 0; background-position: 0 0, 0 0; }
+  27% { opacity: .7; background-position: 13px -6px, -9px 11px; }
+  30% { opacity: 0; }
+  62% { opacity: .55; background-position: -21px 14px, 17px -8px; }
+  65% { opacity: 0; }
 }
 
 /* SHOWDOWN HAS NO FILTER AT ALL - it is a different FILE, an animated GIF
@@ -3222,6 +3383,195 @@ canvas {
 
 @media (prefers-reduced-motion: reduce) {
   .sprite-glitched { animation: none !important; }
+}
+
+
+/* ---- THE TIER ENTRANCE -------------------------------------------------
+
+   A tier's ambient layer cannot also be its announcement: you have been
+   looking at the foil for four seconds by the time you decide what to throw,
+   so it is scenery. This plays ONCE, over the first second, and its job is
+   that you know before you have read anything.
+
+   `--tv` is the tier's colour and the modifier class picks the motion; there
+   are four, and which one a tier gets says what KIND of rare it is rather than
+   how rare - burst adds, implode draws in, scan passes over, tear breaks.
+   Origin is deliberately absent: `origin-fx` already restores the creature out
+   of its own silhouette, and two entrances would fight.
+
+   z-index 3, the effect-layer row, so it sits over the sprite (1) and under
+   the thrown ball (4). `pointer-events: none` throughout - a burst under the
+   cursor eating a click on THROW is the worst possible moment for it. */
+.tv {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  --tv: #fff; --tv2: #fff;
+}
+.tv-vivid    { --tv: #ff4fa3; --tv2: #ffd24f; }
+.tv-noir     { --tv: #f4f4f8; --tv2: #6b6b78; }
+.tv-holo     { --tv: #7fffd4; --tv2: #ff7fe0; }
+.tv-glitched { --tv: #ff0048; --tv2: #00eeff; }
+.tv-astral   { --tv: #9ec4ff; --tv2: #6a5cdc; }
+.tv-shiny    { --tv: #ffe08a; --tv2: #fff6d0; }
+.tv-showdown { --tv: #7fd9ff; --tv2: #c9f0ff; }
+
+/* The flood: the tier's colour poured INTO the creature's own outline, so it
+   reads as the Pokemon being that thing rather than as a light shone at it.
+   Masked to `--art` for the reason every layer here is - see `spriteUrl`. */
+.tv-flash {
+  position: absolute; inset: 0; opacity: 0;
+  background: var(--tv); mix-blend-mode: screen;
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+}
+/* The ring is NOT masked - it is the shockwave leaving, and clipping it to the
+   sprite would make it a glow instead. */
+.tv-ring {
+  position: absolute; left: 50%; top: 52%; width: 34%; aspect-ratio: 1;
+  margin: -17% 0 0 -17%; border-radius: 50%;
+  border: 2px solid var(--tv); opacity: 0;
+}
+.tv i {
+  position: absolute; left: 50%; top: 50%; width: 7px; height: 7px;
+  margin: -3.5px 0 0 -3.5px; border-radius: 50%;
+  background: var(--tv2); box-shadow: 0 0 6px var(--tv); opacity: 0;
+  /* Six directions, so the scatter reads as a burst rather than a line. */
+  --a: 0deg;
+}
+.tv i:nth-child(3) { --a:  15deg; }
+.tv i:nth-child(4) { --a:  75deg; }
+.tv i:nth-child(5) { --a: 140deg; }
+.tv i:nth-child(6) { --a: 205deg; }
+.tv i:nth-child(7) { --a: 265deg; }
+.tv i:nth-child(8) { --a: 325deg; }
+
+/* BURST - something added. Vivid and Shiny. */
+.tv-burst .tv-flash { animation: tv-flood 620ms ease-out both; }
+.tv-burst .tv-ring  { animation: tv-out 720ms cubic-bezier(.15,.75,.35,1) both; }
+.tv-burst i         { animation: tv-fly 780ms cubic-bezier(.1,.7,.3,1) both; }
+@keyframes tv-flood { 0% { opacity: 0; } 18% { opacity: .85; } 100% { opacity: 0; } }
+@keyframes tv-out {
+  0%   { opacity: 0;  transform: scale(.25); border-width: 5px; }
+  15%  { opacity: .95; }
+  100% { opacity: 0;  transform: scale(3.4); border-width: 1px; }
+}
+@keyframes tv-fly {
+  0%   { opacity: 0; transform: rotate(var(--a)) translateX(0) scale(.4); }
+  22%  { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(78px) scale(.7); }
+}
+
+/* IMPLODE - something drawn IN. Astral's starlight, Noir's colour draining
+   out of the frame. Same parts, run backwards, which is the whole point of
+   having parts rather than eight animations. */
+.tv-implode .tv-flash { animation: tv-flood 900ms ease-in both; }
+.tv-implode .tv-ring  { animation: tv-in 820ms cubic-bezier(.3,.1,.2,1) both; }
+.tv-implode i         { animation: tv-fall 900ms cubic-bezier(.3,.05,.2,1) both; }
+@keyframes tv-in {
+  0%   { opacity: 0;  transform: scale(3.6); border-width: 1px; }
+  25%  { opacity: .9; }
+  100% { opacity: 0;  transform: scale(.2);  border-width: 5px; }
+}
+@keyframes tv-fall {
+  0%   { opacity: 0; transform: rotate(var(--a)) translateX(92px) scale(.5); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(0) scale(.2); }
+}
+
+/* SCAN - something passing OVER. Holo's foil and Showdown's signal resolving.
+
+   THE FLOOD IS THE ANNOUNCEMENT AND THE MOTION IS ONLY CHARACTER, which this
+   one had backwards on its first pass: it was a travelling band and nothing
+   else, and rendered across nine frames of its own second it was very nearly
+   invisible - a faint shimmer where burst and implode both hit you with a
+   colour. The other three motions all open on a flood of the tier's colour
+   inside the creature's outline; scan skipping it made Holo and Showdown the
+   two tiers you could still meet without noticing, which is the whole thing
+   this component exists to fix. So it floods too, and the SWEEP is what makes
+   it a scan rather than a burst.
+
+   The sweep's numbers are `holo-sweep`'s, not new ones: a 300% background
+   travelling 220% -> -80%, which is the pairing already proven in this file.
+   The first version used 260% and 170% -> -70%, and percentage
+   `background-position` is not "scroll by p%" - it aligns the p% point of the
+   IMAGE with the p% point of the BOX, so with an image wider than its box the
+   arithmetic runs backwards through negative offsets and a band that looks
+   like it crosses may never arrive. This file records that trap for the ball
+   strip; it is the same one. */
+.tv-scan .tv-flash { animation: tv-flood 700ms ease-out both; }
+.tv-scan .tv-ring {
+  left: 0; top: 0; width: 100%; height: 100%; margin: 0;
+  border: 0; border-radius: 0; mix-blend-mode: screen; opacity: 0;
+  background-image: linear-gradient(104deg,
+    transparent 30%, var(--tv) 44%, #fff 50%, var(--tv2) 56%, transparent 70%);
+  background-size: 300% 100%; background-repeat: no-repeat;
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+  animation: tv-sweep 780ms cubic-bezier(.35,0,.2,1) both;
+}
+/* The particles become scanlines: same six elements, laid across the sprite as
+   bands that resolve downward rather than thrown outward. */
+.tv-scan i {
+  left: 0; width: 100%; height: 3px; margin: 0; border-radius: 0;
+  background: var(--tv); box-shadow: none; mix-blend-mode: screen;
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+  animation: tv-line 620ms steps(6, jump-none) both;
+}
+.tv-scan i:nth-child(3) { top: 12%; animation-delay: 0ms; }
+.tv-scan i:nth-child(4) { top: 28%; animation-delay: 40ms; }
+.tv-scan i:nth-child(5) { top: 44%; animation-delay: 80ms; }
+.tv-scan i:nth-child(6) { top: 60%; animation-delay: 120ms; }
+.tv-scan i:nth-child(7) { top: 76%; animation-delay: 160ms; }
+.tv-scan i:nth-child(8) { top: 90%; animation-delay: 200ms; }
+@keyframes tv-sweep {
+  0%   { opacity: 0;   background-position: 220% 0; }
+  10%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0;   background-position: -80% 0; }
+}
+@keyframes tv-line {
+  0%   { opacity: .9; transform: scaleY(2.4); }
+  100% { opacity: 0;  transform: scaleY(.4); }
+}
+
+/* TEAR - something BROKEN, and only Glitched gets it. `steps`, never ease:
+   corruption is discrete, which is the note the tier's own layers carry. The
+   flash is the channel split held for three hard frames. */
+.tv-tear .tv-flash { animation: tv-rip 700ms steps(1, end) both; }
+.tv-tear .tv-ring {
+  left: 0; top: 0; width: 100%; height: 100%; margin: 0;
+  border: 0; border-radius: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 9px,
+              var(--tv2) 9px 19px, transparent 19px 38px);
+  mix-blend-mode: difference;
+  animation: tv-blocks 700ms steps(1, end) both;
+}
+.tv-tear i { animation: none; opacity: 0; }
+@keyframes tv-rip {
+  0%   { opacity: 0;  transform: none; }
+  8%   { opacity: .9; transform: translateX(-7px); }
+  22%  { opacity: .8; transform: translateX(8px); }
+  36%  { opacity: .9; transform: translateX(-4px); }
+  50%  { opacity: 0;  transform: none; }
+  68%  { opacity: .7; transform: translateX(5px); }
+  80%  { opacity: 0;  transform: none; }
+}
+@keyframes tv-blocks {
+  0%   { opacity: 0;   background-position: 0 0; }
+  10%  { opacity: .75; background-position: 17px 0; }
+  26%  { opacity: 0; }
+  40%  { opacity: .6;  background-position: -23px 0; }
+  52%  { opacity: 0; }
+  70%  { opacity: .5;  background-position: 11px 0; }
+  82%  { opacity: 0; }
+}
+
+/* An entrance is the one thing here that is pure announcement, so under
+   `prefers-reduced-motion` it goes entirely rather than being parked: the
+   nameplate chip already names the tier in words, and the ambient layer is
+   still there to look at. */
+@media (prefers-reduced-motion: reduce) {
+  .tv, .tv * { animation: none !important; opacity: 0 !important; }
 }
 
 /* ---------- the tooltip ----------
@@ -3821,6 +4171,20 @@ button:disabled { transition: none; }
      a Holo with no band on it is just a slightly brighter Pokemon, and the
      band is how you know which tier it is. */
   .holo-foil { animation: none; background-position: 58% 0; }
+  /* The wore-off card still has to LEAVE, or it stacks on the next one. With
+     no animation it would hold at full opacity until React unmounts it, which
+     is fine - the timer is what removes it - so only the slide is dropped. */
+  .fieldbox.worn > span { animation: none; }
+  /* And Glitched parks mid-SPLIT, for exactly that reason. Its own filter is
+     contrast 1.12 - not something anybody identifies a tier by - so stopping
+     the layers dead would leave the loudest tier in the game looking like an
+     ordinary Pokemon. A held channel split is still unmistakably a glitch,
+     and it is the one frame of the burst that says so on its own. The tears
+     and the blocks do stop: they are the flicker, which is the part a reduced
+     -motion setting is actually asking about. */
+  .glitch-ghost, .glitch-tear, .glitch-blocks { animation: none; }
+  .glitch-ghost.red  { opacity: .45; transform: translateX(-3px); }
+  .glitch-ghost.cyan { opacity: .45; transform: translateX(3px); }
   button:not(:disabled):active { transform: none; }
 }
 
@@ -3887,6 +4251,37 @@ button:disabled { transition: none; }
 .fieldbox b { font-size: 17px; font-weight: 400; line-height: 1.05; }
 .fieldbox i { font-style: normal; font-size: 8.5px; letter-spacing: .08em; opacity: .8; }
 .fieldbox u { text-decoration: none; display: grid; }
+
+/* IT WORE OFF, and this is the same card gone cold rather than a new object.
+   An effect ending is the one thing that happens in this corner with no tell
+   at all: the card simply stops being there, which is indistinguishable from
+   nothing having happened, and the next four hundred steps quietly cost what
+   they always did. Reported as wanting to be told.
+
+   So the card that was counting down is replaced, in place, by the same card
+   saying what left - grey where the live one is lit, and with the icon
+   drained, because the whole message is "this is no longer doing anything".
+   It slides in and fades itself out; there is nothing to decide, so there is
+   nothing to dismiss. */
+.fieldbox.worn > span {
+  background: rgba(24, 24, 28, .82);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .22) inset;
+  color: rgba(255, 255, 255, .72);
+  animation: worn-in 260ms ease-out both, worn-out 420ms ease-in 2180ms both;
+}
+.fieldbox.worn img, .fieldbox.worn .item-fx { filter: grayscale(1) opacity(.55); }
+/* The name is the thing being read here, where on the live card it is the
+   number - so it steps down to the size the live card gives its caption. */
+.fieldbox.worn b { font-size: 12px; letter-spacing: .02em; }
+.fieldbox.worn i { opacity: .62; }
+@keyframes worn-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes worn-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 
 @media (hover: none) and (pointer: coarse) {
   /* A phone has less room, so the card gives some back - but it stays the
@@ -4107,27 +4502,58 @@ button:disabled { transition: none; }
 @media (hover: none) and (pointer: coarse) {
   .ballwrap { display: none; }
 }
+/* THE RAIL LIES DOWN, ALONG THE BOTTOM RIGHT.
+
+   It was a column down the LEFT edge, chosen because that strip is empty both
+   while walking and mid-battle. It is still empty; it is also the tallest
+   thing on the screen, and the two costs of that only showed once there were
+   eight balls and a kit under them. A column is the axis the viewport has
+   least of - the map is 15:11 - so the rail was the one panel that could run
+   out of room, which is the whole history in the note below this one. And
+   down the left it sat directly above the minimap's corner, so the left edge
+   carried both permanent overlays while the bottom right carried nothing.
+
+   Horizontal along the bottom right solves both: width is the axis there is
+   spare of, the balls read as a hand of tiles rather than a list, and the
+   three overlays now sit one per corner - minimap bottom left, clock and
+   running effects top right, inventory bottom right.
+
+   THE CAP TURNS WITH IT. A horizontal strip cannot run off the bottom of the
+   map, so `max-height` stops being the interesting bound and `max-width`
+   starts: the parent less the two 3% insets, with a floor so a narrow window
+   leaves four tiles standing rather than squeezing to nothing. The scroller
+   turns with it too - `overflow-x` - and the reasoning is unchanged and was
+   expensive, so it is kept in full below. */
 .ballrail {
-  position: absolute; left: 3%; top: max(92px, 9.5cqw);
-  /* The rail was four balls tall and is eight now, and it is absolutely
-     positioned with a `top` and no floor - so on a WIDE BUT SHORT window the
-     bottom two ran off the end of the map with nothing to say so. Worked out
-     rather than guessed: the viewport is capped at `(100vh - 210px) * 15/11`
-     wide and is 15:11, so a 1366x600 window gives it 286px of height while
-     eight tiles plus the tab need about 250 under a 92px offset. The cap is
-     the parent's height less that same offset, so the two expressions cannot
-     drift, and the list scrolls inside it rather than overflowing. */
-  /* A FLOOR UNDER THE CAP. The cap alone is `100%` of the offset parent less
-     a 92px offset, and in an ENCOUNTER both terms are measured against a
-     different box: `.battle` sets `container-type: inline-size`, so `cqw`
-     resolves against the battle rather than the viewport. On a short window
-     that left the rail shorter than a single row - and `.br-list` is
-     `overflow-y: auto`, so ONE berry drew a scrollbar with arrows on it, which
-     is what was reported. A cap with no floor is a box that can be squeezed to
-     nothing; `max()` gives it four rows to stand on before anything scrolls. */
-  max-height: max(170px, calc(100% - max(92px, 9.5cqw) - 3%));
-  display: flex; flex-direction: column; align-items: stretch; gap: 0;
-  padding: .7cqw .55cqw; pointer-events: auto;
+  position: absolute; right: 3%; bottom: 3%;
+  /* Four tiles of floor under a cap of "whatever the parent leaves", exactly
+     as the vertical version had four rows. A cap with no floor is a box that
+     can be squeezed to nothing, and in an ENCOUNTER both terms measure a
+     different box - `.battle` sets `container-type: inline-size`, so `cqw`
+     resolves against the battle rather than the viewport. */
+  max-width: max(200px, calc(100% - 6%));
+  /* AND THE CAP HAS TO BE ENFORCED BY SOMETHING. It was not, on the vertical
+     version: `.br-wrap` was an ordinary flex item whose `min-size` is `auto`,
+     so the rail grew straight past its own cap and the last balls ran off the
+     end of the map. Measured in a render at 960x300 with the rail outlined -
+     the content finished about 200px outside the box.
+
+     That is also what the reported berry scrollbar really was. Both lists
+     carried `overflow: auto`, so whichever box the broken layout squeezed
+     drew one, and the short one is the one that loses. Two earlier attempts
+     missed it: raising the cap cannot help when the cap is not being
+     honoured, and turning the kit's own overflow off only moved the overflow
+     outside the rail.
+
+     THE SCROLLER IS HERE, AND IT IS ONE. Putting it on `.br-wrap` does not
+     work, because that is the GRID: a grid lays its tracks out inside its own
+     box, so constraining it collapses the `1fr` track to nothing and leaves
+     no overflow to scroll - rendered, and it showed three berries and no
+     balls. The balls are first in the flow and so are the part you always
+     see, which is the right priority in front of a Pokemon. */
+  overflow-x: auto; overflow-y: hidden;
+  display: flex; flex-direction: row; align-items: center; gap: 0;
+  padding: .55cqw .7cqw; pointer-events: auto;
   background: rgba(255, 255, 255, .84);
   border: 2px solid var(--line-firm); border-radius: 13px;
   box-shadow: 0 2px 0 var(--line-firm);
@@ -4137,6 +4563,7 @@ button:disabled { transition: none; }
    number worth carrying around while you walk. */
 .br-tab {
   display: flex; align-items: center; justify-content: center; gap: .5cqw;
+  flex: none;
   padding: .25cqw .55cqw .35cqw; border: 0; border-radius: 8px;
   border-bottom: 2px solid transparent; transition: border-color .22s ease;
   background: transparent; cursor: pointer; font-family: var(--pixel);
@@ -4147,7 +4574,12 @@ button:disabled { transition: none; }
 .ballrail.pinned .br-tab:hover { background: transparent; }
 /* A rule under the tab, so the total reads as the heading of the list rather
    than as a fifth ball. Only when there is a list to head. */
-.ballrail:not(.shut) .br-tab { border-bottom-color: var(--line); }
+/* A rule to the RIGHT of the tab now rather than under it: the total heads the
+   strip from its near end, which is the same relationship turned 90 degrees. */
+.ballrail:not(.shut) .br-tab {
+  border-bottom-color: transparent; border-right: 2px solid var(--line);
+  padding-right: .6cqw; margin-right: .2cqw;
+}
 .br-tab img { width: 3.2cqw; min-width: 15px; image-rendering: pixelated; }
 .br-tab em {
   font-style: normal; font-size: 1.5cqw; color: var(--ink);
@@ -4156,28 +4588,75 @@ button:disabled { transition: none; }
 .br-chev { font-size: 1.9cqw; line-height: 1; color: var(--ink-faint); }
 .br-tab:hover .br-chev { color: var(--path); }
 
+/* THE COLLAPSE TURNED WITH THE RAIL: a 0fr/1fr COLUMN rather than row, so the
+   strip closes sideways into its tab. `grid-auto-flow: column` is what puts
+   the kit beside the balls instead of under them, and the second track is
+   implicit and `auto`, exactly as the vertical version's was. */
 .br-wrap {
-  display: grid; grid-template-rows: 0fr;
-  transition: grid-template-rows .22s ease;
+  display: grid; grid-auto-flow: column; grid-template-columns: 0fr;
+  transition: grid-template-columns .22s ease;
+  /* TOP, not centre. The ball tiles carry a key chip under them in an
+     encounter and the kit tiles do not, so centring floated the berries half a
+     chip high and the icons stopped sharing a line - the "two things in a flex
+     row are different heights" fault, one axis over. Aligned at the top, every
+     icon in the strip reads across. */
+  align-items: start;
+  /* AND IT KEEPS ITS NATURAL WIDTH, which is what lets the rail scroll.
+     `.ballrail` is a flex row with a cap on it and this is its only growing
+     item, so without `flex: none` it is squashed to whatever is left and
+     there is never anything to scroll. */
+  flex: none;
 }
-.ballrail:not(.shut) .br-wrap { grid-template-rows: 1fr; }
+.ballrail:not(.shut) .br-wrap { grid-template-columns: 1fr; }
+/* AND THE KIT COLLAPSES ON ITS OWN, because `grid-template-columns: 0fr`
+   reaches the FIRST track and the kit is in the second - an implicit `auto`
+   one, created by `grid-auto-flow: column`. Shut, the rail showed its tab and
+   then three berries floating beside it; rendered, or it would have shipped.
+
+   Its own `max-width` rather than a second track on the grid, because
+   `0fr -> auto` is not interpolable and the pair would snap where the balls
+   glide. It is already `overflow: hidden` for the same animation. */
+.br-kit {
+  transition: max-width .22s ease, padding-left .22s ease,
+              margin-left .22s ease, border-left-width .22s ease;
+}
+.ballrail.shut .br-kit {
+  max-width: 0; padding-left: 0; margin-left: 0; border-left-width: 0;
+}
 .br-list {
   list-style: none; margin: 0; padding: 0;
   /* `overflow: hidden` while closed is what lets the 0fr/1fr row animate; once
      open it has to be able to scroll, or a capped rail simply clips the balls
      it cannot fit. */
-  min-height: 0; overflow: hidden;
-  display: flex; flex-direction: column; gap: .3cqw;
+  min-width: 0; overflow: hidden;
+  display: flex; flex-direction: row; align-items: stretch; gap: .3cqw;
 }
-.ballrail:not(.shut) .br-list { padding-top: .35cqw; overflow-y: auto; }
+.ballrail:not(.shut) .br-list { padding-left: .35cqw; }
+/* A TILE IS THE THROW BUTTON WITH ITS KEY CHIP UNDER IT - two buttons, so they
+   are SIBLINGS in the li rather than one nested in the other, which is neither
+   valid nor reachable. Stacked rather than side by side now that the strip is
+   horizontal: width is the scarce axis here, and the chip is two characters. */
+.br-list > li { display: flex; flex-direction: column; align-items: stretch; gap: .2cqw; }
+.br-list > li > .br-ball { flex: 1 1 auto; min-width: 0; }
+
+/* AND THE KIT IS NOT THE STRIP THAT SHOULD SCROLL. There are two `.br-list`s -
+   up to nine balls, then one to three berries under a rule - and the rule
+   above puts `overflow-y: auto` on both, so a squeezed rail could put a
+   scrollbar with arrows on it around a single berry. Reported twice.
+
+   The kit needs no rule of its own. It did have one - `flex: none; overflow:
+   visible` - and `flex: none` there did nothing whatever, because `.br-wrap`
+   is a grid and the kit is a grid item. It sat under a comment claiming to be
+   the thing that made the layout work. The rail's own `overflow-y` is where
+   the scrolling lives now. */
 
 /* One line per ball: art, how many, and the key that throws it. The count sat
    on the sprite's corner as a badge to begin with and covered half the ball -
    at this size the art is only about twenty pixels, so anything riding it wins.
    Reading across is also just what a bag looks like. */
 .br-ball {
-  display: flex; align-items: center; gap: .55cqw;
-  padding: .4cqw .5cqw; width: 100%;
+  display: flex; flex-direction: column; align-items: center; gap: .15cqw;
+  padding: .4cqw .45cqw; width: 100%;
   border: 2px solid transparent; border-radius: 9px;
   background: transparent; color: var(--ink);
   font-family: var(--pixel);
@@ -4194,8 +4673,8 @@ button:disabled { transition: none; }
    "which throw", these are "anything else first" - and an unruled second run
    of tiles reads as more balls. */
 .br-kit {
-  margin-top: .5cqw; padding-top: .5cqw;
-  border-top: 2px solid rgba(255, 255, 255, .18);
+  margin-left: .5cqw; padding-left: .5cqw;
+  border-left: 2px solid rgba(255, 255, 255, .18);
 }
 /* A tier's own layers need a box to be absolute inside, and `.sprite-fx` is
    `display: block` with no size of its own - so the wrapper takes the width
@@ -4225,8 +4704,8 @@ button:disabled { transition: none; }
   .br-pop { animation-duration: 1ms; }
 }
 .br-ball em {
-  flex: 1 1 auto; font-style: normal; font-size: 1.55cqw;
-  color: var(--ink); font-variant-numeric: tabular-nums; text-align: right;
+  flex: none; font-style: normal; font-size: 1.35cqw; line-height: 1;
+  color: var(--ink); font-variant-numeric: tabular-nums; text-align: center;
 }
 .br-ball kbd {
   font-size: 1.1cqw; line-height: 1; padding: .3cqw .5cqw .2cqw;
@@ -4235,13 +4714,52 @@ button:disabled { transition: none; }
 }
 .ballrail.live .br-ball:not(:disabled) kbd { background: var(--canopy); }
 
+/* THE KEY CHIP IS A BUTTON, and it wears the `kbd` it replaced: it still says
+   which key throws this ball, and that has to go on reading as a key. Pressing
+   it moves the ball to slot 1.
+
+   No separate "this is the first one" colour, because the chip already prints
+   `1` and a second marker for the same fact is one more thing to keep in step.
+   Gold and canopy are both spoken for in this rail anyway - gold is a ball
+   whose condition is live, canopy is a key you can press - and a third meaning
+   on either would make both ambiguous. */
+/* THE PLAIN `kbd` SHARES THE CHIP'S BOX. The Master Ball gets no promote
+   button - `defaultBall` refuses a ball that cannot fail, so a chip there
+   would offer a slot it cannot have - and left as a bare inline `kbd` under a
+   tile it sat outside the rail's own rounded box entirely. Rendered, which is
+   the only way that was ever going to show: it is one element out of sixty and
+   nothing about it is wrong in the markup. */
+.br-list > li > kbd {
+  display: block; text-align: center;
+  font-family: var(--pixel); font-size: 1.1cqw; line-height: 1;
+  padding: .3cqw .5cqw .2cqw; border-radius: 5px; border: 0;
+  background: var(--ink-faint); color: var(--surface);
+}
+.ballrail.live .br-list > li > kbd { background: var(--canopy); }
+.br-key {
+  align-self: stretch;
+  font-family: var(--pixel); font-size: 1.1cqw; line-height: 1;
+  padding: .3cqw .5cqw .2cqw; min-width: 2.1cqw;
+  border-radius: 5px; border: 0; cursor: pointer;
+  background: var(--canopy); color: var(--surface);
+}
+.br-key:hover { background: var(--path); color: var(--ink); }
+.br-key:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* Already first: pressing it would do nothing, so it does not offer to. */
+.br-key.first { cursor: default; }
+.br-key.first:hover { background: var(--canopy); color: var(--surface); }
+
 /* A situational ball while its condition holds. Gold, and only ever on screen
    when the ball is genuinely the best thing in the bag - so the rail answers
    "which one" without the player having to remember four rules. */
 .br-ball.boosted { border-color: var(--gold); background: rgba(255, 206, 110, .18); }
+/* On a TILE there is no end of a row to sit at, so it rides the corner - and
+   the tile has to be a containing block for it. */
+.br-ball { position: relative; }
 .br-boost {
-  font-style: normal; font-size: 1.1cqw; line-height: 1;
-  padding: .3cqw .45cqw .2cqw; border-radius: 5px;
+  position: absolute; top: -.35cqw; right: -.35cqw;
+  font-style: normal; font-size: 1.05cqw; line-height: 1;
+  padding: .25cqw .35cqw .15cqw; border-radius: 5px;
   background: var(--gold); color: #3a2a05;
 }
 

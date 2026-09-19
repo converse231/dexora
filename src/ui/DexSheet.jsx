@@ -25,6 +25,7 @@ import { label } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
 import {
   foundIn, howOften, speciesById, areaOpen, BIOMES, tiersFor, ROSETTE_NEED,
+  TIER_TELL,
 } from "../game/biomes.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
@@ -40,16 +41,7 @@ import Mark from "./Marks.jsx";
 
    A tier with no line here still renders; it just has no blurb. That is the
    right failure - a missing sentence beats a missing column. */
-const BLURB = {
-  origin: "the 1996 artwork",
-  holo: "pressed in foil",
-  shiny: "the alternate palette",
-  astral: "made of starlight",
-  glitched: "corrupted data",
-  vivid: "the colours turned up",
-  noir: "no colour at all",
-  showdown: "it moves",
-};
+const BLURB = TIER_TELL;
 const LABEL = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /* Where this one turns up, in a sentence a player can act on.

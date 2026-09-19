@@ -19,6 +19,24 @@ export default function Confirm({
      of levels is one you can check. Optional, because most dialogs here are
      about a single named thing and a manifest of one is noise. */
   manifest = [],
+  /* PICKING, and it is what turned this from a receipt into a control.
+
+     A sweep is one button over the whole box, and the manifest was a read-only
+     list of what it was about to take - which is fine until the list contains
+     something you would never give up. Reported with a screenshot of two Latios
+     queued for Rare Candy: the dialog was doing exactly what it said, and what
+     it said was the problem.
+
+     A row carries `uids` to become pickable, and `off: true` to arrive
+     unticked. Confirm owns which are dropped because the set is thrown away
+     when the dialog closes - nothing outside it has a use for a half-made
+     decision - and hands the surviving uids to `onConfirm`.
+
+     `recount` is how the arithmetic stays honest while you tick: the totals at
+     the top and the number on the button are FUNCTIONS of what is still
+     selected, not strings built once. A receipt that does not move while you
+     change what you are buying is worse than no receipt. */
+  recount = null,
   note,
   /* TYPE IT TO MEAN IT. For the one or two actions where "are you sure" is not
      enough - deleting an account takes the dex, the profile and the save with
@@ -32,10 +50,31 @@ export default function Confirm({
   onCancel,
 }) {
   const [typed, setTyped] = useState("");
+  /* Keyed on `row.key`, not on an index: the manifest is rebuilt whenever the
+     box changes underneath and an index would move a tick onto a different
+     species. Seeded from the rows that ask to arrive off. */
+  const pickable = manifest.some((r) => r.uids);
+  const [dropped, setDropped] = useState(
+    () => new Set(manifest.filter((r) => r.off).map((r) => r.key)));
+  const kept = manifest.filter((r) => r.uids && !dropped.has(r.key));
+  const keptUids = kept.flatMap((r) => r.uids);
+  const live = pickable && recount ? recount(keptUids) : null;
+  const rows = live?.lines ?? lines;
+  const label = live?.confirmLabel ?? confirmLabel;
+  const toggle = (key) => setDropped((was) => {
+    const next = new Set(was);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const allOn = () => setDropped(new Set());
+  const allOff = () => setDropped(new Set(manifest.map((r) => r.key)));
   /* Case- and space-insensitive: this is a speed bump against a mis-click, not
      a password. Demanding exact case would only teach people to paste it. */
-  const armed = !typeToConfirm
-    || typed.trim().toLowerCase() === String(typeToConfirm).trim().toLowerCase();
+  const armed = (!typeToConfirm
+    || typed.trim().toLowerCase() === String(typeToConfirm).trim().toLowerCase())
+    /* Untick everything and there is no action left to confirm. The button
+       says so rather than running a sweep over nothing and reporting "+0". */
+    && (!pickable || keptUids.length > 0);
 
   // Stops the map walking under the dialog while it is open.
   useModalLock();
@@ -50,12 +89,14 @@ export default function Confirm({
         /* GATED THE SAME WAY THE BUTTON IS. Enter went straight through, which
            would have made the typed confirmation decorative: a stray Return
            with the dialog open deletes the account the field was guarding. */
-        if (armed) onConfirm();
+        if (armed) onConfirm(pickable ? keptUids : undefined);
       }
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [onConfirm, onCancel, armed]);
+    //  in the deps, or Enter fires the selection as it was when the
+    // dialog opened - which is the one moment it is guaranteed to be wrong.
+  }, [onConfirm, onCancel, armed, pickable, keptUids.join(",")]);
 
   return (
     <div className="sheet" {...useDismiss(onCancel)}>
@@ -68,9 +109,9 @@ export default function Confirm({
       >
         <h3 className="cf-title">{title}</h3>
 
-        {lines.length > 0 && (
+        {rows.length > 0 && (
           <dl className="cf-lines">
-            {lines.map(([key, value]) => (
+            {rows.map(([key, value]) => (
               <div className="cf-line" key={key}>
                 <dt>{key}</dt>
                 <dd>{value}</dd>
@@ -79,10 +120,43 @@ export default function Confirm({
           </dl>
         )}
 
+        {/* ALL or NONE, because the default is neither. Legendaries arrive
+            unticked, so "I did mean everything" would otherwise cost one click
+            per legendary in the box - and the opposite, picking one line out of
+            forty, is the same walk the other way. */}
+        {pickable && (
+          <div className="cf-pickall">
+            <span>{keptUids.length} of {manifest.reduce((n, r) => n + (r.uids?.length ?? 0), 0)} selected</span>
+            <button type="button" onClick={allOn}>ALL</button>
+            <button type="button" onClick={allOff}>NONE</button>
+          </div>
+        )}
+
         {manifest.length > 0 && (
-          <ul className="cf-manifest">
-            {manifest.map((row) => (
+          <ul className={`cf-manifest${pickable ? " pick" : ""}`}>
+            {manifest.map((row) => {
+              const on = row.uids && !dropped.has(row.key);
+              /* THE ROW SITS INSIDE ITS `li`, because only an `li` may be a
+                 child of a `ul` - a `label` there is invalid and the
+                 `.cf-manifest li` rules stop matching, which takes the layout
+                 with them. The `li` is the list item; `.cf-row` is the thing
+                 you click. */
+              const Tag = row.uids ? "label" : "div";
+              return (
               <li key={row.key}>
+              <Tag className="cf-row">
+                {/* A REAL CHECKBOX INSIDE A REAL LABEL. The whole row is the
+                    hit target that way, with no click handler and no
+                    `aria-label` to keep in step - the label's own text is the
+                    accessible name, which is exactly the thing being ticked. */}
+                {row.uids && (
+                  <input
+                    type="checkbox"
+                    className="cf-tick"
+                    checked={on}
+                    onChange={() => toggle(row.key)}
+                  />
+                )}
                 {/* The picture is the point of the list. A name is something
                     you read and check; a sprite is something you recognise
                     before you have finished reading, which is what you want
@@ -98,9 +172,15 @@ export default function Confirm({
                   />
                 )}
                 <span>{row.label}</span>
+                {/* WHY IT ARRIVED UNTICKED, said on the row rather than only in
+                    the note underneath. A default you cannot see the reason for
+                    reads as the dialog having lost your place. */}
+                {row.why && <b className="cf-why">{row.why}</b>}
                 {row.sub && <em>{row.sub}</em>}
+              </Tag>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
 
@@ -124,14 +204,14 @@ export default function Confirm({
         <div className="cf-actions">
           <button
             className={`cf-yes ${tone}`}
-            onClick={onConfirm}
+            onClick={() => onConfirm(pickable ? keptUids : undefined)}
             disabled={!armed}
             /* Focus the confirm button only when it can actually be used -
                autofocusing a disabled control puts focus nowhere, and when
                there is a word to type that field is where a hand should land. */
             autoFocus={!typeToConfirm}
           >
-            {confirmLabel}
+            {label}
           </button>
           <button className="cf-no" onClick={onCancel}>
             CANCEL

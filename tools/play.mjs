@@ -270,7 +270,81 @@ function until(e, what, label, max = 2000) {
   assert.equal(e.useField("repel"), true, "a repel refused to start over the others");
   assert.equal(e.state.field.variant, null, "a repel left a honey running underneath it");
   assert.equal(e.state.field.rarity, null, "a repel left a flute running underneath it");
-  console.log("field ok — counts down while walking; rarity and variant stack, repel is exclusive");
+  /* AND IT SAYS SO WHEN IT RUNS OUT. The only event in the game with no tell
+     of its own: the card in the corner stops being there, which is what
+     nothing happening also looks like. Driven through the real step handler,
+     because the announcement lives in the same three lines as the countdown
+     and a unit test of either would miss the other.
+
+     Walking is legitimate here - the walking IS the subject - and a REPEL is
+     the one effect that can be walked out safely, because it stops every
+     encounter so nothing can interrupt the leg. The steps are cut to one
+     first: 400 real tiles is not a test, it is a benchmark.
+
+     ONE ENGINE FOR THE WHOLE BLOCK. `boot()` does `raf.length = 0`, so
+     standing a second engine up midway through silently kills the first one -
+     its pending frame is dropped and it never asks for another. It looked
+     exactly like the trainer refusing to walk, down to the direction not even
+     changing, and it was this test rather than the engine. */
+  {
+    const f = boot(SAVE).e;
+    assert.equal(f.useField("repel"), true, "a repel refused to start");
+    assert.deepEqual(f.state.worn, [], "something wore off before anything ran");
+    f.state.field.repel.steps = 1;
+    for (let i = 0; i < 60 && !f.state.worn.length; i++) { f.press("right"); tick(16); }
+    f.clearHeld();
+    assert.equal(f.state.field.repel, null, "the repel did not actually run out");
+    assert.equal(f.state.worn.length, 1,
+      "a field effect ran out and said nothing - there is no way to notice it");
+    assert.equal(f.state.worn[0].id, "repel", "the notice named the wrong item");
+
+    /* IT IS NOT A CHEER. A cheer holds the screen for three seconds with
+       sparks on it, and an effect ending is news rather than an occasion - if
+       this ever starts queueing there, the walk is interrupted every 400
+       steps by a celebration of something running out. */
+    assert.equal(f.state.cheers.length, 0, "wearing off queued a celebration");
+
+    /* The notice clears, and the id is what a panel keys its timer on: two of
+       the same item wearing out have to be two notices, or the second card
+       inherits the tail of the first one's clock and vanishes early. */
+    const n = f.state.worn[0].n;
+    f.dropWorn();
+    assert.deepEqual(f.state.worn, [], "dropWorn left the notice up");
+
+    /* AND AN ENCOUNTER CAN START ON THE VERY STEP A REPEL RUNS OUT. The slot
+       is emptied at the top of `onArrive` and the encounter is rolled further
+       down the SAME function, so the step the repel dies on is the first
+       unprotected one in the game. */
+    if (f.state.encounter) {
+      f.flee();
+      for (let i = 0; i < 300 && f.state.encounter; i++) tick(16);
+    }
+    assert.equal(f.state.encounter, null, "could not get back out onto the map");
+
+    assert.equal(f.useField("repel"), true, "the save ran out of repels");
+    f.state.field.repel.steps = 1;
+    // Back the way we came: a leg that never moves never reaches `onArrive`.
+    for (let i = 0; i < 60 && !f.state.worn.length; i++) { f.press("left"); tick(16); }
+    f.clearHeld();
+    assert.ok(f.state.worn[0]?.n > n,
+      "a second expiry reused the first one's id - its card cannot restart");
+  }
+
+  /* CANCELLING IS NOT EXPIRING. Starting a repel clears any honey under it,
+     and telling somebody their honey wore off when they replaced it
+     themselves is worse than saying nothing at all. Its own engine, last,
+     for the rAF reason above. */
+  {
+    const g = boot(SAVE).e;
+    g.useField("honey");
+    g.useField("repel");
+    assert.equal(g.state.field.variant, null, "the repel did not cancel the honey");
+    assert.deepEqual(g.state.worn, [],
+      "cancelling an effect announced it as having worn off");
+  }
+
+  console.log("field ok — counts down while walking, says so when it runs out; " +
+    "rarity and variant stack, repel is exclusive");
 }
 
 /* A PRE-HOENN SAVE, THROUGH THE REAL LOADER. check.mjs proves the remap
@@ -1227,6 +1301,14 @@ function until(e, what, label, max = 2000) {
       ...SAVE, areaId, xp: LEVEL_XP[level - 1],
       bag: { "poke-ball": 5 },
       player: { x: spot.x, y: spot.y, dir: spot.dir },
+      /* UNDER A REPEL, BECAUSE THIS TEST WALKS. Getting ashore is the subject
+         here, so walking is the right way to drive it - but every step carries
+         a 7% chance of an encounter and an encounter stops movement, so the
+         trainer sometimes halted still afloat and the run failed about one time
+         in five. It was doing so before this comment was written and read as a
+         real fault in `tryStep`. A repel is total and is the game's own answer,
+         so nothing here has to be stubbed. */
+      field: { repel: { id: "max-repel", steps: 9999 } },
     };
     const { e } = boot(save);
     return e;
@@ -1280,6 +1362,62 @@ function until(e, what, label, max = 2000) {
 
   console.log("surf ok — onto water and lava at Lv " + SURF_LEVEL +
     ", refused without it, ashore always allowed, no casting afloat");
+}
+
+/* THE LADDERS, DRIVEN. Mt Moon is the first area with more than one floor, and
+   the warp is the only new thing in the step handler since Surf - so it gets
+   the same treatment: a real engine, a held key, and the assertion on where the
+   trainer ENDS UP rather than on what a function returned.
+
+   Every pair is walked, in both directions, because a ladder that only works
+   downwards is a hole you fall into and cannot climb out of - and with seven of
+   them and three floors, the one that is wrong is the one nobody tries. */
+{
+  const { AREAS, AREA_IDS } = await import("../src/game/mapdata.js");
+  const { LEVEL_XP, biomeFor } = await import("../src/game/biomes.js");
+  const { SOLID } = await import("../src/game/map.js");
+  /* EVERY AREA THAT HAS WARPS, not the one that had them first. This named
+     `AREAS.ridge` while Mt Moon was the only multi-floor map; Ember Caldera
+     has seven pairs and Cinderpeak two, and neither was being ridden. */
+  const WARPED = AREA_IDS.filter((id) => AREAS[id].warps?.length);
+  assert.ok(WARPED.length >= 2,
+    `only ${WARPED.length} area(s) carry warps - this test has stopped covering them`);
+
+  const DIRS = [[0, -1, "up"], [0, 1, "down"], [-1, 0, "left"], [1, 0, "right"]];
+
+  let rode = 0, pairs = 0;
+  for (const areaId of WARPED) {
+  const area = AREAS[areaId];
+  pairs += area.warps.length;
+  const solidAt = (x, y) => !area.rows[y] || SOLID.includes(area.rows[y][x] ?? "");
+  for (const [ax, ay, bx, by] of area.warps) {
+    for (const [from, to] of [[[ax, ay], [bx, by]], [[bx, by], [ax, ay]]]) {
+      /* Step ONTO the ladder from a neighbour rather than starting on it: a
+         warp taken at boot would prove the table and not the step handler. */
+      const step = DIRS.find(([dx, dy]) => !solidAt(from[0] - dx, from[1] - dy));
+      if (!step) continue;
+      const [dx, dy, dir] = step;
+      const { e } = boot({
+        ...SAVE, areaId, xp: LEVEL_XP[biomeFor(areaId).level],
+        player: { x: from[0] - dx, y: from[1] - dy, dir },
+        // Under a repel, for the reason the surf test records: an encounter
+        // stops the walk and the trainer never reaches the rung.
+        field: { repel: { id: "max-repel", steps: 9999 } },
+      });
+      e.press(dir);
+      for (let i = 0; i < 40; i++) tick(16);
+      e.clearHeld();
+      for (let i = 0; i < 20; i++) tick(16);
+      assert.deepEqual([e.state.player.x, e.state.player.y], to,
+        `${areaId}: the warp at ${from} came out at ${[e.state.player.x, e.state.player.y]}, not ${to}`);
+      rode++;
+    }
+  }
+  }
+  assert.equal(rode, pairs * 2,
+    `only ${rode} of ${pairs * 2} warp directions could be driven`);
+  console.log(`warps ok — ${pairs} pairs across ${WARPED.length} areas ` +
+    `(${WARPED.join(", ")}), every one ridden both ways`);
 }
 
 console.log("play ok — the frame loop never stopped");

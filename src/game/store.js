@@ -40,6 +40,12 @@ export const BROKEN_KEY = `${SAVE_KEY}.broken`;
 /* And one preference that is not the save: which way the ball rail was left.
    Namespaced under the same prefix so clearing the game clears all of it. */
 export const RAIL_KEY = `${SAVE_KEY}:balls`;
+/* Which ball each number key throws. A PREFERENCE, beside the save rather
+   than in it, for the same reason the rail's open state is: it is about how
+   you drive the game rather than about what you have caught, and putting it
+   in the save would mean a migration and a sync for something a new device
+   can perfectly well start over on. */
+export const ORDER_KEY = `${SAVE_KEY}:ballorder`;
 
 /* WHOSE SAVE THIS BROWSER IS HOLDING, and it is not a nicety.
 
