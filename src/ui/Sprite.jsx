@@ -244,6 +244,39 @@ export default function Sprite({
   );
 }
 
+/* THE TRAINER, OUT OF THE ONE STRIP - and a component because the URL has to
+   be built in JS.
+
+   It was `background-image: url("tilesets/player.png")` in styles.css, and
+   that never loaded in either place: a relative url() in a stylesheet resolves
+   against the STYLESHEET, so it asked the dev server for
+   `/src/tilesets/player.png` (which answers index.html as text/html) and a
+   build for `dist/assets/tilesets/player.png` (which does not exist). Reported
+   as the boy and girl not showing on onboarding, and invisible until then
+   because a background that 404s simply draws nothing and the span is
+   `aria-hidden`.
+
+   Exactly the trap `spriteUrl` above documents, and the one the `--ground`
+   comment warns about by name thirteen hundred lines earlier in the same
+   stylesheet. `public/` is copied verbatim and is never resolved by Vite, so
+   the only correct form is absolute against `document.baseURI` - built here,
+   because the CSS cannot build it and three call sites each doing it is how
+   this repo lost an Astral evolution to a duplicated constant.
+
+   The class stays on the element: `--z` is set by whoever is hosting it
+   (`.set-face .gate-art` runs at 2, the pickers at 3) and the row offset is
+   the character's own, so both belong to the stylesheet. Only the URL comes
+   from here. */
+export function TrainerArt({ char, className = "" }) {
+  return (
+    <span
+      className={`gate-art ch-${char} ${className}`.trim()}
+      style={{ "--trainer": `url(${new URL("tilesets/player.png", document.baseURI).href})` }}
+      aria-hidden="true"
+    />
+  );
+}
+
 /* AN ITEM'S ICON, WEARING ITS TIER IF IT HAS ONE.
 
    Three screens draw one - the shop shelf, the floating rail and the on-screen

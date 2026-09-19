@@ -105,6 +105,7 @@ function Missions({ daily, onClaim, note }) {
    glyph next to 13px body text reads as a bullet. */
 const ICON = {
   help: "M9 9a3 3 0 1 1 4 2.8c-.6.3-1 .9-1 1.7M12 17.5v.01",
+  star: "M12 3.5l2.4 5.2 5.6.7-4.1 3.9 1.1 5.6-5-2.8-5 2.8 1.1-5.6L4 9.4l5.6-.7z",
   cog: "M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4M19.4 15a1.6 1.6 0 0 0 "
     + ".3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1v.3a2 2 0 1 1-4 "
     + "0v-.2a1.6 1.6 0 0 0-2.8-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 "
@@ -124,7 +125,7 @@ function Glyph({ of }) {
   );
 }
 
-function Menu({ onSettings, onHelp, onLogOut, onReset }) {
+function Menu({ onSettings, onHelp, onForms, onLogOut, onReset }) {
   const [open, setOpen] = useState(false);
   const box = useRef(null);
 
@@ -164,6 +165,14 @@ function Menu({ onSettings, onHelp, onLogOut, onReset }) {
           <button type="button" role="menuitem" onClick={run(onHelp)}>
             <Glyph of="help" />How to play
           </button>
+          {/* DIRECTLY UNDER HOW TO PLAY, because it is the same kind of thing:
+              reference you go and look at rather than anything you act on. It
+              is also the only place in the game that says what the rare forms
+              ARE, so burying it below the destructive items would be hiding
+              the explanation for half of what there is to do here. */}
+          <button type="button" role="menuitem" onClick={run(onForms)}>
+            <Glyph of="star" />Rare forms
+          </button>
           {onSettings && (
             <button type="button" role="menuitem" onClick={run(onSettings)}>
               <Glyph of="cog" />Settings
@@ -189,7 +198,8 @@ function Menu({ onSettings, onHelp, onLogOut, onReset }) {
 
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
-  onLogOut = null, onSettings = null, onHelp = null, trainerName = null,
+  onLogOut = null, onSettings = null, onHelp = null, onForms = null,
+  trainerName = null,
   stale = null,
   daily, onClaimDaily, claimNote,
 }) {
@@ -294,6 +304,7 @@ export default function TopBar({
       <Menu
         onSettings={onSettings}
         onHelp={onHelp}
+        onForms={onForms}
         onLogOut={onLogOut}
         onReset={onReset}
       />

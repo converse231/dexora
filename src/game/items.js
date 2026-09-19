@@ -288,6 +288,36 @@ export const STONES = [
 export const HONEY_STEPS = 600;
 export const HONEY_MEETS = 3;
 
+/* WHAT A JAR COSTS, AND IT IS ANCHORED TO THE PLAY IT COVERS.
+
+   These were `6000 + 900 * rank`, two typed numbers with no relationship to
+   the economy - and that is exactly how they drifted into being unaffordable
+   with nothing able to say so. Measured: a honey runs 600 steps, which is 42
+   encounters, and 42 encounters GROSS about Y3,800 on the starting map and
+   Y7,300 on the richest. A Showdown Honey at Y12,300 was **168% of the best
+   map's take and 324% of the starting map's** - so six of the nine jars cost
+   more than the entire income of the run they covered, and using one could
+   only ever be funded by not using one. Reported as too expensive; it was
+   measurably that.
+
+   The rule a price like this needs is that **a jar must cost less than the
+   play it covers earns**, or the item is a net loss by construction. At
+   `2000 + 250` the dearest is Y3,750: 80% of a mid-map run and 51% of the
+   best, so a jar pays for itself and the decision is which tier you want
+   rather than whether you can eat the cost.
+
+   AND IT IS STILL A REAL SPEND. Spending a whole playthrough's ~Y128,000 on
+   jars covers about half its runs and roughly DOUBLES the variants a
+   playthrough meets (134 bought against 167 that arrive on their own) - for
+   every yen, so no balls and no candy. That is a trade, which is what this
+   was supposed to be. At the old band the same total bought 42, a quarter
+   uplift for all your money, which is why they read as not worth buying.
+
+   check.mjs computes the gross from the live tables and asserts the dearest
+   jar sits under it, so this cannot drift again the way it just did. */
+export const HONEY_BASE = 2000;
+export const HONEY_RANK = 250;
+
 const HONEY_MET = HONEY_STEPS * ENCOUNTER_RATE;
 export const honeyLift = (odds) =>
   Math.max(2, Math.ceil(HONEY_MEETS / (HONEY_MET * odds)));
@@ -314,7 +344,7 @@ const TIER_HONEY = [...TIER_ODDS].reverse().map(([tier, odds], rank) => {
        with the value rather than staying where it was and quietly becoming
        the best purchase in the shop. A Showdown Honey is ¥12,300 against a
        playthrough's ~¥147,000 - a real decision, and an obvious one. */
-    price: 6000 + 900 * rank,
+    price: HONEY_BASE + HONEY_RANK * rank,
     level: 16 + rank,
     steps: HONEY_STEPS, lift,
     blurb: `${name}, ×${lift} as likely`,
@@ -370,7 +400,7 @@ export const FIELD = [
      the price difference is about which tier you want rather than about which
      jar works, which is the honest thing for it to be about. */
   {
-    id: "honey", family: "variant", name: "Honey", price: 3500, level: 14,
+    id: "honey", family: "variant", name: "Honey", price: 1500, level: 14,
     steps: HONEY_STEPS, lift: 3, blurb: "Every rare tier, ×3 likely",
   },
   ...TIER_HONEY,
