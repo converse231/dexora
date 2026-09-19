@@ -11,6 +11,7 @@ import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
 import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
+import Variants from "./ui/Variants.jsx";
 import Bag from "./ui/Bag.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
@@ -106,6 +107,7 @@ export default function App({
   const [leaving, setLeaving] = useState(false);
   const [settings, setSettings] = useState(false);
   const [help, setHelp] = useState(false);
+  const [forms, setForms] = useState(false);
   /* THE TOUCH BAG, and it is deliberately not the rail's `ballsOpen`. That one
      is a desktop preference and is PERSISTED - the rail remembers whether you
      left it open. This is a sheet you summon and dismiss, it starts closed
@@ -396,6 +398,7 @@ export default function App({
       )}
 
       {help && <Help onClose={() => setHelp(false)} />}
+      {forms && <Variants onClose={() => setForms(false)} />}
 
       {settings && account && (
         <Settings
@@ -439,6 +442,7 @@ export default function App({
         onLogOut={onLogOut ? () => setLeaving(true) : null}
         onSettings={account ? () => setSettings(true) : null}
         onHelp={() => setHelp(true)}
+        onForms={() => setForms(true)}
         trainerName={trainerName}
       />
 

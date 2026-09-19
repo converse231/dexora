@@ -38,6 +38,7 @@ import { useModalLock, useDismiss } from "./modal.js";
 import Confirm from "./Confirm.jsx";
 import Note from "./Note.jsx";
 import { nameProblem, NAME_MAX, ageProblem } from "../game/name.js";
+import { TrainerArt } from "./Sprite.jsx";
 
 /* The same two, in the same order as the gate's - `build_player` stacks them
    into player.png this way and the tile draws the real walk frame, so what is
@@ -98,7 +99,7 @@ export default function Settings({ account, onClose }) {
               about - and it updates the moment the picker is used, so the
               choice has somewhere to land. */}
           <span className="set-face">
-            <span className={`gate-art ch-${pick}`} aria-hidden="true" />
+            <TrainerArt char={pick} />
           </span>
           <h3>{account.name || "Settings"}</h3>
           <span className="set-mail" title={account.email}>{account.email}</span>
@@ -146,7 +147,7 @@ export default function Settings({ account, onClose }) {
                   className={`set-char${pick === id ? " on" : ""}`}
                   onClick={() => choose(id)}
                 >
-                  <span className={`gate-art ch-${id}`} aria-hidden="true" />
+                  <TrainerArt char={id} />
                   <em>{label}</em>
                 </button>
               ))}

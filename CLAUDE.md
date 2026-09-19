@@ -181,6 +181,31 @@ same shape as `tileBase` against `route.json`. **A literal in an assertion is
 not a rule, and this is the version of that lesson where the literal was right
 when it was written.**
 
+**AND NOTHING ASKED WHETHER THE PICTURE COULD LOAD, WHICH IS THE SAME LESSON
+ONE TURN FURTHER ON.** Every NUMBER in `.gate-art` was checked - the offsets
+against `player.json`, the background-size against the PNG's own header - and
+the `background-image` beside them read `url("tilesets/player.png")`, which
+resolved in neither place. **A relative url() in a stylesheet resolves against
+the STYLESHEET**: `/src/tilesets/player.png` under the dev server, which Vite
+answers with index.html as `text/html`, and `dist/assets/tilesets/player.png`
+in a build, which does not exist. The trainer had never drawn on the onboarding
+screen, and the span is `aria-hidden`, so there was not even an alt to go
+missing. Reported from play as the boy and girl not showing.
+
+It is the trap `spriteUrl()` already documents, and there is a comment beside
+`--ground` **thirteen hundred lines above this rule in the same file** warning
+about it by name. **Vite says so every build** - *"didn't resolve at build
+time, it will remain unchanged to be resolved at runtime"* - and it had been
+scrolling past. `TrainerArt` in `Sprite.jsx` builds it against
+`document.baseURI` and hands it in as `--trainer`, one component for all three
+call sites.
+
+**THE ASSERTION IS THE CLASS, NOT THE ASSET.** `public/` is copied verbatim and
+is never resolved by Vite, so **no `url()` in styles.css may name a path** -
+every image arrives as a custom property built in JS, which is what
+`spriteUrl`, `--icon`, `--ground` and `--strip` all already did. An empty
+`url()` is the one allowed form, because that is the `--ground` placeholder.
+
 The window itself is correct and was never the problem: 16x19 at an offset of
 -13 rows, because the stand frame's content is measurably rows 13..32 of its
 32-row cell. Frame 0 of the walk set IS the idle pose - the set is
@@ -1441,11 +1466,25 @@ game with a resident from outside Kanto**, and the next narrow-typed map will
 need the same thing - the fault is not this roster, it is that a band nothing
 else lives in belongs to whoever does.
 
-**AND `types` IS THREE, NOT FOUR.** Psychic was the tempting one - this is the
-building Mewtwo was made in, and the diary on B1F is why anybody remembers the
-place - but `legendsFor` reads that list to decide whose HOME a map is, and
-claiming psychic would hand Mewtwo a second home on the strength of a story
-rather than a roster. Nothing psychic lives here. The Tower keeps him.
+**AND THE PSYCHIC IS IN THE ROSTER, NOT IN `types`.** Asked for directly - a
+laboratory with no psychic in it - and the obvious lever was measured first and
+is the wrong one. Adding "psychic" to the type list takes the map to **38%
+psychic**, more than the poison that IS its identity, because `derivedHomes`
+then sends every unhomed psychic species in the dex here; it hands Mewtwo a
+second home besides, on the strength of a story rather than a roster.
+
+Three named specimens do what was asked at a share chosen rather than derived:
+**Solosis** and **Elgyem** carry it (Gen 5, so the generation fit lets them
+through - see below) and **Porygon** earns its place twice, being the only
+Pokemon in the dex that was MADE by scientists. The map measures **6.1% psychic
+against 33.6% poison** - a lab with specimens in it rather than a psychic biome.
+The Tower keeps Mewtwo.
+
+**AND ABRA IS DECORATION, WHICH IS THE LESSON UNDER IT.** It was the obvious
+psychic to reach for and it spawns at **0.07%** on a written weight of 6, because
+it is Gen 1 and this map's Kanto is already heavy. See *A WRITTEN WEIGHT IS A
+RANK WITHIN ITS OWN CELL* below - the vehicle for a type you want FELT has to be
+a generation the fit is not already suppressing.
 
 ### The Safari Zone: six maps stitched, and the first copy that cost art
 
@@ -2032,6 +2071,58 @@ describe one differently. It names the TELL and never the odds, for the reason
 already recorded here: two of those strings used to quote a number and both were
 wrong the day the ladder was divided by 4/3.
 
+**AND THERE IS A PAGE THAT SAYS WHAT THEY ARE.** The game's whole second half
+is hunting these and nothing anywhere explained them: you met a Glitched
+Pikachu, read a four-word chip on the catch banner, and that was the entire
+explanation available. The Dex sheet's FORMS strip does draw all eight, but
+only for a species you have already opened and only as silhouettes you have not
+earned - so you could play for hours without learning that Noir exists.
+`Variants.jsx` is every tier at once, drawn in its real treatment, with its
+odds beside it, in the menu next to How to play.
+
+**IT IS THE THIRD SCREEN THAT DRAWS A ROW OF TIERS, and both rules that police
+those had to learn it.** The other two are why the rules exist - the FORMS
+strip kept its own list and shipped missing four tiers, the catch banner kept
+its own text table and headed a 1-in-210 Showdown with the word POKEDEX - so a
+rule that names the files it watches is a rule the third copy escapes. Order
+from `TIERS`, prose from `TIER_TELL`, and both asserted here by name.
+
+**THE ODDS ARE COMPUTED, AND THAT NEEDED A RULE OF ITS OWN.** `TIER_TELL` is
+forbidden from quoting a number because two of its strings used to and both
+were wrong the day the ladder was divided by 4/3. This screen prints a rarity
+for **every** tier, which is the same hazard with four times the surface, so
+check.mjs greps it for a bare three-digit number that matches any tier's
+current odds. Verified by typing `105` into the Vivid cell.
+
+**A PICKER, BECAUSE HALF OF WHAT A TREATMENT DOES DEPENDS ON THE PALETTE UNDER
+IT.** Pikachu, Snorlax, Gengar, Charizard and Gyarados, asked for by name and
+all Gen 1 - which is not incidental, since `tiersFor` drops Origin from
+anything whose ordinary art is no older than its debut, and a Sinnoh sample
+would quietly advertise seven columns where this one shows eight. The grid
+intersects `tiersFor` anyway, so swapping one stays honest rather than becoming
+a lie nobody notices.
+
+**And the picker earns itself in the render.** On Pikachu, Vivid is nearly
+invisible - `.sprite-noir`'s own comment already records why ("Pikachu, which
+is nearly all high luminance") - while on Gengar every one of the eight reads
+at a glance. Looked at on both before believing either. Holo and Glitched look
+plain in a still and are not: their layers are animated, which is the harness
+freezing at `from`, and this file already records that trap twice.
+
+**THE GRID IS TOLD ITS COLUMNS, NOT GIVEN `auto-fit`.** Four, dropping to two
+below 470px. `auto-fit` is recorded on the FORMS strip as the wrong answer -
+it fits whatever it fits, so eight cells came out as a ragged seven and one -
+and four is a deliberate 4x2 for today's eight, where a ninth leaves the last
+row short instead of scattering.
+
+**AND IT SAYS THE THREE THINGS THAT MAKE IT A HUNT RATHER THAN A WAIT**, two of
+which the game had never said anywhere. That the tiers are eight KINDS and not
+eight strengths - the rarest is about twice the wait of the kindest, so chase
+the one you like. That **pity exists**: `state.dry` has counted encounters
+since the last variant since the ladder was written and no screen has ever
+mentioned that the odds climb, which is a mercy doing no work. And that any
+`ROSETTE_NEED` of them completes a species, which is the reason to go wide.
+
 **TWO LAYOUTS WERE SIZED FOR FOUR TIERS.** `.cell-marks` was a no-wrap flex
 row: eight marks at 12px with 2px gaps is 110px on a 76px Dex tile, so the row
 ran off the side and out from under the entry number. It wraps at 9px now, two
@@ -2532,6 +2623,29 @@ generation with one plausible candidate gets one, and `fitShares` gives it its
 share through whatever does live there. Presence is what the assertion wants; a
 count was never the point.
 
+**A SINGLE-TYPE MAP STARVES ITSELF, AND EMBER WAS THE ONLY ONE.** It passed
+the generation bound at exactly **25%** - the one map with no headroom at all,
+so any unrelated change tipped it, and an audit pass that touches rosters
+elsewhere is exactly such a change. `derivedHomes` filters candidates on a
+SHARED TYPE, so a one-type list is the narrowest pool in the game: the fewest
+generations can reach it, and the ones that do concentrate. This file already
+recorded the symptom without the cause - *"the two that moved most are the maps
+with the narrowest type lists"*.
+
+**A resident was tried first and is the wrong lever.** Camerupt is Gen 3 and
+band B, exactly the hole, and it took the spread 25% -> 2% - and pushed the BAND
+budget to **2.7pp against a 2.5 bound**, because the band budget compares
+residents at Lv 1 against Lv 50 and a non-Kanto row is absent at one end. Pairing
+it with an A-band partner to match the Kanto A:B ratio did not close it either.
+The two constraints conflict when the fix is a single row.
+
+Widening the list to `["fire", "ground"]` satisfies both - **25% -> 17% with the
+band drift unmoved at 2.15pp** - because it feeds the map through the mechanism
+that was starving it rather than around it. Ground is the honest second type for
+a volcano rather than a lever picked to pass: Camerupt, Numel and Magcargo are
+what a caldera holds, Groudon is the legendary that belongs in one, and the map
+still measures **68% fire**.
+
 **`GEN_HOME_MIN` (4) is the ceiling on that fill, and four is measured.** Sweeping 1 to 8,
 generation evenness sits at ~5.5% off fair at every value - presence is all it
 needs - but the BAND mix only converges from four upward (0.10pp at four against
@@ -2579,6 +2693,23 @@ pair and leaves Mareep -> Flaaffy -> Ampharos broken. Inside one band the scale
 is uniform, so `parent x EVO_SHARE` survives exactly. `BAND_FLOOR` is what stops
 a band with no Gen 1 members (Rock Ridge has no S-tier) from giving a newcomer a
 zero weight and making it unreachable.
+
+**A WRITTEN WEIGHT IS A RANK WITHIN ITS OWN CELL, NOT A SHARE OF THE MAP**, and
+anyone tuning a table needs it in front of them. `balance` rescales per BAND and
+`fitShares` rescales per GENERATION, alternately, so what survives is a row's
+standing against the others in its own (band, generation) cell - and the two
+rescalings compound. Measured at Lv 50: the Mansion's Rattata is written at 8.4%
+of its table and spawns at **0.13%, a 64x crush**, while Koffing one band over
+loses only 3.5x. Untouched Tall Grass does the same thing - Venonat, 40x.
+
+Nothing is wrong: every map holds its band mix inside 2.5pp and every generation
+inside 17% of fair, which is the design doing exactly what it says. What is
+misleading is the authoring interface, and the consequence is practical - **put
+a species you want FELT in a generation the fit is not already suppressing.**
+The Mansion's psychic works because Solosis and Elgyem are Gen 5 (2.8% and 2.0%)
+and does not because Abra is Gen 1 (0.07%), on comparable written weights. Do not
+"fix" this by reaching for `balance` or `fitShares`: they are the two marginals
+the whole economy is fitted to, and the crush is the price of fitting both.
 
 **The guarantee is about RESIDENTS, not the whole table.** The evolved-form
 overlay is supposed to enrich a map as you level, so check.mjs measures the mix
@@ -2673,6 +2804,35 @@ against a playthrough's ~¥147,000 - a real decision, and an obvious one. **With
 one running, any legendary in that tier goes from 1 in 16,000 encounters to
 1 in 560**, and a named one at home from 1 in 317,000 to 1 in 11,100.
 
+**AND THEN THEY COST MORE THAN THE PLAY THEY COVERED.** Reported as too
+expensive, and it was measurably that rather than a feeling. A honey runs 600
+steps, which is **42 encounters**, and 42 encounters gross about ¥3,800 on the
+starting map and ¥7,300 on the richest. At `6000 + 900 * rank` a Showdown Honey
+was ¥12,300: **168% of the best map's take over its own run and 324% of the
+starting map's**, with six of the nine jars over 100%. An item you can only fund
+by NOT using it is a price with no product.
+
+Every other assertion here passed the whole time, because none of them had any
+idea what a run is worth - and the price was two typed numbers with no
+relationship to the economy, which is exactly how it drifted. **A jar must cost
+less than the play it covers earns** is the rule that was missing, and it is
+computed from the live tables now, the same way the Master Ball's floor and
+ceiling are. Two anchors, each where it means something: the DEAREST against the
+richest map, because that is where a late jar is spent and it is the test the old
+price failed; the CHEAPEST against the starting map, because that is the first
+one a player meets. Anchored both to the start, the dearest read 99% and passed
+on a margin too thin to mean anything.
+
+`HONEY_BASE` 2000 and `HONEY_RANK` 250 puts the dearest at ¥3,750 - **51% of the
+richest map's run** - so a jar pays for itself and the decision is which tier you
+want rather than whether you can absorb the cost. **It is still a real spend**:
+a whole playthrough's ¥128,000 spent on jars covers about half its runs and
+roughly DOUBLES the variants it meets (134 bought against 167 that arrive on
+their own), for every yen - so no balls and no candy. At the old band the same
+total bought 42, a quarter uplift for all your money, which is why they read as
+not worth buying. Verified by putting `6000 + 900` back: *"a Showdown Honey
+costs ¥12300 and the 600 steps it runs for gross ¥7331 on the richest map"*.
+
 **`LIFT_CEILING` IS WHAT STOPS THIS RUNNING AWAY**, and check.mjs now asserts
 the two do not meet. It caps any tier at 1 in 5 however many multipliers stack,
 so three meets a jar cannot become a tier you are simply handed and pity on top
@@ -2692,6 +2852,14 @@ it a ladder.
 wrong file twice over: how often the world stops you is a property of the world,
 and `items.js` needs it to price a honey and cannot import the engine - the rule
 modules are browser-free and the engine is not.
+
+**AND check.mjs KEPT ITS OWN COPY, UNDER A COMMENT SAYING IT WAS THE ONLY ONE.**
+`const ENCOUNTER_RATE = 0.07; // engine.js; the only copy that matters` - true
+the day it was written, false from the day the constant moved here and was
+exported. A second copy of the number that decides how often the world stops
+you, in the file whose entire job is catching second copies, and the one the
+Master Ball's ceiling was priced against. It is imported now. **This file says
+four times that a second copy drifts; the fifth was in the suite.**
 
 **A COLOURED HONEY IS THE JAR PLUS THE TIER'S OWN TREATMENT.** `art: "honey"`
 points all four at one picture and `tier` is what makes a Holo Honey look like

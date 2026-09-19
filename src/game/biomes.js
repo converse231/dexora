@@ -891,7 +891,31 @@ const RESIDENTS = [
     id: "ember",
     level: 15,
     name: "Ember Caldera",
-    types: ["fire"],
+    /* GROUND IS HERE FOR HEADROOM, and the narrow list was the whole cause.
+       Ember passed the generation bound at exactly **25%** - the only map in
+       the game with none to spare, so any unrelated change tipped it, and this
+       pass changes rosters elsewhere.
+
+       It was the one SINGLE-TYPE map, and that is not a coincidence:
+       `derivedHomes` filters candidates on shared type, so a one-type list is
+       the narrowest pool in the game and the fewest generations can reach it.
+       The generations that do get there then concentrate. This file already
+       records the symptom without the cause - "the two that moved most are the
+       maps with the narrowest type lists".
+
+       A resident was tried first and is the wrong lever: Camerupt is Gen 3 and
+       band B, exactly the hole, and it took the generation spread 25% -> 2%
+       and pushed the BAND budget to 2.7pp against a 2.5 bound. The two
+       constraints conflict when the fix is a single row. Widening the list
+       satisfies both - 25% -> 17% with the band drift unmoved at 2.15pp -
+       because it feeds the map through the mechanism that was starving it
+       rather than around it.
+
+       And ground is the honest second type for a volcano rather than a lever
+       picked to pass: Camerupt, Numel and Magcargo are what a caldera holds,
+       Groudon is the legendary that belongs in one, and the map still measures
+       **68% fire**. */
+    types: ["fire", "ground"],
     table: [
       [37, 18], [58, 18], [77, 14], [4, 10], [126, 8], [109, 8], [78, 6],
       [5, 4], [136, 3], [38, 2], [59, 2],
@@ -965,9 +989,25 @@ const RESIDENTS = [
 
        Ditto is the one to protect: this and Tall Grass are its only homes, and
        check.mjs's gettable sweep is the only thing that would say so. */
+    /* AND THREE OF THEM ARE THE LABORATORY, which is what the real roster
+       leaves out. This is the building Mewtwo was made in and its own eight
+       are rats and sludge; asked for directly as wanting psychic here.
+
+       **The lever is the ROSTER, not `types`** - measured, because `types` was
+       the obvious answer and is the wrong one. Adding "psychic" to the list
+       takes the map to **38% psychic**, more than the poison that IS its
+       identity, and hands Mewtwo a second home besides. Three named specimens
+       put psychic in the building at a share chosen rather than derived.
+
+       Porygon is the one that earns its place twice: it is the only Pokemon
+       in the dex that was MADE by scientists, and Abra and Solosis are the
+       psychic either side of it - Solosis is Gen 5 and band C, so it pays the
+       generation spread back at the same time. All three are hand-written
+       elsewhere already, so none of them moves `derivedHomes`. */
     table: [
-      [109, 22], [19, 16], [88, 16], [316, 10], [20, 9], [110, 9], [23, 9],
-      [89, 8], [218, 8], [126, 6], [324, 6], [132, 4], [58, 2], [37, 2],
+      [109, 19], [88, 13], [316, 13], [19, 12], [577, 10], [324, 9], [110, 8],
+      [89, 7], [218, 7], [20, 7], [605, 7], [126, 6], [23, 6], [63, 6],
+      [137, 5], [132, 4], [58, 2], [37, 2],
     ],
   },
   {

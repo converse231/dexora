@@ -1553,7 +1553,12 @@ canvas {
   --z: 3;
   width: calc(16px * var(--z)); height: calc(19px * var(--z));
   image-rendering: pixelated;
-  background-image: url("tilesets/player.png");
+  /* SET BY `TrainerArt`, not written here. A relative url() in this file
+     resolves against the stylesheet - `/src/` under the dev server and
+     `dist/assets/` in a build - so this asked for a player.png that is in
+     neither, drew nothing, and reported as the trainers missing from the
+     onboarding screen. Same trap `--ground` warns about above. */
+  background-image: var(--trainer);
   background-size: calc(320px * var(--z)) calc(256px * var(--z));
   background-repeat: no-repeat;
 }
@@ -2464,6 +2469,100 @@ canvas {
   margin: 14px 0 0; padding-top: 12px; border-top: 2px solid var(--line);
   font-size: 12.5px; line-height: 1.5; color: var(--ink-soft);
 }
+
+/* ---------- the rare forms, and how often you meet one ----------
+
+   WIDER THAN THE OTHER DIALOGS ON PURPOSE. Every card carries a creature, a
+   name, a number and a phrase, and the whole point is comparing them - eight
+   of those stacked one per line is a list you scroll rather than a ladder you
+   read. 520px is what fits four across at a size the treatments are still
+   legible at; below that the grid drops to two and the card follows. */
+.varcard {
+  width: min(520px, 100%); display: flex; flex-direction: column;
+  max-height: min(88vh, 720px);
+  background: var(--surface); border: 3px solid var(--canopy);
+  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  overflow: hidden;
+}
+.vr-body { overflow-y: auto; padding: 4px 15px 16px; }
+.vr-body h4 {
+  margin: 15px 0 7px; font-family: var(--pixel); font-size: 9.5px;
+  letter-spacing: .06em; color: var(--ink-faint);
+}
+
+/* WHO YOU ARE LOOKING AT. A row of real sprites rather than a `<select>`,
+   because the thing being chosen IS a picture - the same argument the type
+   filter makes for being the one hand-rolled listbox in the app. Wraps rather
+   than scrolls: five names is two comfortable lines at the narrowest width
+   this card reaches, and a scroller hides options behind a gesture. */
+.vr-cast {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  padding: 10px 0 2px;
+}
+.vr-who {
+  display: grid; justify-items: center; gap: 1px; cursor: pointer;
+  padding: 5px 7px 4px; border-radius: 9px;
+  border: 2px solid var(--line); background: var(--paper);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.vr-who img { width: 30px; height: 30px; object-fit: contain; image-rendering: pixelated; }
+.vr-who span {
+  font-family: var(--pixel); font-size: 8px; letter-spacing: .03em;
+  color: var(--ink-faint);
+}
+.vr-who:hover { border-color: var(--line-firm); }
+.vr-who.on { border-color: var(--path); background: var(--path-soft); }
+.vr-who.on span { color: var(--path); }
+.vr-who:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* FOUR COLUMNS, TOLD RATHER THAN FITTED. `auto-fit` was tried on the FORMS
+   strip and is recorded there as the wrong answer: it fits whatever it fits,
+   so eight cells came out as a ragged row of seven and one. Four is a
+   deliberate 4x2 for today's eight tiers, and a ninth would leave the last row
+   short - which is the graceful failure, not the scattered one. */
+.vr-grid { display: grid; gap: 7px; grid-template-columns: repeat(4, 1fr); }
+.vr-one {
+  display: grid; justify-items: center; align-content: start; gap: 3px;
+  padding: 10px 5px 9px; border-radius: 10px;
+  border: 2px solid var(--line); background: var(--paper);
+}
+/* The box the moving layers are absolute inside. `Sprite fx` returns a
+   `position: relative` span, so this only has to give it a size - and every
+   layer masks to the sprite's own PNG, which needs a square to mask within. */
+.vr-art { width: 54px; height: 54px; }
+.vr-art .sprite-fx,
+.vr-art img,
+.vr-art .sprite-showdown {
+  width: 100%; height: 100%;
+  object-fit: contain; image-rendering: pixelated;
+}
+.vr-name {
+  font-family: var(--pixel); font-size: 9px; letter-spacing: .04em;
+  color: var(--ink); text-align: center;
+}
+/* THE NUMBER IS THE POINT OF THE CARD, so it is the one thing here set in the
+   display face rather than the pixel one - tabular, because eight of them in a
+   grid that do not line up read as eight different kinds of number. */
+.vr-odds {
+  font-family: var(--display); font-weight: 600; font-size: 13px;
+  font-variant-numeric: tabular-nums; color: var(--path);
+}
+/* Two lines, clamped above and reserved below, for the reason the FORMS strip
+   records: a cell that grows to fit its own sentence makes one row taller than
+   the next, and a grid of mismatched heights reads as broken rather than as
+   full. */
+.vr-tell {
+  font-size: 10.5px; line-height: 1.3; color: var(--ink-faint); text-align: center;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; min-height: 27px;
+}
+
+.vr-notes { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.vr-notes li {
+  font-size: 12.5px; line-height: 1.45; color: var(--ink-soft);
+  padding: 8px 10px; border-radius: 8px; background: var(--surface-2);
+}
+.vr-notes b { color: var(--ink); font-weight: 600; }
 
 .confirm {
   width: min(400px, 100%);
@@ -4831,6 +4930,14 @@ button:disabled { transition: none; }
    which is a 431px viewport. Below that they take a line of their own under
    the header and go back to being a row, which is what they were before they
    moved up. */
+/* TWO COLUMNS WHEN FOUR STOPS FITTING. A 54px creature plus its odds needs
+   about 100px of column; four of those plus gaps is 430 of card, which is
+   where this card runs out. Measured at 400 and 340 rather than assumed, the
+   same way the settings password row was. */
+@media (max-width: 470px) {
+  .vr-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 430px) {
   .sheet-top { flex-wrap: wrap; }
   .sheet-top .sheet-facts {

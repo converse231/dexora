@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { nameProblem, NAME_MAX, ageProblem, MIN_AGE } from "../game/name.js";
+import { TrainerArt } from "./Sprite.jsx";
 
 /* Both trainers, in the order `build_player` stacks them into player.png. The
    tile draws the real down-facing walk frame out of that same strip, so what is
@@ -345,7 +346,7 @@ export function Trainer({ onPick, busy, askName = false, error = null, onOut = n
             className={`gate-char${pick === id ? " on" : ""}`}
             onClick={() => setPick(id)}
           >
-            <span className={`gate-art ch-${id}`} aria-hidden="true" />
+            <TrainerArt char={id} />
             <i>{label}</i>
           </button>
         ))}

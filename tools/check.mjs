@@ -201,7 +201,7 @@ import {
   LEGEND_HOME, LEGEND_HAUNT, legendTier, LAYOUTS, layoutIds,
   GEN_FIRST, GEN_STEP,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
-  SIZE_MIN, SIZE_MAX,
+  SIZE_MIN, SIZE_MAX, ENCOUNTER_RATE,
 } from "../src/game/biomes.js";
 
 const poke = ballById("poke-ball");
@@ -524,7 +524,12 @@ assert.equal(catchChance(255, master.mult), 1, "even against a legendary");
      actually pays, not against the other balls - the best map nets `perEnc` a
      head and a whole playthrough is STEP_TOTAL steps at ENCOUNTER_RATE. A ball
      nobody can afford is the unbuyable one again, wearing a number. */
-  const ENCOUNTER_RATE = 0.07;             // engine.js; the only copy that matters
+  /* IMPORTED, NOT RE-DECLARED. This was `const ENCOUNTER_RATE = 0.07` under a
+     comment reading "engine.js; the only copy that matters" - true when it was
+     written, and false from the day the constant moved to biomes.js and was
+     exported. A second copy of the number that decides how often the world
+     stops you, in the file whose whole job is catching second copies, and the
+     one the Master Ball is priced against. */
   let perEnc = 0;
   for (const b of BIOMES) {
     let tot = 0, w = 0;
@@ -2228,7 +2233,10 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   const kindestFirst = [...TIERS].reverse();
   assert.ok(kindestFirst.indexOf("origin") < kindestFirst.indexOf("holo"),
     "Holo is drawn before Origin - the finish cannot come before the drawing it sits on");
-  for (const f of ["Dex.jsx", "DexSheet.jsx"]) {
+  /* THREE SCREENS NOW. `Variants.jsx` is the rare-forms dialog, which
+     draws every tier at once and is the only place in the game that reads
+     the odds out loud - so it is the one with the most to get wrong. */
+  for (const f of ["Dex.jsx", "DexSheet.jsx", "Variants.jsx"]) {
     const body = readFileSync(new URL(`../src/ui/${f}`, import.meta.url), "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "");
     assert.ok(/\[\.\.\.(TIERS|tiersFor\(id\))\]\.reverse\(\)/.test(body),
@@ -3590,6 +3598,68 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
           "be equally good at their own tier, so this one is mispriced by odds");
       }
 
+      /* AND A JAR MUST COST LESS THAN THE PLAY IT COVERS EARNS.
+
+         The one that was missing, and its absence is how the price drifted to
+         where it did. A honey runs `HONEY_STEPS`, which is about 42
+         encounters; those encounters GROSS something, and at `6000 + 900 *
+         rank` six of the nine jars cost more than the whole of it - the
+         dearest was 168% of the richest map's take over its own run and 324%
+         of the starting map's. An item that can only be funded by NOT using it
+         is a price with no product, and every other assertion here passed the
+         whole time because none of them knew what a run is worth. Reported
+         from play as too expensive; it was measurably that.
+
+         The gross is the mean sell value of a map's own table over the
+         encounters a run meets - a ceiling rather than a forecast, since you
+         catch some and keep some - so a jar that clears THIS clears the real
+         thing comfortably. Measured against the starting map, because a player
+         who cannot afford one at Tall Grass prices cannot afford one.
+
+         Computed from the live tables, never typed, exactly as the Master
+         Ball's floor and ceiling are: retune `SELL`, `ENCOUNTER_RATE`,
+         `HONEY_STEPS` or a roster and re-read what this prints. */
+      {
+        const runGross = (b) => {
+          const t = encounterTable(b, MAX_LEVEL);
+          let w = 0, cash = 0;
+          for (const [id, x] of t) {
+            const sp = speciesById(id);
+            if (!sp) continue;
+            w += x;
+            cash += x * sellValue(sp);
+          }
+          return (cash / w) * honeys[0].steps * ENCOUNTER_RATE;
+        };
+        const start = runGross(BIOMES[0]);
+        const rich = Math.max(...BIOMES.map(runGross));
+        const jars = FIELD.filter((f) => f.family === "variant");
+        const dearest = jars.reduce((a, f) => (f.price > a.price ? f : a));
+        const cheapest = jars.reduce((a, f) => (f.price < a.price ? f : a));
+        /* TWO ANCHORS, EACH WHERE IT MEANS SOMETHING. The dearest jar is
+           bought late and spent on the best ground open, so the richest map
+           is what decides whether it can EVER pay for itself - and that is
+           the test `6000 + 900 * rank` failed, at 168%. The cheapest jar is
+           the one a player meets first, on the starting map's income, so
+           that is the one that has to be reachable from where they are.
+           Anchoring both to the starting map read 99% for the dearest and
+           passed on a margin too thin to mean anything - and on a map
+           nobody takes a Showdown Honey to. */
+        assert.ok(dearest.price < rich,
+          `a ${dearest.name} costs \u00a5${dearest.price} and the `
+          + `${honeys[0].steps} steps it runs for gross \u00a5${rich.toFixed(0)} `
+          + "on the richest map - a jar you can only afford by not using one "
+          + "is a price with no product");
+        assert.ok(cheapest.price < start,
+          `the cheapest jar is a ${cheapest.name} at \u00a5${cheapest.price}, `
+          + `and a run on the starting map grosses \u00a5${start.toFixed(0)} - `
+          + "the first jar a player meets has to be reachable from where "
+          + "they are standing");
+        console.log(`    a jar runs ${(honeys[0].steps * ENCOUNTER_RATE).toFixed(0)} encounters; ` +
+          `the dearest costs ${(100 * dearest.price / start).toFixed(0)}% of what that ` +
+          `grosses at the start and ${(100 * dearest.price / rich).toFixed(0)}% at the richest`);
+      }
+
       /* AND THE FORMULA MUST NOT COLLIDE WITH THE CLAMP. `LIFT_CEILING` caps
          any tier at 1 in 5 however many multipliers stack, which is what stops
          a honey plus a drought handing you a tier every encounter. If
@@ -4475,7 +4545,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   }
   assert.deepEqual(Object.keys(TIER_TELL).sort(), [...TIERS].sort(),
     "TIER_TELL and TIERS name different sets of tiers");
-  for (const f of ["DexSheet.jsx", "Cheer.jsx"]) {
+  for (const f of ["DexSheet.jsx", "Cheer.jsx", "Variants.jsx"]) {
     const src = stripComments(
       readFileSync(new URL(`../src/ui/${f}`, import.meta.url), "utf8"));
     assert.ok(src.includes("TIER_TELL"), `${f} no longer reads TIER_TELL`);
@@ -4485,6 +4555,32 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.ok(own.length < 2,
       `${f} has its own per-tier text table again (${own.join(", ")}) - ` +
       `that is the copy that shipped a banner saying POKEDEX over a Showdown`);
+  }
+
+  /* AND THE ONE SCREEN THAT SAYS THE ODDS OUT LOUD MUST COMPUTE THEM.
+
+     `TIER_TELL` is forbidden from quoting a number, and the reason is in its
+     own comment: two of its strings used to read "ONE IN A THOUSAND" and "ONE
+     IN FOUR THOUSAND" and both were wrong the day the ladder was divided by
+     4/3. The rare-forms dialog prints a rarity for every tier, which is the
+     same hazard with more surface - eight numbers instead of two - so it has
+     to read `TIER_ODDS` rather than carry a table of its own.
+
+     A bare three-digit number in that file is what a typed rarity looks like.
+     The odds today run 105 to 210, so the shape being forbidden is exactly
+     the shape a hand-written one would take. */
+  {
+    const src = stripComments(
+      readFileSync(new URL("../src/ui/Variants.jsx", import.meta.url), "utf8"));
+    assert.ok(src.includes("TIER_ODDS"),
+      "Variants.jsx no longer reads TIER_ODDS - its rarities are typed in");
+    const typed = [...new Set(
+      (src.match(/\b\d{3}\b/g) ?? []).map(Number))]
+      .filter((n) => TIER_ODDS.some(([, odds]) => Math.round(1 / odds) === n));
+    assert.equal(typed.length, 0,
+      `Variants.jsx has a tier's odds typed into it (${typed.join(", ")}) - ` +
+      "that is the second place the ladder lives, and the first one to be wrong " +
+      "the next time it is retuned");
   }
 
   /* THE RAIL AND THE TEXTBOX SHARE ONE NUMBER, OR THEY OVERLAP.
@@ -4633,6 +4729,38 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   /* Read out of `.gate-art` itself, not the first `background-size` in the
      whole stylesheet - which is what the first version did, and it matched an
      icon somewhere else and made the gap come out at 8.5px. */
+  /* AND THE PICTURE HAS TO BE FETCHABLE, which nothing asked.
+
+     Every NUMBER in `.gate-art` was checked - the offsets against
+     `player.json`, the background-size against the PNG's own header - and the
+     `background-image` beside them read `url("tilesets/player.png")`, a
+     RELATIVE url in a stylesheet. Those resolve against the STYLESHEET, not
+     the page: `/src/tilesets/player.png` under the dev server, which Vite
+     answers with index.html as text/html, and `dist/assets/tilesets/player.png`
+     in a build, which does not exist. The trainer never drew on the onboarding
+     screen in either, and the span is `aria-hidden`, so there was not even an
+     alt to go missing. Reported from play.
+
+     Vite says so every build - "didn't resolve at build time, it will remain
+     unchanged to be resolved at runtime" - and it had been scrolling past.
+
+     THE RULE IS THE CLASS, NOT THE ASSET. `public/` is copied verbatim and is
+     never resolved by Vite, so no url() in this stylesheet may name a path:
+     every image arrives as a custom property built against `document.baseURI`,
+     which is what `spriteUrl`, `--icon`, `--ground`, `--strip` and now
+     `--trainer` all do. `url()` with nothing in it is the placeholder the
+     `--ground` default uses and is the one allowed form. */
+  {
+    const named = [...css.matchAll(/url\(\s*(?!var\()([^)]+?)\s*\)/g)]
+      .map((m) => m[1].replace(/^["']|["']$/g, ""))
+      .filter((u) => u && !u.startsWith("data:"));
+    assert.equal(named.length, 0,
+      `styles.css names an asset path in url(): ${named.join(", ")} - a relative ` +
+      "url() resolves against the stylesheet, so it is /src/ under the dev server " +
+      "and dist/assets/ in a build, and public/ is neither. Build it against " +
+      "document.baseURI in JS and pass it in as a custom property");
+  }
+
   const artHead = css.indexOf(".gate-art {");
   assert.ok(artHead >= 0, ".gate-art has no rule");
   const artRule = css.slice(artHead, css.indexOf("}", artHead) + 1);
