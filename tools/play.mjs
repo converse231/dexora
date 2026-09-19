@@ -246,6 +246,51 @@ function until(e, what, label, max = 2000) {
     `¥${paid.showdown}, both through a real throw`);
 }
 
+/* WALKING PAYS A WAGE, AND THE WHOLE POINT OF IT IS THAT IT NEEDS NO CATCH.
+
+   Asked for as *"having no pokeballs at all because you have no money to buy
+   it is very possible"* - so this is the floor under the economy, and a floor
+   that is computed and not wired is worse than none, because the shop still
+   charges. `stepReward` is pure and check.mjs pins its shape; the money is
+   added in `onArrive`, which nothing outside the engine can see.
+
+   **THE STEPS ARE SET, NOT WALKED**, which is the one thing this file says
+   twice: every step is a 7% chance of an encounter and an encounter stops the
+   leg, so walking 250 tiles to provoke a parcel is a coin toss with a
+   near-certain loss. The parcel boundary is what is being tested, not the
+   walking - so `state.steps` is put one short and ONE real step is taken. */
+{
+  const { stepReward, STEP_PARCEL } = await import("../src/game/items.js");
+  const { levelFromXp } = await import("../src/game/biomes.js");
+  const { e } = boot(SAVE);
+  const level = levelFromXp(e.state.xp);
+  const due = stepReward(STEP_PARCEL, level);
+  assert.ok(due?.money > 0, `a parcel pays no cash at Lv ${level}`);
+
+  e.state.steps = STEP_PARCEL - 1;
+  const before = e.state.money;
+  const bag = { ...e.state.bag };
+
+  /* One step, in whichever direction actually moves. An encounter may start
+     on the arrival; the parcel is paid in the same `onArrive` either way. */
+  for (const dir of ["down", "up", "left", "right"]) {
+    e.press(dir);
+    for (let i = 0; i < 40 && e.state.steps < STEP_PARCEL; i++) tick(16);
+    e.clearHeld();
+    if (e.state.steps >= STEP_PARCEL) break;
+  }
+  assert.equal(e.state.steps, STEP_PARCEL,
+    `the trainer would not take one step (steps ${e.state.steps})`);
+
+  assert.equal(e.state.money - before, due.money,
+    `crossing a parcel paid ¥${e.state.money - before}, not the ¥${due.money} ` +
+    "stepReward says - the wage is computed but not wired to the money");
+  assert.ok(Object.entries(due.items).some(([id, n]) => (e.state.bag[id] ?? 0) >= (bag[id] ?? 0) + n),
+    "the parcel's balls did not arrive either - give() and the wage disagree");
+  console.log(`wage ok — crossing step ${STEP_PARCEL} paid ¥${due.money} ` +
+    `and its balls, through a real step`);
+}
+
 /* A BERRY MUST NOT BREAK THE THROW. Each of the three touches a different roll
    and any of them could throw inside the frame loop; the suite in check.mjs
    proves the arithmetic, and this proves the machine survives it. */

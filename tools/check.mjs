@@ -181,6 +181,7 @@ import {
   BALLS, SHOP_BALLS, SHOP_ITEMS, STONES, KEY_ITEMS, forSale, bestRod,
   ballById, itemById, sellValue, SELL, duplicateUids, startingState, ALL_ITEMS,
   DEX_BONUS, DEX_CLIMB, dexBonus, catchBounty, variantPay, VARIANT_PAY,
+  stepWage, STEP_WAGE, STEP_WAGE_HAUL,
   levelReward, MASTER_EVERY, evolutionsOf, evolutionRow, evoLevel, evoNext,
   evolveState, stoneFor, keeper, CANDY, candyValue, CANDY_PRICE,
   SYNTH_MIN, SYNTH_STEP,
@@ -229,6 +230,11 @@ const rareProfit = sellValue(rare) - r.balls * ultra.price;
 assert.ok(rareProfit < 0,
   `rares must cost more than they sell for, got ${rareProfit.toFixed(0)}`);
 let ECON_SHARE = 0;
+/* Measured once in the Master Ball suite and read again by the steps one -
+   what the richest map pays a head. Two copies of it would be two answers to
+   "is this stream too big", which is the whole family of bug this file
+   exists for. */
+let BEST_PER_ENC = 0;
 assert.ok(sellValue(rare) > sellValue(common), "rarer sells for more");
 assert.ok(dexBonus(0, 1000) > sellValue(common), "a new species beats another duplicate");
 
@@ -603,19 +609,55 @@ assert.equal(catchChance(255, master.mult), 1, "even against a legendary");
       const hit = catchChance(sp.rate, PLAIN_MULT);
       const flee = fleeChance(sp.rate);
       const resolve = hit + (1 - hit) * flee;
-      tot += weight * ((hit / resolve) * sellValue(sp) - (1 / resolve) * poke.price);
+      /* THE BOUNTY COUNTS, and leaving it out understated this by 2.4x. A
+         catch pays three ways now - the sale, the tier, the dex - and a
+         "playthrough's income" that knows about one of them prices the
+         rarest item in the game against a game nobody is playing. */
+      const locked = lockedTiers(id) ?? new Set();
+      let tier = 0;
+      for (const [t, odds] of TIER_ODDS)
+        if (!locked.has(t)) tier += odds * catchBounty(sp, t);
+      tot += weight * ((hit / resolve) * (sellValue(sp) + tier) - (1 / resolve) * poke.price);
       w += weight;
     }
     perEnc = Math.max(perEnc, tot / w);
   }
-  const lifetime = 50000 * ENCOUNTER_RATE * perEnc;
+  /* AND THE WAGE IS PART OF THAT INCOME, which it was not for one commit.
+     Walking pays cash now, so a lifetime measured on encounters alone is the
+     same fault this file already records about `ENCOUNTER_RATE`: a bound
+     computed on a number that has stopped being the whole answer. It read 27%
+     while the real figure was well under that, and the direction is the
+     dangerous one - an understated income makes the ball look DEARER than it
+     is, which is exactly what a ceiling is supposed to catch. */
+  let wages = 0;
+  for (let n = 1; n <= 50000; n++) wages += stepReward(n, 30)?.money ?? 0;
+  BEST_PER_ENC = perEnc;             // the steps suite budgets against this too
+  const lifetime = 50000 * ENCOUNTER_RATE * perEnc + wages;
   const share = master.price / lifetime;
   assert.ok(share < 0.5,
     `a Master Ball costs ${(share * 100).toFixed(0)}% of everything a whole ` +
     `playthrough earns (¥${Math.round(lifetime)}) - that is not expensive, that is unbuyable`);
+  /* AND A FLOOR, which is new and is what the wage needs. The only thing
+     balancing this ball is its price, and a price is only a price against
+     what you earn - so an income stream added without looking here makes the
+     rarest item in the game quietly affordable. Verified by raising
+     `STEP_WAGE`. */
+  /* 5% is the bound and it is a BOUND rather than a target: at 9% today you
+     could buy eleven over a playthrough if you bought nothing else, and you
+     cannot, because balls and jars and candy come out of the same pocket.
+     What it refuses is a whole income stream added without looking here, and
+     it is deliberately loose enough to survive a retune: swept, `STEP_WAGE`
+     reads 9.0% at 2, 7.4% at 4, 5.5% at 8 and FAILS at 10. A nudge passes; a
+     fifth doubling does not. Written after measuring, because the first
+     version of this comment claimed doubling would fail it and doubling
+     does not. */
+  assert.ok(share > 0.05,
+    `a Master Ball is only ${(share * 100).toFixed(1)}% of a playthrough's ` +
+    `¥${Math.round(lifetime)} - income has outgrown the one price holding it back`);
   console.log(`master ball price ok — ¥${master.price} is ${over.toFixed(0)}x the ` +
     `cheapest route to a legendary (${via}, ¥${Math.round(cheapest)}) and ` +
-    `${(share * 100).toFixed(0)}% of a playthrough's income`);
+    `${(share * 100).toFixed(1)}% of a playthrough's ¥${Math.round(lifetime)} ` +
+    `(¥${Math.round(lifetime - wages)} played, ¥${wages} walked)`);
 }
 assert.ok(SHOP_ITEMS.every(forSale), "the shop must only stock sellable items");
 
@@ -2793,6 +2835,39 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   assert.ok(worth > 10000 && worth < 120000,
     `walking 50,000 steps is worth ¥${worth} of balls`);
   assert.ok(ultra < 100, `${ultra} Ultra Balls from walking - rares stop costing`);
+
+  /* THE WAGE IS PRICED, AND THAT IS NOT A CONTRADICTION OF THE RULE ABOVE.
+     "What walking pays is a count, never a price" is about the MASTER BALL,
+     which has no honest price to fold in; cash has exactly one. So it is
+     budgeted, and the budget is a RELATIONSHIP rather than a number: walking
+     is the floor under the economy, so it must never out-earn the encounters
+     the walking is for. Measured the same way the Master Ball's ceiling is,
+     on the richest map at the cap. */
+  let wage = 0;
+  for (let n = 1; n <= 50000; n++) wage += stepReward(n, 30)?.money ?? 0;
+  assert.ok(wage > 0, "walking pays no cash - the one income that needs no catch");
+  assert.ok(wage < 50000 * ENCOUNTER_RATE * BEST_PER_ENC,
+    `walking 50,000 steps pays ¥${wage} against ` +
+    `¥${Math.round(50000 * ENCOUNTER_RATE * BEST_PER_ENC)} from the encounters on the way - ` +
+    "the floor has become the economy");
+
+  /* AND IT CLIMBS WITH THE BALL LADDER rather than on a curve of its own, so
+     a parcel is always worth the same number of throws. That is the property
+     that keeps it relevant at Lv 45, which is where it was asked for. */
+  assert.ok(stepWage(MAX_LEVEL) > stepWage(1),
+    "the wage does not climb - it is a curve typed once and left behind");
+  assert.equal(stepWage(30), stepWage(MAX_LEVEL),
+    "the wage moved past the last buyable ball - it is tracking the level, " +
+    "not the shelf, and the Master Ball is what it will reach for next");
+  assert.equal(stepWage(1, true), stepWage(1) * STEP_WAGE_HAUL,
+    "the haul does not multiply the wage the way it multiplies the balls");
+  /* THE MASTER BALL IS EXCLUDED, and this is the assertion for it: at ¥50,000
+     it is the thing you are SAVING for, so a wage denominated in it would pay
+     a hundred thousand a parcel from Lv 30. `defaultBall` refuses it for the
+     sibling reason and check.mjs caught that one too. */
+  assert.ok(stepWage(MAX_LEVEL) < ballById("master-ball").price,
+    "one parcel pays for a Master Ball - the wage is priced against a ball " +
+    "that cannot fail");
   /* Master Balls are deliberately left OUT of `worth`: they have no price, and
      pricing the unpriceable is how a budget check starts approving them. They
      are counted instead.

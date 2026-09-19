@@ -1827,6 +1827,79 @@ another, silent if the copy is dropped. A real throw with the tier forced onto
 the encounter, both directions, verified by commenting out the one line that
 adds it.
 
+**AND EVERY ONE OF THOSE STREAMS IS PAID PER CATCH, WHICH IS THE HOLE UNDER
+ALL OF THEM.** Reported next as running out of money entirely - *"spamming
+pokeballs to legendaries and you lost it all"*, *"having no pokeballs at all
+because you have no money to buy it is very possible"*. Both true, and neither
+is answered by the pass above: sell, bounty and dex bonus all require a
+CATCH, so on the run of bad luck that empties you they pay nothing, together,
+by construction. Measured, a rate-3 legendary is **4.4 Ultra Balls an
+encounter and lands 15.4%** - about ¥7,200 to own one, spent in ¥1,111
+instalments with nothing to show for the failures.
+
+**SO WALKING PAYS CASH, and it is the only income here that needs no catch.**
+It is not a new mechanism: `stepReward` already pays balls every
+`STEP_PARCEL` steps, already runs in `onArrive`, already has a banner on the
+haul, and is already the one pure function both payers call. It returns
+`money` as well.
+
+**DERIVED FROM THE BALL LADDER, never a curve.** `stepWage(level)` is
+`STEP_WAGE` throws of the dearest ball you can currently buy **that can still
+fail** - so the wage is denominated in the thing you are running out of, and
+it re-prices itself if the shelf is ever retuned. ¥50 a parcel at Lv 1, ¥500
+from Lv 12, x`STEP_WAGE_HAUL` on the tenth. The Master Ball is excluded by the
+same predicate `defaultBall` uses and for a sharper reason: at ¥50,000 it is
+what you are saving FOR, and a wage denominated in it would pay ¥200,000 a
+parcel from Lv 30.
+
+**THE BROKE CASE IS NOW ONE PARCEL.** 250 steps is ¥500 and three balls at
+Lv 45 - so ¥0 and an empty bag is a walk to the next parcel, not a dead save.
+It was never quite a dead end (walking always paid balls) but it was a long
+way back.
+
+The curve, per encounter, with the Haggle rank a trainer would hold:
+
+| | sell | bounty | wage | dex | balls | NET |
+|---|---|---|---|---|---|---|
+| Lv 5 Tall Grass, Poke | ¥61 | ¥42 | ¥3 | ¥103 | -¥38 | **+¥171** |
+| Lv 25 mid, Great | ¥161 | ¥88 | ¥29 | ¥7 | -¥129 | **+¥155** |
+| Lv 45 last, Poke | ¥118 | ¥52 | ¥29 | ¥0 | -¥42 | **+¥157** |
+| Lv 45 last, Ultra | ¥172 | ¥75 | ¥29 | ¥1 | -¥254 | **+¥22** |
+
+The Ultra row is thin on purpose and always was: *"commons print money, rares
+burn it"* is the first sentence of `items.js`, and an Ultra Ball is for
+getting the Pokemon rather than for farming.
+
+**AND TWO BOUNDS WERE PRICING THE GAME AGAINST AN INCOME THAT HAD STOPPED
+BEING THE WHOLE ANSWER.** The Master Ball's ceiling read *"27% of a
+playthrough's income"* and knew about neither the wage nor the bounty - it
+measured `sell - ball cost` alone, understating the real figure by 2.4x, and
+understating income makes the rarest item look DEARER than it is, which is
+precisely what a ceiling exists to catch. It is ¥553,002 now (¥433,002 played,
+¥120,000 walked) and the ball is **9.0%**. The same fault this file already
+records about `ENCOUNTER_RATE` having a second copy in the suite.
+
+**A NEW INCOME STREAM NEEDS A FLOOR, NOT ONLY A CEILING**, and there was none
+- the only thing balancing the Master Ball is its price, and a price is only a
+price against what you earn. `share > 0.05`, swept rather than picked:
+`STEP_WAGE` reads 9.0% at 2, 7.4% at 4, 5.5% at 8 and **fails at 10**. The
+first version of that comment claimed doubling would fail it; doubling does
+not, and measuring is what said so.
+
+**THE WAGE IS PRICED IN THE STEPS BUDGET, AND THAT IS NOT A CONTRADICTION.**
+*"What walking pays is a count, never a price"* is about the MASTER BALL,
+which has no honest price to fold in. Cash has exactly one. So it is budgeted,
+relationally: walking must never out-earn the encounters the walking is for
+(¥120,000 against ¥433,002). And it cannot be farmed apart from them either -
+every step carries the 7% encounter roll, so there is no way to collect the
+wage without playing.
+
+**tools/play SETS THE STEPS RATHER THAN WALKING THEM.** Crossing a parcel
+boundary by walking 250 tiles is a coin toss with a near-certain loss - the
+7% roll stops the leg - so `state.steps` goes one short and ONE real step is
+taken. The parcel boundary is the subject; the walking is not. Verified by
+commenting out the one line that adds the money.
+
 **The candy yield must never be flat.** Flat makes one map strictly best to
 grind and the other ten scenery. `CANDY` is tiered 1/2/4/8 and must stay
 FLATTER than `SELL` - if candy tracked cash, a common catch would be worthless

@@ -766,6 +766,36 @@ export const plainShare = (level) => {
 // Never zero: the cheapest ball is the floor of the economy, not a retired one.
 const plain = (n, level) => Math.max(1, Math.round(n * plainShare(level)));
 
+/* WALKING PAYS CASH, AND IT IS THE ONLY INCOME THAT IS NOT AN ENCOUNTER.
+
+   Asked for directly - *"a consistent source of income like for steps"* - and
+   the reason it is the right shape is the one the last pass measured: every
+   other stream here is paid per CATCH, so all of them dry up together on the
+   run of bad luck that is exactly when you need one. Twenty Ultra Balls at a
+   legendary that flees is -¥5,000 and nothing to sell, and no per-catch
+   reward can help, because nothing was caught.
+
+   **DERIVED FROM THE BALL LADDER, never a curve.** The wage is `STEP_WAGE`
+   throws of the dearest ball you can currently buy that can still FAIL - so
+   it is denominated in the thing you are running out of, and it re-prices
+   itself if the shelf is ever retuned. A typed curve would have to be
+   remembered on the day a ball's price moves; this cannot be.
+
+   The Master Ball is excluded by the same predicate `defaultBall` uses, and
+   for a sharper reason here: at 50,000 it is not a ball, it is the thing you
+   are saving FOR, and pricing a wage against it would pay ¥200,000 a parcel
+   the moment you passed Lv 30. */
+export const STEP_WAGE = 2;
+export const STEP_WAGE_HAUL = 3;   // the haul multiplies the balls; it multiplies this too
+
+export const stepWage = (level, haul = false) => {
+  const buyable = PLAIN_BALLS
+    .filter((b) => forSale(b) && b.level <= level && b.mult < GUARANTEED)
+    .map((b) => b.price);
+  const dearest = buyable.length ? Math.max(...buyable) : BALLS[0].price;
+  return dearest * STEP_WAGE * (haul ? STEP_WAGE_HAUL : 1);
+};
+
 export function stepReward(steps, level) {
   if (!steps || steps % STEP_PARCEL !== 0) return null;
   const parcels = steps / STEP_PARCEL;
@@ -780,7 +810,7 @@ export function stepReward(steps, level) {
   else if (level >= 6) items["great-ball"] = haul ? 3 : 1;
   if (haul && level >= 12) items["ultra-ball"] = 2;
   if (treasure) items["master-ball"] = 1;
-  return { items, haul, treasure };
+  return { items, money: stepWage(level, haul), haul, treasure };
 }
 
 // What a duplicate fetches, by the rarity tier already stored on each species.
