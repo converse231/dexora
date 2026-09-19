@@ -174,7 +174,19 @@ body {
   background: var(--surface); border: 2px solid var(--line-firm);
   border-radius: 14px; padding: 10px; box-shadow: 0 2px 0 var(--line-firm);
 }
-.viewport { position: relative; }
+/* HOW TALL THE ENCOUNTER'S TEXTBOX IS, declared once and read twice: the
+   textbox sets its own `min-height` from it, and the ball rail's wrap stops
+   its box there so the two cannot overlap. Both are inside `.viewport` and a
+   custom property inherits downwards, which is why it is declared here rather
+   than on either of them - `.ballwrap` is a SIBLING of `.battle`, so a value
+   set on the battle would never reach it. That is the same mistake the area
+   colours made once with `--sky`.
+
+   A SHARED NUMBER RATHER THAN AN OFFSET TYPED TWICE. This file already
+   records what the other shape costs: `.fieldbox ~ .worldclock { top: 40px }`
+   was a typed offset for a card that was 31px tall when it was written, the
+   card grew, and the two printed on top of each other. */
+.viewport { position: relative; --tb-h: 16%; }
 canvas {
   display: block; width: 100%; height: auto;
   border-radius: 9px; border: 2px solid var(--line-firm);
@@ -1202,7 +1214,7 @@ canvas {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 2.2cqw 3cqw 2cqw;
   background: var(--surface); border-top: 4px solid var(--canopy);
-  min-height: 16%;
+  min-height: var(--tb-h);
   display: grid; grid-template-columns: 1fr auto;
   align-items: center; column-gap: 2.4cqw;
 }
@@ -4493,6 +4505,22 @@ button:disabled { transition: none; }
   position: absolute; inset: 0; z-index: 12;
   pointer-events: none; container-type: inline-size;
 }
+/* IN AN ENCOUNTER THE WRAP ENDS ABOVE THE TEXTBOX. The rail moved to the
+   bottom right and `.ballwrap` is `inset: 0` of the viewport, so its bottom
+   was the bottom of the BATTLE - which is the textbox, and the rail sat on
+   top of "A WILD PUMPKABOO APPEARED". Reported with a screenshot.
+
+   The wrap moves rather than the rail, so `.ballrail`'s own `bottom: 3%`
+   stays what it always was and goes on meaning "3% up from the bottom of the
+   space I am allowed" - one rule for both states instead of two that have to
+   be kept in step. `--tb-h` is the same number the textbox sizes itself from,
+   so neither can move without the other.
+
+   Proportional, so it holds at every width. The rail is `display: none` on a
+   coarse pointer - `Bag.jsx` is the touch inventory - so what this is really
+   protecting is a NARROW DESKTOP WINDOW, which is the case a width query
+   would have got wrong in both directions. */
+.ballwrap.fighting { bottom: var(--tb-h); }
 /* AND IT IS A DESKTOP CONTROL. On a phone the rail is permanently in front of
    the map, over the third of it a Pokemon stands in, with tiles sized for a
    mouse - the most screen in the game spent on the thing you look at least.

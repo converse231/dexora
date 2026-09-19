@@ -78,7 +78,10 @@ export default function BallRail({
   const Tab = pinned ? "div" : "button";
 
   return (
-    <div className="ballwrap">
+    /* AND THE WRAP STOPS WHERE THE TEXTBOX STARTS. `pinned` already means "an
+       encounter is up", which is exactly when there is a textbox to clear -
+       so the flag is here rather than a second one threaded from App. */
+    <div className={`ballwrap${pinned ? " fighting" : ""}`}>
       <div
         className={`ballrail${expanded ? "" : " shut"}${live ? " live" : ""}` +
                    `${pinned ? " pinned" : ""}`}

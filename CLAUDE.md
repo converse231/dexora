@@ -3064,6 +3064,43 @@ balls glide); the Master Ball's plain `kbd` fell outside the rounded box
 entirely, having no tile treatment; and centring the two lists floated the
 berries half a key-chip high so the icons stopped sharing a line.
 
+**AND THE BOTTOM RIGHT IS WHERE THE TEXTBOX IS.** `.ballwrap` is `inset: 0`
+of the viewport, so once the rail moved down there its bottom was the bottom of
+the BATTLE — which is the textbox — and it sat on top of "A WILD PUMPKABOO
+APPEARED". Reported with a screenshot, one commit after the move.
+
+**`--tb-h` IS DECLARED ONCE ON `.viewport` AND READ TWICE**: the textbox sizes
+its own `min-height` from it and `.ballwrap.fighting` stops its box there. On
+`.viewport` because that is the common ancestor — **`.ballwrap` is a SIBLING of
+`.battle`**, so a value set on the battle would never reach it, which is the
+mistake `--sky` made once. The WRAP moves rather than the rail, so
+`.ballrail`'s own `bottom: 3%` goes on meaning "3% up from the space I am
+allowed" in both states instead of two rules to keep in step. `pinned` is the
+flag, because it already means "an encounter is up".
+
+A shared number rather than an offset typed twice, and this file records what
+the other shape costs: `.fieldbox ~ .worldclock { top: 40px }` was a typed
+offset for a card that was 31px tall when it was written. check.mjs asserts
+both sides read `var(--tb-h)`.
+
+**MEASURED BEFORE IT WAS BELIEVED**, because the whole approach rests on the
+textbox not growing past its minimum: at 960 / 620 / 460 / 380 / 340 wide, and
+with the longest message the box prints, it holds at **16.2–16.4%** of the
+viewport every time — so `min-height` is always what decides and the content
+never pushes past. Clearance 23 / 15 / 11 / 8 / 7px. **On a real phone there is
+no overlap to fix**: the rail is `display: none` on a coarse pointer and
+`Bag.jsx` is the touch inventory, so what this protects is a NARROW DESKTOP
+WINDOW — the case a width query would have got wrong in both directions.
+
+**AND A DISTANCE IS NOT A RULE.** tools/play asserted the touch gate by slicing
+**900 characters** after `.ballwrap {` and looking for the media query inside
+them. Adding one sibling rule with a comment on it pushed the gate past the
+window and the suite failed on a change that could not have broken it — the
+gate was there and correct the whole time. It reads every coarse-pointer block
+and asks whether any of them hides the rail now, which is the thing that was
+always meant. Same family as the literals under *Editing*: a magic number in an
+assertion fails on a change it does not care about.
+
 **THE BALL RAIL NEVER HONOURED ITS OWN `max-height`, AND TWO FIXES MISSED IT.**
 Reported twice as a scrollbar with arrows on it around one berry. This file
 recorded the first diagnosis — "a cap with no floor is a box that can be
