@@ -20,7 +20,7 @@
    not have, which is what keeps the two from drifting. */
 
 import { useRef } from "react";
-import { BALLS, bestRod, canRun } from "../game/items.js";
+import { bestRod, canRun, defaultBall } from "../game/items.js";
 
 /* Press-and-hold, not click. A direction and the dash button are both held, and
    `onPointerUp`/`Leave`/`Cancel` all have to release or a thumb that slides off
@@ -90,6 +90,7 @@ const DIRS = [
 
 export default function Pad({
   engine, state, enc, level, onBag, onPickBall, bagOpen, ride = null,
+  order = [],
 }) {
   // Before the early return: a hook after one is a hook that does not always run.
   const held = useRef({ t: null, taken: false });
@@ -102,8 +103,11 @@ export default function Pad({
   const busy = enc && ["throw", "suck", "drop", "wait", "shake"].includes(enc.phase);
   const facing = enc?.phase === "idle";
 
-  // The ball a bare A throws: cheapest you actually hold, as Space does.
-  const ball = BALLS.find((b) => (bag?.[b.id] ?? 0) > 0) ?? null;
+  /* The ball a bare A throws, from the same function Space calls: your key-1
+     ball if you hold any, else the cheapest you do. One function rather than
+     the same rule written twice, because "the pad adds no action the keyboard
+     does not have" is only true while the two agree on what the action IS. */
+  const ball = defaultBall(bag, order);
   const rod = bestRod(bag);
   const runnable = canRun(level, bag);
 

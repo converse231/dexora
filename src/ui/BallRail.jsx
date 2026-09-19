@@ -18,12 +18,14 @@
 
 import { useState } from "react";
 import {
-  BALLS, liveMult, forSale, berryRoom, carriedBalls, usefulItems,
+  BALLS, liveMult, forSale, berryRoom, carriedBalls, usefulItems, ballOrder,
 } from "../game/items.js";
+import { GUARANTEED } from "../catch.js";
 import { ItemIcon } from "./Sprite.jsx";
 
 export default function BallRail({
   bag, enc, field, onThrow, onUseField, onUseBerry, open, onToggle, pinned,
+  order = [], onPromote = null,
 }) {
   /* THE OTHER HALF OF THE BAG, and it is the same rail because it is the same
      question at two different moments - see `usefulItems`, which the touch
@@ -52,9 +54,16 @@ export default function BallRail({
        worse than no animation, because it is a lie about state. */
     if (ok !== false) setPop((p) => ({ id: item.id, n: p.n + 1 }));
   };
-  /* The hotkey is read off BALLS rather than off what is on screen, so hiding
-     one never shifts anybody else's. */
-  const carried = carriedBalls(bag);
+  /* THE KEYS ARE READ OFF THE ARRANGED LIST, NOT OFF WHAT IS ON SCREEN, so
+     hiding a ball you have run out of never shifts anybody else's - which is
+     the invariant this was already keeping against `BALLS`. What changed is
+     whose list it is: `ballOrder` is the player's, and the same call in
+     App.jsx is what the number keys index into, so the chip cannot advertise
+     a key that throws something else. */
+  const arranged = ballOrder(order);
+  const carried = carriedBalls(bag)
+    .slice()
+    .sort((a, b) => arranged.indexOf(a) - arranged.indexOf(b));
   const total = BALLS.reduce((n, b) => n + (bag?.[b.id] ?? 0), 0);
   const live = Boolean(onThrow);
 
@@ -109,7 +118,7 @@ export default function BallRail({
           <ul className="br-list">
             {carried.map((ball) => {
               const owned = bag?.[ball.id] ?? 0;
-              const key = BALLS.indexOf(ball) + 1;
+              const key = arranged.indexOf(ball) + 1;
               /* What this ball is worth against THIS Pokemon, from the same
                  function the engine rolls with. Off the map there is no
                  encounter, so it falls back to the base and the hint carries
@@ -142,8 +151,36 @@ export default function BallRail({
                         is "this one, now" and a row of ×1.0s buries it. */}
                     {boosted && <b className="br-boost">×{now.toFixed(1)}</b>}
                     <em>{owned}</em>
-                    {live && <kbd>{key}</kbd>}
                   </Tag>
+                  {/* THE KEY CHIP IS THE CONTROL, and it is a SIBLING of the
+                      row rather than inside it: the row is already a button
+                      that throws, and a button nested in a button is neither
+                      valid nor reachable. Pressing it moves this ball to slot
+                      1 - which is key 1 AND what a bare throw uses, so one
+                      gesture answers "put this on another key" and "make the
+                      A button throw this", which were asked as two things and
+                      are one. Promoting is the only move offered because it
+                      is enough: everything else keeps its relative order, so
+                      repeated presses reach any arrangement. */}
+                  {/* NO CHIP ON A BALL THAT CANNOT FAIL. `defaultBall`
+                      refuses to hand one to a bare throw, so a chip offering
+                      it slot 1 would promise something slot 1 does not do.
+                      It still throws on its own key. */}
+                  {live && (onPromote && ball.mult < GUARANTEED ? (
+                    <button
+                      type="button"
+                      className={`br-key${key === 1 ? " first" : ""}`}
+                      aria-label={key === 1
+                        ? `${ball.name} is already on key 1`
+                        : `Move ${ball.name} to key 1`}
+                      data-tip={key === 1
+                        ? "Key 1 — what A and Space throw"
+                        : `Put ${ball.name} on key 1`}
+                      onClick={() => onPromote(ball.id)}
+                    >
+                      {key}
+                    </button>
+                  ) : <kbd>{key}</kbd>)}
                 </li>
               );
             })}

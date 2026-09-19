@@ -33,7 +33,21 @@ export const NEVER_CERTAIN = 0.2;
    at a Pidgey. At 0.01 the floor binds for no species in the dex - the
    rawest of them, rate 3, computes 1.2% / 2.1% / 3.5% and differentiates on
    its own - while a throw still cannot be worth nothing. */
-const NEVER_HOPELESS = 0.01;
+export const NEVER_HOPELESS = 0.01;
+
+/* WHAT A PLAIN THROW IS WORTH, and it lives here rather than in `items.js`
+   because it is one of the three numbers that bound a throw - the ceiling, the
+   floor, and the multiplier the four situational balls fall back to. It was in
+   `items.js` for as long as only balls asked; `biomes.js` asks now (a species
+   sitting ON the floor is banded kinder - see `bandFor`) and cannot import
+   `items.js`, which already imports `ENCOUNTER_RATE` from IT. Moving one
+   constant to the file that has no imports at all is the honest way out of
+   that; re-exporting it from `items.js` keeps every existing caller.
+
+   Never type this value into a `bonus()`: an unboosted Net Ball IS a Poke
+   Ball, and typing 1.0 there made it strictly better than the cheap ball at
+   six times the price. */
+export const PLAIN_MULT = 0.8;
 
 export function catchChance(rate, ballMult) {
   if (ballMult >= GUARANTEED) return 1;

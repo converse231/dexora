@@ -105,7 +105,14 @@ SECONDARY = [("mt_ember", "general"), ("seafoam_islands", "general"),
 # lava. So the volcano is built from a second decomp: pokeemerald's Lavaridge,
 # which is the tileset behind Magma Hideout - the map Ember Caldera is after.
 EMERALD = "https://raw.githubusercontent.com/pret/pokeemerald/master"
-EM_SECONDARY = [("lavaridge", "general")]
+EM_SECONDARY = [("lavaridge", "general"), ("lilycove", "general")]
+
+# pokeemerald PRIMARIES we bake WHOLE, because a map drawn against one
+# references its metatiles directly and ours are somebody else's. Ids 0-639
+# here are FIRERED's General; Emerald ships a tileset with the same name, the
+# same job and entirely different art, so it needs its own block. The Safari
+# Zone is 140 of its 189 metatiles, which is why this exists.
+EM_PRIMARY = ["general"]
 
 # Emerald's own constants, and neither matches FireRed's. Get the tile split
 # wrong and every secondary metatile picks tiles 128 slots off; get the palette
@@ -138,6 +145,25 @@ def load_emerald(name, prim):
     return mt, tiles, pals
 
 
+def load_emerald_primary(prim):
+    """A pokeemerald PRIMARY tileset's own metatiles, tiles and palettes.
+
+    `load_emerald` resolves a SECONDARY against its primary; this is the other
+    half. A primary metatile only ever reaches its own tiles and palettes 0-5,
+    so there is nothing to stack and nothing to splice."""
+    def em(rel, dest):
+        return fetch(rel, dest, root=EMERALD)
+
+    prel = f"data/tilesets/primary/{prim}"
+    tiles = cut_tiles(Image.open(em(f"{prel}/tiles.png", f"em/{prim}/tiles.png")))
+    pals = np.concatenate([read_pal(em(f"{prel}/palettes/{i:02d}.pal",
+                                       f"em/{prim}/palettes/{i:02d}.pal"))
+                           for i in range(16)])
+    mt = np.frombuffer(io.open(em(f"{prel}/metatiles.bin", f"em/{prim}/metatiles.bin"),
+                               "rb").read(), dtype="<u2").reshape(-1, 8)
+    return mt, tiles, pals
+
+
 def load_pals(base_rel, cache_prefix):
     return np.concatenate([
         read_pal(fetch(f"{base_rel}/palettes/{i:02d}.pal", f"{cache_prefix}/{i:02d}.pal"))
@@ -145,18 +171,96 @@ def load_pals(base_rel, cache_prefix):
     ])
 
 
-def render_metatiles(mt, tiles, pals, cols=16):
-    """metatiles.bin + tiles + palettes -> an RGBA sheet, `cols` metatiles wide."""
+def render_metatiles(mt, tiles, pals, cols=16, layers=((0, False), (4, True))):
+    """metatiles.bin + tiles + palettes -> an RGBA sheet, `cols` metatiles wide.
+
+    `layers` is what makes the same call serve both atlases: the default is a
+    composite of both, and `((4, True),)` alone is the upper layer on its own -
+    the half that draws over sprites. See the note in build_tileset()."""
     rows = (len(mt) + cols - 1) // cols
     out = np.zeros((rows * 16, cols * 16, 4), np.uint8)
     for i, m in enumerate(mt):
         my, mx = divmod(i, cols)
-        for layer, keyed in ((0, False), (4, True)):
+        for layer, keyed in layers:
             for q in range(4):
                 qy, qx = divmod(q, 2)
                 blit(out, tiles, pals, int(m[layer + q]),
                      mx * 16 + qx * 8, my * 16 + qy * 8, keyed)
     return out
+
+
+TOP_ONLY = ((4, True),)
+
+# Which BG layers a metatile uses. pokefirered packs it in bits 29-30 of a
+# 4-byte attribute (METATILE_ATTR_LAYER_MASK 0x60000000); pokeemerald uses a
+# 2-byte attribute and bits 12-15. Same three values either way:
+#   0 NORMAL   middle + top      - the top half draws ABOVE sprites
+#   1 COVERED  bottom + middle   - BOTH halves draw below sprites
+#   2 SPLIT    bottom + top      - the top half draws above sprites
+LAYER_COVERED = 1
+
+
+def layer_types(rel, n, cache, root=None, u32=True):
+    try:
+        b = io.open(fetch(f"{rel}/metatile_attributes.bin", cache, root=root), "rb").read()
+    except Exception:
+        return None                       # no attributes: treat nothing as covered
+    if u32:
+        return ((np.frombuffer(b, dtype="<u4")[:n] >> 29) & 3)
+    return ((np.frombuffer(b, dtype="<u2")[:n] >> 12) & 0xF)
+
+
+def overhang_sheet(mt, tiles, pals, cols, lay):
+    """The upper layer on its own - but only where it is really an overhang.
+
+    Two gates, and the second one is a guard rather than a rule of the hardware:
+
+      COVERED says so itself. Those metatiles put both halves below the sprite,
+      which is how you stand in FRONT of a drum rather than inside it. 44 of the
+      Power Plant's 153 are covered, the drums and terminals among them.
+
+      A FULLY OPAQUE UPPER LAYER IS NOT AN OVERHANG. Some metatiles draw the
+      same tile on both halves - the Power Plant's floor local 34 does, 123
+      times - and painting that back over the trainer does not put him behind
+      anything, it deletes him. Whatever the hardware does with those, a layer
+      that covers every pixel of its own tile cannot be the half you walk
+      behind, so it is dropped. 28 more of the Power Plant's go this way and
+      what is left is 52: the generator domes, the machine overhangs, the tops
+      of the tall consoles."""
+    out = render_metatiles(mt, tiles, pals, cols, TOP_ONLY)
+    hides = []
+    for i in range(len(mt)):
+        my, mx = divmod(i, cols)
+        cell = out[my * 16:my * 16 + 16, mx * 16:mx * 16 + 16]
+        covered = lay is not None and lay[i] == LAYER_COVERED
+        # HIDES = it draws above the sprite AND leaves no pixel of it showing.
+        # Both halves matter, and leaving the first one out is what swept up
+        # Route 1's flower bed: general metatile 4 also draws the same art
+        # twice, but it is COVERED, so both halves are UNDER the trainer and
+        # you can stand in the flowers exactly as you would expect to.
+        full = bool((cell[:, :, 3] > 0).all())
+        if full and not covered:
+            hides.append(i)
+        if covered or full:
+            cell[:] = 0
+    return out, hides
+
+
+def append_rows(arr, block):
+    """Stack `block` under `arr`. Both atlases grow through this, in lockstep -
+    if one ever gains rows the other does not, every id past that point maps to
+    the wrong overlay and nothing says so."""
+    out = np.zeros((arr.shape[0] + block.shape[0], arr.shape[1], 4), np.uint8)
+    out[:arr.shape[0]] = arr
+    out[arr.shape[0]:] = block
+    return out
+
+
+def blank_like(block):
+    """An empty overlay for a block of synthetic tiles - boulders, bridge planks
+    and the two hand-baked crowns. Nothing composited by hand has an upper
+    layer to give back, and a hole in the top atlas is a silent id shift."""
+    return np.zeros_like(block)
 
 
 def load_secondary(name, prim_tiles, prim_pals):
@@ -194,6 +298,26 @@ def build_tileset():
     cols = 16
     rows = (len(mt) + cols - 1) // cols
     atlas = np.zeros((rows * 16, cols * 16, 4), np.uint8)
+    # THE SAME SHEET AGAIN, TOP LAYER ONLY, AT IDENTICAL IDS.
+    #
+    # A Gen 3 metatile has two layers and the keyed one draws OVER sprites -
+    # that is how a trainer walks behind a tree top, and it is not a special
+    # case: 1,360 of the metatiles we bake have one. This atlas composites both
+    # into one image, which is what makes `drawTile` a single blit, and the
+    # cost is that everything with an upper layer draws UNDER the player.
+    #
+    # Reported from play on the transcribed Power Plant - a trainer standing on
+    # top of the machinery he should have been passing behind. 211 of its tiles
+    # are walkable with an upper layer (the machine tops, the generator domes,
+    # the terminals), and 527 more are solid ones whose upper half his head
+    # reaches into.
+    #
+    # A PARALLEL IMAGE AT THE SAME IDS, rather than an appended block and a
+    # lookup table. There is nothing to map: id n in route_top.png is the upper
+    # layer of id n in route.png, so the overlay pass needs no rule, no dict and
+    # no second copy of anything. It is almost entirely transparent, so it costs
+    # little on disk, and it makes `forest.fringeTop` and `tree.tipTop`
+    # redundant - both are this, hand-baked for one tile each.
     for i, m in enumerate(mt):
         my, mx = divmod(i, cols)
         for layer, keyed in ((0, False), (4, True)):
@@ -201,6 +325,9 @@ def build_tileset():
                 qy, qx = divmod(q, 2)
                 blit(atlas, tiles, pals, int(m[layer + q]),
                      mx * 16 + qx * 8, my * 16 + qy * 8, keyed)
+    top, hides_here = overhang_sheet(mt, tiles, pals, cols,
+                                 layer_types(base, len(mt), "general-attr.bin"))
+    hiding_ids = list(hides_here)                      # the primary starts at id 0
 
     # Community boulders, composited over our own rocky ground and appended as
     # extra atlas rows. Keeping them in the same atlas means one image, one
@@ -229,6 +356,7 @@ def build_tileset():
             my, mx = divmod(tid, cols)
             grown[my * 16:my * 16 + 16, mx * 16:mx * 16 + 16] = out
             boulder_ids.append(tid)
+        top = append_rows(top, blank_like(grown[atlas.shape[0]:]))
         atlas = grown
         print("  boulders  %d tiles at ids %s (Ekat99)" % (len(boulder_ids), boulder_ids[:4] + ["..."]))
 
@@ -247,10 +375,13 @@ def build_tileset():
         smt, stiles, spals = load_secondary(name, ptiles, ppals)
         sheet = render_metatiles(smt, stiles, spals, cols)
         base = (atlas.shape[0] // 16) * cols
-        grown = np.zeros((atlas.shape[0] + sheet.shape[0], atlas.shape[1], 4), np.uint8)
-        grown[:atlas.shape[0]] = atlas
-        grown[atlas.shape[0]:] = sheet
-        atlas = grown
+        atlas = append_rows(atlas, sheet)
+        sheet_top, hides_here = overhang_sheet(
+            smt, stiles, spals, cols,
+            layer_types(f"data/tilesets/secondary/{name}", len(smt),
+                        f"sec/{name}/attr.bin"))
+        top = append_rows(top, sheet_top)
+        hiding_ids += [base + i for i in hides_here]
         sets[name] = base
         print("  %-18s %3d metatiles at base %d  (on %s)"
               % (name, len(smt), base, prim))
@@ -259,13 +390,31 @@ def build_tileset():
         smt, stiles, spals = load_emerald(name, prim)
         sheet = render_metatiles(smt, stiles, spals, cols)
         base = (atlas.shape[0] // 16) * cols
-        grown = np.zeros((atlas.shape[0] + sheet.shape[0], atlas.shape[1], 4), np.uint8)
-        grown[:atlas.shape[0]] = atlas
-        grown[atlas.shape[0]:] = sheet
-        atlas = grown
+        atlas = append_rows(atlas, sheet)
+        # pokeemerald's attributes are two bytes wide, not four.
+        sheet_top, hides_here = overhang_sheet(
+            smt, stiles, spals, cols,
+            layer_types(f"data/tilesets/secondary/{name}", len(smt),
+                        f"em/{name}/attr.bin", root=EMERALD, u32=False))
+        top = append_rows(top, sheet_top)
+        hiding_ids += [base + i for i in hides_here]
         sets[name] = base
         print("  %-18s %3d metatiles at base %d  (pokeemerald, on %s)"
               % (name, len(smt), base, prim))
+
+    for prim in EM_PRIMARY:
+        pmt, ptiles, ppals = load_emerald_primary(prim)
+        base = (atlas.shape[0] // 16) * cols
+        atlas = append_rows(atlas, render_metatiles(pmt, ptiles, ppals, cols))
+        sheet_top, hides_here = overhang_sheet(
+            pmt, ptiles, ppals, cols,
+            layer_types(f"data/tilesets/primary/{prim}", len(pmt),
+                        f"em/{prim}/attr.bin", root=EMERALD, u32=False))
+        top = append_rows(top, sheet_top)
+        hiding_ids += [base + i for i in hides_here]
+        sets["em_" + prim] = base
+        print("  em_%-15s %3d metatiles at base %d  (pokeemerald primary)"
+              % (prim, len(pmt), base))
 
     # Bridges. We had been using the sea pier for these, which is a jetty, not a
     # bridge - and its outer ring is drawn to meet sand, so it brought a green
@@ -316,6 +465,7 @@ def build_tileset():
     for i, tile in enumerate(bridge_tiles):
         my, mx = divmod(first + i, cols)
         grown[my * 16:my * 16 + 16, mx * 16:mx * 16 + 16] = tile
+    top = append_rows(top, blank_like(grown[atlas.shape[0]:]))
     atlas = grown
     print("  bridges   %d tiles at ids %d.. (Route 12 planks, re-based)"
           % (len(bridge_tiles), first))
@@ -334,14 +484,39 @@ def build_tileset():
         qy, qx = divmod(q, 2)
         blit(grown, ftiles, fpals, int(fmt[1][4 + q]),
              qx * 8, atlas.shape[0] + qy * 8, True)
+    top = append_rows(top, blank_like(grown[atlas.shape[0]:]))
     atlas = grown
     print("  overhang  leaves-only tile at id %d" % fringe_top)
+
+    # THE CONIFER'S CROWN, the same trick again and from the PRIMARY this time.
+    # General's metatile 14/15 is the top of the ordinary route tree and its
+    # collision bit is ZERO in every FireRed map: you walk behind it, exactly as
+    # you walk behind the forest fringe. A transcribed map carries those ids, so
+    # it needs their upper layer back or the overhang pass has only one piece to
+    # reach for and paints Viridian Forest's round canopy over a conifer - which
+    # is how Route 1 first rendered, with every tree in the map decapitated.
+    # Two halves rather than one tile: a conifer is two columns wide.
+    tip_top = (atlas.shape[0] // 16) * cols
+    grown = np.zeros((atlas.shape[0] + 16, atlas.shape[1], 4), np.uint8)
+    grown[:atlas.shape[0]] = atlas
+    for k, i in enumerate((14, 15)):
+        for q in range(4):
+            qy, qx = divmod(q, 2)
+            blit(grown, tiles, pals, int(mt[i][4 + q]),
+                 k * 16 + qx * 8, atlas.shape[0] + qy * 8, True)
+    top = append_rows(top, blank_like(grown[atlas.shape[0]:]))
+    atlas = grown
+    print("  tree top  conifer crowns at ids %d,%d" % (tip_top, tip_top + 1))
 
     def sec(name, *local):
         return [sets[name] + i for i in local]
 
     os.makedirs(os.path.join(PUB, "tilesets"), exist_ok=True)
     Image.fromarray(atlas, "RGBA").save(os.path.join(PUB, "tilesets", "route.png"))
+    assert top.shape == atlas.shape, \
+        f"the overlay atlas is {top.shape} against the atlas's {atlas.shape} - " \
+        "every id past the first mismatch would draw the wrong upper layer"
+    Image.fromarray(top, "RGBA").save(os.path.join(PUB, "tilesets", "route_top.png"))
 
     # Metatile ids read off a real FireRed map rather than picked by eye:
     # data/layouts/Route1/map.bin was decoded and its tile usage counted, so
@@ -390,7 +565,10 @@ def build_tileset():
                   # 1 is a black void tile, so it is not a lighter alternative.
                   "tower": sec("pokemon_tower", 2, 4, 14),
                   "towerWall": sec("pokemon_tower", 1, 32, 24)},
-        "tree": {"tip": [14, 15], "bodyA": [30, 31], "bodyB": [22, 23], "base": [36, 37]},
+        # `tipTop` is the crown's upper layer alone, for a copied map that walks
+        # behind one - see the bake above. Index it by (real id - 14).
+        "tree": {"tip": [14, 15], "bodyA": [30, 31], "bodyB": [22, 23],
+                 "base": [36, 37], "tipTop": [tip_top, tip_top + 1]},
         # The Viridian Forest canopy, which is nothing like the primary
         # tileset's conifer: a round crown three tiles wide, and a column of
         # them shares its canopy so only the lowest shows a trunk. Counting
@@ -648,7 +826,15 @@ def build_tileset():
                 "UR": sec("lavaridge", 21)[0],   # 533  its bottom-left
                 "many": sec("lavaridge", 28)[0], # 540  a rock the lava surrounds
             },
-            "ladder": sec("lavaridge", 175)[0],                      # 687
+            # THE LADDER COMES FROM `cave`, NOT FROM LAVARIDGE, AND THAT IS
+            # A DELIBERATE CROSSING. Magma Hideout's own rung (local 175) is
+            # Team Magma's industrial ladder - yellow and black hazard stripes
+            # - and at 16px it reads as a barrier rather than as a way down.
+            # Reported from play as the wrong asset, beside Mt Moon's, which is
+            # `cave` local 22 and unmistakably a ladder. Both sets are earth
+            # tones, so the two sit together; a rung nobody recognises is worse
+            # than a rung from the next tileset over.
+            "ladder": sec("cave", 22)[0],
         },
         # Frost Hollow, copied tile for tile from Seafoam Islands B3F. Every
         # autotile below was derived from the five Seafoam floors by masking:
@@ -697,10 +883,37 @@ def build_tileset():
         # most uniform sand tile in the sheet, and Route 1 repeats the 219-221
         # row down the length of every path, which is what pins the order.
         "path": [[211, 212, 213], [219, 220, 221], [227, 228, 229]],
+        # METATILES YOU CANNOT BE SEEN STANDING ON. Their upper layer covers the
+        # whole tile - the Power Plant's machine plinth draws the SAME tile on
+        # both halves, 123 times - so on the real hardware BG1 hides whoever is
+        # there. It is passable in the map data and it is not a place a player
+        # can be, which is the same thing said two ways.
+        #
+        # A transcription reads this and makes those cells solid: our generated
+        # Power Plant made exactly that call by hand ("FireRed leaves the plinth
+        # walkable; we make it solid"), and the copy reached it from the other
+        # side, reported as standing on top of the machinery.
+        "hides": sorted(hiding_ids),
+        # THE SAFARI ZONE IS AN EMERALD MAP, so both halves of its art are
+        # pokeemerald's: metatile ids below 512 come from Emerald's own General
+        # primary and the rest from Lilycove. Neither shares an id with
+        # anything FireRed draws, which is the whole reason they are separate
+        # blocks - `safari_zone()` rebases against these two numbers.
+        # Cinderpeak needs no block of its own: Emerald's General is already
+        # here for the Safari Zone and `lavaridge` for Ember Caldera, and
+        # Route 112 reaches local 440 of the 441 lavaridge ships.
+        "cinder": {"floor": sets["lavaridge"] + 113},   # metatile 625
+        "safari": {"general": sets["em_general"], "lilycove": sets["lilycove"],
+                   "split": 512,          # NUM_METATILES_IN_PRIMARY, Emerald's
+                   "floor": sets["em_general"] + 1},   # its plain grass
     }
     with io.open(os.path.join(PUB, "tilesets", "route.json"), "w") as f:
         json.dump(meta, f, indent=2)
     print(f"  route.png  {atlas.shape[1]}x{atlas.shape[0]}  ({len(mt)} metatiles)")
+    lit = int((top[:, :, 3] > 0).reshape(-1, 16, top.shape[1] // 16, 16)
+              .any(axis=(1, 3)).sum())
+    print(f"  route_top  the same, upper layer only - {lit} metatiles draw over you")
+    print(f"  hides      {len(hiding_ids)} metatiles hide whoever stands on them")
 
 
 # --------------------------------------------------------------- player sheet
@@ -900,6 +1113,12 @@ def build_ground():
         "ember": meta["volcano"]["floor"],
         "frost": meta["frost"]["floor"],
         "tower": meta["tower"]["floor"],
+        # Emerald's own grass, not FireRed's - the one area drawn against a
+        # different decomp's primary, so its floor cannot come from ours.
+        "safari": meta["safari"]["floor"],
+        # The ash-covered mountain ground, which is also both layouts' own
+        # border block - the one tile Route 112 and Mt Chimney agree on.
+        "cinder": meta["cinder"]["floor"],
     }
     # The fallback an area with no tile of its own lands on, and what the CSS
     # default points at.

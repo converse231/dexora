@@ -60,7 +60,10 @@ for (let y = 0; y < H; y++) {
 }
 /* The top-layer pass - what a trainer walks behind. Without it a canopy edge
    is missing from the picture and the render is not what the game shows. */
-try { drawOverhangs(ctx, atlas, 0, 0, W, H, 0, 0, at); } catch { /* not every map has one */ }
+try {
+  drawOverhangs(ctx, atlas, 0, 0, W, H, 0, 0, at,
+                (x, y) => (area.tiles ? area.tiles[y * W + x] : -1));
+} catch { /* not every map has one */ }
 
 writeFileSync(out, JSON.stringify({ id, W, H, tile: TILE, size: s, cols, draws, rows }));
 console.log(`${id}: ${W}x${H}, ${draws.length} draws -> ${out}`);

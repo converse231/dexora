@@ -1,7 +1,7 @@
 # Dexora
 
 A personal, non-commercial browser game: catch, collect and evolve **1,145
-Pokémon** across eight hand-made areas — the whole National Dex from Kanto to
+Pokémon** across ten hand-made areas — the whole National Dex from Kanto to
 Paldea, plus every Mega, Primal and Gigantamax form. Inspired by DelugeRPG's
 loop — walk, meet, throw, bank the duplicates, evolve.
 
@@ -569,6 +569,19 @@ render.**
 `loops` 49.4 against a real 57-71 is the one flag left, and it is the honest
 one: ranks of banks give few ways round. Closing it needs the compartments the
 reference has, which needs the wall tile that does not exist yet.
+
+**AND THAT SENTENCE IS WHY THE GENERATOR IS GONE.** The reference *has* the
+compartments, because it is the reference — so the Power Plant is **transcribed
+now**, and everything above is history rather than description. It is kept, all
+of it, because the findings outlived the code: that a Building map is not a
+General map, that this tileset has no interior wall so its walls are machinery,
+that metatile 54 is 117 tiles of drum body nobody had counted, and that a render
+sees what no measurement did. Those are what taught this repo to read a map
+instead of drawing one, and they are the reason the transcription that replaced
+four generators is three lines of classification. `bank`, `hang_partitions`,
+`barrels` and `drum_clumps` went with it — about two hundred lines — and `Y`,
+the partition character, now has no producer and is reported as unused by the
+minimap suite rather than deleted across four files.
 - **`dead` = 0.000 on five maps.** Ours had none, because they are composed of
   rectangles, so nooks were added. **Half of that reading was an artefact** - see
   *the ruler was bent* below. Measured honestly, real routes have essentially no
@@ -954,6 +967,13 @@ Cave (Rock Ridge only): `r` floor · `R` wall · `o` floor crater (2×2, x even)
 Power Plant: `p` floor · `P` machine bank (3 rows, ≥3 wide) · `X` console in a
 bank · `B` barrels (1 wide, 1–2 tall, hung off a bank's foot) · `E` room edge
 
+The shapes in brackets are the **generator's** rules and the map is transcribed
+now, so none of them is enforced on it — see *A copied cell is exempt from the
+art rules*. What the characters still decide is collision and the minimap, which
+is why the copy keeps four of them rather than collapsing to walkable/solid:
+`E` is the room's own outer wall, `B` the drums and crates, `X` the lit
+consoles, `P` everything else that is machinery.
+
 Ember Caldera: `m` floor · `M` volcanic rock (≥2×2, or one tile of bank beside
 lava) · `V` lava · `l` ladder · `n` bridge over lava
 
@@ -997,6 +1017,18 @@ one. Do not reach for it to cross anything.
 
 Biomes: `m/M` ember · `i/I` ice · `p/P` plant · `h/H` tower
 
+Cinderpeak: `m/M` and `V` from ember, `.`/`,`/`T`/`L` from the routes, and `l`
+for the two cable-car doors — the warp character, which on that map is a door
+rather than a rung. Nothing new: a re-used character on a transcription costs
+nothing, because the ART comes from the fixed id and the character only has to
+be right about collision and about what the minimap should paint.
+
+`Z` was Route 1's: solid scenery a copied map brought with it, the white fence
+and the signpost. It has **no shape rule and needs none**, which is the whole
+reason a transcription can afford a character per *obstacle class* rather than
+per *object* — and with that map gone it is one of the nine the minimap suite
+reports as unused every run.
+
 **A copied map carries the real map's ids.** Characters alone are not enough for
 a transcription: put through our autotiles, Frost Hollow drew **397 of its 836
 cells** differently from Seafoam B3F. Two reasons, and the second is general:
@@ -1019,6 +1051,386 @@ The ids are rebased against wherever the atlas packs `seafoam_islands`, so
 `AREAS.frost.tileBase` records the base used and check.mjs asserts it still
 matches `route.json`. Run `npm run art` without `npm run map` and that fails
 loudly rather than drawing rubble at the right coordinates.
+
+**AND `tileBase` IS PER MAP, WHICH ROUTE 1 CORRECTED.** That assertion compared
+every copied map against seafoam's base, because for a while Frost Hollow was
+the only copy there was. A map built entirely out of **primary** metatiles needs
+no rebasing at all and records **0** — a real answer rather than a missing one.
+Its companion bound was `forest.fringeTop`, "the last tile baked", and baking
+the conifer crowns after it made that wrong by two: **a ceiling that quietly
+stops being the top passes everything.** It is the max id in `route.json` now.
+
+### Transcribing a whole map: Route 1
+
+**ROUTE 1 IS NOT IN THE GAME ANY MORE.** It was the proving ground for the
+transcription path and it did that job: everything below was found on it, and
+every copy since - the Power Plant, Mt Moon, the Safari Zone, Cinderpeak -
+rests on it. It was never a place anyone was going to play, so it went. The
+section stays, because the lessons are what it was for. `Z`, its one character,
+now has no producer and joins `D ~ o u C S W Y n` on the list the minimap suite
+prints every run.
+
+
+**THE SOURCE IS THE MAP FILE, NEVER A PICTURE OF IT.** A render — vgmaps, a
+screenshot, a ripped sheet — carries the art and nothing else. Where you can
+walk is the **collision** bit and which of two overlapping surfaces you are on
+is the **elevation** bit, and neither is in the pixels. `Route1/map.bin` is the
+source, exactly as Seafoam's is.
+
+**IT COST NO NEW ART, AND THAT IS STRUCTURAL.** 49 of the 50 metatiles Route 1
+uses are **primary** `gTileset_General`, which our atlas already carries at
+identity, so the ids go straight in. The 50th is the gate post at the Pallet
+Town exit, and that exit is sealed, so it does not survive either. **Any FireRed
+map drawn against a tileset already in `SECONDARY` is nearly this cheap** — Mt
+Ember's Ruby Path and the Icefall Cave floors need nothing baked at all.
+
+**SEAL BY CONTINUING THE BORDER, NOT BY INVENTING.** Route 1 opens onto Route 2
+at the top and Pallet Town at the bottom, and this game has no map connections.
+Both gaps close with ids **lifted from two columns over** — the top takes the
+two rows of conifer its neighbours already carry, the bottom takes the fence
+rail and the tree band. So every cell is still a copy and **nothing is
+authored**, which matters beyond tidiness: an authored cell is drawn by our
+rules, and our rules cannot draw this map. 938 of its 960 metatiles are
+pixel-identical to the original and the 22 that differ are exactly the seals.
+
+**WHAT THE COLLISION BIT CALLS PASSABLE IS NOT WHAT YOU CAN REACH.** Route 1's
+bottom border is twenty conifer crowns with collision 0 — walkable art, fenced
+above and trunked below, unreachable in the real game too. Left alone they are
+twenty tiles of ground you can see and never stand on. They go **solid and keep
+their art**. This is the same fact `study_layout.reachable()` records about
+every real map it measures, met from the other side.
+
+**AND THE FILL HAS TO BE DIRECTED, OR IT WALLS IN A TERRACE.** The flower
+meadow at rows 6–9 is enclosed by a ledge above and a ledge below: you hop in
+going south and hop out going south. An undirected flood calls its 24 tiles
+orphans. `walk_steps()` is the one definition of a step now — `check()` and the
+transcribers share it, because two answers to "what can the player reach" is
+how a map ships with a pocket in it.
+
+### And then the Power Plant, which cost nothing at all
+
+**EVERY ONE of its 1,960 tiles is a `power_plant` SECONDARY metatile** — not one
+primary tile in the whole map — and that tileset has been baked against its own
+`building` primary since the day this file learned that pairing matters. So the
+ids go in at `base + local`, **nothing was added to the atlas**, and there was
+no seal to draw either: the Power Plant is one closed interior, so its outer
+ring was already solid and **not a single cell is authored**. Rendered through
+our own `drawTile` and diffed against a fresh render from pokefirered:
+**1,960 of 1,960 metatiles identical.** Route 1 needed 22 seal tiles; this
+needed none.
+
+**IT IS THE SMALLEST MAP IN THE GAME NOW, AND THAT IS THE ONLY REAL COST.**
+49×40 against the generated map's 80×60 — 961 walkable tiles where the old one
+had 2,399. **A 1:1 copy cannot be four times the size and still be a copy.**
+Frost Hollow answered that wall by laying four Seafoam floors in a square;
+there is exactly one Power Plant, and stamping the same room out four times
+would be a bigger lie than a smaller map.
+
+**A METATILE'S COLLISION COMES FROM THE MAP, NOT THE TILESET.** Five of these
+(28, 30, 33, 34, 35) are laid both walkable and solid in different places, so
+the character is read off the cell's own collision bit and the id only refines
+what KIND of solid it is. Classifying by id alone would have put twenty holes in
+the machinery. It also hands back a detail the generated map deliberately got
+wrong: FireRed leaves a bank's **plinth walkable** and we made it solid, because
+there a bank is one side of a room and ours stood alone in the open. A copy has
+no such problem and takes the real collision.
+
+**AND EIGHT TILES ARE PASSABLE WITHOUT BEING REACHABLE** — six of shelf behind
+the north machinery and a two-tile pocket of floor — the same fact Route 1's
+tree crowns record. Solid, and still their own art.
+
+### Mt. Moon: the first area with more than one floor
+
+**THE FLOORS SHARE A GRID AND THE LADDERS ARE WARPS.** Every other area is a
+single grid, and a cave with ladders is not. The engine closes over one `rows`
+at construction, the camera clamps to it, the minimap bakes it, and a save
+stores one `areaId` and one `(x, y)` — so 1F, B1F and B2F are laid out as
+quadrants exactly as Frost Hollow lays out four Seafoam floors, each sealed in
+its own rock, and `AREAS.ridge.warps` pairs the ladder tiles. **Nothing about
+the camera, the save, the minimap or travel changes**; what is new is a `Map`
+lookup in `onArrive`. Three AREAS would have been three biome rows, three level
+gates, three skies and three lines in the travel menu, for one place you are
+meant to experience as one place.
+
+**THE LADDER GRAPH IS READ, NOT INVENTED.** `data/maps/MtMoon_*/map.json`
+carries every warp with its destination map and warp id; resolving those gives
+**seven reciprocal pairs**, which is the whole of Mt Moon's vertical structure.
+The two mouths onto Route 4 are not pairs — one is where you come in (and so is
+the spawn), the other leads somewhere this game has no map for.
+
+**A WARP IS TAKEN IN `onArrive`, NOT IN `tryStep`.** The walk has to finish and
+the tile has to actually be arrived at, or the trainer slides to a place he
+never reached. `move.fromX/fromY` are dragged along with him so the next frame
+interpolates from the new tile instead of gliding across the map.
+
+**AND EVERY FILL THAT MEASURES REACHABILITY HAD TO LEARN IT.** Three of them:
+`mt_moon`'s own, `check()`'s, and check.mjs's. Without the hop, five sixths of
+the map reads as cut off — a true statement about walking and a false one about
+whether a player can get there. tools/play rides all seven pairs **in both
+directions**, because a ladder that only works downwards is a hole, and with
+seven of them the one that is wrong is the one nobody tries.
+
+**B1F IS OPENED UP, AND IT IS THE ONE DELIBERATE DIVERGENCE.** In FireRed its
+304 walkable tiles are four rooms with **no walking route between them at all**
+— you enter each by ladder and leave it by ladder. That is a fine shape for a
+game with a party and a reason to be somewhere; here it is four boxes you get
+dropped into. The rooms are still copied tile for tile and the 46 tiles of
+corridor between them are ours, carved by `join_islands` **on the quadrant
+alone** (run over the shared grid it would tunnel between FLOORS, which is the
+one connection a ladder exists to be) and marked `-1` so they draw by our rules
+and never pretend to be Game Freak's. It costs three of the seven ladders their
+monopoly — they become shortcuts rather than the only way through.
+
+**THE ID STAYED `ridge`.** This slot was Rock Ridge, composed against the same
+`cave` tileset; renaming it would move every save standing there and buy a
+tidier grep. Its encounter table needed nothing either, which is the tell that
+the substitution was always the right one: Zubat, Geodude, Clefairy and Onix
+were already the cast of the place it was standing in for. `rock_ridge()` and
+its five helpers went with it.
+
+### Ember Caldera: a RE-SKIN, which is a third kind of copy
+
+**THE LAYOUT IS TRANSCRIBED AND THE ART IS OURS.** Route 1, the Power Plant,
+Mt Moon and the Safari Zone all carry the real map's own metatile ids. This one
+does not: it takes **Emerald's Victory Road** - 1F / B1F / B2F, 46×45 and two
+46×31 - and draws every cell with the pokeemerald `lavaridge` set behind Magma
+Hideout. `tiles` is `-1` everywhere and `drawTile` runs the same rules it runs
+for a map we drew.
+
+**WHY IT HAS TO BE.** There is no three-floor volcano in any Gen 3 game. Magma
+Hideout is the only lava interior that exists and it is eight small rooms, not a
+cave you descend. The choice was a real volcano that is not a descent or a real
+descent that is not a volcano, and the second is the one you can fix: a cave's
+LAYOUT is only walkable and solid, and both tilesets draw that. **The water
+becomes lava** - 256 tiles of it on B2F, a lake with a fall feeding it - and
+`SURFABLE` already holds `V`, so it is ridden exactly as the old caldera's was.
+
+**SEVEN RECIPROCAL PAIRS AGAIN**, resolved out of the three `map.json` warp
+tables, and the Mt Moon machinery took them unchanged. The two Ever Grande
+mouths are not pairs: one is the way in and so the spawn, the other leads
+somewhere this game has no map for.
+
+**FOUR THINGS THE RE-SKIN COSTS, all measured rather than waved at:**
+
+- **Thin rock is carved.** Our rock is a 3×3 autotile and needs a 2×2 to
+  resolve; a real cave is full of one-tile walls - **102 of 3,124 here, 3%** -
+  and `thicken_walls` turns those into floor, widening 102 spots by a tile.
+- **The shore is banked.** `lava_banks` turns the floor above and beside the
+  lake into rock, because in this tileset the rim is drawn on the ROCK and not
+  on the lava. The bottom edge stays bare, which is both what Magma Hideout
+  does and how you get onto the lake.
+- **The bridges are floor.** Victory Road crosses its chasms on planks; our
+  plank set is Route 12's, baked over lava, and a bridge over nothing is not in
+  the vocabulary.
+- **AND THE LEDGES ARE GONE, WHICH THE FIRST RENDER CAUGHT.** `L` draws
+  `ledge` out of route.json - 176/135/177, FireRed's **grass-topped** earth
+  bank - so nine one-way hops came out as green bars of meadow across a
+  volcano. Magma Hideout has no terraces and so no hop to borrow. They are
+  floor now, and the route is unchanged because a ledge was only ever a
+  shortcut down something you could already walk around. **Look at the render**
+  - this was invisible in every number and obvious in one picture, again.
+
+**A WARP YOU CANNOT STEP OFF IS A TRAP, AND THE REACHABILITY FILL CANNOT SEE
+IT.** Crossing a warp makes the destination *reachable*; leaving it may be
+impossible, and the fill never asks. Ember shipped one: Victory Road puts a 3×2
+**landing platform** in the middle of its lake — reached by ladder, left by
+Surf — and `lava_banks` turned all five floor tiles to rock because they touch
+lava, sealing the rung into an island. Ember opens at Lv 12 and Surf is Lv 20,
+so it was not even a hard exit, it was a dead save. Reported from play as
+arriving somewhere with nothing walkable in any direction.
+
+The rung and its four neighbours are held back from both repair passes — **the
+walkable ones only**, because holding a rock neighbour back too put a one-tile
+wall straight back where `thicken_walls` had just carved it. `check()` exempts
+the lava rule within **one tile of a rung and nowhere else**: a missing rim on
+five tiles beats a warp with no way off, and the exemption cannot spread.
+
+And the rule that would have caught it is in `check()` now, for every map with
+warps — one walkable neighbour is the whole requirement. **Verified by
+reintroducing the bug**, which is the only thing that makes an assertion worth
+having.
+
+**THE LADDER CAME FROM `cave`, NOT FROM LAVARIDGE.** Magma Hideout's own rung
+(local 175) is Team Magma's industrial ladder — yellow and black hazard stripes
+— and at 16px it reads as a barrier rather than as a way down. Reported from
+play as the wrong asset, beside Mt Moon's, which is `cave` local 22 and
+unmistakably a ladder. Both sets are earth tones so the two sit together, and
+**a rung nobody recognises is worse than a rung from the next tileset over.**
+That is the same call the ledges lost and for the opposite reason: there the
+borrowed tile was green grass in a volcano, here it is the only one that reads.
+
+**IT IS SMALLER: 1,560 walkable against the generated caldera's 2,175**, the
+same trade the Power Plant made. `volcano()` kept its name and its biome row;
+ten helpers went with the generator it replaced - `place_lava`,
+`scatter_boulders`, `punch_ladders`, `span_pool`, `ladders_clear`, `islands`,
+`boulder`, `heal_spans`, `lava` and `ladder`.
+
+### Cinderpeak: two levels and a cable car
+
+**THE NAME IS OURS, AND THAT WAS ASKED FOR.** The map is Ruby's **Route 112**
+with **Mt Chimney** above it. "Route 112" is a road number in somebody else's
+region and says nothing about the place; Cinderpeak names what you can see from
+the bottom of it - ash falling on the grass, and the thing dropping the ash.
+
+**IT COST NO NEW ART, WHICH IS NOW THE THIRD TIME.** Both maps are Emerald's
+General primary plus `lavaridge`, and both blocks have been baked since the
+Safari Zone and Ember Caldera respectively. Route 112's highest secondary local
+is **440 against the 441 `lavaridge` ships**, which is as close as that has
+come. Every cell is a copy.
+
+**THE LIFT IS TWO DOORS, NOT FOUR.** The real chain is Route 112 -> its station
+-> the car -> Mt Chimney's station -> Mt Chimney, and the two station interiors
+are 13x12 rooms whose whole content is a platform and an attendant. Joining the
+doors directly is the same simplification Mt Moon's ladders already are: what
+the player does is step into one house and come out of the other. **Stacked
+rather than laid side by side**, because one of these really is above the
+other, and the minimap is the only thing that can say so.
+
+**THE CRATER IS SCENERY, AND THE MAP DATA SAYS SO.** 56 tiles of `lavaridge`
+189 - the same metatile Ember's lake is made of - every one collision 1, with
+no water behaviour anywhere on either map. You cannot enter Mt Chimney's crater
+in Ruby and you cannot here. They carry `V` so the minimap draws the caldera
+rather than more rock, and exactly **one** of the 56 has a walkable neighbour,
+so what that costs is a single tile somebody with Surf could ride onto -
+measured rather than waved at.
+
+**AND THE LEDGES GO THE WRONG WAY, WHICH SETTLED A RULE.** Of the 40 one-way
+hops here, **38 face EAST** and `L` hops south and only south. The Safari Zone
+made its eleven SOLID because that walled nothing off; here solid would wall
+off **137 tiles**, a third of the route, so they are floor. Both are the same
+principle and it is worth stating once: **a ledge is a passage in ONE
+direction, so floor is the closer approximation and a wall is the further one**
+- solid is only safe when nothing is behind it. Measured both ways before
+choosing, which is the only reason the two maps differ.
+
+**THE MINIMAP COLOUR IS READ OFF THE TILE.** Fixed ids mean the art is right
+whatever character a cell carries, so the character is free to be about the MAP
+rather than the renderer - and Route 112 is half forest and half mountain,
+which one `M` would have flattened into a single brown slab. A metatile whose
+mean green beats its red and blue by 14 is foliage: tree 198 is (98,153,60) and
+the volcanic rock beside it is (134,58,42), so the two do not come close to
+touching. Measured against the atlas rather than listed, because a list of ids
+is a list that falls behind.
+
+**AND THE MINIMAP SIZED ITSELF TO THE MAP, WITH NOTHING BOUNDING IT.** Three
+pixels a tile and no cap means the box grows with whatever is drawn.
+Cinderpeak is 40x109 - a tall narrow mountain - and came out **120x327 against
+a 480x352 viewport: 93% of the screen height**, floor to ceiling down the left
+edge. Every other map sits at 76% or less, which is exactly why nothing had
+ever said so. `miniScale` drops the pixels-a-tile for a map that will not fit
+(only Cinderpeak moves, to 2px and 80x218) because the minimap's whole job is
+to show the WHOLE map at once - clipping or scrolling it would be answering a
+different question.
+
+**The assertion measures the SCREEN, not the cap**, and the first one did not:
+comparing the scaled size to `MINI_MAX_*` is nearly a tautology, since
+`miniScale` derives the scale from those - raise the cap to 999 and every map
+passes while the box grows off the viewport. Verified by doing exactly that.
+
+**AND THE WARP TEST NAMED ONE MAP.** tools/play rode `AREAS.ridge` because Mt
+Moon was the only map with warps when it was written - so Ember's seven pairs
+and Cinderpeak's two were never driven. It loops over every area that has them
+now: **16 pairs across three areas, each ridden both ways.** A test that names
+one map is a test that goes quiet the day a second one arrives.
+
+### The Safari Zone: six maps stitched, and the first copy that cost art
+
+**STITCHED, NOT COMPOSED, AND THE DIFFERENCE IS THE POINT.** Frost Hollow and
+Mt Moon lay separate FLOORS side by side and join them with something we
+invented - a tunnelled seam, a warp - because in the real game those floors are
+not adjacent at all. Emerald's Safari Zone is **six 40×40 maps that ARE
+adjacent**: the game joins them with map CONNECTIONS, so walking off the east
+edge of Northwest puts you one tile onto North. Laying them out 3×2 is
+reconstruction rather than composition, and the seams line up because they
+always did - measured, **10 disagreeing cells out of 240** along six shared
+edges, all of them border fill.
+
+**120×80 and 4,161 walkable**, against Deep Woods' 2,961 - the biggest area in
+the game by 40%, which is what makes a roster this mixed honest rather than a
+contradiction.
+
+**IT IS AN EMERALD MAP AND OUR PRIMARY IS FIRERED'S.** Ids 0-639 here are
+`gTileset_General` from pokefirered; Emerald ships a tileset with the same name,
+the same job and completely different art. So both halves were new: `EM_PRIMARY`
+bakes Emerald's General **whole** (512 metatiles, via `load_emerald_primary` -
+the other half of `load_emerald`, which only ever resolved secondaries) and
+`lilycove` joins the secondary list. **This is the first transcription that cost
+any art at all** - Route 1, the Power Plant and Mt Moon each needed none.
+
+**AND COLLISION IS NOT THE WHOLE STORY IN EMERALD.** Water here is **col=0,
+passable**, because Gen 3 gates surfing on the metatile BEHAVIOUR rather than on
+the collision bit. Classify by collision alone and 389 tiles of pond, river and
+waterfall become grass you stroll across. The behaviour field - bits 0-8 of the
+attribute - is also what identifies the tall grass, the sand, and best of all
+the ledges: **36 tiles of `MB_JUMP_SOUTH`, which is exactly the one-way south
+hop `L` has always been.** The eleven east/west ledges have no `L` to map onto,
+so they stay solid; the fill proves nothing is walled off behind them.
+
+**THE FRAME IS THE LAYOUT'S OWN BORDER BLOCK.** The six maps open onto Route 121
+and onto each other, and the stitched rectangle's outer edge opens onto nothing
+we have. `border_filepath` is the 2×2 the game itself tiles beyond the edge, so
+the ring is drawn out of that - the nearest thing to a right answer that exists -
+and made solid, because out there is not a place. **9,358 of 9,600 interior
+metatiles are pixel-identical to pokeemerald and the only 242 that differ are
+that frame.**
+
+**AN APPROACH IS A RULE FOR A LEDGE WE PLACED.** Four of the thirty-six run out
+under the treeline - the tail of a run Emerald drew into a tree mass - and that
+is decoration rather than a trap: nobody can stand above them, so nobody hops
+them, and the rest of the run works. Gated on copied cells in both fills. The
+LANDING below stays unconditional, because a ledge with nothing under it is a
+hop into a wall.
+
+**SEVEN TYPES AND NOT EIGHTEEN.** The ask was a zone that hosts everything, and
+`types` is the wrong lever for it: `legendsFor` reads that list to decide whose
+HOME a map is, so a map claiming every type would be every legendary's home and
+would flatten `legendTier` - "hunt where it lives" - into nothing. Seven is what
+the real reserve holds, it is wider than anywhere else in the game, and the
+breadth lives in a 36-row table instead. The Tower keeps its ghosts.
+
+**A COPIED CELL IS EXEMPT FROM THE ART RULES, AND ONLY FROM THOSE.** Every
+shape rule in `check()` — two wide on an even column, an odd number of rows, a
+run at least three across — exists because **our** autotiles have nine cases.
+A cell with a fixed id never reaches them. So applying those to a transcription
+does not protect it, it **damages** it: Frost Hollow turns real shelf tiles into
+plain ice to satisfy "never stands alone", and what it is really satisfying is a
+limitation of a renderer it does not use. Route 1 forced the split — its own top
+border is **two rows** of conifer and one of its ledges is **two tiles**, both
+drawn by Game Freak and both refused by us. What is *not* gated is everything
+about whether the map can be played: the outer ring, reachability, a ledge with
+somewhere to land, a spawn outside a wall.
+
+**GATE THEM ALL AT ONCE OR DO IT TWICE.** Route 1 needed three of these rules
+relaxed, so three were, and the Power Plant walked straight into a fourth — *"a
+bank is three rows"*, refusing FireRed's own banks. All twenty per-character art
+rules are gated now. The guard is one clause on the loop's own `continue`, it is
+inert for every map that passes no `tiles`, and **a skip can never turn a passing
+map into a failing one** — which is what makes doing the whole family cheaper
+than meeting them one map at a time.
+
+**`tree.tipTop` IS THE SECOND OVERHANG, AND IT SHIPPED DECAPITATED FIRST.**
+General's metatile 14/15 is the conifer's crown and its collision bit is **zero**
+in every FireRed map — you walk behind it, the same two-layer trick
+`forest.fringe` uses, so it maps onto `c`. But `drawOverhangs` had exactly one
+piece to reach for, so it painted **Viridian Forest's round canopy over every
+conifer on the map** and took the top off all thirty-six. The crown's upper
+layer is baked a second time now, two halves because a conifer is two columns,
+and the pass picks by the **real id** rather than by a rule. Caught by diffing
+the render against the original — invisible in the CSS, invisible in every
+metric, and obvious in one picture. **Look at the render.**
+
+**A TWO-SPECIES TABLE DOES NOT SURVIVE THE BAND BUDGETS.** FireRed's Route 1
+holds Pidgey and Rattata and nothing else, and that is what its `RESIDENTS` row
+was written as. `BAND_SHAPE` freezes a map's rarity mix **from its own table**,
+and a table of two commons has no mix to freeze: its rare share is 0% by
+construction, so the evolution overlay and the per-generation homing — forty-odd
+derived rows against two hand-written ones — become the entire map. check.mjs
+said so exactly: *the rare share goes 0.0% → 3.8%, the overlay is meant to
+enrich a map, not re-rank it*. The two headliners carry three quarters of the
+weight and the tail is thin, early-Kanto and in type. **Our maps are four times
+the size of the ones they are named after and hold a whole game's worth of
+encounters where the original held a few minutes of one** — that is the trade
+every map here already makes, and a transcription does not escape it.
 
 **Ledges are one-way.** Solid to ordinary movement; walking *south* into one
 hops it and lands two tiles down. Any reachability check must therefore be a
@@ -1151,10 +1563,17 @@ wage for catching. The two measuring different things is the design, and
 check.mjs pins both directions.
 
 **The candy yield must never be flat.** Flat makes one map strictly best to
-grind and the other seven scenery. `CANDY` is tiered 1/2/4/8 and must stay
+grind and the other nine scenery. `CANDY` is tiered 1/2/4/8 and must stay
 FLATTER than `SELL` - if candy tracked cash, a common catch would be worthless
-in both currencies, and commons are what the economy runs on. Measured spread
-across the eight maps is 1.48-2.58 candy per encounter.
+in both currencies, and commons are what the economy runs on. Measured over the
+ten maps: **1.50 to 3.08 candy an encounter**, against **¥79 to ¥175** of cash
+over the same tables - so candy is x1.9 across the game where cash is x2.2, and
+the rule that it stays flatter than `SELL` holds by measurement rather than by
+the tier table alone. **Yield does NOT track the level gate and must not be
+made to**: Cinderpeak opens at Lv 16 and pays 1.85, below the Power Plant's
+2.62 at Lv 12, because it is a ROUTE and a route is mostly commons. What a map
+pays follows its own band mix, which is the design; the ladder decides where
+you may go, not what you earn there.
 
 **A synthetic evolution level is derived, never tabled.** A stone or trade row
 has no level in PokeAPI; `evoLevel` gives it the parent's plus `SYNTH_STEP`,
@@ -1189,7 +1608,7 @@ nothing else would say so.
 `BIOMES[i].level` gates travel: Tall Grass at 1, the Haunted Tower at `MAP_LAST`
 (20). The old design paced you with the price of balls and check.mjs asserted no
 area carried a `level` at all - a good argument that lost to a better one, since
-a new player cannot act on "all eight are open but seven will waste your balls"
+a new player cannot act on "all ten are open but nine will waste your balls"
 until after they have wasted them. **`areaOpen()` is the single answer**, used by
 the engine's refusal, the Travel panel's padlock AND the Dex sheet's WHERE TO
 LOOK - which is a way to GO to the map rather than only the name of it, so it
@@ -1214,6 +1633,34 @@ directions.** Both in one pass: `PLAIN_MULT` 1.0 -> 0.8 and `fleeChance`
 encounters shorter AND less winnable; pointing them apart makes an encounter
 last longer so a failed throw is a setback rather than the end of it. If either
 is retuned alone, check that the pair still points apart.
+
+**DIFFICULTY IS CHARGED ONCE, ON THE THROW.** Reported from play as Beldum
+seeming uncatchable, and it was within a rounding error of it. Its PokeAPI
+capture rate is 3 - Mewtwo's rate, correct data and not ours to edit - so
+`catchChance` at a plain throw puts it exactly ON `NEVER_HOPELESS`. **This file
+claimed "no species in the dex sits on it"; three do** - beldum, metang,
+metagross, one evolution line - and everything else down there is legendary.
+
+Measured at Lv 50 with an Ultra Ball and a Nanab: Beldum was 0.052% of Mt
+Moon's table and **1,914 encounters to own, against Mewtwo's 1,318**. A species
+with no legendary mark, no `legendTier` homing and no "hunt where it lives" was
+harder to get than the hardest legendary in the game, because the difficulty
+was charged twice - once on the throw and again on the spawn.
+
+`bandFor` drops such a species one band, which took it to 0.326% and **306
+encounters**. Derived from the catch math, never a list of dex numbers, so a
+tenth generation's pseudo-legendary is handled on the day it ships - the exact
+failure `LEGENDARY` itself had once as 34 hand-written numbers that missed
+sixty.
+
+**AND `bandFor` IS THE ONE ANSWER, BECAUSE THREE PLACES WERE ASKING.** The
+first version changed `bandOf` alone; `derivedHomes` went on reading `sp.tier`
+straight and Beldum's share did not move a thousandth of a percent. Caught by
+measuring rather than by the suite. **`PLAIN_MULT` moved to `catch.js`** to make
+that possible: `biomes.js` cannot import `items.js` (which already imports
+`ENCOUNTER_RATE` from IT), and the floor binds at a PLAIN throw - at mult 1
+Beldum is 1.18% and clears it, so the first predicate was false for every
+species in the dex and the rule silently did nothing.
 
 **A LEGENDARY'S HOME IS ITS PRIMARY TYPE.** Matching on ANY type gave half of
 them no home at all: Articuno is Ice/Flying and the starting map is
@@ -1270,13 +1717,36 @@ them stand together instead of being eight strengths of the same idea:
 | | odds | its tell |
 |---|---|---|
 | **Vivid** | 1/105 | the **palette**, turned up |
-| **Noir** | 1/118 | **no colour at all**, in a game entirely about colour |
-| **Origin** | 1/125 | the **artwork** - its debut sprite, the 1996 drawing |
-| **Holo** | 1/125 | the **finish** - the ordinary art, with foil travelling over it |
-| **Glitched** | 1/190 | **corrupted data** - the only tier that stutters |
-| **Astral** | 1/300 | the **substance** - a starlight duotone, no new art |
-| **Shiny** | 1/360 | the **alternate palette** - a second file |
-| **Showdown** | 1/400 | it **moves** - a real animated GIF, and the only asset not in this repo |
+| **Noir** | 1/115 | **no colour at all**, in a game entirely about colour |
+| **Origin** | 1/122 | the **artwork** - its debut sprite, the 1996 drawing |
+| **Holo** | 1/122 | the **finish** - the ordinary art, with foil travelling over it |
+| **Glitched** | 1/150 | **corrupted data** - the only tier that stutters |
+| **Astral** | 1/180 | the **substance** - a starlight duotone, no new art |
+| **Shiny** | 1/195 | the **alternate palette** - a second file |
+| **Showdown** | 1/210 | it **moves** - a real animated GIF |
+
+**AND THEN FLATTENED TO 2.0x, BECAUSE EIGHT KINDS ARE NOT EIGHT STRENGTHS.**
+The spread was 3.81x, and the argument against it is three rows above the
+table: these are eight different KINDS of rare, which is the whole reason they
+can stand together. A ladder that long quietly restates them as eight strengths
+of one idea, and it charges for it at the far end, where the tells are best -
+Showdown MOVES and Shiny is a second set of real art.
+
+**WHERE IT BIT WAS A LEGENDARY IN A TIER, because those are two independent
+rolls multiplied.** Measured in Tall Grass at Lv 50: a legendary in Showdown
+was **1 in 16,000 encounters** - 228,000 steps, four playthroughs - and a NAMED
+one in the map it calls home was **1 in 317,000**. Reported as wanting it
+kinder.
+
+Every rung above Noir came down (Glitched 190 -> 150, Astral 300 -> 180, Shiny
+360 -> 195, Showdown 400 -> 210) and **Vivid holds at 105**, because check.mjs
+requires the kindest tier stay rarer than 1 in 100 and that bound is the only
+thing stopping "kinder" becoming "commonplace" - so the ladder compresses UP
+into it rather than sliding underneath, which is this file's own lever: move
+the RATIO, not the base. Any variant goes 1 in 21 -> **1 in 18**, any legendary
+in a named tier roughly **twice** as often, and the rosette **4,450 -> 2,887**
+median encounters, which puts it inside a single playthrough. The ordering
+survives; it is simply no longer four times the wait.
 
 **THE LADDER WAS COMPRESSED AGAIN, NOT SCALED**, which is the lever this file
 already names: move the RATIO, not the base. The spread went 6.36x -> 3.81x and
@@ -1393,6 +1863,17 @@ the day they had nothing to say. Both are rules now: the marks row and the
 Forms strip must take their order from `TIERS`, and every `TIER_ODDS` row must
 quote its named constant rather than a bare number.
 
+**AND THE CATCH BANNER KNEW FOUR TIERS OF EIGHT.** `Cheer.jsx` kept its own
+`KIND` table, written when there were four, so Vivid, Noir, Glitched and
+Showdown all fell through to its `?? "POKÉDEX"` — meeting a 1-in-400 Showdown
+raised a banner headed with the words for "you filled a dex slot". Nothing
+failed, because a missing key in a lookup table is a sentence nobody notices is
+absent. `TIER_TELL` in `biomes.js` is the one table now, shared with the Dex
+sheet's FORMS strip, so a ninth tier arrives in both for free and the two cannot
+describe one differently. It names the TELL and never the odds, for the reason
+already recorded here: two of those strings used to quote a number and both were
+wrong the day the ladder was divided by 4/3.
+
 **TWO LAYOUTS WERE SIZED FOR FOUR TIERS.** `.cell-marks` was a no-wrap flex
 row: eight marks at 12px with 2px gaps is 110px on a 76px Dex tile, so the row
 ran off the side and out from under the entry number. It wraps at 9px now, two
@@ -1441,6 +1922,114 @@ strip and the evolution REVEAL all use it. Not during the evolution cycle: that
 phase is a white silhouette and a foil band over a white shape is a rainbow with
 no creature in it. A Dex GRID cell still gets none, deliberately - see the next
 note, which is the reason it can afford to.
+
+**GLITCHED WAS ONE THIRD OF ITS RECIPE AND THAT THIRD COULD NOT RUN.**
+Reported from play as "it just shakes". The tier was one animated `filter` on
+the sprite, whose keyframes carried a channel split at 46% and 51% and a blown
+flash at 78% — **and not one of them ever drew**, because `.sprite-glitched`
+sets `filter` with `!important` and an important author declaration outranks an
+animation. That is the same cascade fact the tier DEPENDS on read from the other
+side: it is what protects the filter from `mon-appear`, and it is what killed
+the tier's own keyframes. What was left was the `transform` jitter alone, which
+is precisely a glitch with its colour deleted.
+
+**A TIER MAY NOT ANIMATE A PROPERTY IT ALSO DECLARES `!important`**, and
+check.mjs asserts that for every tier, not for this one — the trap is the
+`!important` all of them need. Nothing fails at runtime: the CSS is valid, the
+animation runs, the property is simply never the animation's to set.
+
+So the split is **two silhouettes BEHIND the sprite**, one red one cyan, offset
+in opposite directions during the burst — which is what `drop-shadow` was
+drawing anyway, and nothing else on the element wants those properties. Behind
+is what makes it a fringe: the same fill masked to the outline and laid on top
+floods the whole creature. The scanline tears and the difference-blended noise
+blocks are two more masked layers and were simply never ported. All four live in
+`VariantFx`, so the Dex grid, the sheet, the FORMS strip, the Box, the encounter
+and the evolution reveal all draw the same four, and all four mask to `--art`
+or they are rectangles of static over the grass instead of damage to the
+creature.
+
+**THE UPPER LAYER IS PUT BACK OVER THE PLAYER, AND `route_top.png` IS HOW.**
+A Gen 3 metatile is two layers and the keyed one draws above sprites - that is
+how a trainer passes behind a tree top or walks between the Power Plant's
+machines instead of on top of them. Our atlas composites both halves into one
+image, which is what keeps `drawTile` to a single blit, and the price is that
+every one of those drew UNDER the player. Reported from play on the transcribed
+Power Plant, where **211 walkable tiles** have an upper layer.
+
+**A PARALLEL IMAGE AT THE SAME IDS, not an appended block and a lookup table.**
+Id *n* in `route_top.png` is the upper layer of id *n* in `route.png`, so the
+overlay pass needs no rule, no dict and no second copy of anything. It is almost
+entirely transparent - 23KB - and it makes `forest.fringeTop` and
+`tree.tipTop` redundant, both being this hand-baked for one tile each. check.mjs
+pins the two images to the same dimensions, read out of the PNG headers: let one
+gain a row the other does not and every id past that point paints somebody
+else's leaves over the player.
+
+**THREE GATES DECIDE WHAT GOES IN IT, and finding the first cost the most.**
+`METATILE_ATTR_LAYER_MASK` is bits 29-30 of a **4-byte** attribute in
+pokefirered (read as 2-byte it is pure noise, which is where this started), and
+`COVERED` means both halves draw BELOW the sprite - 44 of the Power Plant's 153
+metatiles, the drums and terminals among them. **A fully opaque upper layer is
+not an overhang**: some metatiles draw the same tile on both halves - that map's
+floor does, 123 times - and painting it back does not put the trainer behind
+anything, it deletes him. And **the cell has to be WALKABLE**, which is read at
+draw time rather than baked, because collision belongs to the map and five of
+that tileset's metatiles are laid both ways. That last one is the fix for the
+second bug: an overhang is something you walk BEHIND, so it has to be somewhere
+you can walk - a solid tile is one you are always in FRONT of, and skipping the
+check put the Power Plant's outer wall across the trainer's head. 1,359 upper
+layers, 274 after the first two gates, 33 left on that map after the third: the
+generator domes, and nothing else.
+
+**AND THE BOX IS THE SPRITE'S OWN RECT.** `drawPlayer` draws two tiles tall, so
+the trainer occupies his feet tile and the one above it. The first version
+padded a row below him as well, which can only ever repaint ground he is
+standing in front of.
+
+**A CELL YOU CANNOT BE SEEN STANDING ON IS NOT A CELL YOU CAN STAND ON.** Some
+metatiles draw the SAME art on both halves, so the upper one lands on BG1 and
+covers the tile completely - the Power Plant's machine plinth does it 123 times,
+and 100 of those sit directly on top of a machine. The map calls them passable;
+the renderer makes them uninhabitable, and the second fact is the one a player
+meets. Reported from play as **standing on top of the machinery**, which is
+exactly what it was.
+
+`build_assets` records them in `route.json` as `hides` and every transcription
+runs `seal_hidden()`: solid, and still the tile Game Freak drew. Our own
+generated Power Plant had made the identical call by hand for the identical
+reason - *"FireRed leaves the plinth walkable; we make it solid"* - which is the
+tell that this is the map's grammar rather than a compromise. You walk ALONG the
+front of a bank, never over it.
+
+**BOTH HALVES OF THAT TEST MATTER.** The first version asked only "is the upper
+layer opaque" and swept up Route 1's twenty-five flower beds: general metatile 4
+also draws its art twice, but it is `COVERED`, so both halves are UNDER the
+trainer and you stand in the flowers exactly as you would expect to. Opaque AND
+not covered, or the rule eats the scenery it was meant to leave alone.
+
+**A TIER'S AMBIENT LAYER CANNOT ALSO BE ITS ANNOUNCEMENT.** `VariantFx` runs
+forever - the foil travelling, the aura breathing - so by the time you are
+deciding what to throw it is scenery. Origin had a real entrance (`origin-fx`,
+the creature restoring itself out of its own silhouette) and **the other seven
+had none**, so a Glitched Pikachu arrived exactly like an ordinary one and you
+found out by reading the chip. `TierReveal` is the fix: one component, played
+ONCE, keyed on the encounter so the re-render every step causes cannot restart
+it.
+
+**FOUR MOTIONS AND A COLOUR EACH, not eight bespoke animations** - and which
+motion a tier gets says what KIND of rare it is, which is the distinction the
+whole ladder is built on: `burst` adds (Vivid, Shiny), `implode` draws in
+(Astral, Noir), `scan` passes over (Holo, Showdown), `tear` breaks (Glitched,
+and only Glitched). Origin is deliberately absent; two entrances would fight.
+
+**THE FLOOD IS THE ANNOUNCEMENT AND THE MOTION IS ONLY CHARACTER**, which
+`scan` had backwards on its first pass: a travelling band and nothing else,
+and rendered across nine frames of its own second it was very nearly invisible
+where burst and implode both hit you with a colour. So Holo and Showdown would
+have stayed the two tiers you could meet without noticing - the exact thing the
+component exists to fix. It floods too now. **Found by rendering all seven
+frozen across their cycle; invisible in the CSS.**
 
 **A tier's look must survive as a bare `<img>`** - still the rule, and still
 why Holo's rim is three drop-shadows and NOT a `hue-rotate`: a 52px sprite with
@@ -1607,6 +2196,39 @@ is the string `"*"` rather than `undefined`, because the other two answers are
 a tier name and `null`, and `undefined`-means-any next to `null`-means-ordinary
 is one typo from evolving the wrong Pokemon.
 
+**A MANIFEST THAT CANNOT BE EDITED IS A RECEIPT, NOT A CONTROL.** The sweep
+dialog listed exactly what it was about to take, which is right up to the moment
+the list contains something you would never give up. Reported with a screenshot
+of **two Latios queued for Rare Candy**: the dialog was doing precisely what it
+said, and what it said was the problem. `keeper()` holds every variant out of
+`duplicateUids` entirely - so no tier ever reaches the list - but **a legendary
+is not a keeper**, and at 1 in 3,760 encounters it is rarer than any tier.
+
+**THE FIX IS A CHECKBOX AND NOT ANOTHER `keeper()` CLAUSE**, and the reason is
+where `keeper` is enforced: in the ENGINE, on `sell` and `convert` both. Making
+legendaries keepers would mean you could never convert a fifth Latios even
+deliberately, from its own row - protection that turns into permanent clutter.
+So a legendary arrives **unticked**: the default does the protecting and the
+tick is there for when you really did mean it, with a `LEGENDARY` chip on the
+row saying why it came that way. (A default whose reason lives only in the note
+underneath reads as the dialog having lost your place.)
+
+**AND THE ARITHMETIC IS A FUNCTION OF WHAT IS STILL TICKED.** `lines` and
+`confirmLabel` were strings built once when the dialog opened, which is fine for
+a receipt and wrong for a control - untick a row and the header goes on quoting
+a total nobody is about to receive. `recount(keptUids)` rebuilds both, `Confirm`
+owns the dropped set (it is thrown away when the dialog closes, and nothing
+outside has a use for a half-made decision), and `run(picked)` **must never fall
+back to the full list** - a sweep that quietly took everything when the argument
+was missing is the exact failure the checkboxes exist to prevent.
+
+**A `<label>` IS NOT AN `<li>`, AND ONLY AN `<li>` MAY BE A CHILD OF A `<ul>`.**
+The row became a label wrapping a real checkbox - which is what makes the whole
+row the hit target, gives it its accessible name for free and puts it in the tab
+order with no `aria-label` to keep in step - and swapping it for the `li` broke
+both the markup and every `.cf-manifest li` rule with it. The `li` is the list
+item; `.cf-row` is the thing you click.
+
 **Counts that said "species" now count rows.** Three Pidgey rows are still one
 Pidgey - `speciesCount` is a Set over `g.species`, and the sell-all dialog
 counts what is kept as `box.length - spares` rather than the row count.
@@ -1767,7 +2389,7 @@ number".
 per map is the design and so is an even spread of generations, and no single
 rescale satisfies both - fixing the bands moves the generations and fixing the
 generations moves the bands. Alternating the two converges on the closest table
-honouring both. Measured across all eight maps at every level: every generation
+honouring both. Measured across all ten maps at every level: every generation
 within **25%** of fair (worst is Ember's Gen 2 at Lv 20, the narrowest map with
 only four generations open) and every band within **0.10pp**. **It always lands
 on the band step**: running out of rounds leaves whichever ran last in force,
@@ -1816,6 +2438,23 @@ declares exactly ONE of `rate`/`tilt`/`lift`, that a family never mixes two, and
 that no two families share one; two families on one lever are one family with
 two names. **A new field item belongs to a family or it needs a new lever.**
 
+**A COLOURED JAR IS BAIT, SO IT DAMPS WHAT IT IS NOT BAITING.** Reported from
+play: a Glitched Honey run turned up a Holo, a Vivid and one glitched. Measured
+over 40,000 runs, that was not bad luck - a coloured jar handed you 3.05 of its
+own tier and 1.96 of everything else, so **only 61% of what you met was the
+thing you paid for**, which reads as a general boost with a colour on it.
+`favour` lifted its tier and left the rest at full odds, and the rest is SEVEN
+tiers: their combined odds beat any single one, so the jar could never be more
+than a plurality. `FAVOUR_DAMP` (0.25) takes it to **86%**. The same lever
+pointed the other way rather than a new mechanism - a multiplier on odds inside
+`rollVariant`, where every reshaping of the ladder already happens. The plain
+Honey damps nothing: lifting the whole ladder IS its identity.
+
+check.mjs asserts the SHARE now. The old assertion said a honey must "leave the
+others where they were", which is what let this ship - it forbade the one thing
+that would have fixed it. What survives is the half worth keeping: no other
+tier may go UP.
+
 **`state.field` IS KEYED ON THE FAMILY, NOT THE ITEM ID.** That is what makes
 "one of each kind at a time" structural rather than a rule somebody enforces: a
 Max Repel replaces a Repel by being written to the same slot. Keyed on the id,
@@ -1854,9 +2493,35 @@ itself: `onShelf` shows what you can buy plus the next thing to open.
 Shiny Honey quietly fell to 43% when Shiny went 1/240 to 1/600; when the ladder
 was compressed the other way they drifted UP, to 82-91%, against a design that
 says three-in-four. Both times a jar changed value because a number in another
-file moved. `honeyLift(odds)` solves for it -
-`(1 - (1 - HONEY_LANDS)^(1/met)) / odds` - so every jar is equally good at its
+file moved. `honeyLift(odds)` solves for it, so every jar is equally good at its
 own tier BY CONSTRUCTION, which is what the design always claimed.
+
+**AND IT SOLVES FOR A COUNT NOW, NOT A CHANCE.** It solved
+`P(at least one) = HONEY_LANDS`, three-in-four over the run - and the trouble
+is the other quarter: a jar paid for up front that one time in four does
+nothing at all. That is a lottery ticket rather than an item, and it is why the
+honeys read as not worth buying. `HONEY_MEETS` is a COUNT, so
+`lift = MEETS / (met x odds)`, and **three** is the number because three is what
+makes the purchase obvious - you buy a Shiny Honey and you meet shinies, plural,
+with nothing to be unlucky about. Measured: every jar lands within a rounding
+step of 3.0 whatever its tier's odds, so the price still says which tier you
+want rather than which jar works.
+
+**THE PRICES WENT UP WITH THE VALUE, ON PURPOSE.** ¥2,400 + ¥300/rank became
+¥6,000 + ¥900/rank (plain Honey ¥1,400 -> ¥3,500): two and a half times the
+price for about four times the item, because a jar left at the old band would
+quietly have become the best purchase in the shop. A Showdown Honey is ¥12,300
+against a playthrough's ~¥147,000 - a real decision, and an obvious one. **With
+one running, any legendary in that tier goes from 1 in 16,000 encounters to
+1 in 560**, and a named one at home from 1 in 317,000 to 1 in 11,100.
+
+**`LIFT_CEILING` IS WHAT STOPS THIS RUNNING AWAY**, and check.mjs now asserts
+the two do not meet. It caps any tier at 1 in 5 however many multipliers stack,
+so three meets a jar cannot become a tier you are simply handed and pity on top
+of a honey is still bounded. Raise `HONEY_MEETS` far enough and the CLAMP
+rather than `honeyLift` decides what a jar is worth - and then the jars stop
+being equally good at their own tiers silently, because the rarest clamp first
+and nothing else would say so.
 
 **PRICE AND LEVEL COME FROM THE RANK, NOT THE LIFT**, and the suite is what said
 so: the lift is an integer ceiling, so Vivid and Noir both round to x4 and
@@ -1924,6 +2589,24 @@ berry band because of it - the thing it is for is the legendary that keeps
 getting away, where the alternative is losing the encounter outright. Asserted
 as an absolute (`berryCalm === 0`, and 2,000 real `resolveThrow` rolls) rather
 than as "lower", because "lower" is what it used to be.
+
+**AND SO DOES SOMETHING RUNNING OUT.** A field effect ending is the one event
+in the game with no tell at all: the card in the corner stops being there, which
+is exactly what nothing happening also looks like, and the next four hundred
+steps quietly cost what they always did. `state.worn` is a queue the step
+handler pushes to and `App` renders as a grey card in the same `.hud-right`
+stack the live one was in — the effect it names has just left that column, so
+anywhere else would make the player look somewhere new to be told something
+about here. It fades itself out; there is nothing to decide, so there is nothing
+to dismiss.
+
+**IT IS NOT A CHEER**, and check.mjs asserts it never queues as one: a cheer
+holds the screen for 3.2s with sparks on it, and an effect ending is news rather
+than an occasion. **AND CANCELLING IS NOT EXPIRING** — starting a repel clears
+any honey under it, so the announcement lives in the same three lines as the
+countdown rather than in a panel noticing the slot is empty. Telling somebody
+their honey wore off when they replaced it themselves is worse than saying
+nothing.
 
 **USING SOMETHING HAS TO LOOK LIKE USING SOMETHING.** A field item's only
 feedback was a chip in the far corner of the screen and a berry's was a line of
@@ -2361,13 +3044,51 @@ against and making it per-form would quietly halve a ball nobody asked to
 retune. Two questions, two fields, both frozen on the encounter for the reason
 `known` always was.
 
-**A CAP WITH NO FLOOR IS A BOX THAT CAN BE SQUEEZED TO NOTHING.** The ball
-rail's `max-height` is `100%` of its offset parent less a 92px offset, and in an
-ENCOUNTER both terms measure a different box — `.battle` sets
-`container-type: inline-size`, so `cqw` resolves against the battle rather than
-the viewport. On a short window that left the rail shorter than one row, and
-`.br-list` is `overflow-y: auto`, so a single berry drew a scrollbar with arrows
-on it. `max(170px, …)` gives it four rows to stand on.
+**THE RAIL LIES DOWN, ALONG THE BOTTOM RIGHT.** It was a column down the left
+edge, chosen because that strip is empty both while walking and mid-battle. It
+still is; it is also **the axis the viewport has least of** - the map is 15:11 -
+so the rail was the one panel that could run out of room, which is the entire
+history in the note below. And it sat directly over the minimap's corner, so
+the left edge carried both permanent overlays while the bottom right carried
+none. Horizontal along the bottom right fixes both, the balls read as a hand of
+tiles rather than a list, and the three overlays are now one per corner:
+minimap bottom left, clock and effects top right, inventory bottom right.
+
+**THE CAP TURNS WITH IT** - `max-width`, with the same four-tile floor the
+vertical one had four rows of - and so does the scroller. Three things only the
+render caught: **`grid-template-columns: 0fr` collapses the FIRST track**, and
+the kit is in the implicit second one, so shut the rail showed its tab and then
+three berries floating beside it (the kit collapses on its own `max-width` now,
+because `0fr -> auto` is not interpolable and the pair would snap where the
+balls glide); the Master Ball's plain `kbd` fell outside the rounded box
+entirely, having no tile treatment; and centring the two lists floated the
+berries half a key-chip high so the icons stopped sharing a line.
+
+**THE BALL RAIL NEVER HONOURED ITS OWN `max-height`, AND TWO FIXES MISSED IT.**
+Reported twice as a scrollbar with arrows on it around one berry. This file
+recorded the first diagnosis — "a cap with no floor is a box that can be
+squeezed to nothing" — and added `max(170px, …)`. **A cap that is not being
+honoured is not honoured harder for being bigger**, so that changed nothing; the
+second attempt turned the kit's own `overflow` off, which only moved the
+overflow outside the rail, and set a `flex: none` beside it that did literally
+nothing because `.br-wrap` is a GRID. Both shipped under comments claiming to be
+the thing that made the layout work.
+
+What it actually was: `.br-wrap` is a flex item of a capped flex column and a
+flex item's `min-height` is `auto`, so **the rail grew straight past its cap** —
+measured in a render at 960x300 with `.ballrail` outlined, the content finished
+about 200px below the box. Both `.br-list`s then carried `overflow-y: auto`, so
+whichever one the broken layout squeezed drew the scrollbar, and the short one
+is the one that loses.
+
+**THE SCROLLER IS THE RAIL, AND IT IS ONE.** `.br-wrap` takes `flex: none` and
+its natural height; `.ballrail` scrolls. Putting the scroller on `.br-wrap`
+instead does NOT work and was rendered before being believed: a grid lays its
+rows out inside its own box, so constraining it collapses the `1fr` row to
+nothing and leaves no overflow to scroll — on a 300px encounter that showed
+three berries and no balls. The balls are first in the flow and so are the part
+you always see, which is the right priority in front of a Pokemon. **Every step
+of this was diagnosed from a render; none of it was visible in the CSS.**
 
 **AND THE SAVE PANEL SAID THE SAVE WAS SOMEWHERE IT IS NOT.** "KEPT IN THIS
 BROWSER" and "stored in this browser only" were written when that was the whole
@@ -2480,6 +3201,36 @@ on the map A is FISH and B is DASH, **held** rather than toggled because it is
 Shift and because a toggle leaves the trainer sprinting after the thumb has
 gone. Mid-animation both are SKIP, which is what the keyboard already does with
 any key at all.
+
+**WHICH BALL EACH NUMBER KEY THROWS IS THE PLAYER'S.** The keys were
+`BALLS.indexOf(ball) + 1` — the shipped order, the same for everybody, so a
+Timer Ball you throw all afternoon sat on 6 because that is where it happens to
+be declared. Asked for as reassignable hotkeys on a desktop and as choosing
+which ball the A button throws on a phone; **those are one question, because
+slot 1 is both**.
+
+`ballOrder(saved)` is the one answer and `saved` is a PREFERENCE rather than a
+ranking: a list of ids, most-favoured first, and anything it does not name keeps
+its shipped order behind the ones it does. So `promoteBall` moves one ball and
+nothing else, which is what lets repeated presses reach any arrangement — a chip
+that resorted the rest would be a shuffle, not a control. Unknown and duplicate
+ids are dropped rather than trusted, because this comes out of `localStorage`
+and a bad entry there would silently take a key away from a real ball.
+
+**THE KEY CHIP IS THE CONTROL, and it is a SIBLING of the row** rather than
+inside it: the row is already a button that throws, and a button nested in a
+button is neither valid nor reachable. On touch there is no room for a chip per
+tile and no keyboard for a number on one to mean anything, so **choosing from
+the bag sheet is what assigns** — the ball you last reached past A for becomes
+the ball A throws, and the A button's own icon changing is the feedback.
+
+**AND A BALL THAT CANNOT FAIL IS NEVER WHAT A BARE THROW PICKS UP.**
+`defaultBall` refuses `mult >= GUARANTEED`. Not `forSale`, which is what the
+first version said and which does nothing because **the shop sells Master
+Balls** — check.mjs caught it. What makes that ball different is not that it is
+unbuyable, it is that throwing one ENDS the encounter, so a press that reaches
+it by accident cannot be taken back. It is still throwable on its own key or by
+choosing it, and the fallback still finds it when the bag holds nothing else.
 
 **TAP THROWS, HOLD CHOOSES**, which is how A grew the one action the keyboard
 has and the pad did not: keys 1-9 pick a ball, and with the rail gone from
@@ -2739,7 +3490,7 @@ frame it is one `drawImage`, one stroked rect and two arcs.
 
 **The palette is `MINI` in `map.js`, beside `SOLID`, because it is the legend.**
 A second list of map characters anywhere else is a list that falls behind.
-check.mjs asserts every character any of the eight maps uses has a colour, that
+check.mjs asserts every character any of the ten maps uses has a colour, that
 each parses as a hex colour (a typo does not crash - canvas silently reuses the
 previous `fillStyle`, so one bad entry paints its tiles as whatever was drawn
 before), and that **Rock Ridge's plateau and Frost Hollow's shelf are far from

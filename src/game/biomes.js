@@ -1,6 +1,10 @@
 import { SPECIES, isForm } from "../data/dex.js";
 import { SHOWDOWN_IDS } from "../data/showdown.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
+/* One-way: `catch.js` imports nothing, so this cannot cycle. `items.js` is the
+   file that must NOT be reached from here - it already imports
+   `ENCOUNTER_RATE` from this one. */
+import { catchChance, NEVER_HOPELESS, PLAIN_MULT } from "../catch.js";
 
 /* The eight areas: what each one is, and what spawns there.
 
@@ -226,7 +230,7 @@ export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower"]);
    handful of shinies in a whole playthrough - rare enough that each one is a
    story, common enough that they are not a rumour. Do not tune this one alone:
    it is one rung of the ladder below, and they move together. */
-export const SHINY_ODDS = 1 / 360;
+export const SHINY_ODDS = 1 / 195;
 
 /* Four rarities above ordinary, and they are not variations on one idea -
    each is a different KIND of rare, which is what lets all four stand together
@@ -277,9 +281,9 @@ export const SHINY_ODDS = 1 / 360;
    trade this is deliberately making - a FULLY complete 151-species dex is not
    reachable at any odds that leave a rare feeling rare, and no number here
    pretends otherwise. */
-export const ASTRAL_ODDS = 1 / 300;
-export const ORIGIN_ODDS = 1 / 125;
-export const HOLO_ODDS = 1 / 125;
+export const ASTRAL_ODDS = 1 / 180;
+export const ORIGIN_ODDS = 1 / 122;
+export const HOLO_ODDS = 1 / 122;
 
 /* FOUR MORE, AND THE LADDER GOT KINDER RATHER THAN LONGER.
 
@@ -292,17 +296,41 @@ export const HOLO_ODDS = 1 / 125;
    So the spread opens at the BOTTOM. Holo and Origin come down 160 -> 140 and
    the three new cheap ones sit under them, which takes the whole variant rate
    from 1 in 53 encounters to 1 in 25 - a variant is now a thing that happens
-   on an ordinary walk rather than a thing you hear about. Astral is untouched
-   at 480 because it is the one the others are measured against, and Shiny and
-   Showdown go ABOVE it: they are the two with real artwork behind them, so
-   they are the two worth being trophies.
+   on an ordinary walk rather than a thing you hear about.
 
    AND THE ROSETTE CHANGES WITH IT - see `ROSETTE_NEED`. Kinder odds alone do
    not fix it; that was measured too. */
+
+/* AND THEN IT FLATTENED, BECAUSE EIGHT KINDS ARE NOT EIGHT STRENGTHS.
+
+   The spread was 3.81x - Vivid 1/105 up to Showdown 1/400 - and the thing that
+   made it indefensible is written three paragraphs above this one: these are
+   eight different KINDS of rare, which is the whole argument for letting them
+   stand together. A ladder that long quietly re-states them as eight strengths
+   of one idea, and it is paid for at the far end, where the tell is the best:
+   Showdown MOVES and Shiny is a second set of real art.
+
+   Where it bit hardest was a legendary in a tier, because those are two
+   independent rolls multiplied. Measured in Tall Grass at Lv 50: a legendary
+   in Showdown was 1 in 16,000 encounters - 228,000 steps, four playthroughs -
+   and a NAMED one at home was 1 in 317,000. Reported as wanting this kinder.
+
+   The spread is 2.0x now (105 -> 210) and every rung above Noir came down.
+   Vivid holds at 105 because check.mjs requires the kindest tier stay rarer
+   than 1 in 100, and that bound is the whole thing stopping "kinder" from
+   becoming "commonplace" - so the ladder compresses UP into it rather than
+   sliding under it, which is the same lever this file already names: move the
+   RATIO, not the base.
+
+   What it buys: any variant 1 in 21 -> 1 in 18, any legendary in a named tier
+   roughly twice as often, and the rosette shortens with it because the rosette
+   waits on the rarest tier a species can wear. The ordering survives - Shiny
+   and Showdown are still the two trophies, still the two with real artwork
+   behind them - it is just no longer four times the wait. */
 export const VIVID_ODDS = 1 / 105;
-export const NOIR_ODDS = 1 / 118;
-export const GLITCH_ODDS = 1 / 190;
-export const SHOWDOWN_ODDS = 1 / 400;
+export const NOIR_ODDS = 1 / 115;
+export const GLITCH_ODDS = 1 / 150;
+export const SHOWDOWN_ODDS = 1 / 210;
 
 /* THE LADDER, rarest first - and the single source for it.
 
@@ -339,6 +367,31 @@ export const ROSETTE_NEED = 4;
 /* Just the names, rarest first. Kindest-first is `[...TIERS].reverse()`, which
    is what a row of marks reads in - progress towards the rarest. */
 export const TIERS = TIER_ODDS.map(([tier]) => tier);
+
+/* WHAT EACH TIER IS, IN A PHRASE - the TELL, never the odds. Beside `TIERS`
+   because it is the same list and there is no second place a tier's name and
+   a tier's description should have to be kept in step.
+
+   It was two tables. The Dex sheet had all eight and the catch banner had
+   four, written when there were four, so meeting a 1-in-400 Showdown raised a
+   banner headed POKEDEX - the fallback, on the rarest thing in the game.
+   Neither failed, because a missing key in either is a sentence nobody
+   notices is absent.
+
+   Never the odds, either: two of these used to read "ONE IN A THOUSAND" and
+   "ONE IN FOUR THOUSAND", and both were wrong the day the ladder was divided
+   by 4/3 - in the one place the game reads a rare tier out loud. A phrase
+   describing what the thing IS cannot go stale when a constant moves. */
+export const TIER_TELL = {
+  origin: "the 1996 artwork",
+  holo: "pressed in foil",
+  shiny: "the alternate palette",
+  astral: "made of starlight",
+  glitched: "corrupted data",
+  vivid: "the colours turned up",
+  noir: "no colour at all",
+  showdown: "it moves",
+};
 
 /* WHERE TO GO AND LOOK. The single most useful thing the Dex can say about a
    species you have never met, and it was the one thing it did not say.
@@ -460,6 +513,27 @@ export const pityBoost = (dry = 0) =>
    alone caps at 10x, which is 1/48 on Astral. */
 export const LIFT_CEILING = 0.2;
 
+/* A COLOURED JAR IS BAIT, SO IT HAS TO DAMP WHAT IT IS NOT BAITING.
+
+   Reported from play: a Glitched Honey run turned up a Holo, a Vivid and one
+   glitched. Measured over 40,000 runs, that was not bad luck - a coloured jar
+   handed you 3.05 of its own tier and 1.96 of everything else, so **only 61%
+   of what you met was the thing you paid for**. `favour` lifted its tier and
+   left the rest at full odds, and the rest is SEVEN tiers: their combined odds
+   beat any single one of them, so the jar could never be more than a
+   plurality.
+
+   Damping the others by `FAVOUR_DAMP` takes it to about 86%, which is what
+   "the one you are hunting" has to mean for the price to be honest. It is the
+   SAME lever pointed the other way rather than a new mechanism - a multiplier
+   on odds inside this one function, which is where every other reshaping of
+   the ladder already happens.
+
+   The plain Honey is untouched and damps nothing: lifting the whole ladder at
+   once IS its identity, and it is the jar for when you are not hunting
+   anything in particular. */
+export const FAVOUR_DAMP = 0.25;
+
 /* HOW OFTEN THE WORLD STOPS YOU. It lived in engine.js, which is the wrong
    file for it twice over: it is a property of the world rather than of the
    frame loop, and `items.js` needs it to price a honey - and cannot import the
@@ -476,8 +550,13 @@ export function rollVariant(
 ) {
   for (const [tier, odds] of TIER_ODDS) {
     if (locked?.has(tier)) continue;
-    const lift = boost * (favour?.tier === tier ? favour.mult : 1);
-    if (random() < Math.min(LIFT_CEILING, odds * lift)) return tier;
+    /* Three multipliers, and they are three different things: `boost` is the
+       drought, `favour.mult` is the jar you bought, and the damp is what that
+       jar is NOT baiting for. A plain honey has no `tier`, so it never damps. */
+    const bait = favour?.tier
+      ? (favour.tier === tier ? favour.mult : FAVOUR_DAMP)
+      : 1;
+    if (random() < Math.min(LIFT_CEILING, odds * boost * bait)) return tier;
   }
   return null;
 }
@@ -784,7 +863,12 @@ const RESIDENTS = [
   {
     id: "ridge",
     level: 9,
-    name: "Rock Ridge",
+    name: "Mt. Moon",
+    /* THE TABLE NEEDED NOTHING WHEN THE MAP WAS REPLACED, which is worth a
+       line: Rock Ridge was composed against the `cave` tileset and stocked
+       with what lives in one, so Zubat, Geodude, Clefairy and Onix were
+       already the cast of the place it was standing in for. The id is the
+       slot's historical handle - see build_map.py's AREAS. */
     types: ["rock", "ground", "fighting", "steel", "dragon"],
     table: [
       [74, 20], [41, 16], [50, 10], [66, 10], [27, 9], [95, 7], [104, 6],
@@ -813,6 +897,23 @@ const RESIDENTS = [
     ],
   },
   {
+    id: "cinder",
+    level: 16,  // between the volcano and the ice, a rung of its own
+    name: "Cinderpeak",
+    /* THE ROSTER IS THE REAL MOUNTAIN'S, and it is what makes this map not a
+       second Ember Caldera despite sharing a tileset: Ember is Fire all the
+       way down, and Route 112 is a mountainside with ash on it - Machop and
+       Geodude and Zubat live here too, and the Fire types are the ones nearer
+       the summit. Four types rather than Ember's one is the difference. */
+    types: ["fire", "rock", "ground", "fighting"],
+    table: [
+      [322, 20], [66, 16], [41, 15], [218, 14], [74, 12], [27, 10], [50, 9],
+      [109, 8], [325, 8], [324, 6], [240, 5], [111, 5], [95, 4], [219, 4],
+      [323, 3], [75, 3], [67, 3], [42, 3], [228, 2], [126, 2], [231, 2],
+      [246, 1],
+    ],
+  },
+  {
     id: "frost",
     level: 18,  // Lapras and Articuno - the map the old design let you waste a whole bag on
     name: "Frost Hollow",
@@ -830,6 +931,32 @@ const RESIDENTS = [
     table: [
       [92, 22], [63, 16], [96, 14], [93, 10], [64, 8], [97, 6],
       [105, 5], [94, 3], [122, 2],
+    ],
+  },
+  {
+    id: "safari",
+    level: 20,  // MAP_LAST, alongside the tower - the two ends of the game
+    name: "Safari Zone",
+    /* THE BROADEST TABLE IN THE GAME, because the map is: 120x80 and 4,161
+       walkable tiles, more than any other area by 40%, with grass, sand, cliff
+       tops, ponds and a river all inside one fence. A reserve is the one place
+       a roster this mixed is not a contradiction.
+
+       **THE TYPE LIST IS SEVEN AND NOT EIGHTEEN, AND THAT IS DELIBERATE.**
+       `types` is not decoration here - `legendsFor` reads it to decide whose
+       HOME a map is, and "hunt where it lives" is the whole point of
+       `legendTier`. A map listing every type would be every legendary's home
+       and would quietly flatten that rule into nothing. Seven is what the real
+       Safari Zone actually holds, it is wider than anywhere else in the game,
+       and it leaves the Tower its ghosts and Ember its fire. */
+    types: ["normal", "grass", "bug", "water", "ground", "flying", "psychic"],
+    table: [
+      [43, 18], [263, 18], [84, 14], [177, 12], [54, 12], [118, 11], [129, 11],
+      [74, 10], [167, 8], [165, 8], [191, 8], [194, 8], [183, 7], [102, 7],
+      [44, 6], [85, 6], [203, 6], [55, 5], [119, 5], [111, 5], [231, 5],
+      [190, 4], [216, 4], [179, 4], [195, 4], [202, 3], [25, 3],
+      [214, 2], [127, 2], [213, 2], [234, 2],
+      [241, 1], [113, 1], [115, 1], [128, 1], [123, 1],
     ],
   },
 ];
@@ -866,6 +993,31 @@ export const MAP_LAST = 20;
    the Gen 1 commons exactly as it did, while the generations themselves come
    out level. These numbers are therefore a RELATIVE rarity within a
    generation now, not a handicap against Gen 1. */
+/* WHAT BAND A SPECIES COMPETES IN, and it is one answer because three places
+   were asking. `bandOf` is the row-level reader (it also knows about the "L"
+   band and about a row carrying its parent's band down an evolution chain);
+   this is the species-level fact underneath it, and `derivedHomes` needs it
+   too - which is exactly what the first version of the Beldum fix missed. It
+   changed `bandOf` alone, the derived rows went on reading `sp.tier` straight,
+   and Beldum's share did not move a thousandth of a percent. Measured, which
+   is the only reason it was caught. */
+const KINDER = { S: "A", A: "B", B: "C", C: "C" };
+export const bandFor = (id) => {
+  const sp = speciesById(id);
+  if (!sp) return "C";
+  const own = sp.tier ?? "C";
+  /* Already impossible to catch, so not also rare to meet - see the note by
+     `bandOf`. Legendaries are exempt there, and they never reach this
+     function anyway. */
+  /* AT A PLAIN THROW, which is where the floor actually binds - `catchChance`
+     clamps `(rate/255) * mult`, so at mult 1 Beldum is 1.18% and clears it,
+     and at `PLAIN_MULT` it is 0.94% and does not. The first version of this
+     used 1, the predicate was false for every species in the dex, and the rule
+     silently did nothing at all. Measured, which is how that was caught. */
+  return catchChance(sp.rate, PLAIN_MULT) <= NEVER_HOPELESS
+    ? (KINDER[own] ?? own) : own;
+};
+
 const DERIVED_WEIGHT = { C: 8, B: 5, A: 3, S: 1 };
 
 /* EVERY GENERATION LIVES IN EVERY MAP, and until this it did not.
@@ -902,7 +1054,7 @@ const derivedHomes = () => {
       const n = sp.types.filter((t) => b.types.includes(t)).length;
       if (n > score) { score = n; best = b; }
     }
-    homes.get(best.id).push([sp.id, DERIVED_WEIGHT[sp.tier] ?? 4]);
+    homes.get(best.id).push([sp.id, DERIVED_WEIGHT[bandFor(sp.id)] ?? 4]);
   }
 
   for (const b of RESIDENTS) {
@@ -924,7 +1076,7 @@ const derivedHomes = () => {
          like somewhere - but a species whose band the map does not already
          have is not a candidate at all. Every map's table has commons, so the
          pool is never empty. */
-      const bands = new Set(b.table.map(([id]) => speciesById(id)?.tier ?? "C"));
+      const bands = new Set(b.table.map(([id]) => bandFor(id)));
       /* IT MUST SHARE A TYPE WITH THE MAP, and leaving that out put the
          starters in the volcano.
 
@@ -945,10 +1097,10 @@ const derivedHomes = () => {
       const fits = (sp) => sp.types.some((t) => b.types.includes(t));
       const pool = wild
         .filter((sp) => genOf(sp.id) === gen && !here.has(sp.id)
-                     && bands.has(sp.tier) && fits(sp))
+                     && bands.has(bandFor(sp.id)) && fits(sp))
         .slice(0, short);
       for (const sp of pool) {
-        homes.get(b.id).push([sp.id, DERIVED_WEIGHT[sp.tier] ?? 4]);
+        homes.get(b.id).push([sp.id, DERIVED_WEIGHT[bandFor(sp.id)] ?? 4]);
       }
     }
   }
@@ -1220,11 +1372,38 @@ export const BAND_FLOOR = 0.015;
    evolves from - you would meet more Tangrowth than Tangela in Deep Woods.
    Inside one band the scale is uniform, so `parent x EVO_SHARE` survives it
    exactly. */
+/* MOVED UP: see `bandFor`, declared above `derivedHomes` because that is the
+   first thing that asks. This is the note.
+
+   A SPECIES THAT IS ALREADY IMPOSSIBLE TO CATCH IS NOT ALSO RARE TO MEET.
+
+   Reported from play as Beldum seeming uncatchable, and it very nearly was.
+   Its PokeAPI capture rate is 3 - the same as Mewtwo's, which is correct data
+   and not ours to edit - so `catchChance` puts it exactly ON `NEVER_HOPELESS`,
+   the floor this repo's own notes claimed "no species in the dex sits on".
+   Three do: beldum, metang and metagross, and they are one evolution line.
+   Everything else down there is legendary.
+
+   Measured, at Lv 50 with an Ultra Ball and a Nanab: Beldum is 0.052% of Mt
+   Moon's table and takes **1,914 encounters to own**, against Mewtwo's 1,318.
+   A species with no legendary mark, no `legendTier` homing and no "hunt where
+   it lives" was harder to obtain than the hardest legendary in the game.
+
+   The catch rate is right and the BAND is what was wrong: difficulty was being
+   charged twice, once on the throw and again on the spawn. A pseudo-legendary
+   in the real games is hard to KEEP, not hard to find. So a non-legendary on
+   the floor drops one band, which roughly triples how often it turns up and
+   leaves every bit of the difficulty where it belongs - on the ball.
+
+   DERIVED FROM THE CATCH MATH, never a list of dex numbers, so a tenth
+   generation's pseudo-legendary is handled on the day it ships. A legendary is
+   exempt because "L" is its own band with its own placement rule, and being
+   brutal is the entire point of one. */
 const bandOf = (row) => {
   const id = Array.isArray(row) ? row[0] : row;
   if (LEGENDARY.includes(id)) return "L";
   if (Array.isArray(row) && row[3]) return row[3];
-  return speciesById(id)?.tier ?? "C";
+  return bandFor(id);
 };
 
 /* The shape of a biome's ORIGINAL table, as a share per band. Computed from

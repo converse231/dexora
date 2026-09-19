@@ -58,10 +58,17 @@ async function loadPair(base) {
 /* Resolves to { atlas, player }, either of which may be null. A missing sheet
    is the normal case, not an error - don't let it reject. */
 export async function loadArt() {
-  const [atlas, player] = await Promise.all([
+  const [atlas, player, top] = await Promise.all([
     loadPair("tilesets/route").catch(() => null),
     loadPair("tilesets/player").catch(() => null),
+    /* THE UPPER LAYER, AT THE SAME IDS. A Gen 3 metatile's keyed layer draws
+       over sprites; our atlas composites both into one image, so it draws under
+       instead. `route_top.png` is that layer on its own, the same size and the
+       same ids, so `drawOverlays` needs no lookup. Optional like everything
+       else here - without it the game is exactly what it was. */
+    loadImage("tilesets/route_top.png").catch(() => null),
   ]);
+  if (atlas) atlas.imgTop = top;
   return { atlas, player };
 }
 
@@ -75,10 +82,14 @@ function hash(x, y) {
 }
 
 // Metatile id -> source rect in the atlas.
+/* Returns the id it drew, so the caller can ask for that tile's upper layer
+   back without re-deriving which tile a rule picked - which would be a second
+   copy of the tile rules, the one thing this file must not grow. */
 function blit(ctx, atlas, id, px, py) {
   const s = atlas.tileSize;
   const cols = atlas.atlasCols ?? 16;
   ctx.drawImage(atlas.img, (id % cols) * s, Math.floor(id / cols) * s, s, s, px, py, TILE, TILE);
+  return id;
 }
 
 /* A tree is 2 wide and at least 3 tall. Which slice a tile gets depends on how
@@ -537,12 +548,58 @@ const STRIDE_COLS = [0, 2];
    player: map, player, leaves. Everything within the sprite's reach gets
    repainted, which is any overhang on screen - the trainer is two tiles tall,
    so the row above the one he stands on counts too. */
-export function drawOverhangs(ctx, atlas, x0, y0, w, h, camX, camY, at) {
-  const id = atlas?.forest?.fringeTop;
-  if (!id) return;
+/* THE UPPER LAYER, PUT BACK OVER THE PLAYER.
+
+   A Gen 3 metatile is two layers and the keyed one draws above sprites - that
+   is how a trainer passes behind a tree top, stands behind a counter, or walks
+   between the machines in the Power Plant instead of on top of them. 1,359 of
+   the metatiles we bake have one. Our atlas composites both halves into a
+   single image, which is what keeps `drawTile` to one blit, and the price is
+   that every one of those draws UNDER the player.
+
+   Reported from play on the transcribed Power Plant, where 211 walkable tiles
+   have an upper layer: the trainer stood on the machinery he should have been
+   passing behind.
+
+   `ids` is what `drawTile` actually drew, collected by the caller during the
+   tile pass, so nothing here re-derives which tile a rule chose. Only the
+   player's own footprint needs repainting - he is the only sprite on the map,
+   and everywhere else the composited tile is already right.
+
+   THE CALLER DECIDES WHICH TILES, and there are two rules behind that, both
+   paid for: the box is the sprite's own two-tile rect rather than a padded
+   square, and it holds only WALKABLE cells. An overhang is something you walk
+   behind, so it has to be somewhere you can walk - a solid tile is one you are
+   always in front of. Skipping that put the Power Plant's outer wall over the
+   trainer's head every time he stood against it. */
+export function drawOverlays(ctx, atlas, ids, camX, camY) {
+  if (!atlas?.imgTop) return;
+  const s = atlas.tileSize;
+  const cols = atlas.atlasCols ?? 16;
+  for (const [x, y, id] of ids) {
+    if (!(id >= 0)) continue;
+    ctx.drawImage(atlas.imgTop, (id % cols) * s, Math.floor(id / cols) * s, s, s,
+                  Math.round(x * TILE - camX), Math.round(y * TILE - camY), TILE, TILE);
+  }
+}
+
+export function drawOverhangs(ctx, atlas, x0, y0, w, h, camX, camY, at, fixedAt) {
+  const fringe = atlas?.forest?.fringeTop;
+  const tip = atlas?.tree?.tipTop;
+  if (!fringe && !tip) return;
   for (let y = y0; y <= y0 + h; y++) {
     for (let x = x0; x <= x0 + w; x++) {
       if (at(x, y) !== "c") continue;
+      /* WHICH LEAVES GO BACK ON, and it comes from the tile rather than from a
+         rule. Our own canopy has exactly one fringe piece, so for a map we drew
+         there is nothing to choose. A COPIED map's overhang is whatever the real
+         tileset put there, and General's conifer crown is two halves - 14 the
+         left, 15 the right. With one piece to reach for, the pass painted
+         Viridian Forest's round canopy over every conifer on Route 1 and took
+         the top off all thirty-six of them. */
+      const raw = fixedAt ? fixedAt(x, y) : -1;
+      const id = tip && (raw === 14 || raw === 15) ? tip[raw - 14] : fringe;
+      if (!id) continue;
       blit(ctx, atlas, id, Math.round(x * TILE - camX), Math.round(y * TILE - camY));
     }
   }

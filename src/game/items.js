@@ -1,6 +1,6 @@
 import { SPECIES } from "../data/dex.js";
 import { EVOLUTIONS as EVO_ROWS } from "../data/evolutions.js";
-import { GUARANTEED } from "../catch.js";
+import { GUARANTEED, PLAIN_MULT } from "../catch.js";
 import {
   TIERS, TIER_ODDS, ENCLOSED, ENCOUNTER_RATE, speciesById,
 } from "./biomes.js";
@@ -64,7 +64,7 @@ import {
 
    It also WIDENS the plain ladder from below - 0.8 / 1.8 / 3.0 - which is the
    direction the Great Ball wanted anyway. */
-export const PLAIN_MULT = 0.8;
+export { PLAIN_MULT };
 
 export const BALLS = [
   { id: "poke-ball", name: "Poké Ball", short: "POKÉ", mult: PLAIN_MULT, price: 25, level: 1 },
@@ -264,21 +264,33 @@ export const STONES = [
    number in another file changed, which is the one thing a derived value
    cannot do.
 
-   So solve for it. P(at least one) = 1 - (1 - odds x lift)^met, so the lift
-   that lands `HONEY_LANDS` of the time is (1 - (1 - LANDS)^(1/met)) / odds.
-   Every jar is then equally good at its own tier BY CONSTRUCTION, which is
-   what the design always said: the price says which tier you want, never which
-   jar works.
+   AND IT SOLVES FOR A COUNT NOW, NOT FOR A CHANCE. It used to solve
+   P(at least one) = `HONEY_LANDS`, three-in-four over the run - which is a jar
+   that one time in four does nothing at all, at a price you paid up front.
+   That is a lottery ticket rather than an item, and it is the reason the
+   honeys read as not worth buying.
 
-   PRICE AND LEVEL RIDE THE LIFT, because the lift already IS the rarity - a
-   tier needing a bigger multiplier is a rarer tier. No table to maintain, and
-   it lands within a few hundred of the prices the hand-written three had. */
+   `HONEY_MEETS` is how many of that tier one jar is meant to hand you, so
+   lift = MEETS / (met x odds). Three, because three is what makes the purchase
+   obvious: you buy a Shiny Honey and you meet shinies, plural, and there is
+   nothing to be unlucky about. The jars cost about two and a half times what
+   they did and are worth about four, which is the trade being made on purpose.
+
+   Every jar is still equally good at its own tier BY CONSTRUCTION - they all
+   land within a rounding step of three - so the price goes on saying which
+   tier you want rather than which jar works.
+
+   THE CLAMP IS WHAT STOPS THIS RUNNING AWAY. `LIFT_CEILING` caps any tier at
+   1 in 5 however many multipliers stack, so three meets per jar cannot become
+   a tier you are simply handed, and pity on top of a honey is still bounded.
+   Raise `HONEY_MEETS` far enough and the clamp, not this formula, is what
+   decides - check.mjs asserts the two do not meet. */
 export const HONEY_STEPS = 600;
-export const HONEY_LANDS = 0.75;
+export const HONEY_MEETS = 3;
 
 const HONEY_MET = HONEY_STEPS * ENCOUNTER_RATE;
 export const honeyLift = (odds) =>
-  Math.max(2, Math.ceil((1 - Math.pow(1 - HONEY_LANDS, 1 / HONEY_MET)) / odds));
+  Math.max(2, Math.ceil(HONEY_MEETS / (HONEY_MET * odds)));
 
 /* Kindest first, so the shelf reads as a ladder and the cheapest opens first.
    `TIER_ODDS` is rarest-first, hence the reverse. */
@@ -297,7 +309,12 @@ const TIER_HONEY = [...TIER_ODDS].reverse().map(([tier, odds], rank) => {
   return {
     id: `honey-${tier}`, art: "honey", tier, family: "variant",
     name: `${name} Honey`,
-    price: 2400 + 300 * rank,
+    /* DEARER, BECAUSE IT IS WORTH MORE. A jar was ¥2,400 for a three-in-four
+       chance at ONE of its tier; it is three of them now, so the band moved
+       with the value rather than staying where it was and quietly becoming
+       the best purchase in the shop. A Showdown Honey is ¥12,300 against a
+       playthrough's ~¥147,000 - a real decision, and an obvious one. */
+    price: 6000 + 900 * rank,
     level: 16 + rank,
     steps: HONEY_STEPS, lift,
     blurb: `${name}, ×${lift} as likely`,
@@ -353,11 +370,66 @@ export const FIELD = [
      the price difference is about which tier you want rather than about which
      jar works, which is the honest thing for it to be about. */
   {
-    id: "honey", family: "variant", name: "Honey", price: 1400, level: 14,
+    id: "honey", family: "variant", name: "Honey", price: 3500, level: 14,
     steps: HONEY_STEPS, lift: 3, blurb: "Every rare tier, ×3 likely",
   },
   ...TIER_HONEY,
 ];
+
+/* WHICH BALL EACH NUMBER KEY THROWS, AND IT IS THE PLAYER'S TO ARRANGE.
+
+   The keys were `BALLS.indexOf(ball) + 1` - the shipped order, the same for
+   everybody, and a Timer Ball you throw all afternoon sat on 6 because that is
+   where it happened to be declared. Reported as wanting to reassign them, and
+   on a phone as wanting to say which ball the A button throws; those turn out
+   to be one question, because slot 1 is both.
+
+   `saved` is a list of ball ids, most-favoured first, and it is a PREFERENCE
+   rather than a ranking of every ball: anything it does not name keeps its
+   shipped order behind the ones it does. So promoting one ball is one id in
+   the list and nothing else moves relative to anything else.
+
+   Unknown and duplicate ids are dropped rather than trusted - this comes out
+   of `localStorage`, which anyone can edit and a half-written value can
+   truncate, and a bad entry here would silently take a key away from a real
+   ball. `BALLS` is always the fallback and always complete. */
+export function ballOrder(saved) {
+  if (!Array.isArray(saved) || !saved.length) return BALLS;
+  const seen = new Set();
+  const front = [];
+  for (const id of saved) {
+    const ball = BALLS.find((b) => b.id === id);
+    if (ball && !seen.has(id)) { seen.add(id); front.push(ball); }
+  }
+  return [...front, ...BALLS.filter((b) => !seen.has(b.id))];
+}
+
+/* Move one ball to the front, keeping everything else in the order it was in.
+   Returns the new list of ids - the caller is what persists it. */
+export const promoteBall = (saved, id) =>
+  [id, ...ballOrder(saved).map((b) => b.id).filter((x) => x !== id)];
+
+/* THE BALL A BARE THROW USES. Space and the pad's A are the same action and
+   must stay so, which is why this is one function rather than a rule in each:
+   your slot-1 ball if you are holding any, and otherwise the cheapest you
+   have, which is what both did before anybody could arrange anything.
+
+   A BALL THAT CANNOT FAIL IS NEVER THE ONE A BARE THROW PICKS UP. That is
+   `mult >= GUARANTEED` and not a name, and it is not `forSale` either - the
+   first version of this used that and it did nothing, because the shop sells
+   Master Balls. What makes this ball different is not that it is unbuyable,
+   it is that throwing one ENDS the encounter, so a press that reaches for it
+   by accident cannot be taken back. check.mjs caught it.
+
+   It is still throwable - by its own key, or by choosing it on the sheet -
+   and if it is genuinely the only ball left the fallback below still finds
+   it, because then there is nothing else to throw. What it may not be is the
+   ball you get without asking for it. */
+export function defaultBall(bag, saved) {
+  const first = ballOrder(saved)[0];
+  if (first && first.mult < GUARANTEED && (bag?.[first.id] ?? 0) > 0) return first;
+  return BALLS.find((b) => (bag?.[b.id] ?? 0) > 0) ?? null;
+}
 
 export const fieldById = (id) => FIELD.find((f) => f.id === id) ?? null;
 /* The families, in the order they should be read and drawn. Derived, so adding

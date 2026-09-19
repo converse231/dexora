@@ -62,8 +62,11 @@ AREAS = [
     dict(id="pond", name="Pond & Shore", drawn="pond_shore"),
     # No grass patches: there are no transition metatiles between grass and
     # rock, so the two met along hard rectangular edges that read as a bug.
-    # Hand-drawn - see rock_ridge() further down.
-    dict(id="ridge", name="Rock Ridge", drawn="rock_ridge"),
+    # COPIED, and the first area with more than one floor - see mt_moon().
+    # The id is the slot's historical handle (this was Rock Ridge, composed
+    # against the same `cave` tileset); renaming it would move every save
+    # standing here and buy nothing but a tidier grep.
+    dict(id="ridge", name="Mt. Moon", drawn="mt_moon"),
     # Indoors, so no sand path: a dirt track across a concrete factory floor
     # was the single most obviously wrong thing on these maps. `path=None`
     # leaves the floor uniform, which is exactly what the real Power Plant is.
@@ -73,13 +76,19 @@ AREAS = [
     # in 4x4 outcrops - a single face on its own reads as a floating slab.
     # Hand-drawn - see volcano() further down.
     dict(id="ember", name="Ember Caldera", drawn="volcano"),
+    # COPIED, and the second two-level map - Route 112 with Mt Chimney above
+    # it, joined by the real cable car. See cinderpeak().
+    dict(id="cinder", name="Cinderpeak", drawn="cinderpeak"),
     # Hand-drawn - see frost_hollow() further down.
     dict(id="frost", name="Frost Hollow", drawn="frost_hollow"),
     # Hand-drawn - see haunted_tower() further down.
     dict(id="tower", name="Haunted Tower", drawn="haunted_tower"),
+    # COPIED, and the biggest map in the game - six Emerald maps stitched into
+    # the rectangle they already form. See safari_zone().
+    dict(id="safari", name="Safari Zone", drawn="safari_zone"),
 ]
 
-SOLID = set("TwRMIPHLFCWXBEVkKdtYGA")
+SOLID = set("TwRMIPHLFCWXBEVkKdtYGAZ")
 
 
 def h2(x, y, salt=0):
@@ -91,6 +100,69 @@ def h2(x, y, salt=0):
 
 def clamp(v, lo, hi):
     return max(lo, min(hi, v))
+
+
+def hiding_ids():
+    """Atlas ids whose UPPER LAYER covers the whole tile, out of route.json.
+
+    A cell you cannot be SEEN standing on is not a cell you can stand on. These
+    metatiles draw the same art on both halves - the Power Plant's machine
+    plinth does it 123 times - so on the real hardware BG1 paints over whoever
+    is there and the trainer disappears. The map data calls them passable; the
+    renderer makes them uninhabitable, and the second fact is the one a player
+    meets.
+
+    Reported from play as standing ON TOP OF the machinery. Our own generated
+    Power Plant had made the identical call by hand, for the identical reason
+    ("FireRed leaves the plinth walkable; we make it solid"), which is the tell
+    that this is the map's grammar rather than a compromise: you walk ALONG the
+    front of a bank, never over it."""
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    return set(meta.get("hides", ()))
+
+
+def seal_hidden(g, tiles, wall):
+    """Turn every walkable cell that would hide the player into `wall`.
+
+    The ART is kept - it is still the tile Game Freak drew, and it still draws
+    the machine top or the counter it always was. Only the collision changes."""
+    hidden = hiding_ids()
+    H, W = len(g), len(g[0])
+    n = 0
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] not in SOLID and tiles[y][x] in hidden:
+                g[y][x] = wall
+                n += 1
+    return n
+
+
+def walk_steps(rows, x, y):
+    """Where you can get to from (x, y) in one move. THE FILL IS DIRECTED.
+
+    A ledge is solid to ordinary movement and walking SOUTH into one hops it,
+    landing two tiles down - so reachability is not symmetric and an undirected
+    flood passes a map that traps the player on a terrace. It also FAILS a map
+    that is fine: Route 1's flower meadow is enclosed by a ledge above it and a
+    ledge below, which an undirected fill calls an orphan and walls in.
+
+    One definition, used by `check()` and by anything that has to agree with it
+    about what a player can reach."""
+    H, W = len(rows), len(rows[0])
+    out = []
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nx, ny = x + dx, y + dy
+        if not (0 <= nx < W and 0 <= ny < H):
+            continue
+        if rows[ny][nx] == "L":
+            if dy == 1 and 0 <= ny + 1 < H and rows[ny + 1][nx] not in SOLID:
+                out.append((nx, ny + 1))          # hop it, land beyond
+            continue
+        if rows[ny][nx] in SOLID:
+            continue
+        out.append((nx, ny))
+    return out
 
 
 def build(spec):
@@ -283,10 +355,38 @@ def repair_trees(g, W, H, base):
                     changed = True
 
 
-def check(area, rows, spawn):
+def check(area, rows, spawn, tiles=None, warps=None):
     W, H = len(rows[0]), len(rows)
     at = lambda x, y: rows[y][x] if 0 <= x < W and 0 <= y < H else ""
     aid = area["id"]
+
+    """A COPIED CELL IS DRAWN BY THE REAL MAP'S OWN METATILE, and most of the
+    rules below have nothing to say about one.
+
+    Every shape rule here - two wide on an even column, an odd number of rows,
+    a run at least three across - exists because OUR autotiles have nine cases
+    and cannot draw the thing otherwise. A cell with a fixed id never reaches
+    them: `drawTile` blits the id and returns. So applying these to a
+    transcription does not protect it, it DAMAGES it - Frost Hollow turns real
+    shelf tiles into plain ice to satisfy the "never stands alone" rule, and
+    what it is really satisfying is a limitation of a renderer it does not use.
+
+    Route 1 is what forced the split: its own top border is two rows of conifer
+    and its ledges include a two-tile run, both of which Game Freak drew and
+    both of which the rules below refuse.
+
+    What is NOT gated is everything about whether the map can be PLAYED - the
+    outer ring, reachability, a ledge with somewhere to land, a spawn outside a
+    wall. Those are true of a copy exactly as they are of anything else, and
+    they are the ones that have ever caught a real bug on a transcribed map."""
+    copied = ((lambda x, y: tiles[y * W + x] >= 0) if tiles
+              else (lambda x, y: False))
+    # Both ends of every ladder, for the fill at the bottom and for the rule
+    # that says what a ladder has to look like.
+    hop = {}
+    for ax, ay, bx, by in (warps or ()):
+        hop[(ax, ay)] = (bx, by)
+        hop[(bx, by)] = (ax, ay)
 
     assert all(len(r) == W for r in rows), f"{aid}: ragged rows"
     assert rows[spawn[1]][spawn[0]] not in SOLID, f"{aid}: spawn is inside a wall"
@@ -298,7 +398,7 @@ def check(area, rows, spawn):
 
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "T":
+            if rows[y][x] != "T" or copied(x, y):
                 continue
             assert at(x ^ 1, y) == "T", f"{aid}: lone tree column at ({x},{y})"
             top, bot = y, y
@@ -310,7 +410,7 @@ def check(area, rows, spawn):
 
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "F":
+            if rows[y][x] != "F" or copied(x, y):
                 continue
             left = x
             while at(left - 1, y) == "F":
@@ -341,7 +441,14 @@ def check(area, rows, spawn):
             if rows[y][x] != "L":
                 continue
             assert y + 1 < H and rows[y + 1][x] not in SOLID,                 f"{aid}: ledge at ({x},{y}) has nothing to land on"
-            assert rows[y - 1][x] not in SOLID,                 f"{aid}: ledge at ({x},{y}) cannot be reached from above"
+            # AN APPROACH IS A RULE FOR A LEDGE WE PLACED. A copied one can
+            # simply run out under the treeline - four of the Safari Zone's
+            # thirty-six do, the last tiles of a run Game Freak drew into a
+            # tree mass - and those are decoration, not a trap: you cannot
+            # stand above them, so you never hop them, and the rest of the run
+            # works. The LANDING below is still asserted for everyone, because
+            # a ledge with nothing under it is a hop into a wall.
+            assert copied(x, y) or rows[y - 1][x] not in SOLID,                 f"{aid}: ledge at ({x},{y}) cannot be reached from above"
             run = 1
             xx = x - 1
             while at(xx, y) == "L":
@@ -351,7 +458,13 @@ def check(area, rows, spawn):
             while at(xx, y) == "L":
                 run += 1
                 xx += 1
-            assert run >= 3, f"{aid}: ledge run at ({x},{y}) is {run} wide"
+            # The run length is an art rule - cap / mid / cap needs three -
+            # while the two assertions above it are about whether the hop can
+            # be made at all, so only this one gives way to a copy. Route 1
+            # has a two-tile ledge and it draws correctly, because it draws
+            # with its own tiles.
+            assert copied(x, y) or run >= 3, \
+                f"{aid}: ledge run at ({x},{y}) is {run} wide"
 
     # A machine bank is exactly three rows and at least three wide: two columns
     # are two end caps with no middle between them, and the rows are the plinth,
@@ -359,7 +472,7 @@ def check(area, rows, spawn):
     # where it reads as a walkable wall top.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] not in ("P", "X"):
+            if rows[y][x] not in ("P", "X") or copied(x, y):
                 continue
             left = x
             while at(left - 1, y) in ("P", "X"):
@@ -388,7 +501,7 @@ def check(area, rows, spawn):
     # every vertical run in the real Power Plant is attached at the top.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "Y":
+            if rows[y][x] != "Y" or copied(x, y):
                 continue
             assert at(x - 1, y) != "Y" and at(x + 1, y) != "Y", \
                 f"{aid}: partition at ({x},{y}) is two columns wide"
@@ -421,7 +534,7 @@ def check(area, rows, spawn):
     # wide, and it may now stand where the reference stands them.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "B":
+            if rows[y][x] != "B" or copied(x, y):
                 continue
             top = y
             while at(x, top - 1) == "B":
@@ -443,7 +556,7 @@ def check(area, rows, spawn):
     # one standing on it is a lump in the ice, not a hole in it.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "j":
+            if rows[y][x] != "j" or copied(x, y):
                 continue
             assert any(at(x + dx, y + dy) in ("j", "s", "d")
                        for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0))),                 f"{aid}: ice shelf at ({x},{y}) stands alone"
@@ -453,7 +566,7 @@ def check(area, rows, spawn):
     # which is what Seafoam's shelf-edge ramps would have become.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "s":
+            if rows[y][x] != "s" or copied(x, y):
                 continue
             near = {at(x, y - 1), at(x, y + 1), at(x - 1, y), at(x + 1, y)}
             assert "j" in near and "i" in near, \
@@ -463,7 +576,7 @@ def check(area, rows, spawn):
     # a single column is all bank and no river.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "k":
+            if rows[y][x] != "k" or copied(x, y):
                 continue
             wide = at(x - 1, y) in ("k", "K") or at(x + 1, y) in ("k", "K")
             tall = at(x, y - 1) in ("k", "K") or at(x, y + 1) in ("k", "K")
@@ -475,7 +588,7 @@ def check(area, rows, spawn):
     # phase for every tile after it.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "t":
+            if rows[y][x] != "t" or copied(x, y):
                 continue
             left = x
             while at(left - 1, y) == "t":
@@ -497,7 +610,7 @@ def check(area, rows, spawn):
     # A waterfall hangs from an opening in the rock and lands in the river.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "K":
+            if rows[y][x] != "K" or copied(x, y):
                 continue
             top = y
             while at(x, top - 1) == "K":
@@ -518,7 +631,7 @@ def check(area, rows, spawn):
     # not apply to it.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "M":
+            if rows[y][x] != "M" or copied(x, y):
                 continue
             if any(at(x + dx, y + dy) == "V"
                    for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0))):
@@ -534,10 +647,19 @@ def check(area, rows, spawn):
     # wall ends up with the wall's edge and its own stacked into a double lip.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "V":
+            if rows[y][x] != "V" or copied(x, y):
                 continue
             for dx, dy, where in ((0, -1, "above"), (-1, 0, "left of"), (1, 0, "right of")):
                 c = at(x + dx, y + dy)
+                # A LANDING IS EXEMPT, WITHIN ONE TILE OF A RUNG AND NOWHERE
+                # ELSE. The rim is drawn on the rock beside a pool, so lava
+                # meeting open floor has none - right for a pool we sank, and
+                # wrong for a platform somebody has to stand on. Victory Road
+                # puts one in its lake and banking it sealed the ladder in. A
+                # missing rim on five tiles beats a warp with no way off, and
+                # the exemption cannot spread: it reaches exactly one tile.
+                if any(abs(x + dx - hx) + abs(y + dy - hy) <= 1 for hx, hy in hop):
+                    continue
                 assert c in ("V", "M", "n", ""), \
                     f"{aid}: lava at ({x},{y}) has {c!r} {where} it, not rock - no bank"
 
@@ -545,7 +667,7 @@ def check(area, rows, spawn):
     seen = set()
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "V" or (x, y) in seen:
+            if rows[y][x] != "V" or (x, y) in seen or copied(x, y):
                 continue
             # Walk through bridges as well as lava: a bridge floats on the pool
             # rather than dividing it, and counting the halves separately failed
@@ -572,7 +694,7 @@ def check(area, rows, spawn):
     seen = set()
     for y in range(H):
         for x in range(W):
-            if rows[y][x] not in ("n", "N") or (x, y) in seen:
+            if rows[y][x] not in ("n", "N") or (x, y) in seen or copied(x, y):
                 continue
             ch = rows[y][x]
             blob, stack = set(), [(x, y)]
@@ -598,7 +720,17 @@ def check(area, rows, spawn):
     # the bottom - otherwise it is a painting of a ladder on a wall.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "l":
+            # A COPIED LADDER IS A WARP, NOT A CLIMB. Ember's is a painted
+            # column with floor at its head and its foot, which is what this
+            # rule is about; Mt Moon's is one tile that puts you on another
+            # floor, and asking it for floor above and below is asking it to
+            # be the other kind of ladder.
+            # A WARP IS A LADDER IN ITS OWN RIGHT, and a different shape of
+            # one. Ember's old painted ladder was a COLUMN with floor at its
+            # head and its foot, which is what the rest of this rule is about;
+            # a warp is a single rung that puts you on another floor, so asking
+            # it for a column is asking it to be the other kind.
+            if rows[y][x] != "l" or copied(x, y) or (x, y) in hop:
                 continue
             assert at(x - 1, y) != "l" and at(x + 1, y) != "l",                 f"{aid}: ladder at ({x},{y}) is two columns wide"
             top = y
@@ -618,7 +750,7 @@ def check(area, rows, spawn):
     # fault. Two thick everywhere is the whole requirement.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "H" or at(x, y + 1) in ("H", "A", ""):
+            if rows[y][x] != "H" or at(x, y + 1) in ("H", "A", "") or copied(x, y):
                 continue
             assert at(x, y - 1) in ("H", "A"),                 f"{aid}: the wall at ({x},{y}) is one tile thin - no lip above it"
 
@@ -627,7 +759,7 @@ def check(area, rows, spawn):
     # headstone floating in the black.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "A":
+            if rows[y][x] != "A" or copied(x, y):
                 continue
             assert at(x, y - 1) in ("H", "A"),                 f"{aid}: the wall grave at ({x},{y}) has no wall above it"
             assert at(x, y + 1) not in SOLID and at(x, y + 1) != "",                 f"{aid}: the wall grave at ({x},{y}) has no floor below it"
@@ -652,7 +784,7 @@ def check(area, rows, spawn):
     # the least that resolves to a complete edge on every side.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "R":
+            if rows[y][x] != "R" or copied(x, y):
                 continue
             # A pool sunk into a rock face is part of the mass. A tuple, not
             # a string: at() gives "" off the map and "" in "RW" is True,
@@ -678,7 +810,7 @@ def check(area, rows, spawn):
     # The floor crater is 2x2 on the even-column grid, like a tree.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "o":
+            if rows[y][x] != "o" or copied(x, y):
                 continue
             assert at(x ^ 1, y) == "o", \
                 f"{aid}: crater at ({x},{y}) has no other half"
@@ -695,7 +827,7 @@ def check(area, rows, spawn):
     # is the only place the real maps ever put one.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "W":
+            if rows[y][x] != "W" or copied(x, y):
                 continue
             assert at(x ^ 1, y) == "W",                 f"{aid}: pool at ({x},{y}) has no other half"
             top = y
@@ -732,7 +864,7 @@ def check(area, rows, spawn):
     # a bridge to nowhere - both look perfectly fine in a screenshot.
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "D":
+            if rows[y][x] != "D" or copied(x, y):
                 continue
             top, bot = y, y
             while at(x, top - 1) == "D":
@@ -746,7 +878,7 @@ def check(area, rows, spawn):
     # tree there leaves the lake with no bank along that stretch.
     for y in range(H - 1):
         for x in range(W):
-            if rows[y][x] != "w":
+            if rows[y][x] != "w" or copied(x, y):
                 continue
             below = rows[y + 1][x]
             assert below in ("w", "b", "D") or below in SOLID,                 f"{aid}: water at ({x},{y}) sits on {below!r}; the tile under "                 f"water has to be shore, more water, a pier, or rock"
@@ -754,7 +886,7 @@ def check(area, rows, spawn):
     for ch, name in (("#", "path"), ("w", "pond"), ("D", "pier")):
         for y in range(H):
             for x in range(W):
-                if rows[y][x] != ch:
+                if rows[y][x] != ch or copied(x, y):
                     continue
                 run, xx = 1, x - 1
                 while at(xx, y) == ch:
@@ -766,31 +898,34 @@ def check(area, rows, spawn):
                     xx += 1
                 assert run >= 3, f"{aid}: {name} run at ({x},{y}) is {run} wide"
 
+    # A WARP YOU CANNOT STEP OFF IS A TRAP, and the reachability fill cannot
+    # see it: crossing a warp makes the destination "reachable" while leaving
+    # it may be impossible. Ember shipped one - a rung on a platform the lava
+    # bank had turned to rock all round - and whoever took that ladder had no
+    # way back at all. One walkable neighbour is the whole requirement.
+    for (wx, wy) in hop:
+        assert any(at(wx + dx, wy + dy) not in SOLID and at(wx + dx, wy + dy) != ""
+                   for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))), \
+            f"{aid}: the warp at ({wx},{wy}) has nothing to step off onto"
+
     # Reachability is directed, because a ledge is one-way: you may only enter it
     # walking south, and doing so lands you on the far side. A map that traps you
-    # on a terrace would otherwise sail through this check.
-    def steps(x, y):
-        out = []
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            nx, ny = x + dx, y + dy
-            if not (0 <= nx < W and 0 <= ny < H):
-                continue
-            if rows[ny][nx] == "L":
-                if dy == 1 and 0 <= ny + 1 < H and rows[ny + 1][nx] not in SOLID:
-                    out.append((nx, ny + 1))        # hop it, land beyond
-                continue
-            if rows[ny][nx] in SOLID:
-                continue
-            out.append((nx, ny))
-        return out
-
+    # on a terrace would otherwise sail through this check. `walk_steps` is the
+    # one definition of that, shared with the transcribers.
+    # A LADDER IS A WAY THROUGH, so the fill takes one. Mt Moon is three
+    # floors sharing a grid and joined only by its own warps; without this,
+    # every floor but the first reads as an island and five sixths of the map
+    # is "cut off" - a true statement about walking and a false one about
+    # whether a player can get there.
     seen, stack = set(), [spawn]
     while stack:
         x, y = stack.pop()
         if (x, y) in seen:
             continue
         seen.add((x, y))
-        stack += steps(x, y)
+        stack += walk_steps(rows, x, y)
+        if (x, y) in hop:
+            stack.append(hop[(x, y)])
 
     # Every walkable tile spawns now, so the thing to check is that the ground
     # is one connected place: a walled-off pocket is map you can see and never
@@ -1765,75 +1900,6 @@ def pond_shore():
     return ["".join(r) for r in g], (41, 61)
 
 
-def cave_wall(g, x0, y0, x1, y1):
-    """A mass of cave rock.
-
-    A 3x3 autotile like the path, so a mass of any size gets its rounded caps
-    for free - but it has to be at least two across and two down, or a side has
-    only its left cap and the mass draws with one edge missing. check() asserts
-    it. Masses may butt into the border or into each other; the autotile reads
-    the merged shape, so that is one bigger mass and not a seam."""
-    rect(g, "R", x0, y0, x1, y1)
-
-
-def crater(g, x, y):
-    """A ring on the cave floor: 2x2, walkable, x even.
-
-    Mt Moon's floor is a single tile everywhere - 1663 of its walkable tiles are
-    the same id across three storeys - so all of its variety is what stands on
-    the floor. Without these the cavern is a flat expanse."""
-    rect(g, "o", x, y, x + 1, y + 1)
-
-
-def pool(g, x, y):
-    """A pool sunk into the foot of a rock face: 2x2, x even, solid.
-
-    The top half replaces two tiles of the mass's bottom row and the bottom half
-    sits on the floor, which is where every pool in Mt Moon and Victory Road is.
-    Solid, like all this game's water - there is no Surf, so the rod is the only
-    way into it, and you cast from the floor below."""
-    rect(g, "W", x, y, x + 1, y + 1)
-
-
-def plateau(g, x0, y0, x1, y1, stairs):
-    """A ledge you walk on top of, and the way up onto it.
-
-    Three rows of map data, not one: the surface, the cliff face below its near
-    edge, and the staircase set into that face. Everything else around it has to
-    be solid, because the stairs are the only way on - which is the whole point
-    of a second level on a map with no elevation of its own. check() asserts all
-    of it: a cliff with no plateau over it, a plateau with no cliff under it, or
-    a staircase that does not have the upper level above and the floor below,
-    are each a thing that draws perfectly and cannot be used."""
-    rect(g, "u", x0, y0, x1, y1)
-    rect(g, "C", x0, y1 + 1, x1, y1 + 1)
-    for x in stairs:
-        g[y1 + 1][x] = "S"
-
-def stair_cols(g, x0, x1, y1, floor="r", want=1, apart=6):
-    """Where a staircase off this plateau can actually come down.
-
-    A plateau is stamped at chosen coordinates and the floor under it is
-    GENERATED, so a hard-coded staircase column lands in rock about as often as
-    not - the same lesson this file already records for the spring and the
-    craters, arriving a third time. The cliff sits at `y1 + 1`, so what a
-    staircase needs is floor at `y1 + 2`.
-
-    Spread `apart` columns minimum, because two staircases side by side are one
-    wide staircase and the point of a second one is a second way up."""
-    H, W = len(g), len(g[0])
-    out = []
-    for x in range(x0, x1 + 1):
-        if y1 + 2 >= H or g[y1 + 2][x] != floor:
-            continue
-        if out and x - out[-1] < apart:
-            continue
-        out.append(x)
-        if len(out) >= want:
-            break
-    return out
-
-
 def join_islands(g, floor, rng, keep=()):
     """Carve until every walkable tile is reachable from every other.
 
@@ -1911,160 +1977,6 @@ def thicken_walls(g, floor, wall):
             g[y][x] = floor
 
 
-def rock_ridge():
-    """Rock Ridge: a cavern on two levels, after Mt Moon and Victory Road.
-
-    The floor is Mt Moon's: one tile, a thick border, and rock standing in a
-    cavern, because 1663 of that map's walkable tiles are the same id and all of
-    its variety is what stands on the floor rather than the floor itself.
-
-    The upper level is Victory Road's. Its map.bin keeps the floor at elevation
-    3 and its ledges at elevation 4, drawn from a different set - a surface with
-    a rock lip along the far edge, a cliff face where the ground falls away, and
-    a staircase set into that face.
-
-    Two ledges here, and they are the reason the route works. The north-east
-    ledge is a balcony over the whole east half: you can see it from the moment
-    you come in, and the stairs onto it are at the far end, so it reads as
-    somewhere to get to. The west ledge is smaller and its stairs face the
-    entrance, so the first thing you learn is what a staircase looks like.
-
-    Everything BETWEEN those is composed rather than drawn. The hand-drawn
-    version measured 75% of its tiles one-to-three wide where fourteen real
-    caves average 97%, with wall boundaries running 6.2 tiles straight where a
-    real cave turns every 2.7 - which is to say it was halls with walls between
-    them, and a cave is the other way round. tools/compose.py generates the
-    connective tissue against those measurements and scores every candidate, so
-    the passages come out narrow, knotted and turning; the ledges, the pond and
-    the spring are then stamped in where they were always meant to go, and
-    anything the stamping cut off is joined back on.
-
-    42x32, of which 36x26 is playable."""
-    import compose as C
-    import random
-    W, H = 84, 64
-
-    # The seed is fixed, so the map is the same on every build - but it was
-    # chosen by score, not by taste: compose tries 120 of them and keeps the
-    # one closest to the middle of every measured band.
-    #
-    # FOUR TIMES THE AREA AT THE SAME PITCH. `pitch` is the spacing of the
-    # chamber grid, so leaving it at 6 while the canvas doubles is what keeps a
-    # bigger cave a bigger CAVE rather than the same cave drawn larger - four
-    # times the chambers, four times the passages between them, and the same
-    # measured density of both. Raising it would have given one sparse warren
-    # with rooms you walk across.
-    mask, seed, sc, _ = C.best(W, H, tries=120, seed0=1, pitch=6)
-    g = [["r" if mask[y][x] else "R" for x in range(W)] for y in range(H)]
-    rng = random.Random(seed * 7919)
-
-    # --- the border, three thick so it reads as rock and not as a line ---
-    cave_wall(g, 0, 0, W - 1, 2)
-    cave_wall(g, 0, H - 3, W - 1, H - 1)
-    cave_wall(g, 0, 0, 2, H - 1)
-    cave_wall(g, W - 3, 0, W - 1, H - 1)
-
-    # --- the upper level, stamped on top ---------------------------------
-    # Both ledges back onto the border, so the rock behind them is the map's
-    # own wall and only their near edge needs a cliff of its own.
-    #
-    # FOUR OF THEM NOW, not one scaled up. A plateau twice as wide is the same
-    # idea taking twice as long to walk; four separate ones at four corners of
-    # the cave are four places to find, and each is reached by its own
-    # staircase - which is the thing a second level is actually for.
-    # Every staircase is SEARCHED for rather than placed - see `stair_cols`.
-    for x0, y0, x1, y1, ways, shoulder in (
-            (43, 4, 74, 18, 2, (38, 0, 42, 20)),    # the north balcony
-            (5, 28, 24, 39, 1, (5, 24, 27, 26)),    # the west gallery
-            (51, 44, 78, 57, 2, (47, 40, 50, 60)),  # the south-east shelf
-            (4, 48, 20, 56, 1, (4, 46, 22, 47)),    # a low step in the south-west
-    ):
-        cave_wall(g, *shoulder)
-        cols = stair_cols(g, x0 + 2, x1 - 2, y1, want=ways)
-        assert cols, f"rock ridge: no way up onto the ledge at {x0},{y0}"
-        plateau(g, x0, y0, x1, y1, cols)
-    cave_wall(g, 25, 27, 27, 40)        # the west gallery's own near wall
-
-    # --- the pond ---------------------------------------------------------
-    # The cave tilesets have no water of their own beyond the little spring, but
-    # they do not need any: Seafoam Islands B4F is a cave and its lake is the
-    # same primary autotile as the one outdoors, inner corners and all. What it
-    # cannot borrow is the shore, because the tile that carries a water body's
-    # bottom edge is grass - so the pond backs onto rock and is fished from its
-    # north bank, where the rim is drawn on the water itself.
-    # Two of them, at opposite ends, so the rod is worth carrying across the
-    # whole cave rather than being a thing you do once by the entrance.
-    rect(g, "w", 30, 30, 44, 35)
-    cave_wall(g, 30, 36, 44, 39)
-    rect(g, "r", 30, 29, 44, 29)        # the bank you fish from
-
-    rect(g, "w", 56, 22, 68, 26)
-    cave_wall(g, 56, 27, 68, 30)
-    rect(g, "r", 56, 21, 68, 21)
-
-    # --- put right whatever the stamping broke ---------------------------
-    # `keep` is the set pieces. Without it the join carves the shortest way to
-    # a walled-off arm, and the shortest way is straight through whatever was
-    # stamped: a cliff becomes floor and the plateau above it drops onto open
-    # ground. That was invisible with one plateau and one pond and immediate
-    # with four and two - the same failure `keep` was added for when a join
-    # across Ember's lake turned the lava into floor.
-    KEEP = ("u", "C", "S", "w")
-    thicken_walls(g, "r", "R")
-    join_islands(g, "r", rng, keep=KEEP)
-    thicken_walls(g, "r", "R")
-
-    # --- the spring, searched for rather than placed ---------------------
-    # A pool is 2x2 on an even column and belongs in a rock face - the only
-    # place the real maps ever put one - so it needs rock above it and floor
-    # below to fish from. With a generated floor a fixed coordinate lands in
-    # the open half the time, which is what the pool assertion caught.
-    spring = None
-    for y in range(5, H - 6):
-        for x in range(4, W - 6, 2):
-            if (all(g[y - 1][x + dx] == "R" for dx in (0, 1))
-                    and all(g[y + dy][x + dx] == "r"
-                            for dx in (0, 1) for dy in (0, 1, 2))):
-                spring = (x, y)
-                break
-        if spring:
-            break
-    assert spring, "rock ridge: nowhere to sink a spring"
-    pool(g, *spring)
-
-    # --- craters, wherever the cave left room ----------------------------
-    # Searched rather than placed: the floor is generated, so a fixed list of
-    # coordinates would land half of them in rock. A crater is 2x2 on an even
-    # column, and it needs open floor all round or it reads as a hole in a wall.
-    made = 0
-    for y in range(4, H - 6):
-        for x in range(4, W - 6, 2):
-            if made >= 20:
-                break
-            if all(g[y + dy][x + dx] == "r"
-                   for dx in range(-1, 3) for dy in range(-1, 3)):
-                crater(g, x, y)
-                made += 1
-    assert made >= 3, f"rock ridge: only {made} craters fitted"
-
-    # Standing just inside the mouth, at the foot of the west stair.
-    spawn = None
-    for y in range(H - 5, 3, -1):
-        for x in range(3, W - 3):
-            if g[y][x] == "r" and g[y - 1][x] == "r":
-                spawn = (x, y)
-                break
-        if spawn:
-            break
-    assert spawn, "rock ridge: nowhere to stand"
-    return ["".join(r) for r in g], spawn
-
-
-def lava(g, x0, y0, x1, y1):
-    """A lava pool. Call lava_banks() once every pool is painted."""
-    rect(g, "V", x0, y0, x1, y1)
-
-
 def lava_banks(g):
     """Rock along the top and both sides of every pool.
 
@@ -2089,11 +2001,6 @@ def lava_banks(g):
         g[y][x] = "M"
 
 
-def ladder(g, x, y0, y1):
-    """A ladder up a rock face: one column, floor at the top and at the foot."""
-    rect(g, "l", x, y0, x, y1)
-
-
 def bridge(g, x0, y0, x1, y1, over="lava"):
     """A plank bridge. The character says what it crosses - `n` lava, `N` water -
     because the planks are baked over that, not layered over it at draw time.
@@ -2103,75 +2010,6 @@ def bridge(g, x0, y0, x1, y1, over="lava"):
     bridge. Long enough to reach dry ground at both ends - check() asserts it
     actually crosses something."""
     rect(g, "n" if over == "lava" else "N", x0, y0, x1, y1)
-
-
-def boulder(g, x, y):
-    """A free-standing rock: a 2x2 of the wall character, which the wall autotile
-    resolves into four corners and so into a complete little boulder. No new art
-    - the tileset's own loose rocks turned out to be Team Magma's machinery."""
-    rect(g, "M", x, y, x + 1, y + 1)
-
-
-def punch_ladders(g, y0, y1, want, floor="m"):
-    """Ladders through a band of rock, wherever there is floor on both sides.
-
-    Searched, not placed: the two levels either side of the band are composed,
-    so there is no telling in advance which column has floor above and below.
-    Each one is kept only if it actually joins something - a ladder onto ground
-    you could already reach is a decoration, not a way through.
-
-    KEPT ON A COUNT, NOT A BOOLEAN. This used to ask `all_connected` and keep a
-    ladder only if the map went from broken to whole, which is right for two
-    levels and wrong for three: with a second band still solid, no single ladder
-    through the first one can make the whole caldera one place, so every ladder
-    looked useless and every one was reverted - nothing fit anywhere. `islands`
-    counts instead, and a ladder earns its place by lowering that count. The
-    first way between two levels is what this is for; the second and third are
-    a kindness, and are kept once the map is already whole."""
-    W = len(g[0])
-    made = []
-    for x in range(2, W - 2):
-        if len(made) >= want:
-            break
-        if any(abs(x - px) < 11 for px in made):
-            continue
-        if g[y0 - 1][x] != floor or g[y1 + 1][x] != floor:
-            continue
-        if any(g[y][x] != "M" for y in range(y0, y1 + 1)):
-            continue
-        before = islands(g)
-        for y in range(y0, y1 + 1):
-            g[y][x] = "l"
-        if islands(g) < before or before == 1:
-            made.append(x)
-        else:
-            for y in range(y0, y1 + 1):
-                g[y][x] = "M"
-    return made
-
-
-def ladders_clear(g):
-    """Has every ladder still got somewhere to step on and off?
-
-    A pool's bank is made out of the floor beside it, and that floor can be a
-    ladder's landing - so this is checked when a pool is placed, and the pool is
-    what gets put back, since the pool is what broke it."""
-    H, W = len(g), len(g[0])
-    for y in range(H):
-        for x in range(W):
-            if g[y][x] != "l":
-                continue
-            top = y
-            while top > 0 and g[top - 1][x] == "l":
-                top -= 1
-            bot = y
-            while bot < H - 1 and g[bot + 1][x] == "l":
-                bot += 1
-            if top == 0 or bot == H - 1:
-                return False
-            if g[top - 1][x] in SOLID or g[bot + 1][x] in SOLID:
-                return False
-    return True
 
 
 def span_blobs(g):
@@ -2195,56 +2033,6 @@ def span_blobs(g):
             seen |= blob
             out.append((ch, blob))
     return out
-
-
-def heal_spans(g, limit=2):
-    """Push each bridge out until its whole width lands on ground again.
-
-    `lava_banks()` makes a pool's bank out of the floor beside it, and it runs
-    AFTER the bridges - four more times in the caldera, inside the join loop. So
-    a causeway that landed on floor at both ends when it was laid can find one
-    of its landing tiles turned to rock afterwards. Ember shipped exactly that:
-    a two-wide causeway whose RIGHT column ran into solid rock at both ends, so
-    half of it was a shelf welded to a cliff and the whole thing read as drawn
-    one tile out of place.
-
-    Extending is the right repair rather than moving it, because what the bank
-    actually is, is the pool's SHORE - and a bridge is supposed to cross the
-    shore. One or two tiles is a bridge reaching dry ground; more than that is
-    tunnelling through a mountain, so `limit` stops it.
-
-    The whole WIDTH moves out together, and that is the half this got wrong
-    first: the caldera's causeway had one column landing on floor and the other
-    on bank rock, so a rule that only extended when EVERY end cell was rock
-    refused to touch it and left the bridge exactly as broken as it found it. A
-    bridge is one object - it cannot be a tile longer on one side - so a step is
-    taken when ANY cell is blocked, as long as every cell is either bank rock or
-    ground. Walking over the floor tile it absorbs costs nothing: a bridge tile
-    is walkable too.
-
-    Only bank rock is eaten ("M"), never the map's outer wall or anything else,
-    and never a tile on the border."""
-    H, W = len(g), len(g[0])
-    walk = lambda x, y: (0 <= x < W and 0 <= y < H and g[y][x] not in SOLID)
-    for ch, blob in span_blobs(g):
-        xs = sorted({cx for cx, _ in blob})
-        ys = sorted({cy for _, cy in blob})
-        vert = len(ys) >= len(xs)
-        # (the cells one step past each end, as a function of how far out we are)
-        ends = ([lambda d: [(cx, min(ys) - d) for cx in xs],
-                 lambda d: [(cx, max(ys) + d) for cx in xs]] if vert else
-                [lambda d: [(min(xs) - d, cy) for cy in ys],
-                 lambda d: [(max(xs) + d, cy) for cy in ys]])
-        for end in ends:
-            for step in range(1, limit + 1):
-                cells = end(step)
-                if all(walk(x, y) for x, y in cells):
-                    break                       # this end already lands
-                if not all(1 <= x < W - 1 and 1 <= y < H - 1
-                           and (g[y][x] == "M" or walk(x, y)) for x, y in cells):
-                    break                       # not bank rock: leave it alone
-                for x, y in cells:
-                    g[y][x] = ch
 
 
 def spans_clear(g):
@@ -2275,313 +2063,209 @@ def spans_clear(g):
     return True
 
 
-def span_pool(g, x, y, w, h, floor="m"):
-    """Lay a bridge over one pool, from the bank above it to the ground below.
+# ------------------------------------------------------------- Ember Caldera
 
-    Returns True if it fitted. A pool in the middle of a warren is banked on
-    three sides, and the bank is made out of the passage it was sitting in - so
-    sinking one cuts the map in two, and the bridge is what puts it back. That
-    is why the two are placed together rather than one after the other: on its
-    own the pool fails the connectivity test and never gets placed at all, so
-    the bridge never gets a pool to cross."""
-    H, W = len(g), len(g[0])
-    # Two across, never three. The plank set is baked from Route 12, whose own
-    # bridge is two wide, so it holds a left half and a right half and nothing
-    # else - a three-wide span alternates them left/right/left and draws a rail
-    # down its own middle.
-    for wide in (2,):
-        for bx in range(x, x + w - wide + 1):
-            # Stay off the map's own outer wall at both ends: a bridge that
-            # starts in the border leaves a single row of rock above it, which
-            # has no 2x2 for the autotile and no business being walked on.
-            if y - 1 < 2 or y + h > H - 3:
-                continue
-            if any(g[y + h][bx + i] in SOLID for i in range(wide)):
-                continue                       # nothing to land on below
-            if any(g[y - 1][bx + i] not in ("M", floor) for i in range(wide)):
-                continue
-            # And there has to be ground to step onto at the top as well as the
-            # bottom - a bridge that starts on the bank with rock above it is a
-            # shelf, which is what check() means by "both ends".
-            if any(g[y - 2][bx + i] in SOLID for i in range(wide)):
-                continue
-            rect(g, "n", bx, y - 1, bx + wide - 1, y + h - 1)
-            return True
-    return False
+"""Ember Caldera is a RE-SKIN, which is a third kind of copy.
 
+Route 1, the Power Plant and the Safari Zone carry the real map's own metatile
+ids and draw with them. Mt Moon does too. This one does NOT: it takes Emerald's
+Victory Road - three floors, 1F / B1F / B2F, the shape of the place - and draws
+every cell with OUR volcano set, the pokeemerald `lavaridge` tileset behind
+Magma Hideout. The layout is transcribed; the art is ours.
 
-def place_lava(g, want, rng, floor="m", minw=5, minh=3, bridged=1):
-    """Sink lava pools into whatever open ground will take one.
+**WHY IT HAS TO BE A RE-SKIN.** There is no three-floor volcano in any Gen 3
+game. Magma Hideout is the only lava interior that exists and it is eight small
+rooms, not a cave you descend. The choice was a real volcano that is not a
+descent or a real descent that is not a volcano, and the second one is the one
+you can fix: a cave's LAYOUT is just walkable and solid, and both tilesets can
+draw that. What cannot be borrowed is the grammar, which is why this is the one
+transcription whose cells are AUTHORED - `tiles` is -1 everywhere and
+`drawTile` runs the same rules it runs for a map we drew.
 
-    A pool needs a rock bank on its top and both sides - Magma Hideout never
-    lets lava meet open floor except along its bottom edge - and lava_banks()
-    makes that bank out of the floor beside it, which can wall a passage off.
-    So each pool is painted, banked and then checked, and put back if the map
-    stopped being one place."""
-    H, W = len(g), len(g[0])
-    spots = []
-    for h in range(minh + 2, minh - 1, -1):
-        for w in range(minw + 4, minw - 1, -1):
-            for y in range(2, H - h - 2):
-                for x in range(2, W - w - 2):
-                    if not all(g[y + dy][x + dx] == floor
-                               for dy in range(h) for dx in range(w)):
-                        continue
-                    # A pool with floor above AND below can be bridged; one
-                    # backed against the border or the band cannot, because a
-                    # bridge needs somewhere to land on the far side. Prefer the
-                    # ones that leave a crossing possible.
-                    open_ns = (all(g[y - 1][x + dx] == floor for dx in range(w))
-                               and all(g[y + h][x + dx] == floor for dx in range(w)))
-                    spots.append((1 if open_ns else 0, w * h, x, y, w, h))
-    spots.sort(reverse=True)
+**AND THE WATER BECOMES LAVA**, which is the whole reason this map is worth
+copying: B2F is 256 tiles of it, a lake with a waterfall feeding it, and Ember
+is the one place in the game that is largely molten. `SURFABLE` already holds
+`V`, so it is ridden exactly as the old caldera's lake was.
 
-    made = 0
-    for _, _area, x, y, w, h in spots:
-        if made >= want:
-            break
-        if any(g[y + dy][x + dx] != floor for dy in range(h) for dx in range(w)):
-            continue                      # a previous pool took this ground
-        snap = [row[:] for row in g]
-        rect(g, "V", x, y, x + w - 1, y + h - 1)
-        # Take a bite out of two of the four corners. Magma Hideout has no
-        # rectangular lava anywhere - its pools are blobs - and a stamped
-        # rectangle beside the hand-carved lake read as a different substance.
-        # Corners only, so the bounding box check() measures is untouched.
-        for cx, cy in rng.sample([(x, y), (x + w - 1, y),
-                                  (x, y + h - 1), (x + w - 1, y + h - 1)], 2):
-            g[cy][cx] = floor
-        lava_banks(g)
-        big = sum(1 for r in g for c in r if c not in SOLID) >= 240
-        ok = all_connected(g) and ladders_clear(g) and spans_clear(g) and big
-        if not ok and bridged > 0 and big and span_pool(g, x, y, w, h, floor):
-            # The pool cut the map and the bridge put it back.
-            ok = all_connected(g) and ladders_clear(g) and spans_clear(g)
-            if ok:
-                bridged -= 1
-        if not ok:
-            for yy in range(H):
-                g[yy] = snap[yy]
-            continue
-        made += 1
-        # And a bridge is worth having even when nothing needs repairing -
-        # crossing the lava is the point of the pool. Only the first few, so
-        # the map keeps some pools you have to walk around.
-        if bridged > 0:
-            before = [row[:] for row in g]
-            if (span_pool(g, x, y, w, h, floor) and all_connected(g)
-                    and ladders_clear(g) and spans_clear(g)):
-                bridged -= 1
-            else:
-                for yy in range(H):
-                    g[yy] = before[yy]
-    return made
+**THREE THINGS THE RE-SKIN COSTS, all measured rather than waved at:**
 
+  *Thin rock is carved.* Our rock is a 3x3 autotile and needs a 2x2 to resolve,
+  and a real cave is full of one-tile walls - 102 of 3,124 here, 3%. Those
+  become floor, which widens 102 spots by a tile. `thicken_walls` is the same
+  pass the generated caldera used and the reason it exists.
 
-def scatter_boulders(g, want, floor="m"):
-    """Free-standing rock, 2x2, wherever there is room for one to stand."""
-    H, W = len(g), len(g[0])
-    made = 0
-    for y in range(3, H - 4):
-        for x in range(3, W - 4):
-            if made >= want:
-                return made
-            if not all(g[y + dy][x + dx] == floor
-                       for dy in range(-1, 3) for dx in range(-1, 3)):
-                continue
-            snap = [row[:] for row in g]
-            boulder(g, x, y)
-            if all_connected(g):
-                made += 1
-            else:
-                for yy in range(H):
-                    g[yy] = snap[yy]
-    return made
+  *The shore is banked.* `lava_banks` turns the floor above and beside the lava
+  into rock, because in this tileset the rim is drawn on the ROCK and not on
+  the lava - see the note under `volcano` in route.json, which this file paid
+  for once already. The lake's bottom edge stays bare, which is both what Magma
+  Hideout does and how you get onto it.
+
+  *The bridges are floor.* Victory Road crosses its chasms on planks; our plank
+  set is Route 12's, baked over lava, and a bridge over nothing is not in the
+  vocabulary. They read as volcanic floor, and the route across is unchanged.
+"""
+
+EMBER_FLOORS = (("VictoryRoad_1F", 46, 45), ("VictoryRoad_B1F", 46, 31),
+                ("VictoryRoad_B2F", 46, 31))
+EMBER_GUT = 2
+# Resolved out of the three map.json warp tables: seven reciprocal pairs, as
+# (floor, x, y). The two Ever Grande mouths are not pairs - one of them is the
+# way in, and the other leads somewhere this game has no map for.
+EMBER_LADDERS = (
+    ((0, 21, 32), (1, 20, 21)),
+    ((0, 42, 38), (1, 42, 25)),
+    ((0,  9, 14), (1,  8,  3)),
+    ((1, 30, 25), (2, 30, 25)),
+    ((1, 17, 16), (2, 19, 12)),
+    ((1, 42,  2), (2, 43,  2)),
+    ((1,  5, 26), (2,  5, 26)),
+)
+EMBER_MOUTH = (0, 15, 40)          # Ever Grande's door, and so the spawn
+
+# pokeemerald behaviours, bits 0-8 of the metatile attribute.
+EMB_WATER = frozenset((0x10, 0x11, 0x12, 0x13, 0x14, 0x15))
+EMB_LADDER = 0x61
+EMB_JUMP_SOUTH = 0x3B
 
 
 def volcano():
-    """Ember Caldera: a warren of rock threaded between lava, after Magma Hideout.
+    """Ember Caldera: 94x64, Emerald's Victory Road drawn in lava.
 
-    The first version was four terraces stacked up the map. That reads as a
-    diagram of a volcano, and measuring the reference said so plainly: Magma
-    Hideout is 23% walkable across its eight floors and ours was 42% - nearly
-    twice as open - with wall boundaries running 3.8 tiles straight against its
-    2.8. A volcano cave is a warren you thread, not a set of shelves.
+    Laid out the way Mt Moon is - floors as quadrants of one grid, joined by
+    the real map's own warps - because that machinery already exists and this
+    is the same shape of problem."""
+    import numpy as np
+    import build_assets as BA
 
-    So the ground is composed rather than drawn, against that map's own numbers
-    (compose.VOLCANO). Two of them: a gallery across the north and the caldera
-    below it, each composed on its own so each is connected by construction,
-    with two rows of rock between them for the ladders to go through. That keeps
-    the thing the terraces were for - somewhere above you that you have to find
-    the way up to - without paying for it in open floor.
+    layouts = json.load(io.open(
+        BA.fetch("data/layouts/layouts.json", "em/layouts.json", root=BA.EMERALD),
+        encoding="utf-8"))["layouts"]
+    ga = np.frombuffer(io.open(BA.fetch(
+        "data/tilesets/primary/general/metatile_attributes.bin",
+        "em/general/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2")
+    ca = np.frombuffer(io.open(BA.fetch(
+        "data/tilesets/secondary/cave/metatile_attributes.bin",
+        "em/cave/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2")
+    behave = lambda i: int((ga[i] if i < 512 else ca[i - 512]) & 0x1FF)
 
-    Everything after that is searched for rather than placed, because the ground
-    is generated and a fixed coordinate would land in rock: the ladders go where
-    there is floor on both sides of the band, the pools where there is room to
-    sink one, the causeway in the column that reaches shore on both sides for
-    the least rock cut, and each is put back if it stops the map being one
-    place. The lake alone is placed rather than found - see below.
-
-    44x32."""
-    import compose as C
-    import random
-    W, H = 88, 64
-    # ONE BAND, AT FOUR TIMES THE AREA. A third level was tried and taken out
-    # again: with two bands of solid rock no single ladder can make the whole
-    # caldera one place, and the joins that fix that carve passages through the
-    # bands until the levels stop being levels. The gallery-over-caldera shape
-    # is what the map is; four times the floor is what was asked for.
-    BANDS = ((30, 32),)            # the rows of rock the ladders climb through
-
-    tops, seeds = [], []
-    for i, (lo, hi) in enumerate(((0, BANDS[0][0]), (BANDS[0][1] + 1, H))):
-        # TALLER THAN IT IS USED, AND CROPPED TO WHERE THE FLOOR IS.
-        # `compose` walls its own outer ring - two rows thick, not one - so a
-        # deck generated at exactly the height it occupies has rock along the
-        # row the ladders must climb out of, and not one ladder fits anywhere on
-        # the map. Guessing the offset is how that gets fixed at the top and
-        # broken at the bottom, so the window is FOUND: generate over, then crop
-        # to the first and last rows that actually carry floor.
-        deck, sd, _, _ = C.best(W, hi - lo + 8, tries=90, pitch=6 + i,
-                                target=C.VOLCANO)
-        live = [y for y in range(len(deck)) if any(deck[y])]
-        assert live, "ember: a deck came out solid rock"
-        span = live[-1] - live[0] + 1
-        assert span >= hi - lo,             f"ember: a deck has {span} rows of floor for a {hi - lo}-row level"
-        off = live[0] + (span - (hi - lo)) // 2
-        tops.append((lo, hi, deck, off))
-        seeds.append(sd)
+    w0, h0 = EMBER_FLOORS[0][1], EMBER_FLOORS[0][2]
+    h1 = EMBER_FLOORS[1][2]
+    origin = [(0, 0), (w0 + EMBER_GUT, 0), (w0 + EMBER_GUT, h1 + EMBER_GUT)]
+    W = w0 + EMBER_GUT + EMBER_FLOORS[1][1]
+    H = max(h0, h1 + EMBER_GUT + EMBER_FLOORS[2][2])
 
     g = [["M"] * W for _ in range(H)]
-    for lo, hi, deck, off in tops:
-        for y in range(lo, hi):
-            for x in range(W):
-                if deck[y - lo + off][x]:
-                    g[y][x] = "m"
+    ladder_cells = {(f, x, y) for pair in EMBER_LADDERS for (f, x, y) in pair}
+    for i, (name, fw, fh) in enumerate(EMBER_FLOORS):
+        lay = next(q for q in layouts if q["name"] == name + "_Layout")
+        assert lay["width"] == fw and lay["height"] == fh, \
+            f"ember: {name} is {lay['width']}x{lay['height']}, not the {fw}x{fh} assumed"
+        raw = np.frombuffer(io.open(BA.fetch(
+            lay["blockdata_filepath"], "em/%s.bin" % name,
+            root=BA.EMERALD), "rb").read(), dtype="<u2")[:fw * fh]
+        ids = (raw & 0x3FF).reshape(fh, fw)
+        col = ((raw >> 10) & 3).reshape(fh, fw)
+        ox, oy = origin[i]
+        for y in range(fh):
+            for x in range(fw):
+                b = behave(int(ids[y][x]))
+                if b in EMB_WATER:
+                    ch = "V"                     # the lake, and the fall into it
+                elif (i, x, y) in ladder_cells:
+                    ch = "l"
+                elif b == EMB_JUMP_SOUTH:
+                    # NO LEDGE, BECAUSE THIS TILESET HAS NONE. Victory Road
+                    # drops nine one-way hops between its terraces and `L`
+                    # draws `ledge` out of route.json - 176/135/177, FireRed's
+                    # grass-topped earth bank. On lavaridge that is a strip of
+                    # MEADOW across a volcano, which is exactly the wrong-tile
+                    # this re-skin exists to avoid; it was visible in the first
+                    # render as two green bars. Magma Hideout has no terraces
+                    # and so no hop to borrow. They become floor - which is
+                    # what a terrace edge is once you can walk over it - and
+                    # the route is unchanged, because a ledge was only ever a
+                    # shortcut down something you could already walk around.
+                    ch = "m"
+                elif int(col[y][x]):
+                    ch = "M"
+                else:
+                    ch = "m"
+                g[oy + y][ox + x] = ch
 
-    # THE BORDER IS DRAWN, NOT INHERITED. Three thick, so it reads as rock
-    # rather than as a line. The crop above takes each deck's window where the
-    # FLOOR is, which means a deck's own outer wall ring is no longer guaranteed
-    # to land on the map's edge - and one row of rock at the bottom of the world
-    # is a tile the renderer has no face to draw.
-    rect(g, "M", 0, 0, W - 1, 2)
-    rect(g, "M", 0, H - 3, W - 1, H - 1)
-    rect(g, "M", 0, 0, 2, H - 1)
-    rect(g, "M", W - 3, 0, W - 1, H - 1)
+    # --- the frame -------------------------------------------------------
+    # Three floors in one rectangle, and the rectangle's edge is ours. Each
+    # floor's own border is interior to the composition; B1F leaves seven cells
+    # open on its edge and they simply meet the gutter's rock.
+    rect(g, "M", 0, 0, W - 1, 1)
+    rect(g, "M", 0, H - 2, W - 1, H - 1)
+    rect(g, "M", 0, 0, 1, H - 1)
+    rect(g, "M", W - 2, 0, W - 1, H - 1)
 
-    # Seeded off every deck's own seed, so the scatter changes when either of
-    # them does rather than only when the first one does.
-    rng = random.Random(sum(sd * 104729 for sd in seeds))
-    thicken_walls(g, "m", "M")
-
-    # Ladders through EVERY band, or the deck above it is scenery.
-    for lo, hi in BANDS:
-        made = punch_ladders(g, lo, hi, want=4)
-        assert len(made) >= 2,             f"ember: only {len(made)} ladders would fit through the rock at {lo}"
-
-    # --- the great lake, carved rather than found -------------------------
-    # A warren has no clearing big enough for a lake, and searching for one only
-    # ever turned up ponds - which left the map with no centre and its bridge
-    # reduced to a stub at a pond's edge. The lake is the point of a volcano, so
-    # it is cut out of the warren on purpose. Everything else is still found.
-    # Sized by test, not by eye: wider than this and the warren either side of
-    # it is too thin to get round.
-    LX0, LY0, LX1, LY1 = 11, 17, 29, 22
-    rect(g, "m", LX0 - 1, LY0 - 2, LX1 + 1, LY1 + 2)
-
-    # The shore wanders. Magma Hideout's lake is a blob whose edge steps in and
-    # out every tile or two, and a rectangle with a lobe stuck on each side -
-    # which is what this was - still reads as a rectangle with a lobe stuck on
-    # each side. So each column carries its own top and bottom, moved at most
-    # one tile from the column before it, and the last two columns at each end
-    # are pulled in so the lake closes rather than ending on a wall.
-    up, dn = LY0, LY1
-    for x in range(LX0, LX1 + 1):
-        up = max(LY0 - 1, min(LY0 + 2, up + rng.choice((-1, 0, 0, 1))))
-        dn = min(LY1 + 1, max(LY1 - 2, dn + rng.choice((-1, 0, 0, 1))))
-        pull = max(0, 2 - min(x - LX0, LX1 - x))
-        for y in range(up + pull, dn - pull + 1):
-            g[y][x] = "V"
-    lava_banks(g)
-
-    # The causeway is laid before anything is tested, because the lake cuts the
-    # warren in more places than one crossing can put back. Cross first, join
-    # the rest afterwards - around the lake and never through it, which is what
-    # join_islands' `keep` is for.
+    # --- make it something this tileset can draw --------------------------
+    # KEEP THE LADDERS AND THE LEDGES OUT OF BOTH PASSES. `lava_banks` turns
+    # anything beside the lake into rock and does not know that a rung or a hop
+    # is not floor; losing one to the bank is losing a floor of the map.
+    # A LANDING KEEPS ITS FLOOR, and this guard is what that means.
+    # `lava_banks` turns everything above and beside the lake into rock, and
+    # Victory Road puts a 3x2 LANDING PLATFORM in the middle of its lake -
+    # reached by ladder, left by Surf. Banked, that platform went solid and the
+    # rung became an island: reported from play as arriving somewhere with
+    # nothing walkable in any direction. Ember opens at Lv 12 and Surf is Lv
+    # 20, so it was not even a hard exit, it was a dead save.
     #
-    # Only the lava gets planks. Bridging the whole way down laid planking over
-    # the rock bank as well, which reads as a pier built on dry land, and left
-    # check() with no dry ground at either end of the span to find. So the
-    # approach is cut as floor through the bank until it meets ground you could
-    # already stand on, and the planks span only what is molten.
-    # Which column carries it is searched for, not chosen: the shore is composed,
-    # so a fixed one lands in a wall - column 19 did, and drove its shaft clean
-    # through the south wall of the map looking for ground. Take the crossing
-    # that cuts the least rock, and the most central of those.
-    CW = 2                            # see span_pool: the plank set is two wide
-    best_x, best_n, best_s = None, 0, 0
-    for CX in range(LX0 + 1, LX1 - CW):
-        n = LY0 - 1
-        while n > 2 and all(g[n][CX + i] in SOLID for i in range(CW)):
-            n -= 1
-        t = LY1 + 1
-        while t < H - 3 and all(g[t][CX + i] in SOLID for i in range(CW)):
-            t += 1
-        if n <= 2 or t >= H - 3:
-            continue                      # ran off the map instead of landing
-        rank = (t - n, abs(CX + CW / 2 - W / 2))
-        if best_x is None or rank < best_rank:
-            best_x, best_n, best_s, best_rank = CX, n, t, rank
-    assert best_x is not None, "ember: nowhere to bring the causeway ashore"
-    # Both columns take the same character on every row. Deciding it per tile
-    # put a single plank alongside a bare floor tile wherever the shore was
-    # ragged - a bridge one plank wide, which is the fault check() names, and it
-    # reads as a broken step. So find the molten stretch across both columns and
-    # plank the whole of it, approach included.
-    wet = [y for y in range(best_n + 1, best_s)
-           if any(g[y][best_x + i] == "V" for i in range(CW))]
-    assert wet, "ember: the causeway crosses nothing"
-    for y in range(best_n + 1, best_s):
-        ch = "n" if wet[0] <= y <= wet[-1] else "m"
-        for i in range(CW):
-            g[y][best_x + i] = ch
-
-    # Banking can wall off the passage a join just cut, so join and bank until
-    # it settles rather than assuming one pass of each is enough.
-    for _ in range(4):
-        join_islands(g, "m", rng, keep=("V", "n"))
-        lava_banks(g)
-        # Banking eats floor, and a causeway's landing tile is floor. Put the
-        # bridge back over its own shore before asking whether the map joins up,
-        # or the answer is measured against a crossing that has been cut.
-        heal_spans(g)
-        if all_connected(g):
-            break
-    assert all_connected(g), "ember: the caldera would not join up"
-    assert spans_clear(g), "ember: the causeway does not land across its width"
-
-    # More pools for texture. There was a pass that hunted for anywhere a bridge
-    # would save a walk; it put a second crossing six tiles from the causeway and
-    # parallel to it over the same lake, and the middle of the map read as
-    # scaffolding, so it is gone. A pool that cuts the warren in two still gets
-    # its repair span from place_lava.
-    pools = place_lava(g, want=3, rng=rng, bridged=1)
-    assert pools >= 1, f"ember: only {pools} more lava pools would fit"
-    scatter_boulders(g, want=8)
+    # So the rung AND its four neighbours are held back from both passes. Five
+    # tiles of lava keep no rim where they meet that floor, which `check()`
+    # exempts within one tile of a rung and nowhere else.
+    hold = set()
+    for _pair in EMBER_LADDERS:
+        for _f, _lx, _ly in _pair:
+            _gx, _gy = origin[_f][0] + _lx, origin[_f][1] + _ly
+            hold.add((_gx, _gy))
+            hold.update(((_gx + 1, _gy), (_gx - 1, _gy),
+                         (_gx, _gy + 1), (_gx, _gy - 1)))
+    # Only the WALKABLE ones. Holding a rock neighbour back as well put a
+    # one-tile-thin wall back at (64,16) - `thicken_walls` had carved it for
+    # the reason it exists, and the landing has no interest in rock.
+    keep = {(x, y): g[y][x] for (x, y) in hold
+            if 0 <= x < W and 0 <= y < H and g[y][x] in "ml"}
     thicken_walls(g, "m", "M")
+    lava_banks(g)
+    thicken_walls(g, "m", "M")
+    for (x, y), ch in keep.items():
+        g[y][x] = ch
 
-    spawn = None
-    for y in range(H - 3, BANDS[-1][1], -1):
-        for x in range(2, W - 2):
-            if g[y][x] == "m" and g[y - 1][x] == "m":
-                spawn = (x, y)
-                break
-        if spawn:
-            break
-    assert spawn, "ember: nowhere to stand"
-    return ["".join(r) for r in g], spawn
+    # --- the ladders, as warp pairs on the shared grid --------------------
+    warps = []
+    for (fa, xa, ya), (fb, xb, yb) in EMBER_LADDERS:
+        ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
+        bx, by = origin[fb][0] + xb, origin[fb][1] + yb
+        assert g[ay][ax] == "l" and g[by][bx] == "l", \
+            f"ember: the ladder at ({ax},{ay})/({bx},{by}) is not on a rung"
+        warps.append([ax, ay, bx, by])
 
+    mf, mx, my = EMBER_MOUTH
+    spawn = (origin[mf][0] + mx, origin[mf][1] + my)
+    assert g[spawn[1]][spawn[0]] not in SOLID, "ember: the mouth is walled up"
 
+    hop = {}
+    for ax, ay, bx, by in warps:
+        hop[(ax, ay)] = (bx, by)
+        hop[(bx, by)] = (ax, ay)
+    seen, stack = set(), [spawn]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen:
+            continue
+        seen.add((x, y))
+        stack += walk_steps(g, x, y)
+        if (x, y) in hop:
+            stack.append(hop[(x, y)])
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] not in SOLID and (x, y) not in seen:
+                g[y][x] = "M"
+
+    return ["".join(r) for r in g], spawn, None, None, warps
 def haunted_tower():
     """Haunted Tower: one square floor of Lavender Town's graveyard.
 
@@ -3103,61 +2787,6 @@ def frost_hollow():
     return ["".join(r) for r in g], spawn, [i for row in tiles for i in row], base
 
 
-def bank(g, x0, x1, y, consoles=()):
-    """A machine bank: the Power Plant's only wall. Returns the row below it.
-
-    The real map builds every wall out of these, in horizontal runs - which is
-    why this map is bars rather than blocks. Three wide is the least that has a
-    middle between its two end caps.
-
-    Three rows, not two. The top one is the plinth the machine stands on, and
-    the real map caps it at both ends exactly as it caps the machine. Ours drew
-    only the middle of that row, uncapped, the length of the whole run - which
-    reads as a wall with a walkable grey top, and was reported as one. FireRed
-    does leave the plinth walkable, but there a bank is one side of a room;
-    here it stands alone in the open, so the plinth is part of the bank.
-
-    `consoles` are x positions whose two machine rows become a lit console.
-    They sit under the plinth's middle, so a console is never an end cap.
-    check() asserts all of it."""
-    rect(g, "P", x0, y, x1, y + 2)
-    for x in consoles:
-        assert x0 < x < x1, f"console at x={x} would be an end cap of {x0}-{x1}"
-        g[y + 1][x] = "X"
-        g[y + 2][x] = "X"
-    return y + 3
-
-
-def islands(g):
-    """How many separate walkable places this map is in.
-
-    `all_connected` answers the same question as a boolean, and a boolean is
-    exactly what a map with THREE levels cannot be tested with: no single ladder
-    through the first band can make the whole caldera one place while the second
-    band is still solid, so every ladder looked useless and every one was
-    reverted. Counting says what a boolean cannot - "this joined two of the
-    three" - which is what "does this ladder achieve anything" actually means."""
-    H, W = len(g), len(g[0])
-    seen, n = set(), 0
-    for sy in range(H):
-        for sx in range(W):
-            if g[sy][sx] in SOLID or (sx, sy) in seen:
-                continue
-            n += 1
-            stack = [(sx, sy)]
-            while stack:
-                x, y = stack.pop()
-                if (x, y) in seen:
-                    continue
-                seen.add((x, y))
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                    nx, ny = x + dx, y + dy
-                    if (0 <= nx < W and 0 <= ny < H
-                            and g[ny][nx] not in SOLID and (nx, ny) not in seen):
-                        stack.append((nx, ny))
-    return n
-
-
 def all_connected(g):
     """Is every walkable tile reachable from every other?"""
     H, W = len(g), len(g[0])
@@ -3179,303 +2808,707 @@ def all_connected(g):
                             if g[y][x] not in SOLID)
 
 
-def hang_partitions(g, want, floor="p", longest=13):
-    """Hang partitions from the walls, keeping only the ones that cut nothing off.
+# --------------------------------------------------------------- Power Plant
 
-    Placing these by hand went badly three times running: every position that
-    lowered the stripe measurement also sealed a strip against the north wall,
-    and each fix moved the pocket somewhere else. So do not place them by hand.
-    Try the longest candidates first, keep a partition only if the map is still
-    one connected place afterwards, and put it back if it is not - which is the
-    same generate-and-test the cave composer uses, on a smaller problem.
+"""The Power Plant is COPIED, and it is the cheapest transcription there is.
 
-    A candidate hangs from a wall, because the tileset has no cap for the top of
-    a free-standing column: 48 caps the foot and nothing caps the head."""
-    H, W = len(g), len(g[0])
-    runs = []
-    for x in range(1, W - 1):
-        for y in range(1, H - 1):
-            if g[y][x] != floor or g[y - 1][x] not in ("P", "X", "E", "Y"):
-                continue
-            n = 0
-            while y + n < H - 1 and g[y + n][x] == floor:
-                n += 1
-            if n >= 4:
-                runs.append((min(n, longest), x, y))
-    runs.sort(reverse=True)
+EVERY ONE of its 1,960 tiles is a `power_plant` SECONDARY metatile - not one
+primary tile in the whole map - and that tileset has been baked against its own
+`building` primary since the day this file learned that pairing matters. So the
+ids go in at `base + local` and nothing had to be added to the atlas at all.
+Rendered through our own `drawTile` and diffed against a fresh render straight
+from pokefirered: **1,960 of 1,960 metatiles identical, zero differences.**
 
-    placed = 0
-    for n, x, y in runs:
-        if placed >= want:
-            break
-        if any(g[yy][x + dx] == "Y"
-               for yy in range(y - 1, y + n + 1) for dx in (-1, 0, 1)
-               if 0 <= x + dx < W):
-            continue                       # keep them apart
-        # Candidates were measured against the untouched grid, so two in one
-        # column can overlap - and reverting the second used to wipe part of
-        # the first, leaving a one-tile stub the assertion then caught.
-        if any(g[yy][x] != floor for yy in range(y, y + n)):
-            continue
-        for yy in range(y, y + n):
-            g[yy][x] = "Y"
-        if all_connected(g):
-            placed += 1
-        else:
-            for yy in range(y, y + n):
-                g[yy][x] = floor
-    return placed
+WHAT IT REPLACES, AND WHY THE GENERATOR WENT. The hand-built Power Plant was
+the most measured map in this repo - ranks generated from a pitch and a gap,
+partitions placed by search and kept only if the hall stayed connected, and
+`drum_clumps` growing clutter a tile at a time after masking the real map to
+find the 8.7% of itself it was missing. All of that was reverse-engineering the
+reference's grammar out of its own map.bin one rule at a time, and it went
+well: `stripe` 1.21 against the reference's 1.63, `open` 0.50 against its 0.49,
+`turns` 0.25 in band.
 
+Three flags were still open, and the note left on them is the argument for this
+change: *"closing it needs the compartments the reference has, which needs the
+wall tile that does not exist yet."* The reference HAS the compartments,
+because it is the reference. Transcribing closes all three by construction and
+deletes four generators with about two hundred lines behind them.
 
-def barrels(g, x, y, n=1, tall=1):
-    """n barrel stacks side by side, hung off the foot of the bank above.
+The FINDINGS outlive the code and are kept in CLAUDE.md - that a Building map
+is not a General map, that this tileset has no interior wall so its walls are
+machinery, that metatile 54 is 117 tiles of drum body nobody had counted. Those
+are what taught the repo to read a map instead of drawing one, which is the
+whole reason this transcription is three lines of classification.
 
-    In the real map 41 of the 54 drum TOPS sit directly under a bank's body
-    row. The drum BODY does not - see `drum_clumps`, which is the other 117
-    tiles and the reason this map stopped looking empty."""
-    for xx in range(x, x + n):
-        assert g[y - 1][xx] in ("P", "X"), \
-            f"barrels at ({xx},{y}) hang off nothing - the tile above is a floor"
-    rect(g, "B", x, y, x + n - 1, y + tall - 1)
+THE SIZE IS THE TRADE, AND IT IS THE ONLY REAL COST. 49x40 against the
+generated map's 80x60, so this becomes the smallest area in the game - 961
+walkable tiles where the old one had 2,399. A 1:1 copy cannot be four times the
+size and still be a copy. Frost Hollow answered the same wall by laying four
+Seafoam floors in a square; there is exactly one Power Plant, so there is
+nothing here to square up with, and stamping the same room out four times would
+be a bigger lie than a smaller map.
+"""
 
-
-def drum_clumps(g, rng, want, floor="p"):
-    """Irregular clumps of drums standing on the floor, as the real map has.
-
-    MEASURED, NOT CHOSEN: 32 clumps of one to thirteen tiles, 8.7% of FireRed's
-    Power Plant. Grown a tile at a time from a seed rather than stamped as
-    rectangles, because the reference's are ragged and a grid of blocks reads
-    as crates in a warehouse.
-
-    Nothing is placed that would cut the floor in two - the same generate-and-
-    test `hang_partitions` uses, for the same reason. A clump never touches a
-    wall either: pinned against one it reads as part of the wall rather than as
-    something standing in the room, and it can seal a corridor."""
-    H, W = len(g), len(g[0])
-
-    def free(x, y):
-        return 0 < x < W - 1 and 0 < y < H - 1 and g[y][x] == floor
-
-    def clear_of_walls(x, y):
-        return all(g[y + dy][x + dx] in (floor, "B")
-                   for dy in (-1, 0, 1) for dx in (-1, 0, 1))
-
-    def connected():
-        start = next(((x, y) for y in range(H) for x in range(W) if g[y][x] == floor), None)
-        if not start:
-            return False
-        want_n = sum(1 for y in range(H) for x in range(W) if g[y][x] == floor)
-        seen, st = set(), [start]
-        while st:
-            x, y = st.pop()
-            if (x, y) in seen or not (0 <= x < W and 0 <= y < H) or g[y][x] != floor:
-                continue
-            seen.add((x, y))
-            st += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-        return len(seen) == want_n
-
-    made = 0
-    tries = 0
-    while made < want and tries < want * 30:
-        tries += 1
-        sx, sy = rng.randint(2, W - 3), rng.randint(2, H - 3)
-        if not (free(sx, sy) and clear_of_walls(sx, sy)):
-            continue
-        # Sizes drawn from the reference's own distribution.
-        target = rng.choice((1, 2, 2, 2, 3, 4, 4, 5, 5, 5, 6, 7, 7, 8, 8, 10, 11, 13))
-        cells, frontier = [], [(sx, sy)]
-        while frontier and len(cells) < target:
-            x, y = frontier.pop(rng.randrange(len(frontier)))
-            if not (free(x, y) and clear_of_walls(x, y)) or (x, y) in cells:
-                continue
-            cells.append((x, y))
-            g[y][x] = "B"
-            frontier += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-        # A stack is at most two tall, so a column of three is trimmed.
-        for (x, y) in list(cells):
-            n = 0
-            yy = y
-            while yy - 1 >= 0 and g[yy - 1][x] == "B":
-                yy -= 1
-            while yy + n < H and g[yy + n][x] == "B":
-                n += 1
-            if n > 2:
-                for k in range(2, n):
-                    if (x, yy + k) in cells:
-                        g[yy + k][x] = floor
-                        cells.remove((x, yy + k))
-        if not cells or not connected():
-            for (x, y) in cells:
-                g[y][x] = floor
-        else:
-            made += 1
-    return made
+# The room's outer wall, drawn with the void beyond it - `power.edge` in
+# route.json is the middle of this set. Everything here is on the boundary ring
+# and nowhere else, which is what makes the ring worth its own character.
+PP_DRUM = frozenset((53, 54, 88, 89))       # drum top / body, and the crates
+PP_CONSOLE = frozenset((57, 58,             # the lit console set into a bank
+                        110, 111, 118, 119,  # the free-standing terminal
+                        144, 152))          # screens
 
 
 def power_plant():
-    """Power Plant: four times the hall of machine banks, after FireRed's own.
+    """Power Plant: 49x40, transcribed tile for tile from its own map.bin.
 
-    Counting its map.bin settles the shape of the place. 537 of its floor tiles
-    are one id, and its walls are almost entirely horizontal banks - so it has
-    no rooms in the ordinary sense. The banks are laid in ranks across the hall
-    and the corridors are simply the gaps between them, which is why the plan
-    reads as a grid shifted out of true rather than as a maze.
+    Nothing is composed and nothing is placed. The map is read, its collision
+    bits become our characters, and the eight tiles it cannot reach are taken
+    away - which is the whole function.
 
-    80x60, of which 78x58 is floor. Ten ranks instead of five, each broken in
-    three or four places, no gap lining up with the one above it, and the
-    segments nudged a row off their neighbours - laid flush they read as ten
-    parallel lines and the corridors become gaps in a fence rather than
-    anywhere to be.
+    **THE RING IS ALREADY SOLID, which no other transcription has managed.**
+    Route 1 opens onto two towns and Frost Hollow is four floors laid in a
+    square with a frame that was nobody's job; the Power Plant is one sealed
+    interior, so its boundary needs no seal from us and NOT ONE CELL IS
+    AUTHORED. The whole map is a copy, which is as faithful as this gets.
 
-    THE THREE FLAGGED NUMBERS ARE THE BRIEF, and all three said the same thing
-    about the small one: turns 0.16 against a real indoor's 0.20-0.26, loops
-    49.5 against 57.0-70.7, tight 0.83 against 0.64-0.77. More maze than
-    building. A maze is narrow, has few ways round and few corners, and the
-    answer to all three is the same: WIDER CORRIDORS AND MORE GAPS. The ranks
-    sit seven rows apart here rather than five or six, which leaves three rows
-    of corridor rather than two, and every rank has one more break in it.
+    **A METATILE'S COLLISION COMES FROM THE MAP, NOT THE TILESET**, and five of
+    these (28, 30, 33, 34, 35) are laid both walkable and solid in different
+    places. So the character is read off the cell's own collision bit and the id
+    only refines what KIND of solid it is - a rule that classified by id alone
+    would have put twenty holes in the machinery.
 
-    The room ends in its own wall, a separate set from the banks with the void
-    drawn beyond it, taken off the real map's four corners.
+    **AND EIGHT TILES ARE PASSABLE WITHOUT BEING REACHABLE** - six of shelf
+    behind the machinery along the north wall and a two-tile pocket of floor -
+    the same fact Route 1's tree crowns record and `study_layout.reachable()`
+    was written for. They go solid and keep their art."""
+    import numpy as np
+    import build_assets as BA
 
-    Barrels are the only loose thing on this floor and they are not loose: each
-    cluster hangs off the foot of the bank above it, as every cluster in the
-    reference does. The lit consoles are set into the banks."""
-    W, H = 80, 60
-    g = [["p" for _ in range(W)] for _ in range(H)]
+    W, H = 49, 40
+    raw = np.frombuffer(
+        io.open(BA.fetch("data/layouts/PowerPlant/map.bin", "PowerPlant.bin"),
+                "rb").read(), dtype="<u2")[:W * H]
+    ids = (raw & 0x3FF).reshape(H, W)
+    col = ((raw >> 10) & 3).reshape(H, W)
 
-    # --- the room --------------------------------------------------------
-    rect(g, "E", 0, 0, W - 1, 0)
-    rect(g, "E", 0, H - 1, W - 1, H - 1)
-    rect(g, "E", 0, 0, 0, H - 1)
-    rect(g, "E", W - 1, 0, W - 1, H - 1)
+    # The atlas base is read back out of route.json rather than assumed, the
+    # same as Frost Hollow's - `npm run art` moves it whenever a tileset is
+    # added, and check.mjs asserts the two still agree.
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    base = meta["power"]["floor"] - 31          # power_plant local 31 is the floor
 
-    # --- the ranks --------------------------------------------------------
-    # Laid from a table rather than by hand, because ten ranks of four segments
-    # is forty banks and the thing that matters about them is a RELATIONSHIP -
-    # no gap above another gap - which a table can be read for and a wall of
-    # calls cannot. Each entry is (row, [(x0, x1, console offset or None)]),
-    # and the rows are seven apart so the corridor between them is three.
-    # GENERATED FROM A PITCH AND A GAP, not listed. Ten ranks of six segments
-    # is sixty banks, and what matters about them is a RELATIONSHIP - no gap
-    # above another gap, and a corridor wide enough to be somewhere - which a
-    # rule can hold and a table of coordinates cannot.
-    #
-    # PITCH is what the three flagged numbers turn on, and it was measured both
-    # ways. At 7 (three rows of corridor) the hall came out open 0.63 against a
-    # real indoor's 0.30-0.59, loops 72.7 against 57-71 and tight 0.56 against
-    # 0.64-0.77 - too much room, the opposite of the small map's fault. At 6 it
-    # lands between the two.
-    PITCH = 4
-    GAP = 3                      # tiles of corridor between segments in a rank
-    import random as _r
-    rng = _r.Random(20260916)
+    g = [[None] * W for _ in range(H)]
+    tiles = [[-1] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            loc = int(ids[y][x]) - 640
+            assert 0 <= loc, \
+                f"power plant: metatile {ids[y][x]} at ({x},{y}) is not a secondary"
+            tiles[y][x] = base + loc
+            if int(col[y][x]) == 0:
+                g[y][x] = "p"
+            elif x in (0, W - 1) or y in (0, H - 1):
+                g[y][x] = "E"                   # the room's own outer wall
+            elif loc in PP_DRUM:
+                g[y][x] = "B"
+            elif loc in PP_CONSOLE:
+                g[y][x] = "X"
+            else:
+                g[y][x] = "P"
 
-    prev_gaps = []
-    for y in range(2, H - 6, PITCH):
-        x, gaps = 1 + rng.randint(0, 3), []
-        while x < W - 6:
-            # SHORTER THAN THE REAL MAP'S, deliberately. Every segment is two
-            # end caps, and `turns` counts corners per tile of wall boundary -
-            # so a rank of four short banks has twice the corners of a rank of
-            # two long ones for the same amount of solid. The small map sat at
-            # 0.16 against a real indoor's 0.20-0.26 and this is the only lever
-            # that moves it without touching the three that are now in band.
-            span = rng.randint(4, 7)
-            x1 = min(x + span, W - 3)
-            if x1 - x < 3:                      # a bank needs two caps and a middle
-                break
-            # Nudged a row off its neighbours, so a rank is not a ruled line.
-            # NUDGED, BUT NEVER WITH BARRELS ON IT. At pitch 5 a bank is three
-            # rows plus its foot and the next rank starts two rows later, so
-            # there is exactly one free row between them - and a barrel standing
-            # on that foot already uses it. A nudge on top of that closes the
-            # gap, and two banks plus a barrel read as one six-row wall the bank
-            # set cannot draw. Taking the nudge out entirely fixed it and cost
-            # the hall both of the numbers it had just gained (turns 0.21 ->
-            # 0.19, tight 0.66 -> 0.62): the irregularity is doing real work.
-            # So the two are made exclusive rather than one of them dropped.
-            # NO ROW NUDGE, and it was tried twice. At pitch 5 a bank is three
-            # rows plus its foot and the next rank starts two rows later, so
-            # there is one free row between them; a barrel on that foot uses it,
-            # and a partition hanging past it can bridge two ranks into a
-            # six-row wall the bank set cannot draw. Making the nudge and the
-            # barrels exclusive was not enough, because the partitions do it too.
-            #
-            # It costs `turns` 0.21 -> 0.19 and `tight` 0.66 -> 0.62, both about
-            # five per cent outside their bands, and that is the honest trade:
-            # the irregularity was doing real work and the geometry will not
-            # carry it at this pitch. Widening the pitch buys it back and spends
-            # `open`, which was measured at 7 and came out worse.
-            nudged = False
-            yy = y
-            con = x + (x1 - x) // 2 if rng.random() < 0.45 else None
-            foot = bank(g, x, x1, yy, consoles=(con,) if con else ())
-            if not nudged and rng.random() < 0.55:
-                bx = rng.randint(x + 1, max(x + 1, x1 - 3))
-                n = rng.choice((2, 3, 3, 4))
-                if bx + n - 1 <= x1:
-                    barrels(g, bx, foot, n, tall=rng.choice((1, 1, 2)))
-            # The gap after it, pushed off any gap in the rank above - a gap
-            # over a gap is a straight run through the hall and the whole point
-            # of a rank is that you have to walk along it to find the way out.
-            gap = GAP + rng.randint(0, 2)
-            nxt = x1 + 1 + gap
-            for pg in prev_gaps:
-                if abs((x1 + 1) - pg) < 3:
-                    nxt += 3
-                    break
-            gaps.append(x1 + 1)
-            x = nxt
-        prev_gaps = gaps
+    hid = seal_hidden(g, tiles, "P")
+    assert hid, "power plant: no covered tiles found - is route.json stale?"
 
-    # --- partitions, to break the ranks up -------------------------------
-    # The Power Plant's walls are horizontal banks, which is why it reads as
-    # banded: study_layout measured its solid runs 1.83 times longer along rows
-    # than down columns, where no real map exceeds 1.63 - and the real Power
-    # Plant, the most banded map Game Freak shipped, still manages 1.63 because
-    # it breaks its ranks with 45 vertical runs of four tiles or more.
-    #
-    # Placed by search, not by hand. Three hand-placed attempts each lowered the
-    # stripe and each sealed a strip against a wall; hang_partitions keeps only
-    # the ones that leave the hall one connected place. It runs last, after
-    # every bank, or a bank lands on top of one. Scaled with the area.
-    # ...and they no longer fit, which is the right answer rather than a
-    # problem. Partitions were added because the hall measured `stripe` 2.51
-    # against a real ceiling of 1.63 - five ranks of long banks and nothing
-    # crossing them. The generated ranks break themselves now: six short
-    # segments a rank, no gap over another gap, and the hall measures 1.21. A
-    # partition hanging into a three-wide corridor seals it, so every candidate
-    # is correctly refused. `want` is kept so the search still runs and still
-    # takes any that would help, and the assertion is on the thing that actually
-    # matters rather than on a count of scaffolding.
-    made = hang_partitions(g, want=14)
-
-    # THE CLUTTER, AND IT IS 8.7% OF THE REFERENCE. Masking the real Power
-    # Plant settles what its walls are made of: of the solid tiles whose face
-    # you can see - floor directly below them - 85 are the machine bank's body
-    # (local 21), 77 are drums (53/54) and 32 are barrels (89). There is no
-    # interior wall tileset at all, which is why this map is banks and not
-    # rooms, and it is also why the drums matter so much: they are a third of
-    # everything you walk past and we had none of them.
-    import random as _rr
-    clumps = drum_clumps(g, _rr.Random(20260917), want=45)
-    assert clumps >= 30, f"power plant: only {clumps} drum clumps"
-
-    solid_rows = sum(1 for y in range(H) for x in range(W) if g[y][x] in "PXB")
-    assert solid_rows > W * H * 0.15,         f"power plant: only {solid_rows} tiles of machinery in a {W}x{H} hall"
-
-    # Standing at the door end, in the south-west corner of the hall.
+    # The door is the mat in the south-west corner, so the lowest run of floor
+    # is where you would come in. Same idiom as every other map here: lowest
+    # row that has any, middle of it.
     spawn = None
-    for y in range(H - 2, 1, -1):
-        for x in range(1, W - 1):
-            if g[y][x] == "p" and g[y - 1][x] == "p":
-                spawn = (x, y)
-                break
-        if spawn:
+    for y in range(H - 2, 0, -1):
+        xs = [x for x in range(W) if g[y][x] == "p"]
+        if xs:
+            spawn = (xs[len(xs) // 2], y)
             break
     assert spawn, "power plant: nowhere to stand"
-    return ["".join(r) for r in g], spawn
+
+    seen, stack = set(), [spawn]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen:
+            continue
+        seen.add((x, y))
+        stack += walk_steps(g, x, y)
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] not in SOLID and (x, y) not in seen:
+                g[y][x] = "P"                   # solid, and still its own tile
+
+    return (["".join(r) for r in g], spawn,
+            [i for row in tiles for i in row], base)
+
+
+# ------------------------------------------------------------------- Mt Moon
+
+"""Mt Moon is THREE FLOORS, and it is the first map here that is more than one.
+
+Every other area is a single grid. A cave with ladders is not, and the honest
+question was how to hold that without inventing a floor system: the engine
+closes over one `rows` at construction, the camera clamps to it, the minimap
+bakes it, and a save stores one `areaId` and one (x, y).
+
+SO THE FLOORS SHARE A GRID AND THE LADDERS ARE WARPS. 1F, B1F and B2F are laid
+out as quadrants, exactly as Frost Hollow lays out four Seafoam floors, each
+sealed in its own rock - and `AREAS.ridge.warps` pairs the ladder tiles. Nothing
+about the camera, the save, the minimap or travel changes; what is new is a
+lookup in the step handler. The alternative - three AREAS with three biome rows,
+three level gates, three skies and three lines in the travel menu - is three of
+everything for one place you are meant to experience as one place.
+
+THE LADDER GRAPH IS REAL DATA. `data/maps/MtMoon_*/map.json` carries every warp
+with its destination map and warp id, and resolving those gives seven
+reciprocal pairs - the whole of Mt Moon's vertical structure, read rather than
+invented. The two mouths onto Route 4 are not pairs: one is where you come in,
+and the other leads somewhere this game has no map for.
+
+AND B1F IS OPENED UP, WHICH IS THE ONE DELIBERATE DIVERGENCE. In FireRed its
+304 walkable tiles are four rooms with no walking route between them at all -
+you enter each by ladder and leave it by ladder. That is a fine shape for a
+game with a party and a reason to be somewhere; here it is four boxes you get
+dropped into. The rooms are still copied tile for tile; the corridors between
+them are ours, carved by `join_islands` and marked -1 so they draw by our rules
+and never pretend to be Game Freak's. It costs three of the seven ladders their
+monopoly - they become shortcuts rather than the only way through - and that is
+the trade, made on purpose and recorded here rather than discovered later.
+"""
+
+MOON_FLOORS = (("MtMoon_1F", 48, 40), ("MtMoon_B1F", 49, 40), ("MtMoon_B2F", 48, 40))
+MOON_GUT = 2                      # rows and columns of our own rock between them
+# Straight out of the decomp's warp_events, as (floor, x, y) pairs.
+MOON_LADDERS = (
+    ((0, 5, 6),   (1, 3, 3)),
+    ((0, 19, 14), (1, 25, 4)),
+    ((0, 31, 16), (1, 43, 21)),
+    ((1, 22, 18), (2, 25, 21)),
+    ((1, 17, 5),  (2, 31, 11)),
+    ((1, 26, 36), (2, 17, 31)),
+    ((1, 39, 4),  (2, 5, 10)),
+)
+MOON_MOUTH = (0, 18, 37)          # the way in from Route 4 - and so the spawn
+
+
+def mt_moon():
+    """Mt Moon: 99x82, three floors of the real cave joined by its own ladders.
+
+    All three are 100% `cave` SECONDARY metatiles, and that tileset has been
+    baked since Rock Ridge was composed against it - so this needed no new art
+    either, which makes three transcriptions in a row that cost none.
+
+    Each floor's outer ring is already solid, so like the Power Plant there is
+    no seal to draw. What we author is the rock BETWEEN the quadrants, the
+    corridors inside B1F, and nothing else."""
+    import numpy as np
+    import random as _r
+    import build_assets as BA
+
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    base = meta["cave"]["floor"] - 1            # cave local 1 is the floor
+
+    # 1F top-left, B1F top-right, B2F below 1F - the order you walk them, so
+    # the map reads as a descent rather than as three rooms in a row.
+    w0, h0 = MOON_FLOORS[0][1], MOON_FLOORS[0][2]
+    origin = [(0, 0), (w0 + MOON_GUT, 0), (0, h0 + MOON_GUT)]
+    W = w0 + MOON_GUT + MOON_FLOORS[1][1]
+    H = h0 + MOON_GUT + MOON_FLOORS[2][2]
+
+    g = [["R"] * W for _ in range(H)]
+    tiles = [[-1] * W for _ in range(H)]
+
+    ladder_cells = {(f, x, y) for pair in MOON_LADDERS for (f, x, y) in pair}
+    for i, (name, fw, fh) in enumerate(MOON_FLOORS):
+        raw = np.frombuffer(
+            io.open(BA.fetch(f"data/layouts/{name}/map.bin", name + ".bin"),
+                    "rb").read(), dtype="<u2")[:fw * fh]
+        ids = (raw & 0x3FF).reshape(fh, fw)
+        col = ((raw >> 10) & 3).reshape(fh, fw)
+        ox, oy = origin[i]
+        for y in range(fh):
+            for x in range(fw):
+                loc = int(ids[y][x]) - 640
+                assert loc >= 0, f"mt moon: {name} ({x},{y}) is not a cave metatile"
+                g[oy + y][ox + x] = ("l" if (i, x, y) in ladder_cells
+                                     else "r" if int(col[y][x]) == 0 else "R")
+                tiles[oy + y][ox + x] = base + loc
+
+    # --- open B1F up ------------------------------------------------------
+    # Carved on the QUADRANT ALONE and pasted back, never on the shared grid: a
+    # join run over the whole thing would tunnel between FLOORS, which is the
+    # one connection a ladder exists to be.
+    ox, oy = origin[1]
+    fw, fh = MOON_FLOORS[1][1], MOON_FLOORS[1][2]
+    quad = [[g[oy + y][ox + x] for x in range(fw)] for y in range(fh)]
+    was = [row[:] for row in quad]
+    join_islands(quad, "r", _r.Random(20260918), keep=("l",))
+    carved = 0
+    for y in range(fh):
+        for x in range(fw):
+            if quad[y][x] != was[y][x]:
+                g[oy + y][ox + x] = quad[y][x]
+                tiles[oy + y][ox + x] = -1      # ours now, so our own rules draw it
+                carved += 1
+    assert carved, "mt moon: B1F's rooms were already joined - check the crop"
+    seal_hidden(g, tiles, "R")          # nothing on this map, and the rule is the rule
+
+    # --- the ladders, as warp pairs on the shared grid ---------------------
+    warps = []
+    for (fa, xa, ya), (fb, xb, yb) in MOON_LADDERS:
+        ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
+        bx, by = origin[fb][0] + xb, origin[fb][1] + yb
+        assert g[ay][ax] == "l" and g[by][bx] == "l", \
+            f"mt moon: the ladder at ({ax},{ay})/({bx},{by}) is not on a ladder tile"
+        warps.append([ax, ay, bx, by])
+
+    mf, mx, my = MOON_MOUTH
+    spawn = (origin[mf][0] + mx, origin[mf][1] + my)
+    assert g[spawn[1]][spawn[0]] not in SOLID, "mt moon: the mouth is walled up"
+
+    # --- and take away whatever none of that reaches ----------------------
+    # THE FILL CROSSES A LADDER, because a ladder is how you get there. Without
+    # that, every floor but the first is an island and five sixths of the map
+    # reads as cut off - which is the shape of this map rather than a fault in
+    # it, and is exactly why `check()` had to learn the same thing.
+    hop = {}
+    for ax, ay, bx, by in warps:
+        hop[(ax, ay)] = (bx, by)
+        hop[(bx, by)] = (ax, ay)
+    seen, stack = set(), [spawn]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen:
+            continue
+        seen.add((x, y))
+        stack += walk_steps(g, x, y)
+        if (x, y) in hop:
+            stack.append(hop[(x, y)])
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] not in SOLID and (x, y) not in seen:
+                g[y][x] = "R"
+                tiles[y][x] = -1
+
+    return (["".join(r) for r in g], spawn,
+            [i for row in tiles for i in row], base, warps)
+
+
+
+# ---------------------------------------------------------------- Safari Zone
+
+"""The Safari Zone is SIX MAPS STITCHED, and that is not the same trick as
+Frost Hollow or Mt Moon.
+
+Those two lay separate FLOORS side by side and join them with something - a
+tunnelled seam, a ladder - because in the real game they are not adjacent at
+all. Emerald's Safari Zone is six 40x40 maps that ARE adjacent: the game joins
+them with map CONNECTIONS, so walking off the east edge of Northwest puts you
+on the west edge of North, one tile across. Laying them out 3x2 is therefore
+the honest reconstruction rather than a composition, and the seams line up
+because they always did - measured, 10 disagreeing cells out of 240 along six
+shared edges, all of them border fill.
+
+120x80, which makes it by a distance the biggest map in the game: 9,600 tiles
+against Deep Woods' 6,408, and about 4,700 you can walk on.
+
+**IT IS AN EMERALD MAP, AND OUR PRIMARY IS FIRERED'S.** Ids 0-639 in our atlas
+are `gTileset_General` from pokefirered. Emerald ships a tileset with the same
+name, the same job and completely different art, so both halves of this map
+were new: `EM_PRIMARY` bakes Emerald's General whole (512 metatiles) and
+`lilycove` joins the secondaries. That is the first time a transcription has
+cost any art at all - Route 1, the Power Plant and Mt Moon each needed none.
+
+**AND COLLISION IS NOT THE WHOLE STORY IN EMERALD.** Water here is col=0 -
+PASSABLE - because Gen 3 gates surfing on the metatile BEHAVIOUR rather than on
+the collision bit. Classify by collision alone and 399 tiles of pond, river and
+waterfall become grass you stroll across. The behaviour field is bits 0-8 of
+the metatile attribute, and it is also what identifies the tall grass, the sand
+and, best of all, the LEDGES: 36 tiles of `MB_JUMP_SOUTH`, which is exactly the
+one-way south hop `L` has always been.
+
+The eleven east/west ledges have no `L` to map onto - ours hops south and only
+south - so they stay solid. Eleven tiles, and the fill proves nothing is walled
+off behind them.
+"""
+
+SAFARI_GRID = (("SafariZone_Northwest", "SafariZone_North", "SafariZone_Northeast"),
+               ("SafariZone_Southwest", "SafariZone_South", "SafariZone_Southeast"))
+SAFARI_W = SAFARI_H = 40
+
+# pokeemerald's metatile behaviours, bits 0-8 of the attribute.
+MB_WATER = frozenset((0x10, 0x11, 0x12, 0x13, 0x14, 0x15))   # pond .. ocean, waterfall
+MB_GRASS = frozenset((0x02, 0x03, 0x09))                     # tall and long grass
+MB_SAND = frozenset((0x06, 0x21))                            # deep sand, sand cave
+MB_JUMP_SOUTH = 0x3B
+
+
+def safari_zone():
+    """Safari Zone: 120x80, six Emerald maps laid out the way they already are.
+
+    Every cell is a copy. What we author is the frame, and even that is drawn
+    with the real layout's OWN border block - the 2x2 the game tiles beyond the
+    edge - rather than with anything of ours."""
+    import numpy as np
+    import build_assets as BA
+
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    S = meta["safari"]
+    GB, LB, SPLIT = S["general"], S["lilycove"], S["split"]
+    rebase = lambda i: (GB + i) if i < SPLIT else (LB + i - SPLIT)
+
+    layouts = json.load(io.open(
+        BA.fetch("data/layouts/layouts.json", "em/layouts.json", root=BA.EMERALD),
+        encoding="utf-8"))["layouts"]
+    attr = {
+        False: np.frombuffer(io.open(BA.fetch(
+            "data/tilesets/primary/general/metatile_attributes.bin",
+            "em/general/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+        True: np.frombuffer(io.open(BA.fetch(
+            "data/tilesets/secondary/lilycove/metatile_attributes.bin",
+            "em/lilycove/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+    }
+    behave = lambda i: int(attr[i >= SPLIT][i if i < SPLIT else i - SPLIT] & 0x1FF)
+
+    W = SAFARI_W * len(SAFARI_GRID[0])
+    H = SAFARI_H * len(SAFARI_GRID)
+    g = [[None] * W for _ in range(H)]
+    tiles = [[-1] * W for _ in range(H)]
+    border = None
+
+    for r, row in enumerate(SAFARI_GRID):
+        for c, name in enumerate(row):
+            lay = next(q for q in layouts if q["name"] == name + "_Layout")
+            assert lay["width"] == SAFARI_W and lay["height"] == SAFARI_H, \
+                f"safari: {name} is {lay['width']}x{lay['height']}, not the 40x40 the grid assumes"
+            raw = np.frombuffer(io.open(BA.fetch(
+                lay["blockdata_filepath"], "em/%s.bin" % name,
+                root=BA.EMERALD), "rb").read(),
+                dtype="<u2")[:SAFARI_W * SAFARI_H]
+            ids = (raw & 0x3FF).reshape(SAFARI_H, SAFARI_W)
+            col = ((raw >> 10) & 3).reshape(SAFARI_H, SAFARI_W)
+            if border is None:
+                border = [int(v) & 0x3FF for v in np.frombuffer(io.open(BA.fetch(
+                    lay["border_filepath"], "em/safari_border.bin",
+                    root=BA.EMERALD), "rb").read(), dtype="<u2")]
+            ox, oy = c * SAFARI_W, r * SAFARI_H
+            for y in range(SAFARI_H):
+                for x in range(SAFARI_W):
+                    i = int(ids[y][x])
+                    b = behave(i)
+                    if b in MB_WATER:
+                        ch = "w"           # solid on foot, and a rod or Surf reaches it
+                    elif b == MB_JUMP_SOUTH:
+                        ch = "L"
+                    elif int(col[y][x]):
+                        ch = "T"
+                    elif b in MB_GRASS:
+                        ch = ","
+                    elif b in MB_SAND:
+                        ch = "#"
+                    else:
+                        ch = "."
+                    g[oy + y][ox + x] = ch
+                    tiles[oy + y][ox + x] = rebase(i)
+
+    # --- the frame, drawn with the real layout's own border block ----------
+    # The six maps open onto Route 121 and onto each other, and the outer edge
+    # of the stitched rectangle opens onto nothing we have. `check()` wants a
+    # solid ring on every map, so it gets one - out of the 2x2 the game itself
+    # tiles beyond the edge, which is the nearest thing to a right answer that
+    # exists. Solid, because out there is not a place.
+    assert border and len(border) == 4, "safari: the border block is not 2x2"
+    for x in range(W):
+        for y in (0, H - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+    for y in range(H):
+        for x in (0, W - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+
+    seal_hidden(g, tiles, "T")
+
+    # --- the spawn, and then take away what it cannot reach ---------------
+    # SEARCHED IN THE LARGEST PIECE. Six stitched maps have edges that were
+    # drawn to meet a neighbour we did not include on three sides, so there are
+    # pockets; picking the lowest walkable tile outright can land in one, and
+    # then the fill would wall in the rest of the map rather than the pocket.
+    seen_any, best = set(), []
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] in SOLID or (x, y) in seen_any:
+                continue
+            stack, cells = [(x, y)], []
+            while stack:
+                cx, cy = stack.pop()
+                if (not (0 <= cx < W and 0 <= cy < H) or (cx, cy) in seen_any
+                        or g[cy][cx] in SOLID):
+                    continue
+                seen_any.add((cx, cy))
+                cells.append((cx, cy))
+                stack += [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
+            if len(cells) > len(best):
+                best = cells
+    assert best, "safari: nowhere to stand"
+    # The entrance is at the south, so come in at the bottom of the main body.
+    bottom = max(y for _x, y in best)
+    xs = sorted(x for x, y in best if y == bottom)
+    spawn = (xs[len(xs) // 2], bottom)
+
+    seen, stack = set(), [spawn]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen:
+            continue
+        seen.add((x, y))
+        stack += walk_steps(g, x, y)
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] not in SOLID and (x, y) not in seen:
+                # Solid, and still the tile Emerald drew there.
+                g[y][x] = "T"
+
+    return (["".join(r) for r in g], spawn,
+            [i for row in tiles for i in row], GB)
+
+
+
+# -------------------------------------------------------------- Cinderpeak
+
+"""Cinderpeak is Ruby's Route 112 and Mt Chimney, and the lift between them.
+
+Two levels rather than three, and they are not floors of a cave: one is the
+ash-covered mountainside and the other is the summit above it, joined by the
+CABLE CAR - a station house at the foot and another at the top. The warp
+machinery Mt Moon needed does not care which of those it is carrying, so this
+cost nothing new in the engine.
+
+**THE NAME IS OURS.** "Route 112" is a road number in somebody else's region
+and says nothing about the place; Cinderpeak names what you can see from the
+bottom of it - ash falling on the grass, and the thing dropping the ash.
+
+**IT COST NO NEW ART EITHER.** Both maps are Emerald's General primary plus
+`lavaridge`, and both have been baked since the Safari Zone and Ember Caldera
+respectively - Route 112's highest secondary local is 440 against the 441
+lavaridge ships, which is as close as that has come. So the ids go straight in
+and every cell is a copy.
+
+**THE CABLE CAR IS TWO DOORS, NOT FOUR.** The real chain is Route 112 -> its
+station -> the car -> Mt Chimney's station -> Mt Chimney, and the two station
+interiors are 13x12 rooms whose whole content is a platform and an attendant.
+Joining the doors directly is the same simplification Mt Moon's ladders already
+are: what the player does is step into one house and come out of the other.
+
+**THE CRATER IS SCENERY, AND THE MAP DATA SAYS SO.** 56 tiles of `lavaridge`
+189 - the same metatile Ember Caldera's lake is made of - and every one of them
+is collision 1 with no water behaviour anywhere on either map. You cannot enter
+Mt Chimney's crater in Ruby and you cannot here. They carry `V` so the minimap
+draws the caldera rather than more rock; exactly ONE of the 56 has a walkable
+neighbour, so what that costs is a single tile somebody with Surf could ride
+onto, measured rather than assumed.
+
+**AND THE LEDGES GO THE WRONG WAY.** Of the 40 one-way hops here, 38 face EAST
+and `L` hops south and only south. The Safari Zone made its eleven solid
+because that walled nothing off; here it would wall off **137 tiles** - a
+third of the route - so they are floor. The principle behind both is the same
+and worth stating once: a ledge is a passage in ONE direction, so floor is the
+closer approximation and a wall is the further one; solid is only safe when
+nothing is behind it. Measured both ways before choosing.
+
+**THE MINIMAP COLOUR IS READ OFF THE TILE.** Fixed ids mean the art is right
+whatever character a cell carries, so the character is free to be about the
+MAP rather than the renderer - and Route 112 is half forest and half mountain,
+which one `M` would have flattened into a single brown slab. A metatile whose
+mean green beats its red and blue by 14 is foliage: tree 198 is (98,153,60) and
+the volcanic rock beside it is (134,58,42), so the two do not come close to
+touching. Measured against the atlas rather than listed, because a list of ids
+is a list that falls behind.
+"""
+
+CINDER_FLOORS = (("MtChimney", 40, 47), ("Route112", 40, 60))
+CINDER_GUT = 2
+# Both layouts' border block is the same single metatile, so the frame is one
+# tile everywhere rather than a 2x2 to phase.
+CINDER_FRAME = 625
+CINDER_LAVA = 701                  # lavaridge local 189 - the crater
+CINDER_SPLIT = 512                 # NUM_METATILES_IN_PRIMARY, Emerald's
+# The cable car, as (floor, x, y) pairs straight out of the two warp tables.
+CINDER_LIFT = (((1, 28, 27), (0, 17, 36)),
+               ((1, 29, 27), (0, 18, 36)))
+MB_TALL_GRASS = 0x02
+MB_JUMP = (0x38, 0x39, 0x3A, 0x3B)      # east, west, north, south
+MB_JUMP_SOUTH = 0x3B
+
+
+def cinderpeak():
+    """Cinderpeak: 40x109, Route 112 under Mt Chimney, joined by the cable car.
+
+    Stacked rather than laid side by side, because one of these really is
+    above the other - the minimap then says so, which is the only thing a
+    3px-a-tile picture can communicate about a map with two levels."""
+    import numpy as np
+    from PIL import Image
+    import build_assets as BA
+
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    GB = meta["safari"]["general"]              # Emerald's General, baked whole
+    LB = meta["volcano"]["lava"] - 189          # lavaridge, from its own pick
+    rebase = lambda i: (GB + i) if i < CINDER_SPLIT else (LB + i - CINDER_SPLIT)
+
+    # FOLIAGE IS MEASURED OFF THE ATLAS, memoised because the map asks per cell
+    # and there are only about two hundred distinct metatiles on it.
+    sheet = np.asarray(Image.open(os.path.join(ROOT, "public", "tilesets", "route.png"))
+                       .convert("RGB"), dtype=int)
+    leaf = {}
+
+    def foliage(i):
+        if i not in leaf:
+            t = rebase(i)
+            cell = sheet[(t // 16) * 16:(t // 16) * 16 + 16,
+                         (t % 16) * 16:(t % 16) * 16 + 16]
+            r, g, b = cell[..., 0].mean(), cell[..., 1].mean(), cell[..., 2].mean()
+            leaf[i] = bool(g > r + 14 and g > b + 14)
+        return leaf[i]
+
+    layouts = json.load(io.open(
+        BA.fetch("data/layouts/layouts.json", "em/layouts.json", root=BA.EMERALD),
+        encoding="utf-8"))["layouts"]
+    ga = np.frombuffer(io.open(BA.fetch(
+        "data/tilesets/primary/general/metatile_attributes.bin",
+        "em/general/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2")
+    la = np.frombuffer(io.open(BA.fetch(
+        "data/tilesets/secondary/lavaridge/metatile_attributes.bin",
+        "em/lavaridge/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2")
+    behave = lambda i: int((ga[i] if i < CINDER_SPLIT else la[i - CINDER_SPLIT]) & 0x1FF)
+
+    W = CINDER_FLOORS[0][1]
+    origin = [(0, 0), (0, CINDER_FLOORS[0][2] + CINDER_GUT)]
+    H = origin[1][1] + CINDER_FLOORS[1][2]
+
+    g = [["M"] * W for _ in range(H)]
+    tiles = [[rebase(CINDER_FRAME)] * W for _ in range(H)]
+    lift = {(f, x, y) for pair in CINDER_LIFT for (f, x, y) in pair}
+
+    for i, (name, fw, fh) in enumerate(CINDER_FLOORS):
+        lay = next(q for q in layouts if q["name"] == name + "_Layout")
+        assert lay["width"] == fw and lay["height"] == fh, \
+            f"cinderpeak: {name} is {lay['width']}x{lay['height']}, not the {fw}x{fh} assumed"
+        raw = np.frombuffer(io.open(BA.fetch(
+            lay["blockdata_filepath"], "em/%s.bin" % name,
+            root=BA.EMERALD), "rb").read(), dtype="<u2")[:fw * fh]
+        ids = (raw & 0x3FF).reshape(fh, fw)
+        col = ((raw >> 10) & 3).reshape(fh, fw)
+        ox, oy = origin[i]
+        for y in range(fh):
+            for x in range(fw):
+                mid = int(ids[y][x])
+                b = behave(mid)
+                if (i, x, y) in lift:
+                    ch = "l"                     # the station door: a cable car
+                elif mid == CINDER_LAVA:
+                    ch = "V"
+                elif b == MB_JUMP_SOUTH:
+                    ch = "L"
+                elif b in MB_JUMP:
+                    # East, west and north hops have no `L` to map onto - see
+                    # the note above. Floor, never wall.
+                    ch = "." if foliage(mid) else "m"
+                elif b == MB_TALL_GRASS:
+                    ch = ","
+                elif int(col[y][x]):
+                    ch = "T" if foliage(mid) else "M"
+                else:
+                    ch = "." if foliage(mid) else "m"
+                g[oy + y][ox + x] = ch
+                tiles[oy + y][ox + x] = rebase(mid)
+
+    # --- the frame -------------------------------------------------------
+    # Both maps open onto neighbours we do not have - Route 111, Lavaridge,
+    # Jagged Pass, the Fiery Path - and the composed rectangle's edge opens
+    # onto nothing. It closes with the layouts' OWN border block, which is one
+    # metatile on both, so there is no 2x2 to phase and nothing to invent.
+    for x in range(W):
+        for y in (0, H - 1):
+            g[y][x] = "M"
+    for y in range(H):
+        for x in (0, W - 1):
+            g[y][x] = "M"
+
+    # --- a hop needs somewhere to land ------------------------------------
+    # Two of the forty face south and so do map onto `L`. Keeping one whose
+    # landing is rock would be a hop into a wall, which is the one ledge rule
+    # that holds for a copy as firmly as for a map we drew.
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] == "L" and (y + 1 >= H or g[y + 1][x] in SOLID):
+                g[y][x] = "m"
+
+    seal_hidden(g, tiles, "M")
+
+    # --- the lift, as warp pairs on the shared grid -----------------------
+    warps = []
+    for (fa, xa, ya), (fb, xb, yb) in CINDER_LIFT:
+        ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
+        bx, by = origin[fb][0] + xb, origin[fb][1] + yb
+        assert g[ay][ax] == "l" and g[by][bx] == "l", \
+            f"cinderpeak: the cable car at ({ax},{ay})/({bx},{by}) is not on a door"
+        warps.append([ax, ay, bx, by])
+
+    # --- the spawn, and then take away what it cannot reach ---------------
+    # SEARCHED IN THE LARGEST PIECE. Route 112 is cut into terraces by ledges
+    # and into neighbourhoods by the four map connections we did not bring, so
+    # there are pockets; starting the fill inside one would wall in the rest of
+    # the mountain rather than the pocket.
+    seen_any, best = set(), []
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] in SOLID or (x, y) in seen_any:
+                continue
+            stack, cells = [(x, y)], []
+            while stack:
+                cx, cy = stack.pop()
+                if (not (0 <= cx < W and 0 <= cy < H) or (cx, cy) in seen_any
+                        or g[cy][cx] in SOLID):
+                    continue
+                seen_any.add((cx, cy))
+                cells.append((cx, cy))
+                stack += [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
+            if len(cells) > len(best):
+                best = cells
+    assert best, "cinderpeak: nowhere to stand"
+    bottom = max(y for _x, y in best)
+    xs = sorted(x for x, y in best if y == bottom)
+    spawn = (xs[len(xs) // 2], bottom)          # come in at the foot of the mountain
+
+    hop = {}
+    for ax, ay, bx, by in warps:
+        hop[(ax, ay)] = (bx, by)
+        hop[(bx, by)] = (ax, ay)
+    seen, stack = set(), [spawn]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen:
+            continue
+        seen.add((x, y))
+        stack += walk_steps(g, x, y)
+        if (x, y) in hop:
+            stack.append(hop[(x, y)])
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] not in SOLID and (x, y) not in seen:
+                g[y][x] = "M"                   # solid, and still its own tile
+
+    return (["".join(r) for r in g], spawn,
+            [i for row in tiles for i in row], GB, warps)
 
 
 if __name__ == "__main__":
@@ -3484,15 +3517,17 @@ if __name__ == "__main__":
         made = globals()[spec["drawn"]]() if spec.get("drawn") else build(spec)
         rows, spawn = made[0], made[1]
         tiles, base = (made[2], made[3]) if len(made) > 2 else (None, None)
+        # A map with more than one floor carries the ladders that join them.
+        warps = made[4] if len(made) > 4 else None
         spec["w"], spec["h"] = len(rows[0]), len(rows)
-        got, total = check(spec, rows, spawn)
-        out.append((spec, rows, spawn, tiles, base))
+        got, total = check(spec, rows, spawn, tiles, warps)
+        out.append((spec, rows, spawn, tiles, base, warps))
         print("  %-9s %2dx%-2d  spawn %2d,%-2d  %3d of %3d walkable reachable"
               % (spec["id"], spec["w"], spec["h"], spawn[0], spawn[1], got, total))
 
     body = ["/* GENERATED by tools/build_map.py - edit the area specs there. */\n",
             "export const AREAS = {"]
-    for spec, rows, spawn, tiles, base in out:
+    for spec, rows, spawn, tiles, base, warps in out:
         body.append("  %s: {" % spec["id"])
         body.append("    name: %s," % json.dumps(spec["name"]))
         body.append("    spawn: { x: %d, y: %d }," % spawn)
@@ -3508,6 +3543,13 @@ if __name__ == "__main__":
             for y in range(spec["h"]):
                 row = tiles[y * spec["w"]:(y + 1) * spec["w"]]
                 body.append("      " + ",".join(str(i) for i in row) + ",")
+            body.append("    ],")
+        if warps:
+            # THE LADDERS, AS PAIRS. Each entry is [x1, y1, x2, y2] and is
+            # walked in BOTH directions - a one-way ladder is a trap, and two
+            # rows saying the same thing is two places for it to disagree.
+            body.append("    warps: [")
+            body += ["      [%d, %d, %d, %d]," % tuple(w) for w in warps]
             body.append("    ],")
         body.append("  },")
     body.append("};\n")

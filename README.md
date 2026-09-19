@@ -3019,6 +3019,137 @@ it sits at the end rather than in front of four phases that can.
 
 ---
 
+### Trading
+
+Asked for directly, and it is the first feature whose main design problem is not
+a game-design problem. The fun is easy and mostly already invented; what needs
+deciding is what stops it destroying the collection for people who never used
+it. Both halves are below, and the trust half comes first because it gates
+everything.
+
+#### What breaks, stated precisely
+
+**THERE IS NO TRUST BOUNDARY.** Every roll, price and dex write happens in the
+browser and the server stores the result. That is written at the top of
+CLAUDE.md and it is why there is no leaderboard. Trading is a **harder** case
+than a leaderboard, and the difference is worth being exact about:
+
+- A leaderboard publishes numbers that cannot be trusted. The damage is bounded
+  by not looking at it.
+- Trading is a **distribution channel into other people's saves**. One person
+  with devtools writes a Shiny Mewtwo into `localStorage`, posts twenty of them,
+  and now the scarcity every number in this game is tuned around is gone — for
+  players who never opened a console and never asked.
+
+So "ship trading on today's architecture" is not a smaller version of this
+feature. It is the version that ends the game.
+
+**AND DUPLICATION IS THE ABUSE THAT MATTERS, NOT LYING.** These are usually
+lumped together and they should not be. A player who forges themselves one
+Shiny Rattata has done what they can already do today, alone, and it touches
+nobody. A player who can make ONE of anything become a THOUSAND breaks the
+economy for everybody in an afternoon. Every guard below is aimed at the second
+one first, because it is both the worse harm and the cheaper thing to stop:
+duplication is a fact about ids and rows, which a database is good at, where
+"was this roll honest" needs the roll to have happened somewhere we control.
+
+#### Phase T0 — a Pokémon needs an identity the server issued
+
+Nothing is tradeable until this is true, and today it is not: `uid` is
+`state.nextUid++` in the browser, so two players both hold a uid 7 and neither
+id means anything outside its own save.
+
+A `mons` table — server-issued id, owner, species, level, variant, size,
+`caught_at` — and **only the server may insert a row**. The save stays exactly
+what it is: local-first, written every 400ms, mirrored on the 15s cadence. A
+mon that has never been traded does not need a row at all, which keeps the cost
+proportional to the feature rather than to the dex.
+
+**This is the expensive step and there is no way round it.** It is also the step
+CLAUDE.md has been scoping since accounts arrived — *"the ten browser-free
+modules in `src/game` are what makes the fix affordable when it is wanted"* —
+so the work is: stand up one Edge Function that imports `biomes.js` and
+`items.js` unchanged and mints a caught mon. The rule modules already run
+without a browser and check.mjs already drives them in Node, which is the whole
+reason that constraint was kept.
+
+#### Phase T1 — the swap is one statement
+
+Two ownership updates in one Postgres function, the same shape `save_game`
+already uses for the session claim, and for the same reason recorded there:
+**read-then-write from a browser races with itself**, and two devices can both
+read "this is mine" and both proceed. A trade that is two updates is a trade
+that can duplicate under a double-click.
+
+`trade_execute(offer_id, taker)` verifies in one transaction that both sides
+still own what they posted, both rows move, and the offer closes. Anything else
+returns false and the UI says so — the pattern App already has for a lost
+session claim.
+
+#### Phase T2 — three modes, in this order
+
+Ordered by fun-per-unit-of-risk, so each one ships and is enjoyed before the
+next one's problems have to be solved.
+
+1. **Wonder Trade.** Put one in, get one back, no idea what. **The one mode
+   where forging does not pay**, because you do not choose what you receive —
+   which makes it both the safest to ship first and, historically, the one
+   people actually play. It also solves its own liquidity problem: it needs no
+   browsing UI, no search, no negotiation.
+
+2. **Offers — the GTS shape.** Post a spare, say what you would take for it,
+   come back later. **Asynchronous on purpose**: there is no matchmaking here
+   and a browser game cannot assume two people are online together. This is the
+   mode the request actually described ("post/offer trades").
+
+3. **Trade evolutions, which this unlocks for free.** CLAUDE.md records that
+   every non-level evolution method collapses to `bond` because *"a game with no
+   clock, no moves and no map transitions cannot express any of them"* — and
+   trade is the one of those that stops being impossible the day this ships.
+   Machoke, Haunter, Kadabra and Graveler becoming a real reason to trade is the
+   single most Pokémon thing this feature can do, and it costs one flag on
+   `EVOLUTIONS`, not a mechanism.
+
+#### What keeps it from being game-breaking
+
+Six guards. Each is one rule, and each is aimed at something specific:
+
+- **SPARES ONLY.** You may trade what `duplicateUids` already calls spare. The
+  best of each stays, exactly as the sweep does — one predicate, both features,
+  and the request's own instinct ("specially the dupes").
+- **A TRADED MON FILLS THE DEX AND NOTHING ELSE.** It counts as seen and caught;
+  it does **not** count toward medals or the completion rosette. This is the
+  load-bearing line. Dex completion becomes social, which is the fun part and
+  the historically correct one — you were always meant to need trades to finish
+  a Pokédex — while the two marks that measure *your own* play stay yours. It
+  costs one field (`traded: true`) on the box entry, and `medalsFor` and the
+  rosette read it.
+- **THE ROSETTE IS WHY.** It is four variants of one species, and if variants
+  are tradeable then the one mark in the game that cannot be bought becomes the
+  one that can. Without this rule, trading deletes it.
+- **POKÉMON ONLY, NEVER ITEMS.** Balls, candy and money are fungible, so
+  trading them is a currency, and a currency between untrusted clients is the
+  duplication problem wearing a hat. A Master Ball costs ¥50,000 for reasons
+  measured in check.mjs; none of that survives a gift economy.
+- **A RATE, TIED TO SOMETHING ALREADY EARNED.** A handful of trades a day, on
+  the `daily.js` cadence — which is pure, keyed on the day, and already
+  untestable-by-reloading. A cap makes the forger's throughput finite even if
+  the forging is never caught.
+- **AND A TRADE IS LOGGED.** Both sides, both mons, the timestamp, server-side.
+  Not to police it on day one, but because the day something is wrong the only
+  question will be "what actually moved", and that is not a question a save can
+  answer.
+
+#### The trigger
+
+**Not the wanting; the trust boundary.** This is one of the two features in
+this file that cannot ship as a smaller version of itself — the other is the
+leaderboard, and it is blocked on exactly the same thing. When catching runs
+server-side, both unblock together, and that is the moment to come back here.
+
+Building T2 before T0 is not an early version of trading. It is a working
+duplication exploit with a trading UI on it.
+
 ### Not planned
 
 Worth saying out loud, so they do not get half-built by accident:

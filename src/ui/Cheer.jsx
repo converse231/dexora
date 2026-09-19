@@ -12,23 +12,27 @@ import { useEffect } from "react";
 // Level rewards include key items, not only balls, so this has to look
 // across everything the game can name.
 import { itemById } from "../game/items.js";
+import { TIER_TELL } from "../game/biomes.js";
 
 const HOLD = 3200;
+/* THE TIER ROWS ARE DERIVED, and they were four hand-written ones. Vivid,
+   Noir, Glitched and Showdown all fell through to the `?? "POKEDEX"` below -
+   so catching the rarest thing in the game raised a banner with the word for
+   "you filled a dex slot" over it, and nothing anywhere failed. Exactly the
+   drift `TIERS` exists to stop, in a file that was not asking it.
+
+   `TIER_TELL` is the one table now, shared with the Dex sheet's FORMS strip,
+   so the banner and the strip cannot describe a tier differently and a ninth
+   tier arrives here for free. Upper-cased for the chip rather than stored
+   twice in two cases. */
 const KIND = {
   level: "LEVEL UP",
   dex: "POKÉDEX",
   medal: "MEDAL",
-  /* These name the TELL, never the odds. Two of them used to quote a number -
-     "ONE IN A THOUSAND" and "ONE IN FOUR THOUSAND" - and both were wrong the
-     day the whole ladder was divided by 4/3, silently, in the one place the
-     player reads a rare tier's description out loud. A banner that describes
-     what the thing IS cannot go stale when a constant moves, and these now
-     match the FORMS strip word for word. */
-  shiny: "AN ALTERNATE PALETTE",
-  origin: "AS IT WAS FIRST DRAWN",
-  holo: "PRESSED IN FOIL",
-  astral: "MADE OF STARLIGHT",
   steps: "ON FOOT",
+  ...Object.fromEntries(
+    Object.entries(TIER_TELL).map(([t, tell]) => [t, tell.toUpperCase()]),
+  ),
 };
 const SPARKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 

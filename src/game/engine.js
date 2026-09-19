@@ -19,7 +19,7 @@ import {
   pricedAt, valuedAt, xpScale, freePoints,
 } from "./trainer.js";
 import {
-  TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawBobber, fishFrame,
+  TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame,
 } from "./tileset.js";
 import { resolveThrow } from "../catch.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
@@ -184,6 +184,13 @@ function freshState() {
     /* Things worth stopping to say. A queue, because a catch can fill the last
        slot of a milestone and level you up in the same instant. */
     cheers: [],
+    /* And things worth MENTIONING, which is not the same thing. A field
+       effect running out is not a celebration - no sparks, no hold on the
+       screen - but it is the one moment the player has no way to notice on
+       their own: the card in the corner simply stops being there, and the
+       next four hundred steps quietly cost what they always did. Also a
+       queue: a repel and a honey bought together run out together. */
+    worn: [],
   };
 }
 
@@ -438,7 +445,7 @@ function loadState() {
          Lv 20 earned it before it existed, and a key item nobody can be given
          retroactively is a key item half the players never get. */
       bag: grantKeys(s.bag, levelFromXp(s.xp ?? 0)),
-      encounter: null, evolution: null, cheers: [],
+      encounter: null, evolution: null, cheers: [], worn: [],
     };
   } catch {
     keep(BROKEN_KEY, raw);
@@ -462,6 +469,19 @@ function loadState() {
    60fps to move one dot is the most expensive thing that would be on screen.
    Per frame it costs one `drawImage`, one stroked rectangle and two arcs. */
 const MINI_TILE = 3;
+/* AND A CAP, BECAUSE THE MINIMAP SIZES ITSELF TO THE MAP. Three pixels a tile
+   with nothing bounding it means the box grows with whatever is drawn, and
+   Cinderpeak is 40x109 - a tall narrow mountain - which came out 120x327
+   against a 480x352 viewport: 93% of the screen height, floor to ceiling down
+   the left edge. Every other map sits at 76% or less, so nothing had said so.
+
+   A map that does not fit draws at fewer pixels a tile rather than being
+   clipped or scrolled: the minimap's whole job is to show the WHOLE map at
+   once. At these bounds only Cinderpeak moves, to 2px and 80x218. */
+const MINI_MAX_W = 360;
+const MINI_MAX_H = 270;
+const miniScale = (w, h) => Math.max(1, Math.min(
+  MINI_TILE, Math.floor(MINI_MAX_W / w), Math.floor(MINI_MAX_H / h)));
 
 export function createEngine(canvas, onChange, mini = null) {
   const ctx = canvas.getContext("2d");
@@ -487,8 +507,25 @@ export function createEngine(canvas, onChange, mini = null) {
   // Transcribed areas carry the real map's own tile ids; the rest are drawn
   // entirely from the rules and have none.
   let fixed = areaOf(state.areaId).tiles ?? null;
+  /* THE LADDERS, FOR A MAP WITH MORE THAN ONE FLOOR. Mt Moon is 1F, B1F and
+     B2F laid out as quadrants of one grid, each sealed in its own rock, and
+     these pairs are the only way between them - the real cave's own warps,
+     read out of the decomp. Built as a lookup rather than searched per step,
+     and rebuilt beside `bakeMini()` for the same reason: `rows` changing
+     without this changing would leave the ladders of the map you just left. */
+  const warpMap = (area) => {
+    const m = new Map();
+    for (const [ax, ay, bx, by] of area.warps ?? []) {
+      m.set(`${ax},${ay}`, [bx, by]);
+      m.set(`${bx},${by}`, [ax, ay]);     // both ways; a one-way ladder is a trap
+    }
+    return m;
+  };
+  let warps = warpMap(areaOf(state.areaId));
   const at = (x, y) => (rows[y] ? rows[y][x] ?? "" : "");
 
+  // How many pixels a tile the minimap is drawing at - see `miniScale`.
+  let miniTile = MINI_TILE;
   /* The baked terrain and the context that blits it. Both are rebuilt by
      `bakeMini()` whenever `rows` changes, which is only ever `travel()`. */
   let miniCtx = null;
@@ -496,8 +533,9 @@ export function createEngine(canvas, onChange, mini = null) {
 
   function bakeMini() {
     if (!mini) return;
-    const w = MAP_W * MINI_TILE;
-    const h = MAP_H * MINI_TILE;
+    miniTile = miniScale(MAP_W, MAP_H);
+    const w = MAP_W * miniTile;
+    const h = MAP_H * miniTile;
     /* A 2x backing store behind a CSS size of exactly w x h, the same trick
        the route canvas uses: the dot and the camera box are drawn as vectors,
        and at 1x a 1px stroke on a 3px grid lands on half-pixels and blurs. */
@@ -513,7 +551,7 @@ export function createEngine(canvas, onChange, mini = null) {
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         b.fillStyle = MINI[rows[y][x]] ?? MINI_UNKNOWN;
-        b.fillRect(x * MINI_TILE, y * MINI_TILE, MINI_TILE, MINI_TILE);
+        b.fillRect(x * miniTile, y * miniTile, miniTile, miniTile);
       }
     }
     miniCtx = mini.getContext("2d");
@@ -525,7 +563,7 @@ export function createEngine(canvas, onChange, mini = null) {
      drawn with, so the two pictures are the same instant. */
   function drawMini(camX, camY, wx, wy) {
     if (!miniCtx || !miniArt) return;
-    const k = MINI_TILE / TILE;          // world pixels -> minimap pixels
+    const k = miniTile / TILE;           // world pixels -> minimap pixels
     miniCtx.clearRect(0, 0, miniArt.width, miniArt.height);
     miniCtx.drawImage(miniArt, 0, 0);
 
@@ -542,8 +580,8 @@ export function createEngine(canvas, onChange, mini = null) {
        half: a red dot alone disappears into Ember Caldera's lava and a white
        one into Frost Hollow's ice, so the marker carries its own contrast
        instead of relying on whatever it happens to be standing on. */
-    const px = wx * k + MINI_TILE / 2;
-    const py = wy * k + MINI_TILE / 2;
+    const px = wx * k + miniTile / 2;
+    const py = wy * k + miniTile / 2;
     miniCtx.fillStyle = "#fff";
     miniCtx.beginPath();
     miniCtx.arc(px, py, 3, 0, Math.PI * 2);
@@ -602,8 +640,8 @@ export function createEngine(canvas, onChange, mini = null) {
     if (state.stale === "taken") return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      const { encounter, evolution, fishing, running, cheers, rev, stale, hint,
-        ...rest } = state;
+      const { encounter, evolution, fishing, running, cheers, worn, rev, stale,
+        hint, ...rest } = state;
       /* `write` reports whether it stuck rather than throwing - which cause it
          was is its business, not this file's. What happens NEXT is this file's:
          play on either way, and latch it so the top bar can say NOT SAVING. */
@@ -709,15 +747,43 @@ export function createEngine(canvas, onChange, mini = null) {
     return { ...won, streak: d.streak };
   }
 
+  /* Monotonic, and that is the point: the notice is keyed on it, so wearing
+     out the same item twice is two notices rather than one that never
+     restarts - the same reason `e.ate` counts instead of flagging. */
+  let wornSeq = 0;
+
   function onArrive() {
+    /* A LADDER MOVES YOU BEFORE ANYTHING ELSE LOOKS AT WHERE YOU ARE. Taken
+       here, at the end of the step, rather than in `tryStep`: the walk has to
+       finish and the tile has to be arrived at, or the trainer slides to a
+       place he never reached. `move` is dragged along with him so the next
+       frame interpolates from the new tile instead of gliding across the map,
+       and an encounter rolls on the floor he came out on, which is the one he
+       is standing in. */
+    const who = state.player;
+    const hop = warps.get(`${who.x},${who.y}`);
+    if (hop) {
+      [who.x, who.y] = hop;
+      move.fromX = who.x;
+      move.fromY = who.y;
+      move.active = false;
+    }
     walkFrame++;
     state.steps++;
     teach({ kind: "step", steps: state.steps });
     noteDaily({ steps: 1 });
-    // One step off every running effect; the slot empties when it runs out.
+    /* One step off every running effect; the slot empties when it runs out,
+       and says so on the way. Announced HERE rather than by the panel noticing
+       the slot is empty, because only this line knows the difference between
+       an effect that expired and one that was cancelled by starting another -
+       and telling somebody their repel wore off when they replaced it with a
+       Max Repel is worse than saying nothing. */
     for (const fam of FAMILIES) {
       const run = state.field[fam];
-      if (run && --run.steps <= 0) state.field[fam] = null;
+      if (run && --run.steps <= 0) {
+        state.field[fam] = null;
+        state.worn.push({ id: run.id, n: ++wornSeq });
+      }
     }
 
     /* Walking pays. `stepReward` is pure and the panel calls it too, on the
@@ -819,6 +885,7 @@ export function createEngine(canvas, onChange, mini = null) {
     state.areaId = areaId;
     rows = areaOf(areaId).rows;
     fixed = areaOf(areaId).tiles ?? null;
+    warps = warpMap(areaOf(areaId));
     MAP_W = rows[0].length;
     MAP_H = rows.length;
     bakeMini();
@@ -1384,13 +1451,37 @@ export function createEngine(canvas, onChange, mini = null) {
 
     const x0 = Math.floor(camX / TILE);
     const y0 = Math.floor(camY / TILE);
+    /* What the tile pass actually drew, for the handful of tiles the player
+       covers - see `drawOverlays`. Collected here rather than worked out again
+       afterwards, because which tile a rule picked is `drawTile`'s to know.
+
+       THE BOX IS THE SPRITE'S OWN RECT. `drawPlayer` draws at `py + TILE - h`
+       with h = 2 tiles, so the trainer occupies his feet tile and the one
+       ABOVE it and nothing else. The first version padded a row below him as
+       well, which can only ever repaint ground he is standing in front of.
+       One column either side, because the 32-wide sets (fishing, surfing) and
+       a stride between tiles both reach sideways, and one extra row above for
+       a hop's lift. */
+    const px = Math.round(wx / TILE);
+    const py = Math.round(wy / TILE);
+    const over = [];
     for (let y = y0; y <= y0 + VIEW_H; y++) {
       for (let x = x0; x <= x0 + VIEW_W; x++) {
         // Off the map draws as tree so the void reads as forest, but neighbour
         // lookups get "" there - otherwise the tree depth walk never ends.
         const ch = at(x, y) || rows[0][0];
-        drawTile(ctx, art.atlas, ch, Math.round(x * TILE - camX), Math.round(y * TILE - camY),
-                 x, y, at, fixed ? fixed[y * MAP_W + x] : -1);
+        const id = drawTile(ctx, art.atlas, ch,
+                            Math.round(x * TILE - camX), Math.round(y * TILE - camY),
+                            x, y, at, fixed ? fixed[y * MAP_W + x] : -1);
+        /* AND ONLY WHERE HE COULD BE STANDING. An overhang is something you
+           walk BEHIND, so it has to be somewhere you can walk: a solid tile is
+           one you are always in FRONT of, and repainting its upper half over
+           the trainer is the bug that put the Power Plant's outer wall across
+           his head. Read off the cell rather than baked into the tile, because
+           collision belongs to the map - five of that map's metatiles are laid
+           both walkable and solid in different places. */
+        if (x >= px - 1 && x <= px + 1 && y >= py - 2 && y <= py
+            && walkable(rows, x, y)) over.push([x, y, id]);
       }
     }
 
@@ -1426,7 +1517,9 @@ export function createEngine(canvas, onChange, mini = null) {
 
     drawBobber(ctx, state.fishing, now, camX, camY);
 
-    drawOverhangs(ctx, art.atlas, x0, y0, VIEW_W, VIEW_H, camX, camY, at);
+    drawOverhangs(ctx, art.atlas, x0, y0, VIEW_W, VIEW_H, camX, camY, at,
+                  (x, y) => (fixed ? fixed[y * MAP_W + x] : -1));
+    drawOverlays(ctx, art.atlas, over, camX, camY);
 
     drawMini(camX, camY, wx, wy);
   }
@@ -1846,6 +1939,10 @@ export function createEngine(canvas, onChange, mini = null) {
     // The UI shows one at a time and drops it when its moment is over.
     dropCheer() {
       state.cheers.shift();
+      changed();
+    },
+    dropWorn() {
+      state.worn.shift();
       changed();
     },
     press: (dir) => held.add(dir),

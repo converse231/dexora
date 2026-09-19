@@ -32,7 +32,7 @@ import Mark from "./Marks.jsx";
 
 // Rarest first: the order the Box, the Dex and the encounter all read in -
 // one array, in biomes.js, beside the odds that define it.
-import { TIERS as RARE, speciesById } from "../game/biomes.js";
+import { TIERS as RARE, speciesById, isLegendary } from "../game/biomes.js";
 
 /* The order rows of one species sit in: the ordinary pile, then its variants
    kindest first - the same order the Dex sheet lists its FORMS in, so the two
@@ -217,21 +217,63 @@ export default function Box({
     for (const m of box) {
       if (!spare.has(m.uid)) continue;
       const at = bySpecies.get(m.species) ?? [];
-      at.push(m.level);
+      at.push(m);
       bySpecies.set(m.species, at);
     }
     return [...bySpecies.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([id, levels]) => ({
-        key: id,
-        candy: levels.length * candyValue(speciesById(id)),
-        /* No variant: `duplicateUids` holds every keeper out of the spare list
-           entirely, so nothing in a sweep is ever anything but ordinary. */
-        icon: { id },
-        label: `${levels.length} × ${label(speciesById(id))}`,
-        sub: `Lv ${levels.sort((a, b) => a - b).join(", ")}`,
-      }));
+      .map(([id, mons]) => {
+        const levels = mons.map((m) => m.level).sort((a, b) => a - b);
+        /* A LEGENDARY ARRIVES UNTICKED. Variants never reach this list at all -
+           `duplicateUids` holds every keeper out entirely - but a legendary is
+           not a keeper, so a spare Latios sat in the sweep beside the Pidgey.
+           Reported with a screenshot of two of them queued for Rare Candy.
+
+           Unticked rather than held out, which is the whole reason this is a
+           checkbox and not another `keeper()` clause: `keeper` is enforced in
+           the ENGINE for sell and convert both, so making legendaries keepers
+           would mean you could never convert a fifth Latios even deliberately,
+           from its own row. The default does the protecting; the tick is there
+           for when you really did mean it. */
+        const rare = isLegendary(id);
+        return {
+          key: id,
+          uids: mons.map((m) => m.uid),
+          off: rare,
+          why: rare ? "LEGENDARY" : null,
+          candy: levels.length * candyValue(speciesById(id)),
+          /* No variant: `duplicateUids` holds every keeper out of the spare
+             list entirely, so nothing here is ever anything but ordinary. */
+          icon: { id },
+          label: `${levels.length} × ${label(speciesById(id))}`,
+          sub: `Lv ${levels.join(", ")}`,
+        };
+      });
   }, [box, spareUids, rev]);
+
+  /* THE ARITHMETIC IS A FUNCTION OF WHAT IS STILL TICKED. It was three strings
+     built once when the dialog opened, which is fine for a receipt and wrong
+     for a control - untick a row and the header would go on quoting a total
+     nobody was about to receive. */
+  const sweepCount = (uids, candyPayout) => {
+    const picked = new Set(uids);
+    const taken = box.filter((m) => picked.has(m.uid));
+    const candy = taken.reduce((n, m) => n + candyValue(speciesById(m.species)), 0);
+    const cash = taken.reduce((n, m) => n + worth(speciesById(m.species)), 0);
+    return {
+      lines: [
+        ["Pokémon taken", taken.length],
+        ["You receive", candyPayout
+          ? `${candy} Rare Candy`
+          : `¥${cash.toLocaleString()}`],
+        ["Kept", `${box.length - taken.length} — everything you did not tick`],
+      ],
+      confirmLabel: candyPayout
+        ? `CONVERT ${taken.length} · +${candy}`
+        : `SELL ${taken.length} · +¥${cash.toLocaleString()}`,
+      candy, cash, taken: taken.length,
+    };
+  };
 
   /* ONE SWEEP, TWO PAYOUTS. Built from the same list and the same manifest,
      because the only thing that differs is which number goes up - and a sweep
@@ -240,34 +282,35 @@ export default function Box({
   const confirmSweep = (candyPayout) =>
     setPending({
       title: candyPayout ? "Convert every spare?" : "Sell every spare?",
-      lines: [
-        ["Pokémon taken", spareUids.length],
-        ["You receive", candyPayout
-          ? `${spareCandy} Rare Candy`
-          : `¥${spareValue.toLocaleString()}`],
-        /* Counted, not inferred. It was `groups.length`, which was the row
-           count - fine while a row was a species, and an undercount now that
-           a second Holo shares one row with the first. */
-        ["Kept", `${box.length - spareUids.length} — the best of each, and every variant`],
-      ],
+      /* Counted, not inferred, and now recounted as you tick. It was
+         `groups.length` once, which was the row count - fine while a row was a
+         species, and an undercount the day a second Holo shared one row with
+         the first. */
+      lines: sweepCount(spareUids, candyPayout).lines,
+      recount: (uids) => sweepCount(uids, candyPayout),
       /* The sweep reaches across the whole box, so this is the one dialog
          where "which ones" cannot be inferred from the row you pressed. One
          line per species with the levels going, so a Lv 30 sitting in a pile
          of Lv 3s is visible before it is gone. */
       manifest: sellManifest,
       note: candyPayout
-        ? "1 candy = 1 level. Rarer Pokémon are worth more of it."
-        : "The best of each is kept, and no variant is ever taken.",
-      confirmLabel: candyPayout
-        ? `CONVERT ${spareUids.length} · +${spareCandy}`
-        : `SELL ${spareUids.length} · +¥${spareValue.toLocaleString()}`,
-      run: () => {
+        ? "1 candy = 1 level. Untick anything you want to keep — legendaries start unticked."
+        : "The best of each is kept, no variant is ever taken, and legendaries start unticked.",
+      confirmLabel: sweepCount(spareUids, candyPayout).confirmLabel,
+      /* `picked` is what survived the ticking, which the dialog owns - so this
+         must never fall back to `spareUids`. A sweep that quietly took the
+         whole list when the argument was missing is the exact failure the
+         checkboxes exist to prevent. */
+      run: (picked) => {
+        const uids = picked ?? [];
+        if (!uids.length) return;
+        const got = sweepCount(uids, candyPayout);
         if (candyPayout) {
-          onConvert(spareUids);
-          setFlash(`Converted ${spareUids.length} spare · +${spareCandy} candy`);
+          onConvert(uids);
+          setFlash(`Converted ${uids.length} spare · +${got.candy} candy`);
         } else {
-          onSell(spareUids);
-          setFlash(`Sold ${spareUids.length} spare · +¥${spareValue.toLocaleString()}`);
+          onSell(uids);
+          setFlash(`Sold ${uids.length} spare · +¥${got.cash.toLocaleString()}`);
         }
       },
     });
@@ -587,11 +630,12 @@ export default function Box({
           title={pending.title}
           lines={pending.lines}
           manifest={pending.manifest}
+          recount={pending.recount}
           note={pending.note}
           confirmLabel={pending.confirmLabel}
           tone="sell"
-          onConfirm={() => {
-            pending.run();
+          onConfirm={(picked) => {
+            pending.run(picked);
             setPending(null);
           }}
           onCancel={() => setPending(null)}

@@ -24,6 +24,10 @@
            n bridge over lava · N bridge over water
            h tower floor · H tower wall · G a grave standing on the floor
            A a grave set into the wall · y the ward (3x3, walkable)
+           Z solid scenery a COPIED map brought with it - Route 1's white
+             fence and its signpost. It has no shape rule and needs none: a
+             transcribed cell draws with the real map's own metatile, so the
+             character only has to be right about collision.
            p/P plant
    Lowercase is walkable ground, uppercase the solid wall of the same biome. */
 
@@ -32,7 +36,7 @@ import { AREAS, AREA_IDS } from "./mapdata.js";
 export { AREAS, AREA_IDS };
 
 // A ledge is solid to ordinary movement; the engine handles the hop south.
-export const SOLID = "T~wRMIPHLFCWXBEVkKdtYGA";
+export const SOLID = "T~wRMIPHLFCWXBEVkKdtYGAZ";
 
 /* WHAT YOU CAN RIDE, and it is a subset of SOLID rather than a new kind of
    ground: every one of these is impassable on foot and stays so. `w` is open
@@ -73,6 +77,11 @@ export const MINI = {
   ".": "#6fae56", ",": "#54924a", f: "#7fbb63", "#": "#ded0a4",
   w: "#4b7fc4", b: "#c6b988", T: "#2d6634", F: "#26582b", c: "#3d7742",
   L: "#8a6a3c", D: "#9a6a3a", N: "#9a6a3a", "~": "#4b7fc4",
+  /* Route 1's fence and signpost. DARK, although the fence is painted white in
+     the game: at 3px a tile the only thing this palette can say is walkable or
+     not, and a light bar across the foot of the map would read as the path it
+     blocks. */
+  Z: "#6b6478",
   // cave
   r: "#9d9289", o: "#8b8078", R: "#4a423d", u: "#d3c2a2", C: "#5d534c",
   S: "#dcd0ba", W: "#4b7fc4",
