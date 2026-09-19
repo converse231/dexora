@@ -1,7 +1,7 @@
 # Dexora
 
 A personal, non-commercial browser game: catch, collect and evolve **1,145
-Pokémon** across ten hand-made areas — the whole National Dex from Kanto to
+Pokémon** across eleven hand-made areas — the whole National Dex from Kanto to
 Paldea, plus every Mega, Primal and Gigantamax form. Inspired by DelugeRPG's
 loop — walk, meet, throw, bank the duplicates, evolve.
 
@@ -696,8 +696,16 @@ draw over the player needs a second, top-layer-only tile baked separately
 Ids < 640 are primary (`gTileset_General`, shared by every outdoor map);
 ≥ 640 secondary. Our atlas bases: mt_ember 656, seafoam_islands 896,
 power_plant 1152, pokemon_tower 1312, cave 1424, viridian_forest 1600,
-lavaridge 1648, and the overhang tile last at 2096. Bases move whenever a set
-is added — read them out of `route.json`, never hard-code one.
+pokemon_mansion 1648, lavaridge 1920, lilycove 2368, **fr_building 2720**,
+em_general 3360. Bases move whenever a set is added — read them out of
+`route.json`, never hard-code one.
+
+**AND TWO OF THOSE ARE WHOLE PRIMARIES.** `EM_PRIMARY` bakes pokeemerald's
+General because the Safari Zone is drawn against it and ours is FireRed's;
+`FR_PRIMARY` bakes pokefirered's **Building** because the Pokemon Mansion
+references 748 of its metatiles directly. A map drawn against a primary that is
+not the one at ids 0-639 needs its own block, or every primary id it uses draws
+somebody else's art - grass and trees inside a house, in the Mansion's case.
 
 **A second decomp, for lava only.** FireRed has no molten tile anywhere: Mt
 Ember's Ruby Path is dry rock, and the gold a colour sweep finds in
@@ -959,7 +967,10 @@ missing from the generator's copy for a whole area, so check() flooded straight
 through the Power Plant's outer wall and counted it as walkable ground.
 
 `.` grass · `,` tall grass · `f` flowers · `#` sand · `w` water · `b` shore ·
-`T` tree · `L` ledge · `F` canopy · `c` canopy overhang · `D` pier
+`T` tree · `L` ledge · `J` one you hop EAST · `F` canopy · `c` canopy overhang ·
+`D` pier
+
+Pokemon Mansion: `q` floor · `Q` its wall
 
 Cave (Rock Ridge only): `r` floor · `R` wall · `o` floor crater (2×2, x even) ·
 `u` plateau · `C` cliff below it · `S` stairs · `W` spring (2×2 in a rock face)
@@ -1286,6 +1297,31 @@ the player does is step into one house and come out of the other. **Stacked
 rather than laid side by side**, because one of these really is above the
 other, and the minimap is the only thing that can say so.
 
+**AND THERE ARE THREE OF THOSE, WHICH IS WHAT WAS MISSING.** Reported from play
+as two screenshots, each circling a spot the player expected to climb - and
+they were the two ENDS OF THE SAME CONNECTION. Emerald joins these maps three
+ways and we had shipped one:
+
+| | resolved through | what it is |
+|---|---|---|
+| cable car | the two stations | R112 (28,27)(29,27) <-> Chimney (17,36)(18,36) |
+| **Jagged Pass** | JaggedPass #0/#1 .. #2/#3 | R112 (6,46)(7,46) <-> Chimney (20,41)(21,41) |
+| **Fiery Path** | FieryPath #0 .. #1 | R112 (11,36) <-> R112 (22,10), both ends on the route |
+
+Collapsing each is the cable car's own rule applied twice more. Jagged Pass is
+how you leave the summit on foot - without it Mt Chimney's south corridor is a
+staircase with nothing at the end of it, which is what the second screenshot
+was - and the Fiery Path cuts from the foot of the route to the top of it,
+which is the only thing that makes Route 112's north-east quarter reachable at
+all. **The map went 744 walkable to 831**, and it is now more than it was
+before the ledges became one-way rather than less.
+
+**BOTH ENDS WERE IN THE MAP DATA AND NEITHER WAS A GUESS.** `MB_NON_ANIMATED_DOOR`
+(0x60) and `MB_SOUTH_ARROW_WARP` (0x65) are what the circled tiles carry, and
+`map.json`'s `warp_events` says where each goes. THE LADDER GRAPH IS READ, NOT
+INVENTED - the sentence was already in this file, under Mt Moon, and this map
+had only followed it as far as the cable car.
+
 **THE CRATER IS SCENERY, AND THE MAP DATA SAYS SO.** 56 tiles of `lavaridge`
 189 - the same metatile Ember's lake is made of - every one collision 1, with
 no water behaviour anywhere on either map. You cannot enter Mt Chimney's crater
@@ -1332,6 +1368,84 @@ Moon was the only map with warps when it was written - so Ember's seven pairs
 and Cinderpeak's two were never driven. It loops over every area that has them
 now: **16 pairs across three areas, each ridden both ways.** A test that names
 one map is a test that goes quiet the day a second one arrives.
+
+### The Pokemon Mansion: four floors, and the first `building` primary
+
+Cinnabar's burnt-out house, all four floors, laid out **two by two on one grid**
+- upstairs on the top row, the ground floor and the basement beneath. 78x75 and
+**2,633 walkable**, which puts it third behind the Safari Zone and Deep Woods.
+Four in a column would have been 38x152 and the minimap could only have drawn
+that at one pixel a tile.
+
+**5,434 OF 5,434 INTERIOR CELLS CARRY THE REAL MAP'S OWN METATILE ID.** Not one
+differs. The only authored cells are the 416 of frame and gutter, and those are
+drawn out of the layouts' own border block - all four tile a 2x2 of the SAME
+metatile, and it is the black void the real map already fills its own
+out-of-bounds corners with (258 cells of 2F, 452 of 3F), so a gutter reads as
+the nothing it is. A plain interior wall was tried first and rendered as
+*floor*, which is the invisible-wall fault pointing the other way.
+
+**IT IS THE FIRST MAP DRAWN AGAINST A `building` PRIMARY, and that is what
+`FR_PRIMARY` is for.** Route 1 and Mt Moon are General; the Power Plant and the
+Tower are pure secondary against Building, so the pairing mattered but the
+primary itself was never referenced. **748 of the Mansion's 4,973 metatiles are
+`building` ids** - and ids 0-639 in our atlas are `gTileset_General`, which is
+grass, trees and sand. Left alone, three quarters of a thousand tiles of a
+burnt-out house would have drawn as outdoor scenery. `EM_PRIMARY` already bakes
+pokeemerald's General whole for the Safari Zone; this is the same thing one
+decomp over, and `load_primary` is `load_secondary` with the splicing removed.
+
+**THE MANSION IS TWO MAPS AND WE CAN ONLY SHIP ONE.** Its barriers are worked by
+a statue switch: `FLAG_POKEMON_MANSION_SWITCH_STATE` chooses between the grid in
+map.bin and the one `data/scripts/pokemon_mansion.inc` stamps over it with 156
+`setmetatile` calls, and **each state opens what the other closes**. This game
+has no switch, and a barrier with no switch is not a barrier, it is a wall -
+which is the call the ledges lost in Ember and the ladders lost in Frost Hollow,
+met a third time.
+
+So the map is the **UNION**: floor where EITHER state is passable, drawn with
+that state's own metatile. Nothing is invented - every id is one Game Freak
+wrote for that exact cell - and map.bin is **asserted to BE the reset state**
+first, on all 78 cells the reset script names, or the union would be taking one
+state and half of another. It is worth 42 cells and it is not a detail:
+**without them the four floors are 53.7% reachable and the whole basement is
+sealed**, because the stair down to it stands behind a barrier.
+
+**EIGHT RECIPROCAL PAIRS OUT OF ELEVEN WARPS.** Three of the real ones are not
+pairs and are dropped, the same call Mt Moon's two Route 4 mouths got: 1F
+(11,13), 3F (20,18) and 3F (24,18) are the second tile of a wide staircase and
+answer their neighbour's destination rather than their own. Three doors lead
+onto Cinnabar Island, which this game has no map for - except the middle one,
+which is the way in and so the spawn. **Two of the eight are the holes in 3F's
+floor**, which fall to 1F in the real game and are two-way here for the reason
+Mt Moon's ladders are: a ladder that only works downwards is a hole.
+
+**A TABLE OF EIGHT KANTO SPECIES PUT GEN 1 AT 63% AGAINST A FAIR 25%**, six
+times any other map's skew, and the weights were not the cause. A sweep proved
+it: pushing them about took 152% off-fair down to 106% and no further.
+
+`balance` pins each rarity band to the share the hand-written rows freeze, and
+**every hand-written row in this game is Kanto** - so a band those rows dominate
+is a band Kanto owns outright. Measured at Lv 24: the Mansion's B band was 58%
+of the table with five Kanto species in it against four from everywhere else,
+and Kanto held **99%** of it. The Power Plant gets away with a B band of 64%
+because only 34% of it is Kanto.
+
+**So the lever is a resident that is NOT Kanto, in that band**, and one is worth
+more than any reweighting: **Slugma alone took it 152% -> 12%.** With Gulpin and
+Torkoal beside it the map measures **4% off fair**, level with the Power Plant
+and Tall Grass. All three are fire or poison, all three belong in a burnt-out
+house, and all three open (Lv 10 and 15) before the Mansion does at 19, so they
+are there for every level it can be walked. **This is the first table in the
+game with a resident from outside Kanto**, and the next narrow-typed map will
+need the same thing - the fault is not this roster, it is that a band nothing
+else lives in belongs to whoever does.
+
+**AND `types` IS THREE, NOT FOUR.** Psychic was the tempting one - this is the
+building Mewtwo was made in, and the diary on B1F is why anybody remembers the
+place - but `legendsFor` reads that list to decide whose HOME a map is, and
+claiming psychic would hand Mewtwo a second home on the strength of a story
+rather than a roster. Nothing psychic lives here. The Tower keeps him.
 
 ### The Safari Zone: six maps stitched, and the first copy that cost art
 
@@ -1432,10 +1546,53 @@ the size of the ones they are named after and hold a whole game's worth of
 encounters where the original held a few minutes of one** — that is the trade
 every map here already makes, and a transcription does not escape it.
 
-**Ledges are one-way.** Solid to ordinary movement; walking *south* into one
-hops it and lands two tiles down. Any reachability check must therefore be a
-**directed** flood fill — an undirected one passes maps that trap the player on
-a terrace.
+**A LEDGE IS ONE-WAY, AND WHICH WAY IS THE CHARACTER'S.** Solid to ordinary
+movement; walking into one ALONG ITS OWN DIRECTION hops it and lands two tiles
+on. Any reachability check must therefore be a **directed** flood fill - an
+undirected one passes maps that trap the player on a terrace.
+
+`LEDGE` is the one table - `{ L: [0,1], J: [1,0] }` - and it is in `map.js` and
+`build_map.py` exactly as `SOLID` is, with check.mjs holding the pair together.
+`L` was the only direction there was for a year, and the reason is that every
+map we DREW put its terraces above the path. **Route 112 is a mountainside**:
+38 of its 41 ledges face EAST, drawn as vertical strips down the slope. With
+one direction available they had to be laid as floor, which is a terrace wall
+you can simply walk back up - reported from play, with the four vertical runs
+circled.
+
+**THREE FILLS HAD TO LEARN IT**, which is the same sentence Mt Moon's warps
+already earned: `walk_steps`, `tryStep` and check.mjs's own. The third said
+*"59 of 744 reachable"* the moment a ledge faced east, on a map that was fine.
+
+**AND A LEDGE WITH NO LANDING IS A WALL, NOT A FLOOR.** A hop clears exactly
+two tiles, so a ledge whose far side is solid cannot be jumped at all - Route
+112 lays two east ledges side by side at x=12/13, and from x=11 you would land
+ON x=13. Emerald refuses that jump and the pair reads as a two-thick terrace
+wall, which is also what its own collision bit says. `land_ledges` turns them
+to rock. The first version gave FLOOR, decided when a ledge could only face
+south and floor was the safer of two guesses; it is the wrong one, because
+floor is precisely the fault `J` exists to fix.
+
+**THE CULL AND THAT RULE FEED EACH OTHER, so they run to a fixed point.** A
+cell nothing can reach becomes rock, which can take the landing from a ledge
+aimed at it; that ledge becomes rock too, which can cut off whatever it was the
+way into. There is no ORDER that works - run the landing rule first and the
+cull invalidates it, run it last and it invalidates the cull - and both only
+ever turn ground into rock, so the pair shrinks and terminates.
+
+**AND THE SPAWN BECAME A CHOICE.** "The bottom of the largest UNDIRECTED
+region" is right only while every edge is two-way. Hop east off a terrace and
+the door shuts behind you, so where you start decides how much of the mountain
+you ever see: undirected, it picked the SUMMIT and culled 130 tiles of Route
+112 into rock. Every walkable cell is tried now and the one that REACHES the
+most wins, ties to the lowest - which lands on the foot of the mountain, what
+the original comment wanted anyway.
+
+**tools/play RIDES ONE, because nothing else can see `tryStep` reading the face
+backwards.** The tables would agree, the maps would satisfy them, and the game
+would hop the wrong axis. It finds a ledge of each kind on each map rather than
+naming a coordinate, presses into it and asserts it moves two, then presses
+back and asserts it does not move at all.
 
 **Every walkable tile spawns Pokémon.** There are no special encounter tiles.
 
@@ -1563,15 +1720,16 @@ wage for catching. The two measuring different things is the design, and
 check.mjs pins both directions.
 
 **The candy yield must never be flat.** Flat makes one map strictly best to
-grind and the other nine scenery. `CANDY` is tiered 1/2/4/8 and must stay
+grind and the other ten scenery. `CANDY` is tiered 1/2/4/8 and must stay
 FLATTER than `SELL` - if candy tracked cash, a common catch would be worthless
 in both currencies, and commons are what the economy runs on. Measured over the
-ten maps: **1.50 to 3.08 candy an encounter**, against **¥79 to ¥175** of cash
+eleven maps: **1.50 to 3.08 candy an encounter**, against **¥79 to ¥175** of cash
 over the same tables - so candy is x1.9 across the game where cash is x2.2, and
 the rule that it stays flatter than `SELL` holds by measurement rather than by
 the tier table alone. **Yield does NOT track the level gate and must not be
 made to**: Cinderpeak opens at Lv 16 and pays 1.85, below the Power Plant's
-2.62 at Lv 12, because it is a ROUTE and a route is mostly commons. What a map
+2.62 at Lv 12, because it is a ROUTE and a route is mostly commons. The
+Mansion opens at 19 and pays 2.47, between the Safari Zone and the Tower. What a map
 pays follows its own band mix, which is the design; the ladder decides where
 you may go, not what you earn there.
 
@@ -1608,7 +1766,7 @@ nothing else would say so.
 `BIOMES[i].level` gates travel: Tall Grass at 1, the Haunted Tower at `MAP_LAST`
 (20). The old design paced you with the price of balls and check.mjs asserted no
 area carried a `level` at all - a good argument that lost to a better one, since
-a new player cannot act on "all ten are open but nine will waste your balls"
+a new player cannot act on "all eleven are open but ten will waste your balls"
 until after they have wasted them. **`areaOpen()` is the single answer**, used by
 the engine's refusal, the Travel panel's padlock AND the Dex sheet's WHERE TO
 LOOK - which is a way to GO to the map rather than only the name of it, so it
@@ -2389,7 +2547,7 @@ number".
 per map is the design and so is an even spread of generations, and no single
 rescale satisfies both - fixing the bands moves the generations and fixing the
 generations moves the bands. Alternating the two converges on the closest table
-honouring both. Measured across all ten maps at every level: every generation
+honouring both. Measured across all eleven maps at every level: every generation
 within **25%** of fair (worst is Ember's Gen 2 at Lv 20, the narrowest map with
 only four generations open) and every band within **0.10pp**. **It always lands
 on the band step**: running out of rounds leaves whichever ran last in force,
@@ -3527,7 +3685,7 @@ frame it is one `drawImage`, one stroked rect and two arcs.
 
 **The palette is `MINI` in `map.js`, beside `SOLID`, because it is the legend.**
 A second list of map characters anywhere else is a list that falls behind.
-check.mjs asserts every character any of the ten maps uses has a colour, that
+check.mjs asserts every character any of the eleven maps uses has a colour, that
 each parses as a hex colour (a typo does not crash - canvas silently reuses the
 previous `fillStyle`, so one bad entry paints its tiles as whatever was drawn
 before), and that **Rock Ridge's plateau and Frost Hollow's shelf are far from

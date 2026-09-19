@@ -5,7 +5,7 @@
 
 import { SPECIES } from "../data/dex.js";
 import {
-  AREAS, AREA_IDS, areaOf, walkable, rideable, SURFABLE, label, MINI, MINI_UNKNOWN,
+  AREAS, AREA_IDS, areaOf, walkable, rideable, SURFABLE, label, LEDGE, MINI, MINI_UNKNOWN,
 } from "./map.js";
 import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
@@ -667,21 +667,27 @@ export function createEngine(canvas, onChange, mini = null) {
   function tryStep(dir) {
     const p = state.player;
     p.dir = dir;
-    const nx = p.x + (dir === "left" ? -1 : dir === "right" ? 1 : 0);
-    let ny = p.y + (dir === "up" ? -1 : dir === "down" ? 1 : 0);
+    const dx = dir === "left" ? -1 : dir === "right" ? 1 : 0;
+    const dy = dir === "up" ? -1 : dir === "down" ? 1 : 0;
+    let nx = p.x + dx;
+    let ny = p.y + dy;
 
-    /* Ledges are one-way. Walking south into one hops it and lands you on the
-       far side, so a terrace is quick to leave and slow to get back onto -
-       which is the whole reason Route 1 has them. From any other direction a
-       ledge is simply a wall, which `walkable` already reports. */
-    const hop = dir === "down" && at(nx, ny) === "L" && walkable(rows, nx, ny + 1);
+    /* Ledges are one-way, and WHICH way is the character's - `L` is hopped
+       going south, `J` going east. Walking into one ALONG ITS OWN DIRECTION
+       hops it and lands you on the far side, so a terrace is quick to leave
+       and slow to get back onto, which is the whole reason a mountainside has
+       them. From any other direction a ledge is simply a wall, which
+       `walkable` already reports. */
+    const face = LEDGE[at(nx, ny)];
+    const hop = !!face && face[0] === dx && face[1] === dy
+      && walkable(rows, nx + dx, ny + dy);
     /* OFF THE RIDE IS ALWAYS ALLOWED, ONTO IT NEVER IS. While you are on the
        water you may cross to more water or step ashore; from the bank the only
        way out is `surf()`, which is what the key item gates. So this asks
        where you ARE rather than what you hold - the permission was checked
        when you mounted and cannot have changed since. */
     const riding = rideable(rows, p.x, p.y);
-    if (hop) ny += 1;
+    if (hop) { nx += dx; ny += dy; }
     else if (!walkable(rows, nx, ny) && !(riding && rideable(rows, nx, ny))) return;
 
     move.fromX = p.x;

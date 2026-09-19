@@ -7,7 +7,8 @@
 
    Legend: . grass · , tall grass · f flowers · # sand path · T tree
            w pond water (solid) · b its shore, the water's bottom edge
-           L ledge (solid; walking south hops it) · F forest canopy
+           L ledge (solid; walking south hops it) · J one you hop EAST
+           F forest canopy
            c canopy overhang (walkable - you pass behind the tree top)
            D wooden pier (walkable) · o cave floor crater (2x2)
            r cave floor · R cave wall · u cave plateau (the upper level)
@@ -22,6 +23,7 @@
            t stalactite (2x2, in the ceiling)
            k water (solid) · K waterfall · s stairs between the two ice levels
            n bridge over lava · N bridge over water
+           q mansion floor · Q its wall - Cinnabar's burnt-out house
            h tower floor · H tower wall · G a grave standing on the floor
            A a grave set into the wall · y the ward (3x3, walkable)
            Z solid scenery a COPIED map brought with it - Route 1's white
@@ -35,8 +37,26 @@ import { AREAS, AREA_IDS } from "./mapdata.js";
 
 export { AREAS, AREA_IDS };
 
-// A ledge is solid to ordinary movement; the engine handles the hop south.
-export const SOLID = "T~wRMIPHLFCWXBEVkKdtYGAZ";
+// A ledge is solid to ordinary movement; the engine handles the hop.
+export const SOLID = "T~wRMIPHLFCWXBEVkKdtYGAZJQ";
+
+/* A LEDGE IS ONE-WAY, AND WHICH WAY IS THE CHARACTER'S: the value is the step
+   that hops it, so `L` is hopped by walking south and `J` by walking east.
+
+   `L` was the only one there was, and the reason is that every map we DREW put
+   its terraces above the path - south is the only direction a ledge ever
+   needed to face. Route 112 is a MOUNTAINSIDE, and 38 of its 41 ledges face
+   east, drawn as vertical strips down the slope. With one direction available
+   they had to be laid as floor, which is walkable both ways - a ledge you can
+   climb back up, which is not a ledge. Reported from play.
+
+   A table rather than a second special case in `tryStep`, because west and
+   north are then one row each instead of another branch, and because
+   tools/build_map.py needs the identical answer: `walk_steps` is the one
+   definition of a step and a directed fill that disagreed with the engine
+   would pass a map that traps the player on a terrace. check.mjs holds the two
+   copies together, exactly as it does for `SOLID`. */
+export const LEDGE = { L: [0, 1], J: [1, 0] };
 
 /* WHAT YOU CAN RIDE, and it is a subset of SOLID rather than a new kind of
    ground: every one of these is impassable on foot and stays so. `w` is open
@@ -76,7 +96,7 @@ export const MINI = {
   // route
   ".": "#6fae56", ",": "#54924a", f: "#7fbb63", "#": "#ded0a4",
   w: "#4b7fc4", b: "#c6b988", T: "#2d6634", F: "#26582b", c: "#3d7742",
-  L: "#8a6a3c", D: "#9a6a3a", N: "#9a6a3a", "~": "#4b7fc4",
+  L: "#8a6a3c", J: "#8a6a3c", D: "#9a6a3a", N: "#9a6a3a", "~": "#4b7fc4",
   /* Route 1's fence and signpost. DARK, although the fence is painted white in
      the game: at 3px a tile the only thing this palette can say is walkable or
      not, and a light bar across the foot of the map would read as the path it
@@ -95,6 +115,10 @@ export const MINI = {
   k: "#4b7fc4", K: "#a9cfe8", s: "#dcd0ba",
   // haunted tower
   h: "#6b5f7a", H: "#2a2333", G: "#9a92a8", A: "#8a82a0", y: "#4fd2d2",
+  /* pokemon mansion - scorched parquet against charred wall. Four floors on
+     one grid, so the contrast has to carry the room shapes at 3px a tile with
+     no other cue: this is the widest walkable-against-wall gap in the table. */
+  q: "#b99763", Q: "#3b2a24",
 };
 /* Anything the legend grows without telling this table. Deliberately a colour
    nothing else uses, so a missing tile shows up as a magenta stripe rather

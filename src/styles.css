@@ -273,6 +273,15 @@ canvas {
   --ground-glow: rgba(255, 216, 150, .16);
 }
 /* The Power Plant: a room, lit badly. */
+/* The Pokemon Mansion: no sky at all - four floors of a burnt-out house, lit
+   by whatever is left of the windows. Warm where the Power Plant is cold,
+   because what is overhead here is scorched timber rather than a steel roof. */
+.battle[data-area="mansion"] {
+  --sky: linear-gradient(#2b1d18 0%, #4a332a 58%, #6d4c3b 100%);
+  --ground-tint: linear-gradient(rgba(214, 170, 120, .16), rgba(38, 22, 16, .52));
+  --ground-lip: rgba(30, 18, 13, .5);
+  --ground-glow: rgba(255, 216, 168, .12);
+}
 .battle[data-area="power"] {
   --sky: linear-gradient(#232a31 0%, #3b4650 58%, #5a6773 100%);
   --ground-tint: linear-gradient(rgba(70, 92, 116, .34), rgba(10, 15, 21, .58));
@@ -3095,7 +3104,8 @@ canvas {
 .battle[data-area="power"] .battle-ground,
 .battle[data-area="ember"] .battle-ground,
 .battle[data-area="frost"] .battle-ground,
-.battle[data-area="tower"] .battle-ground { filter: none; }
+.battle[data-area="tower"] .battle-ground,
+.battle[data-area="mansion"] .battle-ground { filter: none; }
 
 /* ---------- today's quest, in the top bar ----------
 

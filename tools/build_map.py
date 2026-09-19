@@ -81,6 +81,10 @@ AREAS = [
     dict(id="cinder", name="Cinderpeak", drawn="cinderpeak"),
     # Hand-drawn - see frost_hollow() further down.
     dict(id="frost", name="Frost Hollow", drawn="frost_hollow"),
+    # COPIED, and the first map with FOUR floors - Cinnabar's burnt-out house,
+    # laid out two by two. The first drawn against a `building` primary, too,
+    # which is why `FR_PRIMARY` exists. See mansion().
+    dict(id="mansion", name="Pokemon Mansion", drawn="mansion"),
     # Hand-drawn - see haunted_tower() further down.
     dict(id="tower", name="Haunted Tower", drawn="haunted_tower"),
     # COPIED, and the biggest map in the game - six Emerald maps stitched into
@@ -88,7 +92,15 @@ AREAS = [
     dict(id="safari", name="Safari Zone", drawn="safari_zone"),
 ]
 
-SOLID = set("TwRMIPHLFCWXBEVkKdtYGAZ")
+SOLID = set("TwRMIPHLFCWXBEVkKdtYGAZJQ")
+
+# A LEDGE IS ONE-WAY, AND WHICH WAY IS THE CHARACTER'S: the value is the step
+# that hops it, so `L` is hopped walking south and `J` walking east. This is
+# `LEDGE` in src/game/map.js and the two must agree - `walk_steps` below is
+# what decides whether a map ships with a terrace nobody can leave, and it
+# would be deciding it against a rule the engine does not follow. check.mjs
+# pins the pair, the same way it pins SOLID.
+LEDGE = {"L": (0, 1), "J": (1, 0)}
 
 
 def h2(x, y, salt=0):
@@ -138,6 +150,37 @@ def seal_hidden(g, tiles, wall):
     return n
 
 
+def land_ledges(g, wall):
+    """Turn every ledge with nowhere to land into `wall`. Returns how many.
+
+    A hop clears exactly two tiles, so a ledge whose far side is solid cannot
+    be jumped at all - and in the game it was copied from it simply reads as a
+    terrace wall, which is also what its own collision bit says. Route 112 lays
+    two east ledges side by side at x=12/13 and is where this was found.
+
+    Rock rather than floor. The first version gave floor, decided when a ledge
+    could only face south and floor was the safer of two guesses; it is the
+    wrong one, because floor is a terrace wall you can walk straight back up -
+    the exact fault `J` exists to fix.
+    """
+    H, W = len(g), len(g[0])
+    n = 0
+    moved = True
+    while moved:                                  # taking one away can take
+        moved = False                             # the landing from the next
+        for y in range(H):
+            for x in range(W):
+                face = LEDGE.get(g[y][x])
+                if not face:
+                    continue
+                lx, ly = x + face[0], y + face[1]
+                if not (0 <= lx < W and 0 <= ly < H) or g[ly][lx] in SOLID:
+                    g[y][x] = wall
+                    moved = True
+                    n += 1
+    return n
+
+
 def walk_steps(rows, x, y):
     """Where you can get to from (x, y) in one move. THE FILL IS DIRECTED.
 
@@ -155,9 +198,14 @@ def walk_steps(rows, x, y):
         nx, ny = x + dx, y + dy
         if not (0 <= nx < W and 0 <= ny < H):
             continue
-        if rows[ny][nx] == "L":
-            if dy == 1 and 0 <= ny + 1 < H and rows[ny + 1][nx] not in SOLID:
-                out.append((nx, ny + 1))          # hop it, land beyond
+        face = LEDGE.get(rows[ny][nx])
+        if face:
+            # Only along its OWN direction, and only if there is ground the
+            # far side. Any other approach is a wall.
+            lx, ly = nx + dx, ny + dy
+            if (face == (dx, dy) and 0 <= lx < W and 0 <= ly < H
+                    and rows[ly][lx] not in SOLID):
+                out.append((lx, ly))              # hop it, land beyond
             continue
         if rows[ny][nx] in SOLID:
             continue
@@ -438,9 +486,17 @@ def check(area, rows, spawn, tiles=None, warps=None):
 
     for y in range(H):
         for x in range(W):
-            if rows[y][x] != "L":
+            face = LEDGE.get(rows[y][x])
+            if not face:
                 continue
-            assert y + 1 < H and rows[y + 1][x] not in SOLID,                 f"{aid}: ledge at ({x},{y}) has nothing to land on"
+            # EVERY RULE HERE IS ABOUT THE FACE, so each one reads the
+            # character's own direction rather than assuming south: the
+            # landing is one step along it, the approach one step back,
+            # and the run lies ACROSS it - a south ledge runs east-west
+            # and an east ledge runs north-south.
+            dx, dy = face
+            lx, ly = x + dx, y + dy
+            assert 0 <= lx < W and 0 <= ly < H and rows[ly][lx] not in SOLID,                 f"{aid}: ledge at ({x},{y}) has nothing to land on"
             # AN APPROACH IS A RULE FOR A LEDGE WE PLACED. A copied one can
             # simply run out under the treeline - four of the Safari Zone's
             # thirty-six do, the last tiles of a run Game Freak drew into a
@@ -448,16 +504,17 @@ def check(area, rows, spawn, tiles=None, warps=None):
             # stand above them, so you never hop them, and the rest of the run
             # works. The LANDING below is still asserted for everyone, because
             # a ledge with nothing under it is a hop into a wall.
-            assert copied(x, y) or rows[y - 1][x] not in SOLID,                 f"{aid}: ledge at ({x},{y}) cannot be reached from above"
-            run = 1
-            xx = x - 1
-            while at(xx, y) == "L":
+            assert copied(x, y) or at(x - dx, y - dy) not in SOLID,                 f"{aid}: ledge at ({x},{y}) cannot be reached from above"
+            run, ch = 1, rows[y][x]
+            ax, ay = -dy, dx                      # across the face
+            xx, yy = x - ax, y - ay
+            while at(xx, yy) == ch:
                 run += 1
-                xx -= 1
-            xx = x + 1
-            while at(xx, y) == "L":
+                xx, yy = xx - ax, yy - ay
+            xx, yy = x + ax, y + ay
+            while at(xx, yy) == ch:
                 run += 1
-                xx += 1
+                xx, yy = xx + ax, yy + ay
             # The run length is an art rule - cap / mid / cap needs three -
             # while the two assertions above it are about whether the hop can
             # be made at all, so only this one gives way to a copy. Route 1
@@ -3341,11 +3398,34 @@ CINDER_FRAME = 625
 CINDER_LAVA = 701                  # lavaridge local 189 - the crater
 CINDER_SPLIT = 512                 # NUM_METATILES_IN_PRIMARY, Emerald's
 # The cable car, as (floor, x, y) pairs straight out of the two warp tables.
-CINDER_LIFT = (((1, 28, 27), (0, 17, 36)),
-               ((1, 29, 27), (0, 18, 36)))
+# EMERALD JOINS THESE TWO MAPS THREE WAYS AND WE HAD ONE, which is what was
+# reported from play: two screenshots, each circling one end of the SAME
+# missing connection. Read out of the decomp's own `warp_events` and resolved
+# through the room in the middle, as (floor, x, y) pairs - floor 0 is
+# MtChimney, floor 1 is Route112.
+#
+# Every one of these passes through a map we do not have, and collapsing it is
+# the simplification the cable car is already documented under: what the player
+# does is step into one door and come out of the other.
+#
+#   cable car    R112 (28,27)(29,27) -> the two stations -> Chimney (17,36)(18,36)
+#   Jagged Pass  R112  (6,46)( 7,46) -> #0/#1 .. #2/#3  -> Chimney (20,41)(21,41)
+#   Fiery Path   R112 (11,36) -> #0 .. #1 -> R112 (22,10), both ends on the route
+#
+# The last two are what "take me to the top" means here. Jagged Pass is how you
+# leave the summit on foot - without it Mt Chimney's south corridor is a rung
+# with nothing at the end of it - and the Fiery Path cuts from the foot of the
+# route to the top of it, which is the only thing that makes Route 112's
+# north-east quarter reachable at all.
+CINDER_WARPS = (((1, 28, 27), (0, 17, 36)),        # cable car
+                ((1, 29, 27), (0, 18, 36)),
+                ((1, 6, 46), (0, 20, 41)),         # Jagged Pass
+                ((1, 7, 46), (0, 21, 41)),
+                ((1, 11, 36), (1, 22, 10)))        # the Fiery Path, through
 MB_TALL_GRASS = 0x02
-MB_JUMP = (0x38, 0x39, 0x3A, 0x3B)      # east, west, north, south
-MB_JUMP_SOUTH = 0x3B
+# Emerald's own ledge behaviours, mapped onto our characters. The corner
+# (0x3E, south-east) caps an east run on Route 112 and hops with it.
+MB_JUMP_CH = {0x38: "J", 0x3B: "L", 0x3E: "J"}
 
 
 def cinderpeak():
@@ -3396,7 +3476,7 @@ def cinderpeak():
 
     g = [["M"] * W for _ in range(H)]
     tiles = [[rebase(CINDER_FRAME)] * W for _ in range(H)]
-    lift = {(f, x, y) for pair in CINDER_LIFT for (f, x, y) in pair}
+    doors = {(f, x, y) for pair in CINDER_WARPS for (f, x, y) in pair}
 
     for i, (name, fw, fh) in enumerate(CINDER_FLOORS):
         lay = next(q for q in layouts if q["name"] == name + "_Layout")
@@ -3412,16 +3492,19 @@ def cinderpeak():
             for x in range(fw):
                 mid = int(ids[y][x])
                 b = behave(mid)
-                if (i, x, y) in lift:
-                    ch = "l"                     # the station door: a cable car
+                if (i, x, y) in doors:
+                    ch = "l"                     # a door, an arrow tile or a
+                                                 # cave mouth - all of them warps
                 elif mid == CINDER_LAVA:
                     ch = "V"
-                elif b == MB_JUMP_SOUTH:
-                    ch = "L"
-                elif b in MB_JUMP:
-                    # East, west and north hops have no `L` to map onto - see
-                    # the note above. Floor, never wall.
-                    ch = "." if foliage(mid) else "m"
+                elif b in MB_JUMP_CH:
+                    # THE MOUNTAINSIDE IS 38 EAST HOPS AND TWO SOUTH ONES,
+                    # which is what `J` exists for: as floor they were a
+                    # terrace wall you could walk back up, and as wall they
+                    # sealed 137 tiles. West and north have no character and
+                    # no map uses one; the single south-east corner takes
+                    # the direction of the run it caps.
+                    ch = MB_JUMP_CH[b]
                 elif b == MB_TALL_GRASS:
                     ch = ","
                 elif int(col[y][x]):
@@ -3443,51 +3526,261 @@ def cinderpeak():
         for x in (0, W - 1):
             g[y][x] = "M"
 
-    # --- a hop needs somewhere to land ------------------------------------
-    # Two of the forty face south and so do map onto `L`. Keeping one whose
-    # landing is rock would be a hop into a wall, which is the one ledge rule
-    # that holds for a copy as firmly as for a map we drew.
-    for y in range(H):
-        for x in range(W):
-            if g[y][x] == "L" and (y + 1 >= H or g[y + 1][x] in SOLID):
-                g[y][x] = "m"
-
     seal_hidden(g, tiles, "M")
 
-    # --- the lift, as warp pairs on the shared grid -----------------------
+    # AND IT RUNS AFTER `seal_hidden`, WHICH CAN TAKE A LANDING AWAY. That
+    # pass turns a walkable cell whose upper layer covers the whole tile
+    # solid, so run first it left an east hop at (13,92) aimed at ground
+    # that was about to become rock. Same shape as `ledge_in` laying last
+    # because `fill_the_empty` plants on the approach.
+    # --- the three connections, as warp pairs on the shared grid ----------
     warps = []
-    for (fa, xa, ya), (fb, xb, yb) in CINDER_LIFT:
+    for (fa, xa, ya), (fb, xb, yb) in CINDER_WARPS:
         ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
         bx, by = origin[fb][0] + xb, origin[fb][1] + yb
         assert g[ay][ax] == "l" and g[by][bx] == "l", \
-            f"cinderpeak: the cable car at ({ax},{ay})/({bx},{by}) is not on a door"
+            f"cinderpeak: the warp at ({ax},{ay})/({bx},{by}) is not on a door"
         warps.append([ax, ay, bx, by])
 
     # --- the spawn, and then take away what it cannot reach ---------------
-    # SEARCHED IN THE LARGEST PIECE. Route 112 is cut into terraces by ledges
-    # and into neighbourhoods by the four map connections we did not bring, so
-    # there are pockets; starting the fill inside one would wall in the rest of
-    # the mountain rather than the pocket.
-    seen_any, best = set(), []
-    for y in range(H):
-        for x in range(W):
-            if g[y][x] in SOLID or (x, y) in seen_any:
+    # SEARCHED, AND SEARCHED WITH THE DIRECTED FILL. The first version took the
+    # bottom of the largest UNDIRECTED region, which is right only while every
+    # edge is two-way - and 38 of this map's ledges face east, so hopping one
+    # is a door that shuts behind you. Undirected it chose the SUMMIT, and
+    # culled 130 tiles of Route 112 into rock for the privilege.
+    #
+    # Every walkable cell is tried and the one that REACHES the most wins, ties
+    # going to the lowest - which lands on (8,103), the foot of the mountain,
+    # and so is what the original comment wanted anyway. There is no piece big
+    # enough to guess from: Route 112 is cut into terraces by its own ledges
+    # and into neighbourhoods by four map connections we did not bring.
+    hop = {}
+    for ax, ay, bx, by in warps:
+        hop[(ax, ay)] = (bx, by)
+        hop[(bx, by)] = (ax, ay)
+
+    def reach(from_):
+        seen, stack = set(), [from_]
+        while stack:
+            x, y = stack.pop()
+            if (x, y) in seen:
                 continue
-            stack, cells = [(x, y)], []
-            while stack:
-                cx, cy = stack.pop()
-                if (not (0 <= cx < W and 0 <= cy < H) or (cx, cy) in seen_any
-                        or g[cy][cx] in SOLID):
-                    continue
-                seen_any.add((cx, cy))
-                cells.append((cx, cy))
-                stack += [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
-            if len(cells) > len(best):
-                best = cells
-    assert best, "cinderpeak: nowhere to stand"
-    bottom = max(y for _x, y in best)
-    xs = sorted(x for x, y in best if y == bottom)
-    spawn = (xs[len(xs) // 2], bottom)          # come in at the foot of the mountain
+            seen.add((x, y))
+            stack += walk_steps(g, x, y)
+            if (x, y) in hop:
+                stack.append(hop[(x, y)])
+        return seen
+
+    # THE CULL AND THE LANDING RULE FEED EACH OTHER, so they run until neither
+    # moves. A cell nothing can reach becomes rock, which can take the landing
+    # from a ledge aimed at it; that ledge becomes rock too, which can in turn
+    # cut off whatever it was the way into. There is no ORDER that works - run
+    # the landing rule first and the cull invalidates it, run it last and it
+    # invalidates the cull - and both only ever turn ground into rock, so the
+    # pair shrinks and terminates.
+    while True:
+        scored = [(len(reach((x, y))), x, y) for y in range(H) for x in range(W)
+                  if g[y][x] not in SOLID]
+        assert scored, "cinderpeak: nowhere to stand"
+        most = max(n for n, _x, _y in scored)
+        low = max(y for n, _x, y in scored if n == most)
+        xs = sorted(x for n, x, y in scored if n == most and y == low)
+        spawn = (xs[len(xs) // 2], low)         # the middle of the lowest row
+        seen = reach(spawn)
+        cut = 0
+        for y in range(H):
+            for x in range(W):
+                if g[y][x] not in SOLID and (x, y) not in seen:
+                    g[y][x] = "M"               # solid, and still its own tile
+                    cut += 1
+        if not cut and not land_ledges(g, "M"):
+            break
+
+    return (["".join(r) for r in g], spawn,
+            [i for row in tiles for i in row], GB, warps)
+
+
+# --- the Pokemon Mansion ----------------------------------------------------
+#
+# Cinnabar Island's burnt-out house, four floors of it, laid out two by two on
+# one grid exactly as Frost Hollow lays four Seafoam floors and Mt Moon three.
+# Upstairs on the top row, the ground floor and the basement beneath it - which
+# is the only thing a 3px-a-tile picture can say about which is above which.
+MANSION_FLOORS = (("PokemonMansion_2F", 38, 38), ("PokemonMansion_3F", 38, 35),
+                  ("PokemonMansion_1F", 38, 35), ("PokemonMansion_B1F", 38, 35))
+MANSION_GUT = 2                   # rows and columns of our own wall between them
+MANSION_COLS = 2
+MANSION_SPLIT = 640               # NUM_METATILES_IN_PRIMARY, FireRed's
+MANSION_FLOOR_MT = 644            # METATILE_PokemonMansion_Floor
+# THE FRAME IS THE LAYOUT'S OWN BORDER BLOCK, which the Safari Zone already
+# argued for and which is unusually easy here: all four floors tile a 2x2 of
+# the SAME metatile, and it is the black void the real map already fills its
+# own out-of-bounds corners with - 258 cells of 2F and 452 of 3F. So the
+# gutters between quadrants draw as the nothing they are. A plain wall tile was
+# tried first and read as floor, which is the invisible-wall fault pointing the
+# other way.
+MANSION_BORDER_MT = 8
+
+# THE LADDER GRAPH IS READ, NOT INVENTED - `warp_events` out of each floor's
+# own map.json, resolved to the pairs that answer each other. Floors are
+# indexed into MANSION_FLOORS above: 0 is 2F, 1 is 3F, 2 is 1F, 3 is B1F.
+#
+# Eight reciprocal pairs. Three of the real warps are NOT pairs and are left
+# out, the same call Mt Moon's two Route 4 mouths got: 1F (11,13), 3F (20,18)
+# and 3F (24,18) are the second tile of a wide staircase and lead to a tile
+# whose own warp answers their neighbour instead. And the three doors onto
+# Cinnabar Island lead somewhere this game has no map for - except the middle
+# one, which is the way in and so the spawn.
+MANSION_STAIRS = (
+    ((2, 10, 13), (0, 6, 14)),      # 1F <-> 2F, the main staircase
+    ((2, 25, 27), (3, 34, 29)),     # 1F <-> B1F
+    ((2, 19, 22), (1, 18, 18)),     # 1F <-> 3F, the holes you fall through
+    ((2, 20, 22), (1, 19, 18)),
+    ((0, 9, 3), (1, 8, 3)),         # 2F <-> 3F
+    ((0, 34, 22), (1, 34, 18)),
+    ((0, 9, 14), (1, 11, 11)),
+    ((0, 27, 17), (1, 23, 18)),
+)
+MANSION_DOOR = (2, 8, 33)         # the front door onto Cinnabar - and the spawn
+
+
+def mansion_switch():
+    """Every cell the statue switch OPENS, as {floor: {(x, y): metatile}}.
+
+    THE MANSION IS TWO MAPS AND WE CAN ONLY SHIP ONE. Its barriers are worked
+    by a statue: `FLAG_POKEMON_MANSION_SWITCH_STATE` chooses between the grid
+    in map.bin and the one `PressSwitch_*` stamps over it, and each state opens
+    what the other closes. This game has no switch, and a barrier with no
+    switch is not a barrier - it is a wall. That is the call the ledges lost in
+    Ember and the ladders lost in Frost Hollow, met a third time.
+
+    So the map is the UNION: floor where EITHER state is passable, drawn with
+    that state's own metatile. Nothing is invented - every id here is one Game
+    Freak wrote for that exact cell, and map.bin is verified to BE the reset
+    state first, on all 78 cells the reset script names.
+
+    It is worth 42 cells and it is not a detail: without them the four floors
+    are 53.7% reachable and the whole basement is sealed, because the stair
+    down to it stands behind a barrier.
+    """
+    import re
+    import build_assets as BA
+
+    labels = {}
+    for m in re.finditer(r"#define\s+(METATILE_\w+)\s+(0x[0-9A-Fa-f]+|\d+)",
+                         io.open(BA.fetch("include/constants/metatile_labels.h",
+                                          "metatile_labels.h"),
+                                 encoding="utf-8", errors="replace").read()):
+        labels[m.group(1)] = int(m.group(2), 0)
+
+    text = io.open(BA.fetch("data/scripts/pokemon_mansion.inc",
+                            "data_scripts_pokemon_mansion.inc"),
+                   encoding="utf-8", errors="replace").read()
+
+    def swaps(label):
+        i = text.index(label + "::")
+        body = text[i:text.index("\n\treturn", i)]
+        return [(int(m.group(1)), int(m.group(2)), labels[m.group(3)], int(m.group(4)))
+                for m in re.finditer(
+                    r"setmetatile\s+(\d+),\s*(\d+),\s*(\w+),\s*(\d+)", body)]
+
+    out = {}
+    for i, (name, _fw, _fh) in enumerate(MANSION_FLOORS):
+        key = name.split("_")[-1]
+        out[i] = ({(x, y): mid for x, y, mid, imp in
+                   swaps("PokemonMansion_EventScript_PressSwitch_" + key) if imp == 0},
+                  swaps("PokemonMansion_EventScript_ResetSwitch_" + key))
+    return out
+
+
+def mansion():
+    """The Pokemon Mansion: 78x75, four floors of Cinnabar's burnt-out house.
+
+    **IT IS THE FIRST MAP DRAWN AGAINST A `building` PRIMARY.** Route 1, the
+    Power Plant and Mt Moon are all `general` or pure secondary; 748 of these
+    4,973 metatiles are `building` ids, which in our atlas would have been
+    grass, trees and sand. `FR_PRIMARY` bakes that primary whole - the same
+    thing `EM_PRIMARY` already does for the Safari Zone one decomp over - so
+    both halves of the pairing rebase against their own block and every cell is
+    still a copy.
+
+    The layout is two by two because four floors in a column is 38x152, and the
+    minimap would have to draw that at one pixel a tile to fit the screen.
+    """
+    import numpy as np
+    import build_assets as BA
+
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    PB = meta["mansion"]["building"]           # pokefirered's Building, baked whole
+    SB = meta["mansion"]["mansion"]            # and the mansion's own secondary
+    rebase = lambda i: (PB + i) if i < MANSION_SPLIT else (SB + i - MANSION_SPLIT)
+
+    W = MANSION_COLS * 38 + (MANSION_COLS - 1) * MANSION_GUT
+    band = [max(MANSION_FLOORS[0][2], MANSION_FLOORS[1][2]),
+            max(MANSION_FLOORS[2][2], MANSION_FLOORS[3][2])]
+    H = band[0] + MANSION_GUT + band[1]
+    origin = [(0, 0), (38 + MANSION_GUT, 0),
+              (0, band[0] + MANSION_GUT), (38 + MANSION_GUT, band[0] + MANSION_GUT)]
+
+    g = [["Q"] * W for _ in range(H)]
+    tiles = [[rebase(MANSION_BORDER_MT)] * W for _ in range(H)]
+    opens = mansion_switch()
+    doors = {(f, x, y) for pair in MANSION_STAIRS for (f, x, y) in pair}
+    opened = 0
+
+    for i, (name, fw, fh) in enumerate(MANSION_FLOORS):
+        raw = np.frombuffer(io.open(BA.fetch(f"data/layouts/{name}/map.bin",
+                                             name + ".bin"), "rb").read(),
+                            dtype="<u2")[:fw * fh]
+        ids = (raw & 0x3FF).reshape(fh, fw)
+        col = ((raw >> 10) & 3).reshape(fh, fw)
+        press, reset = opens[i]
+        # MAP.BIN IS THE RESET STATE, ASSERTED RATHER THAN ASSUMED. If it were
+        # not, the union below would be taking one state and half of another.
+        for x, y, mid, imp in reset:
+            assert int(ids[y][x]) == mid and int(col[y][x]) == imp, \
+                f"mansion: {name} ({x},{y}) is not what ResetSwitch lays there"
+        ox, oy = origin[i]
+        for y in range(fh):
+            for x in range(fw):
+                mid, solid = int(ids[y][x]), bool(col[y][x])
+                if solid and (x, y) in press:
+                    mid, solid = press[(x, y)], False     # the switch opens it
+                    opened += 1
+                if (i, x, y) in doors:
+                    ch = "l"          # a staircase or a hole in the floor
+                else:
+                    ch = "Q" if solid else "q"
+                g[oy + y][ox + x] = ch
+                tiles[oy + y][ox + x] = rebase(mid)
+
+    # --- the frame --------------------------------------------------------
+    # Each floor's own outer ring is already solid, so what this closes is the
+    # composition's edge and the gutters between quadrants - which are ours,
+    # and are the one thing on this map that is not a copy.
+    for x in range(W):
+        for y in (0, H - 1):
+            g[y][x] = "Q"
+    for y in range(H):
+        for x in (0, W - 1):
+            g[y][x] = "Q"
+
+    seal_hidden(g, tiles, "Q")
+
+    # --- the staircases, as warp pairs on the shared grid ------------------
+    warps = []
+    for (fa, xa, ya), (fb, xb, yb) in MANSION_STAIRS:
+        ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
+        bx, by = origin[fb][0] + xb, origin[fb][1] + yb
+        assert g[ay][ax] == "l" and g[by][bx] == "l", \
+            f"mansion: the stair at ({ax},{ay})/({bx},{by}) is not on a landing"
+        warps.append([ax, ay, bx, by])
+
+    # --- you come in at the front door, and lose what it cannot reach -------
+    fd, fx, fy = MANSION_DOOR
+    spawn = (origin[fd][0] + fx, origin[fd][1] + fy)
+    assert g[spawn[1]][spawn[0]] not in SOLID, "mansion: the front door is a wall"
 
     hop = {}
     for ax, ay, bx, by in warps:
@@ -3505,10 +3798,14 @@ def cinderpeak():
     for y in range(H):
         for x in range(W):
             if g[y][x] not in SOLID and (x, y) not in seen:
-                g[y][x] = "M"                   # solid, and still its own tile
+                g[y][x] = "Q"            # solid, and still the tile it was
+
+    print("   mansion  the switch opens %d cells; %d of %d walkable reached"
+          % (opened, len(seen),
+             sum(1 for r in g for c in r if c not in SOLID) + 0))
 
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], GB, warps)
+            [i for row in tiles for i in row], PB, warps)
 
 
 if __name__ == "__main__":
