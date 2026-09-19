@@ -801,9 +801,15 @@ export function createEngine(canvas, onChange, mini = null) {
     const parcel = stepReward(state.steps, levelFromXp(state.xp));
     if (parcel) {
       give(parcel.items);
+      /* AND IT PAYS CASH, which is the one income here that does not need a
+         catch. `pay()` is not used: it cheers unconditionally, and an
+         ordinary parcel is deliberately quiet - the top bar's floating delta
+         is what shows this one. */
+      state.money += parcel.money;
       if (parcel.haul) {
         cheer({
           kind: "steps",
+          money: parcel.money,
           title: `${state.steps.toLocaleString()} STEPS`,
           /* A Master Ball is not "the long way round pays" - it is the one
              thing walking gives you that nothing else in the game will, so it
