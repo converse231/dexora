@@ -1758,6 +1758,75 @@ deliberately does NOT read through: cash tracks the species in hand, candy is a
 wage for catching. The two measuring different things is the design, and
 check.mjs pins both directions.
 
+**INCOME HAS TO BE RENEWABLE, AND TWO THIRDS OF THE EARLY GAME'S WAS NOT.**
+Reported from play at Lv 45 as money being hard to earn. Measured per
+encounter, averaged over each map's whole table, at the Haggle rank a trainer
+that far in would hold:
+
+| | sell | bounty | dex | balls | NET |
+|---|---|---|---|---|---|
+| Lv 5 Tall Grass, Poke | ¥61 | — | ¥103 | -¥38 | **+¥126** |
+| Lv 45 last map, Poke | ¥84 | — | ¥0 | -¥53 | **+¥31** |
+| Lv 45 last map, Ultra | ¥142 | — | ¥1 | -¥317 | **-¥146** |
+
+**THE GAP IS ENTIRELY THE DEX BONUS**, and that is the whole finding. Nothing
+was wrong with the late game that was not wrong with the early game's honesty
+about where its money came from: a flat ¥100 a species is two thirds of early
+income and it MUST end. When it does, the floor drops out.
+
+**AND MAKING IT BIGGER CANNOT FIX IT**, which cost a wrong first fix. `DEX_CLIMB`
+takes the payment from ¥100 to ¥1,000 as the dex fills - and measured it is
+still worth ¥0 an encounter at Lv 45, because the problem is the RATE and not
+the size. What is left to find late is the rarest fifth of every table and you
+almost never meet it. The first model missed this by treating the unmet share
+as a flat fraction of everything caught; **sorting the table by weight and
+leaving the commons out is what showed it.** The climb stays, on its own merit
+- the scarce find that got harder now pays ¥820 - but it is not the income.
+
+**SO THE INCOME IS `catchBounty`, AND THE OBVIOUS SHAPE FOR IT WAS DEAD CODE.**
+A multiplier inside `sellValue` is the first thing anyone writes and it pays
+exactly nothing: `keeper()` is enforced in the ENGINE on `sell` and `convert`
+both, so **a variant can never be sold at all**. It is cash at the moment of
+capture, on EVERY variant catch and not only the first of a kind - `newVariant`
+gates the banner, deliberately, because a second Holo Pikachu is not an
+occasion, and gating the money on it too would have made this one-off exactly
+like the bonus it replaces. About 1 in 18 encounters, for as long as you play.
+
+Derived from `TIER_ODDS` and the species' own band, never a table, so a ninth
+tier prices itself: x9 (Vivid) to x18 (Showdown) on `SELL[band]`. `VARIANT_PAY`
+18 is what flattens the curve - Lv 5 **+¥168**, Lv 25 **+¥126**, Lv 45
+**+¥129** - and each step of it is worth about ¥3 an encounter.
+
+**AND THE S BAND HAS A CEILING THE EVOLUTION DATA SETS.** `SELL.S` went ¥600 ->
+¥2,800 and check.mjs refused it: `happiny -> chansey` evolves at 16, so nine
+candy of commons buys a head that sells for the S band, and above **¥1,410**
+the sale buys back more candy than the evolution spent. Solved for over every
+evolution row rather than guessed at - `(spent + 2) * CANDY_PRICE + SELL.B`.
+Raising it again means raising `CANDY_PRICE` or reading `sellValue` through to
+the base form, and the second is deliberately not done.
+
+**THE BOUNTY MUST NOT BECOME THE ECONOMY**, and that is the assertion rather
+than the number: summed over a real table at the odds each tier rolls, it is
+**38%** of what an encounter pays, bounded at half. Past that, catching for
+money means waiting for a colour rather than playing. Verified by setting
+`VARIANT_PAY` to 40, which reads 58% and fails.
+
+**AND TWO FIGURES IN THE TEXTBOX IS A LAYOUT BUG.** Itemised, the Gotcha line
+is `+¥25200 showdown  +¥1000 new entry` - **78 characters on the longest name
+in the dex against the 59 the textbox was measured at**, and `.ballwrap.fighting`
+stops at `var(--tb-h)`, so a message that wraps past the `min-height` puts the
+ball rail back on top of itself. One total instead, which is **51** - shorter
+than what shipped. Nothing is lost: the nameplate carries the tier chip, a new
+variant raises its own banner, and the top bar floats the delta.
+
+**tools/play DRIVES THE PAYMENT, because nothing else can see it.**
+`catchBounty` is pure and check.mjs pins its shape, so the feature can be
+entirely correct and entirely disconnected - the symptom is a number that never
+moves. The same shape as the size roll: computed in one place, copied in
+another, silent if the copy is dropped. A real throw with the tier forced onto
+the encounter, both directions, verified by commenting out the one line that
+adds it.
+
 **The candy yield must never be flat.** Flat makes one map strictly best to
 grind and the other ten scenery. `CANDY` is tiered 1/2/4/8 and must stay
 FLATTER than `SELL` - if candy tracked cash, a common catch would be worthless

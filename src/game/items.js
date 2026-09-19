@@ -784,12 +784,110 @@ export function stepReward(steps, level) {
 }
 
 // What a duplicate fetches, by the rarity tier already stored on each species.
-export const SELL = { C: 40, B: 90, A: 220, S: 600 };
+/* WHAT A HEAD IS WORTH, AND THE TOP OF IT HAD STOPPED TRACKING THE DIFFICULTY.
 
-// Paid once per species, the first time you catch it. 151 x 100 over the game.
-export const DEX_BONUS = 100;
+   Reported from play at Lv 45 as money being hard to earn. Measured per
+   encounter, averaged over each map's whole table, with the Haggle rank a
+   trainer at that level would actually hold:
+
+                            sell   bounty   dex    balls     NET
+     Lv 5  Tall Grass       ¥ 61     ¥ 0   ¥103    -¥ 38   +¥126
+     Lv 45 last map, Poke   ¥ 84     ¥ 0   ¥  0    -¥ 53   +¥ 31
+     Lv 45 last map, Ultra  ¥142     ¥ 0   ¥  1    -¥317   -¥146   <- underwater
+
+   **THE GAP IS ENTIRELY THE DEX BONUS**, and that is the finding: two thirds
+   of early income is a stream that MUST end, so when it does the floor drops
+   out. Nothing was wrong with the late game that was not wrong with the early
+   game's honesty about where its money came from.
+
+   What a catch COSTS in balls - the median catch rate of every species that
+   actually spawns - is the column nobody had put beside this table before:
+
+     band    rate    Poke/catch    was    now
+     C        255    ¥   33        ¥ 40   ¥  40    the grind, untouched
+     B        150    ¥   53        ¥ 90   ¥  90    untouched
+     A         45    ¥  177        ¥220   ¥ 260    was thin
+     S          3    ¥2,509        ¥600   ¥1,400   was 4x under water
+
+   **THE S BAND HAS A CEILING AND THE EVOLUTION DATA SETS IT.** ¥2,800 was the
+   first pick and check.mjs refused it: `happiny -> chansey` evolves at 16, so
+   nine candy of commons buys a head that sells for the S band, and above
+   ¥1,410 the sale buys back more candy than the evolution spent. That is a
+   printer, and the bound is `(spent + 2) * CANDY_PRICE + SELL.B` - solved for
+   over every evolution row rather than guessed at. Raising S again means
+   raising `CANDY_PRICE` or reading `sellValue` through to the base form, and
+   the second is deliberately not done (see `candyValue`).
+
+   The commons did not move, because **the commons are the grind and the grind
+   was never the problem.** */
+export const SELL = { C: 40, B: 90, A: 260, S: 1400 };
 
 export const sellValue = (sp) => SELL[sp.tier] ?? SELL.C;
+
+/* A VARIANT PAYS A BOUNTY ON THE CATCH, AND IT HAS TO BE THE CATCH.
+
+   Asked for as "the variants rewards are greater", and the obvious shape - a
+   multiplier inside `sellValue` - is **dead code**, which is worth writing
+   down because it took a second look to see. `keeper()` is enforced in the
+   ENGINE on `sell` and `convert` both, so a variant can never be sold at all,
+   deliberately: they are the one thing no bulk action may take. A sale price
+   for something that cannot be sold pays exactly nothing.
+
+   So it is cash at the moment of capture, and that is the better answer
+   anyway. It is RENEWABLE where the dex bonus is not - about 1 in 18
+   encounters, for as long as you play - which is precisely the hole the late
+   game had: every other income here dries up or stays flat while the balls
+   get dearer.
+
+   DERIVED FROM THE LADDER, never a table: `VARIANT_PAY` scaled by how much
+   rarer this tier is than the kindest, so a ninth tier prices itself and
+   retuning `TIER_ODDS` carries the money with it. The ladder is 2.0x wide, so
+   the spread is x9 to x18 on the species' own BAND - a Vivid common is ¥360
+   and a Showdown legendary is ¥50,400, which is the jackpot and is meant to
+   be: at 1 in 210 on top of 1 in 3,760 it is one encounter in 790,000.
+
+   18 IS MEASURED, not picked. It is the value that flattens the whole curve -
+   see the table above `SELL` - and each step of it is worth about ¥3 an
+   encounter, so it is the coarse lever for how much of late income comes from
+   luck rather than from volume. */
+export const VARIANT_PAY = 18;
+
+const KINDEST = Math.max(...TIER_ODDS.map(([, o]) => 1 / o));
+export const variantPay = (variant) => {
+  const row = TIER_ODDS.find(([t]) => t === variant);
+  return row ? VARIANT_PAY * ((1 / row[1]) / KINDEST) : 0;
+};
+
+/* What catching THIS one pays, over and above the dex entry. Zero for an
+   ordinary catch - the wage for those is selling the spare, which is what the
+   whole `SELL` table is - so this adds an income stream rather than inflating
+   the one that already exists. */
+export const catchBounty = (sp, variant) =>
+  Math.round((SELL[sp.tier] ?? SELL.C) * variantPay(variant));
+
+/* PAID ONCE PER SPECIES, AND IT USED TO BE FLAT.
+
+   ¥100 whether it was your ninth new species or your nine-hundredth - and the
+   nine-hundredth is enormously harder to find, which is precisely the
+   complaint: *"I caught many pokemon now and new pokemon is getting a bit
+   scarce"*. So it CLIMBS with how much of the dex is already done: the first
+   is ¥100 and the last is `1 + DEX_CLIMB` times that.
+
+   **IT IS NOT THE INCOME FIX, and the first version of this comment claimed
+   it was.** Measured, it is worth ¥103 an encounter at 3% of the dex and ¥0
+   at 80% - because what is left to find late is the RAREST fifth of every
+   table, and you almost never meet it. Making the payment bigger cannot fix a
+   stream whose problem is its RATE. The first model missed this by treating
+   the unmet share as a flat fraction of everything caught; sorting the table
+   by weight and leaving the commons out is what showed it.
+
+   What it does buy is worth having on its own terms: the scarce late find
+   pays ¥820 instead of ¥100, so the thing that got harder got better. The
+   income that actually holds up is `catchBounty`, which is renewable. */
+export const DEX_BONUS = 100;
+export const DEX_CLIMB = 9;
+export const dexBonus = (caught, total) =>
+  Math.round(DEX_BONUS * (1 + DEX_CLIMB * Math.min(1, (caught ?? 0) / (total || 1))));
 
 /* THE OTHER THING A DUPLICATE IS WORTH.
 

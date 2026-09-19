@@ -180,7 +180,8 @@ console.log("phase machine ok — all paths terminate, shakes match the roll");
 import {
   BALLS, SHOP_BALLS, SHOP_ITEMS, STONES, KEY_ITEMS, forSale, bestRod,
   ballById, itemById, sellValue, SELL, duplicateUids, startingState, ALL_ITEMS,
-  DEX_BONUS, levelReward, MASTER_EVERY, evolutionsOf, evolutionRow, evoLevel, evoNext,
+  DEX_BONUS, DEX_CLIMB, dexBonus, catchBounty, variantPay, VARIANT_PAY,
+  levelReward, MASTER_EVERY, evolutionsOf, evolutionRow, evoLevel, evoNext,
   evolveState, stoneFor, keeper, CANDY, candyValue, CANDY_PRICE,
   SYNTH_MIN, SYNTH_STEP,
   stepReward, STEP_PARCEL, STEP_HAUL, STEP_TREASURE,
@@ -227,8 +228,71 @@ const r = ballsPerCatch(rare.rate, ultra);
 const rareProfit = sellValue(rare) - r.balls * ultra.price;
 assert.ok(rareProfit < 0,
   `rares must cost more than they sell for, got ${rareProfit.toFixed(0)}`);
+let ECON_SHARE = 0;
 assert.ok(sellValue(rare) > sellValue(common), "rarer sells for more");
-assert.ok(DEX_BONUS > sellValue(common), "a new species beats another duplicate");
+assert.ok(dexBonus(0, 1000) > sellValue(common), "a new species beats another duplicate");
+
+/* THE BOUNTY IS DERIVED FROM THE LADDER, and the point of saying so here is
+   that a ninth tier must price ITSELF. A table would need an edit on the day,
+   which is the failure `LEGENDARY` had as 34 hand-written dex numbers and
+   `Cheer.jsx` had as a four-row `KIND`. */
+for (const t of TIERS)
+  assert.ok(variantPay(t) > 0, `"${t}" has no bounty - variantPay is a table again`);
+assert.equal(variantPay(null), 0, "an ordinary catch was given a variant multiple");
+assert.equal(catchBounty(common, null), 0,
+  "an ordinary catch pays a bounty - that inflates the grind, not the late game");
+
+/* RARER PAYS MORE, weakly, because Origin and Holo share odds exactly and
+   asserting a strict order between two equal tiers is a test that fails on a
+   reordering that changed nothing. The same shape as the TIER_ODDS ladder
+   check, for the same reason. */
+{
+  const byOdds = [...TIER_ODDS].sort((a, b) => a[1] - b[1]);   // rarest first
+  for (let i = 1; i < byOdds.length; i++)
+    assert.ok(variantPay(byOdds[i - 1][0]) >= variantPay(byOdds[i][0]),
+      `${byOdds[i - 1][0]} is rarer than ${byOdds[i][0]} and pays less`);
+  assert.ok(catchBounty(rare, byOdds[0][0]) > catchBounty(common, byOdds[0][0]),
+    "the same tier pays the same on a common as on a rare - the band is ignored");
+}
+
+/* AND THE BOUNTY MUST NOT BECOME THE ECONOMY. It is renewable where selling
+   is volume, which is exactly why it is the late-game fix - and exactly why
+   it runs away if `VARIANT_PAY` is nudged without measuring. Summed over a
+   real table at the odds each tier actually rolls, against what the same
+   encounters sell for. Half is the bound: past that, catching for money
+   means waiting for a colour rather than playing. */
+{
+  const table = encounterTable(BIOMES[BIOMES.length - 1], MAX_LEVEL);
+  const total = table.reduce((n, r) => n + r[1], 0);
+  let bounty = 0, cash = 0;
+  for (const [id, w] of table) {
+    const sp = speciesById(id);
+    if (!sp) continue;
+    const share = w / total;
+    cash += share * sellValue(sp);
+    const locked = lockedTiers(id) ?? new Set();
+    for (const [t, odds] of TIER_ODDS)
+      if (!locked.has(t)) bounty += share * odds * catchBounty(sp, t);
+  }
+  const part = bounty / (bounty + cash);
+  assert.ok(part < 0.5,
+    `variant bounties are ${(part * 100).toFixed(0)}% of what an encounter pays ` +
+    `(VARIANT_PAY ${VARIANT_PAY}) - selling has stopped being the economy`);
+  ECON_SHARE = part;
+}
+
+/* THE DEX BONUS CLIMBS, and it is the ONE thing here that must not be relied
+   on for income: measured, it is worth ¥103 an encounter on a fresh save and
+   ¥0 late, because what is left to find late is the rarest fifth of every
+   table. The assertion is the relationship, never the two numbers - what it
+   exists to catch is somebody flattening the curve back out. */
+assert.equal(dexBonus(0, 1000), DEX_BONUS, "the first new species stopped paying the base");
+assert.equal(dexBonus(1000, 1000), DEX_BONUS * (1 + DEX_CLIMB),
+  "a finished dex does not pay the full climb");
+assert.ok(dexBonus(900, 1000) > dexBonus(100, 1000) * 2,
+  "the climb is too shallow to notice - a scarce late find must be worth finding");
+assert.equal(dexBonus(2000, 1000), dexBonus(1000, 1000),
+  "a save holding more than the dex ran the climb past its end");
 
 /* THE PLAIN LADDER has to be worth its price: strictly better, strictly
    dearer. Only the unconditional balls - a situational one is deliberately
@@ -653,7 +717,9 @@ const start = startingState();
 assert.ok(start.bag["poke-ball"] > 0, "you start able to throw something");
 assert.ok(start.money >= 0, "you do not start in debt");
 
-console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, rare costs ${rareProfit.toFixed(0)}`);
+console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
+  `rare costs ${rareProfit.toFixed(0)}, ` +
+  `variant bounties ${(ECON_SHARE * 100).toFixed(0)}% of a late encounter`);
 
 // --- evolution ------------------------------------------------------------
 /* Evolution is the only way to reach the species that never spawn, and the bill
