@@ -2868,6 +2868,26 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   assert.ok(stepWage(MAX_LEVEL) < ballById("master-ball").price,
     "one parcel pays for a Master Ball - the wage is priced against a ball " +
     "that cannot fail");
+
+  /* AND BOTH SIDES STILL CALL IT. The engine grants the parcel in `onArrive`
+     and the top bar floats the `+N` over the STEPS counter, on the same step
+     count through the same pure function - which is the only reason the two
+     cannot disagree.
+
+     **AN IMPORT IS NOT A CALL, AND THAT IS EXACTLY HOW THIS WENT MISSING.**
+     `App.jsx` imported `stepReward` and had stopped calling it, so `TopBar`
+     went on taking a `parcel` prop that nothing ever passed: walking paid,
+     silently, and the readout CLAUDE.md describes had simply gone. Nothing
+     failed - a prop that is always `undefined` renders as nothing at all.
+     So the pattern is `stepReward(`, with the bracket, because the version of
+     this written as `includes("stepReward")` would have passed the whole
+     time. Verified by deleting the call. */
+  for (const f of ["src/App.jsx", "src/game/engine.js"]) {
+    const src = stripComments(readFileSync(new URL(`../${f}`, import.meta.url), "utf8"));
+    assert.ok(/\bstepReward\s*\(/.test(src),
+      `${f} imports stepReward but never calls it - the grant and the readout ` +
+      "have stopped being one function, and neither fails when they disagree");
+  }
   /* Master Balls are deliberately left OUT of `worth`: they have no price, and
      pricing the unpriceable is how a budget check starts approving them. They
      are counted instead.

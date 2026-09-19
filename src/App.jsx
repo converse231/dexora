@@ -300,6 +300,38 @@ export default function App({
     return () => clearTimeout(t);
   }, [money]);
 
+  /* AND THE PARCEL FLOATS OVER THE STEPS COUNTER, which `TopBar` has taken a
+     prop for since it was written - nothing ever passed one. `stepReward` was
+     imported here and never called: the import is what CLAUDE.md's "the top
+     bar calls the same function on the same step count" was describing, and
+     the call had gone.
+
+     SAME FUNCTION, SAME STEP COUNT, so the balls granted in `onArrive` and the
+     `+N` drawn here cannot disagree - there is no number passed between them.
+     It returns null on every step that is not a parcel boundary, which is the
+     whole condition.
+
+     The CASH half needs nothing: the wage moves `state.money`, so the effect
+     above already floats it over the counter it belongs to. One reward, two
+     counters, each announcing its own kind.
+
+     THE TIMER IS A REF AND THE EFFECT RETURNS NO CLEANUP, which is not a slip
+     - it is the bug this file already paid for one effect up. Returning
+     `clearTimeout` here would cancel the parcel's own removal on the very
+     next STEP, and a step always follows a parcel immediately, so the label
+     would stick on the counter for the rest of the session. */
+  const steps = st?.steps ?? 0;
+  const [parcel, setParcel] = useState(null);
+  const parcelTimer = useRef(null);
+  useEffect(() => {
+    const won = steps ? stepReward(steps, levelFromXp(st?.xp ?? 0)) : null;
+    if (!won) return;
+    clearTimeout(parcelTimer.current);
+    setParcel(won);
+    parcelTimer.current = setTimeout(() => setParcel(null), LIFE);
+  }, [steps]);
+  useEffect(() => () => clearTimeout(parcelTimer.current), []);
+
   const caught = st ? st.dex.filter((v) => v === 2).length : 0;
   const level = levelFromXp(st?.xp ?? 0);
 
@@ -427,7 +459,8 @@ export default function App({
         caught={caught}
         total={st?.caught ?? 0}
         stale={st?.stale ?? null}
-        steps={st?.steps ?? 0}
+        steps={steps}
+        parcel={parcel}
         money={st?.money ?? 0}
         candy={st?.candy ?? 0}
         deltas={deltas}

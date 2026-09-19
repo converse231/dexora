@@ -1894,6 +1894,34 @@ relationally: walking must never out-earn the encounters the walking is for
 every step carries the 7% encounter roll, so there is no way to collect the
 wage without playing.
 
+**AND THE READOUT THIS FILE DESCRIBES HAD GONE.** *"The engine grants the balls
+in `onArrive`; the top bar calls the same function on the same step count to
+float the `+N`"* - true when it was written, and `App.jsx` had stopped calling
+it. The import was still there, `TopBar` still took a `parcel` prop and still
+rendered `parcelLabel` from it, and **nothing ever passed one**: a prop that is
+always `undefined` renders as nothing at all, so walking paid in silence with no
+error anywhere. Found by grepping the import, not by anything failing.
+
+**AN IMPORT IS NOT A CALL**, and that is the assertion: `/\bstepReward\s*\(/`
+over `App.jsx` and `engine.js` with comments stripped, because the obvious
+`src.includes("stepReward")` - which is the shape the ball-order rule three
+suites up uses - would have passed the whole time. Verified by deleting the
+call.
+
+**ONE REWARD, TWO COUNTERS, EACH ANNOUNCING ITS OWN KIND.** The parcel's balls
+float over STEPS and the wage floats over CASH - and the cash half needed no
+code, because the money delta already watches `state.money`. A parcel reads
+`+3 balls` and `+¥500`; the haul reads `+9 balls` and `+¥1500` and keeps its
+banner.
+
+**THE TIMER IS A REF AND THE EFFECT RETURNS NO CLEANUP.** Not a slip - it is
+the bug recorded two paragraphs above under the money delta, met from the
+other side. `return () => clearTimeout(t)` would cancel the parcel's own
+removal on the very next STEP, and a step always follows a parcel
+immediately, so the label would stick on the counter for the rest of the
+session. The money delta needs its cleanup because it holds a LIST; this holds
+one value and replaces it.
+
 **tools/play SETS THE STEPS RATHER THAN WALKING THEM.** Crossing a parcel
 boundary by walking 250 tiles is a coin toss with a near-certain loss - the
 7% roll stops the leg - so `state.steps` goes one short and ONE real step is
