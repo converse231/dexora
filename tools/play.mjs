@@ -1378,6 +1378,86 @@ function until(e, what, label, max = 2000) {
     ", refused without it, ashore always allowed, no casting afloat");
 }
 
+{
+  /* A LEDGE IS ONE-WAY, AND WHICH WAY IS THE CHARACTER'S - ridden, because
+     nothing else can see `tryStep` reading the face backwards. check.mjs pins
+     the two LEDGE tables to each other and the generator holds every map to
+     them, so with the engine hopping the wrong axis all of that goes on
+     passing: the data is right and the game is wrong.
+
+     Cinderpeak is Route 112, whose 38 east hops are what `J` was added for.
+     They were laid as FLOOR before that - a terrace wall you could walk back
+     up, which is not a ledge - and reported from play with the four vertical
+     runs circled. */
+  const { AREAS } = await import("../src/game/mapdata.js");
+  const { LEDGE, walkable } = await import("../src/game/map.js");
+  const { LEVEL_XP } = await import("../src/game/biomes.js");
+
+  const DIR = { "1,0": ["right", "left"], "0,1": ["down", "up"] };
+
+  /* FOUND, NEVER TYPED: a coordinate in a generated map is a coordinate that
+     moves the next time the map is generated. Any ledge with ground on both
+     the approach and the landing will do. */
+  function ledges(areaId) {
+    const rows = AREAS[areaId].rows;
+    const out = [];
+    for (let y = 1; y < rows.length - 1; y++) {
+      for (let x = 1; x < rows[y].length - 1; x++) {
+        const face = LEDGE[rows[y][x]];
+        if (!face) continue;
+        const [dx, dy] = face;
+        if (!walkable(rows, x - dx, y - dy) || !walkable(rows, x + dx, y + dy)) continue;
+        out.push({ ch: rows[y][x], x, y, dx, dy });
+      }
+    }
+    return out;
+  }
+
+  let rode = 0;
+  const kinds = new Set();
+  for (const areaId of Object.keys(AREAS)) {
+    for (const L of ledges(areaId)) {
+      if (kinds.has(areaId + L.ch)) continue;      // one of each per map is the rule
+      kinds.add(areaId + L.ch);
+      const [into, back] = DIR[`${L.dx},${L.dy}`];
+      assert.ok(into, `no direction for a ledge facing ${L.dx},${L.dy}`);
+      const at = (x, y) => ({
+        ...SAVE, areaId, xp: LEVEL_XP[24],
+        bag: { "poke-ball": 5 },
+        player: { x, y, dir: into },
+        /* UNDER A REPEL, BECAUSE THIS TEST WALKS - the same trap the surf test
+           records. A 7% encounter per step stops movement, and a hop that
+           never happened reads exactly like a hop that was refused. */
+        field: { repel: { id: "max-repel", steps: 9999 } },
+      });
+
+      // DOWN THE FACE: one press clears the ledge and lands two tiles on.
+      {
+        const { e } = boot(at(L.x - L.dx, L.y - L.dy));
+        e.press(into); for (let i = 0; i < 40; i++) tick(16); e.clearHeld();
+        assert.deepEqual([e.state.player.x, e.state.player.y],
+          [L.x + L.dx, L.y + L.dy],
+          `${areaId}: walking ${into} into the "${L.ch}" at ${L.x},${L.y} did not hop it`);
+      }
+      // AND NOT BACK UP IT, which is the whole point of a ledge.
+      {
+        const { e } = boot(at(L.x + L.dx, L.y + L.dy));
+        e.press(back); for (let i = 0; i < 40; i++) tick(16); e.clearHeld();
+        assert.deepEqual([e.state.player.x, e.state.player.y],
+          [L.x + L.dx, L.y + L.dy],
+          `${areaId}: the "${L.ch}" at ${L.x},${L.y} can be climbed going ${back}`);
+      }
+      rode += 1;
+    }
+  }
+
+  assert.ok(kinds.size >= Object.keys(LEDGE).length,
+    `only ${kinds.size} ledge kinds ridden, and LEDGE declares ${Object.keys(LEDGE).length} - ` +
+    "a character no map uses is a direction nothing tests");
+  console.log(`ledges ok — ${rode} ridden, each one-way, ` +
+    `${Object.keys(LEDGE).map((c) => c + ":" + LEDGE[c]).join(" ")}`);
+}
+
 /* THE LADDERS, DRIVEN. Mt Moon is the first area with more than one floor, and
    the warp is the only new thing in the step handler since Surf - so it gets
    the same treatment: a real engine, a held key, and the assertion on where the

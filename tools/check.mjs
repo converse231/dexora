@@ -1745,7 +1745,7 @@ import {
   LEVEL_XP, MAX_LEVEL, xpForCatch,
   LEGENDARY, LEGEND_MATCHED, LEGEND_STRAY, GEN_LAST, genOf,
 } from "../src/game/biomes.js";
-import { AREAS, AREA_IDS, SOLID, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
+import { AREAS, AREA_IDS, SOLID, LEDGE, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
 import {
   encounterTable, evoScale, evoUnlock, bornLevel, areaOpen, foundIn,
   MAP_FIRST, MAP_LAST,
@@ -1798,18 +1798,23 @@ for (const b of BIOMES) {
     seen.add(key);
     if (hop.has(key)) stack.push(hop.get(key));
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      // Walking south into a ledge hops it and lands you on the far side.
-      const over = dy === 1 && rows[y + dy]?.[x + dx] === "L";
-      stack.push([x + dx, y + dy + (over ? 1 : 0)]);
+      /* Walking into a ledge ALONG ITS OWN DIRECTION hops it and lands you on
+         the far side - `L` going south, `J` going east. From any other side it
+         is a wall, which `walkable` already reports. */
+      const face = LEDGE[rows[y + dy]?.[x + dx]];
+      const over = !!face && face[0] === dx && face[1] === dy;
+      stack.push([x + dx * (over ? 2 : 1), y + dy * (over ? 2 : 1)]);
     }
   }
   /* Ledges are one-way, so they are the one thing on a map that can strand you.
      The generator checks the map it draws; this checks the map that shipped. */
   for (let y = 0; y < rows.length; y++) {
     for (let x = 0; x < W; x++) {
-      if (rows[y][x] !== "L") continue;
+      const face = LEDGE[rows[y][x]];
+      if (!face) continue;
+      const [dx, dy] = face;
       assert.ok(!walkable(rows, x, y), `${b.id}: ledge at ${x},${y} must be solid`);
-      assert.ok(walkable(rows, x, y + 1),
+      assert.ok(walkable(rows, x + dx, y + dy),
         `${b.id}: ledge at ${x},${y} has nothing to land on`);
       /* AN APPROACH IS A RULE FOR A LEDGE WE PLACED. A copied one can run out
          under the treeline - four of the Safari Zone's thirty-six do, the tail
@@ -1817,7 +1822,7 @@ for (const b of BIOMES) {
          than a trap: nobody can stand above them, so nobody hops them, and the
          rest of the run works. The LANDING above stays unconditional, because
          a ledge with nothing under it is a hop into a wall. */
-      assert.ok(area.tiles || walkable(rows, x, y - 1),
+      assert.ok(area.tiles || walkable(rows, x - dx, y - dy),
         `${b.id}: ledge at ${x},${y} cannot be reached from above`);
     }
   }
@@ -2050,6 +2055,10 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     ridge: () => route.cave.floor - 1,        // Mt Moon: cave local 1 is the floor
     safari: () => route.safari.general,       // Emerald's General, not FireRed's
     cinder: () => route.safari.general,       // the same primary, and lavaridge
+    // The first map drawn against a pokefirered primary that is not
+    // General, so its base is that primary's own block rather than a
+    // secondary's - 748 of its metatiles are `building` ids.
+    mansion: () => route.mansion.building,
   };
   /* The ceiling is the highest id the atlas actually hands out, read off the
      manifest rather than named. It used to be `forest.fringeTop` because that
@@ -2839,6 +2848,29 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      `SOLID` still lists a couple the maps have grown out of. */
   const used = new Set();
   for (const id of AREA_IDS) for (const row of areaOf(id).rows) for (const ch of row) used.add(ch);
+
+  /* AND THE GENERATOR AGREES ABOUT WHICH WAY A LEDGE FACES. `LEDGE` is in
+     map.js and in build_map.py, exactly as `SOLID` is, and the two decide
+     different things with it: the generator decides whether a map SHIPS with
+     a terrace nobody can leave, the engine decides whether you can leave it.
+     Disagree and the build passes a map the game traps you on - silently,
+     because both halves are individually correct.
+
+     Read out of the source rather than imported, since Python is not. */
+  {
+    const py = readFileSync(new URL("./build_map.py", import.meta.url), "utf8");
+    const row = py.match(/^LEDGE = \{(.*)\}$/m);
+    assert.ok(row, "build_map.py has no LEDGE table");
+    const theirs = {};
+    for (const m of row[1].matchAll(/"(.)": \((-?\d+), (-?\d+)\)/g))
+      theirs[m[1]] = [Number(m[2]), Number(m[3])];
+    assert.deepEqual(theirs, LEDGE,
+      `the two LEDGE tables disagree: build_map.py ${JSON.stringify(theirs)} ` +
+      `against map.js ${JSON.stringify(LEDGE)}`);
+    for (const ch of Object.keys(LEDGE))
+      assert.ok(SOLID.includes(ch),
+        `ledge "${ch}" is not in SOLID - it would be ordinary ground from every side`);
+  }
 
   const uncoloured = [...used].filter((ch) => !(ch in MINI)).sort();
   assert.equal(uncoloured.length, 0,

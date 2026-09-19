@@ -98,7 +98,16 @@ NUM_PRIMARY_TILES = 640
 # to grey. Checked against layouts.json rather than assumed.
 SECONDARY = [("mt_ember", "general"), ("seafoam_islands", "general"),
              ("power_plant", "building"), ("pokemon_tower", "building"),
-             ("cave", "general"), ("viridian_forest", "general")]
+             ("cave", "general"), ("viridian_forest", "general"),
+             ("pokemon_mansion", "building")]
+
+# FireRed PRIMARIES we bake WHOLE, for the same reason `EM_PRIMARY` exists one
+# decomp over: ids 0-639 in this atlas are `gTileset_General`, and a map drawn
+# against a different primary reaches its metatiles directly. The Pokemon
+# Mansion is the first map here that has needed it - **748 of its 4,973
+# metatiles are primary** - and left alone every one of them would have drawn
+# grass, trees or sand inside a burnt-out house.
+FR_PRIMARY = ["building"]
 
 # FireRed has no molten tile anywhere. Mt Ember's Ruby Path is dry rock, and the
 # gold that a colour sweep finds in the Sevii set is the Ember Spa's water, not
@@ -282,6 +291,22 @@ def load_secondary(name, prim_tiles, prim_pals):
     return mt, tiles, pals
 
 
+def load_primary(prim):
+    """A pokefirered PRIMARY tileset's own metatiles, tiles and palettes.
+
+    `load_secondary` resolves a secondary AGAINST its primary; this is the
+    other half, and it is simpler: a primary metatile only ever reaches its own
+    tiles and palettes 0-6, so there is nothing to stack and nothing to splice.
+    The pokeemerald twin is `load_emerald_primary`."""
+    rel = f"data/tilesets/primary/{prim}"
+    tiles = cut_tiles(Image.open(fetch(f"{rel}/tiles.png", f"pri/{prim}/tiles.png")))
+    pals = load_pals(rel, f"pri/{prim}/palettes")
+    mt = np.frombuffer(io.open(fetch(f"{rel}/metatiles.bin",
+                                     f"pri/{prim}/metatiles.bin"), "rb").read(),
+                       dtype="<u2").reshape(-1, 8)
+    return mt, tiles, pals
+
+
 # --------------------------------------------------------------- map tileset
 
 def build_tileset():
@@ -401,6 +426,20 @@ def build_tileset():
         sets[name] = base
         print("  %-18s %3d metatiles at base %d  (pokeemerald, on %s)"
               % (name, len(smt), base, prim))
+
+    for prim in FR_PRIMARY:
+        pmt, ptiles, ppals = load_primary(prim)
+        base = (atlas.shape[0] // 16) * cols
+        atlas = append_rows(atlas, render_metatiles(pmt, ptiles, ppals, cols))
+        sheet_top, hides_here = overhang_sheet(
+            pmt, ptiles, ppals, cols,
+            layer_types(f"data/tilesets/primary/{prim}", len(pmt),
+                        f"pri/{prim}/attr.bin"))
+        top = append_rows(top, sheet_top)
+        hiding_ids += [base + i for i in hides_here]
+        sets["fr_" + prim] = base
+        print("  fr_%-15s %3d metatiles at base %d  (pokefirered primary)"
+              % (prim, len(pmt), base))
 
     for prim in EM_PRIMARY:
         pmt, ptiles, ppals = load_emerald_primary(prim)
@@ -903,6 +942,15 @@ def build_tileset():
         # here for the Safari Zone and `lavaridge` for Ember Caldera, and
         # Route 112 reaches local 440 of the 441 lavaridge ships.
         "cinder": {"floor": sets["lavaridge"] + 113},   # metatile 625
+        # THE MANSION NEEDS BOTH HALVES OF ITS PAIRING, because it is the
+        # first map here drawn against a pokefirered primary that is not
+        # General: 748 of its metatiles are `building` ids and 4,225 are
+        # `pokemon_mansion` ones, so a transcription rebases each against its
+        # own block. `floor` is METATILE_PokemonMansion_Floor (644) - the tile
+        # the switch script itself lays wherever it opens a barrier.
+        "mansion": {"building": sets["fr_building"],
+                    "mansion": sets["pokemon_mansion"],
+                    "floor": sets["pokemon_mansion"] + 4},
         "safari": {"general": sets["em_general"], "lilycove": sets["lilycove"],
                    "split": 512,          # NUM_METATILES_IN_PRIMARY, Emerald's
                    "floor": sets["em_general"] + 1},   # its plain grass
@@ -1119,6 +1167,9 @@ def build_ground():
         # The ash-covered mountain ground, which is also both layouts' own
         # border block - the one tile Route 112 and Mt Chimney agree on.
         "cinder": meta["cinder"]["floor"],
+        # The mansion's own parquet, which is also what its switch script
+        # lays down wherever it opens a barrier.
+        "mansion": meta["mansion"]["floor"],
     }
     # The fallback an area with no tile of its own lands on, and what the CSS
     # default points at.

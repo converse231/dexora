@@ -222,7 +222,8 @@ export const LEGENDARY = SPECIES
 const LEGEND_SET = new Set(LEGENDARY);
 export const isLegendary = (id) => LEGEND_SET.has(id);
 
-export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower"]);
+export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower",
+                                 "mansion"]);
 
 /* Shiny odds, per encounter. The real games use 1 in 8192, and 1 in 4096 since
    Gen 6; this is deliberately kinder than either. At a 7% encounter rate a full
@@ -921,6 +922,52 @@ const RESIDENTS = [
     table: [
       [86, 22], [90, 18], [87, 12], [124, 10], [91, 8], [131, 5],
       [134, 3],
+    ],
+  },
+  {
+    id: "mansion",
+    level: 19,  // a rung of its own between the ice and the tower
+    name: "Pokemon Mansion",
+    /* POISON IS THE POINT, and it is the one type only Deep Woods had - there
+       as a bug-and-grass footnote rather than as a map's identity. Cinnabar's
+       burnt-out house is where the sludge lives, and that is what makes a
+       fourth late map worth walking rather than a bigger Frost Hollow.
+
+       THREE TYPES AND NOT FOUR. Psychic was the tempting one - this is the
+       building Mewtwo was made in, and the diary on B1F is the whole reason
+       anybody remembers the place - but `types` is not flavour: `legendsFor`
+       reads it to decide whose HOME a map is, and claiming psychic would hand
+       Mewtwo a second home on the strength of a story rather than a roster.
+       Nothing psychic lives here. The Tower keeps him. */
+    types: ["poison", "fire", "normal"],
+    /* THE FIRST TABLE IN THE GAME WITH A RESIDENT FROM OUTSIDE KANTO, and it
+       had to be. The Mansion's own roster is Koffing, Grimer, Rattata,
+       Raticate, Muk, Weezing, Ditto and Magmar - Kanto to a species, like
+       every other hand-written row here - and written that way it measured
+       **Gen 1 at 63% against a fair 25%**, six times any other map's skew.
+
+       The cause is not the weights, and a sweep proved it: pushing them about
+       took 152% off-fair down to 106% and no further. `balance` pins each
+       rarity band to the share these rows freeze, so a band the hand-written
+       rows DOMINATE is a band Kanto owns outright - and this map's B band was
+       58% of the table, five Kanto species in it against four from everywhere
+       else. Measured at Lv 24: Kanto held 99% of B. The Power Plant gets away
+       with a B band of 64% because only 34% of it is Kanto.
+
+       So the lever is a resident that is NOT Kanto, in that band - and one is
+       worth more than any reweighting: Slugma alone took 152% -> 12%. With
+       Gulpin and Torkoal beside it the map measures 4% off fair, level with
+       the Power Plant and Tall Grass. All three are fire or poison, all three
+       belong in a burnt-out house, and all three open (Lv 10 and 15) before
+       the Mansion does at 19, so they are there for every level it can be
+       walked. Ekans is Kanto and joined for the same shape reason - the C band
+       needed weight, and a snake in a ruin costs nothing to believe.
+
+       Ditto is the one to protect: this and Tall Grass are its only homes, and
+       check.mjs's gettable sweep is the only thing that would say so. */
+    table: [
+      [109, 22], [19, 16], [88, 16], [316, 10], [20, 9], [110, 9], [23, 9],
+      [89, 8], [218, 8], [126, 6], [324, 6], [132, 4], [58, 2], [37, 2],
     ],
   },
   {
