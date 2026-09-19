@@ -583,8 +583,22 @@ function until(e, what, label, max = 2000) {
      they are opposites on purpose: both at once is two bags disagreeing, and
      neither is a phone with no way to reach a berry. Gated on the POINTER and
      never on width, the rule `.pad` already follows. */
-  const railGate = css.slice(css.indexOf(".ballwrap {"));
-  assert.ok(railGate.slice(0, 900).includes("@media (hover: none) and (pointer: coarse)"),
+  /* ASKED OF THE RULE, NOT OF THE DISTANCE. This used to slice 900 characters
+     after `.ballwrap {` and look for the media query inside them - which is a
+     magic distance, and it broke the day `.ballwrap` grew a sibling rule with
+     a comment on it. The gate was still there and still correct; the window
+     was what was wrong. It reads every coarse-pointer block now and asks
+     whether any of them hides the rail, which is the thing actually meant. */
+  const coarse = [...css.matchAll(/@media \(hover: none\) and \(pointer: coarse\)\s*\{/g)]
+    .map((m) => {
+      let depth = 0, i = m.index + m[0].length - 1;
+      for (; i < css.length; i++) {
+        if (css[i] === "{") depth++;
+        else if (css[i] === "}" && --depth === 0) break;
+      }
+      return css.slice(m.index, i);
+    });
+  assert.ok(coarse.some((b) => /\.ballwrap\s*\{[^}]*display:\s*none/.test(b)),
     "the ball rail is no longer hidden on touch - it will sit on top of the map");
   assert.ok(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.bagsheet \{ display: none/.test(css),
     "the touch bag sheet is no longer hidden on a desktop");

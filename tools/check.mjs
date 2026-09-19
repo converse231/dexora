@@ -4455,6 +4455,41 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `that is the copy that shipped a banner saying POKEDEX over a Showdown`);
   }
 
+  /* THE RAIL AND THE TEXTBOX SHARE ONE NUMBER, OR THEY OVERLAP.
+
+     The rail moved to the bottom right and `.ballwrap` is `inset: 0` of the
+     viewport - so in an encounter its bottom was the bottom of the BATTLE,
+     which is the textbox, and the rail sat on top of "A WILD PUMPKABOO
+     APPEARED". Reported with a screenshot.
+
+     `--tb-h` is declared once on `.viewport` and read twice: the textbox sizes
+     itself from it and the wrap stops its box there. The failure this guards
+     is either of them going back to a literal, which is the shape that already
+     cost this repo the clock printing on top of the effect card - a typed
+     offset for a card that was 31px tall when it was written.
+
+     Measured before it was believed, at 960 / 620 / 460 / 380 / 340 wide and
+     with the longest message the box prints: the textbox holds at 16.2-16.4%
+     of the viewport at EVERY width, so `min-height` is always what decides it
+     and the content never pushes past. Clearance 23 / 15 / 11 / 8 / 7px. */
+  {
+    const vp = /\.viewport\s*\{([^}]*)\}/.exec(clean);
+    assert.ok(vp && /--tb-h:\s*\d/.test(vp[1]),
+      "`--tb-h` is not declared on .viewport - it has to be the common " +
+      "ancestor, because .ballwrap is a SIBLING of .battle and a custom " +
+      "property only inherits downwards");
+    for (const [name, sel, prop] of [
+      [".textbox", "\\.textbox", "min-height"],
+      [".ballwrap.fighting", "\\.ballwrap\\.fighting", "bottom"],
+    ]) {
+      const rule = new RegExp(`${sel}\\s*\\{([^}]*)\\}`).exec(clean);
+      assert.ok(rule, `no rule for ${name}`);
+      assert.ok(new RegExp(`${prop}:\\s*var\\(--tb-h\\)`).test(rule[1]),
+        `${name} sets ${prop} to something other than var(--tb-h) - the two ` +
+        "have to move together or the rail lands on the textbox again");
+    }
+  }
+
   console.log("variant layers ok — the sheet portrait is sized to its art, so " +
     `every tier's layer fits it by construction; no tier animates its own ` +
     `!important property; ${TIERS.length} tiers each have one shared sentence`);
