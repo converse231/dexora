@@ -2002,6 +2002,32 @@ for (const b of BIOMES) {
     assert.ok(Math.abs(share - want) < 1e-9,
       `${b.id} at Lv ${lv}: legendaries are ${(share * 100).toFixed(2)}% of finds ` +
       `over ${open} open, not the ${(want * 100).toFixed(2)}% the per-head rule asks`);
+
+    /* AND A COSTUME PIKACHU IS WORTH A LEGENDARY, which is the rule the rate
+       was asked for as. Same function, same per-head constant, different
+       roster - so this is not a second number to keep in step, it is the same
+       one read twice, and retuning `LEGEND_EACH` moves both.
+
+       IT IS THE SECOND NET, NOT THE FIRST, and that is worth saying rather
+       than implying. Both families are measured as a share of the same final
+       table, so ANY fault that moves either total - the dilution this pair was
+       written for, a doubled costume budget, a dropped denominator - changes
+       the legendaries' share too and trips the assertion above before reaching
+       this one. Verified by breaking each in turn: both times line 2002 fired.
+       What this one still catches is a fault that changes the costume
+       DISTRIBUTION without changing the total - a wrong roster, or a per-head
+       constant applied to one family and not the other - and it is the only
+       place the rule "a costume is worth a legendary" is written down as an
+       assertion rather than as prose. */
+    const dressed = SPECIES.filter((sp) => sp.form === "costume").map((sp) => sp.id);
+    const cShare = t.filter((e) => dressed.includes(e[0]))
+      .reduce((n, e) => n + e[1], 0) / total;
+    const cOpen = dressed.filter((id) => genOpen(id, lv)).length;
+    const cWant = Math.min(LEGEND_CEIL, LEGEND_EACH * cOpen);
+    assert.ok(Math.abs(cShare - cWant) < 1e-9,
+      `${b.id} at Lv ${lv}: the costume Pikachu are ${(cShare * 100).toFixed(3)}% ` +
+      `of finds over ${cOpen} open, not the ${(cWant * 100).toFixed(3)}% a legendary ` +
+      "is worth per head - the two appended families are diluting each other");
     assert.ok(share <= LEGEND_CEIL + 1e-9,
       `${b.id} at Lv ${lv}: legendaries are ${(share * 100).toFixed(2)}% of every ` +
       "encounter - past the ceiling there is nothing rare about one");
