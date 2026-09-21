@@ -146,9 +146,22 @@ export const REGION_NAME = {
    falls off the end and reports the LAST generation - which would file every
    Mega under Paldea in the region filter and gate them on Paldea's arrival
    level. They belong to the species they evolve from, which is what `of` on the
-   form says, so `genOf` reads through to it. */
+   form says, so `genOf` reads through to it.
+
+   EXCEPT A WILD ONE, WHICH CARRIES ITS OWN, and that exception is load-bearing
+   rather than pedantic. Reading through costs a Mega nothing: it is never in
+   an encounter table, so no generation budget ever counts it. A wild form IS
+   in one - and **all 18 Alolan forms and all 13 costume Pikachu have Gen 1
+   bases**, so reading through would drop 31 new rows into the generation this
+   file spends two hundred lines stopping from dominating. Their own `gen` is
+   the generation they were INTRODUCED in (Alolan 7, Galarian and Hisuian 8,
+   Paldean 9, the Pikachu 6-8), which puts them where they are thin, gates them
+   on that generation's arrival level, and is what canon says besides. A late
+   find, rather than a starting one. */
 export const genOf = (id) => {
-  const of = isForm(id) ? (SPECIES.find((sp) => sp.id === id)?.of ?? id) : id;
+  const form = isForm(id) ? SPECIES.find((sp) => sp.id === id) : null;
+  if (form?.gen) return form.gen;
+  const of = form?.of ?? id;
   const i = GEN_LAST.findIndex((last) => of <= last);
   return i < 0 ? GEN_LAST.length : i + 1;
 };
@@ -200,11 +213,22 @@ export const GENERATIONS = (() => {
 
    `fetch-species` now records the flag PokeAPI already knows. Mythicals count
    with them, because this game draws no distinction and a Mew that is not rare
-   is not a Mew. Forms are excluded: a Mega is never wild, so it can have no
+   is not a Mew.
+
+   A form you EVOLVE INTO is excluded: a Mega is never wild, so it can have no
    spawn weight to scale, and counting one would dilute the real legendaries'
-   per-head share for nothing. */
+   per-head share for nothing. **A form you MEET is not excluded**, and the
+   three that qualify are the reason this sentence had to be split - Galarian
+   Articuno, Zapdos and Moltres are legendary birds, and at ids in the 10000s
+   they were legendary to nothing: `derivedHomes` homed all three on type and
+   the Safari Zone spawned a legendary bird at an ordinary band-A weight.
+   `legendTier` never saw them, so "hunt where it lives" did not apply either.
+
+   It moves the roster 94 -> 97, which changes no odds: `LEGEND_EACH x 97` is
+   2.91% against a `LEGEND_CEIL` of 2.5%, so the pool was already saturated and
+   stays there. */
 export const LEGENDARY = SPECIES
-  .filter((sp) => sp.legendary && !isForm(sp.id))
+  .filter((sp) => sp.legendary && (!isForm(sp.id) || sp.wild))
   .map((sp) => sp.id);
 
 /* The areas with a roof over them: four caves and a building, against three
@@ -1107,6 +1131,45 @@ export const bandFor = (id) => {
 
 const DERIVED_WEIGHT = { C: 8, B: 5, A: 3, S: 1 };
 
+/* AND A COSTUME IS AN EVENT POKEMON, NOT A RESIDENT.
+
+   A regional form is an ordinary Pokemon where it comes from - an Alolan
+   Vulpix is just what a Vulpix IS in Alola - so it takes the derived weight
+   its band earns and sits in Frost Hollow at a few percent, which is right.
+
+   A costume Pikachu is not that. In canon they are event distributions, the
+   rarest ordinary Pokemon there are, and on the derived weight they came out
+   **21-24% of the Power Plant** between them: thirteen Electric Pikachu all
+   home to the one Electric map, each landing at 1.1-2.7% against the plain
+   Pikachu's 1.59%. A Pikachu in a luchador mask was commoner than a Pikachu,
+   and a quarter of the map was hats. Measured, not guessed - the band and
+   generation budgets both PASSED the whole time, because neither of them has
+   any idea that thirteen rows are the same creature.
+
+   THE WEIGHT IS A WEAK LEVER HERE, AND THAT IS WORTH KNOWING BEFORE TOUCHING
+   IT. Swept over a 13x range it moves the thirteen's combined share from 12%
+   to 18% and no further, because `fitShares` equalises GENERATIONS and these
+   are three thin ones getting a slice each however they are weighted - this
+   file's own *"a written weight is a rank within its own cell"*, read from the
+   other side.
+
+   FILING THEM AS GEN 1 FOR THE FIT WAS TRIED AND REVERTED. Slot 4 exists to
+   say "this row competes as its line's generation", a costume Pikachu is a
+   Pikachu, and it worked exactly as intended - a specific costume fell to
+   0.41%. It also emptied the Power Plant's Gen 6: the five Cosplay Pikachu
+   ARE that map's Gen 6 presence, so weighting them as Gen 1 while `genOf`
+   still called them Gen 6 left the fit and the census disagreeing, and the
+   generation-fairness suite read 2.1% against a fair 11.1%. Making both agree
+   means changing generation accounting in `GEN_HOME_MIN`, `fitShares` and the
+   suite together, which is a bigger change than the thing it buys.
+
+   So 0.15, the bottom of the useful range: each costume lands at ~0.9% of the
+   Power Plant against a plain Pikachu's 1.9%, so a Pikachu in a mask is half
+   as likely as a Pikachu, and thirteen of them are 12% of a 166-row table
+   whose average row is 0.6%. Above average because there are thirteen, not
+   because any one is common. */
+const COSTUME_WEIGHT = 0.15;
+
 /* EVERY GENERATION LIVES IN EVERY MAP, and until this it did not.
 
    `derivedHomes` sends a species to its single best type match, which is right
@@ -1141,7 +1204,8 @@ const derivedHomes = () => {
       const n = sp.types.filter((t) => b.types.includes(t)).length;
       if (n > score) { score = n; best = b; }
     }
-    homes.get(best.id).push([sp.id, DERIVED_WEIGHT[bandFor(sp.id)] ?? 4]);
+    homes.get(best.id).push([sp.id,
+      sp.form === "costume" ? COSTUME_WEIGHT : (DERIVED_WEIGHT[bandFor(sp.id)] ?? 4)]);
   }
 
   for (const b of RESIDENTS) {

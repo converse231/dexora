@@ -504,6 +504,7 @@ export const EVOLUTIONS = [
   {"from":801,"to":10317,"kind":"mega","level":100},
   {"from":803,"to":804,"kind":"bond"},
   {"from":807,"to":10319,"kind":"mega","level":100},
+  {"from":808,"to":809,"kind":"bond"},
   {"from":809,"to":10208,"kind":"gmax","level":100},
   {"from":810,"to":811,"kind":"level","level":16},
   {"from":811,"to":812,"kind":"level","level":35},
