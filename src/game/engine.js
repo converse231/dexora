@@ -11,7 +11,7 @@ import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
   levelFromXp, xpForCatch,
   rodTable, rodBite,
-  rollVariant, pityBoost, TIERS, TIER_TELL,
+  rollVariant, pityBoost, TIERS, TIER_TELL, isLegendary,
   lockedTiers, wildBand, rollSize, BIOMES, ENCOUNTER_RATE,
 } from "./biomes.js";
 import {
@@ -21,7 +21,7 @@ import {
 import {
   TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame,
 } from "./tileset.js";
-import { resolveThrow } from "../catch.js";
+import { resolveThrow, GUARANTEED } from "../catch.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt } from "./medals.js";
@@ -191,6 +191,7 @@ function freshState() {
        next four hundred steps quietly cost what they always did. Also a
        queue: a repel and a honey bought together run out together. */
     worn: [],
+    ask: null,                 // a press that wants confirming - never saved
   };
 }
 
@@ -445,7 +446,7 @@ function loadState() {
          Lv 20 earned it before it existed, and a key item nobody can be given
          retroactively is a key item half the players never get. */
       bag: grantKeys(s.bag, levelFromXp(s.xp ?? 0)),
-      encounter: null, evolution: null, cheers: [], worn: [],
+      encounter: null, evolution: null, cheers: [], worn: [], ask: null,
     };
   } catch {
     keep(BROKEN_KEY, raw);
@@ -640,8 +641,8 @@ export function createEngine(canvas, onChange, mini = null) {
     if (state.stale === "taken") return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      const { encounter, evolution, fishing, running, cheers, worn, rev, stale,
-        hint, ...rest } = state;
+      const { encounter, evolution, fishing, running, cheers, worn, ask, rev,
+        stale, hint, ...rest } = state;
       /* `write` reports whether it stuck rather than throwing - which cause it
          was is its business, not this file's. What happens NEXT is this file's:
          play on either way, and latch it so the top bar can say NOT SAVING. */
@@ -1174,12 +1175,60 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
-  function throwBall(ballId = "poke-ball") {
+  /* TWO PRESSES IN THIS GAME CANNOT BE TAKEN BACK, and both were one tap.
+
+     Reported from play: a Master Ball thrown by accident, and a legendary run
+     from by reflex. A Master Ball is 1 in 12,500 steps of walking or ¥50,000,
+     it ENDS the encounter, and `defaultBall` already refuses to let a bare
+     throw reach one - which is the same worry solved for the press that does
+     not name it, leaving the press that does. A legendary is 1 in 3,760
+     encounters and RUN sits under the thumb that throws.
+
+     **THE GATE IS IN THE ENGINE, NOT AT THE CALL SITES.** There are five
+     throws and three flees - the key handler, the bag sheet, the rail, the
+     encounter's own button and the pad's two - and this file already records
+     what guarding each one costs: *"a rule enforced in one of two places is
+     not a rule"*, which is how a shiny came to be protected from one bulk
+     action and not its sibling. `keeper()` lives in the engine for exactly
+     this reason. Gated here, `Pad.jsx` needed no change at all and a sixth
+     call site is covered on the day it is written.
+
+     `state.ask` is what the press WANTED, so confirming re-runs the original
+     function rather than reaching into its middle - every guard above runs
+     again, and an encounter that ended while the dialog was open simply does
+     nothing. Never saved, for the reason `worn` is not: it is a question
+     about this moment. */
+  function ask(kind, run, title, body) {
+    state.ask = { kind, title, body, run };
+    changed();
+  }
+
+  // Answering re-runs the press. Cancelling is the default and costs nothing.
+  function answerAsk(yes) {
+    const pending = state.ask;
+    state.ask = null;
+    if (yes && pending) pending.run();
+    else changed();
+  }
+
+  function throwBall(ballId = "poke-ball", confirmed = false) {
     const e = state.encounter;
     if (!e || e.phase !== "idle") return;
 
     const ball = ballById(ballId);
     if (!ball || (state.bag[ball.id] ?? 0) <= 0) return;
+
+    /* On the MULT, not on the id - the same predicate `defaultBall` refuses a
+       bare throw with, so a second ball that cannot fail is covered the day it
+       ships. AFTER the bag check, because confirming a ball you do not hold is
+       a dialog about nothing. */
+    if (!confirmed && ball.mult >= GUARANTEED) {
+      ask("master", () => throwBall(ballId, true),
+        `Throw your ${ball.name}?`,
+        `It cannot fail, and you have ${state.bag[ball.id]}. ` +
+        `${e.name} is ${isLegendary(e.speciesId) ? "a legendary" : "not a legendary"}.`);
+      return;
+    }
     state.bag[ball.id] -= 1;
     e.ball = ball.id;
 
@@ -1453,6 +1502,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (step.settle) return settle(now);
     if (step.close) {
       state.encounter = null;
+      state.ask = null;          // a question about an encounter dies with it
       changed();
       return;
     }
@@ -1460,9 +1510,21 @@ export function createEngine(canvas, onChange, mini = null) {
     changed();
   }
 
-  function flee() {
+  function flee(confirmed = false) {
     const e = state.encounter;
     if (!e || e.phase !== "idle") return;
+
+    /* ASKED THE SAME WAY THE NAMEPLATE ASKS IT - `isLegendary(enc.speciesId)`
+       is what `Encounter.jsx` draws the mark from, and `speciesId` is frozen
+       at spawn, so the dialog and the badge cannot disagree. A second
+       `legendary` field on the encounter would be a copy with nothing to gain:
+       the derivation is pure and its input is already frozen. */
+    if (!confirmed && isLegendary(e.speciesId)) {
+      ask("flee", () => flee(true),
+        `Run from ${e.name}?`,
+        "A legendary. There is no telling when you will meet another.");
+      return;
+    }
     e.phase = "ran";
     e.msg = "Got away safely.";
     e.until = performance.now() + 450;
@@ -1991,6 +2053,7 @@ export function createEngine(canvas, onChange, mini = null) {
     clearHeld: () => held.clear(),
     throwBall,
     flee,
+    answerAsk,
     skip,
     reset() {
       try { localStorage.removeItem(SAVE_KEY); } catch { /* nothing to clear */ }

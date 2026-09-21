@@ -371,6 +371,29 @@ export default function App({
           something is hovered or focused. */}
       <Tip />
 
+      {/* A PRESS THAT CANNOT BE TAKEN BACK ASKS FIRST, and the engine is what
+          decided to ask - see `ask()` there. App renders ONE dialog for both
+          questions rather than one per call site, which is the whole point:
+          the Master Ball and the legendary RUN are reached from five and three
+          places respectively, and a dialog per place is eight chances to miss
+          one.
+
+          `st.encounter` is in the condition as well, because the question is
+          about an encounter and the frame loop keeps running underneath an open
+          dialog. The engine clears `ask` when an encounter ends, so this is the
+          belt to that braces - and a stale question about a Pokemon that has
+          gone would be a dialog whose YES does nothing. */}
+      {st?.ask && st?.encounter && (
+        <Confirm
+          title={st.ask.title}
+          tone="warn"
+          note={st.ask.body}
+          confirmLabel={st.ask.kind === "flee" ? "RUN" : "THROW"}
+          onCancel={() => engine.answerAsk(false)}
+          onConfirm={() => engine.answerAsk(true)}
+        />
+      )}
+
       {/* Above every other overlay: it can land during an encounter or an
           evolution, and both of those already own the middle of the screen. */}
       {leaving && (

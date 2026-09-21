@@ -2817,6 +2817,22 @@ canvas {
   background: var(--canopy) !important; border-color: var(--canopy) !important;
   box-shadow: 0 3px 0 #22513a;
 }
+/* AND `warn` HAD NO RULE AT ALL, which is a class of bug CSS is especially good
+   at hiding: `tone` lands in a template string, an unknown word is a class
+   nobody styled, and the button falls back to looking exactly like every other
+   confirm. Three dialogs were passing it - log out, the session taken away, and
+   now the two presses that cannot be undone - and all three read as routine.
+   Found by grepping for the selector rather than by looking, because "it looks
+   like a confirm button" is what both the right and the wrong answer look
+   like. */
+/* #b5483c is not invented: it is `.deltas em.down`, the red this app already
+   uses for a number going the wrong way. A `var(--ember, …)` was written here
+   first and there is no such token - which would have ridden the fallback
+   silently forever, the same fault one layer down. */
+.cf-yes.warn {
+  background: #b5483c !important; border-color: #b5483c !important;
+  box-shadow: 0 3px 0 #7d2f26;
+}
 .cf-actions button:hover { transform: translateY(-1px); }
 .cf-keys {
   font-family: var(--pixel); font-size: 8.5px; color: var(--ink-faint);
