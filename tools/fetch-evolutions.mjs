@@ -146,6 +146,20 @@ for (const url of chainUrls) walk((await get(url)).chain);
 const FORM_LEVEL = 100;
 const { FORMS } = await import("../src/data/forms.js");
 for (const f of FORMS) {
+  /* A WILD FORM GETS NO ROW, AND THAT ABSENCE IS THE WHOLE MECHANISM.
+
+     An Alolan Vulpix is not something you make, it is something that lives in
+     the snow - so it must not be an evolution target. Writing no row is not
+     merely "skipping" it: `derivedHomes` builds its candidate pool as
+     everything that is NOT in `EVOLUTIONS.to` and not legendary, so a form
+     with no row falls into the wild pool BY CONSTRUCTION and gets homed on its
+     own types like any other species. Nothing had to be told about it.
+
+     It is also what keeps the other half honest. The evolution overlay refuses
+     `isForm(to)` so a Mega can never be met in the grass; a wild form never
+     reaches that code at all, because there is no edge to walk. Two families,
+     one field, and neither can leak into the other. */
+  if (f.wild) continue;
   rows.push({ from: f.of, to: f.id, kind: f.form, level: FORM_LEVEL });
 }
 

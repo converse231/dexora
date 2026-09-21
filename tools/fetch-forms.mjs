@@ -32,6 +32,87 @@ const KINDS = [
   ["-primal", "primal"], ["-gmax", "gmax"], ["-eternamax", "gmax"],
 ];
 
+/* AND THE OTHER HALF OF THE FAMILY IS MET, NOT MADE.
+   ===================================================
+
+   A Mega is something you DO to a Pokemon; an Alolan Vulpix is something that
+   LIVES somewhere. The file above treated every 10000-id as the first kind,
+   because for a long time every one of them was - and that is why the game
+   shipped no regional form at all and it was reported as never meeting one.
+
+   So a form now declares `wild`, and that single field is what decides
+   whether it is an evolution target at Lv 100 or a row in an encounter table.
+   Megas, Primals and Gigantamax keep everything they had.
+
+   THE GENERATION IS THE FORM'S OWN, NOT ITS BASE'S, and that is the one place
+   a wild form must NOT read through. `genOf` reads a Mega through to its base
+   because a Mega's own id is in the 10000s and would otherwise file under the
+   last generation - and it costs nothing, because a Mega is never in a table
+   for `fitShares` to balance. A wild form IS in a table: all 18 Alolan forms
+   and all 13 costume Pikachu have Gen 1 bases, so reading through would drop
+   31 new rows into the generation this game has fought hardest to stop
+   dominating. Filing them where they were actually introduced puts them in
+   Gen 6-9, which are thin, and gates them behind those generations' arrival
+   levels - which is also what they are: a late find, not a starting one. */
+const REGIONS = [
+  ["-alola", "alolan", "Alolan", 7],
+  ["-galar", "galarian", "Galarian", 8],
+  ["-hisui", "hisuian", "Hisuian", 8],
+  ["-paldea", "paldean", "Paldean", 9],
+];
+
+/* MATCHED ANYWHERE, NOT AS A SUFFIX, because three of them carry a tail:
+   `darmanitan-galar-standard` and the three `tauros-paldea-*-breed`. A plain
+   `endsWith` misses all four, which is how a first pass came back with 53
+   regional forms instead of 57. The base is everything before the marker. */
+const REGION_AT = (name) => {
+  for (const [mark, kind, word, gen] of REGIONS) {
+    const at = name.indexOf(mark);
+    if (at < 0) continue;
+    const tail = name.slice(at + mark.length);
+    /* `-zen` is Galarian Darmanitan's BATTLE form - a transformation, like a
+       Mega, not a place - so it is dropped the way `-mega` would be. The three
+       Paldean Tauros breeds are kept: those are three distinct Pokemon, each
+       with its own types, and all three are catchable. */
+    if (tail === "-zen") return null;
+    return { base: name.slice(0, at), kind, word, gen };
+  }
+  return null;
+};
+
+/* THE COSTUME PIKACHU ARE A LIST, AND A LIST IS HONEST HERE.
+
+   This file's own rule is that a list needing an edit per generation gets that
+   edit skipped - which is what `LEGENDARY` did as 34 hand-written numbers that
+   missed sixty. The difference is that this set is CLOSED: Cosplay Pikachu is
+   Gen 6 and was never revisited, and the Cap series ended at World Cap in Gen
+   8. There is nothing arriving that this would have to remember.
+
+   It also has to be named rather than derived, because PokeAPI's Pikachu
+   varieties include `pikachu-cosplay` and `pikachu-starter` - a placeholder
+   and a Let's Go exclusive - which are neither costumes nor anything a player
+   should be able to hold. Deriving "every variety" would sweep both in.
+
+   AND IT HAS TO BE TESTED BEFORE THE REGIONS: `pikachu-alola-cap` carries the
+   string `-alola` and is a HAT, not an Alolan Pikachu - which does not exist,
+   and neither does a Hisuian one. Ask the regions first and the dex ships a
+   species labelled "Alolan Pikachu" that Game Freak never drew. */
+const COSTUMES = new Map([
+  ["pikachu-rock-star", ["Rock Star", 6]],
+  ["pikachu-belle", ["Belle", 6]],
+  ["pikachu-pop-star", ["Pop Star", 6]],
+  ["pikachu-phd", ["Ph.D.", 6]],
+  ["pikachu-libre", ["Libre", 6]],
+  ["pikachu-original-cap", ["Original Cap", 7]],
+  ["pikachu-hoenn-cap", ["Hoenn Cap", 7]],
+  ["pikachu-sinnoh-cap", ["Sinnoh Cap", 7]],
+  ["pikachu-unova-cap", ["Unova Cap", 7]],
+  ["pikachu-kalos-cap", ["Kalos Cap", 7]],
+  ["pikachu-alola-cap", ["Alola Cap", 7]],
+  ["pikachu-partner-cap", ["Partner Cap", 7]],
+  ["pikachu-world-cap", ["World Cap", 8]],
+]);
+
 const byName = new Map(SPECIES.map((sp) => [sp.name, sp]));
 const tierOf = (r) => (r >= 200 ? "C" : r >= 100 ? "B" : r >= 45 ? "A" : "S");
 
@@ -40,7 +121,7 @@ async function sprite(name) {
   return res?.ok ? Buffer.from(await res.arrayBuffer()) : null;
 }
 
-async function one(name, base, kind) {
+async function one(name, base, kind, extra = {}) {
   const pk = await fetch(`${API}/pokemon/${name}`).then((r) => r.json());
   const png = await fetch(`${GH}/${pk.id}.png`);
   if (!png.ok) return null;                       // no art, no form
@@ -64,23 +145,62 @@ async function one(name, base, kind) {
     from: base.name,
     form: kind,
     of: base.id,
+    /* CARRIED FROM THE BASE, because three of these are legendary birds.
+       Galarian Articuno, Zapdos and Moltres are the only wild forms whose base
+       is legendary, and `LEGENDARY` is keyed on dex id - so at id 10169 a
+       Galarian Articuno was not legendary to anything and `derivedHomes` put
+       it in the Safari Zone at band A, spawning like an ordinary bird. Never
+       read for a form you EVOLVE into (a Mega has no spawn weight to scale),
+       which is exactly why nothing had needed it before. */
+    legendary: !!base.legendary,
     genus: kind === "gmax" ? "Gigantamax Pokémon"
       : kind === "primal" ? "Primal Pokémon" : "Mega Pokémon",
+    /* THE BASE'S FLAVOUR, and for a wild form that is a known compromise
+       rather than an oversight. PokeAPI keys flavour text to the SPECIES and
+       to a game version, never to a form, so there is no entry to read that
+       says "Alolan Vulpix" - Sun/Moon's Vulpix text is the Alolan one and
+       nothing in the payload says so. Taking the base's is the honest
+       fallback; the genus below is what actually names the form. */
     flavor: base.flavor,
     height: pk.height,
     weight: pk.weight,
     stats: ["hp", "attack", "defense", "special-attack", "special-defense", "speed"]
       .map(stat),
+    ...extra,
   };
 }
 
 const list = await fetch(`${API}/pokemon?limit=1500&offset=1025`).then((r) => r.json());
 const want = [];
 for (const { name } of list.results) {
+  /* COSTUMES FIRST - see the note on `COSTUMES`. `pikachu-alola-cap` is a hat
+     and would otherwise be read as a region that Pikachu does not have. */
+  const dressed = COSTUMES.get(name);
+  if (dressed) {
+    const [label, gen] = dressed;
+    want.push({
+      name, base: byName.get("pikachu"), kind: "costume",
+      extra: { wild: true, gen, genus: `${label} Pikachu` },
+    });
+    continue;
+  }
+
+  const region = REGION_AT(name);
+  if (region) {
+    const base = byName.get(region.base);
+    if (base) {
+      want.push({
+        name, base, kind: region.kind,
+        extra: { wild: true, gen: region.gen, genus: `${region.word} Form` },
+      });
+    }
+    continue;
+  }
+
   for (const [suffix, kind] of KINDS) {
     if (!name.endsWith(suffix)) continue;
     const base = byName.get(name.slice(0, -suffix.length));
-    if (base) want.push({ name, base, kind });
+    if (base) want.push({ name, base, kind, extra: {} });
     break;                                        // longest suffix wins
   }
 }
@@ -89,14 +209,30 @@ await mkdir("public/sprites/shiny", { recursive: true });
 const out = [];
 for (let i = 0; i < want.length; i += 8) {
   const got = await Promise.all(
-    want.slice(i, i + 8).map((w) => one(w.name, w.base, w.kind)));
+    want.slice(i, i + 8).map((w) => one(w.name, w.base, w.kind, w.extra)));
   out.push(...got.filter(Boolean));
   process.stdout.write(`\rfetched ${out.length}/${want.length}`);
 }
-out.sort((a, b) => a.id - b.id);
+/* MADE FIRST, MET SECOND - AND THAT ORDER IS A SAVE MIGRATION AVOIDED.
+
+   Every save is keyed on POSITION in `SPECIES`, and `SPECIES` is the National
+   Dex with `FORMS` appended. A plain `a.id - b.id` was right while every form
+   was a Mega, and becomes an INSERT the moment a costume Pikachu (10080) or an
+   Alolan Rattata (10091) arrives: 74 of the 120 shipped forms sit above 10080,
+   so sorting by id alone would have moved 74 saved positions and quietly
+   renamed 74 forms in every existing collection. That is the Hoenn migration
+   exactly, and this file's own header already says why it must not happen -
+   *"the forms go on the END - appending moves nothing"*.
+
+   Sorting on `wild` first keeps the evolution forms in the id order they
+   already shipped in, byte for byte, and appends the new ones after. No
+   `LAYOUTS` entry, no `remap`, and `padDex` stays the right answer. */
+out.sort((a, b) => Number(!!a.wild) - Number(!!b.wild) || a.id - b.id);
 
 await writeFile("src/data/forms.js", `export const FORMS = ${JSON.stringify(out)};\n`);
 const kinds = out.reduce((n, f) => ({ ...n, [f.form]: (n[f.form] ?? 0) + 1 }), {});
+const wild = out.filter((f) => f.wild).length;
 console.log(`\nwrote src/data/forms.js — ${out.length} forms ` +
   `(${Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(", ")}) ` +
-  `over ${new Set(out.map((f) => f.of)).size} species`);
+  `over ${new Set(out.map((f) => f.of)).size} species; ` +
+  `${out.length - wild} evolved into, ${wild} met in the wild`);

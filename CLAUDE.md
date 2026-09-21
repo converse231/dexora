@@ -1,6 +1,6 @@
 # Dexora
 
-A personal, non-commercial browser game: catch, collect and evolve **1,145
+A personal, non-commercial browser game: catch, collect and evolve **1,215
 Pokémon** across eleven hand-made areas — the whole National Dex from Kanto to
 Paldea, plus every Mega, Primal and Gigantamax form. Inspired by DelugeRPG's
 loop — walk, meet, throw, bank the duplicates, evolve.
@@ -29,6 +29,74 @@ a Pokémon you meet; a form is a hundred levels of Rare Candy spent on purpose.
 | `genOf` | reads a form through to what it evolves from, or every Mega files under Paldea and gates on Paldea's arrival level |
 | `genComplete` | forms do not count. Origin unlocks on catching every ORDINARY Pokémon of a generation; 33 Kanto forms × 100 levels is not a harder gate, it is a deleted one |
 | `hasOrigin` | never. There is no 1996 drawing of a Mega Charizard |
+
+**AND A FORM YOU MEET IS NOT A FORM YOU MAKE.** Reported as never having
+encountered an Alolan or Hisuian anything, and that was exactly right: the
+game shipped **no regional form of any species**, because `fetch-forms` filtered
+PokeAPI on `-mega`/`-primal`/`-gmax` and nothing else. Pikachu has no Alolan or
+Hisuian form in canon either - it has no regional form at all - so the ask
+resolved into two families, and they split along the line canon already draws:
+
+| | what it is | how you get it |
+|---|---|---|
+| Mega, Primal, Gigantamax | something you DO to a Pokemon | evolve, Lv 100, permanent |
+| regional forms, costume Pikachu | something that LIVES somewhere | **caught in the wild** |
+
+**`wild` IS THE ONE FIELD, AND NO EVOLUTION ROW IS THE WHOLE MECHANISM.**
+`fetch-evolutions` skips a wild form, and that ABSENCE is what makes it wild -
+`derivedHomes` builds its pool as everything not in `EVOLUTIONS.to` and not
+legendary, so a form with no row falls into the wild pool by construction and
+is homed on its own types like any other species. Nothing had to be told about
+it: Alolan Vulpix went to Frost Hollow, Alolan Marowak to Ember, Paldean Tauros
+(Aqua) to Pond & Shore, and all 13 Pikachu to the Power Plant, with **no table
+edited**. The evolution overlay still refuses `isForm(to)` so a Mega can never
+be met; a wild form never reaches that code, because there is no edge to walk.
+
+**THE GENERATION IS THE FORM'S OWN, AND THAT IS THE ONE PLACE A WILD FORM MUST
+NOT READ THROUGH.** `genOf` reads a Mega through to its base and it costs
+nothing, because a Mega is never in a table for `fitShares` to balance. A wild
+form IS - and all 18 Alolan forms and all 13 costume Pikachu have Gen 1 bases.
+They carry the generation they were INTRODUCED in (Alolan 7, Galarian and
+Hisuian 8, Paldean 9, the Pikachu 6-8), which gates them on that generation's
+arrival level. A late find, which is what they are.
+
+**MADE FIRST, MET SECOND - AND THAT SORT ORDER IS A SAVE MIGRATION AVOIDED.**
+`FORMS` was sorted `a.id - b.id`, which is an APPEND while every form is a Mega
+and an INSERT the moment a costume Pikachu (10080) arrives: **74 of the 120
+shipped forms sit above 10080**, so sorting by id alone would have moved 74
+saved positions and quietly renamed 74 forms in every collection. Sorting on
+`wild` first keeps the 120 byte-identical and appends the 70. Measured: **0
+positions changed meaning**, `layoutIds(1145)` still returns null, `padDex` is
+still right, no `LAYOUTS` entry.
+
+**GALARIAN ARTICUNO WAS SPAWNING LIKE A PIDGEY.** `LEGENDARY` filtered
+`!isForm(sp.id)` under a comment saying a Mega has no spawn weight to scale -
+true then, false now. Galarian Articuno, Zapdos and Moltres are legendary birds
+at ids in the 10000s, so they were legendary to nothing: `derivedHomes` homed
+all three on type and the Safari Zone offered one at an ordinary band-A weight.
+It is `(!isForm(sp.id) || sp.wild)` now; the roster moves 94 -> 97 and no odds
+move, because `LEGEND_EACH x 97` is 2.91% against a `LEGEND_CEIL` of 2.5% and
+the pool was already saturated. **It was also what broke the band budget** -
+Safari's A band moved 2.8pp against a 2.5 bound, and those two birds were the
+whole of it.
+
+**A COSTUME IS AN EVENT POKEMON, AND THE WEIGHT IS A WEAK LEVER.** Thirteen
+Electric Pikachu all home to the one Electric map, and on the ordinary derived
+weight they came out **21-24% of the Power Plant**, each commoner than a plain
+Pikachu. Swept, `COSTUME_WEIGHT` moves that only 12% -> 18% over a 13x range,
+because `fitShares` equalises GENERATIONS and these are three thin ones getting
+a slice each however they are weighted - *"a written weight is a rank within
+its own cell"* from the other side. Filing them as Gen 1 via slot 4 fixed it
+properly (0.41% each) and **was reverted**: the five Cosplay Pikachu ARE that
+map's Gen 6 presence, so the fit and the census disagreed and generation
+fairness read 2.1% against a fair 11.1%. At 0.15 each costume is ~0.9% against
+a plain Pikachu's 1.9% - half as likely as a Pikachu, which is the right shape.
+
+**AND REACHABILITY WAS THE CLAIM, NOT EVOLUTION.** check.mjs asserted *"a form
+nothing evolves into"* - a true description of reachability while every form
+was a Mega. It branches on `wild` now, and asserts the two families are
+DISJOINT, because a wild form that also carried an evolution row would be both
+catchable and worth a hundred candy and nothing else would notice.
 
 **They needed no new evolution machinery**, which is the whole argument for
 doing it this way: `evoLevel` already honours a row's own `level` and

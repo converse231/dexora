@@ -3183,15 +3183,45 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.equal(evoScale(MAX_LEVEL, depth), 1, `depth ${depth} never reaches full strength`);
   }
 
-  /* 3b. AND EVERY FORM IS REACHABLE FROM SOMETHING THAT IS. A form that no
-      shipped species evolves into is a dex entry nobody can ever fill, which is
-      worse than not shipping it - the rosette and the region count both include
-      it. Checked against the assembled tables, not against RESIDENTS. */
+  /* 3b. AND EVERY FORM IS REACHABLE, BY WHICHEVER ROUTE IS ITS OWN.
+
+     A form that cannot be obtained at all is a dex entry nobody can fill,
+     which is worse than not shipping it - the rosette and the region count
+     both include it. That claim has not changed. What changed is that there
+     are now two routes, and this asserted only one of them: it read *"a form
+     nothing evolves into"*, which was a true description of reachability while
+     every form was a Mega, and became a false one the day an Alolan Vulpix
+     shipped. **The intent was reachability; evolution was the implementation.**
+
+     So it branches on `wild`, the same field the fetcher and `derivedHomes`
+     branch on:
+
+       MADE  - Mega, Primal, Gigantamax. Never in a table, so the test is that
+               something WILD evolves into it, at the 100 a form costs.
+       MET   - regional forms and the costume Pikachu. No evolution row at all
+               (that absence is what puts them in the wild pool), so the test
+               is the ordinary one every other species gets: findable by the
+               cap.
+
+     And the two are asserted to be DISJOINT, because the failure that would
+     hurt is a wild form that also carries an evolution row - it would be both
+     catchable and worth a hundred candy, and nothing else here would notice. */
   const formCheck = () => {
     const wild = wildAt(MAX_LEVEL);
     for (const sp of SPECIES) {
       if (!isForm(sp.id)) continue;
       const rows = EVOLUTIONS.filter((e) => e.to === sp.id);
+
+      if (sp.wild) {
+        assert.equal(rows.length, 0,
+          `${sp.name} is met in the wild AND evolved into - it would be both ` +
+          "catchable and worth a hundred candy, and the two cannot both be true");
+        assert.ok(wild.has(sp.id),
+          `${sp.name} is a wild form in no table even at Lv ${MAX_LEVEL} - ` +
+          "its evolution row was removed and nothing homed it");
+        continue;
+      }
+
       assert.ok(rows.length, `${sp.name} is a form nothing evolves into`);
       assert.ok(rows.some((e) => wild.has(e.from)),
         `${sp.name} only evolves from something you cannot find in the wild`);
@@ -3208,13 +3238,17 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   assert.ok(late.size > early.size, "levelling adds no species at all");
   formCheck();
   for (const sp of SPECIES) {
-    /* A FORM IS REACHED, NEVER MET. Mega, Primal and Gigantamax are deliberately
-       excluded from every wild table - being able to CATCH a Mega Charizard is
-       the thing they exist to make you work for, handed over for a Poke Ball -
-       so "findable in the wild" is the wrong test for them. Theirs is below:
-       every form must be the target of an evolution FROM a species that is
-       itself wild-findable, which is the same reachability claim one step on. */
-    if (isForm(sp.id)) continue;
+    /* A FORM THAT IS MADE IS REACHED, NEVER MET. Mega, Primal and Gigantamax
+       are deliberately excluded from every wild table - being able to CATCH a
+       Mega Charizard is the thing they exist to make you work for, handed over
+       for a Poke Ball - so "findable in the wild" is the wrong test for them,
+       and `formCheck` above makes the reachability claim one step on instead.
+
+       A form that is MET takes this test like anything else, which is why the
+       guard reads `!sp.wild` rather than `isForm`: an Alolan Vulpix has no
+       evolution row to be reached by, so if it is not in a table it is not
+       anywhere. */
+    if (isForm(sp.id) && !sp.wild) continue;
     assert.ok(late.has(sp.id),
       `${sp.name} is in no wild table even at Lv ${MAX_LEVEL} - a species that ` +
       "exists only inside the Box is a species the Dex cannot honestly place");
