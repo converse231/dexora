@@ -231,6 +231,43 @@ export const LEGENDARY = SPECIES
   .filter((sp) => sp.legendary && (!isForm(sp.id) || sp.wild))
   .map((sp) => sp.id);
 
+/* THE COSTUME PIKACHU ARE APPENDED LIKE LEGENDARIES, AND THAT IS THE WHOLE
+   FIX FOR THREE SEPARATE PROBLEMS.
+
+   Asked for as *"make it rarer, maybe level it to legendary spawn rate"*, and
+   the honest way to get there is not another weight - it is to stop them being
+   residents at all. As derived homes they were unfixable by weight: thirteen
+   Electric Pikachu all home to the one Electric map, and `fitShares` equalises
+   GENERATIONS, so three thin generations got a slice each however small the
+   number was (12% of the Power Plant at 0.15, 18% at 2 - a 13x range moving
+   almost nothing).
+
+   `legendsFor` already solves exactly this shape: a thing that is hunted
+   rather than lived-with, appended AFTER the fit, scaled to a share of the
+   FINAL table so it reads the same on every map at every level. Costumes go
+   through the same door, and three things fall out at once:
+
+     - THE RATE IS EXACT. `LEGEND_EACH` per head is what one legendary is
+       worth, so a costume is worth one legendary - which is the ask, stated
+       as a rule rather than as a number. Thirteen of them come to 0.39%.
+     - THE FIT STOPS SEEING THEM. That is what killed the slot-4 attempt: the
+       five Cosplay Pikachu WERE the Power Plant's Gen 6 presence, so anything
+       that moved their weight left the map's Gen 6 starved. Out of the
+       residents entirely, `GEN_HOME_MIN` fills Gen 6 with a real Gen 6
+       species instead, which is what it is for.
+     - THE RATE IS THE SAME EVERYWHERE, which is worth stating because it is
+       NOT what a legendary does. `legendTier` weights by type, and all
+       thirteen of these are Electric, so they all draw the same tier on any
+       given map and the total lands at 0.38% whether you are in the Power
+       Plant or the meadow. "Hunt where it lives" needs a roster with more than
+       one type in it; this one cannot have it. Measured, not assumed - a first
+       draft of this note claimed the homing applied.
+
+   The band budgets never see them either, which is correct and worth saying
+   out loud: a costume is not part of the map's rarity mix any more than
+   Mewtwo is. */
+const COSTUMES = SPECIES.filter((sp) => sp.form === "costume").map((sp) => sp.id);
+
 /* The areas with a roof over them: four caves and a building, against three
    maps of open country. It is a fact about places, so it lives beside them
    rather than in the bag - `items.js` reads it for the Dusk Ball, and if a
@@ -816,16 +853,36 @@ export const dexIndex = (id) => byIndex.get(id) ?? -1;
 /* Scaled so the legendaries together come to `LEGEND_SHARE` of the FINAL table
    - hence `total / (1 - share)`, which is the weight that makes a share of the
    whole rather than a share of the rest. */
-const legendsFor = (types, total, open = () => true) => {
-  const live = LEGENDARY.filter(open);
+/* WHAT A ROSTER IS WORTH: per head, capped. Split out because TWO families are
+   appended now and the share of each has to be known before either is scaled -
+   see `rareFor`. */
+const rareShare = (roster, open) => {
+  const live = roster.filter(open);
+  return live.length ? Math.min(LEGEND_CEIL, LEGEND_EACH * live.length) : 0;
+};
+
+/* Same scaling as the legendaries always had, same per-head worth, over a
+   different roster - so if `LEGEND_EACH` is ever retuned a costume moves with
+   it, which is what "as rare as a legendary" has to mean to survive a retune.
+
+   `taken` IS THE SUM OF EVERY APPENDED SHARE, NOT JUST THIS ONE, and getting
+   that wrong is how this shipped broken for one commit. The budget that makes
+   a share of the WHOLE is `total * share / (1 - share)` - correct while the
+   legendaries were the only thing appended. Append a second family against the
+   same `total` and each lands in a table the other has since made bigger, so
+   BOTH come out under their own rule: the per-head assertion caught the
+   legendaries at 1.620% against the 1.625% they are owed, on a bound tight
+   enough to see it. One denominator for both. */
+const rareFor = (roster, types, total, open, taken) => {
+  const live = roster.filter(open);
   if (!live.length || total <= 0) return [];
   const raw = live.map((id) => legendTier(id, types));
   const sum = raw.reduce((n, w) => n + w, 0);
   /* PER HEAD, then capped - see LEGEND_EACH. Only the legendaries OPEN at this
      level count, so a generation that has not arrived cannot dilute the ones
      that have. */
-  const share = Math.min(LEGEND_CEIL, LEGEND_EACH * live.length);
-  const budget = (total * share) / (1 - share);
+  const share = rareShare(roster, open);
+  const budget = (total * share) / (1 - taken);
   return live.map((id, i) => [id, (budget * raw[i]) / sum]);
 };
 
@@ -1131,44 +1188,6 @@ export const bandFor = (id) => {
 
 const DERIVED_WEIGHT = { C: 8, B: 5, A: 3, S: 1 };
 
-/* AND A COSTUME IS AN EVENT POKEMON, NOT A RESIDENT.
-
-   A regional form is an ordinary Pokemon where it comes from - an Alolan
-   Vulpix is just what a Vulpix IS in Alola - so it takes the derived weight
-   its band earns and sits in Frost Hollow at a few percent, which is right.
-
-   A costume Pikachu is not that. In canon they are event distributions, the
-   rarest ordinary Pokemon there are, and on the derived weight they came out
-   **21-24% of the Power Plant** between them: thirteen Electric Pikachu all
-   home to the one Electric map, each landing at 1.1-2.7% against the plain
-   Pikachu's 1.59%. A Pikachu in a luchador mask was commoner than a Pikachu,
-   and a quarter of the map was hats. Measured, not guessed - the band and
-   generation budgets both PASSED the whole time, because neither of them has
-   any idea that thirteen rows are the same creature.
-
-   THE WEIGHT IS A WEAK LEVER HERE, AND THAT IS WORTH KNOWING BEFORE TOUCHING
-   IT. Swept over a 13x range it moves the thirteen's combined share from 12%
-   to 18% and no further, because `fitShares` equalises GENERATIONS and these
-   are three thin ones getting a slice each however they are weighted - this
-   file's own *"a written weight is a rank within its own cell"*, read from the
-   other side.
-
-   FILING THEM AS GEN 1 FOR THE FIT WAS TRIED AND REVERTED. Slot 4 exists to
-   say "this row competes as its line's generation", a costume Pikachu is a
-   Pikachu, and it worked exactly as intended - a specific costume fell to
-   0.41%. It also emptied the Power Plant's Gen 6: the five Cosplay Pikachu
-   ARE that map's Gen 6 presence, so weighting them as Gen 1 while `genOf`
-   still called them Gen 6 left the fit and the census disagreeing, and the
-   generation-fairness suite read 2.1% against a fair 11.1%. Making both agree
-   means changing generation accounting in `GEN_HOME_MIN`, `fitShares` and the
-   suite together, which is a bigger change than the thing it buys.
-
-   So 0.15, the bottom of the useful range: each costume lands at ~0.9% of the
-   Power Plant against a plain Pikachu's 1.9%, so a Pikachu in a mask is half
-   as likely as a Pikachu, and thirteen of them are 12% of a 166-row table
-   whose average row is 0.6%. Above average because there are thirteen, not
-   because any one is common. */
-const COSTUME_WEIGHT = 0.15;
 
 /* EVERY GENERATION LIVES IN EVERY MAP, and until this it did not.
 
@@ -1194,8 +1213,14 @@ const derivedHomes = () => {
   const placed = new Set(RESIDENTS.flatMap((b) => b.table.map(([id]) => id)));
   const evolvesInto = new Set(EVOLUTIONS.map((e) => e.to));
   const homes = new Map(RESIDENTS.map((b) => [b.id, []]));
+  /* Costumes are excluded for the same reason legendaries are: both are
+     APPENDED to the finished table rather than living in it. Left in here they
+     would be counted twice - once as a resident the fit balances and once at
+     their own share - which is the exact fault this file records as "a species
+     listed once and derived once has two weights in the same map". */
   const wild = SPECIES.filter((sp) =>
-    !evolvesInto.has(sp.id) && !LEGENDARY.includes(sp.id));
+    !evolvesInto.has(sp.id) && !LEGENDARY.includes(sp.id)
+    && !COSTUMES.includes(sp.id));
 
   for (const sp of wild) {
     if (placed.has(sp.id)) continue;
@@ -1204,8 +1229,7 @@ const derivedHomes = () => {
       const n = sp.types.filter((t) => b.types.includes(t)).length;
       if (n > score) { score = n; best = b; }
     }
-    homes.get(best.id).push([sp.id,
-      sp.form === "costume" ? COSTUME_WEIGHT : (DERIVED_WEIGHT[bandFor(sp.id)] ?? 4)]);
+    homes.get(best.id).push([sp.id, DERIVED_WEIGHT[bandFor(sp.id)] ?? 4]);
   }
 
   for (const b of RESIDENTS) {
@@ -1739,7 +1763,14 @@ export function encounterTable(biome, level = 1) {
   const rolled = fitShares(extra.length ? [...open, ...extra] : open,
                            BAND_SHAPE.get(biome.id) ?? {});
   const total = rolled.reduce((n, e) => n + e[1], 0);
-  return [...rolled, ...legendsFor(biome.types, total, (id) => genOpen(id, level))];
+  const alive = (id) => genOpen(id, level);
+  /* Both are appended to the RESIDENT total, and both are scaled against the
+     share the two of them take together - so each is exactly its own share of
+     the finished table and neither moves when the other's roster grows. */
+  const taken = rareShare(LEGENDARY, alive) + rareShare(COSTUMES, alive);
+  return [...rolled,
+          ...rareFor(LEGENDARY, biome.types, total, alive, taken),
+          ...rareFor(COSTUMES, biome.types, total, alive, taken)];
 }
 
 /* Asked on every step that starts an encounter, and the answer only changes on

@@ -92,6 +92,64 @@ map's Gen 6 presence, so the fit and the census disagreed and generation
 fairness read 2.1% against a fair 11.1%. At 0.15 each costume is ~0.9% against
 a plain Pikachu's 1.9% - half as likely as a Pikachu, which is the right shape.
 
+**"COSTUME PIKACHU-ROCK-STAR" IS A DATABASE ROW, NOT A POKEMON.** `label()`
+stripped the form suffix with `-(mega|primal|gmax|eternamax)(-[xy])?` - complete
+while those were the only forms there were, and silently wrong for all seventy
+that arrived with regional and costume slugs. It rendered *"Costume
+Pikachu-rock-star"*, *"Alolan Vulpix-alola"* and *"Paldean
+Tauros-paldea-aqua-breed"*: the prefix came from `FORM_WORD`'s `?? cap(s.form)`
+fallback and the rest was the raw key title-cased. **Nothing failed, because a
+name is a string and every string renders.**
+
+The base comes from `from` now - the base's real name, already on every form
+record - so there is no slug to parse, and `NAME_FIX` gets *Galarian Mr. Mime*
+and *Galarian Farfetch'd* right for free where a regex would have had to be
+told twice. `title` wins outright where a form carries one: the cosplay five
+are *Pikachu Libre* and the eight caps *Original Cap Pikachu*, the species
+moving from back to front between them, which is what the games call them and
+is not something a rule can infer. `-standard` is dropped (Galarian Darmanitan,
+not "Galarian Darmanitan (Standard)") and the three Paldean Tauros keep their
+breed, because it is the only thing separating three rows with one name.
+
+**A COSTUME IS WORTH A LEGENDARY, AND THAT IS THE MACHINERY AS WELL AS THE
+RATE.** Asked for as *"make it rarer, maybe level it to legendary spawn rate"*.
+As derived homes they were unfixable by weight - thirteen Electric Pikachu all
+home to the one Electric map and `fitShares` equalises GENERATIONS, so three
+thin ones took a slice each however small the number was (12% of the Power
+Plant at 0.15, 18% at 2, a 13x range moving almost nothing). `legendsFor`
+already solves that exact shape, so costumes go through the same door:
+`rareFor(roster, ...)` at `LEGEND_EACH` per head, appended AFTER the fit.
+
+A specific costume is now **1 in 3,418 encounters**, the thirteen together
+0.38% of every table. Three things fell out at once: the rate is a rule rather
+than a number and moves with `LEGEND_EACH`; the fit stops seeing them, which is
+what killed the slot-4 attempt (the five Cosplay Pikachu ARE the Power Plant's
+Gen 6 presence, so `GEN_HOME_MIN` now fills it with a real Gen 6 species); and
+the band budgets never see them, which is right - a costume is no more part of
+a map's rarity mix than Mewtwo is.
+
+**TWO APPENDED FAMILIES NEED ONE DENOMINATOR.** `total * share / (1 - share)`
+is the budget that makes a share of the WHOLE, and it is correct only while one
+thing is appended. Appending a second against the same `total` lands each in a
+table the other has made bigger, so BOTH come out under their own rule - caught
+as the legendaries at 1.620% against the 1.625% they are owed, on a bound tight
+enough to see it. `taken` is the sum of every appended share.
+
+**AND "SO PIXELATED" WAS THE CREATURE, NOT THE FILE.** A render said why:
+PokeAPI's front sprite draws these thirteen SMALL INSIDE THEIR CANVAS - plain
+Pikachu fills its 64px frame, Pikachu Libre occupies about 45px of a 96px one -
+so the UI upscales the costume half again as much as the Pikachu beside it.
+Less creature per file, which looks like lower resolution and is fixed
+differently. Re-framing alone would fix the size and not the detail, so the art
+comes from `other/official-artwork` (475px, 13/13) re-framed onto **plain
+Pikachu's own bounding box**: `build_origin`'s law is RESIZE THE CANVAS, NEVER
+THE CREATURE, and that law is about comparing DIFFERENT species - a Pikachu in
+a mask is Pikachu-sized, so Pikachu is the only honest target. LANCZOS rather
+than NEAREST, because 475 -> 64 from a painted source is a downscale.
+`official-artwork/shiny` covers eleven; **Partner Cap and World Cap keep the
+shiny they had**, since the alternative was giving them the ordinary art as a
+tier whose whole tell is that the colours changed.
+
 **AND REACHABILITY WAS THE CLAIM, NOT EVOLUTION.** check.mjs asserted *"a form
 nothing evolves into"* - a true description of reachability while every form
 was a Mega. It branches on `wild` now, and asserts the two families are

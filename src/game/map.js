@@ -144,14 +144,38 @@ const cap = (w) => w[0].toUpperCase() + w.slice(1);
    what Mega Charizard X is called. Driven off the `form` field rather than off
    the string, so a species that simply has a hyphen in its real name (tapu-koko,
    mr-mime) is untouched. */
-const FORM_WORD = { mega: "Mega", primal: "Primal", gmax: "Gigantamax" };
+const FORM_WORD = {
+  mega: "Mega", primal: "Primal", gmax: "Gigantamax",
+  alolan: "Alolan", galarian: "Galarian", hisuian: "Hisuian", paldean: "Paldean",
+};
 
+/* THE BASE COMES FROM `from`, NOT FROM A REGEX ON THE SLUG, and that is the
+   repair. The strip list was `-(mega|primal|gmax|eternamax)(-[xy])?` - complete
+   while those were the only forms there were, and silently wrong for all
+   seventy that arrived with regional and costume slugs. It rendered
+   **"Costume Pikachu-rock-star"**, "Alolan Vulpix-alola" and "Paldean
+   Tauros-paldea-aqua-breed": the prefix came from `FORM_WORD`'s `?? cap(s.form)`
+   fallback and the rest was the raw key, title-cased. Nothing failed, because a
+   name is a string and every string renders.
+
+   Every form record already carries `from`, the base's real name, so there is
+   nothing to parse: `NAME_FIX` then does "Mr. Mime" and "Farfetch'd" for
+   Galarian Mr. Mime and Galarian Farfetch'd for free, which a regex over the
+   slug would have had to be told about twice.
+
+   `title` wins outright where a form has one. The cosplay five are named
+   "Pikachu Libre" and the eight caps "Original Cap Pikachu" - the species
+   moves from the front to the back between them, which is what the games call
+   them and is not something a rule can infer. */
 export const label = (s) => {
+  if (s.title) return s.title;
   if (s.form) {
-    const base = s.name.replace(/-(mega|primal|gmax|eternamax)(-[xy])?$/, "");
-    const tail = s.name.match(/-(x|y)$/)?.[1];
-    const name = NAME_FIX[base] ?? cap(base);
-    return `${FORM_WORD[s.form] ?? cap(s.form)} ${name}${tail ? ` ${tail.toUpperCase()}` : ""}`;
+    const name = NAME_FIX[s.from] ?? cap(s.from ?? s.name);
+    // Mega X and Mega Y keep their letter behind the name; a Paldean Tauros
+    // keeps its breed, which is the only thing telling the three apart.
+    const xy = s.name.match(/-(x|y)$/)?.[1];
+    const tail = s.tail ? ` (${s.tail})` : xy ? ` ${xy.toUpperCase()}` : "";
+    return `${FORM_WORD[s.form] ?? cap(s.form)} ${name}${tail}`;
   }
   return NAME_FIX[s.name] ?? cap(s.name);
 };

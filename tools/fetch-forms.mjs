@@ -75,7 +75,16 @@ const REGION_AT = (name) => {
        Paldean Tauros breeds are kept: those are three distinct Pokemon, each
        with its own types, and all three are catchable. */
     if (tail === "-zen") return null;
-    return { base: name.slice(0, at), kind, word, gen };
+    /* "-combat-breed" -> "Combat". Only the Paldean Tauros keep one: the three
+       breeds are three Pokemon and the name is all that separates them.
+       `-standard` is dropped - it is Galarian Darmanitan's ordinary state,
+       named only because a `-zen` exists to contrast with, and "Galarian
+       Darmanitan (Standard)" is a database row talking about itself. */
+    const extra = tail.replace(/-breed$/, "").replace(/^-standard$/, "").replace(/^-/, "");
+    return {
+      base: name.slice(0, at), kind, word, gen,
+      tail: extra ? extra.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") : "",
+    };
   }
   return null;
 };
@@ -97,20 +106,25 @@ const REGION_AT = (name) => {
    string `-alola` and is a HAT, not an Alolan Pikachu - which does not exist,
    and neither does a Hisuian one. Ask the regions first and the dex ships a
    species labelled "Alolan Pikachu" that Game Freak never drew. */
+/* THE NAME IS THE GAMES' NAME, CARRIED RATHER THAN DERIVED. The cosplay five
+   put the costume AFTER the species (Pikachu Libre) and the eight caps put it
+   BEFORE (Original Cap Pikachu), which is what the games call them and is not
+   a rule anything could infer from the slug. So the title ships on the record
+   and `label()` prefers it - there is nothing for a regex to get right. */
 const COSTUMES = new Map([
-  ["pikachu-rock-star", ["Rock Star", 6]],
-  ["pikachu-belle", ["Belle", 6]],
-  ["pikachu-pop-star", ["Pop Star", 6]],
-  ["pikachu-phd", ["Ph.D.", 6]],
-  ["pikachu-libre", ["Libre", 6]],
-  ["pikachu-original-cap", ["Original Cap", 7]],
-  ["pikachu-hoenn-cap", ["Hoenn Cap", 7]],
-  ["pikachu-sinnoh-cap", ["Sinnoh Cap", 7]],
-  ["pikachu-unova-cap", ["Unova Cap", 7]],
-  ["pikachu-kalos-cap", ["Kalos Cap", 7]],
-  ["pikachu-alola-cap", ["Alola Cap", 7]],
-  ["pikachu-partner-cap", ["Partner Cap", 7]],
-  ["pikachu-world-cap", ["World Cap", 8]],
+  ["pikachu-rock-star", ["Pikachu Rock Star", 6]],
+  ["pikachu-belle", ["Pikachu Belle", 6]],
+  ["pikachu-pop-star", ["Pikachu Pop Star", 6]],
+  ["pikachu-phd", ["Pikachu, Ph.D.", 6]],
+  ["pikachu-libre", ["Pikachu Libre", 6]],
+  ["pikachu-original-cap", ["Original Cap Pikachu", 7]],
+  ["pikachu-hoenn-cap", ["Hoenn Cap Pikachu", 7]],
+  ["pikachu-sinnoh-cap", ["Sinnoh Cap Pikachu", 7]],
+  ["pikachu-unova-cap", ["Unova Cap Pikachu", 7]],
+  ["pikachu-kalos-cap", ["Kalos Cap Pikachu", 7]],
+  ["pikachu-alola-cap", ["Alola Cap Pikachu", 7]],
+  ["pikachu-partner-cap", ["Partner Cap Pikachu", 7]],
+  ["pikachu-world-cap", ["World Cap Pikachu", 8]],
 ]);
 
 const byName = new Map(SPECIES.map((sp) => [sp.name, sp]));
@@ -177,10 +191,13 @@ for (const { name } of list.results) {
      and would otherwise be read as a region that Pikachu does not have. */
   const dressed = COSTUMES.get(name);
   if (dressed) {
-    const [label, gen] = dressed;
+    const [title, gen] = dressed;
     want.push({
       name, base: byName.get("pikachu"), kind: "costume",
-      extra: { wild: true, gen, genus: `${label} Pikachu` },
+      /* The genus stays the BASE's - "Mouse Pokemon" - because that is what it
+         is. A costume is not a classification, it is a hat, and the title is
+         where the hat belongs. */
+      extra: { wild: true, gen, title },
     });
     continue;
   }
@@ -191,7 +208,15 @@ for (const { name } of list.results) {
     if (base) {
       want.push({
         name, base, kind: region.kind,
-        extra: { wild: true, gen: region.gen, genus: `${region.word} Form` },
+        /* `tail` is what the slug carries past the region marker, which is
+           empty for all but the three Paldean Tauros - "Paldean Tauros" three
+           times over would be three dex rows with one name. No title for the
+           rest: `label()` builds those from `from`, which is the base's real
+           name and gets "Mr. Mime" and "Farfetch'd" right for free. */
+        extra: {
+          wild: true, gen: region.gen, genus: `${region.word} Form`,
+          ...(region.tail ? { tail: region.tail } : {}),
+        },
       });
     }
     continue;
