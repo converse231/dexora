@@ -40,6 +40,12 @@ import { TIERS as RARE, speciesById, isLegendary } from "../game/biomes.js";
 const VARIANT_ORDER = [null, ...[...RARE].reverse()];
 const variantRank = (v) => VARIANT_ORDER.indexOf(v);
 
+/* Ready first, then anything with a spare, and dex order underneath. It is
+   the Box's default and the one entry in the sort menu that restores it. */
+const ACTIONABLE = (a, b) =>
+  Number(b.ready) - Number(a.ready) ||
+  Number(b.spares.length > 0) - Number(a.spares.length > 0);
+
 export default function Box({
   box, bag, dex, candy, rev, stats, busy, findSeed, onSeedUsed,
   onSell, onConvert, onLevelUp, onEvolve,
@@ -144,8 +150,7 @@ export default function Box({
        rows, and everything settled sits below in dex order. */
     const groups = [...byId.values()].sort(
       (a, b) =>
-        Number(b.ready) - Number(a.ready) ||
-        Number(b.spares.length > 0) - Number(a.spares.length > 0) ||
+        ACTIONABLE(a, b) ||
         a.species - b.species ||
         variantRank(a.variant) - variantRank(b.variant),
     );
@@ -184,8 +189,26 @@ export default function Box({
      a Box holding one species worked, and the tab went blank white the moment
      anyone caught a second. A crash that needs real save data to appear is
      exactly what a fresh-save smoke test cannot see. */
+  /* READY FIRST WAS DEX ORDER, AND THE TIEBREAK IS WHAT DID IT.
+
+     `ready: () => 0` meant "keep the order the memo built" and would have,
+     except that `shown` finishes every comparator with `|| a.species - b.species`
+     so that no sort is left unstable. `0 || x` is `x`, so the built-in order
+     was thrown away and **"Ready first" sorted identically to "By dex"** -
+     which is exactly how it was reported: a sort that does not seem to do
+     anything. A no-op comparator is only a no-op when nothing follows it.
+
+     So the ordering is written ONCE, above, and both readers use it: the memo
+     that builds the default order and the menu entry that restores it. Two
+     copies of "ready, then spare" is how they come to disagree, and this pair
+     had already disagreed without anyone being able to see which was right.
+
+     IT IS NOT THE SAME THING AS THE FILTER, which is the other half of the
+     question asked: "Ready to evolve" HIDES every other row, "Ready first"
+     keeps them all and floats the actionable ones. One is for doing a job, the
+     other for browsing with the job in reach. */
   const SORTS = {
-    ready: () => 0,                                   // the built-in order
+    ready: ACTIONABLE,
     dex: (a, b) => a.species - b.species,
     name: (a, b) => label(speciesById(a.species)).localeCompare(label(speciesById(b.species))),
     count: (a, b) => b.count - a.count,

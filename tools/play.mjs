@@ -229,7 +229,15 @@ function until(e, what, label, max = 2000) {
     e.state.dex[dexIndex(enc.speciesId)] = 2;   // not a new entry: that pays too
     const sp = speciesById(enc.speciesId);
     const before = e.state.money;
+    /* THE MASTER BALL ASKS NOW, so this drives the real path rather than
+       reaching past it - the press, the question, the answer. This test broke
+       the day the gate shipped, which is the gate working: a harness that
+       could still throw one without answering would be proof the dialog is
+       skippable. */
     e.throwBall("master-ball");
+    assert.equal(e.state.ask?.kind, "master",
+      "a Master Ball threw without asking - the gate is not in the engine");
+    e.answerAsk(true);
     until(e, (s) => !s.encounter || s.encounter.phase === "caught",
       "the master ball to land");
     const got = e.state.money - before;
@@ -244,6 +252,130 @@ function until(e, what, label, max = 2000) {
   assert.ok(paid.showdown > 0, "the rarest tier in the game paid nothing");
   console.log(`bounty ok — an ordinary catch pays ¥0 and a showdown pays ` +
     `¥${paid.showdown}, both through a real throw`);
+}
+
+/* TWO PRESSES THAT CANNOT BE TAKEN BACK HAVE TO ASK, AND ONLY THE ENGINE CAN
+   BE ASKED WHETHER THEY DO.
+
+   `throwBall` and `flee` are reached from eight call sites across `App.jsx`,
+   `Pad.jsx` and three panels, and this repo has already shipped the failure
+   where a rule lived at one of two call sites and not the other. The gate is
+   in the ENGINE for that reason, so what is worth testing is the ENGINE: that
+   the press does not go through, that the question names the right thing, that
+   NO is free and YES is what spends.
+
+   Both directions on both gates, because a confirmation that cannot be
+   declined is a click tax, and one that spends the item anyway is worse than
+   none at all. */
+{
+  const { isLegendary, LEGENDARY, dexIndex } = await import("../src/game/biomes.js");
+  const { GUARANTEED } = await import("../src/catch.js");
+  const { ballById } = await import("../src/game/items.js");
+  const { e } = boot(SAVE);
+
+  const fresh = () => {
+    const enc = e.state.encounter ?? walkToEncounter(e);
+    assert.ok(enc, "walked a whole map and met nothing");
+    if (enc.phase !== "idle")
+      until(e, (s) => !s.encounter || s.encounter.phase === "idle", "back to idle");
+    return e.state.encounter;
+  };
+
+  // --- the Master Ball, on an ordinary encounter, both answers.
+  {
+    const enc = fresh();
+    enc.speciesId = 19;                       // a Rattata: nothing legendary here
+    e.state.bag["master-ball"] = 2;
+    const held = e.state.bag["master-ball"];
+
+    e.throwBall("master-ball");
+    assert.equal(e.state.ask?.kind, "master", "the Master Ball did not ask");
+    assert.equal(e.state.bag["master-ball"], held,
+      "asking already spent the ball - the question has to come BEFORE the cost");
+    assert.equal(e.state.encounter.phase, "idle", "asking started the throw anyway");
+
+    e.answerAsk(false);
+    assert.equal(e.state.ask, null, "NO left the question up");
+    assert.equal(e.state.bag["master-ball"], held, "NO spent the ball anyway");
+    assert.equal(e.state.encounter.phase, "idle", "NO threw it anyway");
+
+    e.throwBall("master-ball");
+    e.answerAsk(true);
+    assert.equal(e.state.bag["master-ball"], held - 1, "YES did not spend the ball");
+    assert.notEqual(e.state.encounter?.phase, "idle", "YES did not throw it");
+    until(e, (s) => !s.encounter, "the encounter to close", 4000);
+  }
+
+  // --- and an ORDINARY ball is not gated, or the dialog is a click tax.
+  {
+    const enc = fresh();
+    e.state.bag["poke-ball"] = 5;
+    const held = e.state.bag["poke-ball"];
+    e.throwBall("poke-ball");
+    assert.equal(e.state.ask, null, "a Poke Ball asked - only a ball that cannot fail may");
+    assert.equal(e.state.bag["poke-ball"], held - 1, "the plain throw did not happen");
+    /* A plain throw can BREAK FREE and hand the encounter back at "idle", so
+       waiting for it to close is a wait that never ends. Resolve, then leave
+       by the ungated door - this one is a Rattata. */
+    until(e, (s) => !s.encounter || s.encounter.phase === "idle", "the throw to resolve");
+    if (e.state.encounter) {
+      e.state.encounter.speciesId = 19;
+      e.flee();
+      until(e, (s) => !s.encounter, "the encounter to close", 4000);
+    }
+  }
+
+  // --- running from a legendary, both answers; and running from anything else.
+  {
+    const enc = fresh();
+    const legend = LEGENDARY[0];
+    assert.ok(isLegendary(legend), "LEGENDARY[0] is not legendary");
+    enc.speciesId = legend;
+    e.flee();
+    assert.equal(e.state.ask?.kind, "flee", "running from a legendary did not ask");
+    assert.equal(e.state.encounter.phase, "idle", "asking ran anyway");
+    e.answerAsk(false);
+    assert.equal(e.state.encounter.phase, "idle", "NO ran anyway");
+    e.flee();
+    e.answerAsk(true);
+    assert.equal(e.state.encounter.phase, "ran", "YES did not run");
+    until(e, (s) => !s.encounter, "the encounter to close", 4000);
+  }
+  {
+    const enc = fresh();
+    enc.speciesId = 19;
+    e.flee();
+    assert.equal(e.state.ask, null, "running from a Rattata asked");
+    assert.equal(e.state.encounter.phase, "ran", "the plain run did not happen");
+    until(e, (s) => !s.encounter, "the encounter to close", 4000);
+  }
+
+  /* AND A QUESTION ABOUT AN ENCOUNTER DIES WITH IT. The frame loop runs under
+     an open dialog, so the Pokemon can leave while the question is up - and a
+     YES answered into nothing would be a dialog that lies about what it did.
+     `throwBall` re-runs every guard it has, so the worst case is already a
+     no-op; this pins the tidier half, that the question is not still sitting
+     on `state` afterwards. */
+  {
+    const enc = fresh();
+    enc.speciesId = LEGENDARY[0];
+    e.flee();
+    assert.ok(e.state.ask, "no question to strand");
+    e.answerAsk(true);
+    until(e, (s) => !s.encounter, "the encounter to close", 4000);
+    assert.equal(e.state.ask, null, "the question outlived the encounter");
+  }
+
+  // And it is never written to disk - it is a question about this moment.
+  {
+    e.setChar(e.state.char === "red" ? "leaf" : "red");
+    await new Promise((r) => setTimeout(r, 600));
+    const raw = store.get("meadow-route");
+    assert.ok(raw && !JSON.parse(raw).ask, "`ask` was saved - it is not save state");
+  }
+
+  console.log("confirm gates ok — the Master Ball and a legendary RUN both ask, " +
+    "NO costs nothing, YES spends, and the question dies with the encounter");
 }
 
 /* WALKING PAYS A WAGE, AND THE WHOLE POINT OF IT IS THAT IT NEEDS NO CATCH.

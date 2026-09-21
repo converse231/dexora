@@ -2677,6 +2677,69 @@ every half minute of walking is an interruption. It is also the easiest reward i
 the game to make accidentally infinite, so check.mjs pins the cadence, the
 scaling, that ordinary parcels never pay Ultras, and the 50,000-step total.
 
+**A PRESS THAT CANNOT BE TAKEN BACK ASKS FIRST, AND THE GATE IS IN THE
+ENGINE.** Two of them, both reported from play: a Master Ball thrown by
+accident, and a legendary run from by reflex. The ball is ¥50,000 or 12,500
+steps of walking and throwing one ENDS the encounter; a legendary is 1 in
+3,760 encounters and RUN sits under the thumb that throws.
+
+**EIGHT CALL SITES IS WHY IT IS NOT AT THE CALL SITES.** Five throws - the key
+handler, the bag sheet, the rail, the pad's A - and three flees, spread over
+`App.jsx`, `Pad.jsx` and `Encounter.jsx`. This file already records what
+guarding each one costs (*"a rule enforced in one of two places is not a
+rule"*, the shiny protected from one bulk action and not its sibling), and
+`keeper()` lives in the engine for exactly that reason. Gated in `throwBall`
+and `flee`, **`Pad.jsx` needed no change at all** and a sixth call site is
+covered on the day it is written.
+
+**`state.ask` IS THE PRESS, NOT THE DECISION.** It carries the function to
+re-run, so confirming re-enters `throwBall`/`flee` from the top rather than
+reaching into their middle - every guard runs again, and an encounter that
+ended under an open dialog is a no-op rather than a special case. Never saved,
+for the reason `worn` is not. The question is cleared when the encounter is,
+and `App` renders the dialog on `st.ask && st.encounter` so a stranded one
+cannot draw.
+
+**THE PREDICATES ARE THE ONES ALREADY IN USE.** The ball is gated on
+`mult >= GUARANTEED` - what `defaultBall` refuses a bare throw with, so a
+second ball that cannot fail is covered the day it ships - and AFTER the bag
+check, because confirming a ball you do not hold is a dialog about nothing.
+The flee is gated on `isLegendary(e.speciesId)`, which is exactly what
+`Encounter.jsx` draws the mark from, on a `speciesId` frozen at spawn: the
+dialog and the badge cannot disagree, and a second `legendary` field on the
+encounter would be a copy with nothing to gain.
+
+tools/play drives all four answers through a live engine - asking does not
+spend, NO costs nothing, YES spends, and an ordinary ball and an ordinary
+species are not gated at all, because a confirmation you cannot decline is a
+click tax. Verified by removing each gate.
+
+**AND `tone="warn"` HAD NO RULE.** Three dialogs passed it - log out, the
+session taken away, and both of these - and `.cf-yes.warn` did not exist, so
+all three rendered as the ordinary confirm. CSS is especially good at hiding
+this: an unknown word in a template string is a class nobody styled, and the
+button falls back to looking *correct*. Found by grepping for the selector,
+not by looking at it, because "it looks like a confirm button" is what the
+right and the wrong answer both look like.
+
+**"READY FIRST" WAS DEX ORDER, AND THE TIEBREAK IS WHAT DID IT.** Reported as
+a sort that does not seem to do anything, and it did not: `SORTS.ready` was
+`() => 0`, meaning "keep the order the memo built", and `shown` finishes every
+comparator with `|| a.species - b.species` so that no sort is left unstable.
+`0 || x` is `x`, so the built-in order was discarded and the option sorted
+**identically to "By dex"**. **A no-op comparator is only a no-op when nothing
+follows it.**
+
+The ordering is written once now (`ACTIONABLE`) and both readers use it - the
+memo that builds the default order and the menu entry that restores it. Two
+copies of "ready, then spare" is how they come to disagree, and this pair had
+already disagreed with nothing able to say which was right.
+
+**AND IT IS NOT THE SAME THING AS THE FILTER**, which was the question asked:
+"Ready to evolve" HIDES every other row, "Ready first" keeps them all and
+floats the actionable ones. One is for doing a job, the other for browsing
+with the job in reach.
+
 **Medals are derived, never listed.** `medals.js` builds all 80 from the
 evolution graph, the type lists and the biome tables, so a new species or a new
 map grows the set with nothing edited by hand. `medalsFor()` is indexed by
