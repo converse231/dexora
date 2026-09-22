@@ -334,6 +334,11 @@ async function one(name, base, kind, extra = {}) {
        nothing in the payload says so. Taking the base's is the honest
        fallback; the genus below is what actually names the form. */
     flavor: base.flavor,
+    /* SHAPED LIKE WHAT IT IS A FORM OF. PokeAPI keys `shape` to the SPECIES
+       and never to a variety, so there is nothing else to read - and it is the
+       right answer anyway: a White-Striped Basculin is a fish because Basculin
+       is one, and Mega Gyarados is shaped like Gyarados. */
+    shape: base.shape,
     height: pk.height,
     weight: pk.weight,
     stats: ["hp", "attack", "defense", "special-attack", "special-defense", "speed"]

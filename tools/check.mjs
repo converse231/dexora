@@ -5445,6 +5445,47 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
 {
   const per = BIOMES.map((b) => LEGENDARY.filter((id) =>
     speciesById(id).types.some((t) => b.types.includes(t))).length);
-  console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries ` +
+  /* A FISH NEEDS WATER TO BE IN, and both halves of that are checkable.
+
+   Reported as wanting the tables accurate per type, with the distinction drawn
+   for us - *"fish (not all water types) pokemon can only spawn on water"* - and
+   `shape` is what answers it: Game Freak's own classification, complete over
+   the dex where `habitat` is null for 639 of 1,025. Measured before the fix,
+   only 6 of the 47 fish were on a rod and the rest were being met on foot: a
+   Magikarp in the Haunted Tower, a Barboach in Ember Caldera, a Stunfisk in
+   Mt Moon.
+
+   THE FLAG AND THE MAP ARE TWO COPIES OF ONE FACT. `b.water` is declared on
+   the biome row because deriving it would mean importing every row of eleven
+   maps into the module every encounter roll goes through; this counts the
+   water characters in `AREAS` and holds the two together, the same shape as
+   `tileBase` against `route.json`. Verified by flipping one flag.
+
+   AND A LEGENDARY IS EXEMPT - Chi-Yu is a Dark/Fire spirit that PokeAPI shapes
+   `fish`, no map is both fiery and wet, and `legendTier` is what homes it. */
+{
+  const wet = (id) => AREAS[id].rows.some((r) => /[wWkK]/.test(r));
+  for (const b of BIOMES) {
+    assert.equal(!!b.water, wet(b.id),
+      `${b.id} says water: ${!!b.water} and its map says ${wet(b.id)}`);
+  }
+  let fish = 0;
+  for (const b of BIOMES) {
+    if (b.water) continue;
+    for (const lv of [1, 20, MAX_LEVEL]) {
+      for (const [id] of encounterTable(b, lv)) {
+        if (speciesById(id)?.shape !== "fish" || LEGENDARY.includes(id)) continue;
+        assert.fail(`${b.id} has no water and spawns ${speciesById(id).name} ` +
+          `at Lv ${lv} - a fish needs something to be in`);
+      }
+    }
+  }
+  for (const sp of SPECIES) if (sp.shape === "fish") fish++;
+  assert.ok(fish > 40, `only ${fish} species are shaped like a fish - shape is missing`);
+  console.log(`fish ok — ${fish} of them, none on the ` +
+    `${BIOMES.filter((b) => !b.water).length} maps with no water in`);
+}
+
+console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries ` +
     `homed ${Math.min(...per)}-${Math.max(...per)} per map, ${sizes[0]} … ${sizes.at(-1)}`);
 }
