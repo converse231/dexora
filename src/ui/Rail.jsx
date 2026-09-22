@@ -11,7 +11,7 @@
    left only ever appears when pressing the tab would achieve something: a
    Pokémon ready to evolve, a stat point unspent. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Dex from "./Dex.jsx";
 import Box from "./Box.jsx";
 import Shop from "./Shop.jsx";
@@ -36,9 +36,13 @@ import { freePoints } from "../game/trainer.js";
    See tools/build_icons.py for how they are normalised. */
 const TABS = ["dex", "box", "shop", "map", "you"];
 
-/* How many species could evolve this second. Cheap enough to do every render -
-   it is one pass over the box, and only species that actually evolve are
-   costed. Doing it here rather than in Box is what lets the tab say so. */
+/* How many species could evolve this second. NOT cheap enough to do every
+   render, which is what the comment here used to claim: it is a pass over the
+   whole box to find each row's best, then an `evoNext` graph walk per distinct
+   (species, variant), and `App` re-renders on every STEP. The same wrong claim
+   the Box's own grouping memo was making, in the file one level up. Memoised
+   at the call site. Doing it here rather than in Box is what lets the tab say
+   so. */
 /* The badge on the BOX tab: how many rows could evolve right now.
 
    Counted per species AND variant, and over each row's BEST, because that is
@@ -79,10 +83,12 @@ export default function Rail({
   const bag = state?.bag ?? {};
   /* Only what is actionable, so a badge always clears once you have dealt with
      it. Everything else a tab could say about itself is already on its panel. */
-  const badges = {
+  /* `colRev`, not `rev`: the collection is the only thing that can change
+     either of these, and `rev` bumps on every step. See engine.js. */
+  const badges = useMemo(() => ({
     box: readyToEvolve(box, bag) || null,
     you: freePoints(state?.stats, level) || null,
-  };
+  }), [box, bag, state?.stats, state?.colRev, level]);
 
   return (
     <div className="rail">

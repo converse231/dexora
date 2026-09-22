@@ -3204,6 +3204,50 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       }
     }
 
+    /* AND THE LAST OF THE COST WAS NEVER REACT'S AT ALL.
+
+       Reported as the frame rate STILL dropping on the Box tab once the panel
+       was memoised - and no memo could have fixed it. A box row draws a
+       Pokemon, a Pokemon in a tier draws `VariantFx`, and every one of those
+       layers is an `infinite` animation: the Holo foil, the Astral sky and
+       aura, five Glitched layers, a Showdown strip stepping eight frames. They
+       run whether or not the row is inside `.boxlist`'s 400px. A full
+       collection is hundreds of rows of which six are on screen.
+
+       Two rules, and the second is the one nobody would think to check:
+
+       `content-visibility` is the lever `.cell` already pulled for the Dex
+       grid, and the list of long lists is enumerated rather than inferred,
+       because what makes one is that it grows with the SAVE.
+
+       And an animation that runs forever on one of those rows may only touch
+       `opacity` and `transform`. `ready-glow` animated `box-shadow`, which is
+       a PAINT property: every ready row repainted sixty times a second, on
+       top of everything above. The rule reads the keyframes rather than
+       naming the animation, so the next shimmer is covered. */
+    {
+      const body = (re) => css.match(re)?.[0] ?? "";
+      for (const row of [".cell", ".boxrow"]) {
+        assert.ok(/content-visibility:\s*auto/.test(
+          body(new RegExp(`\\${row} \\{[^}]*\\}`))),
+          `${row} is a row of a list that grows with the save and does not ` +
+          "declare content-visibility - every off-screen row still lays out, " +
+          "paints and runs its variant animations");
+      }
+      const COMPOSITED = new Set(["opacity", "transform"]);
+      for (const m of css.matchAll(
+        /\.boxrow[^{}]*\{[^}]*animation:\s*([\w-]+)[^;]*infinite/g)) {
+        const kf = body(new RegExp(`@keyframes ${m[1]} \\{(?:[^{}]|\\{[^}]*\\})*\\}`));
+        assert.ok(kf, `@keyframes ${m[1]} is used on a box row and not defined`);
+        for (const d of kf.matchAll(/([a-z-]+)\s*:/g)) {
+          assert.ok(COMPOSITED.has(d[1]),
+            `@keyframes ${m[1]} runs forever on every ready box row and ` +
+            `animates \`${d[1]}\` - only opacity and transform are ` +
+            "composited, anything else repaints each row every frame");
+        }
+      }
+    }
+
     for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
         `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +

@@ -2717,6 +2717,42 @@ of the cell and centred, so a layer at `inset: 0` masks itself to a silhouette
 `.cell-full` needed a `z-index` - the foil is 3 and they had none, so a Holo
 tile had a rainbow travelling over its own entry number.
 
+**AND THE LAST OF THE BOX'S COST WAS NEVER REACT'S, WHICH IS WHY TWO PASSES OF
+MEMOISING DID NOT FIX IT.** Reported as the frame rate STILL dropping on the
+Box tab after `colRev` had stopped the grouping memo and `memo(Box)` had
+stopped the re-render. Both were real and neither could have touched this: a
+box row draws a Pokemon, a Pokemon in a tier draws `VariantFx`, and **every one
+of those layers is `infinite`** - the Holo foil sweeping, the Astral sky and
+aura, five Glitched layers, a Showdown strip stepping eight frames - and they
+run whether or not the row is inside `.boxlist`'s 400px. A mature collection is
+hundreds of rows of which six are ever on screen.
+
+`content-visibility: auto` on `.boxrow` is the same lever `.cell` pulled, and
+the Box needed it more, because a Dex cell is one layer and a box row is a
+whole creature. `contain-intrinsic-size: auto 96px` rather than a fixed height,
+because a row grows a line when it can evolve and the `auto` keyword makes the
+browser remember each row's real size once rendered.
+
+**AND `ready-glow` WAS ANIMATING `box-shadow`, WHICH IS A PAINT PROPERTY.**
+Every ready row repainted sixty times a second, on top of all of the above, and
+on a full box that is dozens of rows. It is an `::after` at `inset: 0` carrying
+a static ring and animating OPACITY now - composited, so it costs nothing - and
+INSET, because `content-visibility` brings `contain: paint` with it and an
+outer `0 0 0 3px` ring would simply have been clipped off. The two arrived
+together and the second is what made the first safe.
+
+check.mjs reads the KEYFRAMES rather than naming the animation: anything that
+runs forever on a box row may only touch `opacity` and `transform`. The list of
+long lists (`.cell`, `.boxrow`) is enumerated rather than inferred, because
+what makes one is that it grows with the SAVE. Both verified by putting the
+bugs back.
+
+**AND `readyToEvolve` WAS RUNNING ON EVERY RENDER OF THE RAIL**, under a
+comment saying it was cheap enough to - a pass over the whole box to find each
+row's best, then an `evoNext` graph walk per distinct (species, variant), seven
+times a second on every tab. The identical wrong claim the Box's own grouping
+memo was making, one file up.
+
 **The lever was pulled.** `content-visibility: auto` on `.cell`, with
 `contain-intrinsic-size`. This note used to say it was safe to add and had not
 been, "because a realistic save holds a few dozen variants rather than 151" -
