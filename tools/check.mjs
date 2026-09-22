@@ -2400,6 +2400,33 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.ok(/\[\.\.\.(TIERS|tiersFor\(id\))\]\.reverse\(\)/.test(body),
       `${f} no longer takes its tier order from TIERS - it will drift`);
   }
+  /* AND A FOURTH PLACE LISTS THE TIERS NOW: the Box's TIER filter.
+
+     Asked for as wanting to see which Pokemon you hold that are Holo or Shiny.
+     The Box has had a row per species AND variant since the ladder was
+     written and no way at all to ask it that - so on a full collection the
+     eight rare rows of a species sat wherever the sort put them.
+
+     It is the same hazard as the other three and it fails the same way: a
+     typed list of eight option rows would be correct today and quietly
+     missing a tier the day a ninth ships, with nothing failing because a
+     filter that does not offer an option is a filter nobody knows to want.
+     `VARIANT_ORDER` is `[null, ...TIERS reversed]`, which the Box already
+     builds to ORDER its rows - so the menu and the panel read in the same
+     order by construction rather than by agreement. */
+  {
+    const body = readFileSync(new URL("../src/ui/Box.jsx", import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.ok(/VARIANT_ORDER\.map\(/.test(body),
+      "the Box's TIER filter no longer builds its options from VARIANT_ORDER - " +
+      "a typed list of tiers is one a ninth tier never reaches");
+    for (const t of TIERS) {
+      assert.ok(!new RegExp(`"${t}"`).test(body),
+        `Box.jsx names the tier "${t}" as a literal - the filter must be ` +
+        "counted from TIERS, not typed");
+    }
+  }
+
   /* THE TABLE QUOTES THE CONSTANTS, and that is the rule - not which four
      constants they happened to be. This was a typed-out list of the tiers as
      they stood, so the day a fifth arrived it failed for the one reason that
@@ -3370,9 +3397,24 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       const rows = EVOLUTIONS.filter((e) => e.to === sp.id);
 
       if (sp.wild) {
-        assert.equal(rows.length, 0,
-          `${sp.name} is met in the wild AND evolved into - it would be both ` +
-          "catchable and worth a hundred candy, and the two cannot both be true");
+        /* BOTH IS ALLOWED NOW, AND `evo` IS WHAT MAKES IT DELIBERATE.
+
+           This asserted `rows.length === 0` - a wild form could not also be an
+           evolution target, because one that was "would be both catchable and
+           worth a hundred candy, and nothing else here would notice". That was
+           a guard against an ACCIDENT, and Castform, Ogerpon and Hoopa are now
+           deliberately both: catchable if you are lucky, buildable if you are
+           not. So the ban becomes a declaration - the form record has to SAY
+           `evo`, which is the same field `fetch-evolutions` reads to emit the
+           row, so the two cannot disagree about whether it was meant. An
+           undeclared row is still the fault it always was. */
+        assert.ok(!rows.length || sp.evo,
+          `${sp.name} is met in the wild AND evolved into without declaring ` +
+          "`evo` - one of the two is an accident");
+        for (const e of rows) {
+          assert.equal(evoLevel(e), 100,
+            `${sp.name} evolves at Lv ${evoLevel(e)}, not the 100 a form costs`);
+        }
         assert.ok(wild.has(sp.id),
           `${sp.name} is a wild form in no table even at Lv ${MAX_LEVEL} - ` +
           "its evolution row was removed and nothing homed it");

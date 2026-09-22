@@ -60,6 +60,12 @@ function Box({
   const [flash, setFlash] = useState(null);
   // Which rows to show, and a name to match. Both are cheap client-side passes.
   const [only, setOnly] = useState("all");
+  /* WHICH TIER, and `"all"` / `"plain"` are the two that are not one. Asked
+     for as wanting to see which Pokemon you hold that are Holo or Shiny - the
+     Box has had a row per species AND variant since the tiers were written and
+     no way at all to ask it that question, so on a full collection the eight
+     rare rows of a species sat wherever dex order put them. */
+  const [rare, setRare] = useState("all");
   const [sort, setSort] = useState("ready");
   const [find, setFind] = useState("");
 
@@ -240,13 +246,16 @@ function Box({
     if (only === "ready" && !g.ready) return false;
     if (only === "spare" && !g.spares.length) return false;
     if (only === "evolves" && !g.paths.length) return false;
+    // `plain` is the ordinary pile; anything else names one tier exactly.
+    if (rare === "plain" && g.variant) return false;
+    if (rare !== "all" && rare !== "plain" && g.variant !== rare) return false;
     if (!needle) return true;
     return (
       label(sp).toLowerCase().includes(needle) ||
       sp.types.some((t) => t.includes(needle))
     );
   }).sort((a, b) => SORTS[sort](a, b) || a.species - b.species),
-  [groups, only, needle, sort]);
+  [groups, only, rare, needle, sort]);
 
   /* Built here rather than in the dialog: it is a pass over the whole box and
      the dialog is rebuilt on every keystroke of the search field. */
@@ -511,7 +520,9 @@ function Box({
           find={find}
           onFind={setFind}
           placeholder="Find a name or type…"
-          onReset={() => { setOnly("all"); setSort("ready"); setFind(""); }}
+          onReset={() => {
+            setOnly("all"); setRare("all"); setSort("ready"); setFind("");
+          }}
           selects={[
             {
               id: "show", label: "SHOW", value: only, onChange: setOnly,
@@ -521,6 +532,25 @@ function Box({
                 ["spare", "Has spares", spareCount],
                 ["evolves", "Can evolve at all",
                   groups.filter((g) => g.paths.length).length],
+              ],
+            },
+            {
+              /* COUNTED FROM `VARIANT_ORDER`, NEVER TYPED, which is the rule
+                 this file already lives under - *"anything laid out per tier
+                 has to be counted, not typed"*, paid for by a `.sf-row` with
+                 five tracks for nine columns and a marks row sized for four
+                 tiers of eight. `VARIANT_ORDER` is `[null, ...TIERS reversed]`,
+                 the order the rows themselves sit in, so the menu reads down
+                 the panel in the order the panel is in and a ninth tier
+                 arrives in both for free. */
+              id: "rare", label: "TIER", value: rare, onChange: setRare,
+              options: [
+                ["all", "Any", groups.length],
+                ...VARIANT_ORDER.map((v) => [
+                  v ?? "plain",
+                  v ? v[0].toUpperCase() + v.slice(1) : "Ordinary",
+                  groups.filter((g) => (g.variant ?? null) === v).length,
+                ]),
               ],
             },
             {

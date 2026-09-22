@@ -1351,8 +1351,15 @@ const derivedHomes = () => {
      would be counted twice - once as a resident the fit balances and once at
      their own share - which is the exact fault this file records as "a species
      listed once and derived once has two weights in the same map". */
+  /* `|| sp.wild` IS THE BOTH-CASE, and without it the pool silently loses
+     them. Being in nothing's `EVOLUTIONS.to` is what usually puts a species
+     here - that ABSENCE is the whole mechanism a wild form runs on - so
+     Castform's three weather formes, which are catchable AND buildable with a
+     stone, would have been filtered out by the very row that makes them
+     buildable and then been in no table at all. A form says `wild` when it
+     belongs here whatever else is true of it. */
   const wild = SPECIES.filter((sp) =>
-    !evolvesInto.has(sp.id) && !LEGENDARY.includes(sp.id)
+    (!evolvesInto.has(sp.id) || sp.wild) && !LEGENDARY.includes(sp.id)
     && !COSTUMES.includes(sp.id));
 
   /* A HOME IS THE PRIMARY TYPE, AND THE OTHER 453 SPECIES WERE NOT GETTING
