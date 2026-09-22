@@ -3148,6 +3148,32 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `${id} has no sky: add a .battle[data-area="${id}"] block to ` +
       "styles.css, or its encounters happen under the default daylight");
   }
+  /* EVERY SCREEN THAT DRAWS A POKEMON HAS TO SIZE THE ONE THAT IS NOT AN IMG.
+
+     Showdown renders as a `<span>` with the strip as a background, and
+     `Sprite.jsx` returns it BEFORE the `fx` branch - so it is neither an
+     `img` nor a `.sprite-fx`, and a container rule naming only those two
+     gives it nothing. It then takes its own `width: 77%` of an auto-sized
+     grid track and comes out zero wide. Reported as Showdown having no
+     preview in the Box, where exactly that had happened; `Sprite.jsx`'s own
+     comment states the rule - *"`.sprite-showdown` has to be sized wherever
+     an `img` was"* - and prose does not fail a build.
+
+     A LIST, AND DEFENSIBLY SO. The blanket version ("every rule that sizes
+     `.sprite-fx` must size the span too") is wrong: `.br-item .sprite-fx`
+     sizes a tiered HONEY, which is an item and never a Showdown. What has to
+     be enumerated is the screens that draw a POKEMON, and unlike the tier
+     ladder that set is four and changes when a screen is added, not when
+     content is. */
+  {
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow"]) {
+      assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
+        `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +
+        "variant that is a span will render zero wide there, silently");
+    }
+  }
+
   console.log(`battle scene ok — ${Object.keys(AREAS).length} floors, ` +
     `${(css.match(/\.battle\[data-area=/g) ?? []).length} skies`);
 }

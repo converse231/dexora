@@ -10,7 +10,7 @@
     "check": "node tools/check.mjs && node tools/play.mjs",
     "play": "node tools/play.mjs",
     "assets": "node tools/fetch-species.mjs && node tools/fetch-items.mjs && node tools/fetch-evolutions.mjs && python tools/build_origin.py",
-    "forms": "node tools/fetch-forms.mjs && python tools/build_costumes.py && node tools/fetch-evolutions.mjs",
+    "forms": "node tools/fetch-forms.mjs && node tools/fetch-evolutions.mjs",
     "art": "python tools/build_assets.py",
     "map": "python tools/build_map.py",
     "layout": "python tools/study_layout.py",

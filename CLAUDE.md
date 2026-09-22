@@ -135,6 +135,82 @@ table the other has made bigger, so BOTH come out under their own rule - caught
 as the legendaries at 1.620% against the 1.625% they are owed, on a bound tight
 enough to see it. `taken` is the sum of every appended share.
 
+**AND THE HIGHER-RES COSTUME ART WAS REVERTED.** `official-artwork` is a
+painted illustration among 1,200 game rips, and asked for directly: use the
+PokeAPI sprite. `tools/build_costumes.py` is deleted and `npm run forms` no
+longer calls it - what survives is the measurement below, which is still true
+and is what the 77% rule was derived from.
+
+**SIX SIZING FAULTS IN ONE PASS, AND ALL OF THEM ONE SPRITE DRAWN AT THE WRONG
+SCALE.** Worth keeping together because the shape repeats: a number that
+described one box being used to size a different one.
+
+**THE ENCOUNTER SLOT IS 54%, DOWN FROM 62%.** Every sprite here is 64 or 96
+pixels square, so the slot decides how far the art is BLOWN UP - at 62% of a
+352px viewport a 64px Pidgey was drawn at about 3.4x and every edge was three
+and a half pixels wide. There is no better art to reach for, so the only lever
+is to ask for less enlargement.
+
+**SHOWDOWN IS 77%, AND THAT IS MEASURED.** An ordinary sprite fills a median
+**0.77** of its 64px canvas - Game Freak's rips carry that padding - and a
+Showdown frame fills **1.00**, every time, because `build_showdown.py`
+normalises by `min(64/w, 64/h)` over a source GIF that is already cropped
+tight. Both halves do exactly what they were told and the same box draws a
+Showdown 30% larger than the Pokemon beside it.
+
+**THE BOX SHRINKS, NOT THE BACKGROUND**, and both obvious fixes are traps this
+file already names. `background-size: 77% 616%` silently breaks the frame
+stepping - percentage `background-position` aligns the p% point of the IMAGE
+with the p% point of the BOX, so frame i sits at `i/7` only while the image is
+exactly 8x the box; at 6.16x it lands at `i/6.7` and every frame is a sliver
+of two. `transform: scale(.77)` is killed in the encounter by `mon-appear`,
+because an animation outranks a plain declaration. Sizing the element leaves
+both alone, and all four call sites move together (base 77, `.cell` 68,
+`.sf-art` 77, `.vr-art` 77).
+
+**A STRIP IN AN `<img>` IS EIGHT CREATURES IN A COLUMN**, and `Evolve.jsx` did
+exactly that: `art()` handed `spriteUrl(id, "showdown")` to a plain `<img>`, so
+a Showdown evolution played out with all eight frames stacked and squashed into
+a 30cqw box. Reported as it being enormous; it was the whole strip. This is the
+duplicated-`FOLDER` fault one turn on - there the copy got the PATH wrong, here
+the path is right and the ELEMENT is wrong. The refs only set
+`style.transform`, so a span takes them exactly as an image does.
+
+**THE REVEAL'S LAYERS WERE SIZED TO THE STAGE, NOT TO THE SPRITE.** `.evo-mon`
+is `30cqw` and `.evo-fx` said `46%` - 46% of `.evo-stage`. Two measures of two
+different boxes, agreeing only by luck, and they did not: the Holo foil masked
+to `--art` at one size over a creature drawn at another. Reported as the effect
+being far bigger than the Pokemon. Both read `30cqw` now, so a grep finds the
+pair.
+
+**AND SHOWDOWN HAD NO PREVIEW IN THE BOX**, because the span is neither an
+`img` nor a `.sprite-fx` and `.boxrow` named only those two - so it took its
+own 77% of an auto-sized grid track and came out zero wide. `Sprite.jsx`'s
+comment already stated the rule and prose does not fail a build; check.mjs
+asserts the four Pokemon-drawing containers name it. **A list, defensibly**:
+the blanket version is wrong, because `.br-item .sprite-fx` sizes a tiered
+HONEY and never a Showdown.
+
+**AN EVOLUTION CAN COST A TIER, AND THE DIALOG PROMISED IT COULD NOT.** It read
+*"Your origin evolves, and stays origin"* for every tier and every target -
+true of most, false of the case a player minds: **Gyarados has an Origin and
+Mega Gyarados has none.** Origin is DEBUT artwork, so a form Game Freak never
+drew in 1996 has no older picture, and Showdown is the same shape. Measured,
+**193 evolution rows** drop a tier the source could wear. The mark survives in
+the save; the PICTURE does not - `spriteUrl` 404s and `onSpriteError` falls
+back to the ordinary sprite, so you spend a hundred candy on the rarest thing
+you own and it comes out plain. `lockedTiers(target)` is the predicate, the
+same one `tiersFor` and `rollVariant` are built on, so the warning cannot
+disagree with the Dex about which column exists.
+
+**AND `genOf` WAS A LINEAR SCAN ASKED PER DEX CELL.** `SPECIES.find` over
+1,215 entries, run for every form - measured at **35ms for 24,300 calls
+against 2ms** through a Map, and the Dex grid alone is 1,215 cells.
+`speciesById` cannot be used: it is declared six hundred lines below and
+`GENERATIONS` calls this at module init, which is the temporal dead zone that
+once blanked the BOX tab. Its own Map over the 190 forms - the only ids that
+reach the scan - takes it to 2ms.
+
 **AND "SO PIXELATED" WAS THE CREATURE, NOT THE FILE.** A render said why:
 PokeAPI's front sprite draws these thirteen SMALL INSIDE THEIR CANVAS - plain
 Pikachu fills its 64px frame, Pikachu Libre occupies about 45px of a 96px one -

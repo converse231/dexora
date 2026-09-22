@@ -44,6 +44,36 @@ const SPARKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
    because the animation holds refs to these two elements. */
 export default function Evolve({ evo, onDone }) {
   const art = (id) => spriteUrl(id, evo.variant);
+
+  /* A STRIP IN AN `<img>` IS EIGHT CREATURES IN A COLUMN.
+
+     `Sprite.jsx` says that in as many words, and this file did it anyway:
+     `art()` hands `spriteUrl(id, "showdown")` to a plain `<img>`, and a
+     Showdown sprite is a single PNG holding eight frames stacked. So a
+     Showdown evolution played out with all eight on screen at once, squashed
+     into a 30cqw box by `object-fit: contain` - which reads as one enormous
+     wrong-looking Pokemon rather than as the strip it is.
+
+     This is the fault this file already carries a warning about, one turn on:
+     a second copy of `FOLDER` once made an Astral evolution play in ordinary
+     art. There the duplicate got the PATH wrong; here the path is right and
+     the ELEMENT is wrong. **Never re-derive how a tier is drawn** - the only
+     thing that knows a Showdown is a background rather than a picture is
+     `Sprite.jsx`, so the span is built the way it builds one.
+
+     The refs are untouched by the swap: they set `style.transform` and
+     nothing else, which a span takes exactly as an image does. */
+  const Mon = ({ innerRef, id, className }) =>
+    evo.variant === "showdown" ? (
+      <span
+        ref={innerRef}
+        className={`sprite-showdown ${className}`}
+        style={{ "--strip": `url(${art(id)})` }}
+        aria-hidden="true"
+      />
+    ) : (
+      <img ref={innerRef} className={className} src={art(id)} alt="" />
+    );
   // The filter half. Empty for a tier that has its own artwork, which is why
   // the missing half was invisible for as long as it was.
   const tier = evo.variant ? `sprite-${evo.variant}` : "";
@@ -150,18 +180,10 @@ export default function Evolve({ evo, onDone }) {
       <div className="evo-stage">
         {/* Both sprites stay mounted: the cycle is a scale swap between two
             silhouettes, so unmounting either would break the tug-of-war. */}
-        <img
-          ref={preRef}
-          className={`evo-mon evo-pre ${tier}`.trim()}
-          src={art(evo.from)}
-          alt=""
-        />
-        <img
-          ref={postRef}
-          className={`evo-mon evo-post ${tier}`.trim()}
-          src={art(evo.to)}
-          alt=""
-        />
+        <Mon innerRef={preRef} id={evo.from}
+             className={`evo-mon evo-pre ${tier}`.trim()} />
+        <Mon innerRef={postRef} id={evo.to}
+             className={`evo-mon evo-post ${tier}`.trim()} />
 
         {/* The tier's own treatment, on the REVEAL only.
 
