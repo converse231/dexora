@@ -1939,25 +1939,33 @@ canvas {
   display: grid; place-items: center; overflow: hidden;
   padding: 0; cursor: pointer; font: inherit;
 }
-/* `:not(.mark)` so the rarity badges keep their own size - see Marks.jsx. */
-.cell img:not(.mark),
-.cell .sprite-showdown { width: 68%; height: 68%; object-fit: contain; image-rendering: pixelated; }
+/* `:not(.mark)` so the rarity badges keep their own size - see Marks.jsx.
+
+   TWO BOXES, BECAUSE THE TWO KINDS OF ART FILL THEIR CANVAS DIFFERENTLY. An
+   ordinary sprite fills a median 0.77 of its 64px frame and a Showdown strip
+   fills 1.00 - so one shared 68% box drew every ordinary Pokemon a quarter
+   smaller than the Showdown beside it, reported as the grid looking small.
+   84% x 0.77 is 65% of the tile, level with the Showdown's 68% x 1.00, and
+   still clear of the number and the marks in the corners. */
+.cell img:not(.mark) { width: 84%; height: 84%; object-fit: contain; image-rendering: pixelated; }
+.cell .sprite-showdown { width: 68%; height: 68%; image-rendering: pixelated; }
 
 /* ---- a tier moves in the grid too -------------------------------------
-   `inset: 6%` on the foil, and it is not a nudge: the sprite is drawn at 88%
+   `inset: 8%` on the foil, and it is not a nudge: the sprite is drawn at 84%
    of the cell and centred, so a layer at `inset: 0` masks itself to a
-   silhouette 14% larger than the sprite it is supposed to be sheening. Same
-   box, same `contain`, and the two register exactly.
+   silhouette 19% larger than the sprite it is supposed to be sheening. Same
+   box, same `contain`, and the two register exactly - which they did NOT
+   while this said 88% over a sprite drawn at 68%.
 
    The aura is pulled in hard for the same reason in reverse - at the -14% it
    wears in a battle scene it would be a wash across an 84px tile with
    `overflow: hidden` clipping the falloff, which reads as a coloured cell
    rather than a glow coming off a creature. */
-.cell .holo-foil { inset: 6%; }
-/* The same 6% and for the same reason: the cell's sprite is drawn at 88% and
-   centred, so a layer at `inset: 0` masks itself to a silhouette 14% larger
-   than the thing it is meant to be damaging. */
-.cell .glitch-ghost, .cell .glitch-tear, .cell .glitch-blocks { inset: 6%; }
+.cell .holo-foil { inset: 8%; }
+/* The same 8% and for the same reason: the cell's sprite is drawn at 84% and
+   centred, so a layer at `inset: 0` masks itself to a silhouette larger than
+   the thing it is meant to be damaging. */
+.cell .glitch-ghost, .cell .glitch-tear, .cell .glitch-blocks { inset: 8%; }
 .cell .astral-aura { inset: -2%; }
 .cell .shiny-spark i { width: 6px; height: 6px; box-shadow: 0 0 4px rgba(255, 226, 150, .95); }
 .cell .shiny-spark i:nth-child(2),
