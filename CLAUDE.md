@@ -559,6 +559,24 @@ project, and an over-quota project is read-only for EVERY player), a summary
 trigger that cannot throw (its `::int` casts rolled back the upload they rode
 on, forever), and column grants on `profiles` (a row policy says whose row,
 not which columns, so every derived column was writable from the console).
+The grants are the client's writes stated twice, so tools/play reads the
+columns out of SUPABASE.md and out of `createProfile` and Settings and holds
+them together: a profile field added without its grant is a "permission
+denied" on a screen nobody retests after sign-up.
+
+**AND THREE THINGS THE AUDIT LEFT OVER.** A **guest save** is parked at the
+first sign-in rather than adopted or deleted, and it is offered back on the YOU
+panel as GUEST SAVE - to whoever is signed in, because that is who a guest on
+this browser was - and TAKEN when restored, or the next account here would be
+handed the same collection. **Pre-update recovery copies** sat under the bare
+keys a signed-in player is no longer offered, so a failed save there would have
+gone quiet: `settle` moves them under the browser's owner exactly once
+(`SCOPED_KEY`), into an empty slot only, dropping the bare copy only after the
+write landed. And **EXPORT is pointed at once**, as the `backup` tip at
+`BACKUP_AT` catches - asked for as "just once, just to make the player know",
+because a reminder that came back would be a nag about a chore. The tip reads a
+count the `caught` event did not carry, which is the class the suite now pins:
+a rule reading a field nobody sends never fires, and nothing fails.
 
 **THE SERVER STAMPS `updated_at`.** It was sent by the browser, so a device with
 a wrong clock wrote a wrong time and a determined one could write any time at

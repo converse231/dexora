@@ -110,6 +110,16 @@ export const PARKED_KEY = `${SAVE_KEY}.parked`;
    the one it always was, so an existing offline save's backup is still found. */
 export const scoped = (key, owner) => (owner ? `${key}:${owner}` : key);
 
+/* SET ONCE, THE FIRST TIME `settle` RUNS AFTER RECOVERY COPIES BECAME AN
+   ACCOUNT'S. Every BACKUP and BROKEN written before then sits under the bare
+   key, which a signed-in player is no longer offered - so an existing failed
+   save, the one copy of a collection that did not load, would have gone
+   quiet. They are moved under whoever owned the browser at that moment,
+   which is the best attribution there is: they were written by the last load,
+   and the last load was the owner's. After that the bare keys belong to local
+   mode alone, and nothing moves again. */
+export const SCOPED_KEY = `${SAVE_KEY}:scoped`;
+
 /* Reading never throws. A private window, cleared site data, or a browser that
    has revoked storage all arrive here as "no save", which is the same thing a
    new player is - and starting a fresh game is a better answer than a blank
@@ -367,6 +377,17 @@ export async function settle(uid, pull) {
      so "play the parked one" would put this session on their dex. */
   if (!got.ok) return { ok: false, raw: owner === uid ? local : null };
   drop(CHOSEN_KEY);
+
+  if (!read(SCOPED_KEY)) {
+    // Moved only into an empty slot, and dropped only once the copy landed.
+    if (owner) {
+      for (const k of [BACKUP_KEY, BROKEN_KEY]) {
+        const bare = read(k);
+        if (bare && !read(scoped(k, owner)) && write(scoped(k, owner), bare).ok) drop(k);
+      }
+    }
+    write(SCOPED_KEY, "1");
+  }
 
   /* ANYBODY ELSE'S SAVE IS PARKED BEFORE ANYTHING IS WRITTEN OVER IT - an
      owned one under its owner, an unowned one (a guest's, or from before there
