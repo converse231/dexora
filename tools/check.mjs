@@ -3183,6 +3183,27 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     }
 
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    /* AND A MEMOISED PANEL'S HANDLERS ARE `useCallback`ed, or the memo is
+       decoration. `memo` compares props by IDENTITY, so a single inline arrow
+       on the element hands it a new function every render and it never bails
+       - which is what kept the Box dropping frames after `colRev` had already
+       stopped its grouping memo recomputing. The failure is invisible: the
+       code looks memoised, the panel is correct, and it is simply slow. */
+    {
+      const app = stripComments(
+        readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8"));
+      for (const h of ["onSell", "onConvert", "onLevelUp", "onEvolve", "onJumped"]) {
+        assert.ok(!app.includes(h + "={("),
+          `App.jsx passes an inline arrow for ${h} - a new function every ` +
+          "render, so memo(Box) never bails and walking re-renders the whole box");
+      }
+      for (const [f, name] of [["src/ui/Box.jsx", "Box"], ["src/ui/Dex.jsx", "Dex"]]) {
+        const src = readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
+        assert.ok(src.includes(`export default memo(${name})`),
+          `${f} is a heavy panel and is not memoised`);
+      }
+    }
+
     for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
         `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +

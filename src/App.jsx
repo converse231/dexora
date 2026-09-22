@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createEngine, VIEW_W, VIEW_H } from "./game/engine.js";
 import { TILE } from "./game/tileset.js";
 import TopBar from "./ui/TopBar.jsx";
@@ -98,6 +98,26 @@ export default function App({
   const canvasRef = useRef(null);
   const miniRef = useRef(null);
   const [engine, setEngine] = useState(null);
+
+  /* STABLE, BECAUSE A MEMO CANNOT SEE PAST A NEW FUNCTION.
+
+     These were inline arrows on the `<Rail>` element, so every render of `App`
+     handed the Box four brand-new props - and `App` renders on every STEP.
+     `colRev` had already stopped the Box's heavy grouping memo recomputing,
+     which is why the first pass helped and did not fix it: the component
+     itself still re-rendered seven times a second, re-filtering and
+     re-SORTING its rows (the name sort calls `label(speciesById(...))` per
+     comparison) and rebuilding every row's sprite.
+
+     `memo(Box)` is what stops that, and `memo` compares props by identity -
+     so one inline arrow anywhere in the list defeats the whole thing. They
+     close over `engine`, which is `useState` and set exactly once, so the
+     dependency is honest rather than a lie told to the linter. */
+  const onSell = useCallback((uids) => engine?.sell(uids), [engine]);
+  const onConvert = useCallback((uids) => engine?.convert(uids), [engine]);
+  const onLevelUp = useCallback((uid, n) => engine?.levelUp(uid, n), [engine]);
+  const onEvolve = useCallback((uid, to) => engine?.evolve(uid, to), [engine]);
+  const onJumped = useCallback(() => setBoxJump(null), []);
   const [, force] = useReducer((n) => n + 1, 0);
   const [entry, setEntry] = useState(null);
   /* LOGGING OUT ASKS FIRST. It is not destructive - the account keeps the save
@@ -726,14 +746,14 @@ export default function App({
           busy={!!enc || !!evo}
           onTravel={(id) => engine.travel(id)}
           onSelect={setEntry}
-          onSell={(uids) => engine.sell(uids)}
-          onConvert={(uids) => engine.convert(uids)}
-          onLevelUp={(uid, n) => engine.levelUp(uid, n)}
+          onSell={onSell}
+          onConvert={onConvert}
+          onLevelUp={onLevelUp}
           onBuy={(id, n) => engine.buy(id, n)}
           onBuyCandy={(n) => engine.buyCandy(n)}
-          onEvolve={(uid, to) => engine.evolve(uid, to)}
+          onEvolve={onEvolve}
           jumpTo={boxJump}
-          onJumped={() => setBoxJump(null)}
+          onJumped={onJumped}
           onSpend={(id) => engine.spend(id)}
           /* The three save-file calls, handed over as one object so the panel
              does not need the engine itself. */
