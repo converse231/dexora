@@ -89,6 +89,12 @@ async function one(id) {
     legendary: Boolean(sp.is_legendary || sp.is_mythical),
     genus: clean(sp.genera.find((g) => g.language.name === "en")?.genus ?? ""),
     flavor: clean(entry?.flavor_text ?? ""),
+    /* WHAT THE CREATURE IS, not what it is made of, and it is the one Pokedex
+       classification PokeAPI has for EVERY species - measured, 0 nulls over
+       1,025, where `habitat` is null for 639 of them and was rejected for
+       exactly that. `fish` is 47 of them and is what decides that a Magikarp
+       does not turn up in the Haunted Tower; see `WATERY` in biomes.js. */
+    shape: sp.shape?.name ?? null,
     height: pk.height, // decimetres
     weight: pk.weight, // hectograms
     stats: [

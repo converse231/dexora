@@ -961,6 +961,15 @@ const rareFor = (roster, types, total, open, taken, tier = legendTier) => {
 const RESIDENTS = [
   {
     id: "meadow",
+    /* THERE IS WATER ON THIS MAP, and `WATERY` below is why it matters.
+
+       Declared rather than derived, because deriving it means importing all of
+       `mapdata.js` - every row of eleven maps plus their fixed tile ids - into
+       the module every encounter roll goes through, to learn one boolean per
+       map. check.mjs counts the water characters in `AREAS` and asserts the
+       two agree, which is the same shape as `tileBase` against `route.json`:
+       two copies of one fact, checked against each other. */
+    water: true,
     level: 1,  // where you start, so it cannot be anything else
     name: "Tall Grass",
     types: ["normal", "flying", "bug", "fairy"],
@@ -977,6 +986,7 @@ const RESIDENTS = [
   },
   {
     id: "woods",
+    water: true,
     level: 3,  // the second map, and early enough that the ladder is visible
     name: "Deep Woods",
     types: ["bug", "grass", "poison"],
@@ -988,6 +998,7 @@ const RESIDENTS = [
   },
   {
     id: "pond",
+    water: true,
     level: 6,  // arrives with the Old Rod's reach and the Great Ball
     name: "Pond & Shore",
     /* GRASS, not just water. Half this map is bank: sand, grass and a stand of
@@ -1114,6 +1125,7 @@ const RESIDENTS = [
   },
   {
     id: "frost",
+    water: true,
     level: 18,  // Lapras and Articuno - the map the old design let you waste a whole bag on
     name: "Frost Hollow",
     types: ["ice", "water"],
@@ -1196,6 +1208,7 @@ const RESIDENTS = [
   },
   {
     id: "safari",
+    water: true,
     level: 20,  // MAP_LAST, alongside the tower - the two ends of the game
     name: "Safari Zone",
     /* THE BROADEST TABLE IN THE GAME, because the map is: 120x80 and 4,161
@@ -1302,6 +1315,33 @@ const DERIVED_WEIGHT = { C: 8, B: 5, A: 3, S: 1 };
    somewhere it does not really belong. */
 export const GEN_HOME_MIN = 4;
 
+/* A FISH NEEDS WATER TO BE IN, and `shape` is Game Freak's own word for it.
+
+   Reported as wanting the tables accurate per type, with fish named directly
+   and the distinction drawn for us: *"fish (not all water types) pokemon can
+   only spawn on water"*. That is not a thing a TYPE can answer - Marill and
+   Wooper are Water and walk about, Krabby and Tentacool live in the sea
+   without being fish - and `habitat` cannot answer it either, being null for
+   639 of the 1,025. `shape` is complete: **0 nulls over the whole dex**, and
+   `fish` is 47 of them plus 11 forms.
+
+   Measured, only 6 of the 47 were on a rod and the rest were being met on
+   foot - **a Magikarp in the Haunted Tower, a Barboach in Ember Caldera, a
+   Stunfisk in Mt Moon**. What this does NOT do is empty Pond & Shore: its 21
+   hand-written fish are the map, and you meet them walking its shore exactly
+   as before. The rule is the narrow one the complaint is actually about - a
+   fish is not on a map with no water in it at all.
+
+   AND A LEGENDARY IS EXEMPT, BECAUSE A LEGENDARY IS NOT WILDLIFE. Chi-Yu is
+   the case: a Dark/Fire Treasure of Ruin that PokeAPI shapes `fish`, and it is
+   a spirit that floats in the air rather than anything that needs a pond. It
+   is homed by TYPE like every other legendary - which is the whole of
+   `legendTier` - and no map in this game is both fiery and wet, so applying
+   the rule to it would not move it somewhere better, it would delete it from
+   the game. `rareFor` never asks. */
+const WATERY = new Set(RESIDENTS.filter((b) => b.water).map((b) => b.id));
+const isFish = (id) => speciesById(id)?.shape === "fish";
+
 const derivedHomes = () => {
   const placed = new Set(RESIDENTS.flatMap((b) => b.table.map(([id]) => id)));
   const evolvesInto = new Set(EVOLUTIONS.map((e) => e.to));
@@ -1397,6 +1437,10 @@ const derivedHomes = () => {
        keeps every species homed. Sandy Shocks goes to Mt Moon on `ground`
        instead: still one of its own types, still not the meadow it used to be
        filed under. */
+    /* A fish considers only the maps with water; everything else considers
+       every map, which is what it always did. */
+    const open = isFish(sp.id) ? RESIDENTS.filter((b) => WATERY.has(b.id))
+                               : RESIDENTS;
     const myBand = speciesById(sp.id)?.tier;
     const pick = (pool) => {
       let top = null, high = -1;
@@ -1406,8 +1450,8 @@ const derivedHomes = () => {
       }
       return high > 0 ? top : null;
     };
-    const best = pick(RESIDENTS.filter((b) => bands.get(b.id).has(myBand)))
-      ?? pick(RESIDENTS) ?? RESIDENTS[0];
+    const best = pick(open.filter((b) => bands.get(b.id).has(myBand)))
+      ?? pick(open) ?? open[0];
     homes.get(best.id).push([sp.id, DERIVED_WEIGHT[bandFor(sp.id)] ?? 4]);
   }
 
@@ -1448,7 +1492,14 @@ const derivedHomes = () => {
          sort key, and a generation that has only one candidate gets one -
          `fitShares` gives it its share through whatever does live there, and
          the assertion that matters is presence rather than count. */
-      const fits = (sp) => sp.types.some((t) => b.types.includes(t));
+      /* AND A FILLER MAY NOT BE A FISH ON A DRY MAP EITHER. The primary
+         homing learned this and the filler had not, which is how Chinchou
+         reached the Power Plant and Barboach reached Ember Caldera - neither
+         has a drop of water in it. Both are hand-written residents of Pond &
+         Shore, so `placed` had already excluded them from the homing loop and
+         only this pool could have put them there. Two pools, one rule. */
+      const fits = (sp) => sp.types.some((t) => b.types.includes(t))
+        && (b.water || !isFish(sp.id));
       const pool = wild
         .filter((sp) => genOf(sp.id) === gen && !here.has(sp.id)
                      && bands.has(bandFor(sp.id)) && fits(sp))

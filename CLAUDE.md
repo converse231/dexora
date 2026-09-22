@@ -590,7 +590,7 @@ which are the entire server-side security model.
 ## Commands
 
 ```
-npm run dev        vite dev server           npm run check   check.mjs (32) + play.mjs
+npm run dev        vite dev server           npm run check   check.mjs (33) + play.mjs
 npm run build      vite build                npm run art     python tools/build_assets.py
 npm run preview    serve dist/               npm run map     python tools/build_map.py
 npm run play       drive the engine in Node
@@ -2022,12 +2022,12 @@ runs a flood from the spawn afterwards and closes anything it cut off: a pocket
 you can see and never reach is the thing this file complains about three times
 over Deep Woods.
 
-[tools/check.mjs](tools/check.mjs) adds thirty-two suites — catch rules, phase
+[tools/check.mjs](tools/check.mjs) adds thirty-three suites — catch rules, phase
 machine, balls, master balls, economy, evolution, evolution scene, trainer
 stats, casting, tileset, player, map ladder, medals, origin gate, variant rows,
 steps, minimap, battle scene, band budgets, pity, daily, field items, berries,
 origin art, senses, spawn ladder, clock, habitat, save migration, confirm,
-areas. The count in the command table above is the same number;
+fish, areas. The count in the command table above is the same number;
 both are printed by the run, so a new suite means editing both.
 The tileset suite lays out Safari Zone's **real** pond through our own
 `waterId` and asserts 102 tiles match FireRed exactly, and asserts every canopy
@@ -2413,6 +2413,47 @@ legendary looks commoner there) and by how many others call the same map home
 (the Tower is home to Mewtwo AND Mew, which dilutes Celebi's slice). Both
 measures said Celebi belonged in Deep Woods while it was weighted correctly the
 whole time.
+
+**A FISH NEEDS WATER TO BE IN, AND `shape` IS THE FIELD THAT KNOWS.** Asked
+for with the distinction already drawn - *"fish (not all water types) pokemon
+can only spawn on water"* - and that is not a question a TYPE can answer:
+Marill and Wooper are Water and walk about, Krabby and Tentacool live in the
+sea without being fish. `habitat` cannot answer it either, and was rejected on
+a measurement: **null for 639 of the 1,025**. `shape` is Game Freak's own
+classification and it is COMPLETE - **0 nulls over the whole dex** - and `fish`
+is 47 species plus 11 forms.
+
+Measured before the fix: **only 6 of the 47 were on a rod** and the rest were
+being met on foot - a Magikarp in the Haunted Tower, a Barboach in Ember
+Caldera, a Stunfisk in Mt Moon.
+
+**WHAT IT DOES NOT DO IS EMPTY POND & SHORE**, and that is the whole reason the
+rule is this narrow rather than "a fish is only on a rod". Its 21 hand-written
+fish ARE the map - Magikarp at 20, Goldeen at 10, Carvanha, Feebas, Wailmer -
+and you meet them walking its shore exactly as before. Frost Hollow keeps its
+eight and the Safari Zone its six. The rule is only the thing the complaint was
+actually about: **a fish is not on a map with no water in it at all.**
+
+**`b.water` IS DECLARED AND ASSERTED, NOT DERIVED.** Deriving it means
+importing every row of eleven maps plus their fixed tile ids into the module
+every encounter roll goes through, to learn one boolean per map. check.mjs
+counts the water characters in `AREAS` and holds the two together - the same
+shape as `tileBase` against `route.json`, two copies of one fact checked
+against each other. Five maps have water (meadow 110 tiles, woods 60, pond
+1,409, frost 411, safari 389) and six have none.
+
+**TWO POOLS, ONE RULE.** The primary homing learned it and the `GEN_HOME_MIN`
+filler had not, which is how Chinchou reached the Power Plant and Barboach
+reached Ember Caldera - **both are hand-written residents of Pond & Shore**, so
+`placed` had already excluded them from the homing loop and only the filler
+could have put them there.
+
+**AND A LEGENDARY IS EXEMPT, BECAUSE A LEGENDARY IS NOT WILDLIFE.** Chi-Yu is
+the case and it is the only one: a Dark/Fire Treasure of Ruin that PokeAPI
+shapes `fish`, and a spirit that floats in the air rather than anything needing
+a pond. No map here is both fiery and wet, so applying the rule would not move
+it somewhere better - it would delete it from the game. `legendTier` homes it,
+which is what homes every legendary.
 
 **AND `LEGEND_STRAY` IS ZERO: A LEGENDARY SPAWNS WHERE IT LIVES AND NOWHERE
 ELSE.** Asked for directly - *"articuno should spawn on ice maps only ... even
