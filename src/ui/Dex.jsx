@@ -10,7 +10,7 @@
    three variant marks and a completion badge now, and at 52px those were fighting
    each other; at ~76px they each have a place. */
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
 import {
@@ -43,7 +43,15 @@ const SORTS = {
   rarity: (a, b) => "SABC".indexOf(a.tier) - "SABC".indexOf(b.tier),
 };
 
-export default function Dex({ dex, tiers, caught, level = 1, onSelect }) {
+/* MEMOISED, AND EVERY PROP IS ALREADY STABLE WHILE WALKING - which is what
+   makes this a two-line fix rather than a refactor. `dex` and `tiers` are
+   mutated in PLACE by the engine so their references never change, `caught`
+   and `level` are numbers that only move when they should, and `onSelect` is
+   a `useState` setter, which React guarantees is stable. The one thing that
+   was changing seven times a second was the parent re-rendering, and that is
+   exactly what `memo` stops. `colRev` is the signal that this panel's content
+   really did move - see engine.js. */
+function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
   const [only, setOnly] = useState("all");
   const [type, setType] = useState("any");
   const [sort, setSort] = useState("number");
@@ -312,3 +320,5 @@ export default function Dex({ dex, tiers, caught, level = 1, onSelect }) {
     </div>
   );
 }
+
+export default memo(Dex);

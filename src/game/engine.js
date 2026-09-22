@@ -191,6 +191,7 @@ function freshState() {
        next four hundred steps quietly cost what they always did. Also a
        queue: a repel and a honey bought together run out together. */
     worn: [],
+    colRev: 0,                 // bumps when the COLLECTION moves, not the feet
     ask: null,                 // a press that wants confirming - never saved
   };
 }
@@ -618,7 +619,40 @@ export function createEngine(canvas, onChange, mini = null) {
   const stepMs = () =>
     STEP_MS * stepScale(state.stats) * (state.running ? RUN_SCALE : 1);
 
+  /* TWO COUNTERS, AND THE SECOND ONE IS WHY WALKING IS NOT LAGGY ANY MORE.
+
+     Reported as the trainer walking badly whenever the Dex or Box tab is open,
+     and measured it is exactly that: `onArrive` calls `changed()` on EVERY
+     step - about seven a second - `rev` bumps, `App` re-renders, and the Dex
+     panel reconciles **1,215 cells** plus eight `SPECIES.filter` passes for
+     its mark counts. Nothing about a step changes any of that. The position
+     moved; the collection did not.
+
+     `colRev` IS THE COLLECTION, and the INVERSION is the whole safety of it.
+     The obvious shape - bump a second counter at every place that touches the
+     box, the bag, the dex or the wallet - is seven call sites and a stale
+     panel the day somebody adds an eighth, which is precisely the failure
+     `rev` itself exists to prevent. So the DEFAULT bumps both, and only the
+     one hot path opts out: `stepped()` is called from exactly one place, the
+     end of `onArrive`, and every other mutation in this file keeps the
+     behaviour it always had by doing nothing. The dangerous default became the
+     safe one - the same argument `genOpen` records for treating a missing
+     generation as open.
+
+     `rev` still bumps on every step, so the top bar, the step counter and the
+     money float are untouched. It is only the two heavy panels that read
+     `colRev`. */
   const changed = () => {
+    state.colRev++;
+    state.rev++;
+    onChange();
+  };
+
+  /* A step moved the trainer and nothing else. The ONE caller is the end of
+     `onArrive`; anything there that DID touch the collection - a parcel of
+     balls and its wage - calls `changed()` instead, which is why that line is
+     a ternary rather than a plain call. */
+  const stepped = () => {
     state.rev++;
     onChange();
   };
@@ -642,7 +676,7 @@ export function createEngine(canvas, onChange, mini = null) {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       const { encounter, evolution, fishing, running, cheers, worn, ask, rev,
-        stale, hint, ...rest } = state;
+        colRev, stale, hint, ...rest } = state;
       /* `write` reports whether it stuck rather than throwing - which cause it
          was is its business, not this file's. What happens NEXT is this file's:
          play on either way, and latch it so the top bar can say NOT SAVING. */
@@ -860,7 +894,9 @@ export function createEngine(canvas, onChange, mini = null) {
       }
     }
     save();
-    changed();
+    /* A parcel hands over balls and cash, which the Box and the shop both
+       show; a plain step hands over nothing. */
+    if (parcel) changed(); else stepped();
   }
 
   /* NOBODY IS LEFT AFLOAT WITHOUT THE MEANS TO BE. Surfing is derived from the

@@ -3166,6 +3166,22 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      ladder that set is four and changes when a screen is added, not when
      content is. */
   {
+    /* AND A HEAVY PANEL KEYS ON `colRev`, NEVER ON `rev`.
+
+       `rev` bumps on every step - seven a second while walking - and the Dex
+       is 1,215 cells. Reported as the trainer walking badly whenever the Dex
+       or Box tab was open, which is what a panel re-rendering at that rate
+       for a trainer who moved one tile looks like. The counters are two
+       because the collection did not move; asserted because the next person
+       to add a panel will reach for `rev`, it will work perfectly, and the
+       only symptom will be that the game feels worse. */
+    for (const f of ["src/ui/Dex.jsx", "src/ui/Box.jsx"]) {
+      const src = stripComments(readFileSync(new URL(`../${f}`, import.meta.url), "utf8"));
+      assert.ok(!/\brev\b/.test(src),
+        `${f} reads \`rev\`, which bumps on every step - a heavy panel keys ` +
+        "on `colRev`, or walking re-renders it seven times a second");
+    }
+
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
     for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
@@ -4924,7 +4940,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   assert.equal(new Set(keys).size, keys.length,
     `the dex portrait gives ${keys.length} siblings only ${new Set(keys).size} distinct ` +
     "keys - React stops reconciling them and the old sprite stays mounted");
-  assert.ok(!/<Sprite[^>]*key=/s.test(portrait),
+  assert.ok(!/<Sprite[^>]*key=/s.test(portrait),
     "the portrait's <Sprite> is keyed - an image needs no key, a new src is the update");
   console.log(`dex portrait ok — ${keys.length} keyed layer(s), all distinct, image unkeyed`);
 }

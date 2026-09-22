@@ -126,8 +126,23 @@ body {
 .xpbar i { display: block; height: 100%; background: var(--canopy); border-radius: 99px; }
 
 /* Names the zone you are standing in, and says so plainly when it is silent. */
+/* BOUNDED, BECAUSE IT SHARES THE TOP OF THE WORLD WITH TWO OTHER OVERLAYS.
+
+   `.hud-right` (the clock, and any running field effect) is pinned to the
+   opposite corner, and this had no width at all - so it grew with its
+   contents and the Safari Zone, which carries **seven** type badges, ran
+   straight under the clock. Reported from play with the overlap circled.
+
+   A cap rather than a smaller font: the previous answer was to shrink
+   everything on a coarse pointer, which bought room by making the badges
+   6.5px and was reported in the same breath as the text being too small to
+   read. `max-width` plus a wrapping badge row spends HEIGHT instead, and
+   height is the axis this corner has spare - the tag grows down into the
+   sky, not sideways into the clock. 58% leaves the right-hand stack the 42%
+   it needs at every width. */
 .biome-tag {
   position: absolute; top: 12px; left: 3%; z-index: 5;
+  max-width: 58%;
   display: flex; flex-direction: column; gap: 3px;
   padding: 9px 14px 8px;
   background: var(--surface); border: 2px solid var(--line-firm);
@@ -136,7 +151,7 @@ body {
   pointer-events: none;
 }
 .biome-tag.locked { border-color: var(--path); }
-.biome-tag .types { margin-top: 3px; }
+.biome-tag .types { margin-top: 3px; flex-wrap: wrap; }
 .biome-tag i { font-style: normal; font-size: 9px; color: var(--ink-faint); }
 .biome-tag em { font-style: normal; font-size: 9.5px; color: var(--path); }
 
@@ -148,14 +163,20 @@ body {
    on width, the rule the pad and the two bags follow: this is about how big
    the map is, and on a coarse pointer it is always the small one. */
 @media (hover: none) and (pointer: coarse) {
+  /* UP FROM 8.5/6.5px, WHICH WAS THE WRONG LEVER. Those numbers were chosen
+     to stop the tag covering the top-left quarter of the map, and they did -
+     by making a type badge 6.5px, which is below what a pixel font renders
+     legibly at any density. The `max-width` above is what actually bounds the
+     tag now, so the size can go back to something readable and the badges
+     wrap onto a second line instead of pushing the box wider. */
   .biome-tag {
-    top: 7px; padding: 5px 8px 4px; gap: 2px;
-    font-size: 8.5px; border-radius: 7px; border-width: 2px;
+    top: 7px; padding: 6px 9px 5px; gap: 2px;
+    font-size: 10px; border-radius: 7px; border-width: 2px;
   }
-  .biome-tag .types { margin-top: 2px; gap: 3px; }
-  .biome-tag .type { font-size: 6.5px; padding: 2px 4px 1px; }
-  .biome-tag i { font-size: 7.5px; }
-  .biome-tag em { font-size: 8px; }
+  .biome-tag .types { margin-top: 3px; gap: 3px; }
+  .biome-tag .type { font-size: 8px; padding: 2px 5px 1px; }
+  .biome-tag i { font-size: 8.5px; }
+  .biome-tag em { font-size: 9px; }
   /* The clock is the other thing pinned to the world, and it is the same
      decision - it says one word and a time. */
   .worldclock { padding: 4px 8px 3px; font-size: 9.5px; }
@@ -661,8 +682,23 @@ canvas {
   background: var(--surface); border: 3px solid var(--canopy);
   border-radius: 11px; box-shadow: 0 3px 0 rgba(47, 107, 76, .3);
 }
-.np-name { font-family: var(--display); font-weight: 600; font-size: 17px; font-size: 3.2cqw; }
-.np-lv { font-family: var(--pixel); font-size: 10px; font-size: 1.7cqw; color: var(--ink-soft); }
+/* CLAMPED, BECAUSE `cqw` HAS NO FLOOR AND A PHONE IS A NARROW CONTAINER.
+
+   `3.2cqw` is 17px on a 530px battle and **11px on a 340px one** - it scales
+   with the container, which is the whole point of the unit and is exactly
+   wrong at the small end, where the text stops being readable rather than
+   merely getting smaller. Reported as the encounter text being tiny on
+   mobile. The second declaration was a plain fallback for browsers with no
+   container queries, so the px value was never a floor for anyone who had
+   them; `clamp` makes it one and leaves the desktop size untouched. */
+.np-name {
+  font-family: var(--display); font-weight: 600;
+  font-size: 17px; font-size: clamp(15px, 3.2cqw, 17px);
+}
+.np-lv {
+  font-family: var(--pixel); color: var(--ink-soft);
+  font-size: 10px; font-size: clamp(9.5px, 1.7cqw, 10px);
+}
 /* HOW BIG THIS ONE IS, and it is deliberately the quietest thing on the plate.
    The name, the level and the types are what a throw is decided on; this is
    flavour, and flavour that competes with the decision is noise. The XS/XL tag

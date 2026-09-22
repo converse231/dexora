@@ -49,7 +49,7 @@ const ACTIONABLE = (a, b) =>
   Number(b.spares.length > 0) - Number(a.spares.length > 0);
 
 export default function Box({
-  box, bag, dex, candy, rev, stats, busy, findSeed, onSeedUsed,
+  box, bag, dex, candy, colRev, stats, busy, findSeed, onSeedUsed,
   onSell, onConvert, onLevelUp, onEvolve,
 }) {
   const [pending, setPending] = useState(null);
@@ -166,9 +166,9 @@ export default function Box({
         .filter((m) => spare.has(m.uid))
         .reduce((sum, m) => sum + candyValue(speciesById(m.species)), 0),
     };
-    // `rev` is what actually changes: the engine mutates box, bag and dex in
+    // `colRev` is what changes: the engine mutates box, bag and dex in
     // place, so their references alone would keep this memo stale forever.
-  }, [box, bag, dex, rev, stats]);
+  }, [box, bag, dex, colRev, stats]);
 
   /* Distinct SPECIES, not rows. A row is one species-and-variant now, so
      `groups.length` counts a Holo Pidgey separately from the ordinary pile -
@@ -274,7 +274,7 @@ export default function Box({
           sub: `Lv ${levels.join(", ")}`,
         };
       });
-  }, [box, spareUids, rev]);
+  }, [box, spareUids, colRev]);
 
   /* THE ARITHMETIC IS A FUNCTION OF WHAT IS STILL TICKED. It was three strings
      built once when the dialog opened, which is fine for a receipt and wrong

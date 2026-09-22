@@ -126,6 +126,9 @@ export default function Rail({
           tiers={state}
           caught={caught}
           level={level}
+          /* Not `rev`: that bumps every step and this panel is 1,215 cells.
+             See `colRev` in engine.js. */
+          colRev={state?.colRev}
           onSelect={onSelect}
         />
       )}
@@ -134,7 +137,7 @@ export default function Rail({
           box={box}
           bag={bag}
           dex={state?.dex}
-          rev={state?.rev}
+          colRev={state?.colRev}
           stats={state?.stats}
           busy={busy}
           findSeed={seed}
