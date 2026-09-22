@@ -32,7 +32,9 @@ import Mark from "./Marks.jsx";
 
 // Rarest first: the order the Box, the Dex and the encounter all read in -
 // one array, in biomes.js, beside the odds that define it.
-import { TIERS as RARE, speciesById, isLegendary } from "../game/biomes.js";
+import {
+  TIERS as RARE, speciesById, isLegendary, lockedTiers,
+} from "../game/biomes.js";
 
 /* The order rows of one species sit in: the ordinary pile, then its variants
    kindest first - the same order the Dex sheet lists its FORMS in, so the two
@@ -390,8 +392,12 @@ export default function Box({
     const sp = speciesById(group.species);
     const target = speciesById(path.row.to);
     const stone = path.stone && itemById(path.stone);
+    // A tier this target has no art for - see the note below.
+    const lost = !!group.variant
+      && (lockedTiers(target.id) ?? new Set()).has(group.variant);
     setPending({
       title: `Evolve into ${label(target)}?`,
+      tone: lost ? "warn" : null,
       /* No "you receive" row: the title already names what you get, and a
          dialog that repeats itself is just taller. */
       lines: [
@@ -402,10 +408,34 @@ export default function Box({
       /* Nothing is consumed but the stone, which is worth saying plainly: the
          feed this replaced ate up to twenty duplicates and a player who knew
          that version will assume this one does too. */
-      note: group.variant
-        ? `Your ${group.variant} evolves, and stays ${group.variant}. No duplicates are spent.`
-        : "No duplicates are spent — only the level you have already paid for.",
-      confirmLabel: "EVOLVE",
+      /* AND THE NOTE WAS A PROMISE THE ART CANNOT KEEP.
+
+         It read *"Your origin evolves, and stays origin"* for every tier and
+         every target, which is true of most of them and false of exactly the
+         case a player would mind: **a Gyarados has an Origin and Mega
+         Gyarados has none.** Origin is DEBUT artwork, so a form that Game
+         Freak never drew in 1996 has no older picture to wear - and Showdown
+         is the same shape, since `hasShowdown` reads the files and 14 species
+         plus every form have none.
+
+         The mark survives in the save either way; what does not survive is
+         the PICTURE. `spriteUrl` 404s and `onSpriteError` quietly falls back
+         to the ordinary sprite, so the failure is silent: you spend a hundred
+         candy on the rarest thing you own and it comes out looking plain,
+         with a dialog that had just told you it would not.
+
+         `lockedTiers` is the same predicate `tiersFor` and `rollVariant` are
+         built on - what a species can WEAR - so this cannot disagree with the
+         Dex's FORMS strip about which column exists. Asked of the TARGET,
+         because that is the one whose art has to exist. */
+      note: lost
+        ? `${label(target)} has no ${group.variant} artwork — Game Freak never ` +
+          `drew one. Your ${group.variant} mark is kept, but it will be drawn ` +
+          `as an ordinary ${label(target)}. This cannot be undone.`
+        : group.variant
+          ? `Your ${group.variant} evolves, and stays ${group.variant}. No duplicates are spent.`
+          : "No duplicates are spent — only the level you have already paid for.",
+      confirmLabel: lost ? "EVOLVE ANYWAY" : "EVOLVE",
       run: () => {
         const done = onEvolve(group.hero.uid, path.row.to);
         if (!done) setFlash("Not ready to evolve.");
@@ -656,7 +686,7 @@ export default function Box({
           recount={pending.recount}
           note={pending.note}
           confirmLabel={pending.confirmLabel}
-          tone="sell"
+          tone={pending.tone ?? "sell"}
           onConfirm={(picked) => {
             pending.run(picked);
             setPending(null);

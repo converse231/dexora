@@ -158,8 +158,19 @@ export const REGION_NAME = {
    Paldean 9, the Pikachu 6-8), which puts them where they are thin, gates them
    on that generation's arrival level, and is what canon says besides. A late
    find, rather than a starting one. */
+/* A MAP, BECAUSE THIS IS ASKED PER DEX CELL PER RENDER. `SPECIES.find` is a
+   linear scan of 1,215 entries and `genOf` runs it for every form - measured,
+   24,300 calls took 35ms against 2ms for the same count through `speciesById`,
+   and the Dex grid alone is 1,215 cells. `speciesById` cannot be used here:
+   it is declared six hundred lines below and this is called at module init by
+   `GENERATIONS`, which is the temporal dead zone this file already records
+   blanking the BOX tab. So it is its own Map over the 190 forms - the only
+   ids that ever reach the scan. */
+const FORM_GEN = new Map(
+  SPECIES.filter((sp) => isForm(sp.id)).map((sp) => [sp.id, sp]));
+
 export const genOf = (id) => {
-  const form = isForm(id) ? SPECIES.find((sp) => sp.id === id) : null;
+  const form = isForm(id) ? FORM_GEN.get(id) : null;
   if (form?.gen) return form.gen;
   const of = form?.of ?? id;
   const i = GEN_LAST.findIndex((last) => of <= last);

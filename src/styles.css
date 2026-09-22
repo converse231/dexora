@@ -342,9 +342,16 @@ canvas {
    62%, because the Pokemon was filling its whole band and reading as pressed
    against the nameplate. It is a creature standing in a field, and a field
    needs some air above it. */
+/* 54%, DOWN FROM 62%, AND THE REASON IS PIXELS RATHER THAN LAYOUT. Every
+   sprite in this game is 64 or 96 pixels square, so how big this box is decides
+   how far the art is BLOWN UP - at 62% of a 352px viewport a 64px Pidgey was
+   drawn at about 3.4x and every edge on it was three and a half pixels wide.
+   Reported as the sprites looking rough. There is no better art to reach for
+   (see the costume Pikachu, where a higher-res source was tried and reverted),
+   so the only lever is to ask for less enlargement. */
 .mon-slot {
   position: relative; display: grid; place-items: center;
-  height: 62%; aspect-ratio: 1 / 1;
+  height: 54%; aspect-ratio: 1 / 1;
 }
 
 /* Dust kicked up where it lands, on appearing. */
@@ -793,9 +800,22 @@ canvas {
 
 /* The evolution reveal. Sized to the post sprite rather than the whole stage,
    or the aura is a halo round the entire scene. */
+/* THE SAME NUMBER THE SPRITE USES, AND IT WAS A DIFFERENT ONE.
+
+   Reported as the Holo foil being far bigger than the Pokemon once the
+   evolution finishes, and every other tier's layer with it. `.evo-mon` is
+   `30cqw` - 30% of the container's width - and this said `46%`, which is 46%
+   of `.evo-stage`. Two measures of two different boxes, so they could only
+   agree by luck, and they did not: the layers masked to `--art` at one size
+   over a creature drawn at another, which is a rainbow with a Pokemon
+   somewhere inside it.
+
+   Written as `30cqw` twice rather than as a shared token because that is what
+   `.evo-mon` says four lines up; if that moves, this has to move with it, and
+   a grep for `30cqw` finds both. */
 .evo-fx {
   position: absolute; left: 50%; top: 50%; z-index: 2;
-  width: 46%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  width: 30cqw; height: 30cqw; transform: translate(-50%, -50%);
   pointer-events: none;
 }
 
@@ -1875,7 +1895,7 @@ canvas {
 }
 /* `:not(.mark)` so the rarity badges keep their own size - see Marks.jsx. */
 .cell img:not(.mark),
-.cell .sprite-showdown { width: 88%; height: 88%; object-fit: contain; image-rendering: pixelated; }
+.cell .sprite-showdown { width: 68%; height: 68%; object-fit: contain; image-rendering: pixelated; }
 
 /* ---- a tier moves in the grid too -------------------------------------
    `inset: 6%` on the foil, and it is not a nudge: the sprite is drawn at 88%
@@ -1963,7 +1983,20 @@ canvas {
 .boxrow.spare { border-color: var(--path); background: var(--path-soft); }
 /* The Pokémon is the row. It was a 42px thumbnail against three lines of text
    and a full-width button bar, so the card read as chrome with a sticker on it. */
-.boxrow > img, .boxrow > .sprite-fx {
+/* `.sprite-showdown` IS IN THIS SELECTOR BECAUSE IT IS NOT AN `img`.
+
+   Reported as Showdown having no preview in the Box, and it had none: the
+   strip renders as a `<span>` with a background, `Sprite.jsx` returns it
+   BEFORE the `fx` branch so it is not a `.sprite-fx` either, and this rule
+   named only those two - so the span matched nothing, took `width: 77%` of an
+   auto-sized grid track, and came out zero wide. Nothing failed; there was
+   simply a gap where a Pokemon should be.
+
+   `Sprite.jsx`'s own comment already states the rule - *"`.sprite-showdown`
+   has to be sized wherever an `img` was"* - and this is the fourth place that
+   has to obey it, which is why check.mjs now asserts it rather than trusting
+   the next person to read that line. */
+.boxrow > img, .boxrow > .sprite-fx, .boxrow > .sprite-showdown {
   grid-area: img; width: 62px; height: 62px; align-self: center;
   object-fit: contain; image-rendering: pixelated;
 }
@@ -2533,7 +2566,7 @@ canvas {
 .vr-art .sprite-fx,
 .vr-art img,
 .vr-art .sprite-showdown {
-  width: 100%; height: 100%;
+  width: 77%; height: 77%;
   object-fit: contain; image-rendering: pixelated;
 }
 .vr-name {
@@ -3023,7 +3056,7 @@ canvas {
 .sf-one.got:focus-visible { outline: 2px solid var(--canopy); outline-offset: 2px; }
 .sf-art { position: relative; width: 46px; height: 46px; display: grid; place-items: center; }
 .sf-art img:not(.mark),
-.sf-art .sprite-showdown { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.sf-art .sprite-showdown { width: 77%; height: 77%; object-fit: contain; image-rendering: pixelated; }
 /* Not held: a flat silhouette, so the shape is a hint and the colours are not
    given away.
 
@@ -5012,8 +5045,28 @@ button:disabled { transition: none; }
    ends, each held for an eighth of the run, then wraps. Plain `steps(8)` would
    take 0, 12.5, 25 ... 87.5, which is not where the frames are, and would show
    seven and a half of them. */
+/* 77%, AND IT IS MEASURED RATHER THAN EYEBALLED.
+
+   Reported as the Showdown variants being far too big, and they were, by a
+   third. Measured over the shipped art: an ordinary sprite fills a median
+   **0.77** of its 64px canvas - a Caterpie less, a Snorlax more - because
+   Game Freak's rips carry that padding. A Showdown frame fills **1.00**,
+   every time, because `build_showdown.py` normalises each frame by
+   `min(64/w, 64/h)` over a source GIF that is ALREADY cropped tight. Both
+   halves are doing exactly what they were told; the result is that the same
+   box draws a Showdown 30% larger than the Pokemon standing next to it.
+
+   THE BOX SHRINKS, NOT THE BACKGROUND, and that distinction is load-bearing.
+   The obvious fix is `background-size: 77% 616%`, and it silently breaks the
+   frame stepping: percentage `background-position` aligns the p% point of the
+   image with the p% point of the BOX, so frame i sits at `i/7` only while the
+   image is exactly 8x the box. At 6.16x it lands at `i/6.7` and every frame
+   is a sliver of two. The other obvious fix, `transform: scale(.77)`, is
+   killed in the encounter by `mon-appear`, because an animation outranks a
+   plain declaration - this file records that trap three times. Sizing the
+   element leaves both the frame maths and the animation alone. */
 .sprite-showdown {
-  display: block; width: 100%; height: 100%;
+  display: block; width: 77%; height: 77%; margin: auto;
   background-image: var(--strip);
   background-repeat: no-repeat;
   background-size: 100% 800%;
