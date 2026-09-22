@@ -1997,11 +1997,36 @@ for (const b of BIOMES) {
     const total = t.reduce((n, e) => n + e[1], 0);
     const share = t.filter((e) => LEGENDARY.includes(e[0]))
       .reduce((n, e) => n + e[1], 0) / total;
-    const open = LEGENDARY.filter((id) => genOpen(id, lv)).length;
+    /* PER BELONGING HEAD, NOT PER OPEN HEAD, and that is the sharper half of
+       "a legendary spawns where it lives".
+
+       This counted every legendary the LEVEL had opened, wherever it lived -
+       right while a stray could turn up anywhere, and wrong the moment
+       `LEGEND_STRAY` went to zero: it would hand a map the budget for 97
+       legendaries and then divide it among the four that live there, making
+       each of those four twenty times commoner than `LEGEND_EACH` says one is
+       worth. The predicate is the one `legendTier` scores, so the assertion
+       and the rule cannot disagree about who is here. */
+    const here = LEGENDARY.filter((id) => genOpen(id, lv)
+      && speciesById(id).types.some((t) => b.types.includes(t)));
+    const open = here.length;
     const want = Math.min(LEGEND_CEIL, LEGEND_EACH * open);
     assert.ok(Math.abs(share - want) < 1e-9,
       `${b.id} at Lv ${lv}: legendaries are ${(share * 100).toFixed(2)}% of finds ` +
-      `over ${open} open, not the ${(want * 100).toFixed(2)}% the per-head rule asks`);
+      `over ${open} that live here, not the ${(want * 100).toFixed(2)}% the ` +
+      "per-head rule asks");
+
+    /* AND A LEGENDARY THAT DOES NOT LIVE HERE IS NOT HERE AT ALL. Asked for
+       as "articuno should spawn on ice maps only", and it is the one half of
+       the rule the share cannot see: a stray at any weight above zero still
+       satisfies the equation above, it just spends the budget on birds that do
+       not live here. Verified by putting `LEGEND_STRAY` back to 0.03. */
+    for (const id of LEGENDARY) {
+      if (!genOpen(id, lv) || here.includes(id)) continue;
+      assert.ok(!t.some((e) => e[0] === id),
+        `${b.id} at Lv ${lv} spawns #${id}, which shares none of its types - ` +
+        "a legendary is hunted where it lives or it is not hunted");
+    }
 
     /* AND A COSTUME PIKACHU IS WORTH A LEGENDARY, which is the rule the rate
        was asked for as. Same function, same per-head constant, different
@@ -2031,9 +2056,8 @@ for (const b of BIOMES) {
     assert.ok(share <= LEGEND_CEIL + 1e-9,
       `${b.id} at Lv ${lv}: legendaries are ${(share * 100).toFixed(2)}% of every ` +
       "encounter - past the ceiling there is nothing rare about one");
-    // exactly once each, whatever else was added
-    for (const id of LEGENDARY) {
-      if (!genOpen(id, lv)) continue;
+    // exactly once each, whatever else was added - and only the residents
+    for (const id of here) {
       assert.equal(t.filter((e) => e[0] === id).length, 1,
         `${b.id} at Lv ${lv} rolls legendary #${id} more than once`);
     }
@@ -3425,15 +3449,23 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         more legendaries to hunt, never a cheaper hunt for the one you are
         already after. */
   for (const b of BIOMES) {
+    /* AND "OPEN" BECAME "LIVES HERE", which is the same correction the share
+       equation needed one suite up. Deep Woods is [bug, grass, poison] and the
+       five Gen 1 legendaries are ice, electric, fire and psychic, so at Lv 1
+       it has NONE - and a per-head of 0 made every later level look like a
+       cheaper hunt. It is not: nothing got cheaper, Celebi arrived with Johto.
+       Measuring over the residents is what makes the two ends comparable. */
     const perHead = (level) => {
       const t = encounterTable(b, level);
       const total = t.reduce((n, [, x]) => n + x, 0);
-      const open = LEGENDARY.filter((id) => genOpen(id, level));
-      if (!open.length) return 0;
-      const pool = open.reduce((n, id) => n + (t.find(([i]) => i === id)?.[1] ?? 0), 0);
-      return pool / total / open.length;
+      const here = LEGENDARY.filter((id) => genOpen(id, level)
+        && speciesById(id).types.some((ty) => b.types.includes(ty)));
+      if (!here.length) return null;
+      const pool = here.reduce((n, id) => n + (t.find(([i]) => i === id)?.[1] ?? 0), 0);
+      return pool / total / here.length;
     };
-    assert.ok(perHead(MAX_LEVEL) <= perHead(1) + 1e-9,
+    const at1 = perHead(1), atMax = perHead(MAX_LEVEL);
+    assert.ok(at1 === null || atMax === null || atMax <= at1 + 1e-9,
       `${b.id}: one named legendary is easier to find at Lv ${MAX_LEVEL} than at ` +
       "Lv 1 - levelling must buy more of them to hunt, not a cheaper hunt");
   }
@@ -3542,8 +3574,29 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         for (const [id, w] of t) acc[bandOf(id)] = (acc[bandOf(id)] ?? 0) + w / total;
         return acc;
       };
-      const base = mix(1);
-      for (const lv of [GEN_UNLOCK[2], GEN_UNLOCK[4], MAX_LEVEL]) {
+      /* FROM THE LEVEL THE MAP OPENS, NOT FROM LV 1 - a sharper measurement
+         rather than a looser bound, and the two residents above are the other
+         half of the same repair.
+
+         `BIOMES[i].level` gates travel, so the Power Plant at Lv 1 is a table
+         no player can roll: you cannot stand there until Lv 12. What that
+         baseline was measuring is a map with only its Gen 1 residents in it,
+         and for a narrow map that is a map missing whole BANDS - Kanto has no
+         Electric or Steel species at C or S, so the Power Plant had neither,
+         and `BAND_SHAPE` freezes a mix from these rows so a band with no row
+         has no share to hold. Any correctly-homed newcomer in one then reads
+         as the mix being resized. It is not; it is a band arriving into a map
+         that could not hold one.
+
+         So the map gets a C and an S resident that open before it does (see
+         `RESIDENTS` above), and the comparison starts where the map does.
+         What the bound is FOR is untouched - "the rare band went 5.1% ->
+         15.4%" is about content arriving while you play a map you can reach,
+         and every level in the sweep that the map is open at is still
+         compared. Re-measured across all eleven: worst is 1.7 points. */
+      const base = mix(Math.max(1, b.level));
+      for (const lv of [GEN_UNLOCK[2], GEN_UNLOCK[4], MAX_LEVEL]
+        .filter((l) => l >= b.level)) {
         const now = mix(lv);
         for (const k of new Set([...Object.keys(base), ...Object.keys(now)])) {
           const drift = Math.abs((now[k] ?? 0) - (base[k] ?? 0));
@@ -3561,7 +3614,8 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
              ever needs 4, the homing is what to look at, not this number. */
           assert.ok(drift < 0.025,
             `${b.id}: the ${k} band moved ${(drift * 100).toFixed(1)} points ` +
-            `between Lv 1 and Lv ${lv} (${((base[k] ?? 0) * 100).toFixed(1)}% -> ` +
+            `between Lv ${Math.max(1, b.level)} and Lv ${lv} ` +
+            `(${((base[k] ?? 0) * 100).toFixed(1)}% -> ` +
             `${((now[k] ?? 0) * 100).toFixed(1)}%) - a map's rarity mix is a ` +
             "property of the map and adding content must not resize it");
         }
@@ -5384,4 +5438,13 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   console.log(`typed confirm ok — the word gates the button AND the Enter key, in ${asks[0][0]}`);
 }
 
-console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries in every one, ${sizes[0]} … ${sizes.at(-1)}`);
+/* "IN EVERY ONE" WAS TRUE WHILE A STRAY COULD TURN UP ANYWHERE. It cannot:
+   `LEGEND_STRAY` is 0 and a legendary is only in the tables of maps it shares
+   a type with. A readout that outlived its system, on the line that prints the
+   roster. */
+{
+  const per = BIOMES.map((b) => LEGENDARY.filter((id) =>
+    speciesById(id).types.some((t) => b.types.includes(t))).length);
+  console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries ` +
+    `homed ${Math.min(...per)}-${Math.max(...per)} per map, ${sizes[0]} … ${sizes.at(-1)}`);
+}
