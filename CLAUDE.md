@@ -205,6 +205,70 @@ than a fact about Pokemon, which is exactly what it is for. Measured: **0
 positions changed meaning**, `layoutIds` still returns null, `padDex` is still
 right, no `LAYOUTS` entry.
 
+**AND THEN MET BECAME THE DEFAULT, WHICH REVERSED THE SPLIT ABOVE.** The
+thirty `alt` forms shipped as Lv 100 evolution targets on the reasoning that a
+Rotom in a microwave is something you DO. Reversed on the only evidence that
+settles it - *"I think it is more rewarding to encounter them in the wild than
+get them thru evolution"* - and the reversal is worth more than the rule it
+replaced: **meeting a Therian Landorus in the grass is an event; spending a
+hundred candy on one you already own is admin.** Twenty-six of the thirty moved.
+
+**WHAT STAYS MADE IS WHAT MAKING IS THE POINT OF**: Mega, Primal, Gigantamax,
+and Palafin's Hero form, which was named. Those are the transformations the
+games themselves treat as an achievement.
+
+**AND `is_battle_only` STOPPED BEING A FILTER AT ALL.** It cut 35 varieties on
+the reasoning that a game with no battle has nowhere to put a state - true of
+the MECHANISM and beside the point for a COLLECTION. **A Zen Mode Darmanitan is
+its own drawing, its own types and its own stat line**, and a dex that holds it
+is a better dex whatever triggered it in the games. Seventeen arrive met; the
+Megas and Gigantamax among them go through `KINDS` at Lv 100 like every other
+Mega. Worth remembering what it nearly cost on the way out, because the trap is
+still there: **a Mega is `is_battle_only: true` as well**, so the version that
+gated `one()` on the field would have deleted all 120.
+
+**AND `-mega-z` IS LEGENDS Z-A, WHICH A SUFFIX LIST READ AS NOTHING.** Absol,
+Garchomp and Lucario already had a Mega, so three real ones were being dropped
+- and they are not duplicates: measured, all three hash differently from the
+`-mega` beside them. They need a bracket or the dex shows "Mega Absol" twice.
+
+**AND A MEGA OF A FORM RESOLVES TO THE FORM'S OWN BASE.** An exact suffix strip
+asked for `toxtricity-amped`, `meowstic-male` and `magearna-original` - none of
+which are dex entries - and dropped eight more Megas and Gigantamax with them.
+`baseOf` walks back to the longest prefix that IS a species and whatever is
+left over goes in the bracket, so the dex reads *"Mega Tatsugiri (Curly)"*
+rather than three rows called Mega Tatsugiri.
+
+**AND FOUR ARE BOTH, WHICH THE SUITE USED TO FORBID.** Castform and Ogerpon
+evolve with a STONE, Hoopa at Lv 100, and all of them are catchable as well -
+asked for that way, and it is a better shape than either half: the wild route
+is the lucky one and the stone is the one you can plan for. check.mjs asserted
+the two families were DISJOINT precisely because *"a wild form that also
+carried an evolution row would be both catchable and worth a hundred candy,
+and nothing else would notice"* - a guard against an ACCIDENT, so it is a
+DECLARATION now rather than a ban: the form carries `evo`, which is the same
+field `fetch-evolutions` reads to emit the row, so the two cannot disagree
+about whether it was meant. An undeclared row is still the fault it always was.
+
+**A STONE FORM STILL COSTS THE HUNDRED**, because a form costs what a form
+costs and the stone is an extra gate rather than a discount - which also keeps
+`evoLevel(e) === 100` true for every form and needs no exception. The item is a
+shop stone, so check.mjs's existing `STONES`-both-ways rule covers it: an
+evolution gated on an item the shop does not sell is not a hard evolution, it
+is an impossible one.
+
+**AND `derivedHomes` NEEDED `|| sp.wild`**, or the both-case is silently lost:
+being in nothing's `EVOLUTIONS.to` is what usually puts a species in the pool -
+that ABSENCE is the whole mechanism a wild form runs on - so Castform's three
+weather formes would have been filtered out by the very row that makes them
+buildable, and then been in no table at all.
+
+**AND `wave` IS READ OFF THE SHIPPED FILE NOW, NOT HAND-LISTED.** A form keeps
+the wave it shipped with and anything new takes the next one, which is what
+makes it a rule: Heat Rotom went from made to met in this pass and **did not
+move**, because `wave` is about when a family arrived rather than what it is.
+278 forms over four waves, **0 positions changed meaning**.
+
 **AND THE HIGHER-RES COSTUME ART WAS REVERTED.** `official-artwork` is a
 painted illustration among 1,200 game rips, and asked for directly: use the
 PokeAPI sprite. `tools/build_costumes.py` is deleted and `npm run forms` no

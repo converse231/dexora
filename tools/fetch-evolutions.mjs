@@ -159,8 +159,22 @@ for (const f of FORMS) {
      `isForm(to)` so a Mega can never be met in the grass; a wild form never
      reaches that code at all, because there is no edge to walk. Two families,
      one field, and neither can leak into the other. */
-  if (f.wild) continue;
-  rows.push({ from: f.of, to: f.id, kind: f.form, level: FORM_LEVEL });
+  /* AND A FORM CAN BE BOTH NOW, WHICH `evo` IS THE WHOLE OF.
+
+     `wild` alone used to decide: a form was in a table or it was an evolution
+     target, never the pair, and check.mjs asserted the two were disjoint.
+     Castform, Ogerpon and Hoopa are deliberately both - catchable if you are
+     lucky, buildable if you are not - so a wild form says so by carrying
+     `evo`, and nothing else changes. A `null` item is Lv 100 on its own; an
+     item makes it a `stone` row, which is the kind the shop already gates and
+     check.mjs already holds against `STONES` in both directions. */
+  if (f.wild && !f.evo) continue;
+  rows.push({
+    from: f.of, to: f.id,
+    kind: f.evo?.item ? "stone" : f.form,
+    ...(f.evo?.item ? { item: f.evo.item } : {}),
+    level: FORM_LEVEL,
+  });
 }
 
 rows.sort((a, b) => a.from - b.from || a.to - b.to);
