@@ -15,7 +15,7 @@
    past the best of each species and never a variant, and both payouts itemise
    what they are about to take before they take it. */
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { SPECIES } from "../data/dex.js";
 import {
   sellValue, candyValue, duplicateUids, evolutionsOf, evolveState, itemById,
@@ -48,7 +48,11 @@ const ACTIONABLE = (a, b) =>
   Number(b.ready) - Number(a.ready) ||
   Number(b.spares.length > 0) - Number(a.spares.length > 0);
 
-export default function Box({
+/* MEMOISED: see the note on the handlers in App.jsx. Every prop is
+   reference-stable while the trainer walks - `box`, `bag`, `dex` and `stats`
+   are mutated in place, `colRev` only moves when the collection does, and the
+   five handlers are `useCallback`ed over an engine that is set once. */
+function Box({
   box, bag, dex, candy, colRev, stats, busy, findSeed, onSeedUsed,
   onSell, onConvert, onLevelUp, onEvolve,
 }) {
@@ -174,9 +178,14 @@ export default function Box({
      `groups.length` counts a Holo Pidgey separately from the ordinary pile -
      which is right for the list and wrong for a heading that says "species".
      Three Pidgey rows are still one Pidgey. */
-  const speciesCount = new Set(groups.map((g) => g.species)).size;
-  const readyCount = groups.filter((g) => g.ready).length;
-  const spareCount = groups.filter((g) => g.spares.length > 0).length;
+  /* Three passes over every group, and none of them depends on the filter or
+     the sort - so they were being recomputed on every keystroke in the search
+     box as well as on every step. */
+  const { speciesCount, readyCount, spareCount } = useMemo(() => ({
+    speciesCount: new Set(groups.map((g) => g.species)).size,
+    readyCount: groups.filter((g) => g.ready).length,
+    spareCount: groups.filter((g) => g.spares.length > 0).length,
+  }), [groups]);
 
   /* The Box never had a sort - it had one fixed order (ready, then spare, then
      dex) baked into the memo. That order is still the default and still the
@@ -222,7 +231,11 @@ export default function Box({
      every keystroke and the grouping does not, so recomputing it for a search
      term would be work for nothing. */
   const needle = find.trim().toLowerCase();
-  const shown = groups.filter((g) => {
+  /* MEMOISED ON WHAT IT ACTUALLY READS. The sort is the expensive half - the
+     name comparator calls `label(speciesById(id))` on both sides of every
+     comparison, which is O(n log n) string builds over the whole box - and it
+     was running on every render, including the ones a step caused. */
+  const shown = useMemo(() => groups.filter((g) => {
     const sp = speciesById(g.species);
     if (only === "ready" && !g.ready) return false;
     if (only === "spare" && !g.spares.length) return false;
@@ -232,7 +245,8 @@ export default function Box({
       label(sp).toLowerCase().includes(needle) ||
       sp.types.some((t) => t.includes(needle))
     );
-  }).sort((a, b) => SORTS[sort](a, b) || a.species - b.species);
+  }).sort((a, b) => SORTS[sort](a, b) || a.species - b.species),
+  [groups, only, needle, sort]);
 
   /* Built here rather than in the dialog: it is a pass over the whole box and
      the dialog is rebuilt on every keystroke of the search field. */
@@ -697,3 +711,5 @@ export default function Box({
     </div>
   );
 }
+
+export default memo(Box);
