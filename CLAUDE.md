@@ -724,10 +724,54 @@ it dropped onto open ground. And **anything it carves on a transcribed map stops
 being a copy** - a tile turned from wall into floor is not the tile Game Freak
 put there, and left with its own id it draws a wall you can walk through.
 
-**A COPY CANNOT BE STRETCHED.** Frost Hollow IS Seafoam Islands B3F. It grew the
-only way a copy honestly can: by copying more of Seafoam - four floors, in a
-square, joined by passages that tunnel to the nearest ice because every Seafoam
-floor is drawn with a solid border and nothing is ever adjacent to a seam.
+**A COPY CANNOT BE STRETCHED.** Frost Hollow IS Seafoam Islands. It grew the
+only way a copy honestly can: by copying more of Seafoam - **all five floors**,
+laid 2x3, joined by **Seafoam's own ladders**. 78x76, 1,920 walkable.
+
+**AND THE JOINS WERE OURS FOR A YEAR, WHICH IS THE PART WORTH KEEPING.** It
+shipped as four floors in a square with passages SEARCHED FOR through the rock
+between them (`seam_v`, `seam_h`, a `REACH` of 6) and an authored bridge over
+B3F's river - about two hundred cells nobody at Game Freak drew, on the one map
+in the game whose whole argument is that it is a copy. The tunnels existed
+because the LADDERS had been thrown away, and the ladders had been thrown away
+under a note reading *"they lead to B4F there and nowhere here"*: true, and it
+stopped being true the moment B4F was laid beside them. THE LADDER GRAPH IS
+READ, NOT INVENTED was already in this file under Mt Moon, and this map had
+simply never been asked. The bridge went with them - Surf shipped after it was
+drawn, and a river you ride is what a river in this tileset is for.
+
+**FOUR OF THE TWENTY WARPS ARE DROPPED, AND WHICH FOUR IS THE FINDING.** Twelve
+are ladder-to-ladder and reciprocal. Six are BOULDER HOLES - `loc 6`, one-way
+falls - and four become two-way pairs for the reason the Mansion's floor holes
+already did: a hole that only works downwards is a trap. **The other two land in
+water.** B3F (6,18) and (9,18) drop onto `loc 140` at elevation 1, which is
+B4F's lake, because what you push down them in the real game is a BOULDER, to
+make a stepping stone. Warping a trainer there puts him on a ride he never
+mounted - *"surfing is not a flag, it is where you are standing"* cuts both
+ways - so they become the ground they stood in, and B3F still reaches B4F on
+two real ladders. The two Route 20 mouths are not pairs either: one is the way
+in and so the spawn, the other leads somewhere this game has no map for.
+
+**AND THE ROW NUMBER WAS A DESCRIPTION OF ONE FLOOR.** `seafoam_floor` stopped
+at 22 rows and walled off everything below row 20 - exactly right for B3F's
+border fill, and it cut real floor off B2F and B3F, both of which run content
+to row 23. The reachability fill decides now, per cell, and it counts the RIDE:
+`k` is in `SURFABLE` and half of B4F is lake, so the 26 cells no ladder reaches
+are a floor doing what Seafoam's B4F is for rather than a pocket. 2,013
+walkable in, 1,920 out, **1,894 of them reachable on foot**.
+
+**4,423 of 4,522 interior cells are the metatile pokefirered puts there**; the
+99 that are not are the seal and the frame.
+
+**AND AN ASSERTION ON A CHARACTER WE HAD JUST FORCED WAS NOT AN ASSERTION.**
+`classify` returns `s` for any coordinate named in `rungs`, so
+`assert g[ay][ax] == "s"` was checking our own arithmetic - a warp moved onto
+open water built cleanly. It reads the real map's COLLISION and ELEVATION now
+(ground, never rock and never water, which is the half that catches the fall
+into the lake) and, softly, that at least one end is a ladder or a hole, which
+is what gives the player something drawn to read as a way through. *A literal
+in an assertion is not a rule*, one turn on: neither is a tautology. Verified
+by putting both bugs back.
 
 **AND A GENERATOR CAP IS A MAP SIZE IN DISGUISE.** `forestId` walked down at most
 64 tiles to find where its mass ended, which was twice the tallest canopy that
@@ -1001,9 +1045,9 @@ featureless is usually this, not a bad pick.
   Even leaves half a crown stranded. `fringe` is the only canopy metatile with
   no collision: the walkable overhang you pass behind.
 - **ledge** `[176,135,177]` left cap / mid / right cap.
-- **frost** (`seafoam_islands` locals) — Frost Hollow is **Seafoam Islands B3F,
-  transcribed tile for tile** from its own map.bin, and it carries **the real
-  map's own metatile ids** as well as our characters (see below). The classification is the
+- **frost** (`seafoam_islands` locals) — Frost Hollow is **all five Seafoam
+  Islands floors, transcribed tile for tile** from their own map.bin, and it
+  carries **the real map's own metatile ids** as well as our characters (see below). The classification is the
   map's collision and **elevation** bits, never an eye: elevation 3 is the lower
   ice, 4 the raised shelf, 1 the water, 0 the striped step. Three autotiles,
   each derived by masking all five Seafoam floors:
@@ -1019,8 +1063,9 @@ featureless is usually this, not a bad pick.
   **counted along the run**, not read off "is my neighbour one too".
   **Elevation 0 covers three different things in Seafoam** — the step (4), shelf
   edges doing duty as a ramp, and the snow fringe outside the cave — and only
-  the first is a staircase. Ladders and boulder holes were replaced by the
-  ground they stood in: they lead to another floor there and nowhere here.
+  the first is a staircase. A ladder or boulder hole named in `FROST_LADDERS`
+  keeps its character AND its metatile, because it now leads somewhere; one
+  that is not named is still replaced by the ground it stood in.
 - **volcano** (pokeemerald `lavaridge`; local index is the Emerald id minus
   512). Every pick was derived from Magma Hideout's own map.bin by masking —
   for each tile, which of its four neighbours are wall (or lava), then the
@@ -1085,8 +1130,9 @@ featureless is usually this, not a bad pick.
 
   **No staircases.** 2F and 5F each carry two 3×3 stair blocks, and they are the
   strongest furniture in the tileset, but they lead to another floor there and
-  nowhere here — the same reason Frost Hollow's ladders were replaced by the
-  ground they stood in.
+  nowhere here — which is the reason Frost Hollow's ladders were thrown away
+  too, right up until the floors they lead to were laid beside them. This map
+  has one floor and no such excuse.
 
 ### The trainer sheet
 
@@ -1280,8 +1326,8 @@ cells** differently from Seafoam B3F. Two reasons, and the second is general:
    really do end, and **true for a mass of rock**, which does not.
 
 So `frost_hollow()` returns a third channel: `AREAS.frost.tiles`, one id per
-cell, `-1` where we authored something (the bridge, the two staircases) and the
-rules draw it instead. `drawTile`'s `fixed` argument beats every rule in this
+cell, `-1` where we authored something (today: the frame, and whatever the
+reachability seal turned to rock) and the rules draw it instead. `drawTile`'s `fixed` argument beats every rule in this
 file. That took the difference to **18 cells, every one of them a change we
 chose**. Rules are for maps you invent; a map you copied should be copied.
 
@@ -1593,7 +1639,7 @@ passes while the box grows off the viewport. Verified by doing exactly that.
 **AND THE WARP TEST NAMED ONE MAP.** tools/play rode `AREAS.ridge` because Mt
 Moon was the only map with warps when it was written - so Ember's seven pairs
 and Cinderpeak's two were never driven. It loops over every area that has them
-now: **16 pairs across three areas, each ridden both ways.** A test that names
+now: **43 pairs across five areas, each ridden both ways.** A test that names
 one map is a test that goes quiet the day a second one arrives.
 
 ### The Pokemon Mansion: four floors, and the first `building` primary
