@@ -32,15 +32,18 @@ import Note from "./Note.jsx";
    and "delete everything" are none of those. They were also at the bottom of a
    column that scrolls, which put an action with no undo one flick below a
    routine one. They live in Settings.jsx now, in a dialog off the top bar. */
-/* THE THREE COPIES A PLAYER CAN TAKE BACK, in the order they are offered. One
+/* THE COPIES A PLAYER CAN TAKE BACK, in the order they are offered. One
    table for the button and the dialog, because a third copy wired into two
    hand-written branches is how the dialog came to call it "the save that
    failed". `other` is the copy that LOST when this browser and the account
-   disagreed at login - kept only when it held play the winner did not. */
+   disagreed at login - kept only when it held play the winner did not.
+   `guest` is a save this browser held with no account on it, set aside at the
+   first sign-in rather than adopted or deleted. */
 const FROM = {
   backup: { button: "LAST GOOD", from: "Last clean load" },
   other: { button: "SET ASIDE", from: "Set aside when two copies disagreed" },
   broken: { button: "FAILED SAVE", from: "The save that failed" },
+  guest: { button: "GUEST SAVE", from: "Played here before signing in" },
 };
 
 export default function Trainer({

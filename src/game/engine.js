@@ -97,7 +97,7 @@ export const CHARS = ["red", "leaf"];
 /* Where the save lives is `store.js`'s business, not this file's. */
 import {
   SAVE_KEY, BACKUP_KEY, BROKEN_KEY, OTHER_KEY, CHOSEN_KEY, WRITER_KEY, OWNER_KEY,
-  read, write, keep, mirror, scoped,
+  PARKED_KEY, read, write, keep, mirror, drop, scoped,
 } from "./store.js";
 
 /* A recovery copy belongs to whoever this browser is playing as - see
@@ -334,6 +334,10 @@ export function recoverable() {
     const backup = read(mine(BACKUP_KEY));
     const broken = read(mine(BROKEN_KEY));
     const other = read(mine(OTHER_KEY));
+    /* THE GUEST'S, which has no owner to scope to - see `settle`. Offered to
+       whoever is signed in here, because that is who a guest on this browser
+       was, and taken by the first one to restore it. */
+    const guest = read(PARKED_KEY);
     /* `summarise`, NOT `read` - AN IMPORT SHADOWED BY A LOCAL, AGAIN. This
        helper was called `read`, which was harmless while nothing else in scope
        was, and the moment `read` came in from store.js the two collided: the
@@ -359,9 +363,10 @@ export function recoverable() {
       } catch { return { unreadable: true }; }
     };
     return {
-      backup: summarise(backup), broken: summarise(broken), other: summarise(other),
+      backup: summarise(backup), broken: summarise(broken),
+      other: summarise(other), guest: summarise(guest),
     };
-  } catch { return { backup: null, broken: null, other: null }; }
+  } catch { return { backup: null, broken: null, other: null, guest: null }; }
 }
 
 /* RETURNS `[state, verdict]`, AND THE VERDICT IS WHAT KEEPS A BAD LOAD LOCAL.
@@ -1610,7 +1615,7 @@ export function createEngine(canvas, onChange, mini = null) {
          reach. Rounded, because XP is whole and a half-point that only ever
          appears with a berry in play is a rounding difference nobody can
          explain. */
-      teach({ kind: "caught", duplicate: dupe });
+      teach({ kind: "caught", duplicate: dupe, caught: state.caught });
       const gained = gainXp(Math.round(xpForCatch(sp, e.isNew) * berryXp(e.berries)));
 
       /* WHAT A CATCH PAYS, AND IT USED TO BE A FLAT ¥100 OR NOTHING.
@@ -2263,9 +2268,10 @@ export function createEngine(canvas, onChange, mini = null) {
        does: the engine closes over the map rows and their dimensions, and a
        reload is the one path that is certainly consistent. */
     restore(which = "backup") {
-      const key = which === "broken" ? BROKEN_KEY
-        : which === "other" ? OTHER_KEY : BACKUP_KEY;
-      const raw = read(mine(key));
+      const key = which === "guest" ? PARKED_KEY
+        : which === "broken" ? BROKEN_KEY
+          : which === "other" ? OTHER_KEY : BACKUP_KEY;
+      const raw = read(which === "guest" ? key : mine(key));
       if (!raw) return false;
       /* BROKEN IS RAW TEXT AND MAY NOT BE JSON AT ALL - that is why it was
          kept. Parsing it outside a try here would throw out of the click that
@@ -2273,6 +2279,10 @@ export function createEngine(canvas, onChange, mini = null) {
       let obj;
       try { obj = JSON.parse(raw); } catch { return false; }
       if (saveProblem(obj)) return false;
+      /* A GUEST SAVE IS TAKEN, NOT COPIED. It now lives in this account, and
+         left parked it would be offered to the next person to sign in here
+         as well - one guest, two collections. */
+      if (which === "guest") drop(PARKED_KEY);
       chosen(raw);
       return true;
     },

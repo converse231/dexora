@@ -988,6 +988,18 @@ function until(e, what, label, max = 2000) {
   assert.equal(nextHint({ kind: "encounter", variant: null }, HINT_IDS), null,
     "a hint came back after every id had been shown");
 
+  /* THE BACKUP TIP IS SAID ONCE, AT A COLLECTION WORTH LOSING - and it has to
+     be FED the count, because the engine's `caught` event carried only
+     `duplicate` and a rule reading a field nobody sends never fires. */
+  const { BACKUP_AT } = await import("../src/game/hints.js");
+  assert.equal(nextHint({ kind: "caught", caught: BACKUP_AT - 1 }, ["duplicate"]), null,
+    "the backup tip came before there was a collection worth keeping");
+  assert.equal(nextHint({ kind: "caught", caught: BACKUP_AT }, ["duplicate"])?.id, "backup",
+    "the backup tip never arrives");
+  assert.ok(/caught: state\.caught/.test(
+    readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8")),
+    "the engine's caught event does not carry the count the backup tip reads");
+
   // Then through the engine, which is where "once ever" actually lives.
   store.clear();
   store.set("meadow-route", JSON.stringify({ ...SAVE, hints: [] }));
@@ -1171,6 +1183,22 @@ function until(e, what, label, max = 2000) {
   got = await settle("A", ok(S(2000)));
   assert.equal(got.raw, S(2000), "B's restore marker chose a save for A");
 
+  /* OLD RECOVERY COPIES MOVE TO THEIR OWNER ONCE. They were written under the
+     bare key, which a signed-in player is no longer offered; a failed save
+     there would have gone quiet. Once, and never over a copy already scoped. */
+  const { BACKUP_KEY, BROKEN_KEY, SCOPED_KEY } = await import("../src/game/store.js");
+  given({ [SAVE_KEY]: S(5), [OWNER_KEY]: "A", [BACKUP_KEY]: S(4), [BROKEN_KEY]: "{bad" });
+  await settle("A", ok(S(1)));
+  assert.equal(store.get(scoped(BACKUP_KEY, "A")), S(4), "a pre-update backup went quiet");
+  assert.equal(store.get(scoped(BROKEN_KEY, "A")), "{bad", "a pre-update failed save went quiet");
+  assert.equal(store.get(BACKUP_KEY), undefined, "the legacy copy was duplicated, not moved");
+  // An EMPTY slot, so only the flag can be what stops the second move.
+  store.delete(scoped(BACKUP_KEY, "A"));
+  store.set(BACKUP_KEY, S(3));
+  await settle("A", ok(S(1)));
+  assert.equal(store.get(BACKUP_KEY), S(3), "the one-time move ran twice");
+  assert.equal(store.get(SCOPED_KEY), "1");
+
   // Local mode: no account, and the browser's save is simply the save.
   given({ [SAVE_KEY]: S(50) });
   got = await settle(null, ok(null));
@@ -1336,6 +1364,24 @@ function until(e, what, label, max = 2000) {
     assert.equal(e.restore("backup"), false, "B restored A's backup");
     store.set(OWNER_KEY, "A");
     assert.equal(e.recoverable().other.caught, 412, "A's own set-aside copy is not offered to A");
+    e.destroy();
+  }
+  /* A GUEST SAVE COMES BACK ON PURPOSE, AND ONLY ONCE. Parked at the first
+     sign-in rather than adopted or deleted; restoring it moves it into the
+     account and takes it off the offer, or the next person to sign in here
+     would be handed the same collection. */
+  {
+    const { PARKED_KEY } = await import("../src/game/store.js");
+    const { e } = boot(SAVE);
+    store.set(OWNER_KEY, "A");
+    const guest = JSON.stringify({ ...SAVE, caught: 77, money: 4242 });
+    store.set(PARKED_KEY, guest);
+    assert.equal(e.recoverable().guest?.caught, 77, "the guest save is not offered back");
+    assert.equal(e.restore("guest"), true, "the guest save could not be restored");
+    assert.equal(store.get(SAVE_KEY), guest, "restoring the guest save did not load it");
+    assert.equal(store.get(PARKED_KEY), undefined,
+      "a restored guest save is still on offer to the next account");
+    assert.equal(store.get(CHOSEN_KEY), "1", "the guest restore will lose to the account at login");
     e.destroy();
   }
   delete globalThis.location;
@@ -1508,6 +1554,30 @@ function until(e, what, label, max = 2000) {
   assert.ok(writes.length > 100 && writes.length < 4000, "save() is not where it was in engine.js");
   assert.ok(/state\.stale === "taken"[^;]*\) return/.test(writes),
     "a session that lost the save still writes to localStorage, over the live tab's copy");
+
+  /* THE PROFILE'S COLUMN GRANTS AND THE CLIENT'S WRITES ARE ONE FACT IN TWO
+     PLACES. SUPABASE.md §3c grants `authenticated` exactly the columns the
+     browser writes, so a profile field added to the insert or to Settings
+     without a grant fails as "permission denied" on the one screen nobody
+     tests after sign-up. Read out of both files rather than typed here. */
+  {
+    const doc = readFileSync(new URL("../SUPABASE.md", import.meta.url), "utf8");
+    const granted = (verb) => new Set((doc.match(
+      new RegExp(String.raw`grant\s+${verb}\s*\(([^)]*)\)\s*on public\.profiles`)) ?? ["", ""])[1]
+      .split(",").map((c) => c.trim()).filter(Boolean));
+    const ins = cloud.slice(cloud.indexOf("export async function createProfile"));
+    const inserted = [...ins.slice(ins.indexOf(".insert({"), ins.indexOf("});"))
+      .matchAll(/^\s*(\w+):/gm)].map((m) => m[1]);
+    const settings = readFileSync(new URL("../src/ui/Settings.jsx", import.meta.url), "utf8");
+    const updated = [...settings.matchAll(/onProfile\(\{\s*(\w+):/g)].map((m) => m[1]);
+    assert.ok(inserted.length >= 3 && updated.length >= 3, "the profile writes were not found");
+    for (const c of inserted) {
+      assert.ok(granted("insert").has(c), `sign-up writes profiles.${c} and SUPABASE.md does not grant it`);
+    }
+    for (const c of updated) {
+      assert.ok(granted("update").has(c), `Settings writes profiles.${c} and SUPABASE.md does not grant it`);
+    }
+  }
 
   console.log("write safety ok — never blind, one writer, and the loser stops writing");
 }

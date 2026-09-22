@@ -14,6 +14,10 @@
    at once is a dialog, which is the thing being avoided. When a catch is both
    somebody's first duplicate AND their first Holo, the rarer fact wins. */
 
+/* Fifty catches is about half an hour of play: past the tutorial tips, and
+   enough of a dex that losing it would be a loss rather than a restart. */
+export const BACKUP_AT = 50;
+
 export const HINTS = [
   /* Before anything else, because it is the only one you cannot work out by
      looking: every tile spawns, so there is nowhere special to stand. */
@@ -46,6 +50,21 @@ export const HINTS = [
     when: (e) => e.kind === "caught" && e.duplicate,
     text: "A second one. Spares sell for cash or convert to Rare Candy in BOX — "
       + "you pick, every time.",
+  },
+  /* A COLLECTION WORTH LOSING IS WORTH A COPY, AND THAT IS SAID ONCE. EXPORT
+     has been on the YOU panel since saves existed and nothing ever pointed at
+     it, so it was found by the people who had already lost something. It is
+     the one copy that survives everything else going wrong - a cleared
+     browser, a deleted account, a server that goes away - and it is worth
+     one sentence at the moment there is something to lose. Asked for as
+     "just once, just to make the player know": a reminder that came back
+     would be a nag about a chore. After `duplicate`, which a first catch
+     reaches long before the fiftieth. */
+  {
+    id: "backup",
+    when: (e) => e.kind === "caught" && e.caught >= BACKUP_AT,
+    text: "That is a collection worth keeping. EXPORT in YOU saves a copy you "
+      + "hold yourself — it outlives this browser and any account.",
   },
   {
     id: "candy",
