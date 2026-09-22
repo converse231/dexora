@@ -2552,8 +2552,8 @@ def haunted_tower():
     return ["".join(r) for r in g], spawn
 
 
-def seafoam_floor(floor="B3F"):
-    """Seafoam Islands B3F, read out of its own map.bin. Returns (rows, ids).
+def seafoam_floor(floor="B3F", rungs=()):
+    """One Seafoam floor from its own map.bin. (rows, ids, base, ways)
 
     Two channels, because a copy needs both. The characters are ours - they are
     what the engine walks on and spawns in - and they come from the map's own
@@ -2567,21 +2567,31 @@ def seafoam_floor(floor="B3F"):
     same way. Rules are how you draw a map you invented; a map you copied should
     be copied.
 
-    What changes on the way in:
-      * Ladders and boulder holes become the ground they stood in, and lose
-        their id with it. They lead to B4F there and nowhere here, and a way
-        through that is not one is the fault the cave mouths in Ember Caldera
-        had.
+    `rungs` IS WHICH LADDERS LEAD SOMEWHERE, and it used to be none of them.
+    This took one floor and threw every ladder away under the note *"they lead
+    to B4F there and nowhere here"* - true while B4F was not in the game. All
+    five floors are laid out now and Seafoam's own warp graph joins them, so a
+    rung named here keeps its character AND its metatile: the way down is the
+    one Game Freak drew, at the coordinate his map.json gives.
+
+    Anything NOT named still becomes the ground it stood in, which is the old
+    behaviour and is what the six one-way falls get - see `FROST_LADDERS`.
+
+    What else changes on the way in:
       * Elevation 0 is three different things in Seafoam - the step, shelf edges
         doing duty as a ramp, and the snow fringe outside the cave - and only
         the first is a staircase.
-      * Below the cave the real map is border fill you can see and never reach,
-        so it is wall here, except the river, which still runs off the edge.
+      * NOTHING IS CROPPED. This used to stop at 22 rows and wall off everything
+        below row 20, which was a hand-tuned description of B3F's border fill
+        and cut real floor off the other four - B2F and B3F both run content to
+        row 23. `frost_hollow` seals whatever its own reachability fill cannot
+        get to instead, which is the same fact measured per floor rather than
+        guessed once.
     """
     import numpy as np
     import build_assets as BA
 
-    ROWS = 22
+    rungs = set(rungs)
     LADDERS = {5, 14, 15, 22, 23, 45, 46, 47, 53, 55}
     HOLES = {6}
     ROCKS = {2, 3, 39, 54, 79}
@@ -2609,6 +2619,8 @@ def seafoam_floor(floor="B3F"):
     def classify(x, y):
         i, c, e = int(ids[y][x]), int(col[y][x]), int(ele[y][x])
         loc = i - 640
+        if (x, y) in rungs:
+            return "s"
         if i in FALL_PRIM or loc in MOUTH:
             return "K"
         if c:
@@ -2618,7 +2630,7 @@ def seafoam_floor(floor="B3F"):
         if e == 1:
             return "k"
         if loc in LADDERS or loc in HOLES:
-            return "j" if e == 4 else "i"
+            return "j" if e == 4 else "i"     # a rung to nowhere is its ground
         if e == 4:
             return "j"
         if e == 0:
@@ -2629,219 +2641,203 @@ def seafoam_floor(floor="B3F"):
             return "I"
         return "i"
 
+    # WHAT THE REAL MAP SAYS ABOUT EACH NAMED RUNG, because `classify` returns
+    # `s` for one by fiat and an assertion downstream on the character it just
+    # forced would be checking our own arithmetic. "A LITERAL IN AN ASSERTION IS
+    # NOT A RULE", one turn further on: neither is a tautology. Caught by moving
+    # a warp onto open water and watching the build pass.
+    #
+    # Ground is the flat requirement - a warp onto rock is a trap and a warp
+    # onto WATER puts a trainer on a ride he never mounted, which is the one
+    # thing `surf()` gates. `ways` is the softer half, and it is what makes a
+    # pair legible: a real ladder or boulder hole, the tile Game Freak drew as
+    # a way through. A hole LANDS on plain ice, so only one end need be one.
+    ways = set()
+    for rx, ry in rungs:
+        c, e = int(col[ry][rx]), int(ele[ry][rx])
+        assert c == 0 and e != 1, (
+            "seafoam %s: the warp at (%d,%d) is on %s, not on ground"
+            % (floor, rx, ry, "a wall" if c else "water"))
+        if (int(ids[ry][rx]) - 640) in (LADDERS | HOLES):
+            ways.add((rx, ry))
+
     g, tiles = [], []
-    for y in range(ROWS):
+    for y in range(h):
         row, trow = [], []
         for x in range(w):
             ch = classify(x, y)
             i = int(ids[y][x])
-            keep = (i - 640) not in LADDERS and (i - 640) not in HOLES
-            if y >= 20 and ch != "k":
-                # Below the cave is border fill. Rock down there is solid in the
-                # real map too, so it keeps its own tile and only the character
-                # changes; the four cells that are walkable fringe lose both,
-                # because scenery you cannot reach must not look like a step.
-                ch = "I"
-                keep = keep and int(col[y][x]) != 0
+            keep = ((x, y) in rungs
+                    or ((i - 640) not in LADDERS and (i - 640) not in HOLES))
             row.append(ch)
             trow.append((i if i < 640 else base + (i - 640)) if keep else -1)
         g.append(row)
         tiles.append(trow)
-    return g, tiles, base
+    return g, tiles, base, ways
+
+
+# Seafoam's own five floors and the warp graph joining them, resolved out of
+# the five map.json warp tables. THE LADDER GRAPH IS READ, NOT INVENTED - the
+# same sentence Mt Moon and Cinderpeak are built on.
+#
+# SIXTEEN OF THE TWENTY, AND WHICH FOUR ARE DROPPED IS THE INTERESTING PART.
+# Twelve are ladder-to-ladder and reciprocal, so they are simply pairs. Six are
+# BOULDER HOLES - one-way falls, `loc 6` - and a hole that only works downwards
+# is exactly what this repo already made two-way in the Pokemon Mansion, so
+# four of them are pairs here too: the hole is visible art at the top and you
+# land on the lower floor's own ice.
+#
+# THE OTHER TWO LAND IN WATER. B3F (6,18) and (9,18) fall onto `loc 140` at
+# elevation 1 - B4F's lake - because in the real game what you push down them
+# is a BOULDER, to make a stepping stone. Warping a trainer onto water would
+# put him on a ride he never mounted, which is the one thing `surf()` gates and
+# `tryStep` refuses; "SURFING IS NOT A FLAG, IT IS WHERE YOU ARE STANDING" cuts
+# both ways. They become the ground they stood in, and B3F still reaches B4F on
+# two real ladders.
+#
+# The two Route 20 mouths are not pairs either. One of them is the way in, and
+# so the spawn; the other leads somewhere this game has no map for.
+FROST_FLOORS = ("1F", "B1F", "B2F", "B3F", "B4F")
+FROST_GUT = 2
+FROST_LADDERS = (
+    ((0, 10,  6), (1, 10,  6)),
+    ((0, 31,  4), (1, 31,  4)),
+    ((0, 28, 19), (1, 28, 19)),
+    ((0, 21,  8), (1, 21,  8)),      # hole
+    ((0, 30,  8), (1, 29,  8)),      # hole
+    ((1,  7,  3), (2,  7,  4)),
+    ((1, 17,  9), (2, 17,  9)),
+    ((1, 25, 19), (2, 25, 19)),
+    ((1, 32, 14), (2, 32, 14)),
+    ((1, 23,  8), (2, 22,  7)),      # hole
+    ((1, 28,  8), (2, 29,  8)),      # hole
+    ((2,  7, 17), (3,  8, 14)),
+    ((2, 32,  4), (3, 31,  4)),
+    ((2, 31, 17), (3, 31, 16)),
+    ((3, 12,  9), (4, 15,  9)),
+    ((3, 29,  5), (4, 32,  5)),
+)
+FROST_MOUTH = (0, 6, 21)             # Route 20's door, and so the spawn
 
 
 def frost_hollow():
-    """Frost Hollow: four floors of Seafoam Islands, each copied tile for tile.
+    """Frost Hollow: 78x76, all five floors of Seafoam Islands, tile for tile.
 
     THE MAP COULD NOT SIMPLY BE SCALED, and that is the whole shape of this
     one. Every other map here grew by drawing more of itself; this one IS
-    Seafoam Islands B3F, read out of its own map.bin, and a transcription
-    stretched to twice the size is not a transcription any more. So it grew the
-    only way a copy honestly can: by copying MORE. Seafoam has five floors, all
-    38x24, all in the one tileset - four of them laid in a square is four times
-    the cave and not one invented tile.
+    Seafoam Islands, read out of its own map.bin, and a transcription stretched
+    to twice the size is not a transcription any more. So it grew the only way
+    a copy honestly can: by copying MORE.
 
-    Each floor keeps its own ids, so each quadrant is exactly the room Game
-    Freak drew. What we author is the joins: the rock between the quadrants is
-    ours, and so are the passages cut through it, which are SEARCHED for rather
-    than placed - the four floors have their own ideas about where their walls
-    are and a fixed coordinate would open onto rock.
+    AND THE JOINS ARE SEAFOAM'S NOW, WHICH IS THE WHOLE OF THIS PASS. It shipped
+    as four floors in a square with passages SEARCHED FOR through the rock
+    between them, plus a bridge across B3F's river - about two hundred authored
+    cells, none of which Game Freak drew, on the one map in the game whose
+    entire argument is that it is a copy. The tunnels were there because the
+    ladders had been thrown away, and the ladders had been thrown away because
+    B4F was not in the game. It is now: five floors, `FROST_LADDERS`, and
+    **nothing authored inside a floor at all**. The bridge went with them -
+    Surf arrived after it was drawn, and a river you ride is what a river in
+    this tileset is for.
 
-    The one thing added inside a quadrant is a bridge on B3F. Its river runs
-    from the waterfall in the north, down the middle and out of the south wall,
-    and in Seafoam you cross it by surfing - which this game does not have.
+    Laid out 2x3 in reading order, which is the order you walk them, so the cave
+    reads as a descent - the same quadrant trick Mt Moon and Ember Caldera use,
+    and for the same reason: three AREAS would have been three biome rows, three
+    level gates and three lines in the travel menu, for one place. The sixth
+    slot has no floor to hold and stays rock.
+
+    WHAT IS AUTHORED IS THE FRAME AND NOTHING ELSE. Every floor's own border is
+    interior to the composition rather than the edge of it, so the outer ring is
+    ours to draw - reported once from play as walkable walls, when seventeen
+    shelf tiles sat ON the boundary with nothing beyond them.
+
+    AND THE SEAL IS THE CROP. Each floor carries border fill you can see and
+    never reach - the snow outside the cave mouth, the strip down the left edge
+    - and the old code cut it with a row number measured on B3F, which walled
+    off real floor on the two that run content to row 23. The reachability fill
+    is what decides now, per cell: anything the player cannot get to on foot or
+    on Surf becomes rock. 2,013 walkable cells in, 1,847 out, and 98.6% of those
+    are reachable without the ride.
 
     Everything we author gets an id of -1 and is drawn by the rules; everything
-    copied keeps the real map's own tile. 78x46."""
-    FLOORS = ("1F", "B1F", "B2F", "B3F")
-    GUT = 2                      # rows and columns of our own rock between them
+    copied keeps the real map's own tile."""
+    QW, QH, GUT = 38, 24, FROST_GUT
 
-    quads = [seafoam_floor(f) for f in FLOORS]
-    base = quads[0][2]
-    qh = len(quads[0][0])
-    qw = len(quads[0][0][0])
+    rungs = [set() for _ in FROST_FLOORS]
+    for (fa, xa, ya), (fb, xb, yb) in FROST_LADDERS:
+        rungs[fa].add((xa, ya))
+        rungs[fb].add((xb, yb))
 
-    W = qw * 2 + GUT
-    H = qh * 2 + GUT
-    g = [["I" for _ in range(W)] for _ in range(H)]
-    tiles = [[-1 for _ in range(W)] for _ in range(H)]
+    floors = [seafoam_floor(f, rungs[i]) for i, f in enumerate(FROST_FLOORS)]
+    base = floors[0][2]
+    assert all(len(fg[0]) == QW and len(fg) <= QH for fg, _t, _b, _w in floors), \
+        "frost: a Seafoam floor is not 38 wide or is taller than 24"
 
-    # Top-left 1F, top-right B1F, bottom-left B2F, bottom-right B3F - which is
-    # the order you would walk them, so the cave reads as a descent.
-    corners = ((0, 0), (qw + GUT, 0), (0, qh + GUT), (qw + GUT, qh + GUT))
-    for (ox, oy), (qg, qt, _) in zip(corners, quads):
-        for y in range(qh):
-            for x in range(qw):
-                g[oy + y][ox + x] = qg[y][x]
-                tiles[oy + y][ox + x] = qt[y][x]
+    W, H = QW * 2 + GUT, QH * 3 + GUT * 2
+    g = [["I"] * W for _ in range(H)]
+    tiles = [[-1] * W for _ in range(H)]
+    # B1F is 23 rows where the rest are 24; the short one keeps our rock.
+    origin = [(0, 0), (QW + GUT, 0),
+              (0, QH + GUT), (QW + GUT, QH + GUT),
+              (0, (QH + GUT) * 2)]
+    for (ox, oy), (fg, ft, _b, _w) in zip(origin, floors):
+        for y in range(len(fg)):
+            for x in range(QW):
+                g[oy + y][ox + x] = fg[y][x]
+                tiles[oy + y][ox + x] = ft[y][x]
 
-    def author(x0, y0, x1, y1, ch):
-        rect(g, ch, x0, y0, x1, y1)
-        for y in range(y0, y1 + 1):
-            for x in range(x0, x1 + 1):
-                tiles[y][x] = -1
-
-    # --- B3F's bridge, in its own quadrant --------------------------------
-    bx, by = corners[3]
-    author(bx + 24, by + 15, bx + 27, by + 16, "N")
-
-    # --- the joins, searched ----------------------------------------------
-    # A passage is cut where BOTH sides of the gutter already have ice to walk
-    # on, which is a fact about four different rooms and not something to read
-    # off a drawing. Three per seam, spread out, so the cave is one place
-    # several times over rather than by a single thread.
-    # A SEAM TUNNELS TO THE NEAREST ICE rather than needing ice right beside it.
-    # Every Seafoam floor is drawn with a solid border, so the columns either
-    # side of a gutter are always wall - a passage that asked for floor there
-    # found nowhere at all, on any of the four seams. What it asks now is how
-    # far it would have to dig, and it digs when that is short.
-    REACH = 6
-
-    def seam_v(gx, want=4):
-        """East-west passages through the vertical gutter at column gx."""
-        made = []
-        for y in range(3, H - 3):
-            if len(made) >= want:
-                break
-            if any(abs(y - m) < 6 for m in made):
-                continue
-            lx = next((x for x in range(gx - 1, max(0, gx - 1 - REACH), -1)
-                       if g[y][x] == "i"), None)
-            rx = next((x for x in range(gx + GUT, min(W, gx + GUT + REACH))
-                       if g[y][x] == "i"), None)
-            if lx is None or rx is None:
-                continue
-            author(lx, y, rx, y, "i")
-            made.append(y)
-        return made
-
-    def seam_h(gy, want=4):
-        """North-south passages through the horizontal gutter at row gy."""
-        made = []
-        for x in range(3, W - 3):
-            if len(made) >= want:
-                break
-            if any(abs(x - m) < 8 for m in made):
-                continue
-            ty = next((y for y in range(gy - 1, max(0, gy - 1 - REACH), -1)
-                       if g[y][x] == "i"), None)
-            by = next((y for y in range(gy + GUT, min(H, gy + GUT + REACH))
-                       if g[y][x] == "i"), None)
-            if ty is None or by is None:
-                continue
-            author(x, ty, x, by, "i")
-            made.append(x)
-        return made
-
-    cuts = seam_v(qw) + seam_h(qh)
-    assert len(cuts) >= 4, f"frost: only {len(cuts)} passages between quadrants"
-
-    # --- and whatever is still stranded -----------------------------------
-    # Four rooms that were never meant to meet do not always meet on eight
-    # passages: a quadrant whose wall runs the length of a gutter has nowhere
-    # for one to land. `join_islands` carves the rest.
-    #
-    # ANYTHING IT CARVES STOPS BEING A COPY. The ids are the whole reason this
-    # map is transcribed rather than drawn, and a tile turned from wall into
-    # floor is not the tile Game Freak put there - left with its own id it would
-    # draw a wall you can walk through. Snapshot, carve, and hand every changed
-    # cell to the rules with -1.
-    # --- repairs the crop leaves behind -----------------------------------
-    # Each floor is 24 rows and is taken at 22, which was tuned for B3F. The
-    # other three put different things on the rows that get cut, and a shelf
-    # whose neighbours were in row 22 comes out standing on its own - which the
-    # renderer has no piece for. It becomes lower ice, and loses its id with it:
-    # a tile we changed is not a tile Game Freak drew.
-    for y in range(H):
-        for x in range(W):
-            if g[y][x] != "j":
-                continue
-            near = [(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))]
-            if not any(0 <= nx < W and 0 <= ny < H and g[ny][nx] == "j"
-                       for nx, ny in near):
-                g[y][x] = "i"
-                tiles[y][x] = -1
-
-    import random as _r
-    before = [row[:] for row in g]
-    join_islands(g, "i", _r.Random(20260916),
-                 keep=("k", "K", "t", "d", "N", "j", "s"))
-    for y in range(H):
-        for x in range(W):
-            if g[y][x] != before[y][x]:
-                tiles[y][x] = -1
-
-    # SEAL THE RING. Reported from play as walkable walls, and it was exactly
-    # that: seventeen `j` shelf tiles sat ON the outer boundary, so you could
-    # stand where the wall is with nothing beyond you. Every other map in the
-    # game is sealed; this one was not, because it is COMPOSED - four Seafoam
-    # floors laid in a square - and each floor's own solid border is interior
-    # to the composition, not the edge of it. The frame is ours to draw.
-    #
-    # The fixed id has to go with it. A cell keeps the real map's metatile
-    # unless we authored it, so turning the character to `I` and leaving the
-    # shelf art behind would have drawn a floor you cannot walk on - the same
-    # bug pointing the other way.
+    # SEAL THE RING, and the fixed id with it. A cell keeps the real map's
+    # metatile unless we authored one, so turning the character to `I` and
+    # leaving Seafoam's shelf art behind would draw a floor you cannot walk on -
+    # the invisible-wall bug pointing the other way.
     for x in range(W):
         for y in (0, H - 1):
-            g[y][x] = "I"
-            tiles[y][x] = -1
+            g[y][x], tiles[y][x] = "I", -1
     for y in range(H):
         for x in (0, W - 1):
-            g[y][x] = "I"
-            tiles[y][x] = -1
+            g[y][x], tiles[y][x] = "I", -1
 
-    # Standing in the north-west room, at the top of the cave.
-    spawn = None
-    for y in range(2, H - 2):
-        for x in range(2, W - 2):
-            if g[y][x] == "i" and g[y + 1][x] == "i":
-                spawn = (x, y)
-                break
-        if spawn:
-            break
-    assert spawn, "frost: nowhere to stand"
+    warps = []
+    for (fa, xa, ya), (fb, xb, yb) in FROST_LADDERS:
+        assert (xa, ya) in floors[fa][3] or (xb, yb) in floors[fb][3], (
+            f"frost: neither end of {FROST_FLOORS[fa]}({xa},{ya}) <-> "
+            f"{FROST_FLOORS[fb]}({xb},{yb}) is a ladder or a hole - there is "
+            "nothing drawn there for a player to read as a way through")
+        ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
+        bx, by = origin[fb][0] + xb, origin[fb][1] + yb
+        warps.append([ax, ay, bx, by])
 
-    # AND FILL WHAT THE SEAL CUT OFF. Sealing the ring left one walkable tile
-    # with no way in - a pocket you can see and never reach, which this repo
-    # complains about three times over Deep Woods. One tile is still one tile,
-    # and it is cheaper to fill it than to explain it.
+    mf, mx, my = FROST_MOUTH
+    spawn = (origin[mf][0] + mx, origin[mf][1] + my)
+    assert g[spawn[1]][spawn[0]] not in SOLID, "frost: the mouth is walled up"
+
+    # WHAT THE PLAYER CAN GET TO, THROUGH THE LADDERS AND OVER THE WATER.
+    # `k` is in `SURFABLE`, and half of B4F is lake - measured, the ride is
+    # worth 26 cells that no ladder reaches, which is a floor doing what
+    # Seafoam's B4F is for rather than a pocket. Everything else that cannot be
+    # got to is border fill and becomes rock.
+    hop = {}
+    for ax, ay, bx, by in warps:
+        hop[(ax, ay)] = (bx, by)
+        hop[(bx, by)] = (ax, ay)
     seen, stack = set(), [spawn]
     while stack:
-        cx, cy = stack.pop()
-        if (cx, cy) in seen or not (0 <= cx < W and 0 <= cy < H):
+        x, y = stack.pop()
+        if (x, y) in seen or not (0 <= x < W and 0 <= y < H):
             continue
-        if g[cy][cx] in SOLID:
+        if g[y][x] in SOLID and g[y][x] != "k":
             continue
-        seen.add((cx, cy))
-        stack += [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
+        seen.add((x, y))
+        stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+        if (x, y) in hop:
+            stack.append(hop[(x, y)])
     for y in range(H):
         for x in range(W):
             if g[y][x] not in SOLID and (x, y) not in seen:
-                g[y][x] = "I"
-                tiles[y][x] = -1
+                g[y][x], tiles[y][x] = "I", -1
 
-    return ["".join(r) for r in g], spawn, [i for row in tiles for i in row], base
+    return (["".join(r) for r in g], spawn,
+            [i for row in tiles for i in row], base, warps)
 
 
 def all_connected(g):
