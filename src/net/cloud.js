@@ -83,6 +83,7 @@ const SESSION = (globalThis.crypto?.randomUUID?.() ?? `s${Math.random()}`);
    design - see `push`. */
 let pulled = false;
 let lost = false;
+let claimed = false;
 
 export const signedIn = () => Boolean(session);
 export const claimLost = () => lost;
@@ -96,7 +97,7 @@ export const claimLost = () => lost;
 function hold(next) {
   const was = session?.user?.id ?? null;
   const now = next?.user?.id ?? null;
-  if (now !== was) { pulled = false; lost = false; }
+  if (now !== was) { pulled = false; lost = false; claimed = false; }
   session = next ?? null;
   return session;
 }
@@ -349,12 +350,24 @@ export async function pull() {
    Called once at boot, after the pull. It stamps this tab on the row, which is
    what makes every older session's next write fail - see `save_game`. A brand
    new account has no row yet and that is fine: the first `push` creates it and
-   claims it in the same statement. */
+   claims it in the same statement.
+
+   AND A CLAIM THAT FAILED IS TRIED AGAIN, because failing is not safe. This
+   said "the guard fails safe: an unclaimed row is writable" - but a row whose
+   claim did not land is not unclaimed, it is still the OLD device's, so the
+   newest session's first upload lost the race to a laptop left open in
+   another room and told the one person actually playing that they were
+   "playing somewhere else". supabase-js also REPORTS failure rather than
+   throwing, so the catch never ran either. `claimed` latches only on a real
+   success and `push` claims first until it has. */
 export async function claim() {
-  if (!CLOUD || !session || !pulled) return;
+  if (!CLOUD || !session || !pulled) return false;
   try {
-    await supabase.from(TABLE).update({ session: SESSION }).eq("user_id", session.user.id);
-  } catch { /* the guard fails safe: an unclaimed row is writable */ }
+    const { error } = await supabase
+      .from(TABLE).update({ session: SESSION }).eq("user_id", session.user.id);
+    claimed = !error;
+  } catch { claimed = false; }
+  return claimed;
 }
 
 /* ------------------------------------------------------------- the profile */
@@ -491,6 +504,7 @@ export async function push(raw) {
      upload is destructive. Reported as offline, because that is what it is. */
   if (!pulled) return { ok: false, why: "offline" };
   if (lost) return { ok: false, why: "taken" };
+  if (!claimed && !(await claim())) return { ok: false, why: "offline" };
 
   try {
     /* ONE STATEMENT, because read-then-write is a race with itself: two devices

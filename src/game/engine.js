@@ -96,8 +96,14 @@ export const CHARS = ["red", "leaf"];
 
 /* Where the save lives is `store.js`'s business, not this file's. */
 import {
-  SAVE_KEY, BACKUP_KEY, BROKEN_KEY, read, write, keep, mirror,
+  SAVE_KEY, BACKUP_KEY, BROKEN_KEY, OTHER_KEY, CHOSEN_KEY, WRITER_KEY, OWNER_KEY,
+  read, write, keep, mirror, scoped,
 } from "./store.js";
+
+/* A recovery copy belongs to whoever this browser is playing as - see
+   `scoped`. Read at the moment of use rather than once, because `settle` is
+   what writes the owner and it runs before any engine exists. */
+const mine = (key) => scoped(key, read(OWNER_KEY));
 import { push as pushCloud } from "../net/cloud.js";
 import { nextHint, HINT_IDS } from "./hints.js";
 
@@ -195,6 +201,23 @@ function freshState() {
     ask: null,                 // a press that wants confirming - never saved
   };
 }
+
+/* WHAT A SESSION IS, AS OPPOSED TO WHAT A SAVE IS - written once.
+
+   `save()` and `exportSave()` each kept their own list of fields to leave out,
+   and the two had drifted: the export still carried `stale`, `worn`, `hint`,
+   `colRev` and `ask`. The one that mattered was `stale`. Export a save while
+   the session had been taken over, import that file, and `loadState` spread
+   `stale: "taken"` straight back into the new state - and `save()` returns
+   early on "taken", so that save could never be written again by anything.
+   One list, read by both, and `loadState` resets every one of them. */
+const VOLATILE = ["encounter", "evolution", "fishing", "running", "cheers",
+  "worn", "ask", "rev", "colRev", "stale", "hint"];
+const persisted = (s) => {
+  const out = { ...s };
+  for (const k of VOLATILE) delete out[k];
+  return out;
+};
 
 /* An array of 0/1 of exactly `len`, whatever arrived. */
 function normalise(arr, len) {
@@ -308,8 +331,9 @@ export function saveProblem(s) {
    only appears when there is something behind it. */
 export function recoverable() {
   try {
-    const backup = read(BACKUP_KEY);
-    const broken = read(BROKEN_KEY);
+    const backup = read(mine(BACKUP_KEY));
+    const broken = read(mine(BROKEN_KEY));
+    const other = read(mine(OTHER_KEY));
     /* `summarise`, NOT `read` - AN IMPORT SHADOWED BY A LOCAL, AGAIN. This
        helper was called `read`, which was harmless while nothing else in scope
        was, and the moment `read` came in from store.js the two collided: the
@@ -327,25 +351,45 @@ export function recoverable() {
       if (!raw) return null;
       try {
         const o = JSON.parse(raw);
-        return { caught: o.caught ?? 0, box: o.box?.length ?? 0, money: o.money ?? 0 };
+        return {
+          caught: Number(o.caught) || 0,
+          box: Array.isArray(o.box) ? o.box.length : 0,
+          money: Number(o.money) || 0,
+        };
       } catch { return { unreadable: true }; }
     };
-    return { backup: summarise(backup), broken: summarise(broken) };
-  } catch { return { backup: null, broken: null }; }
+    return {
+      backup: summarise(backup), broken: summarise(broken), other: summarise(other),
+    };
+  } catch { return { backup: null, broken: null, other: null }; }
 }
 
+/* RETURNS `[state, verdict]`, AND THE VERDICT IS WHAT KEEPS A BAD LOAD LOCAL.
+
+   A save this build cannot load falls back to a fresh game, which is right,
+   and BROKEN keeps the text - on THIS browser. Signed in, the fresh game was
+   then mirrored to the account fifteen seconds later, and the account's copy
+   was the save that had failed: it had been pulled down a moment earlier by
+   `settle`. So the one place the real save still existed was overwritten by an
+   empty one, and BROKEN only ever helped on the device that failed.
+
+   It does not need a bug. **A save from a NEWER build is longer than this
+   build's dex**, and every Vercel preview URL stays live forever on whatever
+   commit it was built from, all pointed at the same database: open an old
+   preview after the forms landed and it rejects your 1,303-entry save, deals a
+   fresh game, and uploads it. `verdict` is null for a clean load, "outdated"
+   for that case and "unreadable" for everything else, and either one stops the
+   session reaching the account. */
 function loadState() {
-  const raw = (() => {
-    return read(SAVE_KEY);
-  })();
+  const raw = read(SAVE_KEY);
   try {
-    if (!raw) return freshState();
+    if (!raw) return [freshState(), null];
     const s = JSON.parse(raw);
     /* ANYTHING THAT FAILS IS KEPT BEFORE WE WALK AWAY FROM IT. `freshState()`
        here used to be the last moment that save existed. */
     if (!Array.isArray(s.dex)) {
-      keep(BROKEN_KEY, raw);
-      return freshState();
+      keep(mine(BROKEN_KEY), raw);
+      return [freshState(), "unreadable"];
     }
     /* A SHORTER DEX IS AN OLDER SAVE, NOT A BROKEN ONE.
 
@@ -362,8 +406,8 @@ function loadState() {
        generation is ever inserted BEFORE Kanto, this stops being true and that
        assertion is what will say so. */
     if (s.dex.length > SPECIES.length) {
-      keep(BROKEN_KEY, raw);
-      return freshState();
+      keep(mine(BROKEN_KEY), raw);
+      return [freshState(), "outdated"];
     }
 
     /* Built once, and BEFORE the dex, because `repairDex` reads them. Every
@@ -375,14 +419,44 @@ function loadState() {
        was good. Written at LOAD time on purpose: a backup taken at save time is
        a copy of the state you are already in, which is no help at all when that
        state is the problem. */
-    keep(BACKUP_KEY, raw);
+    keep(mine(BACKUP_KEY), raw);
 
     const rows = Object.fromEntries(TIERS.map((t) => [t,
       remap(s[t], SPECIES.length, (v) => (v ? 1 : 0))
         ?? normalise(s[t], SPECIES.length)]));
 
-    return {
-      ...freshState(), ...s, rev: 0,
+    /* A BOX ENTRY THIS BUILD CANNOT USE IS SET ASIDE, NEVER DELETED. The box
+       came straight off `...s`, so one entry naming a species this dex does
+       not hold - a hand-edited import, or a save from a build that shipped
+       forms and was then rolled back - blanked the BOX tab on every boot:
+       `sellValue(undefined)` throws inside a memo, and the save that caused
+       it is the save that loads next time. `limbo` holds them in the save
+       itself, and it is read back into the pool every load, so an entry that
+       becomes usable again (the forms ship a second time) walks straight back
+       into the box. A repeated uid is renumbered for the same reason: every
+       action in the Box names ONE uid, and two Pokemon answering to it means
+       evolving one mutates the other. */
+    const pool = [...(Array.isArray(s.box) ? s.box : []),
+      ...(Array.isArray(s.limbo) ? s.limbo : [])];
+    const sound = (m) => m && typeof m === "object" && Number.isInteger(m.uid)
+      && Number.isFinite(m.level) && Boolean(speciesById(m.species));
+    /* Past every uid in the POOL, limbo included, so an entry that walks back
+       out of limbo never meets a catch wearing its number. A reduce, not
+       `Math.max(...pool)`: a spread is one argument per Pokemon. */
+    let nextUid = pool.reduce((n, m) => (Number.isInteger(m?.uid) ? Math.max(n, m.uid + 1) : n),
+      Math.max(1, Math.floor(Number(s.nextUid)) || 1));
+    const seen = new Set();
+    const box = pool.filter(sound).map((m) => {
+      if (!seen.has(m.uid)) { seen.add(m.uid); return m; }
+      return { ...m, uid: nextUid++ };
+    });
+
+    const fresh = freshState();
+    return [{
+      ...fresh, ...s,
+      box, nextUid,
+      limbo: pool.filter((m) => !sound(m)),
+      money: Math.max(0, Number(s.money) || 0),
       /* A save from before shinies existed has neither of these, and a
          hand-edited or imported one could hold anything at all - so both are
          rebuilt to the right shape rather than trusted. */
@@ -447,11 +521,13 @@ function loadState() {
          Lv 20 earned it before it existed, and a key item nobody can be given
          retroactively is a key item half the players never get. */
       bag: grantKeys(s.bag, levelFromXp(s.xp ?? 0)),
-      encounter: null, evolution: null, cheers: [], worn: [], ask: null,
-    };
+      /* Every field that belongs to a SESSION comes back fresh, whatever the
+         file said - see `VOLATILE`. Last, so nothing above can put one back. */
+      ...Object.fromEntries(VOLATILE.map((k) => [k, fresh[k] ?? null])),
+    }, null];
   } catch {
-    keep(BROKEN_KEY, raw);
-    return freshState();
+    keep(mine(BROKEN_KEY), raw);
+    return [freshState(), "unreadable"];
   }
 }
 
@@ -494,7 +570,14 @@ export function createEngine(canvas, onChange, mini = null) {
   // atlas and draws a seam along every tile edge.
   ctx.imageSmoothingEnabled = false;
 
-  const state = loadState();
+  const [state, verdict] = loadState();
+  /* OUTDATED IS THE ONE VERDICT WORTH STOPPING FOR. The save is fine - it is
+     from a newer build than this page - so a fresh game here would be
+     pointless play that the next real load throws away, and writing anything
+     at all risks the copy that is correct. Latched like "taken", with a
+     dialog that says to reload. "unreadable" plays on: that save really is
+     damaged, BROKEN holds it, and the YOU panel offers it back. */
+  if (verdict === "outdated") state.stale = "outdated";
   if (!AREAS[state.areaId]) state.areaId = START_AREA;
   /* MIGRATION. Maps were all open once, so a save can be standing on one its
      trainer has not earned - and without this it would be stranded there, since
@@ -607,6 +690,10 @@ export function createEngine(canvas, onChange, mini = null) {
   let walkFrame = 0;
   let raf = 0;
   let saveTimer = null;
+  /* Set only by `chosen` - see it. Declared here, beside the timer, rather
+     than beside its user, so no call to `save()` during start-up can ever
+     reach it inside its temporal dead zone. */
+  let halted = false;
 
   /* The engine mutates its state in place and tells React to re-render, which
      works for anything read during render but silently breaks useMemo: after a
@@ -672,28 +759,93 @@ export function createEngine(canvas, onChange, mini = null) {
        LIVE tab is keeping, and on the next boot `newer` can hand the resurrected
        loser back to the player. Refusing to sync while still writing locally
        would be a worse bug than the one it fixes. */
-    if (state.stale === "taken") return;
+    if (halted || state.stale === "taken" || state.stale === "outdated") return;
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      const { encounter, evolution, fishing, running, cheers, worn, ask, rev,
-        colRev, stale, hint, ...rest } = state;
-      /* `write` reports whether it stuck rather than throwing - which cause it
-         was is its business, not this file's. What happens NEXT is this file's:
-         play on either way, and latch it so the top bar can say NOT SAVING. */
-      const raw = JSON.stringify(rest);
-      const got = write(SAVE_KEY, raw);
-      if (got.ok) {
-        if (state.stale) { state.stale = null; changed(); }
-      } else if (state.stale !== got.why) {
-        state.stale = got.why;
-        changed();
-      }
-      /* AND UPWARD, on its own clock. Local is what the next frame reads, so it
-         is never waited on; the account's copy trails it by a few seconds. With
-         no account configured this is a no-op - see cloud.js. */
-      mirror(raw, pushCloud);
-    }, 400);
+    saveTimer = setTimeout(writeNow, 400);
   }
+
+  /* THE DEBOUNCED BODY, callable on its own - because a debounce is a promise
+     to write LATER, and there are two moments when there is no later: logging
+     out, where the next thing Boot does is unmount this engine (whose
+     `destroy()` cancels the timer), and the tab going away, where the timer
+     simply never fires. Either way the last thing you did in the final 400ms
+     was the thing that was lost. */
+  function writeNow() {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (halted || state.stale === "taken" || state.stale === "outdated") return;
+    /* `write` reports whether it stuck rather than throwing - which cause it
+       was is its business, not this file's. What happens NEXT is this file's:
+       play on either way, and latch it so the top bar can say NOT SAVING. */
+    const raw = JSON.stringify(persisted(state));
+    const got = write(SAVE_KEY, raw);
+    if (got.ok) {
+      if (state.stale) { state.stale = null; changed(); }
+    } else if (state.stale !== got.why) {
+      state.stale = got.why;
+      changed();
+    }
+    /* AND UPWARD, on its own clock. Local is what the next frame reads, so it
+       is never waited on; the account's copy trails it by a few seconds. With
+       no account configured this is a no-op - see cloud.js.
+
+       NEVER after a load that was rejected - see `loadState`. The session this
+       started as is a fresh game standing in for a save that could not be
+       read, and the account's copy IS that save. */
+    if (!verdict) mirror(raw, pushCloud);
+  }
+  const pending = () => saveTimer != null;
+
+  /* A SAVE PICKED BY HAND - restored or imported - and the one path both take.
+     The old game must not save over it on the way out, so the debounce dies
+     first; the marker tells the next `settle` that this local save wins over
+     the account's whatever the step counts say, and keeps the account's copy
+     as OTHER so the choice can itself be undone. Reloads, because the engine
+     closes over the map rows and a reload is the one path certainly
+     consistent. */
+  /* HALTED, NOT `stale`. The first version set `stale = "taken"`, which would
+     have flashed the "playing somewhere else" dialog on any render before the
+     reload landed - and this is also what the `pagehide` listener below has to
+     respect, or the reload's own pagehide writes the OLD game straight back
+     over the save that was just chosen. */
+  function chosen(raw) {
+    halted = true;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    write(SAVE_KEY, raw);
+    write(CHOSEN_KEY, "1");
+    location.reload();
+  }
+
+  /* ONE WRITER PER BROWSER, AND THE NEWEST TAB IS IT.
+
+     Two tabs share one localStorage key. Signed in, `claim()` stops the older
+     one - but only at its next upload, which is up to a whole sync window of
+     both of them writing over each other; and in local mode nothing stopped it
+     at all, so an idle tab left open behind a live one could put an hour-old
+     save back the next time anything in it changed. The newest tab stamps its
+     id here, and every OTHER tab is told by the browser - `storage` fires in
+     the documents that did not write - and stops exactly as a lost claim does,
+     under the same dialog. */
+  const TAB = globalThis.crypto?.randomUUID?.() ?? `t${Math.random()}`;
+  if (verdict !== "outdated") write(WRITER_KEY, TAB);
+  const rival = (ev) => {
+    if (ev.key !== WRITER_KEY || !ev.newValue || ev.newValue === TAB) return;
+    if (state.stale === "taken" || state.stale === "outdated") return;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    state.stale = "taken";
+    changed();
+  };
+  /* AND A TAB THAT IS LEAVING WRITES WHAT IT HAS. Registered here rather than
+     in store.js because only the engine knows there is a debounce in flight;
+     store's own listener, registered later, then flushes what this puts in
+     `pending` - listeners run in the order they were added. */
+  const leaving = () => { if (pending()) writeNow(); };
+  const hidden = () => { if (globalThis.document?.visibilityState !== "visible") leaving(); };
+  globalThis.addEventListener?.("storage", rival);
+  globalThis.addEventListener?.("pagehide", leaving);
+  globalThis.addEventListener?.("visibilitychange", hidden);
 
   loadArt().then((loaded) => { art = loaded; });
 
@@ -2042,7 +2194,8 @@ export function createEngine(canvas, onChange, mini = null) {
          else, nothing this session does from here can be kept, and a warning
          that could be cleared by the next successful local write would be a
          lie about that. */
-      if (state.stale === "taken") return;
+      // "outdated" is the same kind of end - see `loadState`.
+      if (state.stale === "taken" || state.stale === "outdated") return;
       if (why === "taken") { state.stale = "taken"; changed(); return; }
       const soft = why ? "offline" : null;
       if (state.stale === "full" || state.stale === "blocked") return;
@@ -2092,6 +2245,10 @@ export function createEngine(canvas, onChange, mini = null) {
     answerAsk,
     skip,
     reset() {
+      /* Halted first, or the reload's own `pagehide` writes the game straight
+         back into the key this has just cleared - see `chosen`. */
+      halted = true;
+      clearTimeout(saveTimer);
       try { localStorage.removeItem(SAVE_KEY); } catch { /* nothing to clear */ }
       location.reload();
     },
@@ -2106,8 +2263,9 @@ export function createEngine(canvas, onChange, mini = null) {
        does: the engine closes over the map rows and their dimensions, and a
        reload is the one path that is certainly consistent. */
     restore(which = "backup") {
-      const key = which === "broken" ? BROKEN_KEY : BACKUP_KEY;
-      const raw = read(key);
+      const key = which === "broken" ? BROKEN_KEY
+        : which === "other" ? OTHER_KEY : BACKUP_KEY;
+      const raw = read(mine(key));
       if (!raw) return false;
       /* BROKEN IS RAW TEXT AND MAY NOT BE JSON AT ALL - that is why it was
          kept. Parsing it outside a try here would throw out of the click that
@@ -2115,15 +2273,13 @@ export function createEngine(canvas, onChange, mini = null) {
       let obj;
       try { obj = JSON.parse(raw); } catch { return false; }
       if (saveProblem(obj)) return false;
-      write(SAVE_KEY, raw);
-      location.reload();
+      chosen(raw);
       return true;
     },
     recoverable,
 
     exportSave() {
-      const { encounter, evolution, fishing, running, cheers, rev, ...rest } = state;
-      return { ...rest, savedAt: new Date().toISOString(), species: SPECIES.length };
+      return { ...persisted(state), savedAt: new Date().toISOString(), species: SPECIES.length };
     },
 
     /* A summary of a file being offered, so the confirm step can show what is
@@ -2157,14 +2313,22 @@ export function createEngine(canvas, onChange, mini = null) {
     importSave(obj) {
       const problem = saveProblem(obj);
       if (problem) return problem;
-      clearTimeout(saveTimer);          // do not let the old game save over it
-      write(SAVE_KEY, JSON.stringify(obj));
-      location.reload();
+      chosen(JSON.stringify(obj));
       return null;
     },
+    /* Everything waiting in the debounce, now - see `writeNow`. */
+    saveNow() { if (pending()) writeNow(); },
+
+    /* A DESTROYED ENGINE NEVER WRITES AGAIN. Boot destroys it before clearing
+       the browser's copy on log out and on delete, and a debounce or a
+       `pagehide` landing after that would put the cleared save straight back. */
     destroy() {
+      halted = true;
       cancelAnimationFrame(raf);
       clearTimeout(saveTimer);
+      globalThis.removeEventListener?.("storage", rival);
+      globalThis.removeEventListener?.("pagehide", leaving);
+      globalThis.removeEventListener?.("visibilitychange", hidden);
     },
   };
 }

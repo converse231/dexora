@@ -425,7 +425,7 @@ export default function App({
             ["Pokédex", `${caught} caught`],
             ["Saved to", "your account"],
           ]}
-          note="Your game stays on your account. This browser's copy is cleared, so log back in to carry on."
+          note="Your latest play uploads first, and this browser's copy is cleared once it has. If it cannot upload, it stays here until you log back in."
           confirmLabel="LOG OUT"
           onCancel={() => setLeaving(false)}
           onConfirm={() => { setLeaving(false); onLogOut(); }}
@@ -447,6 +447,27 @@ export default function App({
             ["This tab", "no longer saving"],
           ]}
           note="Your game was opened on another device or in another tab, and that one now owns the save. Nothing here is being kept. Reload to pick up where that session is."
+          confirmLabel="RELOAD"
+          onCancel={() => location.reload()}
+          onConfirm={() => location.reload()}
+        />
+      )}
+
+      {/* A SAVE FROM A NEWER BUILD THAN THIS PAGE. The engine will not write it,
+          locally or upward, because this build cannot know what its extra
+          positions mean and saving would throw them away - see `loadState`.
+          What is on screen is a fresh game nothing keeps, so it is the end of
+          the session in exactly the way "taken" is, and it offers the one
+          action that helps: a reload is what fetches the newer build. */}
+      {st?.stale === "outdated" && (
+        <Confirm
+          title="This page is out of date"
+          tone="warn"
+          lines={[
+            ["Your save", "made by a newer version"],
+            ["This tab", "not saving"],
+          ]}
+          note="Your game is safe - nothing here is being written over it. Reload to get the latest version of Dexora."
           confirmLabel="RELOAD"
           onCancel={() => location.reload()}
           onConfirm={() => location.reload()}

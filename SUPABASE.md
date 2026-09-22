@@ -242,6 +242,90 @@ Check it took: **Table Editor → saves** should show the table with a green
 `alter table` line — an unrestricted table with a public key is every save in
 the project readable by anyone.
 
+## 3c. Hardening — **run this once** (added 2026-09, the save audit)
+
+Three things the browser could do to the server that it should not, all found
+reading the SQL above rather than in play. Safe to run on a live project: it
+adds rules and changes no row, and every statement is re-runnable.
+
+```sql
+-- 1. A SAVE HAS A CEILING, because one player can otherwise fill the database
+--    for everybody. `data` took any jsonb the browser sent, and a free project
+--    is 500MB: one account uploading 100MB blobs puts the project over quota,
+--    and an over-quota project goes READ-ONLY - which is every other player's
+--    upload failing at once. A real save is ~40KB at 600 caught; 5MB is over a
+--    hundred times that, so no honest collection reaches it. The shape half is
+--    what `saveProblem` already demands of a file in the browser.
+alter table public.saves drop constraint if exists save_shape;
+alter table public.saves add constraint save_shape check (
+  jsonb_typeof(data) = 'object'
+  and jsonb_typeof(data->'dex') = 'array'
+  and octet_length(data::text) <= 5242880
+);
+
+-- 2. THE SUMMARY TRIGGER MUST NOT BE ABLE TO FAIL THE UPLOAD. It cast with
+--    `::int`, and it runs AFTER the save in the same statement - so a save
+--    whose `caught` was not an integer (a hand-edited file, or any future
+--    field that becomes fractional) made the trigger throw, the throw rolled
+--    back the upload, and that account could never sync again: every retry
+--    failed identically, reported only as "not synced". A summary is a
+--    convenience; the save is the record. Anything unreadable counts as 0.
+create or replace function public.summary_int(v jsonb)
+returns int
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when jsonb_typeof(v) = 'number'
+    then greatest(0, least((v #>> '{}')::numeric, 2147483647))::int
+    else 0 end
+$$;
+
+create or replace function public.sync_profile_summary()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.profiles p set
+    -- 2 is "caught", 1 is "seen".
+    dex_count = case when jsonb_typeof(new.data->'dex') = 'array' then (
+      select count(*) from jsonb_array_elements_text(new.data->'dex') d
+       where d = '2') else 0 end,
+    caught    = public.summary_int(new.data->'caught'),
+    steps     = public.summary_int(new.data->'steps'),
+    xp        = public.summary_int(new.data->'xp'),
+    played_at = new.updated_at
+  where p.user_id = new.user_id;
+  return new;
+end;
+$$;
+
+-- 3. A PROFILE'S DERIVED COLUMNS ARE THE DATABASE'S, NOT THE PLAYER'S.
+--    "update own profile" is a ROW rule - it says whose row, not which
+--    columns - so a player could write their own dex_count, steps, xp,
+--    played_at and created_at straight from the console. Nothing reads them
+--    today, which is exactly when to close it: the day a leaderboard or a
+--    friends list reads them, the numbers are already forgeable. The trigger
+--    above is `security definer`, so it still writes them.
+revoke update on public.profiles from anon, authenticated;
+grant  update (username, char, birthdate) on public.profiles to authenticated;
+revoke insert on public.profiles from anon, authenticated;
+grant  insert (user_id, username, char, birthdate, terms_at)
+  on public.profiles to authenticated;
+```
+
+**Check it took:** this should list exactly `username`, `char` and `birthdate`
+for UPDATE, and changing your trainer in Settings must still work:
+
+```sql
+select privilege_type, column_name from information_schema.column_privileges
+ where table_name = 'profiles' and grantee = 'authenticated' order by 1, 2;
+```
+The game needs nothing redeployed for any of this — every column it writes is
+still granted.
+
 ## 4. Turn off email confirmation — **you have to do this one**
 
 It is the only step that cannot be done from here: the setting lives in GoTrue's
@@ -430,6 +514,11 @@ cannot** - and there are three such things, two of which are already here:
 
 The third is deliberately absent: trading is deferred, and box rows are only
 worth their cost when something other than the owner has to move them.
+
+**Also bounded** (§3c): a save is capped at 5MB and must be an object with a
+dex, so one account cannot fill the project for everybody; the summary trigger
+cannot fail an upload; and a profile's derived columns are written only by the
+database.
 
 **Not protected.** Every number in the save is computed in the browser and
 uploaded — the catch roll, the money, the dex. Someone determined can edit their

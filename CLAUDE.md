@@ -478,6 +478,88 @@ else had taken. **The latches are reset when the USER changes and not on a
 token refresh**, which is why exactly one function assigns `session` - five call
 sites used to, and a sixth would simply not have reset anything.
 
+**THE SAVE AUDIT: TWELVE WAYS A COLLECTION COULD BE LOST, AND NONE OF THEM
+FAILED ANYTHING.** Asked for as making sure a player's data can never be lost
+or overwritten. Every one of these is a write that landed where it should not
+have, or a copy that stopped existing - which is exactly the class nothing can
+see, because a write that lands looks like a write that was meant.
+
+- **LOGGING OUT DELETED UNSYNCED PLAY.** `out()` dropped the cache whether or
+  not `flushNow` had landed, under a dialog promising the game stays on your
+  account. The drop is gated on the upload now, and the engine is saved AND
+  destroyed first - its writes are debounced, so the last thing you did was in
+  a timer the unmount cancelled, and a running engine under the spinner writes
+  straight back into a cache being cleared.
+- **AND THE NEXT PERSON TO LOG IN WROTE OVER IT.** Keeping the cache is only
+  safe until somebody else logs in, and `settle` for a second account wrote its
+  save over the first one's. **Anybody else's save is parked before anything
+  is written over it** (`PARKED_KEY`, scoped to its owner) and is that owner's
+  `local` at their next login. A failed read never plays a parked save: the
+  engine reads SAVE_KEY, which is still somebody else's.
+- **AN UNOWNED SAVE WAS STILL ADOPTED BY A BRAND NEW ACCOUNT.** The ownership
+  rule held whenever the account had a save, and not when it was new: a null
+  winner against a null `local` wrote nothing, and the engine then read the
+  stranger's save straight out of SAVE_KEY. It is cleared now - parked first,
+  because a guest's save has no other copy.
+- **THE SAVE THAT LOST AT LOGIN STOPPED EXISTING.** `newer` picks one and the
+  other was overwritten. That is right for an older copy and a lost afternoon
+  for a BRANCH. `steps`, `caught` and `xp` only go up - checked, not assumed -
+  so a loser ahead on ANY of them cannot be an older copy of the winner, and
+  `diverged` keeps exactly those as OTHER, offered on the YOU panel.
+- **RESTORE AND IMPORT WERE NO-OPS ONLINE.** Both write and reload, and then
+  `settle` compared the choice with the account by steps - a backup is older by
+  construction, so the account won and the one recovery path in the game did
+  nothing. `CHOSEN_KEY` makes a hand-picked save win once, keeping the
+  account's copy as OTHER so the choice can be undone. **And `halted`, not
+  `stale`**: the reload's own `pagehide` would otherwise write the old game
+  back over the one just chosen, and `stale = "taken"` would flash the wrong
+  dialog while it did. `reset()` and `destroy()` halt for the same reason.
+- **RECOVERY COPIES WERE THE BROWSER'S, NOT THE ACCOUNT'S.** BACKUP, BROKEN and
+  OTHER were one key each, so B was offered - and could restore - the dex A left
+  behind: the bug `OWNER_KEY` fixed, arriving through the recovery path.
+  `scoped(key, owner)`, bare in local mode so an offline save's backup is still
+  found. Deleting an account drops every copy under its id.
+- **AN OLDER BUILD WROTE A FRESH GAME OVER A NEWER BUILD'S SAVE, AND UPLOADED
+  IT.** A dex longer than `SPECIES` is a save padding cannot shrink. It is kept,
+  the session is `stale: "outdated"` - terminal, like "taken", under its own
+  RELOAD dialog - and nothing is written locally or upward.
+- **AN UNREADABLE SAVE PLAYS A FRESH GAME AND NEVER UPLOADS IT.** `loadState`
+  returns `[state, verdict]` and `mirror` runs only on a clean load; otherwise
+  a truncated localStorage replaced the account's real collection with a Lv 1
+  trainer four seconds later.
+- **SESSION STATE RODE ALONG IN EVERY SAVE.** An export taken mid-session held
+  `stale: "taken"`, and importing it latched the new session shut on its first
+  frame. `VOLATILE` is the one list: stripped on write and export, reset on load.
+- **TWO TABS WROTE ONE KEY.** `claim()` stops the older one only at its next
+  upload, and local mode had nothing at all. The newest tab stamps
+  `WRITER_KEY`; `storage` fires in every OTHER document, and they stop exactly
+  as a lost claim does.
+- **A FAILED CLAIM LOCKED OUT THE NEWEST DEVICE.** "The guard fails safe: an
+  unclaimed row is writable" - but a row whose claim did not land is still the
+  OLD device's, so the one person actually playing was told they were playing
+  somewhere else. supabase-js reports rather than throws, so the catch never
+  ran either. `claimed` latches on a real success and `push` claims first.
+- **ONE BAD BOX ENTRY BLANKED THE BOX TAB ON EVERY BOOT.** `box` came straight
+  off `...s`, and `sellValue(undefined)` throws in a memo. Entries this build
+  cannot use go to `limbo` - in the save, read back into the pool every load,
+  so they return the day they become usable - and a repeated uid is renumbered,
+  because every Box action names ONE uid.
+
+**`settle` LIVES IN store.js NOW, BECAUSE IT HAS TO BE DRIVEN.** Beside the
+screens it needed a server, so the suite could only grep its source, and every
+way it lost a collection was found in play. It takes `pull` as an argument;
+tools/play drives it through nine scenarios and the engine's save paths
+through eight more, and every new assertion was verified by putting its bug
+back - two passed with their bug restored on the first attempt and were
+rewritten until they did not.
+
+**THE SERVER HALF IS SQL THAT HAS NOT BEEN RUN.** SUPABASE.md §3c: a 5MB cap
+and a shape check on `saves.data` (one account could otherwise fill a free
+project, and an over-quota project is read-only for EVERY player), a summary
+trigger that cannot throw (its `::int` casts rolled back the upload they rode
+on, forever), and column grants on `profiles` (a row policy says whose row,
+not which columns, so every derived column was writable from the console).
+
 **THE SERVER STAMPS `updated_at`.** It was sent by the browser, so a device with
 a wrong clock wrote a wrong time and a determined one could write any time at
 all - and `profiles.played_at` is a copy of it. Nothing reads either today,

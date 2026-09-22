@@ -32,6 +32,17 @@ import Note from "./Note.jsx";
    and "delete everything" are none of those. They were also at the bottom of a
    column that scrolls, which put an action with no undo one flick below a
    routine one. They live in Settings.jsx now, in a dialog off the top bar. */
+/* THE THREE COPIES A PLAYER CAN TAKE BACK, in the order they are offered. One
+   table for the button and the dialog, because a third copy wired into two
+   hand-written branches is how the dialog came to call it "the save that
+   failed". `other` is the copy that LOST when this browser and the account
+   disagreed at login - kept only when it held play the winner did not. */
+const FROM = {
+  backup: { button: "LAST GOOD", from: "Last clean load" },
+  other: { button: "SET ASIDE", from: "Set aside when two copies disagreed" },
+  broken: { button: "FAILED SAVE", from: "The save that failed" },
+};
+
 export default function Trainer({
   stats, level, bag, onSpend, save, account = null,
 }) {
@@ -40,7 +51,7 @@ export default function Trainer({
   // A file that has been read and checked, waiting on the confirm step.
   const [offer, setOffer] = useState(null);
   const [saveNote, setSaveNote] = useState("");
-  // Which recovery is waiting on the confirm step: "backup" or "broken".
+  // Which recovery is waiting on the confirm step: a key of `FROM`.
   const [recover, setRecover] = useState(null);
   const free = freePoints(stats, level);
 
@@ -51,7 +62,8 @@ export default function Trainer({
      render - both keys are written at load time and cannot change while the
      panel is open, and restoring reloads the page. */
   const [lost] = useState(() => (save ? save.recover() : null));
-  const canRestore = lost && (lost.backup || (lost.broken && !lost.broken.unreadable));
+  // One entry per copy `recover()` can offer; an unreadable one cannot load.
+  const offers = lost ? Object.keys(FROM).filter((k) => lost[k] && !lost[k].unreadable) : [];
 
   /* Download the save as a file. A Blob and an object URL rather than a data:
      URI - a finished dex is tens of kilobytes of JSON and a data: URI that
@@ -109,7 +121,7 @@ export default function Trainer({
           title="Restore this save?"
           tone="warn"
           lines={[
-            ["From", recover === "backup" ? "Last clean load" : "The save that failed"],
+            ["From", FROM[recover].from],
             ["Pokédex", `${lost[recover].caught} caught`],
             ["Box", `${lost[recover].box} held`],
             ["Money", `¥${lost[recover].money.toLocaleString()}`],
@@ -268,23 +280,18 @@ export default function Trainer({
             is where a player gets one back. An unreadable one is still listed,
             because knowing it survived is what makes exporting it worth doing -
             it just cannot be loaded from here. */}
-        {canRestore && (
+        {offers.length > 0 && (
           <div className="trsave trlost">
             <p className="ts-why">
-              An earlier save is still in this browser. Restoring replaces the
-              game you are playing now.
+              Another copy of your game is still in this browser. Restoring
+              replaces the game you are playing now.
             </p>
             <div className="ts-row">
-              {lost.backup && (
-                <button className="ts-btn" onClick={() => setRecover("backup")}>
-                  {`LAST GOOD · ${lost.backup.caught} CAUGHT`}
+              {offers.map((k) => (
+                <button key={k} className="ts-btn" onClick={() => setRecover(k)}>
+                  {`${FROM[k].button} · ${lost[k].caught} CAUGHT`}
                 </button>
-              )}
-              {lost.broken && !lost.broken.unreadable && (
-                <button className="ts-btn" onClick={() => setRecover("broken")}>
-                  {`FAILED SAVE · ${lost.broken.caught} CAUGHT`}
-                </button>
-              )}
+              ))}
             </div>
           </div>
         )}
