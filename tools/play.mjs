@@ -1088,39 +1088,258 @@ function until(e, what, label, max = 2000) {
   console.log("sync ok — a failed upload is kept and retried, a newer one supersedes it");
 }
 
-/* A CACHE IS ONLY YOURS IF YOU WROTE IT. `settle` treated an UNOWNED local save
-   as the signed-in player's, meant to rescue somebody who played offline and
-   then signed up - and what it did was hand every account whatever the browser
-   happened to be holding. The deployed build is full of localStorage from
-   before accounts existed, so logging in there produced a dex nobody earned,
-   and clearing the database did not help because the data was never in it.
-
-   `settle` needs a network, so the RULE is asserted rather than the function:
-   the four ownership cases, and that the source still states them. */
+/* THE LOGIN-TIME MERGE, DRIVEN. `settle` lived in Boot.jsx and needed a
+   server, so for as long as it did this file could only grep its source - and
+   every way it has lost a collection was found in play. It takes `pull` as an
+   argument now, so a fake server is a one-line async function and every case
+   below is the real function against the real localStorage stub. */
 {
-  const owned = (owner, uid) => owner === uid;
-  assert.equal(owned(null, null), true, "local mode must use the local save");
-  assert.equal(owned("abc", "abc"), true, "your own cache must be used");
-  assert.equal(owned(null, "abc"), false,
-    "an UNOWNED cache was adopted by an account - this is the production bug");
-  assert.equal(owned("xyz", "abc"), false, "another account's cache was adopted");
+  const {
+    settle, SAVE_KEY, OWNER_KEY, OTHER_KEY, CHOSEN_KEY, PARKED_KEY, scoped,
+  } = await import("../src/game/store.js");
+  const S = (steps, caught = 0, xp = 0) => JSON.stringify({ steps, caught, xp, dex: [] });
+  const ok = (raw) => async () => ({ ok: true, raw });
+  const down = async () => ({ ok: false });
+  const given = (entries) => {
+    store.clear();
+    for (const [k, v] of Object.entries(entries)) store.set(k, v);
+  };
+  let got;
 
-  /* COMMENTS STRIPPED FIRST. The first version of this matched the comment
-     INSIDE `settle` that explains the old rule - the prose quotes
-     `!owner || owner === uid` to say why it was wrong, and the assertion read
-     that as the code still doing it. This file already records the same trap
-     for the repel check: a test that forbids documenting itself is a test
-     nobody keeps. */
-  const src = readFileSync(new URL("../src/Boot.jsx", import.meta.url), "utf8");
-  const code = src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
-  const settle = code.slice(code.indexOf("async function settle"), code.indexOf("const fieldOf"));
-  assert.ok(/owner === uid \? read\(SAVE_KEY\)/.test(settle),
-    "settle no longer requires the cache to belong to this account");
-  assert.ok(!/!owner \|\| owner === uid/.test(settle),
+  // An UNOWNED cache - a guest's, or from before accounts - is never adopted.
+  given({ [SAVE_KEY]: S(9000, 400) });
+  got = await settle("A", ok(null));
+  assert.equal(got.raw, null,
+    "a new account was handed an UNOWNED cache - this is the production bug");
+  assert.equal(store.get(SAVE_KEY), undefined,
+    "the stranger's save is still in SAVE_KEY, where the engine will read it anyway");
+  assert.equal(store.get(PARKED_KEY), S(9000, 400),
+    "the guest's save was cleared without being parked - that was its only copy");
+  assert.equal(store.get(OWNER_KEY), "A");
+
+  // Another account's unsynced play is parked under its owner, and comes back.
+  given({ [SAVE_KEY]: S(5000, 50), [OWNER_KEY]: "A" });
+  got = await settle("B", ok(S(100)));
+  assert.equal(got.raw, S(100), "B was handed A's save");
+  assert.equal(store.get(scoped(PARKED_KEY, "A")), S(5000, 50),
+    "logging in as B wrote straight over A's unsynced play");
+  got = await settle("A", ok(S(4000, 40)));
+  assert.equal(got.raw, S(5000, 50),
+    "A's parked play is ahead of the account and was not picked up at A's next login");
+  assert.equal(store.get(scoped(PARKED_KEY, "A")), undefined,
+    "a parked save was merged and left behind to merge again");
+  assert.equal(store.get(scoped(PARKED_KEY, "B")), S(100),
+    "B's cache was not parked when A logged back in");
+
+  // A failed read writes NOTHING, and never plays somebody else's SAVE_KEY.
+  given({ [SAVE_KEY]: S(700), [OWNER_KEY]: "B", [scoped(PARKED_KEY, "A")]: S(5000) });
+  const before = JSON.stringify([...store]);
+  got = await settle("A", down);
+  assert.deepEqual(got, { ok: false, raw: null },
+    "a failed read played a parked save - the engine would have loaded B's dex as A");
+  assert.equal(JSON.stringify([...store]), before, "a failed read wrote to localStorage");
+  // ...but this account's OWN cache is played: offline play is a feature.
+  given({ [SAVE_KEY]: S(700), [OWNER_KEY]: "A", [CHOSEN_KEY]: "1" });
+  got = await settle("A", down);
+  assert.equal(got.raw, S(700), "offline, this account's own cache was not played");
+  assert.equal(store.get(CHOSEN_KEY), "1",
+    "a failed read spent the restore marker it could not honour");
+
+  // Ahead wins; an older copy of the winner is not offered back as a branch.
+  given({ [SAVE_KEY]: S(900, 10, 100), [OWNER_KEY]: "A" });
+  got = await settle("A", ok(S(800, 9, 90)));
+  assert.equal(got.raw, S(900, 10, 100), "offline play ahead of the account was thrown away");
+  assert.equal(store.get(scoped(OTHER_KEY, "A")), undefined,
+    "a copy that is simply BEHIND was kept as if it were a branch");
+  // A branch - behind on steps, ahead on catches - is kept, not erased.
+  given({ [SAVE_KEY]: S(900, 12, 100), [OWNER_KEY]: "A" });
+  got = await settle("A", ok(S(1000, 10, 150)));
+  assert.equal(store.get(SAVE_KEY), S(1000, 10, 150));
+  assert.equal(store.get(scoped(OTHER_KEY, "A")), S(900, 12, 100),
+    "a branch holding catches the winner lacks was erased by the step count");
+
+  // A hand-picked save wins ONCE, and the account's copy is kept to undo it.
+  given({ [SAVE_KEY]: S(300), [OWNER_KEY]: "A", [CHOSEN_KEY]: "1" });
+  got = await settle("A", ok(S(2000)));
+  assert.equal(got.raw, S(300),
+    "restoring a backup was a no-op online - the account won on steps");
+  assert.equal(store.get(scoped(OTHER_KEY, "A")), S(2000),
+    "a restore replaced the account's copy without keeping it");
+  assert.equal(store.get(CHOSEN_KEY), undefined, "the restore marker outlived its boot");
+  // Another account's marker picks nothing for this one.
+  given({ [SAVE_KEY]: S(300), [OWNER_KEY]: "B", [CHOSEN_KEY]: "1" });
+  got = await settle("A", ok(S(2000)));
+  assert.equal(got.raw, S(2000), "B's restore marker chose a save for A");
+
+  // Local mode: no account, and the browser's save is simply the save.
+  given({ [SAVE_KEY]: S(50) });
+  got = await settle(null, ok(null));
+  assert.equal(got.raw, S(50), "local mode lost its own save");
+  assert.equal(store.get(PARKED_KEY), undefined, "local mode parked its own save");
+
+  // No login-time source grep survives: nothing may adopt an unowned cache.
+  const code = readFileSync(new URL("../src/game/store.js", import.meta.url), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.ok(!/!owner \|\| owner === uid/.test(code),
     "settle is adopting unowned local data again - that is the production bug");
-  console.log("cache ownership ok — only a cache this account wrote is ever adopted");
+  console.log("settle ok — owned only, parked not clobbered, branches kept, a failed read writes nothing");
+}
+
+/* WHAT THE ENGINE WILL NOT WRITE, AND WHAT IT WILL NOT LOSE. Each of these is
+   a path by which a session wrote a save it should not have, or failed to
+   write one it should: all of them silent, because a write that lands is
+   indistinguishable from one that should not have. */
+{
+  const {
+    SAVE_KEY, OWNER_KEY, BACKUP_KEY, BROKEN_KEY, OTHER_KEY, CHOSEN_KEY, WRITER_KEY,
+    flushNow, scoped,
+  } = await import("../src/game/store.js");
+  const { SPECIES } = await import("../src/data/dex.js");
+  const reloads = [];
+  globalThis.location = { reload: () => reloads.push(1) };
+
+  /* A SAVE FROM A NEWER BUILD is kept, never written over, never uploaded.
+     Padding cannot invent what extra positions mean and saving would drop
+     them, so the verdict latches the session shut - locally AND upward. */
+  {
+    const future = { ...SAVE, dex: Array(SPECIES.length + 70).fill(0) };
+    const { e } = boot(future);
+    const raw = store.get(SAVE_KEY);
+    assert.equal(e.state.stale, "outdated", "a newer build's save loaded as if it were ours");
+    assert.equal(store.get(BROKEN_KEY), raw, "the newer save was not kept aside");
+    assert.ok(e.setChar("red"), "nothing changed - this test is asserting nothing");
+    e.saveNow();
+    assert.equal(store.get(SAVE_KEY), raw,
+      "an older build wrote a fresh game over a newer build's save");
+    let pushed = 0;
+    await flushNow(async () => { pushed++; return { ok: true }; });
+    assert.equal(pushed, 0, "an older build uploaded a fresh game over the account");
+    e.syncTrouble("offline");
+    assert.equal(e.state.stale, "outdated", "a sync blip cleared the out-of-date latch");
+    e.destroy();
+  }
+
+  /* A SAVE THAT COULD NOT BE READ plays a fresh game here - and never uploads
+     it, or the account's real collection is replaced by a Lv 1 trainer. */
+  {
+    const { e } = boot("a string where a save should be");
+    assert.ok(!e.state.stale, "an unreadable save latched the session");
+    assert.ok(e.setChar("red"), "nothing changed - this test is asserting nothing");
+    e.saveNow();
+    let pushed = 0;
+    await flushNow(async () => { pushed++; return { ok: true }; });
+    assert.equal(pushed, 0, "a fresh game from an unreadable save was uploaded over the account");
+    e.destroy();
+  }
+
+  /* SESSION STATE IS NEVER A SAVE. A file exported mid-session carried
+     `stale: "taken"`, and importing it latched the new session shut on its
+     first frame; `rev` and an encounter rode along the same way. */
+  {
+    const { e } = boot({ ...SAVE, stale: "taken", rev: 99, encounter: { speciesId: 1 } });
+    assert.equal(e.state.stale, null, "a saved `stale` latched a fresh session shut");
+    assert.equal(e.state.encounter, null, "a saved encounter came back as live");
+    const out = e.exportSave();
+    for (const k of ["stale", "rev", "colRev", "encounter", "ask", "cheers"]) {
+      assert.ok(!(k in out), `the exported save carries the session field "${k}"`);
+    }
+    e.destroy();
+  }
+
+  /* A BOX ENTRY THIS BUILD CANNOT USE IS SET ASIDE, NOT DELETED - and a
+     repeated uid is renumbered, because every Box action names ONE uid. */
+  {
+    const ghost = { uid: 7, species: 987654, level: 5 };
+    const { e } = boot({
+      ...SAVE, nextUid: 2,
+      box: [{ uid: 1, species: 16, level: 3 }, { uid: 1, species: 19, level: 4 }, ghost],
+    });
+    assert.deepEqual(e.state.box.map((m) => m.species), [16, 19],
+      "an entry with an unknown species reached the Box, which crashes rendering it");
+    assert.deepEqual(e.state.limbo, [ghost], "an unusable entry was deleted rather than set aside");
+    const uids = e.state.box.map((m) => m.uid);
+    assert.equal(new Set(uids).size, uids.length, "two Pokemon still answer to one uid");
+    assert.ok(e.state.nextUid > Math.max(7, ...uids),
+      "nextUid can hand out a uid an entry already has");
+    e.buyCandy(1);
+    e.saveNow();
+    assert.deepEqual(JSON.parse(store.get(SAVE_KEY)).limbo, [ghost],
+      "the set-aside entry did not survive a save");
+    e.destroy();
+  }
+
+  /* THE LAST 400ms. `save()` is debounced, so what you did just before
+     logging out was in a timer the unmount cancelled. */
+  {
+    const { e } = boot(SAVE);
+    const was = store.get(SAVE_KEY);
+    assert.ok(e.buyCandy(1));
+    e.saveNow();
+    assert.notEqual(store.get(SAVE_KEY), was, "saveNow did not write what was pending");
+    e.destroy();
+    const at = store.get(SAVE_KEY);
+    e.buyCandy(1);
+    e.saveNow();
+    assert.equal(store.get(SAVE_KEY), at,
+      "a destroyed engine wrote - log out clears the cache and this puts it back");
+  }
+
+  /* ONE WRITER PER BROWSER. The newest tab stamps WRITER_KEY and every other
+     tab hears it through `storage` - so the older one stops writing, as a lost
+     claim does, rather than putting an hour-old save back. Listeners captured
+     for the length of one boot, because the harness otherwise throws them away. */
+  {
+    const heard = {};
+    globalThis.addEventListener = (t, f) => { (heard[t] ??= []).push(f); };
+    const { e } = boot(SAVE);
+    globalThis.addEventListener = () => {};
+    assert.ok(store.get(WRITER_KEY), "the tab never stamped itself as the writer");
+    for (const f of heard.storage) f({ key: WRITER_KEY, newValue: "a-newer-tab" });
+    assert.equal(e.state.stale, "taken", "an older tab went on writing after a newer one opened");
+    const frozen = store.get(SAVE_KEY);
+    e.buyCandy(1);
+    for (const f of heard.pagehide) f();
+    assert.equal(store.get(SAVE_KEY), frozen, "the displaced tab wrote over the live tab's save");
+    e.destroy();
+  }
+
+  /* A RESTORE IS A CHOICE, AND IT SURVIVES THE RELOAD IT CAUSES. The restore
+     marker makes it beat the account once; `halted` stops the reload's own
+     `pagehide` writing the OLD game back over the one just chosen. */
+  {
+    const heard = {};
+    globalThis.addEventListener = (t, f) => { (heard[t] ??= []).push(f); };
+    const { e } = boot(SAVE);
+    globalThis.addEventListener = () => {};
+    const file = { ...SAVE, money: 1234, steps: 5 };
+    e.buyCandy(1);                       // leave a debounce in flight
+    assert.equal(e.importSave(file), null, "a valid file was refused");
+    assert.equal(reloads.length > 0, true, "an import did not reload");
+    e.buyCandy(1);                       // and the game runs on until it lands
+    for (const f of heard.pagehide) f();
+    assert.equal(JSON.parse(store.get(SAVE_KEY)).money, 1234,
+      "the reload's pagehide wrote the old game back over the imported one");
+    assert.equal(store.get(CHOSEN_KEY), "1", "an import is not marked as chosen, so the account beats it");
+    e.destroy();
+  }
+
+  /* RECOVERY COPIES BELONG TO THEIR OWNER. They were one key per browser, so
+     B was offered - and could restore - whatever A had left behind. */
+  {
+    const { e } = boot(SAVE);
+    store.set(OWNER_KEY, "B");
+    store.set(scoped(BACKUP_KEY, "A"), JSON.stringify({ ...SAVE, caught: 412 }));
+    store.set(scoped(OTHER_KEY, "A"), JSON.stringify({ ...SAVE, caught: 412 }));
+    const b = e.recoverable();
+    assert.equal(b.backup, null, "B was offered A's backup");
+    assert.equal(b.other, null, "B was offered A's set-aside copy");
+    assert.equal(e.restore("backup"), false, "B restored A's backup");
+    store.set(OWNER_KEY, "A");
+    assert.equal(e.recoverable().other.caught, 412, "A's own set-aside copy is not offered to A");
+    e.destroy();
+  }
+  delete globalThis.location;
+  console.log("save paths ok — newer builds, session state, bad entries, the last 400ms, two tabs, restore and recovery");
 }
 
 /* A TOKEN OUTLIVES THE USER IT NAMES. `restore` read the session out of
@@ -1264,14 +1483,17 @@ function until(e, what, label, max = 2000) {
   const assigns = (cloud.match(/^\s*session = /gm) ?? []).length;
   assert.equal(assigns, 1,
     `${assigns} places assign the session directly - all but \`hold\` skip the latch reset`);
-  assert.ok(/if \(now !== was\) \{ pulled = false; lost = false; \}/.test(cloud),
+  assert.ok(/if \(now !== was\) \{ pulled = false; lost = false; claimed = false; \}/.test(cloud),
     "the read/claim latches are not reset when the user changes, or are reset on every refresh");
 
-  // Boot must act on the failed read rather than treating it as an empty save.
+  // The failed-read rule is DRIVEN above ("settle ok"); Boot must still claim.
   const boot = bare(readFileSync(new URL("../src/Boot.jsx", import.meta.url), "utf8"));
-  assert.ok(/if \(!got\.ok\) return \{ ok: false/.test(boot),
-    "settle writes to localStorage on the strength of a read that failed");
   assert.ok(/await claim\(\)/.test(boot), "Boot never takes the save, so an old tab keeps writing");
+  /* AND A CLAIM THAT FAILED IS RETRIED BY THE NEXT UPLOAD. It used to be fire
+     and forget, so a hiccup at boot left the row with the OLD device and the
+     newest session was told it was "playing somewhere else". */
+  assert.ok(/if \(!claimed && !\(await claim\(\)\)\)/.test(cloud),
+    "push no longer claims first when the boot-time claim did not land");
 
   /* AND THE LOSER STOPS WRITING LOCALLY TOO. Two tabs share one localStorage
      key, so an abandoned tab that keeps writing overwrites the copy the LIVE
@@ -1284,7 +1506,7 @@ function until(e, what, label, max = 2000) {
   const engine = bare(readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8"));
   const writes = engine.slice(engine.indexOf("function save()"), engine.indexOf("loadArt()"));
   assert.ok(writes.length > 100 && writes.length < 4000, "save() is not where it was in engine.js");
-  assert.ok(/state\.stale === "taken"\) return/.test(writes),
+  assert.ok(/state\.stale === "taken"[^;]*\) return/.test(writes),
     "a session that lost the save still writes to localStorage, over the live tab's copy");
 
   console.log("write safety ok — never blind, one writer, and the loser stops writing");

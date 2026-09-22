@@ -289,8 +289,8 @@ export default function TopBar({
           is the end of the session, and App raises a dialog for it. Left to
           fall through the ternary below it would have claimed the browser was
           blocking storage, which is a different problem with a different and
-          useless remedy. */}
-      {stale && stale !== "taken" && (
+          useless remedy. "outdated" is the same: App's dialog, not a banner. */}
+      {stale && stale !== "taken" && stale !== "outdated" && (
         <p className="tb-stale" role="alert">
           <b>{stale === "offline" ? "NOT SYNCED" : "NOT SAVING"}</b>
           {stale === "offline"

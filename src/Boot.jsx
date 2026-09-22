@@ -22,7 +22,8 @@ import {
   changePassword, requestReset, setPassword,
 } from "./net/cloud.js";
 import {
-  SAVE_KEY, OWNER_KEY, read, write, drop, newer, onSyncTrouble, flushNow,
+  SAVE_KEY, OWNER_KEY, BACKUP_KEY, BROKEN_KEY, OTHER_KEY, PARKED_KEY,
+  read, write, drop, onSyncTrouble, flushNow, settle, scoped,
 } from "./game/store.js";
 
 /* THE ACCOUNT OWNS THE SAVE; THE BROWSER IS A CACHE OF IT.
@@ -30,51 +31,13 @@ import {
    Signed in, the database is the record. localStorage still holds a copy and
    the game still writes there first - it writes on every step, so a round trip
    in the middle of the walk cycle is not on the table - but it is a cache, not
-   a peer, and when the two disagree the account wins.
+   a peer, and when the two disagree the account wins, except where the cache is
+   AHEAD because offline play has not uploaded yet.
 
-   The exception is the one case where local is not stale but AHEAD: playing
-   offline, where the writes are real and simply have not been uploaded yet.
-   `newer` settles that by step count, which cannot go down.
-
-   And a cache has an owner. Without one, `newer(local, null)` hands a brand-new
-   account whatever was already in the browser - reported as signing up and
-   landing straight in the game with the trainer question skipped, and the worse
-   version is signing up on somebody else's machine and inheriting their dex.
-   Only a cache THIS account wrote is ever adopted; see `settle`. */
-async function settle(uid) {
-  /* ONLY A CACHE THIS ACCOUNT WROTE COUNTS. This read `!owner || owner === uid`
-     - an UNOWNED save treated as yours - which was meant to rescue somebody who
-     played offline and then signed up. What it actually did was hand every
-     account whatever the browser happened to be holding, and the deployed build
-     is full of localStorage from before there were accounts at all: logging in
-     on it produced a dex nobody had earned, and no amount of clearing the
-     database fixed it, because the data was never in the database.
-
-     Signed in, the server is the only source. The one thing local may still win
-     is being AHEAD of it - offline play whose uploads have not landed - and
-     that is settled by step count, which cannot go down. Somebody who really
-     did play as a guest and wants to keep it has EXPORT on the YOU panel; a
-     silent adoption is the wrong way to offer that, because it cannot tell the
-     difference between your game and a stranger's. */
-  const owner = read(OWNER_KEY);
-  const local = owner === uid ? read(SAVE_KEY) : null;
-  const got = await pull();
-
-  /* A READ THAT FAILED IS NOT AN ACCOUNT WITH NOTHING IN IT, and treating the
-     two alike is how a real collection gets replaced by a fresh one. Nothing
-     is written on this path - not the save, not the owner - because every
-     write here is made on the strength of a comparison that could not be made.
-     `push` is latched shut until a pull succeeds, so what follows is safe: the
-     cache, played offline, uploading nothing. */
-  if (!got.ok) return { ok: false, raw: local };
-
-  const keep = newer(local, got.raw);
-  if (keep !== local) {
-    if (keep) write(SAVE_KEY, keep); else drop(SAVE_KEY);
-  }
-  if (uid) write(OWNER_KEY, uid);
-  return { ok: true, raw: keep };
-}
+   The merge itself is `settle` in store.js. It lived here, beside the screens,
+   and that is exactly why nothing could test it: it needs a server, and the
+   suite could only grep its source. It takes `pull` as an argument now, so a
+   fake server is all a test needs. */
 
 /* ARRIVING FROM A RESET LINK, read before anything can clean it away.
    `detectSessionInUrl` consumes the fragment and rewrites the address bar
@@ -115,7 +78,7 @@ export default function Boot() {
      a player who reinstalls, or clears their browser, is not asked again. */
   const decide = useCallback(async (session) => {
     const uid = session?.user?.id ?? null;
-    const got = await settle(uid);
+    const got = await settle(uid, pull);
     let raw = got.raw;
 
     if (CLOUD && uid) {
@@ -195,17 +158,38 @@ export default function Boot() {
     return got;
   };
 
-  /* LOGGING OUT CLEARS THE BROWSER'S COPY, and the order matters: everything
-     outstanding goes up FIRST, because the token is about to stop working, and
-     only then is the cache dropped. Leaving it behind would hand the next
-     person at this machine somebody else's dex - and the account has it. */
+  /* LOGGING OUT CLEARS THE BROWSER'S COPY - BUT ONLY ONCE THE ACCOUNT HAS IT.
+
+     Everything outstanding goes up first, because the token is about to stop
+     working, and the cache was then dropped WHETHER OR NOT IT HAD. Log out on a
+     train, or in the ten seconds after catching something, and `flushNow` came
+     back failed and the only copy of that play was deleted a line later - under
+     a dialog promising "your game stays on your account".
+
+     So the drop is gated on the upload. When it did not land, the save stays
+     with its OWNER: the next login by the same account adopts it and `newer`
+     keeps it if it is ahead, and anybody else logging in here is refused it by
+     the ownership rule, so leaving it is not handing a stranger a dex.
+
+     And the engine saves FIRST. Its writes are debounced by 400ms, so the last
+     thing you did before pressing LOG OUT was not in `pending` yet - it was in
+     a timer the unmount was about to cancel. */
   const out = async (why = "") => {
     setGateNote(typeof why === "string" ? why : "");
     setBusy(true);
+    /* Then STOPPED, because the game is still running under the spinner and
+       anything it wrote after this would land back in a cache being cleared. */
+    engineRef.current?.saveNow?.();
+    engineRef.current?.destroy?.();
     const sent = await flushNow(push);
     await signOut();
-    drop(SAVE_KEY);
-    drop(OWNER_KEY);
+    if (sent.ok) {
+      drop(SAVE_KEY);
+      drop(OWNER_KEY);
+    } else if (!why) {
+      setGateNote("Your latest play had not reached your account yet. It is "
+        + "kept on this browser and will upload when you log back in here.");
+    }
     setBusy(false);
     setName(null);
     setPhase("account");
@@ -364,10 +348,17 @@ export default function Boot() {
         onPassword: changePassword,
         /* DELETING TAKES THE BROWSER'S COPY WITH IT. The row is gone, so a
            cache of it is a dex belonging to nobody - and leaving it behind
-           would let the next sign-up on this machine adopt it. */
+           would let the next sign-up on this machine adopt it. Every copy
+           kept under the account's id goes too: "delete my account" is a
+           promise about the data, and a backup is the data. */
         onDelete: async () => {
+          const uid = read(OWNER_KEY);
           const got = await deleteAccount();
           if (!got.ok) return got;
+          engineRef.current?.destroy?.();
+          if (uid) {
+            for (const k of [BACKUP_KEY, BROKEN_KEY, OTHER_KEY, PARKED_KEY]) drop(scoped(k, uid));
+          }
           drop(SAVE_KEY);
           drop(OWNER_KEY);
           setName(null);

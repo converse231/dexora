@@ -60,6 +60,56 @@ export const ORDER_KEY = `${SAVE_KEY}:ballorder`;
    by a DIFFERENT account is not. */
 export const OWNER_KEY = `${SAVE_KEY}:owner`;
 
+/* THE SAVE THAT LOST, WHENEVER TWO OF THEM DISAGREED. `newer` picks one save at
+   login and the other one used to simply stop existing - overwritten in
+   localStorage, or never written anywhere if it was the server's. That is fine
+   when one of them is just an older copy of the other, and it is a lost
+   afternoon when they are two BRANCHES: played on a laptop that had not synced,
+   then on a phone, then back on the laptop, and whichever walked further
+   quietly erased the other's catches. Kept here, and offered on the YOU panel
+   beside the backup, only when it holds something the winner does not - see
+   `diverged`. */
+export const OTHER_KEY = `${SAVE_KEY}.other`;
+
+/* A SAVE PICKED BY HAND BEATS A SAVE PICKED BY RULE, ONCE. Restoring a backup
+   or importing a file writes the save and reloads - and signed in, `settle`
+   then compared it with the account by step count, and a backup is an OLDER
+   session by construction, so the account won and the restore did nothing at
+   all. The one recovery path in the game was a no-op online. This marker is
+   set by those two actions only, immediately before the reload, and the next
+   `settle` consumes it whatever happens. */
+export const CHOSEN_KEY = `${SAVE_KEY}:chosen`;
+
+/* WHICH TAB IS WRITING. The account has `claim()` for this, which only notices
+   a rival on the next upload - up to a whole sync window of two tabs writing
+   the same localStorage key over each other - and local mode had nothing at
+   all. The newest tab writes its id here at start, and every other tab hears it
+   through the `storage` event, which fires in the documents that did NOT
+   write. See the engine. */
+export const WRITER_KEY = `${SAVE_KEY}:writer`;
+
+/* ANOTHER ACCOUNT'S UNSYNCED SAVE, set aside rather than written over.
+
+   Logging out no longer throws away play that has not reached the account yet
+   - it stays in the browser with its owner. Which is only safe for as long as
+   nobody else logs in: `settle` for a second account wrote its own save
+   straight over the first one's, and on a family computer that is the next
+   thing that happens. So an owned save that belongs to somebody else is parked
+   under its owner before anything is written, and it is that owner's `local`
+   the next time they log in here. */
+export const PARKED_KEY = `${SAVE_KEY}.parked`;
+
+/* WHOSE COPY A RECOVERY KEY IS, and the answer was nobody's.
+
+   BACKUP, BROKEN and OTHER were one key each for the whole browser, so the YOU
+   panel's recovery offer showed whatever the LAST person to play here had left
+   behind: A logs out, B logs in, and B is offered "LAST GOOD - 412 CAUGHT",
+   which is A's dex, and restoring it hands it over. The exact bug `OWNER_KEY`
+   was written to stop, arriving through the recovery path instead of the
+   login. Scoped to the account now; with no account - local mode - the key is
+   the one it always was, so an existing offline save's backup is still found. */
+export const scoped = (key, owner) => (owner ? `${key}:${owner}` : key);
+
 /* Reading never throws. A private window, cleared site data, or a browser that
    has revoked storage all arrive here as "no save", which is the same thing a
    new player is - and starting a fresh game is a better answer than a blank
@@ -259,4 +309,88 @@ export function newer(localRaw, remoteRaw) {
     try { return Number(JSON.parse(raw).steps) || 0; } catch { return -1; }
   };
   return steps(localRaw) > steps(remoteRaw) ? localRaw : (remoteRaw ?? localRaw);
+}
+
+/* DOES THE SAVE THAT LOST HOLD PLAY THE WINNER DOES NOT?
+
+   `steps`, `caught` and `xp` only ever go up - nothing in the engine decrements
+   any of them, and that was checked rather than assumed. So along ONE history
+   an older save is behind on all three at once, and a save that is ahead on
+   even one of them cannot be an older copy of the winner: it is a branch, and
+   it has catches or levels that exist nowhere else. That is exactly the case
+   worth keeping, and it is the only one: a stale cache on a device you have
+   not opened in a week loses on every counter, and offering it back on every
+   login would be a recovery button nobody should press. */
+const COUNTERS = ["steps", "caught", "xp"];
+export function diverged(loser, winner) {
+  const read3 = (raw) => {
+    try {
+      const s = JSON.parse(raw);
+      return COUNTERS.map((k) => Number(s?.[k]) || 0);
+    } catch { return null; }
+  };
+  const a = read3(loser);
+  const b = read3(winner);
+  if (!a) return false;              // nothing usable in it to keep
+  if (!b) return true;               // the winner is unreadable; keep anything
+  return a.some((v, i) => v > b[i]);
+}
+
+/* WHAT THIS BROWSER SHOULD PLAY, and it is the whole login-time merge.
+
+   Moved here from Boot.jsx so it can be DRIVEN: it needs a server, so for as
+   long as it lived beside the screens the suite could only grep its source,
+   and the three ways it has lost a collection were each found in play rather
+   than by a test. `pull` is passed in, which is all a fake server needs to be.
+
+   Three rules, in order:
+     1. Only a cache THIS account wrote counts. An unowned or foreign save is a
+        stranger's dex, and adopting it is the production bug `OWNER_KEY` fixed.
+     2. A read that failed is not an account with nothing in it. Nothing is
+        written on that path, because every write would be made on the strength
+        of a comparison that could not be made.
+     3. The loser is kept whenever it holds play the winner does not, and a save
+        picked by hand wins and keeps the server's copy for undoing it. */
+export async function settle(uid, pull) {
+  const owner = read(OWNER_KEY);
+  /* THIS ACCOUNT'S OWN CACHE, OR THE ONE PARKED FOR IT. The parked one is what
+     a previous session of theirs left here after an unsynced log out, moved
+     aside when somebody else logged in - see `PARKED_KEY`. */
+  const parked = uid ? read(scoped(PARKED_KEY, uid)) : null;
+  const local = owner === uid ? read(SAVE_KEY) : parked;
+  const chosen = Boolean(local && owner === uid && read(CHOSEN_KEY));
+  const got = await pull();
+
+  /* A FAILED READ WRITES NOTHING. The chosen marker waits for the next boot,
+     which is still the one the player meant, and a PARKED save is not played:
+     the engine plays whatever is in SAVE_KEY, which is still somebody else's,
+     so "play the parked one" would put this session on their dex. */
+  if (!got.ok) return { ok: false, raw: owner === uid ? local : null };
+  drop(CHOSEN_KEY);
+
+  /* ANYBODY ELSE'S SAVE IS PARKED BEFORE ANYTHING IS WRITTEN OVER IT - an
+     owned one under its owner, an unowned one (a guest's, or from before there
+     were accounts) under the bare key. Parked is not adopted: adopting an
+     unowned save into whoever logs in is the production bug, and it used to
+     happen anyway whenever the account was new, because a null winner against
+     a null `local` wrote nothing and the engine read the stranger's save
+     straight out of SAVE_KEY. That path now clears it - so it is parked
+     first, since clearing is the one thing a guest's only copy cannot survive. */
+  const here = read(SAVE_KEY);
+  if (here && owner !== uid) keep(scoped(PARKED_KEY, owner), here);
+
+  const winner = chosen ? local : newer(local, got.raw);
+  const loser = winner === local ? got.raw : local;
+  if (loser && loser !== winner && (chosen || diverged(loser, winner))) {
+    keep(scoped(OTHER_KEY, uid), loser);
+  }
+  if (winner !== here) {
+    if (winner) write(SAVE_KEY, winner); else drop(SAVE_KEY);
+  }
+  if (uid) {
+    write(OWNER_KEY, uid);
+    // Merged: it won, or OTHER kept it, or it was an older copy of the winner.
+    drop(scoped(PARKED_KEY, uid));
+  }
+  return { ok: true, raw: winner };
 }
