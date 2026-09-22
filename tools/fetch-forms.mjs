@@ -20,6 +20,7 @@
 // is not in `SPECIES` is dropped, which is the same reachability rule the rest
 // of the dex is held to.
 import { writeFile, mkdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { SPECIES } from "../src/data/species.js";
 
 const API = "https://pokeapi.co/api/v2";
@@ -127,6 +128,126 @@ const COSTUMES = new Map([
   ["pikachu-world-cap", ["World Cap Pikachu", 8]],
 ]);
 
+/* AND A THIRD FAMILY: THE REST OF WHAT BULBAPEDIA CALLS A FORM DIFFERENCE.
+   =========================================================================
+
+   The two families above are Megas (made) and regions (met), and between them
+   they miss most of the list: Deoxys, Rotom, the Therian trio, Wormadam's
+   cloaks, Oricorio's four islands, Basculin's stripes, every gender form with
+   its own art. PokeAPI carries 136 varieties past the National Dex that this
+   file was dropping, and the question was which of them are POKEMON.
+
+   TWO DERIVED FILTERS DO ALMOST ALL OF IT, and neither needs maintaining:
+
+   `is_battle_only` is PokeAPI's own field and it is exactly the right cut -
+   35 of the 136. Aegislash's Blade stance, Darmanitan's Zen mode, Mimikyu's
+   busted disguise, Minior's broken shell, Palafin's Hero form, Cramorant with
+   a fish in its mouth: those are STATES, and a game with no battle has nothing
+   to put them in. It also catches the six form-of-form megas and all three
+   `-mega-z`, so there is no real Mega missing here - which a suffix list would
+   have had to be told.
+
+   THE ART HASH IS THE SECOND, and it is the `"COSTUME PIKACHU-ROCK-STAR" IS A
+   DATABASE ROW` rule with a measurement behind it: a form drawn with the
+   base's own sprite is not a Pokemon you could tell apart. It removes the nine
+   Totems (a Totem is the same creature, bigger), Greninja's Battle Bond,
+   Rockruff's Own Tempo - and then, compared against each OTHER and against
+   what we already ship, Pumpkaboo's and Gourgeist's four sizes (size is a
+   stat, not a drawing), five of Minior's six meteors, and the two Totems that
+   are really the Alolan forms we already have. 12 + 11 = 23 more.
+
+   WHAT IS LEFT IS A JUDGEMENT AND SO IT IS A LIST. Nothing in PokeAPI
+   separates "Rotom climbed into a microwave" from "Oricorio drank the nectar
+   on Melemele": both are `is_battle_only: false` with their own art. The split
+   is this game's own, it is the same one the file already draws, and the list
+   is honest for the reason `COSTUMES` is - it is CLOSED. These are forms that
+   already shipped in games that already exist; nothing is coming that this
+   would have to remember. A new one arrives as a line, the way a new map does.
+
+   THE NAME IS THE GAMES' NAME AND IT SHIPS AS `title`, because there is no
+   rule that gets "Black Kyurem", "Heat Rotom" and "Wormadam (Sandy Cloak)"
+   right from one another - the word goes in front for some and in brackets for
+   others, and `label()` already prefers a title over anything it could build. */
+
+/* MADE: something you DO to a Pokemon - a machine, a fusion, a held item.
+   An evolution target at Lv 100, exactly like a Mega, and `fetch-evolutions`
+   needs no change to emit the row: it already writes one for every form that
+   is not `wild`. Most of these bases are legendary, so the cost is catching a
+   1-in-3,760 Pokemon and then spending a hundred candy on it - which is the
+   most expensive thing in the game, and the right price for the Origin Forme
+   of a box legendary. */
+const MADE = new Map([
+  ["deoxys-attack", "Deoxys (Attack Forme)"],
+  ["deoxys-defense", "Deoxys (Defense Forme)"],
+  ["deoxys-speed", "Deoxys (Speed Forme)"],
+  ["shaymin-sky", "Sky Forme Shaymin"],
+  ["giratina-origin", "Origin Forme Giratina"],
+  ["dialga-origin", "Origin Forme Dialga"],
+  ["palkia-origin", "Origin Forme Palkia"],
+  ["rotom-heat", "Heat Rotom"],
+  ["rotom-wash", "Wash Rotom"],
+  ["rotom-frost", "Frost Rotom"],
+  ["rotom-fan", "Fan Rotom"],
+  ["rotom-mow", "Mow Rotom"],
+  ["tornadus-therian", "Therian Forme Tornadus"],
+  ["thundurus-therian", "Therian Forme Thundurus"],
+  ["landorus-therian", "Therian Forme Landorus"],
+  ["enamorus-therian", "Therian Forme Enamorus"],
+  ["kyurem-black", "Black Kyurem"],
+  ["kyurem-white", "White Kyurem"],
+  ["keldeo-resolute", "Resolute Form Keldeo"],
+  ["hoopa-unbound", "Hoopa Unbound"],
+  ["necrozma-dusk", "Dusk Mane Necrozma"],
+  ["necrozma-dawn", "Dawn Wings Necrozma"],
+  ["urshifu-rapid-strike", "Rapid Strike Urshifu"],
+  ["zarude-dada", "Dada Zarude"],
+  ["calyrex-ice", "Ice Rider Calyrex"],
+  ["calyrex-shadow", "Shadow Rider Calyrex"],
+  ["magearna-original", "Original Color Magearna"],
+  ["ogerpon-wellspring-mask", "Wellspring Mask Ogerpon"],
+  ["ogerpon-hearthflame-mask", "Hearthflame Mask Ogerpon"],
+  ["ogerpon-cornerstone-mask", "Cornerstone Mask Ogerpon"],
+]);
+
+/* MET: something that LIVES somewhere - an island, a cloak, a stripe, a
+   plumage, a gender. Caught in the grass like any other species, which is what
+   `wild` means here and what no evolution row is the whole mechanism for.
+
+   THE GENERATION IS THE FORM'S OWN, exactly as it is for a regional form, and
+   for all but two that is the base's own generation - a Wormadam's cloak
+   shipped with Wormadam. The two that did not are the ones worth writing down:
+   White-Striped Basculin is Legends Arceus (8) off a Gen 5 base, and Bloodmoon
+   Ursaluna is the Indigo Disk (9) off a Gen 8 one. Written per row rather than
+   derived because the exceptions are the point. */
+const WILD_FORMS = new Map([
+  ["wormadam-sandy", ["Wormadam (Sandy Cloak)", 4, "Sandy Cloak"]],
+  ["wormadam-trash", ["Wormadam (Trash Cloak)", 4, "Trash Cloak"]],
+  ["basculin-blue-striped", ["Blue-Striped Basculin", 5, "Blue Stripe"]],
+  ["basculin-white-striped", ["White-Striped Basculin", 8, "White Stripe"]],
+  ["meowstic-female", ["Meowstic (Female)", 6, "Female"]],
+  ["pumpkaboo-small", ["Small Size Pumpkaboo", 6, "Small Size"]],
+  ["gourgeist-small", ["Small Size Gourgeist", 6, "Small Size"]],
+  ["zygarde-10", ["10% Forme Zygarde", 6, "10% Forme"]],
+  ["oricorio-pom-pom", ["Pom-Pom Style Oricorio", 7, "Pom-Pom Style"]],
+  ["oricorio-pau", ["Pa'u Style Oricorio", 7, "Pa'u Style"]],
+  ["oricorio-sensu", ["Sensu Style Oricorio", 7, "Sensu Style"]],
+  ["lycanroc-midnight", ["Midnight Form Lycanroc", 7, "Midnight Form"]],
+  ["lycanroc-dusk", ["Dusk Form Lycanroc", 7, "Dusk Form"]],
+  ["toxtricity-low-key", ["Low Key Toxtricity", 8, "Low Key"]],
+  ["indeedee-female", ["Indeedee (Female)", 8, "Female"]],
+  ["basculegion-female", ["Basculegion (Female)", 8, "Female"]],
+  ["oinkologne-female", ["Oinkologne (Female)", 9, "Female"]],
+  ["squawkabilly-blue-plumage", ["Blue Plumage Squawkabilly", 9, "Blue Plumage"]],
+  ["squawkabilly-yellow-plumage", ["Yellow Plumage Squawkabilly", 9, "Yellow Plumage"]],
+  ["squawkabilly-white-plumage", ["White Plumage Squawkabilly", 9, "White Plumage"]],
+  ["tatsugiri-droopy", ["Droopy Form Tatsugiri", 9, "Droopy Form"]],
+  ["tatsugiri-stretchy", ["Stretchy Form Tatsugiri", 9, "Stretchy Form"]],
+  ["dudunsparce-three-segment", ["Three-Segment Dudunsparce", 9, "Three-Segment"]],
+  ["maushold-family-of-three", ["Maushold (Family of Three)", 9, "Family of Three"]],
+  ["gimmighoul-roaming", ["Roaming Form Gimmighoul", 9, "Roaming Form"]],
+  ["ursaluna-bloodmoon", ["Bloodmoon Ursaluna", 9, "Bloodmoon"]],
+]);
+
 const byName = new Map(SPECIES.map((sp) => [sp.name, sp]));
 const tierOf = (r) => (r >= 200 ? "C" : r >= 100 ? "B" : r >= 45 ? "A" : "S");
 
@@ -137,10 +258,47 @@ async function sprite(name) {
 
 async function one(name, base, kind, extra = {}) {
   const pk = await fetch(`${API}/pokemon/${name}`).then((r) => r.json());
+  /* PokeAPI'S OWN WORD FOR "THIS IS A STATE, NOT A POKEMON", AND IT IS AN
+     ASSERTION RATHER THAN A FILTER - WHICH COST A RUN TO FIND OUT.
+
+     `is_battle_only` is exactly the right cut for the third family: it is what
+     separates Aegislash's Blade stance and Minior's broken shell from Heat
+     Rotom, and it is what says a `-mega-z` is a battle variant rather than a
+     Mega this file forgot. As a gate in here it would have deleted **all 120
+     Megas, Primals and Gigantamax**, because in the games those only exist in
+     battle too and PokeAPI says so: `charizard-mega-x` is `is_battle_only:
+     true`. Measured before running rather than after.
+
+     So it is scoped to the two curated lists and it THROWS, because what it is
+     really checking is that the lists are still right - a form PokeAPI has
+     reclassified should stop the build, not vanish from the dex in silence. */
+  if (kind === "alt" || kind === "variant") {
+    const form = await fetch(pk.forms[0].url).then((r) => r.json());
+    if (form.is_battle_only) {
+      throw new Error(`${name} is is_battle_only - a state, not a Pokemon; ` +
+        "drop it from MADE/WILD_FORMS");
+    }
+  }
   const png = await fetch(`${GH}/${pk.id}.png`);
   if (!png.ok) return null;                       // no art, no form
   const shiny = await fetch(`${GH}/shiny/${pk.id}.png`);
-  await writeFile(`public/sprites/${pk.id}.png`, Buffer.from(await png.arrayBuffer()));
+  const art = Buffer.from(await png.arrayBuffer());
+  /* A FORM DRAWN WITH THE BASE'S OWN SPRITE IS A DATABASE ROW.
+
+     Measured over the 92 varieties that survive `is_battle_only`: twelve are
+     byte-for-byte the base's picture - every Totem (a Totem is the same
+     creature, bigger), Greninja's Battle Bond, Rockruff's Own Tempo - and
+     eleven more are byte-for-byte EACH OTHER or a form we already ship.
+     Pumpkaboo and Gourgeist draw one sprite for four sizes, because a size is
+     a stat; five of Minior's six meteors are one drawing; and the two Alolan
+     Totems are the Alolan forms themselves.
+
+     The test is "is this picture already in the dex" rather than "does it
+     match its own base" - the weaker version passes six Miniors that are one
+     Minior. It is decided AFTER the fetch loop rather than inside it: the loop
+     runs eight at a time, so a shared set would let two identical sprites in
+     one batch both win and the dex would differ between runs. */
+  await writeFile(`public/sprites/${pk.id}.png`, art);
   if (shiny.ok) {
     await writeFile(`public/sprites/shiny/${pk.id}.png`,
       Buffer.from(await shiny.arrayBuffer()));
@@ -180,9 +338,24 @@ async function one(name, base, kind, extra = {}) {
     weight: pk.weight,
     stats: ["hp", "attack", "defense", "special-attack", "special-defense", "speed"]
       .map(stat),
+    art: createHash("md5").update(art).digest("hex"),   // dropped below
     ...extra,
   };
 }
+
+/* THE LONGEST PREFIX THAT IS A SHIPPED SPECIES. The two maps above are keyed
+   on the variety's full slug and the base is whatever of it names a real dex
+   entry, which `-` counting cannot do: `ogerpon-cornerstone-mask` has three
+   tails and `basculin-white-striped` has two. The same reachability rule the
+   rest of this file is held to - no shipped base, no form. */
+const baseOf = (name) => {
+  for (let i = name.length; i > 0; i--) {
+    if (name[i] !== "-" && i !== name.length) continue;
+    const head = byName.get(name.slice(0, i));
+    if (head) return head;
+  }
+  return null;
+};
 
 const list = await fetch(`${API}/pokemon?limit=1500&offset=1025`).then((r) => r.json());
 const want = [];
@@ -199,6 +372,34 @@ for (const { name } of list.results) {
          where the hat belongs. */
       extra: { wild: true, gen, title },
     });
+    continue;
+  }
+
+  /* THE THIRD FAMILY, ASKED BEFORE THE REGIONS for the reason the costumes
+     are: `basculin-white-striped` and `lycanroc-midnight` carry no region
+     marker, but `ogerpon-cornerstone-mask` and `wormadam-trash` would both
+     survive a loose suffix test, and a named row beats an inferred one. */
+  const made = MADE.get(name);
+  if (made) {
+    const base = byName.get(name.replace(/-[a-z0-9-]+$/, "")) ?? baseOf(name);
+    if (base) {
+      want.push({
+        name, base, kind: "alt",
+        extra: { wave: 2, title: made, genus: "Alternate Forme" },
+      });
+    }
+    continue;
+  }
+  const met = WILD_FORMS.get(name);
+  if (met) {
+    const base = baseOf(name);
+    if (base) {
+      const [title, gen, word] = met;
+      want.push({
+        name, base, kind: "variant",
+        extra: { wave: 2, wild: true, gen, title, genus: `${word} Form` },
+      });
+    }
     continue;
   }
 
@@ -252,12 +453,47 @@ for (let i = 0; i < want.length; i += 8) {
    Sorting on `wild` first keeps the evolution forms in the id order they
    already shipped in, byte for byte, and appends the new ones after. No
    `LAYOUTS` entry, no `remap`, and `padDex` stays the right answer. */
-out.sort((a, b) => Number(!!a.wild) - Number(!!b.wild) || a.id - b.id);
+/* A THIRD WAVE, AND IT SORTS AFTER BOTH THE OTHERS FOR THE REASON THE SECOND
+   DID. `wild` first was already this trick: it kept the 120 Megas byte
+   identical and appended the 70 regional and costume forms. The third family
+   carries ids from 10001 up - Deoxys is 10001, below every Mega - so ANY sort
+   that mixes it in is an insert, and an insert moves saved positions and
+   quietly renames what is in somebody's collection.
 
-await writeFile("src/data/forms.js", `export const FORMS = ${JSON.stringify(out)};\n`);
-const kinds = out.reduce((n, f) => ({ ...n, [f.form]: (n[f.form] ?? 0) + 1 }), {});
-const wild = out.filter((f) => f.wild).length;
-console.log(`\nwrote src/data/forms.js — ${out.length} forms ` +
+   `wave` is therefore the order these families arrived in THIS game rather
+   than a fact about Pokemon, which is exactly what it is for. Measured: 0
+   positions change meaning, `layoutIds` still returns null for the new length,
+   and `padDex` is still the right answer - so there is no `LAYOUTS` entry and
+   no `remap`, which is the whole point of appending. */
+const wave = (f) => f.wave ?? (f.wild ? 1 : 0);
+out.sort((a, b) => wave(a) - wave(b) || a.id - b.id);
+
+/* ONE PICTURE, ONE ROW - see the note in `one()`. Run over the SORTED list,
+   so the survivor is deterministic and is always the earliest wave.
+
+   AND IT MAY REFUSE A NEWCOMER, NEVER EVICT A SHIPPED FORM. The first version
+   applied to everything and dropped `appletun-gmax`, which is drawn with the
+   same picture as another Gigantamax already in the dex - true, and it took
+   **117 saved positions with it**, because every form after position 73 slid
+   up by one. A save keyed on POSITION does not care that the row was a
+   duplicate; it cares that position 74 now means a different Pokemon, which is
+   the Hoenn migration exactly and the thing the `wave` sort above exists to
+   avoid. A duplicate that has already shipped is somebody's collection.
+
+   So waves 0 and 1 are kept unconditionally and only seed the set. Verified by
+   diffing the whole list against the previous one: 0 positions changed. */
+const seen = new Map();
+const kept = out.filter((f) => (wave(f) < 2
+  ? (seen.set(f.art, f.name), true)
+  : !seen.has(f.art) && seen.set(f.art, f.name)));
+const dropped = out.length - kept.length;
+for (const f of kept) delete f.art;
+
+await writeFile("src/data/forms.js", `export const FORMS = ${JSON.stringify(kept)};\n`);
+const kinds = kept.reduce((n, f) => ({ ...n, [f.form]: (n[f.form] ?? 0) + 1 }), {});
+const wild = kept.filter((f) => f.wild).length;
+console.log(`\nwrote src/data/forms.js — ${kept.length} forms ` +
   `(${Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(", ")}) ` +
-  `over ${new Set(out.map((f) => f.of)).size} species; ` +
-  `${out.length - wild} evolved into, ${wild} met in the wild`);
+  `over ${new Set(kept.map((f) => f.of)).size} species; ` +
+  `${kept.length - wild} evolved into, ${wild} met in the wild` +
+  (dropped ? `; ${dropped} drawn with a picture the dex already holds` : ""));

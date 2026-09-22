@@ -135,6 +135,76 @@ table the other has made bigger, so BOTH come out under their own rule - caught
 as the legendaries at 1.620% against the 1.625% they are owed, on a bound tight
 enough to see it. `taken` is the sum of every appended share.
 
+**AND A THIRD FAMILY: THE REST OF WHAT BULBAPEDIA CALLS A FORM DIFFERENCE.**
+Asked for after reading that list - Deoxys, Arceus, Castform - and the two
+families above miss most of it. PokeAPI carries **136 varieties past the
+National Dex** that `fetch-forms` was dropping; 56 of them ship now and the
+dex is **1,271**.
+
+**TWO DERIVED FILTERS DO ALMOST ALL OF THE WORK, and neither needs
+maintaining.** `is_battle_only` is PokeAPI's own field and cuts 35: Aegislash's
+Blade stance, Darmanitan's Zen mode, Mimikyu's busted disguise, Minior's broken
+shell, Palafin's Hero form, Cramorant with a fish in its mouth. Those are
+STATES, and a game with no battle has nothing to put them in. It also catches
+all three `-mega-z` and the six form-of-form megas, **so there is no real Mega
+missing** - which a suffix list would have had to be told.
+
+**BUT IT IS AN ASSERTION, NOT A FILTER, AND THAT COST A RUN TO FIND OUT.** A
+Mega only exists in battle in the games too, and PokeAPI says so:
+`charizard-mega-x` is `is_battle_only: true`. As a gate in `one()` it would
+have **deleted all 120 Megas, Primals and Gigantamax**. It is scoped to the two
+new lists and it THROWS, because what it really checks is that the lists are
+still right - a form PokeAPI reclassifies should stop the build, not vanish
+from the dex in silence. Measured before running rather than after.
+
+**THE ART HASH IS THE SECOND, and it is `"COSTUME PIKACHU-ROCK-STAR" IS A
+DATABASE ROW` with a measurement behind it.** Twelve of the survivors are
+byte-for-byte the base's own picture - every Totem (a Totem is the same
+creature, bigger), Greninja's Battle Bond, Rockruff's Own Tempo - and eleven
+more are byte-for-byte each other or a form already shipped: **Pumpkaboo and
+Gourgeist draw one sprite for four sizes**, because a size is a stat; five of
+Minior's six meteors are one drawing; and the two Alolan Totems are the Alolan
+forms themselves.
+
+**AND IT MAY REFUSE A NEWCOMER, NEVER EVICT A SHIPPED FORM.** The first version
+applied to everything and dropped `appletun-gmax`, which is genuinely drawn
+with another Gigantamax's picture - and took **117 saved positions** with it,
+because every form after position 73 slid up by one. A save keyed on POSITION
+does not care that the row was a duplicate; it cares that position 74 now means
+a different Pokemon. **A duplicate that has already shipped is somebody's
+collection.** Waves 0 and 1 are kept unconditionally and only seed the set.
+
+**WHAT IS LEFT IS A JUDGEMENT, SO IT IS A LIST.** Nothing in PokeAPI separates
+"Rotom climbed into a microwave" from "Oricorio drank the nectar on Melemele":
+both are `is_battle_only: false` with their own art. The split is this game's
+own and it is the one the file already draws:
+
+| | count | what it is |
+|---|---|---|
+| **MADE** (`alt`) | 30 | Deoxys' three formes, the five Rotom appliances, four Therian, Origin Forme Giratina/Dialga/Palkia, Black and White Kyurem, both Calyrex riders, both Necrozma, the three Ogerpon masks, Sky Shaymin, Unbound Hoopa, Resolute Keldeo, Rapid Strike Urshifu, Dada Zarude, Original Color Magearna. An evolution target at **Lv 100**, exactly like a Mega |
+| **MET** (`variant`) | 26 | Wormadam's two cloaks, both Basculin stripes, three Oricorio, both Lycanroc, four gender forms, three Squawkabilly plumages, two Tatsugiri, Low Key Toxtricity, Three-Segment Dudunsparce, Family of Three Maushold, Roaming Gimmighoul, Bloodmoon Ursaluna, 10% Zygarde, Small Size Pumpkaboo and Gourgeist. **Caught in the grass** |
+
+`fetch-evolutions` needed no change at all: it already writes a Lv 100 row for
+every form that is not `wild`. Most MADE bases are legendary, so the price is
+catching a 1-in-3,760 Pokemon and then spending a hundred candy on it.
+
+**SKIPPED DELIBERATELY:** the 8 Minior core colours (the shell-broken state),
+`floette-eternal` (obtainable in no game), `pikachu-cosplay` / `pikachu-starter`
+/ `eevee-starter` (a placeholder and two Let's Go exclusives, already excluded),
+and `zygarde-10-power-construct` (an ability variant of `zygarde-10`).
+
+**THE NAME SHIPS AS `title`**, because no rule gets "Black Kyurem", "Heat
+Rotom" and "Wormadam (Sandy Cloak)" right from one another - the word goes in
+front for some and in brackets for others - and `label()` already prefers a
+title over anything it could build.
+
+**AND THE SORT GREW A THIRD WAVE, for the reason it grew a second.** These
+carry ids from **10001** up, below every Mega, so any sort that mixes them in
+is an INSERT. `wave` is the order these families arrived in THIS game rather
+than a fact about Pokemon, which is exactly what it is for. Measured: **0
+positions changed meaning**, `layoutIds` still returns null, `padDex` is still
+right, no `LAYOUTS` entry.
+
 **AND THE HIGHER-RES COSTUME ART WAS REVERTED.** `official-artwork` is a
 painted illustration among 1,200 game rips, and asked for directly: use the
 PokeAPI sprite. `tools/build_costumes.py` is deleted and `npm run forms` no
@@ -2277,6 +2347,58 @@ that possible: `biomes.js` cannot import `items.js` (which already imports
 Beldum is 1.18% and clears it, so the first predicate was false for every
 species in the dex and the rule silently did nothing.
 
+**A HOME IS THE PRIMARY TYPE, AND THE OTHER 453 SPECIES WERE NOT GETTING THE
+RULE THE LEGENDARIES HAVE HAD FOR A YEAR.** Reported as wanting the spawn
+tables to be accurate per type, with fish as the example. `legendTier` has said
+since Articuno that a Pokemon lives where its FIRST type is; everything that is
+not a legendary was still homed by a COUNT of shared types, and a count cannot
+tell a Water/Poison from a Bug/Poison - both score 1 against Deep Woods [bug,
+grass, poison], so **Tentacool was homed in a forest** while Pond & Shore sat
+there with `water` in its list. Measured: **60 species homed on a map that does
+not share their primary type**, Zubat and Aerodactyl and Skarmory and Delibird
+all filed under the starting meadow on `flying`.
+
+Primary worth 2, secondary worth 1 - the species' own type ORDER, already in
+the data. **Water-primary species found only on dry maps: 2 before, 0 after.**
+
+**AND THE TIEBREAK WAS LEFT ALONE, WHICH IS A MEASUREMENT AND NOT A SHRUG.**
+340 of 453 tie on that score and declaration order breaks every one, so Tall
+Grass takes 136 and Cinderpeak takes none. Two fixes were measured and both
+broke a marginal: narrowest-map-wins spreads them properly (0..136 becomes
+15..81) and pushes the Power Plant's A band 2.9 points against a 2.5 bound,
+because it concentrates newcomers on exactly the maps with the least headroom;
+fewest-homes-wins fixes the bands and drops Pond & Shore's Gen 2 to 12.6%
+against a fair 50%. Those are `fitShares`' two marginals and a tiebreak is not
+the lever that moves both. The accuracy fix is independent of it.
+
+**AND A BAND THE MAP ALREADY HAS IS A FILTER ON THE HOMING.** The rule was
+already written for the generation filler - *"a filled slot must not bring a
+band the map does not already have"* - and the primary homing never obeyed it.
+**Built from `b.table` whole it is a no-op**, and that is the finding: the
+Power Plant's table lists Magneton, Electrode, Raichu and Jolteon, which are
+EVOLUTIONS, so the set read {A,B,C,S} while the residents the band budget
+actually measures are {A,B}. A set built from the wrong half of the table
+agrees with itself and catches nothing.
+
+**AND THE POWER PLANT STILL COULD NOT HOLD A C BAND, because Kanto has none in
+type.** Every hand-written row in this game is Kanto and its C tier is route
+trash - Rattata, Pidgey, Zubat - none of it Electric or Steel. So five
+correctly-homed Electric commons (Plusle, Minun, Shinx, Pachirisu, Yamper; this
+is the only map claiming electric) arrived into a band with no frozen share and
+took B down 2.8 points. **Mareep** is the Mansion's own lever one tier down - a
+resident that is not Kanto, in that band - Gen 2, pure Electric, rate 235, a
+base form, open at Lv 10 before the map is at 12. **Weight 1, solved for rather
+than picked**: 2, 4, 6 and 12 were swept and all made it WORSE, because an
+oversized frozen share is something `balance` then rescales every other band
+around. An S resident (Skarmory) was tried beside it and reverted - it took S
+from 1.5% to 5.0% rather than holding it.
+
+**AND THE BAND BUDGET IS MEASURED FROM THE LEVEL A MAP OPENS.** `BIOMES[i].level`
+gates travel, so the Power Plant at Lv 1 is a table no player can roll. What
+that baseline measured is a map holding only its Gen 1 residents, which for a
+narrow map is a map missing whole BANDS. Re-measured from each gate, the worst
+is power at 2.8 and everything else is at or under 1.97.
+
 **A LEGENDARY'S HOME IS ITS PRIMARY TYPE.** Matching on ANY type gave half of
 them no home at all: Articuno is Ice/Flying and the starting map is
 Normal/Flying, so it was exactly as likely in Tall Grass as in Frost Hollow -
@@ -2291,6 +2413,42 @@ legendary looks commoner there) and by how many others call the same map home
 (the Tower is home to Mewtwo AND Mew, which dilutes Celebi's slice). Both
 measures said Celebi belonged in Deep Woods while it was weighted correctly the
 whole time.
+
+**AND `LEGEND_STRAY` IS ZERO: A LEGENDARY SPAWNS WHERE IT LIVES AND NOWHERE
+ELSE.** Asked for directly - *"articuno should spawn on ice maps only ... even
+legendary types should spawn according to map types"*. At 97 legendaries a
+stray was not a miracle any more, it was a wall of noise: on any map, most of
+the legendary budget was spent on birds that do not live there. Measured first,
+because **every one of the 97 has a home map**, so nothing became unobtainable.
+Each map now holds **13-60** of them instead of all 98.
+
+**ZERO IS A DIVISION, AND THERE IS ONE MAP THAT HITS IT.** `rareFor` splits the
+budget in proportion to these weights, so a map where nothing belongs sums to
+zero - Deep Woods is [bug, grass, poison] and the five Gen 1 legendaries are
+ice, electric, fire and psychic, so between Lv 3 and Lv 9 it has no resident
+legendary at all. That is the rule being true rather than an edge case to paper
+over: the forest has no legendary until Celebi arrives with Johto at Lv 10.
+
+**AND A ZERO-WEIGHT ROW IS NOT A ROW.** Emitting them anyway put Mewtwo in the
+starting meadow at a weight that can never be rolled - invisible in play, and a
+lie to everything that READS a table: `foundIn` would have told the Dex that
+every legendary is found everywhere.
+
+**THE EQUATION IS PER BELONGING HEAD NOW.** It counted every legendary the
+LEVEL had opened, wherever it lived - right while a stray could turn up
+anywhere, and wrong the moment the stray went: it would hand a map the budget
+for 97 and divide it among the four that live there, making each of those four
+twenty times commoner than `LEGEND_EACH` says one is worth. The same correction
+was needed for the per-head monotonicity check, which read a per-head of 0 at
+Lv 1 in Deep Woods and called every later level a cheaper hunt.
+
+**AND A COSTUME IS EXEMPT, BECAUSE IT HAS NO HABITAT.** Every costume Pikachu
+is pure Electric, so under the legendary rule all thirteen would live in the
+Power Plant and nowhere else - thirteen species on one map behind Lv 12, which
+is not rarity, it is a location. A costume is an EVENT Pokemon and an event
+turning up anywhere is what an event is: `eventTier` is flat, so `rareShare`
+still counts all thirteen everywhere and the "a costume is worth a legendary"
+assertion is untouched.
 
 **ONE FIELD EFFECT AT A TIME, whatever family it is in.** The families still
 stop two of the same KIND colliding, but a repel and a honey running together

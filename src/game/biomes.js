@@ -808,7 +808,28 @@ export const LEGEND_MATCHED = 0.5;
    one in 800, while a MATCHED legendary is untouched. That widens the gap
    between hunting where it lives and hunting anywhere from 6x to 17x, which is
    the signal the rule was always supposed to send. */
-export const LEGEND_STRAY = 0.03;
+/* AND IT IS ZERO NOW: A LEGENDARY SPAWNS WHERE IT LIVES AND NOWHERE ELSE.
+
+   Asked for directly - *"articuno should spawn on ice maps only ... even
+   legendary types should spawn according to map types"* - and the paragraph
+   above is the argument for why it was ever anything else: a stray was the
+   1-in-800 miracle that could happen anywhere. What it also was, at 97
+   legendaries, is a wall of noise between you and the one you came for: on any
+   map, most of the legendary budget was being spent on birds that do not live
+   there.
+
+   MEASURED FIRST, BECAUSE ZERO IS A DIVISION. `rareFor` splits the budget in
+   proportion to these weights, so a map where NOTHING belongs sums to zero -
+   and there is one: Deep Woods is [bug, grass, poison] and the five Gen 1
+   legendaries are ice, electric, fire and psychic, so between Lv 3 and Lv 9 it
+   has no resident legendary at all. That is not an edge case to paper over, it
+   is the rule being true: the forest has no legendary until Celebi arrives
+   with Johto at Lv 10. `rareFor` returns nothing, and the map simply has no
+   legendary encounters until one moves in.
+
+   Kept as a named constant rather than deleted, because it is the dial: put
+   0.01 back and strays return at a fiftieth of their old rate. */
+export const LEGEND_STRAY = 0;
 
 /* A HOME IS THE PRIMARY TYPE, and matching on any type was not enough.
 
@@ -867,10 +888,33 @@ export const dexIndex = (id) => byIndex.get(id) ?? -1;
 /* WHAT A ROSTER IS WORTH: per head, capped. Split out because TWO families are
    appended now and the share of each has to be known before either is scaled -
    see `rareFor`. */
-const rareShare = (roster, open) => {
-  const live = roster.filter(open);
+/* PER HEAD OVER THE ONES THAT BELONG HERE, which is a sharper equation than
+   the one it replaces rather than a weaker one.
+
+   It used to count every legendary the LEVEL had opened, wherever it lived, so
+   a map's legendary rate was a fact about the National Dex. With strays gone
+   that is simply wrong: it would hand a map the budget for 97 legendaries and
+   then divide it among the four that live there, making each of those four
+   twenty times commoner than `LEGEND_EACH` says one legendary is worth.
+
+   `belongs` is the same predicate `legendTier` scores - any shared type - so
+   the two cannot disagree about who is here. What the constant now means is
+   what it always claimed to: one legendary, in a place it lives, is worth
+   `LEGEND_EACH` of that place's encounters. */
+const rareShare = (roster, open, types, tier = legendTier) => {
+  const live = roster.filter((id) => open(id) && tier(id, types) > 0);
   return live.length ? Math.min(LEGEND_CEIL, LEGEND_EACH * live.length) : 0;
 };
+
+/* AND A COSTUME HAS NO HABITAT, so "where it lives" is the wrong question to
+   ask one. Every costume Pikachu is pure Electric, so under the legendary rule
+   all thirteen would live in the Power Plant and nowhere else - thirteen
+   species on one map, gated behind Lv 12, which is not rarity, it is a
+   location. A costume is an EVENT Pokemon, which this file already says, and
+   an event turning up anywhere is what an event is. Flat, everywhere, at the
+   same per-head worth - so `rareShare` still counts all thirteen on every map
+   and the "a costume is worth a legendary" assertion is untouched. */
+const eventTier = () => LEGEND_MATCHED;
 
 /* Same scaling as the legendaries always had, same per-head worth, over a
    different roster - so if `LEGEND_EACH` is ever retuned a costume moves with
@@ -884,17 +928,28 @@ const rareShare = (roster, open) => {
    BOTH come out under their own rule: the per-head assertion caught the
    legendaries at 1.620% against the 1.625% they are owed, on a bound tight
    enough to see it. One denominator for both. */
-const rareFor = (roster, types, total, open, taken) => {
+const rareFor = (roster, types, total, open, taken, tier = legendTier) => {
   const live = roster.filter(open);
   if (!live.length || total <= 0) return [];
-  const raw = live.map((id) => legendTier(id, types));
+  const raw = live.map((id) => tier(id, types));
   const sum = raw.reduce((n, w) => n + w, 0);
+  /* NOTHING LIVES HERE YET - see `LEGEND_STRAY`. Deep Woods between Lv 3 and
+     Lv 9 is the real case, and the answer is that it has no legendary
+     encounters rather than a nonsense one: without this the budget is divided
+     by zero and every weight in the table comes out NaN. */
+  if (sum <= 0) return [];
   /* PER HEAD, then capped - see LEGEND_EACH. Only the legendaries OPEN at this
      level count, so a generation that has not arrived cannot dilute the ones
      that have. */
-  const share = rareShare(roster, open);
+  const share = rareShare(roster, open, types, tier);
   const budget = (total * share) / (1 - taken);
-  return live.map((id, i) => [id, (budget * raw[i]) / sum]);
+  /* A ZERO-WEIGHT ROW IS NOT A ROW. With strays gone most legendaries score 0
+     on most maps, and emitting them anyway put Mewtwo in the starting meadow
+     at a weight that can never be rolled - invisible in play, and a lie to
+     everything that READS a table: `foundIn` would have told the Dex that
+     every legendary is found everywhere. */
+  return live.flatMap((id, i) =>
+    (raw[i] > 0 ? [[id, (budget * raw[i]) / sum]] : []));
 };
 
 /* Types are ids, not a display string. They were "Normal / Flying / Bug" - fine
@@ -974,9 +1029,36 @@ const RESIDENTS = [
     level: 12,  // the Ultra Ball's level: the first map worth one
     name: "Power Plant",
     types: ["electric", "steel"],
+    /* MAREEP IS HERE FOR THE C BAND, and it is the same lever the Mansion's
+       Slugma is: *"the lever is a resident that is NOT Kanto, in that band"*.
+
+       `BAND_SHAPE` freezes a map's rarity mix from these hand-written rows, so
+       a band with no row here has no share to hold and any newcomer in it
+       reads as the mix being resized. Every hand-written row in this game is
+       Kanto, and **Kanto has no Electric or Steel species at C** - its C tier
+       is route trash, Rattata and Pidgey and Zubat. So the Power Plant had no
+       C band at all, and the moment the homing started reading PRIMARY types
+       five correctly-placed Electric commons arrived (Plusle, Minun, Shinx,
+       Pachirisu, Yamper - the Power Plant is the only map claiming electric)
+       and took the B band down 2.8 points against a 2.5 bound.
+
+       Mareep is Gen 2, pure Electric, rate 235, and a base form rather than an
+       evolution, so hand-writing it breaks no rule. Open at Lv 10, two levels
+       before the map is, so the band exists for every level it can be walked.
+
+       WEIGHT 1, SOLVED FOR RATHER THAN PICKED. `BAND_SHAPE` is a normalised
+       share, so what this number sets is C's slice of 90: the five commons
+       come to 1.46% at Lv 50, and 1/90 is 1.1%. Weights of 2, 4, 6 and 12 were
+       swept and all made it WORSE, because an oversized frozen share is
+       something `balance` then has to rescale every other band around.
+
+       An S-band resident was tried beside it (Skarmory, the same argument one
+       tier up) and REVERTED: it took S from 1.5% to 5.0% rather than holding
+       it, so the floor is doing something there that a frozen share fights.
+       S drifts 1.5 points on its own, which is inside the bound. */
     table: [
       [81, 20], [100, 18], [25, 16], [82, 9], [101, 9], [88, 7], [125, 5],
-      [26, 3], [135, 2],
+      [26, 3], [135, 2], [179, 1],
     ],
   },
   {
@@ -1233,13 +1315,99 @@ const derivedHomes = () => {
     !evolvesInto.has(sp.id) && !LEGENDARY.includes(sp.id)
     && !COSTUMES.includes(sp.id));
 
+  /* A HOME IS THE PRIMARY TYPE, AND THE OTHER 453 SPECIES WERE NOT GETTING
+     THE RULE THE LEGENDARIES HAVE HAD FOR A YEAR.
+
+     `legendTier` has said since Articuno that a Pokemon lives where its FIRST
+     type is - "Articuno is Ice/Flying and the starting map is Normal/Flying,
+     so it was exactly as likely in Tall Grass as in Frost Hollow, which is the
+     opposite of what hunt-where-it-lives means". Everything that is not a
+     legendary was still homed by a COUNT of shared types, and a count cannot
+     tell a Water/Poison from a Bug/Poison: both score 1 against Deep Woods
+     [bug, grass, poison], so **Tentacool was homed in a forest** while Pond &
+     Shore sat there with `water` in its list. Measured: 60 species homed on a
+     map that does not share their primary type, Zubat and Aerodactyl and
+     Skarmory and Delibird all filed under the starting meadow on `flying`.
+
+     Primary worth 2, secondary worth 1. That is the species' own type ORDER,
+     which is already in the data and needs no table, and it is the same thing
+     `legendTier` scores - one function's worth of principle applied to the
+     other four hundred. */
+  const fit = (sp, b) =>
+    (b.types.includes(sp.types[0]) ? 2 : 0) +
+    (sp.types[1] && b.types.includes(sp.types[1]) ? 1 : 0);
+
+  /* THE BANDS A MAP'S RESIDENTS HOLD, and "resident" has to mean what the band
+     budget means by it or the filter is a no-op.
+
+     Built from `b.table` whole, this read {A, B, C, S} for the Power Plant and
+     blocked nothing - because that table lists Magneton, Electrode, Raichu and
+     Jolteon, which are EVOLUTIONS. `encounterTable` re-derives those as
+     depth-tagged overlay rows and the band budget filters them out, so the
+     residents it actually measures are Magnemite, Voltorb, Pikachu, Grimer and
+     Electabuzz: bands {A, B} and nothing else. A set built from the wrong half
+     of the table agrees with itself and catches nothing. */
+  const bands = new Map(RESIDENTS.map((b) =>
+    [b.id, new Set(b.table.filter(([id]) => !evolvesInto.has(id))
+      .map(([id]) => speciesById(id)?.tier))]));
+
   for (const sp of wild) {
     if (placed.has(sp.id)) continue;
-    let best = RESIDENTS[0], score = -1;
-    for (const b of RESIDENTS) {
-      const n = sp.types.filter((t) => b.types.includes(t)).length;
-      if (n > score) { score = n; best = b; }
-    }
+    /* AND THE TIEBREAK IS LEFT ALONE, WHICH IS A MEASUREMENT AND NOT A SHRUG.
+
+       340 of 453 species tie on the type score and a stable sort breaks every
+       one of them by DECLARATION ORDER, so Tall Grass, written first, takes
+       136 of them and **Cinderpeak takes none at all**. That is worth writing
+       down; it is not worth fixing here, and two attempts measured why.
+
+       Narrowest-map-wins spreads them properly (0..136 becomes 15..81,
+       Cinderpeak 0 -> 47) and breaks the BAND BUDGET: it concentrates
+       newcomers on exactly the maps with the least headroom - *"the two that
+       moved most are the maps with the narrowest type lists"* is already in
+       that bound's own note - and the Power Plant's A band moved 2.9 points
+       against a 2.5 bound. Fewest-homes-wins fixes the bands and breaks
+       GENERATION FAIRNESS instead: Pond & Shore's Gen 2 fell to 12.6% against
+       a fair 50% at Lv 10.
+
+       Those are `fitShares`' two marginals, the pair the whole economy is
+       fitted to, and a tiebreak is not the lever that moves both. The homing
+       change that WAS asked for - a home is the primary type - is independent
+       of the tiebreak and holds both bounds unchanged. Recorded in README's
+       "Deferred on purpose" with those two failures as the trigger. */
+    /* AND A BAND THE MAP ALREADY HAS IS A FILTER, NOT A TIEBREAK, which is the
+       rule the generation filler below has carried since Ember: *"a filled
+       slot must not bring a band the map does not already have, or `balance`
+       gives it `BAND_FLOOR` and the new band dilutes the mix the map was tuned
+       around"*. The primary homing never obeyed it, because until it started
+       reading primary types it was not choosing sharply enough to matter.
+
+       Sandy Shocks found it. Electric/Ground, S band, and the Power Plant is
+       the only map claiming `electric` - so the new rule sent it there, which
+       is accurate, and it arrived as that map's only S-band resident. Every
+       hand-written row in this game is Kanto and no Kanto Electric or Steel
+       species is S or C, so the Power Plant cannot hold either band from its
+       own residents: the share went 0% -> 1.5% and the band budget read the
+       map being resized. Two hand-written residents were tried first (Skarmory
+       for S, Mareep for C) and made it worse, 2.9 -> 4.3 points, because a
+       frozen share is what `BAND_SHAPE` then has to rescale everything else
+       around.
+
+       So the candidate set is maps that share a type AND already hold the
+       band, and only if that is empty does it fall back to type alone - which
+       keeps every species homed. Sandy Shocks goes to Mt Moon on `ground`
+       instead: still one of its own types, still not the meadow it used to be
+       filed under. */
+    const myBand = speciesById(sp.id)?.tier;
+    const pick = (pool) => {
+      let top = null, high = -1;
+      for (const b of pool) {
+        const n = fit(sp, b);
+        if (n > high) { high = n; top = b; }
+      }
+      return high > 0 ? top : null;
+    };
+    const best = pick(RESIDENTS.filter((b) => bands.get(b.id).has(myBand)))
+      ?? pick(RESIDENTS) ?? RESIDENTS[0];
     homes.get(best.id).push([sp.id, DERIVED_WEIGHT[bandFor(sp.id)] ?? 4]);
   }
 
@@ -1778,10 +1946,11 @@ export function encounterTable(biome, level = 1) {
   /* Both are appended to the RESIDENT total, and both are scaled against the
      share the two of them take together - so each is exactly its own share of
      the finished table and neither moves when the other's roster grows. */
-  const taken = rareShare(LEGENDARY, alive) + rareShare(COSTUMES, alive);
+  const taken = rareShare(LEGENDARY, alive, biome.types)
+              + rareShare(COSTUMES, alive, biome.types, eventTier);
   return [...rolled,
           ...rareFor(LEGENDARY, biome.types, total, alive, taken),
-          ...rareFor(COSTUMES, biome.types, total, alive, taken)];
+          ...rareFor(COSTUMES, biome.types, total, alive, taken, eventTier)];
 }
 
 /* Asked on every step that starts an encounter, and the answer only changes on
