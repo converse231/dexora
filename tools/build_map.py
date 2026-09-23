@@ -85,7 +85,7 @@ AREAS = [
     # laid out two by two. The first drawn against a `building` primary, too,
     # which is why `FR_PRIMARY` exists. See mansion().
     dict(id="mansion", name="Pokemon Mansion", drawn="mansion"),
-    # Hand-drawn - see haunted_tower() further down.
+    # Transcribed, all seven floors - see haunted_tower() further down.
     dict(id="tower", name="Haunted Tower", drawn="haunted_tower"),
     # COPIED, and the biggest map in the game - six Emerald maps stitched into
     # the rectangle they already form. See safari_zone().
@@ -1489,8 +1489,8 @@ def forest_masses(W, H, seed, pad=3):
     number of rows - measured on the MERGED run, so two masses that touch are
     one run and their combined height is what has to be odd.
 
-    So this generates over MASSES, the way `haunted_tower` generates over grave
-    plots rather than over corridors. Every mass keeps `pad` (3) tiles clear of
+    So this generates over MASSES, the way `haunted_tower` used to generate
+    over grave plots rather than over corridors (it is transcribed now). Every mass keeps `pad` (3) tiles clear of
     every other mass and of the frame, which buys three things at once:
 
       * no two masses ever merge, so each one's own height is the run height and
@@ -2323,233 +2323,154 @@ def volcano():
                 g[y][x] = "M"
 
     return ["".join(r) for r in g], spawn, None, None, warps
+# THE POKEMON TOWER, ALL SEVEN FLOORS, TRANSCRIBED.
+#
+# Lavender Town's tower, 1F to 7F, laid out on one grid the way the Mansion
+# lays out its four: the ground floor and the three above it along the bottom,
+# the top three above them. Every layout is 24x20 and every one is drawn
+# against pokefirered's `building` primary plus `pokemon_tower` - both baked
+# since the Mansion and the old tower - so it costs no new art at all.
+TOWER_FLOORS = ("1F", "2F", "3F", "4F", "5F", "6F", "7F")
+TOWER_FW, TOWER_FH = 24, 20
+TOWER_GUT = 2
+TOWER_SPLIT = 640
+# Where each floor sits, in floor cells: the bottom row climbs left to right,
+# the top row carries on from there.
+TOWER_AT = ((0, 1), (1, 1), (2, 1), (3, 1), (0, 0), (1, 0), (2, 0))
+# All seven layouts tile the same 2x2 border block - `pokemon_tower` local 1,
+# the black the real oval floats in - so the gutters read as the nothing they
+# are, the Mansion's argument exactly.
+TOWER_BORDER_MT = 641
+# The headstone and the grave set into the wall face. A cell is a GRAVE only
+# if it is one of these AND solid, because collision belongs to the map. 649
+# is 7F's GOLD headstone - 92 of them, on that floor and no other - and it is
+# Game Freak's own tile, not a palette fault; left out, the minimap drew the
+# top floor's graveyard as solid wall.
+TOWER_GRAVE_MT = {657, 649}
+TOWER_WALL_GRAVE_MT = {728, 729}
+# 5F's purification ward: 665-667 over 673-675 over 681-683, walkable.
+TOWER_WARD_MT = {665 + r * 8 + c for r in range(3) for c in range(3)}
+
+# THE LADDER GRAPH IS READ, NOT INVENTED - each floor's `warp_events`, resolved
+# to the pairs that answer each other. Floor index into TOWER_FLOORS. The
+# staircases alternate sides going up, as the real building does.
+TOWER_STAIRS = (
+    ((0, 18, 9), (1, 18, 10)),      # 1F <-> 2F
+    ((1, 4, 10), (2, 4, 10)),       # 2F <-> 3F
+    ((2, 18, 10), (3, 18, 10)),     # 3F <-> 4F
+    ((3, 4, 10), (4, 4, 10)),       # 4F <-> 5F
+    ((4, 18, 10), (5, 18, 10)),     # 5F <-> 6F
+    ((5, 11, 16), (6, 11, 16)),     # 6F <-> 7F
+)
+# The front door onto Lavender Town - and the spawn. Its two neighbours on
+# row 19 lead outside, where this game has no map, and are solid there anyway.
+TOWER_DOOR = (0, 11, 18)
+
+
 def haunted_tower():
-    """Haunted Tower: one square floor of Lavender Town's graveyard.
+    """The Haunted Tower: Pokemon Tower 1F-7F, 102x42, every cell a copy.
 
-    Pokemon Tower's seven floors are ovals, and the oval is the one thing here
-    deliberately not copied. A round room on a square grid spends its whole
-    silhouette on stepped diagonals, and every step wants a wall piece the
-    tileset only carries for the curve Game Freak actually drew - the first
-    attempt at one left white blocks hanging off both top corners. So the room
-    is square. Everything inside it is the real thing:
+    It was a generated square room for as long as a round one looked
+    impossible: "a round room on a square grid spends its whole silhouette on
+    stepped diagonals, and every step wants a wall piece". That was a limit of
+    OUR autotile, and a transcription never reaches the autotile - the oval is
+    Game Freak's own cells, carried as fixed ids, stepped diagonals and all.
 
-      - graves in rows, 1-5 across and one deep. That is the shape, measured
-        rather than eyeballed: of 240 vertical runs of headstone across all
-        seven floors, 172 are a single tile, and the commonest plot bounding
-        boxes are 1x1, 2x1, 3x1 and 3x2.
-      - graves at about 30% of the room, which is the real range (26-37%) and
-        is what makes a tower floor tight (0.74-0.94) where a swept hall is not.
-      - a few graves set into the wall face itself (`A`), which is what breaks
-        the top wall out of being one long identical run - Game Freak's own
-        device, not an invention.
-      - the ward: 5F's cyan sigil, 3x3 and walkable, so the room has a centre
-        to turn about and it costs no floor.
-
-    The wall needs no corner pieces, because of how the tileset is built: a wall
-    tile shows its face only where there is floor below it. So a square room
-    draws purple across its top and flat black everywhere else - which is
-    exactly what the real oval does, and why its lower half has no purple in it.
-
-    Generate-and-test against compose.TOWER, the band measured off 2F-7F
-    themselves. 34x28."""
-    import random
-    import compose as C
+    The id stayed `tower` and the name stayed Haunted Tower, for the reason
+    Mt Moon kept `ridge`: renaming it moves every save standing there.
+    """
     import numpy as np
-    import study_layout as SL
+    import build_assets as BA
 
-    W, H = 76, 54
-    # FOUR TIMES THE FLOOR, AND THE BUILDING SIZED AROUND IT RATHER THAN THE
-    # OTHER WAY ROUND.
-    #
-    # The first attempt made the room four times bigger and left the map at
-    # twice: 58x44 inside 68x56, which is 67% of the map where a real tower
-    # floor's oval is under half of its own. Four of the six measured numbers
-    # said so at once - open 0.54 against a real 0.17-0.34, tight 0.66 against
-    # 0.74-0.94, loops 67 against 38-53 - and they were all saying "this is not
-    # a room in a building, it is a field with headstones on it".
-    #
-    # So the walkable floor is the target (about four times the 309 tiles the
-    # old one had), the grave share is the measured 30%, and the map is whatever
-    # those two need with a real floor's proportion of wall around them.
-    RX0, RY0, RX1, RY1 = 11, 9, 62, 42         # the room: 52 x 34
-    WX, WY = (RX0 + RX1) // 2 - 1, (RY0 + RY1) // 2 - 1
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    PB = meta["mansion"]["building"]           # pokefirered's Building, baked whole
+    SB = meta["tower"]["floor"] - 2            # pokemon_tower local 2 is the floor
+    rebase = lambda i: (PB + i) if i < TOWER_SPLIT else (SB + i - TOWER_SPLIT)
 
-    def lay(seed):
-        rng = random.Random(seed)
-        g = [["H"] * W for _ in range(H)]
-        for y in range(RY0, RY1 + 1):
-            for x in range(RX0, RX1 + 1):
-                # The two bottom corners step in. The top ones cannot: that is
-                # where the wall shows its face, and a step there is the one
-                # shape this tileset has no piece for.
-                if min(x - RX0, RX1 - x) + (RY1 - y) < 2:
-                    continue
-                g[y][x] = "h"
+    cols = 1 + max(c for c, _r in TOWER_AT)
+    rws = 1 + max(r for _c, r in TOWER_AT)
+    W = cols * TOWER_FW + (cols - 1) * TOWER_GUT
+    H = rws * TOWER_FH + (rws - 1) * TOWER_GUT
+    origin = [(c * (TOWER_FW + TOWER_GUT), r * (TOWER_FH + TOWER_GUT)) for c, r in TOWER_AT]
 
-        ward = {(WX + dx, WY + dy) for dx in range(3) for dy in range(3)}
-        for x, y in ward:
-            g[y][x] = "y"
-        # A clear tile of floor all round it, so the sigil reads as a sigil
-        # rather than as the gap left between two grave plots.
-        clear = {(WX + dx, WY + dy) for dx in range(-1, 4) for dy in range(-1, 4)}
+    g = [["H"] * W for _ in range(H)]
+    tiles = [[rebase(TOWER_BORDER_MT)] * W for _ in range(H)]
+    doors = {(f, x, y) for pair in TOWER_STAIRS for (f, x, y) in pair}
 
-        # PILLARS, because a hall four times the size of a real tower floor is
-        # not a tower floor - it is four of them with the walls taken out, and
-        # the measured grammar cannot make it read as one. Every number the band
-        # test refused says the same thing: stripe 1.75 (all lane), dead 0.012
-        # (you can walk round everything), open 0.48 (nothing in the way). A
-        # pillar fixes all three at once, and a big hall standing on pillars is
-        # what a bigger floor of this building would actually be.
-        #
-        # Two thick at the least, because the renderer gives a wall its face
-        # only where there is floor below it - a one-tile pillar has no face to
-        # draw and check() refuses it.
-        pillars = set()
-        for _ in range(rng.randint(14, 24)):
-            pw, ph = rng.choice(((2, 2), (3, 2), (2, 3), (4, 2), (2, 4)))
-            px = rng.randint(RX0 + 2, RX1 - pw - 2)
-            py = rng.randint(RY0 + 2, RY1 - ph - 2)
-            cells = {(px + i, py + j) for i in range(pw) for j in range(ph)}
-            # Never against the wall (that is a bay, not a pillar) and never
-            # touching another one, or two pillars merge into a partition.
-            near = {(cx + dx, cy + dy) for cx, cy in cells
-                    for dx in (-1, 0, 1) for dy in (-1, 0, 1)}
-            if near & pillars or near & clear:
-                continue
-            pillars |= cells
-        for cx, cy in pillars:
-            g[cy][cx] = "H"
+    for i, fl in enumerate(TOWER_FLOORS):
+        name = "PokemonTower_" + fl
+        raw = np.frombuffer(io.open(BA.fetch(f"data/layouts/{name}/map.bin",
+                                             name + ".bin"), "rb").read(),
+                            dtype="<u2")[:TOWER_FW * TOWER_FH]
+        ids = (raw & 0x3FF).reshape(TOWER_FH, TOWER_FW)
+        col = ((raw >> 10) & 3).reshape(TOWER_FH, TOWER_FW)
+        ox, oy = origin[i]
+        for y in range(TOWER_FH):
+            for x in range(TOWER_FW):
+                mid, solid = int(ids[y][x]), bool(col[y][x])
+                if (i, x, y) in doors:
+                    ch = "l"                          # a staircase
+                elif not solid:
+                    ch = "y" if mid in TOWER_WARD_MT else "h"
+                elif mid in TOWER_GRAVE_MT:
+                    ch = "G"
+                elif mid in TOWER_WALL_GRAVE_MT:
+                    ch = "A"
+                else:
+                    ch = "H"
+                g[oy + y][ox + x] = ch
+                tiles[oy + y][ox + x] = rebase(mid)
 
-        # One or two clear columns down the room. Rows of graves on their own
-        # give a floor that is all lane and no cross-lane - stripe 1.63 against
-        # a real ceiling of 1.61 - and a vertical aisle is how 2F answers that:
-        # three clear columns run between its two big grave masses.
-        lanes = set()
-        for _ in range(rng.randint(4, 9)):
-            ax = rng.randint(RX0 + 3, RX1 - 3)
-            lanes |= {(ax, yy) for yy in range(RY0, RY1 + 1)}
+    for x in range(W):
+        for y in (0, H - 1):
+            g[y][x] = "H"
+    for y in range(H):
+        for x in (0, W - 1):
+            g[y][x] = "H"
 
-        def plant(cells, keep=()):
-            if all(c not in clear and c not in keep and 0 <= c[0] < W
-                   and 0 <= c[1] < H and g[c[1]][c[0]] == "h" for c in cells):
-                for cx, cy in cells:
-                    g[cy][cx] = "G"
-                return True
-            return False
+    seal_hidden(g, tiles, "H")
 
-        # A row of graves, then an aisle. A plot two deep runs into the aisle
-        # below it and meets the next row, which is how the big grave masses on
-        # 2F and 6F come about - they are not placed, they are what rows do when
-        # one of them happens to be deep. The row pitch is jittered because a
-        # fixed one leaves every vertical gap the same and the floor measures
-        # 1.63 stripe against the real 0.98-1.61: all lane, no cross-lane.
-        y = RY0 + 1
-        while y < RY1:
-            x = RX0 + rng.randint(0, 3)
-            while x <= RX1:
-                n = rng.choice((1, 2, 2, 3, 3, 3, 4, 5, 5, 7))
-                deep = 2 if rng.random() < 0.30 else 1
-                plant([(x + i, y + d) for i in range(n) for d in range(deep)], lanes)
-                x += n + rng.randint(1, 4)
-            y += rng.choice((2, 2, 3))
+    warps = []
+    for (fa, xa, ya), (fb, xb, yb) in TOWER_STAIRS:
+        ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
+        bx, by = origin[fb][0] + xb, origin[fb][1] + yb
+        assert g[ay][ax] == "l" and g[by][bx] == "l", \
+            f"tower: the stair at ({ax},{ay})/({bx},{by}) is not on a landing"
+        warps.append([ax, ay, bx, by])
 
-        # Stubs hung off the rows, one wide and two or three tall. Rows alone
-        # give a floor with no pockets in it - dead 0.019 against a real
-        # 0.031-0.100 - because you can always walk round a free-standing row.
-        # A stub turns two rows into a U, and a U is where a dead end lives.
-        for _ in range(rng.randint(85, 130)):
-            x = rng.randint(RX0, RX1)
-            y = rng.randint(RY0 + 1, RY1 - 3)
-            if g[y - 1][x] == "G" or g[y][x] == "G" or y == RY0 + 1:
-                plant([(x, y + d) for d in range(rng.randint(2, 3))])
+    fd, fx, fy = TOWER_DOOR
+    spawn = (origin[fd][0] + fx, origin[fd][1] + fy)
+    assert g[spawn[1]][spawn[0]] not in SOLID, "tower: the front door is a wall"
 
-        # Alcoves: one floor tile walled on three sides. That IS a dead end, and
-        # rows and stubs together still only made 0.026 of them against a real
-        # 0.031-0.100 - whatever those two build, you can walk round it.
-        # MOST ATTEMPTS FAIL BY DESIGN - the tile has to be clear floor with
-        # three clear neighbours - so the count is attempts, not alcoves, and it
-        # has to grow FASTER than the room does: a bigger room has proportionally
-        # more of its floor already spoken for, so each try is likelier to land
-        # on something. Scaled by area alone the tower came out at dead 0.012
-        # against a real 0.031-0.100 and the band test refused every seed.
-        for _ in range(rng.randint(60, 95)):
-            x, y = rng.randint(RX0 + 1, RX1 - 1), rng.randint(RY0 + 1, RY1 - 1)
-            if (x, y) in clear or g[y][x] != "h":
-                continue
-            sides = [(x, y - 1), (x, y + 1), (x - 1, y), (x + 1, y)]
-            rng.shuffle(sides)
-            plant(sides[:3])
-
-        # Graves set into the wall face - the bottom row of the wall, the only
-        # row of it you can see.
-        x = RX0 + rng.randint(1, 5)
-        while x < RX1 - 4:
-            n = rng.randint(3, 5)
-            for i in range(n):
-                g[RY0 - 1][x + i] = "A"
-            x += n + rng.randint(4, 9)
-
-        return g
-
-    best, bg, bm = None, None, None
-    for seed in range(1, 900):
-        g = lay(seed)
-        if not all_connected(g):
+    # WHAT THE COLLISION BIT CALLS PASSABLE IS NOT WHAT YOU CAN REACH: 7F's
+    # rim carries a few passable fragments no stair leads to. Solid, and still
+    # their own art.
+    hop = {}
+    for ax, ay, bx, by in warps:
+        hop[(ax, ay)] = (bx, by)
+        hop[(bx, by)] = (ax, ay)
+    seen, stack = set(), [spawn]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen:
             continue
-        walk = np.array([[c not in SOLID for c in row] for row in g])
-        m = SL.measure(walk)
-        # Inside the band first, distance second. compose.score() alone prefers
-        # sitting 0.02 outside a band to sitting at its edge inside one - 0.03
-        # of penalty against the 0.075 its middle-nudge charges - which is fine
-        # for a cave with nine wide bands and wrong here, where the tower's six
-        # are narrow and being outside one is the whole thing the measurement
-        # exists to catch.
-        # `loops` is measured and judged, but SEPARATELY - see below.
-        rank = (0 if all(lo <= m[k] <= hi
-                         for k, (lo, hi) in C.TOWER.items() if k != "loops")
-                else 1, C.score(m, C.TOWER))
-        if best is None or rank < best:
-            best, bg, bm = rank, g, m
-    assert bg is not None, "tower: no floor plan held together"
-    assert best[0] == 0, "tower: nothing landed inside the band - %s" % (bm,)
+        seen.add((x, y))
+        stack += walk_steps(g, x, y)
+        if (x, y) in hop:
+            stack.append(hop[(x, y)])
+    culled = 0
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] not in SOLID and (x, y) not in seen:
+                g[y][x] = "H"
+                culled += 1
 
-    # FIVE OF SIX LAND IN THE BAND MEASURED OFF 2F-7F. `loops` sits at about
-    # 54.4 against a ceiling of 53.4 - two per cent over - and it is named here
-    # rather than tuned away because both levers that move it were measured and
-    # both make the map worse:
-    #
-    #   pillars   6-14 -> 55.9 loops, 14-24 -> 54.4, 22-34 -> 57.6. A pillar
-    #             cuts loops up to a point and then starts adding its own, and
-    #             14-24 is the bottom of that curve.
-    #   aisles    fewer is what a lower loop count wants, and at 1-3 and 2-5 no
-    #             floor plan holds together at all: the clear columns are what
-    #             joins the room, so cutting them buys loops with connectivity.
-    #
-    # Two per cent over a ceiling derived from six real floors is inside the
-    # noise of the derivation itself. The bound below is what keeps it honest -
-    # it fails if a later change lets the floor drift into being a hall again,
-    # which is the failure this whole measurement exists to catch.
-    assert bm["loops"] <= 56.0, \
-        ("tower: loops rose to %.1f - the floor is drifting back towards a hall "
-         "with headstones in it" % bm["loops"])
+    print("   tower  %d walkable reached, %d unreachable culled to wall, %d graves"
+          % (len(seen), culled, sum(1 for r in g for c in r if c in "GA")))
 
-    g = bg
-
-    stones = sum(1 for r in g for c in r if c == "G")
-    room = sum(1 for r in g for c in r if c in "hyG")
-    print("   tower  %d graves of %d room tiles (%.0f%%)  score %.2f"
-          % (stones, room, 100.0 * stones / room, best[1]))
-
-    spawn = None
-    for y in range(RY1, RY0, -1):
-        for x in range(RX0 + 2, RX1 - 1):
-            if g[y][x] == "h" and g[y - 1][x] == "h":
-                spawn = (x, y)
-                break
-        if spawn:
-            break
-    assert spawn, "tower: nowhere to stand"
-    return ["".join(r) for r in g], spawn
+    return (["".join(r) for r in g], spawn,
+            [i for row in tiles for i in row], PB, warps)
 
 
 def seafoam_floor(floor="B3F", rungs=()):
