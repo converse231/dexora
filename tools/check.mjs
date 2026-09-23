@@ -3309,6 +3309,17 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +
         "variant that is a span will render zero wide there, silently");
     }
+
+    /* AND THE EVOLUTION SCENE SIZES IT AGAINST ITS OWN BOX. `.evo-mon` is a
+       fixed `cqw` and the strip's own `width: 77%` is of the containing block
+       - the whole stage there - so without this rule a Showdown evolution drew
+       two and a half times the size of every other one. Held to `.evo-mon`'s
+       own number, so the two cannot drift. Verified by deleting the rule. */
+    const evoSize = /\.evo-mon \{[^}]*width:\s*([\d.]+)cqw/.exec(css)?.[1];
+    assert.ok(evoSize, ".evo-mon no longer has a cqw width to hold the strip to");
+    assert.ok(new RegExp(`\\.evo-mon\\.sprite-showdown\\s*\\{[^}]*width:\\s*calc\\(${evoSize}cqw \\* \\.77\\)`).test(css),
+      `a Showdown evolution is not sized to .evo-mon's ${evoSize}cqw - its 77% is ` +
+      "of the whole stage and it draws two and a half times too big");
   }
 
   console.log(`battle scene ok — ${Object.keys(AREAS).length} floors, ` +

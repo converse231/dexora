@@ -325,6 +325,17 @@ asserts the four Pokemon-drawing containers name it. **A list, defensibly**:
 the blanket version is wrong, because `.br-item .sprite-fx` sizes a tiered
 HONEY and never a Showdown.
 
+**AND A PERCENTAGE IS OF THE CONTAINING BLOCK, WHICH IS WHY THE EVOLUTION
+SCREEN STILL DREW SHOWDOWN HUGE.** The 77% fix sized the strip as `width: 77%` -
+right in the encounter, where the containing block is the Pokemon's own slot,
+and wrong in the evolution scene, where it is the whole `.evo-stage`. Same
+specificity and later in the file, so it beat `.evo-mon`'s `30cqw` and a
+Showdown Trumbeak measured **175x434** beside an ordinary sprite's 68x68 -
+reported with a screenshot. `.evo-mon.sprite-showdown` is `calc(30cqw * .77)`
+now (53x53, measured in a headless browser with `offsetWidth` - a bounding box
+includes the frozen `mon-appear` transform and misreads), and check.mjs holds
+it to `.evo-mon`'s own number; verified by deleting the rule.
+
 **AN EVOLUTION CAN COST A TIER, AND THE DIALOG PROMISED IT COULD NOT.** It read
 *"Your origin evolves, and stays origin"* for every tier and every target -
 true of most, false of the case a player minds: **Gyarados has an Origin and

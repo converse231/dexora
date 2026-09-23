@@ -4130,6 +4130,19 @@ canvas {
   transform-origin: 50% 50%;
 }
 
+/* A SHOWDOWN STRIP IS SIZED AGAINST THIS BOX, NOT AGAINST ITS PARENT.
+   `.sprite-showdown` says `width: 77%` further down this file, and for a span
+   a percentage is of the CONTAINING block - in the encounter that is the
+   Pokemon's own slot, which is what the 77% was measured for, but here it is
+   the whole `.evo-stage`. Same specificity, later in the file, so it beat
+   `30cqw` above and a Showdown evolution drew at ~77cqw, two and a half times
+   the creature beside it. Reported with a screenshot of a Trumbeak filling the
+   stage. The 0.77 is the same measured fill (an ordinary sprite fills 0.77 of
+   its canvas, a Showdown frame 1.00); check.mjs holds this to `.evo-mon`. */
+.evo-mon.sprite-showdown {
+  width: calc(30cqw * .77); height: calc(30cqw * .77);
+}
+
 /* Every visible pixel replaced with solid white, alpha untouched - the CSS
    equivalent of filling the sprite's palette with RGB_WHITE. Hard-edged, so
    the silhouette stays exact. */
