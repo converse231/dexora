@@ -203,7 +203,8 @@ import {
   LEGEND_HOME, LEGEND_HAUNT, legendTier, LAYOUTS, layoutIds,
   GEN_FIRST, GEN_STEP,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
-  SIZE_MIN, SIZE_MAX, ENCOUNTER_RATE,
+  SIZE_MIN, SIZE_MAX, ENCOUNTER_RATE, HEADLINE, genTargets, rowGen,
+  SPECIES_CAP, CAST_CEIL, RODS as RODS_ALL,
 } from "../src/game/biomes.js";
 
 const poke = ballById("poke-ball");
@@ -2008,7 +2009,7 @@ for (const b of BIOMES) {
        worth. The predicate is the one `legendTier` scores, so the assertion
        and the rule cannot disagree about who is here. */
     const here = LEGENDARY.filter((id) => genOpen(id, lv)
-      && speciesById(id).types.some((t) => b.types.includes(t)));
+      && legendTier(id, b.types) > 0);
     const open = here.length;
     const want = Math.min(LEGEND_CEIL, LEGEND_EACH * open);
     assert.ok(Math.abs(share - want) < 1e-9,
@@ -2066,7 +2067,8 @@ for (const b of BIOMES) {
   // A biome sharing a legendary's type is still the better place to hunt it.
   const full = encounterTable(b, MAX_LEVEL);
   const wOf = (id) => full.find((e) => e[0] === id)?.[1] ?? 0;
-  const mine = LEGENDARY.filter((id) => speciesById(id).types.some((t) => b.types.includes(t)));
+  // `legendTier` is the predicate the spawn uses: the primary type is the home.
+  const mine = LEGENDARY.filter((id) => legendTier(id, b.types) > 0);
   const away = LEGENDARY.filter((id) => !mine.includes(id));
   if (mine.length && away.length) {
     assert.ok(wOf(mine[0]) > wOf(away[0]),
@@ -3504,7 +3506,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       const t = encounterTable(b, level);
       const total = t.reduce((n, [, x]) => n + x, 0);
       const here = LEGENDARY.filter((id) => genOpen(id, level)
-        && speciesById(id).types.some((ty) => b.types.includes(ty)));
+        && legendTier(id, b.types) > 0);
       if (!here.length) return null;
       const pool = here.reduce((n, id) => n + (t.find(([i]) => i === id)?.[1] ?? 0), 0);
       return pool / total / here.length;
@@ -3550,28 +3552,56 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
 
      PRESENCE IS SEPARATE AND ABSOLUTE. A generation with nothing living in a
      map is a different failure from one that is merely thin, it is the one
-     that reweighting cannot reach, and it is worth its own assertion. */
+     that reweighting cannot reach, and it is worth its own assertion.
+
+     AND "FAIR" IS `genTargets`, NOT 1/N. Gen 1 - each map's classic cast -
+     is held at no less than `HEADLINE`; every other generation is weighted by
+     the square root of how many of its species live on that map and eases in
+     over `GEN_RAMP` levels after it opens. Read from biomes.js rather than
+     restated here, so the fit and this suite cannot hold two ideas of fair,
+     and measured by LINE (`rowGen`) because that is what the fit balances - a
+     Crobat is Golbat's presence on a map. The floor is asserted separately
+     below, because a target that quietly went back to 1/N would still pass a
+     suite measuring against whatever the target says. */
   {
     const gens = GEN_LAST.map((_, i) => i + 1);
+    const COSTUMED = new Set(SPECIES.filter((sp) => sp.form === "costume").map((sp) => sp.id));
     let worst = 0, worstAt = "";
+    let capHeld = 0;
     for (let lv = 1; lv <= MAX_LEVEL; lv++) {
       for (const b of BIOMES) {
         if (lv < (b.level ?? 1)) continue;
         const open = gens.filter((g) => lv >= (GEN_UNLOCK[g] ?? 0));
-        const rows = encounterTable(b, lv).filter((r) => !LEGENDARY.includes(r[0]));
+        const rows = encounterTable(b, lv)
+          .filter((r) => !LEGENDARY.includes(r[0]) && !COSTUMED.has(r[0]));
         const total = rows.reduce((n, r) => n + r[1], 0);
+        const target = genTargets(rows, lv);
         const by = new Map();
-        for (const r of rows) by.set(genOf(r[0]), (by.get(genOf(r[0])) ?? 0) + r[1]);
+        for (const r of rows) by.set(rowGen(r), (by.get(rowGen(r)) ?? 0) + r[1]);
         for (const g of open) {
           const share = (by.get(g) ?? 0) / total;
           assert.ok(share > 0,
             `${b.id} has no generation ${g} at Lv ${lv} - a generation that ` +
             "does not live in a map cannot be given a share of it by any weight");
-          const off = Math.abs(share - 1 / open.length) * open.length;
+          const fair = target.get(g) ?? 0;
+          /* SHORT BECAUSE THE CAP HELD IT, and only then. A generation with a
+             line at `SPECIES_CAP` gave its surplus away on purpose - that is
+             the rule working, not the fit failing - so it may come in UNDER
+             its target. Never over, and never short with no line held. */
+          const held = rows.some((r) => rowGen(r) === g && !r[2]
+            && r[1] / total >= SPECIES_CAP * 0.9);
+          if (held && share < fair) { capHeld++; continue; }
+          /* GEN 1'S TARGET IS A FLOOR: the cast takes what capped lines had
+             no room for, so it may come in over. What it may NOT do is invade
+             - that is its own assertion below, on the species rather than on
+             the generation, because the fault a player sees is one creature
+             everywhere. */
+          if (g === 1 && share >= fair) continue;
+          const off = Math.abs(share - fair) / fair;
           if (off > worst) {
             worst = off;
             worstAt = `${b.id} gen ${g} at Lv ${lv} (${(share * 100).toFixed(1)}%` +
-              ` against a fair ${(100 / open.length).toFixed(1)}%)`;
+              ` against a fair ${(100 * fair).toFixed(1)}%)`;
           }
         }
       }
@@ -3579,7 +3609,144 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.ok(worst < 0.40,
       `a generation is ${(worst * 100).toFixed(0)}% off its fair share - ${worstAt}`);
     console.log(`gen share ok — every one within ${(worst * 100).toFixed(0)}% of ` +
-      `fair in all ${BIOMES.length} maps, worst is ${worstAt}`);
+      `fair in all ${BIOMES.length} maps, worst is ${worstAt}; ${capHeld} ` +
+      "map-levels where a generation came in short because the species cap held it");
+
+    /* THE FLOOR, MEASURED ON THE FINISHED TABLE. With every generation open
+       the classic cast must hold its headliner share on every map - measured
+       the way a player meets it, legendaries and costumes included in the
+       denominator, so a floor the appended families quietly eat is caught.
+       Half a point of slack is what those appended shares cost at most. */
+    let low = 1, lowAt = "";
+    for (const b of BIOMES) {
+      const rows = encounterTable(b, MAX_LEVEL);
+      const total = rows.reduce((n, r) => n + r[1], 0);
+      const cast = rows.filter((r) => genOf(r[0]) === 1 && !LEGENDARY.includes(r[0]))
+        .reduce((n, r) => n + r[1], 0) / total;
+      if (cast < low) { low = cast; lowAt = b.id; }
+    }
+    assert.ok(low > HEADLINE - 0.03,
+      `the classic cast is ${(100 * low).toFixed(1)}% of ${lowAt} at Lv ${MAX_LEVEL} - ` +
+      `the headliner share promises at least ${100 * HEADLINE}%`);
+    console.log(`headliners ok — Gen 1 holds at least ${(100 * low).toFixed(1)}% ` +
+      `of every map at Lv ${MAX_LEVEL} (${lowAt} lowest), against a floor of ${100 * HEADLINE}%`);
+
+    /* NO ONE SPECIES CARRIES A MAP, UNLESS IT IS THE CAST. Measured before the
+       diversity pass: a non-Kanto species held 8% or more of a map 44 times
+       across the ladder, Pichu 31.8% of the Power Plant at Lv 12. The cap runs
+       after the fit and holds EXACTLY - measured against the constant because
+       `capLines` is what is under test here; verified by making it return its
+       input, which puts Duskull back at 16.8% of the tower. */
+    let over = 0, softened = 0, top = 0, topAt = "";
+    for (const b of BIOMES) {
+      for (let lv = b.level ?? 1; lv <= MAX_LEVEL; lv++) {
+        const rows = encounterTable(b, lv)
+          .filter((r) => !LEGENDARY.includes(r[0]) && !COSTUMED.has(r[0]));
+        const total = rows.reduce((n, r) => n + r[1], 0);
+        /* SOFTENED ONLY WHERE THE CAST IS FULL. A line may pass the cap on a
+           map-level where a Kanto species already sits at `CAST_CEIL` - the
+           two cannot both hold there, and the invasion is the worse fault.
+           Anywhere else, over the cap is a bug. */
+        const castFull = rows.some((r) => rowGen(r) === 1 && r[1] / total >= CAST_CEIL - 1e-6);
+        for (const r of rows) {
+          if (rowGen(r) === 1) continue;
+          const p = r[1] / total;
+          if (p > SPECIES_CAP + 1e-6) { if (castFull) { softened++; continue; } over++; }
+          if (p > top) { top = p; topAt = `${speciesById(r[0]).name} in ${b.id} at Lv ${lv}`; }
+        }
+      }
+    }
+    assert.ok(over === 0 && top <= SPECIES_CAP + 1e-6,
+      `${topAt} is ${(100 * top).toFixed(1)}% of the map (${over} map-levels over) - no ` +
+      `species outside the classic cast may carry more than ${100 * SPECIES_CAP}%`);
+    console.log(`species cap ok — no non-Kanto species above ${(100 * top).toFixed(1)}% ` +
+      `of any map at any level (${topAt}), except ${softened} rows where the cast is at its ` +
+      `${100 * CAST_CEIL}% ceiling`);
+
+    /* NO INVASION. Once four regions are open (Lv 20) no single species may
+       hold more than 30% of a map. The Tower's Gastly was 40-47% of it on its
+       opening level: its rows froze a rarity mix 74% band B, and on that
+       level the only B species alive were four. FireRed's tower is Gastly on
+       75-90% of encounters, so the cast LEADING is right; a third of the map
+       from one creature, with four regions to draw on, is not. Measured at
+       27.2% after the tower's weights were rebalanced; verified by putting
+       the old weights back (39.8%). */
+    let crowd = 0, crowdAt = "";
+    for (const b of BIOMES) {
+      for (let lv = Math.max(b.level ?? 1, GEN_UNLOCK[4]); lv <= MAX_LEVEL; lv++) {
+        const rows = encounterTable(b, lv)
+          .filter((r) => !LEGENDARY.includes(r[0]) && !COSTUMED.has(r[0]));
+        const total = rows.reduce((n, r) => n + r[1], 0);
+        for (const r of rows) {
+          if (r[1] / total > crowd) { crowd = r[1] / total; crowdAt = `${speciesById(r[0]).name} in ${b.id} at Lv ${lv}`; }
+        }
+      }
+    }
+    assert.ok(crowd <= 0.30,
+      `${crowdAt} is ${(100 * crowd).toFixed(1)}% of the map - with four regions open no ` +
+      "one species should be a third of anywhere");
+    console.log(`no invasion ok — from Lv ${GEN_UNLOCK[4]} the most any one species holds is ` +
+      `${(100 * crowd).toFixed(1)}% (${crowdAt})`);
+
+    /* A GENERATION EASES IN. Johto used to take HALF of every map on the
+       level it opened, split among three or four species - Pichu 31.8% of
+       the Power Plant, Sentret and Hoothoot 16% each of Tall Grass. With
+       `GEN_RAMP` the most any generation takes on its opening level is 6.4%
+       (Johto in Tall Grass); 10% is the bound, and it is written against the
+       measurement rather than the constant, because the ramp is what is under
+       test. Verified by setting the ramp to 1 from the first level. */
+    let arrive = 0, arriveAt = "";
+    for (const g of gens.slice(1)) {
+      const lv = GEN_UNLOCK[g];
+      for (const b of BIOMES) {
+        if (lv < (b.level ?? 1) || lv > MAX_LEVEL) continue;
+        const rows = encounterTable(b, lv)
+          .filter((r) => !LEGENDARY.includes(r[0]) && !COSTUMED.has(r[0]));
+        const total = rows.reduce((n, r) => n + r[1], 0);
+        const share = rows.filter((r) => rowGen(r) === g).reduce((n, r) => n + r[1], 0) / total;
+        if (share > arrive) { arrive = share; arriveAt = `gen ${g} in ${b.id} at Lv ${lv}`; }
+      }
+    }
+    assert.ok(arrive <= 0.10,
+      `${arriveAt} takes ${(100 * arrive).toFixed(1)}% of the map on the level it opens - ` +
+      "a new generation should ease in, not flood the map with its three species");
+    console.log(`arrival ok — no generation takes more than ${(100 * arrive).toFixed(1)}% ` +
+      `of a map on the level it opens (${arriveAt})`);
+
+    /* NOTHING IS IMPOSSIBLE TO FIND - asked for in those words when the
+       generation rules changed, and the one promise every spawn retune has to
+       keep. A species you can only EVOLVE into is reached through its base, so
+       the rule binds on what nothing evolves into (and on wild forms, which
+       carry no row): each must turn up at least once in a playthrough's worth
+       of encounters on its best map at the level cap, or sit on a rod.
+
+       ON A ROD COUNTS, and the audit that motivated this forgot it: Dratini
+       reads 1 in 6,307 walking Pond & Shore and is 1 bite in 37 on the Super
+       Rod. A rule that ignored the rods would have demanded a fix for a
+       species that was never hard to get. */
+    const PLAYTHROUGH = 50000 * ENCOUNTER_RATE;
+    const evolvesInto = new Set(EVOLUTIONS.map((e) => e.to));
+    const onRod = new Set(RODS_ALL.flatMap((r) => r.table.map(([id]) => id)));
+    const bestAt = new Map();
+    for (const b of BIOMES) {
+      const rows = encounterTable(b, MAX_LEVEL);
+      const total = rows.reduce((n, r) => n + r[1], 0);
+      for (const [id, w] of rows) bestAt.set(id, Math.max(bestAt.get(id) ?? 0, w / total));
+    }
+    const lost = SPECIES.filter((sp) =>
+      !LEGENDARY.includes(sp.id) && !COSTUMED.has(sp.id)
+      && (!isForm(sp.id) || sp.wild)
+      && (!evolvesInto.has(sp.id) || sp.wild)
+      && !onRod.has(sp.id)
+      && (bestAt.get(sp.id) ?? 0) < 1 / PLAYTHROUGH);
+    assert.equal(lost.length, 0,
+      `${lost.length} species cannot be found in a playthrough: ` +
+      lost.slice(0, 12).map((sp) => `${sp.name} 1 in ${Math.round(1 / (bestAt.get(sp.id) || 1e-9))}`).join(", "));
+    const hardest = [...bestAt].filter(([id]) => !LEGENDARY.includes(id) && !COSTUMED.has(id)
+      && !evolvesInto.has(id) && !onRod.has(id)).sort((a, c) => a[1] - c[1])[0];
+    console.log(`findable ok — every base form turns up within a ${Math.round(PLAYTHROUGH)}-encounter ` +
+      `playthrough or on a rod; hardest walking find is ${speciesById(hardest[0]).name} ` +
+      `at 1 in ${Math.round(1 / hardest[1])}`);
   }
 
   /* BAND BUDGETS: a map's rarity mix must not move when content is added.
@@ -4659,7 +4826,9 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
    what "hunt where it lives" is supposed to mean. The primary type is the home;
    a later type is a haunt. */
 {
-  assert.ok(LEGEND_HOME > LEGEND_HAUNT && LEGEND_HAUNT > LEGEND_STRAY,
+  /* HAUNT >= STRAY, not >: both are zero now - a legendary lives on the map
+     that shares its PRIMARY type and nowhere else. Kept as dials. */
+  assert.ok(LEGEND_HOME > LEGEND_HAUNT && LEGEND_HAUNT >= LEGEND_STRAY,
     "the three legendary tiers are not in order");
 
   /* ITS SHARE OF THE LEGENDARY POOL, not of the table. `LEGEND_SHARE` is a
@@ -4692,6 +4861,21 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   /* THE ONE THAT WAS WRONG, named directly: an ice bird belongs in the ice
      cave, and sharing Flying with the starting map must not make that map its
      equal. */
+  /* AND ONLY THERE. A legendary spawns on the maps that share its PRIMARY
+     type and on no other - the finished table, not the tier function, because
+     `LEGEND_HAUNT` is a dial and the rule is the decision. Measured before:
+     107 of 130 called two to six maps home, the Safari Zone carried 85 and
+     met one every 40 encounters. Verified by putting `LEGEND_HAUNT` back to
+     0.15. */
+  for (const b of BIOMES) {
+    for (const [id] of encounterTable(b, MAX_LEVEL)) {
+      if (!LEGENDARY.includes(id)) continue;
+      assert.ok(b.types.includes(speciesById(id).types[0]),
+        `${speciesById(id).name} spawns in ${b.name}, which does not share its primary ` +
+        `type (${speciesById(id).types[0]}) - a legendary lives where its first type does`);
+    }
+  }
+
   const frost = BIOMES.find((b) => b.id === "frost");
   const meadow = BIOMES.find((b) => b.id === "meadow");
   assert.equal(legendTier(144, frost.types), LEGEND_HOME, "Articuno has no home");
@@ -5489,7 +5673,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
    roster. */
 {
   const per = BIOMES.map((b) => LEGENDARY.filter((id) =>
-    speciesById(id).types.some((t) => b.types.includes(t))).length);
+    legendTier(id, b.types) > 0).length);
   /* A FISH NEEDS WATER TO BE IN, and both halves of that are checkable.
 
    Reported as wanting the tables accurate per type, with the distinction drawn

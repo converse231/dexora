@@ -2277,7 +2277,34 @@ exactly what rank 10 used to be: `catchMult` .06→.03, `rarityPower` .04→.02
 `sellScale` .04→.02, `priceScale` .02→.01, `xpScale` .08→.04, and the five
 `effect()` strings that quote them. Miss one and the ceiling moves without
 anything failing — the numbers stay monotone, which is all the suite checks.
-The design number is **49 points against 100 ranks**, asserted directly.
+The design number is **74 points against 100 ranks** (49 at the old cap of
+50), asserted directly.
+
+**THE CAP WENT TO 75, AND BANKED XP IS OWED.** Asked for because at 50 the YOU
+panel stopped: a trainer at the cap had nothing left to earn. 101 would have let
+every stat max and erased the choice; 75 is 74 points, about three and a half
+stats of five. `LEVEL_XP` was APPENDED - the first thirty rows are frozen and
+the next twenty untouched - and the new rows grow 3% a level where 30-50 grew
+7.5%, on a measurement: at ~11.5 XP a catch, carrying 7.5% on made Lv 75
+168,000 steps past Lv 50 even catching everything, three and a half whole
+playthroughs, which is the "stuck" this fixed arriving later. At 3% it is
+~86,000 (Lv 60 in ~22,000).
+
+**`paid` IS THE HIGHEST LEVEL WHOSE REWARD HAS BEEN PAID, AND IT HAD TO BE
+STORED.** XP was never clamped at the cap, so a trainer who kept playing arrives
+at the new table already past 50 - and rewards were paid only when a GAIN
+crossed a level, while the level (and so the points) is derived from XP. Without
+the field they would load into Lv 58 with the points and none of the balls. An
+old save is taken as paid up to its level capped at `LEGACY_CAP` (50, what it
+really received); `payLevels()` is the one payer, called by every gain and once
+at boot with its banner. tools/play drives a save owed 51-58, reloads it (paid
+once, never twice) and loads a Lv 30 one (owed nothing); each half verified by
+putting its bug back.
+
+**AND `MASTER_EVERY` WENT 8 -> 10**, because the Master Ball total is held to a
+band (8-12 a whole game, "not so many that a Snorlax is worth one") and 75 / 8
+plus walking's four was 13. A ball already paid is never taken back; a new
+trainer gets five by Lv 50 instead of six, and two more past it.
 
 **EVOLUTION IS CANDY AND A LEVEL, and there is no feed any more.** `evolve`
 takes ONE `uid`, checks `evolveState(mon, bag, row)`, and mutates that entry in
@@ -2740,8 +2767,8 @@ its teeth: `w ** 0.6` more than doubles 0.08 while a weight-22 Pidgey falls to a
 quarter of itself.
 
 **The Master Ball divisor is derived from the level cap, not chosen.**
-`level % 15` in `levelReward` exists to make "three in a whole game" true at
-`MAX_LEVEL` 50; it was `% 10` at 30. Move the cap and this moves with it, or the
+`MASTER_EVERY` in `levelReward` exists to keep the whole-game total in its band
+at `MAX_LEVEL` - 8 at 50, 10 at 75, and `% 15` / `% 10` in older eras. Move the cap and this moves with it, or the
 rarest item in the game quietly quintuples — which is exactly what the economy
 suite caught when the cap went up.
 
@@ -3592,6 +3619,135 @@ or `balance` gives it `BAND_FLOOR` and the new band dilutes the mix the map was
 tuned around - that put Ember's A band 2.7 points out against a 2.5 bound whose
 own note says "if this ever needs 4, the homing is what to look at, not this
 number".
+
+**AND THEN GEN 1 GOT A FLOOR: THE HEADLINER SHARE.** Equal generations made
+every place read like every other place by Lv 50. FireRed's Pokemon Tower is
+Gastly on 75-90% of encounters and under a flat 1/N Gastly was 8% of it, with
+Misdreavus - Gen 2's only ghost, so the owner of Gen 2's whole slice - nearly
+as common. Asked for as a share off the top at **20%**, *"so that there is more
+pool for other generations"*.
+
+**GEN 1 IS THE CAST, NOT A LIST.** Every map's hand-written residents are its
+FireRed cast and all of them are Kanto, so a map's classic cast is its Gen 1 -
+nothing per map to keep in step. `genShare(gen, n)` is the one rule: Gen 1 gets
+`max(1/n, HEADLINE)` and the rest split what is left equally.
+
+**A FLOOR, NOT A FIXED SHARE**, and that is what keeps it continuous: at five
+open generations or fewer a fair share is already 20% or more, so nothing moves
+before Gen 6 arrives at Lv 35. A fixed 20% would have SHRUNK Gen 1 at Lv 1-29,
+where it is the only or the largest generation. At Lv 50 Gen 1 is 19.4-19.9% of
+every map (legendaries and costumes are appended on top, which is the gap to
+20%) and every other generation 9-11%, where it was 11.1% each.
+
+**IT LIVES IN THE FIT'S GENERATION STEP**, never bolted on afterwards: the fit
+always finishes on the band step, so band budgets did not move by a hundredth.
+Raising the cast after the fit would have dragged each map's rarity mix towards
+whatever its cast happens to be. check.mjs's generation suite measures against
+`genShare` rather than 1/N, and a separate floor assertion reads the finished
+table at Lv 50. **Verified by disconnecting the fit from `genShare`** - *"power
+gen 1 at Lv 45 (10.9% against a fair 20.0%)"*. Zeroing `HEADLINE` was tried
+first and proves nothing, because the floor assertion reads the same constant:
+**a test that moves with the thing it tests is not a test.**
+
+**AND THEN THE DIVERSITY PASS, WHICH ANSWERED A FEAR WITH A MEASUREMENT.**
+Asked for as an audit - *"I fear the state that we currently have will cause
+redundancies instead of diversity of wild encounters"* - and the fear was right,
+in a place nobody was looking. Across maps there was little repetition (638
+species live on exactly one map); INSIDE maps a thin generation was loud.
+Johto took HALF of every map the level it opened, split among its three or four
+fitting species: **Pichu 31.8% of the Power Plant at Lv 12**, Sentret and
+Hoothoot 16% each of Tall Grass. Later the same shape one generation at a time:
+Fennekin 8.3% of Ember, Clauncher 8.4% of Pond & Shore. 44 map-levels had a
+non-Kanto species at 8% or more. Four rules, each prototyped in a throwaway copy
+of this module and measured before it shipped:
+
+| rule | what | measured |
+|---|---|---|
+| `GEN_RAMP` | a generation's weight climbs over 10 levels from the one that opens it (`RAMP_MIN` keeps it present) | the most any generation takes on its opening level is 6.4%; with the ramp off, 35.8% |
+| roster | a generation's weight is how many of its species live on that map (linear - `sqrt` was swept and gave more thin-generation spikes, 17.1% against 14.2%) | a map leans towards the regions that actually have its types |
+| `SPECIES_CAP` | no line outside the cast above 6% of a map | 0 map-levels over, worst 6.0%, against 44 at 8%+ and a worst of 31.8% |
+| legendaries | home on the PRIMARY type only (`LEGEND_HAUNT` 0), `LEGEND_CEIL` 1.2% | every named legendary is exactly 1 in 3,333 on its home map; each map holds 8-60 |
+
+**`genShares` IS THE ONE ANSWER TO WHAT A GENERATION IS OWED**, and `genTargets`
+counts a table's rows into it - the fit and check.mjs both call it, so the rule
+and its assertion cannot disagree. It also owes no generation more than 6% per
+species it has on the map, which is how a generation with one fitting species
+stops handing that species its whole slice.
+
+**THE CAP TOOK FOUR SHAPES AND THE FIRST THREE ARE THE LESSON.** Capping after
+the fit and spilling within the band handed a just-opened Gen 5 **19.8% of the
+Power Plant against 2.5%**. Clamping rows INSIDE the fit's generation step gave
+the clamped parent's excess to its own evolutions. Turning the written weight
+down and refitting could not reach a species alone in its (band, generation)
+cell - its cell's mass IS its share - and bought 0.1 of a point for three times
+the cost. And holding whole lines inside the fit made band, generation and cap
+fight each other with a loser: the generation step pushed mass into the Power
+Plant's C band every round and the band step took it back, a quarter as much
+each time, until **Plusle, Minun, Emolga, Yamper and Mareep were 10^-28 of the
+map** - caught by the findability assertion, which was written minutes earlier
+for exactly that.
+
+**WHAT SHIPPED RANKS THE THREE instead of letting them fight: band mix, then cap,
+then generation.** The fit runs as it always did, then `capLines` holds any line
+(slot 5 is the resident an overlay row grew from, so a parent and its evolutions
+move together) at the cap and gives the excess to its OWN band: generations still
+short of their target first, only up to what each is short; then the cast; then
+anyone. Every row there only grows or is held, so nothing can be driven to zero,
+and **held stays held** - two capped lines otherwise hand their excess back and
+forth forever. The band mix does not move by a hair.
+
+**AND THEN THE GASTLY INVASION, WHICH WAS THREE THINGS.** The Tower came out
+**47% Gastly on its opening level** (feels like 4 species), reported in those
+words. It already had every Gen 2-4 ghost and dark there is, so adding residents
+was not the lever. What was:
+
+- **Its own weights set its rarity mix.** `BAND_SHAPE` is frozen from the rows,
+  and every later ghost written at 8-10 in band B made the tower 74% B - while on
+  Lv 20 the only B species alive were four. The later ghosts' own spawn barely
+  depends on their written weight, so they went to 5 and the weight moved to the
+  A and C residents the early tower has (Misdreavus, Sableye, Shuppet).
+- **`CAST_CEIL`, the cap's mirror.** No Kanto species above 25% of a map. It is a
+  limit in `capLines` in its own right - bounding only the leftover missed that
+  the fit alone put Gastly at 34%. Where the cast is full and nobody else has
+  room, the non-Kanto cap SOFTENS for the held lines instead; check.mjs allows a
+  line over 6% only on a map-level where a cast species sits at the ceiling.
+- **Where the leftover goes, measured four ways.** Back to the held lines
+  everywhere softened the cap on 141 map-levels (Shieldon 14.2% of the Power
+  Plant). The whole band in proportion filled a generation that had JUST opened
+  to its cap (the Tower's Gen 4, 19.7% on arrival). "Never into the cast" in the
+  targets did the same through `genTargets` (15.9%). What shipped: short
+  generations up to their shortfall, then the cast below its ceiling, then soften.
+
+Result: **the tower opens Gastly 25%, Cubone 17%, Haunter 14%**, then non-Kanto
+ghosts at 6% each - FireRed's own trio leading, feels like 8 - and spreads to 28
+by Lv 50 at 64% ghost. `no invasion` asserts no species above 30% of any map from
+Lv 20; verified by switching the ceiling off (Gastly 35.6%). check.mjs treats Gen
+1's target as a FLOOR, and lets a generation come in short only when the cap is
+what held it.
+
+**NOTHING IS IMPOSSIBLE TO FIND, and that is asserted now rather than hoped.**
+Every species nothing evolves into (and every wild form) turns up at least once in
+a 3,500-encounter playthrough on its best map at the level cap, or sits on a rod.
+**The rod half is the part the audit forgot**: Dratini read 1 in 6,307 walking and
+is 1 bite in 37 on the Super Rod - a fix was proposed for a species that was never
+hard to get. Hardest walking find today: Eevee, 1 in 2,784.
+
+**CINDERPEAK DROPPED ROCK AND KEPT GROUND.** It shared 34% of its encounters with
+Mt Moon because both listed rock and ground. Rock went (Mt Moon's word), grass came
+in (Route 112's lower half is forest), and ground STAYED on a measurement: its own
+hand-written cast is ground-heavy, and dropping ground too made its opening table
+36% on-type against 59%, for one point less overlap. Now 18.5%.
+
+**Every one of these was verified by putting its bug back**: cap disconnected
+(Shieldon 15.4% of the Power Plant), ramp off (Gen 3 35.1% of Mt Moon on
+arrival), `LEGEND_HAUNT` 0.15 (Articuno in Tall Grass), roster disconnected from
+the fit (Safari Gen 4 23.3% against 0.9%), cast ceiling off (Gastly 35.6%).
+
+**WHAT IT CANNOT DO is make a Kanto species the commonest on a map with a big
+Kanto cast.** Tall Grass's 20% is split over a dozen commons, so Pidgey is
+2.5% beside Sentret and Hoothoot; the Tower's is mostly one line, so Gastly is
+14.7%. That is the cast's own shape, and the lever for any single species is
+its written weight inside Gen 1.
 
 **`fitShares` FITS TWO MARGINALS, because neither may give way.** The band mix
 per map is the design and so is an even spread of generations, and no single

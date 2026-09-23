@@ -73,7 +73,7 @@ function tick(ms = 16, steps = 1) {
 }
 
 const { createEngine } = await import("../src/game/engine.js");
-const { BALLS, berryById } = await import("../src/game/items.js");
+const { BALLS, berryById, levelReward } = await import("../src/game/items.js");
 const { PHASES, phaseAt } = await import("../src/game/clock.js");
 const {
   wildBand, biomeFor, bornLevel, SIZE_MIN, SIZE_MAX,
@@ -96,6 +96,11 @@ const SAVE = {
   money: 50000,
   candy: 0,
   xp: 60000,
+  /* Paid for every level it has, so a test about something else does not
+     open on a level-up banner - 60,000 XP was the old Lv 50 cap and is Lv 60
+     now, and an unpaid save is owed 51-60 at boot. The back-pay has its own
+     test below. */
+  paid: 75,
   steps: 4000,
   caught: 0,
   areaId: "meadow",
@@ -1736,6 +1741,51 @@ function until(e, what, label, max = 2000) {
 
   console.log(`tier growth ok — a ${OLD.length}-tier save loads onto ${TIERS.length}, ` +
     "old rows intact, new rows empty, all of them written back");
+}
+
+/* THE CAP ROSE AND BANKED XP IS OWED, EXACTLY ONCE. XP was never clamped at
+   Lv 50, so a trainer who kept playing arrives at 75's table already past 50 -
+   and rewards were paid only on a GAIN that crossed a level, so without `paid`
+   they would load with the points (derived from level) and none of the balls.
+   Three saves: one owed, the same one reloaded, and one under the old cap. */
+{
+  const { levelFromXp, LEVEL_XP } = await import("../src/game/biomes.js");
+  const xp = LEVEL_XP[57];                     // exactly Lv 58
+  const owed = {};
+  for (let lv = 51; lv <= 58; lv++) {
+    for (const [id, n] of Object.entries(levelReward(lv))) owed[id] = (owed[id] ?? 0) + n;
+  }
+  const old = { ...SAVE, xp };
+  delete old.paid;                             // written before the field existed
+  const first = boot(old).e;
+  assert.equal(levelFromXp(first.state.xp), 58, "the fixture is not at Lv 58");
+  assert.equal(first.state.paid, 58, "a save owed levels 51-58 was not paid up to 58 at boot");
+  for (const [id, n] of Object.entries(owed)) {
+    assert.equal(first.state.bag[id] ?? 0, (SAVE.bag[id] ?? 0) + n,
+      `${id}: the back-pay for levels 51-58 did not land`);
+  }
+  assert.ok(first.state.cheers.some((c) => c.kind === "level"),
+    "levels were paid in silence - the banner is how a player learns the cap rose");
+
+  // The same trainer, reloaded: nothing is paid twice.
+  await new Promise((r) => setTimeout(r, 600));
+  const saved = JSON.parse(store.get("meadow-route"));
+  assert.equal(saved.paid, 58, "the payment was not written to the save");
+  const again = boot(saved).e;
+  assert.deepEqual(again.state.bag, first.state.bag, "a reload paid the levels a second time");
+  assert.equal(again.state.cheers.length, 0, "a reload raised a level banner for nothing");
+
+  // Under the old cap: paid for exactly what it has, owed nothing.
+  const low = { ...SAVE, xp: LEVEL_XP[29] };   // Lv 30
+  delete low.paid;
+  const third = boot(low).e;
+  assert.equal(third.state.paid, 30, "a Lv 30 save was credited with levels it has not reached");
+  assert.deepEqual(third.state.bag, { ...third.state.bag, ...SAVE.bag },
+    "a save under the old cap was paid something at boot");
+  assert.equal(third.state.cheers.length, 0, "a save under the old cap opened on a banner");
+
+  console.log(`level cap ok — banked XP past Lv 50 is paid once at boot (51-58: ` +
+    `${Object.entries(owed).map(([id, n]) => `${n} ${id}`).join(", ")}), never twice, and never below the old cap`);
 }
 
 /* A TIER'S IDLE MUST NEVER OUTRANK THE ANIMATION THAT ENDS AN ENCOUNTER.

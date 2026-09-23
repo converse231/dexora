@@ -13,8 +13,8 @@
    - the ceiling has not moved, the road to it is twice as long and has twice as
    many decisions on it. The level curve was extended to 50 to pay for them.
 
-   The one number the whole design rests on: 49 points against 100 ranks of
-   capacity. Being unable to have it all is the only thing that makes the choice
+   The one number the whole design rests on: 74 points against 100 ranks of
+   capacity (49 while the cap was 50). Being unable to have it all is the only thing that makes the choice
    mean anything, and check() asserts that inequality directly. Nothing here is
    respeccable for the same reason.
 
@@ -25,8 +25,9 @@
 
 export const MAX_RANK = 20;
 
-/* One point per level after the first. Level 50 is MAX_LEVEL, so 49 in total
-   against 100 ranks of capacity. */
+/* One point per level after the first. Level 75 is MAX_LEVEL, so 74 in total
+   against 100 ranks of capacity - it was 50 and 49, and a trainer at that cap
+   had nothing left to earn. Still short of 100 on purpose. */
 export const earnedPoints = (level) => Math.max(0, level - 1);
 
 export const STATS = [
