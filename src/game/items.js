@@ -685,9 +685,15 @@ export function onShelf(items, level) {
 
 /* Levelling pays out in balls. It is the same pacing the old area locks were
    doing, but it hands you something instead of taking somewhere away. */
-/* Every this many levels pays a Master Ball: 50 / 8 is six over the cap.
-   A divisor rather than a list, so the cap is the only number that decides. */
-export const MASTER_EVERY = 8;
+/* Every this many levels pays a Master Ball: 75 / 10 is seven over the cap.
+   It was 8 while the cap was 50 (six), and keeping 8 at 75 made a whole game
+   13 with walking's four - one over the 8-12 band check.mjs holds the total
+   to, the band being the design ("enough to cover the legendaries and a few
+   over, not so many that a Snorlax is worth one"). Ten puts it at 11. A ball
+   already paid is never taken back; a new trainer gets five by Lv 50 instead
+   of six, and two more past it. A divisor rather than a list, so the cap is
+   the only number that decides. */
+export const MASTER_EVERY = 10;
 
 export function levelReward(level) {
   const items = { "poke-ball": plain(5, level) };

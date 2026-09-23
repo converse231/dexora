@@ -792,7 +792,11 @@ export const tiersFor = (id) => {
    hunting is preserved exactly; over it, everything scales down together and
    the RATIO still holds. */
 export const LEGEND_EACH = 0.0003;   // ~1% across today's 34, and it stays put
-export const LEGEND_CEIL = 0.025;    // the world must not fill with them
+/* 1.2%, down from 2.5%. With homes on the primary type only, the ceiling
+   binds on exactly one map - the Safari Zone, home to 60 - and it is what
+   stops the broadest map being the one where legendaries are commonplace:
+   1 in 83 there rather than 1 in 55, against 1 in 95-420 everywhere else. */
+export const LEGEND_CEIL = 0.012;    // the world must not fill with them
 export const LEGEND_SHARE = 0.01;    // what it comes to today; read, never set
 export const LEGEND_MATCHED = 0.5;
 /* A STRAY IS MEANT TO BE A STORY, and at 0.08 it was merely uncommon.
@@ -846,7 +850,15 @@ export const LEGEND_STRAY = 0;
    Grass and 0.03 elsewhere - so the ice bird lives in the ice cave and can
    still turn up anywhere, which is what this rule was always for. */
 export const LEGEND_HOME = 0.5;
-export const LEGEND_HAUNT = 0.15;
+/* AND A HAUNT IS ZERO NOW, for the reason the stray went: a secondary type is
+   not where a Pokemon lives. Measured before the change, 107 of 130
+   legendaries called two to six maps home, so the Safari Zone carried 85 of
+   them and met one every 40 encounters while Ember met one every 208 - the
+   rate followed how many type words a map had, not anything about the place.
+   On the primary alone every legendary still has a home (0 orphaned,
+   measured), each map holds 8-60, and a named one is worth exactly
+   `LEGEND_EACH` wherever it lives. Kept as a dial, like `LEGEND_STRAY`. */
+export const LEGEND_HAUNT = 0;
 
 /* What one legendary is worth in one place. Exported because it is the RULE,
    and the rule is the only thing worth asserting: a legendary's share of a
@@ -1115,7 +1127,15 @@ const RESIDENTS = [
        way down, and Route 112 is a mountainside with ash on it - Machop and
        Geodude and Zubat live here too, and the Fire types are the ones nearer
        the summit. Four types rather than Ember's one is the difference. */
-    types: ["fire", "rock", "ground", "fighting"],
+    /* AND NOT ROCK, WHICH IS MT MOON'S WORD - BUT STILL GROUND. With rock
+       in the list this map shared 34% of its encounters with Mt Moon, two
+       places reading as one. Route 112's lower half is forest (the minimap
+       reads it off the tiles), so grass came in. Ground stays, measured: the
+       hand-written cast is ground-heavy - Numel, Sandshrew, Diglett, Phanpy,
+       Camerupt - and dropping it too made the map's own opening table 36%
+       on-type against 59% with it, for 1 point less overlap. Fire, ground,
+       fighting and grass: Mt Moon overlap 18.5%, no legendary orphaned. */
+    types: ["fire", "ground", "fighting", "grass"],
     table: [
       [322, 20], [66, 16], [41, 15], [218, 14], [74, 12], [27, 10], [50, 9],
       [109, 8], [325, 8], [324, 6], [240, 5], [111, 5], [95, 4], [219, 4],
@@ -1221,12 +1241,23 @@ const RESIDENTS = [
        whatever `GEN_HOME_MIN` finds that shares a type. Gen 2's only ghost is
        Misdreavus, and at weight 8 the filler's Houndour took 17% of the
        tower; 24 hands that slice back to the ghost. Sableye does the same for
-       Gen 3's A band. */
+       Gen 3's A band.
+
+       AND THE WEIGHTS SET THE TOWER'S RARITY MIX, WHICH IS WHAT MADE IT A
+       GASTLY INVASION. `BAND_SHAPE` is frozen from these rows, and with every
+       later ghost written at 8-10 in band B the tower was 74% B - but on its
+       opening level the only B species alive are Gastly, Cubone, Duskull and
+       Houndour, so four species had to fill three quarters of the map and
+       Gastly came out 40-47%. The later ghosts' own spawn barely depends on
+       their written weight (a weight is a rank within its cell), so they
+       drop to 5 and the weight moves to the A and C residents the early tower
+       actually has - Misdreavus, Sableye, Shuppet. Opening level: Gastly 27%,
+       feels like 9 species against 5; Lv 50 still 64% ghost. */
     types: ["ghost", "dark"],
     table: [
       [92, 40], [93, 8], [104, 8],
-      [200, 24], [302, 6], [353, 10], [355, 10], [425, 10], [442, 5],
-      [562, 10], [607, 10], [708, 8], [710, 8], [769, 10], [854, 10], [971, 10],
+      [200, 30], [302, 16], [353, 24], [355, 10], [425, 10], [442, 5],
+      [562, 5], [607, 5], [708, 5], [710, 5], [769, 5], [854, 5], [971, 5],
     ],
   },
   {
@@ -1878,7 +1909,7 @@ function balance(rows, shape) {
   for (const [k, members] of bands) {
     const have = members.reduce((n, r) => n + r[1], 0);
     const scale = ((want.get(k) / budget) * total) / have;
-    for (const r of members) out.push([r[0], r[1] * scale, r[2], r[3], r[4]]);
+    for (const r of members) out.push([r[0], r[1] * scale, r[2], r[3], r[4], r[5]]);
   }
   return out;
 }
@@ -1937,10 +1968,186 @@ function balance(rows, shape) {
    is the parent's map presence that put it there. */
 const lineGen = (r) => r[4] ?? genOf(r[0]);
 
+/* THE HEADLINER SHARE: EVERY MAP'S CLASSIC CAST IS AT LEAST A FIFTH OF IT.
+
+   Equal generations made every place feel like every other place by Lv 50.
+   The Pokemon Tower is Gastly - 75-90% of FireRed's encounters on every floor -
+   and under a flat 1/N it was Gen 1's 11.1% like everything else, so Gastly
+   came out 8% of the tower and Misdreavus, Gen 2's only ghost, was nearly as
+   common. Mt Moon's Zubat, the Safari Zone's Kanto cast and the Power Plant's
+   Magnemite had the same fate. Asked for as a share off the top at 20%, "so
+   that there is more pool for the other generations".
+
+   GEN 1 IS THE CAST, NOT A LIST. Every map's hand-written residents are its
+   FireRed cast and every one of them is Kanto, so the classic cast of a map is
+   its Gen 1 - its own rows, their evolutions (slot 4 carries the line) and
+   whatever Gen 1 species the homing sent there. No per-map list to keep in
+   step with the tables.
+
+   A FLOOR, NOT A FIXED SHARE, which is what makes it continuous. At five open
+   generations or fewer a fair share is already 20% or more; from there Gen 1
+   holds 20% and the other generations share the rest by `genShares` below
+   (roster and arrival ramp, not equally any more). A fixed 20% would have
+   SHRUNK Gen 1 at Lv 1-29, where it is the only or the largest generation.
+
+   IT LIVES IN THE GENERATION STEP OF THE FIT, not bolted on after it. The fit
+   always finishes on the band step, so a map's rarity mix stays exactly what
+   it was tuned to; raising the cast afterwards would have moved the bands
+   towards whatever the cast happens to be. check.mjs's generation suite reads
+   this same function for its targets, so the rule and its assertion cannot
+   disagree about what fair is. */
+export const HEADLINE = 0.2;
+
+/* AND A GENERATION'S SHARE FOLLOWS WHAT IT HAS HERE, AND GROWS IN.
+
+   Equal shares made a thin generation loud. Johto opens at Lv 10 and took
+   HALF of every map on the spot, split among the three or four Johto species
+   that fit it - Pichu was 31.8% of the Power Plant at Lv 12, Sentret and
+   Hoothoot 16% each of Tall Grass. Later the same shape repeated one
+   generation at a time: Fennekin 8.3% of Ember, Clauncher 8.4% of Pond &
+   Shore, each the only one of its generation that fits. Reported as a fear
+   that wild encounters would be redundant rather than diverse, and measured
+   to be exactly that. Two levers, prototyped in a throwaway copy first:
+
+   **`GEN_RAMP`: a generation eases in.** Its weight climbs over this many
+   levels from the one that opens it, the way `evoScale` already thickens an
+   evolution - a region that arrives at full strength on one level-up is an
+   event that happens once; one that thickens for ten levels is the world
+   changing under you. `RAMP_MIN` is what keeps a newly-opened generation
+   present from its first level, which check.mjs asserts absolutely.
+
+   **The roster: how many of its species live here.** A generation with
+   twenty fitting species gets more of a map than one with three - which is
+   also what makes the map read as its type. Linear, not the square root it
+   started as: swept on the real tables, linear gave the fewest thin-generation
+   spikes (worst 14.2% against 17.1% with the cap softened) and the most
+   variety, because it is simply every species getting a similar chance.
+
+   Gen 1's `HEADLINE` floor sits on top, unchanged. This is the ONE function
+   that says what a generation is owed; the fit and check.mjs both call it. */
+export const GEN_RAMP = 10;
+export const RAMP_MIN = 0.1;
+
+export const genShares = (counts, level) => {
+  const raw = new Map();
+  let sum = 0;
+  for (const [g, n] of counts) {
+    const ramp = Math.max(RAMP_MIN,
+      Math.min(1, (level - (GEN_UNLOCK[g] ?? 1) + 1) / GEN_RAMP));
+    const w = Math.max(n, 1) * ramp;
+    raw.set(g, w);
+    sum += w;
+  }
+  const out = new Map([...raw].map(([g, w]) => [g, w / sum]));
+  if (out.size > 1 && out.has(1) && out.get(1) < HEADLINE) {
+    const rest = 1 - out.get(1);
+    for (const g of out.keys()) if (g !== 1) out.set(g, (out.get(g) * (1 - HEADLINE)) / rest);
+    out.set(1, HEADLINE);
+  }
+  return out;
+};
+
+/* What a table's own rows say each generation is owed - counted the way the
+   fit counts them: residents and homes, not the evolved overlay (a line is one
+   presence, however many stages of it are showing). Exported so check.mjs
+   measures against the same count. */
+export const rowGen = (r) => r[4] ?? genOf(r[0]);
+export const genTargets = (rows, level) => {
+  const counts = new Map();
+  for (const r of rows) {
+    if (LEGENDARY.includes(r[0]) || COSTUMES.includes(r[0])) continue;
+    const g = rowGen(r);
+    if (!counts.has(g)) counts.set(g, 0);
+    if (!r[2]) counts.set(g, counts.get(g) + 1);
+  }
+  // A generation only present as overlay rows still has a line here.
+  for (const [g, n] of counts) if (!n) counts.set(g, 1);
+  const out = genShares(counts, level);
+  /* AND NO GENERATION IS OWED MORE THAN ITS SPECIES CAN HOLD. A generation
+     with two species here can carry 12% of the map (2 x `SPECIES_CAP`) and
+     not a point more, counted over its RESIDENTS - its evolutions ride along
+     at their parent's ratio and are not seats of their own; what it
+     cannot carry goes to the generations that can, in proportion. Without
+     this the fit and the cap pull against each other forever - the first
+     version capped AFTER the fit, spilled the excess onto whatever else sat
+     in the band, and handed a Gen 5 that had just opened 19.8% of the Power
+     Plant against the 2.5% it was owed. */
+  const fixed = new Set();
+  for (let pass = 0; pass < out.size; pass++) {
+    let excess = 0;
+    for (const [g, t] of out) {
+      if (g === 1 || fixed.has(g)) continue;
+      const room = counts.get(g) * SPECIES_CAP;
+      if (t > room) { excess += t - room; out.set(g, room); fixed.add(g); }
+    }
+    if (excess <= 0) break;
+    /* TO EVERY GENERATION WITH ROOM, IN PROPORTION - the cast included. It
+       was briefly "never into the cast", which sent the whole excess to the
+       only other generation with room: on the Tower's opening level that was
+       a Gen 4 that had JUST opened, owed 3% and handed 15.9%. In proportion,
+       a ramping generation's share stays as small as its ramp. What made the
+       Tower a Gastly invasion was its rarity mix, not this - see its row. If
+       nobody has room, it goes back and the cap softens. */
+    const open = [...out].filter(([g]) => !fixed.has(g));
+    const base = open.reduce((n, [, t]) => n + t, 0);
+    if (base <= 0) {
+      const back = [...out].filter(([g]) => fixed.has(g));
+      const room = back.reduce((n, [, t]) => n + t, 0);
+      for (const [g, t] of back) out.set(g, t + (excess * t) / room);
+      break;
+    }
+    for (const [g, t] of open) out.set(g, t + (excess * t) / base);
+  }
+  return out;
+};
+
+/* NO ONE SPECIES CARRIES A MAP, UNLESS IT IS THE MAP'S OWN CAST.
+
+   The ramp and the roster took the worst case from 31.8% to 19% and left 28
+   cases of a non-Kanto species holding 8% or more of somewhere - the residue
+   the prototype could not reach, because a generation with ONE fitting
+   species hands that species its whole slice however the slice is sized.
+   `SPECIES_CAP` is the direct answer, and it lives in the TARGETS: no
+   generation is owed more than 6% per species it has here, so a generation
+   with one fitting species carries 6% of a map at most. Two other shapes were
+   tried and reverted. Capping after the fit spilled the excess onto whatever
+   shared the band and handed a just-opened Gen 5 19.8% of the Power Plant
+   against 2.5%. Clamping rows inside the generation step broke the evolution
+   rule - the clamped parent's excess went to its own evolutions, which
+   `EVO_SHARE` says are an eighth as common. And turning the WRITTEN weight
+   down and refitting could not reach a species alone in its (band,
+   generation) cell - its cell's mass is its share whatever it weighs - and
+   bought 0.1 of a point for three times the cost, so it went.
+
+   What shipped holds the cap in two places: the targets (a generation is
+   owed at most 6% per species it has here) and the fit's generation step,
+   which treats a resident and its evolutions as ONE line, holds a line at the
+   cap as a whole, and lets the surplus go to other generations. Measured over
+   every map at every level: from 44 cases of a non-Kanto species at 8% or
+   more, worst 31.8%, to none above 8.2% - the leftovers are the Power Plant
+   and the Tower, narrow maps where the final band step lifts every held line
+   a little.
+
+   Gen 1 is exempt, because its rows ARE the headliner cast: the tower's Gastly
+   at 15% is the point. The fit ends on the band step, which can lift a row a
+   little past the cap again; check.mjs bounds how far. */
+export const SPECIES_CAP = 0.06;
+
+/* AND THE CAST HAS A CEILING, THE CAP'S MIRROR. What no short generation can
+   take of a capped line's excess goes to the map's own Kanto cast - but no
+   cast species takes it past a quarter of the map. Beyond that the cap
+   SOFTENS instead: the capped lines keep what nobody else could hold. It binds
+   on exactly one place, the Tower's first levels, where the non-Kanto seats at
+   6% each cannot hold more than two thirds of the map and Gastly otherwise
+   carried 30-47% of it - reported as "the Gastly invasion". check.mjs allows a
+   line over the cap only where a cast species is at this ceiling. */
+export const CAST_CEIL = 0.25;
+
+
 const FIT_ROUNDS = 40;
 const FIT_TOL = 0.0005;
 
-function fitShares(rows, shape) {
+function fitShares(rows, shape, level) {
   if (!rows.length) return rows;
   let out = rows;
   for (let round = 0; round < FIT_ROUNDS; round++) {
@@ -1955,14 +2162,19 @@ function fitShares(rows, shape) {
     }
     if (gens.size < 2) return out;
 
-    const want = mass / gens.size;
+    /* Targets from `genTargets` - the roster, the ramp and the headliner
+       floor in one place, so check.mjs cannot disagree with the fit. */
+    const shares = genTargets(out, level);
+    const want = (g) => mass * (shares.get(g) ?? 0);
+
     let worst = 0;
-    for (const have of gens.values()) worst = Math.max(worst, Math.abs(have - want) / mass);
+    for (const [g, have] of gens) worst = Math.max(worst, Math.abs(have - want(g)) / mass);
     if (worst < FIT_TOL) return out;
 
     out = out.map((r) => {
-      const have = gens.get(lineGen(r));
-      return have > 0 ? [r[0], (r[1] * want) / have, r[2], r[3], r[4]] : r;
+      const g = lineGen(r);
+      const have = gens.get(g);
+      return have > 0 ? [r[0], (r[1] * want(g)) / have, r[2], r[3], r[4], r[5]] : r;
     });
   }
   /* ALWAYS LAND ON THE BAND STEP. The loop alternates, so running out of
@@ -1978,6 +2190,22 @@ function fitShares(rows, shape) {
 export const genOpen = (id, level) => level >= (GEN_UNLOCK[genOf(id)] ?? 1);
 
 export function encounterTable(biome, level = 1) {
+  const rolled = residents(biome, level);
+  const total = rolled.reduce((n, e) => n + e[1], 0);
+  const alive = (id) => genOpen(id, level);
+  /* Both are appended to the RESIDENT total, and both are scaled against the
+     share the two of them take together - so each is exactly its own share of
+     the finished table and neither moves when the other's roster grows. */
+  const taken = rareShare(LEGENDARY, alive, biome.types)
+              + rareShare(COSTUMES, alive, biome.types, eventTier);
+  return [...rolled,
+          ...rareFor(LEGENDARY, biome.types, total, alive, taken),
+          ...rareFor(COSTUMES, biome.types, total, alive, taken, eventTier)];
+}
+
+/* The residents and their evolved overlay, fitted - everything but the two
+   appended families, which `encounterTable` adds against this total. */
+function residents(biome, level) {
   const open = biome.table.filter(([id]) => genOpen(id, level));
   const weight = new Map(open);
   const extra = [];
@@ -1985,12 +2213,12 @@ export function encounterTable(biome, level = 1) {
      Carrying it one step only fixed Tangela -> Tangrowth and left
      Mareep -> Flaaffy -> Ampharos broken, because the third link read
      Flaaffy's own tier instead of the band Flaaffy had inherited. */
-  let front = open.map((r) => [r[0], bandOf(r), genOf(r[0])]);
+  let front = open.map((r) => [r[0], bandOf(r), genOf(r[0]), r[0]]);
 
   for (let depth = 1; depth <= EVO_DEPTH && front.length; depth++) {
     const scale = evoScale(level, depth);
     const next = [];
-    for (const [id, band, gen] of front) {
+    for (const [id, band, gen, root] of front) {
       for (const to of NEXT.get(id) ?? []) {
         /* A FORM IS NEVER WILD. Mega, Primal and Gigantamax are evolution
            targets, and this overlay walks the evolution graph out from whatever
@@ -2008,11 +2236,13 @@ export function encounterTable(biome, level = 1) {
           weight.set(to, w);
           // Slot 3 is the band it competes in: its PARENT's, so `balance`
           // cannot separate an evolution from what it evolves from.
-          if (scale > 0) extra.push([to, w * scale, depth, band, gen]);
+          // Slot 5 is the resident this line grew from - see `fitShares`.
+          if (scale > 0) extra.push([to, w * scale, depth, band, gen, root]);
         }
         // A hand-written row keeps its own band AND its own generation, and
         // passes both on - it is a resident here in its own right.
-        next.push([to, known ? bandOf(to) : band, known ? genOf(to) : gen]);
+        next.push([to, known ? bandOf(to) : band, known ? genOf(to) : gen,
+                   known ? to : root]);
       }
     }
     front = next;
@@ -2020,18 +2250,115 @@ export function encounterTable(biome, level = 1) {
   /* Residents, then the evolved overlay, and the legendaries LAST - scaled to
      whatever the first two came to, so their share of the roll is the same on
      every map at every level whatever else has been added. */
-  const rolled = fitShares(extra.length ? [...open, ...extra] : open,
-                           BAND_SHAPE.get(biome.id) ?? {});
-  const total = rolled.reduce((n, e) => n + e[1], 0);
-  const alive = (id) => genOpen(id, level);
-  /* Both are appended to the RESIDENT total, and both are scaled against the
-     share the two of them take together - so each is exactly its own share of
-     the finished table and neither moves when the other's roster grows. */
-  const taken = rareShare(LEGENDARY, alive, biome.types)
-              + rareShare(COSTUMES, alive, biome.types, eventTier);
-  return [...rolled,
-          ...rareFor(LEGENDARY, biome.types, total, alive, taken),
-          ...rareFor(COSTUMES, biome.types, total, alive, taken, eventTier)];
+  return capLines(fitShares(extra.length ? [...open, ...extra] : open,
+                            BAND_SHAPE.get(biome.id) ?? {}, level), level);
+}
+
+/* THE SPECIES CAP, RANKED UNDER THE BAND MIX AND ABOVE THE GENERATION TARGET.
+
+   Band, generation and cap cannot always all hold, and the one ordering that
+   is safe is to say which gives way. Holding lines at the cap INSIDE the fit
+   let the three fight, and the fight had a loser: every round the generation
+   step pushed mass into the Power Plant's C band and the band step took it
+   back, a quarter as much each time, until Plusle, Minun, Emolga, Yamper and
+   Mareep were 10^-28 of the map - caught by the findability assertion, which
+   is exactly what it is for.
+
+   So the fit runs as it always did, and this runs after it: a LINE (a
+   resident and the evolutions the overlay grew from it, slot 5) whose
+   resident passes `SPECIES_CAP` is scaled down as a whole, evolutions at
+   their ratio, and the excess goes to the rest of its OWN band - generations
+   still short of their `genTargets` first, then anyone outside the cast, then
+   the cast. Every row here only ever grows or is held, so nothing can be
+   driven to zero, and the band mix does not move by a hair. */
+function capLines(rows, level) {
+  const out = rows.map((r) => [...r]);
+  const lineOf = (r) => r[5] ?? r[0];
+  /* HELD STAYS HELD. A line at the cap takes no spill in a later pass, or two
+     capped lines hand their excess back and forth and never settle - the
+     first version left Duskull at 17.8% of the tower that way. */
+  const pinned = new Set();
+  for (let pass = 0; pass < 16; pass++) {
+    const total = out.reduce((n, r) => n + r[1], 0);
+    const cap = SPECIES_CAP * total;
+    const target = genTargets(out, level);
+    const genMass = new Map();
+    for (const r of out) genMass.set(rowGen(r), (genMass.get(rowGen(r)) ?? 0) + r[1]);
+    const short = (g) => (target.get(g) ?? 0) * total > (genMass.get(g) ?? 0);
+    const heads = new Map();
+    for (const r of out) if (r[0] === lineOf(r)) heads.set(r[0], r);
+    /* Two limits, one step: a line outside the cast stops at SPECIES_CAP, a
+       cast line at CAST_CEIL. The ceiling has to be a limit in its own right,
+       not only a bound on the leftover - the fit alone put the Tower's Gastly
+       at 34% before this ran. */
+    const over = new Map();          // line -> factor
+    for (const [l, h] of heads) {
+      const lim = (rowGen(h) === 1 ? CAST_CEIL : SPECIES_CAP) * total;
+      if (h[1] > lim * (1 + 1e-6)) over.set(l, lim / h[1]);
+    }
+    if (!over.size) break;
+    const bands = new Map();
+    for (const r of out) {
+      const k = bandOf(r);
+      if (!bands.has(k)) bands.set(k, []);
+      bands.get(k).push(r);
+    }
+    for (const members of bands.values()) {
+      const held = members.filter((r) => over.has(lineOf(r)));
+      if (!held.length) continue;
+      const free = members.filter((r) => !over.has(lineOf(r)) && !pinned.has(lineOf(r)));
+      if (!free.some((r) => r[1] > 0)) continue;   // a band of one line
+      let excess = 0;
+      for (const r of held) {
+        const f = over.get(lineOf(r));
+        excess += r[1] * (1 - f);
+        r[1] *= f;
+      }
+      for (const r of held) pinned.add(lineOf(r));
+      /* First to the generations still SHORT of their target - but only up
+         to what each is short, or a generation that had just opened, owed
+         2%, was handed 23.1% of the Power Plant as the only short one in
+         its band. The CAST is a generation like any other here: it takes the
+         excess only up to its own target, which `genTargets` never inflates
+         with anyone's leftovers. What no short generation has room for goes
+         to the CAST, and only a band with no cast in it softens the cap by
+         handing it back to the held lines. Three other homes were measured:
+         the held lines everywhere softened the cap on 141 map-levels
+         (Shieldon 14.2% of the Power Plant); the whole band in proportion
+         filled a generation that had JUST opened to its cap (the Tower's Gen
+         4, 19.7% on arrival); everyone outside the cast gave a new Gen 6 23.1%
+         of the Power Plant. The cast absorbing it is what made the Tower 47%
+         Gastly - and that was the tower's own weights, fixed in its row. */
+      for (const g of new Set(free.map(rowGen))) {
+        if (excess <= 0 || !short(g)) continue;
+        const mine = free.filter((r) => rowGen(r) === g);
+        const room = mine.reduce((n, r) => n + r[1], 0);
+        const give = Math.min(excess, (target.get(g) ?? 0) * total - (genMass.get(g) ?? 0));
+        if (room <= 0 || give <= 0) continue;
+        for (const r of mine) r[1] += (give * r[1]) / room;
+        genMass.set(g, (genMass.get(g) ?? 0) + give);
+        excess -= give;
+      }
+      const cast = free.filter((r) => rowGen(r) === 1 && r[1] < CAST_CEIL * total);
+      const castMass = cast.reduce((n, r) => n + r[1], 0);
+      if (excess > 0 && castMass > 0) {
+        let given = 0;
+        for (const r of cast) {
+          const add = Math.min((excess * r[1]) / castMass, CAST_CEIL * total - r[1]);
+          r[1] += add;
+          given += add;
+        }
+        excess -= given;
+      }
+      /* Nobody has room: a cap softens for the lines that were held - the
+         non-Kanto ones first, since the cast at its ceiling is the invasion
+         this exists to stop, and the cast only if nothing else was held. */
+      const soft = held.some((r) => rowGen(r) !== 1) ? held.filter((r) => rowGen(r) !== 1) : held;
+      const room = soft.reduce((n, r) => n + r[1], 0);
+      if (excess > 1e-12 && room > 0) for (const r of soft) r[1] += (excess * r[1]) / room;
+    }
+  }
+  return out;
 }
 
 /* Asked on every step that starts an encounter, and the answer only changes on
@@ -2067,7 +2394,8 @@ export const areaOpen = (areaId, level) => level >= areaLevel(areaId);
    capacity - and 29 points fills a stat every eleven levels, so the interesting
    half of the screen was over long before the dex was. Ranks are 20 deep now
    (see trainer.js) and the road is 20 levels longer to pay for them: 49 points
-   against 100 ranks, and 25,830 XP to the cap where it was 5,480.
+   against 100 ranks, and 25,830 XP to the cap where it was 5,480. (And then
+   to 75 - 74 points, 95,350 XP - below.)
 
    The first thirty rows are byte-identical to the old table on purpose. A save
    holds raw XP, so changing any of them would silently re-level every trainer
@@ -2079,6 +2407,21 @@ export const LEVEL_XP = [
   2500, 2740, 3000, 3280, 3580, 3900, 4250, 4630, 5040, 5480,
   5950, 6460, 7010, 7600, 8230, 8910, 9640, 10420, 11260, 12160,
   13130, 14170, 15290, 16490, 17780, 19170, 20660, 22260, 23980, 25830,
+  /* AND TO 75. Asked for because at 50 the YOU panel stops: 49 points
+     against 100 ranks meant a trainer at the cap had nothing left to earn.
+     74 points still cannot fill 100 ranks - about three and a half stats
+     maxed of five - so the choice survives; 101 would have erased it.
+     Appended only, so every existing trainer keeps their level - and the
+     step FLATTENS to 3% here, where 30-50 grew 7.5%. Measured at ~11.5 XP
+     a catch: carrying 7.5% on made Lv 75 168,000 steps past Lv 50 even
+     catching everything - three and a half whole playthroughs, which is the
+     "stuck" this was asked to fix, arriving later. At 3% it is ~86,000
+     (Lv 60 in ~22,000): post-game, a long goal, and a reachable one. XP was never clamped at the cap, so
+     a trainer who kept playing past 50 arrives with those levels already
+     earned - see `paid` in engine.js for why their rewards arrive too. */
+  27740, 29710, 31740, 33830, 35980, 38190, 40470, 42820, 45240, 47730,
+  50290, 52930, 55650, 58450, 61330, 64300, 67360, 70510, 73750, 77090,
+  80530, 84070, 87720, 91480, 95350,
 ];
 
 export const MAX_LEVEL = LEVEL_XP.length;

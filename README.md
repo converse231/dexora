@@ -393,8 +393,9 @@ the row already answers. The button now states what the next rank buys *before*
 you press it, the warning sits on the panel once instead of interrupting every
 click, and the row flashes afterwards so a spend is never silent.
 
-The whole design rests on one number: **49 points against 100 ranks of capacity**.
-You reach the level cap unable to have finished even three stats, so the screen
+The whole design rests on one number: **74 points against 100 ranks of capacity**
+(49 while the cap was Lv 50 - see *The cap went to 75* below). You reach the level
+cap unable to have finished four stats, so the screen
 is a series of refusals as much as choices — and `npm run check` asserts that
 inequality directly, because the day capacity drops below the points available is
 the day none of it means anything.

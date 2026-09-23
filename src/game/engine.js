@@ -130,6 +130,11 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 const START_AREA = AREA_IDS[0];
 
+/* The level cap every save before `paid` was written under. Not MAX_LEVEL:
+   that is the cap NOW, and the point is which levels an old save was actually
+   paid for. */
+const LEGACY_CAP = 50;
+
 function freshState() {
   return {
     areaId: START_AREA,
@@ -155,6 +160,13 @@ function freshState() {
     hint: null,
     steps: 0,
     xp: 0,
+    /* THE HIGHEST LEVEL WHOSE REWARD HAS BEEN PAID, and it has to be stored.
+       Rewards were paid only when a GAIN crossed a level, and the level is
+       derived from XP - so when the cap rose from 50 to 75, a trainer with XP
+       banked past 50 would load straight into Lv 58 with the points (derived)
+       and none of the balls, or the Master Ball at 56 (paid on crossing). This
+       is what says which crossings have happened. */
+    paid: 1,
     nextUid: 1,
     dry: 0,               // encounters since the last rare tier - see pityBoost
     /* One quest a day. `key` is the local date it belongs to, so a new day is
@@ -505,6 +517,12 @@ function loadState() {
          hint cannot sit in a save forever blocking its own slot. */
       hints: (Array.isArray(s.hints) ? s.hints : []).filter((h) => HINT_IDS.includes(h)),
       dry: Math.max(0, Math.floor(Number(s.dry) || 0)),
+      /* A save from before `paid` existed was paid for every level it had
+         reached, and never past the old cap of 50 - so that is where it
+         stands, and anything above is owed. Never above its own level, so no
+         save can claim to have been paid for levels it has not earned. */
+      paid: Math.min(levelFromXp(s.xp ?? 0),
+        Number.isInteger(s.paid) && s.paid >= 1 ? s.paid : Math.min(levelFromXp(s.xp ?? 0), LEGACY_CAP)),
       // A save from before dailies simply has none, and gets today's.
       daily: { ...freshState().daily, ...(s.daily ?? {}) },
       /* FIELD EFFECTS CHANGED SHAPE. They were a step COUNT per item id and
@@ -1533,10 +1551,18 @@ export function createEngine(canvas, onChange, mini = null) {
   /* Levelling hands out balls. Returns what was won, or null, so the caller can
      say so in whatever message it is already showing. */
   function gainXp(amount) {
-    const before = levelFromXp(state.xp);
     state.xp += Math.max(1, Math.round(amount * xpScale(state.stats)));
+    return payLevels();
+  }
+
+  /* EVERY LEVEL'S REWARD, EXACTLY ONCE, from `paid` up to the level the XP
+     says. Called by a gain and once at start - the second is what pays a
+     trainer whose banked XP carried them past the old cap. */
+  function payLevels() {
+    const before = state.paid ?? levelFromXp(state.xp);
     const after = levelFromXp(state.xp);
     if (after <= before) return null;
+    state.paid = after;
 
     const won = {};
     for (let lv = before + 1; lv <= after; lv++) {
@@ -1896,6 +1922,9 @@ export function createEngine(canvas, onChange, mini = null) {
 
   /* Before the first frame, so nobody ever SEES themselves stuck afloat. */
   ashore();
+  /* And anything a raised cap owes is paid now, with its banner - not on the
+     next catch, which would read as one catch paying out nine levels. */
+  if (!state.stale && payLevels()) save();
   bakeMini();
   raf = requestAnimationFrame(frame);
 
