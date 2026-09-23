@@ -1134,7 +1134,8 @@ a metric you have not written cannot catch anything:
   a map that is technically a cave and looks like none. `score()` now adds a
   nudge towards the middle of each band.
 
-**Not every map is a warren, and the composer only builds warrens.** The Haunted
+**Not every map is a warren, and the composer only builds warrens.** (History:
+the tower is transcribed now - see *The Pokemon Tower*.) The Haunted
 Tower has no passages to carve — it is one square room, and what shapes it is
 the graves standing in it. So it generate-and-tests too, but over grave plots
 rather than corridors, against `compose.TOWER` (measured off 2F-7F alone, and
@@ -1362,11 +1363,11 @@ featureless is usually this, not a bad pick.
   665-667 over 673-675 over 681-683 — three consecutive rows of the 8-wide
   editor grid — 3×3 and **walkable**, so it costs no floor.
 
-  **No staircases.** 2F and 5F each carry two 3×3 stair blocks, and they are the
-  strongest furniture in the tileset, but they lead to another floor there and
-  nowhere here — which is the reason Frost Hollow's ladders were thrown away
-  too, right up until the floors they lead to were laid beside them. This map
-  has one floor and no such excuse.
+  **Staircases, now.** This note used to say the stair blocks "lead to another
+  floor there and nowhere here" - the Frost Hollow sentence, and it expired the
+  same way, the day the floors they lead to were laid beside them. See *The
+  Pokemon Tower* below: everything above is how the GENERATED room was drawn,
+  and still how `drawTile` draws a tower cell with no fixed id.
 
 ### The trainer sheet
 
@@ -1510,7 +1511,8 @@ only the word changed.
 
 Haunted Tower: `h` floor · `H` wall (≥2 thick over floor) · `G` a grave standing
 on the floor (rows 1–5 across, one deep) · `A` a grave set into the wall face ·
-`y` the ward (one 3×3, walkable)
+`y` the ward (one 3×3, walkable) · `l` a staircase. Transcribed now, so the
+shapes in brackets are the old generator's and bind nothing.
 
 **Bridges** are `n` over lava and `N` over water, and both are **Route 12's
 bridge planks** (`lavender_town` 755/757 north-south, 764/772 east-west). The
@@ -1876,6 +1878,59 @@ and Cinderpeak's two were never driven. It loops over every area that has them
 now: **43 pairs across five areas, each ridden both ways.** A test that names
 one map is a test that goes quiet the day a second one arrives.
 
+### The Pokemon Tower: seven floors, and the oval nobody could draw
+
+**THE HAUNTED TOWER IS LAVENDER'S POKEMON TOWER, 1F TO 7F, CELL FOR CELL.** It
+was a generated square room for its whole life, under a note that said the oval
+was *"the one thing here deliberately not copied"* because a round room on a
+square grid needs a wall piece for every stepped diagonal. **That was a limit of
+our autotile, and a transcription never reaches the autotile**: the oval is
+Game Freak's own cells carried as fixed ids, diagonals and all. Rendered, it is
+the building - reception counter on 1F, the ward on 5F, the two statues and the
+gold headstones on 7F.
+
+**IT COST NO ART AND NO NEW CODE PATH.** All seven layouts are 24x20 against
+`building` + `pokemon_tower`, both baked since the Mansion, so it rebases
+against the Mansion's `building` block and check.mjs's `BASE` says so. Laid 4 +
+3 on one grid (1F-4F along the bottom, 5F-7F above, 102x42) because the
+minimap then draws it at 3px a tile - seven in a row would be 180 wide.
+**3,360 of 3,360 interior cells carry the real map's id**; the only authored
+cells are the gutters, drawn with the layouts' own border block (641, the black
+the oval floats in), the Mansion's argument exactly.
+
+**SIX RECIPROCAL PAIRS, READ OUT OF `warp_events`**, and the staircases
+alternate sides going up as the real building does. The front door (1F 11,18)
+is the spawn; its two neighbours lead outside, which this game has no map for.
+38 cells of 7F's rim are passable and reached by nothing - solid, still their
+own art. 1,040 walkable, every one reachable.
+
+**649 IS A GRAVE.** 7F's headstones are a GOLD metatile, 92 of them on that
+floor and no other - Game Freak's own tile, not a palette fault. Classified by
+the one known headstone (657) they came out as wall, so the minimap drew the
+top floor's graveyard as solid rock. Graves are 31% of the room, inside the
+26-37% the real floors run - a rule written for the generator that the copy
+passes on its own.
+
+**AND THE SPAWN TABLE WAS WRONG IN A WAY THE MAP COULD NOT SHOW.** Measured at
+the tower's opening level it was **50% psychic, and Gastly was 5.4% - the
+eighth commonest species in the building Gastly is the face of.** The map listed
+`psychic` and hand-wrote Abra, Drowzee and Mr. Mime, and `types` is what
+`derivedHomes` reads, so every unhomed psychic in the dex came here too.
+FireRed's 3F-7F hold Gastly (75-90%), Cubone (9-10%) and Haunter (1-15%) and
+nothing else.
+
+**`types` IS GHOST AND DARK NOW**, measured against two alternatives: ghost and
+psychic kept gave 54% ghost with Natu second; ghost and ground gave 88% and
+orphaned Darkrai. Ghost and dark is **80% ghost at Lv 20, 74% at Lv 50, Gastly
+the commonest species at every level**, and no legendary loses a home - the
+psychic ones live in the Safari Zone, which lists psychic too. The hand-written
+cast is FireRed's in FireRed's order, plus a ghost from every later generation,
+which the generation fit needs anyway: an open generation with too few residents
+is topped up by `GEN_HOME_MIN` with whatever shares a type, and Gen 2's only
+ghost is Misdreavus - at weight 8 the filler's Houndour took **17%** of the
+tower. **Placing Houndour in the Mansion did nothing**, which is the lesson: the
+filler takes placed species too. Misdreavus at 24 takes the slice back.
+
 ### The Pokemon Mansion: four floors, and the first `building` primary
 
 Cinnabar's burnt-out house, all four floors, laid out **two by two on one grid**
@@ -1960,7 +2015,8 @@ Three named specimens do what was asked at a share chosen rather than derived:
 through - see below) and **Porygon** earns its place twice, being the only
 Pokemon in the dex that was MADE by scientists. The map measures **6.1% psychic
 against 33.6% poison** - a lab with specimens in it rather than a psychic biome.
-The Tower keeps Mewtwo.
+Mewtwo lives in the Safari Zone now, which claims psychic - see *The Pokemon
+Tower* for why the Tower stopped.
 
 **AND ABRA IS DECORATION, WHICH IS THE LESSON UNDER IT.** It was the obvious
 psychic to reach for and it spawns at **0.07%** on a written weight of 6, because

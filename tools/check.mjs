@@ -2222,6 +2222,9 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     // General, so its base is that primary's own block rather than a
     // secondary's - 748 of its metatiles are `building` ids.
     mansion: () => route.mansion.building,
+    // Pokemon Tower is the same pairing - `building` plus its own secondary -
+    // so its ids rebase against the one block the Mansion already bakes.
+    tower: () => route.mansion.building,
   };
   /* The ceiling is the highest id the atlas actually hands out, read off the
      manifest rather than named. It used to be `forest.fringeTop` because that

@@ -1148,7 +1148,9 @@ const RESIDENTS = [
        anybody remembers the place - but `types` is not flavour: `legendsFor`
        reads it to decide whose HOME a map is, and claiming psychic would hand
        Mewtwo a second home on the strength of a story rather than a roster.
-       Nothing psychic lives here. The Tower keeps him. */
+       Nothing psychic lives here. He lives in the Safari Zone, which claims
+       psychic - the Tower did until it was made accurate, and FireRed's
+       tower holds ghosts and a Cubone and nothing else. */
     types: ["poison", "fire", "normal"],
     /* THE FIRST TABLE IN THE GAME WITH A RESIDENT FROM OUTSIDE KANTO, and it
        had to be. The Mansion's own roster is Koffing, Grimer, Rattata,
@@ -1200,10 +1202,31 @@ const RESIDENTS = [
     id: "tower",
     level: 20,  // MAP_LAST. The tower is the end of the ladder
     name: "Haunted Tower",
-    types: ["ghost", "psychic", "dark"],
+    /* GHOST AND DARK, AND NOT PSYCHIC ANY MORE. It was ghost/psychic/dark
+       with Abra, Drowzee and Mr. Mime hand-written in, and measured at Lv 20
+       that made the tower **50% psychic and Gastly 5.4%** - eighth commonest
+       in the building Gastly is the face of. `types` is what `derivedHomes`
+       reads, so `psychic` pulled every unhomed psychic in the dex in here:
+       Girafarig, Natu, Chingling, Mime Jr. Dropped, it is 80% ghost with
+       Gastly the commonest species at every level, and no legendary loses a
+       home - the psychic ones live in the Safari Zone, which lists it too.
+
+       THE HAND-WRITTEN CAST IS FIRERED'S, IN FIRERED'S ORDER: Gastly, then
+       Haunter and Cubone, which is 3F-7F's whole encounter table (Gastly
+       75-90%, Cubone 9-10%, Haunter 1-15%). A WRITTEN WEIGHT IS A RANK WITHIN
+       ITS OWN CELL, so the ratio survives inside Gen 1 and nowhere else.
+
+       AND A GHOST FROM EVERY OTHER GENERATION, because the fit gives each
+       open generation an equal slice and an empty slot gets filled with
+       whatever `GEN_HOME_MIN` finds that shares a type. Gen 2's only ghost is
+       Misdreavus, and at weight 8 the filler's Houndour took 17% of the
+       tower; 24 hands that slice back to the ghost. Sableye does the same for
+       Gen 3's A band. */
+    types: ["ghost", "dark"],
     table: [
-      [92, 22], [63, 16], [96, 14], [93, 10], [64, 8], [97, 6],
-      [105, 5], [94, 3], [122, 2],
+      [92, 40], [93, 8], [104, 8],
+      [200, 24], [302, 6], [353, 10], [355, 10], [425, 10], [442, 5],
+      [562, 10], [607, 10], [708, 8], [710, 8], [769, 10], [854, 10], [971, 10],
     ],
   },
   {
