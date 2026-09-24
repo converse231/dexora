@@ -21,6 +21,7 @@ import {
 import FilterBar from "./FilterBar.jsx";
 import Sprite, { VariantFx } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
+import { researchLevel, RESEARCH_MAX } from "../game/research.js";
 
 const STATE = ["unseen", "seen", "caught"];
 
@@ -251,6 +252,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
           const state = at(sp.id);
           const marks = MARKS.filter((t) => has(t, sp.id));
           const full = complete(sp.id);
+          const studied = researchLevel(sp.id, tiers?.research?.[sp.id]) >= RESEARCH_MAX;
           return (
             <button
               key={sp.id}
@@ -265,7 +267,8 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
                 state
                   ? `${label(sp)}, entry ${sp.id}${
                       marks.length ? `, ${marks.join(" and ")}` : ""
-                    }${full ? ", every variant caught" : ""}`
+                    }${full ? ", every variant caught" : ""}${
+                      studied ? ", research complete" : ""}`
                   : `Unknown Pokémon ${sp.id}`
               }
             >
@@ -311,6 +314,11 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
               )}
 
               {full && <Mark tier="complete" size={16} className="cell-full" />}
+
+              {/* The one free corner. Only a FINISHED entry is marked: a level
+                  number on every caught tile is 1,200 small numbers, and the
+                  finished ones are the ones that changed something. */}
+              {studied && <Mark tier="research" size={12} className="cell-research" />}
 
               <span className="cell-no">{String(sp.id).padStart(3, "0")}</span>
             </button>

@@ -315,7 +315,7 @@ export async function signOut() {
 const TABLE = "saves";
 
 /* "COULD NOT READ IT" AND "THERE IS NOTHING THERE" ARE DIFFERENT ANSWERS, and
-   this returned the same one for both. That is the exact mistake CLAUDE.md
+   this returned the same one for both. That is the exact mistake docs/decisions.md
    records twice on the LOCAL save - a read that fails, a fresh state, and the
    next write over the top of a real collection - and the cloud path was written
    without the lesson.

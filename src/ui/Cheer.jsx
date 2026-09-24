@@ -30,6 +30,9 @@ const KIND = {
   dex: "POKÉDEX",
   medal: "MEDAL",
   steps: "ON FOOT",
+  research: "RESEARCH",
+  alpha: "ALPHA",
+  rift: "SPACE-TIME RIFT",
   ...Object.fromEntries(
     Object.entries(TIER_TELL).map(([t, tell]) => [t, tell.toUpperCase()]),
   ),

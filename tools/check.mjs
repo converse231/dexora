@@ -29,7 +29,12 @@ const stripComments = (src) =>
 /* How many characters the shop's description slot actually holds. Measured in
    a rendered shop at the tightest the row ever gets (169px, next to "you have
    12"), not estimated - the same mistake the 21-character ball hint made, and
-   for the same reason: the COUNT'S DIGITS share the line. */
+   for the same reason: the COUNT'S DIGITS share the line.
+
+   RE-MEASURED for Press Start 2P, which is wider than the Silkscreen this was
+   first taken against: 169px holds 19 characters a line at 9.5px x 90%, so
+   one line no longer held 27 and the description wraps to TWO. Two lines less
+   one word lost to a break still hold 27 - the bound stands, the reason moved. */
 const BLURB_FITS = 27;
 
 // --- odds -----------------------------------------------------------------
@@ -204,8 +209,21 @@ import {
   GEN_FIRST, GEN_STEP,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
   SIZE_MIN, SIZE_MAX, ENCOUNTER_RATE, HEADLINE, genTargets, rowGen,
-  SPECIES_CAP, CAST_CEIL, RODS as RODS_ALL,
+  SPECIES_CAP, CAST_CEIL, RODS as RODS_ALL, isLegendary,
 } from "../src/game/biomes.js";
+import {
+  outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
+  riftChance, riftFind, RIFT_FROM, RIFT_MEDIAN, RIFT_SURE, RIFT_STEPS, RIFT_TILT,
+  RIFT_FIND, RIFT_CANDY,
+} from "../src/game/events.js";
+import {
+  ALPHA_CHANCE, ALPHA_SIZE, canBeAlpha, rollAlpha, alphaSize,
+} from "../src/game/biomes.js";
+import { ALPHA_CATCH, ALPHA_CANDY, alphaCandy } from "../src/game/items.js";
+import {
+  TASKS, tasksFor, bump, researchLevel, researchPoints, researchLift, researchPay,
+  cleanRow, RESEARCH_MAX, POINTS_PER_LEVEL, RESEARCH_LIFT,
+} from "../src/game/research.js";
 
 const poke = ballById("poke-ball");
 const ultra = ballById("ultra-ball");
@@ -351,7 +369,9 @@ for (let i = 1; i < SHOP_BALLS.length; i++)
        clipped next to "YOU HAVE 14", because the two share the line and the
        COUNT'S DIGITS eat the note's budget. 16 leaves room for a three-digit
        stack, which is a bag anyone will have. A character count is a proxy for
-       a pixel width, but the face is Silkscreen and near-monospace. */
+       a pixel width, and the face is Press Start 2P, which is exactly
+       monospace. The description now wraps to two lines (see BLURB_FITS), so
+       16 is the bound on a hint staying on the FIRST one, beside its x3.5. */
     assert.ok(ball.hint.length <= 16,
       `${ball.id}'s hint is ${ball.hint.length} characters and the shop clips at 16: "${ball.hint}"`);
     assert.ok(ball.boost > ball.mult, `${ball.id}'s boost is not a boost`);
@@ -558,6 +578,24 @@ for (let i = 1; i < SHOP_BALLS.length; i++)
   assert.deepEqual(noStrip, [],
     `no throw animation for: ${noStrip.join(", ")} - add the column to ` +
     "tools/build_balls.py and re-run it");
+
+  /* EVERY WORLD EVENT HAS ITS ICON, at the size the event card draws. The
+     list is read out of tools/build_events.py rather than typed here, so an
+     event added there and never built fails, and so does one built at the
+     wrong size (the card is `.fieldbox img`, 30px from a 32px file). */
+  {
+    const src = readFileSync(new URL("./build_events.py", import.meta.url), "utf8");
+    const events = [...(/^EVENTS = \[([^\]]*)\]/m.exec(src)?.[1] ?? "").matchAll(/"([\w-]+)"/g)]
+      .map((m) => m[1]);
+    assert.ok(events.length, "tools/build_events.py lists no EVENTS");
+    for (const id of events) {
+      const url = new URL(`../public/events/${id}.png`, import.meta.url);
+      assert.ok(existsSync(url), `no icon for event "${id}" - run python tools/build_events.py`);
+      const b = readFileSync(url);
+      assert.equal(`${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`, "32x32",
+        `public/events/${id}.png is not 32x32 - rebuild it with tools/build_events.py`);
+    }
+  }
 }
 
 /* THE MASTER BALL IS BUYABLE, AND THE PRICE IS THE ONLY THING BALANCING IT.
@@ -2959,7 +2997,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      **AN IMPORT IS NOT A CALL, AND THAT IS EXACTLY HOW THIS WENT MISSING.**
      `App.jsx` imported `stepReward` and had stopped calling it, so `TopBar`
      went on taking a `parcel` prop that nothing ever passed: walking paid,
-     silently, and the readout CLAUDE.md describes had simply gone. Nothing
+     silently, and the readout docs/decisions.md describes had simply gone. Nothing
      failed - a prop that is always `undefined` renders as nothing at all.
      So the pattern is `stepReward(`, with the bracket, because the version of
      this written as `includes("stepReward")` would have passed the whole
@@ -3996,6 +4034,331 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
 
     console.log(`daily ok — ${GOALS.length} kinds, ${QUEST_TYPES.length} askable types, ` +
       `streak caps at ${STREAK_CAP} (×${streakMult(STREAK_CAP).toFixed(2)})`);
+
+    /* THE MASS OUTBREAK is keyed on the same day and is pure for the same
+       reason. Four claims: the day decides it (a reload cannot reroll it), it
+       is somewhere the player can GO and something that LIVES there, it is
+       never null (the engine freezes whatever it returns, and a null day is a
+       day with no outbreak and a table rebuilt on every render), and it moves
+       about - a hash that always lands on one map is an outbreak of one map. */
+    const obMaps = new Set(), obKinds = new Set();
+    for (const level of [1, 10, 20, 45, MAX_LEVEL]) {
+      for (let i = 0; i < 60; i++) {
+        const key = String(20260101 + i * 7);
+        const ob = outbreakFor(key, level);
+        assert.ok(ob, `no outbreak on ${key} at Lv ${level}`);
+        assert.deepEqual(outbreakFor(key, level), ob, `${key} rerolls its outbreak`);
+        assert.ok(areaOpen(ob.areaId, level), `${key} Lv ${level}: outbreak on shut ${ob.areaId}`);
+        const b = BIOMES.find((x) => x.id === ob.areaId);
+        const row = encounterTable(b, level).find((r) => r[0] === ob.speciesId);
+        assert.ok(row && !row[2] && row[1] > 0,
+          `${key} Lv ${level}: #${ob.speciesId} does not live in ${ob.areaId}`);
+        assert.ok(!isLegendary(ob.speciesId), `${key}: an outbreak of a legendary`);
+        if (level === MAX_LEVEL) { obMaps.add(ob.areaId); obKinds.add(ob.speciesId); }
+      }
+    }
+    assert.ok(obMaps.size >= BIOMES.length - 3,
+      `60 days of outbreaks visited ${obMaps.size} of ${BIOMES.length} maps`);
+    assert.ok(obKinds.size >= 40, `60 days of outbreaks drew only ${obKinds.size} species`);
+
+    /* AND IT IS A HUNT, NOT A HANDOUT. Two relationships, not two numbers:
+       a variant is still the EXCEPTION during an outbreak (under one in three),
+       and a WEEK of outbreaks - every variant caught, which overstates it - must
+       not pay a Master Ball in bounty, because that ball is what the economy
+       is saving for. Averaged over the pools a whole year of days draws. */
+    const chance = (lift, locked) => {
+      const per = {};
+      let none = 1;
+      for (const [t, o] of TIER_ODDS) {
+        if (locked?.has(t)) continue;
+        const p = Math.min(LIFT_CEILING, o * lift);
+        per[t] = none * p;
+        none *= 1 - p;
+      }
+      return [per, 1 - none];
+    };
+    let extra = 0, rate = 0, days = 0;
+    for (let i = 0; i < 365; i++) {
+      const ob = outbreakFor(String(20260101 + i), MAX_LEVEL);
+      const sp = speciesById(ob.speciesId);
+      const [hi, any] = chance(OUTBREAK_LIFT, lockedTiers(sp.id));
+      const [lo] = chance(1, lockedTiers(sp.id));
+      for (const t in hi) extra += (hi[t] - lo[t]) * catchBounty(sp, t) * OUTBREAK_SIZE;
+      rate += any;
+      days++;
+    }
+    assert.ok(rate / days < 1 / 3,
+      `${(rate / days * 100).toFixed(1)}% of outbreak encounters are variants - that is a handout`);
+    const week = Math.round(extra / days * 7);
+    const master = ballById("master-ball").price;
+    assert.ok(week < master,
+      `a week of outbreaks pays ¥${week} in extra bounty against a ¥${master} Master Ball`);
+    assert.ok(OUTBREAK_SHARE <= 0.5, "an outbreak over half the map's encounters replaces the map");
+
+    console.log(`outbreak ok — ${obMaps.size} maps and ${obKinds.size} species over 60 days, ` +
+      `${(rate / days * 100).toFixed(1)}% variants, ¥${week} a week against the Master Ball's ¥${master}`);
+  }
+
+  /* RESEARCH. Pure, so all of it runs here with no engine. */
+  {
+    const full = (ids) => bump(bump(bump(bump([], ids), ids), ids), ids);
+    const need = RESEARCH_MAX * POINTS_PER_LEVEL;
+
+    /* EVERY SPECIES CAN FINISH ITS RESEARCH WITHOUT LUCK - every task but the
+       rare form and the alpha, which are rolls, and a legendary may never
+       offer one at all. Evolving is left out too: a species whose only evolution is a
+       Mega would otherwise need a hundred candy to finish. */
+    const luck = ["variant", "evolve", "alpha"];
+    const sure = TASKS.map((t) => t.id).filter((t) => !luck.includes(t));
+    let row = [];
+    for (let i = 0; i < 20; i++) row = bump(row, sure);
+    for (const sp of SPECIES) {
+      assert.ok(tasksFor(sp.id).length > 0, `${sp.name} has no research tasks`);
+      assert.ok(researchPoints(sp.id, row) >= need,
+        `${sp.name} cannot finish its research without a rare form: ` +
+        `${researchPoints(sp.id, row)} of ${need} points`);
+    }
+    // `when` is derived from the evolution data, not listed.
+    const evolver = EVOLUTIONS[0].from;
+    const dead = SPECIES.find((sp) => !EVOLUTIONS.some((e) => e.from === sp.id)).id;
+    assert.ok(tasksFor(evolver).some((t) => t.id === "evolve"), "an evolving species has no evolve task");
+    assert.ok(!tasksFor(dead).some((t) => t.id === "evolve"), "a species that cannot evolve is asked to");
+
+    // The level arithmetic, and that a counter stops at its last step.
+    assert.equal(researchLevel(evolver, null), 0, "untouched research is not level 0");
+    assert.equal(researchLevel(evolver, bump(null, ["catch"])), 1, "the first catch is not level 1");
+    assert.equal(researchLevel(evolver, full(TASKS.map((t) => t.id))), RESEARCH_MAX,
+      "a finished row is not the top level");
+    let many = [];
+    for (let i = 0; i < 50; i++) many = bump(many, ["catch"]);
+    assert.equal(many[0], TASKS[0].steps.at(-1), "a research counter grows past its last step");
+
+    // A saved row: garbage refused, overlong counters clamped, a newer build's slot kept.
+    assert.equal(cleanRow("x"), null, "a string was accepted as a research row");
+    assert.equal(cleanRow([1, -1]), null, "a negative counter was accepted");
+    assert.equal(cleanRow([1.5]), null, "a fractional counter was accepted");
+    assert.deepEqual(cleanRow([99, 5]), [TASKS[0].steps.at(-1), 1], "counters were not clamped");
+    const newer = [...Array(TASKS.length).fill(0), 3];
+    assert.equal(cleanRow(newer).at(-1), 3, "a slot from a newer build was not kept");
+
+    /* THE REWARD IS A BONUS, NOT A LEVER. It goes through `boost` under
+       `LIFT_CEILING`, and it is weaker than a day's outbreak, or a finished
+       entry would make the outbreak on it pointless. */
+    assert.ok(RESEARCH_LIFT > 1 && RESEARCH_LIFT < OUTBREAK_LIFT,
+      `a finished entry lifts ×${RESEARCH_LIFT} against an outbreak's ×${OUTBREAK_LIFT}`);
+    assert.equal(researchLift(evolver, null), 1, "unfinished research lifts the odds");
+    /* AND THE ENGINE ASKS IT. A finished entry's odds are a probability, so
+       play cannot see a missing call - an import is not a call, and the one
+       place the tier is rolled has to name it. Comments stripped first. */
+    const roller = stripComments(readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8"));
+    assert.match(roller, /rollVariant\([\s\S]{0,400}?researchLift\(/,
+      "the variant roll in engine.js does not ask researchLift - a finished entry lifts nothing");
+
+    /* AND IT IS NOT THE INCOME. A 3,500-encounter playthrough of every map,
+       caught 60% of the time, every task given its fair chance: what research
+       pays must stay under a fifth of what those same catches sell and bounty
+       for. A whole sale per level measured 49% on the starting map, which is
+       the research becoming the reason to catch. Seeded, so it cannot flake. */
+    let seed = 7;
+    const rng = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    let worst = 0, worstMap = "", finished = 0;
+    for (const b of BIOMES) {
+      const table = encounterTable(b, 30);
+      const total = table.reduce((n, r) => n + r[1], 0);
+      const study = {};
+      let earned = 0, paid = 0;
+      for (let i = 0; i < 3500; i++) {
+        let r = rng() * total, id = table[0][0];
+        for (const tr of table) if ((r -= tr[1]) < 0) { id = tr[0]; break; }
+        if (rng() > 0.6) continue;
+        const sp = speciesById(id);
+        const v = rollVariant(rng, lockedTiers(id));
+        const size = sizeTag(rollSize(rng));
+        const did = ["catch", ...(rng() < 0.3 ? ["night"] : []),
+          ...(size === "XS" ? ["xs"] : size === "XL" ? ["xl"] : []),
+          ...(rng() < 0.4 ? ["first"] : []), ...(v ? ["variant"] : []),
+          ...(rng() < 0.1 ? ["fed"] : [])];
+        const before = researchLevel(id, study[id]);
+        study[id] = bump(study[id], did);
+        const after = researchLevel(id, study[id]);
+        paid += researchPay(sellValue(sp), after - before);
+        if (after === RESEARCH_MAX && before < RESEARCH_MAX) finished++;
+        earned += sellValue(sp) + catchBounty(sp, v);
+      }
+      if (paid / earned > worst) { worst = paid / earned; worstMap = b.id; }
+    }
+    assert.ok(worst < 0.2,
+      `research pays ${(worst * 100).toFixed(1)}% of what the catches earn on ${worstMap}`);
+    assert.ok(finished > BIOMES.length * 10,
+      `only ${finished} entries finished over eleven playthroughs - research is out of reach`);
+
+    console.log(`research ok — ${TASKS.length} tasks, every species finishable without luck, ` +
+      `pays at most ${(worst * 100).toFixed(1)}% of catch income (${worstMap}), ` +
+      `${finished} finished over ${BIOMES.length} playthroughs`);
+  }
+
+  /* ALPHAS. Four claims: never a legendary or a costume; they arrive at their
+     own rate; they are bigger than any ordinary roll; and they are held back
+     from every sweep while costing and paying inside the economy's bounds. */
+  {
+    for (const sp of SPECIES) {
+      assert.equal(rollAlpha(() => 0, sp.id), canBeAlpha(sp.id), `${sp.name} ignored canBeAlpha`);
+      if (isLegendary(sp.id)) assert.ok(!canBeAlpha(sp.id), `${sp.name} is a legendary alpha`);
+      if (sp.form === "costume") assert.ok(!canBeAlpha(sp.id), `${sp.name} is a costume alpha`);
+    }
+    let seed = 99, hits = 0;
+    const rng = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const rolls = 300000;
+    for (let i = 0; i < rolls; i++) if (rollAlpha(rng, 16)) hits++;
+    assert.ok(Math.abs(hits / rolls / ALPHA_CHANCE - 1) < 0.15,
+      `alphas arrived at 1 in ${Math.round(rolls / hits)} against 1 in ${Math.round(1 / ALPHA_CHANCE)}`);
+
+    // Bigger than anything ordinary, at both ends of its own roll.
+    assert.ok(ALPHA_SIZE[0] > SIZE_MAX, "an alpha can be no bigger than an ordinary roll");
+    assert.equal(alphaSize(() => 0), ALPHA_SIZE[0], "the alpha roll's floor moved");
+    assert.equal(alphaSize(() => 1), ALPHA_SIZE[1], "the alpha roll's ceiling moved");
+
+    // Never swept: a keeper, and never in the spare list beside ordinary ones.
+    assert.ok(keeper({ species: 16, alpha: 1 }), "an alpha is not a keeper");
+    const flock = [{ uid: 1, species: 16, level: 5 }, { uid: 2, species: 16, level: 3, alpha: 1 },
+      { uid: 3, species: 16, level: 2 }];
+    assert.ok(!duplicateUids(flock).includes(2), "the sell sweep offered an alpha");
+
+    /* Harder, never hopeless, and the rail and the roll agree because the
+       only multiplier is inside `liveMult`. The Master Ball is untouched. */
+    const pokeBall = ballById("poke-ball");
+    assert.ok(ALPHA_CATCH > 0.5 && ALPHA_CATCH < 1, `an alpha catches at ×${ALPHA_CATCH}`);
+    assert.equal(liveMult(pokeBall, { alpha: 1 }), pokeBall.mult * ALPHA_CATCH,
+      "liveMult does not charge an alpha");
+    const mb = ballById("master-ball");
+    assert.equal(liveMult(mb, { alpha: 1 }), mb.mult, "an alpha scaled the Master Ball");
+
+    /* AND ITS CANDY IS A BONUS. Paid at capture on one encounter in 150, it
+       must stay under a tenth of what converting every catch would pay - past
+       that, alphas become the candy economy rather than a treat in it. */
+    assert.ok(ALPHA_CANDY * ALPHA_CHANCE < 0.1,
+      `alpha candy is ${(ALPHA_CANDY * ALPHA_CHANCE * 100).toFixed(1)}% of the candy a catch pays`);
+    assert.equal(alphaCandy(speciesById(16)), ALPHA_CANDY * candyValue(speciesById(16)),
+      "alpha candy does not follow the species' own worth");
+
+    // Research asks for one only where one can exist.
+    assert.ok(tasksFor(16).some((t) => t.id === "alpha"), "Pidgey has no alpha task");
+    assert.ok(!tasksFor(LEGENDARY[0]).some((t) => t.id === "alpha"), "a legendary has an alpha task");
+
+    console.log(`alphas ok — 1 in ${Math.round(rolls / hits)}, size ${ALPHA_SIZE.join("-")}, ` +
+      `catch ×${ALPHA_CATCH}, never flee, ${ALPHA_CANDY}x candy at capture, never swept`);
+  }
+
+  /* RIFTS. The opening curve, what one does to a table, and what its finds
+     are worth - each against a relationship rather than a typed number. */
+  {
+    // The curve: shut before the gate, certain at the end, never falling.
+    assert.equal(riftChance(RIFT_FROM - 1), 0, "a rift can open before its gate");
+    assert.equal(riftChance(RIFT_SURE), 1, "a rift is not certain by RIFT_SURE");
+    for (let n = RIFT_FROM; n < RIFT_SURE; n += 50) {
+      assert.ok(riftChance(n + 50) >= riftChance(n), `riftChance falls at ${n}`);
+    }
+    // And its median is where it says, which is what the solved-for ramp claims.
+    let seed = 5;
+    const rng = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const opens = [];
+    for (let i = 0; i < 4000; i++) {
+      let n = 0;
+      do n++; while (rng() >= riftChance(n));
+      opens.push(n);
+    }
+    opens.sort((a, b) => a - b);
+    const median = opens[2000];
+    assert.ok(Math.abs(median / RIFT_MEDIAN - 1) < 0.08,
+      `rifts open at a median of ${median} steps against ${RIFT_MEDIAN}`);
+    assert.ok(opens.at(-1) <= RIFT_SURE, `a rift took ${opens.at(-1)} steps to open`);
+
+    /* WHAT IT DOES TO A TABLE. Through `weighted`, so it is Fortune's own
+       exponent: on every map the commonest species gets rarer and the rarest
+       gets commoner. A tilt that did not flatten would be a rift that changes
+       nothing you can feel. */
+    const shares = (t) => {
+      const tot = t.reduce((n, r) => n + r[1], 0);
+      return t.map(([, w]) => w / tot);
+    };
+    for (const b of BIOMES) {
+      const t = encounterTable(b, MAX_LEVEL);
+      const plain = shares(weighted(t, emptyStats(), 0));
+      const torn = shares(weighted(t, emptyStats(), RIFT_TILT));
+      const top = plain.indexOf(Math.max(...plain));
+      const low = plain.indexOf(Math.min(...plain));
+      assert.ok(torn[top] < plain[top], `a rift did not thin ${b.id}'s commonest species`);
+      assert.ok(torn[low] > plain[low], `a rift did not bring ${b.id}'s rarest species forward`);
+    }
+
+    // Finds only offer a stone the shop would sell at your level.
+    const always = () => 0;
+    assert.deepEqual(riftFind(always, 1), { candy: RIFT_CANDY }, "a Lv 1 rift turned up a stone");
+    for (let lv = 1; lv <= MAX_LEVEL; lv += 7) {
+      const got = riftFind(always, lv);
+      for (const id of Object.keys(got.items ?? {})) {
+        assert.ok(STONES.find((st) => st.id === id).level <= lv, `a Lv ${lv} rift found ${id}`);
+      }
+    }
+
+    /* AND THE FINDS ARE A BONUS. What a rift turns up must be under a sixth of
+       what the steps it takes to earn one sell for, on every map, with the
+       whole stone shelf open. Counted in sales alone - no bounty, no wage - so
+       the bound is the strict one. */
+    const shelf = STONES.reduce((n, st) => n + st.price, 0) / STONES.length;
+    const findValue = RIFT_STEPS * RIFT_FIND * (shelf + RIFT_CANDY * CANDY_PRICE) / 2;
+    let worst = 0, where = "";
+    for (const b of BIOMES) {
+      const t = encounterTable(b, MAX_LEVEL);
+      const tot = t.reduce((n, r) => n + r[1], 0);
+      const avg = t.reduce((n, [id, w]) => n + (w / tot) * sellValue(speciesById(id)), 0);
+      const cycle = (RIFT_MEDIAN + RIFT_STEPS) * ENCOUNTER_RATE * avg;
+      if (findValue / cycle > worst) { worst = findValue / cycle; where = b.id; }
+    }
+    assert.ok(worst < 1 / 6,
+      `a rift's finds are worth ${(worst * 100).toFixed(1)}% of what earning it sells for on ${where}`);
+
+    console.log(`rifts ok — open at a median of ${median} steps, certain by ${RIFT_SURE}, ` +
+      `tilt ${RIFT_TILT} flattens every map, finds ${(worst * 100).toFixed(1)}% of a cycle (${where})`);
+  }
+
+  /* THE PIXEL FACE HAS A FLOOR. Press Start 2P is drawn on an 8px grid and
+     turns to mush below it - "BAG" read as "DAG" at the sizes Silkscreen was
+     happy at - and a bare cqw size has no floor at all, which put the
+     encounter's size readout at 3px on a phone. Letter-spacing goes too: this
+     face carries its own tracking, and the extra is what pushed text out of
+     its chips. Checked on every rule that names the face; the rules that only
+     inherit it were fixed by hand and are named in the audit, not here. */
+  {
+    const css = stripComments(readFileSync(new URL("../src/styles.css", import.meta.url), "utf8"));
+    const bad = [];
+    for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!body.includes("var(--pixel)")) continue;
+      const name = sel.trim().split("\n").at(-1);
+      if (/letter-spacing/.test(body)) bad.push(`${name}: letter-spacing`);
+      for (const [, v] of body.matchAll(/font-size:\s*([^;]+);/g)) {
+        const px = /^([\d.]+)px$/.exec(v.trim());
+        if (px && +px[1] < 9) bad.push(`${name}: ${v.trim()}`);
+        if (/^[\d.]+cqw$/.test(v.trim())) bad.push(`${name}: bare ${v.trim()}`);
+      }
+    }
+    assert.deepEqual(bad, [], `pixel text below its floor: ${bad.join(", ")}`);
+    console.log("pixel face ok — no letter-spacing, nothing under 9px, every cqw floored");
   }
 
 
@@ -4131,8 +4494,10 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
          nothing looks exactly like bad luck. */
       assert.ok(/ENCOUNTER_RATE \* \(running\("repel"\)\?\.rate \?\? 1\)/.test(eng),
         "Repel must scale the encounter RATE, which is the only thing it does");
-      assert.ok(/weighted\(table, state\.stats, running\("rarity"\)\?\.tilt \?\? 0\)/.test(eng),
-        "the flute must reach the table through rarityPower's own exponent");
+      /* A rift adds its tilt to the SAME sum - one exponent, never a second
+         transform - so both have to appear inside the one `weighted` call. */
+      assert.ok(/weighted\(table, state\.stats,\s*\(running\("rarity"\)\?\.tilt \?\? 0\) \+ \(riftHere\(\) \? RIFT_TILT : 0\)\)/.test(eng),
+        "the flute and a rift must reach the table through rarityPower's own exponent");
       assert.ok(/running\("variant"\)/.test(eng) && /honey\?\.tier/.test(eng),
         "a honey must reach the variant roll, and a coloured one must name its tier");
       // Using one spends a BAG item; it must not charge money a second time.

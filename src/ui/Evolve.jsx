@@ -37,7 +37,7 @@ const SPARKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
    which have no folder**. Those two are the ordinary sprite plus a CSS filter,
    so an Astral evolution played out entirely in ordinary art: you watched a
    normal Pokemon become a normal Pokemon and then found an Astral in the box.
-   Exactly the failure CLAUDE.md records for shiny, reintroduced by a second
+   Exactly the failure docs/decisions.md records for shiny, reintroduced by a second
    copy of a constant that only got fixed in the first copy.
 
    `spriteUrl` is the one that knows, so the copy is gone. Still not <Sprite>,

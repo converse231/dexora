@@ -18,7 +18,8 @@ import BallRail from "./ui/BallRail.jsx";
 import {
   BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall,
 } from "./game/items.js";
-import { ItemIcon } from "./ui/Sprite.jsx";
+import { ItemIcon, eventIcon } from "./ui/Sprite.jsx";
+import { EVENT_NAME } from "./game/events.js";
 import {
   biomeFor, levelFromXp, TIERS, dexIndex,
 } from "./game/biomes.js";
@@ -265,7 +266,13 @@ export default function App({
   const enc = st?.encounter ?? null;
   const evo = st?.evolution ?? null;
   const fishing = st?.fishing ?? null;
-  const cheer = st?.cheers?.[0] ?? null;
+  /* A BANNER WAITS WHILE AN ENCOUNTER IS UNDECIDED. It is fixed across the top
+     of the screen, which on a phone is exactly where the nameplate is - so a
+     rift find or a finished research entry raised on the step that started an
+     encounter covered the name of the thing you were choosing a ball for.
+     Held, not dropped: it plays the moment the encounter resolves. */
+  const held = enc && !["caught", "fled", "ran"].includes(enc.phase);
+  const cheer = held ? null : st?.cheers?.[0] ?? null;
   /* WHAT JUST RAN OUT. Not a cheer: a cheer is a celebration that holds the
      screen for three seconds with sparks on it, and an effect ending is news
      rather than an occasion. It is the one event in the game with no tell at
@@ -322,7 +329,7 @@ export default function App({
 
   /* AND THE PARCEL FLOATS OVER THE STEPS COUNTER, which `TopBar` has taken a
      prop for since it was written - nothing ever passed one. `stepReward` was
-     imported here and never called: the import is what CLAUDE.md's "the top
+     imported here and never called: the import is what docs/decisions.md's "the top
      bar calls the same function on the same step count" was describing, and
      the call had gone.
 
@@ -552,6 +559,10 @@ export default function App({
               height={VIEW_H * TILE * 2}
               aria-label="The route. Walk with the arrow keys; Pokémon appear anywhere you can walk."
             />
+            {/* A RIFT TINTS THE WORLD, directly over the map and under every
+                overlay after it - an element rather than a canvas pass, so
+                the engine's draw loop does not grow a second colour rule. */}
+            {engine?.riftHere() && <div className="rift-tint" aria-hidden="true" />}
             {/* Where you are, at a glance. Hidden the moment anything takes
                 over the screen: during an encounter the question is which
                 ball, not which corner of the map, and a camera box tracking a
@@ -595,14 +606,32 @@ export default function App({
             {worn && (
               <div className="fieldbox worn" role="status" key={worn.n}>
                 <span>
-                  <ItemIcon item={fieldById(worn.id)} />
+                  {worn.event
+                    ? <img src={eventIcon(worn.id)} alt="" />
+                    : <ItemIcon item={fieldById(worn.id)} />}
                   <u>
-                    <b>{fieldById(worn.id)?.name ?? "Effect"}</b>
-                    <i>WORE OFF</i>
+                    <b>{worn.event ? EVENT_NAME[worn.id] ?? "Event" : fieldById(worn.id)?.name ?? "Effect"}</b>
+                    <i>{worn.event ? "IS OVER" : "WORE OFF"}</i>
                   </u>
                 </span>
               </div>
             )}
+
+            {/* WORLD EVENTS - an outbreak, a rift - in the field card's own
+                markup, gold-rimmed: the same object on screen as a running
+                effect, because both are "something is changing the world for
+                a while" and both count down. */}
+            {(engine?.events() ?? []).map((ev) => (
+              <div className="fieldbox event" role="status" key={ev.id}>
+                <span data-tip={ev.tip}>
+                  <img src={eventIcon(ev.id)} alt="" />
+                  <u>
+                    <b>{ev.count}</b>
+                    <i>{ev.label}</i>
+                  </u>
+                </span>
+              </div>
+            ))}
 
             {FAMILIES.some((f) => st?.field?.[f]) && (
               <div className="fieldbox" role="status">
@@ -765,6 +794,7 @@ export default function App({
           caught={caught}
           level={level}
           busy={!!enc || !!evo}
+          outbreakArea={engine?.outbreakArea() ?? null}
           onTravel={(id) => engine.travel(id)}
           onSelect={setEntry}
           onSell={onSell}
@@ -802,6 +832,7 @@ export default function App({
              Arceus' row answering for Chikorita. */
           held={Object.fromEntries(
             TIERS.map((t) => [t, !!st?.[t]?.[dexIndex(entry)]]))}
+          research={st?.research?.[entry] ?? null}
           /* So the sheet can say "finish the dex" rather than "not yet" for a
              variant that cannot currently spawn at all. */
           owned={st?.box?.filter((m) => m.species === entry).length ?? 0}

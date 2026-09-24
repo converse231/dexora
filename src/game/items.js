@@ -179,9 +179,20 @@ export const ballById = (id) => BALLS.find((b) => b.id === id);
 export const liveMult = (ball, enc) => {
   const base = enc && ball.bonus ? ball.bonus(enc) : ball.mult;
   // Never the Master Ball: it is already past certain and scaling it is noise.
-  if (!enc?.berries || base >= GUARANTEED) return base;
-  return base * berryCatch(enc.berries);
+  if (base >= GUARANTEED) return base;
+  /* An ALPHA holds on harder, and it is here rather than beside the roll so
+     the rail prints what the throw uses. */
+  return base * (enc?.berries ? berryCatch(enc.berries) : 1) * (enc?.alpha ? ALPHA_CATCH : 1);
 };
+
+/* WHAT AN ALPHA COSTS AND PAYS. It never flees, so the price is balls rather
+   than the chance of losing it: 0.6 of a throw's worth, which is a harder
+   catch and not a hopeless one. And because `keeper()` protects it from the
+   sweep, it can never be converted - so its candy is paid at the moment of
+   capture, the same shape the variant bounty takes for the same reason. */
+export const ALPHA_CATCH = 0.6;
+export const ALPHA_CANDY = 10;
+export const alphaCandy = (sp) => ALPHA_CANDY * candyValue(sp);
 
 /* `boost` is the HEADLINE: the most a ball can ever be worth, which is what the
    shop shelf prints because "×1.0 odds" is a true and useless thing to say
@@ -1071,7 +1082,7 @@ export const evolutionRow = (from, to) =>
    others. It now reads `TIERS` rather than naming them: the fourth tier was
    added by writing one row in `biomes.js`, and this line did not have to be
    remembered, which is the whole reason the list exists. */
-export const keeper = (mon) => !!mon && TIERS.some((t) => mon[t]);
+export const keeper = (mon) => !!mon && (TIERS.some((t) => mon[t]) || !!mon.alpha);
 
 /* Which tier a box entry is, or null for an ordinary one. Rarest first, so a
    hand-edited save carrying two is described by its best - the same order

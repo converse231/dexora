@@ -25,8 +25,9 @@ export function dayKey(at = new Date()) {
    The obvious alternative - store a random choice on first sight - has a
    failure this does not: two tabs open at midnight generate two different
    quests and the second overwrites the first's progress. Derived from the date,
-   every copy of the game agrees without talking. */
-function hash(str) {
+   every copy of the game agrees without talking. Exported for the outbreak,
+   which is keyed on the same day for the same reason. */
+export function hash(str) {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);

@@ -33,6 +33,10 @@ const TIER_ART = {
      other mark here is something you earned - so it never appears in a row of
      tier marks, only on its own. */
   legendary: { src: "marks/legendary.png", name: "Legendary" },
+  // Not a tier either: a species whose research is finished. See research.js.
+  research: { src: "marks/research.png", name: "Research complete" },
+  // And not a tier: one oversized individual. See `rollAlpha`.
+  alpha: { src: "marks/alpha.png", name: "Alpha" },
 };
 
 export default function Mark({ tier, size = 12, className = "", title }) {

@@ -65,7 +65,7 @@ function readyToEvolve(box, bag) {
 export default function Rail({
   state, caught, level, busy,
   onSelect, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
-  onTravel, onSpend, save, account, jumpTo, onJumped,
+  onTravel, onSpend, save, account, jumpTo, onJumped, outbreakArea,
 }) {
   const [tab, setTab] = useState("dex");
 
@@ -161,7 +161,8 @@ export default function Rail({
               candy={state?.candy ?? 0} onBuyCandy={onBuyCandy} />
       )}
       {tab === "map" && (
-        <Travel areaId={state?.areaId} level={level} busy={busy} onTravel={onTravel} />
+        <Travel areaId={state?.areaId} level={level} busy={busy} onTravel={onTravel}
+          outbreakArea={outbreakArea} />
       )}
       {tab === "you" && (
         <>

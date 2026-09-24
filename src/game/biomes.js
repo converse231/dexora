@@ -1783,6 +1783,20 @@ export function sizeOf(mon) {
 export const sizeTag = (size) =>
   (size >= 118 ? "XL" : size <= 82 ? "XS" : null);
 
+/* AN ALPHA is one individual far bigger than any ordinary roll - 140 to 160
+   against a ceiling of `SIZE_MAX` - that never runs and is harder to hold.
+   A fact about the one in front of you, like its size, and NOT a tier: it
+   rolls alongside the tier rather than instead of it, so a shiny alpha is
+   possible and neither roll's odds move. Never a legendary (one of a kind
+   already) or a costume (an event does not host an event), so no species'
+   findability changes: the table is untouched, only the individual differs. */
+export const ALPHA_CHANCE = 1 / 150;
+export const ALPHA_SIZE = [140, 160];
+export const canBeAlpha = (id) => !LEGEND_SET.has(id) && !COSTUMES.includes(id);
+export const rollAlpha = (random, id) => canBeAlpha(id) && random() < ALPHA_CHANCE;
+export const alphaSize = (random = Math.random) =>
+  Math.round(ALPHA_SIZE[0] + random() * (ALPHA_SIZE[1] - ALPHA_SIZE[0]));
+
 /* This individual's real numbers, in the units a person reads. PokeAPI stores
    height in decimetres and weight in hectograms, which is why nothing has ever
    printed them raw.

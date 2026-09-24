@@ -29,6 +29,9 @@ import {
 } from "../game/biomes.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
+import {
+  tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT,
+} from "../game/research.js";
 
 /* Kindest first, so the row reads as progress toward the rarest. Origin and
    Holo share odds; Origin sits first because its tell is the drawing itself,
@@ -98,6 +101,43 @@ function whereToFind(id) {
 
    Rows that are not places - a rod, an "evolve Bulbasaur" - never become
    buttons at all: `area` is what says a row IS somewhere. */
+/* RESEARCH: what this species still has to teach you, and how far along it
+   is. Every task is derived from the data in research.js, so a species that
+   cannot evolve simply has no "Evolve one" row. A task with several steps
+   counts towards the next one; a task with one is done or it is not. */
+function Research({ id, row }) {
+  const level = researchLevel(id, row);
+  return (
+    <div className="sheet-research">
+      <div className="sw-head sr-head">
+        <span>RESEARCH</span>
+        <b>
+          {level >= RESEARCH_MAX && <Mark tier="research" size={12} />}
+          Lv {level}/{RESEARCH_MAX}
+        </b>
+      </div>
+      <div className="sr-bar"><i style={{ width: `${(level / RESEARCH_MAX) * 100}%` }} /></div>
+      <ul>
+        {tasksFor(id).map((t) => {
+          const p = progress(t, row);
+          const next = t.steps.find((s) => p.n < s);
+          return (
+            <li key={t.id} className={next ? "" : "done"}>
+              <span>{t.label}</span>
+              <em>{t.steps.length > 1 ? `${p.n}/${next ?? t.steps.at(-1)}` : next ? "" : "done"}</em>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="sr-note">
+        {level >= RESEARCH_MAX
+          ? `Complete: its rare forms turn up ${RESEARCH_LIFT}x as often.`
+          : `At Lv ${RESEARCH_MAX} its rare forms turn up ${RESEARCH_LIFT}x as often.`}
+      </p>
+    </div>
+  );
+}
+
 function Where({ id, level = 1, busy = false, here = null, onTravel = null }) {
   const rows = whereToFind(id);
   if (!rows.length) return null;
@@ -133,7 +173,7 @@ function Where({ id, level = 1, busy = false, here = null, onTravel = null }) {
 }
 
 export default function DexSheet({
-  id, state, variant = null, held = {}, owned = 0,
+  id, state, variant = null, held = {}, owned = 0, research = null,
   level = 1, here = null, busy = false,
   onClose, onFindInBox, onTravel,
 }) {
@@ -249,7 +289,7 @@ export default function DexSheet({
               they now sit beside: facts about the species that never change
               and that you cannot act on. They were at the very bottom behind a
               rule of their own, the furthest point on the card from the name
-              they describe, and CLAUDE.md already records them being demoted
+              they describe, and docs/decisions.md already records them being demoted
               once for shouting. Moving them up costs NOTHING vertically - the
               row is 108px tall whatever is in it, because the portrait says so
               - and it takes a whole block plus its border off the bottom, so
@@ -380,7 +420,7 @@ export default function DexSheet({
                           SILHOUETTE - a ring, a four-point star, an eight-
                           point star, and Noir, which is achromatic already.
 
-                          CLAUDE.md claims "the marks are shapes, not just
+                          docs/decisions.md claims "the marks are shapes, not just
                           colours - these stay distinct in greyscale". That was
                           true of the four CSS shapes it was written about and
                           stopped being true the day the art became drawn.
@@ -406,6 +446,8 @@ export default function DexSheet({
                 ))}
               </div>
             </div>
+
+            <Research id={id} row={research} />
 
             {/* Shown whether or not it is caught - see the `seen` branch
                 below, which shows it too. An entry you have never filled in is
