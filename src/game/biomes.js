@@ -918,15 +918,13 @@ const rareShare = (roster, open, types, tier = legendTier) => {
   return live.length ? Math.min(LEGEND_CEIL, LEGEND_EACH * live.length) : 0;
 };
 
-/* AND A COSTUME HAS NO HABITAT, so "where it lives" is the wrong question to
-   ask one. Every costume Pikachu is pure Electric, so under the legendary rule
-   all thirteen would live in the Power Plant and nowhere else - thirteen
-   species on one map, gated behind Lv 12, which is not rarity, it is a
-   location. A costume is an EVENT Pokemon, which this file already says, and
-   an event turning up anywhere is what an event is. Flat, everywhere, at the
-   same per-head worth - so `rareShare` still counts all thirteen on every map
-   and the "a costume is worth a legendary" assertion is untouched. */
-const eventTier = () => LEGEND_MATCHED;
+/* A COSTUME LIVES WHERE A PIKACHU LIVES, which REVERSED "a costume has no
+   habitat". They were flat on every map as event Pokemon, and at thirteen of
+   them that is one in 260 encounters everywhere - reported from play as
+   costume Pikachu all over Ember Caldera, and a Rock Star Pikachu in a volcano
+   is exactly as wrong as it sounds. So they are homed by `legendTier` like
+   every legendary: all pure Electric, so the Power Plant - the one map that
+   claims electric - and nowhere else, each still worth `LEGEND_EACH` there. */
 
 /* Same scaling as the legendaries always had, same per-head worth, over a
    different roster - so if `LEGEND_EACH` is ever retuned a costume moves with
@@ -2211,10 +2209,10 @@ export function encounterTable(biome, level = 1) {
      share the two of them take together - so each is exactly its own share of
      the finished table and neither moves when the other's roster grows. */
   const taken = rareShare(LEGENDARY, alive, biome.types)
-              + rareShare(COSTUMES, alive, biome.types, eventTier);
+              + rareShare(COSTUMES, alive, biome.types);
   return [...rolled,
           ...rareFor(LEGENDARY, biome.types, total, alive, taken),
-          ...rareFor(COSTUMES, biome.types, total, alive, taken, eventTier)];
+          ...rareFor(COSTUMES, biome.types, total, alive, taken)];
 }
 
 /* The residents and their evolved overlay, fitted - everything but the two

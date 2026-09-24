@@ -1989,6 +1989,9 @@ console.log("alpha ok — never flees, caught pays candy and research, boxed, un
   assert.ok(e.state.cheers.some((c) => c.kind === "rift"), "a rift opened without a banner");
   assert.ok(e.riftHere() && e.events().some((ev) => ev.id === "rift"), "an open rift has no card or tint");
   assert.equal(e.state.sinceTravel, 0, "opening a rift did not restart the clock");
+  // The Events page reads the world through one call; it must be the same rift.
+  assert.deepEqual(e.world().rift, e.state.rift, "the Events page sees a different rift");
+  assert.ok(e.world().outbreak, "the Events page sees no outbreak on a day that has one");
 
   // A find: pinned under RIFT_FIND and under the stone half, so a stone lands.
   const stones = Object.keys(e.state.bag).filter((k) => k.endsWith("-stone"))

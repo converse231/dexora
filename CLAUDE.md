@@ -180,9 +180,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   head, capped at `LEGEND_CEIL`; a zero-weight row is not emitted. `types` on a
   map decides legendary homes, so widening it is never flavour. Every
   legendary must keep a home.
-- **Costumes are event Pokémon**: appended like legendaries at `LEGEND_EACH`,
-  on every map (`eventTier`). Both appended families share one denominator,
-  `taken`.
+- **Costumes live where a Pikachu lives**: appended like legendaries at
+  `LEGEND_EACH` and homed by the same `legendTier`, so all thirteen (pure
+  Electric) are Power Plant only. They were flat on every map once and read
+  as costume Pikachu in a volcano. Both appended families share one
+  denominator, `taken`.
 - **`bandFor` is the one band answer**: a non-legendary on the catch floor drops
   one band, so difficulty is charged once, on the throw.
 - **Generations arrive on `GEN_UNLOCK`**, derived from `GEN_LAST`, `GEN_FIRST`
@@ -337,10 +339,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   of the containing block.
 - **Long lists use `content-visibility: auto`**, and anything that runs forever
   on a Box row animates only `opacity` and `transform`.
-- **The pixel face is Press Start 2P, self-hosted and registered in `main.jsx`**
+- **The pixel face is Geist Pixel, self-hosted and registered in `main.jsx`**
   as `Pixel` through `FontFace` (a url in styles.css would resolve against the
-  built stylesheet). `sizeAdjust` 90% is the one scale knob and the ascent and
-  descent overrides set its line box, because its own let wrapped lines overlap.
+  built stylesheet). `sizeAdjust` 110% is the one scale knob: it is
+  proportional and narrower than the Silkscreen the layout was sized for.
   A pixel rule never goes under 9px, never uses a bare `cqw`, and never sets
   `letter-spacing` (asserted); rules that only inherit the face need the same
   care by hand. Touch targets on a coarse pointer are 36px (end of styles.css).
@@ -397,6 +399,14 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   one `weighted` call, never a second transform. Finds (`riftFind`) are a
   shelf stone at your level or candy, held under a sixth of a rift cycle's
   sale income. Its tint is an element after the canvas, not a canvas pass.
+- **The Events page (`Events.jsx`) reads the world through `engine.world()`**
+  (today's outbreak even once over, the rift where you stand, `sinceTravel`)
+  and computes research from `state.research`; every number on it is a live
+  constant. The corner's event cards are buttons that open it. **What's new
+  (`News.jsx`) is a list, newest first**: add an entry at the top with a new
+  id and the menu's dot returns. "Seen" is localStorage, never the save.
+- **The page never scrolls sideways**: `html, body { overflow-x: clip }` is the
+  guard, not the fix - an overflow is still a bug to find and size down.
 - **Irreversible presses ask first, gated in the engine** (`state.ask` in
   `throwBall` and `flee`), so every call site is covered.
 - **A readout outlives its system**: when a system changes, audit what reads it.

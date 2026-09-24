@@ -3,30 +3,24 @@ import { createRoot } from "react-dom/client";
 import Boot from "./Boot.jsx";
 import "./styles.css";
 
-/* THE PIXEL FACE IS PRESS START 2P, SELF-HOSTED, AND REGISTERED HERE RATHER
+/* THE PIXEL FACE IS GEIST PIXEL, SELF-HOSTED, AND REGISTERED HERE RATHER
    THAN IN styles.css. Two reasons, both recorded rules: a relative url() in the
    stylesheet resolves against the BUILT stylesheet and 404s (every other asset
    is built against `document.baseURI` for the same reason), and the game must
    work offline, so its lettering cannot be a request to Google.
 
-   `sizeAdjust` is the one knob. Press Start 2P fills its whole em square where
-   Silkscreen, which it replaced, drew caps 0.63em tall - so at the same
-   font-size it is 1.47x wider, and every tag, chip and nameplate in this game
-   was sized for Silkscreen. Scaling the FACE rather than 103 declarations keeps
-   every size in styles.css meaning what it meant. The font is OFL
-   (public/fonts/OFL.txt).
-
-   AND ITS LINE BOX IS SET HERE, because its own is barely taller than its
-   glyphs: every rule in this game leaves pixel text at `line-height: normal`,
-   so a label that wrapped drew its second line on top of its first - the
-   Box's SELL button and its summary line both did. The ascent and descent
-   make "normal" 1.4em, balanced around the ink (caps sit 0.875em above the
-   baseline, descenders 0.125em below), so a one-line label stays centred in
-   the padding it was tuned with. */
+   `sizeAdjust` is the one knob, and every size in styles.css keeps meaning
+   what it meant. Measured against the two faces before it: Geist Pixel is
+   PROPORTIONAL and 20% narrower than Silkscreen at the same size (Press Start
+   2P, which it replaced, was 47% WIDER), so at 110% it is larger than either
+   and still narrower than the Silkscreen every chip was sized for - the room
+   that took back is what the horizontal scroll needed. Its own line box
+   (ascent 1.01em, descent 0.30em) is normal and centred on the ink, so unlike
+   Press Start 2P it needs no metric overrides. The font is OFL
+   (public/fonts/OFL.txt). */
 const pixel = new FontFace("Pixel",
-  `url(${new URL("fonts/press-start-2p.woff2", document.baseURI).href})`,
-  { sizeAdjust: "90%", ascentOverride: "108%", descentOverride: "32%",
-    lineGapOverride: "0%", display: "swap" });
+  `url(${new URL("fonts/geist-pixel.woff2", document.baseURI).href})`,
+  { sizeAdjust: "110%", display: "swap" });
 document.fonts.add(pixel);
 pixel.load().catch(() => {});   // a failed load falls back to --pixel's next face
 

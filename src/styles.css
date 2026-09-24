@@ -18,9 +18,15 @@
 }
 
 * { box-sizing: border-box; }
-/* Every face here ships the weights it is used at - Press Start 2P ships one -
+/* Every face here ships the weights it is used at - Geist Pixel ships one -
    so a browser-faked bold or italic is only ever a smeared pixel font. */
 html { font-synthesis: none; }
+/* THE PAGE NEVER SLIDES SIDEWAYS. Every screen was swept for overflow at eight
+   widths on both pointers and none was found, but a phone that can pan the
+   whole page sideways is the worst version of any overflow still hiding in a
+   state the sweep cannot reach (a signed-in screen, a long name). `clip`, not
+   `hidden`: it creates no scroll container, so sticky and fixed are untouched. */
+html, body { overflow-x: clip; }
 
 body {
   margin: 0;
@@ -2215,9 +2221,9 @@ canvas {
   overflow: hidden; text-overflow: ellipsis;
 }
 /* TWO LINES, NOT ONE. The description clipped to one line and the rest lived
-   only in a hover tooltip - which a phone cannot show. Press Start 2P is wider
-   than the Silkscreen the 27-character limit was measured against, so even a
-   ball's hint ("x3.5 on Bug and Water") ran past one line. Two lines hold every
+   only in a hover tooltip - which a phone cannot show, and under the wider
+   face this game used for one pass even a ball's hint ran past one line. Two
+   lines hold every
    blurb this game writes; a stone's species list can run longer, so an OPEN row
    (tapping is how you buy) shows all of it. */
 .sh-title i {
@@ -2602,6 +2608,88 @@ canvas {
   overflow: hidden;
 }
 .hp-body { overflow-y: auto; padding: 4px 15px 16px; }
+
+/* ---------- events & what's new ----------
+   One card per system, the live ones gold-rimmed like their card in the
+   corner, so the page and the HUD are visibly the same objects. */
+.evcard .hp-body { display: grid; gap: 10px; padding-top: 10px; }
+.ev-card {
+  border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  background: var(--surface-2); min-width: 0;
+}
+.ev-card.live { border-color: var(--gold); background: #fdf4dc; }
+.ev-card.rift.live { border-color: #8c46e1; background: #f3ecfd; }
+.ev-card header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ev-card header > img { width: 20px; height: 20px; image-rendering: pixelated; flex: none; }
+.ev-card header h4 {
+  margin: 0; flex: 1; min-width: 0;
+  font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--ink);
+}
+.ev-card header em {
+  font-style: normal; font-family: var(--pixel); font-size: 10px;
+  color: var(--ink-faint); white-space: nowrap;
+}
+.ev-card.live header em { color: var(--gold); }
+.ev-card p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-soft); }
+.ev-card small {
+  display: block; margin-top: 4px;
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
+}
+.ev-row { display: flex; gap: 10px; align-items: center; }
+.ev-row img { width: 48px; height: 48px; flex: none; image-rendering: pixelated; }
+.ev-go {
+  margin-top: 8px; width: 100%; min-height: 36px; cursor: pointer;
+  font-family: var(--pixel); font-size: 11px;
+  border: 2px solid var(--canopy); border-radius: 9px;
+  background: var(--canopy); color: #fff; box-shadow: 0 2px 0 rgba(47, 107, 76, .4);
+}
+.ev-go:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+.ev-go:disabled {
+  background: var(--surface); color: var(--ink-faint); border-color: var(--line-firm);
+  box-shadow: none; cursor: default;
+}
+.ev-meter {
+  position: relative; height: 8px; margin-top: 8px; overflow: hidden;
+  border-radius: 4px; background: var(--surface); border: 1px solid var(--line-firm);
+}
+.ev-meter i { display: block; height: 100%; background: linear-gradient(90deg, #8c46e1, #3cc8e6); }
+/* Where a rift first becomes possible. */
+.ev-meter b { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink-faint); }
+.ev-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.ev-list button {
+  width: 100%; min-height: 40px; display: grid; grid-template-columns: 36px 1fr auto;
+  gap: 8px; align-items: center; padding: 2px 8px 2px 2px; text-align: left;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
+  cursor: pointer; font: inherit;
+}
+.ev-list button:hover { border-color: var(--line-firm); }
+.ev-list img { width: 36px; height: 36px; image-rendering: pixelated; }
+.ev-list span { display: grid; min-width: 0; }
+.ev-list b, .ev-list i { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-list b { font-size: 13px; color: var(--ink); }
+.ev-list i { font-style: normal; font-size: 11px; color: var(--ink-faint); }
+.ev-list em { font-style: normal; font-family: var(--pixel); font-size: 10px; color: var(--path); }
+.nw-entry h5 {
+  margin: 0 0 8px; font-family: var(--display); font-weight: 600; font-size: 16px; color: var(--ink);
+}
+.nw-entry + .ev-go { margin-top: 12px; }
+/* The unread dot: on the burger while the menu is shut, beside the item in it. */
+.tb-burger { position: relative; }
+.tb-dot {
+  position: absolute; top: 3px; right: 3px; width: 8px; height: 8px;
+  border-radius: 50%; background: #e24a3b; box-shadow: 0 0 0 2px var(--surface);
+}
+.tb-pop .tb-dot { position: static; display: inline-block; margin-left: 6px; vertical-align: 1px; }
+/* The corner's event cards are buttons now; they opt back into the pointer
+   the rest of `.hud-right` ignores, and otherwise look exactly as they did. */
+/* NOT `font`/`color: inherit` - `button.fieldbox` outranks `.fieldbox`, so
+   inheriting here turned the card's white pixel text dark on a dark card and
+   the count vanished. Only what a button adds is taken away. */
+button.fieldbox {
+  pointer-events: auto; cursor: pointer; background: none; border: 0; padding: 0;
+  text-align: inherit; font-size: inherit; line-height: inherit;
+}
+button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-offset: 2px; }
 .hp-body h4 {
   margin: 12px 0 6px; font-family: var(--pixel); font-size: 9.5px;
   color: var(--ink-faint);
