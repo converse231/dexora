@@ -2808,7 +2808,7 @@ wall tile that does not exist yet."* The reference HAS the compartments,
 because it is the reference. Transcribing closes all three by construction and
 deletes four generators with about two hundred lines behind them.
 
-The FINDINGS outlive the code and are kept in CLAUDE.md - that a Building map
+The FINDINGS outlive the code and are kept in docs/decisions.md - that a Building map
 is not a General map, that this tileset has no interior wall so its walls are
 machinery, that metatile 54 is 117 tiles of drum body nobody had counted. Those
 are what taught the repo to read a map instead of drawing one, which is the

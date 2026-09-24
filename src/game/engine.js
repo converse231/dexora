@@ -12,7 +12,7 @@ import {
   levelFromXp, xpForCatch,
   rodTable, rodBite,
   rollVariant, pityBoost, TIERS, TIER_TELL, isLegendary,
-  lockedTiers, wildBand, rollSize, BIOMES, ENCOUNTER_RATE,
+  lockedTiers, wildBand, rollSize, BIOMES, ENCOUNTER_RATE, sizeTag, rollAlpha, alphaSize,
 } from "./biomes.js";
 import {
   emptyStats, canSpend, catchMult, weighted, stepScale,
@@ -22,6 +22,11 @@ import {
   TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame,
 } from "./tileset.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
+import {
+  outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
+  riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY,
+} from "./events.js";
+import { bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT } from "./research.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt } from "./medals.js";
@@ -30,7 +35,7 @@ import {
   evolveState, evoLevel, startingState, dexBonus, catchBounty, levelReward,
   evolutionRow, bestRod, holding, canRun, canSurf, KEY_ITEMS,
   fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
-  stepReward, keeper,
+  stepReward, keeper, alphaCandy,
 } from "./items.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
    that froze every catch in the game. `createEngine` has its own
@@ -169,6 +174,10 @@ function freshState() {
     paid: 1,
     nextUid: 1,
     dry: 0,               // encounters since the last rare tier - see pityBoost
+    outbreak: null,       // today's mass outbreak, frozen at first sight - see events.js
+    research: {},         // per-species research counters, keyed by DEX ID - see research.js
+    rift: null,           // an open space-time rift, `{ areaId, left }` - see events.js
+    sinceTravel: 0,       // steps since the map last changed, which is what opens a rift
     /* One quest a day. `key` is the local date it belongs to, so a new day is
        detected by comparing rather than by any timer having to fire. */
     daily: { key: null, done: 0, claimed: false, streak: 0, last: null },
@@ -517,6 +526,27 @@ function loadState() {
          hint cannot sit in a save forever blocking its own slot. */
       hints: (Array.isArray(s.hints) ? s.hints : []).filter((h) => HINT_IDS.includes(h)),
       dry: Math.max(0, Math.floor(Number(s.dry) || 0)),
+      /* Today's outbreak. Anything that does not name a real map, a real
+         species and a count in range is DROPPED, and the engine rolls the
+         day afresh - the same outbreak, since it is a hash of the date. */
+      outbreak: ((o) => (o && typeof o.key === "string" && AREAS[o.areaId]
+        && speciesById(o.speciesId) && Number.isInteger(o.left)
+        && o.left >= 0 && o.left <= OUTBREAK_SIZE
+        ? { key: o.key, areaId: o.areaId, speciesId: o.speciesId, left: o.left }
+        : null))(s.outbreak),
+      /* A rift names a real map and a count it could have; anything else is
+         dropped, which is a rift closing early and never a crash. */
+      rift: s.rift && AREAS[s.rift.areaId] && Number.isInteger(s.rift.left)
+        && s.rift.left >= 1 && s.rift.left <= RIFT_STEPS
+        ? { areaId: s.rift.areaId, left: s.rift.left } : null,
+      sinceTravel: Math.min(RIFT_SURE, Math.max(0, Math.floor(Number(s.sinceTravel) || 0))),
+      /* Research, keyed by dex id. Validated ROW BY ROW: one bad row is
+         dropped and the rest kept, because a whole collection's research
+         must not go because one entry was damaged. */
+      research: Object.fromEntries(Object.entries(
+        s.research && typeof s.research === "object" && !Array.isArray(s.research) ? s.research : {})
+        .map(([k, v]) => [k, speciesById(Number(k)) ? cleanRow(v) : null])
+        .filter(([, v]) => v)),
       /* A save from before `paid` existed was paid for every level it had
          reached, and never past the old cap of 50 - so that is where it
          stands, and anything above is owed. Never above its own level, so no
@@ -934,6 +964,19 @@ export function createEngine(canvas, onChange, mini = null) {
     return d;
   }
 
+  /* TODAY'S OUTBREAK, or null once it is over. Rolled over exactly like the
+     quest, and FROZEN at first sight rather than re-derived: the pick depends
+     on the level (which maps are open), so levelling mid-day would otherwise
+     move the outbreak out from under somebody walking to it. */
+  function outbreak() {
+    const key = dayKey();
+    if (state.outbreak?.key !== key) {
+      const pick = outbreakFor(key, levelFromXp(state.xp));
+      state.outbreak = pick && { key, ...pick, left: OUTBREAK_SIZE };
+    }
+    return state.outbreak?.left > 0 ? state.outbreak : null;
+  }
+
   /* One funnel for both events the quest can count, so a kind added to
      `GOALS` needs no new call site. */
   function noteDaily(event) {
@@ -1001,6 +1044,7 @@ export function createEngine(canvas, onChange, mini = null) {
         state.worn.push({ id: run.id, n: ++wornSeq });
       }
     }
+    const found = stepRift();
 
     /* Walking pays. `stepReward` is pure and the panel calls it too, on the
        same step count, so the balls granted here and the +N that floats over
@@ -1071,7 +1115,40 @@ export function createEngine(canvas, onChange, mini = null) {
     save();
     /* A parcel hands over balls and cash, which the Box and the shop both
        show; a plain step hands over nothing. */
-    if (parcel) changed(); else stepped();
+    if (parcel || found) changed(); else stepped();
+  }
+
+  /* A RIFT: open ones run down a step at a time and may turn something up;
+     while none is open, staying on one map opens one - see `riftChance`.
+     Returns whether the bag moved, so the step bumps `colRev` when it did. */
+  function riftHere() { return !!state.rift && state.rift.areaId === state.areaId; }
+  function stepRift() {
+    if (state.rift) {
+      if (!riftHere() || --state.rift.left <= 0) { closeRift(); return false; }
+      const find = riftFind(Math.random, levelFromXp(state.xp));
+      if (!find) return false;
+      give(find.items);
+      state.candy += find.candy ?? 0;
+      const [id] = Object.keys(find.items ?? {});
+      cheer({ kind: "rift", sub: "Found in the rift.", items: find.items,
+        title: id ? itemById(id).name.toUpperCase() : `${RIFT_CANDY} RARE CANDY` });
+      return true;
+    }
+    state.sinceTravel = (state.sinceTravel ?? 0) + 1;
+    if (Math.random() < riftChance(state.sinceTravel)) {
+      state.rift = { areaId: state.areaId, left: RIFT_STEPS };
+      state.sinceTravel = 0;
+      cheer({ kind: "rift", title: "A RIFT OPENED",
+        sub: `Rarer Pokémon for ${RIFT_STEPS} steps, and things turn up underfoot.` });
+    }
+    return false;
+  }
+
+  // Closing is announced like an effect wearing off, and the clock starts again.
+  function closeRift() {
+    state.rift = null;
+    state.sinceTravel = 0;
+    state.worn.push({ id: "rift", event: true, n: ++wornSeq });
   }
 
   /* NOBODY IS LEFT AFLOAT WITHOUT THE MEANS TO BE. Surfing is derived from the
@@ -1106,6 +1183,9 @@ export function createEngine(canvas, onChange, mini = null) {
     // The gate, enforced where the move actually happens rather than only in
     // the panel that offers it.
     if (!areaOpen(areaId, levelFromXp(state.xp))) return false;
+    // A rift is a place: leaving closes it, and a new map starts the clock again.
+    if (state.rift) closeRift();
+    state.sinceTravel = 0;
     state.areaId = areaId;
     rows = areaOf(areaId).rows;
     fixed = areaOf(areaId).tiles ?? null;
@@ -1130,7 +1210,8 @@ export function createEngine(canvas, onChange, mini = null) {
      odds still sum to one and no entry can ever be dropped or invented. */
   function pickSpecies(table) {
     // The flute feeds the SAME exponent Fortune does - see `rarityPower`.
-    const rolled = weighted(table, state.stats, running("rarity")?.tilt ?? 0);
+    const rolled = weighted(table, state.stats,
+      (running("rarity")?.tilt ?? 0) + (riftHere() ? RIFT_TILT : 0));
     const total = rolled.reduce((n, e) => n + e[1], 0);
     let r = Math.random() * total;
     for (const [id, w] of rolled) if ((r -= w) < 0) return speciesById(id);
@@ -1139,7 +1220,13 @@ export function createEngine(canvas, onChange, mini = null) {
 
   function startEncounter(table, source = "wild") {
     held.clear();
-    const sp = pickSpecies(table);
+    /* A MASS OUTBREAK takes a share of the WALKING encounters on its own map -
+       not a rod's or a ride's, whose tables are a different pool - and runs
+       out after `OUTBREAK_SIZE` of them, announced like an effect wearing off. */
+    const ob = source === "wild" ? outbreak() : null;
+    const flood = !!ob && ob.areaId === state.areaId && Math.random() < OUTBREAK_SHARE;
+    if (flood && --ob.left === 0) state.worn.push({ id: "outbreak", event: true, n: ++wornSeq });
+    const sp = flood ? speciesById(ob.speciesId) : pickSpecies(table);
     /* Whether the dex already has this one, read BEFORE the throw can register
        it. It rides on the encounter rather than being looked up while drawing,
        because the panel would then read live state: settling a catch sets the
@@ -1169,7 +1256,8 @@ export function createEngine(canvas, onChange, mini = null) {
     const variant = rollVariant(
       Math.random,
       lockedTiers(sp.id),
-      pityBoost(state.dry) * (honey && !honey.tier ? honey.lift : 1),
+      pityBoost(state.dry) * (honey && !honey.tier ? honey.lift : 1)
+        * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.research[sp.id]),
       honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
 
@@ -1188,6 +1276,11 @@ export function createEngine(canvas, onChange, mini = null) {
     const knownForm = variant
       ? (state[variant]?.[at] ?? 0) === 1
       : known;
+    /* Its own roll beside the tier's - see `rollAlpha`. A BOOLEAN on the
+       encounter, never 1/0: panels write `enc.alpha && <layer/>`, and a 0
+       there renders the digit "0" in the middle of the battle. It shipped
+       that way for one phase. The box entry still stores `alpha: 1`. */
+    const alpha = rollAlpha(Math.random, sp.id);
 
     state.encounter = {
       speciesId: sp.id,
@@ -1240,7 +1333,8 @@ export function createEngine(canvas, onChange, mini = null) {
          Rolled here so every screen agrees and a re-render cannot change it,
          and carried onto the box entry so the Rattata you caught for being
          enormous is still enormous when you go and look at it. */
-      size: rollSize(),
+      size: alpha ? alphaSize() : rollSize(),
+      alpha,
       phase: "idle",
       shakesDone: 0,
       shakesTotal: 0,
@@ -1460,7 +1554,7 @@ export function createEngine(canvas, onChange, mini = null) {
       e.rate,
       liveMult(ball, e) * catchMult(state.stats),
       Math.random,
-      berryCalm(e.berries));
+      e.alpha ? 0 : berryCalm(e.berries));
     e.throws += 1;
     e.pending = result;
     e.shakesTotal = result.shakes;
@@ -1548,6 +1642,25 @@ export function createEngine(canvas, onChange, mini = null) {
     }
   }
 
+  /* ONE RESEARCH TICK: count the tasks, pay any levels crossed, and return
+     the cash so a catch can fold it into its one figure. Levels are paid
+     silently - a 3.2s banner per level would bury the medal and new-entry
+     cheers on every first catch - and only a finished entry raises one,
+     because that is the level that changes the game. */
+  function study(id, tasks) {
+    const before = researchLevel(id, state.research[id]);
+    state.research[id] = bump(state.research[id], tasks);
+    const after = researchLevel(id, state.research[id]);
+    if (after <= before) return 0;
+    const cash = researchPay(sellValue(speciesById(id)), after - before);
+    state.money += cash;
+    if (after === RESEARCH_MAX) {
+      cheer({ kind: "research", title: label(speciesById(id)).toUpperCase(),
+        sub: `Research complete. Its rare forms are ${RESEARCH_LIFT}x as likely.` });
+    }
+    return cash;
+  }
+
   /* Levelling hands out balls. Returns what was won, or null, so the caller can
      say so in whatever message it is already showing. */
   function gainXp(amount) {
@@ -1614,6 +1727,7 @@ export function createEngine(canvas, onChange, mini = null) {
         level: e.level,
         size: e.size,
         ...(roll ? { [roll]: 1 } : {}),
+        ...(e.alpha ? { alpha: 1 } : {}),
         at: Date.now(),
       });
       if (e.newVariant) {
@@ -1655,6 +1769,23 @@ export function createEngine(canvas, onChange, mini = null) {
       const bounty = catchBounty(sp, e.variant);
       const entry = e.isNew ? dexBonus(caughtSpecies(), SPECIES.length) : 0;
       state.money += bounty + entry;
+      // Every fact a research task reads is already frozen on the encounter.
+      const size = sizeTag(e.size);
+      const learnt = study(e.speciesId, ["catch",
+        ...(e.night ? ["night"] : []),
+        ...(size === "XS" ? ["xs"] : size === "XL" ? ["xl"] : []),
+        ...(e.throws === 1 ? ["first"] : []),
+        ...(e.variant ? ["variant"] : []),
+        ...(e.alpha ? ["alpha"] : [])]);
+      /* AN ALPHA PAYS ITS CANDY NOW, because `keeper()` means it can never be
+         converted later - and says so, because it is the rarest individual a
+         walk can turn up and it should not arrive in silence. */
+      if (e.alpha) {
+        const candy = alphaCandy(sp);
+        state.candy += candy;
+        cheer({ kind: "alpha", title: e.name,
+          sub: `+${candy} Rare Candy — never sold, never converted.` });
+      }
 
       /* ONE FIGURE, BECAUSE THE TEXTBOX IS SIZED AND THE SIZE IS LOAD-BEARING.
          Both sums itemised reads `+¥25200 showdown  +¥1000 new entry`, which
@@ -1668,8 +1799,8 @@ export function createEngine(canvas, onChange, mini = null) {
          chip, a NEW variant raises its own banner, and the top bar floats the
          delta. The word survives only where it is the only thing being paid
          for, which is also the case that stays short. */
-      const tail = bounty
-        ? `  +¥${bounty + entry}`
+      const tail = bounty || learnt
+        ? `  +¥${bounty + entry + learnt}`
         : entry ? `  +¥${entry} new entry` : "";
       e.msg = `Gotcha! ${e.name} was caught!${tail}`;
       if (gained) {
@@ -1933,11 +2064,19 @@ export function createEngine(canvas, onChange, mini = null) {
   const priceOf = (item) => pricedAt(item.price, state.stats);
   const valueOf = (sp) => valuedAt(sellValue(sp), state.stats);
 
+  /* A WHOLE NUMBER OF THINGS, enforced here and not only in the shop's input.
+     `qty < 1` let 1.5 through - a ball and a half in the bag for the price of
+     one and a half, and a throw only checks `> 0`, so that was two throws -
+     and let NaN through, since `NaN < 1` is false, which writes NaN into the
+     wallet. The UI floors its input; the engine is where every caller meets. */
+  const whole = (n) => (Number.isFinite(n) && n >= 1 ? Math.floor(n) : 0);
+
   function buy(itemId, qty = 1) {
     const item = itemById(itemId);
+    qty = whole(qty);
     // Key items and the Master Ball have no price; without this they would be
     // free, since the cost of qty x 0 is 0.
-    if (!item || !forSale(item) || qty < 1) return false;
+    if (!item || !forSale(item) || !qty) return false;
     const cost = priceOf(item) * qty;
     if (state.money < cost) return false;
     state.money -= cost;
@@ -1990,6 +2129,7 @@ export function createEngine(canvas, onChange, mini = null) {
        is what a future trade or battle log would need to refer to. */
     mon.species = targetId;
     mon.at = Date.now();
+    study(row.from, ["evolve"]);
 
     if (isNew) {
       checkDexRewards(targetId);
@@ -2061,7 +2201,9 @@ export function createEngine(canvas, onChange, mini = null) {
      0 reads as "nothing happened" at every call site. */
   function levelUp(uid, n = 1) {
     const mon = state.box.find((m) => m.uid === uid);
-    const spend = Math.min(Math.floor(n), state.candy);
+    // `whole`, because NaN here set the level to NaN - and loadState sends a
+    // non-finite level to limbo, so the Pokemon left the Box on the next load.
+    const spend = Math.min(whole(n), state.candy);
     if (!mon || spend < 1) return 0;
     state.candy -= spend;
     mon.level += spend;
@@ -2113,7 +2255,7 @@ export function createEngine(canvas, onChange, mini = null) {
 
        It is NOT true of the other two. The White Flute moves WHICH SPECIES and
        a honey moves WHICH TIER - different levers, by construction (see THREE
-       FIELD FAMILIES in CLAUDE.md), so running both is "a rarer species, and a
+       FIELD FAMILIES in docs/decisions.md), so running both is "a rarer species, and a
        better chance it is a variant", which is a coherent thing to want and the
        obvious reason to own both. Blocking it made the dearest two items in the
        shop mutually exclusive for no reason anybody could act on.
@@ -2155,6 +2297,7 @@ export function createEngine(canvas, onChange, mini = null) {
        that is already true cannot say "again". */
     e.ate = (e.ate ?? 0) + 1;
     e.lastAte = id;      // which one to draw tossing in
+    study(e.speciesId, ["fed"]);
     e.msg = stage > 1
       ? `${e.name} is eating another ${berry.name}!`
       : `${e.name} is eating the ${berry.name}.`;
@@ -2164,10 +2307,11 @@ export function createEngine(canvas, onChange, mini = null) {
   }
 
   function buyCandy(qty = 1) {
-    const cost = pricedAt(CANDY_PRICE, state.stats) * Math.max(1, Math.floor(qty));
-    if (qty < 1 || state.money < cost) return false;
+    qty = whole(qty);
+    const cost = pricedAt(CANDY_PRICE, state.stats) * qty;
+    if (!qty || state.money < cost) return false;
     state.money -= cost;
-    state.candy += Math.floor(qty);
+    state.candy += qty;
     save();
     changed();
     return true;
@@ -2197,6 +2341,32 @@ export function createEngine(canvas, onChange, mini = null) {
     useField,
     useBerry,
     claimDaily,
+    /* WORLD EVENTS RUNNING NOW, for the HUD's event card - one list, so an
+       outbreak and a rift are one kind of object on screen rather than two
+       bespoke cards. Each entry is `{ id, count, label, tip }`: `id` names
+       its icon (`public/events/<id>.png`), `count` is the big number and
+       `label` the word under it. Derived from state on every call, never
+       stored, so it cannot disagree with the event it describes. */
+    events: () => {
+      const out = [];
+      const ob = outbreak();
+      if (ob) {
+        const name = label(speciesById(ob.speciesId));
+        out.push({ id: "outbreak", count: ob.left, label: name.toUpperCase(),
+          tip: `Mass outbreak: ${name} in ${AREAS[ob.areaId].name}. `
+            + `Rare forms are ${OUTBREAK_LIFT}x as likely while it lasts.` });
+      }
+      if (riftHere()) {
+        out.push({ id: "rift", count: state.rift.left, label: "RIFT",
+          tip: "A space-time rift: rarer Pokémon come out and things turn up "
+            + "underfoot. Steps left - and leaving the map closes it." });
+      }
+      return out;
+    },
+    // Whether a rift is open where you stand, for the screen's tint.
+    riftHere,
+    // The map an outbreak is on, for the Travel panel's badge.
+    outbreakArea: () => outbreak()?.areaId ?? null,
     /* Read by the rail every render, so it is a function rather than a field:
        the day can turn over between two renders and a field would not know. */
     daily: () => {

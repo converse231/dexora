@@ -34,6 +34,9 @@ import {
   TIERS, TIER_ODDS, TIER_TELL, tiersFor, speciesById,
   ROSETTE_NEED, PITY_AFTER, PITY_CAP,
 } from "../game/biomes.js";
+import { OUTBREAK_LIFT } from "../game/events.js";
+import { HONEY_STEPS } from "../game/items.js";
+import { RESEARCH_MAX, RESEARCH_LIFT } from "../game/research.js";
 
 /* FIVE CREATURES EVERYBODY KNOWS. The point of a preview is recognition - you
    are here to learn what a treatment looks like, and you can only see that on
@@ -161,9 +164,15 @@ export default function Variants({ onClose }) {
               not required.
             </li>
             <li>
+              <b>Outbreaks and research lift it.</b> The species in today's
+              outbreak is {OUTBREAK_LIFT}&times; as likely to wear one, and a
+              species whose research reaches {RESEARCH_MAX} stays{" "}
+              {RESEARCH_LIFT}&times; as likely for good.
+            </li>
+            <li>
               <b>Honey aims the roll.</b> A coloured jar from the shop makes its
               own kind about three times likelier for {" "}
-              600 steps, and damps the others so most of what turns up is what
+              {HONEY_STEPS} steps, and damps the others so most of what turns up is what
               you paid for.
             </li>
             <li>

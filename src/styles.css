@@ -6,7 +6,7 @@
   --sand: #e5d5a2; --gold: #b4741a;
   --display: "Fredoka", "Trebuchet MS", sans-serif;
   --body: "Nunito Sans", "Segoe UI", system-ui, sans-serif;
-  --pixel: "Silkscreen", "Courier New", monospace;
+  --pixel: "Pixel", "Courier New", monospace;
 
   /* Must match T in game/engine.js. */
   --t-throw: 560ms;
@@ -18,6 +18,9 @@
 }
 
 * { box-sizing: border-box; }
+/* Every face here ships the weights it is used at - Press Start 2P ships one -
+   so a browser-faked bold or italic is only ever a smeared pixel font. */
+html { font-synthesis: none; }
 
 body {
   margin: 0;
@@ -60,7 +63,7 @@ body {
 .tb-stat:first-child { border-left: 0; }
 .tb-stat i {
   font-style: normal; font-family: var(--pixel);
-  font-size: 8px; letter-spacing: .1em; color: var(--ink-faint);
+  font-size: 9px; color: var(--ink-faint);
 }
 .tb-stat b {
   font-family: var(--display); font-weight: 600; font-size: 17px;
@@ -174,8 +177,8 @@ body {
     font-size: 10px; border-radius: 7px; border-width: 2px;
   }
   .biome-tag .types { margin-top: 3px; gap: 3px; }
-  .biome-tag .type { font-size: 8px; padding: 2px 5px 1px; }
-  .biome-tag i { font-size: 8.5px; }
+  .biome-tag .type { font-size: 9px; padding: 2px 5px 1px; }
+  .biome-tag i { font-size: 9px; }
   .biome-tag em { font-size: 9px; }
   /* The clock is the other thing pinned to the world, and it is the same
      decision - it says one word and a time. */
@@ -208,6 +211,17 @@ body {
    was a typed offset for a card that was 31px tall when it was written, the
    card grew, and the two printed on top of each other. */
 .viewport { position: relative; --tb-h: 16%; }
+/* A rift: violet at the edges, clear in the middle where you are walking,
+   breathing on opacity only so it costs a composite and never a repaint. */
+.rift-tint {
+  position: absolute; inset: 0; pointer-events: none; border-radius: 9px;
+  /* Measured too faint to notice at .28 - a rift you have to be told about
+     is not a rift. The inset glow is what reads at a glance. */
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(120, 60, 200, .34) 78%, rgba(60, 200, 230, .42) 100%);
+  box-shadow: inset 0 0 22px 6px rgba(140, 70, 225, .6);
+  animation: rift-breathe 3.2s ease-in-out infinite;
+}
+@keyframes rift-breathe { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
 canvas {
   display: block; width: 100%; height: auto;
   border-radius: 9px; border: 2px solid var(--line-firm);
@@ -216,7 +230,7 @@ canvas {
 }
 .hint {
   font-family: var(--pixel); font-size: 10.5px; color: var(--ink-faint);
-  text-align: center; margin-top: 10px; letter-spacing: .04em;
+  text-align: center; margin-top: 10px;
 }
 /* RUN is listed as soon as it is yours and lights up while Shift is down, so
    the same line says both what you can do and what you are doing. */
@@ -374,6 +388,25 @@ canvas {
   position: relative; display: grid; place-items: center;
   height: 54%; aspect-ratio: 1 / 1;
 }
+/* An alpha stands 25% taller - the slot, so every layer in it comes too. That
+   is past the 62% that read as pressed against the nameplate, and on purpose:
+   crowding the frame is what an alpha is for. It is also 4x on a 64px sprite,
+   so if it ever reads as rough, this is the number to bring down. */
+.mon-slot.alpha { height: 67.5%; }
+/* Its red glow sits BEHIND the creature, like the Astral aura, and breathes
+   on opacity alone - a filter on the sprite would fight the tier filters,
+   which carry !important. */
+.alpha-aura {
+  position: absolute; inset: -6%; z-index: 0; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(circle, rgba(230, 40, 40, .45) 0%, rgba(230, 40, 40, .18) 45%, transparent 70%);
+  animation: alpha-breathe 2.4s ease-in-out infinite;
+}
+@keyframes alpha-breathe { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
+.np-alpha {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: var(--pixel); font-size: 9px; color: #c62828;
+}
+.bx-vtag.alpha { display: inline-flex; align-items: center; gap: 2px; color: #c62828; }
 
 /* Dust kicked up where it lands, on appearing. */
 .land-ring {
@@ -666,10 +699,10 @@ canvas {
   padding: 1.6cqw 2.6cqw 1.4cqw; z-index: 6;
   background: var(--canopy); color: var(--paper); border-radius: 12px;
   box-shadow: 0 4px 0 rgba(20, 50, 34, .35);
-  font-family: var(--pixel); font-size: 1.7cqw; letter-spacing: .05em;
+  font-family: var(--pixel); font-size: max(9px, 1.7cqw);
   animation: shout-in 420ms cubic-bezier(.2, 1.5, .4, 1) both;
 }
-.shout b { font-size: 2.4cqw; font-weight: 400; }
+.shout b { font-size: max(9px, 2.4cqw); font-weight: 400; }
 .shout .lv { color: #ffe57a; }
 @keyframes shout-in {
   from { transform: translateY(-20px) scale(.85); opacity: 0; }
@@ -708,6 +741,7 @@ canvas {
    spoiling which of the unseen silhouettes are the legendaries would hand over
    the most interesting thing the grid has left to tell you. */
 .cell-legend { position: absolute; left: 3px; bottom: 3px; z-index: 4; }
+.cell-research { position: absolute; left: 3px; top: 3px; z-index: 4; pointer-events: none; }
 
 /* The legendary badge, beside the name. Not in the row of tier marks: those are
    four things you can earn and this is a fact about the species, so putting it
@@ -749,7 +783,7 @@ canvas {
 
 .np-size {
   display: inline-flex; align-items: center; gap: 4px;
-  font-family: var(--pixel); font-size: 1cqw; color: var(--ink-faint);
+  font-family: var(--pixel); font-size: max(9px, 1cqw); color: var(--ink-faint);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .np-size b {
@@ -760,7 +794,7 @@ canvas {
 .np-size.np-xs b { background: var(--path); color: #fff; }
 
 .np-types { display: flex; gap: 4px; }
-.np-gen { font-size: 1.35cqw; }
+.np-gen { font-size: max(9px, 1.35cqw); }
 /* Green because green already means "this one is done" here - it is what a
    maxed trainer stat turns. White on --canopy is 6.31:1, which an 8.5px pixel
    font needs. */
@@ -780,8 +814,8 @@ canvas {
    rather than the whole message. */
 .np-tier {
   display: inline-flex; align-items: center; gap: 4px; line-height: 1;
-  font-family: var(--pixel); font-size: 8.5px; font-size: 1.35cqw;
-  letter-spacing: .04em; padding: 3px 7px 2px; border-radius: 5px;
+  font-family: var(--pixel); font-size: 9px; font-size: max(9px, 1.35cqw);
+  padding: 3px 7px 2px; border-radius: 5px;
 }
 .np-tier .mark { width: 14px; height: 14px; }
 .np-origin { color: #4a3208; background: linear-gradient(160deg, #f2ddab, #cfa243);
@@ -1213,7 +1247,7 @@ canvas {
    nameplate's `.np-*` gradients: those carry pulse animations, which is right
    for one badge in an encounter and wrong for eight rows of a list. */
 .bx-vtag {
-  font-family: var(--pixel); font-size: 7.5px; letter-spacing: .06em;
+  font-family: var(--pixel); font-size: 9px;
   line-height: 1; padding: 3px 5px 2px; border-radius: 4px;
   color: #fff; background: var(--ink-soft);
 }
@@ -1228,11 +1262,11 @@ canvas {
 .types { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .type {
   display: inline-block; line-height: 1;
-  font-family: var(--pixel); font-size: 8.5px;
-  letter-spacing: .04em; padding: 4px 6px 3px; border-radius: 5px;
+  font-family: var(--pixel); font-size: 9px;
+  padding: 4px 6px 3px; border-radius: 5px;
   color: #fff; background: var(--ink-soft);
 }
-.battle .type { font-size: 1.35cqw; }
+.battle .type { font-size: max(9px, 1.35cqw); }
 .t-normal { background: #9b9b73; }
 .t-flying { background: #8f9fe8; }
 .t-bug { background: #9aa620; }
@@ -1262,8 +1296,8 @@ canvas {
    Flower Clearing's pseudo-type badge, which went with the map. */
 .gen {
   display: inline-block; line-height: 1;
-  font-family: var(--pixel); font-size: 8.5px;
-  letter-spacing: .04em; padding: 4px 6px 3px; border-radius: 5px;
+  font-family: var(--pixel); font-size: 9px;
+  padding: 4px 6px 3px; border-radius: 5px;
   /* Sand with a gold edge, not gold with ink on it. Both inks on --gold measure
      under 4.5:1 (3.16 dark, 3.85 white) and this chip is an 8.5px pixel font;
      ink on --sand is 8.34:1 and still reads as the odd one out beside the
@@ -1285,16 +1319,16 @@ canvas {
 }
 .tb-msg {
   font-family: var(--pixel); line-height: 1.55; color: var(--ink);
-  margin: 0; font-size: 12px; font-size: 2.05cqw;
+  margin: 0; font-size: 12px; font-size: max(9px, 2.05cqw);
 }
 .tb-hint {
-  font-family: var(--pixel); color: var(--ink-faint); letter-spacing: .06em;
-  font-size: 9px; font-size: 1.5cqw; text-align: right;
+  font-family: var(--pixel); color: var(--ink-faint);
+  font-size: 9px; font-size: max(9px, 1.5cqw); text-align: right;
 }
 
 .tb-warn {
   grid-column: 1 / -1;
-  font-family: var(--pixel); font-size: 1.6cqw; color: var(--path);
+  font-family: var(--pixel); font-size: max(9px, 1.6cqw); color: var(--path);
   margin: 1.2cqw 0 0;
 }
 
@@ -1315,7 +1349,7 @@ canvas {
   position: relative;
   flex: 1; min-width: 0;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
-  font-family: var(--pixel); font-size: 9.5px; letter-spacing: .04em;
+  font-family: var(--pixel); font-size: 9.5px;
   padding: 8px 2px 7px;
   border: 2px solid var(--line-firm); border-radius: 11px;
   background: var(--surface); color: var(--ink-faint); cursor: pointer;
@@ -1465,7 +1499,7 @@ canvas {
   border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
 }
 .hint-tag {
-  font-family: var(--pixel); font-size: 9px; letter-spacing: .14em;
+  font-family: var(--pixel); font-size: 9px;
   padding: 4px 8px 3px; border-radius: 7px;
   background: var(--gold); color: var(--ink);
 }
@@ -1500,7 +1534,7 @@ canvas {
 .gate-brand { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .gate-brand .title { font-family: var(--display); font-size: 22px; font-weight: 600; color: var(--ink); }
 .gate-step {
-  font-family: var(--pixel); font-size: 8px; letter-spacing: .12em;
+  font-family: var(--pixel); font-size: 9px;
   color: var(--ink-faint);
 }
 .gate-title {
@@ -1517,7 +1551,7 @@ canvas {
 .gate-form { display: grid; gap: 12px; margin-top: 16px; }
 .gate-field { display: grid; gap: 5px; }
 .gate-field span {
-  font-family: var(--pixel); font-size: 8.5px; letter-spacing: .1em;
+  font-family: var(--pixel); font-size: 9px;
   color: var(--ink-faint);
 }
 /* 16px so iOS does not zoom the page when a field takes focus - below that it
@@ -1792,7 +1826,7 @@ canvas {
 .hint-act {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 7px 12px 6px; cursor: pointer;
-  font-family: var(--pixel); font-size: 10.5px; letter-spacing: .04em;
+  font-family: var(--pixel); font-size: 10.5px;
   color: var(--canopy); background: var(--surface);
   border: 2px solid var(--canopy); border-radius: 10px;
   box-shadow: 0 2px 0 var(--line-firm);
@@ -1828,7 +1862,7 @@ canvas {
 .panel-head {
   display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
   font-family: var(--pixel); font-size: 11px; color: var(--ink-faint);
-  letter-spacing: .04em; margin-bottom: 11px;
+  margin-bottom: 11px;
 }
 .panel-head span:last-child { color: var(--ink); text-align: right; }
 .empty { font-size: 15px; color: var(--ink-faint); text-align: center; padding: 26px 0; }
@@ -1863,7 +1897,7 @@ canvas {
    already on the left. */
 .count em {
   margin-left: auto; font-style: normal;
-  font-family: var(--pixel); font-size: 10px; letter-spacing: .05em;
+  font-family: var(--pixel); font-size: 10px;
   color: var(--path);
 }
 
@@ -2121,6 +2155,8 @@ canvas {
 .arearow.here { background: var(--path-soft); border-color: var(--path); cursor: default; }
 .arearow:disabled { cursor: default; }
 .ar-name { grid-column: 1; grid-row: 1; font-size: 16px; font-weight: 700; }
+/* Today's outbreak: the event card's own icon, beside the map it is on. */
+.ar-event { width: 18px; height: 18px; margin-left: 6px; vertical-align: -3px; }
 .ar-types { grid-column: 1; grid-row: 2; }
 .arearow em {
   grid-column: 2; grid-row: 1 / span 2; justify-self: end; font-style: normal;
@@ -2140,7 +2176,7 @@ canvas {
 
 .sh-head {
   display: flex; justify-content: space-between; align-items: baseline;
-  font-family: var(--pixel); font-size: 10px; letter-spacing: .08em;
+  font-family: var(--pixel); font-size: 10px;
   color: var(--ink-faint); padding: 2px 2px 0;
 }
 .sh-head span:last-child { color: var(--ink-soft); }
@@ -2178,6 +2214,17 @@ canvas {
   font-size: 9.5px; color: var(--ink-faint); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
+/* TWO LINES, NOT ONE. The description clipped to one line and the rest lived
+   only in a hover tooltip - which a phone cannot show. Press Start 2P is wider
+   than the Silkscreen the 27-character limit was measured against, so even a
+   ball's hint ("x3.5 on Bug and Water") ran past one line. Two lines hold every
+   blurb this game writes; a stone's species list can run longer, so an OPEN row
+   (tapping is how you buy) shows all of it. */
+.sh-title i {
+  white-space: normal; line-height: 1.45;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+.shoprow.open .sh-title i { -webkit-line-clamp: unset; overflow: visible; }
 
 /* Stepper, MAX, then the button that spends the money - left to right in the
    order you decide them. */
@@ -2323,7 +2370,7 @@ canvas {
 .set-row:has(.set-wrap) .set-label { padding-top: 12px; }
 
 .set-label {
-  font-family: var(--pixel); font-size: 9.5px; letter-spacing: .06em;
+  font-family: var(--pixel); font-size: 9.5px;
   color: var(--ink-faint);
 }
 
@@ -2405,8 +2452,8 @@ canvas {
 }
 .set-char .gate-art { --z: 3; }
 .set-char em {
-  font-style: normal; font-family: var(--pixel); font-size: 8.5px;
-  letter-spacing: .06em; color: var(--ink-faint);
+  font-style: normal; font-family: var(--pixel); font-size: 9px;
+  color: var(--ink-faint);
 }
 .set-char:hover { border-color: var(--canopy); }
 .set-char:active { transform: translateY(2px); box-shadow: 0 0 0 var(--line-firm); }
@@ -2531,7 +2578,7 @@ canvas {
 .bag-tile.boosted { border-color: var(--canopy); }
 .bag-boost {
   position: absolute; top: 4px; right: 5px;
-  font-family: var(--pixel); font-size: 8.5px; color: var(--canopy);
+  font-family: var(--pixel); font-size: 9px; color: var(--canopy);
 }
 /* Same pop the rail has, and keyed on a counter for the same reason: a flag
    that is already true cannot say "again". */
@@ -2557,7 +2604,7 @@ canvas {
 .hp-body { overflow-y: auto; padding: 4px 15px 16px; }
 .hp-body h4 {
   margin: 12px 0 6px; font-family: var(--pixel); font-size: 9.5px;
-  letter-spacing: .06em; color: var(--ink-faint);
+  color: var(--ink-faint);
 }
 
 /* A definition list, laid out as a grid so every description starts on the
@@ -2595,7 +2642,7 @@ canvas {
 .vr-body { overflow-y: auto; padding: 4px 15px 16px; }
 .vr-body h4 {
   margin: 15px 0 7px; font-family: var(--pixel); font-size: 9.5px;
-  letter-spacing: .06em; color: var(--ink-faint);
+  color: var(--ink-faint);
 }
 
 /* WHO YOU ARE LOOKING AT. A row of real sprites rather than a `<select>`,
@@ -2615,7 +2662,7 @@ canvas {
 }
 .vr-who img { width: 30px; height: 30px; object-fit: contain; image-rendering: pixelated; }
 .vr-who span {
-  font-family: var(--pixel); font-size: 8px; letter-spacing: .03em;
+  font-family: var(--pixel); font-size: 9px;
   color: var(--ink-faint);
 }
 .vr-who:hover { border-color: var(--line-firm); }
@@ -2645,7 +2692,7 @@ canvas {
   object-fit: contain; image-rendering: pixelated;
 }
 .vr-name {
-  font-family: var(--pixel); font-size: 9px; letter-spacing: .04em;
+  font-family: var(--pixel); font-size: 9px;
   color: var(--ink); text-align: center;
 }
 /* THE NUMBER IS THE POINT OF THE CARD, so it is the one thing here set in the
@@ -2709,12 +2756,12 @@ canvas {
 .cf-pickall {
   display: flex; align-items: center; gap: 8px;
   margin: 10px 0 -2px;
-  font-family: var(--pixel); font-size: 9px; letter-spacing: .06em;
+  font-family: var(--pixel); font-size: 9px;
   color: var(--ink-soft);
 }
 .cf-pickall span { flex: 1 1 auto; font-variant-numeric: tabular-nums; }
 .cf-pickall button {
-  font-family: var(--pixel); font-size: 9px; letter-spacing: .08em;
+  font-family: var(--pixel); font-size: 9px;
   padding: 4px 9px 3px; border-radius: 6px; cursor: pointer;
   border: 2px solid var(--line); background: var(--paper); color: var(--ink);
   box-shadow: 0 2px 0 var(--line);
@@ -2742,7 +2789,7 @@ canvas {
 /* Why it arrived unticked, on the row. A default whose reason is only in the
    note underneath reads as the dialog having lost your place. */
 .cf-why {
-  font-family: var(--pixel); font-size: 7.5px; letter-spacing: .06em;
+  font-family: var(--pixel); font-size: 9px;
   font-weight: 400; padding: 3px 5px 2px; border-radius: 4px;
   background: var(--gold); color: #3a2a05; white-space: nowrap;
 }
@@ -2771,7 +2818,7 @@ canvas {
 }
 .cf-manifest .cf-row span { flex: 1; min-width: 0; }
 .cf-manifest .cf-row em {
-  font-style: normal; font-family: var(--pixel); font-size: 8px;
+  font-style: normal; font-family: var(--pixel); font-size: 9px;
   color: var(--ink-faint); text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -2788,7 +2835,7 @@ canvas {
 .daily.done { opacity: .72; }
 .dy-head {
   display: flex; align-items: center; justify-content: space-between;
-  font-family: var(--pixel); font-size: 8.5px; letter-spacing: .1em;
+  font-family: var(--pixel); font-size: 9px;
   color: var(--ink-faint); margin-bottom: 5px;
 }
 .dy-streak { color: var(--gold); }
@@ -2800,7 +2847,7 @@ canvas {
   font-family: var(--pixel); font-size: 9px; color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
-.dy-done { font-family: var(--pixel); font-size: 8.5px; color: var(--ink-faint); font-style: normal; }
+.dy-done { font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); font-style: normal; }
 .dy-claim {
   font-family: var(--pixel); font-size: 10px; padding: 9px 14px 7px;
   border: 2px solid var(--gold); border-radius: 9px;
@@ -2867,7 +2914,7 @@ canvas {
    it is a promise rather than a rule. */
 .shop-more {
   margin: 5px 0 12px; text-align: center;
-  font-family: var(--pixel); font-size: 8.5px; color: var(--ink-faint);
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
 }
 
 .candyrow {
@@ -2891,9 +2938,10 @@ canvas {
 }
 .cr-copy { flex: 1; min-width: 0; display: grid; }
 .cr-copy b { font-size: 13px; }
+/* Wraps rather than clipping: at 360px the three buy buttons leave it 66px,
+   and "1 candy = 1 level" is the whole explanation of what candy is. */
 .cr-copy i {
-  font-style: normal; font-size: 10.5px; color: var(--ink-soft);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-style: normal; font-size: 10.5px; color: var(--ink-soft); line-height: 1.3;
 }
 .cr-price {
   font-family: var(--pixel); font-size: 9px; color: var(--candy);
@@ -2943,8 +2991,8 @@ canvas {
 }
 .cf-actions button:hover { transform: translateY(-1px); }
 .cf-keys {
-  font-family: var(--pixel); font-size: 8.5px; color: var(--ink-faint);
-  text-align: center; margin: 9px 0 0; letter-spacing: .04em;
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
+  text-align: center; margin: 9px 0 0;
 }
 
 /* ---------- dex detail ---------- */
@@ -2986,15 +3034,32 @@ canvas {
 .sheet-name { font-family: var(--display); font-size: 27px; font-weight: 600; line-height: 1.1; margin: 3px 0; }
 .sheet-genus { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; }
 .sheet-types { display: flex; gap: 5px; }
-.sheet-types .type { font-size: 8.5px; }
+.sheet-types .type { font-size: 9px; }
 
 /* WHERE TO LOOK. Set as a list of place-and-likelihood pairs rather than
    prose: it is a thing you read to decide where to walk next, so it wants to
    be scanned, not read. Quiet enough to sit under the FORMS strip without
    competing with it. */
 .sheet-where { margin: 0 0 14px; }
+
+/* Research: the same quiet reference style as WHERE TO LOOK below it, with a
+   bar because a level is a thing you watch fill. */
+.sheet-research { margin: 0 0 14px; }
+.sr-head { display: flex; justify-content: space-between; align-items: center; }
+.sr-head b { display: inline-flex; align-items: center; gap: 4px; font-weight: 400; color: var(--path); }
+.sr-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-bottom: 6px; }
+.sr-bar i { display: block; height: 100%; background: var(--path); }
+.sheet-research ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.sheet-research li {
+  display: grid; grid-template-columns: 1fr auto; gap: 12px;
+  font-size: 13px; color: var(--ink-soft); min-height: 19px; align-items: center;
+}
+.sheet-research li em { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.sheet-research li.done { color: var(--ink-faint); text-decoration: line-through; }
+.sheet-research li.done em { color: var(--path); text-decoration: none; }
+.sr-note { margin: 6px 0 0; font-size: 12px; color: var(--ink-faint); }
 .sw-head {
-  font-family: var(--pixel); font-size: 8.5px; letter-spacing: .1em;
+  font-family: var(--pixel); font-size: 9px;
   color: var(--ink-faint); margin-bottom: 6px;
 }
 .sheet-where ul {
@@ -3054,8 +3119,8 @@ canvas {
 }
 
 .sheet-where li em {
-  font-style: normal; font-family: var(--pixel); font-size: 7.5px;
-  color: var(--ink-faint); letter-spacing: .04em; white-space: nowrap;
+  font-style: normal; font-family: var(--pixel); font-size: 9px;
+  color: var(--ink-faint); white-space: nowrap;
 }
 
 /* THE DEX TEXT. No coloured bar down the side - it was the only accent on the
@@ -3084,8 +3149,7 @@ canvas {
 }
 .fact { display: grid; justify-items: end; gap: 1px; }
 .fact dt {
-  font-family: var(--pixel); font-size: 8px; color: var(--ink-faint);
-  letter-spacing: .06em;
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
 }
 .fact dd {
   margin: 0; font-family: var(--display); font-weight: 600; font-size: 14px;
@@ -3101,7 +3165,7 @@ canvas {
 .sheet-forms { display: grid; gap: 7px; margin-bottom: 18px; }
 .sf-head {
   display: flex; align-items: center; justify-content: space-between;
-  font-family: var(--pixel); font-size: 8.5px; letter-spacing: .1em;
+  font-family: var(--pixel); font-size: 9px;
   color: var(--ink-faint);
 }
 .sf-all { display: inline-flex; align-items: center; gap: 5px; color: var(--gold); }
@@ -3163,7 +3227,7 @@ canvas {
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, .9));
 }
 .sf-name {
-  font-family: var(--pixel); font-size: 9px; letter-spacing: .04em;
+  font-family: var(--pixel); font-size: 9px;
   color: var(--ink-soft); text-align: center;
 }
 .sf-one.got .sf-name { color: var(--path); }
@@ -3193,7 +3257,7 @@ canvas {
   color: var(--path); font-variant-numeric: tabular-nums;
 }
 .sf-tally b i {
-  font-style: normal; font-size: 8.5px; color: var(--ink-faint);
+  font-style: normal; font-size: 9px; color: var(--ink-faint);
 }
 .sf-tally em {
   font-style: normal; font-family: var(--body); font-size: 9.5px;
@@ -3278,8 +3342,8 @@ canvas {
   background: var(--surface); font-variant-numeric: tabular-nums;
 }
 .tb-clock i {
-  font-style: normal; font-family: var(--pixel); font-size: 7.5px;
-  letter-spacing: .1em; color: var(--ink-faint);
+  font-style: normal; font-family: var(--pixel); font-size: 9px;
+  color: var(--ink-faint);
 }
 .tb-clock b { font-family: var(--pixel); font-size: 11px; font-weight: 400; }
 .tb-clock.ph-dawn  { background: #fdf1e4; border-color: #e8b98a; }
@@ -3344,8 +3408,8 @@ canvas {
   background: var(--surface); color: var(--ink);
 }
 .ms-tab i {
-  font-style: normal; font-family: var(--pixel); font-size: 7.5px;
-  letter-spacing: .1em; color: var(--ink-faint);
+  font-style: normal; font-family: var(--pixel); font-size: 9px;
+  color: var(--ink-faint);
 }
 .ms-tab b {
   display: flex; align-items: center; gap: 5px;
@@ -3451,7 +3515,7 @@ canvas {
     align-items: center; padding: 2px 1px;
     border-left: 2px solid var(--line);
   }
-  .tb-stat i { font-size: 6.5px; letter-spacing: .04em; }
+  .tb-stat i { font-size: 9px; letter-spacing: .04em; }
   .tb-stat b { font-size: 13px; gap: 2px; }
   .tb-stat b u { font-size: 8.5px; }
   .tb-candy { width: 12px; height: 12px; }
@@ -3893,7 +3957,7 @@ canvas {
      drops onto its own shadow. */
   .pad button:active { transform: translateY(2px); box-shadow: none; }
   .pad button:disabled { opacity: .35; box-shadow: none; }
-  .pad button i { font-style: normal; font-size: 8px; letter-spacing: .04em; }
+  .pad button i { font-style: normal; font-size: 9px; letter-spacing: .04em; }
   .pad button img { width: 22px; height: 22px; image-rendering: pixelated; }
 
   /* --- directions. A 3x3 so the arms meet at a hub, like a real cross. --- */
@@ -3951,7 +4015,7 @@ canvas {
      here"; the label and `Help` carry the words. */
   .pad-more {
     position: absolute; top: 7px; right: 0; left: 0;
-    font-size: 8px; letter-spacing: .12em; line-height: 1;
+    font-size: 9px; letter-spacing: .12em; line-height: 1;
     color: var(--surface); opacity: .65; text-decoration: none;
   }
   .pad-a { position: relative; }
@@ -4185,13 +4249,13 @@ canvas {
 }
 .evo-msg {
   font-family: var(--pixel); line-height: 1.5; color: var(--ink);
-  margin: 0 0 .8cqw; font-size: 12px; font-size: 1.95cqw;
+  margin: 0 0 .8cqw; font-size: 12px; font-size: max(9px, 1.95cqw);
 }
 .evo-msg b { color: var(--path); font-weight: 400; }
 .evo-sub {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0 1.8cqw;
   font-family: var(--pixel); color: var(--ink-faint);
-  font-size: 9px; font-size: 1.45cqw; margin: 0 0 1.1cqw;
+  font-size: 9px; font-size: max(9px, 1.45cqw); margin: 0 0 1.1cqw;
 }
 .evo-new { color: #b8791f; }
 .evo-lv { color: #2f7d4f; }
@@ -4199,7 +4263,7 @@ canvas {
 .evo-won img { width: 2.2cqw; min-width: 12px; image-rendering: pixelated; }
 
 .evo-go {
-  font-family: var(--pixel); font-size: 11px; font-size: 1.75cqw;
+  font-family: var(--pixel); font-size: 11px; font-size: max(9px, 1.75cqw);
   padding: 1.1cqw 2.4cqw .9cqw;
   border: 3px solid var(--path); border-radius: 10px;
   background: var(--path); color: #fff6f3;
@@ -4348,7 +4412,7 @@ button:disabled { transition: none; }
 }
 
 .cheer-kind {
-  font-family: var(--pixel); font-size: 9.5px; letter-spacing: .18em;
+  font-family: var(--pixel); font-size: 9.5px;
   color: var(--gold);
 }
 .cheer-dex .cheer-kind { color: var(--canopy); }
@@ -4440,6 +4504,8 @@ button:disabled { transition: none; }
      how you know which tier this is, so stopping them must not remove them. */
   .shiny-spark i, .astral-fx i { opacity: .9; transform: scale(1); }
   .astral-aura { opacity: .8; }
+  .alpha-aura { animation: none; opacity: .8; }
+  .rift-tint { animation: none; }
   /* Parked mid-sweep rather than at `from`, which is off the sprite entirely -
      a Holo with no band on it is just a slightly brighter Pokemon, and the
      band is how you know which tier it is. */
@@ -4519,10 +4585,16 @@ button:disabled { transition: none; }
   pointer-events: auto;
 }
 .fieldbox img { width: 30px; height: 30px; image-rendering: pixelated; }
+/* A world event: the same card, gold-rimmed, so it reads as the world doing
+   something rather than an item you used. */
+.fieldbox.event > span { box-shadow: 0 0 0 2px var(--gold) inset; }
+/* An event's label is a species name, and a regional one is 27 characters -
+   clipped, because the whole sentence is in the tip. */
+.fieldbox.event i { max-width: 13ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fieldbox .item-fx { width: 30px; }
 /* The number is the thing being read; the word is what it counts. */
 .fieldbox b { font-size: 17px; font-weight: 400; line-height: 1.05; }
-.fieldbox i { font-style: normal; font-size: 8.5px; letter-spacing: .08em; opacity: .8; }
+.fieldbox i { font-style: normal; font-size: 9px; letter-spacing: .08em; opacity: .8; }
 .fieldbox u { text-decoration: none; display: grid; }
 
 /* IT WORE OFF, and this is the same card gone cold rather than a new object.
@@ -4569,7 +4641,7 @@ button:disabled { transition: none; }
   .fieldbox > span { padding: 6px 10px 5px; gap: 7px; }
   .fieldbox img, .fieldbox .item-fx { width: 26px; height: 26px; }
   .fieldbox b { font-size: 15px; }
-  .fieldbox i { font-size: 8px; }
+  .fieldbox i { font-size: 9px; }
 }
 
 .minimap {
@@ -4610,7 +4682,7 @@ button:disabled { transition: none; }
 .fb-find { display: flex; gap: 6px; }
 .fb-find input { flex: 1; min-width: 0; }
 .fb-clear {
-  flex: 0 0 auto; font-family: var(--pixel); font-size: 9px; letter-spacing: .06em;
+  flex: 0 0 auto; font-family: var(--pixel); font-size: 9px;
   padding: 0 11px; border: 2px solid var(--line-firm); border-radius: 9px;
   background: var(--surface); color: var(--ink-faint); cursor: pointer;
 }
@@ -4719,13 +4791,13 @@ button:disabled { transition: none; }
   flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: .5cqw; padding: 1.4cqw 2.6cqw 1.1cqw;
-  font-family: var(--pixel); font-size: 1.7cqw;
+  font-family: var(--pixel); font-size: max(9px, 1.7cqw);
   border: 3px solid var(--line-firm); border-radius: 11px;
   background: var(--surface); color: var(--ink-soft); cursor: pointer;
 }
 .runbtn:hover { border-color: var(--path); color: var(--path); }
 .runbtn kbd {
-  font-family: var(--pixel); font-size: 1.25cqw; line-height: 1;
+  font-family: var(--pixel); font-size: max(9px, 1.25cqw); line-height: 1;
   padding: .5cqw .8cqw .35cqw; border-radius: 5px; border: 0;
   background: var(--ink-faint); color: var(--surface);
 }
@@ -4745,8 +4817,8 @@ button:disabled { transition: none; }
   font-family: var(--pixel); white-space: nowrap;
   animation: cheer-drop 260ms cubic-bezier(.2, 1.4, .4, 1) both;
 }
-.castbox b { font-size: 1.3cqw; color: var(--ink-faint); font-weight: 400; }
-.castbox span { font-size: 1.7cqw; color: var(--ink); }
+.castbox b { font-size: max(9px, 1.3cqw); color: var(--ink-faint); font-weight: 400; }
+.castbox span { font-size: max(9px, 1.7cqw); color: var(--ink); }
 /* A bite is the one moment worth colouring, and it lasts about half a second. */
 .castbox.bite { border-color: var(--gold); background: #fdf6e6; }
 .castbox.bite span { color: var(--path); }
@@ -4871,10 +4943,10 @@ button:disabled { transition: none; }
 }
 .br-tab img { width: 3.2cqw; min-width: 15px; image-rendering: pixelated; }
 .br-tab em {
-  font-style: normal; font-size: 1.5cqw; color: var(--ink);
+  font-style: normal; font-size: max(9px, 1.5cqw); color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-.br-chev { font-size: 1.9cqw; line-height: 1; color: var(--ink-faint); }
+.br-chev { font-size: max(9px, 1.9cqw); line-height: 1; color: var(--ink-faint); }
 .br-tab:hover .br-chev { color: var(--path); }
 
 /* THE COLLAPSE TURNED WITH THE RAIL: a 0fr/1fr COLUMN rather than row, so the
@@ -4993,11 +5065,11 @@ button:disabled { transition: none; }
   .br-pop { animation-duration: 1ms; }
 }
 .br-ball em {
-  flex: none; font-style: normal; font-size: 1.35cqw; line-height: 1;
+  flex: none; font-style: normal; font-size: max(9px, 1.35cqw); line-height: 1;
   color: var(--ink); font-variant-numeric: tabular-nums; text-align: center;
 }
 .br-ball kbd {
-  font-size: 1.1cqw; line-height: 1; padding: .3cqw .5cqw .2cqw;
+  font-size: max(9px, 1.1cqw); line-height: 1; padding: .3cqw .5cqw .2cqw;
   border-radius: 5px; border: 0;
   background: var(--ink-faint); color: var(--surface);
 }
@@ -5020,14 +5092,14 @@ button:disabled { transition: none; }
    nothing about it is wrong in the markup. */
 .br-list > li > kbd {
   display: block; text-align: center;
-  font-family: var(--pixel); font-size: 1.1cqw; line-height: 1;
+  font-family: var(--pixel); font-size: max(9px, 1.1cqw); line-height: 1;
   padding: .3cqw .5cqw .2cqw; border-radius: 5px; border: 0;
   background: var(--ink-faint); color: var(--surface);
 }
 .ballrail.live .br-list > li > kbd { background: var(--canopy); }
 .br-key {
   align-self: stretch;
-  font-family: var(--pixel); font-size: 1.1cqw; line-height: 1;
+  font-family: var(--pixel); font-size: max(9px, 1.1cqw); line-height: 1;
   padding: .3cqw .5cqw .2cqw; min-width: 2.1cqw;
   border-radius: 5px; border: 0; cursor: pointer;
   background: var(--canopy); color: var(--surface);
@@ -5047,7 +5119,7 @@ button:disabled { transition: none; }
 .br-ball { position: relative; }
 .br-boost {
   position: absolute; top: -.35cqw; right: -.35cqw;
-  font-style: normal; font-size: 1.05cqw; line-height: 1;
+  font-style: normal; font-size: max(9px, 1.05cqw); line-height: 1;
   padding: .25cqw .35cqw .15cqw; border-radius: 5px;
   background: var(--gold); color: #3a2a05;
 }
@@ -5183,4 +5255,16 @@ button:disabled { transition: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .sprite-showdown { animation: none; }
+}
+
+/* TOUCH TARGETS. Measured on a coarse pointer at 390px: the candy +1/+5/+10
+   were 23px tall, the bag's close 24px, WHERE TO LOOK's rows 22px and RUN
+   30px - all under the size a thumb can hit without taking its neighbour.
+   36px is the floor, and only on a coarse pointer, where a mouse-sized row
+   would otherwise cost the desktop layout its density for nothing. */
+@media (hover: none) and (pointer: coarse) {
+  .cr-buy, .bag-x, .runbtn { min-height: 36px; min-width: 36px; }
+  .bx-acts button { min-height: 36px; }
+  .ms-tab { min-height: 34px; }
+  .sheet-where li button { min-height: 36px; }
 }

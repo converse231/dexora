@@ -221,6 +221,7 @@ function until(e, what, label, max = 2000) {
 {
   const { catchBounty } = await import("../src/game/items.js");
   const { speciesById, dexIndex } = await import("../src/game/biomes.js");
+  const { TASKS } = await import("../src/game/research.js");
   const { e } = boot(SAVE);
   const paid = {};
 
@@ -232,6 +233,8 @@ function until(e, what, label, max = 2000) {
     enc = e.state.encounter;
     enc.variant = tier;
     e.state.dex[dexIndex(enc.speciesId)] = 2;   // not a new entry: that pays too
+    // And research already finished, because a research level pays too.
+    e.state.research[enc.speciesId] = TASKS.map((t) => t.steps.at(-1));
     const sp = speciesById(enc.speciesId);
     const before = e.state.money;
     /* THE MASTER BALL ASKS NOW, so this drives the real path rather than
@@ -717,6 +720,8 @@ function until(e, what, label, max = 2000) {
     `evolving moved the CAUGHT counter ${before} -> ${e.state.caught}`);
   assert.ok(e.state.dex.filter((v) => v === 2).length > dexBefore,
     "evolving must still register the species in the dex");
+  // Research credits the species evolved FROM: evolving a Caterpie is Caterpie research.
+  assert.equal(e.state.research[10]?.[7], 1, "evolving did not count towards the research it evolved from");
   console.log("caught counter ok — an evolution fills a dex slot without counting as a catch");
 }
 
@@ -1688,7 +1693,7 @@ function until(e, what, label, max = 2000) {
     `and ${scrims.length} scrims that ignore a gesture they did not see begin`);
 }
 
-/* A SAVE WRITTEN AT FOUR TIERS MUST LOAD AT EIGHT, and CLAUDE.md's claim that
+/* A SAVE WRITTEN AT FOUR TIERS MUST LOAD AT EIGHT, and docs/decisions.md's claim that
    adding a tier is "a non-event for saves" is exactly the sort of thing that
    is true right up until it is not. The rows are BUILT from `TIERS` in both
    `freshState` and `loadState`, so a save that predates a tier simply has no
@@ -1742,6 +1747,295 @@ function until(e, what, label, max = 2000) {
   console.log(`tier growth ok — a ${OLD.length}-tier save loads onto ${TIERS.length}, ` +
     "old rows intact, new rows empty, all of them written back");
 }
+
+/* A SAVED FIELD IS SAFE ON THREE COUNTS, and every new one gets all three:
+   a save written before the field existed loads with it empty; a real value
+   survives a write and a reload; and garbage (a hand-edit, an import from
+   another build) is dropped to empty rather than trusted. These are the save
+   rules that protect collections, stated once so each new field - an
+   outbreak, research, a rift - costs one line here instead of a test of its
+   own that might skip a count. Proved on `dry`, the pity counter. */
+async function savedField(name, good, bad, empty) {
+  const old = { ...SAVE };
+  delete old[name];
+  assert.deepEqual(boot(old).e.state[name], empty,
+    `a save written before "${name}" existed did not load it as empty`);
+
+  const e = boot({ ...SAVE, [name]: good }).e;
+  e.setChar(e.state.char === "red" ? "leaf" : "red");     // any real change saves
+  await new Promise((r) => setTimeout(r, 600));
+  const back = JSON.parse(store.get("meadow-route"));
+  assert.deepEqual(boot(back).e.state[name], good,
+    `"${name}" did not survive a save and a reload`);
+
+  assert.deepEqual(boot({ ...SAVE, [name]: bad }).e.state[name], empty,
+    `a garbage "${name}" was trusted instead of dropped to empty`);
+}
+await savedField("dry", 123, "lots", 0);
+{
+  const { dayKey } = await import("../src/game/daily.js");
+  const { outbreakPool } = await import("../src/game/events.js");
+  const { BIOMES } = await import("../src/game/biomes.js");
+  const pool = outbreakPool(BIOMES.find((b) => b.id === "meadow"), 50);
+  const ob = { key: dayKey(), areaId: "meadow", speciesId: pool[pool.length - 1], left: 7 };
+  await savedField("outbreak", ob, { key: 5, areaId: "nowhere", speciesId: -1, left: 99 }, null);
+  assert.equal(boot({ ...SAVE, outbreak: { ...ob, left: 16 } }).e.state.outbreak, null,
+    "an outbreak with more left than an outbreak holds was trusted");
+
+  /* AN OUTBREAK SPAWNS, COUNTS DOWN, AND ENDS WITH A NOTICE - through a real
+     step, because the substitution lives in `startEncounter` and nothing else
+     can see it. `Math.random` pinned low makes every roll land: the step
+     spawns, the outbreak takes it, and the tier rolls. One real step from a
+     walkable direction, found rather than named, then run from it. */
+  const real = Math.random;
+  const step = (e) => {
+    Math.random = () => 0.01;
+    try {
+      for (const dir of ["right", "down", "left", "up"]) {
+        e.press(dir);
+        for (let i = 0; i < 30 && !e.state.encounter; i++) tick(16);
+        e.clearHeld();
+        if (e.state.encounter) break;
+      }
+    } finally { Math.random = real; }
+    const enc = e.state.encounter;
+    assert.ok(enc, "a step with every roll landing started no encounter");
+    until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
+    e.flee();
+    until(e, (st) => !st.encounter, "the encounter to close", 4000);
+    return enc;
+  };
+  const e = boot({ ...SAVE, outbreak: { ...ob, left: 2 } }).e;
+  const met = step(e);
+  assert.equal(met.speciesId, ob.speciesId, "an outbreak step did not meet the outbreak species");
+  // Not a number on an ordinary one either: `enc.alpha && <x/>` renders a 0 as "0".
+  assert.equal(typeof met.alpha, "boolean", "enc.alpha is not a boolean");
+  assert.equal(e.state.outbreak.left, 1, "meeting the outbreak did not count it down");
+  assert.equal(e.events()[0]?.id, "outbreak", "a running outbreak has no event card");
+  step(e);
+  assert.equal(e.state.outbreak.left, 0, "the last of the outbreak did not count down to 0");
+  assert.ok(e.state.worn.some((w) => w.id === "outbreak" && w.event),
+    "an outbreak ended without a notice");
+  assert.deepEqual(e.events(), [], "an outbreak that is over still has a card");
+  assert.equal(e.outbreakArea(), null, "an outbreak that is over still badges a map");
+
+  // Off its own map an outbreak takes nothing.
+  const off = boot({ ...SAVE, outbreak: { ...ob, areaId: "pond" } }).e;
+  assert.equal(off.outbreakArea(), "pond", "the Travel badge names the wrong map");
+  step(off);
+  assert.equal(off.state.outbreak.left, 7, "an outbreak on another map took this map's encounter");
+}
+console.log("saved fields ok — dry, outbreak: missing loads empty, a value survives a reload, garbage is dropped");
+console.log("outbreak ok — spawns on its map, counts down, ends with a notice");
+
+/* RESEARCH COUNTS REAL PLAY. The save half first, then a catch through a real
+   step and a real throw: the tasks read facts frozen on the encounter, and
+   only a live catch can show that `settle` actually reads them. The species
+   is forced with an outbreak, the one honest way to choose what a step meets. */
+{
+  const { dayKey } = await import("../src/game/daily.js");
+  const { outbreakPool } = await import("../src/game/events.js");
+  const { BIOMES, speciesById } = await import("../src/game/biomes.js");
+  const { sellValue } = await import("../src/game/items.js");
+  const { TASKS, researchLevel, researchPay, RESEARCH_MAX } = await import("../src/game/research.js");
+  const slot = (id) => TASKS.findIndex((t) => t.id === id);
+
+  await savedField("research", { 16: [3, 1, 0, 0, 1, 0, 0, 0] }, "junk", {});
+  // One bad row costs that row, never the rest.
+  assert.deepEqual(boot({ ...SAVE, research: { 16: [1], 99999: [1], 19: "x", 21: [-2] } }).e.state.research,
+    { 16: [1] }, "a damaged research row took the good ones with it, or was kept");
+
+  const pool = outbreakPool(BIOMES.find((b) => b.id === "meadow"), 50);
+  const id = pool[0];
+  /* Short by exactly what this test does live: a berry (+10), then a
+     first-ball catch that takes the count to 4 (+10, +20) - Lv 6 to 7 to 10.
+     `fed` and `first` start at 0, or asserting them would prove nothing. */
+  const start = { catch: 3, night: 1, xs: 1, xl: 1, variant: 1 };
+  const nearly = TASKS.map((t) => start[t.id] ?? 0);
+  assert.equal(researchLevel(id, nearly), RESEARCH_MAX - 4, "the fixture is not Lv 6");
+  const { e } = boot({ ...SAVE,
+    outbreak: { key: dayKey(), areaId: "meadow", speciesId: id, left: 5 },
+    research: { [id]: nearly } });
+
+  const real = Math.random;
+  Math.random = () => 0.01;              // the step spawns, the outbreak takes it, the throw lands
+  try {
+    for (const dir of ["right", "down", "left", "up"]) {
+      e.press(dir);
+      for (let i = 0; i < 30 && !e.state.encounter; i++) tick(16);
+      e.clearHeld();
+      if (e.state.encounter) break;
+    }
+    assert.equal(e.state.encounter?.speciesId, id, "the research test met the wrong species");
+    until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
+    assert.equal(e.useBerry("razz-berry"), true, "the berry was refused");
+    assert.equal(e.state.research[id][slot("fed")], 1, "feeding a berry did not count");
+    assert.equal(researchLevel(id, e.state.research[id]), RESEARCH_MAX - 3, "a berry did not level research");
+    const money = e.state.money;
+    e.throwBall("poke-ball");
+    until(e, (st) => !st.encounter || st.encounter.phase === "caught", "the catch");
+    const row = e.state.research[id];
+    assert.equal(row[slot("catch")], 4, "a catch did not count towards research");
+    assert.equal(row[slot("first")], 1, "a first-ball catch did not count");
+    assert.equal(researchLevel(id, row), RESEARCH_MAX, "the last level was not reached");
+    assert.ok(e.state.cheers.some((c) => c.kind === "research"), "finishing research raised no banner");
+    assert.ok(e.state.money - money >= researchPay(sellValue(speciesById(id)), 1),
+      "the research level crossed on the catch was not paid");
+  } finally { Math.random = real; }
+  until(e, (st) => !st.encounter, "the encounter to close", 4000);
+}
+console.log("research ok — counts a real catch, a first ball and a berry, pays the level, banners the tenth");
+
+/* AN ALPHA, END TO END, through a real step and real throws - it is a flag on
+   the encounter that four different places have to read (the flee roll, the
+   catch, the box copy, the sweep), and a flag dropped by any one of them is
+   silent. The species is forced with an outbreak; `Math.random` pinned below
+   1 in 150 makes the roll land. */
+{
+  const { dayKey } = await import("../src/game/daily.js");
+  const { outbreakPool } = await import("../src/game/events.js");
+  const { BIOMES, speciesById, canBeAlpha, SIZE_MAX } = await import("../src/game/biomes.js");
+  const { alphaCandy } = await import("../src/game/items.js");
+  const { TASKS } = await import("../src/game/research.js");
+  const id = outbreakPool(BIOMES.find((b) => b.id === "meadow"), 50).find(canBeAlpha);
+  const { e } = boot({ ...SAVE, outbreak: { key: dayKey(), areaId: "meadow", speciesId: id, left: 5 } });
+
+  const real = Math.random;
+  try {
+    Math.random = () => 0.001;
+    for (const dir of ["right", "down", "left", "up"]) {
+      e.press(dir);
+      for (let i = 0; i < 30 && !e.state.encounter; i++) tick(16);
+      e.clearHeld();
+      if (e.state.encounter) break;
+    }
+    const enc = e.state.encounter;
+    assert.equal(enc?.speciesId, id, "the alpha test met the wrong species");
+    assert.equal(enc.alpha, true, "a roll under 1 in 150 did not make an alpha - or made it a number, which renders as \"0\" in JSX");
+    assert.ok(enc.size > SIZE_MAX, `an alpha came out size ${enc.size}`);
+    until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
+
+    /* A MISS THAT WOULD HAVE FLED. The throw's two rolls are the catch then
+       the flee: 0.99 misses, 0 would run from any ordinary Pokemon. */
+    const rolls = [0.99, 0];
+    Math.random = () => (rolls.length ? rolls.shift() : 0.5);
+    e.throwBall("poke-ball");
+    until(e, (st) => !st.encounter || ["idle", "fled", "caught"].includes(st.encounter.phase),
+      "the missed throw to resolve", 4000);
+    assert.ok(e.state.encounter && e.state.encounter.phase === "idle",
+      `an alpha that should never flee ended the throw ${e.state.encounter?.phase ?? "gone"}`);
+
+    Math.random = () => 0.001;
+    const candy = e.state.candy;
+    e.throwBall("poke-ball");
+    until(e, (st) => !st.encounter || st.encounter.phase === "caught", "the alpha to be caught");
+    assert.equal(e.state.candy - candy, alphaCandy(speciesById(id)), "the alpha's candy was not paid");
+    assert.ok(e.state.cheers.some((c) => c.kind === "alpha"), "catching an alpha raised no banner");
+    assert.equal(e.state.research[id][TASKS.findIndex((t) => t.id === "alpha")], 1,
+      "an alpha catch did not count for research");
+  } finally { Math.random = real; }
+  until(e, (st) => !st.encounter, "the encounter to close", 4000);
+
+  const mon = e.state.box.at(-1);
+  assert.equal(mon.alpha, 1, "the alpha flag did not reach the box");
+  assert.equal(e.sell([mon.uid]), 0, "an alpha was sold");
+  assert.ok(e.state.box.includes(mon), "selling took the alpha out of the box");
+
+  e.setChar(e.state.char === "red" ? "leaf" : "red");     // any real change saves
+  await new Promise((r) => setTimeout(r, 600));
+  const back = boot(JSON.parse(store.get("meadow-route"))).e.state.box.find((m) => m.uid === mon.uid);
+  assert.equal(back?.alpha, 1, "the alpha flag did not survive a save and a reload");
+  assert.equal(back.size, mon.size, "the alpha's size did not survive a save and a reload");
+}
+console.log("alpha ok — never flees, caught pays candy and research, boxed, unsellable, survives a reload");
+
+/* A RIFT, through real steps. Opening, counting down, finding and closing all
+   happen in `onArrive`, which only a walk reaches - so each is one real step
+   with `Math.random` pinned to the answer being tested. */
+{
+  const { RIFT_STEPS, RIFT_SURE } = await import("../src/game/events.js");
+  await savedField("rift", { areaId: "meadow", left: 40 }, { areaId: "nowhere", left: 999 }, null);
+  await savedField("sinceTravel", 1234, "lots", 0);
+  assert.equal(boot({ ...SAVE, rift: { areaId: "meadow", left: RIFT_STEPS + 1 } }).e.state.rift, null,
+    "a rift with more steps left than a rift lasts was trusted");
+
+  const real = Math.random;
+  // One step that arrives, from whichever direction is open. Returns false if boxed in.
+  const step = (e, r) => {
+    Math.random = () => r;
+    try {
+      for (const dir of ["right", "down", "left", "up"]) {
+        const n = e.state.steps;
+        e.press(dir);
+        for (let i = 0; i < 30 && e.state.steps === n; i++) tick(16);
+        e.clearHeld();
+        if (e.state.steps > n) return true;
+      }
+      return false;
+    } finally { Math.random = real; }
+  };
+  const leave = (e) => {
+    if (!e.state.encounter) return;
+    until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
+    e.flee();
+    until(e, (st) => !st.encounter, "the encounter to close", 4000);
+  };
+
+  // Certain at RIFT_SURE: the next step opens one, whatever the roll says.
+  const { e } = boot({ ...SAVE, sinceTravel: RIFT_SURE - 1 });
+  assert.ok(step(e, 0.5), "the rift test could not take a step");
+  assert.deepEqual(e.state.rift, { areaId: e.state.areaId, left: RIFT_STEPS },
+    "a certain rift did not open");
+  assert.ok(e.state.cheers.some((c) => c.kind === "rift"), "a rift opened without a banner");
+  assert.ok(e.riftHere() && e.events().some((ev) => ev.id === "rift"), "an open rift has no card or tint");
+  assert.equal(e.state.sinceTravel, 0, "opening a rift did not restart the clock");
+
+  // A find: pinned under RIFT_FIND and under the stone half, so a stone lands.
+  const stones = Object.keys(e.state.bag).filter((k) => k.endsWith("-stone"))
+    .reduce((n, k) => n + e.state.bag[k], 0);
+  step(e, 0.009);
+  leave(e);
+  const after = Object.keys(e.state.bag).filter((k) => k.endsWith("-stone"))
+    .reduce((n, k) => n + e.state.bag[k], 0);
+  assert.equal(after, stones + 1, "a rift find did not land a stone in the bag");
+  assert.equal(e.state.rift.left, RIFT_STEPS - 1, "a step in a rift did not count it down");
+
+  // The last step closes it, with a notice.
+  e.state.rift.left = 1;
+  step(e, 0.5);
+  leave(e);
+  assert.equal(e.state.rift, null, "a rift did not close when it ran out");
+  assert.ok(e.state.worn.some((w) => w.id === "rift" && w.event), "a rift closed without a notice");
+  assert.ok(!e.riftHere() && !e.events().some((ev) => ev.id === "rift"), "a closed rift kept its card");
+
+  // Leaving the map closes it too, and starts the clock again.
+  const t = boot({ ...SAVE, rift: { areaId: "meadow", left: 90 }, sinceTravel: 0 }).e;
+  t.state.sinceTravel = 500;
+  assert.ok(t.travel("woods"), "the rift test could not travel");
+  assert.equal(t.state.rift, null, "a rift stayed open on the map you left");
+  assert.equal(t.state.sinceTravel, 0, "travelling did not restart the rift clock");
+}
+console.log("saved fields ok — rift, sinceTravel");
+console.log("rift ok — opens when certain, counts down, finds, closes on time and on travel");
+
+/* A PURCHASE IS A WHOLE NUMBER, in the engine. The shop floors its input, so
+   only a caller that is not the shop can send 1.5 or NaN - which is exactly
+   why the engine is where it has to be refused. */
+{
+  const { e } = boot(SAVE);
+  const { money } = e.state, balls = e.state.bag["poke-ball"];
+  e.buy("poke-ball", 1.5);
+  assert.equal(e.state.bag["poke-ball"], balls + 1, "a fractional purchase put a fraction in the bag");
+  assert.equal(e.buy("poke-ball", NaN), false, "a NaN purchase went through");
+  assert.equal(e.buyCandy(NaN), false, "a NaN candy purchase went through");
+  e.state.box.push({ uid: 999, species: 16, level: 5, size: 100, at: 1 });
+  assert.equal(e.levelUp(999, NaN), 0, "raising by NaN spent something");
+  assert.equal(e.state.box.at(-1).level, 5, "raising by NaN changed the level");
+  e.buyCandy(2.7);
+  assert.ok(Number.isInteger(e.state.money) && Number.isInteger(e.state.candy) && e.state.money < money,
+    `a fractional purchase left money ${e.state.money} and candy ${e.state.candy}`);
+}
+console.log("purchases ok — whole numbers only, NaN refused");
 
 /* THE CAP ROSE AND BANKED XP IS OWED, EXACTLY ONCE. XP was never clamped at
    Lv 50, so a trainer who kept playing arrives at 75's table already past 50 -

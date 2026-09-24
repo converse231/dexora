@@ -108,10 +108,15 @@ function Box({
        keepers, so a variant row has no spares and no SELL button. */
     for (const mon of box) {
       const variant = variantOf(mon);
-      const key = `${mon.species}:${variant ?? ""}`;
+      /* AN ALPHA IS ITS OWN ROW, for the reason a variant is: `keeper()`
+         protects it, and a protection hidden inside a row of ordinary ones is
+         a guarantee nobody can see. */
+      const alpha = !!mon.alpha;
+      const key = `${mon.species}:${variant ?? ""}:${alpha ? "a" : ""}`;
       const g = byId.get(key) ?? {
         species: mon.species,
         variant,
+        alpha,
         count: 0,
         best: 0,
         mons: [],
@@ -623,7 +628,7 @@ function Box({
           const spare = group.spares.length;
           return (
             <div
-              key={`${group.species}:${group.variant ?? ""}`}
+              key={`${group.species}:${group.variant ?? ""}:${group.alpha ? "a" : ""}`}
               className={`boxrow${group.ready ? " ready" : group.spares.length ? " spare" : ""}`}
             >
               <Sprite id={group.species} variant={group.variant} fx />
@@ -641,6 +646,11 @@ function Box({
                   {group.variant && (
                     <span className={`bx-vtag ${group.variant}`}>
                       {group.variant.toUpperCase()}
+                    </span>
+                  )}
+                  {group.alpha && (
+                    <span className="bx-vtag alpha">
+                      <Mark tier="alpha" size={11} />ALPHA
                     </span>
                   )}
                   <span className={`tier tier-${sp.tier}`}>{sp.tier}</span>

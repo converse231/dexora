@@ -289,6 +289,10 @@ export function TrainerArt({ char, className = "" }) {
 
    An item with no `tier` stays a bare `<img>`, because that is what every
    other item is and a wrapper it does not need would change its layout. */
+/* A world event's icon (`tools/build_events.py`), built against the page for
+   the reason every asset here is - see `spriteUrl`. */
+export const eventIcon = (id) => new URL(`events/${id}.png`, document.baseURI).href;
+
 export function ItemIcon({ item, className = "" }) {
   const url = new URL(`items/${artOf(item)}.png`, document.baseURI).href;
   if (!item?.tier) {

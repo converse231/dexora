@@ -2068,7 +2068,7 @@ They are written as relationships now — `fleeChance(3) > fleeChance(30)`,
 ### The Dex grid was a wall of stills
 
 "The animations don't run in the dex tab" — right, and the reason was a claim in
-`CLAUDE.md` that had been wrong for months: *a Dex cell is one image with
+`docs/decisions.md` that had been wrong for months: *a Dex cell is one image with
 nowhere to hang a layer.* `.cell` is a `position: relative` button with
 `overflow: hidden`. It is a container. The claim was true of the **sprite** and
 got written down about the **cell**, and a note like that is self-fulfilling —
@@ -2809,7 +2809,7 @@ rule that held for one of a thing and not for four — a staircase placed on
 generated floor, a ledge derived by hand against four layers of painting, a
 connectivity test that asked a boolean where it needed a count, a generator cap
 set at twice the tallest map that had ever existed. Those are written up in
-CLAUDE.md under *Four times the map*, because they are what the next person
+docs/decisions.md under *Four times the map*, because they are what the next person
 growing something here will hit.
 
 **And one map could not be scaled at all.** Frost Hollow *is* Seafoam Islands
@@ -3032,7 +3032,7 @@ everything.
 
 **THERE IS NO TRUST BOUNDARY.** Every roll, price and dex write happens in the
 browser and the server stores the result. That is written at the top of
-CLAUDE.md and it is why there is no leaderboard. Trading is a **harder** case
+docs/decisions.md and it is why there is no leaderboard. Trading is a **harder** case
 than a leaderboard, and the difference is worth being exact about:
 
 - A leaderboard publishes numbers that cannot be trusted. The damage is bounded
@@ -3067,7 +3067,7 @@ mon that has never been traded does not need a row at all, which keeps the cost
 proportional to the feature rather than to the dex.
 
 **This is the expensive step and there is no way round it.** It is also the step
-CLAUDE.md has been scoping since accounts arrived — *"the ten browser-free
+docs/decisions.md has been scoping since accounts arrived — *"the ten browser-free
 modules in `src/game` are what makes the fix affordable when it is wanted"* —
 so the work is: stand up one Edge Function that imports `biomes.js` and
 `items.js` unchanged and mints a caught mon. The rule modules already run
@@ -3103,7 +3103,7 @@ next one's problems have to be solved.
    and a browser game cannot assume two people are online together. This is the
    mode the request actually described ("post/offer trades").
 
-3. **Trade evolutions, which this unlocks for free.** CLAUDE.md records that
+3. **Trade evolutions, which this unlocks for free.** docs/decisions.md records that
    every non-level evolution method collapses to `bond` because *"a game with no
    clock, no moves and no map transitions cannot express any of them"* — and
    trade is the one of those that stops being impossible the day this ships.
@@ -3189,5 +3189,7 @@ reference for browsing, not a source: everything in them is in
 [pret/pokeemerald](https://github.com/pret/pokeemerald) with its real palettes,
 layers and collision, which is where map tiles are actually pulled from. If you add any other sheet marked
 ☆ in the source directory, add its artist here before you share the game.
+The pixel lettering is **Press Start 2P by CodeMan38**, under the SIL Open Font
+License 1.1 (`public/fonts/OFL.txt`), self-hosted so the game reads the same offline.
 Uses Nintendo's characters and art — keep it personal and non-commercial: no ads,
 no payments, no store listing. **If you add a tileset marked ☆, credit its artist here.**

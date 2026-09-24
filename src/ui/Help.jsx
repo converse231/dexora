@@ -22,6 +22,9 @@
 import { useEffect } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
 import { RUN_LEVEL, SURF_LEVEL } from "../game/items.js";
+import { ALPHA_CHANCE } from "../game/biomes.js";
+import { OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_STEPS } from "../game/events.js";
+import { RESEARCH_MAX, RESEARCH_LIFT } from "../game/research.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
    lists want identical rows and a second copy of the row is how one of them
@@ -95,6 +98,34 @@ export default function Help({ onClose }) {
             grass. Rarer ones live in the later areas, and a few only appear
             once your trainer level has opened their generation.
           </p>
+          {/* THE FOUR THINGS THAT HAPPEN TO THE WORLD, and nowhere else says
+              them: a system nobody is told about reads as a bug the first time
+              it fires. Every number is the live constant, never typed - two
+              strings on the rare-forms page once quoted odds that had moved. */}
+          <h4>Out in the world</h4>
+          <ul className="vr-notes">
+            <li>
+              <b>Mass outbreaks.</b> Once a day one map is overrun by one
+              species for {OUTBREAK_SIZE} encounters, and its rare forms are{" "}
+              {OUTBREAK_LIFT}&times; as likely. The map list marks which.
+            </li>
+            <li>
+              <b>Research.</b> Every species has a level up to {RESEARCH_MAX}:
+              catch it at night, catch a tiny or a huge one, land the first
+              ball, feed it a berry. Each level pays, and a finished entry makes
+              its rare forms {RESEARCH_LIFT}&times; as likely. The Dex shows it.
+            </li>
+            <li>
+              <b>Alphas.</b> About one Pokémon in {Math.round(1 / ALPHA_CHANCE)} is
+              an alpha: far bigger, harder to catch, and it never runs. It pays
+              Rare Candy when caught and can never be sold.
+            </li>
+            <li>
+              <b>Rifts.</b> Stay on one map long enough and it tears. For{" "}
+              {RIFT_STEPS} steps rarer Pokémon come out and things turn up
+              underfoot. Leaving the map closes it.
+            </li>
+          </ul>
         </div>
       </div>
     </div>

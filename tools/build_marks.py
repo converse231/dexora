@@ -48,7 +48,7 @@ SIZE = 24
 SHEET_ORDER = ["origin", "shiny", "astral", "complete"]
 # Everything the game asks for. `src/ui/Marks.jsx` names the same set.
 ICONS = ["origin", "shiny", "holo", "astral", "glitched", "vivid", "noir",
-         "showdown", "complete", "legendary"]
+         "showdown", "complete", "legendary", "research", "alpha"]
 
 # THE SHAPE HAS TO CARRY IT, NOT THE COLOUR. Eight of these sit in a row on a
 # 76px Dex tile at 9px, and a row of coloured dots is unreadable to anybody who

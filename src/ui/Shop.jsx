@@ -160,7 +160,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
 
   /* BELOW `rowsOf`, DELIBERATELY. It calls it, and a `const` arrow declared
      above the one it calls is the shape that blanked the whole BOX tab once -
-     see the `SORTS` note in CLAUDE.md. It happens to be safe here (both are
+     see the `SORTS` note in docs/decisions.md. It happens to be safe here (both are
      initialised before render reaches either) and that is exactly how the last
      one looked too. */
   /* A shelf is the rows you can buy plus the one wall to aim at - see

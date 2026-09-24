@@ -7,8 +7,9 @@
 import { BIOMES, areaOpen } from "../game/biomes.js";
 import { AREAS } from "../game/map.js";
 import Types from "./Types.jsx";
+import { eventIcon } from "./Sprite.jsx";
 
-export default function Travel({ areaId, level = 1, onTravel, busy }) {
+export default function Travel({ areaId, level = 1, onTravel, busy, outbreakArea }) {
   return (
     <div className="panel">
       <div className="panel-head">
@@ -28,7 +29,13 @@ export default function Travel({ areaId, level = 1, onTravel, busy }) {
               onClick={() => onTravel(b.id)}
               data-tip={open ? undefined : `Opens at level ${b.level}`}
             >
-              <span className="ar-name">{b.name}</span>
+              <span className="ar-name">
+                {b.name}
+                {b.id === outbreakArea && (
+                  <img className="ar-event" src={eventIcon("outbreak")} alt="Mass outbreak"
+                    data-tip="A mass outbreak is on this map today" />
+                )}
+              </span>
               <Types of={b.types} className="ar-types" />
               <em>{here ? "HERE" : open ? "GO" : `LV ${b.level}`}</em>
             </button>
