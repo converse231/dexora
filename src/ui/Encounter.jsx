@@ -151,7 +151,6 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           {/* Both of the big tiers put something BEHIND the sprite - an
               Astral's aura, an Origin's seal - so each reads as something the
               creature is standing in rather than a layer over its art. */}
-          {enc.alpha && monHere && <span className="alpha-aura" aria-hidden="true" />}
           {enc.astral && monHere && <span className="astral-aura" aria-hidden="true" />}
           {enc.origin && monHere && <span className="origin-seal" aria-hidden="true" />}
 
@@ -278,11 +277,14 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           <Mark tier="legendary" size={16} className="np-legend" />
         )}
         <span className="np-name">{enc.name}</span>
-        {enc.alpha ? (
-          <span className="np-alpha" data-tip="An alpha: never runs, harder to catch, pays Rare Candy">
+        {/* AN ICON, NOT A TREATMENT, so it sits beside any tier's chip - an
+            Alpha Shiny shows both - instead of two effects fighting over one
+            sprite. The bigger slot says the rest. */}
+        {enc.alpha && (
+          <span className="np-alpha" data-tip="An alpha: huge, never runs, harder to catch, pays Rare Candy">
             <Mark tier="alpha" size={16} />ALPHA
           </span>
-        ) : null}
+        )}
         <span className="np-lv">Lv {enc.level}</span>
         {/* HOW BIG THIS ONE IS. `species.js` has carried height and weight
             since the first fetch and nothing read them; this is what reads

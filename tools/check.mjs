@@ -838,8 +838,13 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
     if (!rows.length) continue;
     chains++;
     for (const row of rows) {
-      assert.equal(speciesById(row.to).from, sp.name,
-        `${sp.name} -> ${speciesById(row.to).name} is not a real evolution`);
+      /* A regional row is checked against the SPECIES it copies: a form's
+         `from` names its base species, not its pre-evolution, so Alolan
+         Raichu's reads "raichu". Read both ends through to their base. */
+      const real = row.regional
+        ? speciesById(speciesById(row.to).of).from === (isForm(sp.id) ? sp.from : sp.name)
+        : speciesById(row.to).from === sp.name;
+      assert.ok(real, `${sp.name} -> ${speciesById(row.to).name} is not a real evolution`);
       assert.equal(evolutionRow(sp.id, row.to), row, "rows must be findable");
 
       /* EVERY row has a level, including the ones PokeAPI gives none for.
@@ -2193,8 +2198,8 @@ assert.ok(LEGEND_STRAY < LEGEND_MATCHED,
      `from` is one number meaning "not before this level", whichever of the two
      causes is later - the map's own unlock, or an evolved form's. */
   for (const sp of SPECIES) {
-    const { legendary, areas } = foundIn(sp.id);
-    if (legendary) continue;
+    // Legendaries included: they have homes now, and a home can be behind a gate.
+    const { areas } = foundIn(sp.id);
     for (const a of areas) {
       const gate = BIOMES.find((b) => b.id === a.id).level;
       const genGate = GEN_UNLOCK[genOf(sp.id)] ?? 0;
@@ -3463,12 +3468,28 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
            `evo`, which is the same field `fetch-evolutions` reads to emit the
            row, so the two cannot disagree about whether it was meant. An
            undeclared row is still the fault it always was. */
-        assert.ok(!rows.length || sp.evo,
+        /* AND A REGIONAL LINE IS THE THIRD KIND OF ROW. Hisuian Arcanine is
+           wild AND evolved into, like Castform - but it is a LINE, not a
+           transformation, so its row is not declared and does not cost 100:
+           `fetch-evolutions` copies the species' own row, marked `regional`.
+           So a regional row must MIRROR a real one - same method, level and
+           item, from the ordinary parent or that parent's own form - or it is
+           a price somebody invented. Everything else is still the old rule. */
+        const declared = rows.filter((e) => !e.regional);
+        assert.ok(!declared.length || sp.evo,
           `${sp.name} is met in the wild AND evolved into without declaring ` +
           "`evo` - one of the two is an accident");
-        for (const e of rows) {
+        for (const e of declared) {
           assert.equal(evoLevel(e), 100,
             `${sp.name} evolves at Lv ${evoLevel(e)}, not the 100 a form costs`);
+        }
+        for (const e of rows.filter((r) => r.regional)) {
+          const parent = isForm(e.from) ? speciesById(e.from).of : e.from;
+          const twin = EVOLUTIONS.find((r) => !r.regional && r.from === parent && r.to === sp.of);
+          assert.ok(twin && twin.kind === e.kind && twin.level === e.level && twin.item === e.item,
+            `${sp.name}'s regional row from #${e.from} copies no real ${parent} -> ${sp.of} row`);
+          assert.ok(!isForm(e.from) || speciesById(e.from).form === sp.form,
+            `${sp.name} evolves from a form of another region`);
         }
         assert.ok(wild.has(sp.id),
           `${sp.name} is a wild form in no table even at Lv ${MAX_LEVEL} - ` +
@@ -4203,10 +4224,12 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `${finished} finished over ${BIOMES.length} playthroughs`);
   }
 
-  /* ALPHAS. Four claims: never a legendary or a costume; they arrive at their
-     own rate; they are bigger than any ordinary roll; and they are held back
-     from every sweep while costing and paying inside the economy's bounds. */
+  /* ALPHAS - A LAYER, NOT A TIER. Four claims: never a legendary or a
+     costume; its own rate, independent of the ladder (so an Alpha Shiny
+     exists); bigger than any ordinary roll; and held back from every sweep
+     while costing and paying inside the economy's bounds. */
   {
+    assert.ok(!TIERS.includes("alpha"), "alpha is on the tier ladder - it would stop stacking with the tiers");
     for (const sp of SPECIES) {
       assert.equal(rollAlpha(() => 0, sp.id), canBeAlpha(sp.id), `${sp.name} ignored canBeAlpha`);
       if (isLegendary(sp.id)) assert.ok(!canBeAlpha(sp.id), `${sp.name} is a legendary alpha`);
@@ -4256,7 +4279,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.ok(tasksFor(16).some((t) => t.id === "alpha"), "Pidgey has no alpha task");
     assert.ok(!tasksFor(LEGENDARY[0]).some((t) => t.id === "alpha"), "a legendary has an alpha task");
 
-    console.log(`alphas ok — 1 in ${Math.round(rolls / hits)}, size ${ALPHA_SIZE.join("-")}, ` +
+    console.log(`alphas ok — a layer at 1 in ${Math.round(rolls / hits)}, size ${ALPHA_SIZE.join("-")}, ` +
       `catch ×${ALPHA_CATCH}, never flee, ${ALPHA_CANDY}x candy at capture, never swept`);
   }
 
