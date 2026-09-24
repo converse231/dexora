@@ -2365,6 +2365,14 @@ export function createEngine(canvas, onChange, mini = null) {
     },
     // Whether a rift is open where you stand, for the screen's tint.
     riftHere,
+    /* Everything the Events page shows. Today's outbreak even once it is over,
+       so the page can say "over for today" rather than nothing - `outbreak()`
+       is called first because it is what rolls the day over. */
+    world: () => {
+      outbreak();
+      return { outbreak: state.outbreak, rift: riftHere() ? state.rift : null,
+        sinceTravel: state.sinceTravel ?? 0 };
+    },
     // The map an outbreak is on, for the Travel panel's badge.
     outbreakArea: () => outbreak()?.areaId ?? null,
     /* Read by the rail every render, so it is a function rather than a field:

@@ -3189,7 +3189,7 @@ reference for browsing, not a source: everything in them is in
 [pret/pokeemerald](https://github.com/pret/pokeemerald) with its real palettes,
 layers and collision, which is where map tiles are actually pulled from. If you add any other sheet marked
 ☆ in the source directory, add its artist here before you share the game.
-The pixel lettering is **Press Start 2P by CodeMan38**, under the SIL Open Font
+The pixel lettering is **Geist Pixel by the Geist Project Authors (Vercel)**, under the SIL Open Font
 License 1.1 (`public/fonts/OFL.txt`), self-hosted so the game reads the same offline.
 Uses Nintendo's characters and art — keep it personal and non-commercial: no ads,
 no payments, no store listing. **If you add a tileset marked ☆, credit its artist here.**

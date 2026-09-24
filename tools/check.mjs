@@ -31,10 +31,10 @@ const stripComments = (src) =>
    12"), not estimated - the same mistake the 21-character ball hint made, and
    for the same reason: the COUNT'S DIGITS share the line.
 
-   RE-MEASURED for Press Start 2P, which is wider than the Silkscreen this was
-   first taken against: 169px holds 19 characters a line at 9.5px x 90%, so
-   one line no longer held 27 and the description wraps to TWO. Two lines less
-   one word lost to a break still hold 27 - the bound stands, the reason moved. */
+   The description wraps to TWO lines now (a phone has no hover to read a
+   clipped one), and the face is Geist Pixel, which is narrower than the
+   Silkscreen this was first measured against - so 27 is conservative on one
+   line and generous on two. The bound stands as the limit on what we WRITE. */
 const BLURB_FITS = 27;
 
 // --- odds -----------------------------------------------------------------
@@ -369,9 +369,9 @@ for (let i = 1; i < SHOP_BALLS.length; i++)
        clipped next to "YOU HAVE 14", because the two share the line and the
        COUNT'S DIGITS eat the note's budget. 16 leaves room for a three-digit
        stack, which is a bag anyone will have. A character count is a proxy for
-       a pixel width, and the face is Press Start 2P, which is exactly
-       monospace. The description now wraps to two lines (see BLURB_FITS), so
-       16 is the bound on a hint staying on the FIRST one, beside its x3.5. */
+       a pixel width, and Geist Pixel is proportional - so it is a bound with
+       margin, not a measurement. The description wraps to two lines (see
+       BLURB_FITS); 16 keeps a hint on the FIRST one, beside its x3.5. */
     assert.ok(ball.hint.length <= 16,
       `${ball.id}'s hint is ${ball.hint.length} characters and the shop clips at 16: "${ball.hint}"`);
     assert.ok(ball.boost > ball.mult, `${ball.id}'s boost is not a boost`);
@@ -2086,7 +2086,8 @@ for (const b of BIOMES) {
     const dressed = SPECIES.filter((sp) => sp.form === "costume").map((sp) => sp.id);
     const cShare = t.filter((e) => dressed.includes(e[0]))
       .reduce((n, e) => n + e[1], 0) / total;
-    const cOpen = dressed.filter((id) => genOpen(id, lv)).length;
+    // Only the ones that LIVE here - a costume is homed like a legendary now.
+    const cOpen = dressed.filter((id) => genOpen(id, lv) && legendTier(id, b.types) > 0).length;
     const cWant = Math.min(LEGEND_CEIL, LEGEND_EACH * cOpen);
     assert.ok(Math.abs(cShare - cWant) < 1e-9,
       `${b.id} at Lv ${lv}: the costume Pikachu are ${(cShare * 100).toFixed(3)}% ` +
@@ -4337,10 +4338,10 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `tilt ${RIFT_TILT} flattens every map, finds ${(worst * 100).toFixed(1)}% of a cycle (${where})`);
   }
 
-  /* THE PIXEL FACE HAS A FLOOR. Press Start 2P is drawn on an 8px grid and
-     turns to mush below it - "BAG" read as "DAG" at the sizes Silkscreen was
-     happy at - and a bare cqw size has no floor at all, which put the
-     encounter's size readout at 3px on a phone. Letter-spacing goes too: this
+  /* THE PIXEL FACE HAS A FLOOR. A pixel face turns to mush below its grid -
+     "BAG" read as "DAG" under the face this game used for one pass - and a
+     bare cqw size has no floor at all, which put the
+     encounter's size readout at 3px on a phone. Letter-spacing goes too: the
      face carries its own tracking, and the extra is what pushed text out of
      its chips. Checked on every rule that names the face; the rules that only
      inherit it were fixed by hand and are named in the audit, not here. */

@@ -12,6 +12,8 @@ import Confirm from "./ui/Confirm.jsx";
 import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
 import Variants from "./ui/Variants.jsx";
+import Events from "./ui/Events.jsx";
+import News, { newsUnread } from "./ui/News.jsx";
 import Bag from "./ui/Bag.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
@@ -129,6 +131,10 @@ export default function App({
   const [settings, setSettings] = useState(false);
   const [help, setHelp] = useState(false);
   const [forms, setForms] = useState(false);
+  const [events, setEvents] = useState(false);
+  const [news, setNews] = useState(false);
+  // Read once per render, cheap: one localStorage get. Cleared by opening News.
+  const unread = !news && newsUnread();
   /* THE TOUCH BAG, and it is deliberately not the rail's `ballsOpen`. That one
      is a desktop preference and is PERSISTED - the rail remembers whether you
      left it open. This is a sheet you summon and dismiss, it starts closed
@@ -502,6 +508,19 @@ export default function App({
 
       {help && <Help onClose={() => setHelp(false)} />}
       {forms && <Variants onClose={() => setForms(false)} />}
+      {news && <News onClose={() => setNews(false)}
+        onEvents={() => { setNews(false); setEvents(true); }} />}
+      {events && (
+        <Events
+          world={engine?.world()}
+          state={st}
+          level={level}
+          busy={Boolean(enc || evo)}
+          onTravel={(id) => { if (engine.travel(id)) setEvents(false); }}
+          onSelect={(id) => { setEvents(false); setEntry(id); }}
+          onClose={() => setEvents(false)}
+        />
+      )}
 
       {settings && account && (
         <Settings
@@ -547,6 +566,9 @@ export default function App({
         onSettings={account ? () => setSettings(true) : null}
         onHelp={() => setHelp(true)}
         onForms={() => setForms(true)}
+        onEvents={() => setEvents(true)}
+        onNews={() => setNews(true)}
+        unread={unread}
         trainerName={trainerName}
       />
 
@@ -622,7 +644,17 @@ export default function App({
                 effect, because both are "something is changing the world for
                 a while" and both count down. */}
             {(engine?.events() ?? []).map((ev) => (
-              <div className="fieldbox event" role="status" key={ev.id}>
+              /* A CARD YOU CAN SEE SHOULD OPEN WHAT IT IS ABOUT: the Events
+                 page. A real button, so it is in the tab order and a screen
+                 reader names it; the corner is `pointer-events: none` and only
+                 these opt back in. */
+              <button
+                type="button"
+                className="fieldbox event"
+                key={ev.id}
+                onClick={() => setEvents(true)}
+                aria-label={`${ev.tip} Open events.`}
+              >
                 <span data-tip={ev.tip}>
                   <img src={eventIcon(ev.id)} alt="" />
                   <u>
@@ -630,7 +662,7 @@ export default function App({
                     <i>{ev.label}</i>
                   </u>
                 </span>
-              </div>
+              </button>
             ))}
 
             {FAMILIES.some((f) => st?.field?.[f]) && (

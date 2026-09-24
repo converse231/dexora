@@ -98,7 +98,7 @@ function Missions({ daily, onClaim, note }) {
    THE QUEST STAYS OUT OF IT. That is a thing you check and claim during play,
    and it carries a dot when it is ready; buried behind a burger it would be
    the YOU tab again, which is where it was when nobody could find it. */
-/* DRAWN HERE RATHER THAN FETCHED. Three 16px glyphs are smaller as markup than
+/* DRAWN HERE RATHER THAN FETCHED. A handful of 16px glyphs is smaller as markup than
    as a request, they take `currentColor` so the hover state costs nothing, and
    they stay sharp at any zoom - which `public/icons` cannot, being pixel masks
    sized for the tab rail. Stroked rather than filled, because at 16px a filled
@@ -115,6 +115,8 @@ const ICON = {
     + "0 0 0-1.4 1",
   out: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
   reset: "M3 12a9 9 0 1 0 2.6-6.4M3 4v5h5",
+  bolt: "M13 2 4 14h7l-1 8 9-12h-7z",
+  bell: "M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0",
 };
 
 function Glyph({ of }) {
@@ -125,7 +127,7 @@ function Glyph({ of }) {
   );
 }
 
-function Menu({ onSettings, onHelp, onForms, onLogOut, onReset }) {
+function Menu({ onSettings, onHelp, onForms, onEvents, onNews, unread, onLogOut, onReset }) {
   const [open, setOpen] = useState(false);
   const box = useRef(null);
 
@@ -158,10 +160,20 @@ function Menu({ onSettings, onHelp, onForms, onLogOut, onReset }) {
         onClick={() => setOpen((v) => !v)}
       >
         <span aria-hidden="true">{open ? "\u2715" : "\u2630"}</span>
+        {/* One dot for something unread, on the one button that leads to it. */}
+        {unread && !open && <i className="tb-dot" aria-label="New update" />}
       </button>
 
       {open && (
         <div className="tb-pop" role="menu">
+          {/* LIVE FIRST, then news, then reference - what is happening today
+              is the thing a player opens this menu most often to find. */}
+          <button type="button" role="menuitem" onClick={run(onEvents)}>
+            <Glyph of="bolt" />Events
+          </button>
+          <button type="button" role="menuitem" onClick={run(onNews)}>
+            <Glyph of="bell" />What&rsquo;s new{unread && <i className="tb-dot" aria-label="unread" />}
+          </button>
           <button type="button" role="menuitem" onClick={run(onHelp)}>
             <Glyph of="help" />How to play
           </button>
@@ -199,6 +211,7 @@ function Menu({ onSettings, onHelp, onForms, onLogOut, onReset }) {
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
   onLogOut = null, onSettings = null, onHelp = null, onForms = null,
+  onEvents = null, onNews = null, unread = false,
   trainerName = null,
   stale = null,
   daily, onClaimDaily, claimNote,
@@ -305,6 +318,9 @@ export default function TopBar({
         onSettings={onSettings}
         onHelp={onHelp}
         onForms={onForms}
+        onEvents={onEvents}
+        onNews={onNews}
+        unread={unread}
         onLogOut={onLogOut}
         onReset={onReset}
       />
