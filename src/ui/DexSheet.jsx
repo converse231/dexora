@@ -25,8 +25,9 @@ import { label } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
 import {
   foundIn, howOften, speciesById, areaOpen, BIOMES, tiersFor, ROSETTE_NEED,
-  TIER_TELL,
+  TIER_TELL, genOf, dexIndex,
 } from "../game/biomes.js";
+import { evoLevel, itemById } from "../game/items.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
 import {
@@ -59,9 +60,6 @@ const LABEL = (t) => t.charAt(0).toUpperCase() + t.slice(1);
    most likely to open wondering where it is. */
 function whereToFind(id) {
   const { legendary, areas, rods } = foundIn(id);
-  if (legendary) {
-    return [{ key: "legend", where: "Anywhere", how: "vanishingly rare" }];
-  }
 
   /* `from` is the level an evolved form starts turning up at. Printed, because
      a sheet that says "Deep Woods · rare" for a Venusaur to a Lv 3 trainer is
@@ -72,7 +70,7 @@ function whereToFind(id) {
     // a rod row and an "evolve X" row are neither, and must not offer to go.
     area: a.id,
     where: a.name,
-    how: a.from ? `${howOften(a.share)} · Lv ${a.from}+` : howOften(a.share),
+    how: (legendary ? "legendary" : howOften(a.share)) + (a.from ? ` · Lv ${a.from}+` : ""),
   }));
   for (const rod of rods) out.push({ key: rod, where: "Any water", how: rod });
 
@@ -172,10 +170,58 @@ function Where({ id, level = 1, busy = false, here = null, onTravel = null }) {
   );
 }
 
+/* THE EVOLUTION LINE, which the sheet never showed: what this comes from and
+   what it becomes, each with what it costs. A step you have not SEEN stays
+   "???" - the same rule the grid follows, because the line is a spoiler for
+   exactly the entries a player has not met. Seen ones are buttons that open
+   that entry, so the line can be walked. */
+const METHOD = (row) => {
+  const at = `Lv ${evoLevel(row)}`;
+  if (row.item) return `${at} + ${itemById(row.item)?.name ?? row.item}`;
+  return row.kind === "trade" || row.kind === "bond" ? `${at} · friendship` : at;
+};
+
+function Line({ id, dexOf, onSelect }) {
+  const from = EVOLUTIONS.filter((r) => r.to === id).map((r) => [r.from, r]);
+  const into = EVOLUTIONS.filter((r) => r.from === id).map((r) => [r.to, r]);
+  if (!from.length && !into.length) {
+    return <p className="sheet-line-none">Does not evolve.</p>;
+  }
+  const step = ([other, row], dir) => {
+    const known = dexOf(other) >= 1;
+    const name = known ? label(speciesById(other)) : "???";
+    const body = (
+      <>
+        <Sprite id={other} className={known ? "" : "locked"} alt="" />
+        <span><i>{dir}</i><b>{name}</b></span>
+        <em>{METHOD(row)}</em>
+      </>
+    );
+    return (
+      <li key={`${dir}-${other}`}>
+        {known && onSelect
+          ? <button type="button" onClick={() => onSelect(other)}>{body}</button>
+          : <div>{body}</div>}
+      </li>
+    );
+  };
+  return (
+    <div className="sheet-line">
+      <div className="sw-head">EVOLUTION</div>
+      <ul>
+        {from.map((x) => step(x, "from"))}
+        {into.map((x) => step(x, "into"))}
+      </ul>
+    </div>
+  );
+}
+
+let lastTab = "forms";   // the tab this session last used - see `tabs` below
+
 export default function DexSheet({
   id, state, variant = null, held = {}, owned = 0, research = null,
   level = 1, here = null, busy = false,
-  onClose, onFindInBox, onTravel,
+  onClose, onFindInBox, onTravel, onSelect = null, dexOf = () => 0,
 }) {
   const sp = speciesById(id);
   const caught = state === 2;
@@ -213,6 +259,34 @@ export default function DexSheet({
   useEffect(() => { setPicked(variant); }, [id, variant]);
   const shown = got(picked) ? picked : variant;
 
+
+  /* TABS, because it had become five stacked blocks - forms, research, where,
+     flavour, measurements - and on a phone the one you opened it for was a long
+     scroll away. The header stays put and names the Pokemon; only the panel
+     below changes, and the panel scrolls rather than the card, so switching
+     tabs never makes the dialog jump in size. FORMS opens first: it is what
+     this dialog is opened for (see the note at the top of the file). The last
+     tab used is remembered while you browse, so reading one Pokemon's research
+     and opening the next opens on its research. */
+  const tabs = caught ? [
+    ["forms", "Forms", `${heldCount}/${forms.length - 1}`],
+    ["about", "About", null],
+    ["research", "Research", `Lv ${researchLevel(id, research)}`],
+    ["where", "Where", String(whereToFind(id).length || "")],
+  ] : [];
+  const [tab, setTab] = useState(() => lastTab);
+  const current = tabs.some(([t]) => t === tab) ? tab : "forms";
+  const choose = (t) => { lastTab = t; setTab(t); };
+  const onTabKey = (e) => {
+    const i = tabs.findIndex(([t]) => t === current);
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = tabs[(i + step + tabs.length) % tabs.length][0];
+    choose(next);
+    e.currentTarget.parentElement.querySelector(`[data-tab="${next}"]`)?.focus();
+  };
+
   useModalLock();
 
   useEffect(() => {
@@ -229,38 +303,26 @@ export default function DexSheet({
   return (
     <div className="sheet" {...useDismiss(onClose)}>
       <div
-        className="sheet-card"
+        className={`sheet-card${caught ? " tabbed" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={seen ? label(sp) : `Unknown Pokémon number ${id}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-top">
-          {/* The rarest one you have registered claims the entry's portrait:
-              the dex should show you the one you actually own. */}
+          {/* `shown` rather than `variant`: the FORMS tab can change it.
+
+              THE IMAGE IS NOT KEYED AND THE LAYER IS, and they must not share
+              a key: two siblings with one key stopped reconciling, and swapping
+              the form left the old <img> mounted beside the new one. Only the
+              LAYER needs remounting - a CSS animation does not restart on a
+              prop change. */}
           <span className={`sheet-portrait${caught ? "" : " locked"}`}>
-            {/* `shown` rather than `variant`: the strip below can change it.
-
-                THE IMAGE IS NOT KEYED AND THE LAYER IS, and they must not share
-                a key. Both carried `key={shown}` at first - two SIBLINGS with
-                the same key, which is a duplicate in React's implicit child
-                array, and it stopped reconciling them: swapping the form left
-                the old `<img>` mounted next to the new one, two 108px pictures
-                stacked in a 108px box, the second spilling out over the FORMS
-                strip below. Reported as the preview not changing, which is what
-                it looks like when the stale one is on top.
-
-                Only the LAYER needs remounting - a CSS animation does not
-                restart on a prop change, so a foil carrying on mid-sweep reads
-                as the picture not having changed. An `<img>` needs nothing: a
-                new `src` is the whole update. */}
             <Sprite
               id={id}
               variant={caught ? shown : null}
               className={`sheet-art${caught ? "" : " locked"}`}
             />
-            {/* The portrait is the biggest the entry ever draws this Pokemon,
-                so it is the worst place for the treatment to be missing. */}
             {caught && <VariantFx key={`fx-${shown ?? "plain"}`} id={id} variant={shown} />}
           </span>
           <div className="sheet-id">
@@ -279,213 +341,190 @@ export default function DexSheet({
               <div className="sheet-genus">No data recorded</div>
             )}
           </div>
-          {/* THE MEASUREMENTS BELONG ON THE NAMEPLATE, and the hole in the
-              header is what said so. The portrait is a fixed 108px and the
-              name beside it is about 150px of content in a 290px track, so the
-              top right of every entry was a tall empty rectangle - reported as
-              "a big white space".
-
-              These three are IDENTITY, exactly like the genus and the types
-              they now sit beside: facts about the species that never change
-              and that you cannot act on. They were at the very bottom behind a
-              rule of their own, the furthest point on the card from the name
-              they describe, and docs/decisions.md already records them being demoted
-              once for shouting. Moving them up costs NOTHING vertically - the
-              row is 108px tall whatever is in it, because the portrait says so
-              - and it takes a whole block plus its border off the bottom, so
-              the card gets shorter. That is what matters on a phone, where it
-              is capped at 88vh and scrolls.
-
-              WHERE TO LOOK was the other candidate and is the wrong one: it is
-              variable height - one to three rows, so it would either overflow
-              the header or leave it ragged - and it is the one thing on this
-              card you can ACT on, with buttons that travel. A header of pure
-              identity is not where a control belongs. */}
-          {caught && (
-            <dl className="sheet-facts">
-              <div className="fact">
-                <dt>HEIGHT</dt>
-                <dd>{(sp.height / 10).toFixed(1)} m</dd>
-              </div>
-              <div className="fact">
-                <dt>WEIGHT</dt>
-                <dd>{(sp.weight / 10).toFixed(1)} kg</dd>
-              </div>
-              <div className="fact">
-                <dt>CATCH RATE</dt>
-                <dd>{sp.rate}</dd>
-              </div>
-            </dl>
-          )}
+          <button type="button" className="sheet-x" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         {caught ? (
           <>
-            {/* Every form this species comes in, and which you have. It is the
-                question the tile's marks raise and could not answer: a mark
-                says "you have a shiny", this says what a shiny of THIS one
-                actually looks like - and shows the three you have not got as
-                silhouettes, so it doubles as the thing to go hunting for. */}
-            <div className="sheet-forms">
-              <div className="sf-head">
-                <span>FORMS</span>
-                {/* WHAT THE STRIP IS FOR, AS A NUMBER. Every unheld cell used
-                    to print the words "not yet" - seven times on a Kanto
-                    entry, which is seven lines saying what a silhouette
-                    already says. One count replaces all of them, and it says
-                    the thing they never did: how close the rosette is, now
-                    that it wants ANY four rather than every one. */}
-                {every ? (
-                  <span className="sf-all">
-                    <Mark tier="complete" size={14} /> COMPLETE
-                  </span>
-                ) : (
-                  <span className="sf-tally">
-                    <b>{heldCount}<i>/{forms.length - 1}</i></b>
-                    <em>{ROSETTE_NEED} for the rosette</em>
-                  </span>
-                )}
-              </div>
-              <div className="sf-row">
-                {forms.map(([t, name, blurb]) => (
-                  /* A held form is a BUTTON - it promotes itself to the
-                     portrait. One you have not got stays a plain div: there is
-                     nothing to show, and a control that does nothing is worse
-                     than no control. */
-                  <div
-                    key={name}
-                    /* The blurb is clamped to two lines, so the tooltip is
-                       where the rest of a long one lives - the same reason the
-                       shop's descriptions have one. */
-                    data-tip={`${name} \u2014 ${blurb}${got(t) ? "" : " (not found yet)"}`}
-                    className={`sf-one${got(t) ? " got" : ""}${
-                      got(t) && t === shown ? " picked" : ""}`}
-                    {...(got(t) ? {
-                      role: "button",
-                      tabIndex: 0,
-                      "aria-pressed": t === shown,
-                      "aria-label": `Show the ${name} ${label(sp)}`,
-                      onClick: () => setPicked(t),
-                      onKeyDown: (e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setPicked(t);
-                        }
-                      },
-                    } : {})}
-                  >
-                    <div className="sf-art">
-                      {/* This strip is where someone comes to SEE what a
-                          variant looks like, so every tier gets its real
-                          treatment rather than the filter on its own. It was a
-                          hand-rolled copy of the foil for Holo only - the same
-                          duplicated-constant shape that lost Astral its art in
-                          the evolution scene. `VariantFx` is the one list. */}
-                      {/* AN UNHELD SHOWDOWN DRAWS THE ORDINARY SPRITE, and
-                          this strip is the only place in the game that would
-                          ever ask for a tier nobody owns.
-
-                          Showdown is the single picture this repo does not
-                          ship. It comes from PokeAPI's CDN, and the whole
-                          argument for that is in Sprite.jsx: it is the rarest
-                          tier, so a whole playthrough loads a handful. This
-                          strip renders every tier a species can wear, so
-                          opening ANY entry fetched a 67KB animated GIF in
-                          order to paint it black - which makes that argument
-                          untrue on a dex of 1,145.
-
-                          Nothing is lost: a silhouette is a flat fill of the
-                          outline. It also stops the odd one out in a grid
-                          whose whole point is one creature nine ways - a
-                          Showdown GIF is not framed on the 64px canvas every
-                          other sprite is normalised to, so it drew visibly
-                          larger than its eight neighbours. */}
-                      <Sprite
-                        id={id}
-                        variant={t === "showdown" && !got(t) ? null : t}
-                        alt={`${name} ${label(sp)}`}
-                      />
-                      <VariantFx id={id} variant={t} />
-                      {/* A MARK ONLY APPEARS ON A CELL YOU HAVE EARNED, and
-                          before this it appeared on all nine, greyed out.
-
-                          Reported as four broken images - holo, glitched,
-                          astral and showdown - and that is exactly what they
-                          looked like. Those four marks are FILLED SOLIDS whose
-                          identity is their colour: a rainbow hexagon, a blue
-                          crystal, a purple bolt, a blue cone. `grayscale(1)`
-                          at .35 opacity left four featureless grey blobs,
-                          which is what a failed image load looks like. The
-                          other four survived because their identity is a
-                          SILHOUETTE - a ring, a four-point star, an eight-
-                          point star, and Noir, which is achromatic already.
-
-                          docs/decisions.md claims "the marks are shapes, not just
-                          colours - these stay distinct in greyscale". That was
-                          true of the four CSS shapes it was written about and
-                          stopped being true the day the art became drawn.
-
-                          Tuning the grey would only postpone it to the next
-                          tier that is a coloured solid. The cell already names
-                          its tier underneath in pixel type, so on an unheld
-                          cell the mark was decoration that had to be
-                          suppressed until it read as a fault. Gone - and the
-                          badge now MEANS something: you own this one. */}
-                      {t && got(t) && <Mark tier={t} size={12} className="sf-badge" />}
-                    </div>
-                    <span className="sf-name">{name}</span>
-                    {/* THE BLURB SHOWS WHETHER OR NOT YOU HAVE IT. It only
-                        appeared on held cells before, so the seven you are
-                        hunting read "not yet" and the one you already had
-                        explained itself - which is backwards. What a tier
-                        LOOKS like is exactly what you want to know about one
-                        you have not found. The silhouette is what says you
-                        have not got it; it does not need saying twice. */}
-                    <span className="sf-note">{blurb}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="sheet-tabs" role="tablist" aria-label="Entry sections">
+              {tabs.map(([t, name, badge]) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  id={`dex-tab-${t}`}
+                  data-tab={t}
+                  aria-selected={current === t}
+                  aria-controls="dex-panel"
+                  tabIndex={current === t ? 0 : -1}
+                  className={current === t ? "on" : ""}
+                  onClick={() => choose(t)}
+                  onKeyDown={onTabKey}
+                >
+                  <span>{name}</span>
+                  {badge && <em>{badge}</em>}
+                </button>
+              ))}
             </div>
 
-            <Research id={id} row={research} />
+            <div className="sheet-body" role="tabpanel" id="dex-panel" aria-labelledby={`dex-tab-${current}`}>
+              {current === "forms" && (
+                <div className="sheet-forms">
+                  <div className="sf-head">
+                    <span>FORMS</span>
+                    {/* WHAT THE STRIP IS FOR, AS A NUMBER. Every unheld cell used
+                        to print the words "not yet" - seven times on a Kanto
+                        entry, which is seven lines saying what a silhouette
+                        already says. One count replaces all of them, and it says
+                        the thing they never did: how close the rosette is, now
+                        that it wants ANY four rather than every one. */}
+                    {every ? (
+                      <span className="sf-all">
+                        <Mark tier="complete" size={14} /> COMPLETE
+                      </span>
+                    ) : (
+                      <span className="sf-tally">
+                        <b>{heldCount}<i>/{forms.length - 1}</i></b>
+                        <em>{ROSETTE_NEED} for the rosette</em>
+                      </span>
+                    )}
+                  </div>
+                  <div className="sf-row">
+                    {forms.map(([t, name, blurb]) => (
+                      /* A held form is a BUTTON - it promotes itself to the
+                         portrait. One you have not got stays a plain div: there is
+                         nothing to show, and a control that does nothing is worse
+                         than no control. */
+                      <div
+                        key={name}
+                        /* The blurb is clamped to two lines, so the tooltip is
+                           where the rest of a long one lives - the same reason the
+                           shop's descriptions have one. */
+                        data-tip={`${name} \u2014 ${blurb}${got(t) ? "" : " (not found yet)"}`}
+                        className={`sf-one${got(t) ? " got" : ""}${
+                          got(t) && t === shown ? " picked" : ""}`}
+                        {...(got(t) ? {
+                          role: "button",
+                          tabIndex: 0,
+                          "aria-pressed": t === shown,
+                          "aria-label": `Show the ${name} ${label(sp)}`,
+                          onClick: () => setPicked(t),
+                          onKeyDown: (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setPicked(t);
+                            }
+                          },
+                        } : {})}
+                      >
+                        <div className="sf-art">
+                          {/* This strip is where someone comes to SEE what a
+                              variant looks like, so every tier gets its real
+                              treatment rather than the filter on its own. It was a
+                              hand-rolled copy of the foil for Holo only - the same
+                              duplicated-constant shape that lost Astral its art in
+                              the evolution scene. `VariantFx` is the one list. */}
+                          {/* AN UNHELD SHOWDOWN DRAWS THE ORDINARY SPRITE, and
+                              this strip is the only place in the game that would
+                              ever ask for a tier nobody owns.
 
-            {/* Shown whether or not it is caught - see the `seen` branch
-                below, which shows it too. An entry you have never filled in is
-                exactly the one that needs to say where to go. */}
-            <Where
-              id={id}
-              level={level}
-              here={here}
-              busy={busy}
-              onTravel={onTravel}
-            />
+                              Showdown is the single picture this repo does not
+                              ship. It comes from PokeAPI's CDN, and the whole
+                              argument for that is in Sprite.jsx: it is the rarest
+                              tier, so a whole playthrough loads a handful. This
+                              strip renders every tier a species can wear, so
+                              opening ANY entry fetched a 67KB animated GIF in
+                              order to paint it black - which makes that argument
+                              untrue on a dex of 1,145.
 
-            <p className="sheet-flavor">{sp.flavor}</p>
+                              Nothing is lost: a silhouette is a flat fill of the
+                              outline. It also stops the odd one out in a grid
+                              whose whole point is one creature nine ways - a
+                              Showdown GIF is not framed on the 64px canvas every
+                              other sprite is normalised to, so it drew visibly
+                              larger than its eight neighbours. */}
+                          <Sprite
+                            id={id}
+                            variant={t === "showdown" && !got(t) ? null : t}
+                            alt={`${name} ${label(sp)}`}
+                          />
+                          <VariantFx id={id} variant={t} />
+                          {/* A MARK ONLY APPEARS ON A CELL YOU HAVE EARNED, and
+                              before this it appeared on all nine, greyed out.
+
+                              Reported as four broken images - holo, glitched,
+                              astral and showdown - and that is exactly what they
+                              looked like. Those four marks are FILLED SOLIDS whose
+                              identity is their colour: a rainbow hexagon, a blue
+                              crystal, a purple bolt, a blue cone. `grayscale(1)`
+                              at .35 opacity left four featureless grey blobs,
+                              which is what a failed image load looks like. The
+                              other four survived because their identity is a
+                              SILHOUETTE - a ring, a four-point star, an eight-
+                              point star, and Noir, which is achromatic already.
+
+                              docs/decisions.md claims "the marks are shapes, not just
+                              colours - these stay distinct in greyscale". That was
+                              true of the four CSS shapes it was written about and
+                              stopped being true the day the art became drawn.
+
+                              Tuning the grey would only postpone it to the next
+                              tier that is a coloured solid. The cell already names
+                              its tier underneath in pixel type, so on an unheld
+                              cell the mark was decoration that had to be
+                              suppressed until it read as a fault. Gone - and the
+                              badge now MEANS something: you own this one. */}
+                          {t && got(t) && <Mark tier={t} size={12} className="sf-badge" />}
+                        </div>
+                        <span className="sf-name">{name}</span>
+                        {/* THE BLURB SHOWS WHETHER OR NOT YOU HAVE IT. It only
+                            appeared on held cells before, so the seven you are
+                            hunting read "not yet" and the one you already had
+                            explained itself - which is backwards. What a tier
+                            LOOKS like is exactly what you want to know about one
+                            you have not found. The silhouette is what says you
+                            have not got it; it does not need saying twice. */}
+                        <span className="sf-note">{blurb}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {current === "about" && (
+                <div className="sheet-about">
+                  <p className="sheet-flavor">{sp.flavor}</p>
+                  <dl className="sheet-facts">
+                    <div><dt>Height</dt><dd>{(sp.height / 10).toFixed(1)} m</dd></div>
+                    <div><dt>Weight</dt><dd>{(sp.weight / 10).toFixed(1)} kg</dd></div>
+                    <div><dt>Catch rate</dt><dd>{sp.rate}</dd></div>
+                    <div><dt>Generation</dt><dd>{genOf(id)}</dd></div>
+                  </dl>
+                  <Line id={id} dexOf={dexOf} onSelect={onSelect} />
+                </div>
+              )}
+
+              {current === "research" && <Research id={id} row={research} />}
+
+              {current === "where" && (
+                <Where id={id} level={level} here={here} busy={busy} onTravel={onTravel} />
+              )}
+            </div>
           </>
         ) : (
-          <>
+          <div className="sheet-body">
             <p className="sheet-locked">
-              {seen
-                ? "CATCH ONE TO FILL IN THIS ENTRY"
-                : "NOT YET ENCOUNTERED"}
+              {seen ? "CATCH ONE TO FILL IN THIS ENTRY" : "NOT YET ENCOUNTERED"}
             </p>
-            {/* The whole point. A silhouette with no information is a locked
-                door; a silhouette that tells you which map to walk is a lead. */}
-            <Where
-              id={id}
-              level={level}
-              here={here}
-              busy={busy}
-              onTravel={onTravel}
-            />
-          </>
+            {/* A silhouette with no information is a locked door; a silhouette
+                that tells you which map to walk is a lead. */}
+            <Where id={id} level={level} here={here} busy={busy} onTravel={onTravel} />
+          </div>
         )}
 
         <div className="sheet-actions">
-          {/* Only when you actually hold one. A button that jumps to an empty
-              search is worse than no button: it answers "where is mine" with a
-              blank list, which reads as a broken filter rather than as "you do
-              not have one". The entry already says whether it is caught. */}
+          {/* Only when you actually hold one: a jump to an empty search answers
+              "where is mine" with a blank list, which reads as a broken filter. */}
           {owned > 0 && onFindInBox && (
             <button
               className="sheet-inbox"

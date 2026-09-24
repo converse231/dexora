@@ -480,7 +480,10 @@ export const TIER_TELL = {
    total - so "Rock Ridge (common)" means common THERE, which is the question
    being asked. Areas are ordered by how likely you are to actually find one. */
 export function foundIn(speciesId) {
-  if (LEGENDARY.includes(speciesId)) return { legendary: true, areas: [], rods: [] };
+  /* A LEGENDARY HAS A HOME NOW, so it is answered like anything else - this
+     returned "anywhere" for all of them from when they strayed onto every map,
+     which sent players to places they could never meet one. */
+  const legendary = LEGENDARY.includes(speciesId);
 
   /* At the LEVEL CAP, because the question is "where does this live", not
      "where can I find one this minute". A row that only opens later carries the
@@ -527,7 +530,7 @@ export function foundIn(speciesId) {
     .filter((r) => r.table.some(([id]) => id === speciesId))
     .map((r) => r.name);
 
-  return { legendary: false, areas, rods };
+  return { legendary, areas, rods };
 }
 
 /* How a share reads out loud. Thresholds rather than a percentage: the exact
@@ -1783,11 +1786,15 @@ export const sizeTag = (size) =>
 
 /* AN ALPHA is one individual far bigger than any ordinary roll - 140 to 160
    against a ceiling of `SIZE_MAX` - that never runs and is harder to hold.
-   A fact about the one in front of you, like its size, and NOT a tier: it
-   rolls alongside the tier rather than instead of it, so a shiny alpha is
-   possible and neither roll's odds move. Never a legendary (one of a kind
-   already) or a costume (an event does not host an event), so no species'
-   findability changes: the table is untouched, only the individual differs. */
+
+   A LAYER, NOT A TIER, and it was a tier for one pass. As a tier an alpha was
+   one rung of the ladder, so it could never be an Alpha Shiny - and stacking
+   is the point: an alpha that is ALSO a rare form is rarer than either. It
+   rolls beside the tier, so neither roll's odds move, and it is shown as an
+   ICON rather than a treatment, which is what lets it sit on top of any tier's
+   look without two effects fighting over one sprite. Never a legendary (one
+   of a kind already) or a costume (an event does not host an event), and it
+   changes no table, so no species' findability moves. */
 export const ALPHA_CHANCE = 1 / 150;
 export const ALPHA_SIZE = [140, 160];
 export const canBeAlpha = (id) => !LEGEND_SET.has(id) && !COSTUMES.includes(id);

@@ -177,6 +177,31 @@ for (const f of FORMS) {
   });
 }
 
+/* A REGIONAL FORM EVOLVES THE WAY ITS SPECIES DOES, and for a year none did.
+   Every regional form is wild, and a wild form got no row - so Hisuian
+   Growlithe could never become Hisuian Arcanine, and Hisuian Typhlosion
+   existed only as a catch. Reported from play.
+
+   DERIVED, NOT LISTED: each regional form copies every row its SPECIES is
+   evolved into by (the ordinary Growlithe -> Arcanine row, method, level and
+   item intact). If that row's parent has a form of the same region, the copy
+   runs form to form (Hisuian Growlithe -> Hisuian Arcanine; Alolan Geodude ->
+   Graveler -> Golem); if not, it is a BRANCH from the ordinary parent
+   (Quilava -> Typhlosion or Hisuian Typhlosion, your pick - the Box already
+   handles a choice because Slowpoke taught it to). The price is the base
+   evolution's, never the hundred a Mega costs: this is a line, not a
+   transformation. `regional: true` is what check.mjs holds these to. The
+   target stays wild, and `derivedHomes` keeps it in the pool on `sp.wild`. */
+const REGIONS = new Set(["alolan", "galarian", "hisuian", "paldean"]);
+const baseRows = [...rows];
+for (const f of FORMS) {
+  if (!f.wild || !REGIONS.has(f.form)) continue;
+  for (const r of baseRows.filter((e) => e.to === f.of)) {
+    const kin = FORMS.find((g) => g.of === r.from && g.form === f.form && g.wild);
+    rows.push({ ...r, from: kin ? kin.id : r.from, to: f.id, regional: true });
+  }
+}
+
 rows.sort((a, b) => a.from - b.from || a.to - b.to);
 
 const body = rows

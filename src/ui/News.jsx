@@ -17,7 +17,8 @@ export const NEWS = [
     items: [
       ["Mass outbreaks", "Once a day one map is overrun by one species. Rare forms of it turn up far more often while it lasts."],
       ["Discovery", "Every species now has a research level. Catch it in different ways to raise it; a finished entry makes its rare forms likelier for good."],
-      ["Alphas", "Rarely, a Pokémon is an alpha - huge, stubborn, and worth Rare Candy. It never runs."],
+      ["Alphas", "Rarely, a Pokémon is an alpha - huge, stubborn, and worth Rare Candy. It never runs, and it can be a rare form too: an Alpha Shiny is rarer than either."],
+      ["Regional evolutions", "Alolan, Galarian, Hisuian and Paldean forms evolve now - Hisuian Growlithe into Hisuian Arcanine, and Quilava can choose Hisuian Typhlosion."],
       ["Space-time rifts", "Stay on one map long enough and it tears open: rarer Pokémon, and things lying on the ground."],
       ["Events page", "Everything happening today, in one place - open it from the menu or tap an event card."],
       ["Costume Pikachu", "They live in the Power Plant now, not everywhere."],

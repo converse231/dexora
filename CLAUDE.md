@@ -136,7 +136,11 @@ anything done. The run prints each suite; the count is not typed anywhere.
 - **`wild` is the one field for forms you meet.** No evolution row is what makes
   a form wild; `derivedHomes` homes it on its own types. A wild form keeps the
   generation it was introduced in. A form that is both wild and buildable
-  declares `evo`, and its row still costs Lv 100.
+  declares `evo`, and its row still costs Lv 100. **A regional form also
+  evolves the way its species does**: `fetch-evolutions` copies the species'
+  own rows marked `regional` - form to form when the parent has a form of that
+  region, a branch from the ordinary parent when not (Quilava -> Hisuian
+  Typhlosion) - at the base row's price, and check.mjs holds each to its twin.
 - **Names come from `label()`**: a form's base name from `from`, or its `title`
   when it has one. Never parse slugs.
 - **`genOf` has its own Map** because it runs at module init, before
@@ -384,14 +388,15 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   under a fifth of catch income, measured); Lv 10 multiplies that species'
   tier roll by `RESEARCH_LIFT`, weaker than an outbreak, and raises the only
   research banner. `loadState` drops a bad row, never the whole object.
-- **An alpha is an individual, not a tier**: `rollAlpha` (1 in
-  `ALPHA_CHANCE`, never a legendary or costume, `canBeAlpha`) rolls beside
-  the tier in `startEncounter`, sizes it past `SIZE_MAX`, and `alpha: 1` is
-  copied to the box entry like `size`. It never flees (calm 0 on the flee
-  roll), catches at `ALPHA_CATCH` inside `liveMult` so the rail agrees, is a
-  `keeper()`, and so pays its candy at capture (`alphaCandy`) because it can
-  never be converted. It gets its own Box row. It is drawn by sizing
-  `.mon-slot`, never `.mon`, and its aura is a layer, not a filter.
+- **An alpha is a LAYER, not a tier**: `rollAlpha` (1 in `ALPHA_CHANCE`, never
+  a legendary or costume, `canBeAlpha`) rolls BESIDE the tier, so an Alpha
+  Shiny exists and is rarer than either. It was a tier for one pass and lost
+  that stacking. It is shown as an ICON (the alpha mark in a chip on the
+  nameplate and the Box row), never a treatment, so it cannot fight a tier's
+  look. `alpha: 1` is copied to the box entry like `size`; it never flees
+  (calm 0), catches at `ALPHA_CATCH` inside `liveMult`, is a `keeper()`, pays
+  candy at capture (`alphaCandy`), sizes `.mon-slot` (never `.mon`), and
+  gets its own Box row. `enc.alpha` is a boolean - a 0 renders as "0".
 - **A rift opens on `sinceTravel`** (steps since the map changed) through
   `riftChance`, a per-step hazard solved so the median is `RIFT_MEDIAN` and
   `RIFT_SURE` is certain. It lasts `RIFT_STEPS`, one at a time, and travel
@@ -405,6 +410,16 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   constant. The corner's event cards are buttons that open it. **What's new
   (`News.jsx`) is a list, newest first**: add an entry at the top with a new
   id and the menu's dot returns. "Seen" is localStorage, never the save.
+- **The Dex sheet is tabbed** (Forms, About, Research, Where; Forms first,
+  the last tab used remembered): header and tabs fixed, only `.sheet-body`
+  scrolls, and a caught entry's card has a fixed height (`.tabbed`) so
+  switching tabs never resizes it. The evolution line names only entries the
+  dex has seen (`dexOf`) and walks to them (`onSelect`).
+- **Events is a quest board**: progress is drawn (outbreak pips, the rift's
+  zone meter and drain, research rings). A board card must not set
+  `overflow: hidden` - a clipping grid item has min-height 0 and the grid
+  squeezes it - and dialog-scoped headings need `.evcard` in front to beat
+  `.hp-body h4`.
 - **The page never scrolls sideways**: `html, body { overflow-x: clip }` is the
   guard, not the fix - an overflow is still a bug to find and size down.
 - **Irreversible presses ask first, gated in the engine** (`state.ask` in

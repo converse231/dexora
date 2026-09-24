@@ -1889,14 +1889,16 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
 /* AN ALPHA, END TO END, through a real step and real throws - it is a flag on
    the encounter that four different places have to read (the flee roll, the
    catch, the box copy, the sweep), and a flag dropped by any one of them is
-   silent. The species is forced with an outbreak; `Math.random` pinned below
-   1 in 150 makes the roll land. */
+   silent. The species is forced with an outbreak; `Math.random` pinned at
+   0.001 lands BOTH rolls - the alpha and a tier - which is the point of the
+   alpha being a layer rather than a rung: this one is an alpha AND a rare form. */
 {
   const { dayKey } = await import("../src/game/daily.js");
   const { outbreakPool } = await import("../src/game/events.js");
   const { BIOMES, speciesById, canBeAlpha, SIZE_MAX } = await import("../src/game/biomes.js");
   const { alphaCandy } = await import("../src/game/items.js");
   const { TASKS } = await import("../src/game/research.js");
+  const { TIERS: TIERS_ALL } = await import("../src/game/biomes.js");
   const id = outbreakPool(BIOMES.find((b) => b.id === "meadow"), 50).find(canBeAlpha);
   const { e } = boot({ ...SAVE, outbreak: { key: dayKey(), areaId: "meadow", speciesId: id, left: 5 } });
 
@@ -1912,6 +1914,7 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
     const enc = e.state.encounter;
     assert.equal(enc?.speciesId, id, "the alpha test met the wrong species");
     assert.equal(enc.alpha, true, "a roll under 1 in 150 did not make an alpha - or made it a number, which renders as \"0\" in JSX");
+    assert.ok(enc.variant, "an alpha could not also be a rare form - the two rolls are not independent");
     assert.ok(enc.size > SIZE_MAX, `an alpha came out size ${enc.size}`);
     until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
 
@@ -1938,6 +1941,7 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
 
   const mon = e.state.box.at(-1);
   assert.equal(mon.alpha, 1, "the alpha flag did not reach the box");
+  assert.ok(TIERS_ALL.some((t) => mon[t]), "the alpha's tier did not reach the box beside it");
   assert.equal(e.sell([mon.uid]), 0, "an alpha was sold");
   assert.ok(e.state.box.includes(mon), "selling took the alpha out of the box");
 
@@ -1948,6 +1952,18 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
   assert.equal(back.size, mon.size, "the alpha's size did not survive a save and a reload");
 }
 console.log("alpha ok — never flees, caught pays candy and research, boxed, unsellable, survives a reload");
+
+/* A BOX ENTRY WEARING A TIER PROVES THE TIER. If the tier row lost it (a save
+   from before the row existed, a hand edit), loading sets it back from the
+   entry - or the Dex says you have never found the one you are holding. */
+{
+  const { dexIndex } = await import("../src/game/biomes.js");
+  const old = { ...SAVE, box: [{ uid: 1, species: 16, level: 30, size: 100, shiny: 1, at: 1 }], nextUid: 2 };
+  delete old.shiny;
+  const st = boot(old).e.state;
+  assert.equal(st.shiny[dexIndex(16)], 1, "a shiny in the box did not register its tier row on load");
+}
+console.log("tier repair ok — a boxed tier registers its row on load");
 
 /* A RIFT, through real steps. Opening, counting down, finding and closing all
    happen in `onArrive`, which only a walk reaches - so each is one real step

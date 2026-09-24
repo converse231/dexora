@@ -35,7 +35,7 @@ const TIER_ART = {
   legendary: { src: "marks/legendary.png", name: "Legendary" },
   // Not a tier either: a species whose research is finished. See research.js.
   research: { src: "marks/research.png", name: "Research complete" },
-  // And not a tier: one oversized individual. See `rollAlpha`.
+  // Not a tier: a layer on top of one, shown as this icon. See `rollAlpha`.
   alpha: { src: "marks/alpha.png", name: "Alpha" },
 };
 

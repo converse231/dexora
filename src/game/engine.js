@@ -276,7 +276,12 @@ function normalise(arr, len) {
 export function repairDex(dex, s, tiers = s) {
   for (const mon of Array.isArray(s.box) ? s.box : []) {
     const at = dexIndex(mon?.species);
-    if (at >= 0) dex[at] = 2;
+    if (at < 0) continue;
+    dex[at] = 2;
+    /* A BOX ENTRY WEARING A TIER PROVES THE TIER, so its row is set too - only
+       ever raised. A row that lost it (a save from before the row existed, a
+       hand edit) would otherwise show a tier you hold as one never found. */
+    for (const tier of TIERS) if (mon[tier] && Array.isArray(tiers?.[tier])) tiers[tier][at] = 1;
   }
   /* THE ROWS, NOT THE SAVE. `tiers` is what `loadState` has already rebuilt -
      remapped where a generation was inserted, padded where one was appended -
@@ -1276,10 +1281,9 @@ export function createEngine(canvas, onChange, mini = null) {
     const knownForm = variant
       ? (state[variant]?.[at] ?? 0) === 1
       : known;
-    /* Its own roll beside the tier's - see `rollAlpha`. A BOOLEAN on the
-       encounter, never 1/0: panels write `enc.alpha && <layer/>`, and a 0
-       there renders the digit "0" in the middle of the battle. It shipped
-       that way for one phase. The box entry still stores `alpha: 1`. */
+    /* Its own roll beside the tier's - see `rollAlpha` - so an alpha can be a
+       Shiny too. A BOOLEAN, never 1/0: panels write `enc.alpha && <x/>`, and a
+       0 there renders the digit "0" in the battle. The box entry stores 1. */
     const alpha = rollAlpha(Math.random, sp.id);
 
     state.encounter = {

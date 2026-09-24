@@ -399,20 +399,17 @@ canvas {
    crowding the frame is what an alpha is for. It is also 4x on a 64px sprite,
    so if it ever reads as rough, this is the number to bring down. */
 .mon-slot.alpha { height: 67.5%; }
-/* Its red glow sits BEHIND the creature, like the Astral aura, and breathes
-   on opacity alone - a filter on the sprite would fight the tier filters,
-   which carry !important. */
-.alpha-aura {
-  position: absolute; inset: -6%; z-index: 0; pointer-events: none; border-radius: 50%;
-  background: radial-gradient(circle, rgba(230, 40, 40, .45) 0%, rgba(230, 40, 40, .18) 45%, transparent 70%);
-  animation: alpha-breathe 2.4s ease-in-out infinite;
-}
-@keyframes alpha-breathe { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
+/* THE ALPHA'S MARK: an icon in a dark red chip, beside whatever tier chip the
+   Pokemon also wears - an indicator, not a treatment, so it never fights one. */
 .np-alpha {
-  display: inline-flex; align-items: center; gap: 3px;
-  font-family: var(--pixel); font-size: 9px; color: #c62828;
+  display: inline-flex; align-items: center; gap: 4px; line-height: 1;
+  font-family: var(--pixel); font-size: max(9px, 1.35cqw);
+  padding: 3px 7px 2px; border-radius: 5px;
+  color: #ffe3e6; background: linear-gradient(160deg, #8a0f1f, #2a0008);
+  box-shadow: 0 0 0 1.5px #ff4a5c inset;
 }
-.bx-vtag.alpha { display: inline-flex; align-items: center; gap: 2px; color: #c62828; }
+.np-alpha .mark { width: 14px; height: 14px; }
+.bx-vtag.bx-alpha { display: inline-flex; align-items: center; gap: 2px; background: #8a0f1f; }
 
 /* Dust kicked up where it lands, on appearing. */
 .land-ring {
@@ -2038,7 +2035,7 @@ canvas {
    it. */
 .sheet-portrait {
   position: relative; display: block; flex: none;
-  width: 108px; height: 108px;
+  width: 96px; height: 96px;
   background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px;
 }
 .cell-no {
@@ -2612,63 +2609,148 @@ canvas {
 /* ---------- events & what's new ----------
    One card per system, the live ones gold-rimmed like their card in the
    corner, so the page and the HUD are visibly the same objects. */
-.evcard .hp-body { display: grid; gap: 10px; padding-top: 10px; }
+.evcard .hp-body { display: grid; gap: 12px; padding-top: 12px; }
+
+/* A QUEST BOARD. Each card has a coloured banner naming it and a stamp saying
+   whether it is on, so the state of the world reads at a glance - the cards
+   were four pale boxes of prose, and a board you have to read is a list. */
+/* NO `overflow: hidden` HERE: a grid item that clips has a min-height of 0,
+   so the board's grid squeezed every card to fit the dialog and cut off the
+   pips, the list and the button. The banner rounds its own corners instead. */
 .ev-card {
-  border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px;
-  background: var(--surface-2); min-width: 0;
+  display: grid; gap: 9px; min-width: 0; padding: 0 12px 12px;
+  border: 2px solid var(--line); border-radius: 14px; background: var(--surface);
+  box-shadow: 0 3px 0 rgba(47, 107, 76, .18);
 }
-.ev-card.live { border-color: var(--gold); background: #fdf4dc; }
-.ev-card.rift.live { border-color: #8c46e1; background: #f3ecfd; }
-.ev-card header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.ev-card header > img { width: 20px; height: 20px; image-rendering: pixelated; flex: none; }
-.ev-card header h4 {
+.ev-banner {
+  display: flex; align-items: center; gap: 8px; margin: 0 -12px;
+  padding: 8px 12px; background: var(--surface-2); border-bottom: 2px solid var(--line);
+  border-radius: 12px 12px 0 0;
+}
+.ev-banner > img { width: 22px; height: 22px; image-rendering: pixelated; flex: none; }
+/* `.evcard` in front: `.hp-body h4` is the dialog's small grey label and ties
+   with a bare `.ev-banner h4`, which drew every card's title as a caption. */
+.evcard .ev-banner h4 {
   margin: 0; flex: 1; min-width: 0;
-  font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--ink);
+  font-family: var(--display); font-weight: 700; font-size: 16px; color: var(--ink);
 }
-.ev-card header em {
-  font-style: normal; font-family: var(--pixel); font-size: 10px;
-  color: var(--ink-faint); white-space: nowrap;
+.ev-stamp {
+  font-family: var(--pixel); font-size: 10px; padding: 3px 7px; border-radius: 6px;
+  color: var(--ink-faint); border: 2px solid currentColor; transform: rotate(-3deg);
 }
-.ev-card.live header em { color: var(--gold); }
+.ev-stamp.live { color: #d23b2a; animation: ev-throb 1.6s ease-in-out infinite; }
+@keyframes ev-throb { 50% { opacity: .55; } }
 .ev-card p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-soft); }
-.ev-card small {
-  display: block; margin-top: 4px;
+.ev-quiet { color: var(--ink-faint) !important; }
+.ev-meta {
+  display: flex; justify-content: space-between; gap: 8px;
   font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
 }
-.ev-row { display: flex; gap: 10px; align-items: center; }
-.ev-row img { width: 48px; height: 48px; flex: none; image-rendering: pixelated; }
-.ev-go {
-  margin-top: 8px; width: 100%; min-height: 36px; cursor: pointer;
-  font-family: var(--pixel); font-size: 11px;
-  border: 2px solid var(--canopy); border-radius: 9px;
-  background: var(--canopy); color: #fff; box-shadow: 0 2px 0 rgba(47, 107, 76, .4);
+
+/* THE RAID: warm, and loudest when it is live. */
+.ev-raid.live { border-color: #e0913a; }
+.ev-raid .ev-banner { background: linear-gradient(90deg, #fde6c8, #fff4e3); border-color: #f1c58f; }
+.ev-raid-body { display: flex; align-items: center; gap: 12px; }
+.ev-spot {
+  flex: none; width: 72px; height: 72px; display: grid; place-items: center;
+  border-radius: 50%; background: radial-gradient(circle, #fff8e8 45%, #f6d9a8 100%);
+  border: 2px solid #f1c58f;
 }
-.ev-go:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+.ev-spot img { width: 64px; height: 64px; image-rendering: pixelated; }
+.ev-raid-copy { display: grid; gap: 2px; min-width: 0; }
+.ev-raid-copy b { font-family: var(--display); font-size: 19px; line-height: 1.1; color: var(--ink); }
+.ev-raid-copy span { font-size: 13px; color: var(--ink-soft); }
+.ev-raid-copy small { font-family: var(--pixel); font-size: 9px; color: #c0621d; }
+.ev-pips { display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; }
+.ev-pips i {
+  height: 10px; border-radius: 3px; background: #f6d9a8; border: 1px solid #e8b877;
+}
+.ev-pips i.on { background: var(--line); border-color: var(--line-firm); }
+
+/* THE RIFT: cosmic, and the meter shows where you are on its curve. */
+.ev-rift .ev-banner { background: linear-gradient(90deg, #efe6fd, #f7f2ff); border-color: #d9c8f6; }
+.ev-rift.open { border-color: #8c46e1; }
+.ev-rift.open .ev-banner { background: linear-gradient(90deg, #6a2fc0, #3cb8d6); border-color: #6a2fc0; }
+.ev-rift.open .ev-banner h4 { color: #fff; }
+.ev-rift.open .ev-stamp { color: #fff; }
+.ev-zones {
+  position: relative; display: flex; height: 18px; overflow: visible;
+  border-radius: 9px; border: 1px solid var(--line-firm);
+}
+.ev-zones span {
+  display: grid; place-items: center; font-family: var(--pixel); font-size: 9px; color: #fff;
+}
+.ev-zones .z-calm { flex: none; background: #7fb89a; border-radius: 8px 0 0 8px; }
+.ev-zones .z-stir { flex: 1; background: linear-gradient(90deg, #9a6be0, #3cb8d6); border-radius: 0 8px 8px 0; }
+/* You are here. */
+.ev-zones i {
+  position: absolute; top: -4px; bottom: -4px; width: 4px; margin-left: -2px;
+  border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px #fff;
+}
+.ev-drain {
+  position: relative; height: 20px; overflow: hidden;
+  border-radius: 10px; background: #efe6fd; border: 1px solid #b89be8;
+}
+.ev-drain i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #6a2fc0, #3cb8d6); }
+.ev-drain b {
+  position: relative; display: grid; place-items: center; height: 100%;
+  font-family: var(--pixel); font-size: 9px; color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, .4);
+}
+
+/* DISCOVERY: stat chips, then the nearest entries as quests with a ring. */
+.ev-disc .ev-banner { background: linear-gradient(90deg, #f3e7cf, #fbf5e8); border-color: #e2cfa6; }
+.ev-stats { display: flex; flex-wrap: wrap; gap: 6px; }
+.ev-stats span {
+  font-size: 12px; color: var(--ink-soft); padding: 4px 9px;
+  border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line);
+}
+.ev-stats b { font-family: var(--display); font-size: 14px; color: var(--ink); }
+.ev-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.ev-list button {
+  width: 100%; min-height: 50px; display: grid; grid-template-columns: 46px 1fr auto;
+  gap: 10px; align-items: center; padding: 3px 10px 3px 3px; text-align: left;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--surface);
+  cursor: pointer; font: inherit;
+}
+.ev-list button:hover { border-color: var(--path); }
+/* The research ring: a conic sweep as far round as the level. */
+.ev-ring {
+  width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%;
+  background: conic-gradient(var(--path) calc(var(--p) * 360deg), var(--line) 0);
+}
+.ev-ring img {
+  width: 38px; height: 38px; border-radius: 50%; background: var(--surface);
+  image-rendering: pixelated;
+}
+.ev-list span { display: grid; min-width: 0; }
+.ev-list b, .ev-list i { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-list b { font-size: 14px; color: var(--ink); }
+.ev-list i { font-style: normal; font-size: 11.5px; color: var(--ink-faint); }
+.ev-list em { font-style: normal; font-family: var(--pixel); font-size: 10px; color: var(--path); }
+
+/* ALPHAS: a trophy count. */
+.ev-alpha .ev-banner { background: linear-gradient(90deg, #f9dadd, #fdf0f1); border-color: #eab3b9; }
+.ev-trophy { display: flex; align-items: center; gap: 12px; }
+.ev-trophy > b {
+  flex: none; min-width: 56px; height: 56px; display: grid; place-items: center; padding: 0 8px;
+  font-family: var(--display); font-size: 28px; color: #fff; border-radius: 14px;
+  background: linear-gradient(160deg, #b3162b, #4a0610); box-shadow: 0 3px 0 #3a0008;
+}
+.ev-trophy span { display: grid; gap: 3px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.ev-trophy small { font-size: 12px; font-weight: 400; line-height: 1.4; color: var(--ink-soft); }
+
+.ev-go {
+  width: 100%; min-height: 40px; cursor: pointer;
+  font-family: var(--pixel); font-size: 11px;
+  border: 2px solid var(--canopy); border-radius: 10px;
+  background: var(--canopy); color: #fff; box-shadow: 0 3px 0 rgba(47, 107, 76, .45);
+}
+.ev-go:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
 .ev-go:disabled {
   background: var(--surface); color: var(--ink-faint); border-color: var(--line-firm);
   box-shadow: none; cursor: default;
 }
-.ev-meter {
-  position: relative; height: 8px; margin-top: 8px; overflow: hidden;
-  border-radius: 4px; background: var(--surface); border: 1px solid var(--line-firm);
-}
-.ev-meter i { display: block; height: 100%; background: linear-gradient(90deg, #8c46e1, #3cc8e6); }
-/* Where a rift first becomes possible. */
-.ev-meter b { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink-faint); }
-.ev-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
-.ev-list button {
-  width: 100%; min-height: 40px; display: grid; grid-template-columns: 36px 1fr auto;
-  gap: 8px; align-items: center; padding: 2px 8px 2px 2px; text-align: left;
-  border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
-  cursor: pointer; font: inherit;
-}
-.ev-list button:hover { border-color: var(--line-firm); }
-.ev-list img { width: 36px; height: 36px; image-rendering: pixelated; }
-.ev-list span { display: grid; min-width: 0; }
-.ev-list b, .ev-list i { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ev-list b { font-size: 13px; color: var(--ink); }
-.ev-list i { font-style: normal; font-size: 11px; color: var(--ink-faint); }
-.ev-list em { font-style: normal; font-family: var(--pixel); font-size: 10px; color: var(--path); }
+@media (prefers-reduced-motion: reduce) { .ev-stamp.live { animation: none; } }
 .nw-entry h5 {
   margin: 0 0 8px; font-family: var(--display); font-weight: 600; font-size: 16px; color: var(--ink);
 }
@@ -3090,11 +3172,16 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   background: rgba(26, 48, 36, .5);
   animation: battle-in .18s ease-out;
 }
+/* A COLUMN: header, tabs, body, footer - and only the BODY scrolls, so the
+   name and the tabs stay in reach and switching tabs never jumps the card's
+   size. It scrolled as a whole before, which took the name off the top of
+   the screen the moment you read past FORMS. */
 .sheet-card {
-  width: min(460px, 100%); max-height: 88vh; overflow-y: auto;
+  width: min(500px, 100%); max-height: min(88vh, 760px);
+  display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface); border: 3px solid var(--canopy);
   border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
-  padding: 20px 22px 24px;
+  padding: 16px 18px;
 }
 /* The header is the only block on the card that gets to be loud: portrait,
    number, name, genus, types. Everything below it is either the collection
@@ -3107,11 +3194,82 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
    nameplate is what lets a long name shrink rather than shove the numbers off
    the edge of the card. */
 .sheet-top {
-  display: flex; align-items: center; gap: 16px;
-  padding-bottom: 16px; margin-bottom: 16px;
+  position: relative; flex: none;
+  display: flex; align-items: center; gap: 14px;
+  padding-bottom: 12px; margin-bottom: 10px;
   border-bottom: 2px solid var(--line);
 }
-.sheet-id { flex: 1 1 auto; min-width: 0; }
+/* Room for the close button, so a long name wraps before it reaches it. */
+.sheet-id { flex: 1 1 auto; min-width: 0; padding-right: 36px; }
+.sheet-x {
+  position: absolute; top: 0; right: 0;
+  width: 32px; height: 32px; display: grid; place-items: center; cursor: pointer;
+  font-size: 13px; line-height: 1; color: var(--ink-soft);
+  border: 2px solid var(--line-firm); border-radius: 9px; background: var(--surface);
+}
+.sheet-x:hover { background: var(--path); border-color: var(--path); color: #fff; }
+.sheet-x:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* THE TABS: four equal cells, the name over its count, so four fit a 320px
+   phone without wrapping or scrolling. The count is what makes a tab worth
+   opening - "3/8" on FORMS, "Lv 6" on RESEARCH - before you open it. */
+.sheet-tabs {
+  flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+  padding: 3px; margin-bottom: 10px;
+  background: var(--surface-2); border: 2px solid var(--line); border-radius: 11px;
+}
+.sheet-tabs button {
+  min-height: 40px; display: grid; place-items: center; align-content: center; gap: 2px;
+  padding: 4px 2px; cursor: pointer; border: 0; border-radius: 8px;
+  background: transparent; color: var(--ink-soft); font: inherit;
+}
+.sheet-tabs button span { font-family: var(--display); font-weight: 600; font-size: 13px; line-height: 1; }
+.sheet-tabs button em {
+  font-style: normal; font-family: var(--pixel); font-size: 9px; line-height: 1;
+  color: var(--ink-faint);
+}
+.sheet-tabs button:hover { background: var(--surface); }
+.sheet-tabs button.on { background: var(--canopy); color: #fff; box-shadow: 0 2px 0 rgba(0, 0, 0, .18); }
+.sheet-tabs button.on em { color: #cfe8d8; }
+.sheet-tabs button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+
+/* The panel: the one part that scrolls. A floor on its height so the card does
+   not collapse to a sliver on a short tab and grow on a long one. */
+.sheet-body {
+  flex: 1 1 auto; min-height: min(300px, 45vh); overflow-y: auto;
+  overscroll-behavior: contain; padding: 2px 2px 4px;
+}
+
+/* ABOUT: the dex text, then the facts, then the line. */
+.sheet-about { display: grid; gap: 14px; }
+.sheet-about .sheet-flavor { margin: 0; }
+.sheet-about .sheet-facts {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0;
+}
+.sheet-about .sheet-facts > div {
+  display: grid; gap: 3px; padding: 8px 6px; text-align: center;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px;
+}
+.sheet-about .sheet-facts dt { font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.sheet-about .sheet-facts dd {
+  margin: 0; font-family: var(--display); font-weight: 600; font-size: 15px;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.sheet-line ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.sheet-line li > button, .sheet-line li > div {
+  width: 100%; min-height: 44px; display: grid; grid-template-columns: 40px 1fr auto;
+  gap: 8px; align-items: center; padding: 2px 10px 2px 2px; text-align: left;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--surface); font: inherit;
+}
+.sheet-line li > button { cursor: pointer; }
+.sheet-line li > button:hover { border-color: var(--canopy); }
+.sheet-line img { width: 40px; height: 40px; image-rendering: pixelated; }
+.sheet-line img.locked { filter: brightness(0); opacity: .22; }
+.sheet-line span { display: grid; min-width: 0; }
+.sheet-line i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.sheet-line b { font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-line em { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--path); text-align: right; }
+.sheet-line-none { margin: 0; font-size: 13px; color: var(--ink-faint); }
 /* The picture only - the frame is the wrapper's, above. */
 .sheet-art {
   width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;
@@ -3231,18 +3389,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
    arrangements - about 62px against 95px - and the narrow one is what decides
    whether the name still fits beside it on a phone. Ranged right so the three
    values make a clean edge against the card's own margin. */
-.sheet-facts {
-  flex: none; display: grid; gap: 7px; justify-items: end;
-  margin: 0; text-align: right;
-}
-.fact { display: grid; justify-items: end; gap: 1px; }
-.fact dt {
-  font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
-}
-.fact dd {
-  margin: 0; font-family: var(--display); font-weight: 600; font-size: 14px;
-  color: var(--ink-soft); font-variant-numeric: tabular-nums;
-}
+
 /* FORMS: every way this species comes, and which you hold. The ones you do not
    are shown as silhouettes rather than hidden - the point of the strip is as
    much "go and find these" as "look what you have". (It said "the four ways"
@@ -3250,7 +3397,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 /* Promoted: this sits directly under the name now, because it is what the
    dialog is opened for. The extra breathing room under it separates the
    collection from the reference material that follows. */
-.sheet-forms { display: grid; gap: 7px; margin-bottom: 18px; }
+.sheet-forms { display: grid; gap: 7px; }
 .sf-head {
   display: flex; align-items: center; justify-content: space-between;
   font-family: var(--pixel); font-size: 9px;
@@ -3368,7 +3515,10 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
    full height of the line - so SEE IN BOX came out as a tall square next to a
    short bar. The gap is the row's now and both buttons are the same height,
    which is what they looked like they were supposed to be. */
-.sheet-actions { display: flex; align-items: stretch; gap: 8px; margin-top: 18px; }
+/* A caught entry has tabs, and a card that took its height from the tab on
+   show jumped 80px switching FORMS to ABOUT. Fixed; the panel scrolls. */
+.sheet-card.tabbed { height: min(88vh, 700px); }
+.sheet-actions { flex: none; display: flex; align-items: stretch; gap: 8px; margin-top: 12px; }
 .sheet-actions .sheet-close { flex: 1; margin-top: 0; }
 /* GREEN, not the path rose. Rose is what SELL wears in the confirm dialog and
    what a caught cell is tinted with - beside a green CLOSE it read as the
@@ -4592,7 +4742,6 @@ button:disabled { transition: none; }
      how you know which tier this is, so stopping them must not remove them. */
   .shiny-spark i, .astral-fx i { opacity: .9; transform: scale(1); }
   .astral-aura { opacity: .8; }
-  .alpha-aura { animation: none; opacity: .8; }
   .rift-tint { animation: none; }
   /* Parked mid-sweep rather than at `from`, which is off the sprite entirely -
      a Holo with no band on it is just a slightly brighter Pokemon, and the
@@ -5250,16 +5399,16 @@ button:disabled { transition: none; }
   .vr-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* A PHONE: a smaller portrait and name so the header stays one band, the
+   facts two by two, and less margin round a card that is the whole screen. */
 @media (max-width: 430px) {
-  .sheet-top { flex-wrap: wrap; }
-  .sheet-top .sheet-facts {
-    flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 6px 22px;
-    justify-content: flex-start; text-align: left;
-    padding-top: 12px; border-top: 2px solid var(--line);
-  }
-  .sheet-top .fact {
-    display: flex; align-items: baseline; justify-items: start; gap: 7px;
-  }
+  .sheet { padding: 10px; }
+  .sheet-card { padding: 12px 12px 12px; max-height: 92vh; }
+  .sheet-portrait { width: 76px; height: 76px; }
+  .sheet-name { font-size: 22px; }
+  .sheet-top { gap: 10px; }
+  .sheet-about .sheet-facts { grid-template-columns: repeat(2, 1fr); }
+  .sheet-tabs button span { font-size: 12px; }
 }
 
 @media (min-width: 1400px) {

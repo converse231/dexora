@@ -110,7 +110,8 @@ function Box({
       const variant = variantOf(mon);
       /* AN ALPHA IS ITS OWN ROW, for the reason a variant is: `keeper()`
          protects it, and a protection hidden inside a row of ordinary ones is
-         a guarantee nobody can see. */
+         a guarantee nobody can see. It stacks on the tier, so an Alpha Shiny
+         is a row of its own beside the plain Shiny. */
       const alpha = !!mon.alpha;
       const key = `${mon.species}:${variant ?? ""}:${alpha ? "a" : ""}`;
       const g = byId.get(key) ?? {
@@ -649,7 +650,7 @@ function Box({
                     </span>
                   )}
                   {group.alpha && (
-                    <span className="bx-vtag alpha">
+                    <span className="bx-vtag bx-alpha">
                       <Mark tier="alpha" size={11} />ALPHA
                     </span>
                   )}

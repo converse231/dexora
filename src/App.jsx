@@ -865,6 +865,10 @@ export default function App({
           held={Object.fromEntries(
             TIERS.map((t) => [t, !!st?.[t]?.[dexIndex(entry)]]))}
           research={st?.research?.[entry] ?? null}
+          /* The evolution line names only what the dex has seen, and walks to
+             it: opening another entry replaces this one. */
+          dexOf={(x) => st?.dex[dexIndex(x)] ?? 0}
+          onSelect={setEntry}
           /* So the sheet can say "finish the dex" rather than "not yet" for a
              variant that cannot currently spawn at all. */
           owned={st?.box?.filter((m) => m.species === entry).length ?? 0}

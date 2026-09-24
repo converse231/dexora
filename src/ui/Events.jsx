@@ -1,12 +1,14 @@
-/* WHAT IS HAPPENING IN THE WORLD, in one place. Outbreaks, rifts, research
-   and alphas each had a card in the corner or a line in How to play, and none
-   of them had anywhere that said "here is today's, here is how far along you
-   are, go". This is that page: live, read off the engine on every render, and
-   every number is the live constant rather than a typed one - the rare-forms
-   page records what a typed odds string costs the day the ladder moves.
+/* WHAT IS HAPPENING IN THE WORLD, in one place - built as a quest board rather
+   than a list, because the first version read as a settings page and these
+   are the four things in the game worth going out for today.
 
-   Reached from the menu, and from the event cards themselves: a card you can
-   see and cannot press is a door painted on a wall. */
+   Every card is live, read off the engine on every render, and every number
+   is the live constant rather than a typed one - the rare-forms page records
+   what a typed odds string costs the day the ladder moves.
+
+   PROGRESS IS DRAWN, NOT WRITTEN. "9 left" is a sentence; fifteen pips with
+   six of them spent is a raid in progress. The rift's meter shows the zones it
+   moves through, and a research level is a ring you watch close. */
 import { useEffect } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
 import Sprite, { eventIcon } from "./Sprite.jsx";
@@ -23,8 +25,7 @@ import {
 const NEAREST = 4;   // how many unfinished entries the Discovery card lists
 
 /* The research you are closest to finishing, and the next task on each - the
-   question a player actually has ("what should I catch next?"), answered from
-   the counters rather than by making them open every dex entry. */
+   question a player actually has ("what should I catch next?"). */
 function nearest(research) {
   return Object.entries(research ?? {})
     .map(([k, row]) => ({ id: Number(k), row, level: researchLevel(Number(k), row) }))
@@ -39,6 +40,25 @@ function nearest(research) {
     });
 }
 
+/* Until the day turns, which is when the next outbreak starts - the quest's
+   own clock (`dayKey` is local time), so the two can never disagree. */
+function untilTomorrow() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(24, 0, 0, 0);
+  const min = Math.max(0, Math.round((next - now) / 60000));
+  return `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}m`;
+}
+
+// A row of pips: `spent` filled of `total`, drawn rather than counted.
+function Pips({ total, spent, label: aria }) {
+  return (
+    <div className="ev-pips" role="img" aria-label={aria}>
+      {Array.from({ length: total }, (_, i) => <i key={i} className={i < spent ? "on" : ""} />)}
+    </div>
+  );
+}
+
 export default function Events({ world, state, level, busy, onTravel, onSelect, onClose }) {
   useModalLock();
   useEffect(() => {
@@ -50,10 +70,12 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
   const ob = world?.outbreak ?? null;
   const obSp = ob && speciesById(ob.speciesId);
   const obLive = ob && ob.left > 0;
-  const obGo = obLive && ob.areaId !== state?.areaId && areaOpen(ob.areaId, level) && !busy;
+  const obOpen = ob && areaOpen(ob.areaId, level);
+  const obGo = obLive && ob.areaId !== state?.areaId && obOpen && !busy;
 
   const rift = world?.rift ?? null;
   const since = world?.sinceTravel ?? 0;
+  const riftZone = rift ? "open" : since < RIFT_FROM ? "calm" : "stirring";
 
   const research = state?.research ?? {};
   const touched = Object.keys(research).length;
@@ -75,113 +97,125 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
       >
         <div className="set-top">
           <h3>Events</h3>
-          <span className="set-mail">What the world is doing today</span>
+          <span className="set-mail">Today&rsquo;s quest board</span>
           <button className="set-x" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div className="hp-body">
-          {/* OUTBREAK - the "raid" of the day. */}
-          <section className={`ev-card${obLive ? " live" : ""}`}>
-            <header>
+          {/* OUTBREAK - the raid of the day. */}
+          <section className={`ev-card ev-raid${obLive ? " live" : ""}`}>
+            <header className="ev-banner">
               <img src={eventIcon("outbreak")} alt="" />
               <h4>Mass outbreak</h4>
-              <em>{obLive ? `${ob.left} left` : ob ? "over for today" : "none today"}</em>
+              <span className={`ev-stamp${obLive ? " live" : ""}`}>{obLive ? "LIVE" : ob ? "OVER" : "SOON"}</span>
             </header>
             {ob && obSp ? (
-              <div className="ev-row">
-                <Sprite id={obSp.id} alt={label(obSp)} />
-                <p>
-                  <b>{label(obSp)}</b> {obLive ? "is overrunning" : "overran"}{" "}
-                  <b>{AREAS[ob.areaId]?.name}</b>. About a third of what you meet
-                  there is one, for {OUTBREAK_SIZE} encounters, and each is{" "}
-                  {OUTBREAK_LIFT}&times; as likely to be a rare form.
-                </p>
+              <div className="ev-raid-body">
+                <span className="ev-spot"><Sprite id={obSp.id} alt={label(obSp)} /></span>
+                <div className="ev-raid-copy">
+                  <b>{label(obSp)}</b>
+                  <span>{obLive ? "overrunning" : "overran"} {AREAS[ob.areaId]?.name}</span>
+                  <small>{OUTBREAK_LIFT}&times; rare-form odds while it lasts</small>
+                </div>
               </div>
             ) : (
-              <p>A new outbreak starts every day.</p>
+              <p className="ev-quiet">A new outbreak starts every day.</p>
+            )}
+            {ob && (
+              <>
+                <Pips total={OUTBREAK_SIZE} spent={OUTBREAK_SIZE - ob.left}
+                  label={`${ob.left} of ${OUTBREAK_SIZE} encounters left`} />
+                <div className="ev-meta">
+                  <span>{obLive ? `${ob.left} of ${OUTBREAK_SIZE} left` : "All met today"}</span>
+                  <span>Next in {untilTomorrow()}</span>
+                </div>
+              </>
             )}
             {obLive && (
-              <button
-                type="button"
-                className="ev-go"
-                disabled={!obGo}
-                onClick={() => onTravel(ob.areaId)}
-              >
-                {ob.areaId === state?.areaId ? "You are here"
-                  : !areaOpen(ob.areaId, level)
-                    ? `Opens at Lv ${BIOMES.find((b) => b.id === ob.areaId)?.level}`
-                    : `Go to ${AREAS[ob.areaId]?.name}`}
+              <button type="button" className="ev-go" disabled={!obGo} onClick={() => onTravel(ob.areaId)}>
+                {ob.areaId === state?.areaId ? "You are here — go walking"
+                  : !obOpen ? `Opens at Lv ${BIOMES.find((b) => b.id === ob.areaId)?.level}`
+                    : `Go to ${AREAS[ob.areaId]?.name} ›`}
               </button>
             )}
           </section>
 
-          {/* RIFT - opened by staying, so the useful thing to show is how long
-              you have stayed. */}
-          <section className={`ev-card${rift ? " live rift" : ""}`}>
-            <header>
+          {/* RIFT - opened by staying, so what matters is how long you have. */}
+          <section className={`ev-card ev-rift ${riftZone}`}>
+            <header className="ev-banner">
               <img src={eventIcon("rift")} alt="" />
               <h4>Space-time rift</h4>
-              <em>{rift ? `${rift.left} steps left` : since < RIFT_FROM ? "calm" : "stirring"}</em>
+              <span className={`ev-stamp${rift ? " live" : ""}`}>{riftZone.toUpperCase()}</span>
             </header>
             <p>
               {rift
-                ? `Open over ${here}: rarer Pokémon are out and things turn up underfoot. Leaving the map closes it.`
+                ? `Open over ${here}: rarer Pokémon, and things lying on the ground. Leaving closes it.`
                 : since < RIFT_FROM
-                  ? `Stay on one map and it tears. ${RIFT_FROM - since} more steps here before one can open.`
-                  : `Any step here could open one now, and one is certain by ${RIFT_SURE} steps.`}
+                  ? `Stay on one map and it tears. ${RIFT_FROM - since} more steps here first.`
+                  : `The air is thin here. Any step could open one, and one is certain by ${RIFT_SURE}.`}
             </p>
-            {!rift && (
-              <div className="ev-meter" role="img"
-                aria-label={`${since} of ${RIFT_SURE} steps on this map`}>
-                <i style={{ width: `${Math.min(100, (since / RIFT_SURE) * 100)}%` }} />
-                <b style={{ left: `${(RIFT_FROM / RIFT_SURE) * 100}%` }} />
+            {rift ? (
+              <div className="ev-drain" role="img" aria-label={`${rift.left} of ${RIFT_STEPS} steps left`}>
+                <i style={{ width: `${(rift.left / RIFT_STEPS) * 100}%` }} />
+                <b>{rift.left} steps left</b>
+              </div>
+            ) : (
+              <div className="ev-zones" role="img" aria-label={`${since} of ${RIFT_SURE} steps on this map`}>
+                <span className="z-calm" style={{ width: `${(RIFT_FROM / RIFT_SURE) * 100}%` }}>calm</span>
+                <span className="z-stir">possible</span>
+                <i style={{ left: `${Math.min(100, (since / RIFT_SURE) * 100)}%` }} />
               </div>
             )}
-            {!rift && <small>{since} steps on this map · a rift lasts {RIFT_STEPS}</small>}
+            {!rift && <div className="ev-meta"><span>{since} steps on this map</span><span>lasts {RIFT_STEPS}</span></div>}
           </section>
 
           {/* DISCOVERY - research, answered as "what next". */}
-          <section className="ev-card">
-            <header>
-              <Mark tier="research" size={16} />
+          <section className="ev-card ev-disc">
+            <header className="ev-banner">
+              <Mark tier="research" size={18} />
               <h4>Discovery</h4>
-              <em>{finished} finished</em>
             </header>
-            <p>
-              {touched
-                ? `${touched} species studied. A finished entry makes its rare forms ${RESEARCH_LIFT}× as likely.`
-                : "Catch anything to start its research."}
-            </p>
-            {close.length > 0 && (
+            <div className="ev-stats">
+              <span><b>{finished}</b> finished</span>
+              <span><b>{touched}</b> studied</span>
+              <span><b>{RESEARCH_LIFT}&times;</b> rare odds when done</span>
+            </div>
+            {close.length > 0 ? (
               <ul className="ev-list">
                 {close.map((r) => (
                   <li key={r.id}>
                     <button type="button" onClick={() => onSelect(r.id)}>
-                      <Sprite id={r.id} alt="" />
+                      <span className="ev-ring" style={{ "--p": r.level / RESEARCH_MAX }}>
+                        <Sprite id={r.id} alt="" />
+                      </span>
                       <span>
                         <b>{label(speciesById(r.id))}</b>
-                        <i>{r.next}</i>
+                        <i>Next: {r.next}</i>
                       </span>
                       <em>Lv {r.level}</em>
                     </button>
                   </li>
                 ))}
               </ul>
+            ) : (
+              <p className="ev-quiet">Catch anything to start its research.</p>
             )}
           </section>
 
-          {/* ALPHAS - nothing to schedule, so it is only the odds and the tally. */}
-          <section className="ev-card">
-            <header>
-              <Mark tier="alpha" size={16} />
+          {/* ALPHAS - nothing to schedule, so it is a trophy count. */}
+          <section className="ev-card ev-alpha">
+            <header className="ev-banner">
+              <Mark tier="alpha" size={18} />
               <h4>Alphas</h4>
-              <em>{alphas} held</em>
             </header>
-            <p>
-              About one Pokémon in {Math.round(1 / ALPHA_CHANCE)} is an alpha: far
-              bigger, harder to catch, and it never runs. It pays Rare Candy when
-              caught and can never be sold.
-            </p>
+            <div className="ev-trophy">
+              <b>{alphas}</b>
+              <span>
+                {alphas === 1 ? "alpha caught" : "alphas caught"}
+                <small>About one Pokémon in {Math.round(1 / ALPHA_CHANCE)} is one — huge,
+                  it never runs, and it pays Rare Candy. It can be a rare form too.</small>
+              </span>
+            </div>
           </section>
         </div>
       </div>
