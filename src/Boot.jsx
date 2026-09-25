@@ -202,7 +202,15 @@ export default function Boot() {
       <div className="gate">
         <div className="gate-card gate-wait" role="status">
           <span className="title">Dexora</span>
-          <p>Loading your Pokédex…</p>
+          {/* A BALL THAT WOBBLES, the catch's own shake on a loop: something
+              moving says "working" where a sentence alone read as "stuck". */}
+          <span className="load-ball" aria-hidden="true">
+            <img src="items/poke-ball.png" alt="" />
+          </span>
+          <p>
+            Loading your Pokédex
+            <span className="load-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>
+          </p>
         </div>
       </div>
     );

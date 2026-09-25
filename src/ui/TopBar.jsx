@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { levelProgress } from "../game/biomes.js";
 import Daily from "./Daily.jsx";
 import { SPECIES } from "../data/dex.js";
+import { themeChoice, setTheme } from "./theme.js";
 
 /* "+3 +2 balls" - the whole parcel in one short line, because four separate
    floating numbers over one counter is confetti, not information. */
@@ -117,7 +118,11 @@ const ICON = {
   reset: "M3 12a9 9 0 1 0 2.6-6.4M3 4v5h5",
   bolt: "M13 2 4 14h7l-1 8 9-12h-7z",
   bell: "M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0",
+  moon: "M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a6.6 6.6 0 0 0 9.7 9.7z",
 };
+// Night mode cycles: follow the system, always on, always off.
+const THEME_NEXT = { auto: "dark", dark: "light", light: "auto" };
+const THEME_SAYS = { auto: "AUTO", dark: "ON", light: "OFF" };
 
 function Glyph({ of }) {
   return (
@@ -129,6 +134,7 @@ function Glyph({ of }) {
 
 function Menu({ onSettings, onHelp, onForms, onEvents, onNews, unread, onLogOut, onReset }) {
   const [open, setOpen] = useState(false);
+  const [theme, setThemeState] = useState(themeChoice);
   const box = useRef(null);
 
   // Click away and Escape, the same as `Missions` - this sits over a game that
@@ -184,6 +190,13 @@ function Menu({ onSettings, onHelp, onForms, onEvents, onNews, unread, onLogOut,
               the explanation for half of what there is to do here. */}
           <button type="button" role="menuitem" onClick={run(onForms)}>
             <Glyph of="star" />Rare forms
+          </button>
+          {/* A SWITCH, SO IT DOES NOT CLOSE THE MENU: the page changes under
+              it and you see the answer before choosing again. */}
+          <button type="button" role="menuitem" className="tb-theme"
+            aria-label={`Night mode: ${THEME_SAYS[theme].toLowerCase()}`}
+            onClick={() => { const next = THEME_NEXT[theme]; setTheme(next); setThemeState(next); }}>
+            <Glyph of="moon" />Night mode<em>{THEME_SAYS[theme]}</em>
           </button>
           {onSettings && (
             <button type="button" role="menuitem" onClick={run(onSettings)}>

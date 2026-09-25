@@ -11,6 +11,15 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-09-29",
+    date: "September 2026",
+    title: "Night mode",
+    items: [
+      ["Night mode", "Open the menu and choose Night mode: Auto follows your device, or switch it on or off. The map and the battles stay as drawn; everything around them goes dark."],
+      ["Loading", "The loading screen now shows a Poké Ball wobbling while your Pokédex arrives."],
+    ],
+  },
+  {
     id: "2026-09-28",
     date: "September 2026",
     title: "Alphas, rifts and a closer look",

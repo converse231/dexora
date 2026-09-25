@@ -9,7 +9,16 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/sprites/25.png" />
     <meta name="theme-color" content="#2f6b4c" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Night mode before the first paint - the same rule as src/ui/theme.js,
+         which takes over once the bundle runs. -->
+    <script>
+      try {
+        var t = localStorage.getItem("dexora-theme") || "auto";
+        document.documentElement.dataset.theme = t === "dark" || (t === "auto"
+          && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+      } catch (e) {}
+    </script>
     <meta
       name="description"
       content="Catch, collect and evolve the whole National Dex across eleven hand-made maps."

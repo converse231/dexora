@@ -3346,6 +3346,18 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       }
     }
 
+    /* NIGHT MODE IS TOKENS, so a colour token without a night value is a
+       light patch on a dark page that nobody sees until they switch. Every
+       colour-valued token on :root must be redefined under the dark theme. */
+    {
+      const tokens = (block) => new Set([...block.matchAll(/(--[\w-]+):\s*(#|rgba?\()/g)].map((m) => m[1]));
+      const light = new Set([...css.matchAll(/(?:^|\n):root \{([^}]*)\}/g)].flatMap((m) => [...tokens(m[1])]));
+      const dark = tokens(css.match(/:root\[data-theme="dark"\] \{([^}]*)\}/)?.[1] ?? "");
+      const missing = [...light].filter((t) => !dark.has(t));
+      assert.deepEqual(missing, [], `colour tokens with no night value: ${missing.join(", ")}`);
+      assert.ok(light.size >= 20, `only ${light.size} colour tokens found - the parse is wrong`);
+    }
+
     for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
         `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +
