@@ -73,7 +73,7 @@ function Size({ enc }) {
   return (
     <span className={`np-size${tag ? ` np-${tag.toLowerCase()}` : ""}`}>
       {tag && <b>{tag}</b>}
-      {m.toFixed(2)} m · {kg.toFixed(1)} kg
+      <span className="np-dim">{m.toFixed(2)} m · {kg.toFixed(1)} kg</span>
     </span>
   );
 }
@@ -287,7 +287,7 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
             sprite. The bigger slot says the rest. */}
         {enc.alpha && (
           <span className="np-alpha" data-tip="An alpha: huge, never runs, harder to catch, pays Rare Candy">
-            <Mark tier="alpha" size={16} />ALPHA
+            <Mark tier="alpha" size={16} /><span className="np-word">ALPHA</span>
           </span>
         )}
         <span className="np-lv">Lv {enc.level}</span>
@@ -308,9 +308,9 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
         {/* The drawn badge carries the tier now - the word beside it was saying
             the same thing twice, and at a glance the icon is the faster read. */}
         {enc.variant && (
-          <span className={`np-tier np-${enc.variant}`}>
+          <span className={`np-tier np-${enc.variant}`} data-tip={enc.variant.toUpperCase()}>
             <Mark tier={enc.variant} size={16} />
-            {enc.variant.toUpperCase()}
+            <span className="np-word">{enc.variant.toUpperCase()}</span>
           </span>
         )}
         {/* Just the ball. The word was redundant the moment the icon was there
