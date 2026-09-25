@@ -11,7 +11,7 @@ import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
   levelFromXp, xpForCatch,
   rodTable, rodBite,
-  rollVariant, pityBoost, TIERS, TIER_TELL, isLegendary,
+  rollVariant, pityBoost, TIERS, TIER_TELL, isLegendary, LEGENDARY,
   lockedTiers, wildBand, rollSize, BIOMES, ENCOUNTER_RATE, sizeTag, rollAlpha, alphaSize,
 } from "./biomes.js";
 import {
@@ -26,7 +26,10 @@ import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY,
 } from "./events.js";
-import { bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT } from "./research.js";
+import {
+  bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT, STAR_COST,
+  canStar,
+} from "./research.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt } from "./medals.js";
@@ -176,6 +179,7 @@ function freshState() {
     dry: 0,               // encounters since the last rare tier - see pityBoost
     outbreak: null,       // today's mass outbreak, frozen at first sight - see events.js
     research: {},         // per-species research counters, keyed by DEX ID - see research.js
+    stars: [],            // dex ids whose finished research was starred - see `star`
     rift: null,           // an open space-time rift, `{ areaId, left }` - see events.js
     sinceTravel: 0,       // steps since the map last changed, which is what opens a rift
     /* One quest a day. `key` is the local date it belongs to, so a new day is
@@ -483,7 +487,7 @@ function loadState() {
     });
 
     const fresh = freshState();
-    return [{
+    const loaded = {
       ...fresh, ...s,
       box, nextUid,
       limbo: pool.filter((m) => !sound(m)),
@@ -552,6 +556,9 @@ function loadState() {
         s.research && typeof s.research === "object" && !Array.isArray(s.research) ? s.research : {})
         .map(([k, v]) => [k, speciesById(Number(k)) ? cleanRow(v) : null])
         .filter(([, v]) => v)),
+      // Real species, once each; anything else is dropped, never the list.
+      stars: [...new Set(Array.isArray(s.stars) ? s.stars : [])]
+        .filter((id) => Number.isInteger(id) && speciesById(id)),
       /* A save from before `paid` existed was paid for every level it had
          reached, and never past the old cap of 50 - so that is where it
          stands, and anything above is owed. Never above its own level, so no
@@ -582,7 +589,13 @@ function loadState() {
       /* Every field that belongs to a SESSION comes back fresh, whatever the
          file said - see `VOLATILE`. Last, so nothing above can put one back. */
       ...Object.fromEntries(VOLATILE.map((k) => [k, fresh[k] ?? null])),
-    }, null];
+    };
+    /* A LEGENDARY'S RESEARCH IS CATCHING ONE, and the dex already knows who
+       has: a legendary caught before that was its task is credited here. */
+    for (const id of LEGENDARY) {
+      if (loaded.dex[dexIndex(id)] === 2) loaded.research[id] = bump(loaded.research[id], ["legend"]);
+    }
+    return [loaded, null];
   } catch {
     keep(mine(BROKEN_KEY), raw);
     return [freshState(), "unreadable"];
@@ -647,6 +660,16 @@ export function createEngine(canvas, onChange, mini = null) {
   let rows = areaOf(state.areaId).rows;
   let MAP_W = rows[0].length;
   let MAP_H = rows.length;
+  /* A MAP CAN CHANGE UNDER A SAVE - Deep Woods became Monsoon Trail, Ember
+     Caldera became Magma Hideout, both keeping their ids - so a saved spot
+     can be rock, or off the edge. Nowhere to stand is sent to the map's own
+     way in, the same shape as a save sent home from a map it has not earned. */
+  {
+    const { x, y } = state.player ?? {};
+    if (!walkable(rows, x, y) && !rideable(rows, x, y)) {
+      state.player = { ...areaOf(state.areaId).spawn, dir: "down" };
+    }
+  }
   // Transcribed areas carry the real map's own tile ids; the rest are drawn
   // entirely from the rules and have none.
   let fixed = areaOf(state.areaId).tiles ?? null;
@@ -1322,7 +1345,7 @@ export function createEngine(canvas, onChange, mini = null) {
       Math.random,
       lockedTiers(sp.id),
       pityBoost(state.dry) * (honey && !honey.tier ? honey.lift : 1)
-        * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.research[sp.id]),
+        * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.stars),
       honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
 
@@ -1711,6 +1734,18 @@ export function createEngine(canvas, onChange, mini = null) {
      silently - a 3.2s banner per level would bury the medal and new-entry
      cheers on every first catch - and only a finished entry raises one,
      because that is the level that changes the game. */
+  /* WHAT OWNING ONE TEACHES, caught or evolved into: an ordinary one (the ten
+     a star spends), a rare form, an alpha, a size - and a legendary's one task.
+     Evolving counts because it is how most evolved forms are met at all: on
+     wild catches alone, 475 of them finished half an entry a playthrough. */
+  const owned = (id, tier, alpha, size) => [
+    ...(isLegendary(id) ? ["legend"] : []),
+    ...(tier || alpha ? [] : ["catch"]),
+    ...(tier ? ["variant"] : []),
+    ...(alpha ? ["alpha"] : []),
+    ...(sizeTag(size) ? ["xs"] : []),
+  ];
+
   function study(id, tasks) {
     const before = researchLevel(id, state.research[id]);
     state.research[id] = bump(state.research[id], tasks);
@@ -1720,9 +1755,39 @@ export function createEngine(canvas, onChange, mini = null) {
     state.money += cash;
     if (after === RESEARCH_MAX) {
       cheer({ kind: "research", title: label(speciesById(id)).toUpperCase(),
-        sub: `Research complete. Its rare forms are ${RESEARCH_LIFT}x as likely.` });
+        sub: `Research complete. Star it with ${STAR_COST} ordinary ones for ${RESEARCH_LIFT}x rare forms.` });
     }
     return cash;
+  }
+
+  /* A STAR: finished research, paid for with `STAR_COST` ordinary ones out of
+     the Box, makes that species' rare forms `RESEARCH_LIFT`x as likely for
+     good. The LOWEST-LEVEL ones go, so candy spent levelling one towards an
+     evolution is never what pays; a keeper (any tier, any alpha) never goes.
+     Refused mid-evolution, whose scene holds a uid that could be one of them.
+     It cannot be taken back, so it asks first, here, like a Master Ball. */
+  function star(id, confirmed = false) {
+    const sp = speciesById(id);
+    if (!sp || !canStar(id) || state.evolution || state.stars.includes(id)) return false;
+    if (researchLevel(id, state.research[id]) < RESEARCH_MAX) return false;
+    const give = state.box.filter((m) => m.species === id && !keeper(m))
+      .sort((a, b) => a.level - b.level || a.uid - b.uid)
+      .slice(0, STAR_COST);
+    if (give.length < STAR_COST) return false;
+    if (!confirmed) {
+      ask("star", () => star(id, true), `Star ${label(sp)}?`,
+        `${STAR_COST} ordinary ${label(sp)} leave the Box for good, the lowest-level ones. `
+        + `Its rare forms turn up ${RESEARCH_LIFT}x as often from then on.`);
+      return true;
+    }
+    const gone = new Set(give.map((m) => m.uid));
+    state.box = state.box.filter((m) => !gone.has(m.uid));
+    state.stars.push(id);
+    cheer({ kind: "research", title: label(sp).toUpperCase(),
+      sub: `Starred. Its rare forms are ${RESEARCH_LIFT}x as likely for good.` });
+    save();
+    changed();
+    return true;
   }
 
   /* Levelling hands out balls. Returns what was won, or null, so the caller can
@@ -1834,13 +1899,9 @@ export function createEngine(canvas, onChange, mini = null) {
       const entry = e.isNew ? dexBonus(caughtSpecies(), SPECIES.length) : 0;
       state.money += bounty + entry;
       // Every fact a research task reads is already frozen on the encounter.
-      const size = sizeTag(e.size);
-      const learnt = study(e.speciesId, ["catch",
+      const learnt = study(e.speciesId, [...owned(e.speciesId, e.variant, e.alpha, e.size),
         ...(e.night ? ["night"] : []),
-        ...(size === "XS" ? ["xs"] : size === "XL" ? ["xl"] : []),
-        ...(e.throws === 1 ? ["first"] : []),
-        ...(e.variant ? ["variant"] : []),
-        ...(e.alpha ? ["alpha"] : [])]);
+        ...(e.throws === 1 ? ["first"] : [])]);
       /* AN ALPHA PAYS ITS CANDY NOW, because `keeper()` means it can never be
          converted later - and says so, because it is the rarest individual a
          walk can turn up and it should not arrive in silence. */
@@ -2216,6 +2277,7 @@ export function createEngine(canvas, onChange, mini = null) {
     mon.species = targetId;
     mon.at = Date.now();
     study(row.from, ["evolve"]);
+    study(targetId, owned(targetId, roll, mon.alpha, mon.size));
 
     if (isNew) {
       checkDexRewards(targetId);
@@ -2469,6 +2531,7 @@ export function createEngine(canvas, onChange, mini = null) {
       return { goal, done: d.done, claimed: d.claimed, streak: d.streak };
     },
     sell,
+    star,
     convert,
     levelUp,
     spend,

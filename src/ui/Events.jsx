@@ -33,7 +33,7 @@ function nearest(research) {
     .sort((a, b) => researchPoints(b.id, b.row) - researchPoints(a.id, a.row) || a.id - b.id)
     .slice(0, NEAREST)
     .map((r) => {
-      const t = tasksFor(r.id).find((task) => progress(task, r.row).cleared < task.steps.length);
+      const t = tasksFor(r.id).find((task) => !task.bonus && progress(task, r.row).cleared < task.steps.length);
       const p = t && progress(t, r.row);
       const next = t && t.steps.find((s) => p.n < s);
       return { ...r, next: t ? `${t.label}${t.steps.length > 1 ? ` ${p.n}/${next}` : ""}` : "" };
@@ -177,8 +177,9 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
             </header>
             <div className="ev-stats">
               <span><b>{finished}</b> finished</span>
+              <span><b>{state?.stars?.length ?? 0}</b> starred</span>
               <span><b>{touched}</b> studied</span>
-              <span><b>{RESEARCH_LIFT}&times;</b> rare odds when done</span>
+              <span><b>{RESEARCH_LIFT}&times;</b> rare odds starred</span>
             </div>
             {close.length > 0 ? (
               <ul className="ev-list">

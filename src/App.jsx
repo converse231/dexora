@@ -18,7 +18,7 @@ import Bag from "./ui/Bag.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import {
-  BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall,
+  BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall, keeper,
 } from "./game/items.js";
 import { ItemIcon, eventIcon } from "./ui/Sprite.jsx";
 import { EVENT_NAME } from "./game/events.js";
@@ -403,29 +403,6 @@ export default function App({
           is an attribute rather than a wrapper. It renders nothing until
           something is hovered or focused. */}
       <Tip />
-
-      {/* A PRESS THAT CANNOT BE TAKEN BACK ASKS FIRST, and the engine is what
-          decided to ask - see `ask()` there. App renders ONE dialog for both
-          questions rather than one per call site, which is the whole point:
-          the Master Ball and the legendary RUN are reached from five and three
-          places respectively, and a dialog per place is eight chances to miss
-          one.
-
-          `st.encounter` is in the condition as well, because the question is
-          about an encounter and the frame loop keeps running underneath an open
-          dialog. The engine clears `ask` when an encounter ends, so this is the
-          belt to that braces - and a stale question about a Pokemon that has
-          gone would be a dialog whose YES does nothing. */}
-      {st?.ask && st?.encounter && (
-        <Confirm
-          title={st.ask.title}
-          tone="warn"
-          note={st.ask.body}
-          confirmLabel={st.ask.kind === "flee" ? "RUN" : "THROW"}
-          onCancel={() => engine.answerAsk(false)}
-          onConfirm={() => engine.answerAsk(true)}
-        />
-      )}
 
       {/* Above every other overlay: it can land during an encounter or an
           evolution, and both of those already own the middle of the screen. */}
@@ -865,6 +842,10 @@ export default function App({
           held={Object.fromEntries(
             TIERS.map((t) => [t, !!st?.[t]?.[dexIndex(entry)]]))}
           research={st?.research?.[entry] ?? null}
+          starred={!!st?.stars?.includes(entry)}
+          // What a star could spend: ordinary ones, never a keeper.
+          ordinary={st?.box?.filter((m) => m.species === entry && !keeper(m)).length ?? 0}
+          onStar={() => engine.star(entry)}
           /* The evolution line names only what the dex has seen, and walks to
              it: opening another entry replaces this one. */
           dexOf={(x) => st?.dex[dexIndex(x)] ?? 0}
@@ -881,6 +862,31 @@ export default function App({
           busy={Boolean(enc || evo)}
           onTravel={(id) => { if (engine.travel(id)) setEntry(null); }}
           onClose={() => setEntry(null)}
+        />
+      )}
+
+      {/* A PRESS THAT CANNOT BE TAKEN BACK ASKS FIRST, and the engine is what
+          decided to ask - see `ask()` there. App renders ONE dialog for both
+          questions rather than one per call site, which is the whole point:
+          the Master Ball and the legendary RUN are reached from five and three
+          places respectively, and a dialog per place is eight chances to miss
+          one.
+
+          `st.encounter` is in the condition as well, because the question is
+          about an encounter and the frame loop keeps running underneath an open
+          dialog. The engine clears `ask` when an encounter ends, so this is the
+          belt to that braces - and a stale question about a Pokemon that has
+          gone would be a dialog whose YES does nothing. A STAR is the one
+          question asked outside an encounter: it comes from the Dex sheet, which is
+          why this renders AFTER the sheet - same layer, so the later one is on top. */}
+      {st?.ask && (st?.encounter || st.ask.kind === "star") && (
+        <Confirm
+          title={st.ask.title}
+          tone="warn"
+          note={st.ask.body}
+          confirmLabel={{ flee: "RUN", star: "STAR" }[st.ask.kind] ?? "THROW"}
+          onCancel={() => engine.answerAsk(false)}
+          onConfirm={() => engine.answerAsk(true)}
         />
       )}
 

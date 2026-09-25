@@ -24,7 +24,7 @@ import { useModalLock, useDismiss } from "./modal.js";
 import { RUN_LEVEL, SURF_LEVEL } from "../game/items.js";
 import { ALPHA_CHANCE } from "../game/biomes.js";
 import { OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_STEPS } from "../game/events.js";
-import { RESEARCH_MAX, RESEARCH_LIFT } from "../game/research.js";
+import { RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } from "../game/research.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
    lists want identical rows and a second copy of the row is how one of them
@@ -111,9 +111,14 @@ export default function Help({ onClose }) {
             </li>
             <li>
               <b>Research.</b> Every species has a level up to {RESEARCH_MAX}:
-              catch it at night, catch a tiny or a huge one, land the first
-              ball, feed it a berry. Each level pays, and a finished entry makes
-              its rare forms {RESEARCH_LIFT}&times; as likely. The Dex shows it.
+              catch {STAR_COST} ordinary ones, one at night, a tiny or a huge
+              one, one with the first ball and one rare form, feed it a berry
+              and evolve it if it can. Evolving into a species counts as owning
+              one, and an evolved form skips the night, first-ball and berry
+              tasks. Each level pays. Finish every task (an alpha is a bonus) and
+              you can star it: give up {STAR_COST} ordinary ones and its rare
+              forms are {RESEARCH_LIFT}&times; as likely for good. A legendary's
+              research is catching one, and it is never starred.
             </li>
             <li>
               <b>Alphas.</b> About one Pokémon in {Math.round(1 / ALPHA_CHANCE)} is

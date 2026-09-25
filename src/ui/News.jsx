@@ -11,6 +11,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-09-27",
+    date: "September 2026",
+    title: "Research stars",
+    items: [
+      ["Every task counts", "Research now finishes only when every task is done - ten ordinary catches, night, a tiny or huge one, first ball, a rare form, a berry and an evolution where there is one. An alpha is a bonus."],
+      ["Raising counts", "Evolving into a species counts towards its research, and a legendary's research is simply catching one."],
+      ["Get a star", "Finished research can be starred from the Dex: give up ten ordinary ones and that species' rare forms turn up 1.5x as often for good."],
+      ["Rarer alphas", "Alphas now turn up about one Pokémon in 250."],
+      ["Ember Caldera, rebuilt", "Ember Caldera is now Hoenn's Magma Hideout, all eight rooms tile for tile - real rock edges, real ladders, and a lava pool you can surf."],
+    ],
+  },
+  {
     id: "2026-09-26",
     date: "September 2026",
     title: "Monsoon Trail",

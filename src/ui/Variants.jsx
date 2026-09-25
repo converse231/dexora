@@ -36,7 +36,7 @@ import {
 } from "../game/biomes.js";
 import { OUTBREAK_LIFT } from "../game/events.js";
 import { HONEY_STEPS } from "../game/items.js";
-import { RESEARCH_MAX, RESEARCH_LIFT } from "../game/research.js";
+import { RESEARCH_LIFT, STAR_COST } from "../game/research.js";
 
 /* FIVE CREATURES EVERYBODY KNOWS. The point of a preview is recognition - you
    are here to learn what a treatment looks like, and you can only see that on
@@ -166,8 +166,8 @@ export default function Variants({ onClose }) {
             <li>
               <b>Outbreaks and research lift it.</b> The species in today's
               outbreak is {OUTBREAK_LIFT}&times; as likely to wear one, and a
-              species whose research reaches {RESEARCH_MAX} stays{" "}
-              {RESEARCH_LIFT}&times; as likely for good.
+              species you have starred (research finished, {STAR_COST} ordinary
+              ones given up) stays {RESEARCH_LIFT}&times; as likely for good.
             </li>
             <li>
               <b>Honey aims the roll.</b> A coloured jar from the shop makes its

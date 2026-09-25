@@ -74,10 +74,8 @@ AREAS = [
     # leaves the floor uniform, which is exactly what the real Power Plant is.
     # Hand-drawn - see power_plant() further down.
     dict(id="power", name="Power Plant", drawn="power_plant"),
-    # Mt Ember has rock faces rather than boulders, so its obstacles are placed
-    # in 4x4 outcrops - a single face on its own reads as a floating slab.
-    # Hand-drawn - see volcano() further down.
-    dict(id="ember", name="Ember Caldera", drawn="volcano"),
+    # COPIED - Emerald's Magma Hideout, all eight rooms. See magma_hideout().
+    dict(id="ember", name="Ember Caldera", drawn="magma_hideout"),
     # COPIED, and the second two-level map - Route 112 with Mt Chimney above
     # it, joined by the real cable car. See cinderpeak().
     dict(id="cinder", name="Cinderpeak", drawn="cinderpeak"),
@@ -1690,61 +1688,6 @@ def join_islands(g, floor, rng, keep=()):
                     g[y][x] = floor
 
 
-def thicken_walls(g, floor, wall):
-    """No wall one tile thin: its 3x3 autotile has no inside to draw.
-
-    A seam of wall between two passages was never wall. Carving it is the fix,
-    the same as in compose - and doing it here as well means a stamped set piece
-    cannot leave one behind."""
-    H, W = len(g), len(g[0])
-    for _ in range(6):
-        bad = []
-        for y in range(1, H - 1):
-            for x in range(1, W - 1):
-                if g[y][x] != wall:
-                    continue
-                # The bank around a lava pool is one tile thick by definition
-                # and draws from the rim table, not the autotile - the same
-                # exemption check() makes. Carving it away leaves lava meeting
-                # open floor, which is what "no bank" means.
-                if any(g[y + dy][x + dx] == "V"
-                       for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0))):
-                    continue
-                ok = any(all(g[y + dy][x + dx] == wall
-                             for dx in (ox, ox + 1) for dy in (oy, oy + 1))
-                         for ox in (-1, 0) for oy in (-1, 0))
-                if not ok:
-                    bad.append((x, y))
-        if not bad:
-            return
-        for x, y in bad:
-            g[y][x] = floor
-
-
-def lava_banks(g):
-    """Rock along the top and both sides of every pool.
-
-    Magma Hideout never lets lava meet open floor except along a pool's bottom
-    edge - the pool is sunk into rock, and it is the rock tiles beside it that
-    carry the rim. Leave the bank out and the rim has to go on the lava, which
-    means a pool under a wall gets the wall's own edge and the pool's edge
-    stacked into a double lip. That is what "wonky" looked like.
-
-    The bottom edge stays bare, in the real map and here, exactly as a FireRed
-    lake's bottom edge is bare.
-
-    One pass over the whole grid rather than a ring per pool: pools are drawn as
-    overlapping rectangles to get a ragged outline, and a per-pool ring would
-    paint rock over the next rectangle's lava."""
-    H, W = len(g), len(g[0])
-    at = lambda x, y: g[y][x] if 0 <= x < W and 0 <= y < H else ""
-    bank = [(x, y) for y in range(H) for x in range(W)
-            if at(x, y) not in ("V", "M", "n", "N")
-            and (at(x, y + 1) == "V" or at(x - 1, y) == "V" or at(x + 1, y) == "V")]
-    for x, y in bank:
-        g[y][x] = "M"
-
-
 def bridge(g, x0, y0, x1, y1, over="lava"):
     """A plank bridge. The character says what it crosses - `n` lava, `N` water -
     because the planks are baked over that, not layered over it at draw time.
@@ -1808,208 +1751,167 @@ def spans_clear(g):
 
 
 # ------------------------------------------------------------- Ember Caldera
-
-"""Ember Caldera is a RE-SKIN, which is a third kind of copy.
-
-Route 1, the Power Plant and the Safari Zone carry the real map's own metatile
-ids and draw with them. Mt Moon does too. This one does NOT: it takes Emerald's
-Victory Road - three floors, 1F / B1F / B2F, the shape of the place - and draws
-every cell with OUR volcano set, the pokeemerald `lavaridge` tileset behind
-Magma Hideout. The layout is transcribed; the art is ours.
-
-**WHY IT HAS TO BE A RE-SKIN.** There is no three-floor volcano in any Gen 3
-game. Magma Hideout is the only lava interior that exists and it is eight small
-rooms, not a cave you descend. The choice was a real volcano that is not a
-descent or a real descent that is not a volcano, and the second one is the one
-you can fix: a cave's LAYOUT is just walkable and solid, and both tilesets can
-draw that. What cannot be borrowed is the grammar, which is why this is the one
-transcription whose cells are AUTHORED - `tiles` is -1 everywhere and
-`drawTile` runs the same rules it runs for a map we drew.
-
-**AND THE WATER BECOMES LAVA**, which is the whole reason this map is worth
-copying: B2F is 256 tiles of it, a lake with a waterfall feeding it, and Ember
-is the one place in the game that is largely molten. `SURFABLE` already holds
-`V`, so it is ridden exactly as the old caldera's lake was.
-
-**THREE THINGS THE RE-SKIN COSTS, all measured rather than waved at:**
-
-  *Thin rock is carved.* Our rock is a 3x3 autotile and needs a 2x2 to resolve,
-  and a real cave is full of one-tile walls - 102 of 3,124 here, 3%. Those
-  become floor, which widens 102 spots by a tile. `thicken_walls` is the same
-  pass the generated caldera used and the reason it exists.
-
-  *The shore is banked.* `lava_banks` turns the floor above and beside the lava
-  into rock, because in this tileset the rim is drawn on the ROCK and not on
-  the lava - see the note under `volcano` in route.json, which this file paid
-  for once already. The lake's bottom edge stays bare, which is both what Magma
-  Hideout does and how you get onto it.
-
-  *The bridges are floor.* Victory Road crosses its chasms on planks; our plank
-  set is Route 12's, baked over lava, and a bridge over nothing is not in the
-  vocabulary. They read as volcanic floor, and the route across is unchanged.
-"""
-
-EMBER_FLOORS = (("VictoryRoad_1F", 46, 45), ("VictoryRoad_B1F", 46, 31),
-                ("VictoryRoad_B2F", 46, 31))
-EMBER_GUT = 2
-# Resolved out of the three map.json warp tables: seven reciprocal pairs, as
-# (floor, x, y). The two Ever Grande mouths are not pairs - one of them is the
-# way in, and the other leads somewhere this game has no map for.
-EMBER_LADDERS = (
-    ((0, 21, 32), (1, 20, 21)),
-    ((0, 42, 38), (1, 42, 25)),
-    ((0,  9, 14), (1,  8,  3)),
-    ((1, 30, 25), (2, 30, 25)),
-    ((1, 17, 16), (2, 19, 12)),
-    ((1, 42,  2), (2, 43,  2)),
-    ((1,  5, 26), (2,  5, 26)),
-)
-EMBER_MOUTH = (0, 15, 40)          # Ever Grande's door, and so the spawn
-
-# pokeemerald behaviours, bits 0-8 of the metatile attribute.
-EMB_WATER = frozenset((0x10, 0x11, 0x12, 0x13, 0x14, 0x15))
-EMB_LADDER = 0x61
-EMB_JUMP_SOUTH = 0x3B
+#
+# EMBER CALDERA IS EMERALD'S MAGMA HIDEOUT, all eight rooms, cell for cell,
+# against Emerald General + Lavaridge - both baked already for Cinderpeak, so
+# the real map costs no new art.
+#
+# It was a RE-SKIN once: Victory Road's layout redrawn in our own volcano
+# autotile, because no Gen 3 volcano descends. The autotile could not draw a
+# real cave's one-tile walls or its rungs, and it showed: reported from play as
+# wrong edges and ladders everywhere. A copy draws Game Freak's own tiles.
+#
+# Laid out in shelves on one grid, the deepest room at the top, and joined by
+# the real warps - read out of each room's map.json and kept only where they
+# answer each other. The one warp that does not is the way in from Jagged Pass,
+# and so the spawn. The lava is `V` (Lavaridge 189 and 307), ridden as
+# Cinderpeak's crater is; the rim around it is rock, as Emerald draws it.
+MAGMA_ROOMS = ("1F", "2F_1R", "2F_2R", "2F_3R", "3F_1R", "3F_2R", "3F_3R", "4F")
+MAGMA_SHELVES = ((7, 4, 5), (6, 3), (1, 2, 0))     # indexes into MAGMA_ROOMS
+MAGMA_GUT = 2
+MAGMA_SPLIT = 512                                   # NUM_METATILES_IN_PRIMARY
+MAGMA_LAVA = frozenset((MAGMA_SPLIT + 189, MAGMA_SPLIT + 307))
 
 
-def volcano():
-    """Ember Caldera: 94x64, Emerald's Victory Road drawn in lava.
-
-    Laid out the way Mt Moon is - floors as quadrants of one grid, joined by
-    the real map's own warps - because that machinery already exists and this
-    is the same shape of problem."""
+def magma_hideout():
+    """Ember Caldera: Magma Hideout, eight rooms on one grid."""
     import numpy as np
     import build_assets as BA
 
-    layouts = json.load(io.open(
-        BA.fetch("data/layouts/layouts.json", "em/layouts.json", root=BA.EMERALD),
-        encoding="utf-8"))["layouts"]
-    ga = np.frombuffer(io.open(BA.fetch(
-        "data/tilesets/primary/general/metatile_attributes.bin",
-        "em/general/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2")
-    ca = np.frombuffer(io.open(BA.fetch(
-        "data/tilesets/secondary/cave/metatile_attributes.bin",
-        "em/cave/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2")
-    behave = lambda i: int((ga[i] if i < 512 else ca[i - 512]) & 0x1FF)
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    GB = meta["safari"]["general"]              # Emerald's General, baked whole
+    LB = meta["volcano"]["lava"] - 189          # Lavaridge, as Cinderpeak finds it
+    rebase = lambda i: (GB + i) if i < MAGMA_SPLIT else (LB + i - MAGMA_SPLIT)
+    em = lambda rel, dest: BA.fetch(rel, dest, root=BA.EMERALD)
 
-    w0, h0 = EMBER_FLOORS[0][1], EMBER_FLOORS[0][2]
-    h1 = EMBER_FLOORS[1][2]
-    origin = [(0, 0), (w0 + EMBER_GUT, 0), (w0 + EMBER_GUT, h1 + EMBER_GUT)]
-    W = w0 + EMBER_GUT + EMBER_FLOORS[1][1]
-    H = max(h0, h1 + EMBER_GUT + EMBER_FLOORS[2][2])
+    layouts = json.load(io.open(em("data/layouts/layouts.json", "em/layouts.json"),
+                                encoding="utf-8"))["layouts"]
+    ga = np.frombuffer(io.open(em("data/tilesets/primary/general/metatile_attributes.bin",
+                                  "em/general/attr.bin"), "rb").read(), dtype="<u2")
+    la = np.frombuffer(io.open(em("data/tilesets/secondary/lavaridge/metatile_attributes.bin",
+                                  "em/lavaridge/attr.bin"), "rb").read(), dtype="<u2")
+    behave = lambda i: int((ga[i] if i < MAGMA_SPLIT else la[i - MAGMA_SPLIT]) & 0x1FF)
 
+    rooms = []
+    for name in MAGMA_ROOMS:
+        m = json.load(io.open(em(f"data/maps/MagmaHideout_{name}/map.json",
+                                 f"em/maps/MagmaHideout_{name}.json"), encoding="utf-8"))
+        lay = next(q for q in layouts if q["id"] == m["layout"])
+        w, h = lay["width"], lay["height"]
+        raw = np.frombuffer(io.open(em(lay["blockdata_filepath"], f"em/MagmaHideout_{name}.bin"),
+                                    "rb").read(), dtype="<u2")[:w * h].reshape(h, w)
+        border = [int(v) & 0x3FF for v in np.frombuffer(io.open(em(
+            lay["border_filepath"], f"em/MagmaHideout_{name}_border.bin"), "rb").read(), dtype="<u2")]
+        rooms.append(dict(const="MAP_MAGMA_HIDEOUT_" + name.upper(), w=w, h=h, raw=raw,
+                          border=border, warps=m.get("warp_events", [])))
+    index = {r["const"]: i for i, r in enumerate(rooms)}
+
+    # THE WARPS THAT ANSWER EACH OTHER, and the one that leads outside.
+    pairs, mouth = set(), []
+    for i, r in enumerate(rooms):
+        for wv in r["warps"]:
+            j = index.get(wv["dest_map"])
+            if j is None:
+                mouth.append((i, wv["x"], wv["y"]))
+                continue
+            back = rooms[j]["warps"][int(wv["dest_warp_id"])]
+            if index.get(back["dest_map"]) == i and r["warps"][int(back["dest_warp_id"])] is wv:
+                pairs.add(tuple(sorted(((i, wv["x"], wv["y"]), (j, back["x"], back["y"])))))
+    assert len(mouth) == 1, f"ember: {len(mouth)} ways out of Magma Hideout, not one"
+    assert sorted(i for s_ in MAGMA_SHELVES for i in s_) == list(range(len(rooms))), \
+        "ember: every room must sit on exactly one shelf"
+
+    # --- the shelves --------------------------------------------------------
+    origin, y = {}, 0
+    for shelf in MAGMA_SHELVES:
+        x = 0
+        for i in shelf:
+            origin[i] = (x, y)
+            x += rooms[i]["w"] + MAGMA_GUT
+        y += max(rooms[i]["h"] for i in shelf) + MAGMA_GUT
+    W = max(origin[i][0] + rooms[i]["w"] for i in origin)
+    H = max(origin[i][1] + rooms[i]["h"] for i in origin)
+
+    # The gaps between rooms are the layouts' own border block, phased like
+    # the Safari Zone's, so they draw as the rock they are.
+    B = rooms[0]["border"]
     g = [["M"] * W for _ in range(H)]
-    ladder_cells = {(f, x, y) for pair in EMBER_LADDERS for (f, x, y) in pair}
-    for i, (name, fw, fh) in enumerate(EMBER_FLOORS):
-        lay = next(q for q in layouts if q["name"] == name + "_Layout")
-        assert lay["width"] == fw and lay["height"] == fh, \
-            f"ember: {name} is {lay['width']}x{lay['height']}, not the {fw}x{fh} assumed"
-        raw = np.frombuffer(io.open(BA.fetch(
-            lay["blockdata_filepath"], "em/%s.bin" % name,
-            root=BA.EMERALD), "rb").read(), dtype="<u2")[:fw * fh]
-        ids = (raw & 0x3FF).reshape(fh, fw)
-        col = ((raw >> 10) & 3).reshape(fh, fw)
+    tiles = [[rebase(B[(yy % 2) * 2 + (xx % 2)]) for xx in range(W)] for yy in range(H)]
+    elev = [[0] * W for _ in range(H)]
+    doors = {c for pair in pairs for c in pair}
+    for i, r in enumerate(rooms):
         ox, oy = origin[i]
-        for y in range(fh):
-            for x in range(fw):
-                b = behave(int(ids[y][x]))
-                if b in EMB_WATER:
-                    ch = "V"                     # the lake, and the fall into it
-                elif (i, x, y) in ladder_cells:
+        for yy in range(r["h"]):
+            for xx in range(r["w"]):
+                v = int(r["raw"][yy][xx])
+                mid, b = v & 0x3FF, behave(v & 0x3FF)
+                if (i, xx, yy) in doors:
                     ch = "l"
-                elif b == EMB_JUMP_SOUTH:
-                    # NO LEDGE, BECAUSE THIS TILESET HAS NONE. Victory Road
-                    # drops nine one-way hops between its terraces and `L`
-                    # draws `ledge` out of route.json - 176/135/177, FireRed's
-                    # grass-topped earth bank. On lavaridge that is a strip of
-                    # MEADOW across a volcano, which is exactly the wrong-tile
-                    # this re-skin exists to avoid; it was visible in the first
-                    # render as two green bars. Magma Hideout has no terraces
-                    # and so no hop to borrow. They become floor - which is
-                    # what a terrace edge is once you can walk over it - and
-                    # the route is unchanged, because a ledge was only ever a
-                    # shortcut down something you could already walk around.
-                    ch = "m"
-                elif int(col[y][x]):
+                elif mid in MAGMA_LAVA:
+                    ch = "V"
+                elif b in MB_JUMP_CH:
+                    ch = MB_JUMP_CH[b]
+                elif (v >> 10) & 3:
                     ch = "M"
                 else:
                     ch = "m"
-                g[oy + y][ox + x] = ch
+                g[oy + yy][ox + xx] = ch
+                tiles[oy + yy][ox + xx] = rebase(mid)
+                elev[oy + yy][ox + xx] = (v >> 12) & 0xF
 
-    # --- the frame -------------------------------------------------------
-    # Three floors in one rectangle, and the rectangle's edge is ours. Each
-    # floor's own border is interior to the composition; B1F leaves seven cells
-    # open on its edge and they simply meet the gutter's rock.
-    rect(g, "M", 0, 0, W - 1, 1)
-    rect(g, "M", 0, H - 2, W - 1, H - 1)
-    rect(g, "M", 0, 0, 1, H - 1)
-    rect(g, "M", W - 2, 0, W - 1, H - 1)
+    for xx in range(W):
+        g[0][xx] = g[H - 1][xx] = "M"
+    for yy in range(H):
+        g[yy][0] = g[yy][W - 1] = "M"
+    seal_hidden(g, tiles, "M")
 
-    # --- make it something this tileset can draw --------------------------
-    # KEEP THE LADDERS AND THE LEDGES OUT OF BOTH PASSES. `lava_banks` turns
-    # anything beside the lake into rock and does not know that a rung or a hop
-    # is not floor; losing one to the bank is losing a floor of the map.
-    # A LANDING KEEPS ITS FLOOR, and this guard is what that means.
-    # `lava_banks` turns everything above and beside the lake into rock, and
-    # Victory Road puts a 3x2 LANDING PLATFORM in the middle of its lake -
-    # reached by ladder, left by Surf. Banked, that platform went solid and the
-    # rung became an island: reported from play as arriving somewhere with
-    # nothing walkable in any direction. Ember opens at Lv 12 and Surf is Lv
-    # 20, so it was not even a hard exit, it was a dead save.
-    #
-    # So the rung AND its four neighbours are held back from both passes. Five
-    # tiles of lava keep no rim where they meet that floor, which `check()`
-    # exempts within one tile of a rung and nowhere else.
-    hold = set()
-    for _pair in EMBER_LADDERS:
-        for _f, _lx, _ly in _pair:
-            _gx, _gy = origin[_f][0] + _lx, origin[_f][1] + _ly
-            hold.add((_gx, _gy))
-            hold.update(((_gx + 1, _gy), (_gx - 1, _gy),
-                         (_gx, _gy + 1), (_gx, _gy - 1)))
-    # Only the WALKABLE ones. Holding a rock neighbour back as well put a
-    # one-tile-thin wall back at (64,16) - `thicken_walls` had carved it for
-    # the reason it exists, and the landing has no interest in rock.
-    keep = {(x, y): g[y][x] for (x, y) in hold
-            if 0 <= x < W and 0 <= y < H and g[y][x] in "ml"}
-    thicken_walls(g, "m", "M")
-    lava_banks(g)
-    thicken_walls(g, "m", "M")
-    for (x, y), ch in keep.items():
-        g[y][x] = ch
-
-    # --- the ladders, as warp pairs on the shared grid --------------------
     warps = []
-    for (fa, xa, ya), (fb, xb, yb) in EMBER_LADDERS:
+    for (fa, xa, ya), (fb, xb, yb) in sorted(pairs):
         ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
         bx, by = origin[fb][0] + xb, origin[fb][1] + yb
         assert g[ay][ax] == "l" and g[by][bx] == "l", \
-            f"ember: the ladder at ({ax},{ay})/({bx},{by}) is not on a rung"
+            f"ember: the warp at ({ax},{ay})/({bx},{by}) is not on a door"
         warps.append([ax, ay, bx, by])
-
-    mf, mx, my = EMBER_MOUTH
+    mf, mx, my = mouth[0]
     spawn = (origin[mf][0] + mx, origin[mf][1] + my)
-    assert g[spawn[1]][spawn[0]] not in SOLID, "ember: the mouth is walled up"
+    assert g[spawn[1]][spawn[0]] not in SOLID, "ember: the way in is walled up"
 
     hop = {}
     for ax, ay, bx, by in warps:
-        hop[(ax, ay)] = (bx, by)
-        hop[(bx, by)] = (ax, ay)
-    seen, stack = set(), [spawn]
-    while stack:
-        x, y = stack.pop()
-        if (x, y) in seen:
-            continue
-        seen.add((x, y))
-        stack += walk_steps(g, x, y)
-        if (x, y) in hop:
-            stack.append(hop[(x, y)])
-    for y in range(H):
-        for x in range(W):
-            if g[y][x] not in SOLID and (x, y) not in seen:
-                g[y][x] = "M"
+        hop[(ax, ay)], hop[(bx, by)] = (bx, by), (ax, ay)
 
-    return ["".join(r) for r in g], spawn, None, None, warps
+    # THE CULL AND THE LANDING RULE, TO A FIXED POINT, as Cinderpeak's: every
+    # step, every warp, and Surf onto the lava and off it again.
+    while True:
+        seen, stack = set(), [spawn]
+        while stack:
+            x, y = stack.pop()
+            if (x, y) in seen:
+                continue
+            seen.add((x, y))
+            stack += walk_steps(g, x, y)
+            if (x, y) in hop:
+                stack.append(hop[(x, y)])
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < W and 0 <= ny < H and (g[ny][nx] in SURFABLE or
+                        (g[y][x] in SURFABLE and g[ny][nx] not in SOLID)):
+                    stack.append((nx, ny))
+        cut_ = 0
+        for yy in range(H):
+            for xx in range(W):
+                if g[yy][xx] not in SOLID and (xx, yy) not in seen:
+                    g[yy][xx] = "M"             # solid, and still its own tile
+                    cut_ += 1
+        if not cut_ and not land_ledges(g, "M"):
+            break
+
+    lift = ["".join("^" if e in EM_HIGH else "." if e in (0, 15) else "v" for e in row)
+            for row in elev]
+    return (["".join(r) for r in g], spawn, [i for row in tiles for i in row], GB, warps,
+            {"lift": lift})
+
+
 # THE POKEMON TOWER, ALL SEVEN FLOORS, TRANSCRIBED.
 #
 # Lavender Town's tower, 1F to 7F, laid out on one grid the way the Mansion
