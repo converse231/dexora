@@ -1923,17 +1923,29 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
   assert.equal(fresh({ research: { [id]: done.map((n, i) => (i === 0 ? n - 1 : n)) } }).star(id), false,
     "unfinished research was starred");
 
-  /* A LEGENDARY: caught before its task existed, credited from the dex on
-     load - and never starred, whatever the box holds. */
+  /* A LEGENDARY: its catch credited from the dex on load, Lv 100 credited by
+     candy - and its star spends one, never the last one you hold. */
   const { LEGENDARY, dexIndex } = await import("../src/game/biomes.js");
   const { researchLevel, RESEARCH_MAX } = await import("../src/game/research.js");
   const leg = LEGENDARY[0];
+  const at = (tid) => TASKS.findIndex((t) => t.id === tid);
   const dex = [...SAVE.dex]; dex[dexIndex(leg)] = 2;
-  const lb = Array.from({ length: STAR_COST }, (_, i) => ({ uid: 60 + i, species: leg, level: 50, size: 100, at: 1 }));
-  const le = boot({ ...SAVE, dex, box: lb, nextUid: 99 }).e;
-  assert.equal(researchLevel(leg, le.state.research[leg]), RESEARCH_MAX,
-    "a legendary already in the dex did not have its research credited on load");
-  assert.equal(le.star(leg), false, "a legendary was offered a star");
+  const one = [{ uid: 60, species: leg, level: 50, size: 100, at: 1 }];
+  const le = boot({ ...SAVE, dex, box: one, nextUid: 99, candy: 80 }).e;
+  assert.equal(le.state.research[leg]?.[at("legend")], 1,
+    "a legendary already in the dex did not have its catch credited on load");
+  assert.equal(le.levelUp(60, 50), 50, "the legendary could not be raised");
+  assert.equal(le.state.research[leg][at("hundred")], 1, "raising a legendary to Lv 100 did not count");
+  const legDone = TASKS.map((t) => t.steps.at(-1));
+  assert.equal(researchLevel(leg, legDone), RESEARCH_MAX, "the finished legendary row is not finished");
+  const two = [...one, { uid: 61, species: leg, level: 70, size: 100, at: 1 }];
+  assert.equal(boot({ ...SAVE, dex, box: structuredClone(one), nextUid: 99, research: { [leg]: legDone } }).e.star(leg),
+    false, "a legendary's star spent the only one held");
+  const ls = boot({ ...SAVE, dex, box: structuredClone(two), nextUid: 99, research: { [leg]: legDone } }).e;
+  assert.equal(ls.star(leg), true, "a finished legendary with a spare could not be starred");
+  ls.answerAsk(true);
+  assert.deepEqual(ls.state.box.filter((m) => m.species === leg).map((m) => m.uid), [61],
+    "a legendary's star did not spend exactly the lower-level one");
   const no = fresh();
   no.star(id);
   no.answerAsk(false);
@@ -1982,6 +1994,12 @@ console.log("star ok — asks first, spends the lowest ordinary ones and never a
       "the missed throw to resolve", 4000);
     assert.ok(e.state.encounter && e.state.encounter.phase === "idle",
       `an alpha that should never flee ended the throw ${e.state.encounter?.phase ?? "gone"}`);
+
+    // Running from an alpha asks first, as from a legendary.
+    e.flee();
+    assert.equal(e.state.ask?.kind, "flee", "running from an alpha did not ask first");
+    e.answerAsk(false);
+    assert.equal(e.state.encounter?.phase, "idle", "cancelling the run still ran");
 
     Math.random = () => 0.001;
     const candy = e.state.candy;
@@ -2103,6 +2121,14 @@ console.log("stranded ok — a saved spot on rock or off the map loads at the ma
   const t = boot({ ...SAVE, rift: { areaId: "meadow", left: 90 }, sinceTravel: 0 }).e;
   t.state.sinceTravel = 500;
   assert.ok(t.travel("woods"), "the rift test could not travel");
+  // It asks first, and nothing moves until the answer.
+  assert.equal(t.state.ask?.kind, "rift", "leaving a rift did not ask first");
+  assert.ok(t.state.rift && t.state.areaId === "meadow", "the rift closed before the answer");
+  t.answerAsk(false);
+  assert.ok(t.state.rift && t.state.areaId === "meadow", "cancelling still left the rift");
+  t.travel("woods");
+  t.answerAsk(true);
+  assert.equal(t.state.areaId, "woods", "answering yes did not travel");
   assert.equal(t.state.rift, null, "a rift stayed open on the map you left");
   assert.equal(t.state.sinceTravel, 0, "travelling did not restart the rift clock");
 }

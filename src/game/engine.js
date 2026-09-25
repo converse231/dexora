@@ -27,8 +27,8 @@ import {
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY,
 } from "./events.js";
 import {
-  bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT, STAR_COST,
-  canStar,
+  bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
+  starCost, starKeeps, HUNDRED,
 } from "./research.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
@@ -1256,16 +1256,24 @@ export function createEngine(canvas, onChange, mini = null) {
   /* Through a door, or told why not: a door to a map your level has not
      opened stays shut, and says so rather than being a tile that does nothing. */
   function enterDoor([to, x, y]) {
-    if (travel(to, { x, y })) return;
+    if (travel(to, { x, y })) return;       // true when it moved, or asked first
     state.worn.push({ id: "door", event: true, title: AREAS[to]?.name ?? "Locked",
       sub: `Opens at Lv ${BIOMES.find((b) => b.id === to)?.level ?? "?"}`, n: ++wornSeq });
   }
 
-  function travel(areaId, arrive = null) {
+  function travel(areaId, arrive = null, confirmed = false) {
     if (!AREAS[areaId] || state.encounter || state.evolution) return false;
     // The gate, enforced where the move actually happens rather than only in
     // the panel that offers it.
     if (!areaOpen(areaId, levelFromXp(state.xp))) return false;
+    /* LEAVING A RIFT ASKS FIRST - it closes behind you, and nothing brings it
+       back. Asked HERE so the Travel panel, the Dex and a door all ask; true,
+       because the press was answered, and the answer re-runs the move. */
+    if (!confirmed && state.rift?.areaId === state.areaId && areaId !== state.areaId) {
+      ask("rift", () => travel(areaId, arrive, true), `Leave ${AREAS[state.areaId].name}?`,
+        "A rift is open here. Leaving closes it, and what it holds goes with it.");
+      return true;
+    }
     // A rift is a place: leaving closes it, and a new map starts the clock again.
     if (state.rift) closeRift();
     state.sinceTravel = 0;
@@ -1738,8 +1746,9 @@ export function createEngine(canvas, onChange, mini = null) {
      a star spends), a rare form, an alpha, a size - and a legendary's one task.
      Evolving counts because it is how most evolved forms are met at all: on
      wild catches alone, 475 of them finished half an entry a playthrough. */
-  const owned = (id, tier, alpha, size) => [
+  const owned = (id, tier, alpha, size, level = 0) => [
     ...(isLegendary(id) ? ["legend"] : []),
+    ...(level >= HUNDRED ? ["hundred"] : []),
     ...(tier || alpha ? [] : ["catch"]),
     ...(tier ? ["variant"] : []),
     ...(alpha ? ["alpha"] : []),
@@ -1755,12 +1764,12 @@ export function createEngine(canvas, onChange, mini = null) {
     state.money += cash;
     if (after === RESEARCH_MAX) {
       cheer({ kind: "research", title: label(speciesById(id)).toUpperCase(),
-        sub: `Research complete. Star it with ${STAR_COST} ordinary ones for ${RESEARCH_LIFT}x rare forms.` });
+        sub: `Research complete. Star it for ${RESEARCH_LIFT}x rare forms.` });
     }
     return cash;
   }
 
-  /* A STAR: finished research, paid for with `STAR_COST` ordinary ones out of
+  /* A STAR: finished research, paid for with `starCost` ordinary ones out of
      the Box, makes that species' rare forms `RESEARCH_LIFT`x as likely for
      good. The LOWEST-LEVEL ones go, so candy spent levelling one towards an
      evolution is never what pays; a keeper (any tier, any alpha) never goes.
@@ -1768,15 +1777,19 @@ export function createEngine(canvas, onChange, mini = null) {
      It cannot be taken back, so it asks first, here, like a Master Ball. */
   function star(id, confirmed = false) {
     const sp = speciesById(id);
-    if (!sp || !canStar(id) || state.evolution || state.stars.includes(id)) return false;
+    if (!sp || state.evolution || state.stars.includes(id)) return false;
     if (researchLevel(id, state.research[id]) < RESEARCH_MAX) return false;
+    const cost = starCost(id);
     const give = state.box.filter((m) => m.species === id && !keeper(m))
       .sort((a, b) => a.level - b.level || a.uid - b.uid)
-      .slice(0, STAR_COST);
-    if (give.length < STAR_COST) return false;
+      .slice(0, cost);
+    // A legendary's star never spends the last one you hold (`starKeeps`).
+    const held = state.box.filter((m) => m.species === id).length;
+    if (give.length < cost || held - cost < starKeeps(id)) return false;
     if (!confirmed) {
       ask("star", () => star(id, true), `Star ${label(sp)}?`,
-        `${STAR_COST} ordinary ${label(sp)} leave the Box for good, the lowest-level ones. `
+        `${cost === 1 ? "Your lowest-level ordinary" : `${cost} ordinary`} ${label(sp)} `
+        + `${cost === 1 ? "leaves" : "leave"} the Box for good. `
         + `Its rare forms turn up ${RESEARCH_LIFT}x as often from then on.`);
       return true;
     }
@@ -1994,10 +2007,14 @@ export function createEngine(canvas, onChange, mini = null) {
        at spawn, so the dialog and the badge cannot disagree. A second
        `legendary` field on the encounter would be a copy with nothing to gain:
        the derivation is pure and its input is already frozen. */
-    if (!confirmed && isLegendary(e.speciesId)) {
+    /* AN ALPHA ASKS TOO: it never runs from you, so running is the only way
+       to lose one - about one Pokemon in 250, gone on one press. */
+    if (!confirmed && (isLegendary(e.speciesId) || e.alpha)) {
       ask("flee", () => flee(true),
-        `Run from ${e.name}?`,
-        "A legendary. There is no telling when you will meet another.");
+        `Run from ${e.alpha ? "the alpha " : ""}${e.name}?`,
+        isLegendary(e.speciesId)
+          ? "A legendary. There is no telling when you will meet another."
+          : "An alpha never runs from you, but it will be gone if you run from it.");
       return;
     }
     e.phase = "ran";
@@ -2277,7 +2294,7 @@ export function createEngine(canvas, onChange, mini = null) {
     mon.species = targetId;
     mon.at = Date.now();
     study(row.from, ["evolve"]);
-    study(targetId, owned(targetId, roll, mon.alpha, mon.size));
+    study(targetId, owned(targetId, roll, mon.alpha, mon.size, mon.level));
 
     if (isNew) {
       checkDexRewards(targetId);
@@ -2355,6 +2372,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!mon || spend < 1) return 0;
     state.candy -= spend;
     mon.level += spend;
+    if (mon.level >= HUNDRED) study(mon.species, ["hundred"]);
     save();
     changed();
     return spend;

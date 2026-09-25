@@ -31,10 +31,13 @@ const evolves = new Set(EVOLUTIONS.filter((e) => e.level < 100).map((e) => e.fro
    what a star spends (`STAR_COST`). It counted every catch up to 20 before;
    old counters are kept, clamped to 10, since nearly all of them were
    ordinary anyway. */
-/* A LEGENDARY HAS ONE TASK, catching one (`legend`). Any single legendary is
-   met about once in ten playthroughs, measured, so none finished at ANY catch
-   target - and a star would spend ten of them on odds for something you almost
-   never meet. So its research is the catch, and it is never starred.
+/* A LEGENDARY'S RESEARCH IS ONE CATCH AND WHAT YOU DO WITH IT: catch one
+   (`legend`), feed it a berry and land the first ball in that encounter, and
+   raise one to Lv 100 (`hundred`). Hunting on its home map, one specific
+   legendary is met about once a playthrough (1 in 3,333 encounters), so a
+   count of catches is out of reach - one catch was too easy, three was three
+   playthroughs. Its star spends ONE spare (`starCost`) and never the last you
+   hold, so starring asks for a second catch: the endgame, not the research.
 
    XS AND XL ARE ONE TASK, either size: needing both was the tightest of the
    luck tasks, and folding them doubled what a playthrough finishes (12 to 26
@@ -48,19 +51,21 @@ const plain = (id) => !isLegendary(id);
    asked less than it could be; that is the price of reading it off the data. */
 const grown = new Set(EVOLUTIONS.map((e) => e.to));
 const met = (id) => plain(id) && !grown.has(id);
+const metOrLegend = (id) => isLegendary(id) || met(id);
 export const TASKS = [
   { id: "catch", label: "Catch ordinary ones", steps: [1, 4, 10], points: 10, when: plain },
   { id: "night", label: "Catch one at night", steps: [1], points: 10, when: met },
   { id: "xs", label: "Catch an XS or XL one", steps: [1], points: 10, when: plain },
   { id: "xl", label: "Catch an XL one", steps: [1], points: 10, when: () => false },
-  { id: "first", label: "Catch one with the first ball", steps: [1], points: 20, when: met },
+  { id: "first", label: "Catch one with the first ball", steps: [1], points: 20, when: metOrLegend },
   { id: "variant", label: "Catch a rare form", steps: [1], points: 20, when: plain },
-  { id: "fed", label: "Feed one a berry", steps: [1], points: 10, when: met },
+  { id: "fed", label: "Feed one a berry", steps: [1], points: 10, when: metOrLegend },
   { id: "evolve", label: "Evolve one", steps: [1], points: 10, when: (id) => plain(id) && evolves.has(id) },
   { id: "alpha", label: "Catch an alpha", steps: [1], points: 20, when: canBeAlpha, bonus: true },
   { id: "legend", label: "Catch one", steps: [1], points: 10, when: isLegendary },
+  { id: "hundred", label: "Raise one to Lv 100", steps: [1], points: 10, when: isLegendary },
 ];
-export const canStar = plain;
+export const HUNDRED = 100;
 const SLOT = Object.fromEntries(TASKS.map((t, i) => [t.id, i]));
 
 export const RESEARCH_MAX = 10;
@@ -75,6 +80,9 @@ export const RESEARCH_MAX = 10;
    paid, so every star is a sink for the duplicates the game is built on. */
 export const RESEARCH_LIFT = 1.5;
 export const STAR_COST = 10;
+/* What a star spends, and how many of the species must be left after it. */
+export const starCost = (id) => (isLegendary(id) ? 1 : STAR_COST);
+export const starKeeps = (id) => (isLegendary(id) ? 1 : 0);
 
 export const tasksFor = (id) => TASKS.filter((t) => !t.when || t.when(id));
 

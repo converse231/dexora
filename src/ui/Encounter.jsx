@@ -151,6 +151,11 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           {/* Both of the big tiers put something BEHIND the sprite - an
               Astral's aura, an Origin's seal - so each reads as something the
               creature is standing in rather than a layer over its art. */}
+          {/* AN ALPHA ARRIVES: a shockwave and a stamp, once, then only the
+              nameplate chip. Siblings of `.mon`, never on it - a treatment
+              that stayed would fight the tier's own look. */}
+          {enc.alpha && monHere && <span className="alpha-ring" aria-hidden="true" />}
+          {enc.alpha && monHere && <span className="alpha-stamp" aria-hidden="true">ALPHA</span>}
           {enc.astral && monHere && <span className="astral-aura" aria-hidden="true" />}
           {enc.origin && monHere && <span className="origin-seal" aria-hidden="true" />}
 

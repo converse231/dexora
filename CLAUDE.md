@@ -394,9 +394,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   catches only, and evolving is asked only where a sub-Lv-100 row exists.
   `owned()` credits a catch AND an evolution into a species (evolved forms
   are rarely met wild), and an evolved form (`grown`) is not asked night,
-  first ball or a berry. A legendary's only task is `legend` (met ~0.1 times a
-  playthrough, measured) and `canStar` refuses it; `loadState` credits it
-  from the dex. XS and XL are one task (`xl` kept, asked of nobody). A
+  first ball or a berry. A legendary (met about once a playthrough even
+  hunted) is `legend` - one catch, credited from the dex by `loadState` -
+  plus `fed`, `first` and `hundred` (Lv 100, by candy or evolution); its
+  star costs `starCost` 1 and `starKeeps` 1, so it needs a second catch.
+  The Box offers RAISE to Lv 100 for a legendary with no evolution left. XS and XL are one task (`xl` kept, asked of nobody). A
   level pays a quarter of a sale (`RESEARCH_PAY`, under a fifth of catch
   income, measured). Lv 10 only OFFERS the lift: `star(id)` spends
   `STAR_COST` ordinary box entries (lowest level first, never a keeper,
@@ -465,7 +467,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **The page never scrolls sideways**: `html, body { overflow-x: clip }` is the
   guard, not the fix - an overflow is still a bug to find and size down.
 - **Irreversible presses ask first, gated in the engine** (`state.ask` in
-  `throwBall` and `flee`), so every call site is covered.
+  `throwBall`, `flee` - a legendary or an alpha - `star`, and `travel` off a
+  map with an open rift, which covers doors too), so every call site is
+  covered. App shows the non-encounter ones (`star`, `rift`) outside a battle.
+- **An alpha announces itself once**: `.alpha-ring` and `.alpha-stamp` are
+  siblings of `.mon` that play and fade; the nameplate chip stays.
+- **The Box preview** (`Preview.jsx`) is a button laid over the sprite's
+  grid cell, never wrapped round it (`.boxrow > img` sizes every variant).
 - **A readout outlives its system**: when a system changes, audit what reads it.
 
 ## Engine

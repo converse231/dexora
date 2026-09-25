@@ -29,6 +29,8 @@ import Confirm from "./Confirm.jsx";
 import Note from "./Note.jsx";
 import Sprite from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
+import Preview from "./Preview.jsx";
+import { HUNDRED } from "../game/research.js";
 
 // Rarest first: the order the Box, the Dex and the encounter all read in -
 // one array, in biomes.js, beside the odds that define it.
@@ -58,6 +60,7 @@ function Box({
 }) {
   const [pending, setPending] = useState(null);
   const [flash, setFlash] = useState(null);
+  const [peek, setPeek] = useState(null);
   // Which rows to show, and a name to match. Both are cheap client-side passes.
   const [only, setOnly] = useState("all");
   /* WHICH TIER, and `"all"` / `"plain"` are the two that are not one. Asked
@@ -157,6 +160,14 @@ function Box({
       g.at = far.length ? Math.min(...far.map((x) => x.at))
         : (g.paths.length ? Math.max(...g.paths.map((x) => x.at)) : 0);
       g.need = far.length ? Math.min(...far.map((x) => x.need)) : 0;
+      /* A LEGENDARY WITH NOTHING LEFT TO EVOLVE INTO RAISES TOWARDS LV 100 -
+         its research asks for one, and RAISE only ever offered an evolution. */
+      g.goal = far.length ? "Evolves at" : null;
+      if (!far.length && isLegendary(g.species) && g.hero.level < HUNDRED) {
+        g.at = HUNDRED;
+        g.need = HUNDRED - g.hero.level;
+        g.goal = "Research at";
+      }
       // Only a stone stands between you and it: a different sentence entirely.
       g.stoneOnly = g.paths.some((x) => x.need === 0 && !x.hasStone);
     }
@@ -486,7 +497,7 @@ function Box({
       lines: [
         ["Costs", `${spend} Rare Candy`],
         ["Level", `${group.hero.level} → ${group.hero.level + spend}`],
-        ["Evolves at", `Lv ${group.at}`],
+        [group.goal ?? "Evolves at", `Lv ${group.at}`],
       ],
       note: spend < group.need
         ? `${group.need - spend} more candy to reach it.`
@@ -633,6 +644,13 @@ function Box({
               className={`boxrow${group.ready ? " ready" : group.spares.length ? " spare" : ""}`}
             >
               <Sprite id={group.species} variant={group.variant} fx />
+              {/* THE PICTURE OPENS A CLOSER LOOK. Laid over the sprite's own
+                  grid cell rather than wrapped round it, so the sprite keeps
+                  the `.boxrow > img` sizing every variant depends on. */}
+              <button type="button" className="bx-peek" onClick={() => setPeek(group)}
+                aria-label={`Preview ${label(sp)}`} data-tip="Preview">
+                <span aria-hidden="true">VIEW</span>
+              </button>
               {/* The drawn mark, not a star glyph: the same icon the Dex tile
                   and the encounter badge use, so one tier looks like itself
                   everywhere. */}
@@ -732,6 +750,8 @@ function Box({
           );
         })}
       </div>
+
+      {peek && <Preview group={peek} onClose={() => setPeek(null)} />}
 
       {pending && (
         <Confirm

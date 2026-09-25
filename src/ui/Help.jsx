@@ -118,7 +118,8 @@ export default function Help({ onClose }) {
               tasks. Each level pays. Finish every task (an alpha is a bonus) and
               you can star it: give up {STAR_COST} ordinary ones and its rare
               forms are {RESEARCH_LIFT}&times; as likely for good. A legendary's
-              research is catching one, and it is never starred.
+              research is catching one, feeding it, landing the first ball and
+              raising one to Lv 100; its star spends a spare, never the last.
             </li>
             <li>
               <b>Alphas.</b> About one Pokémon in {Math.round(1 / ALPHA_CHANCE)} is

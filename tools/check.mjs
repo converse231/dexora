@@ -222,7 +222,7 @@ import {
 import { ALPHA_CATCH, ALPHA_CANDY, alphaCandy } from "../src/game/items.js";
 import {
   TASKS, tasksFor, bump, researchLevel, researchPoints, researchLift, researchPay,
-  cleanRow, RESEARCH_MAX, RESEARCH_LIFT, STAR_COST, RESEARCH_PAY, canStar,
+  cleanRow, RESEARCH_MAX, RESEARCH_LIFT, STAR_COST, RESEARCH_PAY, starCost, starKeeps,
 } from "../src/game/research.js";
 
 const poke = ballById("poke-ball");
@@ -3346,7 +3346,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       }
     }
 
-    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow"]) {
+    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
         `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +
         "variant that is a span will render zero wide there, silently");
@@ -4141,12 +4141,20 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     });
     assert.ok(!tasksFor(megaOnly.id).some((t) => t.id === "evolve"),
       `${megaOnly.name} is asked to evolve, and its only evolution costs Lv 100`);
-    /* A LEGENDARY FINISHES ON ONE CATCH and is never starred: any one of them
-       is met about 0.1 times a playthrough, and none finished at any target. */
+    /* A LEGENDARY'S RESEARCH IS ONE CATCH AND WHAT YOU DO WITH IT - met about
+       once a playthrough even hunted, so no count of catches - and every one
+       of those tasks is required. Its star spends one and keeps one. */
     const leg = LEGENDARY[0], starter = EVOLUTIONS[0].from;
-    assert.equal(researchLevel(leg, bump(null, ["legend"])), RESEARCH_MAX,
-      `${speciesById(leg).name} does not finish its research on one catch`);
-    assert.ok(!canStar(leg) && canStar(starter), "the star is offered to the wrong species");
+    const legTasks = tasksFor(leg).map((t) => t.id);
+    assert.deepEqual(legTasks.sort(), ["fed", "first", "hundred", "legend"],
+      `${speciesById(leg).name}'s research is ${legTasks.join(", ")}`);
+    assert.equal(researchLevel(leg, full(legTasks)), RESEARCH_MAX, "a legendary cannot finish its research");
+    for (const t of legTasks) {
+      assert.ok(researchLevel(leg, full(legTasks.filter((x) => x !== t))) < RESEARCH_MAX,
+        `a legendary finished its research without "${t}"`);
+    }
+    assert.ok(starCost(leg) === 1 && starKeeps(leg) === 1 && starCost(starter) === STAR_COST
+      && starKeeps(starter) === 0, "the star's price is wrong for a legendary or an ordinary species");
     // An evolved form is raised: nothing only a wild encounter can do is asked of it.
     const raised = EVOLUTIONS[0].to;
     assert.ok(!tasksFor(raised).some((t) => ["night", "first", "fed"].includes(t.id))

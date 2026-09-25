@@ -11,6 +11,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-09-28",
+    date: "September 2026",
+    title: "Alphas, rifts and a closer look",
+    items: [
+      ["Alphas arrive loudly", "An alpha now shows itself with a shockwave when it appears, and running from one asks first."],
+      ["Legendary research", "A legendary's research is catching one, feeding it a berry, landing the first ball and raising one to Lv 100. Its star spends a spare - never the last one."],
+      ["Rifts ask first", "Leaving a map with a rift open asks before it closes behind you."],
+      ["Preview", "Tap a Pokémon's picture in the Box to see its art and base stats."],
+    ],
+  },
+  {
     id: "2026-09-27",
     date: "September 2026",
     title: "Research stars",
