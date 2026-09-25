@@ -2816,6 +2816,12 @@ MB_RAIL_V = frozenset((0xD3, 0xD5))    # isolated / continuing vertical rail
 MB_RAIL_H = frozenset((0xD4, 0xD6))    # isolated / continuing horizontal rail
 MB_LONG_GRASS = frozenset((0x03, 0x09))    # long grass, and its south edge
 MB_BRIDGE = frozenset((0x70,))             # a bridge over ocean water
+EM_TALL_GRASS = 13                          # General's own tall grass metatile
+# WHICH ELEVATIONS DRAW A SPRITE ABOVE THE UPPER LAYER - pokeemerald's
+# sElevationToPriority, where priority 1 or 0 clears BG1. 0 and 15 are neither:
+# a sprite keeps the elevation it had, which is how one bridge is walked over
+# from a bank (4) and surfed under from the river (1).
+EM_HIGH = frozenset((4, 6, 8, 10, 12, 13, 14))
 
 
 def safari_zone():
@@ -2972,8 +2978,12 @@ def monsoon_trail():
 
     It opens onto Route 118 and Fortree City, which we do not have, so the
     outer ring is the layout's own border block, as the Safari Zone's is.
-    Rails are Acro Bike rails - see `RAIL`. Long grass is `g`: it hides the
-    trainer's feet and rustles, which is the renderer's business."""
+    Rails are Acro Bike rails - see `RAIL`. Long grass is laid as General's
+    tall grass: it had no interaction of its own worth its art.
+
+    `lift` carries each cell's elevation as the engine needs it - see
+    `EM_HIGH`. Without it every bridge plank and clifftop drew its upper layer
+    over a trainer standing ON it."""
     import numpy as np
     import build_assets as BA
 
@@ -2994,6 +3004,7 @@ def monsoon_trail():
         dtype="<u2")[:W * H]
     ids = (raw & 0x3FF).reshape(H, W)
     col = ((raw >> 10) & 3).reshape(H, W)
+    elev = ((raw >> 12) & 0xF).reshape(H, W)
     attr = {
         False: np.frombuffer(io.open(BA.fetch(
             "data/tilesets/primary/general/metatile_attributes.bin",
@@ -3013,6 +3024,8 @@ def monsoon_trail():
     for y in range(H):
         for x in range(W):
             i = int(ids[y][x])
+            if behave(i) in MB_LONG_GRASS:
+                i = EM_TALL_GRASS
             b = behave(i)
             if b in MB_WATER:
                 ch = "w"
@@ -3026,8 +3039,6 @@ def monsoon_trail():
                 ch = "N"           # walkable planks over the river
             elif int(col[y][x]):
                 ch = "T"
-            elif b in MB_LONG_GRASS:
-                ch = "g"
             elif b in MB_GRASS:
                 ch = ","
             elif b in MB_SAND:
@@ -3108,8 +3119,10 @@ def monsoon_trail():
     assert g[dy][dx] == "l", "monsoon: the Weather Institute door is cut off"
 
     rows = ["".join(r) for r in g]
+    lift = ["".join("^" if e in EM_HIGH else "." if e in (0, 15) else "v"
+                    for e in map(int, elev[y])) for y in range(H)]
     return (rows, spawn, [i for row in tiles for i in row], GB, None,
-            {"door": MONSOON_DOOR, "arrive": (dx, dy + 1)})
+            {"door": MONSOON_DOOR, "arrive": (dx, dy + 1), "lift": lift})
 
 
 # -------------------------------------------------------------- Cinderpeak
@@ -3601,6 +3614,7 @@ if __name__ == "__main__":
         # A map with more than one floor carries the ladders that join them.
         warps = made[4] if len(made) > 4 else None
         spec["door"] = made[5] if len(made) > 5 else None
+        spec["lift"] = (spec["door"] or {}).get("lift")
         spec["w"], spec["h"] = len(rows[0]), len(rows)
         got, total = check(spec, rows, spawn, tiles, warps)
         out.append((spec, rows, spawn, tiles, base, warps))
@@ -3641,6 +3655,12 @@ if __name__ == "__main__":
             # rows saying the same thing is two places for it to disagree.
             body.append("    warps: [")
             body += ["      [%d, %d, %d, %d]," % tuple(w) for w in warps]
+            body.append("    ],")
+        if spec["lift"]:
+            # ELEVATION, where the map has one: ^ above the upper layer, v
+            # under it, . keeps what you had (bridges, stairs).
+            body.append("    lift: [")
+            body += ['      "%s",' % r for r in spec["lift"]]
             body.append("    ],")
         if spec["id"] in doors:
             # DOORS TO ANOTHER MAP: [x, y, area, arriveX, arriveY].

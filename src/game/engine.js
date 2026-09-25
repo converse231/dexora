@@ -670,6 +670,24 @@ export function createEngine(canvas, onChange, mini = null) {
   const doorMap = (area) =>
     new Map((area.doors ?? []).map(([x, y, to, ax, ay]) => [`${x},${y}`, [to, ax, ay]]));
   let doors = doorMap(areaOf(state.areaId));
+  /* ABOVE THE UPPER LAYER OR UNDER IT, as Emerald decides: by the elevation
+     of the last cell that had one (`lift`, from build_map's `EM_HIGH`). A
+     bridge keeps what you brought onto it, so the planks draw over you when
+     you surf under them and never when you walk across. Maps without `lift`
+     are always under, as before. Drawing state only. */
+  let lift = areaOf(state.areaId).lift ?? null;
+  let high = false;
+  const rise = () => {
+    const c = lift?.[state.player.y]?.[state.player.x];
+    if (c === "^") high = true;
+    else if (c === "v") high = false;
+  };
+  rise();
+  /* UNDER A BRIDGE IS STILL AFLOAT. A plank you reached low (from the water)
+     is river to you, so a surfer paddles under it instead of hopping ashore
+     onto it and standing beneath the logs. */
+  const under = (x, y) => !!lift && !high && at(x, y) === "N";
+  const afloat = (x, y) => rideable(rows, x, y) || under(x, y);
   const at = (x, y) => (rows[y] ? rows[y][x] ?? "" : "");
 
   // How many pixels a tile the minimap is drawing at - see `miniScale`.
@@ -914,12 +932,10 @@ export function createEngine(canvas, onChange, mini = null) {
 
   // ------------------------------------------------------------ movement
 
-  /* THE GRASS YOU WALK THROUGH. Stepping into tall (`,`) or long (`g`) grass
-     starts a rustle on that tile - frames in the order Gen 3 plays them, ending
+  /* THE GRASS YOU WALK THROUGH. Stepping into tall grass (`,`) starts a rustle on that tile - frames in the order Gen 3 plays them, ending
      on the rest frame - and the rest frame then stays over your feet while you
      stand there. Drawing state only: never saved, and nothing reads it. */
-  const GRASS = { ",": { kind: 0, seq: [1, 2, 3, 4, 0], ms: 110 },
-                  g: { kind: 1, seq: [1, 2, 3, 0], ms: 90 } };
+  const GRASS = { ",": { seq: [1, 2, 3, 4, 0], ms: 110 } };
   let grassFx = [];
 
   function tryStep(dir) {
@@ -944,13 +960,13 @@ export function createEngine(canvas, onChange, mini = null) {
        way out is `surf()`, which is what the key item gates. So this asks
        where you ARE rather than what you hold - the permission was checked
        when you mounted and cannot have changed since. */
-    const riding = rideable(rows, p.x, p.y);
+    const riding = afloat(p.x, p.y);
     /* A RAIL IS BIKE-ONLY GROUND: never on foot, any direction on the Acro
        Bike. Like surfing, the ride is where you stand, so nothing is saved -
        and stepping off a rail is always allowed, as stepping ashore is. */
     if (RAIL[at(nx, ny)] && !canBike(levelFromXp(state.xp), state.bag)) return;
     if (hop) { nx += dx; ny += dy; }
-    else if (!walkable(rows, nx, ny) && !(riding && rideable(rows, nx, ny))) return;
+    else if (!walkable(rows, nx, ny) && !(riding && afloat(nx, ny))) return;
 
     move.fromX = p.x;
     move.fromY = p.y;
@@ -962,9 +978,10 @@ export function createEngine(canvas, onChange, mini = null) {
     /* STEPPING ASHORE IS A HOP, because it is one in every game that has ever
        drawn it and because the alternative reads as sliding out of the water
        onto dry land. Only at the boundary: crossing open water is paddling. */
-    move.leap = riding && !rideable(rows, nx, ny);
+    move.leap = riding && !afloat(nx, ny);
     p.x = nx;
     p.y = ny;
+    rise();
     const grass = GRASS[at(nx, ny)];
     if (grass) grassFx.push({ x: nx, y: ny, g: grass, start: move.startedAt });
   }
@@ -1127,7 +1144,8 @@ export function createEngine(canvas, onChange, mini = null) {
        by the time anyone can be out here. It falls back to the map anyway,
        because a table that comes back empty should thin the encounters out
        rather than stop them. */
-    const ride = surfing() ? at(state.player.x, state.player.y) : null;
+    const ride = surfing()
+      ? (under(state.player.x, state.player.y) ? "w" : at(state.player.x, state.player.y)) : null;
     /* REPEL IS ITS OWN AXIS. It changes how OFTEN an encounter happens and
        never what it is - which is what keeps it off the table the White Flute
        and Fortune are already moving, and is the honest reading of what a
@@ -1233,12 +1251,15 @@ export function createEngine(canvas, onChange, mini = null) {
     fixed = areaOf(areaId).tiles ?? null;
     warps = warpMap(areaOf(areaId));
     doors = doorMap(areaOf(areaId));
+    lift = areaOf(areaId).lift ?? null;
+    high = false;
     MAP_W = rows[0].length;
     MAP_H = rows.length;
     bakeMini();
     // Through a door you arrive on its far side, still facing the way you walked.
     const spawn = arrive ?? areaOf(areaId).spawn;
     state.player = { ...spawn, dir: arrive ? state.player.dir : "down" };
+    rise();
     move.active = false;
     move.fromX = spawn.x;
     move.fromY = spawn.y;
@@ -1407,7 +1428,7 @@ export function createEngine(canvas, onChange, mini = null) {
      only proof needed. No new save field, nothing to migrate, and a save from
      before Surf existed loads correctly by construction because its player is
      standing on ground. */
-  const surfing = () => rideable(rows, state.player.x, state.player.y);
+  const surfing = () => afloat(state.player.x, state.player.y);
 
   /* The tile you are facing, which is the only thing fishing cares about. */
   function facing() {
@@ -2025,11 +2046,11 @@ export function createEngine(canvas, onChange, mini = null) {
         const here = f.x === p.x && f.y === p.y;
         underfoot ||= here;
         drawGrass(ctx, art.grass, Math.round(f.x * TILE - camX), Math.round(f.y * TILE - camY),
-          f.g.kind, i < f.g.seq.length ? f.g.seq[i] : 0);
+          i < f.g.seq.length ? f.g.seq[i] : 0);
       }
       const g = GRASS[at(p.x, p.y)];
       if (g && !underfoot && !move.active) {
-        drawGrass(ctx, art.grass, Math.round(p.x * TILE - camX), Math.round(p.y * TILE - camY), g.kind, 0);
+        drawGrass(ctx, art.grass, Math.round(p.x * TILE - camX), Math.round(p.y * TILE - camY), 0);
       }
     }
 
@@ -2037,7 +2058,7 @@ export function createEngine(canvas, onChange, mini = null) {
 
     drawOverhangs(ctx, art.atlas, x0, y0, VIEW_W, VIEW_H, camX, camY, at,
                   (x, y) => (fixed ? fixed[y * MAP_W + x] : -1));
-    drawOverlays(ctx, art.atlas, over, camX, camY);
+    if (!high) drawOverlays(ctx, art.atlas, over, camX, camY);
 
     drawMini(camX, camY, wx, wy);
   }
@@ -2454,6 +2475,8 @@ export function createEngine(canvas, onChange, mini = null) {
     fish,
     surf,
     surfable,
+    // Above the upper layer (see `rise`); read by tools/play.
+    above: () => high,
     setChar,
     /* Dismissing is not the same as banking it - the id went into `hints` the
        moment it was shown, so closing it is only about the screen. It can never

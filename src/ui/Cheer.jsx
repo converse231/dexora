@@ -8,7 +8,7 @@
 
    It sits above every other overlay and dismisses itself; nothing waits on it. */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 // Level rewards include key items, not only balls, so this has to look
 // across everything the game can name.
 import { itemById } from "../game/items.js";
@@ -40,12 +40,17 @@ const KIND = {
 const SPARKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 export default function Cheer({ cheer, onDone }) {
+  /* KEYED ON THE CHEER ITSELF, NEVER ON `onDone`. App passes a fresh arrow
+     every render and every step renders, so a clock keyed on it restarted on
+     each step: walking held a banner up forever, an encounter hid it, and
+     every flee brought "50,000 STEPS" back with its sparks. The object is
+     also what tells two cheers with the same title apart. */
+  const done = useRef(onDone);
+  done.current = onDone;
   useEffect(() => {
-    const t = setTimeout(onDone, HOLD);
+    const t = setTimeout(() => done.current(), HOLD);
     return () => clearTimeout(t);
-    // Keyed on the title so a second cheer restarts the clock rather than
-    // inheriting the tail of the first one's.
-  }, [cheer.title, onDone]);
+  }, [cheer]);
 
   const items = Object.entries(cheer.items ?? {});
 

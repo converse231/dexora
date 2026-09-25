@@ -2062,6 +2062,7 @@ console.log("purchases ok — whole numbers only, NaN refused");
 {
   const { AREAS, RAIL } = await import("../src/game/map.js");
   const { LEVEL_XP } = await import("../src/game/biomes.js");
+  const { SURF_LEVEL } = await import("../src/game/items.js");
   const walk = (e, dir, frames = 40) => {
     const { x, y, } = e.state.player, area = e.state.areaId;
     e.press(dir);
@@ -2120,8 +2121,39 @@ console.log("purchases ok — whole numbers only, NaN refused");
   walk(low, "up");
   assert.equal(low.state.areaId, "woods", "a door opened onto a map the level has not reached");
   assert.ok(low.state.worn.some((w) => w.id === "door"), "a shut door said nothing");
+
+  /* A BRIDGE IS WALKED OVER FROM A BANK AND SURFED UNDER FROM THE RIVER - the
+     planks drew over a trainer standing on them. Found, not named: a plank
+     with a high bank on one side and river on another. */
+  const lift = AREAS.woods.lift;
+  let bridge = null;
+  for (let y = 1; y < rows.length - 1 && !bridge; y++) for (let x = 1; x < W - 1 && !bridge; x++) {
+    if (rows[y][x] !== "N") continue;
+    const side = (ch, l) => DIRS.find(([ox, oy]) => rows[y + oy][x + ox] === ch && lift[y + oy][x + ox] === l);
+    const bank = DIRS.find(([ox, oy]) => lift[y + oy][x + ox] === "^" && !"TwN".includes(rows[y + oy][x + ox]));
+    const river = side("w", "v");
+    if (bank && river) bridge = { bank: [x + bank[0], y + bank[1], bank[2]], river: [x + river[0], y + river[1], river[2]] };
+  }
+  assert.ok(bridge, "Monsoon Trail has no bridge with a bank and a river beside it");
+  const back0 = { left: "right", right: "left", up: "down", down: "up" };
+  const at2 = ([x, y]) => ({ ...SAVE, areaId: "woods", xp: LEVEL_XP[SURF_LEVEL], player: { x, y, dir: "down" },
+    field: { repel: { id: "max-repel", steps: 9999 } } });
+  // River -> under the planks -> ashore on the bank -> back onto the planks.
+  const b2 = boot(at2(bridge.river)).e;
+  assert.ok(walk(b2, bridge.river[2]), "could not surf under the bridge");
+  assert.ok(!b2.above(), "surfing under a bridge drew the trainer over its planks");
+  assert.ok(walk(b2, back0[bridge.bank[2]]), "could not get ashore from under the bridge");
+  assert.ok(b2.above(), "a trainer on a high bank is not above the upper layer");
+  assert.ok(walk(b2, bridge.bank[2]), "could not walk from the bank onto the bridge");
+  assert.ok(b2.above(), "walking onto a bridge put the trainer under its planks");
+  // Still afloat under it: paddling on crosses to the river on the far side,
+  // which a trainer set down on the planks on foot cannot do.
+  const b3 = boot(at2(bridge.river)).e;
+  walk(b3, bridge.river[2]);
+  while (rows[b3.state.player.y][b3.state.player.x] === "N" && walk(b3, bridge.river[2]));
+  assert.equal(rows[b3.state.player.y][b3.state.player.x], "w", "could not paddle under the bridge to the far side");
 }
-console.log("monsoon ok — rails need the bike, stepping off is always allowed, the door runs both ways, a shut door says so");
+console.log("monsoon ok — rails need the bike, stepping off is always allowed, the door runs both ways, a shut door says so, bridges are walked over and surfed under");
 
 /* THE CAP ROSE AND BANKED XP IS OWED, EXACTLY ONCE. XP was never clamped at
    Lv 50, so a trainer who kept playing arrives at 75's table already past 50 -
