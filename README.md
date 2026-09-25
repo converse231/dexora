@@ -3022,6 +3022,9 @@ it sits at the end rather than in front of four phases that can.
 
 ### Trading
 
+**Now being built** (2026-09-26): the decisions and the phase plan are in
+[docs/trading.md](docs/trading.md). What follows is the reasoning that led there.
+
 Asked for directly, and it is the first feature whose main design problem is not
 a game-design problem. The fun is easy and mostly already invented; what needs
 deciding is what stops it destroying the collection for people who never used
@@ -3158,8 +3161,6 @@ Worth saying out loud, so they do not get half-built by accident:
 - **Battles.** There are none and the whole economy assumes it — evolution feeds
   duplicates precisely *because* nothing gains levels. Adding battles is a
   different game, not a phase of this one.
-- **Trading or anything multiplayer.** The standing constraint is personal and
-  non-commercial; a server is neither.
 - **Anything that takes payment.** Same reason. No ads, no store listing, no
   distribution.
 

@@ -1157,7 +1157,8 @@ export function duplicateUids(box) {
        Box groups by species AND variant, so it offered to empty a row that the
        row itself considered full. Same rule on both sides now: every row you
        can see keeps one. */
-    const rest = mons.filter((m) => !keeper(m))
+    // A Pokemon held by a trade is not the sweep's to sell (docs/trading.md).
+    const rest = mons.filter((m) => !keeper(m) && !m.lock)
       .sort((a, b) => b.level - a.level || a.uid - b.uid);
     spare.push(...rest.slice(1).map((m) => m.uid));
   }

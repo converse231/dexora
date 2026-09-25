@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createEngine, VIEW_W, VIEW_H } from "./game/engine.js";
 import { TILE } from "./game/tileset.js";
 import TopBar from "./ui/TopBar.jsx";
@@ -30,6 +30,14 @@ import { modalOpen } from "./ui/modal.js";
 import Cheer from "./ui/Cheer.jsx";
 import Types from "./ui/Types.jsx";
 import Evolve from "./ui/Evolve.jsx";
+/* ON DEMAND: the Trade Center is its own chunk, fetched the first time it
+   opens, so the game's first load does not grow for anyone who never trades. */
+const TradeCenter = lazy(() => import("./ui/trade/TradeCenter.jsx"));
+// A shared profile link: #/trainer/<name>.
+const linkedTrainer = () => {
+  const m = location.hash.match(/^#\/trainer\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
+};
 
 /* One hotkey per ball, derived rather than typed. It was the literal "1234",
    which was right for four balls and silently wrong for eight: the rail prints
@@ -129,6 +137,14 @@ export default function App({
      knowing before leaving: whether everything reached the server. */
   const [leaving, setLeaving] = useState(false);
   const [settings, setSettings] = useState(false);
+  // The Trade Center, and which profile to open it on (a shared link names one).
+  const [trade, setTrade] = useState(() => (linkedTrainer() ? { name: linkedTrainer() } : null));
+  // A profile link pasted into a game that is already open opens it too.
+  useEffect(() => {
+    const onHash = () => { const name = linkedTrainer(); if (name) setTrade({ name }); };
+    addEventListener("hashchange", onHash);
+    return () => removeEventListener("hashchange", onHash);
+  }, []);
   const [help, setHelp] = useState(false);
   const [forms, setForms] = useState(false);
   const [events, setEvents] = useState(false);
@@ -487,6 +503,21 @@ export default function App({
       {forms && <Variants onClose={() => setForms(false)} />}
       {news && <News onClose={() => setNews(false)}
         onEvents={() => { setNews(false); setEvents(true); }} />}
+      {trade && (
+        <Suspense fallback={null}>
+          <TradeCenter
+            signedIn={Boolean(account)}
+            box={st?.box ?? []}
+            dexOf={(x) => st?.dex[dexIndex(x)] ?? 0}
+            openName={trade.name}
+            onClose={() => {
+              setTrade(null);
+              if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+            }}
+          />
+        </Suspense>
+      )}
+
       {events && (
         <Events
           world={engine?.world()}
@@ -544,6 +575,7 @@ export default function App({
         onHelp={() => setHelp(true)}
         onForms={() => setForms(true)}
         onEvents={() => setEvents(true)}
+        onTrade={() => setTrade({ name: null })}
         onNews={() => setNews(true)}
         unread={unread}
         trainerName={trainerName}

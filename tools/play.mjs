@@ -1759,7 +1759,8 @@ function until(e, what, label, max = 2000) {
    rules that protect collections, stated once so each new field - an
    outbreak, research, a rift - costs one line here instead of a test of its
    own that might skip a count. Proved on `dry`, the pity counter. */
-async function savedField(name, good, bad, empty) {
+async function savedField(name, good, bad, empty, base = SAVE) {
+  const SAVE = base;          // a field that depends on others (gifted on dex) brings its own
   const old = { ...SAVE };
   delete old[name];
   assert.deepEqual(boot(old).e.state[name], empty,
@@ -2063,6 +2064,93 @@ console.log("tier repair ok — a boxed tier registers its row on load");
   }
 }
 console.log("stranded ok — a saved spot on rock or off the map loads at the map's way in");
+
+/* TRADING, PHASE 0: the client's half (docs/trading.md). What the server says
+   arrives through ONE engine call, `reconcileTrades`, so every rule about a
+   traded Pokemon is tested here without a network. */
+{
+  const { dexIndex } = await import("../src/game/biomes.js");
+  const { TASKS } = await import("../src/game/research.js");
+  const { duplicateUids } = await import("../src/game/items.js");
+  const M = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const dexWith = (...ids) => SAVE.dex.map((v, i) => (ids.some((id) => dexIndex(id) === i) ? 2 : v));
+
+  // gifted: a dex entry registered only by a trade.
+  await savedField("gifted", [16], "junk", [], { ...SAVE, dex: dexWith(16) });
+  assert.deepEqual(boot({ ...SAVE, gifted: [16] }).e.state.gifted, [],
+    "a gift the dex does not hold as caught survived loading");
+
+  // A box entry's trade fields: kept when sound, each dropped alone when not.
+  const good = { uid: 1, species: 16, level: 5, size: 100, at: 1, mid: M(1), ot: "Ash", traded: 2, lock: "offer" };
+  const bad = { uid: 2, species: 16, level: 5, size: 100, at: 1, mid: "nope", ot: "<b>x</b>", traded: -1, lock: "steal" };
+  const st = boot({ ...SAVE, box: [good, bad], nextUid: 3, dex: dexWith(16) }).e.state;
+  assert.deepEqual(st.box.find((m) => m.uid === 1), good, "a sound traded entry lost a field on load");
+  const b2 = st.box.find((m) => m.uid === 2);
+  assert.ok(b2, "a box entry with bad trade fields was dropped instead of cleaned");
+  assert.ok(!("mid" in b2) && !("ot" in b2) && !("traded" in b2) && !("lock" in b2),
+    `bad trade fields were kept: ${JSON.stringify(b2)}`);
+  // The load-time repair raises the dex from a traded entry, never its tier row.
+  const rep = boot({ ...SAVE, nextUid: 2, box: [{ uid: 1, species: 25, level: 5, size: 100, at: 1, mid: M(7), traded: 1, shiny: 1 }] }).e.state;
+  assert.equal(rep.dex[dexIndex(25)], 2, "a traded entry did not prove its dex entry on load");
+  assert.equal(rep.shiny[dexIndex(25)] ?? 0, 0, "a traded shiny set its tier row on load");
+
+  // LOCKED MEANS FROZEN, enforced in the engine for every action.
+  const box = [
+    { uid: 1, species: 16, level: 30, size: 100, at: 1, mid: M(1), lock: "listing" },
+    { uid: 2, species: 16, level: 5, size: 100, at: 1 },
+    { uid: 3, species: 16, level: 4, size: 100, at: 1 },
+  ];
+  const e = boot({ ...SAVE, box: structuredClone(box), nextUid: 4, candy: 50, dex: dexWith(16) }).e;
+  assert.equal(e.sell([1]), 0, "a locked Pokemon was sold");
+  assert.equal(e.convert([1]), 0, "a locked Pokemon was converted");
+  assert.equal(e.levelUp(1, 5), 0, "a locked Pokemon was levelled");
+  assert.equal(e.evolve(1, 17), null, "a locked Pokemon evolved");
+  assert.ok(e.state.box.some((m) => m.uid === 1), "a locked Pokemon left the box");
+  assert.ok(!duplicateUids(e.state.box).includes(1), "the sweep offered a locked Pokemon");
+  // And where the locked one is the LOWEST level - exactly the one a sweep sells first.
+  assert.ok(!duplicateUids([{ uid: 10, species: 19, level: 30 }, { uid: 11, species: 19, level: 2, mid: M(3), lock: "offer" }]).includes(11),
+    "the sweep offered a locked Pokemon it would otherwise sell first");
+
+  // reconcileTrades: assign, lock, free, gone - each idempotent.
+  assert.ok(e.reconcileTrades({ assign: { 2: M(2) } }), "assigning a server id changed nothing");
+  assert.equal(e.state.box.find((m) => m.uid === 2).mid, M(2), "the server id was not assigned");
+  e.reconcileTrades({ locks: { [M(2)]: "pool" } });
+  assert.equal(e.state.box.find((m) => m.uid === 2).lock, "pool", "a lock was not applied");
+  e.reconcileTrades({ locks: { [M(2)]: null } });
+  assert.ok(!("lock" in e.state.box.find((m) => m.uid === 2)), "a lock was not lifted");
+  e.reconcileTrades({ gone: [M(1)] });
+  assert.ok(!e.state.box.some((m) => m.uid === 1), "a Pokemon traded away stayed in the box");
+
+  // ARRIVED: fills the dex as a gift, and nothing else moves.
+  const money = e.state.money, medals = e.state.medals.length, pika = dexIndex(25);
+  const gift = { mid: M(9), species: 25, level: 12, size: 100, tier: "shiny", alpha: false, ot: "Misty", traded: 1 };
+  e.reconcileTrades({ arrived: [gift] });
+  e.reconcileTrades({ arrived: [gift] });
+  const got = e.state.box.filter((m) => m.mid === M(9));
+  assert.equal(got.length, 1, "one delivery made two Pokemon");
+  assert.equal(got[0].shiny, 1, "the arriving Pokemon lost its tier");
+  assert.equal(got[0].ot, "Misty", "the arriving Pokemon lost its original trainer");
+  assert.equal(e.state.dex[pika], 2, "a traded Pokemon did not fill the Pokedex");
+  assert.ok(e.state.gifted.includes(25), "a species registered by trade is not marked a gift");
+  assert.equal(e.state.shiny[pika] ?? 0, 0, "a traded shiny set the tier row - a mark of your own play");
+  assert.equal(e.state.money, money, "a trade paid the dex bonus");
+  assert.equal(e.state.medals.length, medals, "a trade earned a medal");
+  assert.equal(e.state.research[25]?.[TASKS.findIndex((t) => t.id === "trade")], 1,
+    "receiving one did not count the trade research task");
+
+  // Evolving your OWN into a gifted species makes it yours; a traded one stays a gift.
+  const own = boot({ ...SAVE, dex: dexWith(16, 17), gifted: [17], candy: 50, nextUid: 3,
+    box: [{ uid: 1, species: 16, level: 40, size: 100, at: 1 }, { uid: 2, species: 16, level: 3, size: 100, at: 1 }] }).e;
+  assert.ok(own.evolve(1, 17), "a Pidgey at Lv 40 could not evolve");
+  assert.ok(!own.state.gifted.includes(17), "evolving your own into a gifted species left it a gift");
+  const theirs = boot({ ...SAVE, dex: dexWith(16), nextUid: 3,
+    box: [{ uid: 1, species: 16, level: 40, size: 100, at: 1, mid: M(5), traded: 1, shiny: 1 },
+      { uid: 2, species: 16, level: 3, size: 100, at: 1 }] }).e;
+  assert.ok(theirs.evolve(1, 17), "a traded Pidgey could not evolve");
+  assert.ok(theirs.state.gifted.includes(17), "a traded Pokemon evolved into your own catch");
+  assert.equal(theirs.state.shiny[dexIndex(17)] ?? 0, 0, "evolving a traded shiny set the tier row");
+}
+console.log("trade foundation ok — trade fields load clean, locks freeze every action, reconcile assigns/locks/removes/receives idempotently, a trade fills only the dex");
 
 /* A RIFT, through real steps. Opening, counting down, finding and closing all
    happen in `onArrive`, which only a walk reaches - so each is one real step

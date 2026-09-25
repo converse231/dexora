@@ -3358,7 +3358,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(light.size >= 20, `only ${light.size} colour tokens found - the parse is wrong`);
     }
 
-    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art"]) {
+    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
         `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +
         "variant that is a span will render zero wide there, silently");
@@ -4131,6 +4131,40 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `${(rate / days * 100).toFixed(1)}% variants, ¥${week} a week against the Master Ball's ¥${master}`);
   }
 
+  /* TRADING'S CLIENT RULES (docs/trading.md) - pure, so here. */
+  {
+    const { LIMITS, LOCKS, PRESETS, cleanTradeFields, tradeable, snapshot } =
+      await import("../src/game/trade.js");
+    for (const [k, v] of Object.entries(LIMITS)) {
+      assert.ok(Number.isInteger(v) && v > 0, `trade limit ${k} is ${v}`);
+    }
+    assert.ok(PRESETS.length && PRESETS.every((p) => typeof p === "string" && p.length <= 40),
+      "a trade preset is missing or too long for a chip");
+    const mid = "12345678-1234-4123-8123-123456789abc";
+    const ok = { uid: 1, species: 16, level: 5, mid, ot: "Ash", traded: 1, lock: LOCKS[0] };
+    assert.deepEqual(cleanTradeFields(ok), ok, "sound trade fields were changed");
+    assert.ok(!("lock" in cleanTradeFields({ uid: 1, species: 16, level: 5, lock: "offer" })),
+      "a lock with no server id survived - nothing could ever lift it");
+    const box = [{ uid: 1, species: 16, level: 5 }, { uid: 2, species: 16, level: 3, shiny: 1 },
+      { uid: 3, species: 19, level: 4 }];
+    assert.ok(tradeable(box, box[1]), "a shiny with another of its species is not tradeable");
+    assert.ok(!tradeable(box, box[2]), "the last of a species was offered for trade");
+    assert.ok(!tradeable([...box, { ...box[0], uid: 4, lock: "offer" }], { ...box[0], lock: "offer" }),
+      "a locked Pokemon is tradeable");
+    assert.deepEqual(snapshot(box[1]), { uid: 2, species: 16, level: 3, size: null, tier: "shiny", alpha: false },
+      "the registration snapshot changed shape - the server checks these fields");
+    /* THE SQL IS THE AUTHORITY AND THIS IS ITS COPY - held equal, both ways:
+       every limit, and the tier list the server validates against TIERS. */
+    const sql = readFileSync(new URL("../db/trading.sql", import.meta.url), "utf8");
+    const inSql = Object.fromEntries([...sql.matchAll(/when '(\w+)' then (\d+)/g)].map((m) => [m[1], Number(m[2])]));
+    assert.deepEqual(inSql, LIMITS, "db/trading.sql's trade_limit() and trade.js's LIMITS disagree");
+    for (const m of sql.matchAll(/'(showdown'[^)\]]*)/g)) {
+      const list = m[1].split(",").map((x) => x.trim().replace(/'/g, ""));
+      assert.deepEqual(list, TIERS, `db/trading.sql lists tiers ${list} against TIERS ${TIERS}`);
+    }
+    console.log(`trade rules ok — ${Object.keys(LIMITS).length} limits (SQL agrees), ${PRESETS.length} presets, last-one rule, locks need a server id`);
+  }
+
   /* RESEARCH. Pure, so all of it runs here with no engine. */
   {
     const full = (ids) => { let r = []; for (let i = 0; i < 10; i++) r = bump(r, ids); return r; };
@@ -4157,7 +4191,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
        once a playthrough even hunted, so no count of catches - and every one
        of those tasks is required. Its star spends one and keeps one. */
     const leg = LEGENDARY[0], starter = EVOLUTIONS[0].from;
-    const legTasks = tasksFor(leg).map((t) => t.id);
+    const legTasks = tasksFor(leg).filter((t) => !t.bonus).map((t) => t.id);
     assert.deepEqual(legTasks.sort(), ["fed", "first", "hundred", "legend"],
       `${speciesById(leg).name}'s research is ${legTasks.join(", ")}`);
     assert.equal(researchLevel(leg, full(legTasks)), RESEARCH_MAX, "a legendary cannot finish its research");

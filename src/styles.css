@@ -5714,6 +5714,178 @@ button:disabled { transition: none; }
   .sheet-where li button { min-height: 36px; }
 }
 
+/* ================================================================ TRADE CENTER
+   docs/trading.md. The Events board's cards and banners, so trading reads as
+   part of the same game; tokens only, so night mode needs nothing extra. */
+.tradecard { width: min(520px, 100%); max-height: min(90vh, 760px); }
+.tc-tabs { margin: 10px 15px 0; }
+.tc-tabs em { margin-left: 6px; }
+.tc-list { display: grid; gap: 12px; }
+.tc-input {
+  width: 100%; min-width: 0; font: inherit; font-size: 14px; padding: 9px 11px;
+  color: var(--ink); background: var(--surface); border: 2px solid var(--line-firm); border-radius: 10px;
+}
+.tc-input:focus { outline: none; border-color: var(--canopy); }
+.tc-code { display: flex; gap: 8px; }
+/* `.ev-go` is a full-width block and `.tc-input` a full-width box; in a row
+   they fought, and the input lost - drawn as a sliver beside a button that
+   spilled out of its card. */
+.tc-code .tc-input { flex: 1; width: auto; font-family: var(--pixel); font-size: 13px; }
+.tc-code .ev-go { flex: none; width: auto; padding-inline: 18px; }
+.tc-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tc-row { display: flex; align-items: center; gap: 6px; }
+.tc-who {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 6px 10px; cursor: pointer; font: inherit; color: inherit;
+  background: var(--surface-2); border: 2px solid var(--line); border-radius: 11px;
+}
+.tc-who:hover { border-color: var(--canopy); }
+.tc-who span { display: grid; min-width: 0; }
+.tc-who b { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-who i { font-style: normal; font-size: 11.5px; color: var(--ink-faint); }
+.tc-art.gate-art { --z: 2; flex: none; }
+.tc-yes, .tc-no {
+  flex: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; font-size: 15px;
+  border: 2px solid var(--line-firm); background: var(--surface); color: var(--ink-soft);
+}
+.tc-yes { border-color: var(--canopy); background: var(--canopy); color: #fff; }
+.tc-no:hover { border-color: var(--bad); color: var(--bad); }
+.tc-gate { margin: 18px 4px; text-align: center; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+.tc-err { margin: 0 0 10px; font-size: 13px; color: var(--bad); }
+.tc-note { margin: 0 0 10px; font-size: 13px; color: var(--good); }
+.tc-back {
+  margin: 0 0 8px; padding: 4px 2px; cursor: pointer; font: inherit; font-size: 13px;
+  color: var(--ink-soft); background: none; border: 0;
+}
+.tc-back:hover { color: var(--canopy); }
+.tc-edit { display: grid; gap: 12px; }
+.tc-pick {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px;
+  max-height: 260px; overflow-y: auto; padding: 2px;
+}
+.tc-mon {
+  position: relative; aspect-ratio: 1; padding: 4px; cursor: pointer;
+  background: var(--surface-2); border: 2px solid var(--line); border-radius: 10px;
+}
+.tc-mon > img, .tc-mon > .sprite-fx, .tc-mon > .sprite-showdown {
+  width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;
+}
+.tc-mon > .sprite-showdown { width: 77%; height: 77%; margin: 11.5%; }
+.tc-mon.on { border-color: var(--canopy); background: var(--canopy-soft); }
+.tc-mon em {
+  position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; display: grid; place-items: center;
+  font-family: var(--pixel); font-size: 10px; font-style: normal; color: #fff;
+  background: var(--canopy); border-radius: 50%;
+}
+
+/* ------------------------------------------------ the profile */
+.tp { display: grid; gap: 12px; }
+.tp-hero {
+  position: relative; display: flex; align-items: center; gap: 14px; padding: 14px;
+  border-radius: 14px; border: 2px solid var(--line);
+  background: linear-gradient(135deg, var(--canopy-soft), var(--surface-2) 70%);
+}
+.tp-hero.ch-leaf { background: linear-gradient(135deg, var(--path-soft), var(--surface-2) 70%); }
+.tp-art-frame {
+  flex: none; width: 76px; height: 76px; display: grid; place-items: center; border-radius: 50%;
+  background: radial-gradient(circle at 50% 70%, var(--glow), transparent 70%), var(--surface);
+  border: 3px solid var(--canopy); box-shadow: 0 3px 0 var(--shadow-soft);
+}
+.tp-art.gate-art { --z: 3; }
+.tp-id { display: grid; gap: 3px; min-width: 0; }
+.evcard .tp-id h4 {
+  margin: 0; font-family: var(--display); font-size: 22px; font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tp-id > span { font-size: 12.5px; color: var(--ink-soft); }
+.tp-code {
+  justify-self: start; margin-top: 3px; padding: 3px 8px; border-radius: 7px;
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-soft);
+  background: var(--surface); border: 1px dashed var(--line-firm);
+}
+.tp-code b { font-size: 12px; color: var(--ink); margin-left: 4px; }
+.tp-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tp-stats { flex-wrap: nowrap; }
+/* One row at any width: the four counts share what the ring leaves. */
+.tp-stats > span:not(.tp-ring) {
+  flex: 1 1 0; min-width: 0;
+  display: grid; justify-items: center; padding: 5px 4px;
+  font-size: 10.5px; color: var(--ink-faint);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+}
+.tp-stats b { font-family: var(--display); font-size: 16px; color: var(--ink); line-height: 1.1; }
+.tp-ring {
+  width: 54px; height: 54px; display: grid; place-items: center; border-radius: 50%;
+  background: conic-gradient(var(--canopy) calc(var(--p) * 360deg), var(--line) 0);
+}
+.tp-ring b {
+  width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%;
+  font-size: 14px; background: var(--surface);
+}
+.tp-ring i { font-style: normal; font-size: 9px; }
+.tp-count { font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
+.tp-show { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tp-slot {
+  position: relative; margin: 0; display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px;
+  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px; min-width: 0;
+}
+.tp-slot > img, .tp-slot > .sprite-fx { width: 68px; height: 68px; object-fit: contain; image-rendering: pixelated; }
+.tp-slot > .sprite-showdown { width: calc(68px * .77); height: calc(68px * .77); margin: 7.8px; }
+.tp-slot figcaption { display: grid; justify-items: center; min-width: 0; max-width: 100%; }
+.tp-slot figcaption b { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-slot figcaption i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.tp-slot.empty { place-items: center; min-height: 110px; border-style: dashed; background: none; }
+.tp-slot.empty span { font-family: var(--display); font-size: 28px; color: var(--line-firm); }
+/* A rare one wears its tier's colour on the frame. */
+.tp-slot.has-shiny { border-color: var(--gold); }
+.tp-slot.has-holo { border-color: #9b5fc9; }
+.tp-slot.has-astral { border-color: #6f5bff; }
+.tp-slot.has-origin { border-color: #b8862a; }
+.tp-slot.has-showdown { border-color: #3cb8d6; }
+.tp-slot.has-glitched { border-color: #e0335f; }
+.tp-slot.has-noir { border-color: #6b6b78; }
+.tp-slot.has-vivid { border-color: #e84f9a; }
+.tp-tier { position: absolute; top: 5px; left: 5px; }
+.tp-alpha {
+  position: absolute; top: 4px; right: 4px; display: grid; place-items: center; padding: 2px;
+  border-radius: 5px; background: linear-gradient(160deg, #8a0f1f, #2a0008);
+}
+.tp-seek { display: flex; flex-wrap: wrap; gap: 6px; }
+.tp-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px 3px 3px;
+  font: inherit; font-size: 12.5px; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+}
+.tp-chip img { width: 26px; height: 26px; image-rendering: pixelated; }
+.tp-chip.have { border-color: var(--canopy); background: var(--canopy-soft); }
+.tp-chip.x, .tp-chip.add { cursor: pointer; }
+.tp-chip.x i, .tp-chip.add i { font-style: normal; margin-left: 2px; color: var(--ink-faint); }
+.tp-chip.x:hover { border-color: var(--bad); }
+.tp-chip.add:hover { border-color: var(--canopy); }
+.tp-q {
+  width: 26px; height: 26px; display: grid; place-items: center; font-style: normal;
+  font-family: var(--display); color: var(--ink-faint);
+}
+.tp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tp-actions .ev-go { flex: 1 1 auto; }
+.tp-quiet {
+  padding: 8px 12px; cursor: pointer; font: inherit; font-size: 13px; color: var(--ink-soft);
+  background: var(--surface); border: 2px solid var(--line-firm); border-radius: 10px;
+}
+.tp-quiet:hover { border-color: var(--canopy); color: var(--canopy); }
+.tp-quiet.danger:hover { border-color: var(--bad); color: var(--bad); }
+.tp-badge {
+  padding: 8px 12px; font-size: 13px; font-weight: 700; color: var(--canopy);
+  background: var(--canopy-soft); border-radius: 10px;
+}
+@media (max-width: 420px) {
+  .tp-hero { padding: 11px; gap: 10px; }
+  .tp-art-frame { width: 62px; height: 62px; }
+  .tp-art.gate-art { --z: 2.5; }
+  .tp-slot > img, .tp-slot > .sprite-fx { width: 56px; height: 56px; }
+  .tp-slot > .sprite-showdown { width: calc(56px * .77); height: calc(56px * .77); margin: 6.4px; }
+}
+
 /* ================================================================ NIGHT MODE
 
    A deep forest night, not an inverted day: the same green family the game is

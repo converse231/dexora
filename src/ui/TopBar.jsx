@@ -118,6 +118,7 @@ const ICON = {
   reset: "M3 12a9 9 0 1 0 2.6-6.4M3 4v5h5",
   bolt: "M13 2 4 14h7l-1 8 9-12h-7z",
   bell: "M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0",
+  swap: "M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7",
   moon: "M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a6.6 6.6 0 0 0 9.7 9.7z",
 };
 // Night mode cycles: follow the system, always on, always off.
@@ -132,7 +133,7 @@ function Glyph({ of }) {
   );
 }
 
-function Menu({ onSettings, onHelp, onForms, onEvents, onNews, unread, onLogOut, onReset }) {
+function Menu({ onSettings, onHelp, onForms, onEvents, onTrade, onNews, unread, onLogOut, onReset }) {
   const [open, setOpen] = useState(false);
   const [theme, setThemeState] = useState(themeChoice);
   const box = useRef(null);
@@ -177,6 +178,11 @@ function Menu({ onSettings, onHelp, onForms, onEvents, onNews, unread, onLogOut,
           <button type="button" role="menuitem" onClick={run(onEvents)}>
             <Glyph of="bolt" />Events
           </button>
+          {onTrade && (
+            <button type="button" role="menuitem" onClick={run(onTrade)}>
+              <Glyph of="swap" />Trade Center
+            </button>
+          )}
           <button type="button" role="menuitem" onClick={run(onNews)}>
             <Glyph of="bell" />What&rsquo;s new{unread && <i className="tb-dot" aria-label="unread" />}
           </button>
@@ -224,7 +230,7 @@ function Menu({ onSettings, onHelp, onForms, onEvents, onNews, unread, onLogOut,
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
   onLogOut = null, onSettings = null, onHelp = null, onForms = null,
-  onEvents = null, onNews = null, unread = false,
+  onEvents = null, onTrade = null, onNews = null, unread = false,
   trainerName = null,
   stale = null,
   daily, onClaimDaily, claimNote,
@@ -332,6 +338,7 @@ export default function TopBar({
         onHelp={onHelp}
         onForms={onForms}
         onEvents={onEvents}
+        onTrade={onTrade}
         onNews={onNews}
         unread={unread}
         onLogOut={onLogOut}

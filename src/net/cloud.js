@@ -526,3 +526,56 @@ export async function push(raw) {
     return { ok: false, why: "offline" };
   }
 }
+
+// ------------------------------------------------------------------ trading
+/* TRADING - server half in db/trading.sql, design in docs/trading.md. Every
+   call answers {ok, data} or {ok: false, error} and never throws, and a failed
+   read is "try again", never "nobody here" - the `pull` rule, for the same
+   reason: a paused free project errors every read.
+
+   `closed` IS ITS OWN ANSWER: a server without the trading functions (the live
+   project before its SQL is run) says so once, as "not open yet", rather than
+   as an error on every button. */
+const CARD_COLS = "user_id, username, char, friend_code, xp, dex_count, variants, stars, "
+  + "trades, showcase, seeking, joined_at, played_at";
+
+const tradeFail = (error) => {
+  // PGRST202: no such function. 42P01: no such table. 42883: no such function (SQL).
+  if (["PGRST202", "PGRST205", "42P01", "42883"].includes(error?.code)) {
+    return { ok: false, closed: true, error: "Trading isn't open yet." };
+  }
+  return { ok: false, error: say(error) || "Could not reach the trading post. Try again." };
+};
+
+async function tradeCall(fn, args = {}) {
+  if (!CLOUD || !session) return { ok: false, error: "Sign in to trade." };
+  try {
+    const { data, error } = await supabase.rpc(fn, args);
+    return error ? tradeFail(error) : { ok: true, data };
+  } catch (e) {
+    return tradeFail(e);
+  }
+}
+
+async function cardWhere(col, value, like = false) {
+  if (!CLOUD || !session) return { ok: false, error: "Sign in to trade." };
+  try {
+    const q = supabase.from("trainer_cards").select(CARD_COLS);
+    // A name is matched whole and case-blind: ilike with its wildcards escaped.
+    const { data, error } = await (like
+      ? q.ilike(col, String(value).replace(/[\\%_]/g, (c) => `\\${c}`))
+      : q.eq(col, value)).maybeSingle();
+    return error ? tradeFail(error) : { ok: true, data: data ?? null };
+  } catch (e) {
+    return tradeFail(e);
+  }
+}
+
+export const myCard = () => cardWhere("user_id", session?.user?.id);
+export const cardByName = (name) => cardWhere("username", String(name ?? "").trim(), true);
+export const searchTrainers = (q) => tradeCall("find_trainers", { q });
+export const updateCard = (showcase, seeking) => tradeCall("update_card", { showcase, seeking });
+export const myFriends = () => tradeCall("my_friends");
+export const addFriend = (code) => tradeCall("add_friend", { code });
+export const answerFriend = (other, yes) => tradeCall("answer_friend", { other, yes });
+export const removeFriend = (other) => tradeCall("remove_friend", { other });
