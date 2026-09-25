@@ -879,12 +879,12 @@ export default function App({
           gone would be a dialog whose YES does nothing. A STAR is the one
           question asked outside an encounter: it comes from the Dex sheet, which is
           why this renders AFTER the sheet - same layer, so the later one is on top. */}
-      {st?.ask && (st?.encounter || st.ask.kind === "star") && (
+      {st?.ask && (st?.encounter || st.ask.kind === "star" || st.ask.kind === "rift") && (
         <Confirm
           title={st.ask.title}
           tone="warn"
           note={st.ask.body}
-          confirmLabel={{ flee: "RUN", star: "STAR" }[st.ask.kind] ?? "THROW"}
+          confirmLabel={{ flee: "RUN", star: "STAR", rift: "LEAVE" }[st.ask.kind] ?? "THROW"}
           onCancel={() => engine.answerAsk(false)}
           onConfirm={() => engine.answerAsk(true)}
         />

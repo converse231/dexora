@@ -31,7 +31,7 @@ import { evoLevel, itemById } from "../game/items.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
 import {
-  tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT, STAR_COST, canStar,
+  tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT, starCost, starKeeps,
 } from "../game/research.js";
 
 /* Kindest first, so the row reads as progress toward the rarest. Origin and
@@ -103,8 +103,11 @@ function whereToFind(id) {
    is. Every task is derived from the data in research.js, so a species that
    cannot evolve simply has no "Evolve one" row. A task with several steps
    counts towards the next one; a task with one is done or it is not. */
-function Research({ id, row, starred, ordinary, onStar }) {
+function Research({ id, row, starred, ordinary, owned, onStar }) {
   const level = researchLevel(id, row);
+  const cost = starCost(id), keeps = starKeeps(id);
+  const spend = cost === 1 ? "one spare" : `${cost} ordinary ones`;
+  const ready = ordinary >= cost && owned - cost >= keeps;
   return (
     <div className="sheet-research">
       <div className="sr-bar"><i style={{ width: `${(level / RESEARCH_MAX) * 100}%` }} /></div>
@@ -123,23 +126,19 @@ function Research({ id, row, starred, ordinary, onStar }) {
         })}
       </ul>
       {/* THE STAR: offered by finished research, bought with ordinary ones. */}
-      {!canStar(id) ? (
+      {level < RESEARCH_MAX ? (
         <p className="sr-note">
-          {level < RESEARCH_MAX ? "Catch one to complete it." : "Complete."} A legendary is never starred.
-        </p>
-      ) : level < RESEARCH_MAX ? (
-        <p className="sr-note">
-          Finish every task, then star it: {STAR_COST} ordinary ones for {RESEARCH_LIFT}x rare forms.
+          Finish every task, then star it: {spend} for {RESEARCH_LIFT}x rare forms.
         </p>
       ) : starred ? (
         <p className="sr-note sr-starred">★ Starred: its rare forms turn up {RESEARCH_LIFT}x as often.</p>
       ) : (
         <div className="sr-star">
           <p className="sr-note">
-            Complete. Give up {STAR_COST} ordinary ones (you hold {ordinary}) and its rare
-            forms turn up {RESEARCH_LIFT}x as often.
+            Complete. Give up {spend} (you hold {keeps ? owned : ordinary}{keeps ? ", one stays" : ""}) and
+            its rare forms turn up {RESEARCH_LIFT}x as often.
           </p>
-          <button type="button" className="sheet-inbox" disabled={ordinary < STAR_COST} onClick={onStar}>
+          <button type="button" className="sheet-inbox" disabled={!ready} onClick={onStar}>
             ★ GET STAR
           </button>
         </div>
@@ -537,7 +536,8 @@ export default function DexSheet({
                         {starred ? "★ STARRED" : `LV ${rLevel}/${RESEARCH_MAX}`}
                       </span>
                     </header>
-                    <Research id={id} row={research} starred={starred} ordinary={ordinary} onStar={onStar} />
+                    <Research id={id} row={research} starred={starred} ordinary={ordinary}
+                      owned={owned} onStar={onStar} />
                   </section>
                   <section className="ev-card">
                     <header className="ev-banner"><h4>Evolution</h4></header>
