@@ -15,10 +15,10 @@ export const NEWS = [
     date: "September 2026",
     title: "Monsoon Trail",
     items: [
-      ["A new map", "Monsoon Trail - Hoenn's Route 119, tile for tile - replaces Deep Woods: long grass taller than you, two waterfalls, and a river full of Feebas."],
+      ["A new map", "Monsoon Trail - Hoenn's Route 119, tile for tile - replaces Deep Woods: two waterfalls, log bridges you can walk over or surf under, and a river full of Feebas."],
       ["The first door", "The Weather Institute on Monsoon Trail opens onto the Pokémon Mansion, and the Mansion's front door leads back out."],
       ["The Acro Bike", "At Lv 10 you get the Acro Bike. Step onto the white rails and you ride them - on Monsoon Trail and in the Safari Zone."],
-      ["Grass that moves", "Tall grass rustles as you walk into it, and long grass hides your feet."],
+      ["Grass that moves", "Tall grass rustles as you walk into it and hides your feet."],
     ],
   },
   {

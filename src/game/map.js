@@ -126,7 +126,7 @@ export const MINI = {
   q: "#b99763", Q: "#3b2a24",
   /* monsoon trail - long grass darker than tall, and the rails WHITE, because
      on the map they are the white bars you ride and nothing else here is. */
-  g: "#3f7d3a", "-": "#e8ecef", "|": "#e8ecef",
+  "-": "#e8ecef", "|": "#e8ecef",
 };
 /* Anything the legend grows without telling this table. Deliberately a colour
    nothing else uses, so a missing tile shows up as a magenta stripe rather

@@ -1152,12 +1152,11 @@ def build_grassfx():
 
     Emerald's frames, on every map. FireRed's tall grass has an opaque square
     baked into its second frame (its own tile colour, which it relied on), and on
-    our atlas that draws as a box; Emerald's are keyed cleanly. Row 0 is TALL
-    grass (5 frames: rest, bend, three of scattering leaves), row 1 is LONG
-    grass (4 frames, full height - it hides the lower body, as on Route 119).
-    Palette index 0 is the transparent key."""
-    rows = [("graphics/field_effects/pics/tall_grass.png", "fx/em_tall_grass.png", 5),
-            ("graphics/field_effects/pics/long_grass.png", "fx/em_long_grass.png", 4)]
+    our atlas that draws as a box; Emerald's are keyed cleanly. One row of TALL
+    grass (5 frames: rest, bend, three of scattering leaves). Long grass had a
+    row once; Monsoon Trail now lays its long grass as tall. Palette index 0 is
+    the transparent key."""
+    rows = [("graphics/field_effects/pics/tall_grass.png", "fx/em_tall_grass.png", 5)]
     out = Image.new("RGBA", (16 * 5, 16 * len(rows)), (0, 0, 0, 0))
     for r, (rel, cache, frames) in enumerate(rows):
         im = Image.open(fetch(rel, cache, root=EMERALD))
@@ -1172,7 +1171,7 @@ def build_grassfx():
                     px[x, y] = (0, 0, 0, 0)
         out.paste(rgba, (0, r * 16))
     out.save(os.path.join(PUB, "tilesets", "grassfx.png"))
-    print("  grassfx.png %dx%d  (tall 5, long 4)" % out.size)
+    print("  grassfx.png %dx%d  (tall 5)" % out.size)
 
 
 def build_ground():

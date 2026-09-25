@@ -424,7 +424,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `.hp-body h4`.
 - **Monsoon Trail is Emerald's Route 119** in Deep Woods' slot (id `woods`),
   transcribed like the Safari Zone against Emerald General + `fortree`
-  (appended last in `EM_SECONDARY`). Long grass is `g`; rails are `-` and `|`
+  (appended last in `EM_SECONDARY`). Long grass is laid as tall; rails are `-` and `|`
   (`RAIL`, mirrored in map.js and build_map.py): bike-only ground in ANY
   direction - an axis rule cut the network to 11 of 55 rails. `canBike` needs
   the Acro Bike key item (`BIKE_LEVEL`); stepping off is always allowed, and
@@ -436,8 +436,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   the engine takes one late in `onArrive` (the step counts, no encounter). A
   door to a map your level has not opened stays shut and says so.
 - **Grass is a field effect** (`grassfx.png`, Emerald's frames on every map):
-  stepping into `,` or `g` rustles once, then the rest frame covers your feet;
+  stepping into `,` rustles once, then the rest frame covers your feet;
   drawn after the trainer and before the overhangs, never saved.
+- **Elevation decides who draws over whom** where a map carries `lift`
+  (Monsoon Trail): `^` puts the trainer above the upper layer, `v` under it,
+  `.` (Emerald's 0 and 15: bridges) keeps the last. Updated in `tryStep` and
+  `travel`. Without it a trainer walking a bridge or a clifftop went under it.
 - **The page never scrolls sideways**: `html, body { overflow-x: clip }` is the
   guard, not the fix - an overflow is still a bug to find and size down.
 - **Irreversible presses ask first, gated in the engine** (`state.ask` in

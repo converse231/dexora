@@ -74,12 +74,11 @@ export async function loadArt() {
   return { atlas, player, grass };
 }
 
-/* ONE FRAME OF THE GRASS EFFECT over a tile: `kind` 0 is tall grass, 1 long
-   grass (the rows of grassfx.png), `frame` a column. Drawn after the trainer,
+/* ONE FRAME OF THE GRASS EFFECT over a tile: `frame` a column of grassfx.png. Drawn after the trainer,
    so it covers the lower half the way Gen 3's field-effect sprite does. */
-export function drawGrass(ctx, img, x, y, kind, frame) {
+export function drawGrass(ctx, img, x, y, frame) {
   if (!img) return;
-  ctx.drawImage(img, frame * TILE, kind * TILE, TILE, TILE, x, y, TILE, TILE);
+  ctx.drawImage(img, frame * TILE, 0, TILE, TILE, x, y, TILE, TILE);
 }
 
 // ---------------------------------------------------------------- tiles

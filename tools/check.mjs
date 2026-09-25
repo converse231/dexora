@@ -3135,13 +3135,13 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(SOLID.includes(ch),
         `ledge "${ch}" is not in SOLID - it would be ordinary ground from every side`);
   }
-  /* THE GRASS SHEET IS TWO ROWS OF 16px FRAMES - tall (5) over long (4) - and
+  /* THE GRASS SHEET IS ONE ROW OF FIVE 16px FRAMES, and
      the engine indexes it by row and column with no metadata, so its size IS
      its contract. Read off the PNG header, like the trainer strip. */
   {
     const png = readFileSync(new URL("../public/tilesets/grassfx.png", import.meta.url));
     assert.equal(png.readUInt32BE(16), 80, "grassfx.png is not five 16px frames wide");
-    assert.equal(png.readUInt32BE(20), 32, "grassfx.png is not two 16px rows tall");
+    assert.equal(png.readUInt32BE(20), 16, "grassfx.png is not one 16px row tall");
   }
   /* AND ABOUT WHICH WAY A RAIL RUNS - the same two tables, the same failure:
      the generator counts a region reachable along a rail the engine then
