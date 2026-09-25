@@ -311,7 +311,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Warps are read from `warp_events`, kept only when reciprocal, taken in
   `onArrive`**, and ridden both ways by tools/play on every map. Every warp
   needs a walkable neighbour. Area ids never change (`ridge` is Mt Moon, `tower`
-  the Pokémon Tower), because saves store them.
+  the Pokémon Tower, `ember` Magma Hideout, `woods` Monsoon Trail), because
+  saves store them. A map replaced under its id can leave a save standing on
+  rock: `createEngine` sends a spot with nowhere to stand to the map's spawn.
 - **Place nothing on generated ground by coordinate; search for it**, and lay
   ledges last.
 - **The upper layer is redrawn over the player from `route_top.png`**, a
@@ -383,11 +385,21 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   per species touched. `TASKS` is append-only: a task's index is its slot in
   every saved row. Tasks read facts already frozen on the encounter (`night`,
   size, `throws`, `variant`) in `settle`, plus `useBerry` and `evolve` (credited
-  to the species evolved FROM). Every species must be finishable without a
-  rare form or an evolution. A level pays a quarter of a sale (`RESEARCH_PAY`,
-  under a fifth of catch income, measured); Lv 10 multiplies that species'
-  tier roll by `RESEARCH_LIFT`, weaker than an outbreak, and raises the only
-  research banner. `loadState` drops a bad row, never the whole object.
+  to the species evolved FROM). EVERY TASK IS REQUIRED except a `bonus` one
+  (the alpha: required, it left 0-2 species finishable a playthrough), and
+  the level is a share of the species' own total. Slot 0 counts ORDINARY
+  catches only, and evolving is asked only where a sub-Lv-100 row exists.
+  `owned()` credits a catch AND an evolution into a species (evolved forms
+  are rarely met wild), and an evolved form (`grown`) is not asked night,
+  first ball or a berry. A legendary's only task is `legend` (met ~0.1 times a
+  playthrough, measured) and `canStar` refuses it; `loadState` credits it
+  from the dex. XS and XL are one task (`xl` kept, asked of nobody). A
+  level pays a quarter of a sale (`RESEARCH_PAY`, under a fifth of catch
+  income, measured). Lv 10 only OFFERS the lift: `star(id)` spends
+  `STAR_COST` ordinary box entries (lowest level first, never a keeper,
+  asked first) into `state.stars`, and `researchLift(id, stars)` multiplies
+  that species' tier roll by `RESEARCH_LIFT`, weaker than an outbreak.
+  `loadState` drops a bad row, never the whole object.
 - **An alpha is a LAYER, not a tier**: `rollAlpha` (1 in `ALPHA_CHANCE`, never
   a legendary or costume, `canBeAlpha`) rolls BESIDE the tier, so an Alpha
   Shiny exists and is rarer than either. It was a tier for one pass and lost
@@ -431,6 +443,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   riding draws the `bike` set, appended last in player.png. Every
   reachability fill counts SURF (`SURFABLE`, mirrored): the northwest lake is
   surf-only, and a walk-only cull walled it off.
+- **Ember Caldera is Emerald's Magma Hideout**, all eight rooms in shelves on
+  one grid (`MAGMA_SHELVES`), warps and the way in read from each room's
+  map.json. It was Victory Road re-skinned in our volcano autotile, which
+  could not draw a real cave's thin walls or rungs. Lava (Lavaridge 189/307)
+  is `V`, as Cinderpeak's crater; `lift` as Monsoon Trail.
 - **Doors join maps** (`DOOR_PAIRS` in build_map.py): each builder reports its
   door and arrival tile, `mapdata` carries `doors: [x, y, area, ax, ay]`, and
   the engine takes one late in `onArrive` (the step counts, no encounter). A

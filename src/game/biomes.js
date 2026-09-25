@@ -1801,8 +1801,12 @@ export const sizeTag = (size) =>
    ICON rather than a treatment, which is what lets it sit on top of any tier's
    look without two effects fighting over one sprite. Never a legendary (one
    of a kind already) or a costume (an event does not host an event), and it
-   changes no table, so no species' findability moves. */
-export const ALPHA_CHANCE = 1 / 150;
+   changes no table, so no species' findability moves.
+
+   1 in 250, from 1 in 150: about 14 a playthrough rather than 23. Research
+   asks for one only as a bonus, because at this rate a required alpha left
+   almost no species finishable. */
+export const ALPHA_CHANCE = 1 / 250;
 export const ALPHA_SIZE = [140, 160];
 export const canBeAlpha = (id) => !LEGEND_SET.has(id) && !COSTUMES.includes(id);
 export const rollAlpha = (random, id) => canBeAlpha(id) && random() < ALPHA_CHANCE;

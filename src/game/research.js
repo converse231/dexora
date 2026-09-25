@@ -13,33 +13,68 @@
    saved row, so reordering or deleting one moves every counter in every save
    onto the wrong task. Add at the end. */
 import { EVOLUTIONS } from "../data/evolutions.js";
-import { canBeAlpha } from "./biomes.js";
+import { canBeAlpha, isLegendary } from "./biomes.js";
 
-const evolves = new Set(EVOLUTIONS.map((e) => e.from));
+/* Only an evolution a trainer can afford counts: a Mega, Primal or G-Max row
+   costs Lv 100, and a species whose only evolution is one would need a
+   hundred candy to finish its research. */
+const evolves = new Set(EVOLUTIONS.filter((e) => e.level < 100).map((e) => e.from));
 
 /* Each task counts up to its last step, and every step reached is worth
    `points`. Tasks that only make sense for some species say so in `when` -
    derived from the data, never listed per species. */
+/* EVERY TASK IS REQUIRED EXCEPT A `bonus` one. The alpha is the bonus: it is
+   a 1-in-250 roll, and required it left 0 to 2 species finishable in a whole
+   playthrough (measured) against 16 without it.
+
+   SLOT 0 COUNTS ORDINARY CATCHES ONLY - no tier, no alpha - because they are
+   what a star spends (`STAR_COST`). It counted every catch up to 20 before;
+   old counters are kept, clamped to 10, since nearly all of them were
+   ordinary anyway. */
+/* A LEGENDARY HAS ONE TASK, catching one (`legend`). Any single legendary is
+   met about once in ten playthroughs, measured, so none finished at ANY catch
+   target - and a star would spend ten of them on odds for something you almost
+   never meet. So its research is the catch, and it is never starred.
+
+   XS AND XL ARE ONE TASK, either size: needing both was the tightest of the
+   luck tasks, and folding them doubled what a playthrough finishes (12 to 26
+   species). `xl` keeps its slot, asked of nobody; `cleanRow` folds an old xl
+   into xs. */
+const plain = (id) => !isLegendary(id);
+/* AN EVOLVED FORM IS RAISED, NOT MET - about 0.4 wild encounters each a
+   playthrough, measured - so the tasks only a wild encounter can do (night,
+   the first ball, a berry) are not asked of it. Owning one by evolving counts
+   (see `owned` in the engine). A baby's evolution (Pikachu from Pichu) is
+   asked less than it could be; that is the price of reading it off the data. */
+const grown = new Set(EVOLUTIONS.map((e) => e.to));
+const met = (id) => plain(id) && !grown.has(id);
 export const TASKS = [
-  { id: "catch", label: "Catch", steps: [1, 4, 10, 20], points: 10 },
-  { id: "night", label: "Catch one at night", steps: [1], points: 10 },
-  { id: "xs", label: "Catch an XS one", steps: [1], points: 10 },
-  { id: "xl", label: "Catch an XL one", steps: [1], points: 10 },
-  { id: "first", label: "Catch one with the first ball", steps: [1], points: 20 },
-  { id: "variant", label: "Catch a rare form", steps: [1], points: 20 },
-  { id: "fed", label: "Feed one a berry", steps: [1], points: 10 },
-  { id: "evolve", label: "Evolve one", steps: [1], points: 10, when: (id) => evolves.has(id) },
-  { id: "alpha", label: "Catch an alpha", steps: [1], points: 20, when: canBeAlpha },
+  { id: "catch", label: "Catch ordinary ones", steps: [1, 4, 10], points: 10, when: plain },
+  { id: "night", label: "Catch one at night", steps: [1], points: 10, when: met },
+  { id: "xs", label: "Catch an XS or XL one", steps: [1], points: 10, when: plain },
+  { id: "xl", label: "Catch an XL one", steps: [1], points: 10, when: () => false },
+  { id: "first", label: "Catch one with the first ball", steps: [1], points: 20, when: met },
+  { id: "variant", label: "Catch a rare form", steps: [1], points: 20, when: plain },
+  { id: "fed", label: "Feed one a berry", steps: [1], points: 10, when: met },
+  { id: "evolve", label: "Evolve one", steps: [1], points: 10, when: (id) => plain(id) && evolves.has(id) },
+  { id: "alpha", label: "Catch an alpha", steps: [1], points: 20, when: canBeAlpha, bonus: true },
+  { id: "legend", label: "Catch one", steps: [1], points: 10, when: isLegendary },
 ];
+export const canStar = plain;
 const SLOT = Object.fromEntries(TASKS.map((t, i) => [t.id, i]));
 
 export const RESEARCH_MAX = 10;
-export const POINTS_PER_LEVEL = 10;
-/* A FINISHED ENTRY MAKES ITS RARE FORMS 1.5x AS LIKELY, through the same
+/* A STARRED ENTRY MAKES ITS RARE FORMS 1.5x AS LIKELY, through the same
    `boost` pity and the outbreak use, so `LIFT_CEILING` still caps the stack.
    Deliberately weaker than an outbreak: a permanent bonus that out-did a
-   daily event would make the event pointless on every species you finished. */
+   daily event would make the event pointless on every species you finished.
+
+   A STAR IS BOUGHT, NOT GIVEN. Finishing the research only offers it; the
+   price is `STAR_COST` ordinary ones out of the Box - the same ten the catch
+   task counted. Ten sales against the two and a half that ten research levels
+   paid, so every star is a sink for the duplicates the game is built on. */
 export const RESEARCH_LIFT = 1.5;
+export const STAR_COST = 10;
 
 export const tasksFor = (id) => TASKS.filter((t) => !t.when || t.when(id));
 
@@ -50,14 +85,15 @@ export function progress(task, row) {
   return { n, cleared, points: cleared * task.points };
 }
 
+const required = (id) => tasksFor(id).filter((t) => !t.bonus);
 export const researchPoints = (id, row) =>
-  tasksFor(id).reduce((sum, t) => sum + progress(t, row).points, 0);
-
-export const researchLevel = (id, row) =>
-  Math.min(RESEARCH_MAX, Math.floor(researchPoints(id, row) / POINTS_PER_LEVEL));
-
-export const researchLift = (id, row) =>
-  (researchLevel(id, row) >= RESEARCH_MAX ? RESEARCH_LIFT : 1);
+  required(id).reduce((sum, t) => sum + progress(t, row).points, 0);
+/* A SHARE OF THIS SPECIES' OWN TOTAL, so the top level is every required task
+   and nothing less - a species with an evolve task has more to do, not an
+   easier ten. */
+export const researchLevel = (id, row) => Math.floor(RESEARCH_MAX * researchPoints(id, row)
+  / required(id).reduce((sum, t) => sum + t.steps.length * t.points, 0));
+export const researchLift = (id, stars) => (stars?.includes(id) ? RESEARCH_LIFT : 1);
 
 /* A new row with each named task counted once. Counters stop at their task's
    last step, so a row cannot grow for ever in a save; slots past `TASKS` (a
@@ -87,5 +123,7 @@ export const researchPay = (sellEach, levels) =>
 export function cleanRow(v) {
   if (!Array.isArray(v) || v.length > 64) return null;
   if (!v.every((n) => Number.isInteger(n) && n >= 0)) return null;
-  return v.map((n, i) => Math.min(n, TASKS[i]?.steps.at(-1) ?? 1000));
+  const out = v.map((n, i) => Math.min(n, TASKS[i]?.steps.at(-1) ?? 1000));
+  if (out[SLOT.xl]) out[SLOT.xs] = Math.max(out[SLOT.xs] ?? 0, out[SLOT.xl]);
+  return out;
 }

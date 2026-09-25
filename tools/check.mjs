@@ -222,7 +222,7 @@ import {
 import { ALPHA_CATCH, ALPHA_CANDY, alphaCandy } from "../src/game/items.js";
 import {
   TASKS, tasksFor, bump, researchLevel, researchPoints, researchLift, researchPay,
-  cleanRow, RESEARCH_MAX, POINTS_PER_LEVEL, RESEARCH_LIFT,
+  cleanRow, RESEARCH_MAX, RESEARCH_LIFT, STAR_COST, RESEARCH_PAY, canStar,
 } from "../src/game/research.js";
 
 const poke = ballById("poke-ball");
@@ -2233,6 +2233,8 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     cinder: () => route.safari.general,       // the same primary, and lavaridge
     // Monsoon Trail is Route 119: Emerald's General again, plus Fortree.
     woods: () => route.monsoon.general,
+    // Ember Caldera is Magma Hideout: Emerald's General and Lavaridge, as Cinderpeak.
+    ember: () => route.safari.general,
     // The first map drawn against a pokefirered primary that is not
     // General, so its base is that primary's own block rather than a
     // secondary's - 748 of its metatiles are `building` ids.
@@ -4119,23 +4121,41 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
 
   /* RESEARCH. Pure, so all of it runs here with no engine. */
   {
-    const full = (ids) => bump(bump(bump(bump([], ids), ids), ids), ids);
-    const need = RESEARCH_MAX * POINTS_PER_LEVEL;
+    const full = (ids) => { let r = []; for (let i = 0; i < 10; i++) r = bump(r, ids); return r; };
 
-    /* EVERY SPECIES CAN FINISH ITS RESEARCH WITHOUT LUCK - every task but the
-       rare form and the alpha, which are rolls, and a legendary may never
-       offer one at all. Evolving is left out too: a species whose only evolution is a
-       Mega would otherwise need a hundred candy to finish. */
-    const luck = ["variant", "evolve", "alpha"];
-    const sure = TASKS.map((t) => t.id).filter((t) => !luck.includes(t));
-    let row = [];
-    for (let i = 0; i < 20; i++) row = bump(row, sure);
+    /* EVERY SPECIES CAN FINISH ITS RESEARCH, and every required task is one it
+       can do. The alpha is only a bonus - at 1 in 250, required, it left 0 to
+       2 species finishable in a playthrough - and a legendary is never offered
+       one. Evolving is asked only where an evolution below Lv 100 exists: a
+       species whose only evolution is a Mega would need a hundred candy. */
+    const all = TASKS.map((t) => t.id);
+    const noAlpha = all.filter((t) => t !== "alpha");
     for (const sp of SPECIES) {
       assert.ok(tasksFor(sp.id).length > 0, `${sp.name} has no research tasks`);
-      assert.ok(researchPoints(sp.id, row) >= need,
-        `${sp.name} cannot finish its research without a rare form: ` +
-        `${researchPoints(sp.id, row)} of ${need} points`);
+      assert.equal(researchLevel(sp.id, full(noAlpha)), RESEARCH_MAX,
+        `${sp.name} cannot finish its research without an alpha`);
     }
+    const megaOnly = SPECIES.find((sp) => {
+      const rows = EVOLUTIONS.filter((e) => e.from === sp.id);
+      return rows.length && rows.every((e) => e.level >= 100);
+    });
+    assert.ok(!tasksFor(megaOnly.id).some((t) => t.id === "evolve"),
+      `${megaOnly.name} is asked to evolve, and its only evolution costs Lv 100`);
+    /* A LEGENDARY FINISHES ON ONE CATCH and is never starred: any one of them
+       is met about 0.1 times a playthrough, and none finished at any target. */
+    const leg = LEGENDARY[0], starter = EVOLUTIONS[0].from;
+    assert.equal(researchLevel(leg, bump(null, ["legend"])), RESEARCH_MAX,
+      `${speciesById(leg).name} does not finish its research on one catch`);
+    assert.ok(!canStar(leg) && canStar(starter), "the star is offered to the wrong species");
+    // An evolved form is raised: nothing only a wild encounter can do is asked of it.
+    const raised = EVOLUTIONS[0].to;
+    assert.ok(!tasksFor(raised).some((t) => ["night", "first", "fed"].includes(t.id))
+      && tasksFor(starter).some((t) => t.id === "night"),
+      `${speciesById(raised).name} is asked for a wild-only task, or its base form is not`);
+    // Either size does: an XL alone clears the size task.
+    assert.ok(researchLevel(starter, full(noAlpha.filter((t) => t !== "xs"))) < RESEARCH_MAX
+      && researchLevel(starter, cleanRow(full(noAlpha.filter((t) => t !== "xs")))) === RESEARCH_MAX,
+      "an old XL-only row does not clear the XS-or-XL task once loaded");
     // `when` is derived from the evolution data, not listed.
     const evolver = EVOLUTIONS[0].from;
     const dead = SPECIES.find((sp) => !EVOLUTIONS.some((e) => e.from === sp.id)).id;
@@ -4144,9 +4164,14 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
 
     // The level arithmetic, and that a counter stops at its last step.
     assert.equal(researchLevel(evolver, null), 0, "untouched research is not level 0");
-    assert.equal(researchLevel(evolver, bump(null, ["catch"])), 1, "the first catch is not level 1");
-    assert.equal(researchLevel(evolver, full(TASKS.map((t) => t.id))), RESEARCH_MAX,
-      "a finished row is not the top level");
+    assert.ok(researchPoints(evolver, bump(null, ["catch"])) > 0, "the first catch is worth nothing");
+    assert.equal(researchLevel(evolver, full(all)), RESEARCH_MAX, "a finished row is not the top level");
+    /* EVERY REQUIRED TASK IS REQUIRED: a row missing any one of them stops
+       short of the top, however much else it has done. */
+    for (const t of tasksFor(evolver).filter((task) => !task.bonus)) {
+      assert.ok(researchLevel(evolver, full(all.filter((x) => x !== t.id))) < RESEARCH_MAX,
+        `research finished without "${t.label}"`);
+    }
     let many = [];
     for (let i = 0; i < 50; i++) many = bump(many, ["catch"]);
     assert.equal(many[0], TASKS[0].steps.at(-1), "a research counter grows past its last step");
@@ -4164,7 +4189,12 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
        entry would make the outbreak on it pointless. */
     assert.ok(RESEARCH_LIFT > 1 && RESEARCH_LIFT < OUTBREAK_LIFT,
       `a finished entry lifts ×${RESEARCH_LIFT} against an outbreak's ×${OUTBREAK_LIFT}`);
-    assert.equal(researchLift(evolver, null), 1, "unfinished research lifts the odds");
+    assert.equal(researchLift(evolver, []), 1, "an unstarred species' odds are lifted");
+    assert.equal(researchLift(evolver, [evolver]), RESEARCH_LIFT, "a starred species' odds are not lifted");
+    /* A STAR IS A SINK: it spends more in sales than all ten levels of that
+       species' research ever paid, or starring would be income. */
+    assert.ok(STAR_COST > RESEARCH_MAX * RESEARCH_PAY,
+      `a star costs ${STAR_COST} sales against ${RESEARCH_MAX * RESEARCH_PAY} paid by research`);
     /* AND THE ENGINE ASKS IT. A finished entry's odds are a probability, so
        play cannot see a missing call - an import is not a call, and the one
        place the tier is rolled has to name it. Comments stripped first. */
@@ -4197,10 +4227,10 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         const sp = speciesById(id);
         const v = rollVariant(rng, lockedTiers(id));
         const size = sizeTag(rollSize(rng));
-        const did = ["catch", ...(rng() < 0.3 ? ["night"] : []),
-          ...(size === "XS" ? ["xs"] : size === "XL" ? ["xl"] : []),
-          ...(rng() < 0.4 ? ["first"] : []), ...(v ? ["variant"] : []),
-          ...(rng() < 0.1 ? ["fed"] : [])];
+        const did = [...(v ? ["variant"] : ["catch"]), ...(rng() < 0.3 ? ["night"] : []),
+          ...(size ? ["xs"] : []), "legend",
+          ...(rng() < 0.4 ? ["first"] : []),
+          ...(rng() < 0.1 ? ["fed"] : []), ...(rng() < 0.1 ? ["evolve"] : [])];
         const before = researchLevel(id, study[id]);
         study[id] = bump(study[id], did);
         const after = researchLevel(id, study[id]);
@@ -4215,7 +4245,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.ok(finished > BIOMES.length * 10,
       `only ${finished} entries finished over eleven playthroughs - research is out of reach`);
 
-    console.log(`research ok — ${TASKS.length} tasks, every species finishable without luck, ` +
+    console.log(`research ok — ${TASKS.length} tasks, every species finishable without an alpha, ` +
       `pays at most ${(worst * 100).toFixed(1)}% of catch income (${worstMap}), ` +
       `${finished} finished over ${BIOMES.length} playthroughs`);
   }

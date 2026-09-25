@@ -722,6 +722,8 @@ function until(e, what, label, max = 2000) {
     "evolving must still register the species in the dex");
   // Research credits the species evolved FROM: evolving a Caterpie is Caterpie research.
   assert.equal(e.state.research[10]?.[7], 1, "evolving did not count towards the research it evolved from");
+  // AND WHAT IT BECAME: an ordinary Caterpie evolved is an ordinary Metapod owned.
+  assert.equal(e.state.research[11]?.[0], 1, "evolving into a species did not count towards its research");
   console.log("caught counter ok — an evolution fills a dex slot without counting as a catch");
 }
 
@@ -1837,7 +1839,8 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
   const { outbreakPool } = await import("../src/game/events.js");
   const { BIOMES, speciesById } = await import("../src/game/biomes.js");
   const { sellValue } = await import("../src/game/items.js");
-  const { TASKS, researchLevel, researchPay, RESEARCH_MAX } = await import("../src/game/research.js");
+  const { TASKS, researchLevel, researchPay, researchLift, RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } =
+    await import("../src/game/research.js");
   const slot = (id) => TASKS.findIndex((t) => t.id === id);
 
   await savedField("research", { 16: [3, 1, 0, 0, 1, 0, 0, 0] }, "junk", {});
@@ -1847,12 +1850,12 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
 
   const pool = outbreakPool(BIOMES.find((b) => b.id === "meadow"), 50);
   const id = pool[0];
-  /* Short by exactly what this test does live: a berry (+10), then a
-     first-ball catch that takes the count to 4 (+10, +20) - Lv 6 to 7 to 10.
-     `fed` and `first` start at 0, or asserting them would prove nothing. */
-  const start = { catch: 3, night: 1, xs: 1, xl: 1, variant: 1 };
+  /* Short by exactly what this test does live: a berry, then a first-ball
+     catch that lands a rare form (the pinned roll makes one). `fed`, `first`
+     and `variant` start at 0, or asserting them would prove nothing. */
+  const start = { catch: 10, night: 1, xs: 1, xl: 1, evolve: 1 };
   const nearly = TASKS.map((t) => start[t.id] ?? 0);
-  assert.equal(researchLevel(id, nearly), RESEARCH_MAX - 4, "the fixture is not Lv 6");
+  assert.ok(researchLevel(id, nearly) < RESEARCH_MAX - 1, "the fixture is nearly finished already");
   const { e } = boot({ ...SAVE,
     outbreak: { key: dayKey(), areaId: "meadow", speciesId: id, left: 5 },
     research: { [id]: nearly } });
@@ -1870,12 +1873,12 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
     assert.equal(e.useBerry("razz-berry"), true, "the berry was refused");
     assert.equal(e.state.research[id][slot("fed")], 1, "feeding a berry did not count");
-    assert.equal(researchLevel(id, e.state.research[id]), RESEARCH_MAX - 3, "a berry did not level research");
+    assert.ok(researchLevel(id, e.state.research[id]) > researchLevel(id, nearly), "a berry did not level research");
     const money = e.state.money;
     e.throwBall("poke-ball");
     until(e, (st) => !st.encounter || st.encounter.phase === "caught", "the catch");
     const row = e.state.research[id];
-    assert.equal(row[slot("catch")], 4, "a catch did not count towards research");
+    assert.equal(row[slot("variant")], 1, "a rare-form catch did not count");
     assert.equal(row[slot("first")], 1, "a first-ball catch did not count");
     assert.equal(researchLevel(id, row), RESEARCH_MAX, "the last level was not reached");
     assert.ok(e.state.cheers.some((c) => c.kind === "research"), "finishing research raised no banner");
@@ -1885,6 +1888,58 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
   until(e, (st) => !st.encounter, "the encounter to close", 4000);
 }
 console.log("research ok — counts a real catch, a first ball and a berry, pays the level, banners the tenth");
+
+/* A STAR: finished research, paid for in ordinary ones. Which ten go is the
+   part that can hurt a collection - the lowest levels, never a keeper - so the
+   box holds more than ten, at different levels, beside a shiny and an alpha. */
+{
+  const { TASKS, researchLift, RESEARCH_LIFT, STAR_COST } = await import("../src/game/research.js");
+  await savedField("stars", [16], "junk", []);
+  assert.deepEqual(boot({ ...SAVE, stars: [16, 16, 99999, "x"] }).e.state.stars, [16],
+    "a damaged star list kept its garbage or lost its good entry");
+
+  const id = 16;
+  const done = TASKS.map((t) => t.steps.at(-1));
+  const box = Array.from({ length: STAR_COST + 2 }, (_, i) =>
+    ({ uid: i + 1, species: id, level: 5 + i, size: 100, at: 1 }));
+  box.push({ uid: 50, species: id, level: 1, size: 100, shiny: 1, at: 1 },
+    { uid: 51, species: id, level: 1, size: 150, alpha: 1, at: 1 });
+  const fresh = (extra) => boot({ ...SAVE, box: structuredClone(box), nextUid: 52,
+    research: { [id]: done }, ...extra }).e;
+
+  const e = fresh();
+  assert.equal(e.star(id), true, "finished research with enough ordinary ones could not be starred");
+  assert.equal(e.state.ask?.kind, "star", "starring did not ask first");
+  assert.deepEqual(e.state.stars, [], "the star was taken before the answer");
+  e.answerAsk(true);
+  assert.deepEqual(e.state.stars, [id], "answering yes did not star it");
+  assert.deepEqual(e.state.box.map((m) => m.uid).sort((a, b) => a - b), [STAR_COST + 1, STAR_COST + 2, 50, 51],
+    "the star spent the wrong ones - a keeper, or higher levels before lower");
+  assert.equal(researchLift(id, e.state.stars), RESEARCH_LIFT, "a starred species is not lifted");
+  assert.equal(e.star(id), false, "a species was starred twice");
+
+  assert.equal(fresh({ box: structuredClone(box).slice(0, STAR_COST - 1) }).star(id), false,
+    "a star was offered with fewer than its ordinary ones");
+  assert.equal(fresh({ research: { [id]: done.map((n, i) => (i === 0 ? n - 1 : n)) } }).star(id), false,
+    "unfinished research was starred");
+
+  /* A LEGENDARY: caught before its task existed, credited from the dex on
+     load - and never starred, whatever the box holds. */
+  const { LEGENDARY, dexIndex } = await import("../src/game/biomes.js");
+  const { researchLevel, RESEARCH_MAX } = await import("../src/game/research.js");
+  const leg = LEGENDARY[0];
+  const dex = [...SAVE.dex]; dex[dexIndex(leg)] = 2;
+  const lb = Array.from({ length: STAR_COST }, (_, i) => ({ uid: 60 + i, species: leg, level: 50, size: 100, at: 1 }));
+  const le = boot({ ...SAVE, dex, box: lb, nextUid: 99 }).e;
+  assert.equal(researchLevel(leg, le.state.research[leg]), RESEARCH_MAX,
+    "a legendary already in the dex did not have its research credited on load");
+  assert.equal(le.star(leg), false, "a legendary was offered a star");
+  const no = fresh();
+  no.star(id);
+  no.answerAsk(false);
+  assert.equal(no.state.box.length, box.length, "cancelling the star still spent the ordinary ones");
+}
+console.log("star ok — asks first, spends the lowest ordinary ones and never a keeper, once, only when finished");
 
 /* AN ALPHA, END TO END, through a real step and real throws - it is a flag on
    the encounter that four different places have to read (the flee roll, the
@@ -1913,7 +1968,7 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
     }
     const enc = e.state.encounter;
     assert.equal(enc?.speciesId, id, "the alpha test met the wrong species");
-    assert.equal(enc.alpha, true, "a roll under 1 in 150 did not make an alpha - or made it a number, which renders as \"0\" in JSX");
+    assert.equal(enc.alpha, true, "a roll under 1 in 250 did not make an alpha - or made it a number, which renders as \"0\" in JSX");
     assert.ok(enc.variant, "an alpha could not also be a rare form - the two rolls are not independent");
     assert.ok(enc.size > SIZE_MAX, `an alpha came out size ${enc.size}`);
     until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
@@ -1936,6 +1991,9 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
     assert.ok(e.state.cheers.some((c) => c.kind === "alpha"), "catching an alpha raised no banner");
     assert.equal(e.state.research[id][TASKS.findIndex((t) => t.id === "alpha")], 1,
       "an alpha catch did not count for research");
+    // An alpha rare form is not an ordinary one: a star must never count it.
+    assert.equal(e.state.research[id][TASKS.findIndex((t) => t.id === "catch")], 0,
+      "an alpha rare form counted as an ordinary catch");
   } finally { Math.random = real; }
   until(e, (st) => !st.encounter, "the encounter to close", 4000);
 
@@ -1964,6 +2022,20 @@ console.log("alpha ok — never flees, caught pays candy and research, boxed, un
   assert.equal(st.shiny[dexIndex(16)], 1, "a shiny in the box did not register its tier row on load");
 }
 console.log("tier repair ok — a boxed tier registers its row on load");
+
+/* A SAVED SPOT THE MAP NO LONGER HAS - rock, or off the edge - loads at the
+   map's way in, not inside a wall. */
+{
+  const { AREAS } = await import("../src/game/mapdata.js");
+  const rows = AREAS.ember.rows;
+  const y = rows.findIndex((r) => r.includes("M"));
+  for (const player of [{ x: rows[y].indexOf("M"), y, dir: "up" }, { x: 999, y: 999, dir: "up" }]) {
+    const st = boot({ ...SAVE, areaId: "ember", xp: 60000, player }).e.state;
+    assert.deepEqual([st.player.x, st.player.y], [AREAS.ember.spawn.x, AREAS.ember.spawn.y],
+      `a save standing at ${player.x},${player.y} on rock loaded there`);
+  }
+}
+console.log("stranded ok — a saved spot on rock or off the map loads at the map's way in");
 
 /* A RIFT, through real steps. Opening, counting down, finding and closing all
    happen in `onArrive`, which only a walk reaches - so each is one real step
