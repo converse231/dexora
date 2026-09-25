@@ -54,8 +54,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AREAS = [
     # Hand-drawn - see tall_grass() at the bottom of this file.
     dict(id="meadow", name="Tall Grass", drawn="tall_grass"),
-    # Hand-drawn - see deep_woods() further down.
-    dict(id="woods", name="Deep Woods", drawn="deep_woods"),
+    # COPIED: Emerald's Route 119, as Monsoon Trail - see monsoon_trail(). The
+    # id is the slot's historical handle (this was Deep Woods); renaming it
+    # would move every save standing here.
+    dict(id="woods", name="Monsoon Trail", drawn="monsoon_trail"),
     # Several lakes, not one: water is solid and only the bank spawns, so a
     # single pond leaves a whole map with a 17-tile shoreline to pace.
     # Hand-drawn - see pond_shore() further down.
@@ -101,6 +103,16 @@ SOLID = set("TwRMIPHLFCWXBEVkKdtYGAZJQ")
 # would be deciding it against a rule the engine does not follow. check.mjs
 # pins the pair, the same way it pins SOLID.
 LEDGE = {"L": (0, 1), "J": (1, 0)}
+# ACRO BIKE RAILS: `-` runs east-west and `|` north-south, which is what the
+# minimap and the renderer care about. Ridden on the Bike in ANY direction.
+# An axis rule (along the rail only, no turning) was tried first and cut
+# Route 119's network to 11 of its 55 rails: Emerald joins them with hops
+# between short bars, which a one-axis rule reads as dead ends. The fill below
+# counts them as reachable, because a player with the Bike can. Mirrored in
+# map.js's RAIL; check.mjs holds the pair together.
+RAIL = {"-": (1, 0), "|": (0, 1)}
+# What Surf rides - mirrors map.js's SURFABLE; check.mjs holds the pair together.
+SURFABLE = set("wWkV")
 
 
 def h2(x, y, salt=0):
@@ -983,6 +995,13 @@ def check(area, rows, spawn, tiles=None, warps=None):
         stack += walk_steps(rows, x, y)
         if (x, y) in hop:
             stack.append(hop[(x, y)])
+        # AND SURF IS A WAY THROUGH, like a ladder: Monsoon Trail's northwest
+        # lake is reached on the water in Emerald, and so here, once Surf is
+        # held. Water is crossed, never counted - `got` is still only land.
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= nx < W and 0 <= ny < H and (rows[ny][nx] in SURFABLE or
+                    (rows[y][x] in SURFABLE and rows[ny][nx] not in SOLID)):
+                stack.append((nx, ny))
 
     # Every walkable tile spawns now, so the thing to check is that the ground
     # is one connected place: a walled-off pocket is map you can see and never
@@ -1446,187 +1465,6 @@ def tall_grass():
     return ["".join(r) for r in g], (33, 75)
 
 
-# WHAT A REAL FOREST MEASURES, off the only two FireRed ships: ViridianForest
-# and ThreeIsland_BerryForest, through the same reachability-corrected reader
-# `npm run layout` uses. Two maps is under `MIN_SAMPLE`, so this is a target to
-# aim at rather than a band anything is FLAGGED against - which is exactly how
-# it is used below: `compose.score` ranks candidates, and nothing asserts a
-# finished map sits inside it.
-#
-#                     Viridian   Berry
-#   stripe              0.822    1.025
-#   turns               0.077    0.168
-#   dead                0.000    0.002
-#   loops              79.6     65.3
-#   tight               0.426    0.653
-#   open                0.429    0.321
-FOREST = {
-    "stripe": (0.80, 1.05), "turns": (0.07, 0.17), "dead": (0.000, 0.004),
-    "loops": (65.0, 80.0), "tight": (0.42, 0.66), "open": (0.32, 0.44),
-}
-
-
-# Swept against `FOREST`, not chosen. A mass needs `w + pad` by `h + pad` of
-# lattice or it is rejected for want of room and the canopy thins out - the
-# first pass ran a 12x12 pitch under 9x13 masses and measured `open 0.58`
-# against a real 0.32-0.43, which is a field with trees standing in it.
-# Swept against `FOREST`, not chosen. Mixed sizes because a wood is not one
-# tree repeated: the widths and heights are the range ViridianForest's own
-# masses run at, and the tallest that fits is always taken so the late small
-# ones are filling gaps rather than being the plan.
-WIDTHS = (6, 9, 9, 12)
-HEIGHTS = (7, 9, 11, 13)
-TRIES_PER_SEED = 400
-
-
-def forest_masses(W, H, seed, pad=3):
-    """Canopy masses for a forest, on the grammar's own grid.
-
-    THE COMPOSER CANNOT BE USED HERE, and that is a fact about the tileset
-    rather than about the generator. `compose()` carves free-form passages; a
-    canopy column is `crown + (upper,lower) x n + trunk + shadow`, so every mass
-    has to be a multiple of three wide, sit on the 3-column grid, and be an ODD
-    number of rows - measured on the MERGED run, so two masses that touch are
-    one run and their combined height is what has to be odd.
-
-    So this generates over MASSES, the way `haunted_tower` used to generate
-    over grave plots rather than over corridors (it is transcribed now). Every mass keeps `pad` (3) tiles clear of
-    every other mass and of the frame, which buys three things at once:
-
-      * no two masses ever merge, so each one's own height is the run height and
-        the parity is decided where it is written rather than discovered by
-        check();
-      * every corridor is at least three wide, which is what the autotile needs
-        and what Viridian Forest's own corridors measure;
-      * THE FLOOR IS CONNECTED BY CONSTRUCTION. The walkable part is the
-        complement of a set of disjoint rectangles inside a frame, which cannot
-        be disconnected - and that is the property three hand-patched attempts
-        at a through-corridor kept losing, each sealing a few hundred tiles into
-        pockets you could see and never reach."""
-    rng = random.Random(seed)
-    # THE PAD APPLIES TO THE FRAME TOO. Sitting flush against the border merges
-    # with it - the border is canopy - and the merged run is what has to be odd:
-    # a 13-tall mass at y=5 under a 5-deep top border is a single run of 18, and
-    # check() refused it. Keeping `pad` clear of the frame means a mass is never
-    # part of any run but its own, which is the whole point of the spacing.
-    x_lo, x_hi = 3 + pad, W - 4 - pad
-    y_lo, y_hi = 5 + pad, H - 6 - pad
-    placed = []
-
-    def clear(x0, y0, x1, y1):
-        """Room for this mass, with `pad` between it and everything else."""
-        if x0 < x_lo or x1 > x_hi or y0 < y_lo or y1 > y_hi:
-            return False
-        return all(x1 + pad < ax0 or ax1 + pad < x0
-                   or y1 + pad < ay0 or ay1 + pad < y0
-                   for ax0, ay0, ax1, ay1 in placed)
-
-    # A jittered lattice, so masses are spread without being a grid. The pitch
-    # is the widest mass plus the gap, or candidates never fit.
-    # A LATTICE THAT MATCHES EVERY BAND STILL READS AS AN ORCHARD, and that is
-    # the same lesson `compose.py` records about wall masses: nothing in the
-    # bands measures REGULARITY, so a perfect grid of identical blocks scored
-    # well and rendered as a plantation. Widening the jitter did not fix it -
-    # it just caused collisions, and the canopy thinned from 21 masses to 14.
-    #
-    # So there is no lattice. Masses are thrown at the map in random order and
-    # kept if they fit, tallest variant first, which packs like a real wood: the
-    # early ones land in open ground and the late ones fill what is left with
-    # whatever still fits. Irregular AND dense, where the lattice made those two
-    # things fight. The seed loop in `best_forest` is what turns "random" into
-    # "the best of two hundred", so the result is chosen, not rolled.
-    for _ in range(TRIES_PER_SEED):
-        w = rng.choice(WIDTHS)
-        x0 = rng.randrange(x_lo, max(x_lo + 1, x_hi - w + 2))
-        x0 -= x0 % 3                          # snap to the 3-column grid
-        y0 = rng.randrange(y_lo, max(y_lo + 1, y_hi - 4))
-        for h in sorted(set(HEIGHTS), reverse=True):
-            if clear(x0, y0, x0 + w - 1, y0 + h - 1):
-                placed.append((x0, y0, x0 + w - 1, y0 + h - 1))
-                break
-    return placed
-
-
-def best_forest(W, H, tries=140, seed0=1):
-    """Generate and test, exactly as the cave and the tower do."""
-    import numpy as np
-    import study_shape as S
-    import study_layout as L
-    import compose
-
-    got = None
-    for seed in range(seed0, seed0 + tries):
-        masses = forest_masses(W, H, seed)
-        if len(masses) < 12:
-            continue
-        walk = np.ones((H, W), dtype=bool)
-        walk[:5, :] = walk[-5:, :] = False           # the frame
-        walk[:, :3] = walk[:, -3:] = False
-        for x0, y0, x1, y1 in masses:
-            walk[y0:y1 + 1, x0:x1 + 1] = False
-        m = S.measure_mask("candidate", walk)
-        m.update(L.measure(walk))
-        sc = compose.score(m, FOREST)
-        if got is None or sc < got[2]:
-            got = (masses, seed, sc, m)
-    assert got, "woods: no candidate forest was generated"
-    return got
-
-
-def open_rect(g, w, h, taken, x_lo, y_lo, x_hi, y_hi, rng=None):
-    """A w x h block of plain floor that nothing has claimed.
-
-    PLACE NOTHING ON GENERATED GROUND. The canopy is composed now, so where the
-    floor is depends on which seed won - a clearing at typed coordinates lands
-    half inside a trunk, which is the fault this file already records for
-    staircases, ledges and spawns.
-
-    SEARCHED IN A SHUFFLED ORDER, seeded off the winning map, so the result is
-    still a function of the map and not of luck. A plain top-left scan put every
-    clearing in the first gaps it met - a row of them along the top edge, and no
-    room left for the pools at all - which reads as typed-in precisely because
-    it is the most orderly placement available."""
-    spots = [(x, y)
-             for y in range(y_lo, y_hi - h + 2)
-             for x in range(x_lo, x_hi - w + 2)]
-    if rng is not None:
-        rng.shuffle(spots)
-    for x, y in spots:
-        if any((xx, yy) in taken
-               for yy in range(y - 1, y + h + 1)
-               for xx in range(x - 1, x + w + 1)):
-            continue
-        if all(g[yy][xx] == "."
-               for yy in range(y, y + h)
-               for xx in range(x, x + w)):
-            for yy in range(y - 1, y + h + 1):
-                for xx in range(x - 1, x + w + 1):
-                    taken.add((xx, yy))
-            return x, y
-    return None
-
-
-def canopy(g, x0, y0, x1, y1):
-    """A mass of forest trees.
-
-    Three rules, all read off ViridianForest's own map.bin, all asserted by
-    check() because breaking one shows up as a mangled canopy rather than as an
-    error:
-
-      3 wide     a crown spans three tiles, and every mass sits on the same
-                 3-column grid, so masses that merge share their crowns.
-      odd tall   a column is crown + (upper,lower) x n + trunk + shadow. The
-                 crown is one whole crown and each pair is another, so the row
-                 count is always odd. An even mass leaves half a crown stranded
-                 above the trunk - the first draft of this map was even
-                 throughout and every mass had one sliced row near its foot.
-      >= 3       crown, trunk, shadow is the shortest tree there is.
-
-    Heights are measured on the *merged* run, not on one call, so a mass that
-    butts into the border is odd counted from the top of the border."""
-    rect(g, "F", x0, y0, x1, y1)
-
-
 def shore(g):
     """Every tile of open ground under water becomes the shore.
 
@@ -1639,157 +1477,6 @@ def shore(g):
         for x in range(len(g[0])):
             if g[y][x] in ".,f" and g[y - 1][x] == "w":
                 g[y][x] = "b"
-
-
-def overhang(g):
-    """Plain grass directly above a canopy becomes the overhang you walk behind.
-
-    Viridian Forest finishes a mass either with a solid crown or with this: one
-    walkable row whose canopy is drawn on the layer above the player, so a
-    trainer passing along it goes behind the tree top. Run last, over open grass
-    only, which is what keeps it honest - a mass butting against another mass,
-    a clearing or a field keeps its solid crown instead, and no tile ever ends
-    up drawing grass where sand belongs. Walkability is untouched either way:
-    every tile this converts was already open ground."""
-    for y in range(len(g) - 1):
-        for x in range(len(g[0])):
-            if g[y][x] == "." and g[y + 1][x] == "F":
-                g[y][x] = "c"
-
-
-def deep_woods():
-    """Deep Woods: four times the forest, after Viridian Forest.
-
-    The opposite composition to Tall Grass. A route is an open field with a path
-    threading through it; a forest is the other way round - the trees are the
-    terrain and the walkable part is what is left between them. Counting
-    ViridianForest's own map.bin: tall grass is 20% of the whole floor, laid in
-    solid rectangles, corridors between masses run two to four tiles wide, and
-    sand appears as open clearings rather than as a path.
-
-    72x90, of which 66x80 is playable.
-
-    THE MAZE IS GENERATED, AND THE PARITY IS WHY. A canopy column is
-    `crown + (midA, midB) x n + trunk + shadow` and so is ALWAYS an odd number
-    of rows; even leaves half a crown stranded, which check() refuses. At
-    fourteen hand-listed walls that was a comment per wall counting the run it
-    forms once the border is merged in. At thirty it is a mistake waiting to
-    happen, so the walls are laid by a rule that cannot get it wrong: a comb,
-    alternately hanging off the top border and the bottom one, with every run
-    worked out from H rather than typed.
-
-    A comb is also the right SHAPE for a forest - it is one corridor that
-    doubles back on itself the length of the map, which is what makes Viridian
-    Forest feel like somewhere you get lost rather than a grid of blocks."""
-    # H IS ODD, and that is not a rounding choice: the left and right borders
-    # are canopy columns the full height of the map, so H itself has to be an
-    # odd run or the frame stalls the build before anything else is drawn.
-    W, H = 72, 89
-    g = [["." for _ in range(W)] for _ in range(H)]
-
-    # --- the frame -------------------------------------------------------
-    # Five deep, so an edge with nothing hanging off it still reads as two rows
-    # of trees over a trunk: crown, upper, lower, trunk, shadow.
-    canopy(g, 0, 0, W - 1, 4)
-    canopy(g, 0, H - 5, W - 1, H - 1)
-    canopy(g, 0, 0, 2, H - 1)
-    canopy(g, W - 3, 0, W - 1, H - 1)
-
-    # --- the canopy, generated and tested --------------------------------
-    # THE COMB IS GONE, and it was the map's real problem rather than a style
-    # of it. A comb is ONE serpentine corridor: every lane doubles back into the
-    # next, so getting back to where you came in meant walking the whole map in
-    # reverse, and a wrong turn deep in it cost the entire run back. Reported
-    # from play as not being able to go back at all.
-    #
-    # Three hand-patched through-corridors were tried and all three reverted -
-    # each either sealed a few hundred tiles into pockets you could see and
-    # never reach, or measured `open 0.67` against a real forest's 0.32-0.43.
-    # The comb was load-bearing for the parity and for connectivity at once, so
-    # cutting it needed both to be rebuilt rather than patched.
-    #
-    # Measured, against the comb it replaces and the two real forests:
-    #
-    #                   comb    generated   Viridian   Berry
-    #   stripe          0.32      0.78        0.822    1.025
-    #   turns           0.03      0.074       0.077    0.168
-    #   tight           0.44      0.379       0.426    0.653
-    #   open            0.54      0.456       0.429    0.321
-    #
-    # The comb read as vertical banding, which is what `stripe 0.32` says and
-    # what a comb is. Everything now sits within a whisker of ViridianForest,
-    # and the floor is connected BY CONSTRUCTION - see `forest_masses`.
-    masses, seed, sc, met = best_forest(W, H, tries=200)
-    for x0, y0, x1, y1 in masses:
-        canopy(g, x0, y0, x1, y1)
-
-    # --- clearings and pools, searched for -------------------------------
-    # Corridors are three wide, so a clearing does not fit in one: these go in
-    # the wider gaps the lattice leaves where a cell was skipped or a mass came
-    # up short. `open_rect` finds them; nothing here is a typed coordinate.
-    taken = set()
-    place = random.Random(seed)
-    # POOLS FIRST, because they need the taller gap and there are only two of
-    # them: run after five clearings they never found room at all.
-    for _ in range(2):
-        at = open_rect(g, 6, 6, taken, 4, 6, W - 5, H - 7, place)
-        if at:
-            x0, y0 = at
-            rect(g, "w", x0, y0, x0 + 5, y0 + 4)
-            rect(g, "b", x0, y0 + 5, x0 + 5, y0 + 5)
-
-    for _ in range(5):
-        at = open_rect(g, 6, 5, taken, 4, 6, W - 5, H - 7, place)
-        if at:
-            rect(g, "#", at[0], at[1], at[0] + 5, at[1] + 4)
-
-    # --- tall grass: solid rectangles over whatever floor is left --------
-    # A fifth of Viridian Forest's floor is tall grass. Painted with the guard
-    # so a field can never eat a clearing or the pond it runs up against.
-    # These use the guard, so they can be laid over anything and will only take
-    # the floor - a field can never eat a clearing, a pond or a tooth.
-    for x0, y0, x1, y1 in (
-            (9, 6, 11, 24), (15, 18, 20, 30), (24, 6, 26, 20),
-            (30, 30, 35, 44), (39, 8, 41, 22), (45, 20, 50, 34),
-            (54, 6, 56, 24), (60, 10, 66, 24), (3, 20, 5, 40),
-            (9, 38, 11, 56), (15, 54, 20, 68), (24, 50, 26, 70),
-            (30, 70, 35, 82), (39, 34, 41, 52), (45, 76, 50, 82),
-            (54, 30, 56, 50), (60, 42, 66, 60), (3, 60, 5, 80),
-            (24, 24, 26, 36), (39, 58, 41, 76),
-    ):
-        onto_grass(g, ",", x0, y0, x1, y1)
-
-    # --- ledges, where a corridor doubles back ---------------------------
-    # Searched rather than placed - see `ledge_in`. A forest corridor is three
-    # wide, so most rows have nowhere to put one; the ones that do are the
-    # corners where the comb turns back, which is exactly where a shortcut
-    # belongs.
-    for row in range(14, H - 10, 8):
-        ledge_in(g, row, 3, W - 4, most=8)
-
-    repair_trees(g, W, H, ".")
-
-    # The walkable fringe you pass behind, run LAST and over open grass only -
-    # a mass butting a clearing or a field keeps its solid crown. Dropping this
-    # in the rewrite cost the forest the one thing that makes its canopy read as
-    # canopy rather than as wall, and check.mjs said so: "nothing to walk
-    # behind".
-    overhang(g)
-
-    # SEARCHED, like everything else on a map this size. The comb's teeth are
-    # derived from H, so which tile is floor near the bottom edge is a
-    # consequence of that arithmetic rather than something to read off a
-    # drawing - and a spawn typed in by hand landed inside a trunk.
-    spawn = None
-    for y in range(H - 6, 5, -1):
-        for x in range(4, W - 4):
-            if g[y][x] not in SOLID and g[y - 1][x] not in SOLID:
-                spawn = (x, y)
-                break
-        if spawn:
-            break
-    assert spawn, "woods: nowhere to stand"
-    return ["".join(r) for r in g], spawn
 
 
 def pier(g, x0, y0, x1, y1):
@@ -3121,6 +2808,14 @@ MB_WATER = frozenset((0x10, 0x11, 0x12, 0x13, 0x14, 0x15))   # pond .. ocean, wa
 MB_GRASS = frozenset((0x02, 0x03, 0x09))                     # tall and long grass
 MB_SAND = frozenset((0x06, 0x21))                            # deep sand, sand cave
 MB_JUMP_SOUTH = 0x3B
+# Read off pokeemerald's metatile_behaviors.h, not recalled: MB_ISOLATED_
+# VERTICAL_RAIL 211, _HORIZONTAL 212, MB_VERTICAL_RAIL 213, _HORIZONTAL 214.
+# The first version typed these two off by two and turned most of Route 119's
+# rails into floor or wall - the render looked right and the map was not.
+MB_RAIL_V = frozenset((0xD3, 0xD5))    # isolated / continuing vertical rail
+MB_RAIL_H = frozenset((0xD4, 0xD6))    # isolated / continuing horizontal rail
+MB_LONG_GRASS = frozenset((0x03, 0x09))    # long grass, and its south edge
+MB_BRIDGE = frozenset((0x70,))             # a bridge over ocean water
 
 
 def safari_zone():
@@ -3179,6 +2874,10 @@ def safari_zone():
                     b = behave(i)
                     if b in MB_WATER:
                         ch = "w"           # solid on foot, and a rod or Surf reaches it
+                    elif b in MB_RAIL_V:
+                        ch = "|"           # an Acro Bike rail - was floor or wall
+                    elif b in MB_RAIL_H:
+                        ch = "-"
                     elif b == MB_JUMP_SOUTH:
                         ch = "L"
                     elif int(col[y][x]):
@@ -3253,6 +2952,164 @@ def safari_zone():
     return (["".join(r) for r in g], spawn,
             [i for row in tiles for i in row], GB)
 
+
+
+# ----------------------------------------------------------- Monsoon Trail
+
+MONSOON_DOOR = (6, 32)      # the Weather Institute - the first door to another map
+MONSOON_HOUSE = (33, 109)   # a house with nothing behind it: sealed, art kept
+
+
+def monsoon_trail():
+    """Monsoon Trail is Emerald's Route 119, cell for cell: 40x140 of river
+    valley, long grass, two waterfalls and the Weather Institute.
+
+    THE FIRST CONNECTED MAP. The institute's door is a real door now - it opens
+    onto the Pokemon Mansion, and the Mansion's front door opens back onto the
+    tile below it. Emerald's institute is its own interior; ours is the
+    Mansion, which is a deliberate substitution rather than a copy, and the
+    pairing lives in `DOOR_PAIRS` so neither map has to know the other.
+
+    It opens onto Route 118 and Fortree City, which we do not have, so the
+    outer ring is the layout's own border block, as the Safari Zone's is.
+    Rails are Acro Bike rails - see `RAIL`. Long grass is `g`: it hides the
+    trainer's feet and rustles, which is the renderer's business."""
+    import numpy as np
+    import build_assets as BA
+
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    M = meta["monsoon"]
+    GB, FB, SPLIT = M["general"], M["fortree"], M["split"]
+    rebase = lambda i: (GB + i) if i < SPLIT else (FB + i - SPLIT)
+
+    layouts = json.load(io.open(
+        BA.fetch("data/layouts/layouts.json", "em/layouts.json", root=BA.EMERALD),
+        encoding="utf-8"))["layouts"]
+    lay = next(q for q in layouts if q["name"] == "Route119_Layout")
+    W, H = lay["width"], lay["height"]
+    assert (W, H) == (40, 140), f"monsoon: Route 119 is {W}x{H}, not 40x140"
+    raw = np.frombuffer(io.open(BA.fetch(
+        lay["blockdata_filepath"], "em/Route119.bin", root=BA.EMERALD), "rb").read(),
+        dtype="<u2")[:W * H]
+    ids = (raw & 0x3FF).reshape(H, W)
+    col = ((raw >> 10) & 3).reshape(H, W)
+    attr = {
+        False: np.frombuffer(io.open(BA.fetch(
+            "data/tilesets/primary/general/metatile_attributes.bin",
+            "em/general/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+        True: np.frombuffer(io.open(BA.fetch(
+            "data/tilesets/secondary/fortree/metatile_attributes.bin",
+            "em/fortree/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+    }
+    behave = lambda i: int(attr[i >= SPLIT][i if i < SPLIT else i - SPLIT] & 0x1FF)
+    border = [int(v) & 0x3FF for v in np.frombuffer(io.open(BA.fetch(
+        lay["border_filepath"], "em/route119_border.bin", root=BA.EMERALD), "rb").read(),
+        dtype="<u2")]
+    assert len(border) == 4, "monsoon: the border block is not 2x2"
+
+    g = [[None] * W for _ in range(H)]
+    tiles = [[-1] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            i = int(ids[y][x])
+            b = behave(i)
+            if b in MB_WATER:
+                ch = "w"
+            elif b in MB_RAIL_V:
+                ch = "|"
+            elif b in MB_RAIL_H:
+                ch = "-"
+            elif b == MB_JUMP_SOUTH:
+                ch = "L"
+            elif b in MB_BRIDGE:
+                ch = "N"           # walkable planks over the river
+            elif int(col[y][x]):
+                ch = "T"
+            elif b in MB_LONG_GRASS:
+                ch = "g"
+            elif b in MB_GRASS:
+                ch = ","
+            elif b in MB_SAND:
+                ch = "#"
+            else:
+                ch = "."
+            g[y][x] = ch
+            tiles[y][x] = rebase(i)
+
+    dx, dy = MONSOON_DOOR
+    assert g[dy][dx] not in SOLID and g[dy + 1][dx] not in SOLID, \
+        "monsoon: the Weather Institute door or the tile below it is not walkable"
+    g[dy][dx] = "l"                        # the door - see DOOR_PAIRS
+    hx, hy = MONSOON_HOUSE
+    g[hy][hx] = "T"                        # nothing behind it; keeps its art
+
+    for x in range(W):
+        for y in (0, H - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+    for y in range(H):
+        for x in (0, W - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+
+    seal_hidden(g, tiles, "T")
+
+    # The way in is from Route 118, at the south - the foot of the largest piece.
+    seen_any, best = set(), []
+    for y in range(H):
+        for x in range(W):
+            if g[y][x] in SOLID or (x, y) in seen_any:
+                continue
+            stack, cells = [(x, y)], []
+            while stack:
+                cx, cy = stack.pop()
+                if (not (0 <= cx < W and 0 <= cy < H) or (cx, cy) in seen_any
+                        or g[cy][cx] in SOLID):
+                    continue
+                seen_any.add((cx, cy))
+                cells.append((cx, cy))
+                stack += [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
+            if len(cells) > len(best):
+                best = cells
+    assert best, "monsoon: nowhere to stand"
+    bottom = max(y for _x, y in best)
+    xs = sorted(x for x, y in best if y == bottom)
+    spawn = (xs[len(xs) // 2], bottom)
+
+    # THE CULL AND THE LANDING RULE RUN TO A FIXED POINT, as Cinderpeak's do:
+    # a ledge whose landing is solid is a terrace wall (`land_ledges`), and
+    # turning one to rock can cut off what was behind it. Both only turn
+    # ground into rock, so the pair shrinks and stops.
+    while True:
+        # WALKING AND RIDING: the northwest lake, its rails and the land round
+        # them are reached by Surf in Emerald, and a walk-only fill culled all
+        # of it to wall. So water is crossed too - onto it, along it, off it -
+        # exactly as Frost Hollow's fill counts its lake.
+        seen, stack = set(), [spawn]
+        while stack:
+            x, y = stack.pop()
+            if (x, y) in seen:
+                continue
+            seen.add((x, y))
+            stack += walk_steps(g, x, y)
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < W and 0 <= ny < H and (g[ny][nx] == "w" or
+                        (g[y][x] == "w" and g[ny][nx] not in SOLID)):
+                    stack.append((nx, ny))
+        cut = 0
+        for y in range(H):
+            for x in range(W):
+                if g[y][x] not in SOLID and (x, y) not in seen:
+                    g[y][x] = "T"      # solid, and still the tile Emerald drew
+                    cut += 1
+        if not cut and not land_ledges(g, "T"):
+            break
+    assert g[dy][dx] == "l", "monsoon: the Weather Institute door is cut off"
+
+    rows = ["".join(r) for r in g]
+    return (rows, spawn, [i for row in tiles for i in row], GB, None,
+            {"door": MONSOON_DOOR, "arrive": (dx, dy + 1)})
 
 
 # -------------------------------------------------------------- Cinderpeak
@@ -3721,9 +3578,19 @@ def mansion():
           % (opened, len(seen),
              sum(1 for r in g for c in r if c not in SOLID) + 0))
 
+    # THE FRONT DOOR LEADS SOMEWHERE NOW - Monsoon Trail, see DOOR_PAIRS.
+    # You arrive on the tile inside it, so walking back onto it is leaving.
+    arrive = (spawn[0], spawn[1] - 1)
+    assert g[arrive[1]][arrive[0]] not in SOLID, "mansion: nothing to stand on inside the door"
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], PB, warps)
+            [i for row in tiles for i in row], PB, warps,
+            {"door": spawn, "arrive": arrive})
 
+
+# DOORS BETWEEN MAPS, as pairs of area ids. Each builder reports its own door
+# tile and the tile you arrive on when you come through it; walking onto one
+# map's door puts you on the other's arrival tile. One pair today.
+DOOR_PAIRS = [("woods", "mansion")]
 
 if __name__ == "__main__":
     out = []
@@ -3733,11 +3600,21 @@ if __name__ == "__main__":
         tiles, base = (made[2], made[3]) if len(made) > 2 else (None, None)
         # A map with more than one floor carries the ladders that join them.
         warps = made[4] if len(made) > 4 else None
+        spec["door"] = made[5] if len(made) > 5 else None
         spec["w"], spec["h"] = len(rows[0]), len(rows)
         got, total = check(spec, rows, spawn, tiles, warps)
         out.append((spec, rows, spawn, tiles, base, warps))
         print("  %-9s %2dx%-2d  spawn %2d,%-2d  %3d of %3d walkable reachable"
               % (spec["id"], spec["w"], spec["h"], spawn[0], spawn[1], got, total))
+
+    doors = {}
+    by = {spec["id"]: spec for spec, *_rest in out}
+    for a, b in DOOR_PAIRS:
+        da, db = by[a]["door"], by[b]["door"]
+        assert da and db, f"door pair {a}/{b}: a map reports no door"
+        doors.setdefault(a, []).append([*da["door"], b, *db["arrive"]])
+        doors.setdefault(b, []).append([*db["door"], a, *da["arrive"]])
+        print("   door    %s %s <-> %s %s" % (a, da["door"], b, db["door"]))
 
     body = ["/* GENERATED by tools/build_map.py - edit the area specs there. */\n",
             "export const AREAS = {"]
@@ -3764,6 +3641,12 @@ if __name__ == "__main__":
             # rows saying the same thing is two places for it to disagree.
             body.append("    warps: [")
             body += ["      [%d, %d, %d, %d]," % tuple(w) for w in warps]
+            body.append("    ],")
+        if spec["id"] in doors:
+            # DOORS TO ANOTHER MAP: [x, y, area, arriveX, arriveY].
+            body.append("    doors: [")
+            body += ["      [%d, %d, %s, %d, %d]," % (d[0], d[1], json.dumps(d[2]), d[3], d[4])
+                     for d in doors[spec["id"]]]
             body.append("    ],")
         body.append("  },")
     body.append("};\n")

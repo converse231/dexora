@@ -5,7 +5,7 @@
 
 import { SPECIES } from "../data/dex.js";
 import {
-  AREAS, AREA_IDS, areaOf, walkable, rideable, SURFABLE, label, LEDGE, MINI, MINI_UNKNOWN,
+  AREAS, AREA_IDS, areaOf, walkable, rideable, SURFABLE, label, LEDGE, RAIL, MINI, MINI_UNKNOWN,
 } from "./map.js";
 import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
@@ -19,7 +19,7 @@ import {
   pricedAt, valuedAt, xpScale, freePoints,
 } from "./trainer.js";
 import {
-  TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame,
+  TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame, drawGrass,
 } from "./tileset.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
@@ -35,7 +35,7 @@ import {
   evolveState, evoLevel, startingState, dexBonus, catchBounty, levelReward,
   evolutionRow, bestRod, holding, canRun, canSurf, KEY_ITEMS,
   fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
-  stepReward, keeper, alphaCandy,
+  stepReward, keeper, alphaCandy, canBike,
 } from "./items.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
    that froze every catch in the game. `createEngine` has its own
@@ -665,6 +665,11 @@ export function createEngine(canvas, onChange, mini = null) {
     return m;
   };
   let warps = warpMap(areaOf(state.areaId));
+  /* DOORS TO ANOTHER MAP, keyed like the ladders: [area, arriveX, arriveY].
+     Monsoon Trail's Weather Institute and the Mansion's front door today. */
+  const doorMap = (area) =>
+    new Map((area.doors ?? []).map(([x, y, to, ax, ay]) => [`${x},${y}`, [to, ax, ay]]));
+  let doors = doorMap(areaOf(state.areaId));
   const at = (x, y) => (rows[y] ? rows[y][x] ?? "" : "");
 
   // How many pixels a tile the minimap is drawing at - see `miniScale`.
@@ -909,6 +914,14 @@ export function createEngine(canvas, onChange, mini = null) {
 
   // ------------------------------------------------------------ movement
 
+  /* THE GRASS YOU WALK THROUGH. Stepping into tall (`,`) or long (`g`) grass
+     starts a rustle on that tile - frames in the order Gen 3 plays them, ending
+     on the rest frame - and the rest frame then stays over your feet while you
+     stand there. Drawing state only: never saved, and nothing reads it. */
+  const GRASS = { ",": { kind: 0, seq: [1, 2, 3, 4, 0], ms: 110 },
+                  g: { kind: 1, seq: [1, 2, 3, 0], ms: 90 } };
+  let grassFx = [];
+
   function tryStep(dir) {
     const p = state.player;
     p.dir = dir;
@@ -932,6 +945,10 @@ export function createEngine(canvas, onChange, mini = null) {
        where you ARE rather than what you hold - the permission was checked
        when you mounted and cannot have changed since. */
     const riding = rideable(rows, p.x, p.y);
+    /* A RAIL IS BIKE-ONLY GROUND: never on foot, any direction on the Acro
+       Bike. Like surfing, the ride is where you stand, so nothing is saved -
+       and stepping off a rail is always allowed, as stepping ashore is. */
+    if (RAIL[at(nx, ny)] && !canBike(levelFromXp(state.xp), state.bag)) return;
     if (hop) { nx += dx; ny += dy; }
     else if (!walkable(rows, nx, ny) && !(riding && rideable(rows, nx, ny))) return;
 
@@ -948,6 +965,8 @@ export function createEngine(canvas, onChange, mini = null) {
     move.leap = riding && !rideable(rows, nx, ny);
     p.x = nx;
     p.y = ny;
+    const grass = GRASS[at(nx, ny)];
+    if (grass) grassFx.push({ x: nx, y: ny, g: grass, start: move.startedAt });
   }
 
   /* ROLLING OVER IS A READ, NOT A TIMER. Asked whenever anything might advance
@@ -1085,6 +1104,16 @@ export function createEngine(canvas, onChange, mini = null) {
     /* Every tile in an area belongs to that area's biome, and standing on a
        tile already proves it is walkable, so there is nothing left to test -
        anywhere you can put your feet, something can appear. */
+    /* A DOOR TAKES YOU THROUGH, late in the step so the step still counts -
+       parcels, effects and the rift clock all ticked above - and before the
+       encounter roll, because nothing jumps out on a doormat. */
+    const door = doors.get(`${state.player.x},${state.player.y}`);
+    if (door) {
+      enterDoor(door);
+      save();
+      changed();
+      return;
+    }
     const biome = biomeFor(state.areaId);
     /* WHAT LIVES IN WHAT YOU ARE RIDING, and neither half needed a new table.
 
@@ -1183,7 +1212,15 @@ export function createEngine(canvas, onChange, mini = null) {
     }
   }
 
-  function travel(areaId) {
+  /* Through a door, or told why not: a door to a map your level has not
+     opened stays shut, and says so rather than being a tile that does nothing. */
+  function enterDoor([to, x, y]) {
+    if (travel(to, { x, y })) return;
+    state.worn.push({ id: "door", event: true, title: AREAS[to]?.name ?? "Locked",
+      sub: `Opens at Lv ${BIOMES.find((b) => b.id === to)?.level ?? "?"}`, n: ++wornSeq });
+  }
+
+  function travel(areaId, arrive = null) {
     if (!AREAS[areaId] || state.encounter || state.evolution) return false;
     // The gate, enforced where the move actually happens rather than only in
     // the panel that offers it.
@@ -1195,11 +1232,13 @@ export function createEngine(canvas, onChange, mini = null) {
     rows = areaOf(areaId).rows;
     fixed = areaOf(areaId).tiles ?? null;
     warps = warpMap(areaOf(areaId));
+    doors = doorMap(areaOf(areaId));
     MAP_W = rows[0].length;
     MAP_H = rows.length;
     bakeMini();
-    const spawn = areaOf(areaId).spawn;
-    state.player = { ...spawn, dir: "down" };
+    // Through a door you arrive on its far side, still facing the way you walked.
+    const spawn = arrive ?? areaOf(areaId).spawn;
+    state.player = { ...spawn, dir: arrive ? state.player.dir : "down" };
     move.active = false;
     move.fromX = spawn.x;
     move.fromY = spawn.y;
@@ -1963,6 +2002,7 @@ export function createEngine(canvas, onChange, mini = null) {
            thing here that would look like a bug rather than a feature. */
         set: airborne ? "jump"
           : surfing() ? "surf"
+          : RAIL[at(p.x, p.y)] ? "bike"
           : cast ? "fish"
           : state.running && move.active ? "run" : "walk",
         frame: cast ? fishFrame(p.dir, cast.phase) : undefined,
@@ -1971,6 +2011,27 @@ export function createEngine(canvas, onChange, mini = null) {
         char: state.char,
       },
     );
+
+    /* Over the trainer, under the tree tops. A finished rustle stays only on
+       the tile you are standing on, as its rest frame; the rest drop out. A
+       save that loads you standing in grass has no rustle, so the rest frame is
+       drawn for the tile you are on whatever the list says. */
+    if (art.grass) {
+      grassFx = grassFx.filter((f) => now - f.start < f.g.seq.length * f.g.ms
+        || (f.x === p.x && f.y === p.y));
+      let underfoot = false;
+      for (const f of grassFx) {
+        const i = Math.floor((now - f.start) / f.g.ms);
+        const here = f.x === p.x && f.y === p.y;
+        underfoot ||= here;
+        drawGrass(ctx, art.grass, Math.round(f.x * TILE - camX), Math.round(f.y * TILE - camY),
+          f.g.kind, i < f.g.seq.length ? f.g.seq[i] : 0);
+      }
+      const g = GRASS[at(p.x, p.y)];
+      if (g && !underfoot && !move.active) {
+        drawGrass(ctx, art.grass, Math.round(p.x * TILE - camX), Math.round(p.y * TILE - camY), g.kind, 0);
+      }
+    }
 
     drawBobber(ctx, state.fishing, now, camX, camY);
 

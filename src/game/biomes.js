@@ -1001,12 +1001,19 @@ const RESIDENTS = [
     id: "woods",
     water: true,
     level: 3,  // the second map, and early enough that the ladder is visible
-    name: "Deep Woods",
+    /* MONSOON TRAIL - Emerald's Route 119 in Deep Woods' slot. The cast is
+       BLENDED, as asked: Deep Woods' bug, grass and poison stay, with its
+       `types`, so no legendary loses its home; and the route's own natives join
+       them - Zigzagoon in the long grass, Tropius and Kecleon, and Feebas, the
+       fish Route 119 is famous for, now that this map has a river. Every other
+       generation arrives by type through the fit, as on every map. */
+    name: "Monsoon Trail",
     types: ["bug", "grass", "poison"],
     table: [
       [10, 16], [13, 16], [11, 9], [14, 9], [46, 10], [48, 10], [23, 8],
       [43, 8], [69, 8], [1, 8], [92, 6], [63, 6], [102, 5], [114, 2],
       [123, 1], [127, 1],
+      [263, 10], [357, 4], [352, 4], [349, 2],
     ],
   },
   {

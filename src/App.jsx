@@ -628,12 +628,12 @@ export default function App({
             {worn && (
               <div className="fieldbox worn" role="status" key={worn.n}>
                 <span>
-                  {worn.event
+                  {worn.title ? null : worn.event
                     ? <img src={eventIcon(worn.id)} alt="" />
                     : <ItemIcon item={fieldById(worn.id)} />}
                   <u>
-                    <b>{worn.event ? EVENT_NAME[worn.id] ?? "Event" : fieldById(worn.id)?.name ?? "Effect"}</b>
-                    <i>{worn.event ? "IS OVER" : "WORE OFF"}</i>
+                    <b>{worn.title ?? (worn.event ? EVENT_NAME[worn.id] ?? "Event" : fieldById(worn.id)?.name ?? "Effect")}</b>
+                    <i>{worn.sub ?? (worn.event ? "IS OVER" : "WORE OFF")}</i>
                   </u>
                 </span>
               </div>
