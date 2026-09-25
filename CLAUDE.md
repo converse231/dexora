@@ -439,6 +439,19 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `overflow: hidden` - a clipping grid item has min-height 0 and the grid
   squeezes it - and dialog-scoped headings need `.evcard` in front to beat
   `.hp-body h4`.
+- **Trading is designed in docs/trading.md** - change a decision there first.
+  A Pokémon that enters trading gets a server row (`mons`) and moves only
+  through `db/trading.sql`'s functions, one locked transaction each. The save
+  trigger strips a `mid` someone else owns, keeps an unknown one, completes a
+  delivery when it is saved, and never fails an upload. What the server says
+  reaches the engine through ONE call, `reconcileTrades`; locks (`lock` on a
+  box entry) are enforced in the engine; a trade fills the dex only (`gifted`
+  is excluded from every reward, and tier rows ignore `traded` entries).
+  `trade.js` LIMITS equal the SQL's `trade_limit()` (asserted). `npm run
+  tradedb` tests the SQL against the TEST project and refuses the live one.
+  Trainer cards are written by triggers and `update_card` only (the showcase
+  is read off the STORED save, so flush first); the Trade Center is a lazy
+  chunk; `net/cloud.js` answers `closed` when the server has no trading yet.
 - **Monsoon Trail is Emerald's Route 119** in Deep Woods' slot (id `woods`),
   transcribed like the Safari Zone against Emerald General + `fortree`
   (appended last in `EM_SECONDARY`). Long grass is laid as tall; rails are `-` and `|`

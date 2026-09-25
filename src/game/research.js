@@ -64,6 +64,8 @@ export const TASKS = [
   { id: "alpha", label: "Catch an alpha", steps: [1], points: 20, when: canBeAlpha, bonus: true },
   { id: "legend", label: "Catch one", steps: [1], points: 10, when: isLegendary },
   { id: "hundred", label: "Raise one to Lv 100", steps: [1], points: 10, when: isLegendary },
+  // A bonus: trading is never required to finish anything (docs/trading.md).
+  { id: "trade", label: "Get one in a trade", steps: [1], points: 10, bonus: true },
 ];
 export const HUNDRED = 100;
 const SLOT = Object.fromEntries(TASKS.map((t, i) => [t.id, i]));

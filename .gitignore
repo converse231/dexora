@@ -31,3 +31,6 @@ _*.py
 # Local Supabase credentials - never committed. See .env.example.
 .env
 .env.local
+
+# The trading test project's keys (docs/trading.md) - never committed.
+.env.test

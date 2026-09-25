@@ -30,6 +30,7 @@ import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
   starCost, starKeeps, HUNDRED,
 } from "./research.js";
+import { cleanTradeFields } from "./trade.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt } from "./medals.js";
@@ -180,6 +181,7 @@ function freshState() {
     outbreak: null,       // today's mass outbreak, frozen at first sight - see events.js
     research: {},         // per-species research counters, keyed by DEX ID - see research.js
     stars: [],            // dex ids whose finished research was starred - see `star`
+    gifted: [],           // dex ids registered only by a trade - see `reconcileTrades`
     rift: null,           // an open space-time rift, `{ areaId, left }` - see events.js
     sinceTravel: 0,       // steps since the map last changed, which is what opens a rift
     /* One quest a day. `key` is the local date it belongs to, so a new day is
@@ -285,6 +287,9 @@ export function repairDex(dex, s, tiers = s) {
     /* A BOX ENTRY WEARING A TIER PROVES THE TIER, so its row is set too - only
        ever raised. A row that lost it (a save from before the row existed, a
        hand edit) would otherwise show a tier you hold as one never found. */
+    /* A TRADED ONE PROVES THE DEX AND NOTHING ELSE (docs/trading.md): a tier
+       row is a mark of your own play, and the rosette is built from them. */
+    if (mon.traded) continue;
     for (const tier of TIERS) if (mon[tier] && Array.isArray(tiers?.[tier])) tiers[tier][at] = 1;
   }
   /* THE ROWS, NOT THE SAVE. `tiers` is what `loadState` has already rebuilt -
@@ -484,7 +489,7 @@ function loadState() {
     const box = pool.filter(sound).map((m) => {
       if (!seen.has(m.uid)) { seen.add(m.uid); return m; }
       return { ...m, uid: nextUid++ };
-    });
+    }).map(cleanTradeFields);
 
     const fresh = freshState();
     const loaded = {
@@ -559,6 +564,8 @@ function loadState() {
       // Real species, once each; anything else is dropped, never the list.
       stars: [...new Set(Array.isArray(s.stars) ? s.stars : [])]
         .filter((id) => Number.isInteger(id) && speciesById(id)),
+      gifted: [...new Set(Array.isArray(s.gifted) ? s.gifted : [])]
+        .filter((id) => Number.isInteger(id) && speciesById(id)),
       /* A save from before `paid` existed was paid for every level it had
          reached, and never past the old cap of 50 - so that is where it
          stands, and anything above is owed. Never above its own level, so no
@@ -595,6 +602,8 @@ function loadState() {
     for (const id of LEGENDARY) {
       if (loaded.dex[dexIndex(id)] === 2) loaded.research[id] = bump(loaded.research[id], ["legend"]);
     }
+    // A gift is a dex entry: one the dex does not hold as caught is not a gift.
+    loaded.gifted = loaded.gifted.filter((id) => loaded.dex[dexIndex(id)] === 2);
     return [loaded, null];
   } catch {
     keep(mine(BROKEN_KEY), raw);
@@ -1718,10 +1727,19 @@ export function createEngine(canvas, onChange, mini = null) {
      which pays MORE the fuller the dex is - so it has to be the same number
      in both places or the bonus climbs on a different curve from the one the
      milestones are celebrating. */
-  const caughtSpecies = () => state.dex.reduce((n, v) => n + (v === 2 ? 1 : 0), 0);
+  /* YOUR OWN CATCHES, for every reward: a species registered by a trade fills
+     the Pokédex but not a medal, a milestone or the dex bonus (docs/trading.md).
+     The Pokédex display reads `state.dex` directly and counts it. */
+  const ownDex = () => {
+    if (!state.gifted.length) return state.dex;
+    const d = [...state.dex];
+    for (const id of state.gifted) d[dexIndex(id)] = 1;
+    return d;
+  };
+  const caughtSpecies = () => ownDex().reduce((n, v) => n + (v === 2 ? 1 : 0), 0);
 
   function checkDexRewards(speciesId) {
-    for (const medal of medalsFor(speciesId, state.dex, state.medals)) {
+    for (const medal of medalsFor(speciesId, ownDex(), state.medals)) {
       state.medals.push(medal.id);
       pay(medal.money, medal.items, {
         kind: "medal", title: medal.name, sub: medal.sub,
@@ -1787,7 +1805,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!sp || state.evolution || state.stars.includes(id)) return false;
     if (researchLevel(id, state.research[id]) < RESEARCH_MAX) return false;
     const cost = starCost(id);
-    const give = state.box.filter((m) => m.species === id && !keeper(m))
+    const give = state.box.filter((m) => m.species === id && !keeper(m) && !m.lock)
       .sort((a, b) => a.level - b.level || a.uid - b.uid)
       .slice(0, cost);
     // A legendary's star never spends the last one you hold (`starKeeps`).
@@ -1858,7 +1876,10 @@ export function createEngine(canvas, onChange, mini = null) {
 
     if (phase === "caught") {
       const at = dexIndex(e.speciesId);
-      e.isNew = state.dex[at] !== 2;
+      /* A GIFT BECOMES YOURS the first time you catch one: that is a new
+         species for every reward, and the gift mark goes. */
+      e.isNew = state.dex[at] !== 2 || state.gifted.includes(e.speciesId);
+      state.gifted = state.gifted.filter((id) => id !== e.speciesId);
       state.dex[at] = 2;
       noteDaily({ species: speciesById(e.speciesId) });
       state.caught++;
@@ -2281,7 +2302,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (state.encounter || state.evolution) return null;
 
     const mon = state.box.find((m) => m.uid === uid);
-    if (!mon) return null;
+    if (!mon || mon.lock) return null;         // held by a trade - see trade.js
     const row = evolutionRow(mon.species, targetId);
     if (!row) return null;
     const st = evolveState(mon, state.bag, row);
@@ -2291,7 +2312,13 @@ export function createEngine(canvas, onChange, mini = null) {
 
     const target = speciesById(targetId);
     const at = dexIndex(targetId);
-    const isNew = state.dex[at] !== 2;
+    /* A TRADED ONE EVOLVES INTO A GIFT: raising someone else's catch is not
+       catching the next form. Your own evolving into a gifted species makes
+       it yours, the same rule as catching one. */
+    const gift = !!mon.traded;
+    const isNew = !gift && (state.dex[at] !== 2 || state.gifted.includes(targetId));
+    if (gift && state.dex[at] !== 2) state.gifted.push(targetId);
+    if (!gift) state.gifted = state.gifted.filter((id) => id !== targetId);
     state.dex[at] = 2;
     /* NO `state.caught++` HERE, and it used to be. That counter renders in the
        top bar under the word CAUGHT, where it means throws that landed - and
@@ -2302,7 +2329,7 @@ export function createEngine(canvas, onChange, mini = null) {
     /* The tier travels with the creature, because it IS the creature - rarest
        first so a hand-edited save carrying two is described by its best. */
     const roll = TIERS.find((t) => mon[t]) ?? null;
-    if (roll) state[roll][at] = 1;
+    if (roll && !gift) state[roll][at] = 1;
 
     /* Mutated in place rather than removed and re-pushed. The uid survives an
        evolution, which is what makes it a Pokemon rather than a slot - and it
@@ -2364,7 +2391,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!wanted.size) return 0;
     let got = 0;
     state.box = state.box.filter((mon) => {
-      if (!wanted.has(mon.uid) || keeper(mon)) return true;
+      if (!wanted.has(mon.uid) || keeper(mon) || mon.lock) return true;
       got += candyValue(speciesById(mon.species));
       return false;
     });
@@ -2385,7 +2412,8 @@ export function createEngine(canvas, onChange, mini = null) {
     // `whole`, because NaN here set the level to NaN - and loadState sends a
     // non-finite level to limbo, so the Pokemon left the Box on the next load.
     const spend = Math.min(whole(n), state.candy);
-    if (!mon || spend < 1) return 0;
+    // A held one is frozen: its level is part of what was offered.
+    if (!mon || mon.lock || spend < 1) return 0;
     state.candy -= spend;
     mon.level += spend;
     if (mon.level >= HUNDRED) study(mon.species, ["hundred"]);
@@ -2500,12 +2528,67 @@ export function createEngine(canvas, onChange, mini = null) {
   }
 
   // Same backstop as `convert` - see the note there.
+  /* WHAT THE SERVER SAYS ABOUT TRADES, applied in one place (docs/trading.md).
+     Every field is optional and every step is idempotent, so the net layer can
+     send the whole truth each time rather than a diff:
+       assign  { uid: mid }   a box entry that entered trading got its server id
+       locks   { mid: lock }  what holds each one now (null frees it)
+       gone    [mid]          traded away - it leaves the box
+       arrived [snapshot]     received - it joins the box as a gift
+     Returns true if anything changed. */
+  function reconcileTrades({ assign = {}, locks = {}, gone = [], arrived = [] } = {}) {
+    let moved = false;
+    for (const mon of state.box) {
+      const mid = assign[mon.uid];
+      if (mid && !mon.mid) { Object.assign(mon, cleanTradeFields({ ...mon, mid })); moved = true; }
+      if (mon.mid && mon.mid in locks) {
+        const next = cleanTradeFields({ ...mon, lock: locks[mon.mid] ?? undefined }).lock;
+        if (next !== mon.lock) { if (next) mon.lock = next; else delete mon.lock; moved = true; }
+      }
+    }
+    const away = new Set(gone);
+    if (away.size) {
+      const before = state.box.length;
+      state.box = state.box.filter((m) => !(m.mid && away.has(m.mid)));
+      moved ||= state.box.length !== before;
+    }
+    for (const a of arrived) {
+      const sp = speciesById(a?.species);
+      // Idempotent by server id: the same delivery twice is one Pokemon.
+      if (!sp || !a.mid || state.box.some((m) => m.mid === a.mid)) continue;
+      const entry = cleanTradeFields({
+        uid: state.nextUid++,
+        species: sp.id,
+        level: Math.max(1, whole(a.level) || 1),
+        size: Number.isFinite(a.size) ? a.size : undefined,
+        ...(TIERS.includes(a.tier) ? { [a.tier]: 1 } : {}),
+        ...(a.alpha ? { alpha: 1 } : {}),
+        mid: a.mid,
+        ot: a.ot,
+        traded: Math.max(1, whole(a.traded) || 1),
+        at: Date.now(),
+      });
+      if (entry.size === undefined) delete entry.size;
+      state.box.push(entry);
+      // It fills the Pokedex - as a gift, which no reward counts.
+      const at = dexIndex(sp.id);
+      if (state.dex[at] !== 2) {
+        state.dex[at] = 2;
+        if (!state.gifted.includes(sp.id)) state.gifted.push(sp.id);
+      }
+      study(sp.id, ["trade"]);
+      moved = true;
+    }
+    if (moved) { save(); changed(); }
+    return moved;
+  }
+
   function sell(uids) {
     const wanted = new Set(uids);
     if (!wanted.size) return 0;
     let earned = 0;
     state.box = state.box.filter((mon) => {
-      if (!wanted.has(mon.uid) || keeper(mon)) return true;
+      if (!wanted.has(mon.uid) || keeper(mon) || mon.lock) return true;
       earned += valueOf(speciesById(mon.species));
       return false;
     });
@@ -2566,6 +2649,7 @@ export function createEngine(canvas, onChange, mini = null) {
     },
     sell,
     star,
+    reconcileTrades,
     convert,
     levelUp,
     spend,
