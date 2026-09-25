@@ -506,7 +506,7 @@ export default function App({
         />
       )}
 
-      {cheer && <Cheer cheer={cheer} onDone={() => engine.dropCheer()} />}
+      {cheer && <Cheer cheer={cheer} onDone={(c) => engine.dropCheer(c)} />}
 
       {/* A TIP, NOT A TUTORIAL - one line, the first time you reach the thing
           it is about, never again. See hints.js for why there is no sequence,

@@ -15,6 +15,8 @@ import { itemById } from "../game/items.js";
 import { TIER_TELL } from "../game/biomes.js";
 
 const HOLD = 3200;
+/* A banner an encounter interrupted after this long has had its moment. */
+const SEEN = 1000;
 /* THE TIER ROWS ARE DERIVED, and they were four hand-written ones. Vivid,
    Noir, Glitched and Showdown all fell through to the `?? "POKEDEX"` below -
    so catching the rarest thing in the game raised a banner with the word for
@@ -45,17 +47,35 @@ export default function Cheer({ cheer, onDone }) {
      each step: walking held a banner up forever, an encounter hid it, and
      every flee brought "50,000 STEPS" back with its sparks. The object is
      also what tells two cheers with the same title apart. */
+  /* AND THE CLOCK IS KEPT ON THE CHEER, NOT IN THE COMPONENT. An encounter
+     hides the banner (App holds it off the nameplate), which UNMOUNTS it -
+     and a fresh mount started the 3.2s again, sparks and all. Walk into grass
+     more often than every 3.2s and one banner came back after every run and
+     every catch, never finishing. So the time on screen accumulates on the
+     entry (`seen`, volatile like the whole queue), and one interrupted after
+     `SEEN` is dropped instead of replayed. Idempotent under StrictMode's
+     double mount: that adds a few milliseconds, never a drop. */
   const done = useRef(onDone);
   done.current = onDone;
+  const spent = (cheer.seen ?? 0) >= SEEN;
   useEffect(() => {
-    const t = setTimeout(() => done.current(), HOLD);
-    return () => clearTimeout(t);
-  }, [cheer]);
+    if (spent) {
+      done.current(cheer);
+      return undefined;
+    }
+    const start = performance.now();
+    const t = setTimeout(() => done.current(cheer), HOLD - (cheer.seen ?? 0));
+    return () => {
+      clearTimeout(t);
+      cheer.seen = (cheer.seen ?? 0) + performance.now() - start;
+    };
+  }, [cheer, spent]);
 
+  if (spent) return null;
   const items = Object.entries(cheer.items ?? {});
 
   return (
-    <div className={`cheer cheer-${cheer.kind}`} role="status" onClick={onDone}>
+    <div className={`cheer cheer-${cheer.kind}`} role="status" onClick={() => onDone(cheer)}>
       <div className="cheer-burst" aria-hidden="true">
         {SPARKS.map((i) => (
           <span key={i} style={{ "--i": i }} />

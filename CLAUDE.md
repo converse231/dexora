@@ -354,6 +354,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   care by hand. Touch targets on a coarse pointer are 36px (end of styles.css).
 - **A banner waits while an encounter is undecided**: `App` holds `cheers`
   until the encounter is caught, fled or ran, so it never covers the nameplate.
+  Holding UNMOUNTS it, so its clock lives on the entry (`seen`): one shown a
+  second is dropped, not replayed, and `dropCheer(entry)` drops that entry.
+  Its timer is keyed on the cheer, never on `onDone` (a fresh arrow a render).
 - **The engine takes whole numbers**: `buy`, `buyCandy` and `levelUp` go
   through `whole()`, because the UI flooring its input does not cover the
   engine's other callers, and a NaN level sends a Pokemon to limbo.

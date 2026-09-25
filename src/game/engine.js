@@ -2591,9 +2591,12 @@ export function createEngine(canvas, onChange, mini = null) {
     valueOf,
     evolve,
     closeEvolution,
-    // The UI shows one at a time and drops it when its moment is over.
-    dropCheer() {
-      state.cheers.shift();
+    /* The UI shows one at a time and drops it when its moment is over - THAT
+       one, by identity: a late timer shifting blindly would drop the next. */
+    dropCheer(entry) {
+      const i = state.cheers.indexOf(entry);
+      if (i < 0) return;
+      state.cheers.splice(i, 1);
       changed();
     },
     dropWorn() {
