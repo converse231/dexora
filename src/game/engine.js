@@ -843,6 +843,13 @@ export function createEngine(canvas, onChange, mini = null) {
      `onArrive`; anything there that DID touch the collection - a parcel of
      balls and its wage - calls `changed()` instead, which is why that line is
      a ternary rather than a plain call. */
+  /* AND THE ANIMATION PHASES USE IT TOO - a throw's throw, suck, drop, wait
+     and three shakes, and a cast's beats. Reported as the game lagging on
+     every variant catch, and profiled it was this: each phase called
+     `changed()`, so the Dex grid, the Box list and the rail's evolve count
+     rebuilt seven times per throw - the banner only landed on top of it. A
+     phase moves nothing in the collection; `settle` (the catch itself) and
+     the encounter closing still call `changed()`, once each. */
   const stepped = () => {
     state.rev++;
     onChange();
@@ -1977,7 +1984,9 @@ export function createEngine(canvas, onChange, mini = null) {
         } else {
           Object.assign(f, cast);
         }
-        changed();
+        // Hooking starts an encounter (it calls `changed()` itself); the
+        // other beats are the bobber moving.
+        stepped();
       }
       return;   // no encounter can be running while a line is out
     }
@@ -1995,7 +2004,7 @@ export function createEngine(canvas, onChange, mini = null) {
       return;
     }
     Object.assign(e, step);
-    changed();
+    stepped();           // a phase is animation - see `stepped`
   }
 
   function flee(confirmed = false) {
@@ -2148,6 +2157,8 @@ export function createEngine(canvas, onChange, mini = null) {
      deliberately generous. */
   const STALL = 400;
   let lastFrame = performance.now();
+  let battleSince = null;
+  const BATTLE_FADE = 400;        // `.battle`'s own 300ms fade-in, and a margin
 
   function frame() {
     const now = performance.now();
@@ -2192,7 +2203,12 @@ export function createEngine(canvas, onChange, mini = null) {
       tryStep([...held][held.size - 1]); // most recently pressed direction wins
     }
     advance(now);
-    render(now);
+    /* A BATTLE COVERS THE MAP - `.battle` is opaque and fills the viewport -
+       so once its fade-in is over the map is not redrawn underneath it. It
+       was a full redraw every frame for nothing: the largest cost left in a
+       catch once the collection panels stopped rebuilding per phase. */
+    if (state.encounter) battleSince ??= now; else battleSince = null;
+    if (battleSince === null || now - battleSince < BATTLE_FADE) render(now);
     raf = requestAnimationFrame(frame);
   }
   /* ---- a hidden tab pauses, it does not fast-forward -------------------

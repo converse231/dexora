@@ -328,6 +328,7 @@ function until(e, what, label, max = 2000) {
     until(e, (s) => !s.encounter || s.encounter.phase === "idle", "the throw to resolve");
     if (e.state.encounter) {
       e.state.encounter.speciesId = 19;
+      e.state.encounter.alpha = false;     // an alpha asks too (1 in 250)
       e.flee();
       until(e, (s) => !s.encounter, "the encounter to close", 4000);
     }
@@ -352,6 +353,7 @@ function until(e, what, label, max = 2000) {
   {
     const enc = fresh();
     enc.speciesId = 19;
+    enc.alpha = false;                     // a plain one: an alpha asks too
     e.flee();
     assert.equal(e.state.ask, null, "running from a Rattata asked");
     assert.equal(e.state.encounter.phase, "ran", "the plain run did not happen");
@@ -549,7 +551,7 @@ function until(e, what, label, max = 2000) {
        down the SAME function, so the step the repel dies on is the first
        unprotected one in the game. */
     if (f.state.encounter) {
-      f.flee();
+      f.flee(true);           // leaving, whatever it is - an alpha would ask
       for (let i = 0; i < 300 && f.state.encounter; i++) tick(16);
     }
     assert.equal(f.state.encounter, null, "could not get back out onto the map");
@@ -1803,7 +1805,7 @@ await savedField("dry", 123, "lots", 0);
     const enc = e.state.encounter;
     assert.ok(enc, "a step with every roll landing started no encounter");
     until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
-    e.flee();
+    e.flee(true);           // leaving, whatever it is - an alpha would ask
     until(e, (st) => !st.encounter, "the encounter to close", 4000);
     return enc;
   };
@@ -1989,9 +1991,16 @@ console.log("star ok — asks first, spends the lowest ordinary ones and never a
        the flee: 0.99 misses, 0 would run from any ordinary Pokemon. */
     const rolls = [0.99, 0];
     Math.random = () => (rolls.length ? rolls.shift() : 0.5);
+    const col = e.state.colRev, rev = e.state.rev;
     e.throwBall("poke-ball");
     until(e, (st) => !st.encounter || ["idle", "fled", "caught"].includes(st.encounter.phase),
       "the missed throw to resolve", 4000);
+    /* A THROW'S ANIMATION IS NOT THE COLLECTION. Every phase bumped `colRev`
+       once, so the Dex, the Box and the rail rebuilt seven times a throw -
+       the lag reported on every variant catch. The throw itself and its
+       result may; the phases between may not (they still move `rev`). */
+    assert.ok(e.state.colRev - col <= 2, `one throw rebuilt the collection panels ${e.state.colRev - col} times`);
+    assert.ok(e.state.rev - rev > e.state.colRev - col, "a throw's phases no longer redraw the scene");
     assert.ok(e.state.encounter && e.state.encounter.phase === "idle",
       `an alpha that should never flee ended the throw ${e.state.encounter?.phase ?? "gone"}`);
 
@@ -2083,7 +2092,7 @@ console.log("stranded ok — a saved spot on rock or off the map loads at the ma
   const leave = (e) => {
     if (!e.state.encounter) return;
     until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
-    e.flee();
+    e.flee(true);           // leaving, whatever it is - an alpha would ask
     until(e, (st) => !st.encounter, "the encounter to close", 4000);
   };
 
@@ -2166,7 +2175,7 @@ console.log("purchases ok — whole numbers only, NaN refused");
     e.press(dir);
     for (let i = 0; i < frames && !e.state.encounter; i++) tick(16);
     e.clearHeld();
-    if (e.state.encounter) { until(e, (st) => st.encounter?.phase === "idle", "settle"); e.flee(); until(e, (st) => !st.encounter, "close", 4000); }
+    if (e.state.encounter) { until(e, (st) => st.encounter?.phase === "idle", "settle"); e.flee(true); until(e, (st) => !st.encounter, "close", 4000); }
     return e.state.areaId !== area || e.state.player.x !== x || e.state.player.y !== y;
   };
   const rows = AREAS.woods.rows;

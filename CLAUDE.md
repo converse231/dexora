@@ -477,6 +477,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `throwBall`, `flee` - a legendary or an alpha - `star`, and `travel` off a
   map with an open rift, which covers doors too), so every call site is
   covered. App shows the non-encounter ones (`star`, `rift`) outside a battle.
+- **The nameplate is one row on a phone**: `@container (max-width: 520px)` on
+  `.battle` drops the flavour (height/weight, GEN, the tier's word; the alpha's
+  word under 330px), never the name, level, XS/XL, types or badges.
 - **An alpha announces itself once**: `.alpha-ring` and `.alpha-stamp` are
   siblings of `.mon` that play and fade; the nameplate chip stays.
 - **The Box preview** (`Preview.jsx`) is a button laid over the sprite's
@@ -485,6 +488,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 
 ## Engine
 
+- **`changed()` means the collection moved; `stepped()` means only the scene
+  did.** Steps, a throw's phases and a cast's beats call `stepped()` (rev
+  only), or the Dex, Box and rail rebuild per frame of animation - the
+  variant-catch lag (tools/play caps a throw at 2 `colRev` bumps). The map is
+  not redrawn under a battle once it has faded in (`BATTLE_FADE`), and Dex
+  tiles are a memoised `Cell` on primitive props.
 - **Stalls are paid back in `frame()`**: any gap over `STALL` pushes every live
   deadline forward (`move.startedAt`, `encounter.until`, `fishing.until`) and
   drops held keys. A new timer joins that list.

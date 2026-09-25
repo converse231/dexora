@@ -84,7 +84,14 @@ export const STAR_COST = 10;
 export const starCost = (id) => (isLegendary(id) ? 1 : STAR_COST);
 export const starKeeps = (id) => (isLegendary(id) ? 1 : 0);
 
-export const tasksFor = (id) => TASKS.filter((t) => !t.when || t.when(id));
+/* Cached: `when` reads only static data, and the Dex asks for every tile on
+   every collection change - 1,300 filters of eleven closures, each time. */
+const taskCache = new Map();
+export const tasksFor = (id) => {
+  let list = taskCache.get(id);
+  if (!list) taskCache.set(id, list = TASKS.filter((t) => !t.when || t.when(id)));
+  return list;
+};
 
 /* How far one task is: counter, the steps it has cleared, and the points. */
 export function progress(task, row) {
@@ -93,7 +100,12 @@ export function progress(task, row) {
   return { n, cleared, points: cleared * task.points };
 }
 
-const required = (id) => tasksFor(id).filter((t) => !t.bonus);
+const requiredCache = new Map();
+const required = (id) => {
+  let list = requiredCache.get(id);
+  if (!list) requiredCache.set(id, list = tasksFor(id).filter((t) => !t.bonus));
+  return list;
+};
 export const researchPoints = (id, row) =>
   required(id).reduce((sum, t) => sum + progress(t, row).points, 0);
 /* A SHARE OF THIS SPECIES' OWN TOTAL, so the top level is every required task

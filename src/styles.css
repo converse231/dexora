@@ -833,6 +833,35 @@ canvas {
 
 .np-types { display: flex; gap: 4px; }
 .np-gen { font-size: max(9px, 1.35cqw); }
+/* A PHONE-WIDTH BATTLE GETS A ONE-LINE PLATE. Everything a throw is decided
+   on stays - name, level, the XS/XL tag, types, the tier, alpha, the caught
+   ball - and the flavour goes: the exact height and weight and the GEN chip
+   (the Dex has both). Reported as the plate wrapping to two rows on a phone,
+   the caught ball alone on the second, covering the top of the scene. Keyed
+   on the battle's own width, which is what the plate has to fit. */
+@container (max-width: 520px) {
+  .nameplate {
+    top: 3%; left: 2.5%; max-width: 95%;
+    gap: 5px; padding: 5px 8px 4px; border-width: 2px; border-radius: 9px;
+    box-shadow: 0 2px 0 var(--shadow);
+  }
+  .np-name { font-size: 14px; }
+  /* `.nameplate` in front: `.gen` is declared further down, and a container
+     query adds no specificity, so the bare class lost. The tier keeps its
+     icon; its name is on the tooltip. */
+  .nameplate .np-dim, .nameplate .np-gen, .nameplate .np-tier .np-word { display: none; }
+  .np-size:not(:has(b)) { display: none; }          /* nothing left in it */
+  .np-types { gap: 3px; }
+  .nameplate .type { padding: 3px 4px 2px; }
+  .np-tier { padding: 2px 5px 1px; }
+  .np-tier .mark, .np-alpha .mark { width: 12px; height: 12px; }
+  .np-caught { padding: 2px; }
+  .np-caught img { width: 11px; height: 11px; }
+}
+/* The narrowest phones: the alpha's red chip and mark say it without the word. */
+@container (max-width: 330px) {
+  .nameplate .np-alpha .np-word { display: none; }
+}
 /* Green because green already means "this one is done" here - it is what a
    maxed trainer stat turns. White on --canopy is 6.31:1, which an 8.5px pixel
    font needs. */
@@ -2192,12 +2221,12 @@ canvas {
   padding: 0; border: 0; background: transparent; cursor: zoom-in; min-height: 0;
 }
 .boxrow .bx-peek:hover { background: transparent; border: 0; }
-.bx-peek span {
-  position: absolute; right: -4px; bottom: 0;
-  font-family: var(--pixel); font-size: 9px; line-height: 1; color: var(--ink-soft);
-  padding: 2px 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px;
+.bx-peek svg {
+  position: absolute; right: -4px; bottom: 0; width: 20px; height: 20px; padding: 3px;
+  fill: none; stroke: var(--ink-soft); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 50%;
 }
-.bx-peek:hover span, .bx-peek:focus-visible span { color: var(--path); border-color: var(--path); }
+.bx-peek:hover svg, .bx-peek:focus-visible svg { stroke: var(--path); border-color: var(--path); }
 
 /* THE PREVIEW: the art big, then what the row has no room for. */
 .preview {
@@ -4806,7 +4835,7 @@ button:disabled { transition: none; }
 }
 
 .cheer-card {
-  position: relative;
+  position: relative; will-change: transform, opacity;   /* its own layer: the drop never repaints the page */
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 13px 30px 15px;
   border-radius: 16px;

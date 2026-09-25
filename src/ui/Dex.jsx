@@ -44,6 +44,85 @@ const SORTS = {
   rarity: (a, b) => "SABC".indexOf(a.tier) - "SABC".indexOf(b.tier),
 };
 
+/* ONE TILE, MEMOISED ON WHAT IT SHOWS. A catch changes one or two entries,
+   and the whole grid - some 1,300 tiles with their sprites, tier layers and
+   marks - was reconciled for them: the spike left in a variant catch once
+   the per-phase rebuilds were gone. Every prop is a primitive or a stable
+   reference (`sp` from SPECIES, `onSelect` a state setter; marks joined to a
+   string), so `memo` compares for real and an untouched tile is skipped. */
+const Cell = memo(function Cell({ sp, state, variant, marks, full, studied, onSelect }) {
+  const list = marks ? marks.split(",") : [];
+  return (
+    <button
+      className={`cell ${STATE[state]}${full ? " full" : ""}`}
+      onClick={() => onSelect(sp.id)}
+      /* The tile is one button, so its label has to carry everything
+         inside it - and the marks are images with their own alt text,
+         which a button label swallows. Naming them here and nowhere
+         else is what stops "Pidgey, entry 16, shiny" being read out as
+         "Pidgey entry 16 Shiny Shiny". */
+      aria-label={
+        state
+          ? `${label(sp)}, entry ${sp.id}${
+              list.length ? `, ${list.join(" and ")}` : ""
+            }${full ? ", every variant caught" : ""}${
+              studied ? ", research complete" : ""}`
+          : `Unknown Pokémon ${sp.id}`
+      }
+    >
+      {/* An unseen entry draws nothing. It used to draw its real
+          sprite at `opacity: 0`, which meant a fresh save fetched a
+          screenful of PNGs in order to hide every one of them - and
+          put the answer in the DOM for anyone who looked. The row
+          height is fixed by `grid-auto-rows`, so the cell keeps its
+          shape with no image in it. */}
+      {state > 0 && <Sprite id={sp.id} variant={variant} />}
+
+      {/* AND ITS TREATMENT, MOVING. This file used to say a Dex cell
+          was one image with nowhere to hang a layer - it is a
+          `position: relative` button with `overflow: hidden`, which is
+          a container, and the claim was about the SPRITE rather than
+          the cell. The grid is where a collection is actually looked
+          at, and a wall of stills is the one place a Holo has nothing
+          to say for itself.
+
+          `rarest()` only ever names a tier you have REGISTERED, so an
+          unearned treatment cannot leak here the way it did in the
+          FORMS strip. One layer per cell at most, because the grid
+          shows the rarest tier rather than all of them. */}
+      {state > 0 && <VariantFx id={sp.id} variant={variant} />}
+
+      {/* One mark per variant held, kindest first, so the row reads as
+          progress. `!!` is not needed here because `marks` is already a
+          list of strings - but it IS needed anywhere a 0/1 byte is used
+          as a condition, since `0 && x` renders the text "0". */}
+      {list.length > 0 && (
+        <span className="cell-marks">
+          {list.map((t) => <Mark key={t} tier={t} size={12} />)}
+        </span>
+      )}
+
+      {/* OPPOSITE CORNER FROM THE TIER MARKS, deliberately. Those are
+          four things you can earn and this is a fact about the species,
+          so a legendary badge sitting in that row would read as a fifth
+          tier - and it is the same mistake as putting it beside the
+          rosette, which is the one mark you cannot simply be given. */}
+      {isLegendary(sp.id) && state >= 1 && (
+        <Mark tier="legendary" size={13} className="cell-legend" />
+      )}
+
+      {full && <Mark tier="complete" size={16} className="cell-full" />}
+
+      {/* The one free corner. Only a FINISHED entry is marked: a level
+          number on every caught tile is 1,200 small numbers, and the
+          finished ones are the ones that changed something. */}
+      {studied && <Mark tier="research" size={12} className="cell-research" />}
+
+      <span className="cell-no">{String(sp.id).padStart(3, "0")}</span>
+    </button>
+  );
+});
+
 /* MEMOISED, AND EVERY PROP IS ALREADY STABLE WHILE WALKING - which is what
    makes this a two-line fix rather than a refactor. `dex` and `tiers` are
    mutated in PLACE by the engine so their references never change, `caught`
@@ -250,78 +329,14 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
       <div className="dexgrid">
         {shown.map((sp) => {
           const state = at(sp.id);
-          const marks = MARKS.filter((t) => has(t, sp.id));
-          const full = complete(sp.id);
-          const studied = researchLevel(sp.id, tiers?.research?.[sp.id]) >= RESEARCH_MAX;
           return (
-            <button
-              key={sp.id}
-              className={`cell ${STATE[state]}${full ? " full" : ""}`}
-              onClick={() => onSelect(sp.id)}
-              /* The tile is one button, so its label has to carry everything
-                 inside it - and the marks are images with their own alt text,
-                 which a button label swallows. Naming them here and nowhere
-                 else is what stops "Pidgey, entry 16, shiny" being read out as
-                 "Pidgey entry 16 Shiny Shiny". */
-              aria-label={
-                state
-                  ? `${label(sp)}, entry ${sp.id}${
-                      marks.length ? `, ${marks.join(" and ")}` : ""
-                    }${full ? ", every variant caught" : ""}${
-                      studied ? ", research complete" : ""}`
-                  : `Unknown Pokémon ${sp.id}`
-              }
-            >
-              {/* An unseen entry draws nothing. It used to draw its real
-                  sprite at `opacity: 0`, which meant a fresh save fetched a
-                  screenful of PNGs in order to hide every one of them - and
-                  put the answer in the DOM for anyone who looked. The row
-                  height is fixed by `grid-auto-rows`, so the cell keeps its
-                  shape with no image in it. */}
-              {state > 0 && <Sprite id={sp.id} variant={rarest(sp.id)} />}
-
-              {/* AND ITS TREATMENT, MOVING. This file used to say a Dex cell
-                  was one image with nowhere to hang a layer - it is a
-                  `position: relative` button with `overflow: hidden`, which is
-                  a container, and the claim was about the SPRITE rather than
-                  the cell. The grid is where a collection is actually looked
-                  at, and a wall of stills is the one place a Holo has nothing
-                  to say for itself.
-
-                  `rarest()` only ever names a tier you have REGISTERED, so an
-                  unearned treatment cannot leak here the way it did in the
-                  FORMS strip. One layer per cell at most, because the grid
-                  shows the rarest tier rather than all of them. */}
-              {state > 0 && <VariantFx id={sp.id} variant={rarest(sp.id)} />}
-
-              {/* One mark per variant held, kindest first, so the row reads as
-                  progress. `!!` is not needed here because `marks` is already a
-                  list of strings - but it IS needed anywhere a 0/1 byte is used
-                  as a condition, since `0 && x` renders the text "0". */}
-              {marks.length > 0 && (
-                <span className="cell-marks">
-                  {marks.map((t) => <Mark key={t} tier={t} size={12} />)}
-                </span>
-              )}
-
-              {/* OPPOSITE CORNER FROM THE TIER MARKS, deliberately. Those are
-                  four things you can earn and this is a fact about the species,
-                  so a legendary badge sitting in that row would read as a fifth
-                  tier - and it is the same mistake as putting it beside the
-                  rosette, which is the one mark you cannot simply be given. */}
-              {isLegendary(sp.id) && at(sp.id) >= 1 && (
-                <Mark tier="legendary" size={13} className="cell-legend" />
-              )}
-
-              {full && <Mark tier="complete" size={16} className="cell-full" />}
-
-              {/* The one free corner. Only a FINISHED entry is marked: a level
-                  number on every caught tile is 1,200 small numbers, and the
-                  finished ones are the ones that changed something. */}
-              {studied && <Mark tier="research" size={12} className="cell-research" />}
-
-              <span className="cell-no">{String(sp.id).padStart(3, "0")}</span>
-            </button>
+            <Cell
+              key={sp.id} sp={sp} state={state} onSelect={onSelect}
+              variant={state > 0 ? rarest(sp.id) : null}
+              marks={MARKS.filter((t) => has(t, sp.id)).join(",")}
+              full={complete(sp.id)}
+              studied={researchLevel(sp.id, tiers?.research?.[sp.id]) >= RESEARCH_MAX}
+            />
           );
         })}
       </div>
