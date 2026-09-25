@@ -464,6 +464,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   (Monsoon Trail): `^` puts the trainer above the upper layer, `v` under it,
   `.` (Emerald's 0 and 15: bridges) keeps the last. Updated in `tryStep` and
   `travel`. Without it a trainer walking a bridge or a clifftop went under it.
+- **Night mode is tokens.** `data-theme` on <html> (`theme.js`, mirrored in
+  index.html before first paint; a device preference, never the save). Any
+  colour that must change at night is a `:root` token redefined in the one
+  `[data-theme="dark"]` block at the end of styles.css (check.mjs holds every
+  colour token to a night value); a few pastel banners and the silhouettes
+  have their own dark rules there. The map, battle skies and tier effects are
+  art and do not change. Never type a light literal where a token exists.
 - **The page never scrolls sideways**: `html, body { overflow-x: clip }` is the
   guard, not the fix - an overflow is still a bug to find and size down.
 - **Irreversible presses ask first, gated in the engine** (`state.ask` in

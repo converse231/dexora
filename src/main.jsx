@@ -1,7 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import Boot from "./Boot.jsx";
+import { applyTheme } from "./ui/theme.js";
 import "./styles.css";
+
+applyTheme();
 
 /* THE PIXEL FACE IS GEIST PIXEL, SELF-HOSTED, AND REGISTERED HERE RATHER
    THAN IN styles.css. Two reasons, both recorded rules: a relative url() in the

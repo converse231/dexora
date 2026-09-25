@@ -4,6 +4,14 @@
   --line: #d6e2ce; --line-firm: #b9ccb0;
   --canopy: #2f6b4c; --path: #a4695e; --path-soft: #f0ddd6;
   --sand: #e5d5a2; --gold: #b4741a;
+  /* NAMED, NOT TYPED: every colour that has to change at night is a token,
+     redefined once under `[data-theme="dark"]` at the end of this file. */
+  --shadow: rgba(47, 107, 76, .3); --shadow-soft: rgba(47, 107, 76, .2);
+  --scrim: rgba(26, 48, 36, .5);
+  --gold-soft: #fdf6e4; --canopy-soft: #f2f9f0;
+  --glow: rgba(255, 255, 255, .85); --glass: rgba(255, 255, 255, .86);
+  --good: #2f8b52; --bad: #b5483c; --ready: #d8a13a; --ready-ink: #9a6a12;
+  color-scheme: light;
   --display: "Fredoka", "Trebuchet MS", sans-serif;
   --body: "Nunito Sans", "Segoe UI", system-ui, sans-serif;
   --pixel: "Pixel", "Courier New", monospace;
@@ -96,8 +104,8 @@ body {
 .deltas em:nth-child(2) { margin-top: 13px; }
 .deltas em:nth-child(3) { margin-top: 26px; }
 .deltas em:nth-child(n + 4) { display: none; }
-.deltas em.up { color: #2f8b52; }
-.deltas em.down { color: #b5483c; }
+.deltas em.up { color: var(--good); }
+.deltas em.down { color: var(--bad); }
 @keyframes delta-fly {
   0%   { transform: translate(-50%, -4px); opacity: 0; }
   18%  { opacity: 1; }
@@ -743,7 +751,7 @@ canvas {
   display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
   padding: 8px 13px 7px;
   background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 11px; box-shadow: 0 3px 0 rgba(47, 107, 76, .3);
+  border-radius: 11px; box-shadow: 0 3px 0 var(--shadow);
 }
 /* CLAMPED, BECAUSE `cqw` HAS NO FLOOR AND A PHONE IS A NARROW CONTAINER.
 
@@ -1258,7 +1266,7 @@ canvas {
   position: absolute; right: 3px; top: 3px; pointer-events: none;
   filter: drop-shadow(0 0 3px rgba(255, 206, 110, .8));
 }
-.cell.caught.full { border-color: var(--gold); background: #fdf4dc; }
+.cell.caught.full { border-color: var(--gold); background: var(--gold-soft); }
 
 /* The tier mark on a box row's sprite. It was a coloured star glyph with a
    per-tier text-shadow; it holds the DRAWN mark now - the same icon the Dex
@@ -1431,7 +1439,7 @@ canvas {
 .tr-points.has {
   position: relative;
   border-style: solid; border-color: var(--gold);
-  background: #fdf6e4; color: var(--ink);
+  background: var(--gold-soft); color: var(--ink);
 }
 .tr-points.has::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -1460,13 +1468,13 @@ canvas {
   border-radius: 11px; border: 2px solid var(--line);
   background: var(--surface);
 }
-.trrow.maxed { border-color: var(--canopy); background: #f2f9f0; }
+.trrow.maxed { border-color: var(--canopy); background: var(--canopy-soft); }
 /* A spend is instant now, so it has to be visible: the row it landed on lights
    up for a beat and its new pip lands with it. */
 .trrow.lit { animation: tr-spend 700ms ease-out; }
 @keyframes tr-spend {
-  0% { border-color: var(--gold); background: #fdf0d2; transform: translateX(2px); }
-  40% { border-color: var(--gold); background: #fdf6e6; }
+  0% { border-color: var(--gold); background: var(--gold-soft); transform: translateX(2px); }
+  40% { border-color: var(--gold); background: var(--gold-soft); }
   100% { transform: none; }
 }
 .trrow.lit .tr-pips i.on:last-of-type,
@@ -1518,7 +1526,7 @@ canvas {
 .hintwrap {
   position: fixed; inset: 0; z-index: 80;
   display: grid; place-items: center; padding: 20px;
-  background: rgba(18, 26, 16, .45);
+  background: var(--scrim);
   animation: sheet-in 120ms ease-out;
 }
 .hintbox {
@@ -1526,7 +1534,7 @@ canvas {
   display: grid; gap: 10px; justify-items: start;
   padding: 18px 20px 20px;
   background: var(--surface); border: 3px solid var(--gold);
-  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
 }
 .hint-tag {
   font-family: var(--pixel); font-size: 9px;
@@ -1559,7 +1567,7 @@ canvas {
   display: grid; gap: 4px;
   padding: 24px 26px 26px;
   background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 18px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  border-radius: 18px; box-shadow: 0 6px 0 var(--shadow);
 }
 .gate-brand { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .gate-brand .title { font-family: var(--display); font-size: 22px; font-weight: 600; color: var(--ink); }
@@ -1698,6 +1706,38 @@ canvas {
 
 .gate-wait { justify-items: center; gap: 10px; text-align: center; }
 .gate-wait p { margin: 0; font-size: 13px; color: var(--ink-soft); }
+/* The loading ball: three shakes, a hop, a settle - the capture's rhythm -
+   with its shadow shrinking under the hop so it reads as leaving the ground. */
+.load-ball { position: relative; width: 64px; height: 64px; display: grid; place-items: center; }
+.load-ball img {
+  width: 44px; height: 44px; image-rendering: pixelated; transform-origin: 50% 88%;
+  animation: load-ball 1.6s ease-in-out infinite;
+}
+.load-ball::after {
+  content: ""; position: absolute; left: 50%; bottom: 6px; width: 34px; height: 7px;
+  translate: -50% 0; border-radius: 50%; background: var(--shadow-soft);
+  animation: load-shadow 1.6s ease-in-out infinite;
+}
+@keyframes load-ball {
+  0%, 44%, 100% { transform: translateY(0) rotate(0); }
+  8% { transform: rotate(-20deg); }
+  16% { transform: rotate(16deg); }
+  24% { transform: rotate(-9deg); }
+  32% { transform: rotate(0); }
+  62% { transform: translateY(-12px) rotate(0); }
+  78% { transform: translateY(0) rotate(0); }
+}
+@keyframes load-shadow {
+  0%, 44%, 78%, 100% { scale: 1; opacity: 1; }
+  62% { scale: .6; opacity: .6; }
+}
+.load-dots i { font-style: normal; animation: load-dot 1.2s ease-in-out infinite; }
+.load-dots i:nth-child(2) { animation-delay: .2s; }
+.load-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes load-dot { 0%, 100% { opacity: .2; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .load-ball img, .load-ball::after { animation: none; }
+}
 
 /* THE NAME IS THE TITLE NOW, so it has to survive being one: a trainer name is
    up to 16 characters where "Dexora" is six, and the bar is a flex row whose
@@ -1728,7 +1768,7 @@ canvas {
   position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
   min-width: 172px; display: grid;
   background: var(--surface); border: 2px solid var(--canopy);
-  border-radius: 11px; box-shadow: 0 5px 0 rgba(47, 107, 76, .22);
+  border-radius: 11px; box-shadow: 0 5px 0 var(--shadow-soft);
   padding: 5px; gap: 1px;
 }
 /* EVERY PROPERTY NAMED, because `.topbar button` is a class and a type and so
@@ -1756,6 +1796,11 @@ canvas {
 .tb-pop button:hover .tb-icon { opacity: 1; }
 .tb-pop button:hover { border-color: transparent; }
 .tb-pop button:hover { background: var(--surface-2); }
+.tb-theme em {
+  margin-left: auto; padding: 2px 6px; font-style: normal;
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-soft);
+  border: 1px solid var(--line-firm); border-radius: 5px;
+}
 .tb-pop button:focus-visible { outline: 2px solid var(--canopy); outline-offset: -2px; }
 /* Leaving is not destroying - it is the quiet key RESET was - so it is set
    apart by a rule rather than by colour, and only says the word. */
@@ -2162,7 +2207,7 @@ canvas {
 }
 .pv-art {
   position: relative; display: grid; place-items: center; height: 180px; border-radius: 10px;
-  background: radial-gradient(circle at 50% 60%, rgba(255, 255, 255, .85), transparent 70%);
+  background: radial-gradient(circle at 50% 60%, var(--glow), transparent 70%);
 }
 .pv-tint { position: absolute; inset: 0; border-radius: inherit; opacity: .2; }
 .pv-art > img, .pv-art > .sprite-fx {
@@ -2375,7 +2420,7 @@ canvas {
   width: min(430px, 100%); display: flex; flex-direction: column;
   max-height: min(88vh, 680px);
   background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
   overflow: hidden;
 }
 
@@ -2576,7 +2621,7 @@ canvas {
 .bagsheet {
   position: fixed; inset: 0; z-index: 75;
   display: flex; align-items: flex-end;
-  background: rgba(26, 48, 36, .45);
+  background: var(--scrim);
   animation: battle-in .16s ease-out;
 }
 /* Hidden on a fine pointer for the same reason the rail is hidden on a coarse
@@ -2678,7 +2723,7 @@ canvas {
   width: min(430px, 100%); display: flex; flex-direction: column;
   max-height: min(86vh, 660px);
   background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
   overflow: hidden;
 }
 .hp-body { overflow-y: auto; padding: 4px 15px 16px; }
@@ -2697,7 +2742,7 @@ canvas {
 .ev-card {
   display: grid; gap: 9px; min-width: 0; padding: 0 12px 12px;
   border: 2px solid var(--line); border-radius: 14px; background: var(--surface);
-  box-shadow: 0 3px 0 rgba(47, 107, 76, .18);
+  box-shadow: 0 3px 0 var(--shadow-soft);
 }
 .ev-banner {
   display: flex; align-items: center; gap: 8px; margin: 0 -12px;
@@ -2762,7 +2807,7 @@ canvas {
 /* You are here. */
 .ev-zones i {
   position: absolute; top: -4px; bottom: -4px; width: 4px; margin-left: -2px;
-  border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px #fff;
+  border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px var(--surface);
 }
 .ev-drain {
   position: relative; height: 20px; overflow: hidden;
@@ -2820,7 +2865,7 @@ canvas {
   width: 100%; min-height: 40px; cursor: pointer;
   font-family: var(--pixel); font-size: 11px;
   border: 2px solid var(--canopy); border-radius: 10px;
-  background: var(--canopy); color: #fff; box-shadow: 0 3px 0 rgba(47, 107, 76, .45);
+  background: var(--canopy); color: #fff; box-shadow: 0 3px 0 var(--shadow);
 }
 .ev-go:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
 .ev-go:disabled {
@@ -2883,7 +2928,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   width: min(520px, 100%); display: flex; flex-direction: column;
   max-height: min(88vh, 720px);
   background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
   overflow: hidden;
 }
 .vr-body { overflow-y: auto; padding: 4px 15px 16px; }
@@ -2969,7 +3014,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .confirm {
   width: min(400px, 100%);
   background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 14px; box-shadow: 0 5px 0 rgba(47, 107, 76, .3);
+  border-radius: 14px; box-shadow: 0 5px 0 var(--shadow);
   padding: 15px 17px 13px;
 }
 .cf-title {
@@ -3078,7 +3123,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   padding: 11px 12px 10px; margin-bottom: 12px;
   background: var(--surface);
 }
-.daily.ready { border-color: var(--gold); background: #fdf8e8; }
+.daily.ready { border-color: var(--gold); background: var(--gold-soft); }
 .daily.done { opacity: .72; }
 .dy-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -3152,7 +3197,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   font-variant-numeric: tabular-nums;
 }
 /* Running: the row says how much is left instead of what it costs. */
-.fieldrow.on { border-color: var(--gold); background: #fdf8e8; }
+.fieldrow.on { border-color: var(--gold); background: var(--gold-soft); }
 .fieldrow.on .fr-tail { color: var(--gold); }
 .fieldrow.locked, .fieldrow:disabled { cursor: default; }
 .fieldrow.locked, .fieldrow:disabled:not(.on) { opacity: .5; }
@@ -3246,7 +3291,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .sheet {
   position: fixed; inset: 0; z-index: 70;
   display: grid; place-items: center; padding: 20px;
-  background: rgba(26, 48, 36, .5);
+  background: var(--scrim);
   animation: battle-in .18s ease-out;
 }
 /* A COLUMN: header, tabs, body, footer - and only the BODY scrolls, so the
@@ -3257,7 +3302,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   width: min(500px, 100%); max-height: min(88vh, 760px);
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 16px; box-shadow: 0 6px 0 rgba(47, 107, 76, .3);
+  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
   padding: 16px 18px;
 }
 /* The header is the only block on the card that gets to be loud: portrait,
@@ -3789,7 +3834,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .ms-tab:hover { border-color: var(--path); }
 /* Ready to claim is the one state worth interrupting for, and it is the only
    one that gets colour. "In progress" is most of the time. */
-.ms-tab.ready { border-color: var(--gold); background: #fdf8e8; }
+.ms-tab.ready { border-color: var(--gold); background: var(--gold-soft); }
 .ms-tab.done i, .ms-tab.done b { color: var(--ink-faint); }
 .ms-dot {
   display: grid; place-items: center; width: 14px; height: 14px;
@@ -4433,7 +4478,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 
 /* A row that can evolve right now outranks one that merely has spares, so it
    gets the warmer border - it is the thing worth acting on. */
-.boxrow.ready { border-color: #d8a13a; background: #fbf3e0; }
+.boxrow.ready { border-color: var(--ready); background: var(--gold-soft); }
 
 .bx-evo {
   grid-area: evo;
@@ -4444,7 +4489,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   color: var(--ink-soft);
   white-space: nowrap;
 }
-.bx-evo.on { color: #9a6a12; font-weight: 700; }
+.bx-evo.on { color: var(--ready-ink); font-weight: 700; }
 .bx-bar {
   flex: 0 0 46px;
   height: 6px;
@@ -4460,7 +4505,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   background: var(--ink-soft);
   transition: width 260ms ease;
 }
-.bx-evo.on .bx-bar::after { background: #d8a13a; }
+.bx-evo.on .bx-bar::after { background: var(--ready); }
 
 /* Actions get the full width of the row: three Eevee stones need somewhere to
    wrap to, and nothing here should crowd the count or the progress bar. */
@@ -4473,7 +4518,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 }
 .bx-acts:empty { display: none; }
 .bx-acts button { flex: 1 1 auto; }
-.boxrow .evobtn:not(:disabled) { border-color: #d8a13a; color: #9a6a12; font-weight: 700; }
+.boxrow .evobtn:not(:disabled) { border-color: var(--ready); color: var(--ready-ink); font-weight: 700; }
 .boxrow .evobtn:disabled { opacity: .45; cursor: not-allowed; }
 /* Selling into an evolution's reserve is allowed, but it should not look like
    the same button as selling junk. */
@@ -4627,9 +4672,9 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   font-family: var(--pixel); color: var(--ink-faint);
   font-size: 9px; font-size: max(9px, 1.45cqw); margin: 0 0 1.1cqw;
 }
-.evo-new { color: #b8791f; }
-.evo-lv { color: #2f7d4f; }
-.evo-won { display: inline-flex; align-items: center; gap: .5ch; color: #2f7d4f; }
+.evo-new { color: var(--gold); }
+.evo-lv { color: var(--good); }
+.evo-won { display: inline-flex; align-items: center; gap: .5ch; color: var(--good); }
 .evo-won img { width: 2.2cqw; min-width: 12px; image-rendering: pixelated; }
 
 .evo-go {
@@ -4767,7 +4812,7 @@ button:disabled { transition: none; }
   border-radius: 16px;
   border: 3px solid var(--gold);
   background: linear-gradient(#fffdf4, #fdf3dc);
-  box-shadow: 0 10px 26px rgba(40, 60, 40, .26);
+  box-shadow: 0 10px 26px var(--shadow);
   animation: cheer-drop 460ms cubic-bezier(.16, 1.5, .4, 1) both,
              cheer-out 380ms ease-in 2820ms both;
   text-align: center;
@@ -5180,7 +5225,7 @@ button:disabled { transition: none; }
   position: absolute; left: 50%; bottom: 3.5%; transform: translateX(-50%);
   z-index: 11; display: flex; align-items: baseline; gap: .8cqw;
   padding: .7cqw 1.4cqw .6cqw;
-  background: rgba(255, 255, 255, .9);
+  background: var(--glass);
   border: 2px solid var(--line-firm); border-radius: 11px;
   box-shadow: 0 2px 0 var(--line-firm);
   font-family: var(--pixel); white-space: nowrap;
@@ -5189,7 +5234,7 @@ button:disabled { transition: none; }
 .castbox b { font-size: max(9px, 1.3cqw); color: var(--ink-faint); font-weight: 400; }
 .castbox span { font-size: max(9px, 1.7cqw); color: var(--ink); }
 /* A bite is the one moment worth colouring, and it lasts about half a second. */
-.castbox.bite { border-color: var(--gold); background: #fdf6e6; }
+.castbox.bite { border-color: var(--gold); background: var(--gold-soft); }
 .castbox.bite span { color: var(--path); }
 
 /* ------------------------------------------------------------- the ball rail
@@ -5284,7 +5329,7 @@ button:disabled { transition: none; }
   overflow-x: auto; overflow-y: hidden;
   display: flex; flex-direction: row; align-items: center; gap: 0;
   padding: .55cqw .7cqw; pointer-events: auto;
-  background: rgba(255, 255, 255, .84);
+  background: var(--glass);
   border: 2px solid var(--line-firm); border-radius: 13px;
   box-shadow: 0 2px 0 var(--line-firm);
 }
@@ -5639,3 +5684,65 @@ button:disabled { transition: none; }
   .ms-tab { min-height: 34px; }
   .sheet-where li button { min-height: 36px; }
 }
+
+/* ================================================================ NIGHT MODE
+
+   A deep forest night, not an inverted day: the same green family the game is
+   dressed in, lifted off near-black so cards still sit ON the page, and the
+   accents (canopy, path, gold) raised just enough to carry white text and to
+   read as text on the dark surfaces. Everything that changes is a token,
+   redefined here; the rules below are only the few places a light pastel was
+   the design itself. The world stays as drawn - the map, the battle skies and
+   the rare-form effects are art, and the art does not change at night. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #111915; --surface: #1a241e; --surface-2: #223029;
+  --ink: #e2ebe3; --ink-soft: #a7b8ab; --ink-faint: #7f9285;
+  --line: #2c3a32; --line-firm: #3b4e42;
+  --canopy: #468f66; --path: #b8766a; --path-soft: #3a2724;
+  --sand: #3d3626; --gold: #d09a3c;
+  --candy: #b376cf; --candy-soft: #33223b;
+  --shadow: rgba(0, 0, 0, .5); --shadow-soft: rgba(0, 0, 0, .35);
+  --scrim: rgba(3, 7, 5, .7);
+  --gold-soft: #33291a; --canopy-soft: #1c3025;
+  --glow: rgba(255, 255, 255, .06); --glass: rgba(26, 36, 30, .9);
+  --good: #6cc48c; --bad: #e27f72; --ready: #c9973e; --ready-ink: #e2b560;
+}
+
+/* Silhouettes are black at a fifth of full strength - invisible on a dark
+   card - so at night they are light at the same strength. */
+:root[data-theme="dark"] .cell.seen img,
+:root[data-theme="dark"] .sheet-line img.locked,
+:root[data-theme="dark"] .sheet-art.locked { filter: brightness(0) invert(1); }
+:root[data-theme="dark"] .sf-one:not(.got) .sf-art img:not(.mark) {
+  filter: brightness(0) invert(1) opacity(.22) !important;
+}
+/* A white halo lifts a mark off a light card and smudges it on a dark one. */
+:root[data-theme="dark"] .bx-rare,
+:root[data-theme="dark"] .sf-badge { filter: drop-shadow(0 0 2px rgba(0, 0, 0, .8)); }
+
+/* The clock chip's dawn and dusk were pastel cards; night already is one. */
+:root[data-theme="dark"] .tb-clock.ph-dawn { background: #3a2a1c; border-color: #7a5a3a; }
+:root[data-theme="dark"] .tb-clock.ph-dusk { background: #33243a; border-color: #6d4d66; }
+
+/* The board's banners keep their hue and lose their daylight. */
+:root[data-theme="dark"] .ev-raid .ev-banner { background: linear-gradient(90deg, #45301a, #2a2118); border-color: #6a4a26; }
+:root[data-theme="dark"] .ev-spot { background: radial-gradient(circle, #4a3620 45%, #2c2116 100%); border-color: #6a4a26; }
+:root[data-theme="dark"] .ev-pips i { background: #5a3f20; border-color: #8a6434; }
+:root[data-theme="dark"] .ev-pips i.on { background: var(--line); border-color: var(--line-firm); }
+:root[data-theme="dark"] .ev-raid-copy small { color: #e89a5e; }
+:root[data-theme="dark"] .ev-rift .ev-banner { background: linear-gradient(90deg, #2c2240, #221c30); border-color: #4a3a6e; }
+:root[data-theme="dark"] .ev-drain { background: #251d36; border-color: #5a4690; }
+:root[data-theme="dark"] .ev-disc .ev-banner,
+:root[data-theme="dark"] .dx-research .ev-banner { background: linear-gradient(90deg, #3a3020, #2a241a); border-color: #5a4a2e; }
+:root[data-theme="dark"] .ev-alpha .ev-banner { background: linear-gradient(90deg, #3e1f24, #2c1c1f); border-color: #6a343c; }
+:root[data-theme="dark"] .dx-notes .ev-banner { background: linear-gradient(90deg, #1f3328, #1a2a21); border-color: #2f4a3a; }
+:root[data-theme="dark"] .ev-stamp.live { color: #ff7a66; }
+
+/* Banners and the evolution stage were lit from above. */
+:root[data-theme="dark"] .cheer-card { background: linear-gradient(#2a2619, #201d15); }
+:root[data-theme="dark"] .cheer-dex .cheer-card { background: linear-gradient(#1d2e24, #17251d); }
+:root[data-theme="dark"] .cheer-origin .cheer-kind { color: #d8a64a; }
+:root[data-theme="dark"] .cheer-holo .cheer-kind { color: #c08ae8; }
+:root[data-theme="dark"] .cheer-astral .cheer-kind { color: #a597ff; }
+:root[data-theme="dark"] .evo-bg { background: linear-gradient(#17262e 0%, #182a22 60%, #15221a 100%); }
