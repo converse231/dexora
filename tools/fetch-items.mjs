@@ -29,7 +29,7 @@ const TOOLS = [
    first miss it died there every run, leaving the three rods unfetched and the
    error looking like a network problem. Misses are collected now and reported
    together at the end, so one bad name cannot hide the rest of the list. */
-const KEYS = ["old-rod", "good-rod", "super-rod"];
+const KEYS = ["old-rod", "good-rod", "super-rod", "acro-bike"];
 /* Rare Candy is a CURRENCY here, not a bag item - it is spent per level and
    lives beside the money in the top bar rather than in the bag. It still wants
    its real sprite: the shop row and the Box buttons were drawing a text star,

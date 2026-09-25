@@ -410,8 +410,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   constant. The corner's event cards are buttons that open it. **What's new
   (`News.jsx`) is a list, newest first**: add an entry at the top with a new
   id and the menu's dot returns. "Seen" is localStorage, never the save.
-- **The Dex sheet is tabbed** (Forms, About, Research, Where; Forms first,
-  the last tab used remembered): header and tabs fixed, only `.sheet-body`
+- **The Dex sheet has two tabs, Forms and Info** (four left three mostly
+  white space). Info is one board of Events' `ev-card`s (field notes,
+  research checklist, evolution, where to look); the type-tinted hero carries
+  the research ring, forms held and owned. The last tab used is remembered; header and tabs fixed, only `.sheet-body`
   scrolls, and a caught entry's card has a fixed height (`.tabbed`) so
   switching tabs never resizes it. The evolution line names only entries the
   dex has seen (`dexOf`) and walks to them (`onSelect`).
@@ -420,6 +422,22 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `overflow: hidden` - a clipping grid item has min-height 0 and the grid
   squeezes it - and dialog-scoped headings need `.evcard` in front to beat
   `.hp-body h4`.
+- **Monsoon Trail is Emerald's Route 119** in Deep Woods' slot (id `woods`),
+  transcribed like the Safari Zone against Emerald General + `fortree`
+  (appended last in `EM_SECONDARY`). Long grass is `g`; rails are `-` and `|`
+  (`RAIL`, mirrored in map.js and build_map.py): bike-only ground in ANY
+  direction - an axis rule cut the network to 11 of 55 rails. `canBike` needs
+  the Acro Bike key item (`BIKE_LEVEL`); stepping off is always allowed, and
+  riding draws the `bike` set, appended last in player.png. Every
+  reachability fill counts SURF (`SURFABLE`, mirrored): the northwest lake is
+  surf-only, and a walk-only cull walled it off.
+- **Doors join maps** (`DOOR_PAIRS` in build_map.py): each builder reports its
+  door and arrival tile, `mapdata` carries `doors: [x, y, area, ax, ay]`, and
+  the engine takes one late in `onArrive` (the step counts, no encounter). A
+  door to a map your level has not opened stays shut and says so.
+- **Grass is a field effect** (`grassfx.png`, Emerald's frames on every map):
+  stepping into `,` or `g` rustles once, then the rest frame covers your feet;
+  drawn after the trainer and before the overhangs, never saved.
 - **The page never scrolls sideways**: `html, body { overflow-x: clip }` is the
   guard, not the fix - an overflow is still a bug to find and size down.
 - **Irreversible presses ask first, gated in the engine** (`state.ask` in

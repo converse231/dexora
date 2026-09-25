@@ -587,10 +587,18 @@ export const artOf = (item) => item?.art ?? item?.id ?? "";
    to one of them - and it turns the water and the lava those maps are drawn
    with from scenery into somewhere to go. */
 export const SURF_LEVEL = 20;
+/* THE ACRO BIKE, and it is not the Bicycle that was removed. That was a second
+   way to go FAST, a toggle beside the Running Shoes. This goes nowhere faster:
+   it is what lets you onto a rail - the white bars on Monsoon Trail and in the
+   Safari Zone, which only an Acro Bike crosses in Emerald. Automatic, the way
+   surfing is where you stand: step onto a rail holding it and you are riding. */
+export const BIKE_LEVEL = 10;
 
 export const KEY_ITEMS = [
   { id: "old-rod", name: "Old Rod", price: 0, level: 4,
     blurb: "Fish any shoreline. Mostly Magikarp, but it is a start." },
+  { id: "acro-bike", name: "Acro Bike", price: 0, level: BIKE_LEVEL,
+    blurb: "Ride the white rails. Step onto one and you are on it." },
   { id: "good-rod", name: "Good Rod", price: 0, level: 14,
     blurb: "A wider catch off the same shore." },
   { id: "running-shoes", name: "Running Shoes", price: 0, level: 15,
@@ -607,6 +615,9 @@ export const KEY_ITEMS = [
    exactly as it does the Running Shoes. */
 export const canSurf = (level, bag) =>
   level >= SURF_LEVEL && (bag?.surf ?? 0) > 0;
+// The same two-part gate, for the rails.
+export const canBike = (level, bag) =>
+  level >= BIKE_LEVEL && (bag?.["acro-bike"] ?? 0) > 0;
 
 const keyItemsAt = (level) => KEY_ITEMS.filter((k) => k.level === level);
 

@@ -57,6 +57,11 @@ export const SOLID = "T~wRMIPHLFCWXBEVkKdtYGAZJQ";
    would pass a map that traps the player on a terrace. check.mjs holds the two
    copies together, exactly as it does for `SOLID`. */
 export const LEDGE = { L: [0, 1], J: [1, 0] };
+/* ACRO BIKE RAILS: `-` runs east-west, `|` north-south. Not in SOLID, because
+   a player with the Bike crosses them - in any direction - and `tryStep` is
+   what refuses them on foot. Mirrored in build_map.py's RAIL; check.mjs holds
+   the pair together. */
+export const RAIL = { "-": [1, 0], "|": [0, 1] };
 
 /* WHAT YOU CAN RIDE, and it is a subset of SOLID rather than a new kind of
    ground: every one of these is impassable on foot and stays so. `w` is open
@@ -119,6 +124,9 @@ export const MINI = {
      one grid, so the contrast has to carry the room shapes at 3px a tile with
      no other cue: this is the widest walkable-against-wall gap in the table. */
   q: "#b99763", Q: "#3b2a24",
+  /* monsoon trail - long grass darker than tall, and the rails WHITE, because
+     on the map they are the white bars you ride and nothing else here is. */
+  g: "#3f7d3a", "-": "#e8ecef", "|": "#e8ecef",
 };
 /* Anything the legend grows without telling this table. Deliberately a colour
    nothing else uses, so a missing tile shows up as a magenta stripe rather

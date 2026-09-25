@@ -1678,62 +1678,11 @@ import { F } from "../src/game/engine.js";
   assert.ok(!route.cave.wall.flat().some((id) => surface.has(id)),
     "the plateau surface and the wall share a tile - one of them is drawn wrong");
 
-  /* The canopy has to finish at the top. Deep Woods shipped once with every
-     mass starting at a mid-canopy slice, which renders as a canopy sliced off
-     flat - the tile ids were right and the geometry passed its own assertions,
-     so nothing caught it but looking at the map. Viridian Forest gives the two
-     legal endings, and this asserts a mass has one of them: the solid crown, or
-     the walkable overhang whose shaded half completes the same crown. */
-  const woods = areaOf("woods").rows;
-  const wat = (x, y) => woods[y]?.[x] ?? "";
-  const crown = new Set(route.forest.crown);
-  const midA = new Set(route.forest.midA);
-  const midB = new Set(route.forest.midB);
-  const trunk = new Set(route.forest.trunk);
-  let capped = 0;
-  let behind = 0;
-  let pairs = 0;
-  for (let y = 0; y < woods.length; y++) {
-    for (let x = 0; x < woods[y].length; x++) {
-      if (wat(x, y) === "c") {
-        assert.equal(wat(x, y + 1), "F",
-          `overhang at ${x},${y} has no canopy under it - the leaves would float`);
-        behind++;
-        continue;
-      }
-      if (wat(x, y) !== "F" || wat(x, y - 1) === "F") continue;
-      const id = forestId(route.forest, x, y, wat);
-      const over = wat(x, y - 1) === "c";
-      assert.ok(over ? midB.has(id) : crown.has(id),
-        `canopy top at ${x},${y} draws ${id}, which is neither a crown nor the ` +
-        `half under an overhang - that is a canopy cut off flat`);
-      capped++;
-    }
-  }
-  /* The invariant underneath all of it: midA is a crown's upper half and midB
-     its lower, so the two always pair. Every stranded half is a sliced crown,
-     and it is the fault an even mass height produces - at the foot when the
-     alternation is anchored at the crown, at the head when it is anchored at
-     the trunk. Asserting the pairing catches it at either end, on the rendered
-     ids rather than on the geometry that is meant to guarantee them. */
-  for (let y = 0; y < woods.length; y++) {
-    for (let x = 0; x < woods[y].length; x++) {
-      if (wat(x, y) !== "F") continue;
-      const id = forestId(route.forest, x, y, wat);
-      if (midB.has(id)) {
-        const up = wat(x, y - 1) === "c"
-          ? "overhang" : forestId(route.forest, x, y - 1, wat);
-        assert.ok(up === "overhang" || midA.has(up),
-          `lower half at ${x},${y} has no upper half over it - a sliced crown`);
-        pairs++;
-      }
-      if (midA.has(id)) {
-        assert.ok(midB.has(forestId(route.forest, x, y + 1, wat)),
-          `upper half at ${x},${y} has no lower half under it - a sliced crown`);
-      }
-    }
-  }
-  assert.ok(behind > 0, "no overhang anywhere - nothing to walk behind");
+  /* THE CANOPY SUITE WENT WITH DEEP WOODS. It held the generated forest's
+     crowns to Viridian Forest's grammar, and that forest was the only map
+     drawing one; Monsoon Trail, in its slot, is a copy of Route 119, and a
+     copied cell is exempt from the shape rules. `forestId` still draws any
+     canopy a future map asks for. */
   assert.ok(route.forest.fringeTop, "the overhang needs its leaves as their own tile");
 
   /* THE TWO ATLASES ARE ONE COORDINATE SYSTEM. `route_top.png` is the upper
@@ -1755,8 +1704,7 @@ import { F } from "../src/game/engine.js";
   }
 
   console.log(`tileset ok — ${PAIRS.length} biomes, ground and solid disjoint; ` +
-              `${capped} canopy tops finished, ${pairs} whole crowns, ` +
-              `${behind} to walk behind; ${drawn} water tiles match FireRed, ` +
+              `${drawn} water tiles match FireRed, ` +
               `${banks} tiles of shore`);
 }
 
@@ -1831,6 +1779,7 @@ import { canRun, RUN_LEVEL } from "../src/game/items.js";
      and not a stride. */
   const want = {
     walk: [16, 3], run: [16, 3], fish: [32, 4], surf: [32, 2], jump: [32, 1],
+    bike: [32, 3],          // the Acro Bike, on the rails
   };
   let widest = 0;
   for (const [name, [w, frames]] of Object.entries(want)) {
@@ -1902,7 +1851,7 @@ import {
   LEVEL_XP, MAX_LEVEL, xpForCatch,
   LEGENDARY, LEGEND_MATCHED, LEGEND_STRAY, GEN_LAST, genOf,
 } from "../src/game/biomes.js";
-import { AREAS, AREA_IDS, SOLID, LEDGE, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
+import { AREAS, AREA_IDS, SOLID, LEDGE, RAIL, SURFABLE, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
 import {
   encounterTable, evoScale, evoUnlock, bornLevel, areaOpen, foundIn,
   MAP_FIRST, MAP_LAST,
@@ -1948,7 +1897,20 @@ for (const b of BIOMES) {
   }
   const seen = new Set();
   const stack = [[area.spawn.x, area.spawn.y]];
-  while (stack.length) {
+  // Water cells reached so far, and the land on their far side, fed back in.
+  const ride = [], wet = new Set();
+  while (stack.length || ride.length) {
+    if (!stack.length) {
+      const [wx, wy] = ride.pop();
+      if (wet.has(wx + "," + wy)) continue;
+      wet.add(wx + "," + wy);
+      for (const [ex, ey] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const c = rows[wy + ey]?.[wx + ex];
+        if (c && SURFABLE.includes(c)) ride.push([wx + ex, wy + ey]);
+        else stack.push([wx + ex, wy + ey]);
+      }
+      continue;
+    }
     const [x, y] = stack.pop();
     const key = x + "," + y;
     if (seen.has(key) || !walkable(rows, x, y)) continue;
@@ -1961,6 +1923,11 @@ for (const b of BIOMES) {
       const face = LEDGE[rows[y + dy]?.[x + dx]];
       const over = !!face && face[0] === dx && face[1] === dy;
       stack.push([x + dx * (over ? 2 : 1), y + dy * (over ? 2 : 1)]);
+      /* AND SURF IS A WAY THROUGH - the generator's fill counts it, so this
+         one must, or the two disagree about Monsoon Trail's northwest lake.
+         Water is crossed to reach land; `walkable` still decides what counts. */
+      const n = rows[y + dy]?.[x + dx];
+      if (n && SURFABLE.includes(n)) ride.push([x + dx, y + dy]);
     }
   }
   /* Ledges are one-way, so they are the one thing on a map that can strand you.
@@ -2264,6 +2231,8 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     ridge: () => route.cave.floor - 1,        // Mt Moon: cave local 1 is the floor
     safari: () => route.safari.general,       // Emerald's General, not FireRed's
     cinder: () => route.safari.general,       // the same primary, and lavaridge
+    // Monsoon Trail is Route 119: Emerald's General again, plus Fortree.
+    woods: () => route.monsoon.general,
     // The first map drawn against a pokefirered primary that is not
     // General, so its base is that primary's own block rather than a
     // secondary's - 748 of its metatiles are `building` ids.
@@ -3165,6 +3134,33 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     for (const ch of Object.keys(LEDGE))
       assert.ok(SOLID.includes(ch),
         `ledge "${ch}" is not in SOLID - it would be ordinary ground from every side`);
+  }
+  /* THE GRASS SHEET IS TWO ROWS OF 16px FRAMES - tall (5) over long (4) - and
+     the engine indexes it by row and column with no metadata, so its size IS
+     its contract. Read off the PNG header, like the trainer strip. */
+  {
+    const png = readFileSync(new URL("../public/tilesets/grassfx.png", import.meta.url));
+    assert.equal(png.readUInt32BE(16), 80, "grassfx.png is not five 16px frames wide");
+    assert.equal(png.readUInt32BE(20), 32, "grassfx.png is not two 16px rows tall");
+  }
+  /* AND ABOUT WHICH WAY A RAIL RUNS - the same two tables, the same failure:
+     the generator counts a region reachable along a rail the engine then
+     refuses to let you ride. Not in SOLID, because the Bike crosses them. */
+  {
+    const py = readFileSync(new URL("./build_map.py", import.meta.url), "utf8");
+    const row = py.match(/^RAIL = \{(.*)\}$/m);
+    assert.ok(row, "build_map.py has no RAIL table");
+    const theirs = {};
+    for (const m of row[1].matchAll(/"(.)": \((-?\d+), (-?\d+)\)/g))
+      theirs[m[1]] = [Number(m[2]), Number(m[3])];
+    assert.deepEqual(theirs, RAIL, `the two RAIL tables disagree: ${JSON.stringify(theirs)} against ${JSON.stringify(RAIL)}`);
+    for (const ch of Object.keys(RAIL))
+      assert.ok(!SOLID.includes(ch), `rail "${ch}" is in SOLID - no Bike could ever ride it`);
+    // And what Surf rides, which the generator's reachability now counts too.
+    const surf = py.match(/^SURFABLE = set\("(\w+)"\)$/m);
+    assert.ok(surf, "build_map.py has no SURFABLE");
+    assert.equal([...surf[1]].sort().join(""), [...SURFABLE].sort().join(""),
+      "build_map.py's SURFABLE disagrees with map.js's - the build would count a ride the game refuses");
   }
 
   const uncoloured = [...used].filter((ch) => !(ch in MINI)).sort();

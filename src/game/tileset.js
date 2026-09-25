@@ -58,7 +58,7 @@ async function loadPair(base) {
 /* Resolves to { atlas, player }, either of which may be null. A missing sheet
    is the normal case, not an error - don't let it reject. */
 export async function loadArt() {
-  const [atlas, player, top] = await Promise.all([
+  const [atlas, player, top, grass] = await Promise.all([
     loadPair("tilesets/route").catch(() => null),
     loadPair("tilesets/player").catch(() => null),
     /* THE UPPER LAYER, AT THE SAME IDS. A Gen 3 metatile's keyed layer draws
@@ -67,9 +67,19 @@ export async function loadArt() {
        same ids, so `drawOverlays` needs no lookup. Optional like everything
        else here - without it the game is exactly what it was. */
     loadImage("tilesets/route_top.png").catch(() => null),
+    // The grass you walk through - see `drawGrass`. Optional like the rest.
+    loadImage("tilesets/grassfx.png").catch(() => null),
   ]);
   if (atlas) atlas.imgTop = top;
-  return { atlas, player };
+  return { atlas, player, grass };
+}
+
+/* ONE FRAME OF THE GRASS EFFECT over a tile: `kind` 0 is tall grass, 1 long
+   grass (the rows of grassfx.png), `frame` a column. Drawn after the trainer,
+   so it covers the lower half the way Gen 3's field-effect sprite does. */
+export function drawGrass(ctx, img, x, y, kind, frame) {
+  if (!img) return;
+  ctx.drawImage(img, frame * TILE, kind * TILE, TILE, TILE, x, y, TILE, TILE);
 }
 
 // ---------------------------------------------------------------- tiles

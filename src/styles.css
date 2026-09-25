@@ -1662,7 +1662,7 @@ canvas {
      neither, drew nothing, and reported as the trainers missing from the
      onboarding screen. Same trap `--ground` warns about above. */
   background-image: var(--trainer);
-  background-size: calc(320px * var(--z)) calc(256px * var(--z));
+  background-size: calc(416px * var(--z)) calc(256px * var(--z));
   background-repeat: no-repeat;
 }
 /* Row block x 32 rows, plus the 13-row inset above the art, negated. */
@@ -3208,13 +3208,42 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   border: 2px solid var(--line-firm); border-radius: 9px; background: var(--surface);
 }
 .sheet-x:hover { background: var(--path); border-color: var(--path); color: #fff; }
+/* THE HERO: the header tinted by the Pokemon's first type - the type colours
+   are already the game's palette - behind the portrait and name. */
+.sheet-hero {
+  position: absolute; inset: -16px -18px 0; z-index: 0; pointer-events: none;
+  opacity: .16; border-radius: 13px 13px 0 0;
+}
+.sheet-top .sheet-portrait, .sheet-top .sheet-id { position: relative; z-index: 1; }
+.sheet-x { z-index: 1; }
+/* The numbers that decide what to do next, on the nameplate: research as a
+   ring (the Events board's), forms held, how many you own. */
+.dx-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.dx-stats > span:not(.dx-ring) {
+  font-size: 12px; color: var(--ink-soft); padding: 3px 9px;
+  border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
+}
+.dx-stats b { font-family: var(--display); font-size: 13px; color: var(--ink); }
+.dx-ring {
+  width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%;
+  background: conic-gradient(var(--path) calc(var(--p) * 360deg), var(--line) 0);
+}
+.dx-ring b {
+  width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--surface); font-size: 12px;
+}
+/* FORMS, BIGGER: 46px of a 90px cell read as a thumbnail of a thumbnail -
+   and the sprite inside it is 77% of that on a padded canvas, so the box has
+   to be most of the cell before the creature reads at all. */
+.sheet-card .sf-art { width: 78px; height: 78px; }
+.sheet-card .sf-one { padding: 8px 4px 7px; gap: 3px; }
 .sheet-x:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
 /* THE TABS: four equal cells, the name over its count, so four fit a 320px
    phone without wrapping or scrolling. The count is what makes a tab worth
    opening - "3/8" on FORMS, "Lv 6" on RESEARCH - before you open it. */
 .sheet-tabs {
-  flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+  flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px;
   padding: 3px; margin-bottom: 10px;
   background: var(--surface-2); border: 2px solid var(--line); border-radius: 11px;
 }
@@ -3241,17 +3270,27 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 }
 
 /* ABOUT: the dex text, then the facts, then the line. */
-.sheet-about { display: grid; gap: 14px; }
-.sheet-about .sheet-flavor { margin: 0; }
-.sheet-about .sheet-facts {
+/* THE INFO BOARD: Events' own cards (`.ev-card`, `.ev-banner`), so the dex
+   and the quest board are visibly the same kind of object. */
+.dx-board { display: grid; gap: 10px; }
+.dx-board .sheet-flavor { margin: 0; font-size: 13.5px; line-height: 1.55; }
+.sheet-card .ev-banner h4 {
+  margin: 0; flex: 1; min-width: 0;
+  font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--ink);
+}
+.dx-notes .ev-banner { background: linear-gradient(90deg, #e3f0e6, #f3f9f4); border-color: #cfe3d4; }
+.dx-research .ev-banner { background: linear-gradient(90deg, #f3e7cf, #fbf5e8); border-color: #e2cfa6; }
+.dx-research.live { border-color: var(--gold); }
+.dx-board .sheet-research, .dx-board .sheet-where { margin: 0; }
+.dx-board .sheet-facts {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0;
 }
-.sheet-about .sheet-facts > div {
+.dx-board .sheet-facts > div {
   display: grid; gap: 3px; padding: 8px 6px; text-align: center;
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px;
 }
-.sheet-about .sheet-facts dt { font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
-.sheet-about .sheet-facts dd {
+.dx-board .sheet-facts dt { font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.dx-board .sheet-facts dd {
   margin: 0; font-family: var(--display); font-weight: 600; font-size: 15px;
   color: var(--ink); font-variant-numeric: tabular-nums;
 }
@@ -3297,11 +3336,19 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .sr-bar i { display: block; height: 100%; background: var(--path); }
 .sheet-research ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .sheet-research li {
-  display: grid; grid-template-columns: 1fr auto; gap: 12px;
-  font-size: 13px; color: var(--ink-soft); min-height: 19px; align-items: center;
+  display: grid; grid-template-columns: 18px 1fr auto; gap: 8px;
+  font-size: 13px; color: var(--ink-soft); min-height: 24px; align-items: center;
 }
+/* The tick box - empty until the task is done, then filled like a quest. */
+.sheet-research li > i {
+  width: 16px; height: 16px; display: grid; place-items: center;
+  font-style: normal; font-size: 11px; line-height: 1; color: #fff;
+  border: 2px solid var(--line-firm); border-radius: 4px; background: var(--surface);
+}
+.sheet-research li.done > i { background: var(--canopy); border-color: var(--canopy); }
 .sheet-research li em { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
-.sheet-research li.done { color: var(--ink-faint); text-decoration: line-through; }
+.sheet-research li.done { color: var(--ink-faint); }
+.sheet-research li.done span { text-decoration: line-through; }
 .sheet-research li.done em { color: var(--path); text-decoration: none; }
 .sr-note { margin: 6px 0 0; font-size: 12px; color: var(--ink-faint); }
 .sw-head {
@@ -3429,8 +3476,10 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .sf-one.picked { box-shadow: 0 0 0 2px var(--canopy); }
 .sf-one.got:focus-visible { outline: 2px solid var(--canopy); outline-offset: 2px; }
 .sf-art { position: relative; width: 46px; height: 46px; display: grid; place-items: center; }
-.sf-art img:not(.mark),
-.sf-art .sprite-showdown { width: 77%; height: 77%; object-fit: contain; image-rendering: pixelated; }
+/* A plain sprite fills its box; only Showdown (whose frame fills its canvas)
+   is held to 77% - both at 77% drew every ordinary form half Showdown's size. */
+.sf-art img:not(.mark) { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.sf-art .sprite-showdown { width: 77%; height: 77%; image-rendering: pixelated; }
 /* Not held: a flat silhouette, so the shape is a hint and the colours are not
    given away.
 
@@ -5405,9 +5454,11 @@ button:disabled { transition: none; }
   .sheet { padding: 10px; }
   .sheet-card { padding: 12px 12px 12px; max-height: 92vh; }
   .sheet-portrait { width: 76px; height: 76px; }
+  .sheet-hero { inset: -12px -12px 0; }
+  .sheet-card .sf-art { width: 70px; height: 70px; }
   .sheet-name { font-size: 22px; }
   .sheet-top { gap: 10px; }
-  .sheet-about .sheet-facts { grid-template-columns: repeat(2, 1fr); }
+  .dx-board .sheet-facts { grid-template-columns: repeat(2, 1fr); }
   .sheet-tabs button span { font-size: 12px; }
 }
 

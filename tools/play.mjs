@@ -2056,6 +2056,73 @@ console.log("rift ok — opens when certain, counts down, finds, closes on time 
 }
 console.log("purchases ok — whole numbers only, NaN refused");
 
+/* MONSOON TRAIL: rails and the first door to another map, through real key
+   presses - `tryStep` and `onArrive` are where both live, and a table that is
+   right with an engine that reads it wrong is silent. */
+{
+  const { AREAS, RAIL } = await import("../src/game/map.js");
+  const { LEVEL_XP } = await import("../src/game/biomes.js");
+  const walk = (e, dir, frames = 40) => {
+    const { x, y, } = e.state.player, area = e.state.areaId;
+    e.press(dir);
+    for (let i = 0; i < frames && !e.state.encounter; i++) tick(16);
+    e.clearHeld();
+    if (e.state.encounter) { until(e, (st) => st.encounter?.phase === "idle", "settle"); e.flee(); until(e, (st) => !st.encounter, "close", 4000); }
+    return e.state.areaId !== area || e.state.player.x !== x || e.state.player.y !== y;
+  };
+  const rows = AREAS.woods.rows;
+  const W = rows[0].length;
+  // A rail with walkable ground beside it, found rather than named.
+  let spot = null;
+  const DIRS = [[1, 0, "left"], [-1, 0, "right"], [0, 1, "up"], [0, -1, "down"]];
+  for (let y = 1; y < rows.length - 1 && !spot; y++) for (let x = 1; x < W - 1 && !spot; x++) {
+    if (!RAIL[rows[y][x]]) continue;
+    for (const [ox, oy, dir] of DIRS) {
+      const fx = x + ox, fy = y + oy;
+      if (!RAIL[rows[fy][fx]] && !"TwRMIPHLFCWXBEVkKdtYGAZJQl".includes(rows[fy][fx])) {
+        spot = { rail: [x, y], from: [fx, fy], dir };
+        break;
+      }
+    }
+  }
+  assert.ok(spot, "Monsoon Trail has no rail with ground beside it");
+
+  const e = boot({ ...SAVE, areaId: "woods" }).e;
+  const place = ([x, y]) => { e.state.player.x = x; e.state.player.y = y; };
+
+  place(spot.from);
+  e.state.bag["acro-bike"] = 0;
+  assert.equal(walk(e, spot.dir), false, "a rail let a trainer on foot onto it");
+  e.state.bag["acro-bike"] = 1;
+  assert.ok(walk(e, spot.dir), "the Acro Bike could not ride onto a rail along its axis");
+  assert.deepEqual([e.state.player.x, e.state.player.y], spot.rail, "the bike did not stop on the rail");
+  // Off a rail is always allowed, even with the bike gone - nobody is stranded.
+  e.state.bag["acro-bike"] = 0;
+  const back = { left: "right", right: "left", up: "down", down: "up" }[spot.dir];
+  assert.ok(walk(e, back), "a trainer could not step off a rail");
+  e.state.bag["acro-bike"] = 1;
+
+  // The door, both ways: Monsoon Trail -> Mansion -> back, landing on the pairs.
+  const [dx, dy, to, ax, ay] = AREAS.woods.doors[0];
+  const home = AREAS.mansion.doors[0];
+  assert.equal(to, "mansion", "Monsoon Trail's door does not lead to the Mansion");
+  place([dx, dy + 1]);
+  assert.ok(walk(e, "up"), "walking into the Weather Institute went nowhere");
+  assert.equal(e.state.areaId, "mansion", "the Weather Institute door did not reach the Mansion");
+  assert.deepEqual([e.state.player.x, e.state.player.y], [ax, ay], "the Mansion arrival is not its paired tile");
+  assert.ok(walk(e, "down"), "walking out of the Mansion went nowhere");
+  assert.equal(e.state.areaId, "woods", "the Mansion's front door did not lead back to Monsoon Trail");
+  assert.deepEqual([e.state.player.x, e.state.player.y], [home[3], home[4]], "the way back is not the paired tile");
+
+  // Below the Mansion's level the door stays shut, and says why.
+  const low = boot({ ...SAVE, areaId: "woods", xp: LEVEL_XP[5], paid: 6 }).e;
+  low.state.player.x = dx; low.state.player.y = dy + 1;
+  walk(low, "up");
+  assert.equal(low.state.areaId, "woods", "a door opened onto a map the level has not reached");
+  assert.ok(low.state.worn.some((w) => w.id === "door"), "a shut door said nothing");
+}
+console.log("monsoon ok — rails need the bike, stepping off is always allowed, the door runs both ways, a shut door says so");
+
 /* THE CAP ROSE AND BANKED XP IS OWED, EXACTLY ONCE. XP was never clamped at
    Lv 50, so a trainer who kept playing arrives at 75's table already past 50 -
    and rewards were paid only on a GAIN that crossed a level, so without `paid`

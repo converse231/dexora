@@ -114,7 +114,10 @@ FR_PRIMARY = ["building"]
 # lava. So the volcano is built from a second decomp: pokeemerald's Lavaridge,
 # which is the tileset behind Magma Hideout - the map Ember Caldera is after.
 EMERALD = "https://raw.githubusercontent.com/pret/pokeemerald/master"
-EM_SECONDARY = [("lavaridge", "general"), ("lilycove", "general")]
+# `fortree` is Route 119's, which is Monsoon Trail - appended LAST, so every
+# block before it keeps its base; the ones after move, and every copied map
+# rebases from route.json when `npm run map` runs, which is the rule.
+EM_SECONDARY = [("lavaridge", "general"), ("lilycove", "general"), ("fortree", "general")]
 
 # pokeemerald PRIMARIES we bake WHOLE, because a map drawn against one
 # references its metatiles directly and ours are somebody else's. Ids 0-639
@@ -954,6 +957,10 @@ def build_tileset():
         "safari": {"general": sets["em_general"], "lilycove": sets["lilycove"],
                    "split": 512,          # NUM_METATILES_IN_PRIMARY, Emerald's
                    "floor": sets["em_general"] + 1},   # its plain grass
+        # MONSOON TRAIL is Route 119: Emerald's General plus Fortree, rebased
+        # the way the Safari Zone is. Its floor is the same plain grass.
+        "monsoon": {"general": sets["em_general"], "fortree": sets["fortree"],
+                    "split": 512, "floor": sets["em_general"] + 1},
     }
     with io.open(os.path.join(PUB, "tilesets", "route.json"), "w") as f:
         json.dump(meta, f, indent=2)
@@ -1018,7 +1025,10 @@ def build_player():
             # are real art. Two poses, which is a paddle cycle rather than a
             # walk cycle: the trainer does not stride on water.
             ("surf",      377,    33,    32,      2),
-            ("jump",      527,    33,    32,      1)]
+            ("jump",      527,    33,    32,      1),
+            # THE BIKE, for the Acro Bike rails - appended LAST so every set
+            # above keeps its offset in player.png. Three frames, pedalling.
+            ("bike",      128,    33,    32,      3)]
 
     # BOTH PLAYABLE CHARACTERS ARE ON THIS SHEET, and only one was ever cut out
     # of it. The rip is titled "Playable CharacterS" and is 638px tall, where the
@@ -1135,6 +1145,36 @@ def build_shoes(strip, meta):
 
 # ------------------------------------------------------- encounter ground tiles
 
+def build_grassfx():
+    """The grass you walk through, as Gen 3 draws it: a field-effect sprite laid
+    over the trainer's lower half on a grass tile - a rustle as you step in,
+    then a resting frame over your feet while you stand there.
+
+    Emerald's frames, on every map. FireRed's tall grass has an opaque square
+    baked into its second frame (its own tile colour, which it relied on), and on
+    our atlas that draws as a box; Emerald's are keyed cleanly. Row 0 is TALL
+    grass (5 frames: rest, bend, three of scattering leaves), row 1 is LONG
+    grass (4 frames, full height - it hides the lower body, as on Route 119).
+    Palette index 0 is the transparent key."""
+    rows = [("graphics/field_effects/pics/tall_grass.png", "fx/em_tall_grass.png", 5),
+            ("graphics/field_effects/pics/long_grass.png", "fx/em_long_grass.png", 4)]
+    out = Image.new("RGBA", (16 * 5, 16 * len(rows)), (0, 0, 0, 0))
+    for r, (rel, cache, frames) in enumerate(rows):
+        im = Image.open(fetch(rel, cache, root=EMERALD))
+        assert im.mode == "P" and im.size == (16 * frames, 16), \
+            f"{rel} is {im.size} {im.mode}, not {frames} indexed 16px frames"
+        rgba = im.convert("RGBA")
+        key = im.load()
+        px = rgba.load()
+        for y in range(im.height):
+            for x in range(im.width):
+                if key[x, y] == 0:
+                    px[x, y] = (0, 0, 0, 0)
+        out.paste(rgba, (0, r * 16))
+    out.save(os.path.join(PUB, "tilesets", "grassfx.png"))
+    print("  grassfx.png %dx%d  (tall 5, long 4)" % out.size)
+
+
 def build_ground():
     """Single metatiles pulled out of the atlas so CSS can tile them as the
     encounter background. Same art as the map, no extra source needed.
@@ -1155,7 +1195,9 @@ def build_ground():
     os.makedirs(os.path.join(PUB, "battle"), exist_ok=True)
 
     grounds = {
-        "meadow": 1, "woods": 1, "pond": 1,          # grass, from the primary
+        "meadow": 1, "pond": 1,                      # grass, from the primary
+        # Monsoon Trail is an Emerald map, so Emerald's grass, as the Safari's.
+        "woods": meta["monsoon"]["floor"],
         "ridge": meta["cave"]["floor"],
         "power": meta["power"]["floor"],
         "ember": meta["volcano"]["floor"],
@@ -1191,4 +1233,5 @@ if __name__ == "__main__":
     build_tileset()
     build_player()
     build_ground()
+    build_grassfx()
     print("done")

@@ -107,22 +107,17 @@ function Research({ id, row }) {
   const level = researchLevel(id, row);
   return (
     <div className="sheet-research">
-      <div className="sw-head sr-head">
-        <span>RESEARCH</span>
-        <b>
-          {level >= RESEARCH_MAX && <Mark tier="research" size={12} />}
-          Lv {level}/{RESEARCH_MAX}
-        </b>
-      </div>
       <div className="sr-bar"><i style={{ width: `${(level / RESEARCH_MAX) * 100}%` }} /></div>
+      {/* A CHECKLIST, ticked as you go - a quest log rather than a table. */}
       <ul>
         {tasksFor(id).map((t) => {
           const p = progress(t, row);
           const next = t.steps.find((s) => p.n < s);
           return (
             <li key={t.id} className={next ? "" : "done"}>
+              <i aria-hidden="true">{next ? "" : "✓"}</i>
               <span>{t.label}</span>
-              <em>{t.steps.length > 1 ? `${p.n}/${next ?? t.steps.at(-1)}` : next ? "" : "done"}</em>
+              <em>{t.steps.length > 1 ? `${p.n}/${next ?? t.steps.at(-1)}` : ""}</em>
             </li>
           );
         })}
@@ -136,12 +131,12 @@ function Research({ id, row }) {
   );
 }
 
-function Where({ id, level = 1, busy = false, here = null, onTravel = null }) {
+function Where({ id, level = 1, busy = false, here = null, onTravel = null, head = true }) {
   const rows = whereToFind(id);
   if (!rows.length) return null;
   return (
     <div className="sheet-where">
-      <div className="sw-head">WHERE TO LOOK</div>
+      {head && <div className="sw-head">WHERE TO LOOK</div>}
       <ul>
         {rows.map((r) => {
           const open = r.area ? areaOpen(r.area, level) : false;
@@ -207,7 +202,6 @@ function Line({ id, dexOf, onSelect }) {
   };
   return (
     <div className="sheet-line">
-      <div className="sw-head">EVOLUTION</div>
       <ul>
         {from.map((x) => step(x, "from"))}
         {into.map((x) => step(x, "into"))}
@@ -268,11 +262,14 @@ export default function DexSheet({
      this dialog is opened for (see the note at the top of the file). The last
      tab used is remembered while you browse, so reading one Pokemon's research
      and opening the next opens on its research. */
+  /* TWO TABS, NOT FOUR. Four left three of them mostly white space - a
+     paragraph and four numbers in a tall fixed card - so everything that is
+     not the collection is one INFO board of cards, Events-style: field notes,
+     research, the line and where to look, one scroll. */
+  const rLevel = researchLevel(id, research);
   const tabs = caught ? [
     ["forms", "Forms", `${heldCount}/${forms.length - 1}`],
-    ["about", "About", null],
-    ["research", "Research", `Lv ${researchLevel(id, research)}`],
-    ["where", "Where", String(whereToFind(id).length || "")],
+    ["info", "Info", `Lv ${rLevel}`],
   ] : [];
   const [tab, setTab] = useState(() => lastTab);
   const current = tabs.some(([t]) => t === tab) ? tab : "forms";
@@ -317,6 +314,7 @@ export default function DexSheet({
               the form left the old <img> mounted beside the new one. Only the
               LAYER needs remounting - a CSS animation does not restart on a
               prop change. */}
+          {seen && <span className={`sheet-hero t-${sp.types[0]}`} aria-hidden="true" />}
           <span className={`sheet-portrait${caught ? "" : " locked"}`}>
             <Sprite
               id={id}
@@ -336,6 +334,16 @@ export default function DexSheet({
                     <span key={t} className={`type t-${t}`}>{t.toUpperCase()}</span>
                   ))}
                 </div>
+                {caught && (
+                  <div className="dx-stats">
+                    <span className="dx-ring" style={{ "--p": rLevel / RESEARCH_MAX }}
+                      data-tip={`Research Lv ${rLevel} of ${RESEARCH_MAX}`}>
+                      <b>{rLevel}</b>
+                    </span>
+                    <span><b>{heldCount}/{forms.length - 1}</b> forms</span>
+                    <span><b>{owned}</b> owned</span>
+                  </div>
+                )}
               </>
             ) : (
               <div className="sheet-genus">No data recorded</div>
@@ -491,23 +499,37 @@ export default function DexSheet({
                 </div>
               )}
 
-              {current === "about" && (
-                <div className="sheet-about">
-                  <p className="sheet-flavor">{sp.flavor}</p>
-                  <dl className="sheet-facts">
-                    <div><dt>Height</dt><dd>{(sp.height / 10).toFixed(1)} m</dd></div>
-                    <div><dt>Weight</dt><dd>{(sp.weight / 10).toFixed(1)} kg</dd></div>
-                    <div><dt>Catch rate</dt><dd>{sp.rate}</dd></div>
-                    <div><dt>Generation</dt><dd>{genOf(id)}</dd></div>
-                  </dl>
-                  <Line id={id} dexOf={dexOf} onSelect={onSelect} />
+              {current === "info" && (
+                <div className="dx-board">
+                  <section className="ev-card dx-notes">
+                    <header className="ev-banner"><h4>Field notes</h4></header>
+                    <p className="sheet-flavor">{sp.flavor}</p>
+                    <dl className="sheet-facts">
+                      <div><dt>Height</dt><dd>{(sp.height / 10).toFixed(1)} m</dd></div>
+                      <div><dt>Weight</dt><dd>{(sp.weight / 10).toFixed(1)} kg</dd></div>
+                      <div><dt>Catch rate</dt><dd>{sp.rate}</dd></div>
+                      <div><dt>Gen</dt><dd>{genOf(id)}</dd></div>
+                    </dl>
+                  </section>
+                  <section className={`ev-card dx-research${rLevel >= RESEARCH_MAX ? " live" : ""}`}>
+                    <header className="ev-banner">
+                      <Mark tier="research" size={18} />
+                      <h4>Research</h4>
+                      <span className={`ev-stamp${rLevel >= RESEARCH_MAX ? " live" : ""}`}>
+                        LV {rLevel}/{RESEARCH_MAX}
+                      </span>
+                    </header>
+                    <Research id={id} row={research} />
+                  </section>
+                  <section className="ev-card">
+                    <header className="ev-banner"><h4>Evolution</h4></header>
+                    <Line id={id} dexOf={dexOf} onSelect={onSelect} />
+                  </section>
+                  <section className="ev-card">
+                    <header className="ev-banner"><h4>Where to look</h4></header>
+                    <Where id={id} level={level} here={here} busy={busy} onTravel={onTravel} head={false} />
+                  </section>
                 </div>
-              )}
-
-              {current === "research" && <Research id={id} row={research} />}
-
-              {current === "where" && (
-                <Where id={id} level={level} here={here} busy={busy} onTravel={onTravel} />
               )}
             </div>
           </>
