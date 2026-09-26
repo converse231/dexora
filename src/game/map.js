@@ -73,6 +73,10 @@ export const RAIL = { "-": [1, 0], "|": [0, 1] };
    `K` is out, exactly as it is for fishing: that is the waterfall, and it is
    falling. `~` is out because it is the out-of-bounds border, not a place. */
 export const SURFABLE = "wWkV";
+/* THE ELEVATIONS THAT DRAW A TRAINER ABOVE THE UPPER LAYER - the GBA's
+   sElevationToPriority, where priority 1 or 0 clears BG1. build_map's
+   EM_HIGH is the same set (check.mjs holds them equal). */
+export const HIGH_ELEV = new Set([4, 6, 8, 10, 12, 13, 14]);
 export const rideable = (rows, x, y) =>
   y >= 0 && y < rows.length && x >= 0 && x < rows[y].length
   && SURFABLE.includes(rows[y][x]);

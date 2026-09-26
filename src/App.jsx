@@ -196,7 +196,11 @@ export default function App({
 
   // A profile link pasted into a game that is already open opens it too.
   useEffect(() => {
-    const onHash = () => { const name = linkedTrainer(); if (name) setTrade({ name }); };
+    const onHash = () => {
+      const name = linkedTrainer();
+      if (name) setTrade({ name });
+      else if (!location.hash.startsWith("#/trade")) setTrade(null);   // Back, off the Trade Center page
+    };
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);
   }, []);
@@ -573,7 +577,9 @@ export default function App({
             inbox={inbox}
             onClose={() => {
               setTrade(null);
-              if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+              // Undo the entry the page pushed, so Back does not reopen it.
+              if (history.state?.tc) history.back();
+              else if (location.hash) history.replaceState(null, "", location.pathname + location.search);
             }}
           />
         </Suspense>

@@ -1851,7 +1851,7 @@ import {
   LEVEL_XP, MAX_LEVEL, xpForCatch,
   LEGENDARY, LEGEND_MATCHED, LEGEND_STRAY, GEN_LAST, genOf,
 } from "../src/game/biomes.js";
-import { AREAS, AREA_IDS, SOLID, LEDGE, RAIL, SURFABLE, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
+import { AREAS, AREA_IDS, SOLID, LEDGE, RAIL, SURFABLE, HIGH_ELEV, walkable, MINI, MINI_UNKNOWN } from "../src/game/map.js";
 import {
   encounterTable, evoScale, evoUnlock, bornLevel, areaOpen, foundIn,
   MAP_FIRST, MAP_LAST,
@@ -1895,39 +1895,46 @@ for (const b of BIOMES) {
     hop.set(`${ax},${ay}`, [bx, by]);
     hop.set(`${bx},${by}`, [ax, ay]);
   }
+  /* AND ELEVATION DECIDES WHAT WALKING REACHES, where the map carries it -
+     the engine's `elevOk`, build_map's `elev_step`. The state is (x, y,
+     elevation), since one cell can be reached at one and not another. Water,
+     a hop and a ladder are exempt and only settle the elevation. */
+  const E = (x, y) => (area.elev ? parseInt(area.elev[y]?.[x] ?? "0", 16) || 0 : 0);
+  if (area.elev) {
+    assert.ok(area.elev.length === rows.length && area.elev.every((r) => r.length === W && /^[0-9a-f]+$/.test(r)),
+      `${b.id}: elev is not one hex digit a cell`);
+  }
   const seen = new Set();
-  const stack = [[area.spawn.x, area.spawn.y]];
-  // Water cells reached so far, and the land on their far side, fed back in.
-  const ride = [], wet = new Set();
-  while (stack.length || ride.length) {
-    if (!stack.length) {
-      const [wx, wy] = ride.pop();
-      if (wet.has(wx + "," + wy)) continue;
-      wet.add(wx + "," + wy);
-      for (const [ex, ey] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const c = rows[wy + ey]?.[wx + ex];
-        if (c && SURFABLE.includes(c)) ride.push([wx + ex, wy + ey]);
-        else stack.push([wx + ex, wy + ey]);
-      }
-      continue;
+  const states = new Set();
+  const start = E(area.spawn.x, area.spawn.y);
+  const stack = [[area.spawn.x, area.spawn.y, start === 15 ? 0 : start]];
+  while (stack.length) {
+    const [x, y, cur] = stack.pop();
+    const c = rows[y]?.[x];
+    const wet = !!c && SURFABLE.includes(c);
+    if (!c || (!wet && !walkable(rows, x, y)) || states.has(`${x},${y},${cur}`)) continue;
+    states.add(`${x},${y},${cur}`);
+    if (!wet) seen.add(x + "," + y);
+    const next = (nx, ny) => (E(nx, ny) === 15 ? cur : E(nx, ny));   // build_map's settle
+    if (!wet && hop.has(x + "," + y)) {
+      const [tx, ty] = hop.get(x + "," + y);
+      stack.push([tx, ty, E(tx, ty) === 15 ? cur : E(tx, ty)]);
     }
-    const [x, y] = stack.pop();
-    const key = x + "," + y;
-    if (seen.has(key) || !walkable(rows, x, y)) continue;
-    seen.add(key);
-    if (hop.has(key)) stack.push(hop.get(key));
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      const n = rows[ny]?.[nx];
+      if (!n) continue;
+      /* SURF IS A WAY THROUGH - onto the water, along it and off it - as the
+         generator's fill counts it. Water is crossed, never counted. */
+      if (wet || SURFABLE.includes(n)) { stack.push([nx, ny, next(nx, ny)]); continue; }
       /* Walking into a ledge ALONG ITS OWN DIRECTION hops it and lands you on
          the far side - `L` going south, `J` going east. From any other side it
          is a wall, which `walkable` already reports. */
-      const face = LEDGE[rows[y + dy]?.[x + dx]];
-      const over = !!face && face[0] === dx && face[1] === dy;
-      stack.push([x + dx * (over ? 2 : 1), y + dy * (over ? 2 : 1)]);
-      /* AND SURF IS A WAY THROUGH - the generator's fill counts it, so this
-         one must, or the two disagree about Monsoon Trail's northwest lake.
-         Water is crossed to reach land; `walkable` still decides what counts. */
-      const n = rows[y + dy]?.[x + dx];
-      if (n && SURFABLE.includes(n)) ride.push([x + dx, y + dy]);
+      const face = LEDGE[n];
+      if (face && face[0] === dx && face[1] === dy) { stack.push([nx + dx, ny + dy, next(nx + dx, ny + dy)]); continue; }
+      const t = E(nx, ny);
+      if (cur && t && t !== 15 && t !== cur) continue;       // off the lip: refused
+      stack.push([nx, ny, next(nx, ny)]);
     }
   }
   /* Ledges are one-way, so they are the one thing on a map that can strand you.
@@ -3158,6 +3165,11 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.deepEqual(theirs, RAIL, `the two RAIL tables disagree: ${JSON.stringify(theirs)} against ${JSON.stringify(RAIL)}`);
     for (const ch of Object.keys(RAIL))
       assert.ok(!SOLID.includes(ch), `rail "${ch}" is in SOLID - no Bike could ever ride it`);
+    // Which elevations draw a trainer over the upper layer: one set, two files.
+    const high = py.match(/^EM_HIGH = frozenset\(\(([\d, ]+)\)\)$/m);
+    assert.ok(high, "build_map.py has no EM_HIGH");
+    assert.deepEqual(high[1].split(",").map(Number).sort((a, b) => a - b), [...HIGH_ELEV].sort((a, b) => a - b),
+      "build_map.py's EM_HIGH disagrees with map.js's HIGH_ELEV - the build and the engine draw elevation differently");
     // And what Surf rides, which the generator's reachability now counts too.
     const surf = py.match(/^SURFABLE = set\("(\w+)"\)$/m);
     assert.ok(surf, "build_map.py has no SURFABLE");
@@ -3358,7 +3370,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(light.size >= 20, `only ${light.size} colour tokens found - the parse is wrong`);
     }
 
-    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon", ".ts-got", ".ts-gave", ".tc-send", ".of-mon"]) {
+    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon", ".ts-got", ".ts-gave", ".tc-send", ".of-mon", ".bd-want", ".tc-who.still"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
         `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +
         "variant that is a span will render zero wide there, silently");

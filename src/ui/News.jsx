@@ -11,6 +11,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-01",
+    date: "October 2026",
+    title: "Trade Center page, and solid ground",
+    items: [
+      ["A page of its own", "The Trade Center now opens as its own page with one scroll, instead of a box over the map. Your phone's Back button returns to the game."],
+      ["Copy your code", "Your friend code has a copy button beside it."],
+      ["Rare forms move", "Shiny sparks, holo foil and the rest now animate everywhere in the Trade Center, not just on your showcase."],
+      ["Frost Hollow and the Safari Zone", "Raised ground is raised again: you reach it by its steps, not by walking off any edge, and on Frost Hollow's shelf you are no longer drawn under its lip."],
+    ],
+  },
+  {
     id: "2026-09-30",
     date: "September 2026",
     title: "Trading",

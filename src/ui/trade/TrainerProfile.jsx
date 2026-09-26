@@ -5,7 +5,7 @@
    Everything on it came from `trainer_cards`, which the database keeps from
    the save - so a showcase here is what that trainer really holds, never what
    their client claimed. */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SPECIES } from "../../data/dex.js";
 import { speciesById, levelFromXp } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
@@ -89,7 +89,7 @@ function Shelf({ list, self }) {
         const sp = speciesById(m.species);
         return sp ? (
           <span key={m.mid} className="of-mon big" data-tip={`${label(sp)}, Lv ${m.level}`}>
-            <Sprite id={sp.id} variant={m.tier} />
+            <Sprite id={sp.id} variant={m.tier} fx />
             {m.tier && <span className="tp-tier"><Mark tier={m.tier} size={10} /></span>}
             {m.alpha && <span className="tp-alpha"><Mark tier="alpha" size={9} /></span>}
             <i>Lv {m.level}</i>
@@ -97,6 +97,36 @@ function Shelf({ list, self }) {
         ) : null;
       })}
     </div>
+  );
+}
+
+/* YOUR FRIEND CODE, one tap to copy - it is read aloud or pasted, never typed
+   from a screenshot. The tick is the feedback: the page may be scrolled past
+   any note at its top. */
+function FriendCode({ code }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return undefined;
+    const t = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(t);
+  }, [copied]);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(code); setCopied(true); } catch { /* the code stays on screen */ }
+  };
+  return (
+    <span className="tp-code" data-tip="Friends add you with this code">
+      FRIEND CODE <b>{code}</b>
+      <button type="button" className={`tp-copy${copied ? " done" : ""}`} onClick={copy}
+        aria-label={copied ? "Friend code copied" : "Copy friend code"} data-tip={copied ? "Copied" : "Copy"}>
+        {copied ? (
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12.5l5 5L20 6.5" /></svg>
+        ) : (
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
+          </svg>
+        )}
+      </button>
+    </span>
   );
 }
 
@@ -148,11 +178,7 @@ export default function TrainerProfile({
         <div className="tp-id">
           <h4>{card.username}</h4>
           <span>Lv {level} trainer · since {joined(card.joined_at)}</span>
-          {self && (
-            <span className="tp-code" data-tip="Friends add you with this code">
-              FRIEND CODE <b>{card.friend_code}</b>
-            </span>
-          )}
+          {self && <FriendCode code={card.friend_code} />}
         </div>
       </header>
 

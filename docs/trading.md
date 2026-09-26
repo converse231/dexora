@@ -159,7 +159,8 @@ direct upsert, and `save_game` itself is untouched):
 
 ## Screens
 
-- **Trade Center** - a dialog off the menu, the Events pattern. Tabs:
+- **Trade Center** - a page off the menu (one scroll, header and tabs pinned,
+  `#/trade` so Back leaves it), built of the Events cards. Tabs:
   **Trainers** (search, requests, friends, blocked) · **Offers** (inbox, sent,
   history) · **Board** · **Surprise** · **My card**. The menu's dot shows for
   an offer or a friend request waiting.

@@ -2255,7 +2255,7 @@ console.log("purchases ok — whole numbers only, NaN refused");
    presses - `tryStep` and `onArrive` are where both live, and a table that is
    right with an engine that reads it wrong is silent. */
 {
-  const { AREAS, RAIL } = await import("../src/game/map.js");
+  const { AREAS, RAIL, HIGH_ELEV, walkable } = await import("../src/game/map.js");
   const { LEVEL_XP } = await import("../src/game/biomes.js");
   const { SURF_LEVEL } = await import("../src/game/items.js");
   const walk = (e, dir, frames = 40) => {
@@ -2283,8 +2283,11 @@ console.log("purchases ok — whole numbers only, NaN refused");
   }
   assert.ok(spot, "Monsoon Trail has no rail with ground beside it");
 
-  const e = boot({ ...SAVE, areaId: "woods" }).e;
-  const place = ([x, y]) => { e.state.player.x = x; e.state.player.y = y; };
+  /* PLACED BY LOADING THERE, not by writing x and y: a trainer keeps the
+     elevation he walks at, and one dropped onto a raised bank from the
+     south spawn still walked at the spawn's - a state no walk can reach. */
+  let e;
+  const place = ([x, y]) => { e = boot({ ...SAVE, areaId: "woods", player: { x, y, dir: "down" } }).e; };
 
   place(spot.from);
   e.state.bag["acro-bike"] = 0;
@@ -2320,7 +2323,12 @@ console.log("purchases ok — whole numbers only, NaN refused");
   /* A BRIDGE IS WALKED OVER FROM A BANK AND SURFED UNDER FROM THE RIVER - the
      planks drew over a trainer standing on them. Found, not named: a plank
      with a high bank on one side and river on another. */
-  const lift = AREAS.woods.lift;
+  // What the old `lift` row said, read off the real elevation it came from.
+  const lv = (x, y) => {
+    const e = parseInt(AREAS.woods.elev[y][x], 16);
+    return HIGH_ELEV.has(e) ? "^" : e === 0 || e === 15 ? "." : "v";
+  };
+  const lift = rows.map((r, y) => [...r].map((_, x) => lv(x, y)));
   let bridge = null;
   for (let y = 1; y < rows.length - 1 && !bridge; y++) for (let x = 1; x < W - 1 && !bridge; x++) {
     if (rows[y][x] !== "N") continue;
@@ -2347,8 +2355,57 @@ console.log("purchases ok — whole numbers only, NaN refused");
   walk(b3, bridge.river[2]);
   while (rows[b3.state.player.y][b3.state.player.x] === "N" && walk(b3, bridge.river[2]));
   assert.equal(rows[b3.state.player.y][b3.state.player.x], "w", "could not paddle under the bridge to the far side");
+
+  /* ELEVATION IS WHERE YOU MAY WALK, not only how you are drawn. The copies
+     walked straight off Seafoam's raised shelf (4) onto the ice (3) and up the
+     Safari Zone's platforms (5, 7) from the grass (3): edges the real maps close
+     with elevation alone. Found, not named: two open cells side by side at
+     different elevations, and a step (0) joining a shelf to the ice. */
+  {
+  const E = (a, x, y) => parseInt(AREAS[a].elev[y][x], 16);
+  const at3 = (a, x, y, dir = "down") => ({ ...SAVE, areaId: a, xp: LEVEL_XP[SURF_LEVEL], player: { x, y, dir },
+    field: { repel: { id: "max-repel", steps: 9999 } } });
+  const lip = (a) => {
+    const rows = AREAS[a].rows;   // this map's, not Monsoon Trail's
+    for (let y = 1; y < rows.length - 1; y++) for (let x = 1; x < rows[0].length - 1; x++) {
+      if (!walkable(rows, x, y)) continue;
+      for (const [ox, oy, dir] of DIRS) {
+        const [a1, b1] = [E(a, x, y), E(a, x + ox, y + oy)];
+        if (walkable(rows, x + ox, y + oy) && a1 !== b1 && ![a1, b1].some((e) => e === 0 || e === 15)) return { x, y, dir: back0[dir] };
+      }
+    }
+    return null;
+  };
+  for (const a of ["frost", "safari"]) {
+    const edge = lip(a);
+    assert.ok(edge, `${a}: no two open cells at different elevations - the fixture is gone`);
+    const e = boot(at3(a, edge.x, edge.y)).e;
+    walk(e, edge.dir);
+    assert.deepEqual([e.state.player.x, e.state.player.y], [edge.x, edge.y],
+      `${a}: walked from elevation ${E(a, edge.x, edge.y)} straight onto another at (${edge.x},${edge.y}) ${edge.dir}`);
+  }
+  // Frost Hollow's steps DO join the ice to the shelf, and on the shelf you
+  // stand over its upper layer - its lip drew over the trainer before.
+  const fr = AREAS.frost.rows;
+  let stair = null;
+  for (let y = 1; y < fr.length - 1 && !stair; y++) for (let x = 1; x < fr[0].length - 1 && !stair; x++) {
+    if (E("frost", x, y) !== 0 || !walkable(fr, x, y)) continue;
+    const ice = DIRS.find(([ox, oy]) => walkable(fr, x + ox, y + oy) && E("frost", x + ox, y + oy) === 3);
+    const shelf = DIRS.find(([ox, oy]) => walkable(fr, x + ox, y + oy) && E("frost", x + ox, y + oy) === 4);
+    if (ice && shelf) stair = { ice: [x + ice[0], y + ice[1]], on: ice[2], up: back0[shelf[2]] };
+  }
+  assert.ok(stair, "frost: no step joins the ice to the shelf");
+  const s = boot(at3("frost", ...stair.ice)).e;
+  assert.ok(!s.above(), "frost: a trainer on the lower ice drew over the upper layer");
+  assert.ok(walk(s, stair.on), "frost: could not step from the ice onto the stairs");
+  assert.ok(walk(s, stair.up), "frost: the stairs do not lead up onto the shelf");
+  assert.equal(E("frost", s.state.player.x, s.state.player.y), 4, "frost: the stairs did not reach the shelf");
+  assert.ok(s.above(), "frost: a trainer on the raised shelf is drawn under its upper layer");
+  }
 }
 console.log("monsoon ok — rails need the bike, stepping off is always allowed, the door runs both ways, a shut door says so, bridges are walked over and surfed under");
+console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platforms are not walked onto from below, Frost's steps join them, and the shelf draws the trainer over its lip");
+
 
 /* THE CAP ROSE AND BANKED XP IS OWED, EXACTLY ONCE. XP was never clamped at
    Lv 50, so a trainer who kept playing arrives at 75's table already past 50 -

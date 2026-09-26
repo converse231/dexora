@@ -43,7 +43,7 @@ const Want = ({ species, tier }) => {
   const sp = speciesById(species);
   return (
     <span className="bd-want">
-      <Sprite id={species} variant={tier} alt="" />
+      <Sprite id={species} variant={tier} fx alt="" />
       <span>{tier ? <><Mark tier={tier} size={10} /> {tier}</> : "any"} {sp ? label(sp) : "?"}</span>
     </span>
   );
@@ -169,7 +169,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
           <ul className="of-list">
             {mine.map((l) => (
               <li key={l.id} className="bd-row">
-                <span className="of-mon"><Sprite id={l.mon.species} variant={l.mon.tier} /></span>
+                <span className="of-mon"><Sprite id={l.mon.species} variant={l.mon.tier} fx /></span>
                 <span className="bd-arrow" aria-hidden="true">→</span>
                 <Want species={l.want_species} tier={l.want_tier} />
                 <button type="button" className="tp-quiet" disabled={busy === l.id} onClick={() => takeDown(l)}>Take down</button>
@@ -201,7 +201,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
                   <p className="of-who"><Who name={l.owner} onOpen={onOpenTrainer} /> offers</p>
                   <div className="bd-deal">
                     <span className="of-mon big">
-                      <Sprite id={l.mon.species} variant={l.mon.tier} />
+                      <Sprite id={l.mon.species} variant={l.mon.tier} fx />
                       {l.mon.tier && <span className="tp-tier"><Mark tier={l.mon.tier} size={10} /></span>}
                       <i>Lv {l.mon.level}</i>
                     </span>

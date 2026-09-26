@@ -30,7 +30,7 @@ export function MonPick({ mons, picked, max, onToggle, empty }) {
             aria-pressed={on} aria-label={`${label(sp)}, Lv ${m.level}`}
             disabled={!on && picked.length >= max}
             onClick={() => onToggle(keyOf(m))}>
-            <Sprite id={m.species} variant={tierOf(m)} />
+            <Sprite id={m.species} variant={tierOf(m)} fx />
             {tierOf(m) && <span className="tp-tier"><Mark tier={tierOf(m)} size={10} /></span>}
             {m.alpha ? <span className="tp-alpha"><Mark tier="alpha" size={9} /></span> : null}
             {on && <em>{picked.indexOf(keyOf(m)) + 1}</em>}
@@ -47,7 +47,7 @@ function Side({ mons }) {
     <span className="of-side">
       {(mons ?? []).map((m) => (
         <span key={m.mid} className="of-mon" data-tip={`${label(speciesById(m.species))}, Lv ${m.level}`}>
-          <Sprite id={m.species} variant={m.tier} />
+          <Sprite id={m.species} variant={m.tier} fx />
           {m.tier && <span className="tp-tier"><Mark tier={m.tier} size={9} /></span>}
         </span>
       ))}

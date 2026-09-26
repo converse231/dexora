@@ -20,7 +20,7 @@ import {
 import { Composer, OffersTab, MonPick, keyOf } from "./Offers.jsx";
 import { enterTrading } from "./enter.js";
 import BoardTab from "./Board.jsx";
-import { useDismiss, useModalLock } from "../modal.js";
+import { useModalLock } from "../modal.js";
 import Sprite, { TrainerArt } from "../Sprite.jsx";
 import Mark from "../Marks.jsx";
 import TrainerProfile from "./TrainerProfile.jsx";
@@ -103,7 +103,7 @@ function Editor({ box, dexOf, card, shelf, engine, onSaved, onCancel }) {
             return (
               <button key={m.uid} type="button" className={`tc-mon${on ? " on" : ""}`}
                 aria-pressed={on} aria-label={`${label(sp)}, Lv ${m.level}`} onClick={() => toggle(m.uid)}>
-                <Sprite id={m.species} variant={variantOf(m)} />
+                <Sprite id={m.species} variant={variantOf(m)} fx />
                 {variantOf(m) && <span className="tp-tier"><Mark tier={variantOf(m)} size={10} /></span>}
                 {on && <em>{pick.indexOf(m.uid) + 1}</em>}
               </button>
@@ -222,7 +222,7 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
             {waiting.map((m) => (
               <li key={m.uid} className="tc-row">
                 <span className="tc-who still">
-                  <Sprite id={m.species} variant={variantOf(m)} />
+                  <Sprite id={m.species} variant={variantOf(m)} fx />
                   <span><b>{label(speciesById(m.species))}</b><i>Waiting for a friend…</i></span>
                 </span>
                 <button type="button" className="tp-quiet" disabled={busy} onClick={() => withdraw(m)}>Take back</button>
@@ -243,7 +243,7 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
                 <button key={m.uid} type="button" className={`tc-mon${pick === m.uid ? " on" : ""}`}
                   aria-pressed={pick === m.uid} aria-label={`${label(sp)}, Lv ${m.level}`}
                   onClick={() => { setPick(m.uid); setSure(false); }}>
-                  <Sprite id={m.species} variant={variantOf(m)} />
+                  <Sprite id={m.species} variant={variantOf(m)} fx />
                   {variantOf(m) && <span className="tp-tier"><Mark tier={variantOf(m)} size={10} /></span>}
                 </button>
               );
@@ -276,6 +276,7 @@ export default function TradeCenter({
 }) {
   useModalLock();
   const [tab, setTab] = useState(openBoard ? "board" : "trainers");
+  const page = useRef(null);
   const [blocked, setBlocked] = useState([]);
   const [me, setMe] = useState(null);
   const [friends, setFriends] = useState(null);
@@ -340,11 +341,18 @@ export default function TradeCenter({
     return () => removeEventListener("keydown", onKey);
   }, [back]);
 
-  // The address bar names the profile, so a link can be shared from it.
+  /* THE BROWSER'S BACK LEAVES THE PAGE. Opening pushes one history entry
+     (`#/trade`) unless a link already put us on one; App closes the page when
+     the hash leaves it. The profile names itself in the same entry, so a link
+     can be shared from the address bar. */
   useEffect(() => {
-    const want = viewing ? `#/trainer/${encodeURIComponent(viewing.username)}` : "";
-    if (location.hash !== want) history.replaceState(null, "", want || location.pathname + location.search);
+    if (!/^#\/(trade|trainer\/)/.test(location.hash)) history.pushState({ tc: 1 }, "", "#/trade");
+  }, []);
+  useEffect(() => {
+    const want = viewing ? `#/trainer/${encodeURIComponent(viewing.username)}` : "#/trade";
+    if (location.hash !== want) history.replaceState(history.state, "", want);
   }, [viewing]);
+  useEffect(() => { page.current?.scrollTo(0, 0); }, [tab, viewing, editing, composing]);
 
   // Search, a beat after typing stops, and only from two letters.
   const timer = useRef(null);
@@ -494,17 +502,26 @@ export default function TradeCenter({
     );
   }
 
+  /* A PAGE, NOT A DIALOG. It was a card over the map with its own scroll, and
+     the pickers inside it scrolled too - a scroll inside a scroll, which on a
+     phone is a thumb fight. Now it covers the game with ONE scroll (the page),
+     the header and tabs pinned. It still takes the modal lock, so the game
+     underneath hears no keys; there is no scrim to tap, so it closes by its
+     own button, Escape, or the browser's Back (`#/trade`, see App). */
   return (
-    <div className="sheet" {...useDismiss(onClose)}>
-      <div className="helpcard evcard tradecard" role="dialog" aria-modal="true" aria-label="Trade Center"
-        onClick={(e) => e.stopPropagation()}>
-        <div className="set-top">
-          <h3>Trade Center</h3>
-          <span className="set-mail">Trainers, offers, the board, Surprise Trade and your card</span>
-          <button className="set-x" onClick={onClose} aria-label="Close">✕</button>
+    <div className="tc-page evcard" role="dialog" aria-modal="true" aria-label="Trade Center" ref={page}>
+      <header className="tc-head">
+        <div className="tc-bar">
+          <button type="button" className="tc-home" onClick={onClose} aria-label="Back to the game">
+            <span aria-hidden="true">‹</span> Game
+          </button>
+          <div className="tc-titles">
+            <h3>Trade Center</h3>
+            <span>Trainers, offers, the board, Surprise Trade and your card</span>
+          </div>
         </div>
         {signedIn && !closed && !viewing && !editing && !composing && (
-          <div className="sheet-tabs tc-tabs" role="tablist">
+          <div className="tc-tabbar"><div className="sheet-tabs tc-tabs" role="tablist">
             {[["trainers", "Trainers", incoming.length || null], ["offers", "Offers", offers || null],
               ["board", "Board", null], ["surprise", "Surprise", null], ["card", "My card", null]].map(([id, name, n]) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id}
@@ -512,14 +529,14 @@ export default function TradeCenter({
                 {name}{n ? <em>{n}</em> : null}
               </button>
             ))}
-          </div>
+          </div></div>
         )}
-        <div className="hp-body">
-          {fail && <p className="tc-err" role="alert">{fail} <button type="button" className="tp-quiet" onClick={load}>Try again</button></p>}
-          {note && <p className="tc-note" role="status">{note}</p>}
-          {body}
-        </div>
-      </div>
+      </header>
+      <main className="hp-body tc-main">
+        {fail && <p className="tc-err" role="alert">{fail} <button type="button" className="tp-quiet" onClick={load}>Try again</button></p>}
+        {note && <p className="tc-note" role="status">{note}</p>}
+        {body}
+      </main>
     </div>
   );
 }
