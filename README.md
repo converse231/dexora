@@ -3192,5 +3192,8 @@ layers and collision, which is where map tiles are actually pulled from. If you 
 ☆ in the source directory, add its artist here before you share the game.
 The pixel lettering is **Geist Pixel by the Geist Project Authors (Vercel)**, under the SIL Open Font
 License 1.1 (`public/fonts/OFL.txt`), self-hosted so the game reads the same offline.
+The shipped file is **modified**: `tools/build_font.py` merges each glyph's pixel squares into
+outlines (same shapes, far fewer points - it rendered slowly on phones). The OFL allows it; the
+font declares no Reserved Font Name.
 Uses Nintendo's characters and art — keep it personal and non-commercial: no ads,
 no payments, no store listing. **If you add a tileset marked ☆, credit its artist here.**

@@ -1400,6 +1400,11 @@ canvas {
 }
 
 /* ---------- side rail ---------- */
+/* A tab's panel, kept mounted once visited (Rail.jsx). `contents` so the
+   panel lays out as the rail's own child; `[hidden]` must be said again,
+   because an author `display` beats the browser's own rule for it. */
+.rail-pane { display: contents; }
+.rail-pane[hidden] { display: none; }
 /* Sizes here are deliberately generous. The pixel face is charming on short
    labels but unreadable as body text, so anything you actually read - species
    names, item descriptions - uses the body face instead. */
@@ -2057,21 +2062,22 @@ canvas {
    variant marks and a completion badge now; at the ~52px auto-fill produced
    those were fighting for the same corner. Four fixed columns give ~76px, which
    is enough for each of them to have a place. */
-.dexgrid {
+.dexgrid { max-height: 440px; overflow-y: auto; padding-right: 4px; }
+/* The grid itself, inside the scroller - it carries the windowing's spacer
+   padding, which on the scroller would have been height (see Dex.jsx). */
+.dexgrid-in {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-auto-rows: 84px; gap: 7px;
-  max-height: 440px; overflow-y: auto; padding-right: 4px;
   align-content: start;
 }
-/* `content-visibility` was the noted lever for a grid of animated cells, and
-   358 entries is what made it worth pulling: a full variant dex is 358 masked,
-   animating layers, of which a dozen are ever on screen. Offscreen cells skip
-   rendering entirely - animations included - and `grid-auto-rows` already fixes
-   the row height, so `contain-intrinsic-size` costs no scrollbar jump. */
+/* NO `content-visibility` HERE ANY MORE. It was the lever for 358 animated
+   cells; at 1,300 it cost more than it saved - an intersection check per tile
+   per frame, which halved the frame rate while the Dex was open. The grid now
+   renders only the rows in view (`useRows` in Dex.jsx, which reads its
+   geometry from `grid-auto-rows` and `gap` above), so there is nothing
+   offscreen to skip. */
 .cell {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 84px;
   position: relative; border-radius: 8px;
   border: 2px solid var(--line-firm); background: var(--surface);
   display: grid; place-items: center; overflow: hidden;
@@ -5642,7 +5648,7 @@ button:disabled { transition: none; }
     display: flex; flex-direction: column;
     height: 0; min-height: 100%;
   }
-  .rail > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .rail > .panel, .rail-pane > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .dexgrid, .boxlist, .arealist, .shopscroll, .trscroll {
     max-height: none; flex: 1 1 auto; min-height: 120px;
     /* These are grids that now fill the column, so their rows would stretch to

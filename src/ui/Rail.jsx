@@ -68,6 +68,18 @@ export default function Rail({
   onTravel, onSpend, save, account, jumpTo, onJumped, outbreakArea,
 }) {
   const [tab, setTab] = useState("dex");
+  /* A VISITED TAB STAYS MOUNTED, HIDDEN. Every switch used to tear the panel
+     down and build it again - the Dex's 1,300 tiles each time, the Box's rows
+     each time - which on a phone was seconds per tap. Now the first visit
+     builds it and later ones only show it; it also keeps each panel's filters
+     and scroll where you left them. Hidden is `display: none`: no layout, no
+     paint, no running animations. */
+  const [seen, setSeen] = useState(() => new Set(["dex"]));
+  useEffect(() => {
+    setSeen((s) => (s.has(tab) ? s : new Set(s).add(tab)));
+  }, [tab]);
+  const pane = (id, el) => (seen.has(id) || tab === id
+    ? <div key={id} className="rail-pane" hidden={tab !== id}>{el}</div> : null);
 
   /* Arriving from the Dex's "See in Box". The tab lives here, so the switch
      does too; the Box takes the NAME as a search seed and clears the id. */
@@ -122,7 +134,7 @@ export default function Rail({
         ))}
       </div>
 
-      {tab === "dex" && (
+      {pane("dex", (
         <Dex
           dex={state?.dex}
           /* The whole state, not one prop per tier. Those arrays are already
@@ -137,8 +149,8 @@ export default function Rail({
           colRev={state?.colRev}
           onSelect={onSelect}
         />
-      )}
-      {tab === "box" && (
+      ))}
+      {pane("box", (
         <Box
           box={box}
           bag={bag}
@@ -154,17 +166,17 @@ export default function Rail({
           onEvolve={onEvolve}
           candy={state?.candy ?? 0}
         />
-      )}
-      {tab === "shop" && (
+      ))}
+      {pane("shop", (
         <Shop money={state?.money ?? 0} bag={bag} level={level}
               stats={state?.stats} onBuy={onBuy}
               candy={state?.candy ?? 0} onBuyCandy={onBuyCandy} />
-      )}
-      {tab === "map" && (
+      ))}
+      {pane("map", (
         <Travel areaId={state?.areaId} level={level} busy={busy} onTravel={onTravel}
           outbreakArea={outbreakArea} />
-      )}
-      {tab === "you" && (
+      ))}
+      {pane("you", (
         <>
           <Trainer
             stats={state?.stats}
@@ -175,7 +187,7 @@ export default function Rail({
             account={account}
           />
         </>
-      )}
+      ))}
     </div>
   );
 }

@@ -3337,7 +3337,15 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
        naming the animation, so the next shimmer is covered. */
     {
       const body = (re) => css.match(re)?.[0] ?? "";
-      for (const row of [".cell", ".boxrow"]) {
+      /* THE DEX IS WINDOWED instead: at 1,300 tiles `content-visibility`
+         cost more than it saved (an intersection check per tile per frame
+         halved the frame rate), so only the rows in view are tiles at all.
+         Held to the render itself - the grid maps a SLICE, bounded by
+         `useRows` - so a `shown.map` put back is caught. */
+      const dexSrc = readFileSync(new URL("../src/ui/Dex.jsx", import.meta.url), "utf8");
+      assert.ok(/shown\.slice\(first \* win\.cols, last \* win\.cols\)\.map/.test(dexSrc) && /useRows\(grid,/.test(dexSrc),
+        "the Dex grid renders every species again - 1,300 tiles on each open, seconds on a phone");
+      for (const row of [".boxrow"]) {
         assert.ok(/content-visibility:\s*auto/.test(
           body(new RegExp(`\\${row} \\{[^}]*\\}`))),
           `${row} is a row of a list that grows with the save and does not ` +
