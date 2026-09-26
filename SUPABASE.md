@@ -326,6 +326,61 @@ select privilege_type, column_name from information_schema.column_privileges
 The game needs nothing redeployed for any of this — every column it writes is
 still granted.
 
+## 3d. Trading — **run this once, after 3c** (added 2026-09)
+
+Trading's server half is one file, [db/trading.sql](db/trading.sql), and every
+statement in it is re-runnable. It adds tables and functions and changes no
+existing row, apart from giving every existing profile a trainer card with a
+friend code. Design and rules: [docs/trading.md](docs/trading.md).
+
+1. **3c first.** Its summary-trigger fix matters here: the trading save
+   trigger runs beside it, and without 3c a save whose `dex` is not a list or
+   whose `xp` is not a number fails. Check that 3c took; this should return
+   one row:
+
+   ```
+   select conname from pg_constraint where conname = 'save_shape';
+   ```
+
+2. **Run the file.** SQL Editor → New query → paste the whole of
+   `db/trading.sql` → Run. "Success. No rows returned" is right.
+
+3. **Check it took.** Each of these should hold:
+
+   ```
+   -- every trainer has a card (the two numbers match)
+   select (select count(*) from public.profiles) as profiles,
+          (select count(*) from public.trainer_cards) as cards;
+   -- the limits the game was built against (12)
+   select public.trade_limit('SHELF');
+   -- players can read cards but NOT friend codes: friend_code must be missing here
+   select column_name from information_schema.column_privileges
+    where table_name = 'trainer_cards' and grantee = 'authenticated' order by 1;
+   ```
+
+4. **Deploy the game.** Order does not matter much. A build without trading
+   never calls these functions. A build with trading, against a project
+   without this SQL, says "Trading isn't open yet" and keeps quiet.
+
+5. **Smoke test with two accounts** (a phone and a laptop will do): add each
+   other by friend code (My card shows yours), put a spare on one card, offer
+   for it from the other, accept. The trade scene should play on both, and
+   the Box should show the Pokémon on its new side.
+
+**Reports** land in `public.reports` (Table Editor). `reason` is an index into
+`REPORT_REASONS` in `src/game/trade.js`. No player can read the table. To act
+on a report, look the trainer up in `trainer_cards`.
+
+**If it ever has to come out:** drop the three triggers first, then the
+tables. The game reads a missing function as "not open yet", and Box entries
+keep their trade fields, which it ignores. No save is touched:
+
+```
+drop trigger if exists saves_reconcile_trades on public.saves;
+drop trigger if exists saves_to_card on public.saves;
+drop trigger if exists profile_to_card on public.profiles;
+```
+
 ## 4. Turn off email confirmation — **you have to do this one**
 
 It is the only step that cannot be done from here: the setting lives in GoTrue's

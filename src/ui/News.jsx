@@ -11,6 +11,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-09-30",
+    date: "September 2026",
+    title: "Trading",
+    items: [
+      ["The Trade Center", "Sign in and open the Trade Center from the menu: find trainers, add friends, and show off six Pokémon on your card."],
+      ["Offers", "Put Pokémon up for trade on your card, and ask for anything on someone else's. Nothing moves until both sides agree."],
+      ["Surprise Trade and the Board", "Swap one for one with a friend without knowing what comes back, or list \"this for that\" on the Trade Board. A Pokédex entry's On the Board button searches it."],
+      ["Fair play", "You always keep the last of each species. A traded Pokémon fills your Pokédex; medals and rare-form marks stay for the ones you caught. Block or report anyone from their profile."],
+    ],
+  },
+  {
     id: "2026-09-29",
     date: "September 2026",
     title: "Night mode",

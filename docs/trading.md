@@ -29,6 +29,7 @@ built. Change a decision here first, then the code.
 | `SHOWCASE` | 6 | profile showcase slots |
 | `SEEKING` | 12 | "looking for" species on a profile |
 | `FRIENDS` | 100 | friends and pending requests per trainer |
+| `SHELF` | 12 | Pokémon up for trade on a profile - an offer can only ask for these |
 
 ## Data model (Supabase)
 
@@ -37,15 +38,18 @@ entered trading has a row the server owns**, and only server functions move it.
 
 | Table | Holds | Who writes |
 |---|---|---|
-| `trainer_cards` | public card: username, char, level, dex count, variant count, stars, trades, `showcase` (≤6 snapshots), `seeking` (≤12 species), `friend_code` | stats by trigger from `saves` (like the summary columns); showcase/seeking via `update_card()` |
-| `friends` | (a, b, status) | `add_friend(code)`, `answer_friend()`, `remove_friend()` |
-| `mons` | server id, owner, species, level, tier, alpha, size, caught_at, `ot`/`ot_name`, `local_uid`, `status` (held/offered/listed/pooled/arriving), `traded` count | **RPC only** - no insert/update policy |
+| `trainer_cards` | public card: username, char, level, dex count, variant count, stars, trades, `showcase` (≤6 snapshots), `seeking` (≤12 species), `friend_code` - **readable by its own trainer only** (a column grant; `my_card()`) | stats by trigger from `saves` (like the summary columns); showcase/seeking via `update_card()` |
+| `friends` | (a, b, status) | `add_friend(code)`, `request_friend(user)`, `answer_friend()`, `remove_friend()` |
+| `mons` | server id, owner, species, level, tier, alpha, size, `ot`/`ot_name`, `local_uid`, `shelf`, `status` (held/offered/listed/pooled/arriving/released), `traded` count | **RPC only** - no insert/update policy |
 | `trades` | kind (direct/surprise/board), a, b, what each gives (mon ids), status, preset message, times | RPC only |
-| `listings` | owner, mon, wants (species and/or tier), expires | RPC only |
-| `surprise_pool` | mon, owner, deposited_at | RPC only |
-| `deliveries` | a mon that arrived for a user, until the client claims it | RPC only |
+| `listings` | owner, mon, wanted species and optional tier; open a week | RPC only |
+| `surprise_pool`, `surprise_log` | a waiting deposit; the day's deposits (the cap) | RPC only |
 | `trade_log` | append-only record of every move | RPC only |
-| `blocks`, `reports` | | own rows |
+| `blocks` | (blocker, blocked) | `block_user()`, `unblock_user()`; the blocker reads their own |
+| `reports` | reporter, reported, reason (a `REPORT_REASONS` index) | `report_user()`; **nobody reads it through the API** - the dashboard does |
+
+A delivery is not a table: a traded Pokemon's row changes owner with
+`status = 'arriving'`, and becomes `held` when a save holding it lands.
 
 Every function is `security definer`, `set search_path = ''`, takes no user id
 (it reads `auth.uid()`), and does its whole job in **one transaction with the
@@ -60,8 +64,9 @@ that duplicates under a double-click.
   there, the fields match), validates shape (species in range, level 1-100,
   tier in `TIERS`, alpha only where `canBeAlpha`), applies the daily cap.
 - `propose_trade(to, give[], get[], msg)` / `answer_trade(id, yes)` /
-  `cancel_trade(id)` - direct offers. Proposing locks your side; accepting
-  re-verifies both sides, swaps owners, writes both deliveries and the log.
+  `cancel_trade(id)` - direct offers, asking only for what is on the other
+  trainer's shelf (`set_shelf`, `trainer_shelf`). Proposing locks your side;
+  accepting re-verifies both sides, swaps owners (both arrive) and logs it.
 - `surprise_deposit(mon)` - matches immediately against a **friend's** waiting
   deposit, or waits (≤7 days, then comes home).
 - `post_listing(mon, wants)` / `fulfil_listing(listing, mon)` /
@@ -69,8 +74,29 @@ that duplicates under a double-click.
 - `trade_inbox()` - one round trip with exactly what `reconcileTrades` takes:
   what arrived, what is locked, what is gone, the open offers. It also
   expires the caller's stale offers on the way (a lazy sweep: no cron).
-- `update_card(showcase, seeking)`, `add_friend(code)`, `answer_friend(id, yes)`,
-  `block(user)`, `report(user, reason)`.
+- `my_card()`, `card_by_name(name)`, `find_trainers(q)`, `my_friends()` -
+  cards as a player sees them: another trainer's never carries the code.
+- `update_card(showcase, seeking)`, `add_friend(code)`, `request_friend(user)`,
+  `answer_friend(id, yes)`, `remove_friend(id)`.
+- `block_user(user)`, `unblock_user(user)`, `my_blocks()`,
+  `report_user(user, reason)` - see *Block and report*.
+
+### Block and report
+
+- **A block works both ways and says nothing.** Neither side finds the other
+  in search, opens their card or shelf (a link answers "no trainer called"),
+  sends a friend request (it reads as an unknown code) or proposes an offer.
+- **Blocking ends the friendship and closes every open offer between the
+  two**, freeing what each had locked. Friending refuses across a block, so
+  *friends implies no block* - which is what covers the friends-only Board
+  and Surprise Trade without a second check in each.
+- Only the blocker sees or lifts it (`my_blocks`, the Trainers tab).
+- **A report** is a reason from a fixed list (`REPORT_REASONS`, append-only:
+  the server stores the index), once per pair per day, no free text. Players
+  cannot read reports; SUPABASE.md §3d says where they are.
+- **Friend codes are not public.** A card is readable by every player, so the
+  code is withheld by a column grant (RLS picks rows, not columns); a
+  profile's Add friend sends `request_friend(user)` instead.
 
 ### The save, reconciled on the server
 
@@ -104,7 +130,8 @@ direct upsert, and `save_game` itself is untouched):
   the box (hundreds of entries), with the rebuild only when something is
   actually stripped.
 - **Every hot query is indexed**: `mons (owner, status)`, `mons (owner,
-  local_uid)`, `trades (a, status)`, `trades (b, status)`, `trade_log (from/to, at)`.
+  local_uid)`, `trades (a, status)`, `trades (b, status)`, `trade_log (from/to, at)`,
+  `friends (b, status)` (the inbox's request count), `blocks` both ways.
 - **One round trip per poll** (`trade_inbox`), skipped while the tab is hidden.
 - **The Trade Center loads on demand** (a dynamic import), so the game's first
   load does not grow for players who never open it.
@@ -132,9 +159,10 @@ direct upsert, and `save_game` itself is untouched):
 
 ## Screens
 
-- **Trade Center** - full screen, the Events pattern. Tabs: **Board** ·
-  **Offers** (inbox, sent, history) · **Surprise** · **Friends & my card**.
-  Opened from a new top-bar button with a badge.
+- **Trade Center** - a dialog off the menu, the Events pattern. Tabs:
+  **Trainers** (search, requests, friends, blocked) · **Offers** (inbox, sent,
+  history) · **Board** · **Surprise** · **My card**. The menu's dot shows for
+  an offer or a friend request waiting.
 - **Trainer profile** - trainer art, level, dex ring, stars, variant and trade
   counts, a 6-slot showcase with each tier's effect, "Up for trade", "Looking
   for", friend button, propose trade, block/report. Shareable link
@@ -144,8 +172,11 @@ direct upsert, and `save_game` itself is untouched):
 - **The trade scene** - two Poké Balls ride a glowing link cable into a centre
   ring, swap in a burst, and the arriving Pokémon is revealed with its tier's
   reveal. Plays for the second party the next time they open the game.
-- Entry points: Box row "Trade", Dex sheet "Find trades", a board listing's
-  trainer name.
+- Entry points: a Pokédex entry's **On the Board** (seen species only, like
+  the Board's own search), any trainer's name in Offers or on the Board, a
+  profile link. The Box marks what is in a trade, and its preview tells a
+  traded one's story (original trainer, times traded). A Box-row "Trade"
+  was dropped: a row is a group, and a trade picks one Pokemon.
 
 ## Status
 
@@ -153,13 +184,16 @@ direct upsert, and `save_game` itself is untouched):
 |---|---|
 | 0. Foundation | **done** - client and `db/trading.sql` pass on the test project |
 | 1. Profiles | **done** - cards, showcase, wishes, friends, search, profile page, links |
-| 2-5 | not started |
+| 2. Surprise Trade | **done** - friends-only pool, the sync loop, the trade scene, Box "IN TRADE" |
+| 3. Direct offers | **done** - the shelf (`set_shelf`, `trainer_shelf`: offers ask only for it), composer, Offers tab, history, badges |
+| 4. Trade Board | **done** - friends' listings (`post_listing`, `trade_board`, `fulfil_listing`), species + tier wants, search, one-tap fill |
+| 5. Polish | **done** - block and report, private friend codes, requests on the menu dot, On the Board, names open profiles, the preview's trade story, Help, What's new, the review pass |
 
-**Not on the live project yet.** Until `db/trading.sql` is run there, the Trade
-Center answers "Trading isn't open yet" (a missing function is its own answer,
-never an error). Before running it, run SUPABASE.md §3c too: the base summary
-trigger fails a save whose `dex` is not a list or whose `xp` is not a number,
-and §3c is the fix (found while testing phase 1).
+**Going live is SUPABASE.md §3d**: §3c first, then `db/trading.sql`, a check,
+a deploy and a two-account smoke test. Until the SQL is run, the Trade Center
+answers "Trading isn't open yet" (a missing function is its own answer, never
+an error). tradedb applies §3c to the test project every run, so the tests
+run against the shape live will have.
 
 ## Phases - each ends in QA and your review
 

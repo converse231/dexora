@@ -5,7 +5,9 @@ import TopBar from "./ui/TopBar.jsx";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
-import { RAIL_KEY, ORDER_KEY, read, write } from "./game/store.js";
+import { RAIL_KEY, ORDER_KEY, read, write, flushNow } from "./game/store.js";
+import { tradeInbox, push } from "./net/cloud.js";
+import { inboxToReconcile, freshTrades } from "./game/trade.js";
 import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
@@ -33,6 +35,14 @@ import Evolve from "./ui/Evolve.jsx";
 /* ON DEMAND: the Trade Center is its own chunk, fetched the first time it
    opens, so the game's first load does not grow for anyone who never trades. */
 const TradeCenter = lazy(() => import("./ui/trade/TradeCenter.jsx"));
+const TradeScene = lazy(() => import("./ui/trade/TradeScene.jsx"));
+/* Which trades this DEVICE has shown its scene for - a per-device nicety like
+   "seen" news, so localStorage and never the save. */
+const SEEN_TRADES = "dexora-trades-seen";
+const seenTrades = () => {
+  try { return new Set(JSON.parse(read(SEEN_TRADES) ?? "[]")); } catch { return new Set(); }
+};
+const markSeen = (ids) => write(SEEN_TRADES, JSON.stringify([...seenTrades(), ...ids].slice(-100)));
 // A shared profile link: #/trainer/<name>.
 const linkedTrainer = () => {
   const m = location.hash.match(/^#\/trainer\/(.+)$/);
@@ -139,6 +149,51 @@ export default function App({
   const [settings, setSettings] = useState(false);
   // The Trade Center, and which profile to open it on (a shared link names one).
   const [trade, setTrade] = useState(() => (linkedTrainer() ? { name: linkedTrainer() } : null));
+  /* TRADES REACH THE GAME HERE (docs/trading.md): the server's inbox, through
+     the engine's one door, `reconcileTrades`. Polled - every 60s, 15s while
+     the Trade Center is open - and skipped while the tab is hidden; a server
+     with no trading yet (`closed`) is not asked again. A delivery completes
+     when a save holding it LANDS, so anything that moved is flushed straight
+     after the local save has been written. */
+  const [scenes, setScenes] = useState([]);
+  // Offers waiting on this trainer: the Offers tab's count and the menu's dot.
+  const [offerAlert, setOfferAlert] = useState(0);
+  /* THE LAST INBOX, one copy for every tab that shows it - a trade finishing
+     in the background reached the engine but not the Offers tab, which kept a
+     copy of its own from when it opened. */
+  const [inbox, setInbox] = useState(null);
+  const syncTrades = useCallback(async () => {
+    if (!account || !engine) return { ok: false };
+    const got = await tradeInbox();
+    if (!got.ok) return got;
+    if (engine.reconcileTrades(inboxToReconcile(got.data))) setTimeout(() => flushNow(push), 600);
+    setOfferAlert((got.data.open ?? []).filter((o) => o.kind === "direct" && !o.mine).length);
+    setInbox(got.data);
+    const fresh = freshTrades(got.data.recent, seenTrades());
+    if (fresh.length) {
+      markSeen(fresh.map((r) => r.id));
+      setScenes((q) => [...q, ...fresh]);
+    }
+    return got;
+  }, [account, engine]);
+  const tradeOpen = Boolean(trade);
+  useEffect(() => {
+    if (!account || !engine) return undefined;
+    let stop = false, timer = null;
+    const tick = async () => {
+      const got = document.visibilityState === "visible" ? await syncTrades() : { ok: true };
+      if (!stop && !got.closed) timer = setTimeout(tick, tradeOpen ? 15000 : 60000);
+    };
+    tick();
+    return () => { stop = true; clearTimeout(timer); };
+  }, [account, engine, tradeOpen, syncTrades]);
+  // A trade the player just made plays at once, and is not played again.
+  const onTraded = useCallback((t) => {
+    markSeen([t.id]);
+    setScenes((q) => [...q, t]);
+    syncTrades();
+  }, [syncTrades]);
+
   // A profile link pasted into a game that is already open opens it too.
   useEffect(() => {
     const onHash = () => { const name = linkedTrainer(); if (name) setTrade({ name }); };
@@ -507,14 +562,26 @@ export default function App({
         <Suspense fallback={null}>
           <TradeCenter
             signedIn={Boolean(account)}
+            engine={engine}
+            sync={syncTrades}
+            onTraded={onTraded}
             box={st?.box ?? []}
             dexOf={(x) => st?.dex[dexIndex(x)] ?? 0}
             openName={trade.name}
+            openBoard={trade.board ?? null}
+            offers={offerAlert}
+            inbox={inbox}
             onClose={() => {
               setTrade(null);
               if (location.hash) history.replaceState(null, "", location.pathname + location.search);
             }}
           />
+        </Suspense>
+      )}
+
+      {scenes.length > 0 && (
+        <Suspense fallback={null}>
+          <TradeScene key={scenes[0].id} trade={scenes[0]} onDone={() => setScenes((q) => q.slice(1))} />
         </Suspense>
       )}
 
@@ -576,6 +643,7 @@ export default function App({
         onForms={() => setForms(true)}
         onEvents={() => setEvents(true)}
         onTrade={() => setTrade({ name: null })}
+        tradeAlert={offerAlert > 0 || (inbox?.friend_requests ?? 0) > 0}
         onNews={() => setNews(true)}
         unread={unread}
         trainerName={trainerName}
@@ -886,6 +954,8 @@ export default function App({
              variant that cannot currently spawn at all. */
           owned={st?.box?.filter((m) => m.species === entry).length ?? 0}
           onFindInBox={(id) => { setBoxJump(id); setEntry(null); }}
+          /* Only once the inbox has answered: signed in, and trading open. */
+          onFindOnBoard={inbox ? (id) => { setEntry(null); setTrade({ name: null, board: id }); } : null}
           /* Travelling closes the sheet, because the answer to "where do I
              find one" has been acted on and leaving the entry open over the
              map you just arrived at is a dialog with nothing left to say. */

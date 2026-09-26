@@ -536,9 +536,6 @@ export async function push(raw) {
    `closed` IS ITS OWN ANSWER: a server without the trading functions (the live
    project before its SQL is run) says so once, as "not open yet", rather than
    as an error on every button. */
-const CARD_COLS = "user_id, username, char, friend_code, xp, dex_count, variants, stars, "
-  + "trades, showcase, seeking, joined_at, played_at";
-
 const tradeFail = (error) => {
   // PGRST202: no such function. 42P01: no such table. 42883: no such function (SQL).
   if (["PGRST202", "PGRST205", "42P01", "42883"].includes(error?.code)) {
@@ -557,25 +554,36 @@ async function tradeCall(fn, args = {}) {
   }
 }
 
-async function cardWhere(col, value, like = false) {
-  if (!CLOUD || !session) return { ok: false, error: "Sign in to trade." };
-  try {
-    const q = supabase.from("trainer_cards").select(CARD_COLS);
-    // A name is matched whole and case-blind: ilike with its wildcards escaped.
-    const { data, error } = await (like
-      ? q.ilike(col, String(value).replace(/[\\%_]/g, (c) => `\\${c}`))
-      : q.eq(col, value)).maybeSingle();
-    return error ? tradeFail(error) : { ok: true, data: data ?? null };
-  } catch (e) {
-    return tradeFail(e);
-  }
-}
-
-export const myCard = () => cardWhere("user_id", session?.user?.id);
-export const cardByName = (name) => cardWhere("username", String(name ?? "").trim(), true);
+/* Cards come through functions, not the table: a friend code is readable by
+   its own trainer only (a column grant), and a block hides a card both ways. */
+export const myCard = () => tradeCall("my_card");
+export const cardByName = (name) => tradeCall("card_by_name", { name: String(name ?? "").trim() });
 export const searchTrainers = (q) => tradeCall("find_trainers", { q });
 export const updateCard = (showcase, seeking) => tradeCall("update_card", { showcase, seeking });
 export const myFriends = () => tradeCall("my_friends");
 export const addFriend = (code) => tradeCall("add_friend", { code });
 export const answerFriend = (other, yes) => tradeCall("answer_friend", { other, yes });
 export const removeFriend = (other) => tradeCall("remove_friend", { other });
+export const requestFriend = (other) => tradeCall("request_friend", { other });
+// Phase 5: block and report.
+export const blockUser = (other) => tradeCall("block_user", { other });
+export const unblockUser = (other) => tradeCall("unblock_user", { other });
+export const myBlocks = () => tradeCall("my_blocks");
+export const reportUser = (other, reason) => tradeCall("report_user", { other, reason });
+// Phase 2: the inbox the engine reconciles from, and Surprise Trade.
+export const tradeInbox = () => tradeCall("trade_inbox");
+export const registerMons = (snaps) => tradeCall("register_mons", { snaps });
+export const surpriseDeposit = (mid) => tradeCall("surprise_deposit", { mid });
+export const surpriseWithdraw = (mid) => tradeCall("surprise_withdraw", { mid });
+// Phase 3: the shelf and direct offers.
+export const setShelf = (uids) => tradeCall("set_shelf", { uids });
+export const trainerShelf = (who) => tradeCall("trainer_shelf", { who });
+export const proposeTrade = (target, give, want, msg) => tradeCall("propose_trade", { target, give, want, msg });
+export const answerTrade = (tid, yes) => tradeCall("answer_trade", { tid, yes });
+export const cancelTrade = (tid) => tradeCall("cancel_trade", { tid });
+// Phase 4: the Trade Board.
+export const tradeBoard = (q = null) => tradeCall("trade_board", { q });
+export const postListing = (mid, wantSpecies, wantTier = null) =>
+  tradeCall("post_listing", { mid, want_species: wantSpecies, want_tier: wantTier });
+export const withdrawListing = (lid) => tradeCall("withdraw_listing", { lid });
+export const fulfilListing = (lid, mid) => tradeCall("fulfil_listing", { lid, mid });

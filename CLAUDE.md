@@ -452,6 +452,28 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   Trainer cards are written by triggers and `update_card` only (the showcase
   is read off the STORED save, so flush first); the Trade Center is a lazy
   chunk; `net/cloud.js` answers `closed` when the server has no trading yet.
+  App polls `trade_inbox` (60s, 15s with the Trade Center open, never hidden)
+  into `reconcileTrades` via `inboxToReconcile`, flushes after anything moves
+  (a delivery completes when its save lands), and queues `TradeScene` for
+  `freshTrades` (per-device "seen", through store.js). Every swap goes through
+  `perform_swap`, which also frees the offers it fails. An offer can ask only
+  for what is on the other trainer's SHELF. A Pokemon enters trading through
+  one path, `enterTrading` (flush, register, assign). App holds the ONE inbox
+  every tab reads (a tab's own copy went stale when a trade finished).
+  A board listing is one Pokemon for a species (+ tier if named), friends
+  only; `fits` in trade.js mirrors `fulfil_listing`'s rule for the button.
+  **A block works both ways and ends the friendship**, and friending refuses
+  across one, so friends implies no block and the friends-only modes need no
+  check of their own; every other read (search, card, shelf, offer, request)
+  calls `blocked_between`. **Friend codes are readable by their own trainer
+  only**: a column grant on `trainer_cards` (a new column is unreadable until
+  granted there), so cards come through functions (`my_card`,
+  `card_by_name`, `public_card` strips the code), never `from("trainer_cards")`.
+  A SQL-language function is checked when created, so anything one reads
+  (`blocks`, `blocked_between`) is defined above it in the file.
+  `REPORT_REASONS` is append-only (the server stores the index; check.mjs
+  holds it inside the SQL's range). Going live is SUPABASE.md §3d; tradedb
+  applies §3c every run so the test project has live's shape.
 - **Monsoon Trail is Emerald's Route 119** in Deep Woods' slot (id `woods`),
   transcribed like the Safari Zone against Emerald General + `fortree`
   (appended last in `EM_SECONDARY`). Long grass is laid as tall; rails are `-` and `|`

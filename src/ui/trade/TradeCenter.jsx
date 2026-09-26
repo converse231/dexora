@@ -6,15 +6,20 @@
    empty list - "nobody here" and "could not ask" must not look alike. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SPECIES } from "../../data/dex.js";
-import { speciesById, TIERS } from "../../game/biomes.js";
+import { speciesById, TIERS, isLegendary } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
-import { LIMITS } from "../../game/trade.js";
-import { variantOf } from "../../game/items.js";
+import { LIMITS, tradeable } from "../../game/trade.js";
+import { variantOf, keeper } from "../../game/items.js";
 import { flushNow } from "../../game/store.js";
 import {
   myCard, cardByName, searchTrainers, updateCard, myFriends,
-  addFriend, answerFriend, removeFriend, push,
+  addFriend, requestFriend, answerFriend, removeFriend, push,
+  blockUser, unblockUser, myBlocks, reportUser,
+  surpriseDeposit, surpriseWithdraw, trainerShelf, setShelf,
 } from "../../net/cloud.js";
+import { Composer, OffersTab, MonPick, keyOf } from "./Offers.jsx";
+import { enterTrading } from "./enter.js";
+import BoardTab from "./Board.jsx";
 import { useDismiss, useModalLock } from "../modal.js";
 import Sprite, { TrainerArt } from "../Sprite.jsx";
 import Mark from "../Marks.jsx";
@@ -46,8 +51,13 @@ function Row({ card, children, onOpen }) {
 /* THE CARD EDITOR: six from your box, twelve wishes. What is saved is box uids
    and species ids; the server reads each Pokemon off your STORED save, which is
    why the save is flushed first. */
-function Editor({ box, dexOf, card, onSaved, onCancel }) {
+function Editor({ box, dexOf, card, shelf, engine, onSaved, onCancel }) {
   const [pick, setPick] = useState(() => card.showcase.map((m) => m.uid));
+  // The shelf, picked from what can be traded - plus anything already on it.
+  const shelfMids = useMemo(() => new Set((shelf ?? []).map((m) => m.mid)), [shelf]);
+  const tradeables = useMemo(() => box.filter((m) => shelfMids.has(m.mid) || tradeable(box, m))
+    .sort((a, b) => a.species - b.species || b.level - a.level).slice(0, 150), [box, shelfMids]);
+  const [up, setUp] = useState(() => tradeables.filter((m) => shelfMids.has(m.mid)).map(keyOf));
   const [wish, setWish] = useState(() => [...card.seeking]);
   const [find, setFind] = useState("");
   const [saving, setSaving] = useState(false);
@@ -70,10 +80,15 @@ function Editor({ box, dexOf, card, onSaved, onCancel }) {
 
   const save = async () => {
     setSaving(true); setErr(null);
+    await new Promise((r) => setTimeout(r, 500));  // the engine's local write lands
     await flushNow(push);                          // the server reads the stored save
     const got = await updateCard(pick, wish);
+    const put = got.ok ? await setShelf(tradeables.filter((m) => up.includes(keyOf(m))).map((m) => m.uid)) : got;
     setSaving(false);
-    if (got.ok) onSaved(got.data); else setErr(got.error);
+    if (!put.ok) { setErr(put.error); return; }
+    // set_shelf registered what it had to; the engine learns which entry got which id.
+    engine.reconcileTrades({ assign: Object.fromEntries(put.data.filter((m) => m.uid).map((m) => [m.uid, m.mid])) });
+    onSaved(got.data, put.data);
   };
 
   return (
@@ -123,6 +138,13 @@ function Editor({ box, dexOf, card, onSaved, onCancel }) {
           </>
         )}
       </section>
+      <section className="ev-card">
+        <header className="ev-banner"><h4>Up for trade</h4><span className="tp-count">{up.length}/{LIMITS.SHELF}</span></header>
+        <p>Offers can only ask for these. You always keep the last of each species.</p>
+        <MonPick mons={tradeables} picked={up} max={LIMITS.SHELF}
+          onToggle={(k) => setUp((p) => (p.includes(k) ? p.filter((x) => x !== k) : [...p, k]))}
+          empty="Nothing to trade yet - catch a second of something." />
+      </section>
       {err && <p className="tc-err" role="alert">{err}</p>}
       <div className="tp-actions">
         <button type="button" className="ev-go" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save card"}</button>
@@ -132,13 +154,136 @@ function Editor({ box, dexOf, card, onSaved, onCancel }) {
   );
 }
 
-export default function TradeCenter({ signedIn, box = [], dexOf = () => 0, openName = null, onClose }) {
+/* A Pokemon as the trade scene shows the side you gave. */
+const asShown = (m) => ({ species: m.species, level: m.level, tier: variantOf(m), alpha: !!m.alpha });
+
+/* SURPRISE TRADE (phase 2). Put one in, get one back from a friend. A
+   Pokemon enters trading here for the first time, so the flow is: let the
+   local save land and upload it (the server checks against the STORED save),
+   register it for a server id, then deposit. Anything rare asks twice. */
+function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
+  const [pick, setPick] = useState(null);
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [say, setSay] = useState(null);
+  // App holds the inbox; asking it again updates every tab at once.
+  const refresh = sync;
+  useEffect(() => { sync(); }, [sync]);
+
+  const left = inbox?.surprise_left ?? null;
+  const waiting = box.filter((m) => m.lock === "pool");
+  // Ordinary ones first - the spares a Surprise Trade is for - then by dex.
+  const choices = useMemo(() => box.filter((m) => tradeable(box, m))
+    .sort((a, b) => Number(keeper(a)) - Number(keeper(b)) || a.species - b.species || a.level - b.level)
+    .slice(0, 150), [box]);
+  const chosen = box.find((m) => m.uid === pick) ?? null;
+  const precious = chosen && (keeper(chosen) || isLegendary(chosen.species));
+
+  const deposit = async () => {
+    if (precious && !sure) { setSure(true); return; }
+    setBusy(true); setSay(null);
+    const entered = await enterTrading(engine, [chosen]);
+    if (!entered.ok) { setBusy(false); setSay(entered.error); return; }
+    const mid = entered.mids[chosen.uid];
+    const got = await surpriseDeposit(mid);
+    setBusy(false); setPick(null); setSure(false);
+    if (!got.ok) { setSay(got.error); return; }
+    const r = got.data;
+    if (r.status === "matched") {
+      onTraded({ id: r.trade, kind: "surprise", partner: r.from, at: new Date().toISOString(),
+        gave: [asShown(chosen)], got: [r.got] });
+    } else if (r.status === "waiting") {
+      engine.reconcileTrades({ locks: { [mid]: "pool" } });
+      setSay("In the pool - it trades with the next friend who puts one in.");
+    } else {
+      setSay(r.status === "capped" ? "That's every Surprise Trade for today." : "That Pokémon can't be traded right now.");
+    }
+    refresh();
+  };
+  const withdraw = async (m) => {
+    setBusy(true);
+    const got = await surpriseWithdraw(m.mid);
+    setBusy(false);
+    if (got.ok && got.data) engine.reconcileTrades({ locks: { [m.mid]: null } });
+    refresh();
+  };
+
+  return (
+    <div className="tc-list">
+      <section className={`ev-card ev-surprise${waiting.length ? " live" : ""}`}>
+        <header className="ev-banner">
+          <h4>Surprise Trade</h4>
+          {left !== null && <span className={`ev-stamp${left ? " live" : ""}`}>{left} LEFT TODAY</span>}
+        </header>
+        <p>Put one in, get one back from a friend - no idea what until it arrives.</p>
+        {friends === 0 && <p className="ev-quiet">Surprise Trade matches with friends. Add some in Trainers first.</p>}
+        {waiting.length > 0 && (
+          <ul className="tc-rows">
+            {waiting.map((m) => (
+              <li key={m.uid} className="tc-row">
+                <span className="tc-who still">
+                  <Sprite id={m.species} variant={variantOf(m)} />
+                  <span><b>{label(speciesById(m.species))}</b><i>Waiting for a friend…</i></span>
+                </span>
+                <button type="button" className="tp-quiet" disabled={busy} onClick={() => withdraw(m)}>Take back</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {say && <p className="tc-note" role="status">{say}</p>}
+      </section>
+
+      <section className="ev-card">
+        <header className="ev-banner"><h4>Choose one to send</h4></header>
+        {choices.length ? (
+          <div className="tc-pick">
+            {choices.map((m) => {
+              const sp = speciesById(m.species);
+              return (
+                <button key={m.uid} type="button" className={`tc-mon${pick === m.uid ? " on" : ""}`}
+                  aria-pressed={pick === m.uid} aria-label={`${label(sp)}, Lv ${m.level}`}
+                  onClick={() => { setPick(m.uid); setSure(false); }}>
+                  <Sprite id={m.species} variant={variantOf(m)} />
+                  {variantOf(m) && <span className="tp-tier"><Mark tier={variantOf(m)} size={10} /></span>}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="ev-quiet">Nothing to send - you keep the last of every species.</p>
+        )}
+        {chosen && (
+          <div className="tc-send">
+            <Sprite id={chosen.species} variant={variantOf(chosen)} fx />
+            <span>
+              <b>{label(speciesById(chosen.species))}</b>
+              <i>Lv {chosen.level}{variantOf(chosen) ? ` · ${variantOf(chosen)}` : ""}{chosen.alpha ? " · alpha" : ""}</i>
+              {sure && <em>This one is rare. Send it anyway?</em>}
+            </span>
+            <button type="button" className="ev-go" disabled={busy || left === 0} onClick={deposit}>
+              {busy ? "Sending…" : sure ? "Yes, send it" : "Send"}
+            </button>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+export default function TradeCenter({
+  signedIn, engine, sync, onTraded, box = [], dexOf = () => 0, openName = null, openBoard = null,
+  offers = 0, inbox = null, onClose,
+}) {
   useModalLock();
-  const [tab, setTab] = useState("trainers");
+  const [tab, setTab] = useState(openBoard ? "board" : "trainers");
+  const [blocked, setBlocked] = useState([]);
   const [me, setMe] = useState(null);
   const [friends, setFriends] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [editing, setEditing] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [theirShelf, setTheirShelf] = useState(null);
+  const [myShelf, setMyShelf] = useState(null);
   const [closed, setClosed] = useState(false);
   const [fail, setFail] = useState(null);
   const [note, setNote] = useState(null);
@@ -155,10 +300,11 @@ export default function TradeCenter({ signedIn, box = [], dexOf = () => 0, openN
 
   const load = useCallback(async () => {
     setFail(null);
-    const [c, f] = await Promise.all([myCard(), myFriends()]);
-    const card = answer(c), list = answer(f);
+    const [c, f, b] = await Promise.all([myCard(), myFriends(), myBlocks()]);
+    const card = answer(c), list = answer(f), blocks = answer(b);
     if (card) setMe(card);
     if (list) setFriends(list);
+    if (blocks) setBlocked(blocks);
   }, [answer]);
 
   useEffect(() => {
@@ -173,10 +319,21 @@ export default function TradeCenter({ signedIn, box = [], dexOf = () => 0, openN
 
   // Escape backs out of a profile or the editor first, then closes.
   const back = useCallback(() => {
-    if (editing) setEditing(false);
+    if (composing) setComposing(false);
+    else if (editing) setEditing(false);
     else if (viewing) setViewing(null);
     else onClose();
-  }, [editing, viewing, onClose]);
+  }, [composing, editing, viewing, onClose]);
+
+  // Shelves: whoever you are looking at, and your own for the card.
+  useEffect(() => {
+    setTheirShelf(null);
+    if (!viewing) return;
+    trainerShelf(viewing.user_id).then((got) => setTheirShelf(got.ok ? got.data : []));
+  }, [viewing]);
+  useEffect(() => {
+    if (me) trainerShelf(me.user_id).then((got) => got.ok && setMyShelf(got.data));
+  }, [me]);
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); back(); } };
     addEventListener("keydown", onKey);
@@ -209,6 +366,12 @@ export default function TradeCenter({ signedIn, box = [], dexOf = () => 0, openN
     setBusy(false);
     if (answer(got) !== null || got.ok) { setNote(say?.(got.data) ?? null); await load(); }
   };
+  // A name anywhere in the center (an offer, a listing) opens that profile.
+  const openTrainer = async (name) => {
+    const card = answer(await cardByName(name));
+    if (card) setViewing(card);
+    else setNote(`${name}'s profile isn't available.`);
+  };
   const share = async (name) => {
     try { await navigator.clipboard.writeText(link(name)); setNote("Profile link copied."); }
     catch { setNote(link(name)); }
@@ -224,24 +387,48 @@ export default function TradeCenter({ signedIn, box = [], dexOf = () => 0, openN
   } else if (closed) {
     body = <p className="tc-gate">Trading isn&rsquo;t open yet. Check back soon!</p>;
   } else if (editing && me) {
-    body = <Editor box={box} dexOf={dexOf} card={me}
-      onSaved={(c) => { setMe(c); setEditing(false); setNote("Card saved."); }}
+    body = <Editor box={box} dexOf={dexOf} card={me} shelf={myShelf} engine={engine}
+      onSaved={(c, s) => { setMe(c); setMyShelf(s); setEditing(false); setNote("Card saved."); }}
       onCancel={() => setEditing(false)} />;
+  } else if (composing && viewing) {
+    body = <Composer them={viewing} theirShelf={theirShelf} box={box} engine={engine}
+      onSent={(say) => { setComposing(false); setViewing(null); setTab("offers"); setNote(say); }}
+      onCancel={() => setComposing(false)} />;
   } else if (viewing) {
     const self = viewing.user_id === me?.user_id;
     body = (
       <>
         <button type="button" className="tc-back" onClick={() => setViewing(null)}>‹ Back</button>
         <TrainerProfile card={self ? me : viewing} self={self} relation={relation(viewing)} busy={busy} dexOf={dexOf}
-          onAdd={() => act(() => addFriend(viewing.friend_code), (r) => ADD_SAYS[r])}
+          shelf={self ? myShelf : theirShelf} onPropose={() => setComposing(true)}
+          onAdd={() => act(() => requestFriend(viewing.user_id),
+            (r) => (r === "unknown" ? "That trainer can't be added." : ADD_SAYS[r]))}
           onAccept={() => act(() => answerFriend(viewing.user_id, true), () => "You are friends now!")}
           onRemove={() => act(() => removeFriend(viewing.user_id), () => "Removed.")}
-          onEdit={() => setEditing(true)} onShare={() => share(viewing.username)} />
+          onEdit={() => setEditing(true)} onShare={() => share(viewing.username)}
+          onBlock={async () => {
+            const who = viewing;
+            await act(() => blockUser(who.user_id), () => `${who.username} is blocked.`);
+            setViewing(null);
+            // A search typed before the block still listed them, one tap from a stale card.
+            setFound((f) => f?.filter((c) => c.user_id !== who.user_id) ?? f);
+            sync();   // the offers it closed unlock their Pokemon
+          }}
+          onReport={(reason) => act(() => reportUser(viewing.user_id, reason),
+            (filed) => (filed ? "Thanks - your report was sent." : "You've already reported this trainer today."))} />
       </>
     );
+  } else if (tab === "board") {
+    body = <BoardTab box={box} dexOf={dexOf} engine={engine} inbox={inbox} sync={sync} onTraded={onTraded}
+      friends={friends === null ? null : accepted.length} initialQ={openBoard} onOpenTrainer={openTrainer} />;
+  } else if (tab === "offers") {
+    body = <OffersTab inbox={inbox} sync={sync} onTraded={onTraded} onOpenTrainer={openTrainer} />;
+  } else if (tab === "surprise") {
+    body = <Surprise engine={engine} box={box} inbox={inbox} sync={sync} onTraded={onTraded}
+      friends={friends === null ? null : accepted.length} />;
   } else if (tab === "card") {
     body = me
-      ? <TrainerProfile card={me} self dexOf={dexOf} onEdit={() => setEditing(true)} onShare={() => share(me.username)} />
+      ? <TrainerProfile card={me} self dexOf={dexOf} shelf={myShelf} onEdit={() => setEditing(true)} onShare={() => share(me.username)} />
       : <p className="ev-quiet">{fail ? "" : "Loading your card…"}</p>;
   } else {
     body = (
@@ -285,6 +472,24 @@ export default function TradeCenter({ signedIn, box = [], dexOf = () => 0, openN
               : <p className="ev-quiet">No friends yet. Share your code from My card, or add theirs above.</p>}
           {sent.length > 0 && <p className="ev-quiet">Waiting on {sent.map((f) => f.card.username).join(", ")}.</p>}
         </section>
+
+        {blocked.length > 0 && (
+          <section className="ev-card">
+            <header className="ev-banner"><h4>Blocked</h4><span className="tp-count">{blocked.length}</span></header>
+            <ul className="tc-rows">
+              {blocked.map((c) => (
+                <li key={c.user_id} className="tc-row">
+                  <span className="tc-who still">
+                    <TrainerArt char={c.char} className="tc-art" />
+                    <span><b>{c.username}</b><i>Can&rsquo;t find you or trade with you</i></span>
+                  </span>
+                  <button type="button" className="tp-quiet" disabled={busy}
+                    onClick={() => act(() => unblockUser(c.user_id), () => `${c.username} is unblocked.`)}>Unblock</button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     );
   }
@@ -295,14 +500,15 @@ export default function TradeCenter({ signedIn, box = [], dexOf = () => 0, openN
         onClick={(e) => e.stopPropagation()}>
         <div className="set-top">
           <h3>Trade Center</h3>
-          <span className="set-mail">Trainers, friends and your card</span>
+          <span className="set-mail">Trainers, offers, the board, Surprise Trade and your card</span>
           <button className="set-x" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        {signedIn && !closed && !viewing && !editing && (
+        {signedIn && !closed && !viewing && !editing && !composing && (
           <div className="sheet-tabs tc-tabs" role="tablist">
-            {[["trainers", "Trainers", incoming.length || null], ["card", "My card", null]].map(([id, name, n]) => (
+            {[["trainers", "Trainers", incoming.length || null], ["offers", "Offers", offers || null],
+              ["board", "Board", null], ["surprise", "Surprise", null], ["card", "My card", null]].map(([id, name, n]) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id}
-                className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
+                className={tab === id ? "on" : ""} onClick={() => { setTab(id); setNote(null); }}>
                 {name}{n ? <em>{n}</em> : null}
               </button>
             ))}

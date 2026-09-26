@@ -25,6 +25,7 @@ import { RUN_LEVEL, SURF_LEVEL } from "../game/items.js";
 import { ALPHA_CHANCE } from "../game/biomes.js";
 import { OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_STEPS } from "../game/events.js";
 import { RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } from "../game/research.js";
+import { LIMITS } from "../game/trade.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
    lists want identical rows and a second copy of the row is how one of them
@@ -130,6 +131,38 @@ export default function Help({ onClose }) {
               <b>Rifts.</b> Stay on one map long enough and it tears. For{" "}
               {RIFT_STEPS} steps rarer Pokémon come out and things turn up
               underfoot. Leaving the map closes it.
+            </li>
+          </ul>
+          {/* TRADING, for somebody who opened the menu to find out how. The
+              limits are the live constants; docs/trading.md has the why. */}
+          <h4>Trading</h4>
+          <ul className="vr-notes">
+            <li>
+              <b>The Trade Center</b> is in the menu once you are signed in.
+              Find trainers by name, add friends with a friend code, and put
+              up to {LIMITS.SHELF} Pokémon up for trade on your card.
+            </li>
+            <li>
+              <b>Offers.</b> Ask for anything on another trainer&rsquo;s card
+              and offer some of yours; nothing moves until they accept. What
+              you offer is held until then - it cannot be sold or evolved.
+            </li>
+            <li>
+              <b>With friends:</b> Surprise Trade swaps one for one without
+              either of you knowing what comes back, and the Trade Board lists
+              &ldquo;this for that&rdquo;, which a friend can complete in one
+              tap. A Pokédex entry&rsquo;s <i>On the Board</i> searches it.
+            </li>
+            <li>
+              <b>What counts.</b> You can trade anything except the last of a
+              species, up to {LIMITS.TRADES_PER_DAY} trades a day. A traded
+              Pokémon fills your Pokédex and its research, but medals,
+              milestones and rare-form marks are for ones you caught.
+            </li>
+            <li>
+              <b>Block or report</b> from any trainer&rsquo;s profile. A block
+              works both ways: neither of you can find, friend or trade with
+              the other.
             </li>
           </ul>
         </div>

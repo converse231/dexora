@@ -5720,6 +5720,10 @@ button:disabled { transition: none; }
 .tradecard { width: min(520px, 100%); max-height: min(90vh, 760px); }
 .tc-tabs { margin: 10px 15px 0; }
 .tc-tabs em { margin-left: 6px; }
+/* Five tabs on a narrow phone: a size down, and they still read. */
+@media (max-width: 400px) {
+  .tc-tabs button { font-size: 12.5px; padding-inline: 2px; }
+}
 .tc-list { display: grid; gap: 12px; }
 .tc-input {
   width: 100%; min-width: 0; font: inherit; font-size: 14px; padding: 9px 11px;
@@ -5878,6 +5882,22 @@ button:disabled { transition: none; }
   padding: 8px 12px; font-size: 13px; font-weight: 700; color: var(--canopy);
   background: var(--canopy-soft); border-radius: 10px;
 }
+/* Block and report: quiet, last, and asked twice. */
+.tp-safety { display: flex; justify-content: flex-end; gap: 8px; }
+.tp-safety .tp-quiet { padding: 5px 10px; font-size: 12px; }
+.tp-ask {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px;
+  border: 2px solid var(--line-firm); border-radius: 12px; background: var(--surface);
+}
+.tp-ask p { flex: 1 1 100%; margin: 0; font-size: 13px; }
+/* The confirming press is red before any hover - a phone has none. */
+.tp-ask .tp-quiet.danger { color: var(--bad); border-color: var(--bad); }
+/* A trainer's name in an offer or a listing opens their profile. */
+.of-name {
+  padding: 0; font: inherit; font-weight: 700; color: var(--ink); background: none; border: 0;
+  cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-firm); text-underline-offset: 2px;
+}
+.of-name:hover { color: var(--canopy); text-decoration-color: currentColor; }
 @media (max-width: 420px) {
   .tp-hero { padding: 11px; gap: 10px; }
   .tp-art-frame { width: 62px; height: 62px; }
@@ -5885,6 +5905,158 @@ button:disabled { transition: none; }
   .tp-slot > img, .tp-slot > .sprite-fx { width: 56px; height: 56px; }
   .tp-slot > .sprite-showdown { width: calc(56px * .77); height: calc(56px * .77); margin: 6.4px; }
 }
+
+/* ------------------------------------------------ offers */
+.tp-shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; }
+.of-mon {
+  position: relative; display: inline-grid; place-items: center; width: 46px; height: 46px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+}
+.of-mon > img, .of-mon > .sprite-fx { width: 42px; height: 42px; object-fit: contain; image-rendering: pixelated; }
+.of-mon > .sprite-showdown { width: calc(42px * .77); height: calc(42px * .77); }
+.of-mon.big { width: auto; height: auto; aspect-ratio: 1; padding: 4px 4px 14px; }
+.of-mon.big > img, .of-mon.big > .sprite-fx { width: 100%; height: 100%; }
+.of-mon.big i {
+  position: absolute; bottom: 2px; font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
+}
+.of-mon .tp-tier { top: 2px; left: 2px; }
+.of-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.of-card { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: var(--surface-2); border: 2px solid var(--line); }
+.of-card.done { gap: 6px; padding: 8px 10px; }
+.evcard .of-card p { margin: 0; }
+.of-who { font-size: 13px; color: var(--ink-soft); }
+.of-who b { color: var(--ink); }
+.of-swap { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px 10px; }
+.of-label { font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.of-side { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* ------------------------------------------------ the board */
+.ev-board .ev-banner { background: linear-gradient(90deg, #fbe9d7, #fdf4ea); border-color: #f0cfa8; }
+.bd-row { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px; }
+.bd-arrow, .bd-for { font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.bd-deal { display: flex; align-items: center; gap: 10px; }
+.bd-deal .of-mon.big { width: 64px; flex: none; }
+.bd-want { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; }
+.bd-want img { width: 40px; height: 40px; image-rendering: pixelated; flex: none; }
+.bd-want > span { display: inline-flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evcard .of-card .ev-go { width: 100%; }
+
+/* ------------------------------------------------ the trade scene
+   A night stage in both themes, like the evolution scene - the moment is lit
+   by the balls and the burst, not by the page. The lane is a size container so
+   the balls travel in `cqw` and the path scales with the screen; every moving
+   part animates transform and opacity only. Timings meet at REVEAL_AT (3.3s)
+   in TradeScene.jsx. */
+.ts {
+  position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px;
+  background: radial-gradient(ellipse at 50% 45%, #1f3a4f 0%, #0d1824 62%, #070d14 100%);
+  cursor: pointer; animation: ts-in .3s ease-out both;
+}
+@keyframes ts-in { from { opacity: 0; } }
+.ts-stage { display: grid; justify-items: center; gap: 14px; width: min(560px, 100%); text-align: center; }
+.ts-title { margin: 0; font-family: var(--pixel); font-size: 11px; color: #9fd8ff; }
+.ts-lane { position: relative; width: 100%; height: 120px; container-type: inline-size; }
+.ts-cable {
+  position: absolute; left: 10%; right: 10%; top: 50%; height: 4px; margin-top: -2px; overflow: hidden;
+  border-radius: 2px; background: linear-gradient(90deg, #3cb8d6, #8c46e1 50%, #3cb8d6);
+  box-shadow: 0 0 12px rgba(60, 184, 214, .7);
+}
+.ts-cable i {
+  position: absolute; inset: 0; width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .9), transparent);
+  animation: ts-pulse 1.1s linear infinite;
+}
+@keyframes ts-pulse { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+.ts-end {
+  position: absolute; top: calc(50% + 16px); font-family: var(--pixel); font-size: 9px; color: #7fa7c0;
+  max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ts-end.you { left: 2%; }
+.ts-end.them { right: 2%; }
+.ts-gave { position: absolute; left: 2%; top: 50%; width: 72px; height: 72px; margin-top: -48px;
+  animation: ts-fold .7s ease-in .15s both; }
+.ts-gave > img, .ts-gave > .sprite-fx { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.ts-gave > .sprite-showdown { width: 77%; height: 77%; margin: 11.5%; }
+@keyframes ts-fold { to { transform: scale(0) rotate(-20deg); opacity: 0; } }
+.ts-ball { position: absolute; top: 50%; width: 30px; height: 30px; margin-top: -15px; image-rendering: pixelated; opacity: 0; }
+.ts-ball.out { left: 6%; animation: ts-out 2.3s cubic-bezier(.45, 0, .55, 1) .7s both; }
+.ts-ball.in { right: 6%; animation: ts-back 2.3s cubic-bezier(.45, 0, .55, 1) .7s both; }
+@keyframes ts-out {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0); }
+  8% { opacity: 1; }
+  25% { transform: translate(21cqw, -22px) rotate(180deg); }
+  50% { transform: translate(42cqw, -30px) rotate(360deg); }
+  75% { transform: translate(63cqw, -22px) rotate(540deg); }
+  92% { opacity: 1; }
+  100% { opacity: 0; transform: translate(84cqw, 0) rotate(720deg); }
+}
+@keyframes ts-back {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0); }
+  8% { opacity: 1; }
+  25% { transform: translate(-21cqw, 22px) rotate(-180deg); }
+  50% { transform: translate(-42cqw, 30px) rotate(-360deg); }
+  75% { transform: translate(-63cqw, 22px) rotate(-540deg); }
+  92% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-84cqw, 0) rotate(-720deg); }
+}
+/* They cross at the half: 0.7s + 1.15s. */
+.ts-burst {
+  position: absolute; left: 50%; top: 50%; width: 90px; height: 90px; margin: -45px 0 0 -45px;
+  border-radius: 50%; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle, #fff 0 18%, rgba(159, 216, 255, .9) 30%, rgba(140, 70, 225, .5) 55%, transparent 70%);
+  animation: ts-burst .8s ease-out 1.75s both;
+}
+@keyframes ts-burst { 0% { opacity: 0; transform: scale(.2); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(2.6); } }
+.ts-got {
+  position: relative; width: 160px; height: 160px; display: grid; place-items: center;
+  opacity: 0; animation: ts-rise .6s cubic-bezier(.2, 1.4, .4, 1) 3s both;
+}
+.ts-got > img, .ts-got > .sprite-fx { position: relative; width: 150px; height: 150px; object-fit: contain; image-rendering: pixelated; }
+.ts-got > .sprite-showdown { position: relative; width: calc(150px * .77); height: calc(150px * .77); }
+@keyframes ts-rise { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
+.ts-flash {
+  position: absolute; inset: -30px; border-radius: 50%; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, .95) 0 25%, rgba(159, 216, 255, .5) 45%, transparent 70%);
+  animation: ts-flash .9s ease-out 2.9s both;
+}
+@keyframes ts-flash { 0% { opacity: 0; transform: scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.5); } }
+.ts-caption {
+  margin: 0; display: grid; justify-items: center; gap: 4px; font-size: 15px; color: #e8f4ff;
+  opacity: 0; animation: ts-fade .5s ease-out 3.3s both;
+}
+.ts-caption b { font-family: var(--display); font-size: 22px; }
+.ts-caption i { font-style: normal; font-size: 12.5px; color: #9fb8cc; }
+.ts-tier {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px;
+  font-family: var(--pixel); font-size: 10px; color: #3a2a05; background: #ffd66b;
+}
+.ts-tier.alpha { color: #ffe3e6; background: linear-gradient(160deg, #8a0f1f, #2a0008); }
+.ts-ok { width: auto; min-width: 140px; opacity: 0; animation: ts-fade .4s ease-out 3.5s both; }
+@keyframes ts-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* Skipped, or no motion wanted: the result, and nothing travelling. */
+.ts.done .ts-got, .ts.done .ts-caption, .ts.done .ts-ok { animation: none; opacity: 1; transform: none; }
+.ts.done .ts-ball, .ts.done .ts-gave, .ts.done .ts-burst, .ts.done .ts-flash { animation: none; opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .ts-got, .ts-caption, .ts-ok { animation: none; opacity: 1; transform: none; }
+  .ts-ball, .ts-gave, .ts-burst, .ts-flash, .ts-cable i { animation: none; opacity: 0; }
+}
+.tc-who.still { cursor: default; }
+.tc-who.still:hover { border-color: var(--line); }
+.tc-who.still img { width: 40px; height: 40px; image-rendering: pixelated; flex: none; }
+.ev-surprise .ev-banner { background: linear-gradient(90deg, #dff1f8, #eef7fb); border-color: #bfe0ec; }
+.tc-send {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 12px; background: var(--canopy-soft); border: 2px solid var(--canopy);
+}
+.tc-send > img, .tc-send > .sprite-fx { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; }
+.tc-send > .sprite-showdown { width: calc(56px * .77); height: calc(56px * .77); margin: 6.4px; }
+.tc-send span { display: grid; min-width: 0; }
+.tc-send b { font-size: 15px; }
+.tc-send i { font-style: normal; font-size: 12px; color: var(--ink-soft); }
+.tc-send em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--bad); }
+.tc-send .ev-go { width: auto; padding-inline: 18px; }
+/* The Box says which rows hold a Pokemon that is in a trade. */
+.bx-vtag.bx-trade { background: var(--canopy); }
 
 /* ================================================================ NIGHT MODE
 
@@ -5937,6 +6109,8 @@ button:disabled { transition: none; }
 :root[data-theme="dark"] .ev-disc .ev-banner,
 :root[data-theme="dark"] .dx-research .ev-banner { background: linear-gradient(90deg, #3a3020, #2a241a); border-color: #5a4a2e; }
 :root[data-theme="dark"] .ev-alpha .ev-banner { background: linear-gradient(90deg, #3e1f24, #2c1c1f); border-color: #6a343c; }
+:root[data-theme="dark"] .ev-board .ev-banner { background: linear-gradient(90deg, #3d2c1c, #2a2118); border-color: #5e4428; }
+:root[data-theme="dark"] .ev-surprise .ev-banner { background: linear-gradient(90deg, #1b3340, #172630); border-color: #2d5163; }
 :root[data-theme="dark"] .dx-notes .ev-banner { background: linear-gradient(90deg, #1f3328, #1a2a21); border-color: #2f4a3a; }
 :root[data-theme="dark"] .ev-stamp.live { color: #ff7a66; }
 

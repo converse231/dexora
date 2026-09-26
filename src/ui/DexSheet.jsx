@@ -232,7 +232,7 @@ export default function DexSheet({
   id, state, variant = null, held = {}, owned = 0, research = null,
   starred = false, ordinary = 0, onStar = () => {},
   level = 1, here = null, busy = false,
-  onClose, onFindInBox, onTravel, onSelect = null, dexOf = () => 0,
+  onClose, onFindInBox, onFindOnBoard = null, onTravel, onSelect = null, dexOf = () => 0,
 }) {
   const sp = speciesById(id);
   const caught = state === 2;
@@ -572,6 +572,14 @@ export default function DexSheet({
               data-tip={`Find your ${owned > 1 ? `${owned} ` : ""}${label(sp)} in the Box`}
             >
               SEE IN BOX{owned > 1 ? ` · ${owned}` : ""}
+            </button>
+          )}
+          {/* Seen only: the Board's own search offers only what you have seen,
+              so a listing never spoils an entry. */}
+          {seen && onFindOnBoard && (
+            <button className="sheet-inbox" onClick={() => onFindOnBoard(id)}
+              data-tip={`Friends' Trade Board listings with ${label(sp)}`}>
+              ON THE BOARD
             </button>
           )}
           <button className="sheet-close" onClick={onClose}>CLOSE</button>

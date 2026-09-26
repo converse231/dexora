@@ -18,6 +18,7 @@ export const LIMITS = {
   SHOWCASE: 6,            // profile showcase slots
   SEEKING: 12,            // "looking for" species on a profile
   FRIENDS: 100,           // friends and pending requests, per trainer
+  SHELF: 12,              // Pokemon a trainer puts up for trade
 };
 
 /* WHY A BOX ENTRY CANNOT MOVE. Set by the engine from what the server says the
@@ -54,6 +55,11 @@ export function cleanTradeFields(mon) {
   return out;
 }
 
+/* WHY A TRAINER IS REPORTED. The server stores the INDEX (0-15, `reports`),
+   so this list is append-only, like `TASKS`: an edited row re-labels every
+   report already filed. No free text - nothing to moderate twice. */
+export const REPORT_REASONS = ["Offensive name", "Spam or harassment", "Cheating", "Something else"];
+
 /* CAN THIS ONE BE OFFERED? Anything but the LAST of its species you hold, and
    never while something already holds it. Variants and alphas included: the
    old "spares only" rule read `duplicateUids`, which never counts a variant as
@@ -64,6 +70,41 @@ export function tradeable(box, mon) {
   for (const m of box) if (m.species === mon.species && ++same > 1) return true;
   return false;
 }
+
+/* THE SERVER'S INBOX, AS THE ENGINE TAKES IT. `trade_inbox()` names a
+   Pokemon's state the server's way ('offered', 'pooled'...); `reconcileTrades`
+   takes box locks. One mapping, here, so the two vocabularies meet once. A
+   status this build does not know is left out rather than guessed. */
+const LOCK_OF = { held: null, offered: "offer", listed: "listing", pooled: "pool" };
+export function inboxToReconcile(inbox) {
+  const locks = {};
+  for (const [mid, status] of Object.entries(inbox?.locks ?? {})) {
+    if (status in LOCK_OF) locks[mid] = LOCK_OF[status];
+  }
+  return {
+    locks,
+    gone: Array.isArray(inbox?.gone) ? inbox.gone.filter((m) => typeof m === "string") : [],
+    arrived: Array.isArray(inbox?.arrived) ? inbox.arrived.filter((m) => m && typeof m.mid === "string") : [],
+  };
+}
+
+/* WHICH FINISHED TRADES STILL NEED THEIR SCENE: not seen on this device,
+   something came to you, and from the last day - a new device must not replay
+   a week of trades. Oldest first, at most three, so a burst queues in order. */
+export const SCENE_WINDOW = 24 * 60 * 60 * 1000;
+export function freshTrades(recent, seen, now = Date.now()) {
+  return (Array.isArray(recent) ? recent : [])
+    .filter((r) => r && r.id && !seen.has(r.id) && r.got?.length && now - Date.parse(r.at) < SCENE_WINDOW)
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+    .slice(-3);
+}
+
+/* DOES THIS ONE FIT THAT LISTING? The server's rule in `fulfil_listing`,
+   copied so the board can say "you have one" before a round trip: the wanted
+   species, and the wanted tier if one was named - and free to trade at all. */
+export const fits = (box, mon, listing) => tradeable(box, mon)
+  && mon.species === listing.want_species
+  && (!listing.want_tier || variantOf(mon) === listing.want_tier);
 
 /* What the server is shown when a Pokemon first enters trading. It checks each
    field against the save it already holds, so this is a claim to verify, not a
