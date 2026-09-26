@@ -189,8 +189,8 @@ direct upsert, and `save_game` itself is untouched):
 | 4. Trade Board | **done** - friends' listings (`post_listing`, `trade_board`, `fulfil_listing`), species + tier wants, search, one-tap fill |
 | 5. Polish | **done** - block and report, private friend codes, requests on the menu dot, On the Board, names open profiles, the preview's trade story, Help, What's new, the review pass |
 
-**Going live is SUPABASE.md §3d**: §3c first, then `db/trading.sql`, a check,
-a deploy and a two-account smoke test. Until the SQL is run, the Trade Center
+**Live since 2026-09-26** (SUPABASE.md §3d: §3c, then `db/trading.sql`, one
+transaction, checked). On a project without the SQL, the Trade Center
 answers "Trading isn't open yet" (a missing function is its own answer, never
 an error). tradedb applies §3c to the test project every run, so the tests
 run against the shape live will have.
