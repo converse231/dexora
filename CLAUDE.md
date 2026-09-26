@@ -343,8 +343,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   queries add no specificity (overrides go last); `<details open>` in React
   needs owned state; a flex item's `min-height` is `auto`; a percentage size is
   of the containing block.
-- **Long lists use `content-visibility: auto`**, and anything that runs forever
-  on a Box row animates only `opacity` and `transform`.
+- **Long lists skip what is off screen**: the Box's rows use
+  `content-visibility: auto`; the Dex is WINDOWED (`useRows` renders the rows
+  in view, geometry read off `.dexgrid`'s CSS) - at 1,300 tiles
+  `content-visibility`'s per-tile intersection checks halved the frame rate.
+  Anything that runs forever on a Box row animates only `opacity` and
+  `transform`. **Rail tabs stay mounted once visited** (`.rail-pane`,
+  `display: contents`, hidden when not current): a switch never rebuilds.
+- **The pixel font is merged outlines** (`tools/build_font.py`): Geist Pixel
+  drew a contour per pixel (10,492), and every new size on screen re-rasterised
+  thousands of squares on the main thread - seconds on a phone the first time
+  a panel opened. Never ship a pixel font unmerged.
 - **The pixel face is Geist Pixel, self-hosted and registered in `main.jsx`**
   as `Pixel` through `FontFace` (a url in styles.css would resolve against the
   built stylesheet). `sizeAdjust` 110% is the one scale knob: it is

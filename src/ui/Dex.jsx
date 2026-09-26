@@ -10,7 +10,7 @@
    three variant marks and a completion badge now, and at 52px those were fighting
    each other; at ~76px they each have a place. */
 
-import { memo, useMemo, useState } from "react";
+import { memo, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
 import {
@@ -123,6 +123,48 @@ const Cell = memo(function Cell({ sp, state, variant, marks, full, studied, onSe
   );
 });
 
+/* ONLY THE ROWS ON SCREEN ARE TILES. The grid was 1,300 tiles every time the
+   tab opened - on a phone-speed CPU 2.6-4.0s of React and commit, each open,
+   and with `content-visibility` on every tile the browser ran an intersection
+   check for all 1,300 on every frame the game drew: the frame rate halved
+   while the Dex was merely open (36 -> 18fps, 6x throttled). Now the grid
+   renders the rows in view plus OVERSCAN either side, and padding stands in
+   for the rest, so the scrollbar is the same.
+
+   The geometry is READ off the grid's own CSS (`grid-auto-rows`, `row-gap`,
+   the column count), never typed here, so the stylesheet stays the one place
+   a tile's size is decided. A hidden panel measures 0 tall and renders a few
+   rows; the ResizeObserver catches it being shown again.
+
+   TWO ELEMENTS, BECAUSE PADDING IS HEIGHT. The spacers were padding on the
+   scrolling grid itself, and `max-height` cannot squeeze padding - the box
+   grew to the whole list (28,574px), nothing scrolled, and "the rows in view"
+   was every row. `.dexgrid` scrolls; `.dexgrid-in` is the grid and carries
+   the padding. */
+const OVERSCAN = 3;
+function useRows(ref, count) {
+  const [win, setWin] = useState({ first: 0, last: 12, cols: 4, pitch: 91 });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const measure = () => {
+      const cs = getComputedStyle(el.firstElementChild ?? el);
+      const cols = cs.gridTemplateColumns.split(" ").filter(Boolean).length || 4;
+      const pitch = (parseFloat(cs.gridAutoRows) || 84) + (parseFloat(cs.rowGap) || 0);
+      const first = Math.max(0, Math.floor(el.scrollTop / pitch) - OVERSCAN);
+      const last = Math.ceil((el.scrollTop + el.clientHeight) / pitch) + OVERSCAN;
+      setWin((w) => (w.first === first && w.last === last && w.cols === cols && w.pitch === pitch
+        ? w : { first, last, cols, pitch }));
+    };
+    measure();
+    el.addEventListener("scroll", measure, { passive: true });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", measure); ro.disconnect(); };
+  }, [ref, count]);
+  return win;
+}
+
 /* MEMOISED, AND EVERY PROP IS ALREADY STABLE WHILE WALKING - which is what
    makes this a two-line fix rather than a refactor. `dex` and `tiers` are
    mutated in PLACE by the engine so their references never change, `caught`
@@ -208,6 +250,12 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
       sp.types.some((t) => t.includes(needle))
     );
   }).sort((a, b) => SORTS[sort](a, b) || a.id - b.id);
+
+  const grid = useRef(null);
+  const win = useRows(grid, shown.length);
+  const rows = Math.ceil(shown.length / win.cols);
+  const last = Math.min(rows, win.last);
+  const first = Math.min(win.first, last);
 
   return (
     <div className="panel">
@@ -326,8 +374,10 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
 
       {!shown.length && <p className="empty">Nothing matches that.</p>}
 
-      <div className="dexgrid">
-        {shown.map((sp) => {
+      <div className="dexgrid" ref={grid}>
+        <div className="dexgrid-in"
+          style={{ paddingTop: first * win.pitch, paddingBottom: (rows - last) * win.pitch }}>
+        {shown.slice(first * win.cols, last * win.cols).map((sp) => {
           const state = at(sp.id);
           return (
             <Cell
@@ -339,6 +389,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
             />
           );
         })}
+        </div>
       </div>
     </div>
   );
