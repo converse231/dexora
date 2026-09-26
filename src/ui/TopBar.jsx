@@ -133,7 +133,7 @@ function Glyph({ of }) {
   );
 }
 
-function Menu({ onSettings, onHelp, onForms, onEvents, onTrade, onNews, unread, onLogOut, onReset }) {
+function Menu({ onSettings, onHelp, onForms, onEvents, onTrade, tradeAlert, onNews, unread, onLogOut, onReset }) {
   const [open, setOpen] = useState(false);
   const [theme, setThemeState] = useState(themeChoice);
   const box = useRef(null);
@@ -168,7 +168,7 @@ function Menu({ onSettings, onHelp, onForms, onEvents, onTrade, onNews, unread, 
       >
         <span aria-hidden="true">{open ? "\u2715" : "\u2630"}</span>
         {/* One dot for something unread, on the one button that leads to it. */}
-        {unread && !open && <i className="tb-dot" aria-label="New update" />}
+        {(unread || tradeAlert) && !open && <i className="tb-dot" aria-label={tradeAlert ? "Trades waiting" : "New update"} />}
       </button>
 
       {open && (
@@ -180,7 +180,7 @@ function Menu({ onSettings, onHelp, onForms, onEvents, onTrade, onNews, unread, 
           </button>
           {onTrade && (
             <button type="button" role="menuitem" onClick={run(onTrade)}>
-              <Glyph of="swap" />Trade Center
+              <Glyph of="swap" />Trade Center{tradeAlert && <i className="tb-dot" aria-label="Trades waiting" />}
             </button>
           )}
           <button type="button" role="menuitem" onClick={run(onNews)}>
@@ -230,7 +230,7 @@ function Menu({ onSettings, onHelp, onForms, onEvents, onTrade, onNews, unread, 
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
   onLogOut = null, onSettings = null, onHelp = null, onForms = null,
-  onEvents = null, onTrade = null, onNews = null, unread = false,
+  onEvents = null, onTrade = null, onNews = null, unread = false, tradeAlert = false,
   trainerName = null,
   stale = null,
   daily, onClaimDaily, claimNote,
@@ -339,6 +339,7 @@ export default function TopBar({
         onForms={onForms}
         onEvents={onEvents}
         onTrade={onTrade}
+        tradeAlert={tradeAlert}
         onNews={onNews}
         unread={unread}
         onLogOut={onLogOut}

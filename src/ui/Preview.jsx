@@ -24,6 +24,8 @@ export default function Preview({ group, onClose }) {
   const sp = speciesById(group.species);
   const size = sizeTag(group.hero.size);
   const total = sp.stats.reduce((a, b) => a + b, 0);
+  // A traded one's story: whose it first was, and how many hands since.
+  const traded = group.mons.find((m) => m.traded);
   return (
     <div className="sheet" {...useDismiss(onClose)}>
       <div className="preview" role="dialog" aria-modal="true" aria-label={label(sp)}
@@ -46,6 +48,11 @@ export default function Preview({ group, onClose }) {
             <span>Lv {group.hero.level}</span>
             {size && <span>{size}</span>}
             <span>&times;{group.count} owned</span>
+            {traded && (
+              <span className="pv-traded" data-tip={`Traded ${traded.traded} time${traded.traded > 1 ? "s" : ""}`}>
+                OT {traded.ot ?? "?"} · traded {traded.traded}&times;
+              </span>
+            )}
           </div>
           <Types of={sp.types} />
         </div>

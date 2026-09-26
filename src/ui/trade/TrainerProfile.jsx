@@ -5,10 +5,11 @@
    Everything on it came from `trainer_cards`, which the database keeps from
    the save - so a showcase here is what that trainer really holds, never what
    their client claimed. */
+import { useState } from "react";
 import { SPECIES } from "../../data/dex.js";
 import { speciesById, levelFromXp } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
-import { LIMITS } from "../../game/trade.js";
+import { LIMITS, REPORT_REASONS } from "../../game/trade.js";
 import Sprite, { TrainerArt } from "../Sprite.jsx";
 import Mark from "../Marks.jsx";
 
@@ -76,9 +77,68 @@ function Seeking({ ids, dexOf }) {
   );
 }
 
+/* UP FOR TRADE: the Pokemon this trainer offered. An offer can only ask for
+   these - nobody is badgered for a Pokemon they never put up. */
+function Shelf({ list, self }) {
+  if (!list.length) {
+    return <p className="ev-quiet">{self ? "Nothing up for trade - pick some in Edit." : "Nothing up for trade right now."}</p>;
+  }
+  return (
+    <div className="tp-shelf">
+      {list.map((m) => {
+        const sp = speciesById(m.species);
+        return sp ? (
+          <span key={m.mid} className="of-mon big" data-tip={`${label(sp)}, Lv ${m.level}`}>
+            <Sprite id={sp.id} variant={m.tier} />
+            {m.tier && <span className="tp-tier"><Mark tier={m.tier} size={10} /></span>}
+            {m.alpha && <span className="tp-alpha"><Mark tier="alpha" size={9} /></span>}
+            <i>Lv {m.level}</i>
+          </span>
+        ) : null;
+      })}
+    </div>
+  );
+}
+
+/* BLOCK AND REPORT, quiet and last. Both ask first: a block ends a
+   friendship and closes open offers, and a report is filed for good. */
+function Safety({ name, busy, onBlock, onReport }) {
+  const [ask, setAsk] = useState(null);
+  if (ask === "block") {
+    return (
+      <div className="tp-ask" role="group" aria-label={`Block ${name}`}>
+        <p>Block <b>{name}</b>? Neither of you can find the other, your friendship ends and open offers between you close.</p>
+        <button type="button" className="tp-quiet danger" disabled={busy} onClick={onBlock}>Yes, block</button>
+        {/* Focus lands on the safe answer: the pressed button is gone. */}
+        <button type="button" className="tp-quiet" autoFocus onClick={() => setAsk(null)}>Cancel</button>
+      </div>
+    );
+  }
+  if (ask === "report") {
+    return (
+      <div className="tp-ask" role="group" aria-label={`Report ${name}`}>
+        <p>What&rsquo;s wrong with <b>{name}</b>?</p>
+        <div className="tp-seek">
+          {REPORT_REASONS.map((r, i) => (
+            <button key={r} type="button" className="tp-chip add" disabled={busy}
+              onClick={() => { setAsk(null); onReport(i); }}>{r}</button>
+          ))}
+        </div>
+        <button type="button" className="tp-quiet" autoFocus onClick={() => setAsk(null)}>Cancel</button>
+      </div>
+    );
+  }
+  return (
+    <div className="tp-safety">
+      <button type="button" className="tp-quiet" onClick={() => setAsk("report")}>Report</button>
+      <button type="button" className="tp-quiet danger" onClick={() => setAsk("block")}>Block</button>
+    </div>
+  );
+}
+
 export default function TrainerProfile({
-  card, self = false, relation = null, busy = false, dexOf = () => 0,
-  onAdd, onAccept, onRemove, onEdit, onShare,
+  card, self = false, relation = null, busy = false, dexOf = () => 0, shelf = null,
+  onAdd, onAccept, onRemove, onEdit, onShare, onPropose, onBlock, onReport,
 }) {
   const level = levelFromXp(card.xp ?? 0);
   return (
@@ -114,6 +174,16 @@ export default function TrainerProfile({
         <Seeking ids={card.seeking} dexOf={dexOf} />
       </section>
 
+      {shelf !== null && (
+        <section className="ev-card">
+          <header className="ev-banner">
+            <h4>Up for trade</h4>
+            <span className="tp-count">{shelf.length}/{LIMITS.SHELF}</span>
+          </header>
+          <Shelf list={shelf} self={self} />
+        </section>
+      )}
+
       <div className="tp-actions">
         {self ? (
           <>
@@ -122,6 +192,9 @@ export default function TrainerProfile({
           </>
         ) : (
           <>
+            {shelf?.length > 0 && (
+              <button type="button" className="ev-go" disabled={busy} onClick={onPropose}>Propose a trade</button>
+            )}
             {relation === "friends" && <span className="tp-badge">✓ Friends</span>}
             {relation === "sent" && <span className="tp-badge">Request sent</span>}
             {relation === "incoming" && (
@@ -139,6 +212,7 @@ export default function TrainerProfile({
           </>
         )}
       </div>
+      {!self && onBlock && <Safety name={card.username} busy={busy} onBlock={onBlock} onReport={onReport} />}
     </div>
   );
 }

@@ -3358,7 +3358,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(light.size >= 20, `only ${light.size} colour tokens found - the parse is wrong`);
     }
 
-    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon"]) {
+    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon", ".ts-got", ".ts-gave", ".tc-send", ".of-mon"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
         `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +
         "variant that is a span will render zero wide there, silently");
@@ -4133,7 +4133,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
 
   /* TRADING'S CLIENT RULES (docs/trading.md) - pure, so here. */
   {
-    const { LIMITS, LOCKS, PRESETS, cleanTradeFields, tradeable, snapshot } =
+    const { LIMITS, LOCKS, PRESETS, REPORT_REASONS, cleanTradeFields, tradeable, snapshot, inboxToReconcile, freshTrades, fits } =
       await import("../src/game/trade.js");
     for (const [k, v] of Object.entries(LIMITS)) {
       assert.ok(Number.isInteger(v) && v > 0, `trade limit ${k} is ${v}`);
@@ -4153,6 +4153,28 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       "a locked Pokemon is tradeable");
     assert.deepEqual(snapshot(box[1]), { uid: 2, species: 16, level: 3, size: null, tier: "shiny", alpha: false },
       "the registration snapshot changed shape - the server checks these fields");
+    // The inbox as the engine takes it: every server lock state is a known lock.
+    const rec = inboxToReconcile({ locks: { a: "held", b: "offered", c: "pooled", d: "listed", e: "mystery" },
+      gone: ["x", 5], arrived: [{ mid: "y", species: 1 }, { species: 2 }] });
+    assert.deepEqual(rec.locks, { a: null, b: "offer", c: "pool", d: "listing" }, "the server's lock states mapped wrongly");
+    assert.ok(Object.values(rec.locks).every((l) => l === null || LOCKS.includes(l)), "a mapped lock is not in LOCKS");
+    assert.deepEqual([rec.gone, rec.arrived.length], [["x"], 1], "garbage in the inbox reached the engine");
+    assert.deepEqual(inboxToReconcile(null), { locks: {}, gone: [], arrived: [] }, "an empty inbox did not map to nothing");
+    // The board's "you have one": species, tier if named, and free to trade.
+    const pika = [{ uid: 1, species: 25, level: 5 }, { uid: 2, species: 25, level: 6, shiny: 1 }, { uid: 3, species: 25, level: 7, lock: "offer", mid: "m" }];
+    assert.ok(fits(pika, pika[1], { want_species: 25, want_tier: "shiny" }), "a shiny did not fit a shiny listing");
+    assert.ok(!fits(pika, pika[0], { want_species: 25, want_tier: "shiny" }), "a plain one fitted a shiny listing");
+    assert.ok(fits(pika, pika[0], { want_species: 25, want_tier: null }), "a plain one did not fit an any-form listing");
+    assert.ok(!fits(pika, pika[2], { want_species: 25, want_tier: null }), "a locked one fitted a listing");
+    assert.ok(!fits([pika[0]], pika[0], { want_species: 25 }), "the last of a species fitted a listing");
+    // A scene plays once per trade, only for one that brought you something, only fresh.
+    const now = Date.parse("2026-09-26T12:00:00Z");
+    const at = (h) => new Date(now - h * 3600e3).toISOString();
+    const recent = [{ id: "a", at: at(1), got: [{}] }, { id: "b", at: at(2), got: [{}] }, { id: "c", at: at(30), got: [{}] },
+      { id: "d", at: at(1), got: [] }, { id: "e", at: at(3), got: [{}] }];
+    assert.deepEqual(freshTrades(recent, new Set(["e"]), now).map((r) => r.id), ["b", "a"],
+      "the trade scene would replay a seen, stale or empty trade, or out of order");
+
     /* THE SQL IS THE AUTHORITY AND THIS IS ITS COPY - held equal, both ways:
        every limit, and the tier list the server validates against TIERS. */
     const sql = readFileSync(new URL("../db/trading.sql", import.meta.url), "utf8");
@@ -4162,6 +4184,10 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       const list = m[1].split(",").map((x) => x.trim().replace(/'/g, ""));
       assert.deepEqual(list, TIERS, `db/trading.sql lists tiers ${list} against TIERS ${TIERS}`);
     }
+    // A report stores its reason's INDEX; the server's range must hold every one.
+    const reasons = [...sql.matchAll(/reason (?:not )?between 0 and (\d+)/g)].map((m) => Number(m[1]));
+    assert.ok(reasons.length >= 2 && reasons.every((n) => n === reasons[0]), `db/trading.sql's report reason bounds disagree: ${reasons}`);
+    assert.ok(REPORT_REASONS.length - 1 <= reasons[0], `${REPORT_REASONS.length} report reasons, the server takes 0-${reasons[0]}`);
     console.log(`trade rules ok — ${Object.keys(LIMITS).length} limits (SQL agrees), ${PRESETS.length} presets, last-one rule, locks need a server id`);
   }
 

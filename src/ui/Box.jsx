@@ -675,6 +675,11 @@ function Box({
                       <Mark tier="alpha" size={11} />ALPHA
                     </span>
                   )}
+                  {/* Held by a trade (docs/trading.md): it cannot be sold or
+                      evolved until the trade closes, and this says why. */}
+                  {group.mons.some((m) => m.lock) && (
+                    <span className="bx-vtag bx-trade" data-tip="In a trade - it cannot be sold or evolved until the trade closes">IN TRADE</span>
+                  )}
                   <span className={`tier tier-${sp.tier}`}>{sp.tier}</span>
                 </span>
                 <Types of={sp.types} className="bx-types" />

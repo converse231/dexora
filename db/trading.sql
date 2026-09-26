@@ -99,13 +99,16 @@ returns int language sql immutable set search_path = '' as $$
     when 'SHOWCASE' then 6
     when 'SEEKING' then 12
     when 'FRIENDS' then 100
+    when 'SHELF' then 12
   end
 $$;
 
 -- A mon as a trainer is shown it.
 create or replace function public.mon_json(m public.mons)
 returns jsonb language sql stable set search_path = '' as $$
-  select jsonb_build_object('mid', m.id, 'species', m.species, 'level', m.level,
+  -- `uid` is the owner's box slot (null in transit): how a client that just
+  -- had rows registered for it (set_shelf) learns which entry got which id.
+  select jsonb_build_object('mid', m.id, 'uid', m.local_uid, 'species', m.species, 'level', m.level,
     'size', m.size, 'tier', m.tier, 'alpha', m.alpha, 'ot', m.ot_name,
     'traded', m.traded, 'status', m.status)
 $$;
@@ -174,7 +177,7 @@ declare
   t uuid;
 begin
   if me is null then raise exception 'not signed in'; end if;
-  if target is null or target = me then raise exception 'no such trainer'; end if;
+  if target is null or target = me or public.blocked_between(me, target) then raise exception 'no such trainer'; end if;
   if cardinality(give) not between 1 and public.trade_limit('MAX_SIDE')
      or cardinality(want) not between 1 and public.trade_limit('MAX_SIDE') then
     raise exception 'one to three on each side';
@@ -189,7 +192,8 @@ begin
      <> cardinality(give) then
     raise exception 'offered Pokemon are not free to trade';
   end if;
-  if (select count(*) from public.mons where id = any(want) and owner = target and status = 'held')
+  -- Only what they put up for trade: nobody is asked for a Pokemon they never offered.
+  if (select count(*) from public.mons where id = any(want) and owner = target and status = 'held' and shelf)
      <> cardinality(want) then
     raise exception 'asked-for Pokemon are not available';
   end if;
@@ -208,6 +212,39 @@ returns void language sql security definer set search_path = '' as $$
    where id = any(tr.a_mons) and owner = tr.a and status in ('offered','listed','pooled');
 $$;
 revoke all on function public.trade_release(public.trades) from public, anon, authenticated;
+
+-- THE MOVE ITSELF, shared by every kind of trade: log both sides, swap the
+-- owners, close this trade, count it on both cards - and fail every other
+-- open offer that named one of these Pokemon, FREEING what its proposer had
+-- locked (phase 0 failed them and left the proposer's side 'offered' for good).
+-- Callers hold the row locks; this does no checking of its own.
+create or replace function public.perform_swap(tr public.trades, taker uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  ids uuid[] := tr.a_mons || tr.b_mons;
+  other public.trades;
+begin
+  insert into public.trade_log (trade, mon, from_user, to_user, snapshot)
+  select tr.id, m.id, m.owner, case when m.owner = tr.a then taker else tr.a end, public.mon_json(m)
+    from public.mons m where m.id = any(ids);
+  update public.mons
+     set owner = case when owner = tr.a then taker else tr.a end,
+         status = 'arriving', local_uid = null, traded = traded + 1, moved_at = now(),
+         shelf = false
+   where id = any(ids);
+  update public.trades set b = taker, status = 'done', closed_at = now() where id = tr.id;
+  if to_regclass('public.trainer_cards') is not null then
+    update public.trainer_cards set trades = trades + 1 where user_id in (tr.a, taker);
+  end if;
+  for other in select * from public.trades
+                where status = 'open' and id <> tr.id and (b_mons && ids or a_mons && ids)
+                for update loop
+    update public.trades set status = 'failed', closed_at = now() where id = other.id;
+    perform public.trade_release(other);
+  end loop;
+end;
+$$;
+revoke all on function public.perform_swap(public.trades, uuid) from public, anon, authenticated;
 
 -- THE SWAP. Both sides re-checked with every row locked, in id order (two
 -- accepts that share a Pokemon queue instead of deadlocking); either all of it
@@ -247,21 +284,7 @@ begin
     return 'failed';
   end if;
 
-  insert into public.trade_log (trade, mon, from_user, to_user, snapshot)
-  select tid, m.id, m.owner, case when m.owner = tr.a then me else tr.a end, public.mon_json(m)
-    from public.mons m where m.id = any(ids);
-  update public.mons
-     set owner = case when owner = tr.a then me else tr.a end,
-         status = 'arriving', local_uid = null, traded = traded + 1, moved_at = now()
-   where id = any(ids);
-  update public.trades set status = 'done', closed_at = now() where id = tid;
-  -- Both cards count it (the table arrives in phase 1; absent, nothing to count).
-  if to_regclass('public.trainer_cards') is not null then
-    update public.trainer_cards set trades = trades + 1 where user_id in (tr.a, me);
-  end if;
-  -- Any other open offer asking for one of these can no longer happen.
-  update public.trades set status = 'failed', closed_at = now()
-   where status = 'open' and id <> tid and (b_mons && ids or a_mons && ids);
+  perform public.perform_swap(tr, me);
   return 'done';
 end;
 $$;
@@ -281,24 +304,40 @@ end;
 $$;
 
 -- ------------------------------------------------------------------ inbox
--- Everything the client needs to reconcile, in one round trip - the argument
--- `reconcileTrades` takes. Expires the caller's stale offers on the way (a
--- lazy sweep: no cron to forget, no job to fail).
+-- Everything the client needs, in one round trip: `arrived`, `locks` and
+-- `gone` are exactly what `reconcileTrades` takes (via `inboxToReconcile`);
+-- `recent` is the last trades with what each side gave, for the trade scene;
+-- `pool` and `surprise_left` feed the Surprise tab. Expires the caller's stale
+-- offers and pool deposits on the way (a lazy sweep: no cron to forget).
 create or replace function public.trade_inbox()
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();
   tr public.trades;
+  day timestamptz := date_trunc('day', now());
+  stale interval := make_interval(days => public.trade_limit('LISTING_DAYS'));
 begin
   if me is null then raise exception 'not signed in'; end if;
   for tr in select * from public.trades
-             where a = me and status = 'open'
-               and created_at < now() - make_interval(days => public.trade_limit('LISTING_DAYS'))
+             where a = me and status = 'open' and created_at < now() - stale
              for update loop
     update public.trades set status = 'expired', closed_at = now() where id = tr.id;
     perform public.trade_release(tr);
   end loop;
+  if to_regclass('public.listings') is not null then
+    update public.mons set status = 'held'
+     where id in (select mon from public.listings where owner = me and status = 'open' and created_at < now() - stale)
+       and owner = me and status = 'listed';
+    update public.listings set status = 'expired', closed_at = now()
+     where owner = me and status = 'open' and created_at < now() - stale;
+  end if;
+  if to_regclass('public.surprise_pool') is not null then
+    update public.mons set status = 'held'
+     where id in (select mon from public.surprise_pool where owner = me and deposited_at < now() - stale)
+       and owner = me and status = 'pooled';
+    delete from public.surprise_pool where owner = me and deposited_at < now() - stale;
+  end if;
   return jsonb_build_object(
     'arrived', coalesce((select jsonb_agg(public.mon_json(m)) from public.mons m
                           where m.owner = me and m.status = 'arriving'), '[]'),
@@ -309,9 +348,34 @@ begin
                             and not exists (select 1 from public.mons x where x.id = l.mon and x.owner = me)), '[]'),
     'open',    coalesce((select jsonb_agg(jsonb_build_object('id', t.id, 'kind', t.kind, 'mine', t.a = me,
                           'a', t.a, 'b', t.b, 'msg', t.msg, 'at', t.created_at,
+                          'partner', (select c.username from public.trainer_cards c
+                                       where c.user_id = case when t.a = me then t.b else t.a end),
                           'give', (select jsonb_agg(public.mon_json(m)) from public.mons m where m.id = any(t.a_mons)),
                           'want', (select jsonb_agg(public.mon_json(m)) from public.mons m where m.id = any(t.b_mons))))
-                          from public.trades t where me in (t.a, t.b) and t.status = 'open'), '[]')
+                          from public.trades t where me in (t.a, t.b) and t.status = 'open'), '[]'),
+    'recent',  coalesce((select jsonb_agg(r order by r->>'at' desc) from (
+                          select jsonb_build_object('id', t.id, 'kind', t.kind, 'at', t.closed_at,
+                            'partner', (select c.username from public.trainer_cards c
+                                         where c.user_id = case when t.a = me then t.b else t.a end),
+                            'gave', (select coalesce(jsonb_agg(l.snapshot), '[]') from public.trade_log l
+                                      where l.trade = t.id and l.from_user = me),
+                            'got',  (select coalesce(jsonb_agg(l.snapshot), '[]') from public.trade_log l
+                                      where l.trade = t.id and l.to_user = me)) r
+                            from public.trades t
+                           where me in (t.a, t.b) and t.status = 'done'
+                           order by t.closed_at desc limit 10) x), '[]'),
+    'pool',    case when to_regclass('public.surprise_pool') is null then '[]'::jsonb else
+                 coalesce((select jsonb_agg(jsonb_build_object('mid', p.mon, 'at', p.deposited_at))
+                             from public.surprise_pool p where p.owner = me), '[]') end,
+    'listings', case when to_regclass('public.listings') is null then '[]'::jsonb else
+                 coalesce((select jsonb_agg(jsonb_build_object('id', l.id, 'at', l.created_at,
+                            'want_species', l.want_species, 'want_tier', l.want_tier,
+                            'mon', (select public.mon_json(m) from public.mons m where m.id = l.mon)) order by l.created_at desc)
+                             from public.listings l where l.owner = me and l.status = 'open'), '[]') end,
+    'friend_requests', (select count(*)::int from public.friends where b = me and status = 'pending'),
+    'surprise_left', case when to_regclass('public.surprise_log') is null then 0 else
+                 greatest(0, public.trade_limit('SURPRISE_PER_DAY')
+                   - (select count(*)::int from public.surprise_log where owner = me and at >= day)) end
   );
 end;
 $$;
@@ -419,6 +483,14 @@ alter table public.trainer_cards enable row level security;
 drop policy if exists "cards are public to players" on public.trainer_cards;
 create policy "cards are public to players" on public.trainer_cards for select
   to authenticated using (true);
+-- ...but not the friend code (phase 5: every code was readable, so anybody
+-- could collect them and spam requests). RLS picks rows, not columns, so the
+-- code is withheld by column grant; yours comes from `my_card()`. A new
+-- column is unreadable until it is added here.
+revoke select on public.trainer_cards from anon, authenticated;
+grant select (user_id, username, char, xp, dex_count, variants, stars, trades,
+              showcase, seeking, joined_at, played_at)
+  on public.trainer_cards to authenticated;
 
 -- Eight characters with nothing to misread aloud: no 0/O, no 1/I/L.
 create or replace function public.new_friend_code()
@@ -547,14 +619,48 @@ begin
 end;
 $$;
 
--- By name prefix, case-insensitively, on the index; never yourself.
+-- BLOCKS (phase 5) are defined here because every read below skips them, and
+-- a SQL function is checked against what exists when it is created. A block
+-- works both ways and says nothing.
+create table if not exists public.blocks (
+  blocker    uuid not null references auth.users on delete cascade,
+  blocked    uuid not null references auth.users on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker, blocked),
+  check (blocker <> blocked)
+);
+create index if not exists blocks_blocked on public.blocks (blocked);
+alter table public.blocks enable row level security;
+drop policy if exists "read own blocks" on public.blocks;
+create policy "read own blocks" on public.blocks for select using (auth.uid() = blocker);
+
+create or replace function public.blocked_between(x uuid, y uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.blocks
+                  where (blocker = x and blocked = y) or (blocker = y and blocked = x))
+$$;
+revoke all on function public.blocked_between(uuid, uuid) from public, anon, authenticated;
+
+-- A card as another player sees it: everything but the friend code, which is
+-- yours to hand out (phase 5: codes were readable by everybody, so anyone could
+-- collect them and spam requests).
+create or replace function public.public_card(c public.trainer_cards)
+returns jsonb language sql stable set search_path = '' as $$
+  select to_jsonb(c) - 'friend_code'
+$$;
+
+-- By name prefix, case-insensitively, on the index; never yourself, never
+-- anybody on either side of a block.
+drop function if exists public.find_trainers(text);
 create or replace function public.find_trainers(q text)
-returns setof public.trainer_cards language sql stable security definer set search_path = '' as $$
-  select * from public.trainer_cards
-   where auth.uid() is not null and user_id <> auth.uid()
-     and lower(username) like lower(regexp_replace(btrim(coalesce(q, '')), '([%_\\])', '\\\1', 'g')) || '%'
-     and length(btrim(coalesce(q, ''))) >= 2
-   order by lower(username) limit 20
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(public.public_card(c) order by lower(c.username)), '[]') from (
+    select * from public.trainer_cards
+     where auth.uid() is not null and user_id <> auth.uid()
+       and lower(username) like lower(regexp_replace(btrim(coalesce(q, '')), '([%_\\])', '\\\1', 'g')) || '%'
+       and length(btrim(coalesce(q, ''))) >= 2
+       and not public.blocked_between(auth.uid(), user_id)
+     order by lower(username) limit 20) c
 $$;
 
 -- ------------------------------------------------------------------ friends
@@ -568,21 +674,42 @@ create table if not exists public.friends (
 );
 -- One row per PAIR, whichever way round it was asked.
 create unique index if not exists friends_pair on public.friends (least(a, b), greatest(a, b));
+-- The asked side: the inbox counts pending requests on every poll (phase 5).
+create index if not exists friends_b on public.friends (b, status);
 alter table public.friends enable row level security;
 drop policy if exists "read own friends" on public.friends;
 create policy "read own friends" on public.friends for select using (auth.uid() in (a, b));
 
 -- Answers: 'sent', 'friends' (they had asked you first), 'already', 'self',
--- 'unknown', 'full'.
+-- 'unknown', 'full'. By code (typed in) or by trainer (a profile's button);
+-- one body. A block on either side reads as 'unknown' - it says nothing.
 create or replace function public.add_friend(code text)
+returns text language plpgsql security definer set search_path = '' as $$
+declare them uuid;
+begin
+  if auth.uid() is null then raise exception 'not signed in'; end if;
+  select user_id into them from public.trainer_cards where friend_code = upper(btrim(coalesce(code, '')));
+  return public.befriend(them);
+end;
+$$;
+
+create or replace function public.request_friend(other uuid)
+returns text language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'not signed in'; end if;
+  return public.befriend(other);
+end;
+$$;
+
+create or replace function public.befriend(them uuid)
 returns text language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();
-  them uuid;
 begin
-  if me is null then raise exception 'not signed in'; end if;
-  select user_id into them from public.trainer_cards where friend_code = upper(btrim(coalesce(code, '')));
-  if them is null then return 'unknown'; end if;
+  if them is null or not exists (select 1 from public.trainer_cards where user_id = them)
+     or public.blocked_between(me, them) then
+    return 'unknown';
+  end if;
   if them = me then return 'self'; end if;
   if exists (select 1 from public.friends where a = them and b = me and status = 'pending') then
     update public.friends set status = 'accepted' where a = them and b = me;
@@ -598,6 +725,7 @@ begin
   return 'sent';
 end;
 $$;
+revoke all on function public.befriend(uuid) from public, anon, authenticated;
 
 create or replace function public.answer_friend(other uuid, yes boolean)
 returns boolean language plpgsql security definer set search_path = '' as $$
@@ -624,10 +752,24 @@ create or replace function public.my_friends()
 returns jsonb language sql stable security definer set search_path = '' as $$
   select coalesce(jsonb_agg(jsonb_build_object(
            'status', f.status, 'incoming', f.b = auth.uid() and f.status = 'pending',
-           'card', to_jsonb(c)) order by f.status, lower(c.username)), '[]')
+           'card', public.public_card(c)) order by f.status, lower(c.username)), '[]')
     from public.friends f
     join public.trainer_cards c on c.user_id = case when f.a = auth.uid() then f.b else f.a end
    where auth.uid() in (f.a, f.b)
+$$;
+
+-- Your own card, code and all - the only way a code leaves the server.
+create or replace function public.my_card()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select to_jsonb(c) from public.trainer_cards c where c.user_id = auth.uid()
+$$;
+
+-- A card by name, as a player sees it (a shared link) - not across a block.
+create or replace function public.card_by_name(name text)
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select public.public_card(c) from public.trainer_cards c
+   where auth.uid() is not null and lower(c.username) = lower(btrim(coalesce(name, '')))
+     and not public.blocked_between(auth.uid(), c.user_id)
 $$;
 
 revoke all on function public.update_card(int[], int[]) from public, anon;
@@ -642,3 +784,400 @@ grant execute on function public.add_friend(text) to authenticated;
 grant execute on function public.answer_friend(uuid, boolean) to authenticated;
 grant execute on function public.remove_friend(uuid) to authenticated;
 grant execute on function public.my_friends() to authenticated;
+
+-- =================================================================== PHASE 2
+-- SURPRISE TRADE (docs/trading.md): put one in, get one back, no idea what -
+-- and only from a FRIEND (the trust decision). A deposit matches the oldest
+-- waiting friend's at once, or waits up to LISTING_DAYS and then comes home.
+
+create table if not exists public.surprise_pool (
+  mon          uuid primary key references public.mons on delete cascade,
+  owner        uuid not null references auth.users on delete cascade,
+  deposited_at timestamptz not null default now()
+);
+create index if not exists surprise_pool_at on public.surprise_pool (deposited_at);
+create index if not exists surprise_pool_owner on public.surprise_pool (owner);
+alter table public.surprise_pool enable row level security;
+drop policy if exists "read own pool" on public.surprise_pool;
+create policy "read own pool" on public.surprise_pool for select using (auth.uid() = owner);
+
+-- One row per deposit: what the daily cap counts. Nobody reads it but here.
+create table if not exists public.surprise_log (
+  owner uuid not null references auth.users on delete cascade,
+  at    timestamptz not null default now()
+);
+create index if not exists surprise_log_owner on public.surprise_log (owner, at);
+alter table public.surprise_log enable row level security;
+
+-- Answers {status: 'matched', trade, got, from} | {status: 'waiting'} |
+-- {status: 'unavailable' | 'capped'}.
+create or replace function public.surprise_deposit(mid uuid)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  day timestamptz := date_trunc('day', now());
+  pick record;
+  tr public.trades;
+begin
+  if me is null then raise exception 'not signed in'; end if;
+  perform 1 from public.mons where id = mid for update;
+  if not exists (select 1 from public.mons where id = mid and owner = me and status = 'held') then
+    return jsonb_build_object('status', 'unavailable');
+  end if;
+  if (select count(*) from public.surprise_log where owner = me and at >= day)
+       >= public.trade_limit('SURPRISE_PER_DAY')
+     or (select count(*) from public.trades where status = 'done' and closed_at >= day and me in (a, b))
+       >= public.trade_limit('TRADES_PER_DAY') then
+    return jsonb_build_object('status', 'capped');
+  end if;
+  insert into public.surprise_log (owner) values (me);
+
+  -- The oldest waiting deposit from a friend who can still trade today. SKIP
+  -- LOCKED: two friends depositing at once each take a different one, never
+  -- the same one twice.
+  select sp.mon, sp.owner into pick
+    from public.surprise_pool sp
+    join public.friends f on f.status = 'accepted'
+     and ((f.a = me and f.b = sp.owner) or (f.b = me and f.a = sp.owner))
+   where sp.owner <> me
+     and (select count(*) from public.trades t
+           where t.status = 'done' and t.closed_at >= day and sp.owner in (t.a, t.b))
+         < public.trade_limit('TRADES_PER_DAY')
+   order by sp.deposited_at
+   limit 1
+   for update of sp skip locked;
+
+  if pick.mon is not null then
+    perform 1 from public.mons where id in (pick.mon, mid) order by id for update;
+    if exists (select 1 from public.mons where id = pick.mon and owner = pick.owner and status = 'pooled') then
+      delete from public.surprise_pool where mon = pick.mon;
+      insert into public.trades (kind, a, b, a_mons, b_mons, status)
+      values ('surprise', pick.owner, me, array[pick.mon], array[mid], 'open')
+      returning * into tr;
+      perform public.perform_swap(tr, me);
+      return jsonb_build_object('status', 'matched', 'trade', tr.id,
+        'got', (select public.mon_json(x) from public.mons x where x.id = pick.mon),
+        'from', (select c.username from public.trainer_cards c where c.user_id = pick.owner));
+    end if;
+    delete from public.surprise_pool where mon = pick.mon;       -- a stale row: drop it
+  end if;
+
+  update public.mons set status = 'pooled' where id = mid;
+  insert into public.surprise_pool (mon, owner) values (mid, me);
+  return jsonb_build_object('status', 'waiting');
+end;
+$$;
+
+create or replace function public.surprise_withdraw(mid uuid)
+returns boolean
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from public.surprise_pool where mon = mid and owner = auth.uid();
+  if not found then return false; end if;
+  update public.mons set status = 'held' where id = mid and owner = auth.uid() and status = 'pooled';
+  return true;
+end;
+$$;
+
+revoke all on function public.surprise_deposit(uuid) from public, anon;
+revoke all on function public.surprise_withdraw(uuid) from public, anon;
+grant execute on function public.surprise_deposit(uuid) to authenticated;
+grant execute on function public.surprise_withdraw(uuid) to authenticated;
+
+-- =================================================================== PHASE 3
+-- DIRECT OFFERS (docs/trading.md). Proposing, answering and cancelling were
+-- built and tested in phase 0; what phase 3 adds is the SHELF - the Pokemon a
+-- trainer puts up for trade, shown on their profile. An offer can only ask for
+-- what is on it, so nobody is badgered for a Pokemon they never offered.
+
+alter table public.mons add column if not exists shelf boolean not null default false;
+create index if not exists mons_shelf on public.mons (owner) where shelf;
+
+-- Your shelf, replaced whole: box uids, each read off your STORED save and
+-- registered if it is not yet (the phase 0 rules: the uid must be there, the
+-- entry must not already carry an id). Unknown uids are skipped, the cap cuts.
+-- Returns the shelf as it now stands.
+create or replace function public.set_shelf(uids int[])
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  box jsonb;
+  snaps jsonb;
+  kept uuid[];
+begin
+  if me is null then raise exception 'not signed in'; end if;
+  select case when jsonb_typeof(data->'box') = 'array' then data->'box' else '[]' end
+    into box from public.saves where user_id = me;
+  -- The first SHELF distinct uids that the stored box really holds.
+  select coalesce(jsonb_agg(jsonb_build_object('uid', z.u, 'species', (z.e->>'species')::int,
+                                               'level', (z.e->>'level')::int) order by z.n), '[]')
+    into snaps
+    from (select u.v as u, u.n, e
+            from (select distinct on (v) v, n from unnest(coalesce(uids, '{}')) with ordinality x(v, n) order by v, n) u
+            join jsonb_array_elements(box) e on e->>'uid' = u.v::text
+           where coalesce(e->>'species', '') ~ '^\d{1,5}$' and coalesce(e->>'level', '') ~ '^\d{1,4}$'
+           order by u.n limit public.trade_limit('SHELF')) z;
+  -- Entries already carrying an id are registered rows of ours: find them by uid.
+  perform public.register_mons(snaps);
+  select coalesce(array_agg(m.id), '{}') into kept
+    from public.mons m
+   where m.owner = me and m.status <> 'released'
+     and m.local_uid in (select (x->>'uid')::int from jsonb_array_elements(snaps) x);
+  update public.mons set shelf = (id = any(kept)) where owner = me and (shelf or id = any(kept));
+  return coalesce((select jsonb_agg(public.mon_json(m)) from public.mons m
+                    where m.owner = me and m.shelf), '[]');
+end;
+$$;
+
+-- Anybody's shelf, as a player sees it: only what is up for trade and free.
+create or replace function public.trainer_shelf(who uuid)
+returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select case when auth.uid() is null then '[]'::jsonb else
+    coalesce((select jsonb_agg(public.mon_json(m) order by m.species, m.level desc)
+                from public.mons m
+               where m.owner = who and m.shelf and m.status = 'held'
+                 and not public.blocked_between(auth.uid(), who)), '[]') end
+$$;
+
+revoke all on function public.set_shelf(int[]) from public, anon;
+revoke all on function public.trainer_shelf(uuid) from public, anon;
+grant execute on function public.set_shelf(int[]) to authenticated;
+grant execute on function public.trainer_shelf(uuid) to authenticated;
+
+-- =================================================================== PHASE 4
+-- THE TRADE BOARD (docs/trading.md): "offering this, looking for that",
+-- between FRIENDS (the trust decision). A listing is one Pokemon and what its
+-- owner wants for it - a species, and optionally one tier. Anybody whose box
+-- fits completes it in one step; there is nothing to negotiate.
+
+create table if not exists public.listings (
+  id           uuid primary key default gen_random_uuid(),
+  owner        uuid not null references auth.users on delete cascade,
+  mon          uuid not null references public.mons on delete cascade,
+  want_species int  not null check (want_species between 1 and 20000),
+  -- null: any form of that species. Otherwise exactly this tier.
+  want_tier    text check (want_tier in ('showdown','shiny','astral','glitched','holo','origin','noir','vivid')),
+  status       text not null default 'open' check (status in ('open','done','withdrawn','expired')),
+  created_at   timestamptz not null default now(),
+  closed_at    timestamptz
+);
+create index if not exists listings_open on public.listings (status, created_at desc);
+create index if not exists listings_owner on public.listings (owner, status);
+-- One open listing per Pokemon, whatever the client sends.
+create unique index if not exists listings_one_open on public.listings (mon) where status = 'open';
+alter table public.listings enable row level security;
+drop policy if exists "read own listings" on public.listings;
+create policy "read own listings" on public.listings for select using (auth.uid() = owner);
+
+create or replace function public.are_friends(x uuid, y uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.friends
+                  where status = 'accepted' and ((a = x and b = y) or (a = y and b = x)))
+$$;
+revoke all on function public.are_friends(uuid, uuid) from public, anon, authenticated;
+
+-- Answers the new listing's id; raises with a reason a player can read.
+create or replace function public.post_listing(mid uuid, want_species int, want_tier text default null)
+returns uuid
+language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  new_id uuid;
+begin
+  if me is null then raise exception 'not signed in'; end if;
+  if want_species is null or want_species not between 1 and 20000 then raise exception 'pick what you want for it'; end if;
+  if (select count(*) from public.listings where owner = me and status = 'open')
+     >= public.trade_limit('OPEN_LISTINGS') then
+    raise exception 'too many listings - take one down first';
+  end if;
+  perform 1 from public.mons where id = mid for update;
+  if not exists (select 1 from public.mons where id = mid and owner = me and status = 'held') then
+    raise exception 'that Pokemon is not free to list';
+  end if;
+  update public.mons set status = 'listed', shelf = false where id = mid;
+  insert into public.listings (owner, mon, want_species, want_tier)
+  values (me, mid, post_listing.want_species, nullif(post_listing.want_tier, ''))
+  returning listings.id into new_id;
+  return new_id;
+end;
+$$;
+
+create or replace function public.withdraw_listing(lid uuid)
+returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare l public.listings;
+begin
+  select * into l from public.listings where id = lid for update;
+  if not found or l.owner is distinct from auth.uid() or l.status <> 'open' then return false; end if;
+  update public.listings set status = 'withdrawn', closed_at = now() where id = lid;
+  update public.mons set status = 'held' where id = l.mon and owner = l.owner and status = 'listed';
+  return true;
+end;
+$$;
+
+-- What your friends (and you) have up, newest first; `q` narrows it to a
+-- species, whether offered or wanted.
+create or replace function public.trade_board(q int default null)
+returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select case when auth.uid() is null then '[]'::jsonb else
+    coalesce((select jsonb_agg(x order by x->>'at' desc) from (
+      select jsonb_build_object('id', l.id, 'at', l.created_at, 'mine', l.owner = auth.uid(),
+               'owner', c.username, 'want_species', l.want_species, 'want_tier', l.want_tier,
+               'mon', public.mon_json(m)) x
+        from public.listings l
+        join public.mons m on m.id = l.mon and m.status = 'listed' and m.owner = l.owner
+        join public.trainer_cards c on c.user_id = l.owner
+       where l.status = 'open'
+         and (l.owner = auth.uid() or public.are_friends(auth.uid(), l.owner))
+         and (q is null or m.species = q or l.want_species = q)
+       order by l.created_at desc
+       limit 60) z), '[]') end
+$$;
+
+-- COMPLETE A LISTING with one of yours that fits. Everything re-checked with
+-- the rows locked; a second taker finds it gone. Answers
+-- {status: 'done', trade, got, from} or {status: 'gone' | 'unfit' | 'capped'}.
+create or replace function public.fulfil_listing(lid uuid, mid uuid)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  l public.listings;
+  mine public.mons;
+  tr public.trades;
+  day timestamptz := date_trunc('day', now());
+begin
+  if me is null then raise exception 'not signed in'; end if;
+  select * into l from public.listings where id = lid for update;
+  if not found or l.status <> 'open' or l.owner = me or not public.are_friends(me, l.owner) then
+    return jsonb_build_object('status', 'gone');
+  end if;
+  perform 1 from public.mons where id in (l.mon, mid) order by id for update;
+  if not exists (select 1 from public.mons where id = l.mon and owner = l.owner and status = 'listed') then
+    return jsonb_build_object('status', 'gone');
+  end if;
+  select * into mine from public.mons where id = mid;
+  if not found or mine.owner <> me or mine.status <> 'held' or mine.species <> l.want_species
+     or (l.want_tier is not null and mine.tier is distinct from l.want_tier) then
+    return jsonb_build_object('status', 'unfit');
+  end if;
+  if (select count(*) from public.trades where status = 'done' and closed_at >= day and me in (a, b))
+       >= public.trade_limit('TRADES_PER_DAY')
+     or (select count(*) from public.trades where status = 'done' and closed_at >= day and l.owner in (a, b))
+       >= public.trade_limit('TRADES_PER_DAY') then
+    return jsonb_build_object('status', 'capped');
+  end if;
+  update public.listings set status = 'done', closed_at = now() where id = lid;
+  insert into public.trades (kind, a, b, a_mons, b_mons, status)
+  values ('board', l.owner, me, array[l.mon], array[mid], 'open')
+  returning * into tr;
+  perform public.perform_swap(tr, me);
+  return jsonb_build_object('status', 'done', 'trade', tr.id,
+    'got', (select public.mon_json(x) from public.mons x where x.id = l.mon),
+    'from', (select c.username from public.trainer_cards c where c.user_id = l.owner));
+end;
+$$;
+
+revoke all on function public.post_listing(uuid, int, text) from public, anon;
+revoke all on function public.withdraw_listing(uuid) from public, anon;
+revoke all on function public.trade_board(int) from public, anon;
+revoke all on function public.fulfil_listing(uuid, uuid) from public, anon;
+grant execute on function public.post_listing(uuid, int, text) to authenticated;
+grant execute on function public.withdraw_listing(uuid) to authenticated;
+grant execute on function public.trade_board(int) to authenticated;
+grant execute on function public.fulfil_listing(uuid, uuid) to authenticated;
+
+-- =================================================================== PHASE 5
+-- BLOCK AND REPORT (docs/trading.md). The `blocks` table sits in phase 1,
+-- which reads it. Neither side of a block finds, befriends, offers to or opens
+-- the profile of the other. Blocking ends a friendship and closes the open
+-- offers between the two, freeing what was locked; since `befriend` refuses
+-- across a block, being friends implies no block, which is what keeps the
+-- friends-only Board and Surprise Trade covered. A report is a row for the
+-- project's owner to read - no free text, a reason from a fixed list, once per
+-- pair per day.
+
+create table if not exists public.reports (
+  id         bigint generated always as identity primary key,
+  reporter   uuid not null references auth.users on delete cascade,
+  reported   uuid not null references auth.users on delete cascade,
+  reason     int  not null check (reason between 0 and 15),     -- a REPORT_REASONS index
+  created_at timestamptz not null default now()
+);
+create index if not exists reports_pair on public.reports (reporter, reported, created_at);
+-- No policies: nobody reads reports through the API. The dashboard does.
+alter table public.reports enable row level security;
+
+create or replace function public.block_user(other uuid)
+returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  tr public.trades;
+begin
+  if me is null then raise exception 'not signed in'; end if;
+  if other is null or other = me then return false; end if;
+  insert into public.blocks (blocker, blocked) values (me, other) on conflict do nothing;
+  delete from public.friends where (a = me and b = other) or (a = other and b = me);
+  for tr in select * from public.trades
+             where status = 'open' and ((a = me and b = other) or (a = other and b = me))
+             for update loop
+    update public.trades set status = 'cancelled', closed_at = now() where id = tr.id;
+    perform public.trade_release(tr);
+  end loop;
+  return true;
+end;
+$$;
+
+create or replace function public.unblock_user(other uuid)
+returns boolean
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from public.blocks where blocker = auth.uid() and blocked = other;
+  return found;
+end;
+$$;
+
+-- The trainers you have blocked, as cards (to undo it).
+create or replace function public.my_blocks()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(public.public_card(c) order by lower(c.username)), '[]')
+    from public.blocks b join public.trainer_cards c on c.user_id = b.blocked
+   where b.blocker = auth.uid()
+$$;
+
+-- True if filed; false if this pair was already reported today.
+create or replace function public.report_user(other uuid, reason int)
+returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := auth.uid();
+begin
+  if me is null then raise exception 'not signed in'; end if;
+  if other is null or other = me or reason is null or reason not between 0 and 15 then return false; end if;
+  if exists (select 1 from public.reports where reporter = me and reported = other
+              and created_at >= date_trunc('day', now())) then
+    return false;
+  end if;
+  insert into public.reports (reporter, reported, reason) values (me, other, report_user.reason);
+  return true;
+end;
+$$;
+
+revoke all on function public.block_user(uuid) from public, anon;
+revoke all on function public.unblock_user(uuid) from public, anon;
+revoke all on function public.my_blocks() from public, anon;
+revoke all on function public.report_user(uuid, int) from public, anon;
+revoke all on function public.request_friend(uuid) from public, anon;
+revoke all on function public.my_card() from public, anon;
+revoke all on function public.card_by_name(text) from public, anon;
+grant execute on function public.block_user(uuid) to authenticated;
+grant execute on function public.unblock_user(uuid) to authenticated;
+grant execute on function public.my_blocks() to authenticated;
+grant execute on function public.report_user(uuid, int) to authenticated;
+grant execute on function public.request_friend(uuid) to authenticated;
+grant execute on function public.my_card() to authenticated;
+grant execute on function public.card_by_name(text) to authenticated;
