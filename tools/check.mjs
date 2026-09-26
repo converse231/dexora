@@ -3370,7 +3370,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(light.size >= 20, `only ${light.size} colour tokens found - the parse is wrong`);
     }
 
-    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon", ".ts-got", ".ts-gave", ".tc-send", ".of-mon", ".bd-want", ".tc-who.still"]) {
+    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon", ".ts-got", ".ts-gave", ".tc-send", ".of-mon", ".bd-want", ".tc-who.still", ".ts-one", ".pk-took"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
         `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +
         "variant that is a span will render zero wide there, silently");
@@ -4145,7 +4145,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
 
   /* TRADING'S CLIENT RULES (docs/trading.md) - pure, so here. */
   {
-    const { LIMITS, LOCKS, PRESETS, REPORT_REASONS, cleanTradeFields, tradeable, snapshot, inboxToReconcile, freshTrades, fits } =
+    const { LIMITS, LOCKS, PRESETS, REPORT_REASONS, cleanTradeFields, tradeable, snapshot, inboxToReconcile, freshTrades, fits, keepLast } =
       await import("../src/game/trade.js");
     for (const [k, v] of Object.entries(LIMITS)) {
       assert.ok(Number.isInteger(v) && v > 0, `trade limit ${k} is ${v}`);
@@ -4171,7 +4171,19 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     assert.deepEqual(rec.locks, { a: null, b: "offer", c: "pool", d: "listing" }, "the server's lock states mapped wrongly");
     assert.ok(Object.values(rec.locks).every((l) => l === null || LOCKS.includes(l)), "a mapped lock is not in LOCKS");
     assert.deepEqual([rec.gone, rec.arrived.length], [["x"], 1], "garbage in the inbox reached the engine");
-    assert.deepEqual(inboxToReconcile(null), { locks: {}, gone: [], arrived: [] }, "an empty inbox did not map to nothing");
+    assert.deepEqual(inboxToReconcile(null), { assign: {}, locks: {}, gone: [], arrived: [] }, "an empty inbox did not map to nothing");
+    // The uid -> id map a friend's ask needs, and nothing that is not one.
+    assert.deepEqual(inboxToReconcile({ assign: { 7: "m7", x: "bad", 8: 5 } }).assign, { 7: "m7" },
+      "garbage in the inbox's id map reached the engine");
+    // The last of a species stays, counted over a whole pick: three Meowth, two may go.
+    const meowth = keepLast([{ species: 52 }, { species: 52 }, { species: 52 }, { species: 1 }]);
+    assert.deepEqual([meowth(52), meowth(1), meowth(999)], [2, 0, -1], "keepLast lets the last of a species go");
+    // One Pokemon may sit in several OFFERS - but a listing or the pool keeps it out.
+    const two = [{ uid: 1, species: 16, level: 5, lock: "offer", mid: "m" }, { uid: 2, species: 16, level: 6 }];
+    assert.ok(tradeable(two, two[0], true), "a Pokemon already in an offer could not go into another");
+    assert.ok(!tradeable(two, two[0]), "a Pokemon in an offer could be listed or pooled");
+    assert.ok(!tradeable([{ ...two[0], lock: "listing" }, two[1]], { ...two[0], lock: "listing" }, true),
+      "a listed Pokemon could go into an offer");
     // The board's "you have one": species, tier if named, and free to trade.
     const pika = [{ uid: 1, species: 25, level: 5 }, { uid: 2, species: 25, level: 6, shiny: 1 }, { uid: 3, species: 25, level: 7, lock: "offer", mid: "m" }];
     assert.ok(fits(pika, pika[1], { want_species: 25, want_tier: "shiny" }), "a shiny did not fit a shiny listing");

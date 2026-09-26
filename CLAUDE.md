@@ -479,6 +479,20 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `REPORT_REASONS` is append-only (the server stores the index; check.mjs
   holds it inside the SQL's range). Going live is SUPABASE.md §3d; tradedb
   applies §3c every run so the test project has live's shape.
+  **Phase 6**: a FRIEND's spares are askable by box uid (`want_uids`,
+  registered for them by `register_for`), a stranger's shelf only; six a
+  side. A Pokemon may sit in several open offers - offering no longer sets
+  `offered` (the inbox reports it as a lock, so the game still refuses to sell
+  it), `trade_release` frees only `offered`, and a direct offer's give uses
+  `tradeable(box, m, true)`. **`answer_trade` says `sync`** until the
+  accepter's saved box carries the ids it gives; the trigger strips and keeps
+  entries by uid+species as well as by id. **The last of a species is
+  counted over the whole move** (`leaves_one` in SQL, `keepLast` in trade.js
+  and the Picker's `limit`). Listings are bundles (`mon || bundle`). Every
+  trading screen picks through `Picker.jsx` (grouped, searchable, filtered);
+  wishes and wants search ANY species. The trade scene throws one ball per
+  Pokemon each way. SQL first, client second: the new client calls
+  `post_listing(mids)` and `propose_trade(..., want_uids)`.
 - **Monsoon Trail is Emerald's Route 119** in Deep Woods' slot (id `woods`),
   transcribed like the Safari Zone against Emerald General + `fortree`
   (appended last in `EM_SECONDARY`). Long grass is laid as tall; rails are `-` and `|`

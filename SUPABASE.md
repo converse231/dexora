@@ -345,6 +345,11 @@ friend code. Design and rules: [docs/trading.md](docs/trading.md).
 2. **Run the file.** SQL Editor → New query → paste the whole of
    `db/trading.sql` → Run. "Success. No rows returned" is right.
 
+   **Every later trading change is the same step**: the file is re-runnable,
+   so paste the whole of it again. Run it BEFORE deploying the client that
+   needs it - phase 6 (Oct 2026) changed `post_listing` and `propose_trade`,
+   and a new client against the old SQL reads as "Trading isn't open yet".
+
 3. **Check it took.** Each of these should hold:
 
    ```

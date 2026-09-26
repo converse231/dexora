@@ -143,21 +143,26 @@ export default function Help({ onClose }) {
               up to {LIMITS.SHELF} Pokémon up for trade on your card.
             </li>
             <li>
-              <b>Offers.</b> Ask for anything on another trainer&rsquo;s card
-              and offer some of yours; nothing moves until they accept. What
-              you offer is held until then - it cannot be sold or evolved.
+              <b>Offers.</b> Up to {LIMITS.MAX_SIDE} of yours for up to{" "}
+              {LIMITS.MAX_SIDE} of theirs; nothing moves until they accept,
+              and they can counter. A Pokémon in an offer can&rsquo;t be sold
+              or evolved - but it can be in several offers at once, and the
+              first accepted takes it.
             </li>
             <li>
-              <b>With friends:</b> Surprise Trade swaps one for one without
-              either of you knowing what comes back, and the Trade Board lists
-              &ldquo;this for that&rdquo;, which a friend can complete in one
-              tap. A Pokédex entry&rsquo;s <i>On the Board</i> searches it.
+              <b>Friends</b> can browse each other&rsquo;s Pokédex and ask for
+              any spare, not just what is up for trade. Surprise Trade swaps
+              one for one blind, and the Trade Board lists bundles - several
+              of yours for one you want - that a friend completes in one tap.
+              The Board&rsquo;s search finds any species, even one you have
+              never seen.
             </li>
             <li>
-              <b>What counts.</b> You can trade anything except the last of a
-              species, up to {LIMITS.TRADES_PER_DAY} trades a day. A traded
-              Pokémon fills your Pokédex and its research, but medals,
-              milestones and rare-form marks are for ones you caught.
+              <b>What counts.</b> You always keep the last of each species -
+              counted over the whole offer. Up to {LIMITS.TRADES_PER_DAY}{" "}
+              trades a day. A traded Pokémon fills your Pokédex and its
+              research, but medals, milestones and rare-form marks are for
+              ones you caught.
             </li>
             <li>
               <b>Block or report</b> from any trainer&rsquo;s profile. A block

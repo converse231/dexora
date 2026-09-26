@@ -5712,6 +5712,9 @@ button:disabled { transition: none; }
   .bx-acts button { min-height: 36px; }
   .ms-tab { min-height: 34px; }
   .sheet-where li button { min-height: 36px; }
+  /* The Trade Center's small controls: Edit, the picker's tray and chips, copy. */
+  .tp-edit, .pk-took, .tp-chip.add, .tp-chip.x, .tp-quiet, .tc-home, .tc-browse, .bd-go, .pk-sel { min-height: 36px; }
+  .tp-copy { min-width: 36px; min-height: 36px; }
 }
 
 /* ================================================================ TRADE CENTER
@@ -6008,9 +6011,18 @@ button:disabled { transition: none; }
 .ts-gave > img, .ts-gave > .sprite-fx { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .ts-gave > .sprite-showdown { width: 77%; height: 77%; margin: 11.5%; }
 @keyframes ts-fold { to { transform: scale(0) rotate(-20deg); opacity: 0; } }
-.ts-ball { position: absolute; top: 50%; width: 30px; height: 30px; margin-top: -15px; image-rendering: pixelated; opacity: 0; }
-.ts-ball.out { left: 6%; animation: ts-out 2.3s cubic-bezier(.45, 0, .55, 1) .7s both; }
-.ts-ball.in { right: 6%; animation: ts-back 2.3s cubic-bezier(.45, 0, .55, 1) .7s both; }
+/* ONE BALL PER POKEMON: `--d` staggers each one's start and `--y` fans them
+   apart, both set per ball in TradeScene.jsx (squeezed to land by the reveal). */
+.ts-ball {
+  position: absolute; top: 50%; width: 30px; height: 30px; margin-top: calc(-15px + var(--y, 0px));
+  image-rendering: pixelated; opacity: 0;
+}
+.ts-ball.out { left: 6%; animation: ts-out 2.3s cubic-bezier(.45, 0, .55, 1) var(--d, .7s) both; }
+.ts-ball.in { right: 6%; animation: ts-back 2.3s cubic-bezier(.45, 0, .55, 1) var(--d, .7s) both; }
+.ts-more {
+  position: absolute; right: -6px; bottom: 2px; padding: 1px 6px; border-radius: 9px;
+  font-family: var(--pixel); font-size: 10px; color: #0d1824; background: #9fd8ff;
+}
 @keyframes ts-out {
   0% { opacity: 0; transform: translate(0, 0) rotate(0); }
   8% { opacity: 1; }
@@ -6043,6 +6055,11 @@ button:disabled { transition: none; }
 }
 .ts-got > img, .ts-got > .sprite-fx { position: relative; width: 150px; height: 150px; object-fit: contain; image-rendering: pixelated; }
 .ts-got > .sprite-showdown { position: relative; width: calc(150px * .77); height: calc(150px * .77); }
+/* Several arriving: a row of smaller portraits, each with its marks. */
+.ts-got.many { width: min(100%, 460px); height: auto; min-height: 100px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.ts-one { position: relative; width: 84px; height: 84px; display: grid; place-items: center; }
+.ts-one > img, .ts-one > .sprite-fx { width: 84px; height: 84px; object-fit: contain; image-rendering: pixelated; }
+.ts-one > .sprite-showdown { width: calc(84px * .77); height: calc(84px * .77); }
 @keyframes ts-rise { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
 .ts-flash {
   position: absolute; inset: -30px; border-radius: 50%; opacity: 0; pointer-events: none;
@@ -6087,6 +6104,88 @@ button:disabled { transition: none; }
 .tc-send i { font-style: normal; font-size: 12px; color: var(--ink-soft); }
 .tc-send em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--bad); }
 .tc-send .ev-go { width: auto; padding-inline: 18px; }
+
+/* THE PICKER (Picker.jsx): search, type and sort in one row; filters as
+   chips; the tray of what is taken; then the grouped grid. */
+.pk { display: grid; gap: 8px; }
+.pk-bar { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; }
+.pk-sel {
+  min-width: 0; font: inherit; font-size: 13px; padding: 8px 6px; color: var(--ink);
+  background: var(--surface); border: 2px solid var(--line-firm); border-radius: 10px;
+}
+.pk-sel:focus { outline: none; border-color: var(--canopy); }
+.pk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pk-tray {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px;
+  border-radius: 10px; background: var(--canopy-soft); border: 2px solid var(--canopy);
+}
+.pk-count { font-family: var(--pixel); font-size: 10px; color: var(--canopy); padding: 0 4px; }
+.pk-took {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 2px; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--ink); background: var(--surface);
+  border: 2px solid var(--line-firm); border-radius: 9px;
+}
+.pk-took > img { width: 30px; height: 30px; image-rendering: pixelated; }
+.pk-took > .sprite-showdown { width: calc(30px * .77); height: calc(30px * .77); margin: 3.4px; }
+.pk-took i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-soft); }
+.pk-took b { color: var(--ink-faint); font-weight: 400; }
+.pk-took:hover { border-color: var(--bad); }
+.pk-n {
+  position: absolute; right: 3px; bottom: 2px; font-family: var(--pixel); font-size: 9px;
+  color: var(--ink-soft); pointer-events: none;
+}
+.tc-mon:disabled { opacity: .45; cursor: default; }
+.tc-mon.on:disabled { opacity: 1; }
+.tc-mon { content-visibility: auto; contain-intrinsic-size: 58px; }
+
+/* THE ACTION THAT FINISHES A LONG PAGE stays in reach at its bottom. */
+.tc-dock {
+  position: sticky; bottom: 0; z-index: 2; margin: 0 -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--paper); border-top: 2px solid var(--line); box-shadow: 0 -2px 0 var(--shadow-soft);
+}
+.tc-send.tc-dock { margin: 8px 0 0; border-radius: 12px; box-shadow: 0 -4px 12px var(--shadow-soft); }
+
+/* Each card section's own Edit, and "+" where there is nothing yet. */
+.tp-edit {
+  flex: none; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--canopy); background: var(--surface); border: 2px solid var(--line-firm); border-radius: 8px;
+}
+.tp-edit:hover { border-color: var(--canopy); }
+.tp-slot.empty.add { cursor: pointer; font: inherit; }
+.tp-slot.empty.add span { font-size: 34px; color: var(--canopy); }
+.tp-slot.empty.add:hover { border-color: var(--canopy); background: var(--canopy-soft); }
+.tp-plus { justify-self: start; }
+.tp-plus i { margin: 0 2px 0 0; font-size: 16px; color: var(--canopy); }
+
+/* A friend's box (Browse.jsx). */
+.bw-dex { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.bw-dex span {
+  display: grid; justify-items: center; padding: 6px 4px; border-radius: 10px; font-size: 11px;
+  color: var(--ink-soft); background: var(--surface-2); border: 2px solid var(--line);
+}
+.bw-dex b { font-family: var(--display); font-size: 20px; color: var(--ink); }
+.bw-dex .gap { border-color: var(--gold); }
+.bw-gap { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
+.bw-sp {
+  aspect-ratio: 1; padding: 2px; cursor: pointer; background: var(--surface-2);
+  border: 2px solid var(--line); border-radius: 9px;
+}
+.bw-sp img { width: 100%; height: 100%; image-rendering: pixelated; }
+.bw-sp.spare { border-color: var(--canopy); background: var(--canopy-soft); }
+
+/* A board bundle, and the search's two lists. */
+.bd-bundle { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.bd-bundle .of-mon.big { width: 56px; flex: none; }
+.bd-deal { flex-wrap: wrap; }
+.bd-h { margin: 6px 0 0; font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
+.bd-go, .tc-browse { flex: none; width: auto; padding: 7px 12px; }
+.tc-row > .bd-bundle { margin-left: auto; }
+@media (max-width: 420px) {
+  .pk-bar { grid-template-columns: 1fr 1fr; }
+  .pk-q { grid-column: 1 / -1; }
+  .bd-row { grid-template-columns: 1fr auto; }
+  .bd-row .bd-arrow { display: none; }
+}
 /* The Box says which rows hold a Pokemon that is in a trade. */
 .bx-vtag.bx-trade { background: var(--canopy); }
 
