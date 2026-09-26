@@ -15,6 +15,12 @@ built. Change a decision here first, then the code.
 | First release | Direct offers + trainer profiles, Surprise Trade, Trade Board. | Trade evolutions are parked (cheap to add later: one flag on `EVOLUTIONS`). |
 | Accounts | Trading needs an account. Guests and local mode see a "sign in to trade" screen. | There is no server identity to own a row without one. |
 | Safety (13+) | No free text anywhere: preset messages and emotes only. Block and report. | Moderation-free by construction. |
+| Asking (phase 6) | **A friend's spares are all askable; a stranger's shelf only.** Friends browse each other's Pokédex and every box entry but the last of a species, and an offer may ask for any of it (the server registers it for them by box uid). Up to **six a side**. | DelugeRPG's "view a trainer, offer on anything" - kept to friends, the trust decision. The owner still accepts or declines. |
+| One Pokémon, several offers | **A Pokémon may sit in several open offers at once**; the first accepted takes it and every other offer naming it fails. The game still refuses to sell or evolve it while any offer holds it. | DelugeRPG's way - one lock per offer meant a spare could be offered to one person at a time. |
+| Bundles | **A Board listing is up to six of yours for one wanted Pokémon**, completed in one tap, all or nothing. | "Several for one" was the missing shape of a listing. |
+| Search | **Wishes, Board wants and searches name any species**, seen or not. The Board's search also lists friends with a spare and anybody's shelf. | Trading is how a Pokédex fills its gaps; hiding unseen species hid exactly what a player is looking for. |
+| The last one | **"You keep the last of each species" is counted over a whole offer or listing** (`leaves_one` / `keepLast`), both sides. | Per Pokémon, three Meowth each looked spare and all three could go at once. |
+| Counter-offers | A counter is a new offer to the same trainer, pre-filled with the sides swapped; sending it declines the one it answers. | No messaging, still a negotiation. |
 
 ## Limits (one table - `trade.js` exports these, the SQL mirrors them, check.mjs holds them equal)
 
@@ -80,6 +86,26 @@ that duplicates under a double-click.
   `answer_friend(id, yes)`, `remove_friend(id)`.
 - `block_user(user)`, `unblock_user(user)`, `my_blocks()`,
   `report_user(user, reason)` - see *Block and report*.
+
+### Asking a friend for a spare (phase 6)
+
+A friend's ask names **box uids** (`propose_trade`'s `want_uids`); the server
+reads them off the friend's STORED save - not the last of a species, not an
+entry their game has locked - and registers them for the friend
+(`register_for`, the body of `register_mons` for any owner). That friend's
+game has not learned those server ids, which is the one new hazard:
+
+- **The inbox's `assign`** ({uid: mid} for every row you own) is how their
+  game learns them; `reconcileTrades` writes them onto the entries.
+- **`answer_trade` answers `sync`** until the accepter's saved box carries the
+  ids of what it gives. The Offers tab then syncs, uploads and asks again. A
+  swap before that would leave the old copy in their box with nothing to
+  strip it by.
+- **The save trigger matches by uid too**: an entry with no id whose uid and
+  species match something the trainer traded away is stripped (the log's
+  snapshot holds both), and a held row stays held while an entry with its uid
+  and species is still in the box - without that, any upload before the sync
+  released the asked-for Pokémon.
 
 ### Block and report
 
@@ -188,6 +214,7 @@ direct upsert, and `save_game` itself is untouched):
 | 2. Surprise Trade | **done** - friends-only pool, the sync loop, the trade scene, Box "IN TRADE" |
 | 3. Direct offers | **done** - the shelf (`set_shelf`, `trainer_shelf`: offers ask only for it), composer, Offers tab, history, badges |
 | 4. Trade Board | **done** - friends' listings (`post_listing`, `trade_board`, `fulfil_listing`), species + tier wants, search, one-tap fill |
+| 6. Explore | **done** - a friend's box and Pokédex, ask for any spare by box uid, six a side, one Pokémon in several offers, bundle listings, search any species (friends' spares, shelves, listings), the whole-offer last-one rule, counter-offers, the grouped picker, per-section card editing, one ball per Pokémon in the scene |
 | 5. Polish | **done** - block and report, private friend codes, requests on the menu dot, On the Board, names open profiles, the preview's trade story, Help, What's new, the review pass |
 
 **Live since 2026-09-26** (SUPABASE.md §3d: §3c, then `db/trading.sql`, one

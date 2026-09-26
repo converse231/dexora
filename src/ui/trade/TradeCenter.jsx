@@ -1,12 +1,16 @@
-/* THE TRADE CENTER (docs/trading.md). Phase 1: trainers and friends, and your
-   own card. Loaded on demand (App imports it lazily), so the game's first load
-   does not grow for anybody who never opens it.
+/* THE TRADE CENTER (docs/trading.md): trainers and friends, offers, the
+   board, Surprise Trade and your own card. A page, loaded on demand (App
+   imports it lazily), so the game's first load does not grow for anybody who
+   never opens it.
+
+   ONE VIEW AT A TIME, stacked: an offer being written, a friend's box, a card
+   section being edited, a profile, then the tabs. Escape and "Back" peel them
+   off in that order.
 
    EVERY SERVER ANSWER IS {ok, data}: a failed read shows "try again", never an
    empty list - "nobody here" and "could not ask" must not look alike. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SPECIES } from "../../data/dex.js";
-import { speciesById, TIERS, isLegendary } from "../../game/biomes.js";
+import { speciesById, isLegendary } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { LIMITS, tradeable } from "../../game/trade.js";
 import { variantOf, keeper } from "../../game/items.js";
@@ -17,7 +21,9 @@ import {
   blockUser, unblockUser, myBlocks, reportUser,
   surpriseDeposit, surpriseWithdraw, trainerShelf, setShelf,
 } from "../../net/cloud.js";
-import { Composer, OffersTab, MonPick, keyOf } from "./Offers.jsx";
+import { Composer, OffersTab } from "./Offers.jsx";
+import Picker, { SpeciesFind, keyOf } from "./Picker.jsx";
+import Browse from "./Browse.jsx";
 import { enterTrading } from "./enter.js";
 import BoardTab from "./Board.jsx";
 import { useModalLock } from "../modal.js";
@@ -34,6 +40,7 @@ const ADD_SAYS = {
   full: `A trainer can have ${LIMITS.FRIENDS} friends at most.`,
 };
 const link = (name) => `${location.origin}${location.pathname}#/trainer/${encodeURIComponent(name)}`;
+const byUid = (m) => `u${m.uid}`;
 
 /* ONE ROW PER TRAINER, the same everywhere a list names somebody. */
 function Row({ card, children, onOpen }) {
@@ -48,106 +55,59 @@ function Row({ card, children, onOpen }) {
   );
 }
 
-/* THE CARD EDITOR: six from your box, twelve wishes. What is saved is box uids
-   and species ids; the server reads each Pokemon off your STORED save, which is
-   why the save is flushed first. */
-function Editor({ box, dexOf, card, shelf, engine, onSaved, onCancel }) {
-  const [pick, setPick] = useState(() => card.showcase.map((m) => m.uid));
-  // The shelf, picked from what can be traded - plus anything already on it.
-  const shelfMids = useMemo(() => new Set((shelf ?? []).map((m) => m.mid)), [shelf]);
-  const tradeables = useMemo(() => box.filter((m) => shelfMids.has(m.mid) || tradeable(box, m))
-    .sort((a, b) => a.species - b.species || b.level - a.level).slice(0, 150), [box, shelfMids]);
-  const [up, setUp] = useState(() => tradeables.filter((m) => shelfMids.has(m.mid)).map(keyOf));
+/* ONE CARD SECTION AT A TIME - the showcase, the wishes or the shelf - each
+   opened by its own Edit (or a "+" in an empty slot). What is saved is box
+   uids and species ids; the server reads each Pokemon off your STORED save,
+   which is why the save is flushed first. */
+const EDITS = {
+  showcase: { title: "Showcase", note: `Pick up to ${LIMITS.SHOWCASE} to show off.` },
+  seeking: { title: "Looking for", note: "Any species - even ones you have never seen." },
+  shelf: { title: "Up for trade", note: "Strangers can only ask for these; friends can ask for any spare. You always keep the last of each species." },
+};
+function SectionEdit({ kind, box, dexOf, card, shelf, busy, onSave, onCancel }) {
+  const [pick, setPick] = useState(() => (kind === "showcase"
+    ? card.showcase.map(byUid)
+    : (shelf ?? []).map((m) => `u${m.uid}`)));
   const [wish, setWish] = useState(() => [...card.seeking]);
-  const [find, setFind] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState(null);
-
-  /* Rarest first, then highest level: the Pokemon a trainer would show off. */
-  const choices = useMemo(() => [...box].sort((a, b) => {
-    const r = (m) => (variantOf(m) ? TIERS.length - TIERS.indexOf(variantOf(m)) : 0) + (m.alpha ? 20 : 0);
-    return r(b) - r(a) || b.level - a.level || a.uid - b.uid;
-  }).slice(0, 120), [box]);
-  const hits = useMemo(() => {
-    const n = find.trim().toLowerCase();
-    if (n.length < 2) return [];
-    return SPECIES.filter((sp) => dexOf(sp.id) >= 1 && !wish.includes(sp.id)
-      && label(sp).toLowerCase().includes(n)).slice(0, 8);
-  }, [find, wish, dexOf]);
-
-  const toggle = (uid) => setPick((p) => (p.includes(uid) ? p.filter((u) => u !== uid)
-    : p.length < LIMITS.SHOWCASE ? [...p, uid] : p));
-
-  const save = async () => {
-    setSaving(true); setErr(null);
-    await new Promise((r) => setTimeout(r, 500));  // the engine's local write lands
-    await flushNow(push);                          // the server reads the stored save
-    const got = await updateCard(pick, wish);
-    const put = got.ok ? await setShelf(tradeables.filter((m) => up.includes(keyOf(m))).map((m) => m.uid)) : got;
-    setSaving(false);
-    if (!put.ok) { setErr(put.error); return; }
-    // set_shelf registered what it had to; the engine learns which entry got which id.
-    engine.reconcileTrades({ assign: Object.fromEntries(put.data.filter((m) => m.uid).map((m) => [m.uid, m.mid])) });
-    onSaved(got.data, put.data);
-  };
+  const onShelf = useMemo(() => new Set((shelf ?? []).map((m) => m.uid)), [shelf]);
+  const mons = useMemo(() => (kind === "showcase" ? box
+    : box.filter((m) => onShelf.has(m.uid) || tradeable(box, m, true))), [kind, box, onShelf]);
+  const max = kind === "showcase" ? LIMITS.SHOWCASE : LIMITS.SHELF;
 
   return (
     <div className="tc-edit">
       <section className="ev-card">
-        <header className="ev-banner"><h4>Showcase</h4><span className="tp-count">{pick.length}/{LIMITS.SHOWCASE}</span></header>
-        <p>Pick up to {LIMITS.SHOWCASE}. Rarest first.</p>
-        <div className="tc-pick">
-          {choices.map((m) => {
-            const sp = speciesById(m.species);
-            const on = pick.includes(m.uid);
-            return (
-              <button key={m.uid} type="button" className={`tc-mon${on ? " on" : ""}`}
-                aria-pressed={on} aria-label={`${label(sp)}, Lv ${m.level}`} onClick={() => toggle(m.uid)}>
-                <Sprite id={m.species} variant={variantOf(m)} fx />
-                {variantOf(m) && <span className="tp-tier"><Mark tier={variantOf(m)} size={10} /></span>}
-                {on && <em>{pick.indexOf(m.uid) + 1}</em>}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-      <section className="ev-card">
-        <header className="ev-banner"><h4>Looking for</h4><span className="tp-count">{wish.length}/{LIMITS.SEEKING}</span></header>
-        <div className="tp-seek">
-          {wish.map((id) => (
-            <button key={id} type="button" className="tp-chip x" onClick={() => setWish((w) => w.filter((x) => x !== id))}
-              aria-label={`Remove ${label(speciesById(id))}`}>
-              <Sprite id={id} alt="" />{label(speciesById(id))}<i aria-hidden="true">✕</i>
-            </button>
-          ))}
-        </div>
-        {wish.length < LIMITS.SEEKING && (
+        <header className="ev-banner">
+          <h4>{EDITS[kind].title}</h4>
+          <span className="tp-count">{kind === "seeking" ? wish.length : pick.length}/{kind === "seeking" ? LIMITS.SEEKING : max}</span>
+        </header>
+        <p className="ev-quiet">{EDITS[kind].note}</p>
+        {kind === "seeking" ? (
           <>
-            <input className="tc-input" value={find} onChange={(e) => setFind(e.target.value)}
-              placeholder="Add a species you have seen…" aria-label="Find a species to add" />
-            {hits.length > 0 && (
-              <div className="tp-seek">
-                {hits.map((sp) => (
-                  <button key={sp.id} type="button" className="tp-chip add"
-                    onClick={() => { setWish((w) => [...w, sp.id]); setFind(""); }}>
-                    <Sprite id={sp.id} alt="" />{label(sp)}<i aria-hidden="true">+</i>
-                  </button>
-                ))}
-              </div>
+            <div className="tp-seek">
+              {wish.map((id) => (
+                <button key={id} type="button" className="tp-chip x" onClick={() => setWish((w) => w.filter((x) => x !== id))}
+                  aria-label={`Remove ${label(speciesById(id))}`}>
+                  <Sprite id={id} alt="" />{label(speciesById(id))}<i aria-hidden="true">✕</i>
+                </button>
+              ))}
+            </div>
+            {wish.length < LIMITS.SEEKING && (
+              <SpeciesFind dexOf={dexOf} skip={wish} placeholder="Add a species…"
+                onPick={(id) => setWish((w) => [...w, id])} />
             )}
           </>
+        ) : (
+          <Picker mons={mons} picked={pick} max={max} onChange={setPick} keyFn={byUid}
+            prefer={kind === "showcase" ? "high" : "low"} sort={kind === "showcase" ? "rare" : "dex"}
+            empty={kind === "showcase" ? "Nothing caught yet." : "Nothing to trade yet - catch a second of something."} />
         )}
       </section>
-      <section className="ev-card">
-        <header className="ev-banner"><h4>Up for trade</h4><span className="tp-count">{up.length}/{LIMITS.SHELF}</span></header>
-        <p>Offers can only ask for these. You always keep the last of each species.</p>
-        <MonPick mons={tradeables} picked={up} max={LIMITS.SHELF}
-          onToggle={(k) => setUp((p) => (p.includes(k) ? p.filter((x) => x !== k) : [...p, k]))}
-          empty="Nothing to trade yet - catch a second of something." />
-      </section>
-      {err && <p className="tc-err" role="alert">{err}</p>}
-      <div className="tp-actions">
-        <button type="button" className="ev-go" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save card"}</button>
+      <div className="tp-actions tc-dock">
+        <button type="button" className="ev-go" disabled={busy}
+          onClick={() => onSave(kind === "seeking" ? wish : pick.map((k) => Number(k.slice(1))))}>
+          {busy ? "Saving…" : "Save"}
+        </button>
         <button type="button" className="tp-quiet" onClick={onCancel}>Cancel</button>
       </div>
     </div>
@@ -157,26 +117,21 @@ function Editor({ box, dexOf, card, shelf, engine, onSaved, onCancel }) {
 /* A Pokemon as the trade scene shows the side you gave. */
 const asShown = (m) => ({ species: m.species, level: m.level, tier: variantOf(m), alpha: !!m.alpha });
 
-/* SURPRISE TRADE (phase 2). Put one in, get one back from a friend. A
-   Pokemon enters trading here for the first time, so the flow is: let the
-   local save land and upload it (the server checks against the STORED save),
-   register it for a server id, then deposit. Anything rare asks twice. */
+/* SURPRISE TRADE. Put one in, get one back from a friend. A Pokemon enters
+   trading here for the first time, so the flow is: let the local save land and
+   upload it (the server checks against the STORED save), register it for a
+   server id, then deposit. Anything rare asks twice. */
 function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
-  const [pick, setPick] = useState(null);
+  const [pick, setPick] = useState([]);
   const [sure, setSure] = useState(false);
   const [busy, setBusy] = useState(false);
   const [say, setSay] = useState(null);
-  // App holds the inbox; asking it again updates every tab at once.
-  const refresh = sync;
   useEffect(() => { sync(); }, [sync]);
 
   const left = inbox?.surprise_left ?? null;
   const waiting = box.filter((m) => m.lock === "pool");
-  // Ordinary ones first - the spares a Surprise Trade is for - then by dex.
-  const choices = useMemo(() => box.filter((m) => tradeable(box, m))
-    .sort((a, b) => Number(keeper(a)) - Number(keeper(b)) || a.species - b.species || a.level - b.level)
-    .slice(0, 150), [box]);
-  const chosen = box.find((m) => m.uid === pick) ?? null;
+  const choices = useMemo(() => box.filter((m) => tradeable(box, m)), [box]);
+  const chosen = choices.find((m) => keyOf(m) === pick[0]) ?? null;
   const precious = chosen && (keeper(chosen) || isLegendary(chosen.species));
 
   const deposit = async () => {
@@ -186,7 +141,7 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
     if (!entered.ok) { setBusy(false); setSay(entered.error); return; }
     const mid = entered.mids[chosen.uid];
     const got = await surpriseDeposit(mid);
-    setBusy(false); setPick(null); setSure(false);
+    setBusy(false); setPick([]); setSure(false);
     if (!got.ok) { setSay(got.error); return; }
     const r = got.data;
     if (r.status === "matched") {
@@ -198,14 +153,14 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
     } else {
       setSay(r.status === "capped" ? "That's every Surprise Trade for today." : "That Pokémon can't be traded right now.");
     }
-    refresh();
+    sync();
   };
   const withdraw = async (m) => {
     setBusy(true);
     const got = await surpriseWithdraw(m.mid);
     setBusy(false);
     if (got.ok && got.data) engine.reconcileTrades({ locks: { [m.mid]: null } });
-    refresh();
+    sync();
   };
 
   return (
@@ -235,25 +190,10 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
 
       <section className="ev-card">
         <header className="ev-banner"><h4>Choose one to send</h4></header>
-        {choices.length ? (
-          <div className="tc-pick">
-            {choices.map((m) => {
-              const sp = speciesById(m.species);
-              return (
-                <button key={m.uid} type="button" className={`tc-mon${pick === m.uid ? " on" : ""}`}
-                  aria-pressed={pick === m.uid} aria-label={`${label(sp)}, Lv ${m.level}`}
-                  onClick={() => { setPick(m.uid); setSure(false); }}>
-                  <Sprite id={m.species} variant={variantOf(m)} fx />
-                  {variantOf(m) && <span className="tp-tier"><Mark tier={variantOf(m)} size={10} /></span>}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="ev-quiet">Nothing to send - you keep the last of every species.</p>
-        )}
+        <Picker mons={choices} picked={pick} max={1} onChange={(p) => { setPick(p); setSure(false); }}
+          empty="Nothing to send - you keep the last of every species." />
         {chosen && (
-          <div className="tc-send">
+          <div className="tc-send tc-dock">
             <Sprite id={chosen.species} variant={variantOf(chosen)} fx />
             <span>
               <b>{label(speciesById(chosen.species))}</b>
@@ -281,8 +221,9 @@ export default function TradeCenter({
   const [me, setMe] = useState(null);
   const [friends, setFriends] = useState(null);
   const [viewing, setViewing] = useState(null);
-  const [editing, setEditing] = useState(false);
-  const [composing, setComposing] = useState(false);
+  const [editing, setEditing] = useState(null);        // "showcase" | "seeking" | "shelf"
+  const [browsing, setBrowsing] = useState(null);      // {card, query}
+  const [composing, setComposing] = useState(null);    // {them, want, give, counter}
   const [theirShelf, setTheirShelf] = useState(null);
   const [myShelf, setMyShelf] = useState(null);
   const [closed, setClosed] = useState(false);
@@ -318,13 +259,14 @@ export default function TradeCenter({
     });
   }, [signedIn, openName, load, answer]);
 
-  // Escape backs out of a profile or the editor first, then closes.
+  // Escape and Back peel one view off at a time, then close.
   const back = useCallback(() => {
-    if (composing) setComposing(false);
-    else if (editing) setEditing(false);
+    if (composing) setComposing(null);
+    else if (browsing) setBrowsing(null);
+    else if (editing) setEditing(null);
     else if (viewing) setViewing(null);
     else onClose();
-  }, [composing, editing, viewing, onClose]);
+  }, [composing, browsing, editing, viewing, onClose]);
 
   // Shelves: whoever you are looking at, and your own for the card.
   useEffect(() => {
@@ -352,7 +294,7 @@ export default function TradeCenter({
     const want = viewing ? `#/trainer/${encodeURIComponent(viewing.username)}` : "#/trade";
     if (location.hash !== want) history.replaceState(history.state, "", want);
   }, [viewing]);
-  useEffect(() => { page.current?.scrollTo(0, 0); }, [tab, viewing, editing, composing]);
+  useEffect(() => { page.current?.scrollTo(0, 0); }, [tab, viewing, editing, composing, browsing]);
 
   // Search, a beat after typing stops, and only from two letters.
   const timer = useRef(null);
@@ -377,13 +319,44 @@ export default function TradeCenter({
   // A name anywhere in the center (an offer, a listing) opens that profile.
   const openTrainer = async (name) => {
     const card = answer(await cardByName(name));
-    if (card) setViewing(card);
+    if (card) { setBrowsing(null); setComposing(null); setViewing(card); }
     else setNote(`${name}'s profile isn't available.`);
   };
   const share = async (name) => {
     try { await navigator.clipboard.writeText(link(name)); setNote("Profile link copied."); }
     catch { setNote(link(name)); }
   };
+  /* ONE SECTION OF YOUR CARD. The server reads the Pokemon off your STORED
+     save, so the engine's local write lands and uploads first. */
+  const saveSection = async (kind, value) => {
+    setBusy(true); setNote(null);
+    await new Promise((r) => setTimeout(r, 500));
+    await flushNow(push);
+    let got;
+    if (kind === "shelf") {
+      got = await setShelf(value);
+      if (got.ok) {
+        engine.reconcileTrades({ assign: Object.fromEntries(got.data.filter((m) => m.uid).map((m) => [m.uid, m.mid])) });
+        setMyShelf(got.data);
+      }
+    } else {
+      got = await updateCard(kind === "showcase" ? value : me.showcase.map((m) => m.uid),
+        kind === "seeking" ? value : me.seeking);
+      if (got.ok) setMe(got.data);
+    }
+    setBusy(false);
+    if (!got.ok) { setNote(got.error); return; }
+    setEditing(null);
+    setNote(`${EDITS[kind].title} saved.`);
+  };
+  /* A COUNTER-OFFER is a new offer to the same trainer with the sides swapped
+     in; sending it declines the one it answers. */
+  const counter = (o) => setComposing({
+    them: { user_id: o.a, username: o.partner },
+    want: o.give ?? [],
+    give: box.filter((m) => (o.want ?? []).some((w) => w.mid === m.mid)),
+    counter: o.id,
+  });
 
   const incoming = friends?.filter((f) => f.incoming) ?? [];
   const accepted = friends?.filter((f) => f.status === "accepted") ?? [];
@@ -394,26 +367,42 @@ export default function TradeCenter({
     body = <p className="tc-gate">Trading needs an account - sign in, and your Pokémon and friends come with you.</p>;
   } else if (closed) {
     body = <p className="tc-gate">Trading isn&rsquo;t open yet. Check back soon!</p>;
+  } else if (composing) {
+    body = (
+      <>
+        <button type="button" className="tc-back" onClick={() => setComposing(null)}>‹ Back</button>
+        <Composer them={composing.them} box={box} engine={engine} dexOf={dexOf}
+          want={composing.want} give={composing.give} counter={composing.counter}
+          onSent={(say) => { setComposing(null); setBrowsing(null); setViewing(null); setTab("offers"); setNote(say); sync(); }}
+          onCancel={() => setComposing(null)} />
+      </>
+    );
+  } else if (browsing) {
+    body = (
+      <>
+        <button type="button" className="tc-back" onClick={() => setBrowsing(null)}>‹ Back</button>
+        <Browse them={browsing.card} dexOf={dexOf} query={browsing.query}
+          onOffer={(want) => setComposing({ them: browsing.card, want, give: [] })} />
+      </>
+    );
   } else if (editing && me) {
-    body = <Editor box={box} dexOf={dexOf} card={me} shelf={myShelf} engine={engine}
-      onSaved={(c, s) => { setMe(c); setMyShelf(s); setEditing(false); setNote("Card saved."); }}
-      onCancel={() => setEditing(false)} />;
-  } else if (composing && viewing) {
-    body = <Composer them={viewing} theirShelf={theirShelf} box={box} engine={engine}
-      onSent={(say) => { setComposing(false); setViewing(null); setTab("offers"); setNote(say); }}
-      onCancel={() => setComposing(false)} />;
+    body = <SectionEdit kind={editing} box={box} dexOf={dexOf} card={me} shelf={myShelf} busy={busy}
+      onSave={(v) => saveSection(editing, v)} onCancel={() => setEditing(null)} />;
   } else if (viewing) {
     const self = viewing.user_id === me?.user_id;
+    const rel = relation(viewing);
     body = (
       <>
         <button type="button" className="tc-back" onClick={() => setViewing(null)}>‹ Back</button>
-        <TrainerProfile card={self ? me : viewing} self={self} relation={relation(viewing)} busy={busy} dexOf={dexOf}
-          shelf={self ? myShelf : theirShelf} onPropose={() => setComposing(true)}
+        <TrainerProfile card={self ? me : viewing} self={self} relation={rel} busy={busy} dexOf={dexOf}
+          shelf={self ? myShelf : theirShelf}
+          onPropose={() => setComposing({ them: viewing, want: [], give: [] })}
+          onBrowse={rel === "friends" ? () => setBrowsing({ card: viewing, query: "" }) : null}
           onAdd={() => act(() => requestFriend(viewing.user_id),
             (r) => (r === "unknown" ? "That trainer can't be added." : ADD_SAYS[r]))}
           onAccept={() => act(() => answerFriend(viewing.user_id, true), () => "You are friends now!")}
           onRemove={() => act(() => removeFriend(viewing.user_id), () => "Removed.")}
-          onEdit={() => setEditing(true)} onShare={() => share(viewing.username)}
+          onEdit={setEditing} onShare={() => share(viewing.username)}
           onBlock={async () => {
             const who = viewing;
             await act(() => blockUser(who.user_id), () => `${who.username} is blocked.`);
@@ -428,29 +417,30 @@ export default function TradeCenter({
     );
   } else if (tab === "board") {
     body = <BoardTab box={box} dexOf={dexOf} engine={engine} inbox={inbox} sync={sync} onTraded={onTraded}
-      friends={friends === null ? null : accepted.length} initialQ={openBoard} onOpenTrainer={openTrainer} />;
+      friends={friends === null ? null : accepted.length} initialQ={openBoard} onOpenTrainer={openTrainer}
+      onBrowse={(card, query) => setBrowsing({ card, query })} />;
   } else if (tab === "offers") {
-    body = <OffersTab inbox={inbox} sync={sync} onTraded={onTraded} onOpenTrainer={openTrainer} />;
+    body = <OffersTab inbox={inbox} sync={sync} onTraded={onTraded} onOpenTrainer={openTrainer} onCounter={counter} />;
   } else if (tab === "surprise") {
     body = <Surprise engine={engine} box={box} inbox={inbox} sync={sync} onTraded={onTraded}
       friends={friends === null ? null : accepted.length} />;
   } else if (tab === "card") {
     body = me
-      ? <TrainerProfile card={me} self dexOf={dexOf} shelf={myShelf} onEdit={() => setEditing(true)} onShare={() => share(me.username)} />
+      ? <TrainerProfile card={me} self dexOf={dexOf} shelf={myShelf} onEdit={setEditing} onShare={() => share(me.username)} />
       : <p className="ev-quiet">{fail ? "" : "Loading your card…"}</p>;
   } else {
     body = (
       <div className="tc-list">
         <section className="ev-card">
           <header className="ev-banner"><h4>Find a trainer</h4></header>
-          <input className="tc-input" value={q} onChange={(e) => setQ(e.target.value)}
+          <input className="tc-input" type="search" value={q} onChange={(e) => setQ(e.target.value)}
             placeholder="Trainer name…" aria-label="Search trainers by name" />
           {found && (found.length
             ? <ul className="tc-rows">{found.map((c) => <Row key={c.user_id} card={c} onOpen={setViewing} />)}</ul>
             : <p className="ev-quiet">No trainer by that name.</p>)}
           <form className="tc-code" onSubmit={(e) => { e.preventDefault(); act(() => addFriend(code), (r) => ADD_SAYS[r]); setCode(""); }}>
             <input className="tc-input" value={code} maxLength={8} onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="Friend code" aria-label="Add a friend by code" />
+              placeholder="Friend code" aria-label="Add a friend by code" autoCapitalize="characters" />
             <button type="submit" className="ev-go" disabled={busy || code.trim().length !== 8}>Add</button>
           </form>
         </section>
@@ -476,7 +466,16 @@ export default function TradeCenter({
           {friends === null
             ? <p className="ev-quiet">{fail ? "" : "Loading…"}</p>
             : accepted.length
-              ? <ul className="tc-rows">{accepted.map((f) => <Row key={f.card.user_id} card={f.card} onOpen={setViewing} />)}</ul>
+              ? (
+                <ul className="tc-rows">
+                  {accepted.map((f) => (
+                    <Row key={f.card.user_id} card={f.card} onOpen={setViewing}>
+                      <button type="button" className="tp-quiet tc-browse" aria-label={`Browse ${f.card.username}'s Pokémon`}
+                        onClick={() => setBrowsing({ card: f.card, query: "" })}>Pokémon</button>
+                    </Row>
+                  ))}
+                </ul>
+              )
               : <p className="ev-quiet">No friends yet. Share your code from My card, or add theirs above.</p>}
           {sent.length > 0 && <p className="ev-quiet">Waiting on {sent.map((f) => f.card.username).join(", ")}.</p>}
         </section>
@@ -508,6 +507,7 @@ export default function TradeCenter({
      the header and tabs pinned. It still takes the modal lock, so the game
      underneath hears no keys; there is no scrim to tap, so it closes by its
      own button, Escape, or the browser's Back (`#/trade`, see App). */
+  const stacked = viewing || editing || composing || browsing;
   return (
     <div className="tc-page evcard" role="dialog" aria-modal="true" aria-label="Trade Center" ref={page}>
       <header className="tc-head">
@@ -520,7 +520,7 @@ export default function TradeCenter({
             <span>Trainers, offers, the board, Surprise Trade and your card</span>
           </div>
         </div>
-        {signedIn && !closed && !viewing && !editing && !composing && (
+        {signedIn && !closed && !stacked && (
           <div className="tc-tabbar"><div className="sheet-tabs tc-tabs" role="tablist">
             {[["trainers", "Trainers", incoming.length || null], ["offers", "Offers", offers || null],
               ["board", "Board", null], ["surprise", "Surprise", null], ["card", "My card", null]].map(([id, name, n]) => (

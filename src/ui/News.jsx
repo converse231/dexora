@@ -11,6 +11,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-02",
+    date: "October 2026",
+    title: "Trading, bigger",
+    items: [
+      ["Explore a friend", "Browse a friend's Pokédex against yours, see every spare they have, and ask for any of it - not just what they put up."],
+      ["Several for one", "Offer up to six for up to six, list a bundle on the Board, and counter an offer instead of just declining. One Pokémon can be in several offers; the first accepted takes it."],
+      ["Find anything", "Search any species - even ones you've never seen - and see which friends have a spare and who has one up for trade."],
+      ["Easier picking", "Duplicates are grouped, with search, type, rare-form and \"not in my Pokédex\" filters. Edit each part of your card on its own, and a trade throws one Poké Ball per Pokémon."],
+    ],
+  },
+  {
     id: "2026-10-01",
     date: "October 2026",
     title: "Trade Center page, and solid ground",

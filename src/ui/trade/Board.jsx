@@ -1,43 +1,21 @@
-/* THE TRADE BOARD (docs/trading.md, phase 4): friends' "offering this,
-   looking for that". A listing is one Pokemon and a wanted species (and tier,
-   if named); anybody whose box fits completes it in one tap. The server checks
-   everything again - `fits` is only so the button can say so first. */
+/* THE TRADE BOARD (docs/trading.md): friends' "offering these, looking for
+   that". A listing is a BUNDLE - up to MAX_SIDE of yours - for one wanted
+   species (and tier, if named); a friend whose box fits completes it in one
+   tap. The server checks everything again; `fits` only lets the button say so.
+
+   FIND is the other half: pick any species and see who has one - listings,
+   friends with a spare (browse their box), and anybody's shelf. */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { SPECIES } from "../../data/dex.js";
 import { speciesById, TIERS } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { LIMITS, tradeable, fits } from "../../game/trade.js";
 import { variantOf, keeper } from "../../game/items.js";
-import { tradeBoard, postListing, withdrawListing, fulfilListing } from "../../net/cloud.js";
-import Sprite from "../Sprite.jsx";
+import { tradeBoard, postListing, withdrawListing, fulfilListing, tradeSearch } from "../../net/cloud.js";
+import Sprite, { TrainerArt } from "../Sprite.jsx";
 import Mark from "../Marks.jsx";
-import { MonPick, keyOf, Who } from "./Offers.jsx";
+import Picker, { SpeciesFind, keyOf, keepLast } from "./Picker.jsx";
+import { Who } from "./Offers.jsx";
 import { enterTrading } from "./enter.js";
-
-/* A species search over what you have seen - a wish list must not spoil. */
-function SpeciesFind({ dexOf, onPick, placeholder }) {
-  const [find, setFind] = useState("");
-  const hits = useMemo(() => {
-    const n = find.trim().toLowerCase();
-    if (n.length < 2) return [];
-    return SPECIES.filter((sp) => dexOf(sp.id) >= 1 && label(sp).toLowerCase().includes(n)).slice(0, 8);
-  }, [find, dexOf]);
-  return (
-    <>
-      <input className="tc-input" value={find} onChange={(e) => setFind(e.target.value)}
-        placeholder={placeholder} aria-label={placeholder} />
-      {hits.length > 0 && (
-        <div className="tp-seek">
-          {hits.map((sp) => (
-            <button key={sp.id} type="button" className="tp-chip add" onClick={() => { onPick(sp.id); setFind(""); }}>
-              <Sprite id={sp.id} alt="" />{label(sp)}<i aria-hidden="true">+</i>
-            </button>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
 
 const Want = ({ species, tier }) => {
   const sp = speciesById(species);
@@ -49,39 +27,53 @@ const Want = ({ species, tier }) => {
   );
 };
 
-/* POST: one of yours, and what you want for it. */
+/* A bundle's Pokemon, in a row. */
+const Bundle = ({ mons }) => (
+  <span className="bd-bundle">
+    {mons.map((m) => (
+      <span key={m.mid} className="of-mon big" data-tip={`${label(speciesById(m.species))}, Lv ${m.level}`}>
+        <Sprite id={m.species} variant={m.tier} fx />
+        {m.tier && <span className="tp-tier"><Mark tier={m.tier} size={10} /></span>}
+        {m.alpha && <span className="tp-alpha"><Mark tier="alpha" size={9} /></span>}
+        <i>Lv {m.level}</i>
+      </span>
+    ))}
+  </span>
+);
+
+/* POST: up to six of yours, and what you want for them. */
 function Post({ box, dexOf, engine, onPosted, onCancel }) {
   const [pick, setPick] = useState([]);
   const [want, setWant] = useState(null);
   const [tier, setTier] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const mine = useMemo(() => box.filter((m) => tradeable(box, m))
-    .sort((a, b) => a.species - b.species || b.level - a.level).slice(0, 150), [box]);
-  const chosen = mine.find((m) => keyOf(m) === pick[0]);
+  const mine = useMemo(() => box.filter((m) => tradeable(box, m)), [box]);
+  const chosen = mine.filter((m) => pick.includes(keyOf(m)));
 
   const post = async () => {
     setBusy(true); setErr(null);
-    const entered = await enterTrading(engine, [chosen]);
+    const entered = await enterTrading(engine, chosen);
     if (!entered.ok) { setBusy(false); setErr(entered.error); return; }
-    const mid = entered.mids[chosen.uid];
-    const got = await postListing(mid, want, tier);
+    const mids = chosen.map((m) => entered.mids[m.uid]);
+    const got = await postListing(mids, want, tier);
     setBusy(false);
     if (!got.ok) { setErr(got.error); return; }
-    engine.reconcileTrades({ locks: { [mid]: "listing" } });
+    engine.reconcileTrades({ locks: Object.fromEntries(mids.map((m) => [m, "listing"])) });
     onPosted();
   };
 
   return (
     <div className="tc-edit">
       <section className="ev-card">
-        <header className="ev-banner"><h4>You offer</h4></header>
-        <MonPick mons={mine} picked={pick} max={1} onToggle={(k) => setPick((p) => (p[0] === k ? [] : [k]))}
+        <header className="ev-banner"><h4>You offer</h4><span className="tp-count">{pick.length}/{LIMITS.MAX_SIDE}</span></header>
+        <p className="ev-quiet">One Pokémon, or a bundle of up to {LIMITS.MAX_SIDE} that go together.</p>
+        <Picker mons={mine} picked={pick} max={LIMITS.MAX_SIDE} onChange={setPick} limit={keepLast(box)}
           empty="Nothing to offer - you keep the last of every species." />
       </section>
       <section className="ev-card">
         <header className="ev-banner"><h4>You want</h4></header>
-        {want ? <Want species={want} tier={tier} /> : <p>Pick a species you have seen.</p>}
+        {want ? <Want species={want} tier={tier} /> : <p className="ev-quiet">Any species - even one you have never seen.</p>}
         <SpeciesFind dexOf={dexOf} onPick={setWant} placeholder="Find a species…" />
         <div className="tp-seek" role="group" aria-label="Which form">
           <button type="button" className={`tp-chip add${tier === null ? " have" : ""}`} aria-pressed={tier === null}
@@ -92,11 +84,11 @@ function Post({ box, dexOf, engine, onPosted, onCancel }) {
           ))}
         </div>
       </section>
-      {chosen && (keeper(chosen)) && <p className="tc-err">You are offering something rare - whoever fills this gets it.</p>}
+      {chosen.some(keeper) && <p className="tc-err">You are offering something rare - whoever fills this gets it.</p>}
       {err && <p className="tc-err" role="alert">{err}</p>}
-      <div className="tp-actions">
-        <button type="button" className="ev-go" disabled={busy || !chosen || !want} onClick={post}>
-          {busy ? "Posting…" : "Post listing"}
+      <div className="tp-actions tc-dock">
+        <button type="button" className="ev-go" disabled={busy || !chosen.length || !want} onClick={post}>
+          {busy ? "Posting…" : `Post listing · ${chosen.length} for 1`}
         </button>
         <button type="button" className="tp-quiet" onClick={onCancel}>Cancel</button>
       </div>
@@ -104,16 +96,17 @@ function Post({ box, dexOf, engine, onPosted, onCancel }) {
   );
 }
 
-export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, friends, initialQ = null, onOpenTrainer }) {
+export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, friends, initialQ = null, onOpenTrainer, onBrowse }) {
   const [list, setList] = useState(null);
-  // A Pokedex entry's "On the Board" opens here already searching for it.
   const [q, setQ] = useState(initialQ);
+  const [who, setWho] = useState(null);
   const [posting, setPosting] = useState(false);
   const [busy, setBusy] = useState(null);
   const [say, setSay] = useState(null);
   const load = useCallback(async () => {
-    const got = await tradeBoard(q);
+    const [got, found] = await Promise.all([tradeBoard(q), q ? tradeSearch(q) : Promise.resolve(null)]);
     setList(got.ok ? got.data : []);
+    setWho(found?.ok ? found.data : null);
     if (!got.ok) setSay(got.error);
   }, [q]);
   useEffect(() => { load(); }, [load]);
@@ -126,6 +119,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
 
   const mine = inbox?.listings ?? [];
   const others = (list ?? []).filter((l) => !l.mine);
+  const lots = (l) => l.mons ?? [l.mon];
 
   const fill = async (l, mon) => {
     setBusy(l.id); setSay(null);
@@ -137,7 +131,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
     const r = got.data;
     if (r.status === "done") {
       onTraded({ id: r.trade, kind: "board", partner: r.from, at: new Date().toISOString(),
-        gave: [{ species: mon.species, level: mon.level, tier: variantOf(mon), alpha: !!mon.alpha }], got: [r.got] });
+        gave: [{ species: mon.species, level: mon.level, tier: variantOf(mon), alpha: !!mon.alpha }], got: r.gots ?? [r.got] });
     } else {
       setSay({ gone: "Somebody got there first - that listing is gone.",
         unfit: "That one doesn't fit the listing any more.",
@@ -149,7 +143,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
     setBusy(l.id);
     const got = await withdrawListing(l.id);
     setBusy(null);
-    if (got.ok && got.data) engine.reconcileTrades({ locks: { [l.mon.mid]: null } });
+    if (got.ok && got.data) engine.reconcileTrades({ locks: Object.fromEntries(lots(l).map((m) => [m.mid, null])) });
     load(); sync();
   };
 
@@ -160,6 +154,48 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
   }
   return (
     <div className="tc-list">
+      <section className="ev-card">
+        <header className="ev-banner">
+          <h4>Find a Pokémon</h4>
+          {q && <button type="button" className="tp-chip x" onClick={() => setQ(null)}>
+            <Sprite id={q} alt="" />{label(speciesById(q))}<i aria-hidden="true">✕</i>
+          </button>}
+        </header>
+        <SpeciesFind dexOf={dexOf} onPick={setQ} placeholder="Search any species…" />
+        {q && who && (
+          <>
+            <h5 className="bd-h">Friends with a spare</h5>
+            {who.friends.length ? (
+              <ul className="tc-rows">
+                {who.friends.map((f) => (
+                  <li key={f.user_id} className="tc-row">
+                    <span className="tc-who still">
+                      <TrainerArt char={f.char} className="tc-art" />
+                      <span><b>{f.username}</b><i>{f.spare} spare</i></span>
+                    </span>
+                    <button type="button" className="ev-go bd-go" onClick={() => onBrowse(f, label(speciesById(q)))}>Browse</button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="ev-quiet">No friend has a spare one.</p>}
+            <h5 className="bd-h">Up for trade</h5>
+            {who.shelves.length ? (
+              <ul className="tc-rows">
+                {who.shelves.map((s) => (
+                  <li key={s.user_id} className="tc-row">
+                    <button type="button" className="tc-who" onClick={() => onOpenTrainer(s.username)}>
+                      <TrainerArt char={s.char} className="tc-art" />
+                      <span><b>{s.username}</b><i>{s.mons.length} on their card</i></span>
+                    </button>
+                    <Bundle mons={s.mons.slice(0, 3)} />
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="ev-quiet">Nobody has one on their card.</p>}
+          </>
+        )}
+      </section>
+
       <section className="ev-card ev-board">
         <header className="ev-banner">
           <h4>Your listings</h4>
@@ -169,27 +205,21 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
           <ul className="of-list">
             {mine.map((l) => (
               <li key={l.id} className="bd-row">
-                <span className="of-mon"><Sprite id={l.mon.species} variant={l.mon.tier} fx /></span>
+                <Bundle mons={lots(l)} />
                 <span className="bd-arrow" aria-hidden="true">→</span>
                 <Want species={l.want_species} tier={l.want_tier} />
                 <button type="button" className="tp-quiet" disabled={busy === l.id} onClick={() => takeDown(l)}>Take down</button>
               </li>
             ))}
           </ul>
-        ) : <p className="ev-quiet">Nothing listed. Offer a spare for something you want.</p>}
+        ) : <p className="ev-quiet">Nothing listed. Offer spares for something you want.</p>}
         <button type="button" className="ev-go" disabled={mine.length >= LIMITS.OPEN_LISTINGS}
           onClick={() => { setSay(null); setPosting(true); }}>Post a listing</button>
       </section>
 
       <section className="ev-card">
-        <header className="ev-banner">
-          <h4>Friends&rsquo; listings</h4>
-          {q && <button type="button" className="tp-chip x" onClick={() => setQ(null)}>
-            <Sprite id={q} alt="" />{label(speciesById(q))}<i aria-hidden="true">✕</i>
-          </button>}
-        </header>
+        <header className="ev-banner"><h4>Friends&rsquo; listings</h4></header>
         {friends === 0 && <p className="ev-quiet">The board shows your friends&rsquo; listings. Add friends in Trainers.</p>}
-        <SpeciesFind dexOf={dexOf} onPick={setQ} placeholder="Search by species…" />
         {say && <p className="tc-note" role="status">{say}</p>}
         {list === null ? <p className="ev-quiet">Loading the board…</p> : others.length ? (
           <ul className="of-list">
@@ -200,11 +230,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
                 <li key={l.id} className="of-card">
                   <p className="of-who"><Who name={l.owner} onOpen={onOpenTrainer} /> offers</p>
                   <div className="bd-deal">
-                    <span className="of-mon big">
-                      <Sprite id={l.mon.species} variant={l.mon.tier} fx />
-                      {l.mon.tier && <span className="tp-tier"><Mark tier={l.mon.tier} size={10} /></span>}
-                      <i>Lv {l.mon.level}</i>
-                    </span>
+                    <Bundle mons={lots(l)} />
                     <span className="bd-for">for</span>
                     <Want species={l.want_species} tier={l.want_tier} />
                   </div>

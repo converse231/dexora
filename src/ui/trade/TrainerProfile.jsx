@@ -34,7 +34,9 @@ function Stats({ card }) {
   );
 }
 
-function Showcase({ list }) {
+/* An empty slot on YOUR card is a "+" that opens the showcase picker; on
+   anybody else's it is only an empty frame. */
+function Showcase({ list, onAdd }) {
   const slots = Array.from({ length: LIMITS.SHOWCASE }, (_, i) => list[i] ?? null);
   return (
     <div className="tp-show">
@@ -47,29 +49,36 @@ function Showcase({ list }) {
             {m.tier && <span className="tp-tier"><Mark tier={m.tier} size={12} /></span>}
             <figcaption><b>{label(sp)}</b><i>Lv {m.level}</i></figcaption>
           </figure>
+        ) : onAdd ? (
+          <button key={i} type="button" className="tp-slot empty add" onClick={onAdd} aria-label="Add to your showcase">
+            <span aria-hidden="true">+</span>
+          </button>
         ) : (
-          <figure key={i} className="tp-slot empty" aria-hidden="true"><span>?</span></figure>
+          <figure key={i} className="tp-slot empty" aria-hidden="true" />
         );
       })}
     </div>
   );
 }
 
-/* WHAT THEY ARE LOOKING FOR. A species you have never seen stays a question
-   mark - somebody else's wish list must not spoil your dex. */
-function Seeking({ ids, dexOf }) {
-  if (!ids.length) return <p className="ev-quiet">Nothing listed yet.</p>;
+/* WHAT THEY ARE LOOKING FOR, named - trading is how a Pokedex fills its
+   gaps, so a wish is never hidden behind "???" (the player's call). A ring
+   marks the ones you have caught, which are the ones you could trade them. */
+function Seeking({ ids, dexOf, onAdd }) {
+  if (!ids.length) {
+    return onAdd
+      ? <button type="button" className="tp-chip add tp-plus" onClick={onAdd}><i aria-hidden="true">+</i>Add what you&rsquo;re looking for</button>
+      : <p className="ev-quiet">Nothing listed yet.</p>;
+  }
   return (
     <div className="tp-seek">
       {ids.map((id) => {
         const sp = speciesById(id);
         if (!sp) return null;
-        const known = dexOf(id) >= 1;
         return (
           <span key={id} className={`tp-chip${dexOf(id) === 2 ? " have" : ""}`}
-            data-tip={known ? (dexOf(id) === 2 ? "You have caught one" : "Seen") : "Not seen yet"}>
-            {known ? <Sprite id={id} alt="" /> : <i className="tp-q">?</i>}
-            {known ? label(sp) : "???"}
+            data-tip={dexOf(id) === 2 ? "You have caught one" : "Not in your Pokédex"}>
+            <Sprite id={id} alt="" />{label(sp)}
           </span>
         );
       })}
@@ -79,9 +88,11 @@ function Seeking({ ids, dexOf }) {
 
 /* UP FOR TRADE: the Pokemon this trainer offered. An offer can only ask for
    these - nobody is badgered for a Pokemon they never put up. */
-function Shelf({ list, self }) {
+function Shelf({ list, onAdd }) {
   if (!list.length) {
-    return <p className="ev-quiet">{self ? "Nothing up for trade - pick some in Edit." : "Nothing up for trade right now."}</p>;
+    return onAdd
+      ? <button type="button" className="tp-chip add tp-plus" onClick={onAdd}><i aria-hidden="true">+</i>Put some up for trade</button>
+      : <p className="ev-quiet">Nothing up for trade right now.</p>;
   }
   return (
     <div className="tp-shelf">
@@ -168,9 +179,17 @@ function Safety({ name, busy, onBlock, onReport }) {
 
 export default function TrainerProfile({
   card, self = false, relation = null, busy = false, dexOf = () => 0, shelf = null,
-  onAdd, onAccept, onRemove, onEdit, onShare, onPropose, onBlock, onReport,
+  onAdd, onAccept, onRemove, onEdit, onShare, onPropose, onBrowse, onBlock, onReport,
 }) {
   const level = levelFromXp(card.xp ?? 0);
+  // Each section of YOUR card has its own Edit - the one big button made you
+  // wade through all three to change one.
+  const edit = (kind, n, max) => (
+    <>
+      <span className="tp-count">{n}/{max}</span>
+      {self && <button type="button" className="tp-edit" onClick={() => onEdit(kind)}>Edit</button>}
+    </>
+  );
   return (
     <div className="tp">
       <header className={`tp-hero ch-${card.char}`}>
@@ -186,40 +205,38 @@ export default function TrainerProfile({
 
       <section className="ev-card">
         <header className="ev-banner">
-          <h4>Showcase</h4>
-          <span className="tp-count">{card.showcase.length}/{LIMITS.SHOWCASE}</span>
+          <h4>Showcase</h4>{edit("showcase", card.showcase.length, LIMITS.SHOWCASE)}
         </header>
-        <Showcase list={card.showcase} />
+        <Showcase list={card.showcase} onAdd={self ? () => onEdit("showcase") : null} />
       </section>
 
       <section className="ev-card">
         <header className="ev-banner">
-          <h4>Looking for</h4>
-          <span className="tp-count">{card.seeking.length}/{LIMITS.SEEKING}</span>
+          <h4>Looking for</h4>{edit("seeking", card.seeking.length, LIMITS.SEEKING)}
         </header>
-        <Seeking ids={card.seeking} dexOf={dexOf} />
+        <Seeking ids={card.seeking} dexOf={dexOf} onAdd={self ? () => onEdit("seeking") : null} />
       </section>
 
       {shelf !== null && (
         <section className="ev-card">
           <header className="ev-banner">
-            <h4>Up for trade</h4>
-            <span className="tp-count">{shelf.length}/{LIMITS.SHELF}</span>
+            <h4>Up for trade</h4>{edit("shelf", shelf.length, LIMITS.SHELF)}
           </header>
-          <Shelf list={shelf} self={self} />
+          <Shelf list={shelf} onAdd={self ? () => onEdit("shelf") : null} />
         </section>
       )}
 
       <div className="tp-actions">
         {self ? (
-          <>
-            <button type="button" className="ev-go" onClick={onEdit}>Edit showcase &amp; wishes</button>
-            <button type="button" className="tp-quiet" onClick={onShare}>Copy profile link</button>
-          </>
+          <button type="button" className="tp-quiet" onClick={onShare}>Copy profile link</button>
         ) : (
           <>
-            {shelf?.length > 0 && (
-              <button type="button" className="ev-go" disabled={busy} onClick={onPropose}>Propose a trade</button>
+            {/* A friend can be asked for any spare; anybody else for their shelf. */}
+            {(relation === "friends" || shelf?.length > 0) && (
+              <button type="button" className="ev-go" disabled={busy} onClick={onPropose}>Make an offer</button>
+            )}
+            {onBrowse && (
+              <button type="button" className="ev-go" onClick={onBrowse}>Browse their Pokémon</button>
             )}
             {relation === "friends" && <span className="tp-badge">✓ Friends</span>}
             {relation === "sent" && <span className="tp-badge">Request sent</span>}

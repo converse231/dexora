@@ -578,12 +578,18 @@ export const surpriseWithdraw = (mid) => tradeCall("surprise_withdraw", { mid })
 // Phase 3: the shelf and direct offers.
 export const setShelf = (uids) => tradeCall("set_shelf", { uids });
 export const trainerShelf = (who) => tradeCall("trainer_shelf", { who });
-export const proposeTrade = (target, give, want, msg) => tradeCall("propose_trade", { target, give, want, msg });
+// `wantUids`: a FRIEND's box entries by uid - the server registers them for them.
+export const proposeTrade = (target, give, want, msg, wantUids = []) =>
+  tradeCall("propose_trade", { target, give, want, msg, want_uids: wantUids });
 export const answerTrade = (tid, yes) => tradeCall("answer_trade", { tid, yes });
 export const cancelTrade = (tid) => tradeCall("cancel_trade", { tid });
 // Phase 4: the Trade Board.
 export const tradeBoard = (q = null) => tradeCall("trade_board", { q });
-export const postListing = (mid, wantSpecies, wantTier = null) =>
-  tradeCall("post_listing", { mid, want_species: wantSpecies, want_tier: wantTier });
+// A listing is a bundle: up to MAX_SIDE of yours for one wanted Pokemon.
+export const postListing = (mids, wantSpecies, wantTier = null) =>
+  tradeCall("post_listing", { mids, want_species: wantSpecies, want_tier: wantTier });
 export const withdrawListing = (lid) => tradeCall("withdraw_listing", { lid });
 export const fulfilListing = (lid, mid) => tradeCall("fulfil_listing", { lid, mid });
+// Phase 6: a friend's box, and who has a species.
+export const friendBox = (who) => tradeCall("friend_box", { who });
+export const tradeSearch = (q) => tradeCall("trade_search", { q });

@@ -14,7 +14,7 @@ export const LIMITS = {
   OPEN_OFFERS: 10,        // pending direct offers you have sent
   OPEN_LISTINGS: 5,       // live board listings
   LISTING_DAYS: 7,        // a listing or a deposit comes home after this
-  MAX_SIDE: 3,            // Pokemon per side of one offer
+  MAX_SIDE: 6,            // Pokemon per side of an offer, and in one board listing
   SHOWCASE: 6,            // profile showcase slots
   SEEKING: 12,            // "looking for" species on a profile
   FRIENDS: 100,           // friends and pending requests, per trainer
@@ -63,13 +63,27 @@ export const REPORT_REASONS = ["Offensive name", "Spam or harassment", "Cheating
 /* CAN THIS ONE BE OFFERED? Anything but the LAST of its species you hold, and
    never while something already holds it. Variants and alphas included: the
    old "spares only" rule read `duplicateUids`, which never counts a variant as
-   spare - it would have made every shiny untradeable. */
-export function tradeable(box, mon) {
-  if (!mon || mon.lock) return false;
+   spare - it would have made every shiny untradeable.
+
+   `offer` is for a DIRECT offer: one Pokemon may sit in several open offers
+   at once (docs/trading.md), so an "offer" lock does not keep it out of
+   another - only a listing or the pool does. */
+export function tradeable(box, mon, offer = false) {
+  if (!mon || (mon.lock && !(offer && mon.lock === "offer"))) return false;
   let same = 0;
   for (const m of box) if (m.species === mon.species && ++same > 1) return true;
   return false;
 }
+
+/* HOW MANY OF A SPECIES MAY GO in one offer or listing, counted over the whole
+   pick: one less than `list` holds, so the last always stays - the server's
+   `leaves_one`. Asked per Pokemon, three Meowth each looked spare and all
+   three could be offered at once. */
+export const keepLast = (list) => {
+  const n = new Map();
+  for (const m of list) n.set(m.species, (n.get(m.species) ?? 0) + 1);
+  return (species) => (n.get(species) ?? 0) - 1;
+};
 
 /* THE SERVER'S INBOX, AS THE ENGINE TAKES IT. `trade_inbox()` names a
    Pokemon's state the server's way ('offered', 'pooled'...); `reconcileTrades`
@@ -81,7 +95,16 @@ export function inboxToReconcile(inbox) {
   for (const [mid, status] of Object.entries(inbox?.locks ?? {})) {
     if (status in LOCK_OF) locks[mid] = LOCK_OF[status];
   }
+  /* WHICH BOX ENTRY EACH SERVER ROW IS, {uid: mid}. A friend who asks for a
+     Pokemon in your box has the server register it, so your game learns its
+     id here - and must, before you accept: `answer_trade` says 'sync' until
+     your saved box carries it. */
+  const assign = {};
+  for (const [uid, mid] of Object.entries(inbox?.assign ?? {})) {
+    if (/^\d{1,9}$/.test(uid) && typeof mid === "string") assign[uid] = mid;
+  }
   return {
+    assign,
     locks,
     gone: Array.isArray(inbox?.gone) ? inbox.gone.filter((m) => typeof m === "string") : [],
     arrived: Array.isArray(inbox?.arrived) ? inbox.arrived.filter((m) => m && typeof m.mid === "string") : [],

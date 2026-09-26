@@ -116,6 +116,16 @@ const P = (uid, species, level, extra = {}) => ({ uid, species, level, size: 100
    The phase 0/2 tests are about the swap, not the shelf, so they shelve
    everything free first; phase 3 tests the shelf itself. */
 const shelve = () => q("update public.mons set shelf = true where owner = any($1) and status = 'held'", [both]);
+/* WHAT A TRAINER'S GAME DOES before it answers an offer (phase 6): write every
+   server id the inbox names onto its box entries and upload. `answer_trade`
+   says 'sync' until the saved box carries the ids of what it gives. */
+const synced = async (who) => {
+  const rows = await q("select id, local_uid from public.mons where owner = $1 and local_uid is not null and status <> 'released'", [who.id]);
+  const by = new Map(rows.map((r) => [String(r.local_uid), r.id]));
+  const data = await stored(who);
+  const box = data.box.map((m) => (!m.mid && by.has(String(m.uid)) ? { ...m, mid: by.get(String(m.uid)) } : m));
+  await rpc(who, "save_game", { payload: { ...data, box }, sess: `s-${who.tag}` });
+};
 
 // ---- 1. a save for a trainer who has never traded is untouched ----------------
 const oddBox = [P(1, 16, 5), { uid: "x", mid: "not-a-uuid", level: "NaN" }];
@@ -151,10 +161,15 @@ await refuses(B.c.from("mons").insert({ owner: B.id, species: 150, level: 100 })
 await refuses(rpc(B, "propose_trade", { target: A.id, give: [a1], want: [a2] }), "offered someone else's Pokemon");
 await shelve();
 const t1 = await rpc(A, "propose_trade", { target: B.id, give: [a1], want: [b1], msg: 0 });
-assert.equal((await mon(a1)).status, "offered", "proposing did not lock the offered Pokemon");
-await refuses(rpc(A, "propose_trade", { target: B.id, give: [a1], want: [b1] }), "one Pokemon was offered twice");
+assert.equal((await rpc(A, "trade_inbox", {})).locks[a1], "offered",
+  "the inbox does not lock a Pokemon that is in an open offer - the game would let it be sold");
+// ONE POKEMON, SEVERAL OFFERS (phase 6): the first accepted takes it.
+const t1b = await rpc(A, "propose_trade", { target: B.id, give: [a1], want: [b1] });
 
 // ---- 5. THE RACE: two accepts at once, exactly one trade --------------------------
+assert.equal(await rpc(B, "answer_trade", { tid: t1, yes: true }), "sync",
+  "an accept went through before the giver's saved box knew the id - the old copy would survive");
+await synced(B);
 const results = await Promise.all([
   rpc(B, "answer_trade", { tid: t1, yes: true }),
   rpc(B, "answer_trade", { tid: t1, yes: true }),
@@ -165,6 +180,8 @@ assert.equal((await mon(b1)).owner, A.id, "the asked-for Pokemon did not move");
 assert.equal((await mon(a1)).status, "arriving", "a moved Pokemon is not marked arriving");
 assert.equal((await q("select count(*)::int n from public.trade_log where trade = $1", [t1]))[0].n, 2,
   "the trade log does not hold both sides");
+assert.equal((await q("select status from public.trades where id = $1", [t1b]))[0].status, "failed",
+  "a second offer of a Pokemon that just moved stayed open");
 
 // ---- 6. the inbox is exactly what reconcileTrades takes ---------------------------
 const inA = await rpc(A, "trade_inbox", {});
@@ -192,7 +209,8 @@ assert.ok((await stored(A)).box.some((m) => m.mid === ghost), "an entry with an 
 // ---- 8. decline, cancel and expiry all give the Pokemon back ------------------------
 // A Pokemon still ARRIVING cannot be asked for - it is not in anyone's box yet.
 await refuses(rpc(A, "propose_trade", { target: B.id, give: [a2], want: [a1] }), "an arriving Pokemon was asked for");
-await save(B, [P(1, 16, 5, { mid: a1, traded: 1 }), ...boxB]);        // B completes the arrival
+await save(B, [P(1, 16, 5, { mid: a1, traded: 1 }), P(13, 16, 4), ...boxB]);   // B completes the arrival
+await save(A, [...boxNow, P(12, 16, 4)]);   // neither side gives its LAST Pidgey (phase 6's whole-offer rule)
 await shelve();
 const t2 = await rpc(A, "propose_trade", { target: B.id, give: [a2], want: [a1] });
 assert.equal(await rpc(B, "answer_trade", { tid: t2, yes: false }), "declined", "decline did not answer");
@@ -318,6 +336,7 @@ assert.equal(midsA.length + midsB.length, 20, "the phase 2 boxes did not registe
 
 // ---- 16. a completed trade frees the lock of every offer it fails -------------------
 await shelve();
+await synced(B);
 const t6 = await rpc(A, "propose_trade", { target: B.id, give: [midsA[0]], want: [midsB[0]] });
 const t7 = await rpc(A, "propose_trade", { target: B.id, give: [midsA[1]], want: [midsB[0]] });
 assert.equal(await rpc(B, "answer_trade", { tid: t6, yes: true }), "done", "the first offer did not trade");
@@ -401,7 +420,8 @@ assert.equal(seenShelf.length, 2, `B sees ${seenShelf.length} of A's Pokemon - o
 const onShelf = seenShelf.map((m) => m.mid);
 const offShelf = (await q("select id from public.mons where owner = $1 and local_uid = 42", [A.id]))[0].id;
 
-// ---- 24. an offer can only ask for what is on the shelf -------------------------------------
+// ---- 24. a stranger can only ask for what is on the shelf -----------------------------------
+await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
 const bFree = (await q("select id from public.mons where owner = $1 and status = 'held' limit 1", [B.id]))[0].id;
 await refuses(rpc(B, "propose_trade", { target: A.id, give: [bFree], want: [offShelf] }),
   "an offer asked for a Pokemon that is not up for trade");
@@ -411,6 +431,7 @@ assert.ok(openA && openA.partner === "TesterB" && !openA.mine && openA.msg === 2
   `A's inbox does not show B's offer with its trainer and message: ${JSON.stringify(openA)}`);
 
 // ---- 25. a traded Pokemon leaves its old owner's shelf ----------------------------------------
+await synced(A);
 assert.equal(await rpc(A, "answer_trade", { tid: t8, yes: true }), "done", "a shelf offer did not trade");
 assert.equal((await mon(onShelf[0])).shelf, false, "a traded Pokemon stayed on a shelf");
 assert.equal((await rpc(B, "trainer_shelf", { who: A.id })).length, 1, "A's shelf still shows what A traded away");
@@ -429,10 +450,10 @@ const reg4 = async (who, box) => Object.fromEntries((await rpc(who, "register_mo
 const a4 = await reg4(A, boxA4), b4 = await reg4(B, boxB4);
 
 // ---- 26. posting a listing ------------------------------------------------------------
-const lid = await rpc(A, "post_listing", { mid: a4[60], want_species: 25, want_tier: "shiny" });
+const lid = await rpc(A, "post_listing", { mids: [a4[60]], want_species: 25, want_tier: "shiny" });
 assert.equal((await mon(a4[60])).status, "listed", "a listed Pokemon was not locked");
-await refuses(rpc(A, "post_listing", { mid: a4[60], want_species: 25 }), "one Pokemon was listed twice");
-await refuses(rpc(A, "post_listing", { mid: b4[70], want_species: 25 }), "somebody listed another trainer's Pokemon");
+await refuses(rpc(A, "post_listing", { mids: [a4[60]], want_species: 25 }), "one Pokemon was listed twice");
+await refuses(rpc(A, "post_listing", { mids: [b4[70]], want_species: 25 }), "somebody listed another trainer's Pokemon");
 const boardB = await rpc(B, "trade_board", {});
 assert.ok(boardB.some((x) => x.id === lid && x.owner === "TesterA" && !x.mine && x.want_tier === "shiny"),
   "a friend's listing is not on the board");
@@ -467,19 +488,19 @@ assert.equal((await q("select kind from public.trades where a = $1 and status = 
 assert.ok(!(await rpc(B, "trade_board", {})).some((x) => x.id === lid), "a completed listing stayed on the board");
 
 // ---- 30. "any form" takes any form, once the payment has arrived ------------------------------
-const lid2 = await rpc(A, "post_listing", { mid: a4[61], want_species: 16 });
+const lid2 = await rpc(A, "post_listing", { mids: [a4[61]], want_species: 16 });
 assert.equal((await rpc(B, "fulfil_listing", { lid: lid2, mid: a4[60] })).status, "unfit",
   "a Pokemon still arriving was used to complete a listing");
 await save(B, [...boxB4, P(80, 16, 5, { mid: a4[60], traded: 1 })]);      // B completes the arrival
 assert.equal((await rpc(B, "fulfil_listing", { lid: lid2, mid: a4[60] })).status, "done", "an any-form listing refused a fit");
 
 // ---- 31. withdraw, the cap, and a listing left a week comes home -------------------------------
-const lid3 = await rpc(A, "post_listing", { mid: a4[62], want_species: 1 });
+const lid3 = await rpc(A, "post_listing", { mids: [a4[62]], want_species: 1 });
 assert.equal(await rpc(B, "withdraw_listing", { lid: lid3 }), false, "somebody withdrew another trainer's listing");
 assert.equal(await rpc(A, "withdraw_listing", { lid: lid3 }), true, "a listing could not be withdrawn");
 assert.equal((await mon(a4[62])).status, "held", "a withdrawn listing kept its lock");
-for (const u of [62, 63, 64, 65, 66]) await rpc(A, "post_listing", { mid: a4[u], want_species: 1 });
-await refuses(rpc(A, "post_listing", { mid: a4[67] ?? b4[75], want_species: 1 }), "a sixth listing went up past the cap");
+for (const u of [62, 63, 64, 65, 66]) await rpc(A, "post_listing", { mids: [a4[u]], want_species: 1 });
+await refuses(rpc(A, "post_listing", { mids: [a4[67] ?? b4[75]], want_species: 1 }), "a sixth listing went up past the cap");
 await q("update public.listings set created_at = now() - interval '8 days' where mon = $1 and status = 'open'", [a4[62]]);
 await rpc(A, "trade_inbox", {});
 assert.equal((await mon(a4[62])).status, "held", "a week-old listing did not come home");
@@ -520,8 +541,8 @@ await rpc(A, "propose_trade", { target: B.id, give: [a5[90]], want: [b5[93]] });
 assert.equal(await rpc(A, "block_user", { other: B.id }), true, "a block was refused");
 assert.equal(await rpc(A, "block_user", { other: B.id }), true, "blocking twice failed");
 assert.equal(await rpc(A, "block_user", { other: A.id }), false, "a trainer blocked themselves");
-assert.equal((await mon(b5[92])).status, "held", "a block left the blocked trainer's offer locked");
-assert.equal((await mon(a5[90])).status, "held", "a block left the blocker's own offer locked");
+assert.equal((await rpc(B, "trade_inbox", {})).locks[b5[92]], "held", "a block left the blocked trainer's offer locked");
+assert.equal((await rpc(A, "trade_inbox", {})).locks[a5[90]], "held", "a block left the blocker's own offer locked");
 assert.equal((await q("select count(*)::int n from public.trades where status = 'open' and (a = any($1) or b = any($1))", [both]))[0].n, 0,
   "a block left an offer open");
 assert.deepEqual(await rpc(A, "my_friends", {}), [], "a block left the friendship");
@@ -565,6 +586,107 @@ assert.equal(await rpc(A, "report_user", { other: B.id, reason: 99 }), false, "a
 assert.equal(await rpc(A, "report_user", { other: A.id, reason: 0 }), false, "a trainer reported themselves");
 assert.deepEqual((await B.c.from("reports").select("id")).data, [], "a player read the reports");
 
+// =============================================================== PHASE 6
+await q("delete from public.blocks where blocker = any($1) or blocked = any($1)", [both]);
+await q("delete from public.reports where reporter = any($1) or reported = any($1)", [both]);
+await q("delete from public.listings where owner = any($1)", [both]);
+await q("delete from public.trades where a = any($1) or b = any($1)", [both]);
+await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
+// A: Pidgey 100-103, one Mew 104 (the last of its kind), a locked Pidgey 105.
+// B: Rattata 110-117, one Eevee 118.
+const boxA6 = [P(100, 16, 5), P(101, 16, 6), P(102, 16, 7), P(103, 16, 8), P(104, 151, 30),
+  P(105, 16, 9, { lock: "listing", mid: "00000000-0000-4000-8000-000000000105" }),
+  P(106, 25, 5), P(107, 25, 6)];                                     // A's only two Pikachu
+const boxB6 = [...Array.from({ length: 8 }, (_, i) => P(110 + i, 19, 5 + i)), P(118, 133, 10)];
+await save(A, boxA6);
+await save(B, boxB6);
+const b6 = await reg4(B, boxB6);
+
+// ---- 36. a friend's box: spares only, and only to a friend -----------------------------------
+assert.equal(await rpc(B, "friend_box", { who: A.id }), null, "a stranger browsed a trainer's box");
+await q("insert into public.friends (a, b, status) values ($1, $2, 'accepted')", [A.id, B.id]);
+const fb = await rpc(B, "friend_box", { who: A.id });
+assert.deepEqual(fb.box.map((m) => m.uid).sort(), [100, 101, 102, 103, 106, 107],
+  `a friend's box showed ${fb.box.map((m) => m.uid)} - never the last of a species, never a locked one`);
+assert.ok(Array.isArray(fb.dex), "a friend's box came without their Pokedex");
+
+// ---- 37. ask a friend for anything spare, by box uid ------------------------------------------
+await refuses(rpc(B, "propose_trade", { target: A.id, give: [b6[110]], want: [], want_uids: [104] }),
+  "an offer asked for the last of a friend's species");
+await refuses(rpc(B, "propose_trade", { target: A.id, give: [b6[110]], want: [], want_uids: [105] }),
+  "an offer asked for a Pokemon the friend's game has locked");
+const t9 = await rpc(B, "propose_trade", { target: A.id, give: [b6[110], b6[111], b6[112]], want: [], want_uids: [101] });
+const inA6 = await rpc(A, "trade_inbox", {});
+const asked = inA6.assign["101"];
+assert.ok(asked, "the inbox did not tell A's game which id its asked-for Pidgey got");
+assert.deepEqual(inA6.open.find((o) => o.id === t9)?.want.map((m) => m.mid), [asked], "the offer does not name the Pidgey");
+// A's game uploads BEFORE it learns the id: the asked-for Pidgey must stay held.
+await save(A, boxA6);
+assert.equal((await mon(asked)).status, "held", "an upload from a game that had not synced released a friend-asked Pokemon");
+assert.equal(await rpc(A, "answer_trade", { tid: t9, yes: true }), "sync",
+  "a friend-asked Pokemon was traded before its owner's save knew its id");
+await synced(A);
+assert.equal(await rpc(A, "answer_trade", { tid: t9, yes: true }), "done", "a three-for-one friend offer did not trade");
+assert.equal((await mon(asked)).owner, B.id, "the asked-for Pidgey did not move");
+for (const u of [110, 111, 112]) assert.equal((await mon(b6[u])).owner, A.id, "the three Rattata did not all move");
+// YOU KEEP THE LAST, counted over the whole offer - each of two looks spare alone.
+await refuses(rpc(B, "propose_trade", { target: A.id, give: [b6[113]], want: [], want_uids: [106, 107] }),
+  "an offer asked for every copy a friend has of a species");
+await refuses(rpc(B, "propose_trade", { target: A.id, give: [b6[118]], want: [], want_uids: [106] }),
+  "an offer gave away the last of a species");
+const pk = (await rpc(A, "register_mons", { snaps: [{ uid: 106, species: 25, level: 5 }, { uid: 107, species: 25, level: 6 }] }))
+  .map((r) => r.mid);
+await refuses(rpc(A, "post_listing", { mids: pk, want_species: 1 }), "a bundle listed every copy of a species");
+await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
+await refuses(rpc(B, "propose_trade", { target: A.id, give: [b6[113]], want: [], want_uids: [102] }),
+  "a stranger asked for something off a trainer's shelf");
+await q("insert into public.friends (a, b, status) values ($1, $2, 'accepted')", [A.id, B.id]);
+await refuses(rpc(B, "propose_trade", { target: A.id, give: [b6[113], b6[114], b6[115], b6[116], b6[117], b6[118], b6[113]].slice(0, 7).concat([b6[110]]), want: [], want_uids: [102] }),
+  "an offer gave more than six");
+
+// ---- 38. a Pokemon with no id is still stripped once it is traded away ------------------------
+// A's game never learned the Pidgey's id: its entry comes back without one.
+await save(A, boxA6);
+assert.ok(!(await stored(A)).box.some((m) => m.uid === 101),
+  "a traded-away Pokemon survived in a save that never learned its id");
+assert.ok((await stored(A)).box.some((m) => m.uid === 100), "an untraded Pidgey was stripped with it");
+
+// ---- 39. closing an offer never unlists what was listed since ---------------------------------
+await synced(A);
+const a6 = Object.fromEntries((await q("select local_uid, id from public.mons where owner = $1 and status = 'held' and local_uid is not null", [A.id]))
+  .map((r) => [r.local_uid, r.id]));
+const [p100] = (await rpc(A, "register_mons", { snaps: [{ uid: 100, species: 16, level: 5 }] })).map((r) => r.mid);
+const t10 = await rpc(A, "propose_trade", { target: B.id, give: [p100], want: [b6[113]] });
+const lid6 = await rpc(A, "post_listing", { mids: [p100], want_species: 133 });
+await rpc(A, "cancel_trade", { tid: t10 });
+assert.equal((await mon(p100)).status, "listed", "cancelling an offer pulled its Pokemon off the board");
+await rpc(A, "withdraw_listing", { lid: lid6 });
+
+// ---- 40. a bundle: several for one, all or nothing ------------------------------------------
+const [p102, p103] = (await rpc(A, "register_mons", { snaps: [{ uid: 102, species: 16, level: 7 }, { uid: 103, species: 16, level: 8 }] }))
+  .map((r) => r.mid);
+const lid7 = await rpc(A, "post_listing", { mids: [p100, p102, p103], want_species: 133 });
+const row7 = (await rpc(B, "trade_board", {})).find((x) => x.id === lid7);
+assert.deepEqual(row7?.mons.map((m) => m.mid), [p100, p102, p103], "the board does not show the whole bundle");
+assert.ok((await rpc(B, "trade_board", { q: 16 })).some((x) => x.id === lid7), "a search missed a bundled species");
+for (const m of [p100, p102, p103]) assert.equal((await mon(m)).status, "listed", "a bundled Pokemon was not locked");
+await refuses(rpc(A, "post_listing", { mids: [p100], want_species: 1 }), "a bundled Pokemon was listed twice");
+const done7 = await rpc(B, "fulfil_listing", { lid: lid7, mid: b6[118] });
+assert.equal(done7.status, "done", `a bundle was not completed: ${done7.status}`);
+assert.equal(done7.gots?.length, 3, "completing a bundle did not say all three arrived");
+for (const m of [p100, p102, p103]) assert.equal((await mon(m)).owner, B.id, "a bundled Pokemon did not move");
+
+// ---- 41. who has one: friends' spares and anybody's shelf, never across a block -----------------
+await save(B, [...boxB6, P(119, 19, 4)]);
+const found = await rpc(A, "trade_search", { q: 19 });
+assert.ok(found.friends.some((f) => f.username === "TesterB" && f.spare >= 1), "search missed a friend's spare Rattata");
+await q("update public.mons set shelf = true where id = $1", [b6[117]]);
+assert.ok((await rpc(A, "trade_search", { q: 19 })).shelves.some((s_) => s_.username === "TesterB"),
+  "search missed a Rattata on a shelf");
+await rpc(A, "block_user", { other: B.id });
+const hidden = await rpc(A, "trade_search", { q: 19 });
+assert.ok(!hidden.friends.length && !hidden.shelves.length, "search found a trainer across a block");
+
 await q("delete from public.blocks where blocker = any($1) or blocked = any($1)", [both]);
 await q("delete from public.reports where reporter = any($1) or reported = any($1)", [both]);
 await q("delete from public.listings where owner = any($1)", [both]);
@@ -588,3 +710,7 @@ console.log("tradedb phase 4 ok — a listing locks its Pokemon and shows to fri
 console.log("tradedb phase 5 ok — friend codes readable only by their trainer, a request by trainer, the inbox counts requests, " +
   "a block ends the friendship and closes and unlocks offers both ways, hides search, card, shelf, requests and offers both " +
   "ways, is private and liftable only by its maker; reports take a listed reason once a day and are read by nobody");
+console.log("tradedb phase 6 ok — one Pokemon in several offers (the first accepted takes it, the rest fail), accepting waits " +
+  "for the giver's save to know the id, a friend's box shows spares only, friends ask for any spare by box uid and " +
+  "strangers only for the shelf, six a side, a traded Pokemon with no id is still stripped, closing an offer never " +
+  "unlists, bundles move all or nothing, search finds friends' spares and shelves but never across a block");

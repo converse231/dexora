@@ -95,7 +95,7 @@ returns int language sql immutable set search_path = '' as $$
     when 'OPEN_OFFERS' then 10
     when 'OPEN_LISTINGS' then 5
     when 'LISTING_DAYS' then 7
-    when 'MAX_SIDE' then 3
+    when 'MAX_SIDE' then 6
     when 'SHOWCASE' then 6
     when 'SEEKING' then 12
     when 'FRIENDS' then 100
@@ -122,8 +122,19 @@ $$;
 create or replace function public.register_mons(snaps jsonb)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'not signed in'; end if;
+  return public.register_for(auth.uid(), snaps);
+end;
+$$;
+
+-- THE BODY, for any owner: yourself (`register_mons`), or a FRIEND whose box
+-- entry you ask for (`propose_trade`'s `want_uids`) - the server reads their
+-- stored save exactly as it reads yours. Not callable from outside.
+create or replace function public.register_for(me uuid, snaps jsonb)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
 declare
-  me uuid := auth.uid();
   box jsonb;
   s jsonb;
   e jsonb;
@@ -166,50 +177,117 @@ begin
   return out;
 end;
 $$;
+revoke all on function public.register_for(uuid, jsonb) from public, anon, authenticated;
+
+-- YOU KEEP THE LAST OF EACH SPECIES, counted over a WHOLE move: does `who`'s
+-- STORED box still hold one of every species after `species` (a list, one
+-- entry per Pokemon moving) leaves? Checked per Pokemon, three Meowth each
+-- looked spare and an offer of all three left none (phase 6).
+create or replace function public.leaves_one(who uuid, species int[])
+returns boolean language sql stable security definer set search_path = '' as $$
+  select not exists (
+    select 1 from (select s, count(*) k from unnest(coalesce(species, '{}')) s group by s) w
+     where w.k >= (select count(*) from public.saves sv,
+                     jsonb_array_elements(case when jsonb_typeof(sv.data->'box') = 'array' then sv.data->'box' else '[]' end) e
+                    where sv.user_id = who and e->>'species' = w.s::text))
+$$;
+revoke all on function public.leaves_one(uuid, int[]) from public, anon, authenticated;
 
 -- ------------------------------------------------------------------ offers
--- Propose: your side is locked ('offered') until the offer closes.
-create or replace function public.propose_trade(target uuid, give uuid[], want uuid[], msg int default null)
+-- PROPOSE. Your side stays 'held': one Pokemon may sit in SEVERAL open offers
+-- (DelugeRPG's way, decided in docs/trading.md) - the first to be accepted
+-- takes it and `perform_swap` fails the rest. The client still locks it
+-- against selling while any offer holds it (the inbox reports 'offered').
+--
+-- WHAT YOU MAY ASK FOR: anything on the other trainer's SHELF; and from a
+-- FRIEND, any spare in their box - by server id if it has one (`want`) or by
+-- box uid (`want_uids`), read off their STORED save and registered for them
+-- here. Never the last of a species, never one their game has locked.
+drop function if exists public.propose_trade(uuid, uuid[], uuid[], int);
+create or replace function public.propose_trade(target uuid, give uuid[], want uuid[],
+                                                msg int default null, want_uids int[] default '{}')
 returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();
   t uuid;
+  friend boolean;
+  box jsonb;
+  snaps jsonb;
+  extra uuid[] := '{}';
+  wanted uuid[];
+  uids int[] := array(select distinct u from unnest(coalesce(want_uids, '{}')) u);
 begin
   if me is null then raise exception 'not signed in'; end if;
   if target is null or target = me or public.blocked_between(me, target) then raise exception 'no such trainer'; end if;
+  give := array(select distinct g from unnest(coalesce(give, '{}')) g);
+  want := array(select distinct w from unnest(coalesce(want, '{}')) w);
+  friend := public.are_friends(me, target);
+  if cardinality(uids) > 0 and not friend then
+    raise exception 'only a friend''s box can be asked for';
+  end if;
   if cardinality(give) not between 1 and public.trade_limit('MAX_SIDE')
-     or cardinality(want) not between 1 and public.trade_limit('MAX_SIDE') then
-    raise exception 'one to three on each side';
+     or cardinality(want) + cardinality(uids) not between 1 and public.trade_limit('MAX_SIDE') then
+    raise exception 'one to six on each side';
   end if;
   if (select count(*) from public.trades where a = me and status = 'open')
      >= public.trade_limit('OPEN_OFFERS') then
     raise exception 'too many open offers';
   end if;
-  -- Lock your side, and check it is all yours and free - in the same statement.
-  perform 1 from public.mons where id = any(give) for update;
   if (select count(*) from public.mons where id = any(give) and owner = me and status = 'held')
      <> cardinality(give) then
     raise exception 'offered Pokemon are not free to trade';
   end if;
-  -- Only what they put up for trade: nobody is asked for a Pokemon they never offered.
-  if (select count(*) from public.mons where id = any(want) and owner = target and status = 'held' and shelf)
-     <> cardinality(want) then
+  if not public.leaves_one(me, array(select species from public.mons where id = any(give))) then
+    raise exception 'you keep the last of each species';
+  end if;
+  if (select count(*) from public.mons where id = any(want) and owner = target and status = 'held'
+                                         and (shelf or friend)) <> cardinality(want) then
     raise exception 'asked-for Pokemon are not available';
   end if;
-  update public.mons set status = 'offered' where id = any(give);
+  if cardinality(uids) > 0 then
+    select case when jsonb_typeof(data->'box') = 'array' then data->'box' else '[]' end
+      into box from public.saves where user_id = target;
+    select coalesce(jsonb_agg(jsonb_build_object('uid', (z.e->>'uid')::int, 'species', (z.e->>'species')::int,
+                                                 'level', (z.e->>'level')::int)), '[]')
+      into snaps
+      from (select e, count(*) over (partition by e->>'species') n
+              from jsonb_array_elements(coalesce(box, '[]')) e
+             where coalesce(e->>'uid', '') ~ '^\d{1,9}$' and coalesce(e->>'species', '') ~ '^\d{1,5}$'
+               and coalesce(e->>'level', '') ~ '^\d{1,4}$') z
+     where (z.e->>'uid')::int = any(uids) and z.n > 1 and not (z.e ? 'lock');
+    if jsonb_array_length(snaps) <> cardinality(uids) then
+      raise exception 'asked-for Pokemon are not available';
+    end if;
+    perform public.register_for(target, snaps);
+    extra := array(select m.id from public.mons m
+                    where m.owner = target and m.status = 'held' and m.local_uid = any(uids));
+    if cardinality(extra) <> cardinality(uids) then
+      raise exception 'asked-for Pokemon are not available';
+    end if;
+  end if;
+  wanted := array(select distinct x from unnest(want || extra) x);
+  if cardinality(wanted) > public.trade_limit('MAX_SIDE') then
+    raise exception 'one to six on each side';
+  end if;
+  if not public.leaves_one(target, array(select species from public.mons where id = any(wanted))) then
+    raise exception 'they keep the last of each species';
+  end if;
   insert into public.trades (kind, a, b, a_mons, b_mons, msg)
-  values ('direct', me, target, give, want, msg)
+  values ('direct', me, target, give, wanted, msg)
   returning id into t;
   return t;
 end;
 $$;
 
--- Free the proposer's side of a trade that did not happen.
+-- Free the proposer's side of a trade that did not happen. Only 'offered',
+-- which offers no longer set (phase 6) but older rows may carry: a Pokemon in
+-- an offer can since have been LISTED or POOLED, and closing the offer must
+-- not pull it off the board or out of the pool.
 create or replace function public.trade_release(tr public.trades)
 returns void language sql security definer set search_path = '' as $$
   update public.mons set status = 'held'
-   where id = any(tr.a_mons) and owner = tr.a and status in ('offered','listed','pooled');
+   where id = any(tr.a_mons) and owner = tr.a and status = 'offered';
 $$;
 revoke all on function public.trade_release(public.trades) from public, anon, authenticated;
 
@@ -269,9 +347,22 @@ begin
     return 'declined';
   end if;
 
+  -- YOUR SAVE MUST KNOW WHAT IT IS GIVING. A friend's ask registers your box
+  -- entry here, on the server; until your game has written that id onto the
+  -- entry and uploaded it, a swap would leave the old copy in your box with
+  -- nothing to strip it by. 'sync' tells the client to reconcile, flush and
+  -- ask again - nothing is closed.
+  if exists (select 1 from unnest(tr.b_mons) bm
+              where not exists (select 1 from public.saves sv,
+                                  jsonb_array_elements(case when jsonb_typeof(sv.data->'box') = 'array'
+                                                            then sv.data->'box' else '[]' end) e
+                                 where sv.user_id = me and e->>'mid' = bm::text)) then
+    return 'sync';
+  end if;
+
   ids := tr.a_mons || tr.b_mons;
   perform 1 from public.mons where id = any(ids) order by id for update;
-  if (select count(*) from public.mons where id = any(tr.a_mons) and owner = tr.a and status = 'offered')
+  if (select count(*) from public.mons where id = any(tr.a_mons) and owner = tr.a and status in ('held', 'offered'))
        <> cardinality(tr.a_mons)
      or (select count(*) from public.mons where id = any(tr.b_mons) and owner = me and status = 'held')
        <> cardinality(tr.b_mons)
@@ -327,7 +418,8 @@ begin
   end loop;
   if to_regclass('public.listings') is not null then
     update public.mons set status = 'held'
-     where id in (select mon from public.listings where owner = me and status = 'open' and created_at < now() - stale)
+     where id in (select unnest(mon || bundle) from public.listings
+                   where owner = me and status = 'open' and created_at < now() - stale)
        and owner = me and status = 'listed';
     update public.listings set status = 'expired', closed_at = now()
      where owner = me and status = 'open' and created_at < now() - stale;
@@ -341,8 +433,16 @@ begin
   return jsonb_build_object(
     'arrived', coalesce((select jsonb_agg(public.mon_json(m)) from public.mons m
                           where m.owner = me and m.status = 'arriving'), '[]'),
-    'locks',   coalesce((select jsonb_object_agg(m.id, m.status) from public.mons m
+    -- A 'held' Pokemon in one of your open offers reads 'offered': the game
+    -- keeps it from being sold while any offer holds it.
+    'locks',   coalesce((select jsonb_object_agg(m.id, case when m.status = 'held' and exists (
+                            select 1 from public.trades t where t.a = me and t.status = 'open' and m.id = any(t.a_mons))
+                          then 'offered' else m.status end) from public.mons m
                           where m.owner = me and m.status in ('held','offered','listed','pooled')), '{}'),
+    -- Which box entry each of your rows is: how your game learns the id of a
+    -- Pokemon a FRIEND asked for, which the server registered, not you.
+    'assign',  coalesce((select jsonb_object_agg(m.local_uid, m.id) from public.mons m
+                          where m.owner = me and m.local_uid is not null and m.status <> 'released'), '{}'),
     'gone',    coalesce((select jsonb_agg(distinct l.mon) from public.trade_log l
                           where l.from_user = me
                             and not exists (select 1 from public.mons x where x.id = l.mon and x.owner = me)), '[]'),
@@ -370,7 +470,9 @@ begin
     'listings', case when to_regclass('public.listings') is null then '[]'::jsonb else
                  coalesce((select jsonb_agg(jsonb_build_object('id', l.id, 'at', l.created_at,
                             'want_species', l.want_species, 'want_tier', l.want_tier,
-                            'mon', (select public.mon_json(m) from public.mons m where m.id = l.mon)) order by l.created_at desc)
+                            'mon', (select public.mon_json(m) from public.mons m where m.id = l.mon),
+                            'mons', (select jsonb_agg(public.mon_json(m) order by array_position(l.mon || l.bundle, m.id))
+                                       from public.mons m where m.id = any(l.mon || l.bundle))) order by l.created_at desc)
                              from public.listings l where l.owner = me and l.status = 'open'), '[]') end,
     'friend_requests', (select count(*)::int from public.friends where b = me and status = 'pending'),
     'surprise_left', case when to_regclass('public.surprise_log') is null then 0 else
@@ -407,13 +509,25 @@ begin
     return new;
   end if;
 
+  -- GONE BY ID, OR BY WHAT IT WAS. An entry carrying an id someone else owns
+  -- is a stale copy. So is one with NO id whose box uid and species match
+  -- something this trainer traded away (the log's snapshot holds both) - a
+  -- device that never learned the id must not keep the Pokemon. Uids are
+  -- never reused in a save, and the species check makes a mix-up impossible.
   if exists (select 1 from jsonb_array_elements(box) e
-              join public.mons m on m.id::text = e->>'mid'
-             where m.owner <> me) then
+              where exists (select 1 from public.mons m where m.id::text = e->>'mid' and m.owner <> me)
+                 or (not (e ? 'mid') and exists (
+                       select 1 from public.trade_log l join public.mons m on m.id = l.mon
+                        where l.from_user = me and m.owner <> me
+                          and l.snapshot->>'uid' = e->>'uid' and l.snapshot->>'species' = e->>'species'))) then
     box := coalesce((select jsonb_agg(e order by n)
                        from jsonb_array_elements(box) with ordinality x(e, n)
                       where not exists (select 1 from public.mons m
-                                         where m.id::text = e->>'mid' and m.owner <> me)), '[]');
+                                         where m.id::text = e->>'mid' and m.owner <> me)
+                        and not (not (e ? 'mid') and exists (
+                              select 1 from public.trade_log l join public.mons m on m.id = l.mon
+                               where l.from_user = me and m.owner <> me
+                                 and l.snapshot->>'uid' = e->>'uid' and l.snapshot->>'species' = e->>'species'))), '[]');
     new.data := jsonb_set(new.data, '{box}', box);
   end if;
 
@@ -428,9 +542,16 @@ begin
      and coalesce(e->>'level', '') ~ '^\d{1,4}$'
      and coalesce(e->>'species', '') ~ '^\d{1,5}$';
 
+  -- Still in the box by its id - or, for an entry whose game has not learned
+  -- the id yet (a friend asked for it, so the SERVER registered it), by its
+  -- box uid and species. Without the second half every upload before that
+  -- game synced released the Pokemon, and the offer could never be accepted.
   update public.mons m set status = 'released'
    where m.owner = me and m.status = 'held'
-     and not exists (select 1 from jsonb_array_elements(box) e where e->>'mid' = m.id::text);
+     and not exists (select 1 from jsonb_array_elements(box) e
+                      where e->>'mid' = m.id::text
+                         or (not (e ? 'mid') and e->>'uid' = m.local_uid::text
+                             and e->>'species' = m.species::text));
   return new;
 exception when others then
   -- The collection outranks the trade: never fail the upload.
@@ -445,12 +566,12 @@ create trigger saves_reconcile_trades
 
 -- ------------------------------------------------------------------ grants
 revoke all on function public.register_mons(jsonb) from public, anon;
-revoke all on function public.propose_trade(uuid, uuid[], uuid[], int) from public, anon;
+revoke all on function public.propose_trade(uuid, uuid[], uuid[], int, int[]) from public, anon;
 revoke all on function public.answer_trade(uuid, boolean) from public, anon;
 revoke all on function public.cancel_trade(uuid) from public, anon;
 revoke all on function public.trade_inbox() from public, anon;
 grant execute on function public.register_mons(jsonb) to authenticated;
-grant execute on function public.propose_trade(uuid, uuid[], uuid[], int) to authenticated;
+grant execute on function public.propose_trade(uuid, uuid[], uuid[], int, int[]) to authenticated;
 grant execute on function public.answer_trade(uuid, boolean) to authenticated;
 grant execute on function public.cancel_trade(uuid) to authenticated;
 grant execute on function public.trade_inbox() to authenticated;
@@ -979,27 +1100,40 @@ returns boolean language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.are_friends(uuid, uuid) from public, anon, authenticated;
 
+-- A LISTING IS A BUNDLE (phase 6): up to MAX_SIDE of yours for one Pokemon
+-- you want. `mon` is the first, `bundle` the rest; everything that frees or
+-- moves a listing reads `mon || bundle`.
+alter table public.listings add column if not exists bundle uuid[] not null default '{}';
+
 -- Answers the new listing's id; raises with a reason a player can read.
-create or replace function public.post_listing(mid uuid, want_species int, want_tier text default null)
+drop function if exists public.post_listing(uuid, int, text);
+create or replace function public.post_listing(mids uuid[], want_species int, want_tier text default null)
 returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();
   new_id uuid;
+  -- Each once, in the order picked: the first leads the listing.
+  ids uuid[] := array(select x from unnest(coalesce(mids, '{}')) with ordinality u(x, n)
+                       group by x order by min(n));
 begin
   if me is null then raise exception 'not signed in'; end if;
   if want_species is null or want_species not between 1 and 20000 then raise exception 'pick what you want for it'; end if;
+  if cardinality(ids) not between 1 and public.trade_limit('MAX_SIDE') then raise exception 'one to six Pokemon'; end if;
   if (select count(*) from public.listings where owner = me and status = 'open')
      >= public.trade_limit('OPEN_LISTINGS') then
     raise exception 'too many listings - take one down first';
   end if;
-  perform 1 from public.mons where id = mid for update;
-  if not exists (select 1 from public.mons where id = mid and owner = me and status = 'held') then
+  perform 1 from public.mons where id = any(ids) order by id for update;
+  if (select count(*) from public.mons where id = any(ids) and owner = me and status = 'held') <> cardinality(ids) then
     raise exception 'that Pokemon is not free to list';
   end if;
-  update public.mons set status = 'listed', shelf = false where id = mid;
-  insert into public.listings (owner, mon, want_species, want_tier)
-  values (me, mid, post_listing.want_species, nullif(post_listing.want_tier, ''))
+  if not public.leaves_one(me, array(select species from public.mons where id = any(ids))) then
+    raise exception 'you keep the last of each species';
+  end if;
+  update public.mons set status = 'listed', shelf = false where id = any(ids);
+  insert into public.listings (owner, mon, bundle, want_species, want_tier)
+  values (me, ids[1], ids[2:], post_listing.want_species, nullif(post_listing.want_tier, ''))
   returning listings.id into new_id;
   return new_id;
 end;
@@ -1013,7 +1147,7 @@ begin
   select * into l from public.listings where id = lid for update;
   if not found or l.owner is distinct from auth.uid() or l.status <> 'open' then return false; end if;
   update public.listings set status = 'withdrawn', closed_at = now() where id = lid;
-  update public.mons set status = 'held' where id = l.mon and owner = l.owner and status = 'listed';
+  update public.mons set status = 'held' where id = any(l.mon || l.bundle) and owner = l.owner and status = 'listed';
   return true;
 end;
 $$;
@@ -1027,13 +1161,16 @@ language sql stable security definer set search_path = '' as $$
     coalesce((select jsonb_agg(x order by x->>'at' desc) from (
       select jsonb_build_object('id', l.id, 'at', l.created_at, 'mine', l.owner = auth.uid(),
                'owner', c.username, 'want_species', l.want_species, 'want_tier', l.want_tier,
-               'mon', public.mon_json(m)) x
+               'mon', public.mon_json(m),
+               'mons', (select jsonb_agg(public.mon_json(x) order by array_position(l.mon || l.bundle, x.id))
+                          from public.mons x where x.id = any(l.mon || l.bundle))) x
         from public.listings l
         join public.mons m on m.id = l.mon and m.status = 'listed' and m.owner = l.owner
         join public.trainer_cards c on c.user_id = l.owner
        where l.status = 'open'
          and (l.owner = auth.uid() or public.are_friends(auth.uid(), l.owner))
-         and (q is null or m.species = q or l.want_species = q)
+         and (q is null or l.want_species = q
+              or exists (select 1 from public.mons x where x.id = any(l.mon || l.bundle) and x.species = q))
        order by l.created_at desc
        limit 60) z), '[]') end
 $$;
@@ -1056,8 +1193,9 @@ begin
   if not found or l.status <> 'open' or l.owner = me or not public.are_friends(me, l.owner) then
     return jsonb_build_object('status', 'gone');
   end if;
-  perform 1 from public.mons where id in (l.mon, mid) order by id for update;
-  if not exists (select 1 from public.mons where id = l.mon and owner = l.owner and status = 'listed') then
+  perform 1 from public.mons where id = any(l.mon || l.bundle || mid) order by id for update;
+  if (select count(*) from public.mons where id = any(l.mon || l.bundle) and owner = l.owner and status = 'listed')
+     <> cardinality(l.mon || l.bundle) then
     return jsonb_build_object('status', 'gone');
   end if;
   select * into mine from public.mons where id = mid;
@@ -1073,20 +1211,22 @@ begin
   end if;
   update public.listings set status = 'done', closed_at = now() where id = lid;
   insert into public.trades (kind, a, b, a_mons, b_mons, status)
-  values ('board', l.owner, me, array[l.mon], array[mid], 'open')
+  values ('board', l.owner, me, l.mon || l.bundle, array[mid], 'open')
   returning * into tr;
   perform public.perform_swap(tr, me);
   return jsonb_build_object('status', 'done', 'trade', tr.id,
     'got', (select public.mon_json(x) from public.mons x where x.id = l.mon),
+    'gots', (select jsonb_agg(public.mon_json(x) order by array_position(l.mon || l.bundle, x.id))
+               from public.mons x where x.id = any(l.mon || l.bundle)),
     'from', (select c.username from public.trainer_cards c where c.user_id = l.owner));
 end;
 $$;
 
-revoke all on function public.post_listing(uuid, int, text) from public, anon;
+revoke all on function public.post_listing(uuid[], int, text) from public, anon;
 revoke all on function public.withdraw_listing(uuid) from public, anon;
 revoke all on function public.trade_board(int) from public, anon;
 revoke all on function public.fulfil_listing(uuid, uuid) from public, anon;
-grant execute on function public.post_listing(uuid, int, text) to authenticated;
+grant execute on function public.post_listing(uuid[], int, text) to authenticated;
 grant execute on function public.withdraw_listing(uuid) to authenticated;
 grant execute on function public.trade_board(int) to authenticated;
 grant execute on function public.fulfil_listing(uuid, uuid) to authenticated;
@@ -1181,3 +1321,69 @@ grant execute on function public.report_user(uuid, int) to authenticated;
 grant execute on function public.request_friend(uuid) to authenticated;
 grant execute on function public.my_card() to authenticated;
 grant execute on function public.card_by_name(text) to authenticated;
+
+-- =================================================================== PHASE 6
+-- EXPLORE AND SEARCH (docs/trading.md). A FRIEND's box can be browsed and
+-- asked from (propose_trade's `want_uids`); anybody's shelf can be searched by
+-- species, and so can what your friends have spare. All read the STORED save:
+-- nothing here trusts a client.
+
+create index if not exists mons_shelf_species on public.mons (species) where shelf;
+
+-- A friend's Pokedex and their SPARES: every box entry but the last of its
+-- species and anything their game has locked, as the card shows a Pokemon.
+-- Null for anybody who is not a friend.
+create or replace function public.friend_box(who uuid)
+returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  d jsonb;
+begin
+  if me is null or who is null or not public.are_friends(me, who) then return null; end if;
+  select data into d from public.saves where user_id = who;
+  return jsonb_build_object(
+    'dex', case when jsonb_typeof(d->'dex') = 'array' then d->'dex' else '[]' end,
+    'box', coalesce((select jsonb_agg(public.box_snapshot(z.e) order by z.sp, z.lv desc) from (
+              select e, (e->>'species')::int sp, (e->>'level')::int lv,
+                     count(*) over (partition by e->>'species') n
+                from jsonb_array_elements(case when jsonb_typeof(d->'box') = 'array' then d->'box' else '[]' end) e
+               where coalesce(e->>'uid', '') ~ '^\d{1,9}$' and coalesce(e->>'species', '') ~ '^\d{1,5}$'
+                 and coalesce(e->>'level', '') ~ '^\d{1,4}$') z
+             where z.n > 1 and not (z.e ? 'lock')), '[]'));
+end;
+$$;
+
+-- WHO HAS ONE: friends with a spare of species `q` (how many), and anybody's
+-- shelf holding one - never yourself, never across a block.
+create or replace function public.trade_search(q int)
+returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select case when auth.uid() is null or q is null then null else jsonb_build_object(
+    'friends', coalesce((select jsonb_agg(x order by (x->>'spare')::int desc) from (
+        -- Spare = one less than they hold, and never more than are free (a
+        -- listed or pooled one is in their box but not to be had).
+        select jsonb_build_object('user_id', c.user_id, 'username', c.username, 'char', c.char,
+                                  'spare', least(s.n - 1, s.free)) x
+          from public.friends f
+          join public.trainer_cards c on c.user_id = case when f.a = auth.uid() then f.b else f.a end
+          cross join lateral (
+            select count(*) n, count(*) filter (where not (e ? 'lock')) free from public.saves sv,
+                   jsonb_array_elements(case when jsonb_typeof(sv.data->'box') = 'array' then sv.data->'box' else '[]' end) e
+             where sv.user_id = c.user_id and e->>'species' = q::text) s
+         where f.status = 'accepted' and auth.uid() in (f.a, f.b) and least(s.n - 1, s.free) > 0
+         limit 30) z), '[]'),
+    'shelves', coalesce((select jsonb_agg(x) from (
+        select jsonb_build_object('user_id', c.user_id, 'username', c.username, 'char', c.char,
+                                  'mons', jsonb_agg(public.mon_json(m) order by m.level desc)) x
+          from public.mons m join public.trainer_cards c on c.user_id = m.owner
+         where m.species = q and m.shelf and m.status = 'held' and m.owner <> auth.uid()
+           and not public.blocked_between(auth.uid(), m.owner)
+         group by c.user_id, c.username, c.char
+         limit 30) z), '[]')) end
+$$;
+
+revoke all on function public.friend_box(uuid) from public, anon;
+revoke all on function public.trade_search(int) from public, anon;
+grant execute on function public.friend_box(uuid) to authenticated;
+grant execute on function public.trade_search(int) to authenticated;
