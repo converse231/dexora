@@ -242,7 +242,7 @@ Check it took: **Table Editor → saves** should show the table with a green
 `alter table` line — an unrestricted table with a public key is every save in
 the project readable by anyone.
 
-## 3c. Hardening — **run this once** (added 2026-09, the save audit)
+## 3c. Hardening — **run this once** (added 2026-09, the save audit; live since 2026-09-26)
 
 Three things the browser could do to the server that it should not, all found
 reading the SQL above rather than in play. Safe to run on a live project: it
@@ -326,7 +326,7 @@ select privilege_type, column_name from information_schema.column_privileges
 The game needs nothing redeployed for any of this — every column it writes is
 still granted.
 
-## 3d. Trading — **run this once, after 3c** (added 2026-09)
+## 3d. Trading — **run this once, after 3c** (added 2026-09; live since 2026-09-26)
 
 Trading's server half is one file, [db/trading.sql](db/trading.sql), and every
 statement in it is re-runnable. It adds tables and functions and changes no

@@ -115,8 +115,8 @@ anything done. The run prints each suite; the count is not typed anywhere.
 - **A dev server hot-reloads source edits immediately**, so a half-typed change
   to the save shape reaches an open tab before it is finished.
 - **The server stamps `updated_at`.** Column grants in `SUPABASE.md` mirror the
-  client's profile writes (tools/play holds them together). The SQL in
-  `SUPABASE.md` §3c is written but not yet run.
+  client's profile writes (tools/play holds them together). `SUPABASE.md`
+  §3c and §3d (trading) are live since 2026-09-26.
 - **Settings is a dialog off the top bar**, with one profile writer
   (`updateProfile(patch)`). Email is shown, not editable. Sign-up stores a
   username, a trainer and a birthdate (the age gate: `MIN_AGE` 13 in `name.js`,
