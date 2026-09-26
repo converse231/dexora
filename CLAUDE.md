@@ -362,6 +362,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   engine's other callers, and a NaN level sends a Pokemon to limbo.
 - **Tooltips are `data-tip`, never `title`**; an icon-only control also needs an
   `aria-label`.
+- **The Trade Center is a PAGE, not a dialog** (`.tc-page`): it covers the game
+  with one scroll (a picker scrolling inside a scrolling card fought the
+  thumb), pins its header and tabs, takes the modal lock, and pushes `#/trade`
+  so the browser's Back closes it (App's hashchange). No inner `max-height`
+  scrollers in it.
 - **Every dialog closes through `useDismiss`**, never a bare `onClick` on a
   scrim, and takes the modal lock (`App` ignores keys while `modalOpen()`).
   Custom listboxes carry keyboard handling, focus return and the lock.
@@ -487,7 +492,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   one grid (`MAGMA_SHELVES`), warps and the way in read from each room's
   map.json. It was Victory Road re-skinned in our volcano autotile, which
   could not draw a real cave's thin walls or rungs. Lava (Lavaridge 189/307)
-  is `V`, as Cinderpeak's crater; `lift` as Monsoon Trail.
+  is `V`, as Cinderpeak's crater; `elev` as Monsoon Trail.
 - **Doors join maps** (`DOOR_PAIRS` in build_map.py): each builder reports its
   door and arrival tile, `mapdata` carries `doors: [x, y, area, ax, ay]`, and
   the engine takes one late in `onArrive` (the step counts, no encounter). A
@@ -495,10 +500,20 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Grass is a field effect** (`grassfx.png`, Emerald's frames on every map):
   stepping into `,` rustles once, then the rest frame covers your feet;
   drawn after the trainer and before the overhangs, never saved.
-- **Elevation decides who draws over whom** where a map carries `lift`
-  (Monsoon Trail): `^` puts the trainer above the upper layer, `v` under it,
-  `.` (Emerald's 0 and 15: bridges) keeps the last. Updated in `tryStep` and
-  `travel`. Without it a trainer walking a bridge or a clifftop went under it.
+- **Elevation is the GBA's, where a map carries `elev`** (the real map's
+  0-15, one hex digit a cell: Frost Hollow, the Safari Zone, Monsoon Trail,
+  Ember Caldera). It decides WHERE YOU WALK: a step onto another elevation is
+  refused unless one side is 0 (steps, ramps) or the target is 15 (a bridge) -
+  `elev_step`/`reach` in build_map.py, `elevOk` in the engine, and check.mjs's
+  fill, all three one rule. Surfing, going ashore, a hop and a ladder are
+  exempt. Without it Frost's shelf lips and the Safari's raised ground (38 and
+  51 edges) were floor. And it decides DRAWING: the last elevation not 0 or 15
+  in `HIGH_ELEV` (= build_map's `EM_HIGH`, asserted) puts the trainer above
+  the upper layer - Frost's shelf drew its lip over him. One deliberate
+  difference: stepping OFF a bridge takes the new elevation (the GBA keeps
+  the old), because ours lets you surf under a bridge and climb its bank. A
+  test that moves the trainer must load him there (`boot`), not write x and y:
+  he keeps the elevation he walks at.
 - **Night mode is tokens.** `data-theme` on <html> (`theme.js`, mirrored in
   index.html before first paint; a device preference, never the save). Any
   colour that must change at night is a `:root` token redefined in the one

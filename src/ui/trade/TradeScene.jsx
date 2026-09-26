@@ -49,7 +49,7 @@ export default function TradeScene({ trade, onDone }) {
           <span className="ts-cable"><i /></span>
           <span className="ts-end you">YOU</span>
           <span className="ts-end them">{trade.partner}</span>
-          {gaveSp && <span className="ts-gave"><Sprite id={gaveSp.id} variant={gave.tier} /></span>}
+          {gaveSp && <span className="ts-gave"><Sprite id={gaveSp.id} variant={gave.tier} fx /></span>}
           <img className="ts-ball out" src="items/poke-ball.png" alt="" />
           <img className="ts-ball in" src="items/poke-ball.png" alt="" />
           <span className="ts-burst" />

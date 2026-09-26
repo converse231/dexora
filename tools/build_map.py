@@ -223,6 +223,68 @@ def walk_steps(rows, x, y):
     return out
 
 
+def elev_step(cur, t):
+    """Can a trainer at elevation `cur` walk onto a cell at elevation `t`?
+
+    THE GBA'S RULE (IsElevationMismatchAt): 0 is "any" on either side - the
+    striped steps and the ramps - and 15 is a bridge, which keeps what you
+    brought. Everything else must match. The copies ignored it and walked
+    Seafoam's shelf lips and the Safari Zone's raised ground as floor: 38 and
+    51 edges the real maps close with elevation alone, not collision.
+    Mirrored in engine.js (`elevOk`)."""
+    return cur == 0 or t in (0, 15) or t == cur
+
+
+def settle(cur, e_from, e_to):
+    """The elevation you have after a move: a step ONTO a bridge (15) keeps
+    it, anything else takes the cell's. The GBA also keeps it on the step OFF
+    a bridge; ours lets you surf under one and climb out onto its bank, which
+    no real map offers, and that rule left a trainer on the bank at the
+    river's elevation - unable to walk the bank. Mirrored in engine.js."""
+    return cur if e_to == 15 else e_to
+
+
+def reach(g, starts, elev=None, hop=None, surf=False):
+    """Every cell a trainer can get to from `starts`. ONE fill for the maps
+    whose elevation decides where you may walk.
+
+    The state is (x, y, elevation), because on the GBA the same cell can be
+    reachable at one elevation and not another - a bridge walked over and
+    surfed under. Walking obeys `elev_step`; a ledge hop, getting on and off
+    the water and a ladder do not check it (they don't on the GBA either) and
+    only settle the new elevation. Returns the set of (x, y)."""
+    H, W = len(g), len(g[0])
+    E = (lambda x, y: elev[y][x]) if elev else (lambda x, y: 0)
+    stack = [(x, y, 0 if E(x, y) == 15 else E(x, y)) for x, y in starts]
+    seen, cells = set(), set()
+    while stack:
+        x, y, cur = stack.pop()
+        if (x, y, cur) in seen:
+            continue
+        seen.add((x, y, cur))
+        cells.add((x, y))
+        here = E(x, y)
+        for nx, ny in walk_steps(g, x, y):
+            t = E(nx, ny)
+            if abs(nx - x) + abs(ny - y) == 1 and not elev_step(cur, t):
+                continue
+            stack.append((nx, ny, settle(cur, here, t)))
+        if surf:
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < W and 0 <= ny < H and (g[ny][nx] in SURFABLE or
+                        (g[y][x] in SURFABLE and g[ny][nx] not in SOLID)):
+                    stack.append((nx, ny, settle(cur, here, E(nx, ny))))
+        if hop and (x, y) in hop:
+            tx, ty = hop[(x, y)]
+            stack.append((tx, ty, cur if E(tx, ty) == 15 else E(tx, ty)))
+    return cells
+
+
+def elev_rows(elev):
+    """`elev` as mapdata carries it: one hex digit per cell."""
+    return ["".join("%x" % e for e in row) for row in elev]
+
+
 def build(spec):
     W, H, base, border = spec["w"], spec["h"], spec["base"], spec["border"]
     g = [[base] * W for _ in range(H)]
@@ -984,22 +1046,12 @@ def check(area, rows, spawn, tiles=None, warps=None):
     # every floor but the first reads as an island and five sixths of the map
     # is "cut off" - a true statement about walking and a false one about
     # whether a player can get there.
-    seen, stack = set(), [spawn]
-    while stack:
-        x, y = stack.pop()
-        if (x, y) in seen:
-            continue
-        seen.add((x, y))
-        stack += walk_steps(rows, x, y)
-        if (x, y) in hop:
-            stack.append(hop[(x, y)])
-        # AND SURF IS A WAY THROUGH, like a ladder: Monsoon Trail's northwest
-        # lake is reached on the water in Emerald, and so here, once Surf is
-        # held. Water is crossed, never counted - `got` is still only land.
-        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-            if 0 <= nx < W and 0 <= ny < H and (rows[ny][nx] in SURFABLE or
-                    (rows[y][x] in SURFABLE and rows[ny][nx] not in SOLID)):
-                stack.append((nx, ny))
+    # AND SURF IS A WAY THROUGH, like a ladder: Monsoon Trail's northwest
+    # lake is reached on the water in Emerald, and so here, once Surf is
+    # held. Water is crossed, never counted - `got` is still only land. And
+    # ELEVATION decides what walking reaches, where the map carries it.
+    elev = [[int(c, 16) for c in r] for r in area["elev"]] if area.get("elev") else None
+    seen = reach(rows, [spawn], elev, hop, surf=True)
 
     # Every walkable tile spawns now, so the thing to check is that the ground
     # is one connected place: a walled-off pocket is map you can see and never
@@ -1906,10 +1958,8 @@ def magma_hideout():
         if not cut_ and not land_ledges(g, "M"):
             break
 
-    lift = ["".join("^" if e in EM_HIGH else "." if e in (0, 15) else "v" for e in row)
-            for row in elev]
     return (["".join(r) for r in g], spawn, [i for row in tiles for i in row], GB, warps,
-            {"lift": lift})
+            {"elev": elev_rows(elev)})
 
 
 # THE POKEMON TOWER, ALL SEVEN FLOORS, TRANSCRIBED.
@@ -2183,7 +2233,7 @@ def seafoam_floor(floor="B3F", rungs=()):
             trow.append((i if i < 640 else base + (i - 640)) if keep else -1)
         g.append(row)
         tiles.append(trow)
-    return g, tiles, base, ways
+    return g, tiles, base, ways, [[int(e) for e in r] for r in ele]
 
 
 # Seafoam's own five floors and the warp graph joining them, resolved out of
@@ -2280,21 +2330,23 @@ def frost_hollow():
 
     floors = [seafoam_floor(f, rungs[i]) for i, f in enumerate(FROST_FLOORS)]
     base = floors[0][2]
-    assert all(len(fg[0]) == QW and len(fg) <= QH for fg, _t, _b, _w in floors), \
+    assert all(len(fg[0]) == QW and len(fg) <= QH for fg, _t, _b, _w, _e in floors), \
         "frost: a Seafoam floor is not 38 wide or is taller than 24"
 
     W, H = QW * 2 + GUT, QH * 3 + GUT * 2
     g = [["I"] * W for _ in range(H)]
     tiles = [[-1] * W for _ in range(H)]
+    elev = [[0] * W for _ in range(H)]
     # B1F is 23 rows where the rest are 24; the short one keeps our rock.
     origin = [(0, 0), (QW + GUT, 0),
               (0, QH + GUT), (QW + GUT, QH + GUT),
               (0, (QH + GUT) * 2)]
-    for (ox, oy), (fg, ft, _b, _w) in zip(origin, floors):
+    for (ox, oy), (fg, ft, _b, _w, fe) in zip(origin, floors):
         for y in range(len(fg)):
             for x in range(QW):
                 g[oy + y][ox + x] = fg[y][x]
                 tiles[oy + y][ox + x] = ft[y][x]
+                elev[oy + y][ox + x] = fe[y][x]
 
     # SEAL THE RING, and the fixed id with it. A cell keeps the real map's
     # metatile unless we authored one, so turning the character to `I` and
@@ -2330,24 +2382,22 @@ def frost_hollow():
     for ax, ay, bx, by in warps:
         hop[(ax, ay)] = (bx, by)
         hop[(bx, by)] = (ax, ay)
-    seen, stack = set(), [spawn]
-    while stack:
-        x, y = stack.pop()
-        if (x, y) in seen or not (0 <= x < W and 0 <= y < H):
-            continue
-        if g[y][x] in SOLID and g[y][x] != "k":
-            continue
-        seen.add((x, y))
-        stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-        if (x, y) in hop:
-            stack.append(hop[(x, y)])
+    # ON THE STEPS, NOT OVER THE LIP: the raised shelf (4) and the ice (3)
+    # meet only where Seafoam's striped steps (0) join them. This fill took
+    # any open neighbour, and so did the engine - every shelf edge walkable.
+    seen = reach(g, [spawn], elev, hop, surf=True)
     for y in range(H):
         for x in range(W):
             if g[y][x] not in SOLID and (x, y) not in seen:
                 g[y][x], tiles[y][x] = "I", -1
+    # The ring and the gutters are ours: elevation 0, which says nothing.
+    for y in range(H):
+        for x in range(W):
+            if tiles[y][x] == -1:
+                elev[y][x] = 0
 
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], base, warps)
+            [i for row in tiles for i in row], base, warps, {"elev": elev_rows(elev)})
 
 
 def all_connected(g):
@@ -2758,6 +2808,7 @@ def safari_zone():
     H = SAFARI_H * len(SAFARI_GRID)
     g = [[None] * W for _ in range(H)]
     tiles = [[-1] * W for _ in range(H)]
+    elev = [[0] * W for _ in range(H)]
     border = None
 
     for r, row in enumerate(SAFARI_GRID):
@@ -2771,6 +2822,7 @@ def safari_zone():
                 dtype="<u2")[:SAFARI_W * SAFARI_H]
             ids = (raw & 0x3FF).reshape(SAFARI_H, SAFARI_W)
             col = ((raw >> 10) & 3).reshape(SAFARI_H, SAFARI_W)
+            ele = ((raw >> 12) & 0xF).reshape(SAFARI_H, SAFARI_W)
             if border is None:
                 border = [int(v) & 0x3FF for v in np.frombuffer(io.open(BA.fetch(
                     lay["border_filepath"], "em/safari_border.bin",
@@ -2798,6 +2850,7 @@ def safari_zone():
                         ch = "."
                     g[oy + y][ox + x] = ch
                     tiles[oy + y][ox + x] = rebase(i)
+                    elev[oy + y][ox + x] = int(ele[y][x])
 
     # --- the frame, drawn with the real layout's own border block ----------
     # The six maps open onto Route 121 and onto each other, and the outer edge
@@ -2844,13 +2897,16 @@ def safari_zone():
     xs = sorted(x for x, y in best if y == bottom)
     spawn = (xs[len(xs) // 2], bottom)
 
-    seen, stack = set(), [spawn]
-    while stack:
-        x, y = stack.pop()
-        if (x, y) in seen:
-            continue
-        seen.add((x, y))
-        stack += walk_steps(g, x, y)
+    # THE PLATFORMS ARE ELEVATION. The North and Northwest raise ground to 5
+    # and 7 and South to 5, closed off from the 3 below by elevation alone -
+    # 51 edges the copy walked over. Reached the way Emerald reaches them.
+    for x in range(W):
+        for y in (0, H - 1):
+            elev[y][x] = 0
+    for y in range(H):
+        for x in (0, W - 1):
+            elev[y][x] = 0
+    seen = reach(g, [spawn], elev)
     for y in range(H):
         for x in range(W):
             if g[y][x] not in SOLID and (x, y) not in seen:
@@ -2858,7 +2914,7 @@ def safari_zone():
                 g[y][x] = "T"
 
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], GB)
+            [i for row in tiles for i in row], GB, None, {"elev": elev_rows(elev)})
 
 
 
@@ -2999,17 +3055,7 @@ def monsoon_trail():
         # them are reached by Surf in Emerald, and a walk-only fill culled all
         # of it to wall. So water is crossed too - onto it, along it, off it -
         # exactly as Frost Hollow's fill counts its lake.
-        seen, stack = set(), [spawn]
-        while stack:
-            x, y = stack.pop()
-            if (x, y) in seen:
-                continue
-            seen.add((x, y))
-            stack += walk_steps(g, x, y)
-            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                if 0 <= nx < W and 0 <= ny < H and (g[ny][nx] == "w" or
-                        (g[y][x] == "w" and g[ny][nx] not in SOLID)):
-                    stack.append((nx, ny))
+        seen = reach(g, [spawn], [[int(e) for e in r] for r in elev], surf=True)
         cut = 0
         for y in range(H):
             for x in range(W):
@@ -3021,10 +3067,9 @@ def monsoon_trail():
     assert g[dy][dx] == "l", "monsoon: the Weather Institute door is cut off"
 
     rows = ["".join(r) for r in g]
-    lift = ["".join("^" if e in EM_HIGH else "." if e in (0, 15) else "v"
-                    for e in map(int, elev[y])) for y in range(H)]
     return (rows, spawn, [i for row in tiles for i in row], GB, None,
-            {"door": MONSOON_DOOR, "arrive": (dx, dy + 1), "lift": lift})
+            {"door": MONSOON_DOOR, "arrive": (dx, dy + 1),
+             "elev": elev_rows([[int(e) for e in r] for r in elev])})
 
 
 # -------------------------------------------------------------- Cinderpeak
@@ -3516,7 +3561,7 @@ if __name__ == "__main__":
         # A map with more than one floor carries the ladders that join them.
         warps = made[4] if len(made) > 4 else None
         spec["door"] = made[5] if len(made) > 5 else None
-        spec["lift"] = (spec["door"] or {}).get("lift")
+        spec["elev"] = (spec["door"] or {}).get("elev")
         spec["w"], spec["h"] = len(rows[0]), len(rows)
         got, total = check(spec, rows, spawn, tiles, warps)
         out.append((spec, rows, spawn, tiles, base, warps))
@@ -3558,11 +3603,12 @@ if __name__ == "__main__":
             body.append("    warps: [")
             body += ["      [%d, %d, %d, %d]," % tuple(w) for w in warps]
             body.append("    ],")
-        if spec["lift"]:
-            # ELEVATION, where the map has one: ^ above the upper layer, v
-            # under it, . keeps what you had (bridges, stairs).
-            body.append("    lift: [")
-            body += ['      "%s",' % r for r in spec["lift"]]
+        if spec["elev"]:
+            # ELEVATION, where the map has one: the real map's own 0-15, one hex
+            # digit a cell. It decides where you may walk (`elevOk`) and whether
+            # you draw above the upper layer (EM_HIGH) - see engine.js.
+            body.append("    elev: [")
+            body += ['      "%s",' % r for r in spec["elev"]]
             body.append("    ],")
         if spec["id"] in doors:
             # DOORS TO ANOTHER MAP: [x, y, area, arriveX, arriveY].

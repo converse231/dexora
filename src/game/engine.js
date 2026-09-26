@@ -6,6 +6,7 @@
 import { SPECIES } from "../data/dex.js";
 import {
   AREAS, AREA_IDS, areaOf, walkable, rideable, SURFABLE, label, LEDGE, RAIL, MINI, MINI_UNKNOWN,
+  HIGH_ELEV,
 } from "./map.js";
 import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
@@ -702,23 +703,40 @@ export function createEngine(canvas, onChange, mini = null) {
   const doorMap = (area) =>
     new Map((area.doors ?? []).map(([x, y, to, ax, ay]) => [`${x},${y}`, [to, ax, ay]]));
   let doors = doorMap(areaOf(state.areaId));
-  /* ABOVE THE UPPER LAYER OR UNDER IT, as Emerald decides: by the elevation
-     of the last cell that had one (`lift`, from build_map's `EM_HIGH`). A
-     bridge keeps what you brought onto it, so the planks draw over you when
-     you surf under them and never when you walk across. Maps without `lift`
-     are always under, as before. Drawing state only. */
-  let lift = areaOf(state.areaId).lift ?? null;
-  let high = false;
+  /* ELEVATION, as the GBA keeps it, where a copied map carries its own (`elev`:
+     the real map's 0-15, one hex digit a cell). Two things read it:
+
+     WHERE YOU MAY WALK (`elevOk`, mirrored from build_map's `elev_step`): a
+     step onto a different elevation is refused unless one side is 0 - the
+     striped steps, the ramps - or the target is 15, a bridge. The copies
+     ignored it, so Seafoam's shelf lips and the Safari Zone's raised ground
+     were floor you could walk straight off. Surfing, stepping ashore, a hop
+     and a ladder don't check it, on the GBA or here.
+
+     ABOVE THE UPPER LAYER OR UNDER IT: the last elevation that was not 0 or
+     15 (`EM_HIGH` in build_map). A bridge keeps what you brought onto it, so
+     the planks draw over you when you surf under them and never when you
+     walk across; Seafoam's raised shelf draws you over its own lip. Maps
+     without `elev` are level ground, always under, as before. */
+  let elev = areaOf(state.areaId).elev ?? null;
+  const elevAt = (x, y) => (elev ? parseInt(elev[y]?.[x] ?? "0", 16) || 0 : 0);
+  let cur = 0;        // the elevation you walk at (0 walks anywhere)
+  let high = false;   // drawn above the upper layer
+  const elevOk = (x, y) => { const t = elevAt(x, y); return cur === 0 || t === 0 || t === 15 || t === cur; };
+  /* After a move: a step ONTO a bridge keeps what you had, anything else
+     takes the cell's (build_map's `settle` - including why stepping OFF a
+     bridge does not keep it, where the GBA does). */
   const rise = () => {
-    const c = lift?.[state.player.y]?.[state.player.x];
-    if (c === "^") high = true;
-    else if (c === "v") high = false;
+    const e = elevAt(state.player.x, state.player.y);
+    if (e === 15) return;
+    cur = e;
+    if (e !== 0) high = HIGH_ELEV.has(e);
   };
   rise();
   /* UNDER A BRIDGE IS STILL AFLOAT. A plank you reached low (from the water)
      is river to you, so a surfer paddles under it instead of hopping ashore
      onto it and standing beneath the logs. */
-  const under = (x, y) => !!lift && !high && at(x, y) === "N";
+  const under = (x, y) => !!elev && !high && at(x, y) === "N";
   const afloat = (x, y) => rideable(rows, x, y) || under(x, y);
   const at = (x, y) => (rows[y] ? rows[y][x] ?? "" : "");
 
@@ -1006,6 +1024,8 @@ export function createEngine(canvas, onChange, mini = null) {
     if (RAIL[at(nx, ny)] && !canBike(levelFromXp(state.xp), state.bag)) return;
     if (hop) { nx += dx; ny += dy; }
     else if (!walkable(rows, nx, ny) && !(riding && afloat(nx, ny))) return;
+    // A WALK onto another elevation - the ride, the shore and a hop are exempt.
+    else if (!hop && !riding && !afloat(nx, ny) && !elevOk(nx, ny)) return;
 
     move.fromX = p.x;
     move.fromY = p.y;
@@ -1106,6 +1126,7 @@ export function createEngine(canvas, onChange, mini = null) {
       move.fromX = who.x;
       move.fromY = who.y;
       move.active = false;
+      rise();            // a ladder lands you at the floor's own elevation
     }
     walkFrame++;
     state.steps++;
@@ -1262,6 +1283,7 @@ export function createEngine(canvas, onChange, mini = null) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           if (walkable(rows, p.x + dx, p.y + dy)) {
             p.x += dx; p.y += dy;
+            rise();
             return;
           }
         }
@@ -1298,7 +1320,8 @@ export function createEngine(canvas, onChange, mini = null) {
     fixed = areaOf(areaId).tiles ?? null;
     warps = warpMap(areaOf(areaId));
     doors = doorMap(areaOf(areaId));
-    lift = areaOf(areaId).lift ?? null;
+    elev = areaOf(areaId).elev ?? null;
+    cur = 0;
     high = false;
     MAP_W = rows[0].length;
     MAP_H = rows.length;
@@ -1547,6 +1570,7 @@ export function createEngine(canvas, onChange, mini = null) {
     move.leap = false;
     p.x = fx;
     p.y = fy;
+    rise();
     changed();
     return true;
   }
