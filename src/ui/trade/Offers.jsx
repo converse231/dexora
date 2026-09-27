@@ -40,10 +40,40 @@ function Side({ mons }) {
   );
 }
 
-/* THE COMPOSER. `want` and `give` arrive pre-filled from a friend's box or a
-   counter-offer as Pokemon ({uid, mid}), and are matched to this trainer's
-   list once it has loaded - a friend's by box uid, a shelf by server id. */
-export function Composer({ them, box, engine, dexOf, want: want0 = [], give: give0 = [], counter = null, onSent, onCancel }) {
+/* ONE SIDE OF THE TABLE: what is in it, each a tap to take back, and a "+"
+   while there is room, which turns the picker below to this side. */
+function DealSide({ title, mons, keyFn, on, onSide, onDrop }) {
+  return (
+    <div className={`tx-side${on ? " on" : ""}`}>
+      <button type="button" className="tx-title" onClick={onSide} aria-pressed={on}>
+        {title}<i>{mons.length}/{LIMITS.MAX_SIDE}</i>
+      </button>
+      <div className="tx-slots">
+        {mons.map((m) => (
+          <button key={keyFn(m)} type="button" className="tx-slot" onClick={() => onDrop(keyFn(m))}
+            aria-label={`Take back ${label(speciesById(m.species))}, Lv ${m.level}`} data-tip="Take back">
+            <Sprite id={m.species} variant={tierOf(m)} alt="" />
+            <i>Lv {m.level}</i><b aria-hidden="true">✕</b>
+          </button>
+        ))}
+        {mons.length < LIMITS.MAX_SIDE && (
+          <button type="button" className="tx-slot add" onClick={onSide} aria-label={`Add to ${title}`}>+</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* THE COMPOSER, laid out as a trade table: the deal PINNED at the top - you
+   give on the left, you get on the right, the Send beside them - and ONE
+   picker under it, turned to either side by its tabs or a "+". It was two
+   pickers stacked with the button under both: on a phone you scrolled past
+   one box to reach the other, and never saw the deal whole.
+
+   `want` and `give` arrive pre-filled from a friend's box or a counter-offer
+   as Pokemon ({uid, mid}), and are matched to this trainer's list once it has
+   loaded - a friend's by box uid, a shelf by server id. */
+export function Composer({ them, box, engine, dexOf, want: want0 = [], give: give0 = [], counter = null, onSent }) {
   const [theirs, setTheirs] = useState(null);
   const [friend, setFriend] = useState(false);
   const [theirDex, setTheirDex] = useState(null);
@@ -52,6 +82,8 @@ export function Composer({ them, box, engine, dexOf, want: want0 = [], give: giv
   const [msg, setMsg] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  // What they have is the first question - unless it arrived already asked.
+  const [side, setSide] = useState(want0.length ? "give" : "get");
 
   useEffect(() => {
     let live = true;
@@ -79,6 +111,8 @@ export function Composer({ them, box, engine, dexOf, want: want0 = [], give: giv
   const giving = mine.filter((m) => give.includes(keyOf(m)));
   const precious = giving.some((m) => keeper(m) || isLegendary(m.species));
   const theirKey = (m) => (friend ? `u${m.uid}` : m.mid);
+  // In the order they were picked, so a slot does not jump when another is added.
+  const inOrder = (keys, list, fn) => keys.map((k) => list?.find((m) => fn(m) === k)).filter(Boolean);
 
   const send = async () => {
     setBusy(true); setErr(null);
@@ -95,43 +129,51 @@ export function Composer({ them, box, engine, dexOf, want: want0 = [], give: giv
     onSent(counter ? `Counter-offer sent to ${them.username}.` : `Offer sent to ${them.username}.`);
   };
 
+  const ready = want.length > 0 && give.length > 0;
   return (
-    <div className="tc-edit">
-      <section className="ev-card">
-        <header className="ev-banner">
-          <h4>You get from {them.username}</h4><span className="tp-count">{want.length}/{LIMITS.MAX_SIDE}</span>
-        </header>
-        <p className="ev-quiet">{friend ? "Anything they have spare - they keep the last of each species." : "What they put up for trade."}</p>
+    <div className="tx">
+      <section className="tx-deal" aria-label={`Trade with ${them.username}`}>
+        <div className="tx-table">
+          <DealSide title="You give" mons={inOrder(give, mine, keyOf)} keyFn={keyOf}
+            on={side === "give"} onSide={() => setSide("give")} onDrop={(k) => setGive((g) => g.filter((x) => x !== k))} />
+          <span className="tx-swap" aria-hidden="true">⇄</span>
+          <DealSide title={`You get`} mons={inOrder(want, theirs, theirKey)} keyFn={theirKey}
+            on={side === "get"} onSide={() => setSide("get")} onDrop={(k) => setWant((w) => w.filter((x) => x !== k))} />
+        </div>
+        <div className="tx-go">
+          <select className="pk-sel" value={msg} onChange={(e) => setMsg(Number(e.target.value))} aria-label="Message">
+            {PRESETS.map((p, i) => <option key={p} value={i}>“{p}”</option>)}
+          </select>
+          <button type="button" className="ev-go" disabled={busy || !ready} onClick={send}>
+            {busy ? "Sending…" : !want.length ? "Pick what you want" : !give.length ? "Pick what you give"
+              : `${counter ? "Send counter" : "Send offer"} · ${give.length} for ${want.length}`}
+          </button>
+        </div>
+        {precious && <p className="tc-err">You are offering something rare - once they accept, it is theirs.</p>}
+        {err && <p className="tc-err" role="alert">{err}</p>}
+      </section>
+
+      <div className="sheet-tabs tx-tabs" role="tablist" aria-label="Whose Pokémon">
+        <button type="button" role="tab" aria-selected={side === "get"} className={side === "get" ? "on" : ""}
+          onClick={() => setSide("get")}>{them.username}&rsquo;s Pokémon{want.length ? <em>{want.length}</em> : null}</button>
+        <button type="button" role="tab" aria-selected={side === "give"} className={side === "give" ? "on" : ""}
+          onClick={() => setSide("give")}>Your Pokémon{give.length ? <em>{give.length}</em> : null}</button>
+      </div>
+      {/* Both stay mounted, so a search typed on one side survives a look at the other. */}
+      <section className="ev-card" hidden={side !== "get"}>
+        <p className="ev-quiet">{friend ? "Anything they have spare - they keep the last of each species. Tap to add it to You get." : "What they put up for trade. Tap to add it to You get."}</p>
         {theirs === null ? <p className="ev-quiet">Loading…</p> : (
           <Picker mons={theirs} picked={want} max={LIMITS.MAX_SIDE} onChange={setWant} keyFn={theirKey} limit={theirLimit}
-            missing={{ label: "Not in my Pokédex", test: (sp) => dexOf(sp) !== 2 }}
+            tray={false} missing={{ label: "Not in my Pokédex", test: (sp) => dexOf(sp) !== 2 }}
             empty={friend ? `${them.username} has nothing spare yet.` : `${them.username} has nothing up for trade right now.`} />
         )}
       </section>
-      <section className="ev-card">
-        <header className="ev-banner"><h4>You give</h4><span className="tp-count">{give.length}/{LIMITS.MAX_SIDE}</span></header>
+      <section className="ev-card" hidden={side !== "give"}>
+        <p className="ev-quiet">Your spares - you keep the last of each species. Tap to add it to You give.</p>
         <Picker mons={mine} picked={give} max={LIMITS.MAX_SIDE} onChange={setGive} limit={myLimit}
-          missing={theirDex ? { label: "They don't have", test: (sp) => !theirDex.has(sp) } : null}
+          tray={false} missing={theirDex ? { label: "They don't have", test: (sp) => !theirDex.has(sp) } : null}
           empty="Nothing to give - you keep the last of every species." />
       </section>
-      <section className="ev-card">
-        <header className="ev-banner"><h4>Say</h4></header>
-        <div className="tp-seek">
-          {PRESETS.map((p, i) => (
-            <button key={p} type="button" className={`tp-chip add${msg === i ? " have" : ""}`}
-              aria-pressed={msg === i} onClick={() => setMsg(i)}>{p}</button>
-          ))}
-        </div>
-      </section>
-      {precious && <p className="tc-err">You are offering something rare - once they accept, it is theirs.</p>}
-      {err && <p className="tc-err" role="alert">{err}</p>}
-      {/* Pinned to the bottom of the page: the pickers above can be long. */}
-      <div className="tp-actions tc-dock">
-        <button type="button" className="ev-go" disabled={busy || !want.length || !give.length} onClick={send}>
-          {busy ? "Sending…" : `${counter ? "Send counter" : "Send offer"} · ${give.length} for ${want.length}`}
-        </button>
-        <button type="button" className="tp-quiet" onClick={onCancel}>Cancel</button>
-      </div>
     </div>
   );
 }

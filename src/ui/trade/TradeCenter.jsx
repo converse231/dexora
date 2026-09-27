@@ -217,6 +217,7 @@ export default function TradeCenter({
   useModalLock();
   const [tab, setTab] = useState(openBoard ? "board" : "trainers");
   const page = useRef(null);
+  const head = useRef(null);
   const [blocked, setBlocked] = useState([]);
   const [me, setMe] = useState(null);
   const [friends, setFriends] = useState(null);
@@ -295,6 +296,11 @@ export default function TradeCenter({
     if (location.hash !== want) history.replaceState(history.state, "", want);
   }, [viewing]);
   useEffect(() => { page.current?.scrollTo(0, 0); }, [tab, viewing, editing, composing, browsing]);
+  useEffect(() => {
+    const ro = new ResizeObserver(() => page.current?.style.setProperty("--tc-head-h", `${head.current.offsetHeight}px`));
+    ro.observe(head.current);
+    return () => ro.disconnect();
+  }, []);
 
   // Search, a beat after typing stops, and only from two letters.
   const timer = useRef(null);
@@ -370,17 +376,14 @@ export default function TradeCenter({
   } else if (composing) {
     body = (
       <>
-        <button type="button" className="tc-back" onClick={() => setComposing(null)}>‹ Back</button>
         <Composer them={composing.them} box={box} engine={engine} dexOf={dexOf}
           want={composing.want} give={composing.give} counter={composing.counter}
-          onSent={(say) => { setComposing(null); setBrowsing(null); setViewing(null); setTab("offers"); setNote(say); sync(); }}
-          onCancel={() => setComposing(null)} />
+          onSent={(say) => { setComposing(null); setBrowsing(null); setViewing(null); setTab("offers"); setNote(say); sync(); }} />
       </>
     );
   } else if (browsing) {
     body = (
       <>
-        <button type="button" className="tc-back" onClick={() => setBrowsing(null)}>‹ Back</button>
         <Browse them={browsing.card} dexOf={dexOf} query={browsing.query}
           onOffer={(want) => setComposing({ them: browsing.card, want, give: [] })} />
       </>
@@ -393,7 +396,6 @@ export default function TradeCenter({
     const rel = relation(viewing);
     body = (
       <>
-        <button type="button" className="tc-back" onClick={() => setViewing(null)}>‹ Back</button>
         <TrainerProfile card={self ? me : viewing} self={self} relation={rel} busy={busy} dexOf={dexOf}
           shelf={self ? myShelf : theirShelf}
           onPropose={() => setComposing({ them: viewing, want: [], give: [] })}
@@ -508,12 +510,16 @@ export default function TradeCenter({
      underneath hears no keys; there is no scrim to tap, so it closes by its
      own button, Escape, or the browser's Back (`#/trade`, see App). */
   const stacked = viewing || editing || composing || browsing;
+  /* ONE BACK, in the pinned corner: a view on the stack peels it (as Escape
+     does), the tabs go to the game. It was a second "‹ Back" in the body,
+     drawn centred by the grid it sat in, under the header's own "‹ Game". */
   return (
     <div className="tc-page evcard" role="dialog" aria-modal="true" aria-label="Trade Center" ref={page}>
-      <header className="tc-head">
+      <header className="tc-head" ref={head}>
         <div className="tc-bar">
-          <button type="button" className="tc-home" onClick={onClose} aria-label="Back to the game">
-            <span aria-hidden="true">‹</span> Game
+          <button type="button" className="tc-home" onClick={stacked ? back : onClose}
+            aria-label={stacked ? "Back" : "Back to the game"}>
+            <span aria-hidden="true">‹</span> {stacked ? "Back" : "Game"}
           </button>
           <div className="tc-titles">
             <h3>Trade Center</h3>

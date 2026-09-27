@@ -376,6 +376,14 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   thumb), pins its header and tabs, takes the modal lock, and pushes `#/trade`
   so the browser's Back closes it (App's hashchange). No inner `max-height`
   scrollers in it.
+- **The Trade Center has ONE back**, the pinned header's corner button: it
+  peels a stacked view (as Escape does) and leaves from the tabs. The offer
+  composer is a trade table - the deal (give, get, Send) pinned under the
+  header at `--tc-head-h`, one picker below turned to either side. `.tc-main`
+  isolates, so a tier layer never draws over the header.
+- **Cards in a wide rail row are one height** (stretch); the buttons sit on
+  the card's floor, and an open shop row spans the row. `#root` fills
+  `body`'s flex row, so the app's width never depends on what is inside it.
 - **Every dialog closes through `useDismiss`**, never a bare `onClick` on a
   scrim, and takes the modal lock (`App` ignores keys while `modalOpen()`).
   Custom listboxes carry keyboard handling, focus return and the lock.
