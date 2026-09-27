@@ -6259,3 +6259,65 @@ button:disabled { transition: none; }
 :root[data-theme="dark"] .cheer-holo .cheer-kind { color: #c08ae8; }
 :root[data-theme="dark"] .cheer-astral .cheer-kind { color: #a597ff; }
 :root[data-theme="dark"] .evo-bg { background: linear-gradient(#17262e 0%, #182a22 60%, #15221a 100%); }
+
+/* ================================================================ TOUCH LAYOUTS
+   Last in the file on purpose: media queries add no specificity, and these
+   override the desktop column (the `min-width: 980px` block) that a tablet -
+   and a phone held sideways - is also wide enough to match.
+
+   PORTRAIT PHONE: the map was the page's width less 48px of padding and card
+   (338 of 390px). Tighter page and card edges give it the room back. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
+  body { padding: 8px 6px 12px; }
+  .screen { padding: 6px; }
+  .topbar { margin-bottom: 8px; }
+  .stage { gap: 8px; }
+}
+
+/* SIDEWAYS: A GAME BOY ADVANCE. The D-pad left of the screen, A and B right
+   of it, the screen as big as the height allows - and it was unusable before
+   this: at 844x390 the map drew 792x582, taller than the whole screen, with
+   the pad below it out of reach.
+
+   - THE GAME IS THE FIRST SCREENFUL. `.stage` dissolves (`contents`) so the
+     play card can be ordered ahead of the top bar; the top bar, menu and rail
+     follow it down the page. A sideways phone has no height for a status bar
+     above the screen, and a GBA has none.
+   - THE PAD'S TWO HALVES BECOME THE CARD'S SIDE COLUMNS: `.pad` dissolves too,
+     so `.pad-dir` and `.pad-act` are grid items beside `.viewport`. No markup
+     changes; the portrait pad is untouched.
+   - `--view-w` is the screen: as wide as the height allows at the canvas's
+     15:11, but never so wide that a side column drops under 22vw (150px at
+     least; 210px at most - full-size controls need ~195, and a tablet's
+     extra width belongs to the screen).
+     `--pad-c` then sizes the controls from what is LEFT: a side column holds
+     the D-pad (3 x .74 of it) and the face pair (2 of it + a gap), so side /
+     2.3 always fits - bigger on a tablet, never over the screen. */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  body { padding: 6px 8px 12px; }
+  .app { display: flex; flex-direction: column; }
+  .stage { display: contents; }
+  .screen {
+    order: -1; margin-bottom: 10px; padding: 6px;
+    --view-w: min(calc((100dvh - 36px) * 15 / 11), calc(100vw - 2 * max(150px, min(22vw, 210px))));
+    min-height: calc(100dvh - 12px);
+    display: grid; grid-template-columns: 1fr var(--view-w) 1fr;
+    align-items: center; align-content: center; row-gap: 6px;
+  }
+  .viewport { grid-column: 2; grid-row: 1; width: var(--view-w); max-width: none; margin: 0; }
+  .hint-row { grid-column: 2; grid-row: 2; }
+  .pad {
+    display: contents;
+    --pad-c: clamp(46px, calc((100vw - var(--view-w) - 48px) / 4.6), 84px);
+  }
+  .pad-dir {
+    grid-column: 1; grid-row: 1; justify-self: center;
+    grid-template-columns: repeat(3, calc(var(--pad-c) * .74));
+    grid-template-rows: repeat(3, calc(var(--pad-c) * .68));
+  }
+  .pad-act { grid-column: 3; grid-row: 1; justify-self: center; align-items: center; }
+  /* The rail is below the play card now, full width: back to a list that
+     scrolls inside itself (the desktop column let it grow to fill). */
+  .rail { height: auto; min-height: 0; }
+  .dexgrid, .boxlist, .arealist, .shopscroll, .trscroll { max-height: 70dvh; flex: none; }
+}
