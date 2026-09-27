@@ -1508,25 +1508,29 @@ import { F } from "../src/game/engine.js";
   assert.equal(waterId(route.pond, 3, 1, gat), route.pond.topRight,
     "a pond in grass must keep the grass corner on the right too");
 
-  /* And the shore on the shipped lake: every tile under water has to draw the
-     bank, or the lake ends in a hard blue-to-green line. */
-  const lake = areaOf("pond").rows;
-  const lat = (x, y) => lake[y]?.[x] ?? "";
-  let banks = 0;
-  for (let y = 0; y < lake.length; y++) {
-    for (let x = 0; x < lake[y].length; x++) {
-      if (lat(x, y) === "w") {
-        assert.ok("wbD".includes(lat(x, y + 1)),
-          `water at ${x},${y} has no shore under it`);
-        continue;
+  /* And the shore on every lake the RULES draw: every tile under water has to
+     draw the bank, or the lake ends in a hard blue-to-green line. A copied map
+     (one with `tiles`) is exempt - its water and its shore are Game Freak's
+     own metatiles, which no rule here touches. Pond & Shore was the one
+     rule-drawn lake until Route 110 replaced it, so this may find none. */
+  for (const id of AREA_IDS) {
+    const area = areaOf(id);
+    if (area.tiles) continue;
+    const lake = area.rows;
+    const lat = (x, y) => lake[y]?.[x] ?? "";
+    for (let y = 0; y < lake.length; y++) {
+      for (let x = 0; x < lake[y].length; x++) {
+        if (lat(x, y) === "w") {
+          assert.ok("wbD".includes(lat(x, y + 1)),
+            `${id}: water at ${x},${y} has no shore under it`);
+          continue;
+        }
+        if (lat(x, y) !== "b") continue;
+        assert.equal(waterId(route.pond, x, y, lat), route.pond.bank,
+          `${id}: shore at ${x},${y} does not draw the bank`);
       }
-      if (lat(x, y) !== "b") continue;
-      assert.equal(waterId(route.pond, x, y, lat), route.pond.bank,
-        `shore at ${x},${y} does not draw the bank`);
-      banks++;
     }
   }
-  assert.ok(banks > 0, "the lake has no shore at all");
 
   /* The pier is the same 3x3 shape as the path, and needs its rails to be
      distinct or a deck draws as a slab with no edge. */
@@ -1704,8 +1708,7 @@ import { F } from "../src/game/engine.js";
   }
 
   console.log(`tileset ok — ${PAIRS.length} biomes, ground and solid disjoint; ` +
-              `${drawn} water tiles match FireRed, ` +
-              `${banks} tiles of shore`);
+              `${drawn} water tiles match FireRed`);
 }
 
 // --- the trainer's animation sets -----------------------------------------
@@ -2240,6 +2243,8 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     cinder: () => route.safari.general,       // the same primary, and lavaridge
     // Monsoon Trail is Route 119: Emerald's General again, plus Fortree.
     woods: () => route.monsoon.general,
+    // Seaside Road is Route 110: Emerald's General and Mauville, the same way.
+    pond: () => route.route110.general,
     // Ember Caldera is Magma Hideout: Emerald's General and Lavaridge, as Cinderpeak.
     ember: () => route.safari.general,
     // The first map drawn against a pokefirered primary that is not
@@ -4212,10 +4217,13 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     const sql = readFileSync(new URL("../db/trading.sql", import.meta.url), "utf8");
     const inSql = Object.fromEntries([...sql.matchAll(/when '(\w+)' then (\d+)/g)].map((m) => [m[1], Number(m[2])]));
     assert.deepEqual(inSql, LIMITS, "db/trading.sql's trade_limit() and trade.js's LIMITS disagree");
-    for (const m of sql.matchAll(/'(showdown'[^)\]]*)/g)) {
-      const list = m[1].split(",").map((x) => x.trim().replace(/'/g, ""));
-      assert.deepEqual(list, TIERS, `db/trading.sql lists tiers ${list} against TIERS ${TIERS}`);
-    }
+    /* ONE tier list in the SQL (`tier_list()`), equal to TIERS - and no
+       second typed copy anywhere, which is what a list naming a tier is. */
+    const lists = [...sql.matchAll(/array\[('\w+'(?:,\s*'\w+')*)\]/g)].map((m) => m[1].split(",").map((x) => x.trim().replace(/'/g, "")))
+      .filter((l) => l.some((t) => TIERS.includes(t)));
+    assert.equal(lists.length, 1, `db/trading.sql types ${lists.length} tier lists - tier_list() is the one`);
+    assert.deepEqual(lists[0], TIERS, `db/trading.sql's tier_list() is ${lists[0]}, TIERS is ${TIERS}`);
+    assert.ok(!TIERS.some((t) => new RegExp(`in \\([^)]*'${t}'`).test(sql)), "db/trading.sql checks a tier against a typed list");
     // A report stores its reason's INDEX; the server's range must hold every one.
     const reasons = [...sql.matchAll(/reason (?:not )?between 0 and (\d+)/g)].map((m) => Number(m[1]));
     assert.ok(reasons.length >= 2 && reasons.every((n) => n === reasons[0]), `db/trading.sql's report reason bounds disagree: ${reasons}`);

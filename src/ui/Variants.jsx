@@ -72,7 +72,7 @@ export default function Variants({ onClose }) {
 
      Intersected with `tiersFor`, which is the answer the ROLL uses: a sample
      that cannot wear a tier must not advertise it. Every creature in `CAST`
-     wears all eight today, so this is doing nothing - and it is here so that
+     wears all twelve today, so this is doing nothing - and it is here so that
      swapping one for a Sinnoh species stays honest rather than becoming a lie
      nobody notices. */
   const wearable = tiersFor(who);

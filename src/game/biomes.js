@@ -303,7 +303,7 @@ export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower",
    handful of shinies in a whole playthrough - rare enough that each one is a
    story, common enough that they are not a rumour. Do not tune this one alone:
    it is one rung of the ladder below, and they move together. */
-export const SHINY_ODDS = 1 / 195;
+export const SHINY_ODDS = 1 / 285;
 
 /* Four rarities above ordinary, and they are not variations on one idea -
    each is a different KIND of rare, which is what lets all four stand together
@@ -354,9 +354,9 @@ export const SHINY_ODDS = 1 / 195;
    trade this is deliberately making - a FULLY complete 151-species dex is not
    reachable at any odds that leave a rare feeling rare, and no number here
    pretends otherwise. */
-export const ASTRAL_ODDS = 1 / 180;
-export const ORIGIN_ODDS = 1 / 122;
-export const HOLO_ODDS = 1 / 122;
+export const ASTRAL_ODDS = 1 / 260;
+export const ORIGIN_ODDS = 1 / 180;
+export const HOLO_ODDS = 1 / 180;
 
 /* FOUR MORE, AND THE LADDER GOT KINDER RATHER THAN LONGER.
 
@@ -400,10 +400,33 @@ export const HOLO_ODDS = 1 / 122;
    waits on the rarest tier a species can wear. The ordering survives - Shiny
    and Showdown are still the two trophies, still the two with real artwork
    behind them - it is just no longer four times the wait. */
-export const VIVID_ODDS = 1 / 105;
-export const NOIR_ODDS = 1 / 115;
-export const GLITCH_ODDS = 1 / 150;
-export const SHOWDOWN_ODDS = 1 / 210;
+/* TWELVE, AND A VARIANT IS NO MORE COMMON THAN IT WAS AT EIGHT.
+
+   Shadow, Gold, Chaotic and Projection joined, and the player chose to keep
+   the RATE rather than the rungs: adding four tiers at the old odds would have
+   taken any variant from 1 in 18 encounters to 1 in 12, and a rare you meet
+   every twelfth wild Pokemon is not one. So every rung moved up by about
+   1.45x and the four new ones went in among them, and the total held.
+
+   Held for the TYPICAL species, and that is a choice: most species cannot
+   wear Origin (only Gens 1-2 have an older drawing), so "the rate" is the rate
+   with Origin locked - 1 in 21.0 before, 1 in 20.9 now. A Gen 1 species, which
+   can wear all twelve, goes 1 in 18.1 -> 1 in 18.8.
+
+   The spread is 2.3x (Vivid 1/155 to Gold 1/360), a little wider than the
+   2.0x the paragraph above argues for, and only at the top: Gold is the one
+   tier asked to be THE chase, so it sits above Showdown alone. Vivid stays
+   well inside check.mjs's "rarer than 1 in 100". The bounties move with it
+   for free (`variantPay` is relative to the kindest), and a variant's share
+   of income is unchanged because the total rate is. */
+export const VIVID_ODDS = 1 / 155;
+export const NOIR_ODDS = 1 / 170;
+export const PROJECTION_ODDS = 1 / 195;
+export const GLITCH_ODDS = 1 / 215;
+export const CHAOTIC_ODDS = 1 / 240;
+export const SHADOW_ODDS = 1 / 275;
+export const SHOWDOWN_ODDS = 1 / 305;
+export const GOLD_ODDS = 1 / 360;
 
 /* THE LADDER, rarest first - and the single source for it.
 
@@ -414,10 +437,14 @@ export const SHOWDOWN_ODDS = 1 / 210;
    fourth tier ends up protected from the sell sweep and not from the feed.
    Adding a fifth means adding a row here and drawing an icon. */
 export const TIER_ODDS = [
+  ["gold", GOLD_ODDS],
   ["showdown", SHOWDOWN_ODDS],
   ["shiny", SHINY_ODDS],
+  ["shadow", SHADOW_ODDS],
   ["astral", ASTRAL_ODDS],
+  ["chaotic", CHAOTIC_ODDS],
   ["glitched", GLITCH_ODDS],
+  ["projection", PROJECTION_ODDS],
   ["holo", HOLO_ODDS],
   ["origin", ORIGIN_ODDS],
   ["noir", NOIR_ODDS],
@@ -464,6 +491,10 @@ export const TIER_TELL = {
   vivid: "the colours turned up",
   noir: "no colour at all",
   showdown: "it moves",
+  gold: "cast in gold",
+  shadow: "sealed in darkness",
+  chaotic: "unstable energy",
+  projection: "a projection of light",
 };
 
 /* WHERE TO GO AND LOOK. The single most useful thing the Dex can say about a
@@ -1020,7 +1051,13 @@ const RESIDENTS = [
     id: "pond",
     water: true,
     level: 6,  // arrives with the Old Rod's reach and the Great Ball
-    name: "Pond & Shore",
+    /* SEASIDE ROAD is Route 110 now (build_map.py's route110), in the slot the
+       hand-drawn Pond & Shore held - the id is what saves store. ONLY THE MAP
+       came from Route 110. The Pokemon are this game's, stocked the way every
+       map is: the Kanto cast below, and every later generation homed by type
+       and fitted by `genShares` - not Emerald's encounter table, which was
+       tried for a pass and taken out at the player's call. */
+    name: "Seaside Road",
     /* GRASS, not just water. Half this map is bank: sand, grass and a stand of
        trees, and a lake with nothing living on its shore is a swimming pool.
        It was the only biome whose table was a single type, and it read as one -

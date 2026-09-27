@@ -12,6 +12,19 @@
 -- Players' collections come first (CLAUDE.md); the save trigger swallows its
 -- own errors and lets the write through.
 
+-- ------------------------------------------------------------------ tiers
+
+-- THE RARE TIERS, rarest first: `TIERS` in src/game/biomes.js, which
+-- check.mjs holds this equal to. ONE list, read by both CHECKs and by every
+-- function that names a tier - it was five typed copies, and adding Gold,
+-- Shadow, Chaotic and Projection would have been five edits and a missed one.
+-- Changing it is this line and a re-run: the constraints below are dropped and
+-- re-added from it every run.
+create or replace function public.tier_list()
+returns text[] language sql immutable set search_path = '' as $$
+  select array['gold','showdown','shiny','shadow','astral','chaotic','glitched','projection','holo','origin','noir','vivid']::text[]
+$$;
+
 -- ------------------------------------------------------------------ tables
 
 create table if not exists public.mons (
@@ -23,7 +36,7 @@ create table if not exists public.mons (
   species    int  not null check (species between 1 and 20000),
   level      int  not null check (level between 1 and 1000),
   size       int  check (size between 1 and 1000),
-  tier       text check (tier in ('showdown','shiny','astral','glitched','holo','origin','noir','vivid')),
+  tier       text,
   alpha      boolean not null default false,
   ot         uuid,                 -- the trainer who first registered it
   ot_name    text,
@@ -73,6 +86,11 @@ create index if not exists trade_log_to   on public.trade_log (to_user, at desc)
 
 -- ------------------------------------------------------------------ RLS
 -- READ your own; WRITE nothing. Every write goes through a function below.
+-- Re-derived every run, so a new tier reaches a live table (a CHECK written
+-- inside `create table if not exists` is never looked at again).
+alter table public.mons drop constraint if exists mons_tier_check;
+alter table public.mons add constraint mons_tier_check check (tier = any (public.tier_list()));
+
 alter table public.mons      enable row level security;
 alter table public.trades    enable row level security;
 alter table public.trade_log enable row level security;
@@ -167,7 +185,7 @@ begin
       insert into public.mons (owner, local_uid, species, level, size, tier, alpha, ot, ot_name)
       values (me, u, (e->>'species')::int, (e->>'level')::int,
         case when coalesce(e->>'size', '') ~ '^\d{1,4}$' then (e->>'size')::int end,
-        (select t from unnest(array['showdown','shiny','astral','glitched','holo','origin','noir','vivid']) t
+        (select t from unnest(public.tier_list()) t
           where e->>t = '1' limit 1),
         coalesce(e->>'alpha' = '1', false), me, who)   -- absent is false, never null
       returning id into m;
@@ -654,7 +672,7 @@ begin
   card.dex_count := case when jsonb_typeof(data->'dex') = 'array'
     then (select count(*) from jsonb_array_elements_text(data->'dex') d where d = '2') else card.dex_count end;
   card.variants := (select count(*)
-    from unnest(array['showdown','shiny','astral','glitched','holo','origin','noir','vivid']) t,
+    from unnest(public.tier_list()) t,
          jsonb_array_elements_text(case when jsonb_typeof(data->t) = 'array' then data->t else '[]' end) v
    where v = '1');
   card.stars := case when jsonb_typeof(data->'stars') = 'array' then jsonb_array_length(data->'stars') else 0 end;
@@ -676,7 +694,7 @@ returns jsonb language sql immutable set search_path = '' as $$
     'species', case when coalesce(e->>'species', '') ~ '^\d{1,5}$' then (e->>'species')::int end,
     'level', case when coalesce(e->>'level', '') ~ '^\d{1,4}$' then (e->>'level')::int end,
     'size', case when coalesce(e->>'size', '') ~ '^\d{1,4}$' then (e->>'size')::int end,
-    'tier', (select t from unnest(array['showdown','shiny','astral','glitched','holo','origin','noir','vivid']) t
+    'tier', (select t from unnest(public.tier_list()) t
               where e->>t = '1' limit 1),
     'alpha', coalesce(e->>'alpha' = '1', false))
 $$;
@@ -1080,7 +1098,7 @@ create table if not exists public.listings (
   mon          uuid not null references public.mons on delete cascade,
   want_species int  not null check (want_species between 1 and 20000),
   -- null: any form of that species. Otherwise exactly this tier.
-  want_tier    text check (want_tier in ('showdown','shiny','astral','glitched','holo','origin','noir','vivid')),
+  want_tier    text,
   status       text not null default 'open' check (status in ('open','done','withdrawn','expired')),
   created_at   timestamptz not null default now(),
   closed_at    timestamptz
@@ -1089,6 +1107,8 @@ create index if not exists listings_open on public.listings (status, created_at 
 create index if not exists listings_owner on public.listings (owner, status);
 -- One open listing per Pokemon, whatever the client sends.
 create unique index if not exists listings_one_open on public.listings (mon) where status = 'open';
+alter table public.listings drop constraint if exists listings_want_tier_check;
+alter table public.listings add constraint listings_want_tier_check check (want_tier = any (public.tier_list()));
 alter table public.listings enable row level security;
 drop policy if exists "read own listings" on public.listings;
 create policy "read own listings" on public.listings for select using (auth.uid() = owner);

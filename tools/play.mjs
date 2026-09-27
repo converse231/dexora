@@ -2710,17 +2710,51 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
 
   const DIRS = [[0, -1, "up"], [0, 1, "down"], [-1, 0, "left"], [1, 0, "right"]];
 
-  let rode = 0, pairs = 0;
+  let rode = 0, pairs = 0, brushed = 0;
   for (const areaId of WARPED) {
   const area = AREAS[areaId];
   pairs += area.warps.length;
   const solidAt = (x, y) => !area.rows[y] || SOLID.includes(area.rows[y][x] ?? "");
+  const walkIn = new Set((area.enter ?? []).map(([x, y]) => `${x},${y}`));
   for (const [ax, ay, bx, by] of area.warps) {
     for (const [from, to] of [[[ax, ay], [bx, by]], [[bx, by], [ax, ay]]]) {
       /* Step ONTO the ladder from a neighbour rather than starting on it: a
-         warp taken at boot would prove the table and not the step handler. */
-      const step = DIRS.find(([dx, dy]) => !solidAt(from[0] - dx, from[1] - dy));
+         warp taken at boot would prove the table and not the step handler.
+         A door, cave mouth or stairway is walked INTO - the step has to point
+         at its wall - so that is the approach it gets. */
+      const into = walkIn.has(`${from[0]},${from[1]}`);
+      const step = DIRS.find(([dx, dy]) => !solidAt(from[0] - dx, from[1] - dy)
+        && (!into || solidAt(from[0] + dx, from[1] + dy)));
       if (!step) continue;
+      /* AND BRUSHING PAST ONE DOES NOTHING - reported from play as doors that
+         grabbed you. Onto it along open floor, it holds you; pushing into its
+         wall from there is what takes you through. */
+      const past = into && DIRS.find(([dx, dy]) => !solidAt(from[0] - dx, from[1] - dy)
+        && !solidAt(from[0] + dx, from[1] + dy));
+      if (past) {
+        const [pdx, pdy, pdir] = past;
+        const { e } = boot({
+          ...SAVE, areaId, xp: LEVEL_XP[biomeFor(areaId).level],
+          player: { x: from[0] - pdx, y: from[1] - pdy, dir: pdir },
+          field: { repel: { id: "max-repel", steps: 9999 } },
+        });
+        e.press(pdir);
+        for (let i = 0; i < 12; i++) tick(16);
+        e.clearHeld();
+        for (let i = 0; i < 20; i++) tick(16);
+        if (e.state.player.x === from[0] && e.state.player.y === from[1]) {
+          e.press(step[2]);
+          for (let i = 0; i < 12; i++) tick(16);
+          e.clearHeld();
+          for (let i = 0; i < 20; i++) tick(16);
+          assert.deepEqual([e.state.player.x, e.state.player.y], to,
+            `${areaId}: pushing into the ${from} doorway did not take it`);
+          brushed++;
+        } else {
+          assert.notDeepEqual([e.state.player.x, e.state.player.y], to,
+            `${areaId}: brushing past the doorway at ${from} took it`);
+        }
+      }
       const [dx, dy, dir] = step;
       const { e } = boot({
         ...SAVE, areaId, xp: LEVEL_XP[biomeFor(areaId).level],
@@ -2741,8 +2775,10 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   }
   assert.equal(rode, pairs * 2,
     `only ${rode} of ${pairs * 2} warp directions could be driven`);
+  assert.ok(brushed > 0, "no doorway was ever brushed past - the walk-in rule is untested");
   console.log(`warps ok — ${pairs} pairs across ${WARPED.length} areas ` +
-    `(${WARPED.join(", ")}), every one ridden both ways`);
+    `(${WARPED.join(", ")}), every one ridden both ways; ${brushed} doorways ` +
+    `stepped onto from the side hold you until you push into them`);
 }
 
 console.log("play ok — the frame loop never stopped");

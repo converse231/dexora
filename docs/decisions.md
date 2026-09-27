@@ -2786,6 +2786,35 @@ at `MAX_LEVEL` - 8 at 50, 10 at 75, and `% 15` / `% 10` in older eras. Move the 
 rarest item in the game quietly quintuples — which is exactly what the economy
 suite caught when the cap went up.
 
+**Seaside Road (2026-10-04)** replaced the hand-drawn Pond & Shore with Emerald's
+Route 110, which is Ruby and Sapphire's layout. The id stayed `pond`. The first
+build walled off the whole Cycling Road, for two reasons. First, its planks
+are upper-layer tiles, so `seal_hidden` made them rock; the road sits at
+elevation 4 and 15, and neither can hide you. Second, the road is reached only
+through its gatehouses, which the cull did not count until the warps went in.
+The transcription also found that the Emerald reader put behaviour before
+collision. That made Route 110's 92 sea rocks and 69 railings (and Monsoon
+Trail's 22 rocks and waterfall edges) walkable or surfable, so `em_cell` now
+reads collision first. In the same pass, doors stopped firing when you merely
+brushed past them. MB_LADDER is the only warp taken on arrival; everything else
+is walked into. A doorway in a corridor still fires on arrival, because it
+cannot be brushed past.
+
+**Twelve since 2026-10-03.** Gold, Shadow, Chaotic and Projection were designed in
+a standalone Variant Lab page first and cut down for the game. Holographic was
+renamed Projection before it shipped, because Holo already existed and a tier
+name is stored in every save. The player chose to keep the RATE rather than the
+rungs: at the old odds, four more tiers would have taken any variant from 1 in 18
+to 1 in 12. So every rung moved up by about 1.45x, and the any-variant rate held
+for the typical species. That is a species without Origin: 1 in 21.0 before,
+1 in 20.9 after. The ladder, rarest first, is now Gold 1/360, Showdown 1/305,
+Shiny 1/285, Shadow 1/275, Astral 1/260, Chaotic 1/240, Glitched 1/215,
+Projection 1/195, Holo and Origin 1/180, Noir 1/170 and Vivid 1/155. Bounties
+and honeys re-derived themselves, and the income share held because the total
+rate did. The SQL's five typed tier lists became one function, `tier_list()`,
+while this change was going in. Chaotic's red-and-blue fringes were cut in the
+Lab for a black-and-yellow negative, and Shadow's pulsing ring was cut too.
+
 **Eight rare tiers, and each is a different KIND of rare** - which is what lets
 them stand together instead of being eight strengths of the same idea:
 

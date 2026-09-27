@@ -60,8 +60,10 @@ AREAS = [
     dict(id="woods", name="Monsoon Trail", drawn="monsoon_trail"),
     # Several lakes, not one: water is solid and only the bank spawns, so a
     # single pond leaves a whole map with a 17-tile shoreline to pace.
-    # Hand-drawn - see pond_shore() further down.
-    dict(id="pond", name="Pond & Shore", drawn="pond_shore"),
+    # COPIED: Emerald's Route 110 and the Seaside Cycling Road, in the slot the
+    # hand-drawn Pond & Shore held - see route110(). The id stays `pond`
+    # because saves store it.
+    dict(id="pond", name="Seaside Road", drawn="route110"),
     # No grass patches: there are no transition metatiles between grass and
     # rock, so the two met along hard rectangular edges that read as a bug.
     # COPIED, and the first area with more than one floor - see mt_moon().
@@ -144,16 +146,26 @@ def hiding_ids():
     return set(meta.get("hides", ()))
 
 
-def seal_hidden(g, tiles, wall):
+def seal_hidden(g, tiles, wall, elev=None):
     """Turn every walkable cell that would hide the player into `wall`.
 
     The ART is kept - it is still the tile Game Freak drew, and it still draws
-    the machine top or the counter it always was. Only the collision changes."""
+    the machine top or the counter it always was. Only the collision changes.
+
+    EXCEPT WHERE THE ELEVATION LIFTS YOU ABOVE IT. On a map carrying the GBA's
+    elevation, a cell at an `EM_HIGH` elevation draws the trainer OVER the
+    upper layer, so it hides nobody - and it is exactly how a raised road is
+    drawn: Route 110's cycling road is upper-layer planks at elevation 4, so
+    you surf under it and ride on top of it. Sealed, the whole road was rock."""
     hidden = hiding_ids()
     H, W = len(g), len(g[0])
     n = 0
     for y in range(H):
         for x in range(W):
+            # 15 is a bridge: you keep the elevation you walked on at, so it
+            # hides you no more than the road it carries does.
+            if elev and (elev[y][x] in EM_HIGH or elev[y][x] == 15):
+                continue
             if g[y][x] not in SOLID and tiles[y][x] in hidden:
                 g[y][x] = wall
                 n += 1
@@ -513,8 +525,10 @@ def check(area, rows, spawn, tiles=None, warps=None):
 
     # Every bridge on every map, not just the ones place_lava happened to test.
     # Ember's causeway is hand-laid and was never asked, which is how it shipped
-    # two wide with only its left column landing.
-    assert spans_clear([list(r) for r in rows]),         f"{aid}: a bridge does not land across its whole width at both ends"
+    # two wide with only its left column landing. NOT on a map carrying the
+    # GBA's elevation: Route 110's Cycling Road is one branching deck, not a
+    # span, and there the elevation-aware fill is what proves it lands.
+    assert area.get("elev") or spans_clear([list(r) for r in rows]),         f"{aid}: a bridge does not land across its whole width at both ends"
 
     for y in range(H):
         for x in range(W):
@@ -1513,185 +1527,6 @@ def tall_grass():
 
     # Standing on the path at the southern entrance, facing up the route.
     return ["".join(r) for r in g], (33, 75)
-
-
-def shore(g):
-    """Every tile of open ground under water becomes the shore.
-
-    A water body's rim runs round three of its sides on the water tiles
-    themselves, and round the fourth on the land below it. Nothing about the
-    map data says so, so this walks the grid at the end and marks that row -
-    the same trick as overhang(), for the same reason: it is a fact about how
-    the tile set is drawn, not a decision the map should have to remember."""
-    for y in range(1, len(g)):
-        for x in range(len(g[0])):
-            if g[y][x] in ".,f" and g[y - 1][x] == "w":
-                g[y][x] = "b"
-
-
-def pier(g, x0, y0, x1, y1):
-    """A stretch of wooden pier. Walkable, and drawn with a rail down each side.
-
-    The deck is a 3x3 autotile like the path, so it only has to be at least
-    three wide to get a rail on both sides with deck in between - two would be
-    all rail. check() asserts that, and that a run has somewhere to step on and
-    off at each end, because a pier you cannot leave is the one way this can be
-    laid out wrong and still look right."""
-    rect(g, "D", x0, y0, x1, y1)
-
-
-def pond_shore():
-    """Pond & Shore: one great lake, walked around and walked across.
-
-    84x68, of which 80x62 is playable. The old one was 42x34 and had a single
-    lake with one island; this has the same subject at four times the size,
-    which means the lake can do what a real one does - reach into bays, break
-    into islands, and leave a shore that is worth following rather than a rim
-    you cross in six steps.
-
-    Everything the small one got right is kept, and it is all about asymmetry:
-
-      * the lake is widest along its north edge and tapers south-west in
-        right-angled steps, the way FireRed shapes water. Water carries its rim
-        on its top and sides only - the foot of a lake simply meets the grass -
-        so every step in the outline has to be a right angle or the rim has
-        nothing to turn on.
-      * the islands are not centred and the bridges do not line up. You arrive
-        from the south beach, cross to the big island, walk its length, and take
-        a second span north - a dog-leg, so the crossing is a route rather than
-        a line drawn through the middle of the map.
-      * going round is always open, so a bridge is a shortcut you choose and
-        never a gate.
-
-    The three numbers the layout tool flagged on the small one are the brief for
-    this one: loops 76.7 against a real route's 71.0-75.1, tight 0.48 against
-    0.50-0.57, and dead 0.00. All three say the same thing - too much open
-    ground with nothing near you - so the extra space goes to tree masses and
-    fields rather than to more water."""
-    W, H = 84, 68
-    g = [["." for _ in range(W)] for _ in range(H)]
-
-    # --- the frame -------------------------------------------------------
-    rect(g, "T", 0, 0, W - 1, 2)
-    rect(g, "T", 0, H - 3, W - 1, H - 1)
-    rect(g, "T", 0, 0, 1, H - 1)
-    rect(g, "T", W - 2, 0, W - 1, H - 1)
-
-    # --- the lake, in right-angled steps ----------------------------------
-    rect(g, "w", 30, 6, 74, 10)
-    rect(g, "w", 24, 11, 74, 22)
-    rect(g, "w", 20, 23, 68, 32)
-    rect(g, "w", 26, 33, 62, 40)
-    rect(g, "w", 34, 41, 54, 46)
-
-    # --- what stands in the water -----------------------------------------
-    # Carved back out rather than drawn on top, so the lake stays one shape with
-    # holes in it and the rim wraps each hole by itself.
-    rect(g, ".", 36, 14, 55, 20)        # the big island - bridges only
-    rect(g, ".", 30, 27, 39, 31)        # the west island
-    # Stopping at 65, not 66: the lake reaches x68 here, so a headland ending
-    # at 66 leaves a two-tile channel behind it and water runs three wide at
-    # the least - anything narrower has no rim to draw.
-    rect(g, ".", 58, 25, 65, 30)        # a headland off the east shore
-    rect(g, ".", 66, 6, 74, 9)          # a spur off the north, making a bay
-    # NO SHOAL IN THE SOUTHERN REACH. There was one, and it was exactly the 36
-    # tiles the reachability count could not get to: an island with no bridge is
-    # scenery you can see and never stand on, which is the fault that check
-    # exists for. Left as open water.
-
-    # --- the crossings, in spans that do not line up ----------------------
-    # BRIDGES, not piers. A pier is a JETTY - it runs out from land and stops,
-    # and its outer ring is drawn to meet sand, so laying it across open water
-    # fringes the span in beach. Every tile of these has water on both sides and
-    # dry ground at each end, which is a bridge, and the planks are baked for
-    # exactly that. Two across, never three: Route 12's own bridge is two wide,
-    # so the set is a left half and a right half and `bridgeId()` picks by
-    # parity - a third column comes out left/right/left and draws a rail down
-    # the middle of its own deck.
-    bridge(g, 44, 6, 45, 13, over="water")    # big island -> north shore
-    bridge(g, 38, 21, 39, 26, over="water")   # big island -> west island
-    bridge(g, 32, 32, 33, 40, over="water")   # west island -> south shore
-    # NORTH-SOUTH, like every other span here, and that is structural rather
-    # than stylistic: water carries its rim on its top and sides only, so the
-    # row under a body of water has to be a bank. An east-west bridge puts its
-    # own planks there and the lake above it ends on nothing - which is exactly
-    # what check() said when one was tried.
-    # At x58, not x60: the lake's south-east reach ends at x62, so a span two
-    # columns further east leaves a single tile of water behind it.
-    bridge(g, 58, 31, 59, 40, over="water")   # east headland -> south shore
-
-    # --- sand, only where you walk ---------------------------------------
-    rect(g, "#", 14, 4, 78, 5)           # the north shore
-    rect(g, "#", 14, 4, 17, 51)          # down the west bank
-    # ONE ROW CLEAR OF THE WATER'S FOOT. A lake carries no rim along its
-    # bottom - the tile below it is the walkable bank, and `shore()` makes one
-    # out of grass. Sand painted on that row leaves the water ending on beach
-    # with no bank at all, which is what check() catches.
-    rect(g, "#", 14, 48, 60, 51)         # the southern beach
-    rect(g, "#", 75, 6, 78, 46)          # the east bank
-    rect(g, "#", 40, 51, 43, 62)         # the lane south, where you come in
-
-    # --- tree masses, which are what the three flags actually asked for ---
-    # Rectangles with right angles, like Route 1's own. A mass takes floor out
-    # of `open` and its straight edges keep `turns` down, and both of those are
-    # what turns a shore into somewhere rather than a margin.
-    for x0, y0, x1, y1 in (
-            (2, 6, 11, 10), (2, 18, 11, 22), (2, 30, 11, 34),
-            (2, 42, 11, 46), (2, 54, 13, 58), (18, 54, 29, 58),
-            (46, 54, 57, 58), (62, 52, 73, 56), (20, 6, 27, 9),
-            (62, 58, 73, 62), (30, 58, 37, 62), (76, 50, 81, 60),
-    ):
-        rect(g, "T", x0, y0, x1, y1)
-
-    # --- tall grass, in rectangles of several sizes ----------------------
-    for x0, y0, x1, y1 in (
-            (2, 12, 11, 16), (2, 24, 11, 28), (2, 36, 11, 40),
-            (2, 48, 13, 52), (18, 51, 38, 53), (44, 51, 60, 53),
-            (62, 46, 74, 50), (18, 60, 29, 64), (44, 60, 60, 64),
-            (66, 12, 74, 18), (70, 26, 78, 34), (38, 16, 53, 19),
-            (32, 28, 37, 30), (60, 26, 65, 29), (18, 6, 19, 22),
-    ):
-        onto_grass(g, ",", x0, y0, x1, y1)
-
-    # --- trees standing in the open --------------------------------------
-    for x, y in ((4, 4), (44, 17), (34, 29), (62, 27), (14, 60),
-                 (72, 20), (24, 48), (52, 48), (68, 42), (8, 62)):
-        clump(g, x, y)
-    # ...and then wherever the map is emptiest. Taller than they are wide, for
-    # the reason the meadow records: a 2x5 buys the same `turns` as a 2x3 and
-    # nearly twice the `tight`.
-    # SHORTER AND MORE OF THEM, which is the opposite of the meadow's answer
-    # and for the opposite reason. This map came out at turns 0.08 against a
-    # real route's 0.11-0.18 - BELOW the band, not above it - and tight 0.38
-    # against 0.50: all big rectangles and nothing near you. A lake is already
-    # one enormous straight-edged mass, so the trees here have to supply the
-    # texture the water cannot.
-    fill_the_empty(g, want=80, tall=3)
-    make_nooks(g, want=8)
-
-    # --- ledges: the way back down, the gap between them the way up ------
-    # Searched rather than placed - see `ledge_in` - and laid after the trees,
-    # because `fill_the_empty` stands them wherever the map is emptiest and
-    # "emptiest" is exactly where a ledge was given its approach.
-    for row in (23, 35, 47, 59):
-        ledge_in(g, row, 3, W // 2 - 1)
-        ledge_in(g, row, W // 2, W - 4)
-
-    # --- flowers, in loose handfuls on whatever grass is left ------------
-    flowers(g, (4, 4), (6, 7), (3, 11), (5, 14))
-    flowers(g, (8, 26), (4, 31), (9, 35), (6, 39))
-    flowers(g, (40, 18), (46, 17), (50, 19), (43, 16))   # on the big island
-    flowers(g, (33, 29), (36, 30), (34, 31))             # on the west island
-    flowers(g, (69, 8), (72, 7), (70, 9))                # on the north spur
-    flowers(g, (20, 52), (26, 53), (33, 52), (48, 53))
-    flowers(g, (66, 48), (70, 47), (73, 49))
-    flowers(g, (16, 62), (22, 63), (52, 62), (58, 61))
-
-    repair_trees(g, W, H, ".")
-    shore(g)
-
-    # Standing in the south lane, looking up it towards the water.
-    return ["".join(r) for r in g], (41, 61)
 
 
 def join_islands(g, floor, rng, keep=()):
@@ -2768,6 +2603,37 @@ MB_RAIL_V = frozenset((0xD3, 0xD5))    # isolated / continuing vertical rail
 MB_RAIL_H = frozenset((0xD4, 0xD6))    # isolated / continuing horizontal rail
 MB_LONG_GRASS = frozenset((0x03, 0x09))    # long grass, and its south edge
 MB_BRIDGE = frozenset((0x70,))             # a bridge over ocean water
+MB_WATERFALL = 0x13
+
+
+def em_cell(b, col, solid="T"):
+    """One Emerald cell as our character, from its behaviour `b` and its
+    collision bit. ONE reading for every copied Emerald route.
+
+    COLLISION OUTRANKS WATER AND BRIDGE, and it did not. Monsoon Trail read
+    behaviour first, so its 10 rocks standing in the river and 12 waterfall
+    edges - water behaviour, collision 1 - were surfable, and Route 110's 92
+    sea rocks and 69 cycling-road railings would have been water and planks.
+    On the GBA a collision-1 cell is never entered, whatever it looks like."""
+    if b in MB_WATER:
+        if col:
+            return "K" if b == MB_WATERFALL else "R"
+        return "w"
+    if b in MB_RAIL_V:
+        return "|"
+    if b in MB_RAIL_H:
+        return "-"
+    if b == MB_JUMP_SOUTH:
+        return "L"
+    if col:
+        return solid
+    if b in MB_BRIDGE:
+        return "N"           # walkable planks over the water
+    if b in MB_GRASS:
+        return ","
+    if b in MB_SAND:
+        return "#"
+    return "."
 EM_TALL_GRASS = 13                          # General's own tall grass metatile
 # WHICH ELEVATIONS DRAW A SPRITE ABOVE THE UPPER LAYER - pokeemerald's
 # sElevationToPriority, where priority 1 or 0 clears BG1. 0 and 15 are neither:
@@ -2984,26 +2850,7 @@ def monsoon_trail():
             i = int(ids[y][x])
             if behave(i) in MB_LONG_GRASS:
                 i = EM_TALL_GRASS
-            b = behave(i)
-            if b in MB_WATER:
-                ch = "w"
-            elif b in MB_RAIL_V:
-                ch = "|"
-            elif b in MB_RAIL_H:
-                ch = "-"
-            elif b == MB_JUMP_SOUTH:
-                ch = "L"
-            elif b in MB_BRIDGE:
-                ch = "N"           # walkable planks over the river
-            elif int(col[y][x]):
-                ch = "T"
-            elif b in MB_GRASS:
-                ch = ","
-            elif b in MB_SAND:
-                ch = "#"
-            else:
-                ch = "."
-            g[y][x] = ch
+            g[y][x] = em_cell(behave(i), int(col[y][x]))
             tiles[y][x] = rebase(i)
 
     dx, dy = MONSOON_DOOR
@@ -3070,6 +2917,126 @@ def monsoon_trail():
     return (rows, spawn, [i for row in tiles for i in row], GB, None,
             {"door": MONSOON_DOOR, "arrive": (dx, dy + 1),
              "elev": elev_rows([[int(e) for e in r] for r in elev])})
+
+
+# -------------------------------------------------------------- Seaside Road
+
+# Route 110's two Seaside Cycling Road gatehouses, as pairs of its own warp
+# tiles: each gatehouse's ground door and its road-side door, resolved through
+# the gatehouse interior's warp table (warps 0/1 lead back to Route 110 warp 2,
+# 12/13 to warp 3; the south one to 4 and 5). Walking into one door comes out
+# of the other, the Cinderpeak cable car's simplification. The Trick House
+# (11,66) and New Mauville (35,24) lead to maps we do not have: solid, art kept.
+R110_WARPS = (((15, 16), (18, 16)), ((16, 88), (19, 88)))
+R110_SHUT = ((11, 66), (35, 24))
+
+
+def route110():
+    """Seaside Road is Emerald's Route 110, cell for cell: 40x100 of shore,
+    sea and the Seaside Cycling Road raised over it. Ruby and Sapphire draw
+    the same layout.
+
+    Built exactly as Monsoon Trail is - General plus Mauville rebased off
+    route.json, `em_cell` for the characters, the real elevation for where
+    you may walk and what draws over you - and the outer ring is the layout's
+    own border block, because Mauville, Slateport and Route 103 are not here.
+
+    THE ROAD IS REACHED THROUGH ITS GATEHOUSES, as on the GBA, so the fill that
+    culls the unreachable counts both warp pairs as well as surfing: without
+    them the whole road is walled off, and without Surf the sea is."""
+    import numpy as np
+    import build_assets as BA
+
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    M = meta["route110"]
+    GB, MB, SPLIT = M["general"], M["mauville"], M["split"]
+    rebase = lambda i: (GB + i) if i < SPLIT else (MB + i - SPLIT)
+
+    layouts = json.load(io.open(
+        BA.fetch("data/layouts/layouts.json", "em/layouts.json", root=BA.EMERALD),
+        encoding="utf-8"))["layouts"]
+    lay = next(q for q in layouts if q["name"] == "Route110_Layout")
+    W, H = lay["width"], lay["height"]
+    assert (W, H) == (40, 100), f"route110: Route 110 is {W}x{H}, not 40x100"
+    raw = np.frombuffer(io.open(BA.fetch(
+        lay["blockdata_filepath"], "em/Route110.bin", root=BA.EMERALD), "rb").read(),
+        dtype="<u2")[:W * H]
+    ids = (raw & 0x3FF).reshape(H, W)
+    col = ((raw >> 10) & 3).reshape(H, W)
+    elev = [[int(e) for e in r] for r in ((raw >> 12) & 0xF).reshape(H, W)]
+    attr = {
+        False: np.frombuffer(io.open(BA.fetch(
+            "data/tilesets/primary/general/metatile_attributes.bin",
+            "em/general/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+        True: np.frombuffer(io.open(BA.fetch(
+            "data/tilesets/secondary/mauville/metatile_attributes.bin",
+            "em/mauville/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+    }
+    behave = lambda i: int(attr[i >= SPLIT][i if i < SPLIT else i - SPLIT] & 0x1FF)
+    border = [int(v) & 0x3FF for v in np.frombuffer(io.open(BA.fetch(
+        lay["border_filepath"], "em/route110_border.bin", root=BA.EMERALD), "rb").read(),
+        dtype="<u2")]
+    assert len(border) == 4, "route110: the border block is not 2x2"
+
+    g = [[None] * W for _ in range(H)]
+    tiles = [[-1] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            i = int(ids[y][x])
+            g[y][x] = em_cell(behave(i), int(col[y][x]))
+            tiles[y][x] = rebase(i)
+
+    warps = []
+    for (ax, ay), (bx, by) in R110_WARPS:
+        for x, y in ((ax, ay), (bx, by)):
+            assert g[y + 1][x] not in SOLID, f"route110: nothing to stand on below the door at ({x},{y})"
+            g[y][x] = "l"
+        warps.append([ax, ay, bx, by])
+    for x, y in R110_SHUT:
+        g[y][x] = "T"
+
+    for x in range(W):
+        for y in (0, H - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+    for y in range(H):
+        for x in (0, W - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+
+    seal_hidden(g, tiles, "T", elev)
+
+    # The way in is from Slateport, at the south: the middle of the lowest row
+    # of ground the south gatehouse's door reaches on foot.
+    hop = {}
+    for ax, ay, bx, by in warps:
+        hop[(ax, ay)] = (bx, by)
+        hop[(bx, by)] = (ax, ay)
+    sx, sy = R110_WARPS[1][0]
+    foot = reach(g, [(sx, sy + 1)], elev)
+    low = max(y for _x, y in foot if g[y][_x] not in "l")
+    xs = sorted(x for x, y in foot if y == low)
+    spawn = (xs[len(xs) // 2], low)
+
+    # The cull and the landing rule to a fixed point, walking, riding the
+    # gatehouses and surfing - see monsoon_trail().
+    while True:
+        seen = reach(g, [spawn], elev, hop=hop, surf=True)
+        cut = 0
+        for y in range(H):
+            for x in range(W):
+                if g[y][x] not in SOLID and (x, y) not in seen:
+                    g[y][x] = "T"
+                    cut += 1
+        if not cut and not land_ledges(g, "T"):
+            break
+    for ax, ay, bx, by in warps:
+        assert g[ay][ax] == "l" and g[by][bx] == "l", "route110: a gatehouse door is cut off"
+
+    rows = ["".join(r) for r in g]
+    return (rows, spawn, [i for row in tiles for i in row], GB, warps,
+            {"elev": elev_rows(elev)})
 
 
 # -------------------------------------------------------------- Cinderpeak
@@ -3577,6 +3544,35 @@ if __name__ == "__main__":
         doors.setdefault(b, []).append([*db["door"], a, *da["arrive"]])
         print("   door    %s %s <-> %s %s" % (a, da["door"], b, db["door"]))
 
+    # WALKED INTO, NOT STEPPED ON. On the GBA a ladder is taken the moment you
+    # arrive on it, but a door, a cave mouth or a stairway is taken only when
+    # you walk into it - reported from play as doors that grabbed you for
+    # brushing past them. Every warp or door tile that is not a ladder
+    # (MB_LADDER, listed by the atlas bake) and can be walked into a wall is
+    # listed; the engine takes those only when your step points into
+    # that wall, or when you push into it standing there.
+    ladders = set(json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                                    encoding="utf-8")).get("ladders", ()))
+    enter = {}
+    for spec, rows, spawn, tiles, base, warps in out:
+        pts = [(w[0], w[1]) for w in (warps or [])] + [(w[2], w[3]) for w in (warps or [])]
+        pts += [(d[0], d[1]) for d in doors.get(spec["id"], [])]
+        W, H = spec["w"], spec["h"]
+        solid = lambda x, y: not (0 <= x < W and 0 <= y < H) or rows[y][x] in SOLID
+        # Only where some approach FACES a wall: a doorway in a corridor (walls
+        # both sides, floor at both ends - Ember's tunnel mouths, the Tower's
+        # stairs) cannot be brushed past, and is walked straight through on
+        # the GBA, so it stays taken on arrival.
+        keep = sorted({(x, y) for x, y in pts
+                       if not (tiles and tiles[y * W + x] in ladders)
+                       and any(not solid(x - dx, y - dy) and solid(x + dx, y + dy)
+                               for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)))})
+        if keep:
+            enter[spec["id"]] = keep
+        if pts:
+            print("   enter   %-8s %d walked into, %d taken on arrival"
+                  % (spec["id"], len(keep), len(set(pts)) - len(keep)))
+
     body = ["/* GENERATED by tools/build_map.py - edit the area specs there. */\n",
             "export const AREAS = {"]
     for spec, rows, spawn, tiles, base, warps in out:
@@ -3610,6 +3606,9 @@ if __name__ == "__main__":
             body.append("    elev: [")
             body += ['      "%s",' % r for r in spec["elev"]]
             body.append("    ],")
+        if spec["id"] in enter:
+            # WARPS AND DOORS YOU WALK INTO rather than step on - see `enter`.
+            body.append("    enter: [%s]," % ", ".join("[%d, %d]" % q for q in enter[spec["id"]]))
         if spec["id"] in doors:
             # DOORS TO ANOTHER MAP: [x, y, area, arriveX, arriveY].
             body.append("    doors: [")
