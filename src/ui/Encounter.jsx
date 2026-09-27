@@ -164,6 +164,7 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
             variant={enc.variant}
             className={`mon${monCaptured ? " captured" : ""}${monGone ? " gone" : ""}`}
             alt={enc.name}
+            eager
           />
 
           {/* THE ENTRANCE. Keyed on the encounter so it plays once per

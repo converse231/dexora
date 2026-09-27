@@ -544,6 +544,16 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   colour token to a night value); a few pastel banners and the silhouettes
   have their own dark rules there. The map, battle skies and tier effects are
   art and do not change. Never type a light literal where a token exists.
+- **The rail is a size container** (`container: rail`): its lists answer to
+  the rail's width, never the device's - cards in columns from 620px, and
+  the Dex takes as many >= 76px columns as fit (`useRows` reads the count).
+- **Dialogs have a short-screen shape** (`max-height: 540px`, tighter at
+  420px): picture left, the rest right, and the close or confirm button
+  always on screen. A sideways phone is 360-430px tall; audit there.
+- **An encounter's sprite is fetched before the encounter**: App warms the
+  map's table through `preloadSprites` in idle time and KEEPS the Images
+  (the host answers `no-cache`; a dropped one revalidated and drew late),
+  and the battle's `<Sprite eager>` is never lazy.
 - **The page never scrolls sideways**: `html, body { overflow-x: clip }` is the
   guard, not the fix - an overflow is still a bug to find and size down.
 - **Irreversible presses ask first, gated in the engine** (`state.ask` in

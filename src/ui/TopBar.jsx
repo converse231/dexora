@@ -43,6 +43,9 @@ function Missions({ daily, onClaim, note }) {
      again is a panel people leave open. */
   useEffect(() => {
     if (!open) return undefined;
+    /* Into view: held sideways, the top bar sits BELOW the game, and the card
+       opened under the fold where nobody saw it arrive. */
+    box.current?.querySelector(".ms-pop")?.scrollIntoView({ block: "center", behavior: "smooth" });
     const away = (ev) => { if (!box.current?.contains(ev.target)) setOpen(false); };
     const esc = (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); setOpen(false); } };
     addEventListener("pointerdown", away);
