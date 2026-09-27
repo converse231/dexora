@@ -14,7 +14,7 @@ import {
 import { berryById, artOf } from "../game/items.js";
 import Types from "./Types.jsx";
 import Gen from "./Gen.jsx";
-import Sprite, { spriteUrl, VariantFx, TierReveal } from "./Sprite.jsx";
+import Sprite, { spriteUrl, VariantFx, TierReveal, SCENE_FX } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 
   /* THE EVOLUTION CARD IS GONE, and "confusing" was the kind half of it.
@@ -205,8 +205,8 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
               the four above it. Those predate the component; this one has no
               reason to be a fifth copy, and the four layers it needs are
               exactly the four the Box and the Dex already draw. */}
-          {enc.glitched && monHere && (
-            <VariantFx id={enc.speciesId} variant="glitched" />
+          {SCENE_FX.has(enc.variant) && monHere && (
+            <VariantFx id={enc.speciesId} variant={enc.variant} />
           )}
 
           {/* The sky inside it, clipped to its own outline. */}

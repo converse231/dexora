@@ -1,4 +1,4 @@
-/* The rarity badges - eight of them now - and the rosette, which wants any
+/* The rarity badges - twelve of them now - and the rosette, which wants any
    FOUR of whatever a species can wear rather than every one. See
    `ROSETTE_NEED`: at eight tiers "all of them" stopped being a hard mark and
    became an unreachable one.
@@ -26,6 +26,10 @@ const TIER_ART = {
   vivid: { src: "marks/vivid.png", name: "Vivid" },
   noir: { src: "marks/noir.png", name: "Noir" },
   showdown: { src: "marks/showdown.png", name: "Showdown" },
+  gold: { src: "marks/gold.png", name: "Gold" },
+  shadow: { src: "marks/shadow.png", name: "Shadow" },
+  chaotic: { src: "marks/chaotic.png", name: "Chaotic" },
+  projection: { src: "marks/projection.png", name: "Projection" },
   complete: { src: "marks/complete.png", name: "Every variant" },
   /* NOT A TIER, and it sits here anyway because it is the same object: a small
      drawn badge on a sprite, in the same set, at the same size. Legendary is a

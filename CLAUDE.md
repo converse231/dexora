@@ -207,8 +207,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   tiers (FORMS strip, catch banner, `Variants.jsx`) takes its order from `TIERS`
   and its prose from `TIER_TELL`, which never quotes a number. `Variants.jsx`
   computes odds from `TIER_ODDS`.
-- **The eight tiers are kinds, not strengths.** Keep the spread narrow; move the
-  ratio, never the base. Vivid stays rarer than 1 in 100.
+- **The twelve tiers are kinds, not strengths.** Keep the spread narrow; move
+  the ratio, never the base. Vivid stays rarer than 1 in 100. A new tier keeps
+  the any-variant RATE (every rung moves up to make room, held for a species
+  without Origin); Gold alone sits above the 2.0x spread, as the chase.
+- **A tier also lives in the SQL**: `public.tier_list()` in `db/trading.sql`
+  is the one list the CHECKs and functions read (asserted equal to `TIERS`),
+  and the constraints are re-added from it every run. A new tier is SQL first:
+  a box entry in a tier the server does not know cannot enter trading.
+- **A tier added since Glitched draws its motion through `VariantFx`**
+  (`SCENE_FX` in the battle): a `.sprite-<tier>` filter for the bare `<img>`
+  plus a few layers in the sprite's box, sized for forty Dex tiles at once.
 - **`rollVariant` walks rarest first** and takes a `locked` set from
   `lockedTiers(id)`, an art check only (one argument). `tiersFor` derives from
   it. Origin means debut art older than the base art (`genOf < baseArtGen`,
@@ -510,6 +519,18 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   wishes and wants search ANY species. The trade scene throws one ball per
   Pokemon each way. SQL first, client second: the new client calls
   `post_listing(mids)` and `propose_trade(..., want_uids)`.
+- **Seaside Road is Emerald's Route 110** in Pond & Shore's slot (id `pond`),
+  General + `mauville` (appended last in `EM_SECONDARY`). The Cycling Road is
+  reached only through its two gatehouses (`R110_WARPS`, a same-map warp pair
+  each), so the cull counts warps and Surf. Its road is upper-layer planks at
+  elevation 4 and 15: `seal_hidden(g, tiles, wall, elev)` never seals an
+  `EM_HIGH` or bridge (15) cell. `em_cell` is the one Emerald cell reader, and
+  COLLISION OUTRANKS WATER AND BRIDGE (a sea rock is `R`, a waterfall edge `K`).
+- **Doors are walked into, ladders stepped on.** `route.json`'s `ladders` are
+  the MB_LADDER (0x61) metatiles; every other warp or door tile that some
+  approach can walk into a wall is in the area's `enter`, and the engine takes
+  it only when the step points into that wall or you push into it standing
+  there (`intoIt`, `goThrough`, held keys dropped). tools/play drives both.
 - **Monsoon Trail is Emerald's Route 119** in Deep Woods' slot (id `woods`),
   transcribed like the Safari Zone against Emerald General + `fortree`
   (appended last in `EM_SECONDARY`). Long grass is laid as tall; rails are `-` and `|`

@@ -703,6 +703,50 @@ export function createEngine(canvas, onChange, mini = null) {
   const doorMap = (area) =>
     new Map((area.doors ?? []).map(([x, y, to, ax, ay]) => [`${x},${y}`, [to, ax, ay]]));
   let doors = doorMap(areaOf(state.areaId));
+  /* WALKED INTO, NOT STEPPED ON: the warp and door tiles that are not ladders
+     (`enter` in mapdata, from the GBA's own behaviours). Reported from play as
+     doors that took you for brushing past them - a ladder is taken when you
+     arrive on it, but a door, a cave mouth or a stairway only when you walk
+     INTO it: your step points at its wall, or you push into the wall while
+     standing on it. */
+  const enterSet = (area) => new Set((area.enter ?? []).map(([x, y]) => `${x},${y}`));
+  let enter = enterSet(areaOf(state.areaId));
+  const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  /* Whether a warp or door at (x, y) fires for someone facing `dir` there. */
+  const intoIt = (x, y, dir) => {
+    if (!enter.has(`${x},${y}`)) return true;
+    const [dx, dy] = DIRS[dir] ?? [0, 0];
+    return !walkable(rows, x + dx, y + dy);
+  };
+  /* Pushing into the wall of the walk-in tile you are standing on - after
+     coming through the far door, say - takes you through. Held keys are
+     dropped either way, so holding Up does not bounce you straight back. */
+  function goThrough() {
+    const p = state.player;
+    const key = `${p.x},${p.y}`;
+    if (!enter.has(key)) return false;
+    const hop = warps.get(key);
+    if (hop) {
+      [p.x, p.y] = hop;
+      move.fromX = p.x;
+      move.fromY = p.y;
+      move.active = false;
+      rise();
+      held.clear();
+      save();
+      changed();
+      return true;
+    }
+    const door = doors.get(key);
+    if (door) {
+      held.clear();
+      enterDoor(door);
+      save();
+      changed();
+      return true;
+    }
+    return false;
+  }
   /* ELEVATION, as the GBA keeps it, where a copied map carries its own (`elev`:
      the real map's 0-15, one hex digit a cell). Two things read it:
 
@@ -1023,7 +1067,7 @@ export function createEngine(canvas, onChange, mini = null) {
        and stepping off a rail is always allowed, as stepping ashore is. */
     if (RAIL[at(nx, ny)] && !canBike(levelFromXp(state.xp), state.bag)) return;
     if (hop) { nx += dx; ny += dy; }
-    else if (!walkable(rows, nx, ny) && !(riding && afloat(nx, ny))) return;
+    else if (!walkable(rows, nx, ny) && !(riding && afloat(nx, ny))) { goThrough(); return; }
     // A WALK onto another elevation - the ride, the shore and a hop are exempt.
     else if (!hop && !riding && !afloat(nx, ny) && !elevOk(nx, ny)) return;
 
@@ -1120,8 +1164,9 @@ export function createEngine(canvas, onChange, mini = null) {
        and an encounter rolls on the floor he came out on, which is the one he
        is standing in. */
     const who = state.player;
-    const hop = warps.get(`${who.x},${who.y}`);
+    const hop = intoIt(who.x, who.y, who.dir) ? warps.get(`${who.x},${who.y}`) : null;
     if (hop) {
+      if (enter.has(`${who.x},${who.y}`)) held.clear();
       [who.x, who.y] = hop;
       move.fromX = who.x;
       move.fromY = who.y;
@@ -1184,8 +1229,10 @@ export function createEngine(canvas, onChange, mini = null) {
     /* A DOOR TAKES YOU THROUGH, late in the step so the step still counts -
        parcels, effects and the rift clock all ticked above - and before the
        encounter roll, because nothing jumps out on a doormat. */
-    const door = doors.get(`${state.player.x},${state.player.y}`);
+    const door = intoIt(state.player.x, state.player.y, state.player.dir)
+      ? doors.get(`${state.player.x},${state.player.y}`) : null;
     if (door) {
+      held.clear();
       enterDoor(door);
       save();
       changed();
@@ -1320,6 +1367,7 @@ export function createEngine(canvas, onChange, mini = null) {
     fixed = areaOf(areaId).tiles ?? null;
     warps = warpMap(areaOf(areaId));
     doors = doorMap(areaOf(areaId));
+    enter = enterSet(areaOf(areaId));
     elev = areaOf(areaId).elev ?? null;
     cur = 0;
     high = false;

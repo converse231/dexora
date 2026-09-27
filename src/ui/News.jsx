@@ -11,6 +11,28 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-04",
+    date: "October 2026",
+    title: "Seaside Road",
+    items: [
+      ["A new map", "Pond & Shore is now Seaside Road: Route 110 from Ruby and Sapphire, tile for tile, with the Seaside Cycling Road raised over the sea. Ride it through its two gatehouses, or surf underneath it."],
+      ["Doors wait for you", "Doors, cave mouths and stairs only take you through when you walk into them, so you no longer get pulled inside just by walking past. Ladders still work the moment you step on."],
+      ["Firmer water", "Rocks in the river on Monsoon Trail and the edges of its waterfalls are solid now, so you can't surf through them."],
+    ],
+  },
+  {
+    id: "2026-10-03",
+    date: "October 2026",
+    title: "Four new rare forms",
+    items: [
+      ["Gold", "Cast in gold, with a sheen and glints running over it. The rarest form in the game."],
+      ["Shadow", "Sealed in darkness, with violet flame rising around it."],
+      ["Chaotic", "Unstable energy: a red storm turns around it, and now and then it flips to a black-and-yellow negative."],
+      ["Projection", "A projection of light, standing in the beam of an emitter, scanlines and all."],
+      ["Just as rare as before", "There are twelve forms now, and one Pokémon in about 18 still wears one. Each form got a little rarer to make room, so meeting any form is as common as it was. Every new form has its own honey in the shop."],
+    ],
+  },
+  {
     id: "2026-10-02",
     date: "October 2026",
     title: "Trading, bigger",

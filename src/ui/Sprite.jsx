@@ -82,8 +82,8 @@ export const spriteUrl = (id, variant = null) =>
    slot sat empty for most of a second, and a quick throw could catch it
    before it was ever drawn. A map's table is a few hundred plain sprites of
    about 1KB each, fetched in idle time a handful at a time so a walk never
-   waits on it, and each URL once per page. Variants are not guessed (eight
-   folders, rolled at 1 in 100+); the battle asks for those eagerly.
+   waits on it, and each URL once per page. Variants are not guessed (twelve
+   tiers, rolled at 1 in 150+); the battle asks for those eagerly.
    The Images are KEPT: the host answers `no-cache` (Vite and Vercel both
    revalidate), and a dropped one left the battle's <img> waiting on a round
    trip anyway - measured, 1 in 8 drawn at 150ms. A live Image holds the
@@ -169,6 +169,54 @@ export function VariantFx({ id, variant, art = null }) {
     );
   }
   if (variant === "astral") return <span className="astral-aura" aria-hidden="true" />;
+  /* THE FOUR THAT JOINED TOGETHER (Gold, Shadow, Chaotic, Projection), each a
+     filter that carries the tier on a bare `<img>` plus the layers here, which
+     are the MOTION. Designed in the Variant Lab and cut down for the Dex grid,
+     where forty of them can be on screen: a handful of elements each, moving
+     transform and opacity only, and nothing that animates the sprite itself
+     (`.mon`'s appear and absorb own its animation). `--art` is the jar for a
+     coloured honey, as with the foil. */
+  if (variant === "gold" || variant === "chaotic" || variant === "projection" || variant === "shadow") {
+    const url = `url(${art ?? spriteUrl(id)})`;
+    if (variant === "gold") {
+      return (
+        <>
+          <span className="gold-shine" style={{ "--art": url }} aria-hidden="true"><i /></span>
+          <span className="gold-glint" aria-hidden="true"><i /><i /><i /></span>
+        </>
+      );
+    }
+    if (variant === "shadow") {
+      return (
+        <>
+          <span className="shadow-aura" aria-hidden="true"><i /><i /><i /><i /></span>
+          <span className="shadow-aura front" aria-hidden="true"><i /><i /></span>
+        </>
+      );
+    }
+    if (variant === "chaotic") {
+      /* Red energy round it, and the black-and-yellow negative is the
+         glitch: a difference layer masked to the creature, and one slice of
+         it torn sideways for a frame. */
+      return (
+        <>
+          <span className="chaos-core" aria-hidden="true" />
+          <span className="chaos-vortex" aria-hidden="true" />
+          <span className="chaos-shards" aria-hidden="true"><i /><i /><i /><i /></span>
+          <span className="chaos-neg" style={{ "--art": url }} aria-hidden="true" />
+          <span className="chaos-cut" style={{ "--art": url }} aria-hidden="true" />
+        </>
+      );
+    }
+    return (
+      <>
+        <span className="proj-beam" aria-hidden="true" />
+        <span className="proj-base" aria-hidden="true" />
+        <span className="proj-lines" style={{ "--art": url }} aria-hidden="true"><i /></span>
+        <span className="proj-cut" style={{ "--art": url }} aria-hidden="true" />
+      </>
+    );
+  }
   if (variant === "shiny") {
     return (
       <span className="shiny-spark" aria-hidden="true">
@@ -209,7 +257,14 @@ const REVEAL = {
   astral: "implode", noir: "implode",
   holo: "scan", showdown: "scan",
   glitched: "tear",
+  gold: "burst", shadow: "implode", chaotic: "tear", projection: "scan",
 };
+
+/* THE TIERS THE BATTLE DRAWS THROUGH `VariantFx`. The older four (Shiny,
+   Holo, Astral, Origin) are hand-rolled in Encounter.jsx and predate the
+   component; everything since goes through it, so a battle and a Box row can
+   never draw one tier two ways. */
+export const SCENE_FX = new Set(["glitched", "gold", "shadow", "chaotic", "projection"]);
 
 export function TierReveal({ id, variant }) {
   const motion = REVEAL[variant];

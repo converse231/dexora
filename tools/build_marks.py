@@ -48,7 +48,8 @@ SIZE = 24
 SHEET_ORDER = ["origin", "shiny", "astral", "complete"]
 # Everything the game asks for. `src/ui/Marks.jsx` names the same set.
 ICONS = ["origin", "shiny", "holo", "astral", "glitched", "vivid", "noir",
-         "showdown", "complete", "legendary", "research", "alpha"]
+         "showdown", "gold", "shadow", "chaotic", "projection",
+         "complete", "legendary", "research", "alpha"]
 
 # THE SHAPE HAS TO CARRY IT, NOT THE COLOUR. Eight of these sit in a row on a
 # 76px Dex tile at 9px, and a row of coloured dots is unreadable to anybody who
@@ -64,6 +65,18 @@ STAND_IN = {
                                   (6, 38), (40, 38)]),
     "noir":     ((225, 228, 236), None),          # a half-disc, drawn below
     "showdown": ((120, 210, 255), [(24, 12), (88, 50), (24, 88)]),
+    # The four that joined together, and again none shares an outline with
+    # the rest: a crown, a flame, a cross of shards and a beam over its base.
+    "gold":       ((242, 188, 52), [(8, 80), (8, 26), (30, 50), (50, 12), (70, 50),
+                                    (92, 26), (92, 80)]),
+    "shadow":     ((150, 80, 240), [(50, 4), (66, 30), (82, 50), (86, 70), (74, 90),
+                                    (50, 97), (26, 90), (14, 70), (20, 48), (34, 62),
+                                    (36, 38)]),
+    "chaotic":    ((230, 36, 44), [(18, 6), (50, 36), (82, 6), (94, 18), (64, 50),
+                                   (94, 82), (82, 94), (50, 64), (18, 94), (6, 82),
+                                   (36, 50), (6, 18)]),
+    "projection": ((90, 228, 250), [(8, 6), (92, 6), (60, 70), (84, 94), (16, 94),
+                                    (40, 70)]),
 }
 
 

@@ -117,7 +117,9 @@ EMERALD = "https://raw.githubusercontent.com/pret/pokeemerald/master"
 # `fortree` is Route 119's, which is Monsoon Trail - appended LAST, so every
 # block before it keeps its base; the ones after move, and every copied map
 # rebases from route.json when `npm run map` runs, which is the rule.
-EM_SECONDARY = [("lavaridge", "general"), ("lilycove", "general"), ("fortree", "general")]
+# `mauville` is Route 110's, in the Pond & Shore slot - appended after it.
+EM_SECONDARY = [("lavaridge", "general"), ("lilycove", "general"), ("fortree", "general"),
+                ("mauville", "general")]
 
 # pokeemerald PRIMARIES we bake WHOLE, because a map drawn against one
 # references its metatiles directly and ours are somebody else's. Ids 0-639
@@ -212,14 +214,26 @@ TOP_ONLY = ((4, True),)
 LAYER_COVERED = 1
 
 
+# MB_LADDER, the same number in pokefirered and pokeemerald. A ladder is taken
+# the moment you step on it; every other warp and door is walked INTO - the
+# engine asks `route.json`'s `ladders` which is which.
+MB_LADDER = 0x61
+# The ladders among the last attribute file `layer_types` read, as local ids -
+# every bake block reads one and records them beside the tiles that hide you.
+LADDERS = []
+
+
 def layer_types(rel, n, cache, root=None, u32=True):
     try:
         b = io.open(fetch(f"{rel}/metatile_attributes.bin", cache, root=root), "rb").read()
     except Exception:
+        LADDERS.append([])
         return None                       # no attributes: treat nothing as covered
+    raw = np.frombuffer(b, dtype="<u4" if u32 else "<u2")[:n]
+    LADDERS.append([i for i, v in enumerate(raw) if int(v) & 0x1FF == MB_LADDER])
     if u32:
-        return ((np.frombuffer(b, dtype="<u4")[:n] >> 29) & 3)
-    return ((np.frombuffer(b, dtype="<u2")[:n] >> 12) & 0xF)
+        return ((raw >> 29) & 3)
+    return ((raw >> 12) & 0xF)
 
 
 def overhang_sheet(mt, tiles, pals, cols, lay):
@@ -356,6 +370,7 @@ def build_tileset():
     top, hides_here = overhang_sheet(mt, tiles, pals, cols,
                                  layer_types(base, len(mt), "general-attr.bin"))
     hiding_ids = list(hides_here)                      # the primary starts at id 0
+    ladder_ids = list(LADDERS[-1])
 
     # Community boulders, composited over our own rocky ground and appended as
     # extra atlas rows. Keeping them in the same atlas means one image, one
@@ -410,6 +425,7 @@ def build_tileset():
                         f"sec/{name}/attr.bin"))
         top = append_rows(top, sheet_top)
         hiding_ids += [base + i for i in hides_here]
+        ladder_ids += [base + i for i in LADDERS[-1]]
         sets[name] = base
         print("  %-18s %3d metatiles at base %d  (on %s)"
               % (name, len(smt), base, prim))
@@ -426,6 +442,7 @@ def build_tileset():
                         f"em/{name}/attr.bin", root=EMERALD, u32=False))
         top = append_rows(top, sheet_top)
         hiding_ids += [base + i for i in hides_here]
+        ladder_ids += [base + i for i in LADDERS[-1]]
         sets[name] = base
         print("  %-18s %3d metatiles at base %d  (pokeemerald, on %s)"
               % (name, len(smt), base, prim))
@@ -440,6 +457,7 @@ def build_tileset():
                         f"pri/{prim}/attr.bin"))
         top = append_rows(top, sheet_top)
         hiding_ids += [base + i for i in hides_here]
+        ladder_ids += [base + i for i in LADDERS[-1]]
         sets["fr_" + prim] = base
         print("  fr_%-15s %3d metatiles at base %d  (pokefirered primary)"
               % (prim, len(pmt), base))
@@ -454,6 +472,7 @@ def build_tileset():
                         f"em/{prim}/attr.bin", root=EMERALD, u32=False))
         top = append_rows(top, sheet_top)
         hiding_ids += [base + i for i in hides_here]
+        ladder_ids += [base + i for i in LADDERS[-1]]
         sets["em_" + prim] = base
         print("  em_%-15s %3d metatiles at base %d  (pokeemerald primary)"
               % (prim, len(pmt), base))
@@ -936,6 +955,7 @@ def build_tileset():
         # walkable; we make it solid"), and the copy reached it from the other
         # side, reported as standing on top of the machinery.
         "hides": sorted(hiding_ids),
+        "ladders": sorted(ladder_ids),
         # THE SAFARI ZONE IS AN EMERALD MAP, so both halves of its art are
         # pokeemerald's: metatile ids below 512 come from Emerald's own General
         # primary and the rest from Lilycove. Neither shares an id with
@@ -961,6 +981,9 @@ def build_tileset():
         # the way the Safari Zone is. Its floor is the same plain grass.
         "monsoon": {"general": sets["em_general"], "fortree": sets["fortree"],
                     "split": 512, "floor": sets["em_general"] + 1},
+        # SEASIDE ROAD is Route 110 in the pond slot: General plus Mauville.
+        "route110": {"general": sets["em_general"], "mauville": sets["mauville"],
+                     "split": 512, "floor": sets["em_general"] + 1},
     }
     with io.open(os.path.join(PUB, "tilesets", "route.json"), "w") as f:
         json.dump(meta, f, indent=2)
@@ -1194,7 +1217,9 @@ def build_ground():
     os.makedirs(os.path.join(PUB, "battle"), exist_ok=True)
 
     grounds = {
-        "meadow": 1, "pond": 1,                      # grass, from the primary
+        "meadow": 1,                                 # grass, from the primary
+        # Route 110, an Emerald map: Emerald's grass, as Monsoon Trail's.
+        "pond": meta["route110"]["floor"],
         # Monsoon Trail is an Emerald map, so Emerald's grass, as the Safari's.
         "woods": meta["monsoon"]["floor"],
         "ridge": meta["cave"]["floor"],

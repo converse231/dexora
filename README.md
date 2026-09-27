@@ -2947,6 +2947,33 @@ animated one moves, which no other tier does. Both need the same reframing
 actually felt - a fifth tier changes the completion rosette for every species,
 and the ladder's SPREAD is the thing that took two attempts to get right.
 
+### Twelve tiers, and a variant is no more common
+
+Gold, Shadow, Chaotic and Projection joined the ladder together. Each one is a
+different kind of rare, the same argument that lets the first eight stand side
+by side:
+
+| | the tell | odds |
+|---|---|---|
+| **Gold** | **cast in gold**: a metal re-cast of the art, with a sheen and glints | 1/360, the rarest |
+| **Shadow** | **sealed in darkness**: tinted violet, with flame rising around it | 1/275 |
+| **Chaotic** | **unstable energy**: a red storm, and a black-and-yellow negative for a frame | 1/240 |
+| **Projection** | **a projection of light**: cyan and scanlined, standing in a beam | 1/195 |
+
+Projection was called Holographic in the design pass. It was renamed before it
+shipped, because Holo already exists and the two would be confused on a
+nameplate.
+
+**The rate held, and the rungs moved.** Four more tiers at the old odds would
+have taken any variant from 1 in 18 encounters to 1 in 12. So every existing
+rung went up by about 1.45x (Vivid is 1/155, Showdown 1/305) and the new tiers
+went in among them. For a species that cannot wear Origin, which is most of the
+dex, a variant is 1 in 20.9, against 1 in 21.0 before.
+
+Gold sits alone above the old 2.0x spread, because it was asked to be the one
+you chase. Bounties, honey jars and the Rare forms page all derive from
+`TIER_ODDS`, so none of them needed editing.
+
 ### The hybrid data model
 
 **Trigger: a box that is slow to render or slow to save. Not a species count.**
