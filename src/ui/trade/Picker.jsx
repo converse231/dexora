@@ -43,7 +43,7 @@ const SORTS = {
    `limit(species)` caps picks of one species (`keepLast`). */
 export default function Picker({
   mons, picked, max, onChange, empty, prefer = "low", missing = null,
-  keyFn = keyOf, query = "", sort: sort0 = "dex", limit = null,
+  keyFn = keyOf, query = "", sort: sort0 = "dex", limit = null, tray: showTray = true,
 }) {
   const [q, setQ] = useState(query);
   const [only, setOnly] = useState(null);
@@ -122,7 +122,7 @@ export default function Picker({
             onClick={() => setOnly((o) => (o === id ? null : id))}>{name}</button>
         ))}
       </div>
-      {!single && tray.length > 0 && (
+      {showTray && !single && tray.length > 0 && (
         <div className="pk-tray" aria-label="Picked">
           <span className="pk-count">{tray.length}/{max}</span>
           {tray.map((m) => {
