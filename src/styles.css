@@ -4386,7 +4386,15 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .pad { display: none; }
 
 @media (hover: none) and (pointer: coarse) {
+  /* ONE SIZE, THE FACE BUTTONS', AND EVERYTHING ELSE IN PROPORTION. The pad
+     was fixed at the smallest phone's sizes, so a 390px phone left 54px of its
+     row unused and the buttons read as small - reported. `--pad-c` grows with
+     the screen: 62px at 320-340px (where the row is full), the tablet's 74px
+     from ~400px. Its budget: the row is the viewport less ~52px of page
+     padding, and the pad needs 4.25 x --pad-c + 22px (three D-pad arms at .74
+     of it, two face buttons, the gaps) - so (100vw - 86px) / 4.25 always fits. */
   .pad {
+    --pad-c: clamp(62px, calc((100vw - 86px) / 4.25), 74px);
     display: flex; align-items: flex-end; justify-content: space-between;
     gap: 12px; margin-top: 12px;
     /* Clear of the home indicator on a phone, and of nothing on a tablet. */
@@ -4408,14 +4416,14 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   .pad button:active { transform: translateY(2px); box-shadow: none; }
   .pad button:disabled { opacity: .35; box-shadow: none; }
   .pad button i { font-style: normal; font-size: 9px; letter-spacing: .04em; }
-  .pad button img { width: 22px; height: 22px; image-rendering: pixelated; }
+  .pad button img { width: calc(var(--pad-c) * .355); height: calc(var(--pad-c) * .355); image-rendering: pixelated; }
 
   /* --- directions. A 3x3 so the arms meet at a hub, like a real cross. --- */
   .pad-dir {
-    display: grid; grid-template-columns: repeat(3, 46px);
-    grid-template-rows: repeat(3, 42px); flex: none;
+    display: grid; grid-template-columns: repeat(3, max(46px, calc(var(--pad-c) * .74)));
+    grid-template-rows: repeat(3, max(42px, calc(var(--pad-c) * .68))); flex: none;
   }
-  .pad-d { font-size: 15px; }
+  .pad-d { font-size: calc(var(--pad-c) * .245); }
   .pad-up    { grid-area: 1 / 2; border-radius: 10px 10px 0 0; border-bottom: none; }
   .pad-left  { grid-area: 2 / 1; border-radius: 10px 0 0 10px; border-right: none; }
   .pad-right { grid-area: 2 / 3; border-radius: 0 10px 10px 0; border-left: none; }
@@ -4429,13 +4437,13 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   /* --- actions --- */
   .pad-act { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: none; }
   .pad-mini { display: flex; gap: 8px; }
-  .pad-s { width: 52px; height: 38px; border-radius: 9px; }
+  .pad-s { width: max(52px, calc(var(--pad-c) * .84)); height: max(38px, calc(var(--pad-c) * .6)); border-radius: 9px; }
   .pad-s.on { background: var(--canopy); color: var(--surface); border-color: var(--canopy); }
 
   /* A SITS LOW AND RIGHT OF B, which is the GBA's own diagonal and not styling:
      offsetting them is what stops a thumb rolling off one onto the other. */
   .pad-face { display: flex; align-items: flex-start; gap: 10px; }
-  .pad-a, .pad-b { width: 62px; height: 62px; border-radius: 50%; }
+  .pad-a, .pad-b { width: var(--pad-c); height: var(--pad-c); border-radius: 50%; }
   /* A HIGH AND RIGHT, B LOW AND LEFT. Look at a GBA: the two face buttons sit
      on a diagonal that rises towards the right hand, so A - the one you press
      most - is the upper one and the thumb falls back onto B. This had the
@@ -4443,8 +4451,8 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
      rather than the top of it, and the note explaining the choice described
      the console backwards. Corrected against a photograph of the hardware. */
   .pad-a { margin-top: 0; }
-  .pad-b { margin-top: 18px; }
-  .pad-a b, .pad-b b { font-size: 17px; color: var(--ink); font-weight: 400; }
+  .pad-b { margin-top: calc(var(--pad-c) * .29); }
+  .pad-a b, .pad-b b { font-size: calc(var(--pad-c) * .275); color: var(--ink); font-weight: 400; }
   /* The face labels carry the meaning - "A" alone is only legible to somebody
      who already knows the console - so they are a step up from the mini rows. */
   .pad-a i, .pad-b i { font-size: 9px; }
@@ -4477,13 +4485,6 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
      in, so the clusters grow toward the edges rather than toward each other. */
   @media (min-width: 700px) {
     .pad { gap: 24px; padding-inline: 10px; }
-    .pad-dir { grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 52px); }
-    .pad-d { font-size: 18px; }
-    .pad-a, .pad-b { width: 74px; height: 74px; }
-    .pad-a b, .pad-b b { font-size: 20px; }
-    .pad-s { width: 62px; height: 44px; }
-    .pad button i { font-size: 9px; }
-    .pad button img { width: 26px; height: 26px; }
   }
 }
 
