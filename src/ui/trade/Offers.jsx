@@ -25,19 +25,48 @@ export { keyOf };
    caught - how "they don't have" is answered from a friend's box. */
 export const caughtIds = (dex) => new Set((dex ?? []).flatMap((v, i) => (v === 2 && SPECIES[i] ? [SPECIES[i].id] : [])));
 
-/* A ROW OF SPRITES for one side of an offer. */
-function Side({ mons }) {
+/* AN OFFER AS A TRADE TABLE, the composer's shape: what you give on the
+   left, what you get on the right, every Pokemon big enough to recognise and
+   named. It was two rows of 42px sprites under 9px labels, and which side was
+   which changed between "For you" and "Sent". */
+function Half({ title, mons, get }) {
   return (
-    <span className="of-side">
-      {(mons ?? []).map((m) => (
-        <span key={m.mid} className="of-mon" data-tip={`${label(speciesById(m.species))}, Lv ${m.level}`}>
-          <Sprite id={m.species} variant={m.tier} fx />
-          {m.tier && <span className="tp-tier"><Mark tier={m.tier} size={9} /></span>}
-          {m.alpha && <span className="tp-alpha"><Mark tier="alpha" size={8} /></span>}
-        </span>
-      ))}
-    </span>
+    <div className={`of-half${get ? " get" : ""}`}>
+      <span className="of-label">{title}<i>{(mons ?? []).length}</i></span>
+      <div className="of-mons">
+        {(mons ?? []).map((m, i) => {
+          const name = label(speciesById(m.species));
+          return (
+            <figure key={m.mid ?? i} className={`of-big${m.tier ? ` has-${m.tier}` : ""}`}
+              data-tip={`${name}${m.tier ? ` · ${m.tier}` : ""}${m.alpha ? " · alpha" : ""} · Lv ${m.level}`}>
+              <Sprite id={m.species} variant={m.tier} fx alt={name} />
+              {m.tier && <span className="tp-tier"><Mark tier={m.tier} size={10} /></span>}
+              {m.alpha && <span className="tp-alpha"><Mark tier="alpha" size={9} /></span>}
+              <figcaption><b>{name}</b><i>Lv {m.level}</i></figcaption>
+            </figure>
+          );
+        })}
+      </div>
+    </div>
   );
+}
+const Deal = ({ give, get, past }) => (
+  <div className="of-deal">
+    <Half title={past ? "Gave" : "You give"} mons={give} />
+    <span className="tx-swap" aria-hidden="true">⇄</span>
+    <Half title={past ? "Got" : "You get"} mons={get} get />
+  </div>
+);
+
+// "3h ago" - the server stamps every offer and trade with `at`.
+const RTF = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+function ago(at) {
+  const s = (Date.parse(at) - Date.now()) / 1000;
+  if (!Number.isFinite(s)) return "";
+  for (const [unit, n] of [["day", 86400], ["hour", 3600], ["minute", 60]]) {
+    if (Math.abs(s) >= n) return RTF.format(Math.round(s / n), unit);
+  }
+  return "just now";
 }
 
 /* ONE SIDE OF THE TABLE: what is in it, each a tap to take back, and a "+"
@@ -235,13 +264,14 @@ export function OffersTab({ inbox, sync, onTraded, onOpenTrainer, onCounter }) {
         {incoming.length ? (
           <ul className="of-list">
             {incoming.map((o) => (
-              <li key={o.id} className="of-card">
-                <p className="of-who"><Who name={o.partner} onOpen={onOpenTrainer} /> · “{PRESETS[o.msg] ?? PRESETS[0]}”</p>
-                <div className="of-swap">
-                  <span className="of-label">You get</span><Side mons={o.give} />
-                  <span className="of-label">You give</span><Side mons={o.want} />
-                </div>
-                <div className="tp-actions">
+              <li key={o.id} className="of-card new">
+                <header className="of-head">
+                  <span className="of-who">From <Who name={o.partner} onOpen={onOpenTrainer} /></span>
+                  <span className="of-when">{ago(o.at)}</span>
+                </header>
+                <p className="of-msg">“{PRESETS[o.msg] ?? PRESETS[0]}”</p>
+                <Deal give={o.want} get={o.give} />
+                <div className="tp-actions of-acts">
                   <button type="button" className="ev-go" disabled={busy === o.id} onClick={() => answer(o, true)}>
                     {busy === o.id ? "Trading…" : "Accept"}
                   </button>
@@ -261,12 +291,13 @@ export function OffersTab({ inbox, sync, onTraded, onOpenTrainer, onCounter }) {
           <ul className="of-list">
             {sent.map((o) => (
               <li key={o.id} className="of-card">
-                <p className="of-who">To <Who name={o.partner} onOpen={onOpenTrainer} /> · waiting</p>
-                <div className="of-swap">
-                  <span className="of-label">You give</span><Side mons={o.give} />
-                  <span className="of-label">You get</span><Side mons={o.want} />
-                </div>
-                <div className="tp-actions">
+                <header className="of-head">
+                  <span className="of-who">To <Who name={o.partner} onOpen={onOpenTrainer} /></span>
+                  <span className="of-when">{ago(o.at)}</span>
+                  <span className="of-state">Waiting</span>
+                </header>
+                <Deal give={o.give} get={o.want} />
+                <div className="tp-actions of-acts">
                   <button type="button" className="tp-quiet" disabled={busy === o.id} onClick={() => cancel(o)}>Take back offer</button>
                 </div>
               </li>
@@ -280,11 +311,12 @@ export function OffersTab({ inbox, sync, onTraded, onOpenTrainer, onCounter }) {
           <ul className="of-list">
             {history.map((h) => (
               <li key={h.id} className="of-card done">
-                <p className="of-who">{h.kind === "surprise" ? "Surprise Trade" : "Trade"} with <Who name={h.partner} onOpen={onOpenTrainer} /></p>
-                <div className="of-swap">
-                  <span className="of-label">Gave</span><Side mons={h.gave} />
-                  <span className="of-label">Got</span><Side mons={h.got} />
-                </div>
+                <header className="of-head">
+                  <span className="of-who">{h.kind === "surprise" ? "Surprise Trade" : "Trade"} with <Who name={h.partner} onOpen={onOpenTrainer} /></span>
+                  <span className="of-when">{ago(h.at)}</span>
+                  <span className="of-state done">Done</span>
+                </header>
+                <Deal give={h.gave} get={h.got} past />
               </li>
             ))}
           </ul>
