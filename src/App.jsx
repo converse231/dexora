@@ -22,10 +22,10 @@ import BallRail from "./ui/BallRail.jsx";
 import {
   BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall, keeper,
 } from "./game/items.js";
-import { ItemIcon, eventIcon } from "./ui/Sprite.jsx";
+import { ItemIcon, eventIcon, preloadSprites } from "./ui/Sprite.jsx";
 import { EVENT_NAME } from "./game/events.js";
 import {
-  biomeFor, levelFromXp, TIERS, dexIndex,
+  biomeFor, levelFromXp, TIERS, dexIndex, tableFor,
 } from "./game/biomes.js";
 import DexSheet from "./ui/DexSheet.jsx";
 import { modalOpen } from "./ui/modal.js";
@@ -442,6 +442,13 @@ export default function App({
 
   const caught = st ? st.dex.filter((v) => v === 2).length : 0;
   const level = levelFromXp(st?.xp ?? 0);
+  /* The map's encounter sprites, fetched before anything is met - see
+     `preloadSprites`. On the map and the level, the two things the table is. */
+  const areaId = st?.areaId;
+  useEffect(() => {
+    const b = biomeFor(areaId);
+    return b ? preloadSprites(tableFor(b, level).map(([id]) => id)) : undefined;
+  }, [areaId, level]);
 
   /* The claim says what it paid, in the one alert the game uses. Without it a
      claim is a button that greys itself out and three numbers that moved

@@ -77,6 +77,36 @@ export const onSpriteError = (ev) => {
 export const spriteUrl = (id, variant = null) =>
   new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png`, document.baseURI).href;
 
+/* WARM THE CACHE WITH WHAT THIS MAP CAN THROW AT YOU. An encounter's sprite
+   was fetched only when the battle mounted it - on a phone, the Pokemon's
+   slot sat empty for most of a second, and a quick throw could catch it
+   before it was ever drawn. A map's table is a few hundred plain sprites of
+   about 1KB each, fetched in idle time a handful at a time so a walk never
+   waits on it, and each URL once per page. Variants are not guessed (eight
+   folders, rolled at 1 in 100+); the battle asks for those eagerly.
+   The Images are KEPT: the host answers `no-cache` (Vite and Vercel both
+   revalidate), and a dropped one left the battle's <img> waiting on a round
+   trip anyway - measured, 1 in 8 drawn at 150ms. A live Image holds the
+   page's copy, which the next <img> of that URL takes without asking. */
+const warmed = new Map();
+export function preloadSprites(ids) {
+  const queue = ids.filter((id) => !warmed.has(id));
+  if (!queue.length) return () => {};
+  const idle = window.requestIdleCallback ?? ((f) => setTimeout(f, 200));
+  const stop = window.cancelIdleCallback ?? clearTimeout;
+  let handle = 0;
+  const batch = () => {
+    for (const id of queue.splice(0, 12)) {
+      const img = new Image();
+      img.src = spriteUrl(id);
+      warmed.set(id, img);
+    }
+    if (queue.length) handle = idle(batch);
+  };
+  handle = idle(batch);
+  return () => stop(handle);
+}
+
 /* THE MOVING HALF OF A TIER, as one component.
 
    THREE of the eight tiers are nothing but artwork - Origin's 1996 sprite,
@@ -201,8 +231,11 @@ export function TierReveal({ id, variant }) {
    Off by default, because the wrapper changes the DOM shape and every existing
    caller is laid out against a bare `<img>`. */
 export default function Sprite({
-  id, variant = null, className = "", alt = "", fx = false,
+  id, variant = null, className = "", alt = "", fx = false, eager = false,
 }) {
+  /* Lazy is right for a Box of hundreds; the battle's one Pokemon is the
+     point of the screen and must not wait for layout to be asked for. */
+  const load = eager ? { loading: "eager", fetchpriority: "high" } : { loading: "lazy" };
   /* THE ONE TIER THAT IS NOT AN IMAGE. A strip in an `<img>` is eight
      creatures stacked in a column, so this has to be a box with a background
      - and it goes BEFORE the `fx` branch, because `VariantFx` returns null for
@@ -224,7 +257,7 @@ export default function Sprite({
           className={variant ? `sprite-${variant}` : ""}
           src={spriteUrl(id, variant)}
           alt={alt}
-          loading="lazy"
+          {...load}
           data-plain={id}
           onError={onSpriteError}
         />
@@ -237,7 +270,7 @@ export default function Sprite({
       className={`${variant ? `sprite-${variant} ` : ""}${className}`.trim()}
       src={spriteUrl(id, variant)}
       alt={alt}
-      loading="lazy"
+      {...load}
       data-plain={id}
       onError={onSpriteError}
     />

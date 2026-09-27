@@ -2067,7 +2067,11 @@ canvas {
    padding, which on the scroller would have been height (see Dex.jsx). */
 .dexgrid-in {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* As many as fit at >= 76px: FOUR in the desktop's 360px rail and a phone's
+     portrait one, as before - and more when the rail is wide (sideways, a
+     tablet), where a fixed four stretched each tile to 200-270px wide and
+     84px tall. `useRows` reads the resolved count off the computed style. */
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   grid-auto-rows: 84px; gap: 7px;
   align-content: start;
 }
@@ -6320,4 +6324,85 @@ button:disabled { transition: none; }
      scrolls inside itself (the desktop column let it grow to fill). */
   .rail { height: auto; min-height: 0; }
   .dexgrid, .boxlist, .arealist, .shopscroll, .trscroll { max-height: 70dvh; flex: none; }
+}
+
+/* ================================================================ WIDE RAIL
+   The rail is its own size container, so its lists answer to how wide IT is,
+   not the device: a 360px desktop column, the full width of a sideways phone
+   (700-900px) or of a tablet. The Box, Map, Shop and You lists were single
+   rows stretched across all of it - a 1,100px Box row with its name at one
+   end and its buttons at the other. From 620px they are cards in columns. */
+.rail { container: rail / inline-size; }
+@container rail (min-width: 620px) {
+  .boxlist, .arealist, .shoplist, .trlist {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    align-content: start;
+    /* Each card its own height: a short row stretched to an Eevee's (seven
+       branches) read as a card with a hole in it. */
+    align-items: start;
+  }
+}
+
+/* The bag is a bottom sheet; on a wide screen it was a full-width strip with
+   its tiles bunched in one corner. A readable width, centred. */
+@media (min-width: 760px) {
+  .bag-card { max-width: 720px; margin-inline: auto; border-radius: 18px 18px 0 0; }
+}
+
+/* ================================================================ SHORT SCREENS
+   A phone held sideways is 360-430px tall, and a dialog built as a tall
+   column either overflows it or spends half of it on a header. Measured at
+   844x390: the Dex entry's header took 185 of 390px, the Box preview's Close
+   sat 145px below the screen, and the sell confirmation (488px) had its
+   buttons off screen. Below 540px tall they go side by side instead - the
+   picture on the left, the rest on the right - and fill the height. */
+@media (max-height: 540px) {
+  .sheet { padding: 8px; }
+
+  /* THE DEX ENTRY: portrait and name down the left, tabs and body right. */
+  .sheet-card, .sheet-card.tabbed {
+    width: min(880px, 100%); height: calc(100dvh - 16px); max-height: none;
+    display: grid; grid-template-columns: minmax(190px, 32%) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto; column-gap: 16px;
+    padding: 12px 14px;
+  }
+  /* Stacked: portrait over the name. Side by side in a ~250px column, the
+     name ran under the close button. */
+  .sheet-card > .sheet-top {
+    grid-column: 1; grid-row: 1 / -1; align-self: start;
+    flex-direction: column; align-items: flex-start;
+  }
+  .sheet-card > .sheet-tabs { grid-column: 2; grid-row: 1; }
+  .sheet-card > .sheet-body { grid-column: 2; grid-row: 2; }
+  .sheet-card > .sheet-actions { grid-column: 2; grid-row: 3; }
+
+  /* THE BOX PREVIEW: art left, name and stats right, Close always in view. */
+  .preview {
+    width: min(700px, calc(100vw - 16px)); max-height: calc(100dvh - 16px);
+    grid-template-columns: minmax(180px, 38%) minmax(0, 1fr); align-items: start;
+  }
+  .preview > .pv-art { grid-column: 1; grid-row: 1 / span 3; height: 100%; min-height: 170px; }
+  .preview > :not(.pv-art) { grid-column: 2; }
+
+  /* THE CONFIRMATION: the list gives up height, the buttons never do. */
+  .confirm { max-height: calc(100dvh - 16px); display: flex; flex-direction: column; }
+  .confirm .cf-manifest { max-height: none; flex: 0 1 auto; min-height: 56px; }
+}
+
+/* UNDER 420px TALL (a 740x360 phone sideways) side by side is still not
+   enough: the preview's seven stat rows and the sell sheet's three summary
+   lines pushed Close and Sell below the screen. The stats go two columns and
+   the summary goes one row; the key hint (there is no keyboard) goes. */
+@media (max-height: 420px) {
+  .preview .pv-stats { grid-template-columns: 1fr 1fr; column-gap: 14px; }
+  .preview .pv-stats > div { grid-template-columns: 52px 1fr; gap: 6px; }
+  .preview .pv-total { grid-column: 1 / -1; }
+  .confirm .cf-lines { grid-template-columns: 1fr 1fr; }
+  .confirm .cf-line:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .confirm .cf-note { margin-bottom: 8px; }
+  .confirm .cf-keys { display: none; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .cf-pickall button { min-height: 36px; min-width: 44px; }
 }
