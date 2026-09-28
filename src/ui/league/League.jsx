@@ -23,7 +23,7 @@ import { useModalLock } from "../modal.js";
 import Sprite from "../Sprite.jsx";
 import Types from "../Types.jsx";
 import Picker, { keyOf } from "../trade/Picker.jsx";
-import Fight, { areaFor } from "./Fight.jsx";
+import Fight from "./Fight.jsx";
 import { standing, tuneOf } from "./progress.js";
 import Ranked from "./Ranked.jsx";
 import { CHAR_PIC } from "../../game/ranked.js";
@@ -281,6 +281,7 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
   const [pick, setPick] = useState(null);    // { o, kind }
   const [fight, setFight] = useState(null);  // { o, kind, team, n }
   const [editing, setEditing] = useState(null);   // the defense team slot being edited
+  const [nonce, setNonce] = useState(0);          // a ranked battle closed: the Ranked tab reloads its standing
   const ranked = regionId === RANKED;
   const ri = LEAGUES.findIndex((r) => r.id === regionId);
   const region = LEAGUES[ri], rs = st[ri];
@@ -338,7 +339,8 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
   /* A RANKED BATTLE (6b): refereed on the server, so the fight holds only the
      view it is sent and asks the server for every turn. */
   const startRanked = (data, again) => setFight({
-    o: { id: `ranked:${data.id}`, name: data.opponent.username, pic: CHAR_PIC[data.opponent.char] ?? CHAR_PIC.red },
+    o: { id: `ranked:${data.id}`, name: data.opponent.username,
+      pic: data.opponent.pic ?? CHAR_PIC[data.opponent.char] ?? CHAR_PIC.red, rating: data.opponent.rating },
     kind: "ranked", n: (fight?.n ?? 0) + 1, again,
     mons: data.mine,
     remote: {
@@ -395,25 +397,25 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
           <TeamPick o={pick.o} kind={pick.kind} box={box} last={team} beaten={beaten} steps={steps} onFight={startFight} />
         ) : ranked ? (
           <Ranked box={box} signedIn={signedIn} editing={editing} setEditing={setEditing}
-            onPractice={startPractice} onRanked={startRanked} />
+            onPractice={startPractice} onRanked={startRanked} nonce={nonce} onDefense={engine.setDefense} />
         ) : (
           <>
-            <section className={`lg-hero area-${areaFor(region.gyms[0].type)}${rs.open ? "" : " shut"}`}>
-              <div className="lg-hero-text">
-                <span className="lg-kicker">Pokémon {region.game}</span>
+            <section className={`lg-hero${rs.open ? "" : " shut"}`}>
+              <span className="lg-kicker">Pokémon {region.game}</span>
+              <div className="lg-hero-title">
                 <h2>{region.name}</h2>
-                <p>{rs.open
-                  ? rs.cleared ? `Cleared - every ${badgeWord(region).slice(0, -1).toLowerCase()} and the League.`
-                    : `${rs.badges} of ${region.gyms.length} ${badgeWord(region)} · then the League`
-                  : rs.why}</p>
+                <ol className="lg-case" aria-label={`${region.name} ${badgeWord(region)}`}>
+                  {region.gyms.map((g, k) => (
+                    <li key={g.id} className={rs.gyms[k].won ? "won" : ""} data-tip={g.badge}>
+                      <img src={asset(`badges/${g.id}.png`)} alt={`${g.badge}${rs.gyms[k].won ? "" : " (not won)"}`} loading="lazy" />
+                    </li>
+                  ))}
+                </ol>
               </div>
-              <ol className="lg-case" aria-label={`${region.name} ${badgeWord(region)}`}>
-                {region.gyms.map((g, k) => (
-                  <li key={g.id} className={rs.gyms[k].won ? "won" : ""} data-tip={g.badge}>
-                    <img src={asset(`badges/${g.id}.png`)} alt={`${g.badge}${rs.gyms[k].won ? "" : " (not won)"}`} loading="lazy" />
-                  </li>
-                ))}
-              </ol>
+              <p>{rs.open
+                ? rs.cleared ? `Cleared - every ${badgeWord(region).slice(0, -1).toLowerCase()} and the League.`
+                  : `${rs.badges} of ${region.gyms.length} ${badgeWord(region)} · then the League`
+                : rs.why}</p>
             </section>
 
             <h3 className="lg-section">{region.id === "alola" ? "Island Kahunas" : "Gyms"}</h3>
@@ -450,9 +452,10 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
           badge={fight.kind === "leader" ? { id: fight.o.id, name: fight.o.badge } : null}
           ai={AI_FOR[fight.kind] ?? 3}
           onDone={(result, again) => {
+            if (fight.kind === "ranked") setNonce((n) => n + 1);
             if (again && fight.again) {
               setFight(null);
-              fight.again();        // practice: a fresh blind team from the server
+              fight.again();        // practice or ranked: a fresh blind team from the server
             } else if (again) {
               setFight((f) => ({ ...f, n: f.n + 1, mine: f.mons.map((m) => fighter(m.species, m.level, m.uid)), foe: teamOf(f.o, engine.state.beaten) }));
             } else {

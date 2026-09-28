@@ -11,8 +11,19 @@
 import { newBattle, step, rankedFighter, AIS, mulberry32 } from "./battle.js";
 import { teamProblem, RULES_VERSION, DEFENSE_MIN } from "./ranked.js";
 import { hash } from "./daily.js";
+import { ANCHORS } from "../data/anchors.js";
 
-export { teamProblem, RULES_VERSION, DEFENSE_MIN };
+export { teamProblem, RULES_VERSION, DEFENSE_MIN, ANCHORS };
+
+/* THE ANCHOR TO MEET when no trainer is in the window (6c): the one rated
+   nearest you that you have not met in 24 hours, ties to the earlier in the
+   League's order. Its team is the format's: its species, Lv 100. */
+export function nearestAnchor(rating, met = []) {
+  const open = ANCHORS.filter((a) => !met.includes(a.id));
+  if (!open.length) return null;
+  return open.reduce((best, a) => (Math.abs(a.rating - rating) < Math.abs(best.rating - rating) ? a : best));
+}
+export const anchorTeam = (a) => a.team.map((species, k) => ({ uid: k + 1, species, tier: null, alpha: false }));
 
 export const TURN_SECONDS = 60;       // a decision; after it the AI plays yours
 export const ABANDON_MINUTES = 10;    // no request at all: the battle is lost (db/ranked.sql)

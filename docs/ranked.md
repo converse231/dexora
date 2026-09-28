@@ -16,7 +16,7 @@ the build, the way docs/battles.md's were.
 |---|---|---|
 | Battles | **The challenger plays live against a CPU ghost**: the defender is not there, their team is played by AI 3, and the challenger picks every move as in the League. *(rev 3: rev 2 read "auto battle" as AI against AI; you meant live against the CPU.)* **Real-time person against person is parked** (*Deferred*). | The server steps every turn: about 20 calls a battle (measured, a mean of 17 turns). |
 | Format | **Flat Lv 100, no bans** (species clause kept, see *Format*) | Measured, AI 3 against AI 3 at Lv 100: the six biggest stat totals (Eternamax, Mega Mewtwo X, Mega Rayquaza, Primal Kyogre and Groudon, Ultra Necrozma) beat random teams **100%**; the six best non-legendaries (all Megas) **99%**; the first beats the second **99%** - but two legendaries and four Megas beat the six legendaries **49%**. So the ladder rewards owning strong Pokémon (legendaries caught, Megas raised to Lv 100) and, among strong teams, guessing the match-up. It measures the collection, which is this game's progress. |
-| Rank names | **Beginner, Poké Ball, Great Ball, Ultra Ball, Master Ball** | |
+| Rank names | **Beginner, then the Dex careers: Scout, Ranger, Researcher, Professor, Legend** *(2026-09-29; Poké Ball to Master Ball before - you asked for a concept of the game's own)* | A Pokédex game's career ladder, echoing research. Five ranks where there were four, so the bands are re-cut with Legend at Master Ball's old edge (1400): the top stays the top ~5%, and the new rank splits the crowded middle. |
 | Global top list | **Yes**, from season 1 | The one place a forged save would want to be - see *Moderation*. |
 | Rewards | **Cosmetic only** | |
 | Season | **One month** | |
@@ -104,19 +104,23 @@ moderation (below) and the Help page says so plainly.
   were not there to choose.
 - **Monthly seasons.** At the end ratings move halfway back to 1000, and
   your **season badge** (the highest rank reached) stays on your card.
-- **Rank floors:** reaching a Ball tier in a season keeps you in it until the
+- **Rank floors:** reaching a rank in a season keeps you in it until the
   season ends; divisions can drop.
 
 | Rank | Rating (*provisional*) | Divisions |
 |---|---|---|
 | **Beginner** | the 5 placement battles | - |
-| **Poké Ball** | below 1100 | III, II, I |
-| **Great Ball** | 1100 - 1249 | III, II, I |
-| **Ultra Ball** | 1250 - 1399 | III, II, I |
-| **Master Ball** | 1400 + | the rating, shown ("Master Ball · 1,532") |
+| **Scout** | below 1050 | III, II, I |
+| **Ranger** | 1050 - 1149 | III, II, I |
+| **Researcher** | 1150 - 1249 | III, II, I |
+| **Professor** | 1250 - 1399 | III, II, I |
+| **Legend** | 1400 + | the rating, shown ("Legend · 1,532") |
 
-Bands are fixed for season 1 and re-cut from its distribution (aim: Master
-Ball the top ~5%).
+Bands are fixed for season 1 and re-cut from its distribution (aim: Legend
+the top ~5%). *(2026-09-29: the Ball tiers were Poké below 1100, Great 1100,
+Ultra 1250, Master 1400; the careers keep 1250 and 1400 and split the bottom
+two at 1050 and 1150, since everyone starts at 1000 and Scout would otherwise
+hold most of the ladder.)*
 
 ## Matchmaking
 
@@ -153,7 +157,7 @@ Ball the top ~5%).
 ## Rewards
 
 Cosmetic only: the rank emblem on your trainer card, the season badge, a
-card border for Master Ball, and the list. No money, candy, items or EXP -
+card border for Legend, and the list. No money, candy, items or EXP -
 every income stream is held under a ceiling by a guard, and ranked pay would
 be farmable with a second account.
 
@@ -210,15 +214,16 @@ does.
 
 | Path | Size | Prompt |
 |---|---|---|
-| `public/ranks/beginner.png` | 48×48 | Rank emblem, the first of a matching set of five: a plain round bronze-brown medal with a single small white star in the centre and a short ribbon tail below. Simple and humble. Readable at 24px. |
-| `public/ranks/poke.png` | 48×48 | Rank emblem, second of the set: a shield-shaped badge, red top half and white bottom half split by a black band, a small Poké Ball button at its centre, one green laurel sprig under it. Readable at 24px. |
-| `public/ranks/great.png` | 48×48 | Rank emblem, third of the set: the same shield silhouette in Great Ball colours - blue body with two red stripes on the top half - a white button at the centre, two laurel sprigs. Readable at 24px. |
-| `public/ranks/ultra.png` | 48×48 | Rank emblem, fourth of the set: the same shield in Ultra Ball colours - black top with a yellow H-shaped band - a white button at the centre, two gold laurel sprigs. Readable at 24px. |
-| `public/ranks/master.png` | 48×48 | Rank emblem, the highest of the set: the same shield in Master Ball colours - purple with two pink bosses and a white "M" - a white button at the centre, gold laurels and a small crown on top, a two-pixel sparkle at one corner. Readable at 24px. |
+| `public/ranks/scout.png` | 48×48 | Rank emblem, the first of a matching set of five career badges for a Pokédex researcher: a round bronze medal showing a small pair of binoculars, a short brown ribbon below. Humble, simple shapes. Readable at 24px. |
+| `public/ranks/ranger.png` | 48×48 | Rank emblem, second of the set: the same round medal in forest green with a white leaf-and-compass mark at its centre, a green ribbon below. Readable at 24px. |
+| `public/ranks/researcher.png` | 48×48 | Rank emblem, third of the set: the same medal in sky blue with a white open field notebook and a magnifying glass over it, a blue ribbon below. Readable at 24px. |
+| `public/ranks/professor.png` | 48×48 | Rank emblem, fourth of the set: the medal in deep purple with a white lab-coat collar and a small red-and-white Pokédex at its centre, two silver laurel sprigs. Readable at 24px. |
+| `public/ranks/legend.png` | 48×48 | Rank emblem, the highest of the set: the medal in gold with a white eight-point star, gold laurels round it and a small crown on top, a two-pixel sparkle at one corner. Readable at 24px. |
 | `public/icons/ranked.png` | 32×32 | Tab icon: two crossed swords over a small shield, silver and red on transparent, bold 1px outline, readable at 16px. |
 
-Divisions (III, II, I), the season number and the Master Ball rating are CSS
-on the emblem - no art.
+Divisions (III, II, I), the season number and Legend's rating are CSS on the
+emblem - no art. When these land, `RankMedal` (RankBadge.jsx) draws the file
+in place of the coloured disc - one line.
 
 ## Status
 
@@ -226,7 +231,7 @@ on the emblem - no art.
 |---|---|
 | **6a. Cards and teams** | **done** 2026-09-28 - see below |
 | 6b. The server referees | **done** 2026-09-29 - see below |
-| 6c. The ladder | not started |
+| 6c. The ladder | **done** 2026-09-29 - see below |
 
 **What 6a shipped:**
 
@@ -329,9 +334,90 @@ TEST project and called over HTTP with real tokens (CORS, missing and forged
 tokens, broken bodies, a whole battle). 16 guards shown to fail with their
 bug put back. **Not done here:** deploying - SUPABASE.md §3f.
 
-**Deferred from 6a to 6c:** a warning when you sell, trade or evolve a
-defense-team member. A team whose member is gone already says so on the tab,
-and nothing costs anything until the ladder exists.
+**6c's decisions** *(2026-09-29, taken before building)*:
+
+- **The ratings are the database's.** Elo runs in SQL, inside the same
+  transaction that marks a battle won, lost or abandoned (`ranked_rate`, rows
+  locked in id order so two battles ending together neither lose an update nor
+  deadlock). No client reads or writes `ranked_ratings`; the page reads
+  standings through functions.
+- **Abandoning is a rated loss** - marked lazily as in 6b, rated when marked -
+  or walking away from a losing battle would dodge it.
+- **Seasons are calendar months, UTC** (`2026-10`). A trainer's first battle
+  of a season starts them halfway between their last season's rating and
+  1000 - lazily, no scheduled reset. **Placement is per season**: 5 battles
+  at K 40, shown as Beginner, then K 20; the defender moves at half their K.
+- **Floors** are the rank of your season's peak rating: Ranger 1050,
+  Researcher 1150, Professor 1250, Legend 1400 (the bands' lower edges).
+  Scout has none.
+- **Divisions**: Scout III/II/I split 1000-1049 in 17-point steps (below
+  1000 is III); Ranger and Researcher in 33-point steps, Professor in 50;
+  Legend shows the rating.
+- **The window** is +-100, widened by 50 up to +-400 within one request.
+  Nobody human inside it: the nearest **League anchor** not met in 24 hours.
+- **The anchors** are every region's Elite Four and Champion in the ranked
+  format (their species at Lv 100 with level-up moves - the format, not their
+  game movesets). Each one's rating is SOLVED, never typed: its win rate
+  against random legal teams from the whole dex, as the Elo rating that win
+  rate means against a field of 1000 (`npm run anchors` writes
+  `src/data/anchors.js`; check.mjs replays it exactly). Only the challenger's
+  rating moves in an anchor battle.
+- **The daily cap** is 20 battles a UTC day, anchors included.
+- **The top list** is the current season's top 100 trainers past placement
+  and not voided; a defense team's Pokemon show there once it has defended 10
+  times. Past seasons keep their top 10.
+- **The rank icon** is a plain medal in the career's colour (CSS, no
+  request) until the emblems under *Art* are drawn - no invented pictures.
+  Beginner shows words only. *(It was the Ball's item sprite while the ranks
+  were Balls.)*
+- **On a trainer's profile** the rank comes from `ranked_standing(who)`, not
+  from `trainer_cards` columns: the card's column grants belong to
+  trading.sql, which must not name a column ranked.sql creates.
+- **A voided trainer** cannot start ranked battles that season either.
+
+**What 6c shipped:**
+
+- **`db/ranked.sql`**: `ranked_ratings` (the players' ratings, readable and
+  writable by no client), `ranked_rate` (Elo inside the transaction that
+  finishes a battle; placement K 40, then 20, the defender at half; the floor
+  of the season's peak; rated once), abandonment rated as a loss, soft resets
+  by `ranked_start`, the rating window in `ranked_candidates`, the daily cap,
+  `void_trainer`, and the reads - `my_ranked`, `ranked_top`,
+  `ranked_seasons`, `ranked_friends`, `ranked_standing`, `my_defense_log`.
+  6b's battle functions are defined once, as the ladder has them.
+- **The anchors**: `npm run anchors` solves the 47 Elite Four members and
+  Champions (410-1351, median 937) into `src/data/anchors.js`, carried to the
+  server in `rules.js`. `nearestAnchor` picks when nobody is in the window.
+- **The page**: the Ranked tab's head is your standing (rank with the Ball's
+  sprite, rating, place, record, today's battles, the season's end, and your
+  past seasons' badges on its line); tabs for Teams, Standings (Top 100,
+  Friends, Past seasons), Defense log and Practice; a finished battle shows
+  its points and your new rank. A trainer's profile shows their rank and
+  season badges. `RankBadge` lives outside the League's folder so the Trade
+  Center can use it.
+- **The League page, cleaner** (your call, 2026-09-29): no type-coloured
+  stripe down a card's side, and the region's badges sit on the title's line
+  without rings - the section is half as tall.
+
+**Tested:** check.mjs (the SQL's floors are ranked.js's tiers, the
+divisions, the season dates, the anchors re-solved exactly, the nearest
+anchor); the SQL and handler on a local Postgres (the anchor fallback, the
+exact Elo amounts in and after placement, rated once, the floor, abandoning,
+the window's widening and edge, the daily cap, voiding, teams shown after ten
+defenses, soft resets and badges, blocks, no client touching a rating) and
+on the TEST project by `npm run tradedb`, which also proved 6c migrates over
+a project already on 6b. 19 guards shown to fail with their bug put back.
+
+**Deferred from 6c, built 2026-09-29:** a warning when you sell, trade or
+evolve a defense-team member. The game reads `my_defense` at sign-in and
+after every edit into the engine's VOLATILE `state.defense` (uid -> "Team
+A"), and every press that could break a team says so first: the Box's sell
+dialog (a sweep lists a defender on its own line, unticked, as it does a
+legendary), its evolve dialog (a defender keeps its place and defends as the
+new species), every trading screen, and a star (which spends a defender
+last). A warning, never a refusal: the team is yours to break, and a broken
+one still fails safe (the Teams tab shows the gap; matchmaking skips a team
+with nobody left).
 
 ## Phases (each ends as every phase does: check, build, mutations, a CLAUDE.md rule)
 

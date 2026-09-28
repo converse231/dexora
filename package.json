@@ -21,7 +21,8 @@
     "moves": "node tools/fetch-moves.mjs",
     "battleart": "python tools/build_battle_art.py",
     "gyms": "node tools/tune-gyms.mjs",
-    "edge": "node tools/build-edge.mjs"
+    "edge": "node tools/build-edge.mjs",
+    "anchors": "node tools/rank-anchors.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

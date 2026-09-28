@@ -1282,7 +1282,7 @@ function until(e, what, label, max = 2000) {
     assert.equal(e.state.stale, null, "a saved `stale` latched a fresh session shut");
     assert.equal(e.state.encounter, null, "a saved encounter came back as live");
     const out = e.exportSave();
-    for (const k of ["stale", "rev", "colRev", "encounter", "ask", "cheers"]) {
+    for (const k of ["stale", "rev", "colRev", "encounter", "ask", "cheers", "defense"]) {
       assert.ok(!(k in out), `the exported save carries the session field "${k}"`);
     }
     e.destroy();
@@ -1821,7 +1821,7 @@ await savedField("dry", 123, "lots", 0);
   assert.equal(e.state.outbreak.left, 0, "the last of the outbreak did not count down to 0");
   assert.ok(e.state.worn.some((w) => w.id === "outbreak" && w.event),
     "an outbreak ended without a notice");
-  assert.deepEqual(e.events(), [], "an outbreak that is over still has a card");
+  assert.deepEqual(e.events().filter((ev) => ev.id !== "rift"), [], "an outbreak that is over still has a card");
   assert.equal(e.outbreakArea(), null, "an outbreak that is over still badges a map");
 
   // Off its own map an outbreak takes nothing.
@@ -1953,8 +1953,29 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
   no.star(id);
   no.answerAsk(false);
   assert.equal(no.state.box.length, box.length, "cancelling the star still spent the ordinary ones");
+
+  /* A DEFENDER GOES LAST, AND SAYS SO (docs/ranked.md, the warning deferred
+     from 6c). `setDefense` takes `my_defense` as the server answers it; a
+     member gone from the saved box defends nothing; the lowest-level one here
+     defends, so the star passes over it, and the question names it when a
+     star cannot. Never saved: it is the server's, read again at sign-in. */
+  const { defenders } = await import("../src/game/ranked.js");
+  const teams = [{ slot: 1, team: [{ uid: 1, species: id }, { uid: 77, missing: true }] },
+    { slot: 2, team: [{ uid: 1, species: id }] }];
+  assert.deepEqual(defenders(teams), { 1: "Teams A and B" }, "a defender's teams are misnamed, or a gone one defends");
+  const d = fresh();
+  d.setDefense(teams);
+  d.star(id);
+  assert.ok(!/defends/.test(d.state.ask.body), "the star asked about a defender it did not have to take");
+  d.answerAsk(true);
+  assert.ok(d.state.box.some((m) => m.uid === 1), "the star spent a defender while ordinary ones were left");
+  assert.ok(!("defense" in d.exportSave()), "who defends rode in the save");
+  const forced = fresh({ box: structuredClone(box).slice(0, STAR_COST) });
+  forced.setDefense(teams);
+  forced.star(id);
+  assert.match(forced.state.ask.body, /\(Teams A and B\) defends in ranked/, "a star that must take a defender did not say so");
 }
-console.log("star ok — asks first, spends the lowest ordinary ones and never a keeper, once, only when finished");
+console.log("star ok — asks first, spends the lowest ordinary ones and never a keeper, once, only when finished; a defender last, and named");
 
 /* AN ALPHA, END TO END, through a real step and real throws - it is a flag on
    the encounter that four different places have to read (the flee roll, the
@@ -2190,7 +2211,13 @@ console.log("trade foundation ok — trade fields load clean, locks freeze every
   assert.deepEqual(e.state.rift, { areaId: e.state.areaId, left: RIFT_STEPS },
     "a certain rift did not open");
   assert.ok(e.state.cheers.some((c) => c.kind === "rift"), "a rift opened without a banner");
-  assert.ok(e.riftHere() && e.events().some((ev) => ev.id === "rift"), "an open rift has no card or tint");
+  assert.ok(e.riftHere() && e.events().some((ev) => ev.id === "rift" && ev.open), "an open rift has no card or tint");
+  /* THE RING: open, it drains with the steps the rift has left. */
+  {
+    const ring = e.events().find((ev) => ev.id === "rift");
+    assert.equal(ring.ring, e.state.rift.left / RIFT_STEPS, "an open rift's ring is not the steps it has left");
+    assert.equal(ring.count, e.state.rift.left);
+  }
   assert.equal(e.state.sinceTravel, 0, "opening a rift did not restart the clock");
   // The Events page reads the world through one call; it must be the same rift.
   assert.deepEqual(e.world().rift, e.state.rift, "the Events page sees a different rift");
@@ -2212,7 +2239,21 @@ console.log("trade foundation ok — trade fields load clean, locks freeze every
   leave(e);
   assert.equal(e.state.rift, null, "a rift did not close when it ran out");
   assert.ok(e.state.worn.some((w) => w.id === "rift" && w.event), "a rift closed without a notice");
-  assert.ok(!e.riftHere() && !e.events().some((ev) => ev.id === "rift"), "a closed rift kept its card");
+  assert.ok(!e.riftHere() && !e.events().some((ev) => ev.id === "rift" && ev.open), "a closed rift kept its card");
+  /* AND BEFORE ONE OPENS THE RING IS STILL THERE, filling with the steps on
+     this map toward the one that makes a rift certain (reported from play:
+     that progress was only on the Events page). */
+  {
+    const building = (since) => {
+      e.state.sinceTravel = since;
+      return e.events().find((ev) => ev.id === "rift");
+    };
+    assert.deepEqual([building(0).ring, building(0).open], [0, false], "a fresh map's rift ring is not empty");
+    assert.equal(building(RIFT_SURE / 2).ring, 0.5, "the ring does not fill with the steps on this map");
+    assert.equal(building(RIFT_SURE).ring, 1);
+    assert.equal(building(0).label, "CALM");
+    e.state.sinceTravel = 0;
+  }
 
   // Leaving the map closes it too, and starts the clock again.
   const t = boot({ ...SAVE, rift: { areaId: "meadow", left: 90 }, sinceTravel: 0 }).e;
@@ -2256,7 +2297,7 @@ console.log("purchases ok — whole numbers only, NaN refused");
    right with an engine that reads it wrong is silent. */
 {
   const { AREAS, RAIL, HIGH_ELEV, walkable } = await import("../src/game/map.js");
-  const { LEVEL_XP } = await import("../src/game/biomes.js");
+  const { LEVEL_XP, BIOMES } = await import("../src/game/biomes.js");
   const { SURF_LEVEL } = await import("../src/game/items.js");
   const walk = (e, dir, frames = 40) => {
     const { x, y, } = e.state.player, area = e.state.areaId;
@@ -2312,6 +2353,33 @@ console.log("purchases ok — whole numbers only, NaN refused");
   assert.ok(walk(e, "down"), "walking out of the Mansion went nowhere");
   assert.equal(e.state.areaId, "woods", "the Mansion's front door did not lead back to Monsoon Trail");
   assert.deepEqual([e.state.player.x, e.state.player.y], [home[3], home[4]], "the way back is not the paired tile");
+
+  /* MT MOON'S EXIT LADDER CLIMBS OUT TO THE POWER PLANT (reported from play
+     as a ladder that did nothing): stepped on, as a ladder is, and back
+     through the Power Plant's front door, walked into, as a door is. */
+  {
+    const [mx, my, mto, max_, may] = AREAS.ridge.doors[0];
+    const [px, py, pto, rax, ray] = AREAS.power.doors[0];
+    assert.deepEqual([mto, pto], ["power", "ridge"], "Mt Moon's exit and the Power Plant's door are not a pair");
+    // LEVEL_XP[k] is the XP that reaches level k + 1.
+    const at = (areaId, x, y, lv = 20) => boot({ ...SAVE, areaId, xp: LEVEL_XP[lv - 1], paid: lv, player: { x, y, dir: "up" },
+      field: { repel: { id: "max-repel", steps: 9999 } } }).e;
+    const m = at("ridge", rax, ray);
+    // From the arrival tile beside it, the one step onto the ladder.
+    const toLadder = { "0,-1": "up", "0,1": "down", "-1,0": "left", "1,0": "right" }[`${mx - rax},${my - ray}`];
+    assert.ok(toLadder, "Mt Moon's arrival tile is not beside its exit ladder");
+    walk(m, toLadder);
+    assert.equal(m.state.areaId, "power", "Mt Moon's exit ladder did not reach the Power Plant");
+    assert.deepEqual([m.state.player.x, m.state.player.y], [max_, may], "the Power Plant arrival is not inside its door");
+    walk(m, "down");
+    assert.equal(m.state.areaId, "ridge", "walking out of the Power Plant's front door did not reach Mt Moon");
+    assert.deepEqual([m.state.player.x, m.state.player.y], [rax, ray], "the way back is not beside the exit ladder");
+    // Below the Power Plant's level the ladder stays shut, and says why.
+    const shut = at("ridge", rax, ray, BIOMES.find((b) => b.id === "power").level - 1);
+    walk(shut, toLadder);
+    assert.equal(shut.state.areaId, "ridge", "Mt Moon's exit opened onto a map the level has not reached");
+    assert.ok(shut.state.worn.some((w) => w.id === "door"), "Mt Moon's shut exit said nothing");
+  }
 
   // Below the Mansion's level the door stays shut, and says why.
   const low = boot({ ...SAVE, areaId: "woods", xp: LEVEL_XP[5], paid: 6 }).e;
@@ -2714,14 +2782,35 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
 
   const DIRS = [[0, -1, "up"], [0, 1, "down"], [-1, 0, "left"], [1, 0, "right"]];
 
-  let rode = 0, pairs = 0, brushed = 0;
+  let rode = 0, pairs = 0, brushed = 0, dirs = 0, holes = 0;
   for (const areaId of WARPED) {
   const area = AREAS[areaId];
   pairs += area.warps.length;
   const solidAt = (x, y) => !area.rows[y] || SOLID.includes(area.rows[y][x] ?? "");
   const walkIn = new Set((area.enter ?? []).map(([x, y]) => `${x},${y}`));
-  for (const [ax, ay, bx, by] of area.warps) {
-    for (const [from, to] of [[[ax, ay], [bx, by]], [[bx, by], [ax, ay]]]) {
+  for (const [ax, ay, bx, by, oneWay] of area.warps) {
+    /* A HOLE (a fifth element) drops you and nothing brings you back up
+       through it: the landing is ordinary floor, and stepping onto it again
+       goes nowhere - it went back up, an invisible hole in Frost Hollow. */
+    if (oneWay) {
+      holes++;
+      const land = DIRS.find(([dx, dy]) => !solidAt(bx - dx, by - dy));
+      const [ldx, ldy, ldir] = land;
+      const { e } = boot({
+        ...SAVE, areaId, xp: LEVEL_XP[biomeFor(areaId).level],
+        player: { x: bx - ldx, y: by - ldy, dir: ldir },
+        field: { repel: { id: "max-repel", steps: 9999 } },
+      });
+      e.press(ldir);
+      for (let i = 0; i < 40; i++) tick(16);
+      e.clearHeld();
+      for (let i = 0; i < 20; i++) tick(16);
+      assert.deepEqual([e.state.player.x, e.state.player.y], [bx, by],
+        `${areaId}: stepping onto the landing at ${[bx, by]} took you somewhere - an invisible hole`);
+    }
+    const ways = oneWay ? [[[ax, ay], [bx, by]]] : [[[ax, ay], [bx, by]], [[bx, by], [ax, ay]]];
+    dirs += ways.length;
+    for (const [from, to] of ways) {
       /* Step ONTO the ladder from a neighbour rather than starting on it: a
          warp taken at boot would prove the table and not the step handler.
          A door, cave mouth or stairway is walked INTO - the step has to point
@@ -2777,12 +2866,12 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     }
   }
   }
-  assert.equal(rode, pairs * 2,
-    `only ${rode} of ${pairs * 2} warp directions could be driven`);
+  assert.equal(rode, dirs, `only ${rode} of ${dirs} warp directions could be driven`);
+  assert.ok(holes >= 4, `only ${holes} one-way holes - Frost Hollow's four have stopped being tested`);
   assert.ok(brushed > 0, "no doorway was ever brushed past - the walk-in rule is untested");
   console.log(`warps ok — ${pairs} pairs across ${WARPED.length} areas ` +
-    `(${WARPED.join(", ")}), every one ridden both ways; ${brushed} doorways ` +
-    `stepped onto from the side hold you until you push into them`);
+    `(${WARPED.join(", ")}), every one ridden both ways but ${holes} holes, which only drop you and whose landing ` +
+    `goes nowhere; ${brushed} doorways stepped onto from the side hold you until you push into them`);
 }
 
 /* SEASIDE ROAD'S CYCLING ROAD, driven. Reported from play as a trainer on a
@@ -3139,6 +3228,61 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     "a Potion spent in a battle came back after it or a reload");
   console.log("battle shelf ok — an item turn spends from the bag once, moves rev only, " +
     "a turn using one not held is refused whole, and nothing spent comes back");
+}
+
+/* HOW MANY OF THIS FORM YOU HOLD, on the nameplate (reported from play: a
+   collector wants to know before spending a ball). Counted from the Box for
+   this species IN THIS TIER - an ordinary one is not a Shiny - and frozen at
+   the start like `knownForm`, through a real walk into a real encounter. */
+{
+  const { SPECIES } = await import("../src/data/dex.js");
+  const { TIERS } = await import("../src/game/biomes.js");
+  const box = [];
+  let uid = 1;
+  for (const { id } of SPECIES) {
+    box.push({ uid: uid++, species: id, level: 5 }, { uid: uid++, species: id, level: 6 },
+      { uid: uid++, species: id, level: 7, shiny: 1 });
+  }
+  const { e } = boot({ ...SAVE, box, nextUid: uid });
+  const enc = walkToEncounter(e);
+  assert.ok(enc, "no encounter to count against");
+  const want = e.state.box.filter((m) => m.species === enc.speciesId && (TIERS.find((t) => m[t]) ?? null) === enc.variant).length;
+  assert.equal(enc.ownedForm, want, `the nameplate counts ${enc.ownedForm} of this form; the Box holds ${want}`);
+  assert.equal(enc.ownedForm, enc.variant === "shiny" ? 1 : enc.variant ? 0 : 2,
+    "an ordinary Pokemon counted its species' rare forms, or the other way round");
+  const frozen = enc.ownedForm;
+  e.state.box.push({ uid: 99999, species: enc.speciesId, level: 3, ...(enc.variant ? { [enc.variant]: 1 } : {}) });
+  tick(16, 5);
+  assert.equal(e.state.encounter.ownedForm, frozen, "the count moved mid-encounter");
+  console.log(`owned ok — the nameplate's count is the Box's for that species in that tier (${frozen} ` +
+    `for this ${enc.variant ?? "ordinary"} #${enc.speciesId}), frozen at the start`);
+}
+
+/* A LEAGUE WIN TEACHES (research's `league` task, a legendary's in place of
+   the first ball): credited in `battleEnd` to every Pokemon that fought, on a
+   win and never on a loss. */
+{
+  const { newBattle, fighter, opponent } = await import("../src/game/battle.js");
+  const { topOf } = await import("../src/game/league.js");
+  const { TASKS } = await import("../src/game/research.js");
+  const { LEAGUES } = await import("../src/data/leagues.js");
+  const slot = TASKS.findIndex((t) => t.id === "league");
+  const brock = LEAGUES[0].gyms[0];
+  const box = [{ uid: 1, species: 146, level: 5 }, { uid: 2, species: 16, level: 5 }];
+  const play = (over) => {
+    const { e } = boot({ ...SAVE, box, nextUid: 3 });
+    const b = newBattle([[fighter(146, 5, 1), fighter(16, 5, 2)], opponent(brock.party, topOf(brock.id, {}), (k) => k + 1)], [null, 2]);
+    assert.equal(e.battleBegin(b, { id: brock.id, uids: [1, 2] }), null, "the battle was refused");
+    e.battleStep({ ...b, over });
+    e.battleEnd();
+    return e.state.research;
+  };
+  const lost = play(1);
+  assert.ok(!(lost[146]?.[slot] > 0), "a lost League battle credited the league task");
+  const won = play(0);
+  assert.equal(won[146]?.[slot], 1, "a League win did not credit the legendary that fought");
+  assert.equal(won[16]?.[slot], 1, "a League win did not credit every Pokemon that fought");
+  console.log("league research ok — a League win credits `league` to every Pokemon that fought, a loss credits nothing");
 }
 
 console.log("play ok — the frame loop never stopped");

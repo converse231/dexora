@@ -11,7 +11,7 @@ import {
 import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
   levelFromXp, xpForCatch,
-  rodTable, rodBite,
+  rodTable, rodBite, surfTable,
   rollVariant, pityBoost, TIERS, TIER_TELL, isLegendary, LEGENDARY,
   lockedTiers, wildBand, rollSize, BIOMES, ENCOUNTER_RATE, sizeTag, rollAlpha, alphaSize,
 } from "./biomes.js";
@@ -25,7 +25,7 @@ import {
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
-  riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY,
+  riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
@@ -33,6 +33,7 @@ import {
 } from "./research.js";
 import { cleanTradeFields } from "./trade.js";
 import { isOpen, refusal, capOf, payFor, teamSize, rematchesReady, cleanBeaten, TEAM_MAX } from "./league.js";
+import { defenders, defendNote } from "./ranked.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt } from "./medals.js";
@@ -41,7 +42,7 @@ import {
   evolveState, evoLevel, startingState, dexBonus, catchBounty, levelReward,
   evolutionRow, bestRod, holding, canRun, canSurf, KEY_ITEMS,
   fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
-  stepReward, keeper, alphaCandy, canBike,
+  stepReward, keeper, alphaCandy, canBike, variantOf,
 } from "./items.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
    that froze every catch in the game. `createEngine` has its own
@@ -234,6 +235,7 @@ function freshState() {
     worn: [],
     colRev: 0,                 // bumps when the COLLECTION moves, not the feet
     ask: null,                 // a press that wants confirming - never saved
+    defense: null,             // uid -> "Team A": who defends in ranked - server data, never saved
   };
 }
 
@@ -249,7 +251,7 @@ function freshState() {
 /* `battle` is a League battle in progress (docs/battles.md): never saved, so a
    reload mid-battle is a forfeit with nothing spent. */
 const VOLATILE = ["encounter", "evolution", "fishing", "running", "cheers",
-  "worn", "ask", "rev", "colRev", "stale", "hint", "battle"];
+  "worn", "ask", "rev", "colRev", "stale", "hint", "battle", "defense"];
 const persisted = (s) => {
   const out = { ...s };
   for (const k of VOLATILE) delete out[k];
@@ -708,9 +710,12 @@ export function createEngine(canvas, onChange, mini = null) {
      without this changing would leave the ladders of the map you just left. */
   const warpMap = (area) => {
     const m = new Map();
-    for (const [ax, ay, bx, by] of area.warps ?? []) {
+    for (const [ax, ay, bx, by, oneWay] of area.warps ?? []) {
       m.set(`${ax},${ay}`, [bx, by]);
-      m.set(`${bx},${by}`, [ax, ay]);     // both ways; a one-way ladder is a trap
+      /* Both ways - a one-way ladder is a trap - except a HOLE (a fifth
+         element): you fall through and land on ordinary floor, and a landing
+         that took you back up was an invisible hole (Frost Hollow's four). */
+      if (!oneWay) m.set(`${bx},${by}`, [ax, ay]);
     }
     return m;
   };
@@ -1295,11 +1300,12 @@ export function createEngine(canvas, onChange, mini = null) {
     const biome = biomeFor(state.areaId);
     /* WHAT LIVES IN WHAT YOU ARE RIDING, and neither half needed a new table.
 
-       On water it is the rod's pool - the same species a line reaches, which
-       is what water in this game has always meant and is already balanced. On
-       LAVA it is the map's own table, because the only lava here is Ember
-       Caldera and every resident of Ember is a Fire type; a separate lava list
-       would be that list written twice.
+       On water it is the map's own water-dwellers (`surfTable`: its fitted
+       table's Water types and fish, or the rod's pool where it has too few).
+       It was the rod's pool everywhere, and every lake in the game was Kanto's
+       (reported from Frost Hollow). On LAVA it is the map's own table, because
+       the only lava here is Ember Caldera and every resident of Ember is a
+       Fire type; a separate lava list would be that list written twice.
 
        A rod is granted at Lv 4 and Surf at Lv 20, so `bestRod` always answers
        by the time anyone can be out here. It falls back to the map anyway,
@@ -1319,7 +1325,7 @@ export function createEngine(canvas, onChange, mini = null) {
       const here = tableFor(biome, levelFromXp(state.xp));
       if (ride && ride !== "V") {
         const rod = bestRod(state.bag);
-        const pool = rod && rodTable(rod.id);
+        const pool = surfTable(biome, levelFromXp(state.xp), rod?.id);
         startEncounter(pool && pool.length ? pool : here, "surf");
       } else {
         startEncounter(here, ride ? "surf" : undefined);
@@ -1514,6 +1520,10 @@ export function createEngine(canvas, onChange, mini = null) {
     const knownForm = variant
       ? (state[variant]?.[at] ?? 0) === 1
       : known;
+    /* HOW MANY OF THIS FORM YOU HOLD, beside the ball on the nameplate - the
+       Box's count of this species in this tier (ordinary counts ordinary).
+       Frozen with `knownForm`, so it does not tick up mid-catch. */
+    const ownedForm = state.box.reduce((n, m) => n + (m.species === sp.id && variantOf(m) === variant), 0);
     /* Its own roll beside the tier's - see `rollAlpha` - so an alpha can be a
        Shiny too. A BOOLEAN, never 1/0: panels write `enc.alpha && <x/>`, and a
        0 there renders the digit "0" in the battle. The box entry stores 1. */
@@ -1525,6 +1535,7 @@ export function createEngine(canvas, onChange, mini = null) {
       types: sp.types,
       known,
       knownForm,
+      ownedForm,
       variant,
       /* The same word as four booleans, so a panel can ask `enc.holo` without
          re-deriving anything. Spread from `TIERS` rather than typed out: the
@@ -1932,8 +1943,10 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!sp || state.evolution || state.stars.includes(id)) return false;
     if (researchLevel(id, state.research[id]) < RESEARCH_MAX) return false;
     const cost = starCost(id);
+    // A defender goes last (`state.defense`), and the question says so if one must.
+    const defends = (m) => Number(Boolean(state.defense?.[m.uid]));
     const give = state.box.filter((m) => m.species === id && !keeper(m) && !m.lock)
-      .sort((a, b) => a.level - b.level || a.uid - b.uid)
+      .sort((a, b) => defends(a) - defends(b) || a.level - b.level || a.uid - b.uid)
       .slice(0, cost);
     // A legendary's star never spends the last one you hold (`starKeeps`).
     const held = state.box.filter((m) => m.species === id).length;
@@ -1942,7 +1955,8 @@ export function createEngine(canvas, onChange, mini = null) {
       ask("star", () => star(id, true), `Star ${label(sp)}?`,
         `${cost === 1 ? "Your lowest-level ordinary" : `${cost} ordinary`} ${label(sp)} `
         + `${cost === 1 ? "leaves" : "leave"} the Box for good. `
-        + `Its rare forms turn up ${RESEARCH_LIFT}x as often from then on.`);
+        + `Its rare forms turn up ${RESEARCH_LIFT}x as often from then on.`
+        + (defendNote(give, state.defense, () => label(sp)) ? ` ${defendNote(give, state.defense, () => label(sp))}` : ""));
       return true;
     }
     const gone = new Set(give.map((m) => m.uid));
@@ -2124,7 +2138,7 @@ export function createEngine(canvas, onChange, mini = null) {
             ? { phase: "bite", until: now + F.bite }
             : { phase: "miss", until: now + F.miss });
         } else if (cast.hook) {
-          const table = rodTable(f.rod);
+          const table = rodTable(f.rod, levelFromXp(state.xp));   // a generation bites once it has arrived
           state.fishing = null;
           startEncounter(table, "fishing");
         } else if (cast.close) {
@@ -2820,6 +2834,13 @@ export function createEngine(canvas, onChange, mini = null) {
         pay = payFor(fight.id, state.beaten, state.steps);
         state.beaten = { ...state.beaten, [fight.id]: { wins: (was?.wins ?? 0) + 1, at: state.steps } };
         state.money += pay;
+        /* A LEAGUE WIN TEACHES: research's `league` task (a legendary's) is
+           credited to every Pokemon that fought - the team `battleBegin`
+           checked and kept. */
+        for (const uid of state.team) {
+          const mon = state.box.find((m) => m.uid === uid);
+          if (mon) study(mon.species, ["league"]);
+        }
         save();
       }
       state.battle = null;
@@ -2848,11 +2869,21 @@ export function createEngine(canvas, onChange, mini = null) {
           tip: `Mass outbreak: ${name} in ${AREAS[ob.areaId].name}. `
             + `Rare forms are ${OUTBREAK_LIFT}x as likely while it lasts.` });
       }
-      if (riftHere()) {
-        out.push({ id: "rift", count: state.rift.left, label: "RIFT",
-          tip: "A space-time rift: rarer Pokémon come out and things turn up "
-            + "underfoot. Steps left - and leaving the map closes it." });
-      }
+      /* THE RIFT IS ALWAYS HERE, AS A RING (reported from play: its progress
+         was only on the Events page, and a bar is too wide for the corner).
+         `ring` is the fraction the ring shows: building up, the steps spent on
+         this map toward the one that makes a rift certain; open, the steps it
+         has left. `open` says which. */
+      const since = state.sinceTravel ?? 0;
+      out.push(riftHere()
+        ? { id: "rift", open: true, count: state.rift.left, label: "RIFT", ring: state.rift.left / RIFT_STEPS,
+          tip: `A space-time rift: rarer Pokémon come out and things turn up underfoot. ${state.rift.left} steps left - `
+            + "and leaving the map closes it." }
+        : { id: "rift", open: false, count: null, label: since < RIFT_FROM ? "CALM" : "STIRRING",
+          ring: Math.min(1, since / RIFT_SURE),
+          tip: since < RIFT_FROM
+            ? `Stay on one map and space tears open: ${RIFT_FROM - since} more steps here before a rift can.`
+            : `A rift could open with any step here, and one is certain by ${RIFT_SURE} (${since} so far).` });
       return out;
     },
     // Whether a rift is open where you stand, for the screen's tint.
@@ -2968,6 +2999,8 @@ export function createEngine(canvas, onChange, mini = null) {
     throwBall,
     flee,
     answerAsk,
+    // Your defense teams as the server read them (`my_defense`): only so a press that breaks one warns.
+    setDefense(teams) { state.defense = defenders(teams); stepped(); },
     skip,
     reset() {
       /* Halted first, or the reload's own `pagehide` writes the game straight

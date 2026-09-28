@@ -12,6 +12,7 @@ import { speciesById, isLegendary } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { LIMITS, PRESETS, tradeable } from "../../game/trade.js";
 import { keeper } from "../../game/items.js";
+import { defendNote } from "../../game/ranked.js";
 import { flushNow } from "../../game/store.js";
 import { proposeTrade, answerTrade, cancelTrade, friendBox, trainerShelf, push } from "../../net/cloud.js";
 import Sprite from "../Sprite.jsx";
@@ -139,6 +140,7 @@ export function Composer({ them, box, engine, dexOf, want: want0 = [], give: giv
   const theirLimit = useMemo(() => (friend && theirs ? keepLast(theirs) : null), [friend, theirs]);
   const giving = mine.filter((m) => give.includes(keyOf(m)));
   const precious = giving.some((m) => keeper(m) || isLegendary(m.species));
+  const defends = defendNote(giving, engine.state.defense, (m) => label(speciesById(m.species)));
   const theirKey = (m) => (friend ? `u${m.uid}` : m.mid);
   // In the order they were picked, so a slot does not jump when another is added.
   const inOrder = (keys, list, fn) => keys.map((k) => list?.find((m) => fn(m) === k)).filter(Boolean);
@@ -179,6 +181,7 @@ export function Composer({ them, box, engine, dexOf, want: want0 = [], give: giv
           </button>
         </div>
         {precious && <p className="tc-err">You are offering something rare - once they accept, it is theirs.</p>}
+        {defends && <p className="tc-err">{defends}</p>}
         {err && <p className="tc-err" role="alert">{err}</p>}
       </section>
 

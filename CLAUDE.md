@@ -20,8 +20,10 @@ should bring it back.
   artist credited.
 - **There is no trust boundary.** Every roll, price and dex write happens in the
   browser and the server stores the result. Row-level security stops players
-  touching each other's saves; it does not make a save honest. So there is no
-  leaderboard.
+  touching each other's saves; it does not make a save honest. So nothing the
+  browser decides is ranked: the one leaderboard, ranked battles
+  (docs/ranked.md), is played and rated on the server, in a format where a
+  save can claim a species but never a stronger one.
 - **Players' collections must never be lost or overwritten.** Every save-path
   rule below serves this; when in doubt, keep the data.
 
@@ -38,6 +40,7 @@ npm run leagues  Bulbapedia rosters       npm run moves    PokeAPI moves/learnse
 npm run battleart  League portraits, badges, back sprites
 npm run gyms     solve every League opponent's level (~30 min)
 npm run edge     bundle the referee into the ranked-step Edge Function
+npm run anchors  solve the League anchors' ranked ratings (then npm run edge)
 ```
 
 Run `npm run check` after any logic change and `npx vite build` before calling
@@ -65,6 +68,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/trainers/`, `public/badges/`, `public/sprites/back/` | `npm run battleart` |
 | `src/data/gymtune.js` | `npm run gyms` (check.mjs re-derives it and says when to re-run) |
 | `supabase/functions/ranked-step/rules.js` | `npm run edge` (check.mjs re-bundles and compares) |
+| `src/data/anchors.js` | `npm run anchors` (check.mjs re-solves and compares) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
   National Dex alone, read by the fetchers).
@@ -188,6 +192,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   with the map and never brings a new band.
 - **A fish (`shape: fish`) only spawns on maps with water.** `b.water` is
   declared and asserted against the map's water tiles. Legendaries are exempt.
+- **The water is every generation's.** Surfing meets `surfTable`: the map's
+  fitted table filtered to Water types and fish, at the map's weights (the
+  rod's pool only under `SURF_MIN` of them). Each rod lists every generation,
+  and `rodTable(id, level)` lets one bite from its `GEN_UNLOCK`. Both were
+  Kanto's alone once - surfing drew the rods' three Gen 1 lists - and every
+  lake in the game was the same. check.mjs holds Kanto under half of every
+  rod and every map's surf at the cap.
 - **Legendaries live only on maps sharing their primary type** (`legendTier`,
   `LEGEND_HAUNT` and `LEGEND_STRAY` are 0). Each is worth `LEGEND_EACH` per
   head, capped at `LEGEND_CEIL`; a zero-weight row is not emitted. `types` on a
@@ -334,7 +345,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   culling and landing checks run to a fixed point.
 - **Warps are read from `warp_events`, kept only when reciprocal, taken in
   `onArrive`**, and ridden both ways by tools/play on every map. Every warp
-  needs a walkable neighbour. Area ids never change (`ridge` is Mt Moon, `tower`
+  needs a walkable neighbour. **A hole is one-way**: a 5th element `1`
+  (`FROST_HOLES`) warps down only, its landing is plain floor, and every
+  fill (build_map's `check()`, the engine's `warpMap`, check.mjs) is
+  directed; two-way, Frost Hollow's landings bounced you back up. A ladder
+  whose warp leaves the game's maps becomes a door (`MOON_EXIT`: Mt Moon
+  B1F's Route 4 ladder is the door to the Power Plant's real mat, read from
+  its `warp_events`), never a dead rung. Area ids never change (`ridge` is Mt Moon, `tower`
   the Pokémon Tower, `ember` Magma Hideout, `woods` Monsoon Trail), because
   saves store them. A map replaced under its id can leave a save standing on
   rock: `createEngine` sends a spot with nowhere to stand to the map's spawn.
@@ -442,8 +459,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   are rarely met wild), and an evolved form (`grown`) is not asked night,
   first ball or a berry. A legendary (met about once a playthrough even
   hunted) is `legend` - one catch, credited from the dex by `loadState` -
-  plus `fed`, `first` and `hundred` (Lv 100, by candy or evolution); its
+  plus `fed`, `league` (a League win with it on the team, credited to every
+  Pokemon that fought in `battleEnd`) and `hundred` (Lv 100, by candy or
+  evolution); `first` is not asked of it (luck on luck, reported). Its
   star costs `starCost` 1 and `starKeeps` 1, so it needs a second catch.
+  Catches and `STAR_COST` are both 5 (10 was reported as too many).
   The Box offers RAISE to Lv 100 for a legendary with no evolution left. XS and XL are one task (`xl` kept, asked of nobody). A
   level pays a quarter of a sale (`RESEARCH_PAY`, under a fifth of catch
   income, measured). Lv 10 only OFFERS the lift: `star(id)` spends
@@ -467,6 +487,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   one `weighted` call, never a second transform. Finds (`riftFind`) are a
   shelf stone at your level or candy, held under a sixth of a rift cycle's
   sale income. Its tint is an element after the canvas, not a canvas pass.
+  `engine.events()` ALWAYS carries the rift, as a RING (`.rift-ring`, `--p`
+  from `ring`): filling with `sinceTravel / RIFT_SURE` while it builds,
+  draining with `left / RIFT_STEPS` while `open`. Anything reading
+  `events()` for an open rift checks `ev.open`, not the id.
 - **The Events page (`Events.jsx`) reads the world through `engine.world()`**
   (today's outbreak even once over, the rift where you stand, `sinceTravel`)
   and computes research from `state.research`; every number on it is a live
@@ -504,6 +528,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   and every level is solved by `npm run gyms`; any change to the rules, the
   rosters or the economy means re-running it (check.mjs says so). AI 3 stays
   only while it beats AI 2 55% of the time.
+- **The League's cards and hero are plain** (your call, 2026-09-29): no
+  coloured stripe down a card's side - the type chip and the portrait's
+  ground already say it - and the region's badges sit on the title's line,
+  greyed until won, with no rings. Colour and frames only where they carry
+  information.
 - **The League page is `src/ui/league/`, reached only by `lazy()`** (asserted,
   with the data it imports). It pauses the engine while open (`pause`: no
   walk, no redraw, deadlines shifted on resume), hands each turn to
@@ -571,6 +600,27 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   battle rules is a redeploy** (SUPABASE.md §3f), and one that makes an old
   page and the server disagree bumps `RULES_VERSION`. `npm run tradedb` runs
   the handler against the TEST project.
+- **Ratings are the database's** (docs/ranked.md, 6c). Elo runs in
+  `ranked_rate`, inside the transaction that finishes a battle (rows locked in
+  id order), exactly once per battle; abandonment is a rated loss; no client
+  may read or write `ranked_ratings` - the page reads standings through
+  functions, and the result screen shows what the server says. `ranked.js`
+  holds only the words (`RANKS`, `rankOf`, seasons), and its tier edges ARE
+  the SQL's floors (asserted). **The anchors are solved, never typed** (`npm
+  run anchors`, replayed exactly by check.mjs; then `npm run edge`, since the
+  server carries them). A rank on a profile comes from `ranked_standing`,
+  never a `trainer_cards` column: the card's grants belong to trading.sql,
+  which must not name a column ranked.sql creates. `RankBadge` lives outside
+  `ui/league/` because the Trade Center draws it too. The ranks are the Dex
+  careers (Scout, Ranger, Researcher, Professor, Legend; `TOP_RANK` shows the
+  rating); `RankMedal` is the one place a rank is drawn, a CSS disc until
+  `public/ranks/*.png` exist.
+- **Who defends is the server's, held VOLATILE as `state.defense`** (uid ->
+  "Team A", `defenders()` over `my_defense`): App reads it at sign-in and
+  Ranked hands every edit to `engine.setDefense`. It exists only so a press
+  that breaks a team warns: the Box's sell and evolve dialogs (a sweep lists
+  a defender unticked, as a legendary), every trading screen (`defendNote`),
+  and `star`, which spends a defender last and names it.
 - **A remembered uid is found in the Box, then keyed with `keyOf(mon)`** -
   never `keyOf({ uid })`: a Pokemon registered for trading is keyed by its
   server id, and the League's remembered team silently lost every such one.

@@ -324,12 +324,17 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
         {enc.knownForm && (
           <span
             className="np-caught"
-            data-tip={enc.variant
+            data-tip={(enc.variant
               ? `This ${enc.variant} is already in the Pokédex`
-              : "Already in the Pokédex"}
+              : "Already in the Pokédex") + (enc.ownedForm > 0 ? ` - you hold ${enc.ownedForm}` : "")}
           >
             <img src="items/poke-ball.png" alt="Already caught" />
           </span>
+        )}
+        {/* How many of this form you hold, once there is more than one: the
+            question a collector asks before spending a ball on another. */}
+        {enc.knownForm && enc.ownedForm > 1 && (
+          <span className="np-owned" aria-label={`You hold ${enc.ownedForm}`}>×{enc.ownedForm}</span>
         )}
       </div>
 

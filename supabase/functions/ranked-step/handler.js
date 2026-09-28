@@ -8,7 +8,8 @@
    seed and the state never go out: a challenger gets `viewOf` - their side,
    and of the defender only what has been sent out. */
 import {
-  openBattle, refereeTurn, viewOf, teamProblem, RULES_VERSION, DEFENSE_MIN, TURN_SECONDS,
+  openBattle, refereeTurn, viewOf, teamProblem, nearestAnchor, anchorTeam, ANCHORS,
+  RULES_VERSION, DEFENSE_MIN, TURN_SECONDS,
 } from "./rules.js";
 
 const reply = (status, body) => ({ status, body });
@@ -16,13 +17,23 @@ const deadlineFrom = (now) => new Date(now + TURN_SECONDS * 1000).toISOString();
 // The words a service-only SQL function raises, as the game's error codes.
 const FROM_SQL = [
   [/not in your saved box/, "uploading"], [/twice/, "twice"], [/team size/, "size"], [/already in a battle/, "busy"],
+  [/daily cap/, "cap"], [/voided/, "voided"],
 ];
+
+/* WHOM THEY ARE AGAINST: a trainer (name, sprite, rating) or a League anchor
+   (its name and portrait, and its fixed rating). */
+function opponentOf(row) {
+  const a = row.anchor && ANCHORS.find((x) => x.id === row.anchor);
+  if (a) return { username: a.name, char: null, pic: a.pic, anchor: true, rating: a.rating };
+  return { username: row.username ?? "A trainer", char: row.char ?? "red", rating: row.opponent_rating ?? null,
+    games: row.opponent_games ?? null };
+}
 
 // What a challenger is sent about their battle: never the seed, never the state.
 function out(row, state, extra = {}) {
   return {
     id: row.id,
-    opponent: { username: row.username ?? "A trainer", char: row.char ?? "red" },
+    opponent: opponentOf(row),
     view: viewOf(state, row.teams),
     mine: row.teams.mine,
     deadline: row.deadline,
@@ -43,9 +54,10 @@ async function start(me, body, rpc, now) {
   const problem = teamProblem(mine.map((m) => m.species));
   if (problem) return reply(400, { error: problem });
 
-  // The first candidate (they come in random order) with MIN legal teams.
-  const candidates = await rpc("ranked_candidates", { me });
-  for (const c of candidates) {
+  /* The first candidate in the rating window (they come in random order) with
+     MIN legal teams; nobody there, the nearest League anchor not met today. */
+  const cand = await rpc("ranked_candidates", { me });
+  for (const c of cand.candidates) {
     const legal = c.teams.filter((t) => !teamProblem(t.team.map((m) => m.species)));
     if (legal.length < DEFENSE_MIN) continue;
     const chosen = legal[pick(legal.length)];
@@ -54,11 +66,21 @@ async function start(me, body, rpc, now) {
     const deadline = deadlineFrom(now);
     const id = await rpc("ranked_create", {
       me, defender: c.user_id, slot: chosen.slot, teams,
-      seed: pick(2 ** 31), state, deadline, version: RULES_VERSION,
+      seed: pick(2 ** 31), state, deadline, version: RULES_VERSION, anchor: null, anchor_rating: null,
     });
-    return reply(200, out({ id, username: c.username, char: c.char, teams, deadline }, state));
+    return reply(200, out({ id, username: c.username, char: c.char, opponent_rating: c.rating, opponent_games: c.games,
+      teams, deadline }, state));
   }
-  return reply(404, { error: "nobody" });
+  const a = nearestAnchor(cand.rating, cand.anchors_met);
+  if (!a) return reply(404, { error: "nobody" });
+  const teams = { mine, foe: anchorTeam(a) };
+  const state = openBattle(mine, teams.foe);
+  const deadline = deadlineFrom(now);
+  const id = await rpc("ranked_create", {
+    me, defender: null, slot: null, teams, seed: pick(2 ** 31), state, deadline, version: RULES_VERSION,
+    anchor: a.id, anchor_rating: a.rating,
+  });
+  return reply(200, out({ id, anchor: a.id, teams, deadline }, state));
 }
 
 async function turn(me, body, rpc, now) {
@@ -76,7 +98,9 @@ async function turn(me, body, rpc, now) {
   });
   // Another request took this turn first (a second tab, a retry): resync.
   if (!saved) return reply(409, { error: "stale" });
-  return reply(200, out({ ...row, deadline }, r.state, { log: r.log, auto: r.auto }));
+  // A finished battle was rated in the same save: say what it did.
+  const result = over < 0 ? null : await rpc("ranked_outcome", { me, id: row.id });
+  return reply(200, out({ ...row, deadline }, r.state, { log: r.log, auto: r.auto, result }));
 }
 
 async function forfeit(me, body, rpc) {
@@ -85,7 +109,8 @@ async function forfeit(me, body, rpc) {
   const saved = await rpc("ranked_save", {
     me, id: row.id, expect: row.n, state: row.state, n: row.n, status: "lost", deadline: row.deadline,
   });
-  return saved ? reply(200, { over: 1 }) : reply(409, { error: "stale" });
+  if (!saved) return reply(409, { error: "stale" });
+  return reply(200, { over: 1, result: await rpc("ranked_outcome", { me, id: row.id }) });
 }
 
 export async function handle({ user, body, rpc, now = Date.now() }) {

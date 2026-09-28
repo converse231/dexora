@@ -120,8 +120,9 @@ export default function Help({ onClose }) {
               tasks. Each level pays. Finish every task (an alpha is a bonus) and
               you can star it: give up {STAR_COST} ordinary ones and its rare
               forms are {RESEARCH_LIFT}&times; as likely for good. A legendary's
-              research is catching one, feeding it, landing the first ball and
-              raising one to Lv 100; its star spends a spare, never the last.
+              research is catching one, feeding it, winning a League battle
+              with one and raising one to Lv 100; its star spends a spare,
+              never the last.
             </li>
             <li>
               <b>Alphas.</b> About one Pokémon in {Math.round(1 / ALPHA_CHANCE)} is
@@ -210,12 +211,20 @@ export default function Help({ onClose }) {
               and nothing is saved.
             </li>
             <li>
-              <b>Ranked battles</b> (a preview, unrated until the ladder
-              opens): find a battle and the server picks another trainer and
-              one of their defense teams, and referees every turn. You have 60
-              seconds a turn before it is played for you; leave a battle for
-              ten minutes and it counts as a loss. Close the page any time and
-              resume from the Ranked tab.
+              <b>Ranked battles</b>: find a battle and the server picks a trainer
+              near your rating and one of their defense teams - or a League
+              Elite Four member or Champion rated to match when nobody is - and
+              referees every turn. You have 60 seconds a turn before it is
+              played for you; leave a battle for ten minutes and it counts as a
+              loss. Close the page any time and resume from the Ranked tab.
+            </li>
+            <li>
+              <b>The ladder</b>: your first 5 battles each month place you, then
+              you rise through the Dex careers - Scout, Ranger, Researcher,
+              Professor, Legend. A win against a higher rating is worth more;
+              once you reach a rank you keep it for the season. When your teams are battled you gain or lose a little
+              too. Seasons are calendar months: the highest rank you reach
+              stays on your card. Up to 20 ranked battles a day.
             </li>
           </ul>
         </div>

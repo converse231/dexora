@@ -32,8 +32,11 @@ const evolves = new Set(EVOLUTIONS.filter((e) => e.level < 100).map((e) => e.fro
    old counters are kept, clamped to 10, since nearly all of them were
    ordinary anyway. */
 /* A LEGENDARY'S RESEARCH IS ONE CATCH AND WHAT YOU DO WITH IT: catch one
-   (`legend`), feed it a berry and land the first ball in that encounter, and
-   raise one to Lv 100 (`hundred`). Hunting on its home map, one specific
+   (`legend`), feed it a berry in that encounter, win a League battle with one
+   on your team (`league`), and raise one to Lv 100 (`hundred`). It asked for
+   the first ball too until 2026-09-29: with one meeting a playthrough, a
+   first-ball catch of a legendary was luck on top of luck (reported from
+   play), where a League win is something you can set out to do. Hunting on its home map, one specific
    legendary is met about once a playthrough (1 in 3,333 encounters), so a
    count of catches is out of reach - one catch was too easy, three was three
    playthroughs. Its star spends ONE spare (`starCost`) and never the last you
@@ -53,11 +56,13 @@ const grown = new Set(EVOLUTIONS.map((e) => e.to));
 const met = (id) => plain(id) && !grown.has(id);
 const metOrLegend = (id) => isLegendary(id) || met(id);
 export const TASKS = [
-  { id: "catch", label: "Catch ordinary ones", steps: [1, 4, 10], points: 10, when: plain },
+  /* 1, 3, 5 - it was 1, 4, 10, reported from play as too many; the star
+     spends the same five (`STAR_COST`). */
+  { id: "catch", label: "Catch ordinary ones", steps: [1, 3, 5], points: 10, when: plain },
   { id: "night", label: "Catch one at night", steps: [1], points: 10, when: met },
   { id: "xs", label: "Catch an XS or XL one", steps: [1], points: 10, when: plain },
   { id: "xl", label: "Catch an XL one", steps: [1], points: 10, when: () => false },
-  { id: "first", label: "Catch one with the first ball", steps: [1], points: 20, when: metOrLegend },
+  { id: "first", label: "Catch one with the first ball", steps: [1], points: 20, when: met },
   { id: "variant", label: "Catch a rare form", steps: [1], points: 20, when: plain },
   { id: "fed", label: "Feed one a berry", steps: [1], points: 10, when: metOrLegend },
   { id: "evolve", label: "Evolve one", steps: [1], points: 10, when: (id) => plain(id) && evolves.has(id) },
@@ -66,6 +71,8 @@ export const TASKS = [
   { id: "hundred", label: "Raise one to Lv 100", steps: [1], points: 10, when: isLegendary },
   // A bonus: trading is never required to finish anything (docs/trading.md).
   { id: "trade", label: "Get one in a trade", steps: [1], points: 10, bonus: true },
+  // A legendary's in place of the first ball (above); credited by `battleEnd` to every Pokemon that fought.
+  { id: "league", label: "Win a League battle with it", steps: [1], points: 20, when: isLegendary },
 ];
 export const HUNDRED = 100;
 const SLOT = Object.fromEntries(TASKS.map((t, i) => [t.id, i]));
@@ -77,11 +84,13 @@ export const RESEARCH_MAX = 10;
    daily event would make the event pointless on every species you finished.
 
    A STAR IS BOUGHT, NOT GIVEN. Finishing the research only offers it; the
-   price is `STAR_COST` ordinary ones out of the Box - the same ten the catch
-   task counted. Ten sales against the two and a half that ten research levels
-   paid, so every star is a sink for the duplicates the game is built on. */
+   price is `STAR_COST` ordinary ones out of the Box - the same five the catch
+   task counted. Five sales against the two and a half that ten research
+   levels paid, so every star is still a sink for the duplicates the game is
+   built on. Ten, reported from play as too many; three would have left a
+   permanent 1.5x lift costing barely more than the research paid. */
 export const RESEARCH_LIFT = 1.5;
-export const STAR_COST = 10;
+export const STAR_COST = 5;
 /* What a star spends, and how many of the species must be left after it. */
 export const starCost = (id) => (isLegendary(id) ? 1 : STAR_COST);
 export const starKeeps = (id) => (isLegendary(id) ? 1 : 0);
