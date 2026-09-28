@@ -256,6 +256,23 @@ def settle(cur, e_from, e_to):
     return cur if e_to == 15 else e_to
 
 
+def shore_ok(cur, ch, t):
+    """Can a trainer on OPEN WATER at elevation `cur` leave it onto a cell of
+    character `ch` at elevation `t`?
+
+    Onto a bridge plank (`N`) only as a walk would - under a span (15) or a
+    water-level plank, NEVER into a deck (4): Seaside Road's Cycling Road let a
+    surfer slip into its deck and ride out on top of it. Onto land, anything
+    but raised ground: every shore on every map is elevation 3 (or 1) against
+    water at 1, so the GBA lands you there, but a cell at 4+ is a shelf or a
+    road above you. And from UNDER a bridge (not open water) the step is an
+    ordinary walk - `elev_step` - so the land beneath a bridge is not a shore.
+    Mirrored in engine.js (`tryStep`) and check.mjs's fill."""
+    if ch == "N":
+        return elev_step(cur, t)
+    return t not in EM_HIGH
+
+
 def reach(g, starts, elev=None, hop=None, surf=False):
     """Every cell a trainer can get to from `starts`. ONE fill for the maps
     whose elevation decides where you may walk.
@@ -283,9 +300,16 @@ def reach(g, starts, elev=None, hop=None, surf=False):
             stack.append((nx, ny, settle(cur, here, t)))
         if surf:
             for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                if 0 <= nx < W and 0 <= ny < H and (g[ny][nx] in SURFABLE or
+                if not (0 <= nx < W and 0 <= ny < H):
+                    continue
+                if not (g[ny][nx] in SURFABLE or
                         (g[y][x] in SURFABLE and g[ny][nx] not in SOLID)):
-                    stack.append((nx, ny, settle(cur, here, E(nx, ny))))
+                    continue
+                # OFF THE WATER, ELEVATION STILL COUNTS (`shore_ok`): under a
+                # bridge only where it is one, never up onto raised ground.
+                if g[ny][nx] not in SURFABLE and not shore_ok(cur, g[ny][nx], E(nx, ny)):
+                    continue
+                stack.append((nx, ny, settle(cur, here, E(nx, ny))))
         if hop and (x, y) in hop:
             tx, ty = hop[(x, y)]
             stack.append((tx, ty, cur if E(tx, ty) == 15 else E(tx, ty)))

@@ -805,6 +805,13 @@ export function createEngine(canvas, onChange, mini = null) {
   /* THE CYCLING ROAD IS BIKE GROUND (a `cycling` map): its deck at
      elevation 4, and a bridge cell while you are up on it. Walking or
      surfing beneath it at a lower elevation is not the road. */
+  /* ON A MAP WITH THE GBA'S ELEVATION, EVERY UPPER LAYER IS OVER YOU while
+     you are low - solid or not: below the `HIGH_ELEV` elevations a sprite
+     draws under BG1 on the hardware. Reported as the trainer's head drawn
+     over the Cycling Road's railing (a solid cell at elevation 0-1) while
+     surfing under it. Maps without elevation keep "walkable cells only",
+     which is what stopped the Power Plant's wall crossing his head. */
+  const raisedOver = () => !!elev && !high;
   const onRoad = (x, y) => !!areaOf(state.areaId).cycling
     && (elevAt(x, y) === 4 || (elevAt(x, y) === 15 && high));
   const afloat = (x, y) => rideable(rows, x, y) || under(x, y);
@@ -1094,6 +1101,17 @@ export function createEngine(canvas, onChange, mini = null) {
     if ((RAIL[at(nx, ny)] || onRoad(nx, ny)) && !canBike(levelFromXp(state.xp), state.bag)) return;
     if (hop) { nx += dx; ny += dy; }
     else if (!walkable(rows, nx, ny) && !(riding && afloat(nx, ny))) { goThrough(); return; }
+    /* OFF OPEN WATER, ELEVATION STILL COUNTS (build_map's `shore_ok`): onto a
+       plank only as a walk would - under a span, never into the Cycling
+       Road's deck - and ashore onto anything but raised ground. It was all
+       exempt, so a surfer slipped under the road's deck and hopped out on
+       top of it. Open water itself - getting on, paddling - stays exempt. */
+    else if (!hop && riding && rideable(rows, p.x, p.y) && !rideable(rows, nx, ny)
+      && (at(nx, ny) === "N" ? !elevOk(nx, ny) : HIGH_ELEV.has(elevAt(nx, ny)))) return;
+    /* FROM UNDER A BRIDGE the step is a walk: on along the span or back to
+       the water, never out onto the land beneath it. */
+    else if (!hop && riding && !rideable(rows, p.x, p.y) && !rideable(rows, nx, ny)
+      && !elevOk(nx, ny)) return;
     // A WALK onto another elevation - the ride, the shore and a hop are exempt.
     else if (!hop && !riding && !afloat(nx, ny) && !elevOk(nx, ny)) return;
 
@@ -2205,7 +2223,7 @@ export function createEngine(canvas, onChange, mini = null) {
            collision belongs to the map - five of that map's metatiles are laid
            both walkable and solid in different places. */
         if (x >= px - 1 && x <= px + 1 && y >= py - 2 && y <= py
-            && walkable(rows, x, y)) over.push([x, y, id]);
+            && (walkable(rows, x, y) || raisedOver(x, y))) over.push([x, y, id]);
       }
     }
 
