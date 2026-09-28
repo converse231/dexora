@@ -5669,7 +5669,7 @@ button:disabled { transition: none; }
   /* The map grows with the column, so without this a wide window makes it
      taller than the screen and the whole page scrolls. Cap its width by what is
      left of the viewport height, using the canvas's own 15:11 ratio. */
-  .viewport { max-width: calc((100vh - 210px) * 15 / 11); margin-inline: auto; }
+  .viewport { max-width: calc((100vh - 210px) * var(--cols, 15) / 11); margin-inline: auto; }
   /* `align-items: stretch` equalises the two columns to the TALLER one, and the
      rail's natural height is its whole list - so stretching made the map grow
      to match the box rather than the other way round, and the page scrolled.

@@ -2781,4 +2781,75 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     `stepped onto from the side hold you until you push into them`);
 }
 
+/* SEASIDE ROAD'S CYCLING ROAD, driven. Reported from play as a trainer on a
+   surf blob in the middle of the grass: the road crosses a meadow on bridge
+   cells (elevation 15), and every low bridge cell was being read as water.
+   Walked under from the grass, you are on foot; the road itself is bike
+   ground, refused without the Acro Bike and ridden with it. */
+{
+  const { AREAS } = await import("../src/game/mapdata.js");
+  const { LEVEL_XP } = await import("../src/game/biomes.js");
+  const { BIKE_LEVEL } = await import("../src/game/items.js");
+  const { SOLID } = await import("../src/game/map.js");
+  const a = AREAS.pond;
+  assert.ok(a.cycling, "Seaside Road is not marked as having a cycling road");
+  const E = (x, y) => parseInt(a.elev[y][x], 16);
+  const ch = (x, y) => a.rows[y]?.[x] ?? "T";
+  const DIRS = [[1, 0, "right"], [-1, 0, "left"], [0, 1, "down"], [0, -1, "up"]];
+  const quiet = { field: { repel: { id: "max-repel", steps: 9999 } } };
+  const walk = (e, dir) => { e.press(dir); for (let i = 0; i < 14; i++) tick(16); e.clearHeld(); for (let i = 0; i < 20; i++) tick(16); };
+
+  // Under the road, from the grass: a bridge cell with low GROUND beside it.
+  let under = null;
+  for (let y = 1; y < a.rows.length - 1 && !under; y++) {
+    for (let x = 1; x < a.rows[0].length - 1 && !under; x++) {
+      if (ch(x, y) !== "N" || E(x, y) !== 15) continue;
+      for (const [dx, dy, dir] of DIRS) {
+        const gx = x - dx, gy = y - dy;
+        if (".,#".includes(ch(gx, gy)) && E(gx, gy) === 3) { under = { gx, gy, x, y, dir }; break; }
+      }
+    }
+  }
+  assert.ok(under, "no bridge cell on Seaside Road crosses grass - the test has nothing to walk");
+  {
+    const { e } = boot({ ...SAVE, ...quiet, areaId: "pond", xp: LEVEL_XP[6],
+      player: { x: under.gx, y: under.gy, dir: under.dir } });
+    walk(e, under.dir);
+    assert.deepEqual([e.state.player.x, e.state.player.y], [under.x, under.y],
+      "could not walk under the Cycling Road from the grass");
+    assert.ok(!e.afloat(), "walking under the road from the grass put the trainer afloat");
+    assert.ok(!e.above(), "a trainer under the road is drawn above it");
+  }
+
+  // Onto the road: a deck cell (elevation 4) with ground at elevation 0 beside it.
+  let ramp = null;
+  for (let y = 1; y < a.rows.length - 1 && !ramp; y++) {
+    for (let x = 1; x < a.rows[0].length - 1 && !ramp; x++) {
+      if (E(x, y) !== 4 || SOLID.includes(ch(x, y))) continue;
+      for (const [dx, dy, dir] of DIRS) {
+        const gx = x - dx, gy = y - dy;
+        if (!SOLID.includes(ch(gx, gy)) && E(gx, gy) === 0 && !"wWkV".includes(ch(gx, gy))) { ramp = { gx, gy, x, y, dir }; break; }
+      }
+    }
+  }
+  assert.ok(ramp, "no way onto Seaside Road's Cycling Road from the ground");
+  {
+    // Under the bike's level: key items are granted by level (`grantKeys`).
+    const { e } = boot({ ...SAVE, ...quiet, areaId: "pond", xp: LEVEL_XP[BIKE_LEVEL - 2],   // LEVEL_XP[n] is Lv n + 1
+      bag: { ...SAVE.bag, "acro-bike": 0 }, player: { x: ramp.gx, y: ramp.gy, dir: ramp.dir } });
+    walk(e, ramp.dir);
+    assert.deepEqual([e.state.player.x, e.state.player.y], [ramp.gx, ramp.gy],
+      "the Cycling Road let a trainer on without the Acro Bike");
+  }
+  {
+    const { e } = boot({ ...SAVE, ...quiet, areaId: "pond", xp: LEVEL_XP[BIKE_LEVEL],
+      bag: { ...SAVE.bag, "acro-bike": 1 }, player: { x: ramp.gx, y: ramp.gy, dir: ramp.dir } });
+    walk(e, ramp.dir);
+    assert.deepEqual([e.state.player.x, e.state.player.y], [ramp.x, ramp.y],
+      "the Cycling Road refused a trainer with the Acro Bike");
+  }
+  console.log(`cycling road ok — walked under it from the grass at (${under.x},${under.y}) on foot, ` +
+    `refused onto it at (${ramp.x},${ramp.y}) without the Acro Bike, ridden with it`);
+}
+
 console.log("play ok — the frame loop never stopped");
