@@ -56,6 +56,10 @@ import {
 
 export const VIEW_W = 15;
 export const VIEW_H = 11;
+/* THE WIDEST THE VIEW GROWS on a desktop, in tiles: App fits as many as the
+   card holds at the height the screen allows (`setView`), from VIEW_W up. The
+   smallest map is 40 across, so this is always a window onto it. */
+export const VIEW_W_MAX = 21;
 const SCALE = 2;              // canvas backing store multiplier, for crispness
 const STEP_MS = 150;          // tune: lower feels snappier, higher feels heavier
 /* THE BICYCLE IS GONE, and Running Shoes is the whole speed story now. Two key
@@ -647,6 +651,9 @@ export function createEngine(canvas, onChange, mini = null) {
   // setTransform, not scale: scale() compounds if the engine is ever remounted
   // (React StrictMode mounts effects twice in dev), silently doubling the zoom.
   ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  /* How many tiles across the view is - VIEW_W, or more on a wide desktop
+     (`setView`). The height never changes. */
+  let viewW = VIEW_W;
   // Pixel art upscaled 2x: smoothing samples neighbouring metatiles out of the
   // atlas and draws a seam along every tile edge.
   ctx.imageSmoothingEnabled = false;
@@ -766,21 +773,40 @@ export function createEngine(canvas, onChange, mini = null) {
   const elevAt = (x, y) => (elev ? parseInt(elev[y]?.[x] ?? "0", 16) || 0 : 0);
   let cur = 0;        // the elevation you walk at (0 walks anywhere)
   let high = false;   // drawn above the upper layer
+  let wet = false;    // afloat - read by `under`, set by `rise`
   const elevOk = (x, y) => { const t = elevAt(x, y); return cur === 0 || t === 0 || t === 15 || t === cur; };
   /* After a move: a step ONTO a bridge keeps what you had, anything else
      takes the cell's (build_map's `settle` - including why stepping OFF a
      bridge does not keep it, where the GBA does). */
   const rise = () => {
-    const e = elevAt(state.player.x, state.player.y);
+    const { x, y } = state.player;
+    /* WET IS WHERE YOU CAME FROM, under a bridge. A plank reached low from
+       the water is river to you; one reached low from the grass - Seaside
+       Road's Cycling Road crosses a meadow - is a roof you walk beneath. It
+       was "every low plank is water", which sat a trainer on a surf blob in
+       the middle of a field. (`rows`, not `at`: this runs before `at` is.) */
+    wet = rideable(rows, x, y) || (!!elev && !high && rows[y]?.[x] === "N" && wet);
+    const e = elevAt(x, y);
     if (e === 15) return;
     cur = e;
     if (e !== 0) high = HIGH_ELEV.has(e);
   };
+  /* UNDER A BRIDGE IS STILL AFLOAT - if you came in afloat. A plank you
+     reached low from the water is river to you, so a surfer paddles under it
+     instead of hopping ashore onto it; see `wet`. A save loaded under one
+     counts as afloat where water touches it, so nobody wakes up stranded. */
+  const under = (x, y) => !!elev && !high && at(x, y) === "N" && wet;
+  {
+    const { x, y } = state.player;
+    wet = rideable(rows, x, y) || (rows[y]?.[x] === "N" && [[1, 0], [-1, 0], [0, 1], [0, -1]]
+      .some(([dx, dy]) => rideable(rows, x + dx, y + dy)));
+  }
   rise();
-  /* UNDER A BRIDGE IS STILL AFLOAT. A plank you reached low (from the water)
-     is river to you, so a surfer paddles under it instead of hopping ashore
-     onto it and standing beneath the logs. */
-  const under = (x, y) => !!elev && !high && at(x, y) === "N";
+  /* THE CYCLING ROAD IS BIKE GROUND (a `cycling` map): its deck at
+     elevation 4, and a bridge cell while you are up on it. Walking or
+     surfing beneath it at a lower elevation is not the road. */
+  const onRoad = (x, y) => !!areaOf(state.areaId).cycling
+    && (elevAt(x, y) === 4 || (elevAt(x, y) === 15 && high));
   const afloat = (x, y) => rideable(rows, x, y) || under(x, y);
   const at = (x, y) => (rows[y] ? rows[y][x] ?? "" : "");
 
@@ -833,7 +859,7 @@ export function createEngine(canvas, onChange, mini = null) {
     miniCtx.strokeStyle = "rgba(255, 255, 255, .85)";
     miniCtx.strokeRect(
       Math.round(camX * k) + 0.5, Math.round(camY * k) + 0.5,
-      Math.round(VIEW_W * TILE * k) - 1, Math.round(VIEW_H * TILE * k) - 1,
+      Math.round(viewW * TILE * k) - 1, Math.round(VIEW_H * TILE * k) - 1,
     );
 
     /* You. A white ring under a red dot, and the ring is the load-bearing
@@ -1065,7 +1091,7 @@ export function createEngine(canvas, onChange, mini = null) {
     /* A RAIL IS BIKE-ONLY GROUND: never on foot, any direction on the Acro
        Bike. Like surfing, the ride is where you stand, so nothing is saved -
        and stepping off a rail is always allowed, as stepping ashore is. */
-    if (RAIL[at(nx, ny)] && !canBike(levelFromXp(state.xp), state.bag)) return;
+    if ((RAIL[at(nx, ny)] || onRoad(nx, ny)) && !canBike(levelFromXp(state.xp), state.bag)) return;
     if (hop) { nx += dx; ny += dy; }
     else if (!walkable(rows, nx, ny) && !(riding && afloat(nx, ny))) { goThrough(); return; }
     // A WALK onto another elevation - the ride, the shore and a hop are exempt.
@@ -1371,6 +1397,7 @@ export function createEngine(canvas, onChange, mini = null) {
     elev = areaOf(areaId).elev ?? null;
     cur = 0;
     high = false;
+    wet = false;
     MAP_W = rows[0].length;
     MAP_H = rows.length;
     bakeMini();
@@ -2143,7 +2170,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const wx = (move.fromX + (p.x - move.fromX) * t) * TILE;
     const wy = (move.fromY + (p.y - move.fromY) * t) * TILE;
 
-    const camX = clamp(wx + TILE / 2 - (VIEW_W * TILE) / 2, 0, MAP_W * TILE - VIEW_W * TILE);
+    const camX = clamp(wx + TILE / 2 - (viewW * TILE) / 2, 0, MAP_W * TILE - viewW * TILE);
     const camY = clamp(wy + TILE / 2 - (VIEW_H * TILE) / 2, 0, MAP_H * TILE - VIEW_H * TILE);
 
     const x0 = Math.floor(camX / TILE);
@@ -2163,7 +2190,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const py = Math.round(wy / TILE);
     const over = [];
     for (let y = y0; y <= y0 + VIEW_H; y++) {
-      for (let x = x0; x <= x0 + VIEW_W; x++) {
+      for (let x = x0; x <= x0 + viewW; x++) {
         // Off the map draws as tree so the void reads as forest, but neighbour
         // lookups get "" there - otherwise the tree depth walk never ends.
         const ch = at(x, y) || rows[0][0];
@@ -2203,7 +2230,7 @@ export function createEngine(canvas, onChange, mini = null) {
            thing here that would look like a bug rather than a feature. */
         set: airborne ? "jump"
           : surfing() ? "surf"
-          : RAIL[at(p.x, p.y)] ? "bike"
+          : RAIL[at(p.x, p.y)] || onRoad(p.x, p.y) ? "bike"
           : cast ? "fish"
           : state.running && move.active ? "run" : "walk",
         frame: cast ? fishFrame(p.dir, cast.phase) : undefined,
@@ -2236,7 +2263,7 @@ export function createEngine(canvas, onChange, mini = null) {
 
     drawBobber(ctx, state.fishing, now, camX, camY);
 
-    drawOverhangs(ctx, art.atlas, x0, y0, VIEW_W, VIEW_H, camX, camY, at,
+    drawOverhangs(ctx, art.atlas, x0, y0, viewW, VIEW_H, camX, camY, at,
                   (x, y) => (fixed ? fixed[y * MAP_W + x] : -1));
     if (!high) drawOverlays(ctx, art.atlas, over, camX, camY);
 
@@ -2730,6 +2757,18 @@ export function createEngine(canvas, onChange, mini = null) {
     surfable,
     // Above the upper layer (see `rise`); read by tools/play.
     above: () => high,
+    // Riding the water, as `surfing()` decides it; read by tools/play.
+    afloat: () => surfing(),
+    /* THE VIEW'S WIDTH IN TILES. Resizing a canvas clears its context, so the
+       2x transform and the no-smoothing flag go back on with it. */
+    setView(cols) {
+      const w = Math.max(VIEW_W, Math.min(VIEW_W_MAX, Math.round(cols) || VIEW_W));
+      if (w === viewW) return;
+      viewW = w;
+      canvas.width = w * TILE * SCALE;
+      ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+    },
     setChar,
     /* Dismissing is not the same as banking it - the id went into `hints` the
        moment it was shown, so closing it is only about the screen. It can never
