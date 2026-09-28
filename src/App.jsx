@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { createEngine, VIEW_W, VIEW_H } from "./game/engine.js";
+import { createEngine, VIEW_W, VIEW_H, VIEW_W_MAX } from "./game/engine.js";
 import { TILE } from "./game/tileset.js";
 import TopBar from "./ui/TopBar.jsx";
 import Tip from "./ui/Tip.jsx";
@@ -119,6 +119,34 @@ export default function App({
   const canvasRef = useRef(null);
   const miniRef = useRef(null);
   const [engine, setEngine] = useState(null);
+  /* A WIDER VIEW ON A DESKTOP. The map is capped by the window's HEIGHT at
+     15:11, which left the card half empty on a wide screen once the rail got
+     narrower. So it shows more tiles across instead of stretching: as many as
+     the card holds at the height `.viewport` is allowed (the same 210px
+     allowance as its cap), 15 to VIEW_W_MAX. Phones and tablets keep 15x11,
+     whose layouts are sized to it. */
+  useEffect(() => {
+    const screen = canvasRef.current?.closest(".screen");
+    if (!engine || !screen) return undefined;
+    const wide = matchMedia("(min-width: 980px)");
+    const touch = matchMedia("(hover: none) and (pointer: coarse)");
+    const fit = () => {
+      let cols = VIEW_W;
+      if (wide.matches && !touch.matches) {
+        const cs = getComputedStyle(screen);
+        const w = screen.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const tile = Math.max(1, innerHeight - 210) / VIEW_H;
+        cols = Math.min(VIEW_W_MAX, Math.max(VIEW_W, Math.floor(w / tile)));
+      }
+      engine.setView(cols);
+      screen.style.setProperty("--cols", cols);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(screen);
+    addEventListener("resize", fit);
+    return () => { ro.disconnect(); removeEventListener("resize", fit); };
+  }, [engine]);
 
   /* STABLE, BECAUSE A MEMO CANNOT SEE PAST A NEW FUNCTION.
 

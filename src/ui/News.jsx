@@ -16,6 +16,8 @@ export const NEWS = [
     title: "Seaside Road",
     items: [
       ["A new map", "Pond & Shore is now Seaside Road: Route 110 from Ruby and Sapphire, tile for tile, with the Seaside Cycling Road raised over the sea. Ride it through its two gatehouses, or surf underneath it."],
+      ["The Cycling Road", "It's for bikes, as in the original: ride it with the Acro Bike. Walk under it through the grass, or surf under it from the sea."],
+      ["A wider view", "On a wide screen the map now shows more of the world across, instead of leaving empty space at the sides."],
       ["Doors wait for you", "Doors, cave mouths and stairs only take you through when you walk into them, so you no longer get pulled inside just by walking past. Ladders still work the moment you step on."],
       ["Firmer water", "Rocks in the river on Monsoon Trail and the edges of its waterfalls are solid now, so you can't surf through them."],
     ],

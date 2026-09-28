@@ -526,6 +526,14 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   elevation 4 and 15: `seal_hidden(g, tiles, wall, elev)` never seals an
   `EM_HIGH` or bridge (15) cell. `em_cell` is the one Emerald cell reader, and
   COLLISION OUTRANKS WATER AND BRIDGE (a sea rock is `R`, a waterfall edge `K`).
+  The road is BIKE GROUND (`cycling: true`; `onRoad` = elevation 4, or 15
+  while high), gated by `canBike` like a rail. Low under a bridge you are
+  afloat only if you came in afloat (`wet`, set in `rise`): from the grass
+  you walk beneath it, covered by the planks (`drawOverlays` draws a `hides`
+  tile whole when you are low).
+- **The desktop view widens, never stretches**: App fits VIEW_W to
+  `VIEW_W_MAX` columns at the height `.viewport` allows (`engine.setView`,
+  `--cols`); phones and tablets keep 15x11.
 - **Doors are walked into, ladders stepped on.** `route.json`'s `ladders` are
   the MB_LADDER (0x61) metatiles; every other warp or door tile that some
   approach can walk into a wall is in the area's `enter`, and the engine takes

@@ -3035,8 +3035,12 @@ def route110():
         assert g[ay][ax] == "l" and g[by][bx] == "l", "route110: a gatehouse door is cut off"
 
     rows = ["".join(r) for r in g]
+    # THE ROAD IS BIKE GROUND, as the Cycling Road is on the GBA: the engine
+    # asks for the Acro Bike to ride it (elevation 4, or a bridge cell reached
+    # from it). Nothing else is lost - every other cell here is reached on foot
+    # or by Surf without it, checked when this went in.
     return (rows, spawn, [i for row in tiles for i in row], GB, warps,
-            {"elev": elev_rows(elev)})
+            {"elev": elev_rows(elev), "cycling": True})
 
 
 # -------------------------------------------------------------- Cinderpeak
@@ -3529,6 +3533,7 @@ if __name__ == "__main__":
         warps = made[4] if len(made) > 4 else None
         spec["door"] = made[5] if len(made) > 5 else None
         spec["elev"] = (spec["door"] or {}).get("elev")
+        spec["cycling"] = (spec["door"] or {}).get("cycling")
         spec["w"], spec["h"] = len(rows[0]), len(rows)
         got, total = check(spec, rows, spawn, tiles, warps)
         out.append((spec, rows, spawn, tiles, base, warps))
@@ -3606,6 +3611,9 @@ if __name__ == "__main__":
             body.append("    elev: [")
             body += ['      "%s",' % r for r in spec["elev"]]
             body.append("    ],")
+        if spec.get("cycling"):
+            # Its raised road is bike ground - see route110().
+            body.append("    cycling: true,")
         if spec["id"] in enter:
             # WARPS AND DOORS YOU WALK INTO rather than step on - see `enter`.
             body.append("    enter: [%s]," % ", ".join("[%d, %d]" % q for q in enter[spec["id"]]))

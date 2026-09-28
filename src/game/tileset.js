@@ -585,9 +585,16 @@ export function drawOverlays(ctx, atlas, ids, camX, camY) {
   if (!atlas?.imgTop) return;
   const s = atlas.tileSize;
   const cols = atlas.atlasCols ?? 16;
+  /* A WALKABLE TILE WHOSE UPPER LAYER COVERS IT WHOLE is a roof you are under -
+     the Cycling Road's planks, walked or surfed beneath - so the whole tile
+     goes over you, from the composite (the top sheet drops fully opaque upper
+     layers, which is right for everything else). The caller only asks when
+     you are low. */
+  atlas.hideSet ??= new Set(atlas.hides ?? []);
   for (const [x, y, id] of ids) {
     if (!(id >= 0)) continue;
-    ctx.drawImage(atlas.imgTop, (id % cols) * s, Math.floor(id / cols) * s, s, s,
+    ctx.drawImage(atlas.hideSet.has(id) ? atlas.img : atlas.imgTop,
+                  (id % cols) * s, Math.floor(id / cols) * s, s, s,
                   Math.round(x * TILE - camX), Math.round(y * TILE - camY), TILE, TILE);
   }
 }
