@@ -617,6 +617,9 @@ create table if not exists public.trainer_cards (
   played_at   timestamptz
 );
 create index if not exists trainer_cards_name on public.trainer_cards (lower(username) text_pattern_ops);
+-- Badges (battles phase 6, docs/battles.md): the League leaders beaten in the
+-- stored save's `beaten`, counted by `card_stats` like every other number.
+alter table public.trainer_cards add column if not exists badges int not null default 0;
 
 alter table public.trainer_cards enable row level security;
 drop policy if exists "cards are public to players" on public.trainer_cards;
@@ -628,7 +631,7 @@ create policy "cards are public to players" on public.trainer_cards for select
 -- column is unreadable until it is added here.
 revoke select on public.trainer_cards from anon, authenticated;
 grant select (user_id, username, char, xp, dex_count, variants, stars, trades,
-              showcase, seeking, joined_at, played_at)
+              showcase, seeking, joined_at, played_at, badges)
   on public.trainer_cards to authenticated;
 
 -- Eight characters with nothing to misread aloud: no 0/O, no 1/I/L.
@@ -662,6 +665,28 @@ drop trigger if exists profile_to_card on public.profiles;
 create trigger profile_to_card after insert or update of username, char on public.profiles
   for each row execute function public.profile_to_card();
 
+-- THE BADGES, one per League leader, in the League's order: the ids in
+-- src/data/leagues.js (check.mjs holds this list equal to them). A save's
+-- `beaten` names opponents of every kind; only these are badges.
+create or replace function public.badge_list()
+returns text[] language sql immutable set search_path = '' as $$
+  select array[
+    'kanto-brock', 'kanto-misty', 'kanto-lt-surge', 'kanto-erika', 'kanto-koga', 'kanto-sabrina',
+    'kanto-blaine', 'kanto-giovanni', 'johto-falkner', 'johto-bugsy', 'johto-whitney',
+    'johto-morty', 'johto-chuck', 'johto-jasmine', 'johto-pryce', 'johto-clair', 'hoenn-roxanne',
+    'hoenn-brawly', 'hoenn-wattson', 'hoenn-flannery', 'hoenn-norman', 'hoenn-winona',
+    'hoenn-tate-liza', 'hoenn-juan', 'sinnoh-roark', 'sinnoh-gardenia', 'sinnoh-fantina',
+    'sinnoh-maylene', 'sinnoh-wake', 'sinnoh-byron', 'sinnoh-candice', 'sinnoh-volkner',
+    'unova-cheren', 'unova-roxie', 'unova-burgh', 'unova-elesa', 'unova-clay', 'unova-skyla',
+    'unova-drayden', 'unova-marlon', 'kalos-viola', 'kalos-grant', 'kalos-korrina', 'kalos-ramos',
+    'kalos-clemont', 'kalos-valerie', 'kalos-olympia', 'kalos-wulfric', 'alola-hala',
+    'alola-olivia', 'alola-nanu', 'alola-hapu', 'galar-milo', 'galar-nessa', 'galar-kabu',
+    'galar-bea', 'galar-opal', 'galar-gordie', 'galar-piers', 'galar-raihan', 'paldea-katy',
+    'paldea-brassius', 'paldea-iono', 'paldea-kofu', 'paldea-larry', 'paldea-ryme', 'paldea-tulip',
+    'paldea-grusha'
+  ]
+$$;
+
 -- A card's numbers, and its showcase kept honest, from a save document.
 create or replace function public.card_stats(data jsonb, card public.trainer_cards)
 returns public.trainer_cards language plpgsql stable set search_path = '' as $$
@@ -676,6 +701,13 @@ begin
          jsonb_array_elements_text(case when jsonb_typeof(data->t) = 'array' then data->t else '[]' end) v
    where v = '1');
   card.stars := case when jsonb_typeof(data->'stars') = 'array' then jsonb_array_length(data->'stars') else 0 end;
+  -- A badge is a leader's id in `beaten` with a whole number of wins - a JSON
+  -- NUMBER, as the game's own `cleanBeaten` keeps one ("3" is not); anything
+  -- else counts for nothing.
+  card.badges := (select count(*)
+    from jsonb_each(case when jsonb_typeof(data->'beaten') = 'object' then data->'beaten' else '{}' end) b
+   where b.key = any(public.badge_list())
+     and jsonb_typeof(b.value->'wins') = 'number' and coalesce(b.value->>'wins', '') ~ '^[1-9]\d{0,8}$');
   -- A showcased Pokemon that left the box leaves the showcase; one that
   -- evolved or levelled shows as it is now.
   card.showcase := coalesce((
@@ -707,7 +739,7 @@ begin
   if not found then return new; end if;
   c := public.card_stats(new.data, c);
   update public.trainer_cards set xp = c.xp, dex_count = c.dex_count, variants = c.variants,
-    stars = c.stars, showcase = c.showcase, played_at = now()
+    stars = c.stars, badges = c.badges, showcase = c.showcase, played_at = now()
    where user_id = new.user_id;
   return new;
 exception when others then
@@ -728,6 +760,13 @@ update public.trainer_cards c set
   from (select c2.user_id as uid, public.card_stats(sv.data, c2) as st
           from public.trainer_cards c2 join public.saves sv on sv.user_id = c2.user_id) s
  where s.uid = c.user_id and c.played_at is null;
+-- Badges arrived after the cards did: every card with a save gets its count
+-- now, not at its trainer's next upload. Only rows that differ are written,
+-- so running the file again writes nothing.
+update public.trainer_cards c set badges = s.n
+  from (select sv.user_id as uid, (public.card_stats(sv.data, c2)).badges as n
+          from public.saves sv join public.trainer_cards c2 on c2.user_id = sv.user_id) s
+ where s.uid = c.user_id and c.badges <> s.n;
 
 -- The one thing a trainer writes: which Pokemon to show, which to look for.
 -- Showcase entries are box uids; each is looked up in the STORED save and

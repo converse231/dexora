@@ -11,6 +11,41 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-07",
+    date: "October 2026",
+    title: "Ranked battles, preview",
+    items: [
+      ["Find a battle", "On the League's Ranked tab, battle another trainer's defense team with one of yours. You won't know which of their teams you'll meet until it's sent out."],
+      ["Played on the server", "The server referees every turn, so nobody can bend a result. You get 60 seconds a turn - after that your turn is played for you - and ten minutes away from a battle counts as a loss."],
+      ["Pick up where you left off", "Closing the page mid-battle is fine: open the Ranked tab again and resume."],
+      ["Unrated for now", "Results aren't rated yet. Ratings, ranks and seasons come with the ladder."],
+    ],
+  },
+  {
+    id: "2026-10-06",
+    date: "October 2026",
+    title: "Defense teams and badges",
+    items: [
+      ["Defense teams", "The League has a new Ranked tab. Set up to three teams there: when ranked battles open, a challenger will meet one of them without knowing which, and the CPU will play it for you."],
+      ["Ranked rules", "In ranked, every Pokémon is Lv 100 with the same IVs, and a team has one of each species - a Mega or a regional form counts as its species. So what you've caught is what matters, not how you raised it."],
+      ["Practice with friends", "Battle one of a friend's defense teams from the Ranked tab. You won't know which until it's sent out, and nothing is saved."],
+      ["Badges on your card", "Your trainer card now shows how many League badges you've won."],
+    ],
+  },
+  {
+    id: "2026-10-05",
+    date: "October 2026",
+    title: "The Pokémon League",
+    items: [
+      ["Battles are here", "Open the menu and choose Pokémon League. Every region from Kanto to Paldea has its Gym Leaders (Alola's Island Kahunas), their gym trainers, and its Elite Four and Champion, with the teams they used in their games."],
+      ["In order", "A region's leaders open one at a time, in the games' order. Win all of a region's badges to face its Elite Four, one at a time, and then its Champion. Beat everyone in a region, gym trainers too, to open the next one."],
+      ["A level cap", "Each battle has a highest level you may bring, and legendaries have a lower one. Battles never give EXP: raise your team with Rare Candy."],
+      ["Prizes", "Your first win against anyone pays a prize, and a leader's first win gives you its badge. Rematches pay part of the prize, which refills as you walk, and each rematch win makes that opponent stronger."],
+      ["Potions, Full Heals and Revives", "A new Battle shelf in the Shop. Open the Bag in a battle to heal, cure or revive a Pokémon in place of a move."],
+      ["Nothing to lose", "Losing or giving up costs nothing. Your Pokémon are never used up, and a battle cut short by closing the page simply didn't happen."],
+    ],
+  },
+  {
     id: "2026-10-04",
     date: "October 2026",
     title: "Seaside Road",
@@ -29,7 +64,7 @@ export const NEWS = [
     items: [
       ["Gold", "Cast in gold, with a sheen and glints running over it. The rarest form in the game."],
       ["Shadow", "Sealed in darkness, with violet flame rising around it."],
-      ["Chaotic", "Unstable energy: a red storm turns around it, and now and then it flips to a black-and-yellow negative."],
+      ["Chaotic", "Unstable energy: a red and black aura pulses out of it, and now and then it glitches into a black-and-yellow negative."],
       ["Projection", "A projection of light, standing in the beam of an emitter, scanlines and all."],
       ["Just as rare as before", "There are twelve forms now, and one Pokémon in about 18 still wears one. Each form got a little rarer to make room, so meeting any form is as common as it was. Every new form has its own honey in the shop."],
     ],

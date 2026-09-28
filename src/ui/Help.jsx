@@ -26,6 +26,7 @@ import { ALPHA_CHANCE } from "../game/biomes.js";
 import { OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_STEPS } from "../game/events.js";
 import { RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } from "../game/research.js";
 import { LIMITS } from "../game/trade.js";
+import { TEAM_MAX, REMATCH_SHARE, REMATCH_CAP_STEP } from "../game/league.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
    lists want identical rows and a second copy of the row is how one of them
@@ -168,6 +169,53 @@ export default function Help({ onClose }) {
               <b>Block or report</b> from any trainer&rsquo;s profile. A block
               works both ways: neither of you can find, friend or trade with
               the other.
+            </li>
+          </ul>
+          {/* THE LEAGUE. The order and the pay are league.js's, which the
+              engine enforces; the numbers are its live constants. */}
+          <h4>Pokémon League</h4>
+          <ul className="vr-notes">
+            <li>
+              <b>The League</b> is in the menu. Each region&rsquo;s leaders open
+              one at a time, in their games&rsquo; order; all of a region&rsquo;s
+              badges open its Elite Four, one at a time, then its Champion.
+              Beating everyone in a region, gym trainers included, opens the
+              next.
+            </li>
+            <li>
+              <b>Your team.</b> Up to {TEAM_MAX} Pokémon (no more than your
+              opponent fields), each at or under the battle&rsquo;s level cap; a
+              legendary&rsquo;s cap is lower, the stronger it is. A Pokémon in a
+              trade offer stays home. Battles give no EXP - raise your team with
+              Rare Candy.
+            </li>
+            <li>
+              <b>Prizes.</b> A first win pays a prize, and a leader&rsquo;s first
+              win its badge. A leader, Elite Four member or Champion can be
+              fought again: a rematch pays up to {Math.round(REMATCH_SHARE * 100)}%
+              of the prize, refilling as you walk, and each rematch win raises
+              their cap by {REMATCH_CAP_STEP} levels. Losing costs nothing.
+            </li>
+            <li>
+              <b>In battle</b>, keys 1-4 pick a move, S changes Pokémon, B opens
+              the Bag, Space or Enter hurries the text, and Escape offers to
+              forfeit. Potions, Full Heals and Revives come from the Shop&rsquo;s
+              Battle shelf; using one takes your turn.
+            </li>
+            <li>
+              <b>Ranked</b> is the first tab on the League page. Set up to three
+              defense teams: everyone is Lv 100 there with the same IVs, one of
+              each species (a Mega or a regional form counts as its species),
+              and no items. Friends can practice against your teams - blind,
+              and nothing is saved.
+            </li>
+            <li>
+              <b>Ranked battles</b> (a preview, unrated until the ladder
+              opens): find a battle and the server picks another trainer and
+              one of their defense teams, and referees every turn. You have 60
+              seconds a turn before it is played for you; leave a battle for
+              ten minutes and it counts as a loss. Close the page any time and
+              resume from the Ranked tab.
             </li>
           </ul>
         </div>

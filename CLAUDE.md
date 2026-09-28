@@ -34,6 +34,10 @@ npm run map      python tools/build_map.py
 npm run art      python tools/build_assets.py
 npm run layout   composition metrics      npm run shape    structural metrics
 npm run assets   PokeAPI species/items/evolutions
+npm run leagues  Bulbapedia rosters       npm run moves    PokeAPI moves/learnsets
+npm run battleart  League portraits, badges, back sprites
+npm run gyms     solve every League opponent's level (~30 min)
+npm run edge     bundle the referee into the ranked-step Edge Function
 ```
 
 Run `npm run check` after any logic change and `npx vite build` before calling
@@ -56,6 +60,11 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/game/mapdata.js` | `npm run map` |
 | `public/tilesets/route.{png,json}`, `route_top.png` | `npm run art` |
 | `src/data/species.js`, `evolutions.js`, forms | `npm run assets` / fetch scripts |
+| `src/data/leagues.js` | `npm run leagues` (Bulbapedia; FireRed and Emerald cross-checked against pret) |
+| `src/data/moves.js`, `learnsets.js`, `types.js` | `npm run moves` |
+| `public/trainers/`, `public/badges/`, `public/sprites/back/` | `npm run battleart` |
+| `src/data/gymtune.js` | `npm run gyms` (check.mjs re-derives it and says when to re-run) |
+| `supabase/functions/ranked-step/rules.js` | `npm run edge` (check.mjs re-bundles and compares) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
   National Dex alone, read by the fetchers).
@@ -234,6 +243,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   carry `!important` so capture and flee beat any tier idle.
 - **`VariantFx` is the one moving layer.** Layers are siblings of `.mon` and
   are gated on `monHere`.
+- **A container holding a tier wrapper (`.sprite-fx`, `.item-fx`) sizes its
+  image with a CHILD selector** (`> img`). Every layer is `inset: 0` and masked
+  at `center / contain`, so the `<img>` must fill exactly the wrapper; a sized
+  descendant `img` also reaches the one inside it (the Rare forms dialog drew
+  its creatures at 77% of 77%, top-left, every effect off to the side).
+  Asserted in check.mjs.
 - **Showdown is an 8-frame strip on a span, not an `<img>`**, stepped with
   `steps(8, jump-none)`. It is sized to 77% of its box (a Showdown frame fills
   its canvas where an ordinary sprite fills 0.77), and that must be set in each
@@ -470,6 +485,103 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `overflow: hidden` - a clipping grid item has min-height 0 and the grid
   squeezes it - and dialog-scoped headings need `.evcard` in front to beat
   `.hp-body h4`.
+- **Battles are designed in docs/battles.md** - change a decision there
+  first. They live on a League page (a lazy chunk), never on a map, and never
+  give a Pokémon EXP or a level: a team is bought with Rare Candy. **Only
+  `game/battle.js` and `ui/League.jsx` may import the League's data**
+  (`leagues`, `moves`, `learnsets`, `types`; asserted), or a player who never
+  battles downloads it. **League ids never change** (`beaten` keys on them;
+  the fetch refuses to drop one). A leader's type comes from its OWN party,
+  never the gym infobox, which is written for one version. A Pokémon's moves
+  are read across its line (a Metapod keeps Caterpie's Tackle).
+- **`battle.js` is pure**: `step(battle, action, rng)` returns a new battle,
+  never mutates the old one, and takes every roll from `rng` (asserted). The
+  engine never imports it. **Opponents are built by `opponent()` only** - their
+  game movesets, their stage at the solved level, and past Lv 100 training
+  (`effort`); a player's Pokémon never has effort, and a tier, size or alpha
+  changes no stat. **Nothing on the League ladder is typed**: caps, intended
+  levels, prizes and the rematch clock are derived in `tools/league-sim.mjs`
+  and every level is solved by `npm run gyms`; any change to the rules, the
+  rosters or the economy means re-running it (check.mjs says so). AI 3 stays
+  only while it beats AI 2 55% of the time.
+- **The League page is `src/ui/league/`, reached only by `lazy()`** (asserted,
+  with the data it imports). It pauses the engine while open (`pause`: no
+  walk, no redraw, deadlines shifted on resume), hands each turn to
+  `battleStep` (`stepped()`) and ends with one `battleEnd` (`changed()`).
+  A turn is played back as beats from its log; each event's `after` snapshot
+  is what moves a health bar, so a bar falls with the hit that caused it.
+  Health bars are a `scaleX`, never a width. A type's colour is `--tc` on its
+  `.t-<type>` class - read it, never copy a hex.
+- **The engine judges a League battle; `game/league.js` is the one rulebook.**
+  The order (leaders in turn, the Elite Four on every badge, a region on the
+  whole of the last one, gym trainers and Champion included), `refusal`,
+  `capOf`/`topOf` (a rematch win raises both) and `payFor` live there, and
+  both the engine and the page read them - the page never decides. It reads
+  only `gymtune.js`, which ships in the main bundle for this (each opponent's
+  `region`, `kind` and `k`; held to the rosters and under 8KB gzipped by
+  check.mjs); nothing else of the League may join it. `battleBegin(battle,
+  { id, uids })` refuses (answering why) and `battleEnd()` is the only place a
+  battle pays or records a win, replacing `beaten` rather than editing it
+  (the page's memo keys on it). A loss, forfeit or reload pays nothing.
+- **The Battle shelf is `HEALS` in items.js, one list**: the Shop sells it
+  and `battle.js` reads what each item does from it - a SHARE of max HP,
+  never a flat amount (a flat Potion lowered a late gym's win rate; check.mjs
+  holds the share from Lv 5 to 100). `canUse` is the one answer to whether
+  an item would do anything (the Bag greys on it, `step` refuses on it with
+  no turn passing). `battleStep` is the only place one is spent, and it
+  refuses a turn using one the bag does not hold. The prices are bounded by
+  the rematch guard (a full-clock rematch outearns, in expectation, the
+  healers the reference player spends at every capped opponent, replayed on
+  `KIT_RECORD`); the solved levels are measured without items. The CPU uses
+  none.
+- **A legendary is what its data says**: `legendary(id)` in league.js
+  (`isLegendary` OR the species' `legendary` field). `isLegendary()` is the
+  spawn tables' answer and is false for the 17 forms of legendaries, which
+  walked into the League's Lv 100 caps at full level. Never gate a battle
+  rule on `isLegendary` alone.
+- **Ranked is designed in docs/ranked.md** - change a decision there first.
+  **Its format is species, nothing else**: `rankedFighter` (battle.js) takes
+  the level, IVs and moves from `ranked.js`, because a save can choose its
+  levels and uids (a uid picks IVs); asserted. `ranked.js` is the one
+  rulebook (the page reads it; 6b's server function bundles it). The species
+  clause counts a form as its species (`baseOf`), through the Picker's `kin`.
+  **Defense teams live on the server** (`db/ranked.sql`, applied AFTER
+  `db/trading.sql`, re-runnable), every uid checked against and read back
+  from the STORED save - flush before `set_defense_team`, which refuses
+  (never trims) a uid it cannot see. **Practice is blind on the server**
+  (`practice_team` picks one team at random; the page never holds the
+  others), is played in ranked's format with no Bag, and hands nothing to
+  the engine. **The card is trading.sql's**: badges (`badge_list()`, held
+  equal to the League's leaders) are counted in `card_stats` there - never
+  redefine a trading.sql function in another file, or re-running
+  trading.sql reverts it. `npm run tradedb` tests both files on the TEST
+  project.
+- **A ranked battle is played on the server** (docs/ranked.md, 6b). The
+  referee (`src/game/referee.js`) is pure and is imported by NOTHING in src
+  (asserted): the page gets views, never the state. The `ranked-step` Edge
+  Function is `handler.js` (portable, run in Node by the tests) plus a thin
+  Deno `index.ts`; it imports only `rules.js`, the referee bundled by `npm
+  run edge` (a deployed function cannot reach src/; check.mjs fails when it
+  is stale). **The seed and the state never leave the server**: every roll
+  is `hash(seed:n)`, `ranked_battles` is unreadable and unwritable by every
+  client, its functions are the service role's only, and `viewOf` shows the
+  defender's Pokemon only once sent out (asserted). A save is
+  compare-and-set on the step counter. Timers are lazy (a late turn is AI 2's;
+  ten quiet minutes lose, marked on the next request). **Any change to the
+  battle rules is a redeploy** (SUPABASE.md §3f), and one that makes an old
+  page and the server disagree bumps `RULES_VERSION`. `npm run tradedb` runs
+  the handler against the TEST project.
+- **A remembered uid is found in the Box, then keyed with `keyOf(mon)`** -
+  never `keyOf({ uid })`: a Pokemon registered for trading is keyed by its
+  server id, and the League's remembered team silently lost every such one.
+- **check.mjs replays every solved battle EXACTLY** (seeded record, not a
+  fresh sample - fresh samples read noise as drift), holds each solve within
+  ±15 points of target unless a replayed neighbour proves a cliff, and keeps
+  gym trainers over 85% (lowered by the solver, never above their leader's
+  proportion). The League opens when a counter can be caught (5% of an open
+  map); opened at the first encounter it solved Brock to Lv 2. A legendary
+  enters at `cap × 360 / BST` (`legendLevel`): wild legendary forms exist, and
+  a flat 80% let one take 7 of Kanto's 8 leaders alone.
 - **Trading is designed in docs/trading.md** - change a decision there first.
   A Pokémon that enters trading gets a server row (`mons`) and moves only
   through `db/trading.sql`'s functions, one locked transaction each. The save

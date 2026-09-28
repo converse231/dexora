@@ -614,7 +614,8 @@ the sprite stage above it each gave up 5%, so they still meet flush.
 
 ## Evolution: a level, paid in Rare Candy
 
-Nothing gains levels here — there are no battles — so evolution spends a
+Nothing gains levels by fighting here — battles give no EXP (see *Battles*) —
+so evolution spends a
 currency instead, and **the real evolution level sets the price**. Those levels
 come straight from PokéAPI via `tools/fetch-evolutions.mjs` into
 `src/data/evolutions.js`.
@@ -3181,14 +3182,52 @@ server-side, both unblock together, and that is the moment to come back here.
 Building T2 before T0 is not an early version of trading. It is a working
 duplication exploit with a trading UI on it.
 
+### Battles
+
+**Designed** (2026-09-28, awaiting approval): the decisions, the measured
+numbers and the phase plan are in [docs/battles.md](docs/battles.md). Battles
+live on their own **League page**, region by region (each gym's trainers and
+leader in the games' order, then the Elite Four), never on the catching maps:
+Kanto is open from the start, and each later region opens when the one before
+it is cleared, its Champion included. The League is a lazy chunk (about 60 KB
+gzipped) and the walk draws nothing while it is open, so a player who never
+battles pays nothing for it. This section used to sit under *Not planned*,
+and what follows is why it moved.
+
+It said: *"the whole economy assumes it — evolution feeds duplicates precisely
+because nothing gains levels. Adding battles is a different game."* That is true
+of battles that **level** Pokémon, and it is the one thing this design does not
+build. **A battle never gives a Pokémon EXP or a level.** A level is still bought
+only with Rare Candy, one candy a level on one `uid`, so a team is paid for in
+the same currency as evolution. Battles become a **candy sink** that competes
+with the Pokédex, not a second road to a level that would empty `levelUp` and
+the evolution bill of meaning.
+
+The competition is real and measured. Evolving one of everything costs about
+19,000 candy from wild levels, and a whole Lv 75 game earns about the same, so
+candy spent on a team is candy the dex does not get. A full team to Lv 100 is
+about 510 candy, 2.6% of that, so the prices of duplicates, candy and sales do
+not move.
+
+What else holds the economy together, each checked in check.mjs:
+
+- **Trainer XP from battles is zero**, so `LEVEL_XP` still paces the maps.
+- **Wild Pokémon stay throw-only.** Weakening before a throw makes a ¥25 Poké
+  Ball beat a ¥250 Ultra Ball eight to one on a rare, and every ball price is
+  tuned on a throw at full HP.
+- **Prizes are derived from what catching pays**: every first win in the game
+  together stays under a tenth of a whole game's income, and rematches refill
+  on a step clock, at most a fifth of catch income a step.
+- **Gyms cap levels and refuse what is over the cap**, because scaling down
+  kept the evolved form and let one Pokémon win most gyms alone.
+- **There is no PvP and no leaderboard**, for the same reason there is no
+  leaderboard today: there is no trust boundary.
+
 ### Not planned
 
 Worth saying out loud, so they do not get half-built by accident:
 
-- **Battles.** There are none and the whole economy assumes it — evolution feeds
-  duplicates precisely *because* nothing gains levels. Adding battles is a
-  different game, not a phase of this one.
-- **Anything that takes payment.** Same reason. No ads, no store listing, no
+- **Anything that takes payment.** The game is non-commercial. No ads, no store listing, no
   distribution.
 
 ## Credits
@@ -3222,5 +3261,13 @@ License 1.1 (`public/fonts/OFL.txt`), self-hosted so the game reads the same off
 The shipped file is **modified**: `tools/build_font.py` merges each glyph's pixel squares into
 outlines (same shapes, far fewer points - it rendered slowly on phones). The OFL allows it; the
 font declares no Reserved Font Name.
+**The League's rosters** — every gym leader's, gym trainer's, Elite Four
+member's and Champion's party — **are read from [Bulbapedia](https://bulbapedia.bulbagarden.net/)**
+(text under CC BY-NC-SA 2.5) by `tools/fetch-leagues.mjs`, and FireRed's and
+Emerald's are checked against pret's decompilations. **Badges and Z-Crystals are
+from [Bulbagarden Archives](https://archives.bulbagarden.net/)**, and **trainer
+portraits are [Pokémon Showdown](https://play.pokemonshowdown.com/)'s trainer
+sprites**, drawn by its sprite artists. Moves, learnsets, the type chart and
+back sprites are PokéAPI's.
 Uses Nintendo's characters and art — keep it personal and non-commercial: no ads,
 no payments, no store listing. **If you add a tileset marked ☆, credit its artist here.**

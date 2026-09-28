@@ -2884,4 +2884,261 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     `and never entered from the water (${dock.x},${dock.y})`);
 }
 
+/* THE LEAGUE THROUGH THE ENGINE (docs/battles.md, phase 3). The page computes
+   every turn with battle.js and hands it over: a turn is `stepped()` - the
+   collection did not move, so `colRev` must not, or the Dex and Box rebuild
+   on every hit - and the result is the one `changed()`. The battle is
+   VOLATILE: a save written mid-battle does not carry it. While the page covers
+   the game the walk stops, and an encounter's clock stops with it. */
+{
+  const { step, newBattle, fighter, mulberry32 } = await import("../src/game/battle.js");
+  const { e } = boot({ ...SAVE, box: [{ uid: 1, species: 6, level: 40 }, { uid: 2, species: 9, level: 40 }], nextUid: 3 });
+  tick(16, 3);
+  const col0 = e.state.colRev, rev0 = e.state.rev;
+  let b = newBattle([[fighter(6, 40, 1), fighter(9, 40, 2)], [fighter(3, 40, 3), fighter(65, 40, 4)]], [2, 2]);
+  // A gym trainer of the first gym: open from the start, and no cap.
+  assert.equal(e.battleBegin(b, { id: "kanto-brock-camper-liam", uids: [1, 2] }), null);
+  const rng = mulberry32(5);
+  let turns = 0;
+  while (b.over < 0) { b = step(b, null, rng); e.battleStep(b); turns++; tick(16, 30); }
+  assert.equal(e.state.colRev, col0, `a battle's ${turns} turns bumped colRev - the collection panels rebuilt on every hit`);
+  assert.ok(e.state.rev >= rev0 + turns, "a battle turn did not tell React it happened");
+  /* A SAVE WRITTEN WHILE IT IS ON: turns write nothing, so something else has
+     to - a purchase, then the flush a closing tab does. Reading the save from
+     before the battle proved nothing, and missed a missing VOLATILE entry. */
+  e.buy("poke-ball", 1);
+  e.saveNow();
+  const saved = JSON.parse(store.get("meadow-route"));
+  assert.ok(!("battle" in saved), "a save written mid-battle carries the battle - it must be VOLATILE");
+  // The result is ONE changed(), counted from just before it (the purchase had its own).
+  const colEnd = e.state.colRev;
+  assert.equal(e.battleEnd().over, b.over);
+  assert.equal(e.state.colRev, colEnd + 1, "a battle's result is not exactly one changed()");
+  assert.equal(e.state.battle, null);
+
+  // Paused, a held key walks nobody and a waiting encounter's clock stands still.
+  const at = [e.state.player.x, e.state.player.y];
+  e.pause(true);
+  e.press("right");
+  tick(16, 90);
+  assert.deepEqual([e.state.player.x, e.state.player.y], at, "the trainer walked while the League page covered the game");
+  e.release("right");
+  /* Ordinary frames, not long ones: a gap over STALL is the stall
+     compensation's to shift, and a first version of this test passed on that
+     alone with the pause's own shift deleted. */
+  e.state.encounter = { phase: "idle", until: now + 500 };
+  const until = e.state.encounter.until;
+  tick(16, 200);
+  e.pause(false);
+  assert.ok(e.state.encounter.until >= until + 3000, "an encounter's clock ran on under the League page");
+  e.state.encounter = null;
+  console.log(`league engine ok — a ${turns}-turn battle moved rev only, its result was one changed(), ` +
+    "no save carried it, and a paused game walked nowhere and lost no time");
+}
+
+/* THE LEAGUE'S ORDER AND PAY, ENFORCED BY THE ENGINE (docs/battles.md,
+   phase 4). The page offers only what league.js allows, so every refusal
+   here is the engine's own - a page bug, a stale tab or a Box that changed
+   under the picker cannot start a battle it should not. A result is forced
+   (`over: 0`) where the rules of the fight are not the question: this is the
+   judge, not the battle. */
+{
+  const { newBattle, fighter, opponent } = await import("../src/game/battle.js");
+  const L = await import("../src/game/league.js");
+  const { GYMTUNE, REMATCH_STEPS } = await import("../src/data/gymtune.js");
+  const { LEAGUES } = await import("../src/data/leagues.js");
+  const byId = new Map(LEAGUES.flatMap((r) => [...r.gyms, ...r.gyms.flatMap((g) => g.trainers), ...r.league])
+    .map((o) => [o.id, o]));
+  const kanto = LEAGUES[0], johto = LEAGUES[1];
+  const [brock, misty] = kanto.gyms;
+  const cap = GYMTUNE[brock.id].cap;
+  const legend = L.legendLevel(150, cap);
+  const box = [
+    { uid: 1, species: 4, level: 5 }, { uid: 2, species: 7, level: 5 }, { uid: 3, species: 1, level: 5 },
+    { uid: 4, species: 1, level: cap + 1 },                  // over Brock's cap
+    { uid: 5, species: 150, level: legend + 1 },             // a legendary over its share of it
+    { uid: 6, species: 16, level: 5 },                       // locked in a trade, below
+  ];
+  const at = (beaten = {}) => {
+    const { e } = boot({ ...SAVE, box, nextUid: 7, beaten });
+    e.state.box.find((m) => m.uid === 6).lock = "offer";
+    return e;
+  };
+  // A battle as the page builds it: the Box's own Pokemon, the opponent at its level now.
+  const battle = (e, id, uids) => newBattle([
+    uids.map((uid) => { const m = e.state.box.find((x) => x.uid === uid) ?? { species: 1, level: 5 }; return fighter(m.species, m.level, uid); }),
+    opponent(byId.get(id).party, L.topOf(id, e.state.beaten), (k) => k + 1),
+  ], [null, 2]);
+  const begin = (e, id, uids) => e.battleBegin(battle(e, id, uids), { id, uids });
+  const win = (e, id, uids = [1]) => {
+    const b = battle(e, id, uids);
+    const no = e.battleBegin(b, { id, uids });
+    assert.equal(no, null, `${id} refused (${no}) where it should be open`);
+    e.battleStep({ ...b, over: 0 });
+    return e.battleEnd();
+  };
+  const everyone = (r) => [...r.gyms.flatMap((g) => [g.id, ...g.trainers.map((t) => t.id)]), ...r.league.map((p) => p.id)];
+  const allOf = (ids) => Object.fromEntries(ids.map((id) => [id, { wins: 1, at: 0 }]));
+
+  // Who may come: the engine's refusal, reason by reason, and nothing starts.
+  {
+    const e = at();
+    assert.equal(begin(e, brock.id, [4]), "level", "a Pokemon over the cap was let into the battle");
+    assert.equal(begin(e, brock.id, [5]), "legend", "a legendary over its share of the cap was let in");
+    assert.equal(begin(e, brock.id, [6]), "locked", "a Pokemon locked in a trade was let into the battle");
+    assert.equal(begin(e, brock.id, [99]), "team", "a Pokemon not in the Box was let in");
+    assert.equal(begin(e, brock.id, [1, 1]), "team", "one Pokemon was let in twice");
+    // Read off the roster, not teamSize - that is what is under test.
+    assert.ok(brock.party.length < 3, "Brock fields three - this test needs a leader with a smaller party");
+    assert.equal(begin(e, brock.id, [1, 2, 3]), "team", "a bigger team than Brock fields was let in");
+    // A fighter that is not the Box's Pokemon at its own level is not that Pokemon.
+    const b = battle(e, brock.id, [1]);
+    b.sides[0].team[0] = fighter(4, 60, 1);
+    assert.equal(e.battleBegin(b, { id: brock.id, uids: [1] }), "team", "a Lv 60 fighter passed as a Lv 5 Charmander");
+    assert.equal(e.state.battle, null, "a refused battle was started anyway");
+  }
+
+  // A leader waits for the one before; a first win pays once and gives the badge.
+  {
+    const e = at();
+    assert.equal(begin(e, misty.id, [1]), "shut", "Misty opened before Brock was beaten");
+    const before = JSON.stringify({ box: e.state.box, xp: e.state.xp, candy: e.state.candy });
+    const money = e.state.money;
+    const was = e.state.beaten;
+    const r = win(e, brock.id);
+    assert.notEqual(e.state.beaten, was, "a win was written into `beaten` in place - the League page's memo never sees it");
+    assert.deepEqual(r, { over: 0, pay: GYMTUNE[brock.id].prize, first: true });
+    assert.equal(e.state.money, money + GYMTUNE[brock.id].prize, "the first win did not pay its prize");
+    assert.deepEqual(e.state.beaten[brock.id], { wins: 1, at: e.state.steps });
+    assert.equal(L.badgesOf(e.state.beaten), 1);
+    assert.equal(JSON.stringify({ box: e.state.box, xp: e.state.xp, candy: e.state.candy }), before,
+      "a battle changed a level, the XP or the candy - battles never give EXP");
+    assert.deepEqual(e.state.team, [1], "the team taken was not remembered");
+    assert.equal(begin(e, misty.id, [1]), null, "Misty stayed shut after Brock was beaten");
+    // Losing, forfeiting or leaving pays and records nothing.
+    const lost = e.battleEnd();
+    assert.deepEqual(lost, { over: -1, pay: 0, first: false }, "a battle left unfinished paid");
+    assert.ok(!e.state.beaten[misty.id], "a battle left unfinished was recorded as a win");
+
+    // A rematch at once pays nothing; the clock refills as you walk.
+    const again = win(e, brock.id);
+    assert.deepEqual(again, { over: 0, pay: 0, first: false }, "a rematch straight after the win paid");
+    assert.equal(e.state.beaten[brock.id].wins, 2);
+    assert.equal(L.capOf(brock.id, e.state.beaten), Math.min(100, cap + 2 * L.REMATCH_CAP_STEP),
+      "each win did not raise Brock's cap");
+    e.state.steps += REMATCH_STEPS / 2;
+    const half = win(e, brock.id);
+    assert.equal(half.pay, Math.round(GYMTUNE[brock.id].prize * L.REMATCH_SHARE / 2), "a rematch did not pay pro rata");
+    e.state.steps += REMATCH_STEPS * 3;
+    assert.equal(e.world().rematches, 1, "Brock's full clock is not reported by world()");
+    assert.equal(win(e, brock.id).pay, Math.round(GYMTUNE[brock.id].prize * L.REMATCH_SHARE),
+      "a rematch past its full clock paid other than the full rematch share");
+
+    // A gym trainer pays a fifth of its leader, once.
+    const t = brock.trainers[0].id;
+    assert.equal(win(e, t).pay, Math.round(GYMTUNE[brock.id].prize * L.TRAINER_SHARE));
+    e.state.steps += REMATCH_STEPS * 2;
+    assert.equal(win(e, t).pay, 0, "a gym trainer paid twice");
+  }
+
+  // The Elite Four waits for every badge, and each member for the one before.
+  {
+    const leaders = kanto.gyms.map((g) => g.id);
+    const e = at(allOf(leaders.slice(0, -1)));
+    assert.equal(begin(e, kanto.league[0].id, [1]), "shut", "the Elite Four opened one badge short");
+    win(e, leaders.at(-1));
+    assert.equal(begin(e, kanto.league[1].id, [1]), "shut", "the second member opened before the first was beaten");
+    assert.equal(begin(e, kanto.league[0].id, [1]), null, "the Elite Four stayed shut with every badge");
+    e.battleEnd();
+  }
+
+  // A region waits for the whole of the one before - gym trainers and Champion
+  // included - and opens on the win that clears it.
+  {
+    const all = everyone(kanto);
+    const champ = kanto.league.at(-1).id;
+    const trainer = kanto.gyms.at(-1).trainers[0].id;
+    const e1 = at(allOf(all.filter((id) => id !== trainer)));
+    assert.equal(begin(e1, johto.gyms[0].id, [1]), "shut", "Johto opened with a Kanto gym trainer unbeaten");
+    const e = at(allOf(all.filter((id) => id !== champ)));
+    assert.equal(begin(e, johto.gyms[0].id, [1]), "shut", "Johto opened before Kanto's Champion was beaten");
+    win(e, champ);
+    assert.ok(L.regionCleared(kanto.id, e.state.beaten));
+    assert.equal(begin(e, johto.gyms[0].id, [1]), null, "Johto stayed shut once Kanto was cleared");
+    e.battleEnd();
+  }
+
+  // A reload mid-battle is a forfeit with nothing spent: no battle, no win, no money.
+  {
+    const e = at();
+    assert.equal(begin(e, brock.id, [1]), null);
+    e.buy("poke-ball", 1);                  // something to save
+    e.saveNow();
+    const saved = JSON.parse(store.get("meadow-route"));
+    const back = boot(saved).e;
+    assert.equal(back.state.battle, null, "a battle survived a reload");
+    assert.deepEqual(back.state.beaten, {}, "a reload mid-battle recorded a win");
+    assert.equal(back.state.money, saved.money);
+    assert.deepEqual(back.battleEnd(), { over: -1, pay: 0, first: false }, "the reloaded game paid for the old battle");
+    assert.equal(JSON.stringify(back.state.box.map(({ uid, species, level }) => [uid, species, level])),
+      JSON.stringify(saved.box.map(({ uid, species, level }) => [uid, species, level])), "a reload mid-battle changed the Box");
+  }
+
+  // The saved fields: each on its three counts, then each entry cleaned on its own.
+  await savedField("beaten", { [brock.id]: { wins: 2, at: 40 } }, "junk", {});
+  await savedField("team", [1, 3], "junk", [], { ...SAVE, box, nextUid: 7 });
+  {
+    const e = boot({ ...SAVE, box, nextUid: 7, team: [3, 99, 1],
+      beaten: { [brock.id]: { wins: 1, at: 5 }, [misty.id]: { wins: "x", at: 1 }, "from-a-newer-build": { wins: 1, at: 0 } } }).e;
+    assert.deepEqual(e.state.beaten, { [brock.id]: { wins: 1, at: 5 }, "from-a-newer-build": { wins: 1, at: 0 } },
+      "one bad beaten row was not dropped alone, or an unknown id was not kept");
+    assert.deepEqual(e.state.team, [3, 1], "a team uid no longer in the Box was kept");
+  }
+
+  // What the save costs when everything in the game is beaten (docs/battles.md, *Performance*).
+  const full = allOf([...byId.keys()]);
+  // hrtime: `performance.now` here is the hand-driven clock.
+  const t0 = process.hrtime.bigint();
+  for (let i = 0; i < 100; i++) JSON.stringify(full);
+  const each = Number(process.hrtime.bigint() - t0) / 100 / 1e6;
+  console.log(`league progress ok — order, refusals, first wins, rematch pay and caps, the Elite Four and ` +
+    `region unlocks all enforced by the engine; everything beaten is ${(JSON.stringify(full).length / 1000).toFixed(1)}KB ` +
+    `in the save, ${each.toFixed(2)}ms to stringify`);
+}
+
+/* THE BATTLE SHELF THROUGH THE ENGINE (docs/battles.md, phase 5). The page
+   computes an item turn with battle.js; the engine spends the item when the
+   turn is handed over - the one place it is spent - and refuses the whole
+   turn when the bag does not hold it. The bag moving is `stepped()`, like
+   every turn, and what was spent stays spent whatever the result. */
+{
+  const { newBattle, fighter, step, mulberry32 } = await import("../src/game/battle.js");
+  const box = [{ uid: 1, species: 6, level: 40 }, { uid: 2, species: 9, level: 40 }];
+  const { e } = boot({ ...SAVE, box, nextUid: 3, bag: { ...SAVE.bag, potion: 2 } });
+  tick(16, 3);
+  const mine = [fighter(6, 40, 1), fighter(9, 40, 2)];
+  mine[0].hp = 5;
+  mine[1].hp = 0;
+  const b = newBattle([mine, [fighter(129, 5, 3)]], [null, 1]);
+  assert.equal(e.battleBegin(b, { id: "kanto-brock-camper-liam", uids: [1, 2] }), null);
+  const col = e.state.colRev;
+  const rng = mulberry32(2);
+  const healed = step(b, { item: "potion", target: 0 }, rng);
+  assert.equal(e.battleStep(healed), null);
+  assert.equal(e.state.bag.potion, 1, "a Potion used in a battle was not spent");
+  assert.equal(e.state.colRev, col, "an item turn bumped colRev - the collection panels rebuilt mid-battle");
+  // A Revive the bag does not hold: the turn is refused whole, and nothing moves.
+  const revived = step(healed, { item: "revive", target: 1 }, rng);
+  assert.ok(revived.turn > healed.turn, "battle.js refused a Revive on a fainted Pokemon");
+  assert.equal(e.battleStep(revived), "bag", "a turn using an item the bag does not hold was taken");
+  assert.equal(e.state.battle, healed, "a refused turn replaced the battle");
+  // Spent stays spent: leaving the battle gives nothing back, and the save carries it.
+  e.battleEnd();
+  e.saveNow();
+  assert.equal(boot(JSON.parse(store.get("meadow-route"))).e.state.bag.potion, 1,
+    "a Potion spent in a battle came back after it or a reload");
+  console.log("battle shelf ok — an item turn spends from the bag once, moves rev only, " +
+    "a turn using one not held is refused whole, and nothing spent comes back");
+}
+
 console.log("play ok — the frame loop never stopped");

@@ -21,6 +21,7 @@ import {
 import {
   tasksFor, progress, researchLevel, researchPoints, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../game/research.js";
+import { badgesOf } from "../game/league.js";
 
 const NEAREST = 4;   // how many unfinished entries the Discovery card lists
 
@@ -59,7 +60,7 @@ function Pips({ total, spent, label: aria }) {
   );
 }
 
-export default function Events({ world, state, level, busy, onTravel, onSelect, onClose }) {
+export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onClose }) {
   useModalLock();
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
@@ -84,6 +85,8 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
   const close = nearest(research);
 
   const alphas = (state?.box ?? []).filter((m) => m.alpha).length;
+  const badges = badgesOf(state?.beaten);
+  const rematches = world?.rematches ?? 0;
   const here = BIOMES.find((b) => b.id === state?.areaId)?.name ?? "";
 
   return (
@@ -217,6 +220,26 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
                   it never runs, and it pays Rare Candy. It can be a rare form too.</small>
               </span>
             </div>
+          </section>
+
+          {/* THE LEAGUE - rematches refill as you walk, so they are news. */}
+          <section className={`ev-card ev-league${rematches ? " live" : ""}`}>
+            <header className="ev-banner">
+              {/* The first badge of all as its emblem: League ids never change. */}
+              <img src={new URL("badges/kanto-brock.png", document.baseURI).href} alt="" />
+              <h4>Pokémon League</h4>
+              {rematches > 0 && <span className="ev-stamp live">READY</span>}
+            </header>
+            <div className="ev-trophy">
+              <b>{badges}</b>
+              <span>
+                {badges === 1 ? "badge won" : "badges won"}
+                <small>{rematches
+                  ? `${rematches} rematch${rematches === 1 ? " pays" : "es pay"} in full - the prize refills as you walk.`
+                  : "Beat each region's gyms in order, then its Elite Four and Champion."}</small>
+              </span>
+            </div>
+            <button type="button" className="ev-go" disabled={busy} onClick={onLeague}>Open the League ›</button>
           </section>
         </div>
       </div>

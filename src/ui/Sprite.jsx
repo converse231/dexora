@@ -77,6 +77,15 @@ export const onSpriteError = (ev) => {
 export const spriteUrl = (id, variant = null) =>
   new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png`, document.baseURI).href;
 
+/* A POKEMON FROM BEHIND, for your side of a League battle - the one place a
+   back path is derived (docs/battles.md, *Data model*). Shiny has back art of
+   its own; every tier drawn as a filter wears the ordinary back under the same
+   `sprite-<tier>` class. Origin (the 1996 art) and Showdown (a strip) have no
+   back, so this answers null and the caller draws the front, flipped. */
+const NO_BACK = new Set(["origin", "showdown"]);
+export const backUrl = (id, variant = null) => (NO_BACK.has(variant) ? null
+  : new URL(`sprites/back/${variant === "shiny" ? "shiny/" : ""}${id}.png`, document.baseURI).href);
+
 /* WARM THE CACHE WITH WHAT THIS MAP CAN THROW AT YOU. An encounter's sprite
    was fetched only when the battle mounted it - on a phone, the Pokemon's
    slot sat empty for most of a second, and a quick throw could catch it
@@ -195,14 +204,14 @@ export function VariantFx({ id, variant, art = null }) {
       );
     }
     if (variant === "chaotic") {
-      /* Red energy round it, and the black-and-yellow negative is the
-         glitch: a difference layer masked to the creature, and one slice of
-         it torn sideways for a frame. */
+      /* A red-and-black aura pulsing out of it, and the black-and-yellow
+         negative is the glitch: a difference layer masked to the creature,
+         and one slice of it torn sideways for a frame. The aura replaced a
+         spinning vortex and four orbiting stones, which read as something
+         circling the Pokemon rather than energy coming out of it. */
       return (
         <>
-          <span className="chaos-core" aria-hidden="true" />
-          <span className="chaos-vortex" aria-hidden="true" />
-          <span className="chaos-shards" aria-hidden="true"><i /><i /><i /><i /></span>
+          <span className="chaos-aura" style={{ "--art": url }} aria-hidden="true"><i /><i /><i /></span>
           <span className="chaos-neg" style={{ "--art": url }} aria-hidden="true" />
           <span className="chaos-cut" style={{ "--art": url }} aria-hidden="true" />
         </>

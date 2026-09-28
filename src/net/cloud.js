@@ -35,6 +35,8 @@
    is not worth an untestable auth path in the feature everything else depends
    on. */
 import { createClient } from "@supabase/supabase-js";
+// The ranked rules this build plays by, sent with every refereed request (6b).
+import { RULES_VERSION } from "../game/ranked.js";
 
 const URL = import.meta.env?.VITE_SUPABASE_URL ?? "";
 const KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY ?? "";
@@ -593,3 +595,34 @@ export const fulfilListing = (lid, mid) => tradeCall("fulfil_listing", { lid, mi
 // Phase 6: a friend's box, and who has a species.
 export const friendBox = (who) => tradeCall("friend_box", { who });
 export const tradeSearch = (q) => tradeCall("trade_search", { q });
+
+// ------------------------------------------------------------------ ranked
+/* RANKED (docs/ranked.md) - server half in db/ranked.sql. The trading calls'
+   shape and rules ({ok, data} or {ok: false, error}, never a throw), in
+   ranked's own words: a server without db/ranked.sql is "not open yet". */
+async function rankedCall(fn, args = {}) {
+  if (!CLOUD || !session) return { ok: false, error: "Sign in to set up defense teams." };
+  const got = await tradeCall(fn, args);
+  return got.closed ? { ...got, error: "Ranked isn't open yet." } : got;
+}
+export const myDefense = () => rankedCall("my_defense");
+export const setDefenseTeam = (slot, uids) => rankedCall("set_defense_team", { slot, uids });
+export const practiceTeam = (who) => rankedCall("practice_team", { who });
+
+/* THE REFEREE (docs/ranked.md, 6b): the ranked-step Edge Function, which
+   plays a ranked battle on the server. Answers {ok, data} or {ok: false,
+   error} with the function's own code (handler.js), which the page says in
+   words; never throws. A project without the function deployed answers
+   `closed` - a missing function is a 404 with no code of ours in it. */
+export async function rankedStep(body) {
+  if (!CLOUD || !session) return { ok: false, error: "signin" };
+  try {
+    const { data, error } = await supabase.functions.invoke("ranked-step", { body: { ...body, version: RULES_VERSION } });
+    if (!error) return { ok: true, data };
+    const got = await error.context?.json?.().catch(() => null);
+    if (got?.error) return { ok: false, error: got.error };
+    return error.context?.status === 404 ? { ok: false, closed: true, error: "closed" } : { ok: false, error: "offline" };
+  } catch {
+    return { ok: false, error: "offline" };
+  }
+}

@@ -1352,24 +1352,26 @@ canvas {
   color: #fff; background: var(--ink-soft);
 }
 .battle .type { font-size: max(9px, 1.35cqw); }
-.t-normal { background: #9b9b73; }
-.t-flying { background: #8f9fe8; }
-.t-bug { background: #9aa620; }
-.t-poison { background: #9b53a0; }
-.t-grass { background: #68b04c; }
-.t-psychic { background: #e35f8c; }
-.t-fighting { background: #b53b2c; }
-.t-ground { background: #c8a54a; }
-.t-rock { background: #a89440; }
-.t-fire { background: #e6802f; }
-.t-water { background: #5a8fdd; }
-.t-electric { background: #dcb32a; }
-.t-ice { background: #79cfcf; }
-.t-ghost { background: #6a5a9b; }
-.t-dragon { background: #6a3ae8; }
-.t-dark { background: #6a5648; }
-.t-steel { background: #9a9ab5; }
-.t-fairy { background: #d98fa8; }
+.t-normal { --tc: #9b9b73; background: var(--tc); }
+.t-flying { --tc: #8f9fe8; background: var(--tc); }
+.t-bug { --tc: #9aa620; background: var(--tc); }
+.t-poison { --tc: #9b53a0; background: var(--tc); }
+.t-grass { --tc: #68b04c; background: var(--tc); }
+.t-psychic { --tc: #e35f8c; background: var(--tc); }
+.t-fighting { --tc: #b53b2c; background: var(--tc); }
+.t-ground { --tc: #c8a54a; background: var(--tc); }
+.t-rock { --tc: #a89440; background: var(--tc); }
+.t-fire { --tc: #e6802f; background: var(--tc); }
+.t-water { --tc: #5a8fdd; background: var(--tc); }
+.t-electric { --tc: #dcb32a; background: var(--tc); }
+.t-ice { --tc: #79cfcf; background: var(--tc); }
+.t-ghost { --tc: #6a5a9b; background: var(--tc); }
+.t-dragon { --tc: #6a3ae8; background: var(--tc); }
+.t-dark { --tc: #6a5648; background: var(--tc); }
+.t-steel { --tc: #9a9ab5; background: var(--tc); }
+.t-fairy { --tc: #d98fa8; background: var(--tc); }
+/* Each type's colour is `--tc` on its class, so a move button or a card's
+   accent reads the same colour the chip does rather than a second copy. */
 /* Not types, but they stand in the same row of badges and have to be read the
    same way: neutral for "no filter", and the gold the game already spends on
    rarity for the legendaries. Gold takes dark text - white on it is the one
@@ -2381,7 +2383,7 @@ canvas {
 .sh-pick:disabled { cursor: default; }
 .sh-pick:not(:disabled):hover b { color: var(--path); }
 .sh-pick .item-fx { width: 30px; }
-.sh-pick img { width: 30px; height: 30px; image-rendering: pixelated; }
+.sh-pick > img { width: 30px; height: 30px; image-rendering: pixelated; }
 
 .sh-title, .sh-tail { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .sh-tail { text-align: right; }
@@ -2741,7 +2743,10 @@ canvas {
   border: 2px solid var(--line-firm); border-radius: 12px;
   background: var(--surface-2); color: var(--ink);
 }
-.bag-tile img { width: 30px; height: 30px; image-rendering: pixelated; }
+/* Child selectors, one size for both: `.bag-tile img` also matched the jar
+   INSIDE a coloured honey's `.item-fx` (26px), so the jar drew at 30px and
+   its foil, masked to a 26px box, missed it - the Rare forms dialog's fault. */
+.bag-tile > img, .bag-tile > .item-fx { width: 30px; height: 30px; image-rendering: pixelated; }
 .bag-name {
   font-size: 10px; line-height: 1.15; text-align: center; color: var(--ink-soft);
   /* Two lines, then clipped. "Repel" and "Silver Nanab Berry" share this row. */
@@ -2918,6 +2923,11 @@ canvas {
 .ev-trophy span { display: grid; gap: 3px; font-size: 14px; font-weight: 600; color: var(--ink); }
 .ev-trophy small { font-size: 12px; font-weight: 400; line-height: 1.4; color: var(--ink-soft); }
 
+/* THE LEAGUE: badges as a trophy count, gold where the alphas are red. */
+.ev-league .ev-banner { background: linear-gradient(90deg, #f6e6bf, #fdf6e4); border-color: #e2c27a; }
+.ev-league .ev-banner img { image-rendering: pixelated; }
+.ev-league .ev-trophy > b { background: linear-gradient(160deg, #d8a13a, #7a4a08); box-shadow: 0 3px 0 #553305; }
+
 .ev-go {
   width: 100%; min-height: 40px; cursor: pointer;
   font-family: var(--pixel); font-size: 11px;
@@ -3032,14 +3042,30 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 }
 /* The box the moving layers are absolute inside. `Sprite fx` returns a
    `position: relative` span, so this only has to give it a size - and every
-   layer masks to the sprite's own PNG, which needs a square to mask within. */
-.vr-art { width: 54px; height: 54px; }
-.vr-art .sprite-fx,
-.vr-art img,
-.vr-art .sprite-showdown {
-  width: 77%; height: 77%;
+   layer masks to the sprite's own PNG, which needs a square to mask within.
+
+   CHILD SELECTORS, AND THE SPRITE FILLS THE BOX. This was `.vr-art img` at
+   77%, which also matched the <img> INSIDE `.sprite-fx`: the creature came out
+   77% of a 77% box, pinned top-left, while every layer (`inset: 0`, masked to
+   `--art` at `center / contain`) filled and centred on the outer box - so each
+   aura, foil, cut and scanline sat off the creature, and the plain sprite
+   looked half the size of the Showdown one. A layer is only on the creature
+   if the <img> fills exactly the box the layer fills. Only Showdown is 77%: its
+   frame fills its canvas where an ordinary sprite fills 0.77 of its own. */
+.vr-art {
+  width: 54px; height: 54px;
+  display: grid; place-items: center;
+  /* Room for the layers that reach past the sprite's box by design -
+     Chaotic's vortex (-16%), Projection's beam and base, Shadow's flames - so
+     they overhang the card's padding rather than the tier's name. */
+  margin: 4px 0 8px;
+}
+.vr-art > .sprite-fx,
+.vr-art > img {
+  width: 100%; height: 100%;
   object-fit: contain; image-rendering: pixelated;
 }
+.vr-art > .sprite-showdown { width: 77%; height: 77%; }
 .vr-name {
   font-family: var(--pixel); font-size: 9px;
   color: var(--ink); text-align: center;
@@ -5064,7 +5090,7 @@ button:disabled { transition: none; }
      explaining what is running has no way to open. */
   pointer-events: auto;
 }
-.fieldbox img { width: 30px; height: 30px; image-rendering: pixelated; }
+.fieldbox > span > img { width: 30px; height: 30px; image-rendering: pixelated; }
 /* A world event: the same card, gold-rimmed, so it reads as the world doing
    something rather than an item you used. */
 .fieldbox.event > span { box-shadow: 0 0 0 2px var(--gold) inset; }
@@ -5119,7 +5145,7 @@ button:disabled { transition: none; }
      nothing left for it to reach. */
   .fieldbox { flex-direction: column; align-items: flex-end; gap: 6px; }
   .fieldbox > span { padding: 6px 10px 5px; gap: 7px; }
-  .fieldbox img, .fieldbox .item-fx { width: 26px; height: 26px; }
+  .fieldbox > span > img, .fieldbox .item-fx { width: 26px; height: 26px; }
   .fieldbox b { font-size: 15px; }
   .fieldbox i { font-size: 9px; }
 }
@@ -5875,7 +5901,7 @@ button:disabled { transition: none; }
 .tp-copy:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
 .tp-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .tp-stats { flex-wrap: nowrap; }
-/* One row at any width: the four counts share what the ring leaves. */
+/* One row at any width: the five counts share what the ring leaves. */
 .tp-stats > span:not(.tp-ring) {
   flex: 1 1 0; min-width: 0;
   display: grid; justify-items: center; padding: 5px 4px;
@@ -6299,6 +6325,529 @@ button:disabled { transition: none; }
    redefined here; the rules below are only the few places a light pastel was
    the design itself. The world stays as drawn - the map, the battle skies and
    the rare-form effects are art, and the art does not change at night. */
+/* ================================================================ POKEMON LEAGUE
+   docs/battles.md. The Trade Center's page (`.tc-page`, `.tc-head`, `.tc-home`)
+   so the League reads as the same game; its own parts below. Tokens only, so
+   night mode needs nothing extra; a card's accent is its type's `--tc`, the
+   colour its type chip already wears. */
+.lg-page .tc-bar, .lg-page .tc-main { max-width: 1000px; }
+.lg-main { display: grid; gap: 14px; }
+.lg-kicker { font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+
+/* ---- the region strip: nine regions, pinned under the title. It scrolls
+   sideways - nine names do not fit a 360px phone - and fades at its edges so
+   the next region shows there is more; the chosen one is kept in view. */
+.lg-strip-wrap { max-width: 1000px; margin: 0 auto; padding: 0 16px 10px; }
+.lg-strip {
+  display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity;
+  scrollbar-width: none; padding: 2px;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+          mask: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+}
+.lg-strip::-webkit-scrollbar { display: none; }
+.lg-strip button {
+  flex: none; scroll-snap-align: center; min-width: 86px; min-height: 44px;
+  display: grid; place-items: center; gap: 2px; padding: 5px 12px; cursor: pointer;
+  font: inherit; color: var(--ink-soft); background: var(--surface-2);
+  border: 2px solid var(--line); border-radius: 11px;
+}
+.lg-strip button:first-child { margin-left: 10px; }
+.lg-strip button:last-child { margin-right: 10px; }
+.lg-strip b { font-family: var(--display); font-weight: 600; font-size: 14px; line-height: 1; }
+.lg-strip em { font-style: normal; font-family: var(--pixel); font-size: 9px; line-height: 1; color: var(--ink-faint); }
+.lg-strip button:hover { border-color: var(--line-firm); background: var(--surface); }
+.lg-strip button.on { background: var(--canopy); border-color: var(--canopy); color: #fff; box-shadow: 0 2px 0 rgba(0, 0, 0, .18); }
+.lg-strip button.on em { color: #cfe8d8; }
+.lg-strip button.shut { opacity: .72; }
+.lg-strip button.done:not(.on) { border-color: var(--gold); }
+.lg-strip button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.lg-lock {
+  width: 11px; height: 11px; flex: none; vertical-align: -1px;
+  fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ---- the region: its name, its game, and a badge case that fills. */
+.lg-hero {
+  display: grid; gap: 12px; padding: 16px 18px; border-radius: 16px;
+  border: 2px solid var(--line); box-shadow: 0 3px 0 var(--shadow-soft);
+  background: linear-gradient(135deg, var(--canopy-soft), var(--surface-2) 70%);
+}
+.lg-hero h2 { margin: 2px 0 0; font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1; color: var(--ink); }
+.lg-hero p { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
+.lg-hero.shut { background: var(--surface-2); }
+.lg-case { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.lg-case li {
+  width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--line);
+}
+.lg-case img { width: 32px; height: 32px; image-rendering: auto; filter: grayscale(1) opacity(.3); }
+.lg-case li.won { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+.lg-case li.won img { filter: none; }
+.lg-section {
+  margin: 6px 2px -4px; font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--ink);
+}
+.lg-list { display: grid; gap: 12px; }
+@media (min-width: 820px) { .lg-list { grid-template-columns: 1fr 1fr; align-items: start; } }
+
+/* ---- an opponent: portrait, who, the facts, their team, and one button. */
+/* The accent reads `--tc` from the card's own `.t-<type>` class - a default
+   declared here would win the tie (same specificity, later in the file) and
+   paint every card grey, so the fallback lives in the `var()` instead. */
+.lg-card {
+  display: grid; gap: 10px; min-width: 0; padding: 12px 12px 12px 14px;
+  background: var(--surface); border: 2px solid var(--line); border-left: 6px solid var(--tc, var(--ink-faint));
+  border-radius: 16px; box-shadow: 0 3px 0 var(--shadow-soft);
+}
+.lg-card.champ {
+  border-color: var(--gold); border-left-color: var(--gold);
+  background: linear-gradient(160deg, var(--gold-soft), var(--surface) 55%);
+}
+.lg-card-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.lg-portrait {
+  width: 76px; height: 76px; display: grid; place-items: center; overflow: hidden;
+  border-radius: 14px; background: var(--surface-2);
+  background: color-mix(in srgb, var(--tc, var(--ink-faint)) 18%, var(--surface-2));
+}
+.lg-portrait img { width: 76px; height: 76px; image-rendering: pixelated; }
+.lg-card.shut .lg-portrait img { filter: grayscale(.7) opacity(.75); }
+.lg-who { display: grid; gap: 4px; min-width: 0; align-content: start; }
+.lg-who h4 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 19px; line-height: 1.05; color: var(--ink); }
+.lg-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.lg-cap, .lg-trained {
+  font-family: var(--pixel); font-size: 9px; line-height: 1; padding: 4px 6px 3px; border-radius: 5px;
+  color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line-firm);
+}
+.lg-trained { color: var(--ready-ink); border-color: var(--ready); background: var(--gold-soft); }
+.lg-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); }
+.lg-badge img { width: 20px; height: 20px; }
+.lg-stamp {
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  font-family: var(--pixel); font-size: 9px; padding: 4px 7px 3px; border-radius: 6px;
+  color: var(--ink-faint); border: 2px solid currentColor; transform: rotate(-3deg);
+}
+.lg-stamp.open { color: var(--canopy); }
+.lg-stamp.won { color: var(--gold); }
+
+.lg-party { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lg-party li {
+  width: 54px; display: grid; justify-items: center; gap: 1px; padding: 3px 2px 4px;
+  border-radius: 10px; background: var(--surface-2);
+}
+.lg-party img { width: 44px; height: 44px; image-rendering: pixelated; object-fit: contain; }
+.lg-party i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-soft); }
+.lg-party.small { gap: 4px; }
+.lg-party.small li { width: 40px; padding: 2px 1px 3px; }
+.lg-party.small img { width: 32px; height: 32px; }
+
+.lg-card-go { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.lg-go {
+  min-height: 42px; padding: 8px 20px; cursor: pointer; font: inherit;
+  font-family: var(--display); font-weight: 700; font-size: 15px; color: #fff;
+  background: var(--canopy); border: 0; border-radius: 11px; box-shadow: 0 3px 0 rgba(0, 0, 0, .22);
+}
+.lg-go:hover { filter: brightness(1.08); }
+.lg-go:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, .22); }
+.lg-go:disabled { opacity: .45; cursor: default; transform: none; }
+.lg-go:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.lg-go.quiet { color: var(--ink); background: var(--surface-2); box-shadow: 0 3px 0 var(--shadow-soft); }
+.lg-go.small { min-height: 34px; padding: 5px 12px; font-size: 13px; }
+.lg-go.big { min-height: 50px; padding: 10px 26px; font-size: 17px; }
+.lg-card.champ .lg-go { background: var(--gold); }
+.lg-more {
+  min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-soft);
+  background: transparent; border: 2px solid var(--line); border-radius: 10px;
+}
+.lg-more:hover { border-color: var(--line-firm); color: var(--ink); }
+.lg-why { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-faint); }
+/* The button and what it pays, side by side; the rematch prize is a meter
+   that refills as you walk (a `scaleX`, like a health bar). */
+.lg-go-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.lg-prize { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-soft); }
+.lg-prize b { color: var(--gold); font-weight: 700; }
+.lg-clock {
+  width: 46px; height: 7px; overflow: hidden; border-radius: 4px;
+  background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-firm);
+}
+.lg-clock i { display: block; height: 100%; background: var(--gold); transform-origin: left; }
+.lg-tpay { font-style: normal; color: var(--gold); font-weight: 700; }
+
+/* A gym's own trainers: a portrait, who, their team, a button - the team on
+   its own line on a phone, where four columns do not fit. */
+.lg-trainers { display: grid; gap: 6px; margin: 0; padding: 8px 0 0; list-style: none; border-top: 2px dashed var(--line); }
+/* `>`: a row's own party is a list too, and must not inherit the row's grid. */
+.lg-trainers > li {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "pic name go" "pic party party";
+  align-items: center; gap: 4px 10px; padding: 6px 8px; border-radius: 12px; background: var(--surface-2);
+}
+.lg-trainers > li.won { box-shadow: inset 0 0 0 2px var(--gold); }
+.lg-tpic { grid-area: pic; width: 44px; height: 44px; image-rendering: pixelated; object-fit: cover; object-position: top; border-radius: 10px; background: var(--surface); }
+.lg-tname { grid-area: name; display: grid; min-width: 0; }
+.lg-tname i { font-style: normal; font-size: 11px; color: var(--ink-faint); }
+.lg-tname b { font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-trainers .lg-party { grid-area: party; }
+.lg-trainers .lg-go { grid-area: go; }
+
+/* ---- choosing a team. The foe you face, the rules, the picker, and a dock
+   pinned to the bottom of the screen - the thumb's end of a phone - holding
+   your team and the one button that starts the fight. */
+.lg-pick { display: grid; gap: 12px; padding-bottom: 8px; }
+.lg-foe {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center;
+  padding: 12px; border-radius: 16px; background: var(--surface); border: 2px solid var(--line);
+  box-shadow: 0 3px 0 var(--shadow-soft);
+}
+.lg-foe-pic { width: 80px; height: 80px; image-rendering: pixelated; border-radius: 14px; background: var(--surface-2); }
+.lg-foe-who { display: grid; gap: 4px; min-width: 0; }
+.lg-foe-who h4 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 20px; color: var(--ink); }
+.lg-rules { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lg-rules li {
+  font-size: 12.5px; color: var(--ink-soft); padding: 5px 10px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--line);
+}
+.lg-rules b { color: var(--ink); }
+.lg-pick-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lg-pick-head h4 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 16px; color: var(--ink); }
+.lg-refused { margin: 0; font-size: 12px; color: var(--ink-faint); }
+.lg-dock {
+  position: sticky; bottom: 0; z-index: 2; margin: 4px -16px -48px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--surface); border-top: 2px solid var(--line); box-shadow: 0 -3px 0 var(--shadow-soft);
+}
+/* ONE ROW, whatever the team size: the slots shrink (to ~26px for six at a
+   320px phone) and the button keeps its words on one line. They wrapped - six
+   slots in two rows and "Save team" broken over two lines - at 360px. */
+.lg-dock-team { display: flex; gap: 5px; min-width: 0; flex: 1 1 auto; }
+.lg-dock-team i {
+  flex: 0 1 40px; min-width: 0; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%;
+  background: var(--surface-2); border: 2px dashed var(--line-firm);
+}
+.lg-dock-team i.on { border-style: solid; border-color: var(--canopy); background: var(--canopy-soft); }
+.lg-dock-team img { width: 90%; height: 90%; image-rendering: pixelated; }
+.lg-dock .lg-go { flex: none; white-space: nowrap; }
+@media (max-width: 400px) { .lg-dock .lg-go.big { padding: 10px 16px; font-size: 16px; } }
+/* The level a tap would take, on a picker tile (a battle team's question). */
+.pk-lv {
+  position: absolute; left: 3px; bottom: 2px; font-family: var(--pixel); font-size: 9px;
+  color: var(--ink); pointer-events: none; text-shadow: 0 1px 0 var(--surface);
+}
+
+/* ================================================================ THE FIGHT
+   Covers the page. Three rows - a bar, the scene, the controls - and on a
+   sideways phone two columns, the controls beside the scene, since 360px of
+   height cannot hold both stacked. The scene is the encounter's own sky and
+   floor (`.battle[data-area]`), sized to the room left by the largest 16:10
+   box that fits (`.ft-stage` is a size container, so `cqh` is its height). */
+.ft {
+  position: fixed; inset: 0; z-index: 10; display: grid;
+  /* `minmax(0, ...)`: an `auto` column grows to its widest child's content,
+     and at 320px that pushed the whole fight wider than the screen. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto; background: var(--paper);
+  animation: battle-in .2s ease-out;
+}
+.ft-top {
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  background: var(--surface); border-bottom: 2px solid var(--line);
+}
+.ft-vs { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ft-vs img { width: 34px; height: 34px; image-rendering: pixelated; border-radius: 50%; background: var(--surface-2); object-fit: cover; object-position: top; }
+.ft-vs span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--ink); }
+.ft-vs i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.ft-vs b { font-family: var(--display); font-weight: 700; }
+.ft-turn { min-width: 58px; text-align: right; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.ft-stage { min-height: 0; display: grid; place-items: center; padding: 10px; container-type: size; }
+.battle.ft-scene {
+  position: relative; inset: auto; width: min(100cqw, 160cqh, 1000px); aspect-ratio: 16 / 10;
+  border-radius: 14px; box-shadow: 0 4px 0 var(--shadow-soft);
+}
+
+.ft-mon { position: absolute; aspect-ratio: 1; display: grid; place-items: center; }
+.ft-mon.foe { right: 8%; top: 13%; width: 31%; }
+.ft-mon.me { left: 5%; bottom: 2%; width: 42%; }
+.ft-base {
+  position: absolute; left: -12%; right: -12%; bottom: 4%; height: 22%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, .28), rgba(0, 0, 0, .12) 60%, transparent);
+}
+.ft-mon.me .ft-base { bottom: 0; }
+.ft-sprite { position: relative; width: 100%; height: 100%; }
+.ft-sprite > img, img.ft-sprite { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.ft-mon > .sprite-showdown { width: 77%; height: 77%; }
+.ft-sprite.flip { transform: scaleX(-1); }
+.ft-mon.in { animation: ft-in .45s cubic-bezier(.2, .9, .3, 1.2) both; }
+.ft-mon.foe.lunge { animation: ft-lunge-foe .42s ease-in-out; }
+.ft-mon.me.lunge { animation: ft-lunge-me .42s ease-in-out; }
+.ft-mon.hit { animation: ft-hit .5s steps(1, end); }
+.ft-mon.down { animation: ft-down .55s ease-in forwards; }
+@keyframes ft-in { from { transform: scale(.25); opacity: 0; } }
+@keyframes ft-lunge-me { 45% { transform: translate(9%, -7%); } }
+@keyframes ft-lunge-foe { 45% { transform: translate(-9%, 7%); } }
+@keyframes ft-hit {
+  0%, 40%, 80% { opacity: .25; transform: translateX(-4%); }
+  20%, 60%, 100% { opacity: 1; transform: translateX(4%); }
+}
+@keyframes ft-down { to { transform: translateY(35%); opacity: 0; } }
+/* The trainer, standing where their Pokemon will, until it is sent out. */
+.ft-coach {
+  position: absolute; right: 10%; top: 5%; width: 27%; image-rendering: pixelated;
+  animation: ft-coach .55s cubic-bezier(.2, .8, .3, 1) both;
+}
+@keyframes ft-coach { from { transform: translateX(50%); opacity: 0; } }
+
+/* HEALTH BOXES: a card over the art, the foe's top-left and yours bottom-
+   right, as the games lay them out. The bar is a scale, not a width, so its
+   fall is a transform. */
+.ft-hp {
+  position: absolute; display: grid; gap: 4px; padding: .9cqw 1.3cqw 1cqw; min-width: 0;
+  background: var(--glass); border: 2px solid var(--line-firm); border-radius: 1.2cqw;
+  box-shadow: 0 .5cqw 0 rgba(0, 0, 0, .18); color: var(--ink);
+}
+.ft-hp.foe { left: 3.5%; top: 6%; width: 43%; }
+.ft-hp.me { right: 3.5%; bottom: 7%; width: 45%; }
+.ft-hp-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.ft-hp-top b {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--display); font-weight: 700; font-size: max(12px, 2.5cqw); line-height: 1.1;
+}
+.ft-hp-top i { font-style: normal; font-family: var(--pixel); font-size: max(9px, 1.6cqw); color: var(--ink-soft); }
+.ft-bar {
+  height: max(6px, 1.3cqw); overflow: hidden; border-radius: 99px;
+  background: rgba(0, 0, 0, .22); box-shadow: inset 0 1px 0 rgba(0, 0, 0, .2);
+}
+.ft-fill {
+  display: block; height: 100%; border-radius: inherit; background: var(--good);
+  transform-origin: left center; transition: transform .6s ease-out;
+}
+.ft-fill.mid { background: var(--ready); }
+.ft-fill.low { background: var(--bad); }
+.ft-hp-bot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.ft-hp-bot em { font-style: normal; font-family: var(--pixel); font-size: max(9px, 1.6cqw); color: var(--ink-soft); }
+.ft-pips { display: flex; gap: 3px; }
+.ft-pips i { width: max(6px, 1.1cqw); height: max(6px, 1.1cqw); border-radius: 50%; background: var(--bad); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .2); }
+.ft-pips i.out { background: var(--ink-faint); opacity: .5; }
+.ft-st {
+  font-family: var(--pixel); font-size: 9px; line-height: 1; padding: 3px 5px 2px; border-radius: 4px; color: #fff;
+}
+.st-par { background: #c9a227; } .st-brn { background: #e0703c; } .st-psn { background: #9b53a0; }
+.st-slp { background: #7c7c7c; } .st-frz { background: #4fb6c9; }
+
+/* A MOVE LANDS: one effect for every type, coloured by the type's `--tc` - a
+   ring that bursts and six sparks thrown outward from the target. The shape
+   of a spark is the type's; the motion is the same for all of them. */
+/* `.t-<type>` gives the effect its `--tc` - and a type chip's background,
+   which painted the whole box a solid square until this took it back off. */
+.ft-fx { position: absolute; aspect-ratio: 1; pointer-events: none; z-index: 2; background: none; }
+.ft-fx.at-foe { right: 8%; top: 13%; width: 31%; }
+.ft-fx.at-me { left: 5%; bottom: 2%; width: 42%; }
+/* A flash of the type's colour where it lands, a ring that bursts, sparks. */
+.ft-fx::before {
+  content: ""; position: absolute; inset: 8%; border-radius: 50%;
+  background: radial-gradient(closest-side, #fff, var(--tc) 35%, transparent 72%);
+  animation: ft-flash .5s ease-out both;
+}
+@keyframes ft-flash { 0% { transform: scale(.3); opacity: .95; } 100% { transform: scale(1.25); opacity: 0; } }
+.ft-fx b {
+  position: absolute; inset: 18%; border-radius: 50%; border: max(4px, 1.1cqw) solid var(--tc);
+  box-shadow: 0 0 2.5cqw var(--tc), inset 0 0 2.5cqw var(--tc);
+  animation: ft-ring .6s ease-out both;
+}
+.ft-fx i {
+  position: absolute; left: 41%; top: 41%; width: 18%; height: 18%;
+  background: radial-gradient(circle at 40% 35%, #fff, var(--tc) 55%);
+  border-radius: 50%; opacity: 0; animation: ft-spark .65s cubic-bezier(.1, .7, .3, 1) both;
+}
+.ft-fx i:nth-child(2) { --a: 0deg; } .ft-fx i:nth-child(3) { --a: 60deg; animation-delay: .04s; }
+.ft-fx i:nth-child(4) { --a: 120deg; } .ft-fx i:nth-child(5) { --a: 180deg; animation-delay: .06s; }
+.ft-fx i:nth-child(6) { --a: 240deg; } .ft-fx i:nth-child(7) { --a: 300deg; animation-delay: .03s; }
+@keyframes ft-ring { from { transform: scale(.2); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+@keyframes ft-spark {
+  0% { transform: rotate(var(--a)) translateY(0) scale(.4); opacity: 1; }
+  100% { transform: rotate(var(--a)) translateY(-240%) scale(1.1); opacity: 0; }
+}
+.ft-fx.t-fire i { border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; clip-path: polygon(50% 0, 90% 60%, 50% 100%, 10% 60%); }
+.ft-fx.t-water i, .ft-fx.t-ice i { border-radius: 50% 50% 50% 0; }
+.ft-fx.t-electric i { border-radius: 0; clip-path: polygon(40% 0, 100% 0, 60% 45%, 90% 45%, 20% 100%, 40% 55%, 10% 55%); }
+.ft-fx.t-grass i, .ft-fx.t-bug i { border-radius: 0 70% 0 70%; }
+.ft-fx.t-ice i { clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.ft-fx.t-rock i, .ft-fx.t-ground i, .ft-fx.t-steel i { border-radius: 2px; clip-path: polygon(20% 0, 90% 15%, 100% 70%, 45% 100%, 0 60%); }
+.ft-fx.t-psychic i, .ft-fx.t-fairy i { clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.ft-fx.t-ghost i, .ft-fx.t-dark i { border-radius: 50% 50% 20% 20%; }
+
+/* ---- the controls: what is happening, then what you can do. */
+.ft-panel {
+  display: grid; gap: 10px; padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  background: var(--surface); border-top: 2px solid var(--line);
+}
+.ft-panel > * { width: 100%; max-width: 900px; margin-inline: auto; }
+.ft-msg {
+  position: relative; min-height: 3.2em; margin: 0 auto; padding: 10px 34px 10px 14px;
+  font-family: var(--display); font-weight: 500; font-size: 16px; line-height: 1.3; color: var(--ink);
+  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px;
+}
+.ft-msg.live { cursor: pointer; }
+.ft-more {
+  position: absolute; right: 12px; bottom: 8px; font-size: 11px; color: var(--path);
+  animation: ft-more .9s ease-in-out infinite;
+}
+@keyframes ft-more { 50% { transform: translateY(3px); opacity: .5; } }
+.ft-cmds { display: grid; gap: 8px; }
+.ft-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ft-move {
+  position: relative; min-height: 58px; min-width: 0; display: grid; align-content: center; gap: 5px;
+  padding: 8px 12px; cursor: pointer; text-align: left; font: inherit; color: var(--ink);
+  background: var(--surface-2);
+  background: linear-gradient(170deg, color-mix(in srgb, var(--tc) 26%, var(--surface)), color-mix(in srgb, var(--tc) 10%, var(--surface)));
+  border: 2px solid var(--tc); border-radius: 13px; box-shadow: 0 3px 0 color-mix(in srgb, var(--tc) 55%, #000);
+}
+.ft-move b {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--display); font-weight: 700; font-size: 15px; line-height: 1.1;
+}
+.ft-move-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ft-move-meta i {
+  font-style: normal; font-family: var(--pixel); font-size: 9px; line-height: 1;
+  padding: 3px 5px 2px; border-radius: 4px; color: #fff; background: var(--tc);
+}
+.ft-move-meta u { text-decoration: none; font-family: var(--pixel); font-size: 9px; color: var(--ink-soft); margin-left: auto; }
+.ft-move-meta em { font-style: normal; font-family: var(--pixel); font-size: 9px; line-height: 1; padding: 3px 5px 2px; border-radius: 4px; }
+.ft-move-meta em.up { color: #fff; background: var(--good); }
+.ft-move-meta em.down { color: var(--ink); background: var(--line-firm); }
+.ft-move-meta em.none { color: #fff; background: var(--ink-faint); }
+.ft-move kbd, .ft-team-btn kbd {
+  position: absolute; top: 5px; right: 7px; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint);
+}
+.ft-move:hover:not(:disabled) { transform: translateY(-1px); }
+.ft-move:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 color-mix(in srgb, var(--tc) 55%, #000); }
+.ft-move:disabled { opacity: .5; cursor: default; }
+.ft-move:focus-visible, .ft-team-btn:focus-visible, .ft-switch button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.ft-team-btn {
+  position: relative; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; font: inherit; font-weight: 700; font-size: 14px; color: var(--ink);
+  background: var(--surface); border: 2px solid var(--line-firm); border-radius: 12px;
+}
+.ft-team-btn:hover:not(:disabled) { border-color: var(--canopy); color: var(--canopy); }
+.ft-team-btn:disabled { opacity: .5; cursor: default; }
+.ft-team-btn kbd { top: 50%; transform: translateY(-50%); right: 12px; }
+/* ---- Ranked (docs/ranked.md): the strip's first tab, and the defense teams. */
+.lg-strip .rk-tab { border-color: var(--gold); }
+.lg-strip .rk-tab.on { background: var(--gold); border-color: var(--gold); color: #fff; }
+.lg-strip .rk-tab.on em { color: #fff; }
+.rk-hero { display: grid; gap: 10px; }
+.rk-slots { align-items: stretch; }
+.rk-slot.empty { border-style: dashed; }
+.rk-slot-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.rk-slot-head b { font-size: 14px; color: var(--ink); }
+.rk-warn { font-style: normal; font-size: 12px; font-weight: 700; color: var(--bad); }
+.lg-party li.rk-gone { opacity: .6; }
+.rk-gone-mark {
+  width: 44px; height: 44px; display: grid; place-items: center;
+  font-family: var(--display); font-size: 22px; color: var(--ink-faint);
+}
+.rk-note { margin: 0 0 8px; }
+.rk-battle { border-left-color: var(--gold); margin-bottom: 4px; }
+.ft-turn i { font-style: normal; }
+.ft-turn.hurry { color: var(--bad); font-weight: 700; }
+.ft-note { margin: 6px 0 0; font-size: 12.5px; font-weight: 700; color: var(--bad); text-align: center; }
+.rk-use { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 13px; color: var(--ink-soft); }
+.rk-friends { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+/* The gym-trainer row's pieces (`.lg-tpic`, `.lg-tname`) carry grid-area
+   names, so this grid names the same areas - without them the pieces were
+   placed in implicit tracks, the button top-left and the name bottom-right. */
+.rk-friends > li {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "pic name go";
+  align-items: center; gap: 10px; padding: 6px 8px; border-radius: 12px; background: var(--surface-2);
+}
+.rk-friends .lg-go { grid-area: go; }
+.rk-edit-head { display: grid; gap: 6px; }
+.rk-edit-head h4 { margin: 0; font-family: var(--display); font-size: 19px; color: var(--ink); }
+
+/* Pokémon and Bag, side by side under the moves. */
+.ft-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ft-side > :only-child { grid-column: 1 / -1; }
+.ft-bag li button > img { grid-row: span 2; width: 30px; height: 30px; justify-self: center; image-rendering: pixelated; }
+.ft-empty { margin: 0; font-size: 13px; color: var(--ink-soft); text-align: center; }
+
+.ft-switch { display: grid; gap: 8px; }
+.ft-switch ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ft-switch li button {
+  width: 100%; min-height: 52px; display: grid; grid-template-columns: 40px minmax(0, 1fr); grid-template-rows: auto auto;
+  gap: 2px 8px; align-items: center; padding: 6px 10px; cursor: pointer; text-align: left; font: inherit; color: var(--ink);
+  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px;
+}
+.ft-switch li button > img, .ft-switch li button > .sprite-showdown { grid-row: span 2; width: 40px; height: 40px; image-rendering: pixelated; }
+.ft-sw-name { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.ft-sw-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.ft-sw-name i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.ft-bar.small { height: 6px; }
+.ft-switch em { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-soft); grid-column: 2; }
+.ft-switch li button:hover:not(:disabled) { border-color: var(--canopy); }
+.ft-switch li button:disabled { opacity: .55; cursor: default; }
+
+.ft-result {
+  display: grid; justify-items: center; gap: 6px; padding: 14px; text-align: center;
+  border-radius: 14px; background: var(--surface-2); border: 2px solid var(--line);
+}
+.ft-result b { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; }
+.ft-result.won b { color: var(--good); }
+.ft-result.lost b { color: var(--bad); }
+.ft-result span { font-size: 13px; color: var(--ink-soft); }
+.ft-result-go { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+/* What the win paid: a first leader win's badge, then the money. */
+.ft-result .ft-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--ink); }
+.ft-badge img { width: 32px; height: 32px; image-rendering: pixelated; }
+.ft-result .ft-pay { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--gold); }
+/* A battle the engine refused: the one card, centred on the fight's ground. */
+.ft.ft-refused { display: grid; place-items: center; padding: 16px; }
+.ft-refused .ft-result { max-width: 420px; }
+
+/* AN UPRIGHT SCREEN: the scene takes the height it is given, up to a little
+   taller than square - a 16:10 strip on a phone left a quarter of the screen
+   empty above and below it. Every position in the scene is a percentage, so
+   the sprites and boxes follow the taller frame. */
+@media (orientation: portrait) {
+  .battle.ft-scene { aspect-ratio: auto; width: 100cqw; height: min(100cqh, 118cqw); }
+  .ft-mon.foe, .ft-fx.at-foe { top: 18%; }
+  .ft-hp.foe { top: 5%; }
+}
+/* A SIDEWAYS PHONE: the controls beside the scene, which keeps the whole
+   height for it. 360-430px tall is the shape to audit. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .ft { grid-template-columns: minmax(0, 1fr) minmax(280px, 42%); grid-template-rows: auto minmax(0, 1fr); }
+  .ft-top { grid-column: 1 / -1; padding: 5px 12px; }
+  .ft-stage { padding: 6px; }
+  .ft-panel { overflow-y: auto; border-top: 0; border-left: 2px solid var(--line); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); gap: 8px; }
+  .ft-msg { font-size: 14px; min-height: 2.8em; padding: 8px 30px 8px 12px; }
+  .ft-move { min-height: 48px; padding: 6px 10px; gap: 3px; }
+  .ft-move b { font-size: 14px; }
+  .ft-switch ul { grid-template-columns: minmax(0, 1fr); }
+}
+/* A TOUCH SCREEN: no key hints, and nothing under the 36px floor. */
+@media (hover: none) and (pointer: coarse) {
+  .ft-move kbd, .ft-team-btn kbd { display: none; }
+  .lg-more, .lg-go.small { min-height: 40px; }
+}
+/* A PHONE: all eight badges in one row of the case. */
+@media (max-width: 480px) {
+  .lg-case { gap: 5px; }
+  .lg-case li { width: 36px; height: 36px; }
+  .lg-case img { width: 26px; height: 26px; }
+  .lg-hero { padding: 14px; }
+}
+@media (max-width: 380px) {
+  .ft-move b { font-size: 14px; }
+  .ft-msg { font-size: 15px; }
+  .lg-portrait, .lg-portrait img { width: 64px; height: 64px; }
+  .lg-hero h2 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ft-mon.in, .ft-mon.lunge, .ft-mon.hit, .ft-coach, .ft-fx b, .ft-fx i, .ft-fx::before, .ft-more { animation: none; }
+  .ft-fx { display: none; }
+  .ft-mon.down { animation: none; opacity: 0; }
+  .ft-fill { transition: none; }
+}
+
+
 :root[data-theme="dark"] {
   color-scheme: dark;
   --paper: #111915; --surface: #1a241e; --surface-2: #223029;
@@ -6341,6 +6890,7 @@ button:disabled { transition: none; }
 :root[data-theme="dark"] .ev-disc .ev-banner,
 :root[data-theme="dark"] .dx-research .ev-banner { background: linear-gradient(90deg, #3a3020, #2a241a); border-color: #5a4a2e; }
 :root[data-theme="dark"] .ev-alpha .ev-banner { background: linear-gradient(90deg, #3e1f24, #2c1c1f); border-color: #6a343c; }
+:root[data-theme="dark"] .ev-league .ev-banner { background: linear-gradient(90deg, #3d3018, #2a2416); border-color: #6a5224; }
 :root[data-theme="dark"] .ev-board .ev-banner { background: linear-gradient(90deg, #3d2c1c, #2a2118); border-color: #5e4428; }
 :root[data-theme="dark"] .ev-surprise .ev-banner { background: linear-gradient(90deg, #1b3340, #172630); border-color: #2d5163; }
 :root[data-theme="dark"] .dx-notes .ev-banner { background: linear-gradient(90deg, #1f3328, #1a2a21); border-color: #2f4a3a; }
@@ -6619,13 +7169,13 @@ button:disabled { transition: none; }
           drop-shadow(0 0 3px rgba(90, 240, 255, .85)) !important;
 }
 
-.gold-shine, .gold-glint, .shadow-aura, .chaos-core, .chaos-vortex, .chaos-shards,
+.gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
 .chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .proj-cut {
   position: absolute; inset: 0; pointer-events: none;
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */
-.shadow-aura, .chaos-core, .chaos-vortex, .proj-beam, .proj-base { z-index: 0; }
-.gold-shine, .gold-glint, .shadow-aura.front, .chaos-shards, .chaos-neg, .chaos-cut, .proj-lines, .proj-cut { z-index: 3; }
+.shadow-aura, .chaos-aura, .proj-beam, .proj-base { z-index: 0; }
+.gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines, .proj-cut { z-index: 3; }
 /* Masked to the creature's own outline, or they are rectangles over the grass. */
 .gold-shine, .chaos-neg, .proj-lines {
   overflow: hidden;
@@ -6693,36 +7243,41 @@ button:disabled { transition: none; }
   100% { opacity: 0; transform: translateY(-95%) scale(.25, 1.25); }
 }
 
-/* ---- Chaotic: unstable energy. A red storm turns round it; for a frame at
-   a time it flips to a black-and-yellow negative and a slice tears away. */
-.chaos-core {
-  inset: -6%; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255, 30, 40, .5), rgba(90, 0, 10, .4) 50%, transparent);
-  animation: chaos-throb 1.2s ease-in-out infinite;
+/* ---- Chaotic: unstable energy. A red-and-black aura pulses OUT of it: a
+   glow that throbs round it, and echoes of its own silhouette - red, then
+   black, then red - that leave its body, swell and fade. And for a frame at a
+   time it flips to a black-and-yellow negative and a slice tears away.
+
+   It had a spinning vortex and four stones orbiting it, which read as
+   something circling the Pokemon rather than energy coming out of it; asked
+   for by name. An echo in the creature's own shape is what makes the pulse
+   come FROM it - a round ring hid behind a Charizard and missed a Pikachu.
+   An echo is a colour masked to the sprite (a filter cannot tint the black
+   `brightness(0)` makes); only transform and opacity animate, so a Dex
+   screen of forty stays cheap. */
+.chaos-aura { inset: 0; }
+.chaos-aura::before {
+  content: ""; position: absolute; inset: -16%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 30, 36, .6), rgba(140, 0, 12, .5) 42%,
+    rgba(12, 0, 2, .55) 68%, transparent);
+  animation: chaos-core 1.2s ease-in-out infinite;
 }
-@keyframes chaos-throb { 50% { transform: scale(1.12); opacity: .7; } }
-.chaos-vortex {
-  inset: -16%; border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent, rgba(255, 35, 35, .7) 8%, transparent 18%,
-    rgba(0, 0, 0, .75) 33%, transparent 45%, rgba(255, 90, 60, .55) 62%, transparent 74%,
-    rgba(0, 0, 0, .7) 88%, transparent);
-  -webkit-mask: radial-gradient(closest-side, transparent 40%, #000 54%, #000 66%, transparent 78%);
-          mask: radial-gradient(closest-side, transparent 40%, #000 54%, #000 66%, transparent 78%);
-  animation: chaos-spin 6s linear infinite;
+@keyframes chaos-core {
+  0%, 100% { transform: scale(.9); opacity: .7; }
+  45% { transform: scale(1.08); opacity: 1; }
 }
-@keyframes chaos-spin { to { transform: rotate(360deg); } }
-/* Each shard is a full-size box turned to its angle, the stone drawn at its
-   top edge - so the orbit is a circle round the sprite whatever its size. */
-.chaos-shards { animation: chaos-spin 5s linear infinite; }
-.chaos-shards i { position: absolute; inset: -4%; }
-.chaos-shards i::before {
-  content: ""; position: absolute; top: 0; left: 46%; width: 8%; height: 13%;
-  background: linear-gradient(160deg, #ffb3a8, #ff2222 34%, #5a0000 70%, #1a0000);
-  clip-path: polygon(50% 0, 100% 70%, 50% 100%, 0 70%);
+.chaos-aura i {
+  position: absolute; inset: 0; background: #ff2a2a;
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+  opacity: 0; animation: chaos-pulse 1.8s cubic-bezier(.15, .55, .35, 1) infinite;
 }
-.chaos-shards i:nth-child(2) { transform: rotate(95deg); }
-.chaos-shards i:nth-child(3) { transform: rotate(190deg); }
-.chaos-shards i:nth-child(4) { transform: rotate(280deg); }
+.chaos-aura i:nth-child(2) { background: #120003; animation-delay: -.6s; }
+.chaos-aura i:nth-child(3) { animation-delay: -1.2s; }
+@keyframes chaos-pulse {
+  0% { transform: scale(1); opacity: .95; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
 /* Difference with yellow keeps the blue channel and inverts the rest, so the
    creature goes black-and-amber; the white beneath it, for one frame, is the
    full negative. */
@@ -6775,13 +7330,13 @@ button:disabled { transition: none; }
 /* In a Dex tile the sprite is 84% of the cell and centred (see `.cell .holo-foil`),
    so the layers that register to it come in by the same 8%. */
 .cell .gold-shine, .cell .gold-glint, .cell .chaos-neg, .cell .chaos-cut, .cell .proj-lines,
-.cell .proj-cut, .cell .chaos-shards { inset: 8%; }
+.cell .proj-cut { inset: 8%; }
 .cell .shadow-aura { inset: 0 4% 6%; }
-.cell .chaos-core, .cell .chaos-vortex { inset: 2%; }
+.cell .chaos-aura { inset: 8%; }
 .cell .proj-beam { inset: 8% 14% 4%; }
 .cell .proj-base { inset: auto 30% 2%; }
 
 @media (prefers-reduced-motion: reduce) {
-  .gold-shine i, .gold-glint i, .shadow-aura i, .chaos-core, .chaos-vortex, .chaos-shards,
+  .gold-shine i, .gold-glint i, .shadow-aura i, .chaos-aura::before, .chaos-aura i,
   .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i, .proj-cut { animation: none; }
 }

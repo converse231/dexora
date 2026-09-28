@@ -1,4 +1,5 @@
-/* TRADING'S SERVER HALF, TESTED AGAINST THE TEST PROJECT ONLY (docs/trading.md).
+/* TRADING'S SERVER HALF - AND RANKED'S (docs/ranked.md, db/ranked.sql) -
+   TESTED AGAINST THE TEST PROJECT ONLY (docs/trading.md).
 
      node tools/tradedb.mjs
 
@@ -62,6 +63,8 @@ if (!(await q("select to_regclass('public.saves') as t"))[0].t) {
   for (const m of hard.matchAll(/```sql\r?\n([\s\S]*?)```/g)) await db.query(m[1]);
 }
 await db.query(readFileSync(new URL("../db/trading.sql", import.meta.url), "utf8"));
+// Ranked reads trading's functions, so it goes on after, as on the live project.
+await db.query(readFileSync(new URL("../db/ranked.sql", import.meta.url), "utf8"));
 
 // ---- two trainers -------------------------------------------------------------
 /* NO REALTIME HERE, and Node 20 has no WebSocket for supabase-js to find at
@@ -93,6 +96,8 @@ await q("delete from public.mons where owner = any($1)", [both]);
 await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
 await q("delete from public.blocks where blocker = any($1) or blocked = any($1)", [both]);
 await q("delete from public.reports where reporter = any($1) or reported = any($1)", [both]);
+await q("delete from public.defense_teams where owner = any($1)", [both]);
+await q("delete from public.ranked_battles where challenger = any($1) or defender = any($1)", [both]);
 // A browser pass signed in as a test trainer owns its save now (one writer per
 // save): the harness takes the claim back, or every upload here is refused.
 await q("update public.saves set session = null where user_id = any($1)", [both]);
@@ -693,6 +698,93 @@ await q("delete from public.listings where owner = any($1)", [both]);
 await q("delete from public.trades where a = any($1) or b = any($1)", [both]);
 await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
 await q("delete from public.surprise_pool where owner = any($1)", [both]);
+
+// ================================================================ RANKED 6a (docs/ranked.md)
+// ---- 42. badges: the stored save's leaders, readable by players, written by nobody ------------
+await rpc(A, "save_game", { payload: { dex: [0], box: [P(1, 25)], nextUid: 999, beaten: {
+  "kanto-brock": { wins: 2, at: 40 }, "kanto-misty": { wins: 1, at: 50 },
+  "kanto-brock-camper-liam": { wins: 1, at: 1 }, "kanto-league-lorelei": { wins: 1, at: 1 },
+  "kanto-erika": { wins: "3", at: 1 }, "kanto-koga": 7,
+} }, sess: "s-a" });
+const cardA = async () => (await q("select badges from public.trainer_cards where user_id = $1", [A.id]))[0].badges;
+assert.equal(await cardA(), 2, "a card's badges are not the leaders beaten in the stored save");
+assert.equal((await rpc(B, "card_by_name", { name: "TesterA" })).badges, 2, "a player cannot see another's badges");
+await A.c.from("trainer_cards").update({ badges: 68 }).eq("user_id", A.id);
+assert.equal(await cardA(), 2, "a trainer wrote their own badges");
+
+// ---- 43. defense teams: checked against the stored save, read-own, write-none ------------------
+await save(A, [P(1, 25), P(2, 6, 50), P(3, 9, 40, { shiny: 1 }), P(4, 3), P(5, 150, 70)]);
+const d43 = await rpc(A, "set_defense_team", { slot: 1, uids: [2, 3, 5] });
+assert.deepEqual(d43[0].team.map((m) => m.species), [6, 9, 150], "a defense team does not read the stored save");
+await refuses(rpc(A, "set_defense_team", { slot: 2, uids: [2, 99] }), "a team naming a uid not in the stored save was taken");
+await refuses(rpc(A, "set_defense_team", { slot: 2, uids: [2, 2] }), "a Pokemon went into a team twice");
+await refuses(rpc(A, "set_defense_team", { slot: 4, uids: [2] }), "a fourth slot was taken");
+await refuses(rpc(A, "set_defense_team", { slot: 2, uids: [1, 2, 3, 4, 5, 1, 2] }), "a team of seven was taken");
+await rpc(A, "set_defense_team", { slot: 2, uids: [1, 4] });
+assert.equal((await B.c.from("defense_teams").select("*")).data?.length ?? 0, 0, "a trainer read another's defense teams");
+await refuses(A.c.from("defense_teams").insert({ owner: A.id, slot: 3, uids: [1] }).then(({ error }) => { if (error) throw error; }),
+  "a trainer wrote the defense table directly");
+
+// ---- 44. practice: friends only, blind, never across a block -----------------------------------
+assert.equal(await rpc(B, "practice_team", { who: A.id }), null, "a stranger saw a defense team");
+await q("insert into public.friends (a, b, status) values ($1, $2, 'accepted')", [A.id, B.id]);
+const drawn = new Set();
+for (let i = 0; i < 30; i++) drawn.add((await rpc(B, "practice_team", { who: A.id })).map((m) => m.uid).join(","));
+assert.deepEqual([...drawn].sort(), ["1,4", "2,3,5"], "practice did not draw among the teams blind");
+await rpc(A, "block_user", { other: B.id });
+assert.equal(await rpc(B, "practice_team", { who: A.id }), null, "practice worked across a block");
+await q("delete from public.blocks where blocker = any($1) or blocked = any($1)", [both]);
+await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
+
+// ---- 45. 6b: the referee, as the deployed function runs it (handler.js + rules.js, service role) --
+{
+  const { handle } = await import("../supabase/functions/ranked-step/handler.js");
+  const { RULES_VERSION } = await import("../supabase/functions/ranked-step/rules.js");
+  const service = async (fn, args) => {
+    const { data, error } = await admin.rpc(fn, args);
+    if (error) throw new Error(error.message);
+    return data;
+  };
+  const call = (who, body, now = Date.now()) => handle({ user: who.id, body: { version: RULES_VERSION, ...body }, rpc: service, now });
+  await save(B, [P(11, 445, 60, { shiny: 1 }), P(12, 248), P(13, 373), P(14, 94)]);
+  await rpc(B, "set_defense_team", { slot: 1, uids: [11, 12] });
+  // One team is not enough to be met: the SQL's own filter, which keeps the candidate list short.
+  assert.ok(!(await service("ranked_candidates", { me: A.id })).some((c) => c.user_id === B.id),
+    "ranked_candidates offered a trainer with one team");
+  await rpc(B, "set_defense_team", { slot: 2, uids: [13, 14] });
+  await save(A, [P(1, 25), P(2, 6, 50), P(3, 9, 40)]);
+  const s45 = await call(A, { op: "start", uids: [1, 2, 3] });
+  assert.equal(s45.status, 200, `a battle did not start: ${JSON.stringify(s45.body)}`);
+  assert.ok(!("state" in s45.body) && !JSON.stringify(s45.body).includes('"seed"'), "the seed or state went out");
+  assert.equal(s45.body.view.sides[1].team.filter((f) => !f.hidden).length, 1, "more than the defender's lead was shown");
+  // No client reads or writes a battle - not the challenger, not the defender.
+  for (const who of [A, B]) {
+    const { data } = await who.c.from("ranked_battles").select("*");
+    assert.ok(!data?.length, "a client read ranked_battles");
+    await refuses(rpc(who, "ranked_load", { me: A.id }), "a client called ranked_load");
+    await refuses(rpc(who, "ranked_save", { me: A.id, id: s45.body.id, expect: 0, state: {}, n: 1, status: "won", deadline: new Date().toISOString() }),
+      "a client called ranked_save");
+  }
+  let v = s45.body.view, turns = 0;
+  while (v.over < 0) {
+    const me = v.sides[0];
+    const action = v.need[0] ? { swap: me.team.findIndex((f, k) => f.hp > 0 && k !== me.active) } : { move: 0 };
+    const r = await call(A, { op: "turn", id: s45.body.id, action });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    v = r.body.view;
+    if (++turns > 300) throw new Error("a refereed battle never ended");
+  }
+  const [row] = await q("select status, defender from public.ranked_battles where id = $1", [s45.body.id]);
+  assert.equal(row.status, v.over === 0 ? "won" : "lost");
+  assert.equal(row.defender, B.id);
+  assert.equal((await call(A, { op: "start", uids: [1] })).body.error, "nobody", "the same defender twice in a day");
+  assert.equal((await handle({ user: A.id, body: { op: "resume", version: RULES_VERSION - 1 }, rpc: service })).body.error, "version");
+  console.log(`tradedb ranked 6b ok — a ${turns}-turn battle refereed through the function's own handler on the TEST ` +
+    "project, the seed and state never sent, battles unreadable and unwritable by both trainers, the result stored, " +
+    "the 24-hour rule and old clients refused");
+}
+await q("delete from public.defense_teams where owner = any($1)", [both]);
+await q("delete from public.ranked_battles where challenger = any($1) or defender = any($1)", [both]);
 await db.end();
 console.log("tradedb ok — never-traded saves untouched, registration checked against the stored save, RLS read-own/write-none, " +
   "two racing accepts make one trade, inbox matches reconcile, stale copies stripped, arrivals completed by saving, " +
@@ -714,3 +806,6 @@ console.log("tradedb phase 6 ok — one Pokemon in several offers (the first acc
   "for the giver's save to know the id, a friend's box shows spares only, friends ask for any spare by box uid and " +
   "strangers only for the shelf, six a side, a traded Pokemon with no id is still stripped, closing an offer never " +
   "unlists, bundles move all or nothing, search finds friends' spares and shelves but never across a block");
+console.log("tradedb ranked 6a ok — badges from the stored save's leaders only, readable by players and written by nobody; " +
+  "defense teams checked against the stored save and refused when unknown, repeated, over six or out of slot, read-own/" +
+  "write-none; practice is friends-only, blind and never crosses a block");

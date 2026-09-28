@@ -16,7 +16,12 @@
     "map": "python tools/build_map.py",
     "layout": "python tools/study_layout.py",
     "shape": "python tools/study_shape.py",
-    "tilesets": "python tools/fetch_tilesets.py"
+    "tilesets": "python tools/fetch_tilesets.py",
+    "leagues": "node tools/fetch-leagues.mjs",
+    "moves": "node tools/fetch-moves.mjs",
+    "battleart": "python tools/build_battle_art.py",
+    "gyms": "node tools/tune-gyms.mjs",
+    "edge": "node tools/build-edge.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
@@ -26,6 +31,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "pg": "^8.23.0",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "esbuild": "^0.21.5"
   }
 }

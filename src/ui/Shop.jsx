@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import {
-  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, BERRIES, onShelf, speciesNeedingStone,
+  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, BERRIES, HEALS, onShelf, speciesNeedingStone,
 } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
@@ -283,6 +283,18 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
 
         <p className="shop-note">
           A stone is used up by the evolution it makes.
+        </p>
+
+        {/* THE BATTLE SHELF, last: it is for the League page, not the map. */}
+        <div className="sh-head">
+          <span>BATTLE</span>
+          <span>IN THE LEAGUE</span>
+        </div>
+
+        {shelf(HEALS)}
+
+        <p className="shop-note">
+          Used from the Bag in a League battle, in place of a move.
         </p>
       </div>
 

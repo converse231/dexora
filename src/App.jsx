@@ -36,6 +36,9 @@ import Evolve from "./ui/Evolve.jsx";
    opens, so the game's first load does not grow for anyone who never trades. */
 const TradeCenter = lazy(() => import("./ui/trade/TradeCenter.jsx"));
 const TradeScene = lazy(() => import("./ui/trade/TradeScene.jsx"));
+/* THE LEAGUE, the same way: the battle rules, rosters and moves are the
+   heaviest data in the game, and only this chunk carries them (asserted). */
+const League = lazy(() => import("./ui/league/League.jsx"));
 /* Which trades this DEVICE has shown its scene for - a per-device nicety like
    "seen" news, so localStorage and never the save. */
 const SEEN_TRADES = "dexora-trades-seen";
@@ -228,10 +231,12 @@ export default function App({
       const name = linkedTrainer();
       if (name) setTrade({ name });
       else if (!location.hash.startsWith("#/trade")) setTrade(null);   // Back, off the Trade Center page
+      if (!location.hash.startsWith("#/league")) setLeague(false);      // Back, off the League
     };
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);
   }, []);
+  const [league, setLeague] = useState(false);
   const [help, setHelp] = useState(false);
   const [forms, setForms] = useState(false);
   const [events, setEvents] = useState(false);
@@ -620,6 +625,24 @@ export default function App({
         </Suspense>
       )}
 
+      {league && (
+        <Suspense fallback={null}>
+          <League
+            engine={engine}
+            box={st?.box ?? []}
+            beaten={st?.beaten ?? {}}
+            steps={st?.steps ?? 0}
+            team={st?.team ?? []}
+            signedIn={Boolean(account)}
+            onClose={() => {
+              setLeague(false);
+              if (history.state?.lg) history.back();
+              else if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+            }}
+          />
+        </Suspense>
+      )}
+
       {scenes.length > 0 && (
         <Suspense fallback={null}>
           <TradeScene key={scenes[0].id} trade={scenes[0]} onDone={() => setScenes((q) => q.slice(1))} />
@@ -634,6 +657,7 @@ export default function App({
           busy={Boolean(enc || evo)}
           onTravel={(id) => { if (engine.travel(id)) setEvents(false); }}
           onSelect={(id) => { setEvents(false); setEntry(id); }}
+          onLeague={() => { setEvents(false); setLeague(true); }}
           onClose={() => setEvents(false)}
         />
       )}
@@ -683,6 +707,7 @@ export default function App({
         onHelp={() => setHelp(true)}
         onForms={() => setForms(true)}
         onEvents={() => setEvents(true)}
+        onLeague={() => setLeague(true)}
         onTrade={() => setTrade({ name: null })}
         tradeAlert={offerAlert > 0 || (inbox?.friend_requests ?? 0) > 0}
         onNews={() => setNews(true)}
