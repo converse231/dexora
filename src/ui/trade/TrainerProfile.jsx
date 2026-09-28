@@ -17,8 +17,11 @@ const joined = (at) => (at
   ? new Date(at).toLocaleDateString(undefined, { month: "short", year: "numeric" })
   : "");
 
-/* The Pokedex ring and three counts: how far, how rare, how finished, how
-   social. The ring is the one that is a proportion, so it is the one drawn. */
+/* The Pokedex ring and its counts: how far, how far in the League, how rare,
+   how finished, how social. The ring is the one that is a proportion, so it
+   is the one drawn. Badges are counted by the server from the stored save's
+   League wins (db/trading.sql `card_stats`); a server that has not run that
+   SQL yet sends none, which reads as 0. */
 function Stats({ card }) {
   const pct = card.dex_count / SPECIES.length;
   return (
@@ -27,6 +30,7 @@ function Stats({ card }) {
         <b>{Math.round(pct * 100)}<i>%</i></b>
       </span>
       <span><b>{card.dex_count}</b>Pokédex</span>
+      <span><b>{card.badges ?? 0}</b>badges</span>
       <span><b>{card.variants}</b>rare forms</span>
       <span><b>{card.stars}</b>stars</span>
       <span><b>{card.trades}</b>trades</span>

@@ -531,6 +531,21 @@ export const BERRIES = [
 
 export const berryById = (id) => BERRIES.find((b) => b.id === id) ?? null;
 
+/* THE BATTLE SHELF (docs/battles.md, *Economy*): used in a League battle
+   and nowhere else, one a turn, in place of a move. A FRACTION of max HP,
+   never a flat amount: measured, a flat 20 HP Potion LOWERED a late gym's
+   win rate from 60% to 28% - it healed a sliver of a Lv 60's HP and cost the
+   turn. `battle.js` reads what each does from here, so the shelf and the
+   rules are one list; the CPU uses none. */
+export const HEALS = [
+  { id: "potion", name: "Potion", price: 8, level: 6, heal: 0.5,
+    blurb: "Heals half its HP, in a League battle" },
+  { id: "full-heal", name: "Full Heal", price: 10, level: 6, cure: true,
+    blurb: "Cures a burn, poison, paralysis, sleep or freeze" },
+  { id: "revive", name: "Revive", price: 40, level: 15, revive: 0.5,
+    blurb: "A fainted Pokémon back at half its HP" },
+];
+
 /* WHAT IS BEING EATEN, AS A NUMBER, and one function per system so no screen
    or roll has to know how a stage becomes a multiplier.
 
@@ -652,7 +667,7 @@ export const forSale = (item) => item.price > 0 && item.level !== null;
 export const SHOP_BALLS = BALLS.filter(forSale);
 
 // Everything the game can name, whether or not it is for sale.
-export const ALL_ITEMS = [...BALLS, ...STONES, ...KEY_ITEMS, ...FIELD, ...BERRIES];
+export const ALL_ITEMS = [...BALLS, ...STONES, ...KEY_ITEMS, ...FIELD, ...BERRIES, ...HEALS];
 
 /* WHAT THE BAG SHOWS, asked in one place because two screens now ask it.
 
@@ -674,7 +689,7 @@ export const carriedBalls = (bag) =>
    because a repel is no longer a decision you can act on. */
 export const usefulItems = (bag, enc) =>
   (enc ? BERRIES : FIELD).filter((i) => (bag?.[i.id] ?? 0) > 0);
-export const SHOP_ITEMS = [...SHOP_BALLS, ...BERRIES, ...FIELD, ...STONES];
+export const SHOP_ITEMS = [...SHOP_BALLS, ...BERRIES, ...FIELD, ...STONES, ...HEALS];
 export const itemById = (id) => ALL_ITEMS.find((i) => i.id === id);
 
 /* WHAT A SHELF SHOWS AT A GIVEN LEVEL, and this reverses a decision the shop

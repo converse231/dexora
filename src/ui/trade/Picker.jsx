@@ -40,10 +40,16 @@ const SORTS = {
 };
 
 /* `missing` is {label, test(species)} - "You don't have", "They don't have".
-   `limit(species)` caps picks of one species (`keepLast`). */
+   `limit(species)` caps picks of one species (`keepLast`); `kin(species)` is
+   what counts as the same one - by default the species itself, and for
+   ranked's species clause its base species, so a Mega and its species are
+   one (`baseOf`). */
 export default function Picker({
   mons, picked, max, onChange, empty, prefer = "low", missing = null,
-  keyFn = keyOf, query = "", sort: sort0 = "dex", limit = null, tray: showTray = true,
+  keyFn = keyOf, query = "", sort: sort0 = "dex", limit = null, kin = null, tray: showTray = true,
+  /* The level a tap would take, on the tile: for a battle team the level is
+     the whole question, where for a trade the species is. */
+  level = false,
 }) {
   const [q, setQ] = useState(query);
   const [only, setOnly] = useState(null);
@@ -83,7 +89,8 @@ export default function Picker({
   const byKey = useMemo(() => new Map(mons.map((m) => [keyFn(m), m])), [mons, keyFn]);
   const tray = picked.map((k) => byKey.get(k)).filter(Boolean);
   const single = max === 1;
-  const ofSpecies = (sp) => tray.filter((m) => m.species === sp).length;
+  const same = kin ?? ((sp) => sp);
+  const ofSpecies = (sp) => tray.filter((m) => same(m.species) === same(sp)).length;
   const capped = (sp) => !!limit && ofSpecies(sp) >= limit(sp);
 
   const tap = (g) => {
@@ -154,6 +161,7 @@ export default function Picker({
                 {g.tier && <span className="tp-tier"><Mark tier={g.tier} size={10} /></span>}
                 {g.alpha && <span className="tp-alpha"><Mark tier="alpha" size={9} /></span>}
                 {g.members.length > 1 && <span className="pk-n">×{g.members.length}</span>}
+                {level && <span className="pk-lv">Lv {(g.members.find((m) => !pickedSet.has(keyFn(m))) ?? g.members[0]).level}</span>}
                 {took > 0 && <em>{single ? "✓" : took}</em>}
               </button>
             );

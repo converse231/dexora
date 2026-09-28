@@ -5748,6 +5748,43 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       "the next time it is retuned");
   }
 
+  /* A TIER'S LAYERS ARE ONLY ON THE CREATURE IF THE <img> FILLS THEIR BOX.
+
+     `Sprite fx` and `ItemIcon` wrap the image in `.sprite-fx` (an item's is
+     also `.item-fx`), and every layer inside is `inset: 0` and masked to the
+     art at `center / contain` - so the image must be exactly the wrapper's
+     size. The rare-forms dialog sized `.vr-art img` at 77%, which ALSO matched
+     the <img> inside the wrapper: the creature came out 77% of a 77% box,
+     pinned top-left, with every aura, foil and cut-slice off to one side.
+     Reported with a screenshot as "they're all broken". The Bag's honey jar
+     had the same fault at 30px in a 26px box.
+
+     So a container that holds a wrapper sizes its image with a CHILD
+     selector. A descendant `img` that sets a size reaches the one inside the
+     wrapper too. */
+  {
+    const css = stripComments(readFileSync(new URL("../src/styles.css", import.meta.url), "utf8"));
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map(([, sel, body]) => [sel.split(",").map((x) => x.trim()), body]);
+    const host = (sel) => sel.match(/^\.[\w-]+/)?.[0];
+    const hosts = new Set();
+    for (const [sels] of rules)
+      for (const sel of sels)
+        if (/\.(sprite-fx|item-fx)\b/.test(sel) && !/^\.(sprite-fx|item-fx)\b/.test(sel)) hosts.add(host(sel));
+    const bad = [];
+    for (const [sels, body] of rules) {
+      if (!/(^|[;\s])(width|height)\s*:/.test(body)) continue;
+      for (const sel of sels)
+        // the host (with any compound class) then a descendant img, nothing between
+        if (/^\.[\w-]+(?:[.:][\w-]+)*\s+img\b/.test(sel) && hosts.has(host(sel))) bad.push(sel);
+    }
+    assert.equal(bad.length, 0,
+      `${bad.join(", ")} sizes every <img> under a container that holds a ` +
+      "tier wrapper - it reaches the one inside `.sprite-fx` too, and the tier's " +
+      "layers stop lining up with the creature. Use a child selector (`> img`).");
+    console.log(`tier layers ok - ${hosts.size} containers holding a tier wrapper size their image by child selector`);
+  }
+
   /* THE RAIL AND THE TEXTBOX SHARE ONE NUMBER, OR THEY OVERLAP.
 
      The rail moved to the bottom right and `.ballwrap` is `inset: 0` of the
@@ -6271,4 +6308,650 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
 
 console.log(`areas ok — ${BIOMES.length} maps, ${LEGENDARY.length} legendaries ` +
     `homed ${Math.min(...per)}-${Math.max(...per)} per map, ${sizes[0]} … ${sizes.at(-1)}`);
+}
+
+/* ============================================================== THE LEAGUE'S DATA
+   Battles, phase 1 (docs/battles.md). Four generated files - rosters from
+   Bulbapedia (`npm run leagues`), moves, learnsets and the type chart from
+   PokéAPI (`npm run moves`) - and the pictures `npm run battleart` fetches.
+   These hold the files to each other and to the dex; the rules come later. */
+import { LEAGUES } from "../src/data/leagues.js";
+import { MOVES as L_MOVES } from "../src/data/moves.js";
+import { LEARNSETS as L_LEARN } from "../src/data/learnsets.js";
+import { TYPES as L_TYPES, CHART as L_CHART } from "../src/data/types.js";
+import { speciesById as lSpecies } from "../src/game/biomes.js";
+import { gzipSync as lGzip } from "node:zlib";
+import {
+  REGIONS as G_REGIONS, leadersOf as gLeaders, leagueOf as gLeague, trainersOf as gTrainers,
+} from "../src/game/league.js";
+import { GYMTUNE as G_TUNE, TRAINERTUNE as G_TRAINERS } from "../src/data/gymtune.js";
+import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/battle.js";
+{
+  const people = LEAGUES.flatMap((r) => [
+    ...r.gyms.flatMap((g) => [{ r, o: g, kind: "leader" }, ...g.trainers.map((t) => ({ r, o: t, kind: "trainer" }))]),
+    ...r.league.map((p) => ({ r, o: p, kind: "league" }))]);
+
+  /* SAVES KEY ON THESE IDS (`beaten`), so two opponents sharing one would
+     share a win - Alola's Hala is a Kahuna AND in its League, which is why a
+     League id carries `-league-`. */
+  const ids = new Set();
+  for (const { o } of people) {
+    assert.ok(!ids.has(o.id), `two opponents share the id ${o.id}`);
+    ids.add(o.id);
+  }
+
+  /* A REGION IS ITS GYMS IN ORDER, THEN A LEAGUE RUN THAT ENDS ON ITS
+     CHAMPION. Eight gyms, or Alola's four Kahunas - the one region with no
+     gyms. The run's length is the game's own (Galar's Champion Cup is seven),
+     so it is not a number here; that it ends on exactly one Champion is. */
+  for (const r of LEAGUES) {
+    assert.equal(r.gyms.length, r.id === "alola" ? 4 : 8, `${r.name} has ${r.gyms.length} gyms`);
+    assert.deepEqual(r.gyms.map((g) => g.order), r.gyms.map((_, i) => i + 1), `${r.name}'s gyms are out of order`);
+    assert.equal(r.league.filter((p) => p.champion).length, 1, `${r.name}'s League has no single Champion`);
+    assert.ok(r.league.at(-1).champion, `${r.name}'s League run does not end on its Champion`);
+    assert.ok(r.league.length >= 5, `${r.name}'s League run is ${r.league.length} long - the venue page was misread`);
+  }
+
+  /* EVERY POKÉMON IN EVERY PARTY IS ONE THE GAME SHIPS, at a level a party
+     can have. Dex numbers come straight off Bulbapedia, so a miss here is a
+     parse gone wrong, not a spelling. */
+  for (const { r, o } of people) {
+    assert.ok(o.party.length >= 1 && o.party.length <= 6, `${r.name} ${o.name} fields ${o.party.length}`);
+    for (const [id, lv] of o.party) {
+      assert.ok(lSpecies(id), `${r.name} ${o.name} fields dex id ${id}, which the game does not ship`);
+      assert.ok(Number.isInteger(lv) && lv >= 1 && lv <= 100, `${r.name} ${o.name} fields a Lv ${lv}`);
+    }
+  }
+
+  /* A LEADER'S TYPE IS ITS PARTY'S. The type comes from the gym's infobox and
+     the party from its Party blocks - two reads of one page, checked against
+     each other: the type must be one its party shares most. */
+  for (const r of LEAGUES) for (const g of r.gyms) {
+    const count = new Map();
+    for (const [id] of g.party) for (const t of lSpecies(id).types) count.set(t, (count.get(t) ?? 0) + 1);
+    const top = Math.max(...count.values());
+    assert.equal(count.get(g.type), top,
+      `${r.name} ${g.name} is a ${g.type} leader and ${g.type} is not what most of the party is`);
+  }
+
+  /* THE CHART IS THE TYPES THE DEX USES, 18 by 18, every cell a multiplier
+     the games have. Two copies of one fact: the chart's list and species.js. */
+  const used = new Set(SPECIES.flatMap((sp) => sp.types));
+  assert.deepEqual([...used].sort(), [...L_TYPES].sort(), "the type chart's types are not the dex's types");
+  assert.equal(L_CHART.length, L_TYPES.length);
+  for (const row of L_CHART) {
+    assert.equal(row.length, L_TYPES.length);
+    for (const x of row) assert.ok([0, 0.5, 1, 2].includes(x), `the chart has a ${x}`);
+  }
+  const eff = (a, d) => L_CHART[L_TYPES.indexOf(a)][L_TYPES.indexOf(d)];
+  assert.equal(eff("water", "fire"), 2, "the chart's rows are not attackers");
+
+  /* EVERY SHIPPED SPECIES HAS A LEARNSET, every row names a move that exists
+     at a level a Pokémon can have, and the rows are in level order (the four
+     most recent is read by walking them). */
+  for (const sp of SPECIES) {
+    const rows = L_LEARN[sp.id];
+    assert.ok(rows?.length, `${sp.name} has no learnset`);
+    let last = 0;
+    for (const x of rows) {
+      const lv = Math.floor(x / 1000);
+      assert.ok(L_MOVES[x % 1000], `${sp.name} learns move ${x % 1000}, which is not in moves.js`);
+      assert.ok(lv >= 0 && lv <= 100 && lv >= last, `${sp.name}'s learnset is out of level order at ${lv}`);
+      last = lv;
+    }
+  }
+
+  /* EVERY OPPONENT CAN HIT BACK, as battle.js builds it at its game's own
+     levels: its game moveset, or the level-up rule read across its line (a
+     Metapod keeps the Tackle it learned as a Caterpie - read alone, Bugsy's
+     Metapod and Cynthia's Roserade had nothing that hits). One move must have
+     power, or the fight is Struggle against a wall. The exemption is derived:
+     a species whose whole line learns nothing with power (Wobbuffet counters,
+     it never attacks) fights with Struggle, as it all but does in the games. */
+  const toothless = [];
+  for (const { r, o } of people) {
+    const ace = Math.max(...o.party.map(([, lv]) => lv));
+    bOpponent(o.party, ace, (slot) => slot).forEach((f) => {
+      if (!bNeverHits(f.id) && !f.moves.some((m) => L_MOVES[m.i].p)) {
+        toothless.push(`${r.name} ${o.name}'s ${lSpecies(f.id).name} (Lv ${f.level})`);
+      }
+    });
+  }
+  assert.equal(toothless.length, 0, `no damaging move at their level: ${toothless.join(", ")}`);
+
+  /* EVERY PICTURE THE LEAGUE DRAWS EXISTS, at the size its CSS will ask for:
+     Showdown's portraits are 80px, badges are cut to 32. */
+  const pngAt = (rel) => {
+    const f = new URL(`../public/${rel}`, import.meta.url);
+    assert.ok(existsSync(f), `public/${rel} is missing - run npm run battleart`);
+    const b = readFileSync(f);
+    return `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`;
+  };
+  const pics = new Set(people.map(({ o }) => o.pic));
+  for (const pic of pics) assert.equal(pngAt(`trainers/${pic}.png`), "80x80", `${pic}.png is not 80x80`);
+  for (const r of LEAGUES) for (const g of r.gyms) assert.equal(pngAt(`badges/${g.id}.png`), "32x32");
+
+  /* THE LEAGUE COSTS A PLAYER WHO NEVER BATTLES NOTHING. These files are the
+     heaviest data in the game and go in the League's lazy chunk only: nothing
+     imports them yet, and when the rules and the page do, it is those two and
+     nobody the main bundle reaches. The budget is the design's estimate
+     (about 60KB gzipped) with room for a re-fetch, not a target. */
+  const DATA = ["leagues.js", "moves.js", "learnsets.js", "types.js"];
+  // battle.js, and the League page's own folder - App imports that lazily.
+  const allowed = (rel) => rel === "game/battle.js" || rel.startsWith("ui/league/");
+  const walk = (dir) => readdirSync(new URL(dir, import.meta.url), { withFileTypes: true })
+    .flatMap((e) => e.isDirectory() ? walk(`${dir}${e.name}/`) : [`${dir}${e.name}`]);
+  for (const f of walk("../src/").filter((f) => /\.(js|jsx)$/.test(f))) {
+    const rel = f.replace("../src/", "");
+    if (rel.startsWith("data/")) continue;
+    const src = stripComments(readFileSync(new URL(f, import.meta.url), "utf8"));
+    for (const d of DATA) {
+      if (new RegExp(`from\\s+["'][^"']*data/${d.replace(".", "\\.")}["']`).test(src)) {
+        assert.ok(allowed(rel), `${rel} imports data/${d} - that puts the League's data in the main bundle`);
+      }
+    }
+    // battle.js carries all of it, so only the League page may import that -
+    // and the referee (6b), which is bundled for the server and nothing in src imports.
+    if (/from\s+["'][^"']*\/battle\.js["']/.test(src)) {
+      assert.ok(rel.startsWith("ui/league/") || rel === "game/referee.js",
+        `${rel} imports battle.js - that puts the League's data in the main bundle`);
+    }
+    assert.ok(!/from\s+["'][^"']*\/referee\.js["']/.test(src),
+      `${rel} imports referee.js - the server's rules; the page gets views, never the state`);
+  }
+  /* AND THE LEAGUE'S FOLDER IS REACHED ONLY BY A LAZY IMPORT: a static import
+     of it from anywhere else would pull every byte above into the first load. */
+  for (const f of walk("../src/").filter((f) => /\.(js|jsx)$/.test(f))) {
+    const rel = f.replace("../src/", "");
+    if (rel.startsWith("ui/league/")) continue;
+    const src = stripComments(readFileSync(new URL(f, import.meta.url), "utf8"));
+    assert.ok(!/^\s*import\s[^;]*from\s+["'][^"']*\/league\//m.test(src),
+      `${rel} imports the League statically - it must be lazy(() => import(...))`);
+  }
+  /* THE ENGINE'S COPY OF THE ORDER IS THE ROSTERS' ORDER (phase 4). The
+     engine enforces who opens when from gymtune.js alone - region, role and
+     place per opponent - so it can judge a battle without the rosters in the
+     main bundle. That copy must be the rosters' own, opponent for opponent:
+     a region, leader, member or gym trainer out of place there is a door the
+     page shows open and the engine keeps shut, or the other way round. */
+  assert.deepEqual(G_REGIONS, LEAGUES.map((r) => r.id), "gymtune.js's regions are not the League's, in order - run npm run gyms");
+  for (const r of LEAGUES) {
+    assert.deepEqual(gLeaders(r.id), r.gyms.map((g) => g.id), `${r.name}'s leaders are out of order in gymtune.js - run npm run gyms`);
+    assert.deepEqual(gLeague(r.id), r.league.map((p) => p.id), `${r.name}'s League is out of order in gymtune.js - run npm run gyms`);
+    for (const g of r.gyms) {
+      assert.deepEqual(gTrainers(g.id), g.trainers.map((t) => t.id), `${g.name}'s gym trainers in gymtune.js are not the roster's`);
+    }
+  }
+  assert.equal(Object.keys(G_TUNE).length + Object.keys(G_TRAINERS).length, people.length,
+    "gymtune.js and the rosters count different opponents");
+  /* ...and it is the one piece of the League in the main bundle, so it is
+     held small: the design's estimate is about 5KB gzipped, and a field added
+     per opponent would multiply by nearly 400 before anyone noticed. */
+  const tuneGz = lGzip(readFileSync(new URL("../src/data/gymtune.js", import.meta.url))).length;
+  assert.ok(tuneGz < 8_000, `gymtune.js is ${Math.round(tuneGz / 1000)}KB gzipped in the main bundle`);
+
+  const gz = DATA.reduce((n, d) => n + lGzip(readFileSync(new URL(`../src/data/${d}`, import.meta.url))).length, 0);
+  assert.ok(gz < 100_000, `the League's data is ${Math.round(gz / 1000)}KB gzipped - past the design's budget`);
+
+  const fb = L_MOVES.filter((m) => m.fb).length, no = L_MOVES.filter((m) => m.no).length;
+  console.log(`league data ok — ${LEAGUES.length} regions, ${people.length} opponents in ${pics.size} portraits, ` +
+    `${L_MOVES.length} moves (${fb} keep only their damage, ${no} never chosen), ` +
+    `${Math.round(gz / 1000)}KB gzipped and imported by nothing in the main bundle`);
+}
+
+/* ============================================================== THE BATTLE RULES
+   Battles, phase 2 (docs/battles.md). `battle.js` is the rules, and
+   tools/league-sim.mjs the model both the solver and this suite play against
+   - one reference player, so the two cannot measure different things. */
+import {
+  step as bStep, newBattle as bNew, simulate as bSim, fighter as bFighter, refusal as bRefusal,
+  TURN_LIMIT, legendLevel as bLegendLevel, LEGEND_BST, TEAM_MAX as B_TEAM, canUse as bCanUse,
+} from "../src/game/battle.js";
+import { HEALS } from "../src/game/items.js";
+import { SHARE as T_SHARE, GYM_PRIZE, REMATCH_STEPS, GYMTUNE, TRAINERTUNE } from "../src/data/gymtune.js";
+import {
+  ladder as lLadder, prices as lPrices, winRate as lWin, mulberry32 as lRng, candyBy as lCandy,
+  PRIZE_CEIL, REMATCH_CEIL, REMATCH_SHARE, TRAINER_SHARE, RECORD as L_RECORD,
+  TRAINER_RECORD as L_TRAINER_RECORD, TRAINER_FLOOR as L_TRAINER_FLOOR, trainerTop as lTrainerTop,
+  KIT_RECORD,
+} from "./league-sim.mjs";
+import { isLegendary as lLegend, MAX_LEVEL as L_MAX } from "../src/game/biomes.js";
+import { evolutionsOf as lEvos, evoLevel as lEvoLevel } from "../src/game/items.js";
+let healNote = "";
+{
+  const t0 = Date.now();
+
+  /* PURE AND SEEDED. `step` must hand back a new battle and leave the one it
+     was given exactly as it was - the League page keeps the previous state
+     for its animation - and the same seed must play the same battle, or a
+     simulation proves nothing and a bug report cannot be replayed. */
+  const teams = () => [[bFighter(6, 40, 1), bFighter(9, 40, 2)], [bFighter(3, 40, 3), bFighter(65, 40, 4)]];
+  {
+    let b = bNew(teams(), [2, 2]);
+    const rng = lRng(3);
+    for (let i = 0; i < 40 && b.over < 0; i++) {
+      const before = JSON.stringify(b);
+      const next = bStep(b, null, rng);
+      assert.equal(JSON.stringify(b), before, "step() changed the battle it was given");
+      b = next;
+    }
+    const play = (seed) => JSON.stringify(bSim(...teams(), 2, 3, lRng(seed)));
+    assert.equal(play(7), play(7), "the same seed played two different battles");
+    assert.notEqual(play(7), play(8), "two seeds played the same battle - the rolls are not reaching the rules");
+  }
+
+  /* A PLAYER'S TURN WAITS FOR A PLAYER. With side 0 unmanned, a fainted
+     active must be replaced before anything else happens - no turn passes on
+     a fainted fighter. */
+  {
+    let b = bNew([[bFighter(10, 2, 1), bFighter(25, 60, 2)], [bFighter(150, 70, 3)]], [null, 2]);
+    const rng = lRng(1);
+    for (let i = 0; i < 5 && !b.need[0]; i++) b = bStep(b, { move: 0 }, rng);
+    assert.ok(b.need[0], "a Lv 2 Caterpie survived five turns of a Lv 70 Mewtwo");
+    const t = b.turn;
+    assert.equal(bStep(b, { move: 0 }, rng).turn, t, "a turn passed on a fainted fighter");
+    const sent = bStep(b, { swap: 1 }, rng);
+    assert.equal(sent.sides[0].active, 1);
+    assert.equal(sent.turn, t, "sending a replacement took a turn");
+  }
+
+  /* REFUSED, NOT SCALED DOWN (docs/battles.md, *Level cap*): over the cap,
+     a legendary over its share of it (LEGEND_BST over its base stat total),
+     and anything locked in a trade. A weak legendary may bring the whole cap. */
+  assert.equal(bRefusal({ species: 6, level: 30 }, 30), null);
+  assert.equal(bRefusal({ species: 6, level: 31 }, 30), "level");
+  assert.equal(bRefusal({ species: 150, level: bLegendLevel(150, 30) }, 30), null);
+  assert.equal(bRefusal({ species: 150, level: bLegendLevel(150, 30) + 1 }, 30), "legend");
+  assert.ok(bLegendLevel(150, 30) < 30, "Mewtwo may bring the whole cap");
+  assert.equal(bLegendLevel(SPECIES.find((sp) => sp.name === "cosmog").id, 30), 30,
+    "a legendary weaker than LEGEND_BST is held under the cap anyway");
+  assert.equal(bRefusal({ species: 6, level: 5, lock: "offer" }, 30), "locked");
+
+  /* THE BATTLE SHELF HEALS A SHARE, AT EVERY LEVEL (phase 5). A flat amount
+     was measured to LOWER a late gym's win rate (a sliver of a Lv 60's HP for
+     the turn it costs), so what a Potion or a Revive gives is a fraction of
+     max HP - held here from Lv 5 to 100, where a flat number would be right
+     at most at one of them. A Full Heal cures; an item that would do nothing
+     is refused with no turn passing; using one costs the turn. */
+  {
+    const heal = Object.fromEntries(HEALS.map((h) => [h.id, h]));
+    const foe = () => [bFighter(129, 5, 9)];        // a Magikarp: Splash harms nobody
+    for (const lv of [5, 30, 60, 100]) {
+      const hurt = bFighter(6, lv, 1), down = bFighter(9, lv, 2);
+      hurt.hp = 1; hurt.status = 1; down.hp = 0;
+      const b = bNew([[hurt, down], foe()], [null, 1]);
+      const at = (nb) => nb.log.find((ev) => ev.item != null).after[0].hp;
+      const potion = bStep(b, { item: "potion", target: 0 }, lRng(1));
+      assert.equal(at(potion), 1 + Math.floor(hurt.max * heal.potion.heal),
+        `a Potion at Lv ${lv} did not heal ${heal.potion.heal} of max HP`);
+      assert.ok(!potion.log.some((ev) => ev.side === 0 && ev.move != null), "using an item did not cost the turn");
+      const cured = bStep(b, { item: "full-heal", target: 0 }, lRng(1));
+      assert.equal(cured.sides[0].team[0].status, -1, "a Full Heal did not cure");
+      const up = bStep(b, { item: "revive", target: 1 }, lRng(1));
+      assert.equal(up.sides[0].team[1].hp, Math.floor(down.max * heal.revive.revive),
+        `a Revive at Lv ${lv} did not restore ${heal.revive.revive} of max HP`);
+    }
+    const full = bNew([[bFighter(6, 30, 1)], foe()], [null, 1]);
+    for (const [id, k] of [["potion", 0], ["full-heal", 0], ["revive", 0]]) {
+      assert.ok(!bCanUse(full.sides[0].team[k], id), `a ${id} is usable where it would do nothing`);
+      assert.equal(bStep(full, { item: id, target: k }, lRng(1)).turn, full.turn, `a wasted ${id} took a turn`);
+    }
+  }
+
+  /* THE LADDER AND THE PRICES ARE DERIVED, and gymtune.js is only their
+     cache: re-derived here, they must match it exactly - or the rules, the
+     rosters or the economy moved and `npm run gyms` has to run again. */
+  const { share, rungs } = lLadder();
+  assert.ok(Math.abs(share - T_SHARE) < 1e-12, "the ladder's candy share moved - run npm run gyms");
+  for (const r of rungs) {
+    const g = GYMTUNE[r.o.id];
+    assert.ok(g, `${r.o.id} has no solved level - run npm run gyms`);
+    assert.equal(g.T, r.T, `${r.o.id}'s intended level moved - run npm run gyms`);
+    assert.equal(g.cap, r.cap, `${r.o.id}'s cap moved - run npm run gyms`);
+  }
+  for (let k = 1; k < rungs.length; k++) assert.ok(rungs[k].cap >= rungs[k - 1].cap, "a cap went down the ladder");
+  assert.equal(rungs.at(-1).cap, 100, "the last Champion does not ask for a Lv 100 team");
+  const p = lPrices(rungs);
+  assert.equal(p.gymPrize, GYM_PRIZE, "the prize unit moved - run npm run gyms");
+  assert.equal(p.rematchSteps, REMATCH_STEPS, "the rematch clock moved - run npm run gyms");
+  rungs.forEach((r, k) => assert.equal(GYMTUNE[r.o.id].prize, p.prize[k], `${r.o.id}'s prize moved`));
+
+  /* THE BOUNDS THE PRICES WERE SOLVED FROM, held as relations: every first
+     win in the game under PRIZE_CEIL of a Lv 75 game; rematching every leader
+     as fast as the clocks allow under REMATCH_CEIL of what walking and
+     catching pay a step. */
+  assert.ok(p.oneOff <= PRIZE_CEIL * p.lifetime,
+    `first wins pay ¥${p.oneOff}, over ${PRIZE_CEIL * 100}% of a game's ¥${Math.round(p.lifetime)}`);
+  const rematchRate = p.prize.reduce((a, b) => a + b, 0) * REMATCH_SHARE / REMATCH_STEPS;
+  assert.ok(rematchRate <= REMATCH_CEIL * p.perStep,
+    `rematches pay ¥${rematchRate.toFixed(2)} a step against catching's ¥${p.perStep.toFixed(2)}`);
+
+  /* THE MASTER BALL IS STILL PRICED AGAINST EVERYTHING A PLAYTHROUGH EARNS,
+     battles included: the first wins a playthrough reaches plus rematches at
+     the cap for all of it. The existing floor (5%) is the bound. */
+  {
+    const reached = rungs.reduce((n, r, k) => n + (r.T <= rungs.at(-1).T ? p.prize[k]
+      + (r.role === "leader" ? r.o.trainers.length * Math.round(p.prize[k] * TRAINER_SHARE) : 0) : 0), 0);
+    const playthrough = 50000 * (p.inc.catchPerStep) + p.inc.wages + reached + rematchRate * 50000;
+    const mb = ballById("master-ball").price / playthrough;
+    assert.ok(mb > 0.05, `battles bring the Master Ball to ${(mb * 100).toFixed(1)}% of a playthrough - under the 5% floor`);
+  }
+
+  /* A REMATCH IS STILL WORTH HAVING WITH A BATTLE SHELF (phase 5): at every
+     capped opponent, a full-clock rematch pays more, in expectation, than the
+     healers the reference player spends on it - win or lose, since a lost
+     battle spends them too. The prices are typed; this is what bounds them.
+     The design's first prices (¥60/¥80/¥300) failed it at 112 of 115
+     opponents: a rematch pays about ¥205 and a Revive alone was ¥300.
+     Replayed on a fixed record, so the margin is exact, not noise. */
+  {
+    let tight = null;
+    for (const r of rungs) {
+      const g = GYMTUNE[r.o.id];
+      const k = lWin(r, g.top, { ...KIT_RECORD, share, kit: true });
+      const net = k.win * g.prize * REMATCH_SHARE - k.spent;
+      assert.ok(net > 0, `a rematch against ${r.o.name} pays ¥${Math.round(k.win * g.prize * REMATCH_SHARE)} ` +
+        `in expectation and the reference player spends ¥${Math.round(k.spent)} in healers on it`);
+      const ratio = k.win * g.prize * REMATCH_SHARE / k.spent;
+      if (!tight || ratio < tight.ratio) tight = { ratio, name: r.o.name, used: k.used };
+    }
+    healNote = `a rematch outearns its healers everywhere (tightest ${tight.name}, ${tight.ratio.toFixed(2)}x at ${tight.used.toFixed(1)} items)`;
+  }
+
+  /* CANDY IS THE SINK, NOT A WALL: all six of a team to Lv 100 stays a small
+     share of what a whole game's catching converts to. */
+  assert.ok(B_TEAM * 85 < 0.05 * lCandy(L_MAX), "a full team to Lv 100 costs over 5% of a game's candy");
+
+  /* THE AIS ARE A LADDER: identical teams, both ways round. 2 must clearly
+     beat 1, and 3 must beat 2 by enough to be worth its code - the phase 0
+     prototype's did not (51%), and the design says delete it if so. */
+  const pool = SPECIES.filter((sp) => sp.id <= 1025 && !lLegend(sp.id));
+  const h2h = (weak, strong, n) => {
+    let w = 0;
+    for (let i = 0; i < n; i++) {
+      const rng = lRng(i * 31 + weak * 7 + strong);
+      const pick = () => Array.from({ length: 6 }, () => pool[Math.floor(rng() * pool.length)].id);
+      const a = pick(), c = pick();
+      const mk = (xs, s) => xs.map((id, k) => bFighter(id, 50, s * 100 + k));
+      w += bSim(mk(a, 1), mk(c, 2), strong, weak, rng).over === 0;
+      w += bSim(mk(c, 2), mk(a, 1), strong, weak, rng).over === 0;
+    }
+    return w / (2 * n);
+  };
+  const ai21 = h2h(1, 2, 400), ai32 = h2h(2, 3, 600);
+  assert.ok(ai21 >= 0.65, `AI 2 beats AI 1 only ${Math.round(ai21 * 100)}%`);
+  assert.ok(ai32 >= 0.55, `AI 3 beats AI 2 only ${Math.round(ai32 * 100)}% - by the design's rule it goes`);
+
+  /* NO ONE POKEMON WINS A REGION ALONE. The strongest there are - the six
+     legendaries and six others with the highest base stats - each brought
+     alone at the most it may be (the cap, a legendary's `legendLevel` of it,
+     never below the level its species can exist at), against every leader. */
+  const LEGEND_WINS = 3;
+  const bstOf = (sp) => sp.stats.reduce((a, b) => a + b, 0);
+  const floorOf = new Map();
+  for (const sp of SPECIES) for (const e of lEvos(sp.id)) if (!floorOf.has(e.to)) floorOf.set(e.to, lEvoLevel(e));
+  const strongest = [
+    ...SPECIES.filter((sp) => lLegend(sp.id)).sort((a, b) => bstOf(b) - bstOf(a)).slice(0, 6),
+    ...SPECIES.filter((sp) => !lLegend(sp.id)).sort((a, b) => bstOf(b) - bstOf(a)).slice(0, 6),
+  ];
+  const solos = [];
+  for (const sp of strongest) {
+    const wins = new Map();
+    for (const r of rungs.filter((x) => x.role === "leader")) {
+      const lv = lLegend(sp.id) ? bLegendLevel(sp.id, r.cap) : r.cap;
+      if (lv < (floorOf.get(sp.id) ?? 1)) continue;
+      const w = lWin(r, GYMTUNE[r.o.id].top, { n: 12, seed: 31, share, team: (rng) => [bFighter(sp.id, lv, Math.floor(rng() * 1e9))] }).win;
+      if (w >= 0.5) wins.set(r.region.name, (wins.get(r.region.name) ?? 0) + 1);
+    }
+    for (const [region, n] of wins) if (n > LEGEND_WINS) solos.push(`${sp.name} wins ${n} of ${region}'s leaders alone`);
+  }
+  assert.equal(solos.length, 0, solos.join(", "));
+
+  /* EVERY OPPONENT WINS NEAR ITS TARGET, AND STILL WINS WHAT IT WAS SOLVED
+     TO. Two questions, held apart:
+
+     - Is the solve good? Its recorded rate is within ±15 points of target:
+       a level is a whole number, and one level across an evolution cliff can
+       move a rate 20 points, so exactly-on-target is not always there to find.
+     - Did anything move since? The record is replayed EXACTLY - same seed,
+       same count - and must come out the same. A fresh sample on another seed
+       was the first version, and 100 battles of noise (±5 points, 2.4σ
+       apart on Drake) stacked on a cliff read as five opponents "out of band"
+       with no rule changed. */
+  /* A CLIFF IS THE ONE EXCUSE, AND IT IS PROVED, NOT CLAIMED: an opponent
+     may sit outside the band only when the target lies between its level
+     and the next one towards it - replayed here - so no closer level exists.
+     Kanto's Bruno is the case that made it: 73% at ace 20, 18% at 22, his
+     Tyrogue-line fighters crossing the level they evolve at. */
+  const BAND = 0.15;
+  let worst = 0, maxTurns = 0;
+  const off = [], moved = [], cliffs = [];
+  for (const r of rungs) {
+    const g = GYMTUNE[r.o.id];
+    const d = g.win - r.target;
+    if (Math.abs(d) > Math.abs(worst)) worst = d;
+    if (Math.abs(d) > BAND) {
+      const next = lWin(r, g.top + (d > 0 ? 1 : -1), { ...L_RECORD, share }).win;
+      if ((next - r.target) * d < 0) {
+        cliffs.push(`${r.o.name} ${Math.round(g.win * 100)}/${Math.round(next * 100)}% for ${Math.round(r.target * 100)}%`);
+        continue;
+      }
+      off.push(`${r.region.name} ${r.o.name} ${Math.round(g.win * 100)}% for ${Math.round(r.target * 100)}%`);
+    }
+    const w = lWin(r, g.top, { ...L_RECORD, share });
+    maxTurns = Math.max(maxTurns, w.maxTurns);
+    if (w.win !== g.win) moved.push(`${r.o.name} ${Math.round(g.win * 100)}% -> ${Math.round(w.win * 100)}%`);
+  }
+  assert.equal(off.length, 0, `solved out of band: ${off.join(", ")}`);
+  assert.equal(moved.length, 0, `the battles changed since the solve (${moved.slice(0, 6).join(", ")}${moved.length > 6 ? ", ..." : ""}) - run npm run gyms`);
+
+  /* A GYM'S OWN TRAINERS ARE THE EASY PART: the reference player for that
+     gym, bringing six, wins at least TRAINER_FLOOR of the time - on the
+     recorded battles, replayed exactly. A trainer sits at its leader's level
+     in proportion, and lower only where that is what the floor needs. */
+  const weak = [], lowTrainers = [];
+  for (const r of rungs.filter((x) => x.role === "leader")) {
+    for (const t of r.o.trainers) {
+      const g = TRAINERTUNE[t.id];
+      assert.ok(g, `${t.id} has no solved level - run npm run gyms -- --trainers`);
+      const rung = { ...r, o: t, role: "trainer", type: r.o.type };
+      const w = lWin(rung, g.top, { ...L_TRAINER_RECORD, share });
+      maxTurns = Math.max(maxTurns, w.maxTurns);
+      if (w.win !== g.win) moved.push(`${t.cls} ${t.name}`);
+      if (g.win < L_TRAINER_FLOOR) weak.push(`${r.region.name} ${t.cls} ${t.name} ${Math.round(g.win * 100)}%`);
+      const prop = lTrainerTop(t, r.o, GYMTUNE[r.o.id].top);
+      assert.ok(g.top <= prop, `${t.cls} ${t.name} is above its leader's proportion`);
+      if (g.top < prop) lowTrainers.push(t.name);
+    }
+  }
+  assert.equal(weak.length, 0, `gym trainers too hard: ${weak.join(", ")}`);
+  assert.equal(moved.length, 0, `the battles changed since the solve (${moved.slice(0, 6).join(", ")}) - run npm run gyms`);
+  assert.ok(maxTurns < TURN_LIMIT, `a battle ran ${maxTurns} turns - PP and Struggle are not ending it`);
+
+
+  console.log(`battle rules ok — ${rungs.length} opponents within ${BAND * 100} points of target ` +
+    `or on a proved cliff (${cliffs.join(", ") || "none"}), ${Object.keys(TRAINERTUNE).length} gym trainers all over ` +
+    `${L_TRAINER_FLOOR * 100}% (${lowTrainers.length} lowered to get there), ` +
+    `AI 2 beats 1 ${Math.round(ai21 * 100)}% and 3 beats 2 ${Math.round(ai32 * 100)}%, ` +
+    `no single Pokémon takes more than ${LEGEND_WINS} leaders of a region, longest battle ${maxTurns} turns, ` +
+    `first wins ¥${p.oneOff} and a ${REMATCH_STEPS}-step rematch clock, ${healNote} (${Math.round((Date.now() - t0) / 1000)}s)`);
+}
+
+/* ============================================================== RANKED, PHASE 6a
+   docs/ranked.md. The format, the species clause, the legendary rule the
+   League now reads off the data, and the server's copies of all of it. */
+import {
+  RANKED_LEVEL, RANKED_IV, DEFENSE_SLOTS, DEFENSE_MIN as R_DEFENSE_MIN, CHAR_PIC, baseOf as rBase, teamProblem as rProblem,
+} from "../src/game/ranked.js";
+import { ABANDON_MINUTES as R_ABANDON } from "../src/game/referee.js";
+import { rankedFighter as rFighter, refusal as rRefusal, legendLevel as rLegendLevel } from "../src/game/battle.js";
+import { legendary as rLegendary } from "../src/game/league.js";
+import { TEAM_MAX as R_TEAM } from "../src/game/league.js";
+import { LEAGUES as R_LEAGUES } from "../src/data/leagues.js";
+{
+  const by = (n) => SPECIES.find((sp) => sp.name === n).id;
+
+  /* A RANKED FIGHTER IS ITS SPECIES, NOTHING ELSE. A save chooses its uids (and
+     a uid picks IVs) and its levels, so nothing a save holds may reach a ranked
+     Pokemon's strength: the same species under any uid is the same fighter, at
+     the format's level, with the format's IVs. */
+  for (const n of ["pikachu", "garchomp", "eternatus-eternamax", "shedinja", "chansey"]) {
+    const a = rFighter(by(n), 1), b = rFighter(by(n), 987654321);
+    assert.deepEqual({ ...a, uid: 0 }, { ...b, uid: 0 }, `a ranked ${n} depends on its uid`);
+    assert.equal(a.level, RANKED_LEVEL);
+    const sp = speciesById(by(n));
+    assert.equal(a.st[1], Math.floor((2 * sp.stats[1] + RANKED_IV) * RANKED_LEVEL / 100) + 5,
+      `a ranked ${n}'s Attack is not the format's (Lv ${RANKED_LEVEL}, IV ${RANKED_IV})`);
+  }
+
+  /* THE SPECIES CLAUSE COUNTS A FORM AS ITS SPECIES: a Mega, a regional form
+     and a Gigantamax are each one with their species. */
+  assert.equal(rProblem([by("charizard"), by("charizard-mega-x")]), "clause", "a Mega slipped past the species clause");
+  assert.equal(rProblem([by("raichu"), by("raichu-alola")]), "clause", "a regional form slipped past the species clause");
+  assert.equal(rProblem([by("charizard"), by("venusaur"), by("blastoise")]), null);
+  assert.equal(rProblem([]), "empty");
+  assert.equal(rProblem(Array.from({ length: R_TEAM + 1 }, (_, k) => k + 1)), "size");
+  assert.equal(rProblem([99999]), "unknown");
+  for (const sp of SPECIES.filter((x) => x.id >= 10000)) {
+    assert.ok(speciesById(rBase(sp.id)), `${sp.name} has no species to count as`);
+    assert.ok(rBase(sp.id) < 10000, `${sp.name} counts as another form, not a species`);
+  }
+
+  /* A LEGENDARY IS WHAT ITS DATA SAYS, forms included. `isLegendary()` is
+     false for the forms of legendaries (Mega Mewtwo, the Primals, Eternamax),
+     and the League's refusal read it - a Lv 100 Eternamax (BST 1,125) walked
+     into a cap of 100. Every legendary form now meets the rule at every cap. */
+  const legendForms = SPECIES.filter((sp) => sp.legendary && !lLegend(sp.id));
+  assert.ok(legendForms.length >= 17, "the legendary forms this guards are gone - re-read the rule");
+  for (const sp of legendForms) {
+    assert.ok(rLegendary(sp.id), `${sp.name} is not a legendary to the League`);
+    const top = rLegendLevel(sp.id, 100);
+    if (top < 100) assert.equal(rRefusal({ species: sp.id, level: top + 1 }, 100), "legend",
+      `a Lv ${top + 1} ${sp.name} was let in at a cap of 100`);
+  }
+
+  /* THE SERVER'S COPIES, held equal to the game's. `badge_list()` is the
+     leaders in the League's order (a save's `beaten` names every kind of
+     opponent; only these are badges); `ranked_limit()` and the table's CHECKs
+     are the slots and the team size. */
+  const tsql = readFileSync(new URL("../db/trading.sql", import.meta.url), "utf8");
+  const badgeSql = tsql.match(/function public\.badge_list\(\)[\s\S]*?array\[([\s\S]*?)\]/);
+  assert.ok(badgeSql, "db/trading.sql has no badge_list()");
+  assert.deepEqual(badgeSql[1].split(",").map((x) => x.trim().replace(/'/g, "")).filter(Boolean),
+    R_LEAGUES.flatMap((r) => r.gyms.map((g) => g.id)), "db/trading.sql's badge_list() is not the League's leaders, in order");
+  assert.match(tsql, /card\.badges := /, "card_stats no longer counts badges");
+  assert.match(tsql, /grant select \([^)]*\bbadges\b[^)]*\)\s+on public\.trainer_cards/,
+    "players cannot read a card's badges - the column is missing from the grant");
+  const rsql = readFileSync(new URL("../db/ranked.sql", import.meta.url), "utf8");
+  const rlim = Object.fromEntries([...rsql.matchAll(/when '(\w+)' then (\d+)/g)].map((m) => [m[1], Number(m[2])]));
+  assert.deepEqual(rlim, { SLOTS: DEFENSE_SLOTS, TEAM: R_TEAM, MIN: R_DEFENSE_MIN, ABANDON_MINUTES: R_ABANDON },
+    "db/ranked.sql's ranked_limit() and the game disagree");
+  assert.match(rsql, new RegExp(`check \\(slot between 1 and ${DEFENSE_SLOTS}\\)`), "the defense table's slot CHECK moved");
+  assert.match(rsql, new RegExp(`check \\(cardinality\\(uids\\) between 1 and ${R_TEAM}\\)`), "the defense table's size CHECK moved");
+
+  /* EVERY TRAINER A FRIEND CAN BE HAS A PORTRAIT: each char the engine knows,
+     through CHAR_PIC, to a fetched file (build_battle_art.py PLAYER_PICS). */
+  const chars = JSON.parse(readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8")
+    .match(/export const CHARS = (\[[^\]]*\]);/)[1].replace(/'/g, '"'));
+  const art = readFileSync(new URL("./build_battle_art.py", import.meta.url), "utf8");
+  for (const c of chars) {
+    assert.ok(CHAR_PIC[c], `the ${c} trainer has no ranked portrait`);
+    assert.ok(art.includes(`"${CHAR_PIC[c]}"`), `${CHAR_PIC[c]} is not fetched by build_battle_art.py`);
+    const f = new URL(`../public/trainers/${CHAR_PIC[c]}.png`, import.meta.url);
+    assert.ok(existsSync(f), `public/trainers/${CHAR_PIC[c]}.png is missing - run npm run battleart`);
+    const b = readFileSync(f);
+    assert.equal(`${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`, "80x80", `${CHAR_PIC[c]}.png is not 80x80`);
+  }
+
+  console.log(`ranked ok — a ranked fighter is its species alone (Lv ${RANKED_LEVEL}, IV ${RANKED_IV}), the species clause ` +
+    `counts ${SPECIES.filter((x) => x.id >= 10000).length} forms as their species, ${legendForms.length} legendary forms meet ` +
+    "the League's legendary rule, and the server's badges, slots and team size are the game's");
+}
+
+/* ============================================================== RANKED, PHASE 6b
+   The referee (src/game/referee.js): the rules the server plays a ranked
+   battle by, bundled into the ranked-step Edge Function as rules.js. */
+import {
+  openBattle as rOpen, refereeTurn as rTurn, viewOf as rView, legal as rLegal, autoAction as rAuto,
+  rngFor as rRng, RANKED_TURNS, RULES_VERSION as R_VERSION,
+} from "../src/game/referee.js";
+import { step as rStep, AIS as rAIS } from "../src/game/battle.js";
+import { bundle as edgeBundle, RULES as EDGE_RULES } from "./build-edge.mjs";
+{
+  const by = (n) => SPECIES.find((sp) => sp.name === n).id;
+  const snap = (names) => names.map((n, k) => ({ uid: 100 + k, species: by(n), tier: k === 1 ? "shiny" : null }));
+  const teams = { mine: snap(["pikachu", "charizard", "blastoise"]), foe: snap(["garchomp", "rayquaza", "tyranitar", "gengar"]) };
+
+  /* THE SERVER'S TURN IS THE RULES' TURN: refereed, a battle is exactly
+     battle.js stepped with each step's rolls from hash(seed:n) - so the
+     server holds nothing but the seed, and a battle can be replayed. */
+  let st = rOpen(teams.mine, teams.foe);
+  let plain = st.b;
+  const seed = 987654321;
+  const rng = lRng(4);
+  for (let n = 0; st.b.over < 0 && n < 400; n++) {
+    const me = st.b.sides[0];
+    const opts = st.b.need[0]
+      ? me.team.map((f, k) => ({ swap: k })).filter((a) => rLegal(st.b, a))
+      : [...me.team[me.active].moves.map((_, k) => ({ move: k })), ...me.team.map((_, k) => ({ swap: k }))].filter((a) => rLegal(st.b, a));
+    const action = opts[Math.floor(rng() * opts.length)];
+    const r = rTurn(st, action, { seed });
+    assert.ok(!r.error, `a legal action was refused: ${JSON.stringify(action)}`);
+    plain = rStep(plain, action, rRng(seed, n));
+    if (plain.over < 0 && plain.turn >= RANKED_TURNS) break;
+    assert.deepEqual(r.state.b.sides, plain.sides, "a refereed step is not the rules stepped from hash(seed:n)");
+    st = r.state;
+
+    /* THE VIEW NAMES ONLY WHAT HAS BEEN SEEN: every defender slot not yet
+       sent out is a placeholder - no species, no level - and the view never
+       carries the seed or the step counter. */
+    const v = rView(st, teams);
+    v.sides[1].team.forEach((f, k) => {
+      if (st.seen.includes(k)) assert.equal(f.id, teams.foe[k].species);
+      else assert.ok(f.hidden && f.id === null && f.level === 0, `the view showed the defender's unseen slot ${k}`);
+    });
+    assert.ok(!("n" in v) && !("seed" in v) && !("seen" in v), "the view carried the referee's state");
+    assert.equal(v.sides[0].team[1].tier, "shiny", "the view lost a Pokemon's look");
+  }
+  assert.ok(st.b.over >= 0, "a refereed battle did not end");
+
+  // WHAT MAY BE PLAYED: a move with PP, a switch to a standing teammate, a replacement when down - nothing else.
+  const fresh = rOpen(teams.mine, teams.foe);
+  for (const bad of [{ move: 7 }, { move: -1 }, { move: 0.5 }, { swap: 0 }, { swap: 9 }, { item: "potion", target: 0 },
+    { move: 0, swap: 1 }, null, {}, { move: "0" }]) {
+    assert.equal(rTurn(fresh, bad, { seed }).error, "illegal", `an illegal action was played: ${JSON.stringify(bad)}`);
+  }
+  // LATE: the stand-in (AI 2) plays the turn, whatever was sent.
+  const late = rTurn(fresh, { move: 3 }, { seed, late: true });
+  assert.deepEqual(late.auto, rAIS[2](fresh.b, 0), "a late turn was not the stand-in's choice");
+  // THE TURN CAP is decided on health, not called a loss.
+  const capped = rOpen(teams.mine, teams.foe);
+  capped.b.turn = RANKED_TURNS - 1;
+  capped.b.sides[1].team.forEach((f) => { f.hp = 1; });
+  const cr = rTurn(capped, { move: 0 }, { seed });
+  if (cr.state.b.sides[0].team.some((f) => f.hp > 0)) assert.equal(cr.state.b.over, 0, "the turn cap was not decided on health");
+
+  /* THE SERVER RUNS THE BUNDLE, SO THE BUNDLE IS THE SOURCE: rules.js is
+     generated from referee.js and must be exactly what bundling it now makes. */
+  // assert.ok, not equal: on two long strings a byte apart, node's diff replaces the message.
+  assert.ok(readFileSync(EDGE_RULES, "utf8") === await edgeBundle(),
+    "supabase/functions/ranked-step/rules.js is not today's referee - run npm run edge");
+  /* ...and the function reaches nothing else: handler.js imports only rules.js
+     (a deployed function cannot see src/), and index.ts only handler.js and supabase-js. */
+  const fnDir = new URL("../supabase/functions/ranked-step/", import.meta.url);
+  const imports = (f) => [...stripComments(readFileSync(new URL(f, fnDir), "utf8")).matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(imports("handler.js"), ["./rules.js"], "handler.js reaches past rules.js");
+  assert.deepEqual(imports("index.ts").sort(), ["./handler.js", "npm:@supabase/supabase-js@2"], "index.ts imports something new");
+
+  /* THE FUNCTION'S GATES, with no database: nobody unsigned, no other version
+     of the rules (an old client's replay of a battle would not match). */
+  const { handle } = await import("../supabase/functions/ranked-step/handler.js");
+  const never = () => { throw new Error("the database was asked before the gates"); };
+  assert.equal((await handle({ user: null, body: { op: "resume", version: R_VERSION }, rpc: never })).status, 401);
+  assert.equal((await handle({ user: "u", body: { op: "resume", version: R_VERSION - 1 }, rpc: never })).body.error, "version");
+  assert.equal((await handle({ user: "u", body: null, rpc: never })).body.error, "version");
+
+  console.log("referee ok — a refereed battle is battle.js stepped from hash(seed:n), the view never names an unseen " +
+    "defender or carries the state, illegal actions are refused, a late turn is AI 2's, the turn cap is decided on " +
+    "health, rules.js is today's referee, and the function reaches nothing past it");
 }

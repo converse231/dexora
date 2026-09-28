@@ -386,6 +386,91 @@ drop trigger if exists saves_to_card on public.saves;
 drop trigger if exists profile_to_card on public.profiles;
 ```
 
+## 3e. Badges and defense teams — **run this once, after 3d** (added 2026-09-28)
+
+Battles phase 6 and ranked phase 6a (docs/battles.md, docs/ranked.md): the
+trainer card's **badges**, and **defense teams** with friend practice. Two
+files, in this order, both re-runnable:
+
+1. **`db/trading.sql` again** - paste the whole file and run it. It adds the
+   card's `badges` column (and its column grant), counts badges in
+   `card_stats`, and fills them in once for every existing card. Running it
+   again writes nothing.
+2. **`db/ranked.sql`** - paste the whole file and run it. It adds
+   `defense_teams` and the three functions the Ranked tab calls
+   (`my_defense`, `set_defense_team`, `practice_team`). It reads trading's
+   functions, so it must come after step 1. **Every later ranked change is the
+   same step**: paste the whole file again.
+
+**Check it took.** Each of these should hold:
+
+```
+-- badges are readable by players: `badges` must be in this list
+select column_name from information_schema.column_privileges
+ where table_name = 'trainer_cards' and grantee = 'authenticated' order by 1;
+-- the League's leaders the server counts as badges (68)
+select cardinality(public.badge_list());
+-- the ranked limits the game was built against (3, 6)
+select public.ranked_limit('SLOTS'), public.ranked_limit('TEAM');
+```
+
+**Deploy order does not matter.** A build without ranked never calls these; a
+build with ranked, against a project without `db/ranked.sql`, says "Ranked
+isn't open yet" on its tab and the rest of the League works. A card from a
+project without step 1 has no `badges`, which the profile shows as 0.
+
+`npm run tradedb` runs both files against the TEST project and tests them.
+
+**If it ever has to come out:** `drop table public.defense_teams;` removes
+every team (the functions then answer "not open yet"). Badges are a card
+column the save trigger fills; leaving it costs nothing.
+
+## 3f. Ranked battles: the SQL and the Edge Function — **run this once, after 3e** (added 2026-09-29)
+
+Ranked phase 6b (docs/ranked.md): a ranked battle is played on the server,
+turn by turn, by the **`ranked-step` Edge Function**
+(`supabase/functions/ranked-step/`), which stores its battles through
+`db/ranked.sql`. Do it on the TEST project first, then live.
+
+1. **`db/ranked.sql` again** - paste the whole file and run it. It adds
+   `ranked_battles` (no player can read or write it) and the five
+   service-only functions the Edge Function calls. Re-runnable.
+2. **Deploy the function** from the repository's root, with the Supabase
+   CLI (`npx` fetches it):
+
+   ```
+   npx supabase login
+   npx supabase functions deploy ranked-step --project-ref <project ref> --no-verify-jwt --use-api
+   ```
+
+   The project ref is the part of the project URL before `.supabase.co`.
+   `--use-api` bundles on Supabase's side, so Docker is not needed (tried here:
+   the CLI packs `index.ts`, `handler.js` and `rules.js`). `--no-verify-jwt` is right: the function checks who is asking itself
+   (`auth.getUser`), which works whichever JWT signing keys the project
+   uses. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided to the
+   function by Supabase; there are no secrets to set.
+3. **Check it took.** On the Ranked tab, "Find a battle" should say "Nobody
+   to battle right now..." (or find somebody) - not "Ranked battles aren't
+   open yet", which is what a project without the function says.
+
+**The function runs `rules.js`**, the referee bundled by `npm run edge`
+(check.mjs fails when it is stale). **Every change to the battle rules is a
+redeploy** (step 2 again). When a change makes the server and an older page
+disagree about a battle, bump `RULES_VERSION` in `src/game/ranked.js`: the
+function then refuses the older page, which asks its player to reload.
+Deploy the function first, then the game.
+
+**Order:** SQL, then the function, then the game. A game without ranked
+battles never calls the function; a game with them, against a project
+without it, says "Ranked battles aren't open yet".
+
+`npm run tradedb` tests the SQL and the function's own handler against the
+TEST project.
+
+**If it ever has to come out:** `npx supabase functions delete ranked-step
+--project-ref <ref>`; the Ranked tab then says ranked battles aren't open.
+`drop table public.ranked_battles;` removes the battles.
+
 ## 4. Turn off email confirmation — **you have to do this one**
 
 It is the only step that cannot be done from here: the setting lives in GoTrue's

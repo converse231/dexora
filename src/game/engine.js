@@ -32,6 +32,7 @@ import {
   starCost, starKeeps, HUNDRED,
 } from "./research.js";
 import { cleanTradeFields } from "./trade.js";
+import { isOpen, refusal, capOf, payFor, teamSize, rematchesReady, cleanBeaten, TEAM_MAX } from "./league.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt } from "./medals.js";
@@ -187,6 +188,8 @@ function freshState() {
     research: {},         // per-species research counters, keyed by DEX ID - see research.js
     stars: [],            // dex ids whose finished research was starred - see `star`
     gifted: [],           // dex ids registered only by a trade - see `reconcileTrades`
+    beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
+    team: [],             // the last League team, box uids - see `battleBegin`
     rift: null,           // an open space-time rift, `{ areaId, left }` - see events.js
     sinceTravel: 0,       // steps since the map last changed, which is what opens a rift
     /* One quest a day. `key` is the local date it belongs to, so a new day is
@@ -243,8 +246,10 @@ function freshState() {
    `stale: "taken"` straight back into the new state - and `save()` returns
    early on "taken", so that save could never be written again by anything.
    One list, read by both, and `loadState` resets every one of them. */
+/* `battle` is a League battle in progress (docs/battles.md): never saved, so a
+   reload mid-battle is a forfeit with nothing spent. */
 const VOLATILE = ["encounter", "evolution", "fishing", "running", "cheers",
-  "worn", "ask", "rev", "colRev", "stale", "hint"];
+  "worn", "ask", "rev", "colRev", "stale", "hint", "battle"];
 const persisted = (s) => {
   const out = { ...s };
   for (const k of VOLATILE) delete out[k];
@@ -571,6 +576,9 @@ function loadState() {
         .filter((id) => Number.isInteger(id) && speciesById(id)),
       gifted: [...new Set(Array.isArray(s.gifted) ? s.gifted : [])]
         .filter((id) => Number.isInteger(id) && speciesById(id)),
+      // Entry by entry, never the whole record: badges are years of play.
+      beaten: cleanBeaten(s.beaten),
+      team: [...new Set(Array.isArray(s.team) ? s.team : [])].filter(Number.isInteger).slice(0, TEAM_MAX),
       /* A save from before `paid` existed was paid for every level it had
          reached, and never past the old cap of 50 - so that is where it
          stands, and anything above is owed. Never above its own level, so no
@@ -609,6 +617,8 @@ function loadState() {
     }
     // A gift is a dex entry: one the dex does not hold as caught is not a gift.
     loaded.gifted = loaded.gifted.filter((id) => loaded.dex[dexIndex(id)] === 2);
+    // The last team names Pokemon, and one sold or traded since is not on it.
+    loaded.team = loaded.team.filter((uid) => loaded.box.some((m) => m.uid === uid));
     return [loaded, null];
   } catch {
     keep(mine(BROKEN_KEY), raw);
@@ -2297,6 +2307,19 @@ export function createEngine(canvas, onChange, mini = null) {
   let lastFrame = performance.now();
   let battleSince = null;
   const BATTLE_FADE = 400;        // `.battle`'s own 300ms fade-in, and a margin
+  /* Every live deadline, pushed forward by a gap the clock ran on without us:
+     a stall, or the League page covering the game. A new timer joins here. */
+  function shift(gap) {
+    if (move.active) move.startedAt += gap;
+    if (state.encounter?.until) state.encounter.until += gap;
+    if (state.fishing?.until) state.fishing.until += gap;
+  }
+  /* THE LEAGUE PAGE COVERS THE GAME, so while it is open the walk stops and
+     the map is not drawn - nothing under an opaque page is worth a frame
+     (docs/battles.md, *Performance*). When it closes, every deadline moves by
+     the time it was open, so an encounter left waiting does not flee the
+     moment you come back. */
+  let pausedAt = null;
 
   function frame() {
     const now = performance.now();
@@ -2319,9 +2342,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const gap = now - lastFrame;
     lastFrame = now;
     if (gap > STALL) {
-      if (move.active) move.startedAt += gap;
-      if (state.encounter?.until) state.encounter.until += gap;
-      if (state.fishing?.until) state.fishing.until += gap;
+      shift(gap);
       /* Keys are dropped because a keyup fired while we were away never
          reached us, and a held direction would walk the trainer on his own.
          `running` with it, or the rail shows RUN over somebody standing still.
@@ -2331,6 +2352,10 @@ export function createEngine(canvas, onChange, mini = null) {
       changed();
     }
 
+    if (pausedAt !== null) {
+      raf = requestAnimationFrame(frame);
+      return;
+    }
     if (move.active && now - move.startedAt >= move.ms) {
       move.active = false;
       move.fromX = state.player.x;
@@ -2715,8 +2740,93 @@ export function createEngine(canvas, onChange, mini = null) {
     return earned;
   }
 
+  /* THE ENGINE JUDGES A LEAGUE BATTLE (docs/battles.md, phase 4), not the
+     page: a page that told the engine what it had won would be the page
+     deciding. `battleBegin(battle, { id, uids })` refuses - answering why -
+     an opponent that is not open yet, or a team that is not the Box's own
+     Pokemon at their own levels, too many, or one the cap refuses (a
+     locked one, over the cap, a legendary over its share). `null` is yes.
+     `fight` is which opponent is on: a closure, never saved, like the
+     battle itself. */
+  let fight = null;
+  function battleBegin(battle, { id, uids } = {}) {
+    if (!isOpen(id, state.beaten)) return "shut";
+    const mine = battle?.sides?.[0]?.team, theirs = battle?.sides?.[1]?.team;
+    if (!Array.isArray(uids) || !uids.length || new Set(uids).size !== uids.length
+      || !Array.isArray(mine) || mine.length !== uids.length || !theirs?.length
+      || uids.length > teamSize(id, theirs.length)) return "team";
+    const cap = capOf(id, state.beaten);
+    for (const [k, uid] of uids.entries()) {
+      const mon = state.box.find((m) => m.uid === uid);
+      if (!mon || mine[k].id !== mon.species || mine[k].level !== mon.level) return "team";
+      const no = refusal(mon, cap);
+      if (no) return no;
+    }
+    fight = { id };
+    state.battle = battle;
+    state.team = [...uids];
+    save();
+    stepped();
+    return null;
+  }
+
   return {
     state,
+    /* The League page (docs/battles.md). `pause` while it covers the game;
+       a battle is held here, VOLATILE, only so the walk knows one is on and a
+       reload drops it - the page computes every turn with battle.js, which
+       this file never imports (asserted), and hands each one over. A turn
+       moves nothing in the collection, so it is `stepped()`; the end is the
+       one `changed()`. */
+    pause(on) {
+      const now = performance.now();
+      if (on && pausedAt === null) {
+        pausedAt = now;
+        held.clear();
+        state.running = false;
+      } else if (!on && pausedAt !== null) {
+        shift(now - pausedAt);
+        pausedAt = null;
+        lastFrame = now;
+      }
+    },
+    paused: () => pausedAt !== null,
+    battleBegin,
+    /* A TURN, and the one place a Battle-shelf item is spent: each the turn
+       used (its log says so) comes out of the bag here, and a turn using one
+       the bag does not hold is refused whole. Spent when used, as a berry is:
+       a battle lost or left afterwards does not give it back. The bag moving
+       mid-battle is still `stepped()` - the result is the one `changed()`. */
+    battleStep(battle) {
+      if (!state.battle) return "none";
+      const used = battle.log.filter((ev) => ev.side === 0 && ev.item != null).map((ev) => ev.item);
+      if (used.some((id) => (state.bag[id] ?? 0) < used.filter((x) => x === id).length)) return "bag";
+      for (const id of used) state.bag[id]--;
+      if (used.length) save();
+      state.battle = battle;
+      stepped();
+      return null;
+    },
+    /* THE RESULT, and the only place a League win is paid: recorded in
+       `beaten` (a new object, so the page's memo sees it) with the step it
+       came on, which restarts that opponent's rematch clock. A loss, a
+       forfeit and a battle cut short record and pay nothing. */
+    battleEnd() {
+      const over = state.battle?.over ?? -1;
+      let pay = 0, first = false;
+      if (over === 0 && fight) {
+        const was = state.beaten[fight.id];
+        first = !was;
+        pay = payFor(fight.id, state.beaten, state.steps);
+        state.beaten = { ...state.beaten, [fight.id]: { wins: (was?.wins ?? 0) + 1, at: state.steps } };
+        state.money += pay;
+        save();
+      }
+      state.battle = null;
+      fight = null;
+      changed();
+      return { over, pay, first };
+    },
     travel,
     buy,
     buyCandy,
@@ -2753,7 +2863,9 @@ export function createEngine(canvas, onChange, mini = null) {
     world: () => {
       outbreak();
       return { outbreak: state.outbreak, rift: riftHere() ? state.rift : null,
-        sinceTravel: state.sinceTravel ?? 0 };
+        sinceTravel: state.sinceTravel ?? 0,
+        // League opponents whose rematch clock is full (league.js).
+        rematches: rematchesReady(state.beaten, state.steps) };
     },
     // The map an outbreak is on, for the Travel panel's badge.
     outbreakArea: () => outbreak()?.areaId ?? null,
