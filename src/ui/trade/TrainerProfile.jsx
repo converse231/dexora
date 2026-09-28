@@ -12,6 +12,35 @@ import { label } from "../../game/map.js";
 import { LIMITS, REPORT_REASONS } from "../../game/trade.js";
 import Sprite, { TrainerArt } from "../Sprite.jsx";
 import Mark from "../Marks.jsx";
+import RankBadge, { RankMedal } from "../RankBadge.jsx";
+import { peakRank, seasonName } from "../../game/ranked.js";
+import { rankedStanding } from "../../net/cloud.js";
+
+/* THEIR RANK (docs/ranked.md, 6c), read from the server when the profile
+   opens; nothing while it loads, on a server without ranked, or for a trainer
+   who has never battled a ranked season. */
+function Ranked({ who }) {
+  const [s, setS] = useState(null);
+  useEffect(() => {
+    let live = true;
+    rankedStanding(who).then((r) => { if (live && r.ok) setS(r.data); });
+    return () => { live = false; };
+  }, [who]);
+  if (!s || (!s.games && !s.badges.length)) return null;
+  return (
+    <div className="tp-rank">
+      <RankBadge rating={s.rating} games={s.games} withRating />
+      {s.badges.map((b) => {
+        const p = peakRank(b.peak);
+        return (
+          <span key={b.season} data-tip={`${seasonName(b.season)}: ${p.name}${p.division ? ` ${p.division}` : ""}`}>
+            <RankMedal id={p.id} label={`${seasonName(b.season)}: ${p.name}`} />
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 const joined = (at) => (at
   ? new Date(at).toLocaleDateString(undefined, { month: "short", year: "numeric" })
@@ -206,6 +235,7 @@ export default function TrainerProfile({
       </header>
 
       <Stats card={card} />
+      <Ranked who={card.user_id} />
 
       <section className="ev-card">
         <header className="ev-banner">

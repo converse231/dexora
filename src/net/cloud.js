@@ -608,6 +608,13 @@ async function rankedCall(fn, args = {}) {
 export const myDefense = () => rankedCall("my_defense");
 export const setDefenseTeam = (slot, uids) => rankedCall("set_defense_team", { slot, uids });
 export const practiceTeam = (who) => rankedCall("practice_team", { who });
+// The ladder, read (6c): standings come through functions; no rating is readable as a row.
+export const myRanked = () => rankedCall("my_ranked");
+export const rankedTop = (s = null, lim = null) => rankedCall("ranked_top", { s, lim });
+export const rankedSeasons = () => rankedCall("ranked_seasons");
+export const rankedFriends = () => rankedCall("ranked_friends");
+export const rankedStanding = (who) => rankedCall("ranked_standing", { who });
+export const myDefenseLog = () => rankedCall("my_defense_log");
 
 /* THE REFEREE (docs/ranked.md, 6b): the ranked-step Edge Function, which
    plays a ranked battle on the server. Answers {ok, data} or {ok: false,

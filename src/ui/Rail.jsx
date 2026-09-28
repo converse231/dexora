@@ -156,6 +156,7 @@ export default function Rail({
           bag={bag}
           dex={state?.dex}
           colRev={state?.colRev}
+          defense={state?.defense}
           stats={state?.stats}
           busy={busy}
           findSeed={seed}

@@ -6,7 +6,7 @@ import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
 import { RAIL_KEY, ORDER_KEY, read, write, flushNow } from "./game/store.js";
-import { tradeInbox, push } from "./net/cloud.js";
+import { tradeInbox, push, myDefense } from "./net/cloud.js";
 import { inboxToReconcile, freshTrades } from "./game/trade.js";
 import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
@@ -208,6 +208,11 @@ export default function App({
     return got;
   }, [account, engine]);
   const tradeOpen = Boolean(trade);
+  // Who defends in ranked, so the Box and the Trade Center warn before one goes (Ranked refreshes it on every edit).
+  useEffect(() => {
+    if (!account || !engine) return;
+    myDefense().then((got) => { if (got.ok) engine.setDefense(got.data); });
+  }, [account, engine]);
   useEffect(() => {
     if (!account || !engine) return undefined;
     let stop = false, timer = null;
@@ -786,7 +791,23 @@ export default function App({
                 markup, gold-rimmed: the same object on screen as a running
                 effect, because both are "something is changing the world for
                 a while" and both count down. */}
-            {(engine?.events() ?? []).map((ev) => (
+            {(engine?.events() ?? []).map((ev) => (ev.ring != null ? (
+              /* THE RIFT, AS A RING: the icon inside a ring that fills as a
+                 rift builds up on this map and drains while one is open - the
+                 whole meter in a circle a card's height, not a card's width. */
+              <button
+                type="button"
+                className={`rift-ring${ev.open ? " open" : ""}`}
+                key={ev.id}
+                onClick={() => setEvents(true)}
+                aria-label={`${ev.tip} Open events.`}
+                data-tip={ev.tip}
+                style={{ "--p": ev.ring }}
+              >
+                <img src={eventIcon(ev.id)} alt="" />
+                {ev.open && <b>{ev.count}</b>}
+              </button>
+            ) : (
               /* A CARD YOU CAN SEE SHOULD OPEN WHAT IT IS ABOUT: the Events
                  page. A real button, so it is in the tab order and a screen
                  reader names it; the corner is `pointer-events: none` and only
@@ -806,7 +827,7 @@ export default function App({
                   </u>
                 </span>
               </button>
-            ))}
+            )))}
 
             {FAMILIES.some((f) => st?.field?.[f]) && (
               <div className="fieldbox" role="status">

@@ -1400,6 +1400,42 @@ import { F } from "../src/game/engine.js";
   assert.deepEqual(chances, [...chances].sort((a, b) => a - b),
     "a better rod must not bite less often than a worse one");
 
+  /* THE WATER IS EVERY GENERATION'S (reported from Frost Hollow: the rods and
+     surfing were Kanto's alone). At the cap every rod reaches every
+     generation and Kanto holds under half of it - half being the line past
+     which one generation of nine owns the water - and a generation bites
+     only once it has arrived, as it walks in. Surfing is the map's own
+     water-dwellers at the map's own weights wherever there are `SURF_MIN`,
+     so it keeps the fitted table's balance, and is held to the same half. */
+  const kanto = (t) => t.filter(([id]) => genOf(id) === 1).reduce((n, r) => n + r[1], 0)
+    / t.reduce((n, r) => n + r[1], 0);
+  const gens = GEN_LAST.map((_, i) => i + 1);
+  for (const r of RODS) {
+    const full = rodTable(r.id, MAX_LEVEL);
+    assert.deepEqual([...new Set(full.map(([id]) => genOf(id)))].sort((a, b) => a - b), gens,
+      `${r.id} does not reach every generation`);
+    assert.ok(kanto(full) < 0.5, `${r.id} is ${Math.round(kanto(full) * 100)}% Kanto at the cap`);
+    for (const lv of [1, GEN_UNLOCK[2], GEN_UNLOCK[5], MAX_LEVEL]) {
+      assert.ok(rodTable(r.id, lv).every(([id]) => GEN_UNLOCK[genOf(id)] <= lv),
+        `${r.id} bites a generation that has not arrived at Lv ${lv}`);
+    }
+  }
+  const wetMaps = BIOMES.filter((b) => b.water);
+  assert.ok(wetMaps.length >= 3, "the water maps went missing");
+  for (const b of wetMaps) {
+    const own = tableFor(b, MAX_LEVEL);
+    const surf = surfTable(b, MAX_LEVEL, "super-rod");
+    const dweller = (id) => speciesById(id).types.includes("water") || speciesById(id).shape === "fish";
+    if (own.filter(([id]) => dweller(id)).length >= SURF_MIN) {
+      assert.equal(surf.length, own.filter(([id]) => dweller(id)).length, `surfing ${b.id} is not all of its water-dwellers`);
+      for (const [id, w] of surf) {
+        assert.equal(own.find((x) => x[0] === id)?.[1], w, `${b.id}'s surf row ${id} is not the map's own`);
+        assert.ok(dweller(id), `${b.id} surfs up ${speciesById(id).name}, which is not a water-dweller`);
+      }
+    }
+    assert.ok(kanto(surf) < 0.5, `surfing ${b.id} is ${Math.round(kanto(surf) * 100)}% Kanto at the cap`);
+  }
+
   console.log(`casting ok \u2014 ${CAST_PHASES.length} phases, both outcomes ` +
               `terminate, ${RODS.length} rods bite ` +
               `${chances.map((c) => Math.round(c * 100) + "%").join("/")}`);
@@ -1850,7 +1886,7 @@ import { canRun, RUN_LEVEL } from "../src/game/items.js";
 // matters is that each map has enough connected ground to walk on - a map you
 // cannot get around is a map that never rolls an encounter.
 import {
-  BIOMES, RODS, rodTable, biomeFor, levelFromXp, levelProgress,
+  BIOMES, RODS, rodTable, surfTable, SURF_MIN, tableFor, biomeFor, levelFromXp, levelProgress,
   LEVEL_XP, MAX_LEVEL, xpForCatch,
   LEGENDARY, LEGEND_MATCHED, LEGEND_STRAY, GEN_LAST, genOf,
 } from "../src/game/biomes.js";
@@ -1894,9 +1930,9 @@ for (const b of BIOMES) {
      off, which is true about walking and false about the map. Both ends of
      every pair, because the engine walks them both ways. */
   const hop = new Map();
-  for (const [ax, ay, bx, by] of area.warps ?? []) {
+  for (const [ax, ay, bx, by, oneWay] of area.warps ?? []) {
     hop.set(`${ax},${ay}`, [bx, by]);
-    hop.set(`${bx},${by}`, [ax, ay]);
+    if (!oneWay) hop.set(`${bx},${by}`, [ax, ay]);   // a hole only drops you
   }
   /* AND ELEVATION DECIDES WHAT WALKING REACHES, where the map carries it -
      the engine's `elevOk`, build_map's `elev_step`. The state is (x, y,
@@ -4266,7 +4302,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
        of those tasks is required. Its star spends one and keeps one. */
     const leg = LEGENDARY[0], starter = EVOLUTIONS[0].from;
     const legTasks = tasksFor(leg).filter((t) => !t.bonus).map((t) => t.id);
-    assert.deepEqual(legTasks.sort(), ["fed", "first", "hundred", "legend"],
+    assert.deepEqual(legTasks.sort(), ["fed", "hundred", "league", "legend"],
       `${speciesById(leg).name}'s research is ${legTasks.join(", ")}`);
     assert.equal(researchLevel(leg, full(legTasks)), RESEARCH_MAX, "a legendary cannot finish its research");
     for (const t of legTasks) {
@@ -6782,6 +6818,7 @@ let healNote = "";
    League now reads off the data, and the server's copies of all of it. */
 import {
   RANKED_LEVEL, RANKED_IV, DEFENSE_SLOTS, DEFENSE_MIN as R_DEFENSE_MIN, CHAR_PIC, baseOf as rBase, teamProblem as rProblem,
+  PLACEMENT as R_PLACEMENT, DAILY_BATTLES as R_DAILY,
 } from "../src/game/ranked.js";
 import { ABANDON_MINUTES as R_ABANDON } from "../src/game/referee.js";
 import { rankedFighter as rFighter, refusal as rRefusal, legendLevel as rLegendLevel } from "../src/game/battle.js";
@@ -6844,8 +6881,10 @@ import { LEAGUES as R_LEAGUES } from "../src/data/leagues.js";
     "players cannot read a card's badges - the column is missing from the grant");
   const rsql = readFileSync(new URL("../db/ranked.sql", import.meta.url), "utf8");
   const rlim = Object.fromEntries([...rsql.matchAll(/when '(\w+)' then (\d+)/g)].map((m) => [m[1], Number(m[2])]));
-  assert.deepEqual(rlim, { SLOTS: DEFENSE_SLOTS, TEAM: R_TEAM, MIN: R_DEFENSE_MIN, ABANDON_MINUTES: R_ABANDON },
-    "db/ranked.sql's ranked_limit() and the game disagree");
+  // Every limit the game also knows is the game's; K, the window and the list sizes are the SQL's alone.
+  const shared = { SLOTS: DEFENSE_SLOTS, TEAM: R_TEAM, MIN: R_DEFENSE_MIN, ABANDON_MINUTES: R_ABANDON,
+    PLACEMENT: R_PLACEMENT, DAILY: R_DAILY };
+  for (const [k, v] of Object.entries(shared)) assert.equal(rlim[k], v, `db/ranked.sql's ranked_limit('${k}') and the game disagree`);
   assert.match(rsql, new RegExp(`check \\(slot between 1 and ${DEFENSE_SLOTS}\\)`), "the defense table's slot CHECK moved");
   assert.match(rsql, new RegExp(`check \\(cardinality\\(uids\\) between 1 and ${R_TEAM}\\)`), "the defense table's size CHECK moved");
 
@@ -6954,4 +6993,53 @@ import { bundle as edgeBundle, RULES as EDGE_RULES } from "./build-edge.mjs";
   console.log("referee ok — a refereed battle is battle.js stepped from hash(seed:n), the view never names an unseen " +
     "defender or carries the state, illegal actions are refused, a late turn is AI 2's, the turn cap is decided on " +
     "health, rules.js is today's referee, and the function reaches nothing past it");
+}
+
+/* ============================================================== RANKED, PHASE 6c
+   The ladder's words (ranked.js) and its anchors (src/data/anchors.js). The
+   ratings themselves are the database's; tradedb and the SQL tests hold them. */
+import { RANKS, rankOf, seasonOf, seasonEnd } from "../src/game/ranked.js";
+import { ANCHORS } from "../src/data/anchors.js";
+import { solveAnchors, ANCHOR_SPREAD } from "./rank-anchors.mjs";
+import { nearestAnchor as rNearest } from "../src/game/referee.js";
+{
+  /* THE FLOORS ARE THE BANDS: the SQL's ranked_floor gives each rank's
+     lower edge, and those are ranked.js's `from`s - one ladder, two copies. */
+  const rsql = readFileSync(new URL("../db/ranked.sql", import.meta.url), "utf8");
+  const floorSql = rsql.match(/function public\.ranked_floor[\s\S]*?\$\$([\s\S]*?)\$\$/)[1];
+  const floors = [...floorSql.matchAll(/then (\d+)/g)].map((m) => Number(m[1])).sort((a, b) => a - b);
+  assert.deepEqual(floors, RANKS.filter((r) => r.from > -Infinity).map((r) => r.from),
+    "db/ranked.sql's floors are not ranked.js's ranks");
+
+  // THE WORDS: Beginner through placement; three divisions a rank, III lowest; the top shows no division.
+  assert.equal(rankOf(1600, R_PLACEMENT - 1).id, "beginner", "a trainer in placement was ranked");
+  for (const r of RANKS) {
+    if (r.from === -Infinity) continue;
+    assert.equal(rankOf(r.from, R_PLACEMENT).id, r.id, `${r.from} is not ${r.name}`);
+    assert.notEqual(rankOf(r.from - 1, R_PLACEMENT).id, r.id, `${r.from - 1} is already ${r.name}`);
+    if (r.steps.length) assert.equal(rankOf(r.from, R_PLACEMENT).division, "III", `${r.name}'s divisions do not start at III`);
+  }
+  for (const r of RANKS.filter((x) => x.steps.length)) {
+    assert.deepEqual(r.steps.map((x) => rankOf(x, R_PLACEMENT).division), ["II", "I"], `${r.name}'s divisions`);
+  }
+  assert.equal(rankOf(2000, R_PLACEMENT).division, null);
+  // Seasons: a calendar month in UTC, ending where the next begins.
+  assert.equal(seasonOf(new Date("2026-10-31T23:59:59Z")), "2026-10");
+  assert.equal(seasonEnd("2026-12").toISOString(), "2027-01-01T00:00:00.000Z");
+
+  /* THE ANCHORS ARE SOLVED, NOT TYPED: re-solved on their record they must
+     be exactly the shipped file - or the rosters, the format or the rules
+     moved and `npm run anchors` has to run again (then `npm run edge`). */
+  assert.deepEqual(solveAnchors(), ANCHORS, "src/data/anchors.js is not the anchors solved today - run npm run anchors");
+  assert.ok(ANCHORS.every((a) => Math.abs(a.rating - 1000) <= ANCHOR_SPREAD));
+  assert.ok(ANCHORS.every((a) => !rProblem(a.team)), "an anchor's team breaks the format");
+  // The anchor met: the nearest, never one met today.
+  const nearest = rNearest(1000, []);
+  assert.ok(ANCHORS.every((a) => Math.abs(a.rating - 1000) >= Math.abs(nearest.rating - 1000)), "not the nearest anchor");
+  assert.notEqual(rNearest(1000, [nearest.id])?.id, nearest.id, "an anchor met today was met again");
+  assert.equal(rNearest(1000, ANCHORS.map((a) => a.id)), null);
+
+  const r = ANCHORS.map((a) => a.rating).sort((x, y) => x - y);
+  console.log(`ladder ok — the SQL's floors are ranked.js's tiers, divisions split at their steps, ${ANCHORS.length} ` +
+    `anchors re-solved exactly (${r[0]}-${r.at(-1)}), and the nearest anchor is never one met today`);
 }

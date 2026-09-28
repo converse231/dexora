@@ -10,6 +10,7 @@ import { speciesById, TIERS } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { LIMITS, tradeable, fits } from "../../game/trade.js";
 import { variantOf, keeper } from "../../game/items.js";
+import { defendNote } from "../../game/ranked.js";
 import { tradeBoard, postListing, withdrawListing, fulfilListing, tradeSearch } from "../../net/cloud.js";
 import Sprite, { TrainerArt } from "../Sprite.jsx";
 import Mark from "../Marks.jsx";
@@ -85,6 +86,8 @@ function Post({ box, dexOf, engine, onPosted, onCancel }) {
         </div>
       </section>
       {chosen.some(keeper) && <p className="tc-err">You are offering something rare - whoever fills this gets it.</p>}
+      {defendNote(chosen, engine.state.defense, (m) => label(speciesById(m.species)))
+        && <p className="tc-err">{defendNote(chosen, engine.state.defense, (m) => label(speciesById(m.species)))}</p>}
       {err && <p className="tc-err" role="alert">{err}</p>}
       <div className="tp-actions tc-dock">
         <button type="button" className="ev-go" disabled={busy || !chosen.length || !want} onClick={post}>
@@ -118,6 +121,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
   }, [say]);
 
   const mine = inbox?.listings ?? [];
+  const defense = engine.state.defense;
   const others = (list ?? []).filter((l) => !l.mine);
   const lots = (l) => l.mons ?? [l.mon];
 
@@ -224,8 +228,10 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
         {list === null ? <p className="ev-quiet">Loading the board…</p> : others.length ? (
           <ul className="of-list">
             {others.map((l) => {
+              // The one it would take: never a keeper or a defender while another fits.
               const fit = box.filter((m) => fits(box, m, l))
-                .sort((a, b) => Number(keeper(a)) - Number(keeper(b)) || a.level - b.level)[0];
+                .sort((a, b) => Number(keeper(a)) - Number(keeper(b))
+                  || Number(Boolean(defense?.[a.uid])) - Number(Boolean(defense?.[b.uid])) || a.level - b.level)[0];
               return (
                 <li key={l.id} className="of-card">
                   <p className="of-who"><Who name={l.owner} onOpen={onOpenTrainer} /> offers</p>
@@ -239,6 +245,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
                       {busy === l.id ? "Trading…" : `Trade your ${label(speciesById(fit.species))} Lv ${fit.level}`}
                     </button>
                   ) : <p className="ev-quiet">You have none to spare.</p>}
+                  {fit && defense?.[fit.uid] && <p className="tc-err">Your only fit defends in ranked ({defense[fit.uid]}).</p>}
                 </li>
               );
             })}

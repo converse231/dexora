@@ -557,9 +557,10 @@ export function foundIn(speciesId) {
   }
   areas.sort((a, b) => b.share - a.share);
 
+  // A rod row carries the level its generation starts biting at, as an area's does.
   const rods = RODS
     .filter((r) => r.table.some(([id]) => id === speciesId))
-    .map((r) => r.name);
+    .map((r) => ({ id: r.id, name: r.name, from: GEN_UNLOCK[genOf(speciesId)] ?? 0 }));
 
   return { legendary, areas, rods };
 }
@@ -2526,7 +2527,15 @@ export const xpForCatch = (species, isNew) =>
    than a modifier on the shore's, which is what makes upgrading one feel like
    somewhere new rather than the same place with better odds - the Super Rod's
    list is almost entirely second-stage water Pokémon you cannot find any other
-   way. Order matters only for readability; the weights do the work. */
+   way. Order matters only for readability; the weights do the work.
+
+   EVERY GENERATION FISHES (2026-09-29). The three lists were Kanto's alone,
+   and surfing drew from them too, so every body of water in the game was
+   Gen 1 - reported from Frost Hollow's lake. Each rod now holds its Kanto
+   rows at about half their old weight, one line per generation after, and a
+   generation bites from its `GEN_UNLOCK` level as it walks in from. At the
+   cap Kanto is under half of every rod (check.mjs), a third of the Good and
+   Super Rods'. */
 export const RODS = [
   {
     id: "old-rod",
@@ -2535,15 +2544,25 @@ export const RODS = [
     // like a rod. A better rod finds more, on top of a better table.
     bite: 0.5,
     // The real Old Rod catches nothing but Magikarp. This is a little kinder.
-    table: [[129, 70], [118, 18], [60, 12]],
+    table: [
+      [129, 28], [118, 10], [60, 8],
+      [223, 6], [370, 6], [349, 3], [456, 6], [535, 6], [692, 5], [746, 3], [846, 6], [963, 6],
+    ],
   },
   {
     id: "good-rod",
     name: "Good Rod",
     bite: 0.65,
     table: [
-      [129, 20], [118, 16], [60, 14], [72, 12], [116, 10],
-      [98, 9], [90, 7], [54, 6], [86, 4], [79, 2],
+      [129, 10], [118, 8], [60, 7], [72, 6], [116, 5], [98, 5], [90, 4], [54, 3], [86, 2], [79, 1],
+      [223, 6], [170, 6], [211, 3],
+      [339, 5], [318, 5], [341, 5], [320, 4], [370, 3], [349, 2],
+      [456, 6],
+      [535, 5], [592, 4], [550, 1],
+      [692, 5], [690, 4],
+      [747, 4], [746, 3], [779, 2],
+      [846, 5], [833, 5],
+      [963, 5], [960, 4], [976, 2],
     ],
   },
   {
@@ -2551,11 +2570,36 @@ export const RODS = [
     name: "Super Rod",
     bite: 0.8,
     table: [
-      [119, 14], [61, 12], [73, 11], [99, 10], [117, 9], [121, 8],
-      [91, 7], [55, 7], [87, 6], [80, 5], [130, 4], [131, 3], [147, 3], [148, 1],
+      [119, 7], [61, 6], [73, 6], [99, 5], [117, 5], [121, 4],
+      [91, 4], [55, 3], [87, 3], [80, 2], [130, 2], [131, 2], [147, 3], [148, 1],
+      [224, 6], [171, 6], [211, 4], [226, 2],
+      [340, 6], [319, 6], [342, 6], [321, 3], [369, 2], [349, 3],
+      [457, 6],
+      [593, 5], [594, 4], [550, 3],
+      [693, 5], [691, 3],
+      [779, 4], [746, 4],
+      [847, 6], [834, 4],
+      [976, 5], [978, 3], [977, 2],
     ],
   },
 ];
 
-export const rodTable = (id) => RODS.find((r) => r.id === id)?.table ?? null;
+// A rod's rows at a trainer level: a generation bites once it has arrived.
+export const rodTable = (id, level = MAX_LEVEL) =>
+  RODS.find((r) => r.id === id)?.table.filter(([sp]) => GEN_UNLOCK[genOf(sp)] <= level) ?? null;
+
+/* WHAT YOU MEET ON THE WATER is the map's own water-dwellers: its fitted
+   table's Water types and fish, at their own weights. It was the rod's list
+   on every map, which made Frost Hollow's lake, the Safari's ponds and the
+   sea all the same Kanto water (reported from play). The map's table is
+   already fitted - its generations near target, its lines capped - so its
+   water keeps that balance and the map's character. A map with fewer than
+   `SURF_MIN` of them at this level (Monsoon Trail's river holds only Feebas
+   until Lv 30) meets the rod's pool instead, as all water once did. */
+export const SURF_MIN = 4;
+const wet = (id) => { const sp = speciesById(id); return sp.types.includes("water") || sp.shape === "fish"; };
+export function surfTable(biome, level, rodId) {
+  const own = tableFor(biome, level).filter(([id]) => wet(id));
+  return own.length >= SURF_MIN ? own : rodTable(rodId, level);
+}
 export const rodBite = (id) => RODS.find((r) => r.id === id)?.bite ?? 0;

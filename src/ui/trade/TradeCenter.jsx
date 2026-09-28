@@ -132,7 +132,8 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
   const waiting = box.filter((m) => m.lock === "pool");
   const choices = useMemo(() => box.filter((m) => tradeable(box, m)), [box]);
   const chosen = choices.find((m) => keyOf(m) === pick[0]) ?? null;
-  const precious = chosen && (keeper(chosen) || isLegendary(chosen.species));
+  const defends = chosen && engine.state.defense?.[chosen.uid];
+  const precious = chosen && (keeper(chosen) || isLegendary(chosen.species) || defends);
 
   const deposit = async () => {
     if (precious && !sure) { setSure(true); return; }
@@ -198,7 +199,7 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
             <span>
               <b>{label(speciesById(chosen.species))}</b>
               <i>Lv {chosen.level}{variantOf(chosen) ? ` · ${variantOf(chosen)}` : ""}{chosen.alpha ? " · alpha" : ""}</i>
-              {sure && <em>This one is rare. Send it anyway?</em>}
+              {sure && <em>{defends ? `It defends in ranked (${defends}). Send it anyway?` : "This one is rare. Send it anyway?"}</em>}
             </span>
             <button type="button" className="ev-go" disabled={busy || left === 0} onClick={deposit}>
               {busy ? "Sending…" : sure ? "Yes, send it" : "Send"}

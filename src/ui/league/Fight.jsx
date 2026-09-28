@@ -19,6 +19,7 @@ import { speciesById } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { useModalLock } from "../modal.js";
 import Sprite, { backUrl, VariantFx, ItemIcon } from "../Sprite.jsx";
+import RankBadge from "../RankBadge.jsx";
 import Confirm from "../Confirm.jsx";
 
 const STATUS = [["PAR", "paralysed"], ["BRN", "burned"], ["PSN", "poisoned"], ["SLP", "put to sleep"], ["FRZ", "frozen solid"]];
@@ -38,7 +39,7 @@ const AREA = {
   dark: "tower", psychic: "tower", poison: "mansion", dragon: "ridge", normal: "meadow",
   flying: "safari", fairy: "meadow",
 };
-export const areaFor = (type) => AREA[type] ?? "meadow";
+const areaFor = (type) => AREA[type] ?? "meadow";
 
 const BEAT = 1050;          // a line of text and its motion
 // A ranked turn the server refused, in words (handler.js's codes).
@@ -197,6 +198,7 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
   const [note, setNote] = useState(null);
   const [deadline, setDeadline] = useState(remote?.deadline ?? null);
   const [left, setLeft] = useState(null);     // seconds on the current decision
+  const [rated, setRated] = useState(null);   // what the ladder did with a finished ranked battle
   const [beat, setBeat] = useState(null);      // the one being played
   const queue = useRef([]);
   const [panel, setPanel] = useState("moves"); // moves | switch | forced | bag | use
@@ -302,6 +304,7 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
       }
       nb = { ...got.data.view, log: got.data.log };
       auto = got.data.auto;
+      if (got.data.result) setRated(got.data.result);
       setDeadline(got.data.deadline);
     } else {
       nb = step(b, action, rng);
@@ -378,7 +381,7 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
         </button>
         <div className="ft-vs">
           <img src={new URL(`trainers/${opponent.pic}.png`, document.baseURI).href} alt="" />
-          <span><i>vs</i> <b>{foeName}</b></span>
+          <span><i>vs</i> <b>{foeName}</b>{opponent.rating != null && <em className="ft-opp-rating"> {opponent.rating.toLocaleString("en-US")}</em>}</span>
         </div>
         <span className={`ft-turn${left !== null && left <= 10 && !over ? " hurry" : ""}`}>
           {b.turn ? `Turn ${b.turn}` : ""}
@@ -420,8 +423,14 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
         {over ? (
           <div className={`ft-result ${over}`}>
             <b>{over === "won" ? "Victory!" : "Defeated"}</b>
+            {remote && rated?.rated && (
+              <span className="ft-rated">
+                <b className={rated.delta >= 0 ? "up" : "down"}>{rated.delta >= 0 ? "+" : ""}{rated.delta}</b>
+                <RankBadge rating={rated.rating} games={rated.games} withRating />
+              </span>
+            )}
             <span>{remote
-              ? `${b.turn} turns. Ranked preview - the ladder, and ratings, open in the next update.`
+              ? `${b.turn} turns.`
               : practice
               ? `${b.turn} turns. Practice - nothing is saved or rated.`
               : over === "won"
@@ -571,7 +580,17 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
           onCancel={() => setAsk(false)}
           onConfirm={async () => {
             setAsk(false);
-            if (remote) await remote.forfeit();
+            /* A ranked forfeit is a rated loss: stay for the result card, which
+               says what it cost - leaving at once took the points unseen. */
+            if (remote) {
+              const got = await remote.forfeit();
+              if (got?.ok && got.data?.result) setRated(got.data.result);
+              finish();
+              queue.current = [];
+              setBeat(null);
+              setOver("lost");
+              return;
+            }
             finish();
             onDone("forfeit");
           }}

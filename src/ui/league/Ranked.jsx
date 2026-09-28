@@ -1,7 +1,8 @@
-/* RANKED (docs/ranked.md): your DEFENSE TEAMS and PRACTICE against a
-   friend's (6a), and RANKED BATTLES refereed by the server (6b) - unrated
-   until the ladder opens (6c). The teams set here are the ones challengers
-   meet, and the one you battle with.
+/* RANKED (docs/ranked.md): your standing on the ladder (6c), RANKED BATTLES
+   refereed by the server (6b), your DEFENSE TEAMS and PRACTICE against a
+   friend's (6a). The teams set here are the ones challengers meet, and the
+   one you battle with. The page holds no rating: standings are read from the
+   server's functions, and a battle's points are the database's.
 
    The server holds the teams (db/ranked.sql) and reads every member off your
    STORED save, so the game flushes before it saves a team, and a team shows
@@ -15,13 +16,16 @@ import { label } from "../../game/map.js";
 import { variantOf } from "../../game/items.js";
 import { flushNow } from "../../game/store.js";
 import { TEAM_MAX } from "../../game/league.js";
-import { baseOf, teamProblem, CHAR_PIC, DEFENSE_SLOTS, DEFENSE_MIN, RANKED_LEVEL } from "../../game/ranked.js";
-import { push, myDefense, setDefenseTeam, practiceTeam, myFriends, rankedStep } from "../../net/cloud.js";
+import {
+  baseOf, teamProblem, rankOf, peakRank, seasonName, seasonEnd, CHAR_PIC, DEFENSE_SLOTS, DEFENSE_MIN, RANKED_LEVEL, PLACEMENT, TEAM_NAME,
+} from "../../game/ranked.js";
+import { push, myDefense, setDefenseTeam, practiceTeam, myFriends, rankedStep, myRanked } from "../../net/cloud.js";
 import Sprite from "../Sprite.jsx";
+import { RankMedal } from "../RankBadge.jsx";
+import { Standings, DefenseLog } from "./Standings.jsx";
 import Picker, { keyOf } from "../trade/Picker.jsx";
 
 const asset = (path) => new URL(path, document.baseURI).href;
-const NAME = ["A", "B", "C"];
 const present = (team) => (team ?? []).filter((m) => !m.missing);
 // The server's refusals, in the game's words (db/ranked.sql).
 const say = (error) => (/not in your saved box/.test(error ?? "")
@@ -37,6 +41,8 @@ const RANKED_SAYS = {
   size: "A team is one to six Pokémon.",
   version: "A new version of Dexora is out - reload the page to battle.",
   closed: "Ranked battles aren't open yet.",
+  cap: "That's today's battles - the ladder opens again at midnight UTC.",
+  voided: "Your ranked season was voided after a report, so you can't battle until the next season.",
   signin: "Sign in to battle.",
   offline: "Could not reach the server. Try again.",
   server: "Something went wrong on the server. Try again.",
@@ -95,7 +101,7 @@ function Editor({ slot, team, box, onSaved }) {
   return (
     <div className="lg-pick">
       <section className="rk-edit-head">
-        <span className="lg-kicker">Defense team {NAME[slot - 1]}</span>
+        <span className="lg-kicker">Defense team {TEAM_NAME[slot - 1]}</span>
         <h4>Choose up to {TEAM_MAX}</h4>
         <Rules />
       </section>
@@ -127,7 +133,53 @@ function Editor({ slot, team, box, onSaved }) {
   );
 }
 
-export default function Ranked({ box, signedIn, editing, setEditing, onPractice, onRanked }) {
+const TABS = [["teams", "Teams"], ["standings", "Standings"], ["log", "Defenses"], ["practice", "Practice"]];
+const TAB_KEY = "dexora-ranked-tab";
+const readTab = () => { try { return localStorage.getItem(TAB_KEY) ?? "teams"; } catch { return "teams"; } };
+
+/* YOUR STANDING, as the tab's head: the rank with your past seasons' badges
+   on its line (the League's badge case, same shape), and one line of numbers. */
+function Standing({ me }) {
+  if (!me) {
+    return (
+      <section className="lg-hero rk-hero">
+        <span className="lg-kicker">Ranked</span>
+        <div className="lg-hero-title"><h2>Ranked</h2></div>
+      </section>
+    );
+  }
+  const r = rankOf(me.rating, me.games);
+  const days = Math.max(1, Math.ceil((seasonEnd(me.season) - Date.now()) / 86400000));
+  return (
+    <section className="lg-hero rk-hero">
+      <span className="lg-kicker">Ranked · {seasonName(me.season)} · ends in {days} day{days === 1 ? "" : "s"}</span>
+      <div className="lg-hero-title">
+        <h2 className="rk-title">
+          {r.id !== "beginner" && <RankMedal id={r.id} />}
+          {r.name}{r.division ? ` ${r.division}` : ""}
+        </h2>
+        {me.badges.length > 0 && (
+          <ol className="lg-case" aria-label="Season badges">
+            {me.badges.map((b) => {
+              const p = peakRank(b.peak);
+              return (
+                <li key={b.season} className="won" data-tip={`${seasonName(b.season)}: ${p.name}${p.division ? ` ${p.division}` : ""}`}>
+                  <RankMedal id={p.id} label={`${seasonName(b.season)}: ${p.name}`} />
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
+      <p>{r.id === "beginner"
+        ? `${r.left} placement battle${r.left === 1 ? "" : "s"} to go`
+        : `${me.rating.toLocaleString("en-US")} · #${me.place.toLocaleString("en-US")}`}
+        {` · ${me.wins}–${me.games - me.wins} · ${me.today} of ${me.cap} battles today`}</p>
+    </section>
+  );
+}
+
+export default function Ranked({ box, signedIn, editing, setEditing, onPractice, onRanked, nonce = 0, onDefense }) {
   const [teams, setTeams] = useState(null);       // [{slot, team}] as the server has them
   const [friends, setFriends] = useState(null);
   const [error, setError] = useState(null);
@@ -137,17 +189,23 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
   const [live, setLive] = useState(null);         // a ranked battle of yours still open on the server
   const [finding, setFinding] = useState(false);
   const [rkNote, setRkNote] = useState(null);
+  const [me, setMe] = useState(null);             // your standing (`my_ranked`)
+  const [tab, setTabState] = useState(readTab);
+  const setTab = (t) => { setTabState(t); try { localStorage.setItem(TAB_KEY, t); } catch { /* a preference */ } };
 
   const load = useCallback(async () => {
-    const [d, f, r] = await Promise.all([myDefense(), myFriends(), rankedStep({ op: "resume" })]);
+    const [d, f, r, m] = await Promise.all([myDefense(), myFriends(), rankedStep({ op: "resume" }), myRanked()]);
     if (!d.ok) { setError(say(d.error)); return; }
     setError(null);
     setTeams(d.data ?? []);
+    onDefense?.(d.data);
     setFriends(f.ok ? (f.data ?? []).filter((x) => x.status === "accepted").map((x) => x.card) : []);
     setLive(r.ok && !r.data?.none ? r.data : null);
     if (!r.ok && r.error !== "offline") setRkNote(RANKED_SAYS[r.error] ?? null);
-  }, []);
-  useEffect(() => { if (signedIn) load(); }, [signedIn, load]);
+    setMe(m.ok ? m.data : null);
+  }, [onDefense]);
+  // Again after every battle the League page closes: the standing moved.
+  useEffect(() => { if (signedIn) load(); }, [signedIn, load, nonce]);
 
   const bySlot = useMemo(() => new Map((teams ?? []).map((t) => [t.slot, t.team])), [teams]);
   const usable = [...bySlot].filter(([, t]) => present(t).length).map(([s]) => s);
@@ -171,7 +229,7 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
 
   const clear = async (slot) => {
     const got = await setDefenseTeam(slot, []);
-    if (got.ok) setTeams(got.data); else setError(say(got.error));
+    if (got.ok) { setTeams(got.data); onDefense?.(got.data); } else setError(say(got.error));
   };
 
   /* PRACTICE: one of their teams, blind, against one of yours - played in the
@@ -193,7 +251,7 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
 
   if (!signedIn) {
     return (
-      <section className="lg-hero area-power rk-hero">
+      <section className="lg-hero rk-hero">
         <div className="lg-hero-text">
           <span className="lg-kicker">Ranked</span>
           <h2>Defense teams</h2>
@@ -205,39 +263,32 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
 
   if (editing) {
     return <Editor slot={editing} team={bySlot.get(editing)} box={box}
-      onSaved={(d) => { setTeams(d); setEditing(null); }} />;
+      onSaved={(d) => { setTeams(d); onDefense?.(d); setEditing(null); }} />;
   }
 
   return (
     <>
-      <section className="lg-hero area-power rk-hero">
-        <div className="lg-hero-text">
-          <span className="lg-kicker">Ranked · coming next</span>
-          <h2>Defense teams</h2>
-          <p>Set up to {DEFENSE_SLOTS} teams. A challenger meets one of them without knowing which, and the CPU
-            plays it for you. Ranked needs at least {DEFENSE_MIN}.</p>
-        </div>
-        <Rules />
-      </section>
+      <Standing me={me} />
 
       {error && <p className="lg-refused" role="alert">{error}</p>}
 
       {/* THE BATTLE, first: what the tab is for once a team is set. */}
       <section className="lg-card rk-battle">
         <div className="rk-slot-head">
-          <span className="lg-kicker">Ranked battle · preview</span>
+          <span className="lg-kicker">Ranked battle</span>
           <b>{live ? `In progress against ${live.opponent.username}` : "Battle another trainer's defense"}</b>
         </div>
         <p className="lg-why">
           {live ? "Your battle is waiting where you left it. Ten minutes without a move and it counts as a loss."
-            : "The server picks who you meet and which of their teams, and referees every turn. You get 60 seconds a turn. Unrated until the ladder opens."}
+            : `The server picks someone near your rating and one of their teams, and referees every turn: 60 seconds a turn. ${me && me.games < PLACEMENT ? `Your first ${PLACEMENT} battles place you.` : ""}`}
         </p>
+        <Rules />
         {!live && usable.length > 1 && (
           <div className="rk-use" role="group" aria-label="Your team">
             <span>Your team</span>
             {usable.map((s) => (
               <button key={s} type="button" className={`tp-chip add${s === mine ? " have" : ""}`} aria-pressed={s === mine}
-                onClick={() => setUse(s)}>Team {NAME[s - 1]}</button>
+                onClick={() => setUse(s)}>Team {TEAM_NAME[s - 1]}</button>
             ))}
           </div>
         )}
@@ -255,7 +306,19 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
         </div>
       </section>
 
-      <h3 className="lg-section">Your teams</h3>
+      <nav className="sheet-tabs rk-tabs" role="tablist" aria-label="Ranked">
+        {TABS.map(([id, name]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""}
+            onClick={() => setTab(id)}>{name}</button>
+        ))}
+      </nav>
+
+      {tab === "standings" && <Standings me={me} />}
+      {tab === "log" && <DefenseLog />}
+
+      {tab === "teams" && (<>
+      <p className="lg-why rk-note">Up to {DEFENSE_SLOTS} teams; a challenger meets one of them without knowing which, and
+        the CPU plays it for you. You're matched once you have {DEFENSE_MIN}.</p>
       {teams === null && !error ? <p className="ev-quiet">Loading your teams…</p> : (
         <div className="lg-list rk-slots">
           {Array.from({ length: DEFENSE_SLOTS }, (_, k) => {
@@ -264,7 +327,7 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
             return (
               <article key={slot} className={`lg-card rk-slot${team.length ? "" : " empty"}`}>
                 <div className="rk-slot-head">
-                  <span className="lg-kicker">Team {NAME[k]}</span>
+                  <span className="lg-kicker">Team {TEAM_NAME[k]}</span>
                   <b>{team.length ? `${present(team).length} of ${TEAM_MAX}` : "Empty"}</b>
                   {gone > 0 && <em className="rk-warn">{gone} no longer in your Box</em>}
                 </div>
@@ -282,13 +345,14 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
           })}
         </div>
       )}
+      </>)}
 
-      <h3 className="lg-section">Practice with friends</h3>
+      {tab === "practice" && (<>
       <p className="ev-quiet rk-note">
         Battle one of a friend&rsquo;s defense teams - you won&rsquo;t know which until it&rsquo;s sent out.
         Nothing is saved or rated.
       </p>
-      {usable.length > 1 && <p className="lg-why">Practice uses the team chosen above: Team {NAME[(mine ?? 1) - 1]}.</p>}
+      {usable.length > 1 && <p className="lg-why">Practice uses the team chosen above: Team {TEAM_NAME[(mine ?? 1) - 1]}.</p>}
       {note && <p className="lg-refused" role="status">{note}</p>}
       {friends === null ? <p className="ev-quiet">Loading friends…</p>
         : !friends.length ? <p className="ev-quiet">Add friends in the Trade Center to practice against their teams.</p>
@@ -307,8 +371,9 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
             </ul>
           )}
       {friends?.length > 0 && mine === null && (
-        <p className="lg-why">Set up a team above to practice.</p>
+        <p className="lg-why">Set up a team under Teams to practice.</p>
       )}
+      </>)}
     </>
   );
 }

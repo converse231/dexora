@@ -222,7 +222,6 @@ export function VariantFx({ id, variant, art = null }) {
         <span className="proj-beam" aria-hidden="true" />
         <span className="proj-base" aria-hidden="true" />
         <span className="proj-lines" style={{ "--art": url }} aria-hidden="true"><i /></span>
-        <span className="proj-cut" style={{ "--art": url }} aria-hidden="true" />
       </>
     );
   }

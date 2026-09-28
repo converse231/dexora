@@ -873,6 +873,7 @@ canvas {
 /* Just the ball. A Poke Ball beside a name has meant "registered" since 1996,
    so the word was the same statement twice - and on a nameplate that now also
    carries a tier badge, the shorter of the two wins. */
+.np-owned { font-family: var(--pixel); font-size: 10px; line-height: 1; color: var(--ink-soft); margin-left: -2px; }
 .np-caught {
   display: inline-flex; align-items: center; line-height: 1;
   padding: 3px; border-radius: 50%;
@@ -5102,6 +5103,35 @@ button:disabled { transition: none; }
 .fieldbox b { font-size: 17px; font-weight: 400; line-height: 1.05; }
 .fieldbox i { font-style: normal; font-size: 9px; letter-spacing: .08em; opacity: .8; }
 .fieldbox u { text-decoration: none; display: grid; }
+/* THE RIFT'S RING (reported from play: its progress lived only on the Events
+   page, and a bar is too wide for this corner). The ring fills as a rift
+   builds up on this map and drains while one is open (`--p`, from
+   `engine.events()`); violet building, gold open; the icon lights when it
+   opens and the steps it has left sit on its edge. */
+/* The rim alone is the meter (a mask over the conic), so the centre stays the
+   field card's own translucent ground - an opaque inner disc let the fill
+   show through as a wedge. */
+.rift-ring {
+  --rc: #b48cff;
+  position: relative; width: 46px; height: 46px; padding: 0; border: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer; pointer-events: auto; font: inherit;
+  background: rgba(18, 26, 16, .78);
+}
+.rift-ring::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--rc) calc(var(--p) * 360deg), rgba(255, 255, 255, .22) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+}
+.rift-ring img { position: relative; width: 28px; height: 28px; image-rendering: pixelated; opacity: .55; }
+.rift-ring.open { --rc: var(--gold); }
+.rift-ring.open img { opacity: 1; }
+.rift-ring b {
+  position: absolute; right: -6px; bottom: -4px; min-width: 22px; padding: 2px 4px 1px; border-radius: 8px;
+  font-family: var(--pixel); font-size: 9px; font-weight: 400; line-height: 1; color: #fff; text-align: center;
+  background: rgba(18, 26, 16, .92); box-shadow: 0 0 0 1.5px var(--gold) inset;
+}
+.rift-ring:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
 /* IT WORE OFF, and this is the same card gone cold rather than a new object.
    An effect ending is the one thing that happens in this corner with no tell
@@ -6366,22 +6396,20 @@ button:disabled { transition: none; }
   fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
 }
 
-/* ---- the region: its name, its game, and a badge case that fills. */
+/* ---- the region: its game, its name with the badge case beside it, and
+   where you stand. The badges are the badges - no rings round them; one not
+   won yet is greyed. They sit on the title's line so the section is as tall
+   as its words, and drop under the name only when the line is too short. */
 .lg-hero {
-  display: grid; gap: 12px; padding: 16px 18px; border-radius: 16px;
-  border: 2px solid var(--line); box-shadow: 0 3px 0 var(--shadow-soft);
-  background: linear-gradient(135deg, var(--canopy-soft), var(--surface-2) 70%);
+  display: grid; gap: 4px; padding: 14px 18px; border-radius: 16px;
+  border: 2px solid var(--line); box-shadow: 0 3px 0 var(--shadow-soft); background: var(--surface-2);
 }
-.lg-hero h2 { margin: 2px 0 0; font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1; color: var(--ink); }
-.lg-hero p { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
-.lg-hero.shut { background: var(--surface-2); }
-.lg-case { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.lg-case li {
-  width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%;
-  background: var(--surface); border: 2px solid var(--line);
-}
-.lg-case img { width: 32px; height: 32px; image-rendering: auto; filter: grayscale(1) opacity(.3); }
-.lg-case li.won { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+.lg-hero-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.lg-hero h2 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1; color: var(--ink); }
+.lg-hero p { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.lg-case { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.lg-case li { display: grid; }
+.lg-case img { width: 28px; height: 28px; image-rendering: auto; filter: grayscale(1) opacity(.3); }
 .lg-case li.won img { filter: none; }
 .lg-section {
   margin: 6px 2px -4px; font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--ink);
@@ -6389,19 +6417,16 @@ button:disabled { transition: none; }
 .lg-list { display: grid; gap: 12px; }
 @media (min-width: 820px) { .lg-list { grid-template-columns: 1fr 1fr; align-items: start; } }
 
-/* ---- an opponent: portrait, who, the facts, their team, and one button. */
-/* The accent reads `--tc` from the card's own `.t-<type>` class - a default
-   declared here would win the tie (same specificity, later in the file) and
-   paint every card grey, so the fallback lives in the `var()` instead. */
+/* ---- an opponent: portrait, who, the facts, their team, and one button.
+   One plain border: the type is already said by the chip and the portrait's
+   ground (`--tc` from the card's `.t-<type>` class), so a coloured stripe down
+   the side said it a third time. The Champion's gold border is information. */
 .lg-card {
-  display: grid; gap: 10px; min-width: 0; padding: 12px 12px 12px 14px;
-  background: var(--surface); border: 2px solid var(--line); border-left: 6px solid var(--tc, var(--ink-faint));
+  display: grid; gap: 10px; min-width: 0; padding: 12px;
+  background: var(--surface); border: 2px solid var(--line);
   border-radius: 16px; box-shadow: 0 3px 0 var(--shadow-soft);
 }
-.lg-card.champ {
-  border-color: var(--gold); border-left-color: var(--gold);
-  background: linear-gradient(160deg, var(--gold-soft), var(--surface) 55%);
-}
+.lg-card.champ { border-color: var(--gold); }
 .lg-card-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; }
 .lg-portrait {
   width: 76px; height: 76px; display: grid; place-items: center; overflow: hidden;
@@ -6745,7 +6770,65 @@ button:disabled { transition: none; }
   font-family: var(--display); font-size: 22px; color: var(--ink-faint);
 }
 .rk-note { margin: 0 0 8px; }
-.rk-battle { border-left-color: var(--gold); margin-bottom: 4px; }
+.rk-battle { margin-bottom: 4px; }
+
+/* ---- the ladder (6c). Plain rows: the rank is words with the Ball's own
+   sprite, the numbers are numbers, and nothing is framed that needs no frame. */
+.rk-title { display: inline-flex; align-items: center; gap: 8px; }
+.rk-tabs { margin: 4px 0 0; }
+.rk-badge { display: inline-flex; align-items: center; gap: 5px; min-width: 0; white-space: nowrap; }
+/* THE DEX CAREERS' MEDALS (docs/ranked.md): a disc in the career's colour with
+   a lit upper edge and a dark rim, until the drawn emblems land. Art, so the
+   colours do not change at night. Sized by the context it sits in. */
+.rk-medal {
+  --mc: #b07a4a; display: inline-block; flex: none; width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .55) 0 18%, transparent 20%), var(--mc);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .18), 0 0 0 1px rgba(20, 20, 28, .75);
+}
+.rk-medal.rk-ranger { --mc: #4f9a55; }
+.rk-medal.rk-researcher { --mc: #4a86d4; }
+.rk-medal.rk-professor { --mc: #8657c4; }
+.rk-medal.rk-legend {
+  --mc: #e4b53c;
+  box-shadow: inset 0 0 0 2px rgba(120, 70, 0, .35), 0 0 0 1px rgba(20, 20, 28, .75), 0 0 0 3px rgba(228, 181, 60, .45);
+}
+.rk-title .rk-medal { width: 26px; height: 26px; }
+.lg-case .rk-medal { width: 24px; height: 24px; }
+.rk-badge b { font-size: 13px; color: var(--ink); }
+.rk-badge i { font-style: normal; font-size: 12px; color: var(--ink-faint); }
+.rk-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rk-row {
+  display: grid; grid-template-columns: 30px 40px minmax(0, 1fr) auto; align-items: center; gap: 4px 10px;
+  padding: 6px 10px; border-radius: 12px; background: var(--surface);
+}
+.rk-row.me { background: var(--gold-soft); }
+.rk-place { font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--ink-soft); text-align: right; }
+.rk-pic { width: 40px; height: 40px; image-rendering: pixelated; object-fit: cover; object-position: top; }
+.rk-who { display: grid; min-width: 0; }
+.rk-who b { font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-who i { font-style: normal; font-size: 11.5px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-score { display: grid; justify-items: end; gap: 1px; }
+.rk-score i { font-style: normal; font-size: 11.5px; color: var(--ink-faint); }
+.rk-score .up, .ft-rated .up { color: var(--good); }
+.rk-score .down, .ft-rated .down { color: var(--bad); }
+.rk-team { grid-column: 3 / -1; display: flex; gap: 2px; }
+.rk-team img { width: 28px; height: 28px; image-rendering: pixelated; }
+.rk-held { font-family: var(--pixel); font-size: 9px; text-align: center; grid-column: 1; }
+.rk-held.held { color: var(--good); }
+.rk-held.fell { color: var(--bad); }
+.rk-you { margin-top: 6px; }
+.ft-rated { display: inline-flex; align-items: center; gap: 10px; }
+.ft-rated > b { font-family: var(--display); font-size: 20px; }
+.ft-opp-rating { font-style: normal; font-size: 12px; color: var(--ink-faint); }
+.tp-rank { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.tp-rank > span[data-tip] { display: inline-flex; }
+/* On a phone the badge drops under the name in a list row (the page spans the
+   viewport, so a media query, not a container one). */
+@media (max-width: 440px) {
+  .rk-row { grid-template-columns: 26px 34px minmax(0, 1fr); }
+  .rk-score { grid-column: 3; justify-items: start; grid-auto-flow: column; gap: 8px; }
+  .rk-pic { width: 34px; height: 34px; }
+}
 .ft-turn i { font-style: normal; }
 .ft-turn.hurry { color: var(--bad); font-weight: 700; }
 .ft-note { margin: 6px 0 0; font-size: 12.5px; font-weight: 700; color: var(--bad); text-align: center; }
@@ -6788,9 +6871,10 @@ button:disabled { transition: none; }
   display: grid; justify-items: center; gap: 6px; padding: 14px; text-align: center;
   border-radius: 14px; background: var(--surface-2); border: 2px solid var(--line);
 }
-.ft-result b { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; }
-.ft-result.won b { color: var(--good); }
-.ft-result.lost b { color: var(--bad); }
+/* `>`: the card's own title - a rank inside the card has a <b> of its own. */
+.ft-result > b { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; }
+.ft-result.won > b { color: var(--good); }
+.ft-result.lost > b { color: var(--bad); }
 .ft-result span { font-size: 13px; color: var(--ink-soft); }
 .ft-result-go { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
 /* What the win paid: a first leader win's badge, then the money. */
@@ -6827,12 +6911,11 @@ button:disabled { transition: none; }
   .ft-move kbd, .ft-team-btn kbd { display: none; }
   .lg-more, .lg-go.small { min-height: 40px; }
 }
-/* A PHONE: all eight badges in one row of the case. */
+/* A PHONE: all eight badges still fit one line. */
 @media (max-width: 480px) {
-  .lg-case { gap: 5px; }
-  .lg-case li { width: 36px; height: 36px; }
+  .lg-case { gap: 3px; }
   .lg-case img { width: 26px; height: 26px; }
-  .lg-hero { padding: 14px; }
+  .lg-hero { padding: 12px 14px; }
 }
 @media (max-width: 380px) {
   .ft-move b { font-size: 14px; }
@@ -7167,15 +7250,33 @@ button:disabled { transition: none; }
 .sprite-projection {
   filter: grayscale(1) sepia(1) hue-rotate(140deg) saturate(3.2) brightness(1.2)
           drop-shadow(0 0 3px rgba(90, 240, 255, .85)) !important;
+  /* A PROJECTION FLICKERS; IT DOES NOT GLITCH (reported from play - a slice
+     tearing sideways read as Glitched's damage). An uneven signal dimming in
+     steps, opacity only, and the scanlines on the same clock. No `!important`
+     on an animation: capture and flee must still win. */
+  animation: proj-flicker 5.2s steps(1, end) infinite;
+}
+/* On the battle sprite this replaces `.mon`'s whole animation list, so its
+   entrance and its breathing are named again - the Origin lesson - and the
+   flicker waits for the entrance to finish. */
+.sprite-projection.mon {
+  animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both,
+             mon-idle 2.6s ease-in-out 700ms infinite,
+             proj-flicker 5.2s steps(1, end) 700ms infinite;
+}
+@keyframes proj-flicker {
+  0%, 100% { opacity: 1; }
+  38% { opacity: .55; } 39% { opacity: 1; } 41% { opacity: .75; } 42% { opacity: 1; }
+  77% { opacity: .6; } 78% { opacity: .9; } 79% { opacity: 1; }
 }
 
 .gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
-.chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .proj-cut {
+.chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines {
   position: absolute; inset: 0; pointer-events: none;
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */
 .shadow-aura, .chaos-aura, .proj-beam, .proj-base { z-index: 0; }
-.gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines, .proj-cut { z-index: 3; }
+.gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines { z-index: 3; }
 /* Masked to the creature's own outline, or they are rectangles over the grass. */
 .gold-shine, .chaos-neg, .proj-lines {
   overflow: hidden;
@@ -7183,7 +7284,7 @@ button:disabled { transition: none; }
           mask: var(--art) center / contain no-repeat;
 }
 /* A slice of the sprite itself, drawn again: the same box and fit as the <img>. */
-.chaos-cut, .proj-cut { background: var(--art) center / contain no-repeat; image-rendering: pixelated; opacity: 0; }
+.chaos-cut { background: var(--art) center / contain no-repeat; image-rendering: pixelated; opacity: 0; }
 
 /* ---- Gold: cast in gold. A sheen crosses the metal, glints flash on it. */
 .gold-shine { mix-blend-mode: screen; }
@@ -7299,7 +7400,8 @@ button:disabled { transition: none; }
 }
 
 /* ---- Projection: a projection of light. A cone from an emitter at its feet,
-   scanlines rolling down it, and now and then a slice slips sideways. */
+   scanlines rolling down it, and the whole image flickering like a weak
+   signal. (A slice used to slip sideways too; that was a glitch, and cut.) */
 .proj-beam {
   inset: 0 6% -8%; clip-path: polygon(0 0, 100% 0, 64% 100%, 36% 100%);
   background: linear-gradient(to top, rgba(100, 240, 255, .5), rgba(100, 240, 255, .1) 55%, transparent);
@@ -7310,27 +7412,18 @@ button:disabled { transition: none; }
   inset: auto 24% -6%; height: 13%; border-radius: 50%;
   background: radial-gradient(closest-side, #e9ffff, #5ff0ff 35%, rgba(40, 160, 205, .45) 70%, transparent);
 }
-.proj-lines { animation: proj-flick 6.2s steps(1) infinite; }
+.proj-lines { animation: proj-flicker 5.2s steps(1, end) infinite; }
+.mon-slot .proj-lines { animation-delay: 700ms; }   /* with the battle sprite's flicker */
 .proj-lines i {
   position: absolute; left: 0; right: 0; top: -8%; height: 108%;
   background: repeating-linear-gradient(to bottom, rgba(0, 30, 45, .5) 0 3%, transparent 3% 8%);
   animation: proj-roll 1.1s linear infinite;
 }
 @keyframes proj-roll { to { transform: translateY(7.4%); } }
-@keyframes proj-flick { 0% { opacity: 1; } 30% { opacity: .35; } 31% { opacity: 1; } 33% { opacity: .6; } 34% { opacity: 1; } }
-.proj-cut {
-  filter: grayscale(1) sepia(1) hue-rotate(140deg) saturate(3.2) brightness(1.4);
-  clip-path: inset(46% 0 36% 0); animation: proj-tear 4.6s steps(1) infinite;
-}
-@keyframes proj-tear {
-  0% { opacity: 0; transform: none; } 72% { opacity: 1; transform: translateX(6%) skewX(-6deg); }
-  73.5% { transform: translateX(-3%); } 75% { opacity: 0; transform: none; }
-}
 
 /* In a Dex tile the sprite is 84% of the cell and centred (see `.cell .holo-foil`),
    so the layers that register to it come in by the same 8%. */
-.cell .gold-shine, .cell .gold-glint, .cell .chaos-neg, .cell .chaos-cut, .cell .proj-lines,
-.cell .proj-cut { inset: 8%; }
+.cell .gold-shine, .cell .gold-glint, .cell .chaos-neg, .cell .chaos-cut, .cell .proj-lines { inset: 8%; }
 .cell .shadow-aura { inset: 0 4% 6%; }
 .cell .chaos-aura { inset: 8%; }
 .cell .proj-beam { inset: 8% 14% 4%; }
@@ -7338,5 +7431,7 @@ button:disabled { transition: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .gold-shine i, .gold-glint i, .shadow-aura i, .chaos-aura::before, .chaos-aura i,
-  .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i, .proj-cut { animation: none; }
+  .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i,
+  .sprite-projection:not(.mon) { animation: none; }
+  .sprite-projection.mon { animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both; }
 }

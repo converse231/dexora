@@ -26,6 +26,7 @@ import Types from "./Types.jsx";
 import FilterBar from "./FilterBar.jsx";
 import { valuedAt } from "../game/trainer.js";
 import Confirm from "./Confirm.jsx";
+import { defendNote } from "../game/ranked.js";
 import Note from "./Note.jsx";
 import Sprite from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
@@ -56,7 +57,7 @@ const ACTIONABLE = (a, b) =>
    five handlers are `useCallback`ed over an engine that is set once. */
 function Box({
   box, bag, dex, candy, colRev, stats, busy, findSeed, onSeedUsed,
-  onSell, onConvert, onLevelUp, onEvolve,
+  onSell, onConvert, onLevelUp, onEvolve, defense = null,
 }) {
   const [pending, setPending] = useState(null);
   const [flash, setFlash] = useState(null);
@@ -278,16 +279,19 @@ function Box({
      the dialog is rebuilt on every keystroke of the search field. */
   const sellManifest = useMemo(() => {
     const spare = new Set(spareUids);
+    /* A DEFENDER IS ITS OWN LINE, UNTICKED, for the legendary's reason below:
+       a sweep of Pidgey should not quietly take the one in your ranked team. */
     const bySpecies = new Map();
     for (const m of box) {
       if (!spare.has(m.uid)) continue;
-      const at = bySpecies.get(m.species) ?? [];
-      at.push(m);
-      bySpecies.set(m.species, at);
+      const team = defense?.[m.uid] ?? "";
+      const k = `${m.species}|${team}`;
+      if (!bySpecies.has(k)) bySpecies.set(k, { id: m.species, team, mons: [] });
+      bySpecies.get(k).mons.push(m);
     }
-    return [...bySpecies.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([id, mons]) => {
+    return [...bySpecies.values()]
+      .sort((a, b) => a.id - b.id || a.team.localeCompare(b.team))
+      .map(({ id, team, mons }) => {
         const levels = mons.map((m) => m.level).sort((a, b) => a - b);
         /* A LEGENDARY ARRIVES UNTICKED. Variants never reach this list at all -
            `duplicateUids` holds every keeper out entirely - but a legendary is
@@ -302,10 +306,10 @@ function Box({
            for when you really did mean it. */
         const rare = isLegendary(id);
         return {
-          key: id,
+          key: `${id}|${team}`,
           uids: mons.map((m) => m.uid),
-          off: rare,
-          why: rare ? "LEGENDARY" : null,
+          off: rare || Boolean(team),
+          why: team ? `DEFENDS · ${team.toUpperCase()}` : rare ? "LEGENDARY" : null,
           candy: levels.length * candyValue(speciesById(id)),
           /* No variant: `duplicateUids` holds every keeper out of the spare
              list entirely, so nothing here is ever anything but ordinary. */
@@ -314,7 +318,7 @@ function Box({
           sub: `Lv ${levels.join(", ")}`,
         };
       });
-  }, [box, spareUids, colRev]);
+  }, [box, spareUids, colRev, defense]);
 
   /* THE ARITHMETIC IS A FUNCTION OF WHAT IS STILL TICKED. It was three strings
      built once when the dialog opened, which is fine for a receipt and wrong
@@ -399,9 +403,11 @@ function Box({
     const going = group.mons
       .filter((m) => uids.includes(m.uid))
       .sort((a, b) => a.level - b.level || a.uid - b.uid);
+    const defends = defendNote(going, defense, (m) => `Lv ${m.level}`);
 
     setPending({
       title: candyPayout ? `Convert spare ${label(sp)}?` : `Sell spare ${label(sp)}?`,
+      ...(defends && { tone: "warn", note: `${label(sp)} ${defends}` }),
       lines: [
         ["Taken", `${uids.length} × ${label(sp)}`],
         ["You receive", candyPayout ? `${gain} Rare Candy` : `¥${value.toLocaleString()}`],
@@ -411,7 +417,7 @@ function Box({
         key: m.uid,
         icon: { id: group.species, variant: group.variant ?? null },
         label: `${label(sp)}${group.variant ? ` · ${group.variant.toUpperCase()}` : ""}`,
-        sub: `Lv ${m.level}`,
+        sub: `Lv ${m.level}${defense?.[m.uid] ? ` · defends, ${defense[m.uid]}` : ""}`,
       })),
       confirmLabel: candyPayout
         ? `CONVERT ${uids.length} · +${gain}`
@@ -435,9 +441,11 @@ function Box({
     // A tier this target has no art for - see the note below.
     const lost = !!group.variant
       && (lockedTiers(target.id) ?? new Set()).has(group.variant);
+    // Evolving keeps the uid, so a defender stays in its team - as the new species.
+    const defends = defense?.[group.hero.uid];
     setPending({
       title: `Evolve into ${label(target)}?`,
-      tone: lost ? "warn" : null,
+      tone: lost || defends ? "warn" : null,
       /* No "you receive" row: the title already names what you get, and a
          dialog that repeats itself is just taller. */
       lines: [
@@ -468,13 +476,14 @@ function Box({
          built on - what a species can WEAR - so this cannot disagree with the
          Dex's FORMS strip about which column exists. Asked of the TARGET,
          because that is the one whose art has to exist. */
-      note: lost
+      note: (lost
         ? `${label(target)} has no ${group.variant} artwork — Game Freak never ` +
           `drew one. Your ${group.variant} mark is kept, but it will be drawn ` +
           `as an ordinary ${label(target)}. This cannot be undone.`
         : group.variant
           ? `Your ${group.variant} evolves, and stays ${group.variant}. No duplicates are spent.`
-          : "No duplicates are spent — only the level you have already paid for.",
+          : "No duplicates are spent — only the level you have already paid for.")
+        + (defends ? ` It defends in ranked (${defends}) and will defend as ${label(target)} from now on.` : ""),
       confirmLabel: lost ? "EVOLVE ANYWAY" : "EVOLVE",
       run: () => {
         const done = onEvolve(group.hero.uid, path.row.to);

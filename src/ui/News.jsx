@@ -11,6 +11,25 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-08",
+    date: "October 2026",
+    title: "The ranked ladder",
+    items: [
+      ["Ratings and ranks", "Ranked battles now count. Your first 5 battles each season place you; after that you climb the Dex careers - Scout, Ranger, Researcher and Professor, three divisions each, to Legend."],
+      ["Monthly seasons", "Each month is a season. When a new one starts, your rating moves halfway back to the middle, and the highest rank you reached stays on your trainer card as a season badge."],
+      ["Always someone to battle", "You're matched with trainers near your rating. When nobody is, you'll meet a League Elite Four member or Champion rated to match."],
+      ["The top 100", "The Standings tab shows the season's top trainers, you and your friends, and past seasons. Your Defenses tab shows who battled your teams and how they did."],
+      ["20 a day", "You can play 20 ranked battles a day. Walking away from a battle for ten minutes counts as a loss."],
+      ["A cleaner League", "The League's cards and badge case are simpler: no coloured stripes, and a region's badges sit beside its name."],
+      ["Defenders say so", "Selling, trading or evolving a Pokémon in one of your defense teams now tells you first, and sweeps leave it unticked."],
+      ["Every generation in the water", "Surfing now meets each map's own water Pokémon, and every rod fishes up all nine generations as they arrive - the water was all Kanto before."],
+      ["Research, lighter", "Catching ordinary ones needs 5, not 10, and a star costs 5. A legendary's first-ball task is now: win a League battle with it."],
+      ["How many you hold", "A wild Pokémon you already own shows how many of that form you have, beside the Poké Ball."],
+      ["The rift, on screen", "A ring in the corner fills as a rift builds on your map and drains while one is open."],
+      ["Fixes", "Mt Moon's far ladder leads out to the Power Plant, Frost Hollow's holes drop you one way instead of bouncing you back, and Projection flickers instead of glitching."],
+    ],
+  },
+  {
     id: "2026-10-07",
     date: "October 2026",
     title: "Ranked battles, preview",

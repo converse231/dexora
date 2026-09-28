@@ -72,7 +72,11 @@ function whereToFind(id) {
     where: a.name,
     how: (legendary ? "legendary" : howOften(a.share)) + (a.from ? ` · Lv ${a.from}+` : ""),
   }));
-  for (const rod of rods) out.push({ key: rod, where: "Any water", how: rod });
+  for (const rod of rods) {
+    // The later of the rod's own level and its generation's arrival.
+    const from = Math.max(rod.from, itemById(rod.id)?.level ?? 0);
+    out.push({ key: rod.id, where: "Any water", how: `${rod.name}${from > 1 ? ` · Lv ${from}+` : ""}` });
+  }
 
   if (!out.length) {
     const from = EVOLUTIONS.filter((r) => r.to === id);

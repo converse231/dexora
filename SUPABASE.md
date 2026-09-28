@@ -471,6 +471,42 @@ TEST project.
 --project-ref <ref>`; the Ranked tab then says ranked battles aren't open.
 `drop table public.ranked_battles;` removes the battles.
 
+## 3g. The ranked ladder — **run this once, after 3f** (added 2026-09-29)
+
+Ranked phase 6c (docs/ranked.md): ratings, ranks, seasons, the top list. On
+the TEST project first, then live:
+
+1. **`db/ranked.sql` again** - paste the whole file and run it. It adds
+   `ranked_ratings` (no player can read or write it), rates battles inside
+   the database, and replaces 6b's battle functions (the old
+   `ranked_create` is dropped). Battles played in the 6b preview stay
+   unrated. Re-runnable.
+2. **Redeploy the function** - the same command as §3f step 2. The handler
+   now meets League anchors and reports what a battle did to your rating.
+3. **Check it took**:
+
+   ```
+   -- the season now running, and the ladder's constants (5 placement, 20 a day)
+   select public.ranked_season(), public.ranked_limit('PLACEMENT'), public.ranked_limit('DAILY');
+   -- the Dex careers' floors (2026-09-29): 1050, 1150, 1250, 1400
+   select public.ranked_floor(1060), public.ranked_floor(1160), public.ranked_floor(1260), public.ranked_floor(1500);
+   ```
+
+**Moderation.** To take a trainer off this season's list and out of its
+matchmaking (a report of an impossible team that holds up), in the SQL
+editor:
+
+```
+select public.void_trainer(
+  (select user_id from public.trainer_cards where lower(username) = lower('TheirName')));
+```
+
+Their battles stay on record and the points their opponents won or lost
+stand. It lasts the season; the next one starts them clean.
+
+**Order:** SQL, then the function, then the game. `npm run tradedb` tests all
+of it against the TEST project.
+
 ## 4. Turn off email confirmation — **you have to do this one**
 
 It is the only step that cannot be done from here: the setting lives in GoTrue's

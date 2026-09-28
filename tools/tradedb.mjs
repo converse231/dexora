@@ -98,6 +98,7 @@ await q("delete from public.blocks where blocker = any($1) or blocked = any($1)"
 await q("delete from public.reports where reporter = any($1) or reported = any($1)", [both]);
 await q("delete from public.defense_teams where owner = any($1)", [both]);
 await q("delete from public.ranked_battles where challenger = any($1) or defender = any($1)", [both]);
+await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
 // A browser pass signed in as a test trainer owns its save now (one writer per
 // save): the harness takes the claim back, or every upload here is refused.
 await q("update public.saves set session = null where user_id = any($1)", [both]);
@@ -749,7 +750,7 @@ await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
   await save(B, [P(11, 445, 60, { shiny: 1 }), P(12, 248), P(13, 373), P(14, 94)]);
   await rpc(B, "set_defense_team", { slot: 1, uids: [11, 12] });
   // One team is not enough to be met: the SQL's own filter, which keeps the candidate list short.
-  assert.ok(!(await service("ranked_candidates", { me: A.id })).some((c) => c.user_id === B.id),
+  assert.ok(!(await service("ranked_candidates", { me: A.id })).candidates.some((c) => c.user_id === B.id),
     "ranked_candidates offered a trainer with one team");
   await rpc(B, "set_defense_team", { slot: 2, uids: [13, 14] });
   await save(A, [P(1, 25), P(2, 6, 50), P(3, 9, 40)]);
@@ -777,14 +778,56 @@ await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
   const [row] = await q("select status, defender from public.ranked_battles where id = $1", [s45.body.id]);
   assert.equal(row.status, v.over === 0 ? "won" : "lost");
   assert.equal(row.defender, B.id);
-  assert.equal((await call(A, { op: "start", uids: [1] })).body.error, "nobody", "the same defender twice in a day");
+  // The same defender is not met twice in a day: with nobody else in reach, a League anchor is (6c).
+  const again45 = await call(A, { op: "start", uids: [1] });
+  assert.ok(again45.body.opponent?.anchor, "the same defender was met twice in a day");
+  await call(A, { op: "forfeit", id: again45.body.id });
   assert.equal((await handle({ user: A.id, body: { op: "resume", version: RULES_VERSION - 1 }, rpc: service })).body.error, "version");
   console.log(`tradedb ranked 6b ok — a ${turns}-turn battle refereed through the function's own handler on the TEST ` +
     "project, the seed and state never sent, battles unreadable and unwritable by both trainers, the result stored, " +
     "the 24-hour rule and old clients refused");
+
+  // ---- 46. 6c: the ladder on the TEST project -------------------------------------------------------
+  const [{ s: season }] = await q("select public.ranked_season() as s");
+  const rating = async (who) => (await q("select * from public.ranked_ratings where user_id = $1 and season = $2", [who.id, season]))[0];
+  const setRating = (who, r, games, peak = r) => q(`insert into public.ranked_ratings (user_id, season, rating, peak, games)
+    values ($1, $2, $3, $4, $5) on conflict (user_id, season) do update set rating = $3, peak = $4, games = $5, voided = false`,
+    [who.id, season, r, peak, games]);
+  await q("update public.ranked_battles set created_at = now() - interval '25 hours' where challenger = $1", [A.id]);
+  await setRating(A, 1000, 0); await setRating(B, 1000, 0);
+  const h46 = await call(A, { op: "start", uids: [1, 2, 3] });
+  assert.equal(h46.body.opponent.username, "TesterB", `the window met ${h46.body.opponent.username}`);
+  const f46 = await call(A, { op: "forfeit", id: h46.body.id });
+  assert.equal(f46.body.result.delta, -20, "a placement loss at even ratings is not K 40 x -0.5");
+  assert.equal((await rating(B)).rating, 1010, "the defender did not move by half K");
+  // Nobody reads or writes a rating but the database.
+  for (const who of [A, B]) {
+    const { data } = await who.c.from("ranked_ratings").select("*");
+    assert.ok(!data?.length, "a client read ranked_ratings");
+    await who.c.from("ranked_ratings").update({ rating: 3000 }).eq("user_id", who.id);
+    await refuses(rpc(who, "ranked_rate", { bid: h46.body.id }), "a client called ranked_rate");
+    await refuses(rpc(who, "void_trainer", { who: B.id }), "a client called void_trainer");
+  }
+  assert.notEqual((await rating(A)).rating, 3000, "a client wrote a rating");
+  // The page's reads, as players.
+  const mine46 = await rpc(A, "my_ranked", {});
+  assert.deepEqual([mine46.season, mine46.rating, mine46.cap], [season, 980, 20]);
+  assert.equal((await rpc(B, "my_defense_log", {}))[0]?.delta, 10, "the defense log does not say what a defense won");
+  // Void: off the list and out of matchmaking; A keeps the points it lost to B.
+  await setRating(A, 1000, 9); await setRating(B, 1000, 9);
+  await q("update public.ranked_battles set created_at = now() - interval '25 hours' where challenger = $1", [A.id]);
+  assert.ok((await service("ranked_candidates", { me: A.id })).candidates.some((c) => c.user_id === B.id),
+    "B was not a candidate before the void - the check after it proves nothing");
+  await service("void_trainer", { who: B.id, s: null });
+  assert.ok(!(await rpc(A, "ranked_top", {})).some((x) => x.user_id === B.id), "a voided trainer is on the list");
+  assert.ok(!(await service("ranked_candidates", { me: A.id })).candidates.some((c) => c.user_id === B.id), "a voided trainer can be met");
+  assert.equal((await handle({ user: B.id, body: { op: "start", uids: [11], version: RULES_VERSION }, rpc: service })).body.error, "voided");
+  console.log("tradedb ranked 6c ok — the migration over 6b applies, a placement loss is -20 and the defender +10, " +
+    "ratings unreadable and unwritable by players, the page's reads, the defense log, voiding");
 }
 await q("delete from public.defense_teams where owner = any($1)", [both]);
 await q("delete from public.ranked_battles where challenger = any($1) or defender = any($1)", [both]);
+await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
 await db.end();
 console.log("tradedb ok — never-traded saves untouched, registration checked against the stored save, RLS read-own/write-none, " +
   "two racing accepts make one trade, inbox matches reconcile, stale copies stripped, arrivals completed by saving, " +

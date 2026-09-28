@@ -537,12 +537,17 @@ def check(area, rows, spawn, tiles=None, warps=None):
     they are the ones that have ever caught a real bug on a transcribed map."""
     copied = ((lambda x, y: tiles[y * W + x] >= 0) if tiles
               else (lambda x, y: False))
-    # Both ends of every ladder, for the fill at the bottom and for the rule
-    # that says what a ladder has to look like.
-    hop = {}
-    for ax, ay, bx, by in (warps or ()):
+    # Both ends of every ladder, for the rules that say what a warp has to
+    # look like and have round it (`ends`) - and the way each one TAKES you,
+    # for the fill at the bottom (`hop`). A hole is one-way (a fifth element,
+    # 1): you fall through it and land on ordinary floor, which takes you
+    # nowhere - two-way, the landing was an invisible hole back up.
+    hop, ends = {}, set()
+    for ax, ay, bx, by, *one in (warps or ()):
         hop[(ax, ay)] = (bx, by)
-        hop[(bx, by)] = (ax, ay)
+        if not one:
+            hop[(bx, by)] = (ax, ay)
+        ends |= {(ax, ay), (bx, by)}
 
     assert all(len(r) == W for r in rows), f"{aid}: ragged rows"
     assert rows[spawn[1]][spawn[0]] not in SOLID, f"{aid}: spawn is inside a wall"
@@ -825,7 +830,7 @@ def check(area, rows, spawn, tiles=None, warps=None):
                 # puts one in its lake and banking it sealed the ladder in. A
                 # missing rim on five tiles beats a warp with no way off, and
                 # the exemption cannot spread: it reaches exactly one tile.
-                if any(abs(x + dx - hx) + abs(y + dy - hy) <= 1 for hx, hy in hop):
+                if any(abs(x + dx - hx) + abs(y + dy - hy) <= 1 for hx, hy in ends):
                     continue
                 assert c in ("V", "M", "n", ""), \
                     f"{aid}: lava at ({x},{y}) has {c!r} {where} it, not rock - no bank"
@@ -897,7 +902,7 @@ def check(area, rows, spawn, tiles=None, warps=None):
             # head and its foot, which is what the rest of this rule is about;
             # a warp is a single rung that puts you on another floor, so asking
             # it for a column is asking it to be the other kind.
-            if rows[y][x] != "l" or copied(x, y) or (x, y) in hop:
+            if rows[y][x] != "l" or copied(x, y) or (x, y) in ends:
                 continue
             assert at(x - 1, y) != "l" and at(x + 1, y) != "l",                 f"{aid}: ladder at ({x},{y}) is two columns wide"
             top = y
@@ -1070,7 +1075,7 @@ def check(area, rows, spawn, tiles=None, warps=None):
     # it may be impossible. Ember shipped one - a rung on a platform the lava
     # bank had turned to rock all round - and whoever took that ladder had no
     # way back at all. One walkable neighbour is the whole requirement.
-    for (wx, wy) in hop:
+    for (wx, wy) in ends:
         assert any(at(wx + dx, wy + dy) not in SOLID and at(wx + dx, wy + dy) != ""
                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))), \
             f"{aid}: the warp at ({wx},{wy}) has nothing to step off onto"
@@ -2136,6 +2141,16 @@ FROST_LADDERS = (
     ((3, 12,  9), (4, 15,  9)),
     ((3, 29,  5), (4, 32,  5)),
 )
+# SEAFOAM'S HOLES ARE ONE-WAY, as on the GBA: you drop through to the floor
+# below and land on ordinary floor. These four were warps both ways, and the
+# landing - plain snow, nothing drawn - pulled anybody who stepped on it back
+# up through the ceiling: reported from play as an invisible hole.
+FROST_HOLES = (
+    ((0, 21,  8), (1, 21,  8)),
+    ((0, 30,  8), (1, 29,  8)),
+    ((1, 23,  8), (2, 22,  7)),
+    ((1, 28,  8), (2, 29,  8)),
+)
 FROST_MOUTH = (0, 6, 21)             # Route 20's door, and so the spawn
 
 
@@ -2226,7 +2241,10 @@ def frost_hollow():
             "nothing drawn there for a player to read as a way through")
         ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
         bx, by = origin[fb][0] + xb, origin[fb][1] + yb
-        warps.append([ax, ay, bx, by])
+        hole = ((fa, xa, ya), (fb, xb, yb)) in FROST_HOLES
+        if hole:
+            assert (xa, ya) in floors[fa][3], f"frost: the hole at {FROST_FLOORS[fa]}({xa},{ya}) is not drawn"
+        warps.append([ax, ay, bx, by, 1] if hole else [ax, ay, bx, by])
 
     mf, mx, my = FROST_MOUTH
     spawn = (origin[mf][0] + mx, origin[mf][1] + my)
@@ -2238,9 +2256,10 @@ def frost_hollow():
     # Seafoam's B4F is for rather than a pocket. Everything else that cannot be
     # got to is border fill and becomes rock.
     hop = {}
-    for ax, ay, bx, by in warps:
+    for ax, ay, bx, by, *one in warps:
         hop[(ax, ay)] = (bx, by)
-        hop[(bx, by)] = (ax, ay)
+        if not one:
+            hop[(bx, by)] = (ax, ay)
     # ON THE STEPS, NOT OVER THE LIP: the raised shelf (4) and the ice (3)
     # meet only where Seafoam's striped steps (0) join them. This fill took
     # any open neighbour, and so did the engine - every shelf edge walkable.
@@ -2415,8 +2434,20 @@ def power_plant():
             if g[y][x] not in SOLID and (x, y) not in seen:
                 g[y][x] = "P"                   # solid, and still its own tile
 
+    # THE FRONT DOOR LEADS SOMEWHERE NOW - Mt Moon's exit, see DOOR_PAIRS. It
+    # is the real map's own Route 10 mat, READ from its warp_events (the one
+    # warp above the bottom row), not the spawn: that is the middle of the
+    # lowest floor, which is where you are put, not where the door is.
+    events = json.load(io.open(BA.fetch("data/maps/PowerPlant/map.json", "PowerPlant.map.json"),
+                               encoding="utf-8"))["warp_events"]
+    mats = [(w["x"], w["y"]) for w in events if w["dest_map"] == "MAP_ROUTE10" and w["y"] == H - 2]
+    assert len(mats) == 1, f"power plant: expected one front-door mat, found {mats}"
+    door = mats[0]
+    arrive = (door[0], door[1] - 1)
+    assert g[door[1]][door[0]] not in SOLID, "power plant: the front door is walled up"
+    assert g[arrive[1]][arrive[0]] not in SOLID, "power plant: nothing to stand on inside the door"
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], base)
+            [i for row in tiles for i in row], base, None, {"door": door, "arrive": arrive})
 
 
 # ------------------------------------------------------------------- Mt Moon
@@ -2466,6 +2497,11 @@ MOON_LADDERS = (
     ((1, 39, 4),  (2, 5, 10)),
 )
 MOON_MOUTH = (0, 18, 37)          # the way in from Route 4 - and so the spawn
+# B1F's exit ladder climbs out to Route 4's far side on the GBA (warp_events,
+# MAP_ROUTE4), and Route 4 runs on to Cerulean and Route 10, where the Power
+# Plant stands - the next map up the level ladder. It was a ladder that did
+# nothing (reported from play); it is the door between the two (DOOR_PAIRS).
+MOON_EXIT = (1, 45, 4)
 
 
 def mt_moon():
@@ -2508,7 +2544,7 @@ def mt_moon():
             for x in range(fw):
                 loc = int(ids[y][x]) - 640
                 assert loc >= 0, f"mt moon: {name} ({x},{y}) is not a cave metatile"
-                g[oy + y][ox + x] = ("l" if (i, x, y) in ladder_cells
+                g[oy + y][ox + x] = ("l" if (i, x, y) in ladder_cells or (i, x, y) == MOON_EXIT
                                      else "r" if int(col[y][x]) == 0 else "R")
                 tiles[oy + y][ox + x] = base + loc
 
@@ -2568,8 +2604,14 @@ def mt_moon():
                 g[y][x] = "R"
                 tiles[y][x] = -1
 
+    ef, ex, ey = MOON_EXIT
+    door = (origin[ef][0] + ex, origin[ef][1] + ey)
+    assert door in seen, "mt moon: the exit ladder is out of reach"
+    arrive = next(((door[0] + dx, door[1] + dy) for dx, dy in ((0, 1), (-1, 0), (1, 0), (0, -1))
+                   if g[door[1] + dy][door[0] + dx] not in SOLID and g[door[1] + dy][door[0] + dx] != "l"), None)
+    assert arrive, "mt moon: nowhere to stand beside the exit ladder"
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], base, warps)
+            [i for row in tiles for i in row], base, warps, {"door": door, "arrive": arrive})
 
 
 
@@ -3545,7 +3587,7 @@ def mansion():
 # DOORS BETWEEN MAPS, as pairs of area ids. Each builder reports its own door
 # tile and the tile you arrive on when you come through it; walking onto one
 # map's door puts you on the other's arrival tile. One pair today.
-DOOR_PAIRS = [("woods", "mansion")]
+DOOR_PAIRS = [("woods", "mansion"), ("ridge", "power")]
 
 if __name__ == "__main__":
     out = []
@@ -3584,7 +3626,8 @@ if __name__ == "__main__":
                                     encoding="utf-8")).get("ladders", ()))
     enter = {}
     for spec, rows, spawn, tiles, base, warps in out:
-        pts = [(w[0], w[1]) for w in (warps or [])] + [(w[2], w[3]) for w in (warps or [])]
+        # A one-way warp's landing is ordinary floor: nothing to walk into.
+        pts = [(w[0], w[1]) for w in (warps or [])] + [(w[2], w[3]) for w in (warps or []) if len(w) < 5]
         pts += [(d[0], d[1]) for d in doors.get(spec["id"], [])]
         W, H = spec["w"], spec["h"]
         solid = lambda x, y: not (0 <= x < W and 0 <= y < H) or rows[y][x] in SOLID
@@ -3625,8 +3668,10 @@ if __name__ == "__main__":
             # THE LADDERS, AS PAIRS. Each entry is [x1, y1, x2, y2] and is
             # walked in BOTH directions - a one-way ladder is a trap, and two
             # rows saying the same thing is two places for it to disagree.
+            # A HOLE carries a fifth element, 1: from (x1, y1) to (x2, y2)
+            # only, onto floor that takes you nowhere (Frost Hollow's four).
             body.append("    warps: [")
-            body += ["      [%d, %d, %d, %d]," % tuple(w) for w in warps]
+            body += ["      [%s]," % ", ".join(str(v) for v in w) for w in warps]
             body.append("    ],")
         if spec["elev"]:
             # ELEVATION, where the map has one: the real map's own 0-15, one hex
