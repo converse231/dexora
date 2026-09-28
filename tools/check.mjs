@@ -1929,7 +1929,15 @@ for (const b of BIOMES) {
       if (!n) continue;
       /* SURF IS A WAY THROUGH - onto the water, along it and off it - as the
          generator's fill counts it. Water is crossed, never counted. */
-      if (wet || SURFABLE.includes(n)) { stack.push([nx, ny, next(nx, ny)]); continue; }
+      if (SURFABLE.includes(n)) { stack.push([nx, ny, next(nx, ny)]); continue; }
+      if (wet) {
+        // Off the water: build_map's `shore_ok` - under a span, never into a
+        // deck, never up onto raised ground.
+        const t = E(nx, ny);
+        const ok = n === "N" ? (!cur || !t || t === 15 || t === cur) : !HIGH_ELEV.has(t);
+        if (ok && !SOLID.includes(n)) stack.push([nx, ny, next(nx, ny)]);
+        continue;
+      }
       /* Walking into a ledge ALONG ITS OWN DIRECTION hops it and lands you on
          the far side - `L` going south, `J` going east. From any other side it
          is a wall, which `walkable` already reports. */

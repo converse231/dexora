@@ -2341,14 +2341,18 @@ console.log("purchases ok — whole numbers only, NaN refused");
   const back0 = { left: "right", right: "left", up: "down", down: "up" };
   const at2 = ([x, y]) => ({ ...SAVE, areaId: "woods", xp: LEVEL_XP[SURF_LEVEL], player: { x, y, dir: "down" },
     field: { repel: { id: "max-repel", steps: 9999 } } });
-  // River -> under the planks -> ashore on the bank -> back onto the planks.
+  /* River -> under the planks, and NO FURTHER onto the high bank. This used
+     to be allowed on purpose ("surf under a bridge and climb its bank"), and
+     it is the move reported from Seaside Road as a bug: out from under the
+     road onto the land beneath it, then up onto the road. From under a
+     bridge the step is a walk (`shore_ok`), and no map lost a cell by it. */
   const b2 = boot(at2(bridge.river)).e;
   assert.ok(walk(b2, bridge.river[2]), "could not surf under the bridge");
   assert.ok(!b2.above(), "surfing under a bridge drew the trainer over its planks");
-  assert.ok(walk(b2, back0[bridge.bank[2]]), "could not get ashore from under the bridge");
-  assert.ok(b2.above(), "a trainer on a high bank is not above the upper layer");
-  assert.ok(walk(b2, bridge.bank[2]), "could not walk from the bank onto the bridge");
-  assert.ok(b2.above(), "walking onto a bridge put the trainer under its planks");
+  const from = [b2.state.player.x, b2.state.player.y];
+  walk(b2, back0[bridge.bank[2]]);
+  assert.ok(!b2.above() && rows[b2.state.player.y][b2.state.player.x] !== ".",
+    `a surfer under the bridge at ${from} climbed out onto its high bank`);
   // Still afloat under it: paddling on crosses to the river on the far side,
   // which a trainer set down on the planks on foot cannot do.
   const b3 = boot(at2(bridge.river)).e;
@@ -2848,8 +2852,36 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.deepEqual([e.state.player.x, e.state.player.y], [ramp.x, ramp.y],
       "the Cycling Road refused a trainer with the Acro Bike");
   }
+  /* AND NOT FROM THE WATER. Reported from play: a surfer slipped under the
+     deck, hopped onto the land beneath it and came out on top of the road.
+     The deck never touches open water - a span (15) or a railing is always
+     between - so the way that was open is water -> under a span -> into the
+     deck (elevation 4). Refused, bike or no bike. */
+  const { SURF_LEVEL } = await import("../src/game/items.js");
+  let dock = null;
+  for (let y = 1; y < a.rows.length - 1 && !dock; y++) {
+    for (let x = 1; x < a.rows[0].length - 1 && !dock; x++) {
+      if (ch(x, y) !== "N" || E(x, y) !== 15) continue;
+      const water = DIRS.find(([dx, dy]) => ch(x - dx, y - dy) === "w");
+      const deck = DIRS.find(([dx, dy]) => ch(x + dx, y + dy) === "N" && E(x + dx, y + dy) === 4);
+      if (water && deck) dock = { wx: x - water[0], wy: y - water[1], in: water[2], x, y, out: deck[2] };
+    }
+  }
+  assert.ok(dock, "no span on the Cycling Road has water on one side and deck on another");
+  {
+    const { e } = boot({ ...SAVE, ...quiet, areaId: "pond", xp: LEVEL_XP[Math.max(SURF_LEVEL, BIKE_LEVEL)],
+      bag: { ...SAVE.bag, "acro-bike": 1 }, player: { x: dock.wx, y: dock.wy, dir: dock.in } });
+    assert.ok(e.afloat(), "the trainer booted on the water is not afloat");
+    walk(e, dock.in);
+    assert.deepEqual([e.state.player.x, e.state.player.y], [dock.x, dock.y], "could not surf under the span");
+    assert.ok(e.afloat() && !e.above(), "under the span the trainer is not a surfer below the road");
+    walk(e, dock.out);
+    assert.deepEqual([e.state.player.x, e.state.player.y], [dock.x, dock.y],
+      `a surfer under the span at (${dock.x},${dock.y}) climbed into the Cycling Road's deck`);
+  }
   console.log(`cycling road ok — walked under it from the grass at (${under.x},${under.y}) on foot, ` +
-    `refused onto it at (${ramp.x},${ramp.y}) without the Acro Bike, ridden with it`);
+    `refused onto it at (${ramp.x},${ramp.y}) without the Acro Bike, ridden with it, ` +
+    `and never entered from the water (${dock.x},${dock.y})`);
 }
 
 console.log("play ok — the frame loop never stopped");

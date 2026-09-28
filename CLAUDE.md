@@ -569,11 +569,15 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   exempt. Without it Frost's shelf lips and the Safari's raised ground (38 and
   51 edges) were floor. And it decides DRAWING: the last elevation not 0 or 15
   in `HIGH_ELEV` (= build_map's `EM_HIGH`, asserted) puts the trainer above
-  the upper layer - Frost's shelf drew its lip over him. One deliberate
-  difference: stepping OFF a bridge takes the new elevation (the GBA keeps
-  the old), because ours lets you surf under a bridge and climb its bank. A
-  test that moves the trainer must load him there (`boot`), not write x and y:
-  he keeps the elevation he walks at.
+  the upper layer - Frost's shelf drew its lip over him. Stepping OFF a
+  bridge takes the new elevation (the GBA keeps the old). LEAVING THE WATER
+  obeys elevation too (`shore_ok`, mirrored in engine and check.mjs): onto a
+  plank only under a span (15), never into a deck (4); ashore never onto
+  raised ground; and from UNDER a bridge only as a walk, so the land beneath
+  one is not a shore (it was, and a surfer came out on top of the Cycling
+  Road). When you are low, raised cells (4+, 15) near the sprite draw over
+  it even if solid (`raisedOver`). A test that moves the trainer must load
+  him there (`boot`), not write x and y: he keeps the elevation he walks at.
 - **Night mode is tokens.** `data-theme` on <html> (`theme.js`, mirrored in
   index.html before first paint; a device preference, never the save). Any
   colour that must change at night is a `:root` token redefined in the one
