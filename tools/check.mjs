@@ -205,7 +205,7 @@ import {
   LEGEND_EACH, LEGEND_CEIL,
   GENERATIONS, pityBoost, PITY_AFTER, PITY_RAMP, PITY_CAP,
   LIFT_CEILING, hasOrigin, tiersFor, ART_GEN, baseArtGen, bandFor,
-  LEGEND_HOME, LEGEND_HAUNT, legendTier, LAYOUTS, layoutIds,
+  LEGEND_HOME, LEGEND_HAUNT, legendTier, legendTypes, LAYOUTS, layoutIds,
   GEN_FIRST, GEN_STEP,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
   SIZE_MIN, SIZE_MAX, ENCOUNTER_RATE, HEADLINE, genTargets, rowGen,
@@ -2073,7 +2073,7 @@ for (const b of BIOMES) {
        worth. The predicate is the one `legendTier` scores, so the assertion
        and the rule cannot disagree about who is here. */
     const here = LEGENDARY.filter((id) => genOpen(id, lv)
-      && legendTier(id, b.types) > 0);
+      && legendTier(id, legendTypes(b)) > 0);
     const open = here.length;
     const want = Math.min(LEGEND_CEIL, LEGEND_EACH * open);
     assert.ok(Math.abs(share - want) < 1e-9,
@@ -2133,7 +2133,7 @@ for (const b of BIOMES) {
   const full = encounterTable(b, MAX_LEVEL);
   const wOf = (id) => full.find((e) => e[0] === id)?.[1] ?? 0;
   // `legendTier` is the predicate the spawn uses: the primary type is the home.
-  const mine = LEGENDARY.filter((id) => legendTier(id, b.types) > 0);
+  const mine = LEGENDARY.filter((id) => legendTier(id, legendTypes(b)) > 0);
   const away = LEGENDARY.filter((id) => !mine.includes(id));
   if (mine.length && away.length) {
     assert.ok(wOf(mine[0]) > wOf(away[0]),
@@ -3702,7 +3702,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       const t = encounterTable(b, level);
       const total = t.reduce((n, [, x]) => n + x, 0);
       const here = LEGENDARY.filter((id) => genOpen(id, level)
-        && legendTier(id, b.types) > 0);
+        && legendTier(id, legendTypes(b)) > 0);
       if (!here.length) return null;
       const pool = here.reduce((n, id) => n + (t.find(([i]) => i === id)?.[1] ?? 0), 0);
       return pool / total / here.length;
@@ -5481,12 +5481,12 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   let checked = 0;
   for (const id of LEGENDARY) {
     const sp = speciesById(id);
-    const homes = BIOMES.filter((b) => b.types.includes(sp.types[0]));
+    const homes = BIOMES.filter((b) => legendTypes(b).includes(sp.types[0]));
     if (!homes.length) continue;
     for (const b of BIOMES) {
-      const tier = legendTier(id, b.types);
+      const tier = legendTier(id, legendTypes(b));
       const want = homes.includes(b) ? LEGEND_HOME
-        : sp.types.some((t) => b.types.includes(t)) ? LEGEND_HAUNT : LEGEND_STRAY;
+        : sp.types.some((t) => legendTypes(b).includes(t)) ? LEGEND_HAUNT : LEGEND_STRAY;
       assert.equal(tier, want,
         `${sp.name} in ${b.name} is worth ${tier}, not ${want}`);
     }
@@ -5506,7 +5506,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   for (const b of BIOMES) {
     for (const [id] of encounterTable(b, MAX_LEVEL)) {
       if (!LEGENDARY.includes(id)) continue;
-      assert.ok(b.types.includes(speciesById(id).types[0]),
+      assert.ok(legendTypes(b).includes(speciesById(id).types[0]),
         `${speciesById(id).name} spawns in ${b.name}, which does not share its primary ` +
         `type (${speciesById(id).types[0]}) - a legendary lives where its first type does`);
     }
@@ -6346,7 +6346,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
    roster. */
 {
   const per = BIOMES.map((b) => LEGENDARY.filter((id) =>
-    legendTier(id, b.types) > 0).length);
+    legendTier(id, legendTypes(b)) > 0).length);
   /* A FISH NEEDS WATER TO BE IN, and both halves of that are checkable.
 
    Reported as wanting the tables accurate per type, with the distinction drawn

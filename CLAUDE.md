@@ -207,8 +207,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Legendaries live only on maps sharing their primary type** (`legendTier`,
   `LEGEND_HAUNT` and `LEGEND_STRAY` are 0). Each is worth `LEGEND_EACH` per
   head, capped at `LEGEND_CEIL`; a zero-weight row is not emitted. `types` on a
-  map decides legendary homes, so widening it is never flavour. Every
-  legendary must keep a home.
+  map decides legendary homes, so widening it is never flavour; `legends`
+  (`legendTypes`) adds a type for legendary homes alone - the Mansion's psychic,
+  where `types` measured 49% psychic residents. Every legendary must keep a home.
 - **Costumes live where a Pikachu lives**: appended like legendaries at
   `LEGEND_EACH` and homed by the same `legendTier`, so all thirteen (pure
   Electric) are Power Plant only. They were flat on every map once and read

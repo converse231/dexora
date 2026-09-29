@@ -831,7 +831,12 @@ export const LEGEND_EACH = 0.0003;   // ~1% across today's 34, and it stays put
    binds on exactly one map - the Safari Zone, home to 60 - and it is what
    stops the broadest map being the one where legendaries are commonplace:
    1 in 83 there rather than 1 in 55, against 1 in 95-420 everywhere else. */
-export const LEGEND_CEIL = 0.012;    // the world must not fill with them
+/* 1.5%, up from 1.2%, so the Mansion's 50 (its own plus the psychic ones
+   `legends` homes there) are each worth `LEGEND_EACH`, 1 in 3,333: at 1.2%
+   they were 1 in 4,167, past a 3,500-encounter playthrough. It binds on the
+   Safari alone again (66 heads, 1 in 4,400 each, 1 in 67 for any), and every
+   legendary there has another home at the full rate. */
+export const LEGEND_CEIL = 0.015;    // the world must not fill with them
 export const LEGEND_SHARE = 0.01;    // what it comes to today; read, never set
 export const LEGEND_MATCHED = 0.5;
 /* A STRAY IS MEANT TO BE A STORY, and at 0.08 it was merely uncommon.
@@ -901,6 +906,11 @@ export const LEGEND_HAUNT = 0;
    and by how many other legendaries call the same map home. Celebi looked
    commoner in Deep Woods than in its own Haunted Tower on both of those
    measures, and was correctly weighted the whole time. */
+/* THE TYPES A MAP IS HOME TO LEGENDARIES OF: its own, plus `legends`, which
+   homes legendaries and nothing else (see the Mansion). Costumes and
+   residents read `types` alone. */
+export const legendTypes = (b) => (b.legends ? [...b.types, ...b.legends] : b.types);
+
 export const legendTier = (speciesId, types) => {
   const mine = speciesById(speciesId)?.types ?? [];
   if (mine.length && types.includes(mine[0])) return LEGEND_HOME;
@@ -1218,6 +1228,14 @@ const RESIDENTS = [
        psychic - the Tower did until it was made accurate, and FireRed's
        tower holds ghosts and a Cubone and nothing else. */
     types: ["poison", "fire", "normal"],
+    /* AND PSYCHIC FOR THE LEGENDARIES ALONE, which is the story without the
+       roster. The Safari was the only map claiming psychic, so 29 psychic
+       legendaries (Mewtwo, Mew, Lugia, the lake trio...) lived only there,
+       splitting a `LEGEND_CEIL` of 66 heads: 1 in 5,500 each, against a
+       3,500-encounter playthrough. Putting psychic in `types` instead measured
+       49% psychic at Lv 75 and still left Mewtwo 1 in 4,167 here. `legends`
+       homes the psychic legendaries at `LEGEND_EACH` and moves no resident. */
+    legends: ["psychic"],
     /* THE FIRST TABLE IN THE GAME WITH A RESIDENT FROM OUTSIDE KANTO, and it
        had to be. The Mansion's own roster is Koffing, Grimer, Rattata,
        Raticate, Muk, Weezing, Ditto and Magmar - Kanto to a species, like
@@ -2264,10 +2282,10 @@ export function encounterTable(biome, level = 1) {
   /* Both are appended to the RESIDENT total, and both are scaled against the
      share the two of them take together - so each is exactly its own share of
      the finished table and neither moves when the other's roster grows. */
-  const taken = rareShare(LEGENDARY, alive, biome.types)
+  const taken = rareShare(LEGENDARY, alive, legendTypes(biome))
               + rareShare(COSTUMES, alive, biome.types);
   return [...rolled,
-          ...rareFor(LEGENDARY, biome.types, total, alive, taken),
+          ...rareFor(LEGENDARY, legendTypes(biome), total, alive, taken),
           ...rareFor(COSTUMES, biome.types, total, alive, taken)];
 }
 

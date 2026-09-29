@@ -121,8 +121,8 @@ export const catchMult = (stats) => 1 + 0.03 * rank(stats, "precision");
 
    Floored, because the exponent is what separates a weight-22 Pidgey from a
    weight-1 Snorlax: at 0 every row is worth the same and rarity stops
-   existing. A maxed Fortune with a White Flute running lands at 0.45, which is
-   the most compressed this table is ever meant to get. */
+   existing. A maxed Fortune with a White Flute running lands exactly on it,
+   which is the most compressed this table is ever meant to get. */
 export const RARITY_FLOOR = 0.4;
 
 export const rarityPower = (stats, tilt = 0) =>

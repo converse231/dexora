@@ -390,10 +390,15 @@ export const FIELD = [
      The White Flute, under its own name and doing its own job: in Gen 3 it is
      already the item that brings out rarer wild Pokemon. `tilt` is subtracted
      from `rarityPower`'s exponent - the SAME number Fortune moves - so there
-     is one place in the codebase where how rare the world is gets decided. */
+     is one place in the codebase where how rare the world is gets decided.
+     0.2 and ¥1,800, from 0.15 and ¥900: asked for as a legendary hunt. The
+     exponent lifts the smallest weights most, so a legendary is about twice as
+     likely under it (Arceus 1 in 3,333 -> 1 in 1,739 on the Meadow). 0.2 is as
+     far as it goes: past it, maxed Fortune with a flute sinks to `RARITY_FLOOR`
+     and the flute is worth less to that trainer than to a new one. */
   {
-    id: "white-flute", family: "rarity", name: "White Flute", price: 900, level: 12,
-    steps: 400, tilt: 0.15, blurb: "Rarer Pokémon come out",
+    id: "white-flute", family: "rarity", name: "White Flute", price: 1800, level: 12,
+    steps: 400, tilt: 0.2, blurb: "Rarer ones and legendaries",
   },
 
   /* --- variant: WHICH TIER ---------------------------------------------
