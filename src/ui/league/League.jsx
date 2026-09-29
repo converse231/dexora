@@ -12,8 +12,16 @@
    no redraw of a map nobody can see, and every timer shifted on the way out. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LEAGUES } from "../../data/leagues.js";
-import { opponent, fighter, rankedFighter, refusal, effectiveness, AI_FOR } from "../../game/battle.js";
-import { teamSize, REMATCH_CAP_STEP } from "../../game/league.js";
+import {
+  opponent, playerFighter, rankedFighter, refusal, effectiveness, AI_FOR, hardParty, learnable, movesOf,
+} from "../../game/battle.js";
+import {
+  teamSize, REMATCH_CAP_STEP, isOpen, hardOpen, hardCleared, charmOf, giftOf, feeFor, CHARM_MAX, REGIONS,
+} from "../../game/league.js";
+import { MOVES } from "../../data/moves.js";
+import { HEALS, TUTOR_PRICE } from "../../game/items.js";
+import { pricedAt } from "../../game/trainer.js";
+import { ShopShelf } from "../Shop.jsx";
 import { REMATCH_STEPS } from "../../data/gymtune.js";
 import { speciesById } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
@@ -23,7 +31,7 @@ import { useModalLock } from "../modal.js";
 import Sprite from "../Sprite.jsx";
 import Types from "../Types.jsx";
 import Picker, { keyOf } from "../trade/Picker.jsx";
-import Fight from "./Fight.jsx";
+import Fight, { moveName } from "./Fight.jsx";
 import { standing, tuneOf, trainerName } from "./progress.js";
 import Ranked from "./Ranked.jsx";
 import { CHAR_PIC } from "../../game/ranked.js";
@@ -32,6 +40,8 @@ import { rankedStep } from "../../net/cloud.js";
 /* The Ranked tab sits first in the region strip under its own id, which is
    not a region's; the strip remembers it like one. */
 const RANKED = "ranked";
+// The League's shop and Move Tutor (phase 8) sit beside it, under ids no region has.
+const SHOP = "shop", TUTOR = "tutor";
 
 const asset = (path) => new URL(path, document.baseURI).href;
 const REGION_KEY = "dexora-league-region";
@@ -69,7 +79,7 @@ function Party({ team, small = false }) {
 
 /* WHO, as every card heads it: the portrait on its type's ground, the
    role, the name, the facts and the stamp. */
-function Head({ o, kind, region, order, tune, stamp }) {
+function Head({ o, kind, region, order, tune, stamp, hard = false }) {
   const champ = kind === "champion";
   return (
     <div className="lg-card-head">
@@ -79,7 +89,7 @@ function Head({ o, kind, region, order, tune, stamp }) {
       <div className="lg-who">
         <span className="lg-kicker">
           {kind === "leader" ? (region.id === "alola" ? `Grand trial ${order}` : `Gym ${order}`)
-            : champ ? "Champion" : `League · ${order}`}
+            : champ ? "Champion" : `League · ${order}`}{hard ? " · Hard" : ""}
         </span>
         <h4>{o.name}</h4>
         <div className="lg-facts">
@@ -89,7 +99,8 @@ function Head({ o, kind, region, order, tune, stamp }) {
         </div>
         {kind === "leader" && (
           <span className="lg-badge">
-            <img src={asset(`badges/${o.id}.png`)} alt="" loading="lazy" />{o.badge}
+            {/* A hard opponent's badge is its gym's (`base`): the art is keyed on the gym id. */}
+            <img src={asset(`badges/${o.base?.id ?? o.id}.png`)} alt="" loading="lazy" />{o.badge}
           </span>
         )}
       </div>
@@ -213,6 +224,210 @@ function Prize({ tune, won }) {
   );
 }
 
+/* ---------------------------------------------------------------- phase 8 */
+
+/* A HARD-MODE OPPONENT (docs/battles.md, phase 8): the same trainer on its
+   strongest team, every member at Lv 100, under its own id. */
+const hardOf = (o) => ({ ...o, id: `${o.id}:hard`, party: hardParty(o.hard), base: o });
+const tierWord = (t) => (t ? t[0].toUpperCase() + t.slice(1) : "");
+
+/* WHAT HARD MODE GIVES, shown whether or not it is open yet - a locked door
+   with the prize written on it is a goal. */
+function HardRewards({ region, run, beaten, open }) {
+  const done = run.filter((h) => beaten[h.o.id]).length;
+  const cleared = hardCleared(region.id, beaten);
+  const charm = charmOf(beaten);
+  return (
+    <section className="lg-hard-rewards">
+      <div className="lg-hard-top">
+        <span className="lg-kicker">Hard mode · every Pokémon Lv 100</span>
+        <b>{open ? `${done} of ${run.length} beaten` : `Clear ${region.name} to open it`}</b>
+      </div>
+      <ul>
+        <li>
+          <img src={asset("items/master-ball.png")} alt="" />
+          <span><i>{cleared ? "WON" : "CLEAR ALL " + run.length}</i><b>A Master Ball</b></span>
+        </li>
+        <li>
+          <span className="lg-charm" aria-hidden="true">✦</span>
+          <span><i>{cleared ? "WON" : "AND"}</i><b>Region Charm: rare forms ×{(1 + CHARM_MAX / REGIONS.length).toFixed(2)}</b></span>
+        </li>
+        <li>
+          <span className="lg-charm" aria-hidden="true">★</span>
+          <span><i>EVERY FIRST WIN</i><b>Their signature Pokémon, Shiny</b></span>
+        </li>
+      </ul>
+      {charm > 1 && <p className="lg-hard-note">Your charms so far: rare forms ×{charm.toFixed(2)} everywhere.</p>}
+    </section>
+  );
+}
+
+/* ONE HARD OPPONENT: who, their Lv 100 team, the signature Pokemon a first
+   win gives, and the fee that a win gives back. */
+function HardCard({ h, st, region, order, beaten, steps, money, onBattle }) {
+  const { o, kind } = h;
+  const tune = tuneOf(o, beaten, steps);
+  const team = useMemo(() => teamOf(o, beaten), [o, beaten]);
+  const gift = giftOf(o.id);
+  const fee = feeFor(o.id);
+  return (
+    <article className={`lg-card lg-hardcard${kind === "champion" ? " champ" : ""}${st.won ? " won" : ""}${st.open ? "" : " shut"}`}>
+      <Head o={o} kind={kind} region={region} order={order} tune={tune} hard
+        stamp={st.won ? "won" : st.open ? "open" : ""} />
+      <Party team={team} />
+      <p className="lg-from">Their team from {o.base.hardFrom === "first battle" ? "their first battle" : o.base.hardFrom}</p>
+      <div className="lg-card-go">
+        {st.open ? (
+          <span className="lg-go-row">
+            <button type="button" className="lg-go" disabled={fee > money} onClick={() => onBattle(o, "hard")}>
+              {st.won ? "Rematch" : "Battle"}
+            </button>
+            <span className="lg-prize" data-tip="Paid for each try and given back with the win">Entry <b>{yen(fee)}</b></span>
+            {!st.won && <span className="lg-prize">Prize <b>{yen(tune.pay)}</b></span>}
+          </span>
+        ) : <p className="lg-why"><Lock />{st.why}</p>}
+        {gift && (
+          <span className={`lg-gift${st.won ? " given" : ""}`} data-tip={st.won ? "Given on your first win" : "Yours on the first win"}>
+            <Sprite id={gift.species} variant={gift.tier} alt="" />
+            <span><i>{st.won ? "GIVEN" : "FIRST WIN"}</i><b>{label(speciesById(gift.species))}{gift.tier ? `, ${tierWord(gift.tier)}` : ""}</b></span>
+          </span>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function HardView({ region, beaten, steps, money, onBattle }) {
+  const open = hardOpen(region.id, beaten);
+  const run = useMemo(() => [
+    ...region.gyms.map((g, k) => ({ o: hardOf(g), kind: "leader", order: k + 1 })),
+    ...region.league.map((p, k) => ({
+      o: { ...hardOf(p), type: p.type ?? speciesById(p.party.at(-1)[0]).types[0] },
+      kind: p.champion ? "champion" : "league", order: k + 1,
+    })),
+  ], [region]);
+  const say = (h, k) => (!open ? `Clear ${region.name} first: every gym, its trainers and its League.`
+    : `Beat ${run[k - 1]?.o.name} on hard first.`);
+  return (
+    <>
+      <HardRewards region={region} run={run} beaten={beaten} open={open} />
+      <div className="lg-list">
+        {run.map((h, k) => (
+          <HardCard key={h.o.id} h={h} region={region} order={h.order} beaten={beaten} steps={steps} money={money}
+            st={{ open: isOpen(h.o.id, beaten), won: Boolean(beaten[h.o.id]), why: say(h, k) }}
+            onBattle={onBattle} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* THE LEAGUE'S SHOP (phase 8): the Battle shelf, sold where battles are. */
+function BattleShop({ money, bag, level, stats, onBuy }) {
+  return (
+    <section className="lg-shop">
+      <div className="lg-shop-head">
+        <div>
+          <span className="lg-kicker">Battle shelf</span>
+          <h4>Items for League battles</h4>
+          <p>Used from the Bag in a battle, in place of a move. X items boost the Pokémon that is out.</p>
+        </div>
+        <b className="lg-wallet">{yen(money)}</b>
+      </div>
+      <ShopShelf items={HEALS} money={money} bag={bag} level={level} stats={stats} onBuy={onBuy} first={HEALS[0].id} />
+    </section>
+  );
+}
+
+/* THE MOVE TUTOR (phase 8): choose a Pokemon, tap one of its four moves,
+   tap a move its line learns by its level to put there, and pay for each new
+   one. League battles only - ranked's format sets every move. */
+function Tutor({ engine, box, money, stats }) {
+  const mons = useMemo(() => box.map((m) => ({ ...m, tier: variantOf(m) })), [box]);
+  const [picked, setPicked] = useState([]);
+  const mon = mons.find((m) => keyOf(m) === picked[0]) ?? null;
+  const now = useMemo(() => (mon ? movesOf(mon) : []), [mon]);
+  const [draft, setDraft] = useState([]);
+  const [slot, setSlot] = useState(0);
+  const [q, setQ] = useState("");
+  const [note, setNote] = useState(null);
+  useEffect(() => { setDraft(now); setSlot(0); setNote(null); }, [now]);
+  const can = useMemo(() => (mon ? learnable(mon.species, mon.level) : []), [mon]);
+  const price = pricedAt(TUTOR_PRICE, stats);
+  const fresh = draft.filter((i) => !now.includes(i)).length;
+  const cost = fresh * price;
+  const put = (i) => {
+    setDraft((d) => {
+      const next = [...d];
+      if (next.includes(i)) return d;
+      next[Math.min(slot, next.length)] = i;
+      return next.slice(0, 4);
+    });
+    setSlot((s) => Math.min(3, s + 1));
+  };
+  const teach = () => {
+    const no = engine.tutor(mon.uid, draft.map((i) => MOVES[i].n), now.map((i) => MOVES[i].n));
+    setNote(no ? { stale: "That Pokémon's moves changed - pick it again.", money: "Not enough money.", same: "Nothing new to teach." }[no] ?? "Could not teach that." : "Learned!");
+  };
+  const shown = can.filter((i) => !q || moveName(i).toLowerCase().includes(q.toLowerCase()) || MOVES[i].t.includes(q.toLowerCase()));
+  return (
+    <div className="lg-pick lg-tutor">
+      <section className="rk-edit-head">
+        <span className="lg-kicker">Move Tutor</span>
+        <h4>Teach a move its line learns</h4>
+        <p className="lg-tutor-lede">Any move its evolution line learns by its level, {yen(price)} for each new one. League battles only - ranked sets every move.</p>
+      </section>
+      {!mon ? (
+        <Picker mons={mons} picked={picked} max={1} onChange={setPicked} prefer="high" sort="level" level
+          empty="Your Box is empty - catch some Pokémon first." />
+      ) : (
+        <>
+          <section className="lg-tutor-mon">
+            <Sprite id={mon.species} variant={mon.tier} alt="" />
+            <div>
+              <b>{label(speciesById(mon.species))}</b>
+              <i>Lv {mon.level} · {can.length} moves it can learn</i>
+            </div>
+            <button type="button" className="tp-quiet" onClick={() => setPicked([])}>Another Pokémon</button>
+          </section>
+          <ol className="lg-slots" aria-label="Its four moves">
+            {[0, 1, 2, 3].map((k) => {
+              const i = draft[k];
+              return (
+                <li key={k}>
+                  <button type="button" aria-pressed={slot === k} onClick={() => setSlot(k)}
+                    className={`ft-move ${i != null ? `t-${MOVES[i].t}` : "empty"}${i != null && !now.includes(i) ? " new" : ""}`}>
+                    <b>{i != null ? moveName(i) : "Empty"}</b>
+                    {i != null && <span className="ft-move-meta"><i>{MOVES[i].t.toUpperCase()}</i><u>{MOVES[i].p ? `POW ${MOVES[i].p}` : "STATUS"}</u></span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <div className="lg-tutor-go">
+            <span className="lg-prize">{fresh ? <>{fresh} new · <b>{yen(cost)}</b></> : "Tap a slot, then a move"}</span>
+            <button type="button" className="lg-go" disabled={!fresh || cost > money} onClick={teach}>Teach</button>
+            <button type="button" className="lg-go quiet" disabled={!fresh} onClick={() => setDraft(now)}>Undo</button>
+          </div>
+          {note && <p className="lg-refused" role="status">{note}</p>}
+          <input className="lg-tutor-q" type="search" placeholder="Search moves or a type" value={q}
+            onChange={(e) => setQ(e.target.value)} aria-label="Search moves" />
+          <ul className="lg-learn">
+            {shown.map((i) => (
+              <li key={i}>
+                <button type="button" className={`ft-move t-${MOVES[i].t}`} disabled={draft.includes(i)} onClick={() => put(i)}>
+                  <b>{moveName(i)}</b>
+                  <span className="ft-move-meta"><i>{MOVES[i].t.toUpperCase()}</i><u>{MOVES[i].p ? `POW ${MOVES[i].p}` : "STATUS"}{MOVES[i].a ? ` · ${MOVES[i].a}%` : ""}</u></span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* CHOOSING A TEAM: who may come (and, for everyone else, why not), picked
    with the Trade Center's picker - a tap takes your highest level of that
    Pokemon - and one pinned button to go. */
@@ -256,7 +471,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
       <section className="lg-foe">
         <img className="lg-foe-pic" src={asset(`trainers/${o.pic}.png`)} alt="" />
         <div className="lg-foe-who">
-          <span className="lg-kicker">{kind === "trainer" ? o.cls : kind === "champion" ? "Champion" : kind === "league" ? "Elite Four" : "Leader"}</span>
+          <span className="lg-kicker">{kind === "trainer" ? o.cls : kind === "hard" ? "Hard mode · Lv 100" : kind === "champion" ? "Champion" : kind === "league" ? "Elite Four" : "Leader"}</span>
           <h4>{o.name}</h4>
           <Party team={theirs} small />
         </div>
@@ -267,6 +482,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
         {kind !== "trainer" && <li>Up to <b>Lv {cap}</b></li>}
         {kind !== "trainer" && <li>Legendaries: a lower limit, <b>by strength</b></li>}
         <li>{tune.wins ? "Rematch" : "Prize"} <b>{yen(tune.pay)}</b></li>
+        {feeFor(o.id) > 0 && <li>Entry <b>{yen(feeFor(o.id))}</b>, back on a win</li>}
       </ul>
 
       <div className="lg-pick-head">
@@ -310,14 +526,17 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
   );
 }
 
-export default function League({ engine, box = [], beaten = {}, steps = 0, team = [], signedIn = false, onClose }) {
+export default function League({
+  engine, box = [], beaten = {}, steps = 0, team = [], signedIn = false, onClose,
+  money = 0, bag = {}, level = 1, stats = null,
+}) {
   useModalLock();
   const page = useRef(null);
   const head = useRef(null);
   const st = useMemo(() => standing(beaten), [beaten]);
   const firstOpen = () => {
     const saved = readRegion();
-    if (saved === RANKED) return RANKED;
+    if ([RANKED, SHOP, TUTOR].includes(saved)) return saved;
     if (saved && st[LEAGUES.findIndex((r) => r.id === saved)]?.open) return saved;
     const k = st.findIndex((s) => s.open && !s.cleared);
     return LEAGUES[k >= 0 ? k : 0].id;
@@ -327,7 +546,9 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
   const [fight, setFight] = useState(null);  // { o, kind, team, n }
   const [editing, setEditing] = useState(null);   // the defense team slot being edited
   const [nonce, setNonce] = useState(0);          // a ranked battle closed: the Ranked tab reloads its standing
-  const ranked = regionId === RANKED;
+  const ranked = regionId === RANKED, shop = regionId === SHOP, tutor = regionId === TUTOR;
+  // Normal or hard: one switch for every region, remembered while the page is open.
+  const [hard, setHard] = useState(false);
   const ri = LEAGUES.findIndex((r) => r.id === regionId);
   const region = LEAGUES[ri], rs = st[ri];
   const sub = pick || (ranked && editing);       // a stacked view the one Back peels
@@ -373,7 +594,7 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
     const { o, kind } = pick;
     setFight({
       o, kind, n: (fight?.n ?? 0) + 1,
-      mine: team.map((m) => fighter(m.species, m.level, m.uid)),
+      mine: team.map(playerFighter),
       mons: team,
       foe: teamOf(o, beaten),
     });
@@ -424,6 +645,16 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
                 <b>Ranked</b>
                 <em>Teams</em>
               </button>
+              <button type="button" role="tab" aria-selected={shop}
+                className={`rk-tab${shop ? " on" : ""}`} onClick={() => choose(SHOP)}>
+                <b>Shop</b>
+                <em>{yen(money)}</em>
+              </button>
+              <button type="button" role="tab" aria-selected={tutor}
+                className={`rk-tab${tutor ? " on" : ""}`} onClick={() => choose(TUTOR)}>
+                <b>Tutor</b>
+                <em>Moves</em>
+              </button>
               {LEAGUES.map((r, k) => (
                 <button key={r.id} type="button" role="tab" aria-selected={r.id === regionId}
                   className={`${r.id === regionId ? "on" : ""}${st[k].open ? "" : " shut"}${st[k].cleared ? " done" : ""}`}
@@ -440,6 +671,10 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
       <main className="hp-body tc-main lg-main">
         {pick ? (
           <TeamPick o={pick.o} kind={pick.kind} box={box} last={team} beaten={beaten} steps={steps} onFight={startFight} />
+        ) : shop ? (
+          <BattleShop money={money} bag={bag} level={level} stats={stats} onBuy={(id, n) => engine.buy(id, n)} />
+        ) : tutor ? (
+          <Tutor engine={engine} box={box} money={money} stats={stats} />
         ) : ranked ? (
           <Ranked box={box} signedIn={signedIn} editing={editing} setEditing={setEditing}
             onPractice={startPractice} onRanked={startRanked} nonce={nonce} onDefense={engine.setDefense} />
@@ -461,24 +696,39 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
                 ? rs.cleared ? `Cleared - every ${badgeWord(region).slice(0, -1).toLowerCase()} and the League.`
                   : `${rs.badges} of ${region.gyms.length} ${badgeWord(region)} · then the League`
                 : rs.why}</p>
+              {/* NORMAL OR HARD (phase 8): hard is always shown, locked with
+                  its rewards in view until the region is cleared. */}
+              <div className="lg-modes" role="tablist" aria-label="Difficulty">
+                <button type="button" role="tab" aria-selected={!hard} onClick={() => setHard(false)}>Normal</button>
+                <button type="button" role="tab" aria-selected={hard} onClick={() => setHard(true)}>
+                  {!hardOpen(region.id, beaten) && <Lock />}Hard · Lv 100
+                </button>
+              </div>
             </section>
 
-            <h3 className="lg-section">{region.id === "alola" ? "Island Kahunas" : "Gyms"}</h3>
-            <div className="lg-list">
-              {region.gyms.map((g, k) => (
-                <GymCard key={g.id} g={g} st={rs.gyms[k]} region={region} order={k + 1}
-                  beaten={beaten} steps={steps} onBattle={(o, kind) => setPick({ o, kind })} />
-              ))}
-            </div>
+            {hard ? (
+              <HardView region={region} beaten={beaten} steps={steps} money={money}
+                onBattle={(o, kind) => setPick({ o, kind })} />
+            ) : (
+              <>
+                <h3 className="lg-section">{region.id === "alola" ? "Island Kahunas" : "Gyms"}</h3>
+                <div className="lg-list">
+                  {region.gyms.map((g, k) => (
+                    <GymCard key={g.id} g={g} st={rs.gyms[k]} region={region} order={k + 1}
+                      beaten={beaten} steps={steps} onBattle={(o, kind) => setPick({ o, kind })} />
+                  ))}
+                </div>
 
-            <h3 className="lg-section">{region.id === "galar" ? "Champion Cup" : "Elite Four & Champion"}</h3>
-            <div className="lg-list">
-              {region.league.map((p, k) => (
-                <Card key={p.id} o={{ ...p, type: p.type ?? speciesById(teamOf(p, beaten).at(-1).id).types[0] }}
-                  kind={p.champion ? "champion" : "league"} st={rs.league[k]} region={region} order={k + 1}
-                  beaten={beaten} steps={steps} onBattle={(o, kind) => setPick({ o, kind })} />
-              ))}
-            </div>
+                <h3 className="lg-section">{region.id === "galar" ? "Champion Cup" : "Elite Four & Champion"}</h3>
+                <div className="lg-list">
+                  {region.league.map((p, k) => (
+                    <Card key={p.id} o={{ ...p, type: p.type ?? speciesById(teamOf(p, beaten).at(-1).id).types[0] }}
+                      kind={p.champion ? "champion" : "league"} st={rs.league[k]} region={region} order={k + 1}
+                      beaten={beaten} steps={steps} onBattle={(o, kind) => setPick({ o, kind })} />
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
       </main>
@@ -502,7 +752,7 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
               setFight(null);
               fight.again();        // practice or ranked: a fresh blind team from the server
             } else if (again) {
-              setFight((f) => ({ ...f, n: f.n + 1, mine: f.mons.map((m) => fighter(m.species, m.level, m.uid)), foe: teamOf(f.o, engine.state.beaten) }));
+              setFight((f) => ({ ...f, n: f.n + 1, mine: f.mons.map(playerFighter), foe: teamOf(f.o, engine.state.beaten) }));
             } else {
               setFight(null);
               setPick(null);

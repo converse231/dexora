@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MOVES } from "../../data/moves.js";
 import { TYPES } from "../../data/types.js";
-import { step, newBattle, effectiveness, mulberry32, canUse, STRUGGLE } from "../../game/battle.js";
+import { step, newBattle, effectiveness, mulberry32, canUse, itemOn, STRUGGLE } from "../../game/battle.js";
 import { HEALS } from "../../game/items.js";
 import { speciesById } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
@@ -29,7 +29,7 @@ const STATUS = [["PAR", "paralysed"], ["BRN", "burned"], ["PSN", "poisoned"], ["
 const STAT = [null, "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed", "accuracy", "evasiveness"];
 const nameOf = (id) => label(speciesById(id));
 /* "thunder-shock" -> "Thunder Shock"; "u-turn" keeps its hyphen, as the games write it. */
-const moveName = (i) => (i === STRUGGLE ? "Struggle"
+export const moveName = (i) => (i === STRUGGLE ? "Struggle"
   : MOVES[i].n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(MOVES[i].n.startsWith("u-") ? "-" : " "));
 const moveType = (i) => (i === STRUGGLE ? "normal" : MOVES[i].t);
 const moveSlug = (i) => (i === STRUGGLE ? "struggle" : MOVES[i].n);
@@ -78,6 +78,7 @@ const REFUSED = {
   locked: "One of your team is in a trade and can't battle.",
   level: "One of your team is over this battle's level cap.",
   legend: "One of your legendaries is over its limit for this battle.",
+  fee: "You need the entry fee for this battle.",
 };
 const hpClass = (f) => (f <= 0.2 ? "low" : f <= 0.5 ? "mid" : "");
 
@@ -103,8 +104,9 @@ function beatsOf(log, battle, foeName) {
     if (ev.item != null) {
       const h = HEALS.find((x) => x.id === ev.item);
       const f = battle.sides[ev.side].team[ev.target];
-      out.push({ text: `You used a ${h.name} on ${nameOf(f.id)}!`, after });
-      out.push({ text: `${nameOf(f.id)} ${h.revive ? "is back on its feet!" : h.cure ? "was cured!" : "regained health!"}` });
+      out.push({ text: `You used ${/^[AEIOUX]/.test(h.name) ? "an" : "a"} ${h.name} on ${nameOf(f.id)}!`, after });
+      out.push({ text: h.stage ? `${nameOf(f.id)}'s ${STAT[h.stage[0]]} rose sharply!`
+        : `${nameOf(f.id)} ${h.revive ? "is back on its feet!" : h.heal && h.cure ? "was fully restored!" : h.cure ? "was cured!" : "regained health!"}` });
       continue;
     }
     if (ev.residual) {
@@ -540,10 +542,33 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
                     <span><i>NEW BADGE</i><b>{badge.name}</b></span>
                   </li>
                 )}
+                {over === "won" && paid?.gift && (
+                  <li className="gift">
+                    <Sprite id={paid.gift.species} variant={paid.gift.tier} alt="" />
+                    <span><i>JOINS YOUR BOX · LV {paid.gift.level}</i><b>{nameOf(paid.gift.species)}{paid.gift.tier ? `, ${paid.gift.tier[0].toUpperCase()}${paid.gift.tier.slice(1)}` : ""}</b></span>
+                  </li>
+                )}
+                {over === "won" && paid?.master && (
+                  <li>
+                    <img src={new URL("items/master-ball.png", document.baseURI).href} alt="" />
+                    <span><i>HARD MODE CLEARED</i><b>A Master Ball</b></span>
+                  </li>
+                )}
+                {over === "won" && paid?.charm && (
+                  <li>
+                    <span className="ft-coin" aria-hidden="true">✦</span>
+                    <span><i>REGION CHARM</i><b>Rare forms ×{paid.charm.toFixed(2)}</b></span>
+                  </li>
+                )}
                 {over === "won" && paid && (paid.pay > 0 ? (
                   <li className="pay">
                     <span className="ft-coin" aria-hidden="true">¥</span>
-                    <span><i>PRIZE</i><b>+¥{paid.pay.toLocaleString("en-US")}</b></span>
+                    <span><i>{paid.fee ? `PRIZE + ENTRY BACK` : "PRIZE"}</i><b>+¥{(paid.pay + (paid.fee ?? 0)).toLocaleString("en-US")}</b></span>
+                  </li>
+                ) : paid.fee ? (
+                  <li className="pay">
+                    <span className="ft-coin" aria-hidden="true">¥</span>
+                    <span><i>ENTRY BACK</i><b>+¥{paid.fee.toLocaleString("en-US")}</b></span>
                   </li>
                 ) : (
                   <li className="none"><span><i>PRIZE</i><b>Refills as you walk</b></span></li>
@@ -602,15 +627,17 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
             {kit.length ? (
               <ul>
                 {kit.map((h) => {
-                  const any = b.sides[0].team.some((f) => canUse(f, h.id));
+                  const any = itemOn(h.id) === "active" ? canUse(b.sides[0].team[view[0].slot], h.id)
+                    : b.sides[0].team.some((f) => canUse(f, h.id));
                   return (
                     <li key={h.id}>
                       <button type="button" disabled={busy || !any}
-                        onClick={() => { setUsing(h.id); setPanel("use"); }}
+                        onClick={() => (itemOn(h.id) === "active" ? play({ item: h.id, target: view[0].slot })
+                          : (setUsing(h.id), setPanel("use")))}
                         aria-label={`${h.name}, ${bag[h.id]} left: ${h.blurb}`}>
                         <ItemIcon item={h} />
                         <span className="ft-sw-name"><b>{h.name}</b><i>×{bag[h.id]}</i></span>
-                        <em>{any ? h.blurb : h.revive ? "Nobody has fainted" : h.cure ? "Nobody has a status" : "Everyone is at full health"}</em>
+                        <em>{any ? h.blurb : h.stage ? "It can't go any higher" : h.revive ? "Nobody has fainted" : h.cure && !h.heal ? "Nobody has a status" : "Everyone is at full health"}</em>
                       </button>
                     </li>
                   );

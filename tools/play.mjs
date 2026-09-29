@@ -3037,6 +3037,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
 {
   const { newBattle, fighter, opponent } = await import("../src/game/battle.js");
   const L = await import("../src/game/league.js");
+  const { dexIndex } = await import("../src/game/biomes.js");
   const { GYMTUNE, REMATCH_STEPS } = await import("../src/data/gymtune.js");
   const { LEAGUES } = await import("../src/data/leagues.js");
   const byId = new Map(LEAGUES.flatMap((r) => [...r.gyms, ...r.gyms.flatMap((g) => g.trainers), ...r.league])
@@ -3104,7 +3105,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     const was = e.state.beaten;
     const r = win(e, brock.id);
     assert.notEqual(e.state.beaten, was, "a win was written into `beaten` in place - the League page's memo never sees it");
-    assert.deepEqual(r, { over: 0, pay: GYMTUNE[brock.id].prize, first: true });
+    assert.deepEqual(r, { over: 0, pay: GYMTUNE[brock.id].prize, first: true, fee: 0, gift: null, master: false, charm: null });
     assert.equal(e.state.money, money + GYMTUNE[brock.id].prize, "the first win did not pay its prize");
     assert.deepEqual(e.state.beaten[brock.id], { wins: 1, at: e.state.steps });
     assert.equal(L.badgesOf(e.state.beaten), 1);
@@ -3116,12 +3117,12 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(begin(e, misty.trainers[0].id, [1]), null, "Misty's first gym trainer stayed shut after Brock was beaten");
     // Losing, forfeiting or leaving pays and records nothing.
     const lost = e.battleEnd();
-    assert.deepEqual(lost, { over: -1, pay: 0, first: false }, "a battle left unfinished paid");
+    assert.deepEqual(lost, { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null }, "a battle left unfinished paid");
     assert.ok(!e.state.beaten[misty.trainers[0].id], "a battle left unfinished was recorded as a win");
 
     // A rematch at once pays nothing; the clock refills as you walk.
     const again = win(e, brock.id);
-    assert.deepEqual(again, { over: 0, pay: 0, first: false }, "a rematch straight after the win paid");
+    assert.deepEqual(again, { over: 0, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null }, "a rematch straight after the win paid");
     assert.equal(e.state.beaten[brock.id].wins, 2);
     assert.equal(L.capOf(brock.id, e.state.beaten), Math.min(100, cap + 2 * L.REMATCH_CAP_STEP),
       "each win did not raise Brock's cap");
@@ -3146,6 +3147,97 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     e.battleEnd();
     assert.equal(begin(e, misty.trainers[0].id, [1]), null, "a gym was not reached on a leader beaten before rev 5");
     e.battleEnd();
+  }
+
+  /* HARD MODE (phase 8): shut until the region is cleared, then its run in
+     order; every attempt pays HARD_FEE and a win gives it back; a first win
+     pays the prize and gives the signature Pokemon as a gift; the whole run
+     gives a Master Ball and a step of the Region Charm. */
+  {
+    const { HARDTUNE, HARD_FEE, HARD_PRIZE } = await import("../src/data/gymtune.js");
+    const { hardParty } = await import("../src/game/battle.js");
+    const run = L.hardRunOf(kanto.id);
+    assert.equal(run.length, kanto.gyms.length + kanto.league.length, "Kanto's hard run is not every leader and League member");
+    assert.equal(run[0], `${brock.id}:hard`, "the hard run does not start with Kanto's first leader");
+    const hardBattle = (e, id, uids) => newBattle([
+      uids.map((uid) => { const m = e.state.box.find((x) => x.uid === uid); return fighter(m.species, m.level, uid); }),
+      opponent(hardParty(byId.get(id.replace(/:hard$/, "")).hard), L.topOf(id, e.state.beaten), (k) => k + 1),
+    ], [null, 3]);
+    const hbegin = (e, id) => e.battleBegin(hardBattle(e, id, [1]), { id, uids: [1] });
+    const hwin = (e, id) => {
+      const b = hardBattle(e, id, [1]);
+      assert.equal(e.battleBegin(b, { id, uids: [1] }), null, `${id} refused where it should be open`);
+      e.battleStep({ ...b, over: 0 });
+      return e.battleEnd();
+    };
+    const cleared = allOf(everyone(kanto));
+    const shut = at(allOf(everyone(kanto).filter((id) => id !== kanto.league.at(-1).id)));
+    shut.state.money = 1e6;
+    assert.equal(hbegin(shut, run[0]), "shut", "hard mode opened before the region was cleared");
+
+    const e = at(cleared);
+    e.state.money = HARD_FEE - 1;
+    assert.equal(hbegin(e, run[0]), "fee", "a hard battle began without its entry fee");
+    e.state.money = 1e6;
+    assert.equal(hbegin(e, run[1]), "shut", "the second hard opponent opened before the first was beaten");
+    // A loss keeps the fee.
+    const m0 = e.state.money;
+    assert.equal(hbegin(e, run[0]), null);
+    assert.equal(e.state.money, m0 - HARD_FEE, "the entry fee was not taken");
+    e.battleEnd();
+    assert.equal(e.state.money, m0 - HARD_FEE, "a hard battle left unfinished gave its fee back");
+    // A first win: the fee back, the prize, the signature Pokemon as a gift.
+    const boxBefore = e.state.box.length, m1 = e.state.money;
+    const r = hwin(e, run[0]);
+    assert.equal(e.state.money, m1 + HARD_PRIZE, "a first hard win did not give the fee back and pay the prize");
+    assert.equal(r.pay, HARD_PRIZE);
+    const gift = L.giftOf(run[0]);
+    assert.deepEqual(r.gift, gift, "the result does not name the gift given");
+    assert.equal(e.state.box.length, boxBefore + 1, "a first hard win gave no Pokemon");
+    const g = e.state.box.at(-1);
+    assert.deepEqual([g.species, g.level, g.traded, g[gift.tier]], [HARDTUNE[run[0]].gift[0], HARDTUNE[run[0]].gift[1], 1, 1],
+      "the signature Pokemon is not the solved ace, at its level, a gift, in its tier");
+    assert.equal(e.state.dex[dexIndex(g.species)], 2, "the signature Pokemon did not fill the Pokedex");
+    // A hard rematch: no prize, no second gift, the fee back.
+    const m2 = e.state.money, n2 = e.state.box.length;
+    const again = hwin(e, run[0]);
+    assert.deepEqual([again.pay, again.gift, e.state.money, e.state.box.length], [0, null, m2, n2],
+      "a hard rematch paid, gave a second Pokemon or kept the fee");
+    // The whole run: a Master Ball and the charm, once.
+    const balls = e.state.bag["master-ball"] ?? 0;
+    assert.equal(L.charmOf(e.state.beaten), 1, "the Region Charm grew before a hard run was cleared");
+    let last = null;
+    for (const id of run.slice(1)) last = hwin(e, id);
+    assert.equal(last.master, true, "clearing Kanto's hard run gave no Master Ball");
+    assert.equal(e.state.bag["master-ball"], balls + 1, "the Master Ball did not reach the bag");
+    assert.ok(Math.abs(last.charm - (1 + L.CHARM_MAX / L.REGIONS.length)) < 1e-12, "the Region Charm is not one region's step");
+    assert.equal(hwin(e, run.at(-1)).master, false, "a hard rematch of the Champion gave a second Master Ball");
+  }
+
+  /* THE MOVE TUTOR (phase 8): each new move costs TUTOR_PRICE (through
+     Haggle), a taught set that moved under the page is refused, and the
+     moves are saved by name - a malformed field is dropped, never the entry. */
+  {
+    const { TUTOR_PRICE } = await import("../src/game/items.js");
+    const { pricedAt } = await import("../src/game/trainer.js");
+    const e = at();
+    e.state.money = 1e6;
+    const price = pricedAt(TUTOR_PRICE, e.state.stats);
+    const now = ["scratch", "growl"];
+    const m0 = e.state.money;
+    assert.equal(e.tutor(1, ["scratch", "ember", "smokescreen"], now), null);
+    assert.equal(e.state.money, m0 - 2 * price, "two new moves did not cost two tutor prices");
+    assert.deepEqual(e.state.box.find((m) => m.uid === 1).moves, ["scratch", "ember", "smokescreen"]);
+    assert.equal(e.tutor(1, ["ember"], now), "stale", "a taught set that moved under the page was overwritten");
+    assert.equal(e.tutor(1, ["scratch", "ember", "smokescreen"], ["scratch", "ember", "smokescreen"]), "same", "teaching nothing new was charged");
+    e.state.money = price - 1;
+    assert.equal(e.tutor(2, ["bubble"], ["tackle"]), "money", "a move was taught without the money");
+    e.saveNow();
+    const back = boot(JSON.parse(store.get("meadow-route"))).e;
+    assert.deepEqual(back.state.box.find((m) => m.uid === 1).moves, ["scratch", "ember", "smokescreen"], "taught moves did not survive a reload");
+    const junk = boot({ ...SAVE, box: [{ uid: 1, species: 4, level: 5, moves: ["a", "a"] }, { uid: 2, species: 7, level: 5, moves: 7 }], nextUid: 3 }).e;
+    assert.equal(junk.state.box.length, 2, "a malformed taught set lost the Pokemon");
+    assert.ok(junk.state.box.every((m) => m.moves === undefined), "a malformed taught set was kept");
   }
 
   // The Elite Four waits for every badge, and each member for the one before.
@@ -3188,7 +3280,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(back.state.battle, null, "a battle survived a reload");
     assert.deepEqual(back.state.beaten, {}, "a reload mid-battle recorded a win");
     assert.equal(back.state.money, saved.money);
-    assert.deepEqual(back.battleEnd(), { over: -1, pay: 0, first: false }, "the reloaded game paid for the old battle");
+    assert.deepEqual(back.battleEnd(), { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null }, "the reloaded game paid for the old battle");
     assert.equal(JSON.stringify(back.state.box.map(({ uid, species, level }) => [uid, species, level])),
       JSON.stringify(saved.box.map(({ uid, species, level }) => [uid, species, level])), "a reload mid-battle changed the Box");
   }

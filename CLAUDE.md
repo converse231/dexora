@@ -66,7 +66,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/data/leagues.js` | `npm run leagues` (Bulbapedia; FireRed and Emerald cross-checked against pret) |
 | `src/data/moves.js`, `learnsets.js`, `types.js` | `npm run moves` |
 | `public/trainers/`, `public/badges/`, `public/sprites/back/` | `npm run battleart` |
-| `src/data/gymtune.js` | `npm run gyms` (check.mjs re-derives it and says when to re-run) |
+| `src/data/gymtune.js` | `npm run gyms` (check.mjs re-derives it and says when to re-run; `-- --hard` re-solves hard mode alone, ~20 min) |
 | `supabase/functions/ranked-step/rules.js` | `npm run edge` (check.mjs re-bundles and compares) |
 | `src/data/anchors.js` | `npm run anchors` (check.mjs re-solves and compares) |
 | `public/ranks/{battle,dex}/` | `npm run ranks` from the drawn originals in `art/ranks/` (check.mjs: one per rank id, 192px, small) |
@@ -552,6 +552,20 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   is what moves a health bar, so a bar falls with the hit that caused it.
   Health bars are a `scaleX`, never a width. A type's colour is `--tc` on its
   `.t-<type>` class - read it, never copy a hex.
+- **Hard mode is designed in docs/battles.md, phase 8.** A cleared region's
+  leaders, Elite Four and Champion again, ids `<id>:hard`, on the strongest
+  core-series party each trainer has (`hard` in leagues.js, fetched), all at
+  Lv 100, their TRAINING solved to `HARD_TARGET` (20%) - `HARDTUNE` in
+  gymtune.js, replayed exactly by check.mjs; a team the most training leaves
+  above it stays at the most. Every attempt pays `HARD_FEE` in `battleBegin`,
+  given back with the win in `battleEnd`, which also gives a first win's
+  signature Pokemon (`giftOf`, arriving `traded: 1`, so it fills the dex as a
+  gift and nothing counts it) and a run's Master Ball. The Region Charm
+  (`charmOf`) is derived from `beaten` and multiplies the tier roll; it stays
+  at most a research star's lift. **The Move Tutor** saves up to four move
+  NAMES on a box entry (`moves`, `cleanTaught` drops a bad field alone);
+  `playerFighter`/`movesOf` is the one way a League fighter is built from the
+  Box; ranked never reads it.
 - **Move animations are the games' own, compiled** (docs/battles.md, Art):
   `tools/build_anims.py` turns each move's pokeemerald-expansion script into
   a timeline; `moveAnim.js` is the one player and the only loader of
@@ -575,8 +589,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   { id, uids })` refuses (answering why) and `battleEnd()` is the only place a
   battle pays or records a win, replacing `beaten` rather than editing it
   (the page's memo keys on it). A loss, forfeit or reload pays nothing.
-- **The Battle shelf is `HEALS` in items.js, one list**: the Shop sells it
-  and `battle.js` reads what each item does from it - a SHARE of max HP,
+- **The Battle shelf is `HEALS` in items.js, one list**: the League page's
+  Shop tab sells it (`ShopShelf`, shared with the rail's shop, which no
+  longer carries it - phase 8) and `battle.js` reads what each item does from it - a SHARE of max HP,
   never a flat amount (a flat Potion lowered a late gym's win rate; check.mjs
   holds the share from Lv 5 to 100). `canUse` is the one answer to whether
   an item would do anything (the Bag greys on it, `step` refuses on it with

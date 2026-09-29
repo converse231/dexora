@@ -1,4 +1,5 @@
-/* Two shelves: balls to catch with, stones to evolve with.
+/* The shelves: balls to catch with, berries, field items, stones to evolve
+   with. (The Battle shelf is the League page's - `ShopShelf` is shared.)
 
    Nine items each needing a name, a price, a stock count and a way to pick a
    quantity is more than fits in a rail, so only the row you are actually buying
@@ -11,7 +12,7 @@
 
 import { useState } from "react";
 import {
-  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, BERRIES, HEALS, onShelf, speciesNeedingStone,
+  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, BERRIES, onShelf, speciesNeedingStone,
 } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
@@ -21,18 +22,17 @@ import { ItemIcon } from "./Sprite.jsx";
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCandy }) {
+/* ONE SHELF: its rows, the one row whose buy controls are open, and the
+   confirm. Exported because the League page sells its Battle shelf with the
+   same rows (docs/battles.md, phase 8). `first` is the row that starts open. */
+export function ShopShelf({ items, money, bag, level, stats, onBuy, first = null }) {
   const [pending, setPending] = useState(null);
-  // The row whose buy controls are showing. Starts on the ball everyone owns,
-  // so the shop opens explaining itself rather than as a list of closed doors.
-  const [open, setOpen] = useState(SHOP_BALLS[0].id);
+  const [open, setOpen] = useState(first);
   // One quantity per item, so opening another row does not lose what you typed.
   const [qty, setQty] = useState({});
 
   // Haggle discounts the shelf; the engine charges the same number.
   const priceOf = (item) => pricedAt(item.price, stats);
-  // Through the same discount as everything else, or Haggle has two rules.
-  const candyPrice = pricedAt(CANDY_PRICE, stats);
 
   const confirmBuy = (item, n) => {
     const cost = priceOf(item) * n;
@@ -160,26 +160,42 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
 
   /* BELOW `rowsOf`, DELIBERATELY. It calls it, and a `const` arrow declared
      above the one it calls is the shape that blanked the whole BOX tab once -
-     see the `SORTS` note in docs/decisions.md. It happens to be safe here (both are
-     initialised before render reaches either) and that is exactly how the last
-     one looked too. */
+     see the `SORTS` note in docs/decisions.md. */
   /* A shelf is the rows you can buy plus the one wall to aim at - see
      `onShelf`. The count of what is behind that wall is printed under it, so
      "there is more later" is said once instead of twenty-four times. */
-  const shelf = (items) => {
-    const { rows, later } = onShelf(items, level);
-    return (
-      <>
-        <div className="shoplist">{rowsOf(rows)}</div>
-        {later > 0 && (
-          <p className="shop-more">
-            +{later} more {later === 1 ? "unlocks" : "unlock"} as you level
-          </p>
-        )}
-      </>
-    );
-  };
+  const { rows, later } = onShelf(items, level);
+  return (
+    <>
+      <div className="shoplist">{rowsOf(rows)}</div>
+      {later > 0 && (
+        <p className="shop-more">
+          +{later} more {later === 1 ? "unlocks" : "unlock"} as you level
+        </p>
+      )}
+      {pending && (
+        <Confirm
+          title={pending.title}
+          lines={pending.lines}
+          confirmLabel={pending.confirmLabel}
+          tone="buy"
+          onConfirm={() => {
+            pending.run();
+            setPending(null);
+          }}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </>
+  );
+}
 
+export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCandy }) {
+  // Through the same discount as everything else, or Haggle has two rules.
+  const candyPrice = pricedAt(CANDY_PRICE, stats);
+  const shelf = (items, first = null) => (
+    <ShopShelf items={items} money={money} bag={bag} level={level} stats={stats} onBuy={onBuy} first={first} />
+  );
 
   return (
     <div className="panel">
@@ -239,7 +255,8 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
           <span>TO THROW</span>
         </div>
 
-        {shelf(SHOP_BALLS)}
+        {/* Opens on the ball everyone owns, so the shop explains itself. */}
+        {shelf(SHOP_BALLS, SHOP_BALLS[0].id)}
 
         <p className="shop-note">Better balls raise the odds, not the reward.</p>
 
@@ -285,32 +302,10 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
           A stone is used up by the evolution it makes.
         </p>
 
-        {/* THE BATTLE SHELF, last: it is for the League page, not the map. */}
-        <div className="sh-head">
-          <span>BATTLE</span>
-          <span>IN THE LEAGUE</span>
-        </div>
-
-        {shelf(HEALS)}
-
-        <p className="shop-note">
-          Used from the Bag in a League battle, in place of a move.
-        </p>
+        {/* THE BATTLE SHELF moved to the League page (phase 8): it is for
+            battles, so it is sold where they are. */}
+        <p className="shop-note">Potions, Revives and X items are in the Pokémon League&rsquo;s shop.</p>
       </div>
-
-      {pending && (
-        <Confirm
-          title={pending.title}
-          lines={pending.lines}
-          confirmLabel={pending.confirmLabel}
-          tone="buy"
-          onConfirm={() => {
-            pending.run();
-            setPending(null);
-          }}
-          onCancel={() => setPending(null)}
-        />
-      )}
     </div>
   );
 }

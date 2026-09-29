@@ -10,8 +10,8 @@
 
    `beaten` is the save's `{ [opponent id]: { wins, at } }`, `at` the step
    count at the last win (the rematch clock). */
-import { GYMTUNE, TRAINERTUNE, REMATCH_STEPS } from "../data/gymtune.js";
-import { speciesById, isLegendary } from "./biomes.js";
+import { GYMTUNE, TRAINERTUNE, REMATCH_STEPS, HARDTUNE, HARD_PRIZE, HARD_FEE } from "../data/gymtune.js";
+import { speciesById, isLegendary, TIERS, tiersFor } from "./biomes.js";
 
 // ------------------------------------------------------------------ refusal
 
@@ -97,6 +97,13 @@ export function gymReached(gymId, beaten) {
    leader under rev 3, past its trainers, keeps it. An id this build does not
    know is never open. */
 export function isOpen(id, beaten) {
+  const h = HARDTUNE[id];
+  if (h) {
+    if (!regionCleared(h.region, beaten)) return false;
+    const run = hardRunOf(h.region);
+    const k = run.indexOf(id);
+    return won(beaten, id) || k === 0 || won(beaten, run[k - 1]);
+  }
   const t = TRAINERTUNE[id];
   if (t) {
     if (!gymReached(t.gym, beaten)) return false;
@@ -122,12 +129,13 @@ export function isOpen(id, beaten) {
    leader beaten at a cap of 11 comes back at 17 as hard, not as a formality.
    A gym trainer has no cap and never changes. */
 export function capOf(id, beaten) {
-  if (TRAINERTUNE[id]) return 100;
+  if (TRAINERTUNE[id] || HARDTUNE[id]) return 100;
   const wins = beaten?.[id]?.wins ?? 0;
   return Math.min(100, GYMTUNE[id].cap + REMATCH_CAP_STEP * wins);
 }
 export function topOf(id, beaten) {
   if (TRAINERTUNE[id]) return TRAINERTUNE[id].top;
+  if (HARDTUNE[id]) return HARDTUNE[id].top;
   const g = GYMTUNE[id];
   return Math.round(g.top * capOf(id, beaten) / g.cap);
 }
@@ -138,6 +146,7 @@ export function topOf(id, beaten) {
    rematch at once pays nothing and waiting renews it (docs/battles.md,
    *Economy*). A gym trainer again pays nothing. */
 export function payFor(id, beaten, steps) {
+  if (HARDTUNE[id]) return beaten?.[id] ? 0 : HARD_PRIZE;
   const t = TRAINERTUNE[id];
   const prize = t ? Math.round(GYMTUNE[t.gym].prize * TRAINER_SHARE) : GYMTUNE[id]?.prize ?? 0;
   const last = beaten?.[id];
@@ -154,6 +163,59 @@ export const clockOf = (id, beaten, steps) => {
 };
 export const rematchesReady = (beaten, steps) =>
   IDS.filter((id) => won(beaten, id) && clockOf(id, beaten, steps) >= 1).length;
+
+// ------------------------------------------------------------------ hard mode
+
+/* HARD MODE (docs/battles.md, phase 8): every leader, League member and
+   Champion of a CLEARED region again, at Lv 100 on its strongest team - the
+   leaders in order, then the League in order, the Champion last. Ids are
+   `<id>:hard`, so `beaten` holds both runs apart. A hard rematch pays
+   nothing; every attempt costs HARD_FEE, given back with the win. */
+export const hardRunOf = (rid) => {
+  const ids = Object.keys(HARDTUNE).filter((id) => HARDTUNE[id].region === rid);
+  const role = (id) => (HARDTUNE[id].kind === "leader" ? 0 : 1);
+  return ids.sort((a, b) => role(a) - role(b) || HARDTUNE[a].k - HARDTUNE[b].k);
+};
+export const hardOpen = (rid, beaten) => regionCleared(rid, beaten);
+export const hardCleared = (rid, beaten) => {
+  const run = hardRunOf(rid);
+  return run.length > 0 && run.every((id) => won(beaten, id));
+};
+export const feeFor = (id) => (HARDTUNE[id] ? HARD_FEE : 0);
+
+/* THE REGION CHARM: every tier roll x (1 + CHARM_MAX x the share of regions
+   whose hard run is beaten) - 1.5 with all nine, a research star's lift and
+   well under an outbreak's. Derived from `beaten`, never stored. */
+export const CHARM_MAX = 0.5;
+export const charmOf = (beaten) =>
+  1 + CHARM_MAX * REGIONS.filter((rid) => hardCleared(rid, beaten)).length / REGIONS.length;
+
+/* THE SIGNATURE POKEMON a first hard win gives: the ace of its hard team, at
+   the level its trainer fields it (`gift`, solved into gymtune.js), in a rare
+   form - Shiny where the species has that art, else the next tier down it
+   can wear. */
+export function giftOf(id) {
+  const g = HARDTUNE[id]?.gift;
+  if (!g) return null;
+  const [species, level] = g;
+  const can = tiersFor(species);
+  const tier = TIERS.slice(TIERS.indexOf("shiny")).find((t) => can.includes(t)) ?? null;
+  return { species, level, tier };
+}
+
+// ------------------------------------------------------------------ the Move Tutor
+
+/* A BOX ENTRY'S TAUGHT MOVES (phase 8): up to four move NAMES, so a
+   re-fetched moves.js cannot shift them. A malformed field is dropped alone -
+   the Pokemon keeps its level-up moves - never the entry. */
+const MOVE_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export const taughtOk = (moves) => Array.isArray(moves) && moves.length >= 1 && moves.length <= 4
+  && new Set(moves).size === moves.length && moves.every((n) => typeof n === "string" && MOVE_NAME.test(n));
+export function cleanTaught(m) {
+  if (m.moves === undefined || taughtOk(m.moves)) return m;
+  const { moves, ...rest } = m;
+  return rest;
+}
 
 export const badgesOf = (beaten) => IDS.filter((id) => GYMTUNE[id].kind === "leader" && won(beaten, id)).length;
 

@@ -384,6 +384,67 @@ async function league(region) {
   }));
 }
 
+// ------------------------------------------------------------------ hard mode
+
+/* HARD MODE'S TEAMS (docs/battles.md, phase 8): the strongest singles party
+   the core series gives each leader, League member and Champion - the most
+   Pokémon, then the highest levels - among every `{{Party}}` under their name
+   on the page their first battle was read from and on their own page:
+   rematches, the Pokémon World Tournament, the Champion Cup, the remakes.
+   The Stadium games are not the core series. A first-battle roster is often
+   two or three Pokémon, and at Lv 100 no training makes two Pokémon brutal. */
+const CORE_GAME = /^(RGB|RB|Y|GSC|GS|C|RS|E|FRLG|FR|LG|DP|Pt|HGSS|HG|SS|BW|Bl|W|B2W2|B2|W2|XY|ORAS|SM|USUM|US|UM|PE|LGP|LGE|SwSh|Sw|Sh|BDSP|SV|S|V)$/;
+const who = (s) => plain(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+
+// A trainer's own page: its name, or the "(game)" page where the name is ambiguous.
+async function ownPage(name) {
+  for (const title of [name, `${name} (game)`, name.replace(/ & /g, " and ")]) {
+    try {
+      const text = core(await page(title));
+      if (templates(text, "Party").some((b) => who(named(params(b.body)).name) === who(name))) return { title, text };
+    } catch { /* no such page: the next spelling */ }
+  }
+  return null;
+}
+
+function strongest(o, sources, where) {
+  let best = null;
+  for (const { title, text } of sources) {
+    const hs = headings(text);
+    for (const b of templates(text, "Party")) {
+      const head = named(params(b.body));
+      if (who(head.name) !== who(o.name) || !CORE_GAME.test(String(head.game ?? "").trim())) continue;
+      let p;
+      try { p = partyAt(text, b, `${where} (${title})`); } catch { continue; }
+      const sum = p.party.reduce((n, [, lv]) => n + lv, 0);
+      const heading = [...hs].reverse().find((h) => h.at < b.at)?.title ?? "";
+      const cand = { party: p.party, n: p.party.length, sum, from: `${head.game} · ${plain(heading)}` };
+      if (!best || cand.n > best.n || (cand.n === best.n && cand.sum > best.sum)) best = cand;
+    }
+  }
+  return best;
+}
+
+async function hardTeams(regions) {
+  const small = [];
+  for (const r of regions) {
+    for (const o of [...r.gyms, ...r.league]) {
+      const where = `${r.name} ${o.name}`;
+      const sources = [{ title: o.page, text: core(await page(o.page)) }];
+      const own = o.page === o.name ? null : await ownPage(o.name);
+      if (own) sources.push(own);
+      const best = strongest(o, sources, where);
+      // Never weaker than the first battle: that party is always a candidate.
+      const first = { party: o.party, n: o.party.length, sum: o.party.reduce((n, [, lv]) => n + lv, 0), from: "first battle" };
+      const pick = !best || first.n > best.n || (first.n === best.n && first.sum > best.sum) ? first : best;
+      o.hard = pick.party;
+      o.hardFrom = pick.from;
+      if (pick.n < 6) small.push(`${where} (${pick.n})`);
+    }
+  }
+  return small;
+}
+
 // ------------------------------------------------------------------ pret
 
 /* TWO COPIES OF ONE FACT, CHECKED AGAINST EACH OTHER. FireRed's and Emerald's
@@ -513,6 +574,8 @@ if (unresolved.length) {
   throw new Error(`no Showdown portrait for: ${[...new Set(unresolved)].join(", ")} - add an ALIAS`);
 }
 
+const small = await hardTeams(out);
+console.log(`  hard teams: ${small.length} of them field fewer than six: ${small.join(", ")}`);
 const checked = await crossCheck(out);
 console.log(`  pret agrees on all ${checked} FireRed and Emerald leaders and League members`);
 if (formFallbacks.length) {
