@@ -93,7 +93,9 @@ moderation (below) and the Help page says so plainly.
   A turn is ~1 ms of `battle.js`; the rest is the round trip, which the
   fight screen's beats (about a second each) cover.
 - **Versioning:** a `RULES_VERSION` in `ranked.js`; the function refuses an
-  older client, which reloads.
+  older client, which reloads. *(2, 2026-09-29: every Kanto species' level-up
+  moves were Japanese Red/Green's - PokéAPI's newest group by id - and are
+  Scarlet/Violet's now, so ranked movesets changed: a redeploy, SUPABASE.md §3f.)*
 - **Offline / local mode:** the tab hides itself without an account. A paused
   free project stops ranked, never the game.
 

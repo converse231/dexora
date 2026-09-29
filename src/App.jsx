@@ -646,6 +646,10 @@ export default function App({
             beaten={st?.beaten ?? {}}
             steps={st?.steps ?? 0}
             team={st?.team ?? []}
+            money={st?.money ?? 0}
+            bag={st?.bag ?? {}}
+            level={level}
+            stats={st?.stats ?? null}
             signedIn={Boolean(account)}
             onClose={() => {
               setLeague(false);

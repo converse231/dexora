@@ -191,6 +191,17 @@ export default function Help({ onClose }) {
               then its Champion. Beating everyone in a region opens the next.
             </li>
             <li>
+              <b>Hard mode.</b> A cleared region opens its hard mode: its leaders,
+              Elite Four and Champion again, at Lv 100 on their strongest teams. Each
+              try costs an entry fee that a win gives back; each first win gives that
+              trainer&rsquo;s signature Pokémon, and a region&rsquo;s whole hard run a
+              Master Ball and a Region Charm for rarer finds.
+            </li>
+            <li>
+              <b>Shop and Move Tutor.</b> The League page sells battle items and
+              teaches moves: any move a Pokémon&rsquo;s line learns by its level.
+            </li>
+            <li>
               <b>Your team.</b> Up to {TEAM_MAX} Pokémon (no more than your
               opponent fields), each at or under the battle&rsquo;s level cap; a
               legendary&rsquo;s cap is lower, the stronger it is. A Pokémon in a

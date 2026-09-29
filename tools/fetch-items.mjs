@@ -57,8 +57,9 @@ const FIELD = [
    the catch roll, the flee roll and the XP award - which is the same test the
    four situational balls had to pass. */
 const BERRIES = ["razz-berry", "nanab-berry", "pinap-berry"];
-// The Battle shelf: healing, used in a League battle only.
-const HEALS = ["potion", "full-heal", "revive"];
+// The Battle shelf: healing and X items, used in a League battle only.
+const HEALS = ["potion", "full-heal", "revive", "hyper-potion", "max-potion", "full-restore", "max-revive",
+  "x-attack", "x-defense", "x-sp-atk", "x-sp-def", "x-speed", "x-accuracy"];
 
 await mkdir("public/items", { recursive: true });
 const missing = [];

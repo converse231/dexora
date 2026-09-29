@@ -72,6 +72,26 @@ export function movesAt(id, level) {
   return out.reverse();
 }
 
+/* THE MOVE TUTOR (phase 8): every usable level-up move of the line at or
+   below its level, in the order the line learns them, once each. */
+export function learnable(id, level) {
+  const out = [];
+  for (const x of rowsOf(id)) {
+    const mi = x % 1000;
+    if (Math.floor(x / 1000) <= level && !MOVES[mi].no && !out.includes(mi)) out.push(mi);
+  }
+  return out;
+}
+
+/* WHAT A BOX ENTRY FIGHTS WITH in the League: the moves it was taught (by
+   name) where the data still knows any, else the level-up four. Ranked never
+   reads this: its format sets every move. */
+export function movesOf(mon) {
+  const taught = (mon.moves ?? []).map((n) => MOVE_INDEX.get(n)).filter((i) => i != null && !MOVES[i].no);
+  return taught.length ? taught.slice(0, 4) : movesAt(mon.species, mon.level);
+}
+export const playerFighter = (mon) => fighter(mon.species, mon.level, mon.uid, movesOf(mon));
+
 /* A species whose whole line learns nothing with power (Wobbuffet counters,
    it never attacks). It fights with Struggle, as it all but does in the games. */
 export const neverHits = (id) => !rowsOf(id).some((x) => MOVES[x % 1000].p && !MOVES[x % 1000].no);
@@ -158,6 +178,11 @@ export function opponent(party, top, uidOf) {
     return fighter(id, level, uidOf(slot), own.length ? own : movesAt(id, level), effort);
   });
 }
+
+/* A HARD-MODE PARTY (docs/battles.md, phase 8): the opponent's hard team
+   with every member at Lv 100, so `opponent` puts them all at 100 and its
+   `top` past 100 is their training. */
+export const hardParty = (party) => party.map(([sp, , mv]) => (mv ? [sp, 100, mv] : [sp, 100]));
 
 // ------------------------------------------------------------------ the battle
 
@@ -273,13 +298,17 @@ const alive = (b, side) => b.sides[side].team.some((f) => f.hp > 0);
 
 /* THE BATTLE SHELF (items.js `HEALS`): a Potion heals a share of max HP, a
    Full Heal cures a status, a Revive raises a fainted Pokemon to a share of
-   it. `canUse` is the one answer to whether one would do anything - the page
-   greys on it and `step` refuses on it, so a wasted item cannot happen. */
+   it, an X item raises a stat of the Pokemon OUT by `stage` (phase 8; it is
+   refused on anyone else). `canUse` is the one answer to whether one would
+   do anything - the page greys on it and `step` refuses on it, so a wasted
+   item cannot happen. */
 const HEAL = new Map(HEALS.map((h) => [h.id, h]));
+export const itemOn = (id) => HEAL.get(id)?.stage ? "active" : "any";
 export function canUse(f, id) {
   const h = HEAL.get(id);
   if (!h || !f) return false;
   if (h.revive) return f.hp <= 0;
+  if (h.stage) return f.hp > 0 && f.stages[h.stage[0]] < 6;
   return f.hp > 0 && Boolean((h.heal && f.hp < f.max) || (h.cure && f.status >= 0));
 }
 function useItem(f, id) {
@@ -287,6 +316,7 @@ function useItem(f, id) {
   if (h.revive) { f.hp = Math.max(1, Math.floor(f.max * h.revive)); f.status = -1; f.sleep = 0; }
   if (h.heal) f.hp = Math.min(f.max, f.hp + Math.max(1, Math.floor(f.max * h.heal)));
   if (h.cure) { f.status = -1; f.sleep = 0; }
+  if (h.stage) f.stages[h.stage[0]] = Math.min(6, f.stages[h.stage[0]] + h.stage[1]);
 }
 const usable = (f) => f.moves.filter((m) => m.pp > 0).map((m) => m.i);
 
@@ -351,7 +381,8 @@ export function step(battle, action, rng) {
     return b;
   }
 
-  if (action?.item != null && b.ai[0] == null && !canUse(b.sides[0].team[action.target], action.item)) return b;
+  if (action?.item != null && b.ai[0] == null && (!canUse(b.sides[0].team[action.target], action.item)
+    || (itemOn(action.item) === "active" && action.target !== b.sides[0].active))) return b;
 
   b.turn++;
   const choice = [0, 1].map((side) => (b.ai[side] == null ? action : choose(b, side, rng)));
@@ -474,7 +505,7 @@ function aiLook(b, side, rng) {
 
 export const AIS = { 1: aiRandom, 2: aiDamage, 3: aiLook };
 // Who plays which: docs/battles.md, *AI*.
-export const AI_FOR = { trainer: 1, leader: 2, league: 3, champion: 3 };
+export const AI_FOR = { trainer: 1, leader: 2, league: 3, champion: 3, hard: 3 };
 export const choose = (b, side, rng) => AIS[b.ai[side]](b, side, rng);
 
 /* THE ONE SEEDED ROLL. check.mjs, the solver and the League page all take

@@ -32,13 +32,17 @@ import {
   starCost, starKeeps, HUNDRED,
 } from "./research.js";
 import { cleanTradeFields } from "./trade.js";
-import { isOpen, refusal, capOf, payFor, teamSize, rematchesReady, cleanBeaten, TEAM_MAX } from "./league.js";
+import {
+  isOpen, refusal, capOf, payFor, teamSize, rematchesReady, cleanBeaten, TEAM_MAX,
+  feeFor, giftOf, hardCleared, charmOf, cleanTaught, taughtOk,
+} from "./league.js";
+import { HARDTUNE } from "../data/gymtune.js";
 import { defenders, defendNote } from "./ranked.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt, dexRank, rankLine } from "./medals.js";
 import {
-  ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE,
+  ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE, TUTOR_PRICE,
   evolveState, evoLevel, startingState, dexBonus, catchBounty, levelReward,
   evolutionRow, bestRod, holding, canRun, canSurf, KEY_ITEMS,
   fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
@@ -501,7 +505,7 @@ function loadState() {
     const box = pool.filter(sound).map((m) => {
       if (!seen.has(m.uid)) { seen.add(m.uid); return m; }
       return { ...m, uid: nextUid++ };
-    }).map(cleanTradeFields);
+    }).map(cleanTradeFields).map(cleanTaught);
 
     const fresh = freshState();
     const loaded = {
@@ -1501,7 +1505,7 @@ export function createEngine(canvas, onChange, mini = null) {
       Math.random,
       lockedTiers(sp.id),
       pityBoost(state.dry) * (honey && !honey.tier ? honey.lift : 1)
-        * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.stars),
+        * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.stars) * charmOf(state.beaten),
       honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
 
@@ -2477,6 +2481,27 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
+  /* THE MOVE TUTOR (docs/battles.md, phase 8): `moves` are the four (at most)
+     move names this Pokemon will fight with; `now` the ones it fights with
+     today, as the League page shows them (its taught set, or its level-up
+     four - the engine holds no learnsets). Each name not in `now` costs
+     TUTOR_PRICE; a taught set that moved under the page is refused. Which
+     moves may be taught is the page's (battle.js `learnable`). */
+  function tutor(uid, moves, now) {
+    const mon = state.box.find((m) => m.uid === uid);
+    if (!mon || !taughtOk(moves) || !Array.isArray(now)) return "bad";
+    if (mon.moves && JSON.stringify(mon.moves) !== JSON.stringify(now)) return "stale";
+    const fresh = moves.filter((n) => !now.includes(n)).length;
+    const cost = pricedAt(TUTOR_PRICE, state.stats) * fresh;
+    if (!fresh) return "same";
+    if (state.money < cost) return "money";
+    state.money -= cost;
+    mon.moves = [...moves];
+    save();
+    changed();
+    return null;
+  }
+
   /* Evolve ONE Pokemon, named by uid.
 
      It used to take (speciesId, targetId, whichVariant) and consume a pile, and
@@ -2810,11 +2835,16 @@ export function createEngine(canvas, onChange, mini = null) {
       const no = refusal(mon, cap);
       if (no) return no;
     }
-    fight = { id };
+    /* HARD MODE'S ENTRY FEE (phase 8), paid here and given back with the win:
+       a loss, a forfeit or a reload keeps it. */
+    const fee = feeFor(id);
+    if (fee > state.money) return "fee";
+    state.money -= fee;
+    fight = { id, fee };
     state.battle = battle;
     state.team = [...uids];
     save();
-    stepped();
+    if (fee) changed(); else stepped();
     return null;
   }
 
@@ -2840,6 +2870,7 @@ export function createEngine(canvas, onChange, mini = null) {
     },
     paused: () => pausedAt !== null,
     battleBegin,
+    tutor,
     /* A TURN, and the one place a Battle-shelf item is spent: each the turn
        used (its log says so) comes out of the bag here, and a turn using one
        the bag does not hold is refused whole. Spent when used, as a berry is:
@@ -2861,13 +2892,36 @@ export function createEngine(canvas, onChange, mini = null) {
        forfeit and a battle cut short record and pay nothing. */
     battleEnd() {
       const over = state.battle?.over ?? -1;
-      let pay = 0, first = false;
+      let pay = 0, first = false, fee = 0, gift = null, master = false, charm = null;
       if (over === 0 && fight) {
         const was = state.beaten[fight.id];
         first = !was;
         pay = payFor(fight.id, state.beaten, state.steps);
+        const region = HARDTUNE[fight.id]?.region;
+        const clearedBefore = region ? hardCleared(region, state.beaten) : false;
         state.beaten = { ...state.beaten, [fight.id]: { wins: (was?.wins ?? 0) + 1, at: state.steps } };
-        state.money += pay;
+        fee = fight.fee ?? 0;
+        state.money += pay + fee;
+        /* A FIRST HARD WIN GIVES ITS SIGNATURE POKEMON (phase 8), arriving
+           as a traded one does: it fills the Pokedex as a gift, and no catch
+           reward or research counts it. */
+        const g = first ? giftOf(fight.id) : null;
+        if (g) {
+          gift = g;
+          state.box.push({ uid: state.nextUid++, species: g.species, level: g.level,
+            ...(g.tier ? { [g.tier]: 1 } : {}), traded: 1, at: Date.now() });
+          const at = dexIndex(g.species);
+          if (state.dex[at] !== 2) {
+            register(at);
+            if (!state.gifted.includes(g.species)) state.gifted.push(g.species);
+          }
+        }
+        // The whole hard run of a region: a Master Ball and a step of the Region Charm.
+        if (region && !clearedBefore && hardCleared(region, state.beaten)) {
+          master = true;
+          state.bag["master-ball"] = (state.bag["master-ball"] ?? 0) + 1;
+          charm = charmOf(state.beaten);
+        }
         /* A LEAGUE WIN TEACHES: research's `league` task (a legendary's) is
            credited to every Pokemon that fought - the team `battleBegin`
            checked and kept. */
@@ -2880,7 +2934,7 @@ export function createEngine(canvas, onChange, mini = null) {
       state.battle = null;
       fight = null;
       changed();
-      return { over, pay, first };
+      return { over, pay, first, fee, gift, master, charm };
     },
     travel,
     buy,

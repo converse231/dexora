@@ -19,7 +19,7 @@ import { catchChance, fleeChance } from "../src/catch.js";
 import { hash, QUEST_SHARE } from "../src/game/daily.js";
 import { TYPES } from "../src/data/types.js";
 import {
-  fighter, simulate, effectiveness, opponent, TEAM_MAX, AI_FOR, MAX_EFFORT, mulberry32,
+  fighter, simulate, effectiveness, opponent, TEAM_MAX, AI_FOR, MAX_EFFORT, mulberry32, hardParty,
   newBattle, step, canUse, expected, AIS,
 } from "../src/game/battle.js";
 import { HEALS } from "../src/game/items.js";
@@ -336,6 +336,57 @@ export function solve(rung, share, { n = 200, seed = 5 } = {}) {
 }
 
 export { mulberry32 };   // battle.js's - one seeded roll everywhere
+
+// ------------------------------------------------------------------ hard mode
+
+/* HARD MODE (docs/battles.md, phase 8). Every capped opponent again with its
+   hard team, all at Lv 100 (`hardParty`), against the reference player as it
+   stands where the ladder ends - cap 100, the candy of a whole playthrough -
+   and played at AI 3 (`AI_FOR.hard`). What is solved is the training past
+   100: the smallest that brings the reference player down to HARD_TARGET,
+   or the most there is, where even that leaves it above. */
+export const HARD_TARGET = 0.2;          // brutal: your call, over 40% and 60%
+export const HARD_PRIZE_CEIL = 0.2;      // every first hard win, of a whole Lv 75 game's income
+export const HARD_FEE_SHARE = 0.25;      // an attempt's fee, of its prize; given back with the win
+export const HARD_RECORD = { n: 120, seed: 17 };
+export function hardRungs() {
+  const { rungs } = ladder();
+  const T = rungs.at(-1).T;
+  return rungs.map((r) => ({
+    region: r.region, kind: r.role, k: r.k, role: "hard", T, cap: 100, target: HARD_TARGET,
+    type: r.o.type, base: r.o, o: { ...r.o, id: `${r.o.id}:hard`, party: hardParty(r.o.hard) },
+  }));
+}
+export function solveHard(rung, share, { n = 120, seed = 5 } = {}) {
+  const top0 = 100, top1 = 100 + MAX_EFFORT;
+  // Even the most training leaves it above target: it stays at the most (the record says how far).
+  const most = winRate(rung, top1, { ...HARD_RECORD, share }).win;
+  if (most > rung.target) return { top: top1, win: most };
+  let lo = top0, hi = top1, mid = top1;
+  while (lo <= hi) {
+    mid = (lo + hi) >> 1;
+    if (winRate(rung, mid, { n, seed, share }).win > rung.target) lo = mid + 1; else hi = mid - 1;
+  }
+  let best = null;
+  for (let top = Math.max(top0, mid - 3); top <= Math.min(top1, mid + 3); top++) {
+    const w = winRate(rung, top, { ...HARD_RECORD, share }).win;
+    if (!best || Math.abs(w - rung.target) < Math.abs(best.win - rung.target)) best = { top, win: w };
+  }
+  return best;
+}
+/* The ace a first hard win gives: the highest level in the hard team as its
+   game fields it, the last listed on a tie, at that level. */
+export function signature(o) {
+  let ace = o.hard[0];
+  for (const row of o.hard) if (row[1] >= ace[1]) ace = row;
+  return [ace[0], Math.max(1, Math.min(100, ace[1]))];
+}
+export function hardPrices(rungs) {
+  const inc = incomePerStep();
+  const lifetime = (encountersBy(MAX_LEVEL) / ENCOUNTER_RATE) * (inc.catchPerStep + inc.wagePerStep);
+  const prize = Math.floor(HARD_PRIZE_CEIL * lifetime / rungs.length);
+  return { prize, fee: Math.round(prize * HARD_FEE_SHARE), lifetime };
+}
 
 // ------------------------------------------------------------------ prices
 

@@ -13,7 +13,10 @@
    species to 1025 one consistent source and the physical/special split. Two
    groups are skipped: Let's Go (a cut-down moveset for 153 species) and
    Legends: Arceus (a different move system); a species found only there
-   takes its newest other group.
+   takes its newest other group. And the JAPANESE releases (`red-green-japan`,
+   `blue-japan`): PokéAPI added them with the highest ids of all, so "newest
+   by id" gave every Kanto species its Red/Blue moveset - Charizard with
+   Scratch, Rage and Fire Spin, Articuno with five moves (reported 2026-09-29).
 
    A FORM WITH NO LEVEL-UP MOVES OF ITS OWN (a Mega, a Gigantamax) TAKES ITS
    SPECIES'. PokéAPI lists none for most of them, and a form is fought as the
@@ -79,7 +82,8 @@ const levelUp = (id) => cached(`learn-${id}`, async () => {
   const byGroup = new Map();
   for (const mv of j.moves) {
     for (const d of mv.version_group_details) {
-      if (d.move_learn_method.name !== "level-up" || SKIP_GROUPS.has(d.version_group.name)) continue;
+      if (d.move_learn_method.name !== "level-up" || SKIP_GROUPS.has(d.version_group.name)
+        || /-japan$/.test(d.version_group.name)) continue;
       const g = groupId(d.version_group.url);
       if (!byGroup.has(g)) byGroup.set(g, []);
       byGroup.get(g).push([d.level_learned_at, mv.move.name]);
@@ -120,7 +124,9 @@ const CLASS = { physical: 0, special: 1, status: 2 };
    its game (leagues.js: a party row's third field). A roster name PokéAPI
    does not know stops the fetch here, naming it, so fetch-leagues can alias it. */
 const { LEAGUES } = await import("../src/data/leagues.js");
-const roster = LEAGUES.flatMap((r) => [...r.gyms, ...r.league]).flatMap((o) => o.party.flatMap((p) => p[2] ?? []));
+// Hard mode's teams too (phase 8): a hard row's own moves are the game's, as a first battle's are.
+const roster = LEAGUES.flatMap((r) => [...r.gyms, ...r.league])
+  .flatMap((o) => [...o.party, ...(o.hard ?? [])].flatMap((p) => p[2] ?? []));
 const names = [...new Set([...[...ROWS.values()].flatMap((rows) => rows.map(([, m]) => m)), ...roster])].sort();
 const unknown = [];
 const raw = (await pool(names, 8, (name) => cached(`move-${name}`, async () => {

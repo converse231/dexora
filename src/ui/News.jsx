@@ -11,6 +11,19 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-12",
+    date: "October 2026",
+    title: "Hard mode",
+    items: [
+      ["Hard mode", "Clear a region and its hard mode opens: every Gym Leader, Elite Four member and Champion again, with the full teams they field after the story in their games, every Pokémon at Lv 100 and trained to the limit. It is meant to be brutal."],
+      ["Worth it", "Each first win gives you that trainer's signature Pokémon, Shiny. Beat a region's whole hard run for a Master Ball and a Region Charm that makes rare forms more likely everywhere - clear them all for half again the odds."],
+      ["Entry fees", "A hard battle costs an entry fee each try, handed back when you win."],
+      ["The League's shop", "Battle items moved into the Pokémon League page, with Hyper and Max Potions, Full Restores, Max Revives and X items to boost the Pokémon you have out."],
+      ["Move Tutor", "Teach your Pokémon any move its evolution line learns by its level, for League battles. Each new move has a price."],
+      ["Kanto's moves, fixed", "Kanto Pokémon were fighting with their original 1996 movesets - Charizard with Scratch and Rage. They now know their modern moves, and every League battle was re-tuned to match."],
+    ],
+  },
+  {
     id: "2026-10-11",
     date: "October 2026",
     title: "Walk the gym",

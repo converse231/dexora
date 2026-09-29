@@ -6928,6 +6928,113 @@ let healNote = "";
     `first wins ¥${p.oneOff} and a ${REMATCH_STEPS}-step rematch clock, ${healNote} (${Math.round((Date.now() - t0) / 1000)}s)`);
 }
 
+/* ============================================================== HARD MODE, THE SHELF, THE TUTOR
+   Battles, phase 8 (docs/battles.md). Hard mode is solved like the ladder -
+   gymtune.js is its cache, re-derived and replayed here exactly - and its
+   rewards are held under the events they must not outshine. */
+import { HARDTUNE, HARD_PRIZE, HARD_FEE } from "../src/data/gymtune.js";
+import {
+  hardRungs as lHardRungs, hardPrices as lHardPrices, signature as lSignature, HARD_TARGET, HARD_RECORD,
+  HARD_FEE_SHARE, KIT as lKit,
+} from "./league-sim.mjs";
+import { CHARM_MAX, charmOf as lCharm, hardRunOf, giftOf as lGift, REGIONS as L_REGIONS } from "../src/game/league.js";
+import { OUTBREAK_LIFT as E_OUTBREAK_LIFT } from "../src/game/events.js";
+import { RESEARCH_LIFT as R_LIFT } from "../src/game/research.js";
+import { learnable as bLearnable, movesOf as bMovesOf, movesAt as bMovesAt, MAX_EFFORT as B_MAX_EFFORT, itemOn as bItemOn } from "../src/game/battle.js";
+{
+  const t0 = Date.now();
+  const { share, rungs } = lLadder();
+  const hard = lHardRungs();
+  // Every capped opponent has a hard twin, placed where the ladder places it.
+  assert.equal(Object.keys(HARDTUNE).length, rungs.length, "hard mode is not every leader, League member and Champion - run npm run gyms -- --hard");
+  for (const h of hard) {
+    const g = HARDTUNE[h.o.id];
+    assert.ok(g, `${h.o.id} has no solved hard level - run npm run gyms -- --hard`);
+    assert.deepEqual([g.region, g.kind, g.k], [h.region.id, h.kind, h.k], `${h.o.id} is out of place in HARDTUNE`);
+    assert.deepEqual(g.gift, lSignature(h.base), `${h.o.id}'s signature Pokemon moved - run npm run gyms -- --hard`);
+    assert.ok(g.top >= 100 && g.top <= 100 + B_MAX_EFFORT, `${h.o.id} is not a Lv 100 team with training`);
+    assert.ok(h.o.party.length >= h.base.party.length, `${h.o.id}'s hard team is smaller than its first battle`);
+  }
+  // The prize and the fee are their ceilings' arithmetic, and a fee is less than the prize it guards.
+  const hp = lHardPrices(rungs);
+  assert.deepEqual([HARD_PRIZE, HARD_FEE], [hp.prize, hp.fee], "the hard prize or fee moved - run npm run gyms -- --hard");
+  assert.ok(HARD_FEE < HARD_PRIZE && HARD_FEE_SHARE < 1, "a hard fee is not less than the prize");
+  // A run is its leaders, then its League, in order - and each region has one.
+  for (const rid of L_REGIONS) {
+    const run = hardRunOf(rid);
+    const kinds = run.map((id) => (HARDTUNE[id].kind === "leader" ? 0 : 1));
+    assert.deepEqual(kinds, [...kinds].sort(), `${rid}'s hard run does not put its leaders before its League`);
+  }
+  /* THE RECORD, replayed EXACTLY, and each solve held to its rule: within
+     15 points of HARD_TARGET, or above it only at the most training there is,
+     or below it only on a proved cliff (one less training wins over 20%). */
+  const moved = [], off = [], short = [];
+  for (const h of hard) {
+    const g = HARDTUNE[h.o.id];
+    const w = lWin(h, g.top, { ...HARD_RECORD, share }).win;
+    if (w !== g.win) moved.push(h.o.id);
+    const d = g.win - HARD_TARGET;
+    if (d > 0.15) { if (g.top === 100 + B_MAX_EFFORT) short.push(`${h.base.name} ${Math.round(g.win * 100)}%`); else off.push(h.o.id); }
+    if (d < -0.15 && g.top > 100 && lWin(h, g.top - 1, { ...HARD_RECORD, share }).win <= HARD_TARGET) off.push(h.o.id);
+  }
+  assert.equal(moved.length, 0, `hard battles changed since the solve (${moved.slice(0, 5).join(", ")}) - run npm run gyms -- --hard`);
+  assert.equal(off.length, 0, `hard mode solved out of band: ${off.join(", ")}`);
+
+  /* THE REGION CHARM stays a research star's lift at most, under an
+     outbreak's, and is 1 with no hard run beaten. */
+  assert.equal(lCharm({}), 1, "the Region Charm lifts rolls with nothing beaten");
+  const all = Object.fromEntries(Object.keys(HARDTUNE).map((id) => [id, { wins: 1, at: 0 }]));
+  const full = lCharm(all);
+  assert.ok(Math.abs(full - (1 + CHARM_MAX)) < 1e-12, "the full Region Charm is not 1 + CHARM_MAX");
+  assert.ok(full <= R_LIFT && full < E_OUTBREAK_LIFT, `the Region Charm (${full}) outshines a research star or an outbreak`);
+  // Every gift is a species with a tier it can wear.
+  for (const id of Object.keys(HARDTUNE)) {
+    const gift = lGift(id);
+    assert.ok(lSpecies(gift.species) && gift.level >= 1 && gift.level <= 100, `${id}'s gift is not a Pokemon`);
+    assert.ok(gift.tier, `${id}'s gift has no rare form`);
+  }
+
+  /* THE SHELF'S NEW ITEMS do what their rows say: a heal to its share, a
+     Full Restore heals and cures, a Max Revive back to full, an X item +2 on
+     the Pokemon out and refused on anyone else. */
+  {
+    const heal = Object.fromEntries(HEALS.map((h) => [h.id, h]));
+    const b0 = bNew([[bFighter(6, 60, 1), bFighter(9, 60, 2)], [bFighter(3, 60, 3)]], [null, 1]);
+    const hurt = JSON.parse(JSON.stringify(b0));
+    hurt.sides[0].team[0].hp = 1; hurt.sides[0].team[0].status = 1;
+    const r = bStep(hurt, { item: "full-restore", target: 0 }, lRng(1));
+    const me = r.sides[0].team[0];
+    assert.ok(me.status === -1 && r.log[0].after, "a Full Restore did not cure");
+    assert.ok(heal["max-potion"].heal === 1 && heal["full-restore"].heal === 1 && heal["max-revive"].revive === 1, "a max item does not restore it all");
+    const x = bStep(b0, { item: "x-attack", target: 0 }, lRng(1));
+    assert.equal(x.sides[0].team[0].stages[1], 2, "an X Attack did not raise Attack by 2");
+    const bench = bStep(b0, { item: "x-attack", target: 1 }, lRng(1));
+    assert.equal(bench.turn, b0.turn, "an X item was used on a Pokemon that is not out");
+    assert.equal(bItemOn("x-speed"), "active");
+    for (const h of HEALS) assert.ok(h.price > 0 && h.level >= 1, `${h.id} has no price or level`);
+    // The rematch guard's kit is still the first three, so the new shelf never moved a solved price.
+    assert.deepEqual(Object.keys(lKit).sort(), ["full-heal", "potion", "revive"], "the rematch guard's KIT moved");
+  }
+
+  /* THE MOVE TUTOR teaches only what the line learns by its level, and a
+     taught set is what a League fighter uses - never ranked's. */
+  {
+    const ids = [1, 4, 25, 133, 448, 887];
+    for (const id of ids) {
+      for (const lv of [5, 30, 100]) {
+        const can = bLearnable(id, lv);
+        for (const i of bMovesAt(id, lv)) assert.ok(can.includes(i), `#${id} at Lv ${lv} fights with a move the Tutor would not teach`);
+      }
+    }
+    const taught = bMovesOf({ species: 4, level: 50, moves: ["flamethrower", "nonsense-move"] }).map((i) => L_MOVES[i].n);
+    assert.deepEqual(taught, ["flamethrower"], "a taught set is not what the fighter uses, or a name the data lacks was kept");
+    assert.deepEqual(bMovesOf({ species: 4, level: 50 }), bMovesAt(4, 50), "an untaught Pokemon does not fight with its level-up moves");
+  }
+  console.log(`hard mode ok — ${hard.length} opponents replayed on the record, ${short.length} short of ` +
+    `${HARD_TARGET * 100}% at the most training (${short.slice(0, 6).join(", ")}${short.length > 6 ? ", ..." : ""}); ` +
+    `prize ¥${HARD_PRIZE}, fee ¥${HARD_FEE}; the full Region Charm ×${full}; ${HEALS.length} battle items; the Tutor's lists hold (${Math.round((Date.now() - t0) / 1000)}s)`);
+}
+
 /* ============================================================== RANKED, PHASE 6a
    docs/ranked.md. The format, the species clause, the legendary rule the
    League now reads off the data, and the server's copies of all of it. */

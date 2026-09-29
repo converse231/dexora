@@ -544,6 +544,26 @@ export const HEALS = [
     blurb: "Cures a burn, poison, paralysis, sleep or freeze" },
   { id: "revive", name: "Revive", price: 40, level: 15, revive: 0.5,
     blurb: "A fainted Pokémon back at half its HP" },
+  /* PHASE 8 (docs/battles.md): the rest of the games' shelf, at THEIR price
+     ratios to the Potion (¥300 there is ¥8 here): Hyper Potion 1,200, Max
+     Potion 2,500, Full Restore 3,000, an X item 1,000 (Gen 7's +2 stages); a
+     Max Revive, never sold, at two Revives, which is what it sells for. The
+     rematch guard's `KIT` is the three above and does not move. `stage` is
+     [stat, stages] on the Pokemon out: battle.js's stage indices. */
+  { id: "hyper-potion", name: "Hyper Potion", price: 32, level: 20, heal: 0.75,
+    blurb: "Heals three quarters of its HP" },
+  { id: "max-potion", name: "Max Potion", price: 67, level: 30, heal: 1,
+    blurb: "Heals all of its HP" },
+  { id: "full-restore", name: "Full Restore", price: 80, level: 40, heal: 1, cure: true,
+    blurb: "Heals all of its HP and cures its status" },
+  { id: "max-revive", name: "Max Revive", price: 80, level: 40, revive: 1,
+    blurb: "A fainted Pokémon back at full HP" },
+  { id: "x-attack", name: "X Attack", price: 27, level: 20, stage: [1, 2], blurb: "Sharply raises the Attack of the Pokémon out" },
+  { id: "x-defense", name: "X Defense", price: 27, level: 20, stage: [2, 2], blurb: "Sharply raises the Defense of the Pokémon out" },
+  { id: "x-sp-atk", name: "X Sp. Atk", price: 27, level: 20, stage: [3, 2], blurb: "Sharply raises the Sp. Atk of the Pokémon out" },
+  { id: "x-sp-def", name: "X Sp. Def", price: 27, level: 20, stage: [4, 2], blurb: "Sharply raises the Sp. Def of the Pokémon out" },
+  { id: "x-speed", name: "X Speed", price: 27, level: 20, stage: [5, 2], blurb: "Sharply raises the Speed of the Pokémon out" },
+  { id: "x-accuracy", name: "X Accuracy", price: 27, level: 20, stage: [6, 2], blurb: "Sharply raises the accuracy of the Pokémon out" },
 ];
 
 /* WHAT IS BEING EATEN, AS A NUMBER, and one function per system so no screen
@@ -1023,6 +1043,11 @@ export const candyValue = (sp) =>
    The sink is self-limiting because its input is the same input. It also puts
    candy in competition with balls for one wallet, which is a real choice. */
 export const CANDY_PRICE = 120;
+
+/* THE MOVE TUTOR'S PRICE (docs/battles.md, phase 8), per NEW move taught: 25
+   Rare Candy's worth. The late game's lasting sink - six Pokemon, four moves,
+   and a change of mind costs again - and through Haggle like every price. */
+export const TUTOR_PRICE = 25 * CANDY_PRICE;
 
 export function startingState() {
   return {

@@ -11,8 +11,9 @@
 import { speciesById } from "./biomes.js";
 import { TEAM_MAX } from "./league.js";
 
-// The server refuses a client on another version of these rules (6b).
-export const RULES_VERSION = 1;
+// The server refuses a client on another version of these rules (6b). 2: the Kanto
+// learnsets came from Japanese Red/Green (fetch-moves) and are now Scarlet/Violet's.
+export const RULES_VERSION = 2;
 export const RANKED_LEVEL = 100;   // everyone, whatever the box says (your call, rev 2)
 export const RANKED_IV = 31;       // every stat, everyone
 export const DEFENSE_SLOTS = 3;
