@@ -984,6 +984,11 @@ def build_tileset():
         # SEASIDE ROAD is Route 110 in the pond slot: General plus Mauville.
         "route110": {"general": sets["em_general"], "mauville": sets["mauville"],
                      "split": 512, "floor": sets["em_general"] + 1},
+        # MIRAGE DESERT is Route 111: the same General and Mauville blocks, so
+        # no new art. Its floor is the desert's deep sand, Mauville local 81 -
+        # 449 of the route's 690 deep-sand cells.
+        "route111": {"general": sets["em_general"], "mauville": sets["mauville"],
+                     "split": 512, "floor": sets["mauville"] + 81},
     }
     with io.open(os.path.join(PUB, "tilesets", "route.json"), "w") as f:
         json.dump(meta, f, indent=2)
@@ -1220,6 +1225,8 @@ def build_ground():
         "meadow": 1,                                 # grass, from the primary
         # Route 110, an Emerald map: Emerald's grass, as Monsoon Trail's.
         "pond": meta["route110"]["floor"],
+        # Route 111, an Emerald map: the desert's own sand, not grass.
+        "desert": meta["route111"]["floor"],
         # Monsoon Trail is an Emerald map, so Emerald's grass, as the Safari's.
         "woods": meta["monsoon"]["floor"],
         "ridge": meta["cave"]["floor"],

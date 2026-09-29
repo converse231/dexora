@@ -308,6 +308,14 @@ canvas {
   --ground-tint: linear-gradient(rgba(255, 230, 200, .10), rgba(70, 34, 22, .30));
   --ground-lip: rgba(60, 28, 18, .28);
 }
+/* Mirage Desert: sand in the air. A bleached sky going ochre toward the
+   horizon, and the ground lit hot from above - the sandstorm, as light. */
+.battle[data-area="desert"] {
+  --sky: linear-gradient(#d9c7a0 0%, #ecd9ad 55%, #f5e7c4 100%);
+  --ground-tint: linear-gradient(rgba(255, 236, 190, .12), rgba(96, 62, 24, .28));
+  --ground-lip: rgba(92, 60, 24, .26);
+  --ground-glow: rgba(255, 244, 214, .34);
+}
 /* Deep Woods: the same grass, under a canopy. Green light, not blue. */
 .battle[data-area="woods"] {
   --sky: linear-gradient(#7fb069 0%, #a8cf8e 55%, #cfe3b4 100%);

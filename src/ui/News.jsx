@@ -11,6 +11,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-13",
+    date: "October 2026",
+    title: "The Mirage Desert",
+    items: [
+      ["A new map", "The Mirage Desert opens at Lv 20: Hoenn's Route 111, from the rocky grass past the Old Lady's rest stop, through the sandstorm desert with Mirage Tower and the Desert Ruins, down to the Winstrates' pond."],
+      ["Who lives there", "Sandshrew, Trapinch, Baltoy and Cacnea, the Root and Claw Fossils' Lileep and Anorith, and Ground types from every region's deserts. Mt. Moon is less crowded for it."],
+      ["Arceus in every type", "Arceus now appears in each of its type forms, on the maps that share that type."],
+      ["A stronger White Flute", "The White Flute brings out rarer Pokémon and legendaries about twice as often. It costs ¥1,800."],
+      ["Easier legendaries", "Mewtwo, Mew, Lugia and the other Psychic legendaries now live in the Pokémon Mansion too. No legendary is rarer than 1 in 3,333 on its best map."],
+    ],
+  },
+  {
     id: "2026-10-12",
     date: "October 2026",
     title: "Hard mode",

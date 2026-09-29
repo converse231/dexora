@@ -92,6 +92,10 @@ AREAS = [
     # COPIED, and the biggest map in the game - six Emerald maps stitched into
     # the rectangle they already form. See safari_zone().
     dict(id="safari", name="Safari Zone", drawn="safari_zone"),
+    # COPIED: Emerald's Route 111, the sandstorm desert - see route111().
+    # Takes Ground from Mt. Moon, whose 190-species table was the second most
+    # crowded in the game.
+    dict(id="desert", name="Mirage Desert", drawn="route111"),
 ]
 
 SOLID = set("TwRMIPHLFCWXBEVkKdtYGAZJQ")
@@ -3107,6 +3111,133 @@ def route110():
     # or by Surf without it, checked when this went in.
     return (rows, spawn, [i for row in tiles for i in row], GB, warps,
             {"elev": elev_rows(elev), "cycling": True})
+
+
+# ------------------------------------------------------------ Mirage Desert
+
+MB_MUDDY_SLOPE = 0xD0
+R111_ROAD = frozenset((264, 265, 266))     # the paved road down to Mauville
+
+
+def route111():
+    """Mirage Desert is Emerald's Route 111, cell for cell: 40x140 of rocky
+    grassland, the sandstorm desert with Mirage Tower and the Desert Ruins in
+    it, and the Winstrate house by its pond. General plus Mauville, the pair
+    Seaside Road already bakes, so it costs no art; built as route110() is.
+
+    EVERY DOOR IS SEALED, READ OFF THE MAP'S OWN `warp_events` rather than
+    typed: all five (the rest stop, Mirage Tower, the Desert Ruins, Trainer
+    Hill, the Winstrates) lead to interiors we do not have. Solid, art kept.
+
+    THE MUDDY SLOPES ARE ONE WAY. On the GBA you slide down one and climb it
+    only on the Mach Bike, which this game does not have - and the walk-down
+    half is exactly a ledge: the lowest cell of each slope is `L`, so you drop
+    south over it and never come back up. Found by behaviour, not position.
+
+    Breakable rocks and the Cut tree are OBJECTS in Emerald, not metatiles, so
+    the ground under them is floor and the way past is simply open. The one
+    east ledge and its corner stay solid, as `em_cell` reads every Emerald
+    route's. Mauville, Route 112 and Route 113 are not here: the outer ring is
+    the layout's own border block."""
+    import numpy as np
+    import build_assets as BA
+
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))
+    M = meta["route111"]
+    GB, MB, SPLIT = M["general"], M["mauville"], M["split"]
+    rebase = lambda i: (GB + i) if i < SPLIT else (MB + i - SPLIT)
+
+    layouts = json.load(io.open(
+        BA.fetch("data/layouts/layouts.json", "em/layouts.json", root=BA.EMERALD),
+        encoding="utf-8"))["layouts"]
+    lay = next(q for q in layouts if q["name"] == "Route111_Layout")
+    W, H = lay["width"], lay["height"]
+    assert (W, H) == (40, 140), f"route111: Route 111 is {W}x{H}, not 40x140"
+    raw = np.frombuffer(io.open(BA.fetch(
+        lay["blockdata_filepath"], "em/Route111.bin", root=BA.EMERALD), "rb").read(),
+        dtype="<u2")[:W * H]
+    ids = (raw & 0x3FF).reshape(H, W)
+    col = ((raw >> 10) & 3).reshape(H, W)
+    elev = [[int(e) for e in r] for r in ((raw >> 12) & 0xF).reshape(H, W)]
+    attr = {
+        False: np.frombuffer(io.open(BA.fetch(
+            "data/tilesets/primary/general/metatile_attributes.bin",
+            "em/general/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+        True: np.frombuffer(io.open(BA.fetch(
+            "data/tilesets/secondary/mauville/metatile_attributes.bin",
+            "em/mauville/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+    }
+    behave = lambda i: int(attr[i >= SPLIT][i if i < SPLIT else i - SPLIT] & 0x1FF)
+    border = [int(v) & 0x3FF for v in np.frombuffer(io.open(BA.fetch(
+        lay["border_filepath"], "em/route111_border.bin", root=BA.EMERALD), "rb").read(),
+        dtype="<u2")]
+    assert len(border) == 4, "route111: the border block is not 2x2"
+    events = json.load(io.open(BA.fetch(
+        "data/maps/Route111/map.json", "em/Route111_map.json", root=BA.EMERALD),
+        encoding="utf-8"))
+
+    g = [[None] * W for _ in range(H)]
+    tiles = [[-1] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            i = int(ids[y][x])
+            g[y][x] = em_cell(behave(i), int(col[y][x]))
+            tiles[y][x] = rebase(i)
+
+    shut = [(w["x"], w["y"]) for w in events["warp_events"]]
+    assert len(shut) == 5, f"route111: {len(shut)} warps, the note above names five"
+    for x, y in shut:
+        g[y][x] = "T"
+
+    slopes = 0
+    for y in range(H):
+        for x in range(W):
+            if behave(int(ids[y][x])) != MB_MUDDY_SLOPE:
+                continue
+            below = y + 1 < H and behave(int(ids[y + 1][x])) == MB_MUDDY_SLOPE
+            if not below:
+                assert g[y + 1][x] not in SOLID, f"route111: the slope at ({x},{y}) lands on rock"
+                g[y][x] = "L"
+                slopes += 1
+    assert slopes == 2, f"route111: {slopes} muddy slopes, the real map has two"
+
+    for x in range(W):
+        for y in (0, H - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+    for y in range(H):
+        for x in (0, W - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+
+    seal_hidden(g, tiles, "T", elev)
+
+    # The way in is from Mauville, at the south: the road's lowest cell inside
+    # the ring, searched for by its own metatiles.
+    road = [(x, y) for y in range(H - 1) for x in range(W)
+            if int(ids[y][x]) in R111_ROAD and g[y][x] not in SOLID]
+    assert road, "route111: no road down to Mauville"
+    low = max(y for _x, y in road)
+    xs = sorted(x for x, y in road if y == low)
+    spawn = (xs[len(xs) // 2], low)
+
+    # The cull and the landing rule to a fixed point, walking and surfing -
+    # see monsoon_trail(). The pond by the Winstrates is surfed, as on the GBA.
+    while True:
+        seen = reach(g, [spawn], elev, surf=True)
+        cut = 0
+        for y in range(H):
+            for x in range(W):
+                if g[y][x] not in SOLID and (x, y) not in seen:
+                    g[y][x] = "T"
+                    cut += 1
+        if not cut and not land_ledges(g, "T"):
+            break
+
+    rows = ["".join(r) for r in g]
+    return (rows, spawn, [i for row in tiles for i in row], GB, None,
+            {"elev": elev_rows(elev)})
 
 
 # -------------------------------------------------------------- Cinderpeak

@@ -750,6 +750,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   afloat only if you came in afloat (`wet`, set in `rise`): from the grass
   you walk beneath it, covered by the planks (`drawOverlays` draws a `hides`
   tile whole when you are low).
+- **Mirage Desert is Emerald's Route 111** (id `desert`, Lv 20), General +
+  Mauville - Seaside Road's blocks, so `route111` in route.json costs no art.
+  Its five doors are sealed from its own `warp_events`; its two muddy slopes
+  are one-way `L` (no Mach Bike). It took Ground from Mt. Moon, homes Regirock
+  through `legends: ["rock"]`, and its written B band stays small because at
+  Lv 20 only three B lines are open (the 6% cap).
 - **The desktop view widens, never stretches**: App fits VIEW_W to
   `VIEW_W_MAX` columns at the height `.viewport` allows (`engine.setView`,
   `--cols`); phones and tablets keep 15x11.
