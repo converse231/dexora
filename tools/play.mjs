@@ -26,8 +26,11 @@ import { readFileSync, readdirSync } from "node:fs";
 let now = 1000;
 const raf = [];
 const noop = () => {};
+// Every call on a 2D context is counted: `draws` is how much the engine painted.
+let draws = 0;
+const paint = () => { draws++; };
 const ctx2d = new Proxy({}, {
-  get: (_, k) => (k === "canvas" ? { width: 0, height: 0 } : noop),
+  get: (_, k) => (k === "canvas" ? { width: 0, height: 0 } : paint),
   set: () => true,
 });
 const canvas = () => ({
@@ -3283,6 +3286,69 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   assert.equal(won[146]?.[slot], 1, "a League win did not credit the legendary that fought");
   assert.equal(won[16]?.[slot], 1, "a League win did not credit every Pokemon that fought");
   console.log("league research ok — a League win credits `league` to every Pokemon that fought, a loss credits nothing");
+}
+
+/* THE POKÉDEX RANK IS ANNOUNCED whichever way the count crosses a step - an
+   evolution or a trade, as well as a catch (one `register` for all three) -
+   once, and never when the count did not move. */
+{
+  const { DEX_RANKS } = await import("../src/game/medals.js");
+  const { SPECIES } = await import("../src/data/dex.js");
+  const { dexIndex } = await import("../src/game/biomes.js");
+  const withCaught = (n) => {
+    const dex = SPECIES.map(() => 0);
+    for (const sp of SPECIES.filter((x) => ![10, 11, 25, 133].includes(x.id)).slice(0, n)) dex[dexIndex(sp.id)] = 2;
+    dex[dexIndex(10)] = 2;                                      // the Caterpie in the box
+    return dex;
+  };
+  const ranks = (e) => e.state.cheers.filter((c) => c.kind === "rank");
+  const one = DEX_RANKS[1], two = DEX_RANKS[2];
+  // An evolution into a new species: one short of Researcher, then on it.
+  const ev = boot({ ...SAVE, dex: withCaught(one.at - 2), box: [{ uid: 1, species: 10, level: 20 }], nextUid: 2 }).e;
+  ev.state.cheers.length = 0;
+  assert.ok(ev.evolve(1, 11), "the evolution did not run - this test is asserting nothing");
+  assert.deepEqual(ranks(ev).map((c) => c.title), [one.name.toUpperCase()], "an evolution onto a rank step did not announce it");
+  // The ceremony raises the medal you had into the one you reached.
+  assert.deepEqual([ranks(ev)[0].from, ranks(ev)[0].step], [0, 1], "the rank-up does not say which step it left");
+  // A trade arriving: one short of the next step.
+  const tr = boot({ ...SAVE, dex: withCaught(two.at - 2), box: [], nextUid: 2 }).e;
+  tr.state.cheers.length = 0;
+  const gift = { mid: "11111111-1111-4111-8111-111111111111", species: 25, level: 5, size: 100, tier: null, alpha: false, ot: "Misty", traded: 1 };
+  tr.reconcileTrades({ arrived: [gift] });
+  assert.deepEqual(ranks(tr).map((c) => c.rank), [two.id], "a traded species onto a rank step did not announce it");
+  tr.reconcileTrades({ arrived: [{ ...gift, mid: "22222222-2222-4222-8222-222222222222" }] });
+  assert.equal(ranks(tr).length, 1, "a species already registered announced the rank again");
+  // A new species one past the step is not a step.
+  tr.reconcileTrades({ arrived: [{ ...gift, species: 133, mid: "33333333-3333-4333-8333-333333333333" }] });
+  assert.equal(tr.state.dex[dexIndex(133)], 2, "the second gift did not register - this asserts nothing");
+  assert.equal(ranks(tr).length, 1, "a new species off a rank step announced a rank");
+  console.log(`dex rank ok — ${DEX_RANKS.length} ranks, announced once on the step whether it is reached by evolving or a trade`);
+}
+
+/* A STILL SCENE IS NOT DRAWN AGAIN (engine `drawnKey`): standing still, the
+   loop keeps running and paints nothing; a step paints every frame of it,
+   and a resize (which clears a canvas) paints once. */
+{
+  const { VIEW_W } = await import("../src/game/engine.js");
+  const { e } = boot({ ...SAVE });
+  tick(16, 4);
+  draws = 0;
+  tick(16, 30);
+  assert.equal(draws, 0, `standing still painted ${draws} calls in 30 frames`);
+  e.setView(VIEW_W + 2);
+  tick(16, 1);
+  assert.ok(draws > 0, "a resized view was not repainted");
+  const at = [e.state.player.x, e.state.player.y];
+  for (const dir of ["right", "left", "down", "up"]) {
+    e.press(dir); tick(16, 30); e.clearHeld(); tick(16, 30);
+    if (e.state.player.x !== at[0] || e.state.player.y !== at[1]) break;
+  }
+  assert.notDeepEqual([e.state.player.x, e.state.player.y], at, "the trainer never moved - this test is asserting nothing");
+  draws = 0;
+  e.press("right"); tick(16, 8); e.clearHeld();
+  assert.ok(draws > 0, "a step was not painted");
+  e.destroy();
+  console.log("idle draw ok — a still scene paints nothing, a step and a resize paint");
 }
 
 console.log("play ok — the frame loop never stopped");

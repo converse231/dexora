@@ -26,6 +26,7 @@ import { ALPHA_CHANCE } from "../game/biomes.js";
 import { OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_STEPS } from "../game/events.js";
 import { RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } from "../game/research.js";
 import { LIMITS } from "../game/trade.js";
+import { DEX_RANKS } from "../game/medals.js";
 import { TEAM_MAX, REMATCH_SHARE, REMATCH_CAP_STEP } from "../game/league.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
@@ -99,6 +100,12 @@ export default function Help({ onClose }) {
             Every tile you can walk on can spawn a Pokémon — there is no special
             grass. Rarer ones live in the later areas, and a few only appear
             once your trainer level has opened their generation.
+          </p>
+          {/* The Pokédex rank's steps are live, read off DEX_RANKS. */}
+          <p className="hp-note">
+            Your Pokédex rank grows with the species you have caught:{" "}
+            {DEX_RANKS.map((r) => `${r.name}${r.at ? ` (${r.at})` : ""}`).join(", ")}.
+            It shows on the Dex tab and on your trainer card.
           </p>
           {/* THE FOUR THINGS THAT HAPPEN TO THE WORLD, and nowhere else says
               them: a system nobody is told about reads as a bug the first time
@@ -220,8 +227,9 @@ export default function Help({ onClose }) {
             </li>
             <li>
               <b>The ladder</b>: your first 5 battles each month place you, then
-              you rise through the Dex careers - Scout, Ranger, Researcher,
-              Professor, Legend. A win against a higher rating is worth more;
+              you climb from Challenger through Contender, Rival, Vanguard,
+              Elite, Master and Champion to Sovereign. A win against a higher
+              rating is worth more;
               once you reach a rank you keep it for the season. When your teams are battled you gain or lose a little
               too. Seasons are calendar months: the highest rank you reach
               stays on your card. Up to 20 ranked battles a day.

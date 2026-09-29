@@ -30,6 +30,8 @@ import {
 import DexSheet from "./ui/DexSheet.jsx";
 import { modalOpen } from "./ui/modal.js";
 import Cheer from "./ui/Cheer.jsx";
+import RankUp from "./ui/RankUp.jsx";
+import { DEX_RANKS, dexRank, rankLine } from "./game/medals.js";
 import Types from "./ui/Types.jsx";
 import Evolve from "./ui/Evolve.jsx";
 /* ON DEMAND: the Trade Center is its own chunk, fetched the first time it
@@ -166,6 +168,10 @@ export default function App({
      close over `engine`, which is `useState` and set exactly once, so the
      dependency is honest rather than a lie told to the linter. */
   const onSell = useCallback((uids) => engine?.sell(uids), [engine]);
+  const onRank = useCallback(() => {
+    const to = dexRank(engine?.state.dex.filter((v) => v === 2).length ?? 0).step;
+    setReplay({ from: to > 0 ? to - 1 : null, to });
+  }, [engine]);
   const onConvert = useCallback((uids) => engine?.convert(uids), [engine]);
   const onLevelUp = useCallback((uid, n) => engine?.levelUp(uid, n), [engine]);
   const onEvolve = useCallback((uid, to) => engine?.evolve(uid, to), [engine]);
@@ -392,6 +398,8 @@ export default function App({
      Held, not dropped: it plays the moment the encounter resolves. */
   const held = enc && !["caught", "fled", "ran"].includes(enc.phase);
   const cheer = held ? null : st?.cheers?.[0] ?? null;
+  // The Dex's rank line replays your rank-up: the step you hold, from the one below.
+  const [replay, setReplay] = useState(null);
   /* WHAT JUST RAN OUT. Not a cheer: a cheer is a celebration that holds the
      screen for three seconds with sparks on it, and an effect ending is news
      rather than an occasion. It is the one event in the game with no tell at
@@ -674,7 +682,22 @@ export default function App({
         />
       )}
 
-      {cheer && <Cheer cheer={cheer} onDone={(c) => engine.dropCheer(c)} />}
+      {cheer && cheer.kind !== "rank" && <Cheer cheer={cheer} onDone={(c) => engine.dropCheer(c)} />}
+      {/* A NEW POKÉDEX RANK IS A CEREMONY, not a banner: the screen, until you
+          tap on (RankUp.jsx). Held with the banners while an encounter is
+          undecided. The Dex's rank line replays yours. */}
+      {(cheer?.kind === "rank" || replay) && (
+        <RankUp
+          key={cheer?.kind === "rank" ? `c${cheer.step}` : "replay"}
+          set="dex"
+          ranks={DEX_RANKS}
+          from={cheer?.kind === "rank" ? cheer.from : replay.from}
+          to={cheer?.kind === "rank" ? cheer.step : replay.to}
+          kicker={cheer?.kind === "rank" ? "Pokédex rank up" : "Your Pokédex rank"}
+          detail={cheer?.kind === "rank" ? cheer.sub : rankLine(caught)}
+          onDone={() => (cheer?.kind === "rank" ? engine.dropCheer(cheer) : setReplay(null))}
+        />
+      )}
 
       {/* A TIP, NOT A TUTORIAL - one line, the first time you reach the thing
           it is about, never again. See hints.js for why there is no sequence,
@@ -993,6 +1016,7 @@ export default function App({
           outbreakArea={engine?.outbreakArea() ?? null}
           onTravel={(id) => engine.travel(id)}
           onSelect={setEntry}
+          onRank={onRank}
           onSell={onSell}
           onConvert={onConvert}
           onLevelUp={onLevelUp}

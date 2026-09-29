@@ -69,6 +69,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/data/gymtune.js` | `npm run gyms` (check.mjs re-derives it and says when to re-run) |
 | `supabase/functions/ranked-step/rules.js` | `npm run edge` (check.mjs re-bundles and compares) |
 | `src/data/anchors.js` | `npm run anchors` (check.mjs re-solves and compares) |
+| `public/ranks/{battle,dex}/` | `npm run ranks` from the drawn originals in `art/ranks/` (check.mjs: one per rank id, 192px, small) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
   National Dex alone, read by the fetchers).
@@ -155,7 +156,10 @@ anything done. The run prints each suite; the count is not typed anywhere.
   region, a branch from the ordinary parent when not (Quilava -> Hisuian
   Typhlosion) - at the base row's price, and check.mjs holds each to its twin.
 - **Names come from `label()`**: a form's base name from `from`, or its `title`
-  when it has one. Never parse slugs.
+  when it has one. Never parse slugs. **Every hyphenated slug is in
+  `NAME_FIX`** (map.js) unless its real name keeps the hyphen lower-case
+  (`HYPHEN_NAMES`, Jangmo-o's line); check.mjs reads every label. 36 were
+  shown as slugs ("Iron-bundle", "Chi-yu", "Type-null") until 2026-09-29.
 - **`genOf` has its own Map** because it runs at module init, before
   `speciesById` exists.
 
@@ -379,7 +383,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   (`.battle` for `data-area` and `data-phase`, `.viewport` for `--tb-h`).
 - **Cascade traps**: an animation beats a plain declaration; naming an
   `animation` replaces the whole list; a duplicate `@keyframes` name lets the
-  later one win silently; hold a sprite range with `steps(n, jump-none)`;
+  later one win silently, and so does a class name reused for something new
+  (grep before naming - a second `.dx-ring` resized the Dex sheet's); hold a sprite range with `steps(n, jump-none)`;
   percentage `background-position` aligns p% of image to p% of box; media
   queries add no specificity (overrides go last); `<details open>` in React
   needs owned state; a flex item's `min-height` is `auto`; a percentage size is
@@ -389,15 +394,20 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   in view, geometry read off `.dexgrid`'s CSS) - at 1,300 tiles
   `content-visibility`'s per-tile intersection checks halved the frame rate.
   Anything that runs forever on a Box row animates only `opacity` and
-  `transform`. **Rail tabs stay mounted once visited** (`.rail-pane`,
+  `transform`. **A Dex grid out of view pauses its tier loops**
+  (`useOffscreenPause`, `.dexgrid.offscreen`): on a phone the Dex sits below
+  the game, and its unseen loops were a quarter of the idle main thread. **Rail tabs stay mounted once visited** (`.rail-pane`,
   `display: contents`, hidden when not current): a switch never rebuilds.
 - **The pixel font is merged outlines** (`tools/build_font.py`): Geist Pixel
   drew a contour per pixel (10,492), and every new size on screen re-rasterised
   thousands of squares on the main thread - seconds on a phone the first time
   a panel opened. Never ship a pixel font unmerged.
-- **The pixel face is Geist Pixel, self-hosted and registered in `main.jsx`**
-  as `Pixel` through `FontFace` (a url in styles.css would resolve against the
-  built stylesheet). `sizeAdjust` 110% is the one scale knob: it is
+- **Every face is self-hosted and registered in `main.jsx`** through
+  `FontFace` (a url in styles.css would resolve against the built
+  stylesheet), and preloaded by index.html: Geist Pixel as `Pixel`, Fredoka
+  (`--display`) and Nunito Sans (`--body`), one variable woff2 each. No
+  third-party font host: it was a render-blocking stylesheet from two more
+  origins, and offline play lost its headings. **The pixel face** `sizeAdjust` 110% is the one scale knob: it is
   proportional and narrower than the Silkscreen the layout was sized for.
   A pixel rule never goes under 9px, never uses a bare `cqw`, and never sets
   `letter-spacing` (asserted); rules that only inherit the face need the same
@@ -611,10 +621,28 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   server carries them). A rank on a profile comes from `ranked_standing`,
   never a `trainer_cards` column: the card's grants belong to trading.sql,
   which must not name a column ranked.sql creates. `RankBadge` lives outside
-  `ui/league/` because the Trade Center draws it too. The ranks are the Dex
-  careers (Scout, Ranger, Researcher, Professor, Legend; `TOP_RANK` shows the
-  rating); `RankMedal` is the one place a rank is drawn, a CSS disc until
-  `public/ranks/*.png` exist.
+  `ui/league/` because the Trade Center draws it too. The eight battle ranks
+  run Challenger to Sovereign (`TOP_RANK` shows the rating; every band's
+  edge is a SQL floor). **`RankMedal` is the one place either ladder is
+  drawn**: the built `ranks/{battle|dex}/{id}.png` (`npm run ranks` - never
+  ship an original from `art/`), or a disc in the rank's own `color` (on
+  `RANKS` / `DEX_RANKS`, also the rank-up glow) if one is missing, asked
+  once a session.
+- **The Pokédex rank is a title, never a reward** (README *Pokédex*):
+  `DEX_RANKS` in medals.js, SHARES of `SPECIES.length` (never counts, so a new
+  generation moves them) ending on the whole dex. It reads the Pokédex as
+  the card counts it (`dex_count`, trades included), so a profile works out
+  anyone's rank with nothing on the server; the dex rewards still count your
+  own catches. Every registration goes through the engine's `register(at)`,
+  which is what announces a step, whichever way the count moved.
+- **A new rank is a ceremony, never a banner** (`RankUp.jsx`, both ladders):
+  App plays a `kind: "rank"` cheer through it (held with the banners while
+  an encounter is undecided), and the ranked result card plays it when
+  `promotion()` says the battle crossed a rank or ended placement. Its
+  timeline is delayed CSS keyframes whose RESTING styles are the final
+  scene, so a skip (every non-`.loop` delay and duration crushed to 1ms)
+  and reduced motion both land on the end; anything that repeats forever
+  carries `.loop`, or a skip turns it into a strobe.
 - **Who defends is the server's, held VOLATILE as `state.defense`** (uid ->
   "Team A", `defenders()` over `my_defense`): App reads it at sign-in and
   Ranked hands every edit to `engine.setDefense`. It exists only so a press
@@ -780,6 +808,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   variant-catch lag (tools/play caps a throw at 2 `colRev` bumps). The map is
   not redrawn under a battle once it has faded in (`BATTLE_FADE`), and Dex
   tiles are a memoised `Cell` on primitive props.
+- **A still scene is not drawn again**: `frame()` renders only while a step,
+  a rustle, a cast or a battle's fade is playing, or when `drawnKey` moves
+  (`rev`, where the trainer stands and faces, the view's width, the art). The
+  map has no clock-driven animation, so anything new drawn on the canvas that
+  changes by itself must join that condition. Standing still, the redraw was
+  half of a phone's idle main thread (tools/play counts the paints).
 - **Stalls are paid back in `frame()`**: any gap over `STALL` pushes every live
   deadline forward (`move.startedAt`, `encounter.until`, `fishing.until`) and
   drops held keys. A new timer joins that list.

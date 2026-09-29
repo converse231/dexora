@@ -10,7 +10,7 @@
    three variant marks and a completion badge now, and at 52px those were fighting
    each other; at ~76px they each have a place. */
 
-import { memo, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
 import {
@@ -22,6 +22,8 @@ import FilterBar from "./FilterBar.jsx";
 import Sprite, { VariantFx } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 import { researchLevel, RESEARCH_MAX } from "../game/research.js";
+import { dexRank } from "../game/medals.js";
+import { RankMedal } from "./RankBadge.jsx";
 
 const STATE = ["unseen", "seen", "caught"];
 
@@ -141,6 +143,21 @@ const Cell = memo(function Cell({ sp, state, variant, marks, full, studied, onSe
    grew to the whole list (28,574px), nothing scrolled, and "the rows in view"
    was every row. `.dexgrid` scrolls; `.dexgrid-in` is the grid and carries
    the padding. */
+/* A GRID NOBODY CAN SEE ANIMATES NOTHING. Each rare tile runs its tier's
+   layers forever (a Chaotic one, seven), and on a phone the Dex sits below the
+   game, off screen - measured 2026-09-29, those unseen loops were a quarter of
+   a throttled phone's main thread while standing still. `.offscreen` pauses
+   every animation inside until the grid scrolls back into view. */
+function useOffscreenPause(ref) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver !== "function") return undefined;
+    const io = new IntersectionObserver(([e]) => el.classList.toggle("offscreen", !e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref]);
+}
+
 const OVERSCAN = 3;
 function useRows(ref, count) {
   const [win, setWin] = useState({ first: 0, last: 12, cols: 4, pitch: 91 });
@@ -173,7 +190,7 @@ function useRows(ref, count) {
    was changing seven times a second was the parent re-rendering, and that is
    exactly what `memo` stops. `colRev` is the signal that this panel's content
    really did move - see engine.js. */
-function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
+function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
   const [only, setOnly] = useState("all");
   const [type, setType] = useState("any");
   const [sort, setSort] = useState("number");
@@ -184,6 +201,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
   const [find, setFind] = useState("");
 
   const at = (id) => dex?.[dexIndex(id)] ?? 0;
+  const rank = dexRank(caught);
   const has = (t, id) => !!tiers?.[t]?.[dexIndex(id)];
   const count = (t) => SPECIES.filter((sp) => has(t, sp.id)).length;
   /* Which art a tile wears: the rarest registered. */
@@ -252,6 +270,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
   }).sort((a, b) => SORTS[sort](a, b) || a.id - b.id);
 
   const grid = useRef(null);
+  useOffscreenPause(grid);
   const win = useRows(grid, shown.length);
   const rows = Math.ceil(shown.length / win.cols);
   const last = Math.min(rows, win.last);
@@ -353,6 +372,16 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect }) {
           Scoped to the REGION only, deliberately, and not to the search box or
           the SHOW filter: this is a progression readout, and "2 / 3" because
           you typed "pika" is a result count wearing a progress bar's clothes. */}
+      {/* YOUR POKÉDEX RANK, over the bar that measures it: the whole dex,
+          whatever region is picked, because the rank is the whole dex's. */}
+      <button type="button" className="dx-rank" onClick={onRank} data-tip="Replay your rank-up">
+        <span className="rk-ring" aria-hidden="true"
+          style={{ "--mc": rank.color, "--p": rank.next ? (caught - rank.at) / (rank.next.at - rank.at) : 1 }}>
+          <RankMedal set="dex" id={rank.id} color={rank.color} />
+        </span>
+        <b>{rank.name}</b>
+        {rank.next && <i>{rank.left} more to {rank.next.name}</i>}
+      </button>
       <div className="count">
         <b>{scope.caught}</b> <span>/ {scope.total}</span>
         <em>{Math.round((scope.caught / Math.max(1, scope.total)) * 100)}%</em>

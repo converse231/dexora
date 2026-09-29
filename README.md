@@ -161,6 +161,73 @@ name and types, and only a caught one opens up the dex text, height, weight,
 catch rate and base stats. Holding detail back is deliberate — the gaps are the
 reason to keep hunting.
 
+### The Pokédex rank
+
+*(2026-09-29, your names.)* A title for how much of the Pokédex you have
+caught: **Field Intern, Researcher, Senior Researcher, Specialist, Professor,
+Expedition Leader, Grand Scholar, Pokédex Master**. It is read off the same
+count the trainer card shows (`dex_count`, species at 2 - a trade counts, as
+it does in every Pokédex), so your rank and the rank on your profile are one
+number, and a friend's is worked out from their card with nothing new on the
+server. It is a title, never a reward: the milestones and the dex bonus
+still count your own catches only.
+
+The steps are SHARES of the dex (`DEX_RANKS` in `medals.js`), so a new
+generation moves them with it, and the last one is the whole dex. Measured
+against the spawn tables (2026-09-29, 1,303 entries): one playthrough of
+walking catches about 578 species, about 973 if you evolve everything you
+catch, and four playthroughs about 1,182 - so Professor (35%) is a thorough
+first playthrough, Expedition Leader (50%) a player who evolves as they go,
+Grand Scholar (75%) the long haul, and Pokédex Master the chase.
+
+| Rank | From |
+|---|---|
+| Field Intern | the start |
+| Researcher | 3% |
+| Senior Researcher | 10% |
+| Specialist | 20% |
+| Professor | 35% |
+| Expedition Leader | 50% |
+| Grand Scholar | 75% |
+| Pokédex Master | every entry |
+
+It shows over the Dex tab's bar (with how many more to the next), under
+your name on a trainer card, and the catch (or evolution, or trade) that
+reaches a new one plays the rank-up ceremony below; the Dex's rank line
+replays yours.
+
+### The rank-up ceremony
+
+*(2026-09-29, both ladders: `RankUp.jsx`.)* A rank is the rarest thing the
+game says about you, so it takes the screen until you tap on, where every
+other celebration is a three-second banner. The old medal rises up a shaft
+of light and CHARGES - it and the new one trade places as white
+silhouettes, faster and faster, over the evolution scene's concentric
+waves, because a rank is you evolving - then a flash, shockwaves and a burst
+that grows with the rank; the new medal lands and glints, its name drops in
+a letter at a time, and the whole ladder fills from the step you left to the
+one you reached. The top two steps add gold rain and fireworks. A tap
+skips to the end; reduced motion shows the end. It is all delayed CSS
+keyframes (one timer, for the button), each element's resting style its
+final state, so both of those land on the finished scene for free.
+
+**Art - made by you** (drawn 2026-09-29): the originals live in
+`art/ranks/dex/`, any size, and `npm run ranks` (tools/build_ranks.py) crops,
+centres and shrinks each into `public/ranks/dex/` at 192px, ~7KB - the
+sixteen originals shipped as they were weighed 6.5MB. `RankMedal` draws the
+built file, or a disc in the rank's colour if one is missing:
+
+| Path | Size | Prompt |
+|---|---|---|
+| `art/ranks/dex/field-intern.png` | 48×48 | Rank insignia 1 of a matching set of 8 Pokédex research ranks, all the same round medal hanging from a short ribbon: a small plain bronze medal with a white leaf and a tiny pencil crossed in its centre, brown ribbon. Humble and simple. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/dex/researcher.png` | 48×48 | Rank insignia 2 of a matching set of 8 Pokédex research ranks, the same round medal on a short ribbon: a copper-orange medal with a white magnifying glass in its centre, orange ribbon. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/dex/senior-researcher.png` | 48×48 | Rank insignia 3 of a matching set of 8 Pokédex research ranks, the same round medal on a short ribbon: a silver medal with a white magnifying glass over a small open notebook, grey-blue ribbon. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/dex/specialist.png` | 48×48 | Rank insignia 4 of a matching set of 8 Pokédex research ranks, the same round medal on a short ribbon: a forest-green medal with a white creature paw print inside a thin target ring, green ribbon. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/dex/professor.png` | 48×48 | Rank insignia 5 of a matching set of 8 Pokédex research ranks, the same round medal on a short ribbon: a sky-blue medal with a small red-and-white handheld Pokédex device and a white lab flask beside it, blue ribbon, two small silver laurel sprigs. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/dex/expedition-leader.png` | 48×48 | Rank insignia 6 of a matching set of 8 Pokédex research ranks, the same round medal on a short ribbon: a deep purple medal with a white compass rose over a small mountain peak with a tiny flag on top, purple ribbon, silver laurels. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/dex/grand-scholar.png` | 48×48 | Rank insignia 7 of a matching set of 8 Pokédex research ranks, the same round medal on a short ribbon: a gold medal with a white open book and a small star above it, a gold laurel wreath around the medal, red ribbon. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/dex/pokedex-master.png` | 48×48 | Rank insignia 8, the highest of a matching set of 8 Pokédex research ranks, the same round medal on a short ribbon: a gold medal with a rainbow-coloured rim, a red-and-white handheld Pokédex device in its centre, a small gold crown on top, a gold laurel wreath and a two-pixel sparkle at one corner. Regal but not busy. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+
 ## Art
 
 `npm run art` builds everything the game draws, from `tools/build_assets.py`:

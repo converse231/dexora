@@ -11,11 +11,24 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-09",
+    date: "October 2026",
+    title: "Smoother, lighter, sharper",
+    items: [
+      ["Rank badges", "Every battle and Pokédex rank now has its own badge - on the Dex tab, your trainer card, the ladder and the rank-up ceremony. The Dex tab's badge is ringed with your way to the next rank."],
+      ["Runs cooler", "Standing still, the game no longer redraws anything, and the Dex's animated forms rest while they're off screen - a phone does a fifth of the work it did."],
+      ["Loads faster", "The game's fonts now come with it, so it starts sooner and looks the same offline, and the rank badges are a fiftieth of their old size."],
+      ["Names", "Iron Bundle, Scream Tail, Ho-Oh, Type: Null, Mime Jr., the Tapus, the Treasures of Ruin and more are now spelled properly everywhere."],
+    ],
+  },
+  {
     id: "2026-10-08",
     date: "October 2026",
     title: "The ranked ladder",
     items: [
-      ["Ratings and ranks", "Ranked battles now count. Your first 5 battles each season place you; after that you climb the Dex careers - Scout, Ranger, Researcher and Professor, three divisions each, to Legend."],
+      ["Ratings and ranks", "Ranked battles now count. Your first 5 battles each season place you; after that you climb from Challenger through Contender, Rival, Vanguard, Elite, Master and Champion, three divisions each, to Sovereign."],
+      ["Pokédex ranks", "Catching has ranks too: from Field Intern through Researcher, Senior Researcher, Specialist, Professor, Expedition Leader and Grand Scholar to Pokédex Master, for the whole Pokédex. Yours is on the Dex tab and your trainer card."],
+      ["Rank up!", "Reaching a new rank - in the Pokédex or on the ladder - now plays its own ceremony: your old medal evolves into the new one, and the whole ladder lights up to where you stand. Tap your rank on the Dex tab or the Ranked tab to watch yours again."],
       ["Monthly seasons", "Each month is a season. When a new one starts, your rating moves halfway back to the middle, and the highest rank you reached stays on your trainer card as a season badge."],
       ["Always someone to battle", "You're matched with trainers near your rating. When nobody is, you'll meet a League Elite Four member or Champion rated to match."],
       ["The top 100", "The Standings tab shows the season's top trainers, you and your friends, and past seasons. Your Defenses tab shows who battled your teams and how they did."],

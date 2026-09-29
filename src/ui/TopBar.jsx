@@ -64,7 +64,7 @@ function Missions({ daily, onClaim, note }) {
         className={`ms-tab${ready ? " ready" : ""}${daily.claimed ? " done" : ""}`}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        data-tip={ready ? "Today's quest is ready to claim"
+        data-tip={open ? undefined : ready ? "Today's quest is ready to claim"
           : daily.claimed ? "Claimed - come back tomorrow"
             : "Today's quest"}
       >
@@ -167,7 +167,8 @@ function Menu({ onSettings, onHelp, onForms, onEvents, onLeague, onTrade, tradeA
         className="tb-burger"
         aria-expanded={open}
         aria-label={open ? "Close the menu" : "Menu"}
-        data-tip="Settings, help, log out"
+        /* No tip while it is open: it sat over the menu's first item. */
+        data-tip={open ? undefined : "Settings, help, log out"}
         onClick={() => setOpen((v) => !v)}
       >
         <span aria-hidden="true">{open ? "\u2715" : "\u2630"}</span>

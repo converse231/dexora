@@ -22,7 +22,8 @@
     "battleart": "python tools/build_battle_art.py",
     "gyms": "node tools/tune-gyms.mjs",
     "edge": "node tools/build-edge.mjs",
-    "anchors": "node tools/rank-anchors.mjs"
+    "anchors": "node tools/rank-anchors.mjs",
+    "ranks": "python tools/build_ranks.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

@@ -488,8 +488,8 @@ the TEST project first, then live:
    ```
    -- the season now running, and the ladder's constants (5 placement, 20 a day)
    select public.ranked_season(), public.ranked_limit('PLACEMENT'), public.ranked_limit('DAILY');
-   -- the Dex careers' floors (2026-09-29): 1050, 1150, 1250, 1400
-   select public.ranked_floor(1060), public.ranked_floor(1160), public.ranked_floor(1260), public.ranked_floor(1500);
+   -- the eight ranks' floors (2026-09-29): 1050, 1150, 1325, 1400
+   select public.ranked_floor(1060), public.ranked_floor(1160), public.ranked_floor(1330), public.ranked_floor(1500);
    ```
 
 **Moderation.** To take a trainer off this season's list and out of its

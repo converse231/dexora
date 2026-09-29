@@ -1426,6 +1426,12 @@ canvas {
    because an author `display` beats the browser's own rule for it. */
 .rail-pane { display: contents; }
 .rail-pane[hidden] { display: none; }
+/* A tab arrives with a short fade, not a cut. OPACITY ONLY: a transform on
+   the panel, even for 180ms, would make it the containing block for the
+   fixed dialogs the Box renders inside itself. */
+.rail-pane:not([hidden]) > * { animation: pane-in .18s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .rail-pane > * { animation: none; } }
+@keyframes pane-in { from { opacity: 0; } }
 /* Sizes here are deliberately generous. The pixel face is charming on short
    labels but unreadable as body text, so anything you actually read - species
    names, item descriptions - uses the body face instead. */
@@ -3756,7 +3762,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   font-style: normal; font-size: 9px; color: var(--ink-faint);
 }
 .sf-tally em {
-  font-style: normal; font-family: var(--body); font-size: 9.5px;
+  font-style: normal; font-family: var(--body); font-size: 11px;
   letter-spacing: 0; color: var(--ink-faint);
 }
 
@@ -4016,7 +4022,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   }
   .tb-stat i { font-size: 9px; letter-spacing: .04em; }
   .tb-stat b { font-size: 13px; gap: 2px; }
-  .tb-stat b u { font-size: 8.5px; }
+  .tb-stat b u { font-size: 10px; }
   .tb-candy { width: 12px; height: 12px; }
 
   .tb-burger { padding: 5px 7px; }
@@ -6777,23 +6783,294 @@ button:disabled { transition: none; }
 .rk-title { display: inline-flex; align-items: center; gap: 8px; }
 .rk-tabs { margin: 4px 0 0; }
 .rk-badge { display: inline-flex; align-items: center; gap: 5px; min-width: 0; white-space: nowrap; }
-/* THE DEX CAREERS' MEDALS (docs/ranked.md): a disc in the career's colour with
-   a lit upper edge and a dark rim, until the drawn emblems land. Art, so the
-   colours do not change at night. Sized by the context it sits in. */
-.rk-medal {
-  --mc: #b07a4a; display: inline-block; flex: none; width: 18px; height: 18px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .55) 0 18%, transparent 20%), var(--mc);
+/* THE RANK MEDALS, both ladders (battle: docs/ranked.md; Pokédex: README):
+   the drawn emblem (public/ranks, `npm run ranks`, 192px shown at 24, 48 and
+   96), or a disc in the rank's own colour (`--mc`, from the ladder's data)
+   when a file is missing. Art, so the colours do not change at night. Sized
+   by the context it sits in. */
+.rk-medal { display: inline-block; flex: none; width: 24px; height: 24px; }
+.rk-medal.art { object-fit: contain; image-rendering: auto; user-select: none; }
+.rk-medal:not(.art) {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .55) 0 18%, transparent 20%), var(--mc, #b07a4a);
   box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .18), 0 0 0 1px rgba(20, 20, 28, .75);
 }
-.rk-medal.rk-ranger { --mc: #4f9a55; }
-.rk-medal.rk-researcher { --mc: #4a86d4; }
-.rk-medal.rk-professor { --mc: #8657c4; }
-.rk-medal.rk-legend {
-  --mc: #e4b53c;
-  box-shadow: inset 0 0 0 2px rgba(120, 70, 0, .35), 0 0 0 1px rgba(20, 20, 28, .75), 0 0 0 3px rgba(228, 181, 60, .45);
-}
-.rk-title .rk-medal { width: 26px; height: 26px; }
+.rk-title .rk-medal.art { width: 48px; height: 48px; }
+.rk-title .rk-medal:not(.art) { width: 26px; height: 26px; }
 .lg-case .rk-medal { width: 24px; height: 24px; }
+/* A Dex grid out of view pauses its tiles' tier loops (Dex.jsx `useOffscreenPause`). */
+.dexgrid.offscreen *, .dexgrid.offscreen *::before, .dexgrid.offscreen *::after { animation-play-state: paused !important; }
+.dx-rank {
+  display: flex; align-items: center; gap: 7px; margin: 0 0 4px; min-width: 0; max-width: 100%;
+  padding: 0; border: 0; background: none; font: inherit; text-align: left; cursor: pointer;
+}
+/* THE WAY TO THE NEXT RANK, round the medal: a ring in the rank's own colour
+   that fills from this step's threshold to the next (`--p`). Masked to the rim
+   as the rift's ring is, so the medal sits on the panel, not on a disc. */
+.rk-ring { position: relative; display: grid; place-items: center; flex: none; width: 32px; height: 32px; }
+.rk-ring::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--mc) calc(var(--p) * 360deg), var(--line) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+}
+.rk-ring .rk-medal { position: relative; }
+.dx-rank:hover b, .rk-replay:hover { text-decoration: underline; text-underline-offset: 3px; }
+.rk-replay {
+  display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; cursor: pointer;
+}
+.dx-rank b { font-size: 13px; color: var(--ink); white-space: nowrap; }
+.dx-rank i { font-style: normal; font-size: 12px; color: var(--ink-faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-title { display: inline-flex; align-items: center; gap: 5px; }
+/* ---- THE RANK-UP CEREMONY (RankUp.jsx, both ladders). One timeline of
+   delayed keyframes; the header comment in RankUp.jsx lists the beats. EVERY
+   ELEMENT'S RESTING STYLE IS ITS FINAL STATE and its keyframes fill
+   backwards from hidden, so a skip (every delay and duration crushed) and
+   reduced motion (no animation at all) both land on the finished scene.
+   `.loop` marks what repeats forever, which a skip must leave alone - a
+   loop crushed to 1ms is a strobe. Art, so it keeps its colours at night;
+   `--mc` is the rank's colour, the same eight as the medals. */
+.ru {
+  position: fixed; inset: 0; z-index: 90; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: 16px; cursor: pointer; user-select: none;
+  background: radial-gradient(ellipse at 50% 34%, color-mix(in srgb, var(--mc) 24%, #0a0c16) 0%, #05060b 72%);
+  animation: ru-in .35s ease-out both;
+}
+@keyframes ru-in { from { opacity: 0; } }
+.ru-stage { position: relative; width: 100%; height: clamp(120px, 30vh, 230px); flex: none; }
+.ru-stage > * { position: absolute; left: 50%; top: 50%; }
+
+.ru-glow {
+  width: 92vmin; height: 92vmin; transform: translate(-50%, -50%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--mc) 50%, transparent) 0%, transparent 58%);
+  animation: ru-glow 1s ease-out 2.5s both;
+}
+@keyframes ru-glow { from { opacity: 0; transform: translate(-50%, -50%) scale(.4); } }
+.ru.top .ru-glow { background: radial-gradient(circle, color-mix(in srgb, var(--mc) 70%, transparent) 0%, transparent 64%); }
+
+.ru-rays {
+  width: 120vmin; height: 120vmin; opacity: .5; transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(color-mix(in srgb, var(--mc) 45%, transparent) 0 5deg, transparent 5deg 15deg);
+  -webkit-mask: radial-gradient(circle, #000 0 12%, transparent 58%);
+  mask: radial-gradient(circle, #000 0 12%, transparent 58%);
+  animation: ru-spin 24s linear infinite, ru-fade 1s ease-out 2.5s both;
+}
+@keyframes ru-spin { from { transform: translate(-50%, -50%) rotate(0); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+@keyframes ru-fade { from { opacity: 0; } }
+
+/* The shaft of light the old medal rises up. */
+.ru-beam {
+  top: auto; bottom: 50%; width: 120px; height: 70vh; opacity: 0;
+  transform: translateX(-50%); transform-origin: 50% 100%;
+  background: linear-gradient(to top, color-mix(in srgb, var(--mc) 55%, #fff) 0%, transparent 100%);
+  /* Feathered at the sides: a shaft of light, not a rectangle. */
+  -webkit-mask: linear-gradient(90deg, transparent, #000 38% 62%, transparent);
+  mask: linear-gradient(90deg, transparent, #000 38% 62%, transparent);
+  animation: ru-beam 1.5s ease-out .2s both;
+}
+/* While it charges, the evolution scene's own concentric waves (the GBA's
+   tiled rings, hard-stepped) pulse out behind it. */
+.ru-waves {
+  width: 100vmin; height: 100vmin; opacity: 0; transform: translate(-50%, -50%) scale(1.4);
+  background: repeating-radial-gradient(circle, color-mix(in srgb, var(--mc) 26%, transparent) 0 14px, transparent 14px 28px);
+  -webkit-mask: radial-gradient(circle, #000 0 30%, transparent 62%);
+  mask: radial-gradient(circle, #000 0 30%, transparent 62%);
+  animation: ru-waves 1.45s linear 1.05s both;
+}
+@keyframes ru-waves {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+  15%, 90% { opacity: .85; }
+}
+@keyframes ru-beam {
+  0% { opacity: 0; transform: translateX(-50%) scaleX(.15); }
+  30% { opacity: .55; transform: translateX(-50%) scaleX(1); }
+  100% { opacity: 0; transform: translateX(-50%) scaleX(.3); }
+}
+
+.ru-ring {
+  width: 64px; height: 64px; border-radius: 50%; opacity: 0;
+  border: 3px solid color-mix(in srgb, var(--mc) 55%, #fff);
+  transform: translate(-50%, -50%) scale(7);
+  animation: ru-ring .95s cubic-bezier(.15, .7, .3, 1) calc(2.5s + var(--k) * 130ms) both;
+}
+@keyframes ru-ring { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.3); } }
+
+/* Motes falling INTO the medal while it charges. */
+.ru-mote {
+  width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; opacity: 0;
+  background: #fff; box-shadow: 0 0 6px 1px var(--mc);
+  transform: rotate(var(--a)) translateX(0);
+  animation: ru-mote 1.1s cubic-bezier(.5, 0, .9, .6) calc(1.2s + var(--t)) both;
+}
+@keyframes ru-mote {
+  0% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(.6); }
+  25% { opacity: 1; }
+}
+
+/* The burst - square, like the game's own pixels - and at the top two steps
+   two more over the room, like fireworks. */
+.ru-spark {
+  width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); opacity: 0;
+  transform: rotate(var(--a)) translateX(var(--d)) scale(.3);
+  animation: ru-burst 1.15s cubic-bezier(.1, .75, .3, 1) calc(2.5s + var(--t)) both;
+}
+.ru-spark.c0 { background: color-mix(in srgb, var(--mc) 80%, #fff); }
+.ru-spark.c1 { background: #ffd76a; }
+.ru-spark.c2 { background: #fff; }
+@keyframes ru-burst {
+  0% { opacity: 1; transform: rotate(var(--a)) translateX(0) scale(1.3); }
+  70% { opacity: 1; }
+}
+.ru-show { width: 0; height: 0; }
+.ru-show.s0 { --show: 3.3s; left: calc(50% - 30vmin); top: calc(50% - 14vmin); }
+.ru-show.s1 { --show: 3.9s; left: calc(50% + 28vmin); top: calc(50% - 4vmin); }
+.ru-show .ru-spark { position: absolute; left: 0; top: 0; animation-delay: calc(var(--show) + var(--t)); }
+
+/* THE MEDAL: rises (`.ru-medal`), charges and lands (`.ru-core`), and the
+   old and the new trade places as white silhouettes, faster and faster. */
+.ru-medal { transform: translate(-50%, -50%); animation: ru-rise .85s cubic-bezier(.2, .8, .2, 1) .3s both; }
+@keyframes ru-rise { from { opacity: 0; transform: translate(-50%, calc(-50% + 34vh)) scale(.45); } }
+.ru-core {
+  display: grid; place-items: center; width: 96px; height: 96px;
+  animation: ru-land .7s cubic-bezier(.2, 1.8, .4, 1) 2.5s both, ru-shake 1.4s linear 1.1s,
+             ru-white 1.4s step-end 1.1s both;
+}
+.ru-core > span { grid-area: 1 / 1; display: grid; place-items: center; }
+.ru .ru-core .rk-medal { width: 96px; height: 96px; }
+.ru .ru-core .rk-medal.art { image-rendering: auto; }
+.ru .ru-core .rk-medal:not(.art) { width: 76px; height: 76px; }
+@keyframes ru-land { 0% { transform: scale(1); } 35% { transform: scale(1.45); } 70% { transform: scale(.94); } }
+@keyframes ru-shake {
+  0% { transform: scale(1); }
+  20% { transform: translate(-1px, 1px) scale(1.02); } 30% { transform: translate(1px, -1px) scale(1.03); }
+  45% { transform: translate(-2px, 0) scale(1.05); } 55% { transform: translate(2px, 1px) scale(1.06); }
+  65% { transform: translate(-2px, -2px) scale(1.08); } 72% { transform: translate(3px, 1px) scale(1.1); }
+  80% { transform: translate(-3px, 2px) scale(1.12); } 86% { transform: translate(3px, -2px) scale(1.15); }
+  92% { transform: translate(-4px, 1px) scale(1.18); } 100% { transform: scale(1.22); }
+}
+@keyframes ru-white { 0% { filter: none; } 6% { filter: brightness(0) invert(1); } 100% { filter: none; } }
+.ru-old { opacity: 0; animation: ru-old 1.4s step-end 1.1s both; }
+.ru-new { opacity: 1; animation: ru-new 1.4s step-end 1.1s both; }
+.ru-medal.solo .ru-new { animation: none; }
+@keyframes ru-old {
+  0% { opacity: 1; } 16% { opacity: 0; } 28% { opacity: 1; } 38% { opacity: 0; } 47% { opacity: 1; }
+  55% { opacity: 0; } 62% { opacity: 1; } 68% { opacity: 0; } 73% { opacity: 1; } 78% { opacity: 0; }
+  82% { opacity: 1; } 86% { opacity: 0; } 89% { opacity: 1; } 92% { opacity: 0; } 94% { opacity: 1; }
+  96% { opacity: 0; } 100% { opacity: 0; }
+}
+@keyframes ru-new {
+  0% { opacity: 0; } 16% { opacity: 1; } 28% { opacity: 0; } 38% { opacity: 1; } 47% { opacity: 0; }
+  55% { opacity: 1; } 62% { opacity: 0; } 68% { opacity: 1; } 73% { opacity: 0; } 78% { opacity: 1; }
+  82% { opacity: 0; } 86% { opacity: 1; } 89% { opacity: 0; } 92% { opacity: 1; } 94% { opacity: 0; }
+  96% { opacity: 1; } 100% { opacity: 1; }
+}
+/* Glints on the new medal, twinkling for as long as you look. */
+.ru-glint {
+  position: absolute; width: 16px; height: 16px; opacity: 0;
+  background: linear-gradient(transparent 44%, #fff 44% 56%, transparent 56%),
+              linear-gradient(90deg, transparent 44%, #fff 44% 56%, transparent 56%);
+  animation: ru-twinkle 1.7s ease-in-out calc(2.9s + var(--g)) infinite both;
+}
+.ru-glint.g0 { --g: 0s; right: -6px; top: 4px; }
+.ru-glint.g1 { --g: .6s; left: -4px; bottom: 10px; width: 12px; height: 12px; }
+.ru-glint.g2 { --g: 1.1s; left: 12px; top: -6px; width: 10px; height: 10px; }
+@keyframes ru-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0); }
+  50% { opacity: 1; transform: scale(1) rotate(45deg); }
+}
+
+.ru-flash {
+  position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none;
+  animation: ru-flash .75s ease-out 2.42s both;
+}
+@keyframes ru-flash { 0% { opacity: 0; } 12% { opacity: .92; } 100% { opacity: 0; } }
+
+.ru-rain {
+  position: absolute; left: var(--x); top: -12px; width: var(--s); height: var(--s); opacity: 0;
+  background: #ffd76a; box-shadow: 0 0 4px rgba(255, 215, 106, .8);
+  animation: ru-fall var(--d) linear calc(2.6s + var(--t)) infinite both;
+}
+@keyframes ru-fall {
+  0% { opacity: 0; transform: translateY(0) rotate(0); }
+  10% { opacity: 1; }
+  100% { opacity: .8; transform: translateY(108vh) rotate(540deg); }
+}
+
+/* THE WORDS. The name drops in a letter at a time; words never break. */
+.ru-text { position: relative; text-align: center; max-width: 560px; }
+.ru-kicker {
+  margin: 0; font-family: var(--pixel); font-size: 12px; text-transform: uppercase;
+  color: color-mix(in srgb, var(--mc) 55%, #fff); animation: ru-up .5s ease-out 2.8s both;
+}
+.ru-name {
+  margin: 6px 0 4px; font-family: var(--pixel); font-weight: 400; line-height: 1.15;
+  font-size: clamp(24px, 8vw, 44px); color: #fff8e0;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--mc) 85%, transparent), 0 3px 0 rgba(0, 0, 0, .55);
+}
+.ru-name .w { display: inline-block; white-space: nowrap; }
+.ru-name .w > span {
+  display: inline-block;
+  animation: ru-drop .55s cubic-bezier(.2, 1.7, .4, 1) calc(2.95s + var(--i) * 45ms) both;
+}
+@keyframes ru-drop { from { opacity: 0; transform: translateY(-42px) rotate(-14deg) scale(1.7); } }
+.ru-path, .ru-detail { margin: 0; font-family: var(--pixel); font-size: 12px; color: #d9dcef; }
+.ru-path { animation: ru-up .5s ease-out 3.4s both; }
+.ru-path b { font-weight: 400; color: #ffd76a; }
+.ru-detail { margin-top: 4px; font-size: 11px; color: #9aa0bd; animation: ru-up .5s ease-out 3.55s both; }
+@keyframes ru-up { from { opacity: 0; transform: translateY(10px); } }
+
+/* THE LADDER: every step of it, lit to where you stand; the track fills
+   from the step you left to the one you reached, and the new one pops. */
+.ru-ladder {
+  position: relative; display: flex; gap: clamp(8px, 3vw, 16px); margin: 6px 0 0; padding: 0; list-style: none;
+  animation: ru-up .5s ease-out 3.5s both;
+}
+.ru-track { position: absolute; left: 13px; right: 13px; top: 50%; height: 3px; margin-top: -1.5px; background: rgba(255, 255, 255, .14); }
+.ru-track b {
+  position: absolute; inset: 0; transform-origin: 0 50%; transform: scaleX(var(--to));
+  background: linear-gradient(90deg, #ffd76a, color-mix(in srgb, var(--mc) 70%, #fff));
+  animation: ru-fill .75s cubic-bezier(.3, .8, .3, 1) 3.7s both;
+}
+@keyframes ru-fill { from { transform: scaleX(var(--from)); } }
+.ru-ladder li { position: relative; display: grid; place-items: center; width: 26px; height: 26px; }
+.ru-ladder .rk-medal { width: 26px; height: 26px; }
+.ru-ladder .rk-medal:not(.art) { width: 18px; height: 18px; }
+.ru-ladder li.ahead { opacity: .32; filter: grayscale(1); }
+.ru-ladder li.now { animation: ru-pop .5s cubic-bezier(.2, 1.8, .4, 1) 4.35s both; }
+.ru-ladder li.now::after {
+  content: ""; position: absolute; inset: -5px; border-radius: 50%; opacity: 0;
+  border: 2px solid #ffd76a; animation: ru-halo .8s ease-out 4.35s both;
+}
+@keyframes ru-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.45); } 100% { transform: scale(1.2); } }
+@keyframes ru-halo { 0% { opacity: 1; transform: scale(.6); } 100% { opacity: 0; transform: scale(1.8); } }
+.ru-ladder li.now { transform: scale(1.2); }
+
+.ru-go {
+  margin-top: 8px; min-height: 36px; padding: 9px 26px 8px; cursor: pointer;
+  font-family: var(--pixel); font-size: 13px; color: #2b1d00;
+  border: 2px solid #fff0b8; border-radius: 10px;
+  background: linear-gradient(#ffe38a, #f0b83c); box-shadow: 0 3px 0 #8a6414, 0 0 18px rgba(255, 215, 106, .35);
+  animation: ru-up .5s ease-out 4.6s both;
+}
+.ru-go:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+/* A SKIP lands on the end: every non-looping beat crushed to nothing. */
+.ru.skip, .ru.skip *:not(.loop), .ru.skip *::after { animation-delay: 0s !important; animation-duration: 1ms !important; }
+.ru.skip .ru-rays { animation: ru-spin 24s linear infinite; }
+
+@media (max-height: 520px) {
+  .ru { gap: 6px; padding: 8px 16px; }
+  .ru-stage { height: 108px; }
+  .ru-core, .ru .ru-core .rk-medal { width: 64px; height: 64px; }
+  .ru .ru-core .rk-medal:not(.art) { width: 52px; height: 52px; }
+  .ru-name { font-size: clamp(20px, 6vw, 32px); margin: 2px 0; }
+  .ru-go { margin-top: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ru, .ru *, .ru *::after { animation: none !important; }
+}
 .rk-badge b { font-size: 13px; color: var(--ink); }
 .rk-badge i { font-style: normal; font-size: 12px; color: var(--ink-faint); }
 .rk-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
@@ -6910,6 +7187,7 @@ button:disabled { transition: none; }
 @media (hover: none) and (pointer: coarse) {
   .ft-move kbd, .ft-team-btn kbd { display: none; }
   .lg-more, .lg-go.small { min-height: 40px; }
+  .dx-rank, .rk-replay { min-height: 36px; }
 }
 /* A PHONE: all eight badges still fit one line. */
 @media (max-width: 480px) {
