@@ -3308,6 +3308,11 @@ Caldera's rock, lava and ladders come from
 tileset, the one behind Magma Hideout — because FireRed has no molten tile
 anywhere in it. Player
 sprites from [The Spriters Resource](https://www.spriters-resource.com/game_boy_advance/pokemonfireredleafgreen/asset/52432/).
+**Every move's battle animation is compiled from
+[rh-hideout/pokeemerald-expansion](https://github.com/rh-hideout/pokeemerald-expansion)**,
+the community's pret fork, by `tools/build_anims.py`: its animation scripts,
+sprite templates, effect sheets and backgrounds, pinned to one commit.
+Pokémon Showdown's effects were not used: they are AGPL-3.0.
 
 **The Poké Ball throw animation is [All Pokeball Sprites for throw animation by
 Anarlaurendil](https://www.deviantart.com/anarlaurendil/art/All-Pokeball-Sprites-for-throw-animation-815730891),

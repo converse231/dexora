@@ -11,6 +11,28 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-11",
+    date: "October 2026",
+    title: "Walk the gym",
+    items: [
+      ["Gym trainers first", "As in the games, you now battle your way through a gym's trainers, one after another, before its leader will face you. Leaders you've already beaten stay open for rematches."],
+      ["A gym is a path", "Each gym shows its trainers and leader as a path, filling in as you win. The next battle waits under it - tap any step to see that trainer's team."],
+      ["Go, Poké Ball!", "Every Pokémon sent into battle is thrown in a Poké Ball and bursts out of the light, and the balls under each health bar show who's still standing."],
+      ["Suggest a ranked team", "Building a ranked team, one tap now picks your strongest Pokémon, one of each and no two of the same main type."],
+      ["Cleaner results", "The victory screen fits on one line: who's still standing, what you won, and what's next."],
+    ],
+  },
+  {
+    id: "2026-10-10",
+    date: "October 2026",
+    title: "Every move, animated",
+    items: [
+      ["The games' own animations", "Moves in the League and in ranked now play their own animation from the Game Boy Advance games - Flamethrower's stream of fire, Surf's wave, Shadow Ball's ghostly backdrop, Rock Slide's falling rocks - for 760 moves, the newest generations included."],
+      ["The hit lands with the bar", "A health bar now drops when the attack connects, not when the move is announced."],
+      ["Your pace", "Tap the battle, or press Space, to skip an animation. The switch at the top of a battle picks Full, Quick or Off; Off is the default if your device asks for less motion."],
+    ],
+  },
+  {
     id: "2026-10-09",
     date: "October 2026",
     title: "Smoother, lighter, sharper",

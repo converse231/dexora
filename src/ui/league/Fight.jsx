@@ -23,6 +23,7 @@ import RankBadge from "../RankBadge.jsx";
 import RankUp from "../RankUp.jsx";
 import { RANKS, rankOf, promotion } from "../../game/ranked.js";
 import Confirm from "../Confirm.jsx";
+import { loadAnims, preload, hasAnim, play as playAnim, SPEEDS } from "./moveAnim.js";
 
 const STATUS = [["PAR", "paralysed"], ["BRN", "burned"], ["PSN", "poisoned"], ["SLP", "put to sleep"], ["FRZ", "frozen solid"]];
 const STAT = [null, "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed", "accuracy", "evasiveness"];
@@ -31,6 +32,21 @@ const nameOf = (id) => label(speciesById(id));
 const moveName = (i) => (i === STRUGGLE ? "Struggle"
   : MOVES[i].n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(MOVES[i].n.startsWith("u-") ? "-" : " "));
 const moveType = (i) => (i === STRUGGLE ? "normal" : MOVES[i].t);
+const moveSlug = (i) => (i === STRUGGLE ? "struggle" : MOVES[i].n);
+
+/* MOVE ANIMATIONS (docs/battles.md, Art, phase 7): full, quick or off, per
+   device. Off where the device asks for reduced motion, until chosen. */
+const ANIM_KEY = "dexora-anim";
+const ANIM_MODES = ["full", "quick", "off"];
+const ANIM_SAYS = { full: "Full", quick: "Quick", off: "Off" };
+const ANIM_MARK = { full: "✦", quick: "»", off: "✧" };   // the state alone on a narrow screen
+function readAnimMode() {
+  try {
+    const v = localStorage.getItem(ANIM_KEY);
+    if (ANIM_MODES.includes(v)) return v;
+  } catch { /* a preference */ }
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? "off" : "full";
+}
 
 /* THE AREA A FIGHT STANDS IN, by the opponent's type: the encounter scene's
    own sky and floor (`.battle[data-area]`), so a League fight is drawn in the
@@ -109,6 +125,8 @@ function beatsOf(log, battle, foeName) {
       text: `${me} used ${moveName(ev.move)}!`, lunge: ev.side,
       fx: hits || ev.status != null ? { type, at: 1 - ev.side } : null,
       hit: hits && ev.dmg > 0 ? 1 - ev.side : null, after,
+      // The move's own animation, where it has one; a miss plays none, as in the games.
+      move: ev.miss ? null : { slug: moveSlug(ev.move), side: ev.side },
     });
     if (ev.miss) { out.push({ text: `${me}'s attack missed!` }); continue; }
     if (hits && ev.hits > 1) out.push({ text: `Hit ${ev.hits} times!` });
@@ -143,6 +161,7 @@ function HpBox({ f, shown, side, level, team, statusAt }) {
         <span className={`ft-fill ${hpClass(frac)}`} style={{ transform: `scaleX(${frac})` }} />
       </div>
       <div className="ft-hp-bot">
+        {/* The party as Poke Balls, as the games draw it: a fainted one greyed. */}
         <span className="ft-pips" aria-label={`${team.filter((x) => x.hp > 0).length} of ${team.length} able to fight`}>
           {team.map((x, k) => <i key={k} className={x.hp > 0 ? "" : "out"} />)}
         </span>
@@ -218,6 +237,16 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
   const [down, setDown] = useState([false, false]);
   const ended = useRef(false);
   const timer = useRef(0);
+  // The scene's animation layers, the one running, and the chosen speed (read by `next`, a stable callback).
+  const sceneRef = useRef(null), canvasRef = useRef(null), bgRef = useRef(null), tintRef = useRef(null), flashRef = useRef(null);
+  const running = useRef(null);
+  const [animMode, setAnimModeState] = useState(readAnimMode);
+  const animRef = useRef(animMode);
+  const setAnimMode = (m) => {
+    animRef.current = m;
+    setAnimModeState(m);
+    try { localStorage.setItem(ANIM_KEY, m); } catch { /* a preference */ }
+  };
   // What the engine paid for the result (`battleEnd`), for the result card.
   const [paid, setPaid] = useState(null);
   // Why the engine refused the battle, if it did (`battleBegin`).
@@ -240,16 +269,45 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
   }, [engine]);
 
   /* PLAY THE QUEUE: one beat, then the next after BEAT ms or a tap. A beat
-     carrying `after` moves the bars to it as it starts. */
+     carrying `after` moves the bars to it as it starts - except a move with
+     its own animation, whose bar falls at the IMPACT (the first hit on the
+     target), and whose beat lasts as long as the animation does. */
   const next = useCallback(() => {
     clearTimeout(timer.current);
     const nb = queue.current.shift();
     if (!nb) { setBeat(null); return; }
+    const scene = sceneRef.current;
+    if (nb.move && animRef.current !== "off" && hasAnim(nb.move.slug) && scene) {
+      setBeat({ ...nb, fx: null, lunge: null, hit: null, key: Math.random() });
+      const after = nb.after;
+      running.current = playAnim({
+        slug: nb.move.slug, attacker: nb.move.side, speed: SPEEDS[animRef.current],
+        stage: { scene, canvas: canvasRef.current, bg: bgRef.current, tint: tintRef.current, flash: flashRef.current,
+          mons: [scene.querySelector(".ft-mon.me .ft-sprite"), scene.querySelector(".ft-mon.foe .ft-sprite")] },
+        onImpact: () => { if (after) setView(after.map((a) => ({ ...a }))); },
+        onDone: () => { running.current = null; timer.current = setTimeout(next, 240); },
+      });
+      return;
+    }
     if (nb.after) setView(nb.after.map((a) => ({ ...a })));
     setBeat({ ...nb, key: Math.random() });
     timer.current = setTimeout(next, nb.wait ?? BEAT);
   }, []);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  // A tap hurries: an animation finishes at once (its bar falls), a line moves on.
+  const hurry = useCallback(() => (running.current ? running.current.skip() : next()), [next]);
+  useEffect(() => () => {
+    const r = running.current;
+    running.current = null;
+    clearTimeout(timer.current);
+    if (r) r.skip();
+    clearTimeout(timer.current);
+  }, []);
+  // Every move either side can use, fetched as the battle opens so no turn waits on the network.
+  useEffect(() => {
+    if (animRef.current === "off") { loadAnims(); return; }
+    const slugs = start.sides.flatMap((s) => s.team.flatMap((f) => (f.moves ?? []).map((m) => moveSlug(m.i))));
+    preload([...new Set(slugs)]);
+  }, [start]);
 
   // The opening: the trainer steps up, then both sides send out. A resumed
   // ranked battle is already under way.
@@ -343,7 +401,7 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
     const onKey = (e) => {
       if (ask) return;
       if (e.key === "Escape") { e.preventDefault(); if (over) onDone(over); else setAsk(true); return; }
-      if (busy && (e.key === " " || e.key === "Enter")) { e.preventDefault(); next(); return; }
+      if (busy && (e.key === " " || e.key === "Enter")) { e.preventDefault(); hurry(); return; }
       if (busy || over) return;
       const k = Number(e.key) - 1;
       if (panel === "moves" && k >= 0 && k < me.moves.length) { e.preventDefault(); play({ move: k }); }
@@ -352,7 +410,7 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [ask, busy, over, panel, me, play, next, onDone, practice]);
+  }, [ask, busy, over, panel, me, play, hurry, onDone, practice]);
 
   const anim = (side) => [
     beat?.in === side ? "in" : "",
@@ -368,8 +426,10 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
     return (
       <div className="ft ft-refused" role="alertdialog" aria-modal="true" aria-label="Battle refused">
         <div className="ft-result lost">
-          <b>Not this time</b>
-          <span>{REFUSED[refused] ?? REFUSED.team}</span>
+          <div className="ft-res-head">
+            <b className="ft-res-title">Not this time</b>
+            <span className="ft-res-sub">{REFUSED[refused] ?? REFUSED.team}</span>
+          </div>
           <div className="ft-result-go">
             <button type="button" className="lg-go" onClick={() => onDone("refused")}>Back to the League</button>
           </div>
@@ -388,17 +448,25 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
           <img src={new URL(`trainers/${opponent.pic}.png`, document.baseURI).href} alt="" />
           <span><i>vs</i> <b>{foeName}</b>{opponent.rating != null && <em className="ft-opp-rating"> {opponent.rating.toLocaleString("en-US")}</em>}</span>
         </div>
+        <button type="button" className="ft-anim-mode" aria-label={`Move animations: ${ANIM_SAYS[animMode]}`}
+          data-tip="Move animations: full, quick or off"
+          onClick={() => setAnimMode(ANIM_MODES[(ANIM_MODES.indexOf(animMode) + 1) % ANIM_MODES.length])}>
+          <i aria-hidden="true">{ANIM_MARK[animMode]}</i><span>{ANIM_SAYS[animMode]}</span>
+        </button>
         <span className={`ft-turn${left !== null && left <= 10 && !over ? " hurry" : ""}`}>
           {b.turn ? `Turn ${b.turn}` : ""}
           {remote && left !== null && !over && <i> · {left > 0 ? `${left}s` : "time's up"}</i>}
         </span>
       </div>
 
-      <div className="ft-stage" onClick={beat ? next : undefined}>
-        <div className="battle ft-scene" data-area={area} data-phase="day"
+      <div className="ft-stage" onClick={beat ? hurry : undefined}>
+        <div className="battle ft-scene" data-area={area} data-phase="day" ref={sceneRef}
           style={{ "--ground": `url(${new URL(`battle/${area}.png`, document.baseURI).href})` }}>
           <div className="battle-sky" />
           <div className="battle-ground" />
+          {/* A move's background (Shadow Ball's, Psychic's) and its tint: over the ground, under the mons. */}
+          <div className="ft-anim-bg" ref={bgRef} aria-hidden="true" />
+          <div className="ft-anim-tint" ref={tintRef} aria-hidden="true" />
           {out[1] ? (
             <Mon key={`f${view[1].slot}`} f={foe} side={1} mon={foeLook?.[view[1].slot] ?? null} anim={anim(1)} />
           ) : (
@@ -409,16 +477,27 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
           {out[0] && <Mon key={`m${view[0].slot}`} f={me} side={0} mon={myMons[view[0].slot]} anim={anim(0)} />}
           {out[0] && <HpBox f={me} shown={view[0]} side={0} level={me.level}
             team={b.sides[0].team} statusAt={view[0].status} />}
+          {/* EVERY SEND-OUT IS THROWN: a Poke Ball arcs in from the thrower's
+              side, spins, bursts open, and the Pokemon comes out of the light
+              (`.ft-mon.in` waits for it). Trainers throw Poke Balls; a box
+              entry does not remember the ball it was caught in. */}
+          {beat?.in != null && (
+            <span key={`ball${beat.key}`} className={`ball ft-ball ${beat.in ? "foe" : "me"}`} aria-hidden="true"
+              style={{ backgroundImage: `url(${new URL("items/throw/poke-ball.png", document.baseURI).href})` }} />
+          )}
           {beat?.fx && (
             <span key={beat.key} className={`ft-fx t-${beat.fx.type} at-${beat.fx.at ? "foe" : "me"}`} aria-hidden="true">
               <b /><i /><i /><i /><i /><i /><i />
             </span>
           )}
+          {/* A move's sprites, over the mons and under the health boxes, and its flash over them. */}
+          <canvas className="ft-anim" ref={canvasRef} aria-hidden="true" />
+          <div className="ft-anim-flash" ref={flashRef} aria-hidden="true" />
         </div>
       </div>
 
       <div className="ft-panel">
-        <p className={`ft-msg${busy ? " live" : ""}`} aria-live="polite" onClick={beat ? next : undefined}>
+        <p className={`ft-msg${busy ? " live" : ""}`} aria-live="polite" onClick={beat ? hurry : undefined}>
           {beat?.text ?? (waiting ? "…" : over ? (over === "won" ? `You defeated ${foeName}!` : `${foeName} won this time.`)
             : panel === "forced" ? "Who will you send out next?" : `What will ${nameOf(me.id)} do?`)}
           {busy && !waiting && <span className="ft-more" aria-hidden="true">▼</span>}
@@ -426,31 +505,51 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
         {note && <p className="ft-note" role="alert">{RANKED_SAYS[note] ?? RANKED_SAYS.offline}</p>}
 
         {over ? (
+          /* THE RESULT, in one band: what happened and who is still standing on
+             the left, what it won in chips beside it, the next step on the
+             right. It stacks on a phone. */
           <div className={`ft-result ${over}`}>
-            <b>{over === "won" ? "Victory!" : "Defeated"}</b>
-            {remote && rated?.rated && (
-              <span className="ft-rated">
-                <b className={rated.delta >= 0 ? "up" : "down"}>{rated.delta >= 0 ? "+" : ""}{rated.delta}</b>
-                <RankBadge rating={rated.rating} games={rated.games} withRating />
-              </span>
-            )}
-            <span>{remote
-              ? `${b.turn} turns.`
-              : practice
-              ? `${b.turn} turns. Practice - nothing is saved or rated.`
-              : over === "won"
-                ? `${b.turn} turns, ${b.sides[0].team.filter((f) => f.hp > 0).length} still standing.`
-                : "Nothing is lost - raise your team with Rare Candy and try again."}</span>
-            {over === "won" && paid?.first && badge && (
-              <span className="ft-badge">
-                <img src={new URL(`badges/${badge.id}.png`, document.baseURI).href} alt="" />
-                You won the {badge.name}!
-              </span>
-            )}
-            {over === "won" && paid && (
-              <span className="ft-pay">{paid.pay > 0 ? `+¥${paid.pay.toLocaleString("en-US")}`
-                : "No prize this time - a rematch prize refills as you walk."}</span>
-            )}
+            <div className="ft-res-head">
+              <b className="ft-res-title">{over === "won" ? "Victory!" : "Defeated"}</b>
+              <span className="ft-res-sub">{remote
+                ? `${b.turn} turns`
+                : practice
+                ? `${b.turn} turns · practice, nothing is saved or rated`
+                : over === "won"
+                  ? `${b.turn} turns · ${b.sides[0].team.filter((f) => f.hp > 0).length} of ${b.sides[0].team.length} still standing`
+                  : "Nothing is lost - raise your team with Rare Candy and try again."}</span>
+              <ul className="ft-res-team" aria-label="Your team">
+                {b.sides[0].team.map((f, k) => (
+                  <li key={k} className={f.hp > 0 ? "" : "out"}>
+                    <Sprite id={f.id} variant={myMons[k]?.tier ?? null} alt={`${nameOf(f.id)}${f.hp > 0 ? "" : " (fainted)"}`} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {(remote && rated?.rated) || (over === "won" && paid) ? (
+              <ul className="ft-loot">
+                {remote && rated?.rated && (
+                  <li className="ft-rated">
+                    <b className={rated.delta >= 0 ? "up" : "down"}>{rated.delta >= 0 ? "+" : ""}{rated.delta}</b>
+                    <RankBadge rating={rated.rating} games={rated.games} withRating />
+                  </li>
+                )}
+                {over === "won" && paid?.first && badge && (
+                  <li>
+                    <img src={new URL(`badges/${badge.id}.png`, document.baseURI).href} alt="" />
+                    <span><i>NEW BADGE</i><b>{badge.name}</b></span>
+                  </li>
+                )}
+                {over === "won" && paid && (paid.pay > 0 ? (
+                  <li className="pay">
+                    <span className="ft-coin" aria-hidden="true">¥</span>
+                    <span><i>PRIZE</i><b>+¥{paid.pay.toLocaleString("en-US")}</b></span>
+                  </li>
+                ) : (
+                  <li className="none"><span><i>PRIZE</i><b>Refills as you walk</b></span></li>
+                ))}
+              </ul>
+            ) : null}
             <div className="ft-result-go">
               <button type="button" className="lg-go" onClick={() => onDone(over, "again")}>
                 {remote ? "Find another" : practice ? "Another team" : over === "won" ? "Rematch" : "Try again"}

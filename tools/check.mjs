@@ -6581,6 +6581,75 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     `${Math.round(gz / 1000)}KB gzipped and imported by nothing in the main bundle`);
 }
 
+/* ============================================================== MOVE ANIMATIONS
+   Battles, phase 7 (docs/battles.md, Art). `npm run anims` compiles every
+   move's own script from pokeemerald-expansion into src/data/anims.js and
+   the sheets and backgrounds it draws into public/battle/anim/. These hold
+   the timelines, the data and the pictures to each other. */
+import { SHEETS as A_SHEETS, SPRITES as A_SPRITES, BGS as A_BGS, ANIMS as A_ANIMS } from "../src/data/anims.js";
+{
+  // Every move the rules can choose, and Struggle, has a timeline. A few are
+  // one special task each (Substitute's doll, Transform) and play the type
+  // burst instead: held to a bound, so a broken compile cannot hide as "empty".
+  const choosable = [...L_MOVES.filter((m) => !m.no).map((m) => m.n), "struggle"];
+  const missing = choosable.filter((n) => !A_ANIMS[n]);
+  assert.deepEqual(missing, [], `moves with no timeline in anims.js - run npm run anims: ${missing.slice(0, 5).join(", ")}`);
+  const empty = choosable.filter((n) => !A_ANIMS[n][2].length);
+  assert.ok(empty.length < choosable.length * 0.03, `${empty.length} moves play no animation of their own: ${empty.join(", ")}`);
+
+  const png = (dir, f) => {
+    const url = new URL(`../public/battle/anim/${dir}/${f}.png`, import.meta.url);
+    assert.ok(existsSync(url), `public/battle/anim/${dir}/${f}.png is missing - run npm run anims`);
+    const b = readFileSync(url);
+    return [b.readUInt32BE(16), b.readUInt32BE(20)];
+  };
+  // A sheet is its frames side by side: the PNG header is the other copy of w, h and the count.
+  A_SHEETS.forEach(([f, w, h, n], i) => {
+    assert.ok(f && n > 0, `sheet ${i} has no picture - a sprite would draw nothing`);
+    assert.deepEqual(png("s", f), [w * n, h], `battle/anim/s/${f}.png is not ${n} frames of ${w}x${h}`);
+  });
+  A_BGS.forEach((f, i) => { assert.ok(f, `background ${i} has no picture`); png("bg", f); });
+  A_SPRITES.forEach(([sheet, seq], i) => {
+    assert.ok(A_SHEETS[sheet], `sprite ${i} names sheet ${sheet}, which is not in SHEETS`);
+    for (const [frame] of seq) assert.ok(frame < A_SHEETS[sheet][3], `sprite ${i} plays frame ${frame} its sheet does not have`);
+  });
+  // ...and nothing on disk the data does not name (a rebuild clears the folder; a stray file ships forever).
+  for (const [dir, names] of [["s", A_SHEETS.map((x) => x[0])], ["bg", A_BGS]]) {
+    const want = new Set(names.map((f) => `${f}.png`));
+    const stray = readdirSync(new URL(`../public/battle/anim/${dir}/`, import.meta.url)).filter((f) => !want.has(f));
+    assert.deepEqual(stray, [], `public/battle/anim/${dir}/ holds files anims.js does not name`);
+  }
+  let events = 0;
+  for (const [slug, [frames, impact, evs]] of Object.entries(A_ANIMS)) {
+    // The health bar falls at the impact, so it must fall inside the timeline.
+    assert.ok(impact === -1 || (impact >= 0 && impact < frames), `${slug}'s impact (${impact}) is outside its ${frames} frames`);
+    for (const e of evs) {
+      events++;
+      assert.ok(e[1] >= 0 && e[1] <= frames, `${slug} starts an event at ${e[1]}, past its ${frames} frames`);
+      if (e[0] === "s") assert.ok(A_SPRITES[e[2]], `${slug} draws sprite ${e[2]}, which is not in SPRITES`);
+      if (e[0] === "g" || e[0] === "w") {
+        for (const b of e.slice(2)) assert.ok(b === -1 || A_BGS[b], `${slug} fades to background ${b}, which is not in BGS`);
+      }
+    }
+  }
+  /* THE DATA IS ITS OWN CHUNK: only the player loads it, and only lazily
+     (import()), so neither the main bundle nor the League page's first
+     paint waits on its 90KB. */
+  const walkA = (dir) => readdirSync(new URL(dir, import.meta.url), { withFileTypes: true })
+    .flatMap((e) => e.isDirectory() ? walkA(`${dir}${e.name}/`) : [`${dir}${e.name}`]);
+  for (const f of walkA("../src/").filter((f) => /\.(js|jsx)$/.test(f))) {
+    const rel = f.replace("../src/", "");
+    const src = stripComments(readFileSync(new URL(f, import.meta.url), "utf8"));
+    assert.ok(!/from\s+["'][^"']*data\/anims\.js["']/.test(src), `${rel} imports data/anims.js statically - only moveAnim.js loads it, with import()`);
+    if (/import\(\s*["'][^"']*data\/anims\.js["']/.test(src)) {
+      assert.equal(rel, "ui/league/moveAnim.js", `${rel} loads data/anims.js - only the League's player may`);
+    }
+  }
+  const gz = lGzip(readFileSync(new URL("../src/data/anims.js", import.meta.url))).length;
+  console.log(`move animations ok — ${choosable.length - empty.length}/${choosable.length} moves, ${events} events, ` +
+    `${A_SHEETS.length} sheets, ${A_BGS.length} backgrounds, ${Math.round(gz / 1000)}KB gzipped in their own chunk`);
+}
+
 /* ============================================================== THE BATTLE RULES
    Battles, phase 2 (docs/battles.md). `battle.js` is the rules, and
    tools/league-sim.mjs the model both the solver and this suite play against

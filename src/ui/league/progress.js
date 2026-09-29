@@ -3,9 +3,11 @@
    the engine enforces - so the page can never show a door the engine keeps
    shut; this file only adds the sentence that says what opens each one. */
 import { LEAGUES } from "../../data/leagues.js";
-import { isOpen, regionOpen, regionCleared, capOf, topOf, payFor, clockOf } from "../../game/league.js";
+import { isOpen, gymReached, regionOpen, regionCleared, capOf, topOf, payFor, clockOf } from "../../game/league.js";
 
 const won = (beaten, id) => Boolean(beaten?.[id]);
+// "Lass Kay"; a trainer the roster names only by class is just that.
+export const trainerName = (t) => (t.name === t.cls ? t.cls : `${t.cls} ${t.name}`);
 
 /* One region's standing: what is open, what is won, and - for anything shut -
    the sentence that says what opens it. */
@@ -14,11 +16,20 @@ export function standing(beaten = {}) {
     const prev = LEAGUES[ri - 1];
     const open = regionOpen(r.id, beaten);
     const badges = r.gyms.filter((g) => won(beaten, g.id)).length;
-    const gyms = r.gyms.map((g, k) => ({
-      open: isOpen(g.id, beaten), won: won(beaten, g.id),
-      why: !open ? `Opens once ${prev.name} is cleared.` : `Beat ${r.gyms[k - 1]?.name} first.`,
-      trainers: g.trainers.map((t) => ({ open: isOpen(t.id, beaten), won: won(beaten, t.id) })),
-    }));
+    const gyms = r.gyms.map((g, k) => {
+      const reached = gymReached(g.id, beaten);
+      const shut = !open ? `Opens once ${prev.name} is cleared.` : `Beat ${r.gyms[k - 1]?.name} first.`;
+      const left = g.trainers.filter((t) => !won(beaten, t.id)).length;
+      return {
+        open: isOpen(g.id, beaten), won: won(beaten, g.id), reached,
+        why: !reached ? shut : `Beat ${left === 1 ? "the last gym trainer" : `the ${left} gym trainers`} first.`,
+        // Each gym trainer after the one before it (the gym's path).
+        trainers: g.trainers.map((t, i) => ({
+          open: isOpen(t.id, beaten), won: won(beaten, t.id),
+          why: !reached ? shut : i > 0 ? `Beat ${trainerName(g.trainers[i - 1])} first.` : null,
+        })),
+      };
+    });
     const allBadges = badges === r.gyms.length;
     const league = r.league.map((p, k) => ({
       open: isOpen(p.id, beaten), won: won(beaten, p.id),

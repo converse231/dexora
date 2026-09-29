@@ -3074,7 +3074,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
 
   // Who may come: the engine's refusal, reason by reason, and nothing starts.
   {
-    const e = at();
+    const e = at(allOf(brock.trainers.map((t) => t.id)));
     assert.equal(begin(e, brock.id, [4]), "level", "a Pokemon over the cap was let into the battle");
     assert.equal(begin(e, brock.id, [5]), "legend", "a legendary over its share of the cap was let in");
     assert.equal(begin(e, brock.id, [6]), "locked", "a Pokemon locked in a trade was let into the battle");
@@ -3090,10 +3090,15 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(e.state.battle, null, "a refused battle was started anyway");
   }
 
-  // A leader waits for the one before; a first win pays once and gives the badge.
+  // A gym is walked through (rev 5): its trainers in the roster's order, then its
+  // leader; the next gym waits for this leader. A first win pays once and gives the badge.
   {
     const e = at();
-    assert.equal(begin(e, misty.id, [1]), "shut", "Misty opened before Brock was beaten");
+    assert.equal(begin(e, brock.id, [1]), "shut", "Brock opened before his gym trainers were beaten");
+    assert.equal(begin(e, misty.trainers[0].id, [1]), "shut", "Misty's gym opened before Brock was beaten");
+    const firstPay = win(e, brock.trainers[0].id).pay;
+    assert.equal(firstPay, Math.round(GYMTUNE[brock.id].prize * L.TRAINER_SHARE), "a gym trainer's first win did not pay a fifth of its leader");
+    for (const t of brock.trainers.slice(1)) win(e, t.id);
     const before = JSON.stringify({ box: e.state.box, xp: e.state.xp, candy: e.state.candy });
     const money = e.state.money;
     const was = e.state.beaten;
@@ -3106,11 +3111,13 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(JSON.stringify({ box: e.state.box, xp: e.state.xp, candy: e.state.candy }), before,
       "a battle changed a level, the XP or the candy - battles never give EXP");
     assert.deepEqual(e.state.team, [1], "the team taken was not remembered");
-    assert.equal(begin(e, misty.id, [1]), null, "Misty stayed shut after Brock was beaten");
+    assert.equal(begin(e, misty.id, [1]), "shut", "Misty opened before her gym trainers were beaten");
+    assert.equal(begin(e, misty.trainers[1].id, [1]), "shut", "a gym trainer opened before the one before it was beaten");
+    assert.equal(begin(e, misty.trainers[0].id, [1]), null, "Misty's first gym trainer stayed shut after Brock was beaten");
     // Losing, forfeiting or leaving pays and records nothing.
     const lost = e.battleEnd();
     assert.deepEqual(lost, { over: -1, pay: 0, first: false }, "a battle left unfinished paid");
-    assert.ok(!e.state.beaten[misty.id], "a battle left unfinished was recorded as a win");
+    assert.ok(!e.state.beaten[misty.trainers[0].id], "a battle left unfinished was recorded as a win");
 
     // A rematch at once pays nothing; the clock refills as you walk.
     const again = win(e, brock.id);
@@ -3126,17 +3133,25 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(win(e, brock.id).pay, Math.round(GYMTUNE[brock.id].prize * L.REMATCH_SHARE),
       "a rematch past its full clock paid other than the full rematch share");
 
-    // A gym trainer pays a fifth of its leader, once.
-    const t = brock.trainers[0].id;
-    assert.equal(win(e, t).pay, Math.round(GYMTUNE[brock.id].prize * L.TRAINER_SHARE));
+    // A gym trainer pays once (its first win, above), however long you wait.
     e.state.steps += REMATCH_STEPS * 2;
-    assert.equal(win(e, t).pay, 0, "a gym trainer paid twice");
+    assert.equal(win(e, brock.trainers[0].id).pay, 0, "a gym trainer paid twice");
+  }
+
+  // A win is never taken back: a save that beat Brock past his trainers (rev 3)
+  // keeps his rematch, and Misty's gym is reached on it.
+  {
+    const e = at(allOf([brock.id]));
+    assert.equal(begin(e, brock.id, [1]), null, "a leader beaten before rev 5 was shut again for its unbeaten trainers");
+    e.battleEnd();
+    assert.equal(begin(e, misty.trainers[0].id, [1]), null, "a gym was not reached on a leader beaten before rev 5");
+    e.battleEnd();
   }
 
   // The Elite Four waits for every badge, and each member for the one before.
   {
     const leaders = kanto.gyms.map((g) => g.id);
-    const e = at(allOf(leaders.slice(0, -1)));
+    const e = at(allOf([...leaders.slice(0, -1), ...kanto.gyms.at(-1).trainers.map((t) => t.id)]));
     assert.equal(begin(e, kanto.league[0].id, [1]), "shut", "the Elite Four opened one badge short");
     win(e, leaders.at(-1));
     assert.equal(begin(e, kanto.league[1].id, [1]), "shut", "the second member opened before the first was beaten");
@@ -3150,20 +3165,22 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     const all = everyone(kanto);
     const champ = kanto.league.at(-1).id;
     const trainer = kanto.gyms.at(-1).trainers[0].id;
+    // Johto's first door is its first gym's first trainer (a gym is walked through).
+    const door = johto.gyms[0].trainers[0]?.id ?? johto.gyms[0].id;
     const e1 = at(allOf(all.filter((id) => id !== trainer)));
-    assert.equal(begin(e1, johto.gyms[0].id, [1]), "shut", "Johto opened with a Kanto gym trainer unbeaten");
+    assert.equal(begin(e1, door, [1]), "shut", "Johto opened with a Kanto gym trainer unbeaten");
     const e = at(allOf(all.filter((id) => id !== champ)));
-    assert.equal(begin(e, johto.gyms[0].id, [1]), "shut", "Johto opened before Kanto's Champion was beaten");
+    assert.equal(begin(e, door, [1]), "shut", "Johto opened before Kanto's Champion was beaten");
     win(e, champ);
     assert.ok(L.regionCleared(kanto.id, e.state.beaten));
-    assert.equal(begin(e, johto.gyms[0].id, [1]), null, "Johto stayed shut once Kanto was cleared");
+    assert.equal(begin(e, door, [1]), null, "Johto stayed shut once Kanto was cleared");
     e.battleEnd();
   }
 
   // A reload mid-battle is a forfeit with nothing spent: no battle, no win, no money.
   {
     const e = at();
-    assert.equal(begin(e, brock.id, [1]), null);
+    assert.equal(begin(e, brock.trainers[0].id, [1]), null);
     e.buy("poke-ball", 1);                  // something to save
     e.saveNow();
     const saved = JSON.parse(store.get("meadow-route"));
@@ -3273,7 +3290,9 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   const brock = LEAGUES[0].gyms[0];
   const box = [{ uid: 1, species: 146, level: 5 }, { uid: 2, species: 16, level: 5 }];
   const play = (over) => {
-    const { e } = boot({ ...SAVE, box, nextUid: 3 });
+    // Brock's gym trainers beaten, so Brock is open (a gym is walked through).
+    const beaten = Object.fromEntries(brock.trainers.map((t) => [t.id, { wins: 1, at: 0 }]));
+    const { e } = boot({ ...SAVE, box, nextUid: 3, beaten });
     const b = newBattle([[fighter(146, 5, 1), fighter(16, 5, 2)], opponent(brock.party, topOf(brock.id, {}), (k) => k + 1)], [null, 2]);
     assert.equal(e.battleBegin(b, { id: brock.id, uids: [1, 2] }), null, "the battle was refused");
     e.battleStep({ ...b, over });

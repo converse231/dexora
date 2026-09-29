@@ -262,7 +262,10 @@ session, remembered).
   its gone members left out). The species clause is the rules' (the
   database cannot see the dex's forms); 6b's function re-checks it.
 - **The Ranked tab**, first in the League's strip: three team slots edited
-  with the League's picker (one of each species, through `kin`), and
+  with the League's picker (one of each species, through `kin`) and its
+  **Suggest a team**: the Box's strongest species by base stat total, one of
+  each, no two sharing a primary type while the Box allows, nothing in a
+  trade - the format sets every level, so the species is all that decides; and
   **practice** against a friend's teams - blind, ranked's format, the CPU at
   AI 3, no Bag, nothing handed to the engine. "Another team" draws again.
 - **The friend's trainer** is drawn from Showdown's FireRed/LeafGreen art
