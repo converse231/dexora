@@ -547,6 +547,48 @@ for (let i = 0; i < want.length; i += 8) {
   out.push(...got.filter(Boolean));
   process.stdout.write(`\rfetched ${out.length}/${want.length}`);
 }
+
+/* ARCEUS'S PLATES ARE FORMS POKEAPI NEVER MADE A POKEMON OF. They are
+   `pokemon-form` rows under the one `arceus` variety, so the list above never
+   saw them, and reported as missing: Arceus is meant to be met in every type.
+
+   THEIR IDS ARE OURS. A pokemon-form id shares no namespace with a pokemon
+   id - Bug Arceus is form 10041, and pokemon 10041 is Mega Gyarados, already
+   shipped. So a plate is `PLATE_BASE` + its form id (19041), clear of every
+   variety PokeAPI has and under trading.sql's `species between 1 and 20000`.
+
+   The ??? plate is dropped because nothing could hold it: `unknown` is not a
+   type in the chart, and a legendary with no map sharing its type has no home.
+   Stats and size are Arceus's own - a plate changes the type and nothing else. */
+const PLATE_BASE = 9000;
+const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix"];
+{
+  const { TYPES } = await import("../src/data/types.js");
+  const base = byName.get("arceus");
+  const pk = await fetch(`${API}/pokemon/arceus`).then((r) => r.json());
+  for (const { url } of pk.forms) {
+    const form = await fetch(url).then((r) => r.json());
+    const types = form.types.map((t) => t.type.name);
+    if (form.is_default || !types.every((t) => TYPES.includes(t))) continue;
+    const vg = await fetch(form.version_group.url).then((r) => r.json());
+    const png = await fetch(form.sprites.front_default);
+    if (!png.ok) continue;
+    const id = PLATE_BASE + form.id;
+    const art = Buffer.from(await png.arrayBuffer());
+    await writeFile(`public/sprites/${id}.png`, art);
+    const shiny = form.sprites.front_shiny && await fetch(form.sprites.front_shiny);
+    if (shiny?.ok) await writeFile(`public/sprites/shiny/${id}.png`, Buffer.from(await shiny.arrayBuffer()));
+    const word = types[0][0].toUpperCase() + types[0].slice(1);
+    out.push({
+      id, name: form.name, types, rate: base.rate, tier: base.tier, from: base.name,
+      form: "variant", of: base.id, legendary: !!base.legendary, genus: "Form",
+      flavor: base.flavor, shape: base.shape, height: pk.height, weight: pk.weight,
+      stats: base.stats, art: createHash("md5").update(art).digest("hex"),
+      wave: waveOf(form.name), title: `Arceus (${word} Type)`,
+      gen: ROMAN.indexOf(vg.generation.name.replace("generation-", "")) + 1, wild: true,
+    });
+  }
+}
 /* MADE FIRST, MET SECOND - AND THAT ORDER IS A SAVE MIGRATION AVOIDED.
 
    Every save is keyed on POSITION in `SPECIES`, and `SPECIES` is the National
