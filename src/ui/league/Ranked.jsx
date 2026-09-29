@@ -17,11 +17,12 @@ import { variantOf } from "../../game/items.js";
 import { flushNow } from "../../game/store.js";
 import { TEAM_MAX } from "../../game/league.js";
 import {
-  baseOf, teamProblem, rankOf, peakRank, seasonName, seasonEnd, CHAR_PIC, DEFENSE_SLOTS, DEFENSE_MIN, RANKED_LEVEL, PLACEMENT, TEAM_NAME,
+  baseOf, teamProblem, rankOf, peakRank, seasonName, seasonEnd, CHAR_PIC, DEFENSE_SLOTS, DEFENSE_MIN, RANKED_LEVEL, PLACEMENT, TEAM_NAME, RANKS,
 } from "../../game/ranked.js";
 import { push, myDefense, setDefenseTeam, practiceTeam, myFriends, rankedStep, myRanked } from "../../net/cloud.js";
 import Sprite from "../Sprite.jsx";
 import { RankMedal } from "../RankBadge.jsx";
+import RankUp from "../RankUp.jsx";
 import { Standings, DefenseLog } from "./Standings.jsx";
 import Picker, { keyOf } from "../trade/Picker.jsx";
 
@@ -140,6 +141,7 @@ const readTab = () => { try { return localStorage.getItem(TAB_KEY) ?? "teams"; }
 /* YOUR STANDING, as the tab's head: the rank with your past seasons' badges
    on its line (the League's badge case, same shape), and one line of numbers. */
 function Standing({ me }) {
+  const [replay, setReplay] = useState(false);
   if (!me) {
     return (
       <section className="lg-hero rk-hero">
@@ -155,16 +157,26 @@ function Standing({ me }) {
       <span className="lg-kicker">Ranked · {seasonName(me.season)} · ends in {days} day{days === 1 ? "" : "s"}</span>
       <div className="lg-hero-title">
         <h2 className="rk-title">
-          {r.id !== "beginner" && <RankMedal id={r.id} />}
-          {r.name}{r.division ? ` ${r.division}` : ""}
+          {r.id !== "beginner" ? (
+            // Your rank replays its ceremony (RankUp.jsx).
+            <button type="button" className="rk-replay" onClick={() => setReplay(true)} data-tip="Replay your rank-up">
+              <RankMedal set="battle" id={r.id} color={r.color} />
+              {r.name}{r.division ? ` ${r.division}` : ""}
+            </button>
+          ) : r.name}
         </h2>
+        {replay && (
+          <RankUp set="battle" ranks={RANKS} from={r.step > 0 ? r.step - 1 : null} to={r.step}
+            kicker="Your rank" detail={`Rating ${me.rating.toLocaleString("en-US")}${r.division ? ` · ${r.name} ${r.division}` : ""}`}
+            onDone={() => setReplay(false)} />
+        )}
         {me.badges.length > 0 && (
           <ol className="lg-case" aria-label="Season badges">
             {me.badges.map((b) => {
               const p = peakRank(b.peak);
               return (
                 <li key={b.season} className="won" data-tip={`${seasonName(b.season)}: ${p.name}${p.division ? ` ${p.division}` : ""}`}>
-                  <RankMedal id={p.id} label={`${seasonName(b.season)}: ${p.name}`} />
+                  <RankMedal set="battle" id={p.id} color={p.color} label={`${seasonName(b.season)}: ${p.name}`} />
                 </li>
               );
             })}

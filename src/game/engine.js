@@ -36,7 +36,7 @@ import { isOpen, refusal, capOf, payFor, teamSize, rematchesReady, cleanBeaten, 
 import { defenders, defendNote } from "./ranked.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
-import { medalsFor, milestoneAt } from "./medals.js";
+import { medalsFor, milestoneAt, dexRank, rankLine } from "./medals.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE,
   evolveState, evoLevel, startingState, dexBonus, catchBounty, levelReward,
@@ -1876,6 +1876,22 @@ export function createEngine(canvas, onChange, mini = null) {
   };
   const caughtSpecies = () => ownDex().reduce((n, v) => n + (v === 2 ? 1 : 0), 0);
 
+  /* A SPECIES REGISTERS HERE, every way one can (a catch, an evolution, a
+     trade), so the Pokédex rank is announced whichever way the count moved.
+     The rank reads the Pokédex as shown - trades included, as the trainer
+     card counts it - since it is a title and pays nothing. */
+  function register(at) {
+    if (state.dex[at] === 2) return;
+    const before = dexRank(state.dex.reduce((n, v) => n + (v === 2 ? 1 : 0), 0));
+    state.dex[at] = 2;
+    const now = dexRank(state.dex.reduce((n, v) => n + (v === 2 ? 1 : 0), 0));
+    if (now.step > before.step) {
+      // Played as the rank-up ceremony (RankUp.jsx), never the banner.
+      cheer({ kind: "rank", title: now.name.toUpperCase(), rank: now.id, step: now.step, from: before.step,
+        sub: rankLine(now.at) });
+    }
+  }
+
   function checkDexRewards(speciesId) {
     for (const medal of medalsFor(speciesId, ownDex(), state.medals)) {
       state.medals.push(medal.id);
@@ -2021,7 +2037,7 @@ export function createEngine(canvas, onChange, mini = null) {
          species for every reward, and the gift mark goes. */
       e.isNew = state.dex[at] !== 2 || state.gifted.includes(e.speciesId);
       state.gifted = state.gifted.filter((id) => id !== e.speciesId);
-      state.dex[at] = 2;
+      register(at);
       noteDaily({ species: speciesById(e.speciesId) });
       state.caught++;
       /* A first shiny - or a first Astral - of a species is its own event, even
@@ -2320,6 +2336,17 @@ export function createEngine(canvas, onChange, mini = null) {
   const STALL = 400;
   let lastFrame = performance.now();
   let battleSince = null;
+  /* WHAT THE CANVAS LAST SHOWED, as a key: a still scene is not drawn again.
+     Measured 2026-09-29, standing still: the redraw every frame was half the
+     main thread's idle load (18% on a desktop, 59% on a 4x-throttled phone,
+     with the CSS animations). Nothing on the map moves by the clock - tiles
+     have no animation - so only these can change the picture: a step in
+     progress, a rustle or a cast playing out (redrawn every frame while they
+     last), a battle fading in, and what the key holds - the state's `rev`
+     (every scene change bumps it), where he stands and faces (a turn into a
+     wall moves no rev), the view's width (a resize clears the canvas) and the
+     art arriving. */
+  let drawnKey = "";
   const BATTLE_FADE = 400;        // `.battle`'s own 300ms fade-in, and a margin
   /* Every live deadline, pushed forward by a gap the clock ran on without us:
      a stall, or the League page covering the game. A new timer joins here. */
@@ -2385,7 +2412,14 @@ export function createEngine(canvas, onChange, mini = null) {
        was a full redraw every frame for nothing: the largest cost left in a
        catch once the collection panels stopped rebuilding per phase. */
     if (state.encounter) battleSince ??= now; else battleSince = null;
-    if (battleSince === null || now - battleSince < BATTLE_FADE) render(now);
+    if (battleSince === null || now - battleSince < BATTLE_FADE) {
+      const p = state.player;
+      const key = `${state.rev}|${p.x},${p.y},${p.dir}|${viewW}|${!!art.atlas}${!!art.player}|${state.running}`;
+      if (key !== drawnKey || move.active || grassFx.length || state.fishing || battleSince !== null) {
+        render(now);
+        drawnKey = key;
+      }
+    }
     raf = requestAnimationFrame(frame);
   }
   /* ---- a hidden tab pauses, it does not fast-forward -------------------
@@ -2475,7 +2509,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const isNew = !gift && (state.dex[at] !== 2 || state.gifted.includes(targetId));
     if (gift && state.dex[at] !== 2) state.gifted.push(targetId);
     if (!gift) state.gifted = state.gifted.filter((id) => id !== targetId);
-    state.dex[at] = 2;
+    register(at);
     /* NO `state.caught++` HERE, and it used to be. That counter renders in the
        top bar under the word CAUGHT, where it means throws that landed - and
        an evolution is not a throw. It was incremented unconditionally, so it
@@ -2729,7 +2763,7 @@ export function createEngine(canvas, onChange, mini = null) {
       // It fills the Pokedex - as a gift, which no reward counts.
       const at = dexIndex(sp.id);
       if (state.dex[at] !== 2) {
-        state.dex[at] = 2;
+        register(at);
         if (!state.gifted.includes(sp.id)) state.gifted.push(sp.id);
       }
       study(sp.id, ["trade"]);

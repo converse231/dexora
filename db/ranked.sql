@@ -238,10 +238,11 @@ returns text language sql stable set search_path = '' as $$
 $$;
 
 -- THE FLOOR: the rank of a season's peak (ranked.js RANKS, asserted) - the
--- Dex careers' lower edges since 2026-09-29 (the Ball tiers' 1100/1250/1400 before).
+-- eight ranks' lower edges since 2026-09-29 (the Ball tiers' 1100/1250/1400 before).
 create or replace function public.ranked_floor(peak int)
 returns int language sql immutable set search_path = '' as $$
-  select case when peak >= 1400 then 1400 when peak >= 1250 then 1250 when peak >= 1150 then 1150
+  select case when peak >= 1400 then 1400 when peak >= 1325 then 1325 when peak >= 1250 then 1250
+              when peak >= 1200 then 1200 when peak >= 1150 then 1150 when peak >= 1100 then 1100
               when peak >= 1050 then 1050 end
 $$;
 

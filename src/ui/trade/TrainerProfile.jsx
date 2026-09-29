@@ -13,6 +13,7 @@ import { LIMITS, REPORT_REASONS } from "../../game/trade.js";
 import Sprite, { TrainerArt } from "../Sprite.jsx";
 import Mark from "../Marks.jsx";
 import RankBadge, { RankMedal } from "../RankBadge.jsx";
+import { dexRank } from "../../game/medals.js";
 import { peakRank, seasonName } from "../../game/ranked.js";
 import { rankedStanding } from "../../net/cloud.js";
 
@@ -34,7 +35,7 @@ function Ranked({ who }) {
         const p = peakRank(b.peak);
         return (
           <span key={b.season} data-tip={`${seasonName(b.season)}: ${p.name}${p.division ? ` ${p.division}` : ""}`}>
-            <RankMedal id={p.id} label={`${seasonName(b.season)}: ${p.name}`} />
+            <RankMedal set="battle" id={p.id} color={p.color} label={`${seasonName(b.season)}: ${p.name}`} />
           </span>
         );
       })}
@@ -230,6 +231,11 @@ export default function TrainerProfile({
         <div className="tp-id">
           <h4>{card.username}</h4>
           <span>Lv {level} trainer · since {joined(card.joined_at)}</span>
+          {/* Their Pokédex rank, off the count the card already carries. */}
+          <span className="tp-title">
+            <RankMedal set="dex" id={dexRank(card.dex_count).id} color={dexRank(card.dex_count).color} />
+            {dexRank(card.dex_count).name}
+          </span>
           {self && <FriendCode code={card.friend_code} />}
         </div>
       </header>

@@ -64,7 +64,7 @@ function readyToEvolve(box, bag) {
 
 export default function Rail({
   state, caught, level, busy,
-  onSelect, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
+  onSelect, onRank, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
   onTravel, onSpend, save, account, jumpTo, onJumped, outbreakArea,
 }) {
   const [tab, setTab] = useState("dex");
@@ -148,6 +148,7 @@ export default function Rail({
              See `colRev` in engine.js. */
           colRev={state?.colRev}
           onSelect={onSelect}
+          onRank={onRank}
         />
       ))}
       {pane("box", (

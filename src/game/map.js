@@ -143,10 +143,30 @@ export const walkable = (rows, x, y) =>
   y >= 0 && y < rows.length && x >= 0 && x < rows[0].length &&
   !SOLID.includes(rows[y][x]);
 
+/* EVERY SPECIES WHOSE SLUG HAS A HYPHEN IS NAMED HERE, or is one of the three
+   whose real name is a hyphen and a lower-case letter (Jangmo-o's line).
+   Capitalising the slug alone gave "Ho-oh", "Mime-jr", "Type-null",
+   "Tapu-koko", "Iron-bundle" and "Chi-yu" - 36 of them, in the Dex, the
+   encounter, the outbreak card and every trade (found 2026-09-29).
+   check.mjs holds every hyphenated slug to this list. */
 const NAME_FIX = {
   "nidoran-f": "Nidoran\u2640", "nidoran-m": "Nidoran\u2642",
-  "mr-mime": "Mr. Mime", farfetchd: "Farfetch'd",
+  "mr-mime": "Mr. Mime", farfetchd: "Farfetch'd", sirfetchd: "Sirfetch'd", flabebe: "Flab\u00e9b\u00e9",
+  "ho-oh": "Ho-Oh", "mime-jr": "Mime Jr.", "porygon-z": "Porygon-Z", "type-null": "Type: Null",
+  "tapu-koko": "Tapu Koko", "tapu-lele": "Tapu Lele", "tapu-bulu": "Tapu Bulu", "tapu-fini": "Tapu Fini",
+  "mr-rime": "Mr. Rime",
+  "great-tusk": "Great Tusk", "scream-tail": "Scream Tail", "brute-bonnet": "Brute Bonnet",
+  "flutter-mane": "Flutter Mane", "slither-wing": "Slither Wing", "sandy-shocks": "Sandy Shocks",
+  "roaring-moon": "Roaring Moon", "walking-wake": "Walking Wake", "gouging-fire": "Gouging Fire",
+  "raging-bolt": "Raging Bolt",
+  "iron-treads": "Iron Treads", "iron-bundle": "Iron Bundle", "iron-hands": "Iron Hands",
+  "iron-jugulis": "Iron Jugulis", "iron-moth": "Iron Moth", "iron-thorns": "Iron Thorns",
+  "iron-valiant": "Iron Valiant", "iron-leaves": "Iron Leaves", "iron-boulder": "Iron Boulder",
+  "iron-crown": "Iron Crown",
+  "wo-chien": "Wo-Chien", "chien-pao": "Chien-Pao", "ting-lu": "Ting-Lu", "chi-yu": "Chi-Yu",
 };
+// Real names that ARE the slug capitalised: the hyphen and a lower-case o.
+export const HYPHEN_NAMES = ["jangmo-o", "hakamo-o", "kommo-o"];
 const cap = (w) => w[0].toUpperCase() + w.slice(1);
 
 /* A FORM IS NAMED THE WAY THE GAMES NAME IT, not the way PokeAPI keys it.

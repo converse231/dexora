@@ -16,7 +16,7 @@ the build, the way docs/battles.md's were.
 |---|---|---|
 | Battles | **The challenger plays live against a CPU ghost**: the defender is not there, their team is played by AI 3, and the challenger picks every move as in the League. *(rev 3: rev 2 read "auto battle" as AI against AI; you meant live against the CPU.)* **Real-time person against person is parked** (*Deferred*). | The server steps every turn: about 20 calls a battle (measured, a mean of 17 turns). |
 | Format | **Flat Lv 100, no bans** (species clause kept, see *Format*) | Measured, AI 3 against AI 3 at Lv 100: the six biggest stat totals (Eternamax, Mega Mewtwo X, Mega Rayquaza, Primal Kyogre and Groudon, Ultra Necrozma) beat random teams **100%**; the six best non-legendaries (all Megas) **99%**; the first beats the second **99%** - but two legendaries and four Megas beat the six legendaries **49%**. So the ladder rewards owning strong Pokémon (legendaries caught, Megas raised to Lv 100) and, among strong teams, guessing the match-up. It measures the collection, which is this game's progress. |
-| Rank names | **Beginner, then the Dex careers: Scout, Ranger, Researcher, Professor, Legend** *(2026-09-29; Poké Ball to Master Ball before - you asked for a concept of the game's own)* | A Pokédex game's career ladder, echoing research. Five ranks where there were four, so the bands are re-cut with Legend at Master Ball's old edge (1400): the top stays the top ~5%, and the new rank splits the crowded middle. |
+| Rank names | **Beginner, then Challenger, Contender, Rival, Vanguard, Elite, Master, Champion, Sovereign** *(2026-09-29, your list; Poké Ball to Master Ball first, then the Dex careers for a day - which moved to catching as the Pokédex rank, README *Pokédex*)* | Eight ranks where there were four, so the bands are 50 points wide from 1050 and Sovereign keeps the old top's edge (1400): the top stays the top ~5%, and the best League anchor (~1350) is a Champion. |
 | Global top list | **Yes**, from season 1 | The one place a forged save would want to be - see *Moderation*. |
 | Rewards | **Cosmetic only** | |
 | Season | **One month** | |
@@ -110,17 +110,21 @@ moderation (below) and the Help page says so plainly.
 | Rank | Rating (*provisional*) | Divisions |
 |---|---|---|
 | **Beginner** | the 5 placement battles | - |
-| **Scout** | below 1050 | III, II, I |
-| **Ranger** | 1050 - 1149 | III, II, I |
-| **Researcher** | 1150 - 1249 | III, II, I |
-| **Professor** | 1250 - 1399 | III, II, I |
-| **Legend** | 1400 + | the rating, shown ("Legend · 1,532") |
+| **Challenger** | below 1050 | III, II, I |
+| **Contender** | 1050 - 1099 | III, II, I |
+| **Rival** | 1100 - 1149 | III, II, I |
+| **Vanguard** | 1150 - 1199 | III, II, I |
+| **Elite** | 1200 - 1249 | III, II, I |
+| **Master** | 1250 - 1324 | III, II, I |
+| **Champion** | 1325 - 1399 | III, II, I |
+| **Sovereign** | 1400 + | the rating, shown ("Sovereign · 1,532") |
 
-Bands are fixed for season 1 and re-cut from its distribution (aim: Legend
-the top ~5%). *(2026-09-29: the Ball tiers were Poké below 1100, Great 1100,
-Ultra 1250, Master 1400; the careers keep 1250 and 1400 and split the bottom
-two at 1050 and 1150, since everyone starts at 1000 and Scout would otherwise
-hold most of the ladder.)*
+Bands are fixed for season 1 and re-cut from its distribution (aim:
+Sovereign the top ~5%). *(2026-09-29: the Ball tiers were Poké below 1100,
+Great 1100, Ultra 1250, Master 1400. Eight ranks keep 1250 and 1400 and cut
+the middle in 50s, since everyone starts at 1000 and a wide bottom band
+would hold most of the ladder; Champion is 75 wide, where the anchors thin
+out.)*
 
 ## Matchmaking
 
@@ -157,7 +161,7 @@ hold most of the ladder.)*
 ## Rewards
 
 Cosmetic only: the rank emblem on your trainer card, the season badge, a
-card border for Legend, and the list. No money, candy, items or EXP -
+card border for Sovereign, and the list. No money, candy, items or EXP -
 every income stream is held under a ceiling by a guard, and ranked pay would
 be farmable with a second account.
 
@@ -214,16 +218,22 @@ does.
 
 | Path | Size | Prompt |
 |---|---|---|
-| `public/ranks/scout.png` | 48×48 | Rank emblem, the first of a matching set of five career badges for a Pokédex researcher: a round bronze medal showing a small pair of binoculars, a short brown ribbon below. Humble, simple shapes. Readable at 24px. |
-| `public/ranks/ranger.png` | 48×48 | Rank emblem, second of the set: the same round medal in forest green with a white leaf-and-compass mark at its centre, a green ribbon below. Readable at 24px. |
-| `public/ranks/researcher.png` | 48×48 | Rank emblem, third of the set: the same medal in sky blue with a white open field notebook and a magnifying glass over it, a blue ribbon below. Readable at 24px. |
-| `public/ranks/professor.png` | 48×48 | Rank emblem, fourth of the set: the medal in deep purple with a white lab-coat collar and a small red-and-white Pokédex at its centre, two silver laurel sprigs. Readable at 24px. |
-| `public/ranks/legend.png` | 48×48 | Rank emblem, the highest of the set: the medal in gold with a white eight-point star, gold laurels round it and a small crown on top, a two-pixel sparkle at one corner. Readable at 24px. |
+| `art/ranks/battle/challenger.png` | 48×48 | Rank emblem 1 of a matching set of 8 battle ranks, all the same heater-shield silhouette: a plain bronze shield with one small white sword standing upright in its centre. Humble and simple. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/battle/contender.png` | 48×48 | Rank emblem 2 of a matching set of 8 battle ranks, the same heater-shield silhouette: a steel-grey shield with two small white swords crossed in its centre. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/battle/rival.png` | 48×48 | Rank emblem 3 of a matching set of 8 battle ranks, the same heater-shield silhouette: a red shield split diagonally, with two white lightning-bolt slashes meeting in its centre like a clash. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/battle/vanguard.png` | 48×48 | Rank emblem 4 of a matching set of 8 battle ranks, the same heater-shield silhouette: a teal shield with a white upward spearhead in its centre and a small white wing on each side of the shield. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/battle/elite.png` | 48×48 | Rank emblem 5 of a matching set of 8 battle ranks, the same heater-shield silhouette: a royal-blue shield with a silver rim and a white four-point star in its centre, two small silver laurel sprigs under the shield. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/battle/master.png` | 48×48 | Rank emblem 6 of a matching set of 8 battle ranks, the same heater-shield silhouette: a deep purple shield with a gold rim and a round violet gem set in gold in its centre, gold laurel sprigs under the shield. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/battle/champion.png` | 48×48 | Rank emblem 7 of a matching set of 8 battle ranks, the same heater-shield silhouette: a gold shield with a small white trophy cup in its centre and a red ribbon banner draped across the bottom of the shield. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
+| `art/ranks/battle/sovereign.png` | 48×48 | Rank emblem 8, the highest of a matching set of 8 battle ranks, the same heater-shield silhouette: a white-and-gold shield with a gold crown on top, a glowing cyan gem in its centre, short gold sunburst rays behind the shield and a two-pixel sparkle at one corner. Regal but not busy. GBA-era Pokémon pixel art, 48×48 pixels, transparent background, crisp 1px dark outline, at most 8 colours, no text or letters, no anti-aliasing, centred, readable when shown at 24px. |
 | `public/icons/ranked.png` | 32×32 | Tab icon: two crossed swords over a small shield, silver and red on transparent, bold 1px outline, readable at 16px. |
 
-Divisions (III, II, I), the season number and Legend's rating are CSS on the
-emblem - no art. When these land, `RankMedal` (RankBadge.jsx) draws the file
-in place of the coloured disc - one line.
+Divisions (III, II, I), the season number and Sovereign's rating are CSS on
+the emblem - no art. The originals (drawn 2026-09-29) live in
+`art/ranks/battle/`; `npm run ranks` builds the 192px files the game ships in
+`public/ranks/battle/`, and `RankMedal` (RankBadge.jsx) draws those, or a disc
+in the rank's `color` if one is missing (one failed request per emblem a
+session, remembered).
 
 ## Status
 
@@ -347,12 +357,11 @@ bug put back. **Not done here:** deploying - SUPABASE.md §3f.
   of a season starts them halfway between their last season's rating and
   1000 - lazily, no scheduled reset. **Placement is per season**: 5 battles
   at K 40, shown as Beginner, then K 20; the defender moves at half their K.
-- **Floors** are the rank of your season's peak rating: Ranger 1050,
-  Researcher 1150, Professor 1250, Legend 1400 (the bands' lower edges).
-  Scout has none.
-- **Divisions**: Scout III/II/I split 1000-1049 in 17-point steps (below
-  1000 is III); Ranger and Researcher in 33-point steps, Professor in 50;
-  Legend shows the rating.
+- **Floors** are the rank of your season's peak rating: every band's lower
+  edge (1050, 1100, 1150, 1200, 1250, 1325, 1400). Challenger has none.
+- **Divisions**: III/II/I split each 50-point band in 17-point steps
+  (Challenger's is 1000-1049; below 1000 is III), Champion's 75 in 25s;
+  Sovereign shows the rating.
 - **The window** is +-100, widened by 50 up to +-400 within one request.
   Nobody human inside it: the nearest **League anchor** not met in 24 hours.
 - **The anchors** are every region's Elite Four and Champion in the ranked
@@ -366,10 +375,14 @@ bug put back. **Not done here:** deploying - SUPABASE.md §3f.
 - **The top list** is the current season's top 100 trainers past placement
   and not voided; a defense team's Pokemon show there once it has defended 10
   times. Past seasons keep their top 10.
-- **The rank icon** is a plain medal in the career's colour (CSS, no
-  request) until the emblems under *Art* are drawn - no invented pictures.
-  Beginner shows words only. *(It was the Ball's item sprite while the ranks
-  were Balls.)*
+- **A promotion is a ceremony** *(2026-09-29)*: when a battle's result
+  (`ranked_outcome`) crosses into a new rank - or ends placement - the
+  result card plays the rank-up scene over itself (`promotion()` in
+  ranked.js; README *The rank-up ceremony*). A new division is not one.
+  Your rank on the Ranked tab replays it.
+- **The rank icon** is the emblem under *Art* once drawn, a plain disc in
+  the rank's colour until then - no invented pictures. Beginner shows words
+  only. *(It was the Ball's item sprite while the ranks were Balls.)*
 - **On a trainer's profile** the rank comes from `ranked_standing(who)`, not
   from `trainer_cards` columns: the card's column grants belong to
   trading.sql, which must not name a column ranked.sql creates.

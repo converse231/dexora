@@ -161,3 +161,34 @@ export const MILESTONES = [
 ];
 
 export const milestoneAt = (n) => MILESTONES.find((m) => m.at === n) ?? null;
+
+/* THE POKÉDEX RANK (README *Pokédex*, 2026-09-29): a title for how much of the
+   dex is caught, read off the count the trainer card shows, so yours and the
+   one on your profile are one number. SHARES of the dex, never counts - a
+   new generation moves every step with it, as the last milestone learned -
+   and the last is the whole dex. Measured then: one playthrough catches ~578
+   of 1,303 walking (~973 evolving everything), four ~1,182. A title, never
+   a reward: nothing here pays. */
+// `color` is the emblem's own (public/ranks/dex), for its stand-in disc and the rank-up glow.
+export const DEX_RANKS = [
+  ["field-intern", "Field Intern", 0, "#b07a4a"],
+  ["researcher", "Researcher", 0.03, "#c9773f"],
+  ["senior-researcher", "Senior Researcher", 0.1, "#a9b3bd"],
+  ["specialist", "Specialist", 0.2, "#3f9a55"],
+  ["professor", "Professor", 0.35, "#4a9ad4"],
+  ["expedition-leader", "Expedition Leader", 0.5, "#7a4bc4"],
+  ["grand-scholar", "Grand Scholar", 0.75, "#e4b53c"],
+  ["pokedex-master", "Pokédex Master", 1, "#f3d56b"],
+].map(([id, name, share, color], step) => ({ id, name, step, color, at: Math.ceil(share * SPECIES.length) }));
+
+// Your rank for a caught count, the next one and how many species away it is.
+export function dexRank(caught) {
+  const r = DEX_RANKS.findLast((x) => (caught ?? 0) >= x.at);
+  const next = DEX_RANKS[r.step + 1] ?? null;
+  return { ...r, next, left: next ? next.at - caught : 0 };
+}
+// The line under a rank, on the ceremony: where you are and what is next.
+export const rankLine = (caught) => {
+  const r = dexRank(caught);
+  return r.next ? `${caught} species · ${r.left} more to ${r.next.name}` : "Every entry in the Pokédex";
+};

@@ -29,26 +29,43 @@ export const CHAR_PIC = { red: "red-gen3", leaf: "leaf-gen3" };
    (`ranked_floor`, asserted equal); `steps` split a tier into III, II, I. */
 export const PLACEMENT = 5;        // battles a season before a rank shows (K 40 meanwhile)
 export const DAILY_BATTLES = 20;   // a challenger's battles a UTC day, anchors included
-/* The Dex careers (2026-09-29; the Ball tiers before - docs/ranked.md). Five
-   where there were four: Legend sits at Master Ball's old edge, and the
-   bottom two split at 1050 and 1150 because everybody starts at 1000. */
+/* Eight ranks (2026-09-29, your names; the Ball tiers before - docs/ranked.md).
+   Sovereign keeps the old top's edge, 1400; the middle is cut in 50s because
+   everybody starts at 1000, and Champion is 75 wide where the anchors thin. */
+// `color` is the emblem's own (public/ranks/battle), for its stand-in disc and the rank-up glow.
 export const RANKS = [
-  { id: "scout", name: "Scout", from: -Infinity, steps: [1017, 1034] },
-  { id: "ranger", name: "Ranger", from: 1050, steps: [1083, 1116] },
-  { id: "researcher", name: "Researcher", from: 1150, steps: [1183, 1216] },
-  { id: "professor", name: "Professor", from: 1250, steps: [1300, 1350] },
-  { id: "legend", name: "Legend", from: 1400, steps: [] },
+  { id: "challenger", name: "Challenger", from: -Infinity, steps: [1017, 1034], color: "#c0803f" },
+  { id: "contender", name: "Contender", from: 1050, steps: [1067, 1084], color: "#9aa5b1" },
+  { id: "rival", name: "Rival", from: 1100, steps: [1117, 1134], color: "#d8413f" },
+  { id: "vanguard", name: "Vanguard", from: 1150, steps: [1167, 1184], color: "#2fa9ad" },
+  { id: "elite", name: "Elite", from: 1200, steps: [1217, 1234], color: "#3563cf" },
+  { id: "master", name: "Master", from: 1250, steps: [1267, 1284], color: "#7b3fd0" },
+  { id: "champion", name: "Champion", from: 1325, steps: [1350, 1375], color: "#e5a92b" },
+  { id: "sovereign", name: "Sovereign", from: 1400, steps: [], color: "#f2dc8c" },
 ];
 // The top rank shows the rating in place of a division.
 export const TOP_RANK = RANKS.at(-1).id;
 const DIVISIONS = ["III", "II", "I"];
 
-/* A standing in words: Beginner through placement, then the rank and its
-   division (III lowest) - Legend shows the rating instead. */
+/* A standing in words: Beginner through placement, then the rank, its step
+   on the ladder (the medal's colour) and its division (III lowest) - the top
+   rank shows the rating instead. */
 export function rankOf(rating, games) {
-  if (games < PLACEMENT) return { id: "beginner", name: "Beginner", division: null, left: PLACEMENT - games };
+  if (games < PLACEMENT) return { id: "beginner", name: "Beginner", step: null, division: null, left: PLACEMENT - games };
   const r = RANKS.findLast((x) => rating >= x.from);
-  return { id: r.id, name: r.name, division: r.steps.length ? DIVISIONS[r.steps.filter((x) => rating >= x).length] : null };
+  return { id: r.id, name: r.name, step: RANKS.indexOf(r), color: r.color,
+    division: r.steps.length ? DIVISIONS[r.steps.filter((x) => rating >= x).length] : null };
+}
+/* A PROMOTION, read off what the server said a finished battle did
+   (`ranked_outcome`: the rating and games after, and the delta): the step
+   left and the step reached, or null when the rank did not climb. Leaving
+   placement is one (`from` null). A new division is not - the ceremony is
+   for a new rank. */
+export function promotion({ rating, games, delta }) {
+  const was = rankOf(rating - delta, games - 1);
+  const now = rankOf(rating, games);
+  if (now.step == null || (was.step != null && now.step <= was.step)) return null;
+  return { from: was.step, to: now.step };
 }
 // The rank a season's peak reached - a season badge.
 export const peakRank = (peak) => rankOf(peak, PLACEMENT);

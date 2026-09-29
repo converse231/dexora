@@ -27,6 +27,20 @@ const pixel = new FontFace("Pixel",
 document.fonts.add(pixel);
 pixel.load().catch(() => {});   // a failed load falls back to --pixel's next face
 
+/* THE TWO TEXT FACES, SELF-HOSTED (2026-09-29). They were a Google Fonts
+   stylesheet: a render-blocking request to a third origin and then a second
+   origin for the files, before the first paint - and a game that is fully
+   playable offline lost its headings to the fallback there. Each is one
+   variable woff2 (Latin, SIL OFL - public/fonts/OFL.txt), preloaded by
+   index.html, registered here as the pixel face is, for the same reason: a
+   url() in styles.css would resolve against the built stylesheet. */
+for (const [family, file, weight] of [["Fredoka", "fredoka", "300 700"], ["Nunito Sans", "nunito-sans", "200 1000"]]) {
+  const face = new FontFace(family, `url(${new URL(`fonts/${file}.woff2`, document.baseURI).href})`,
+    { weight, display: "swap" });
+  document.fonts.add(face);
+  face.load().catch(() => {});   // a failed load keeps the next face in --display / --body
+}
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <Boot />

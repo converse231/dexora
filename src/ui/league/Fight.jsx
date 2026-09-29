@@ -20,6 +20,8 @@ import { label } from "../../game/map.js";
 import { useModalLock } from "../modal.js";
 import Sprite, { backUrl, VariantFx, ItemIcon } from "../Sprite.jsx";
 import RankBadge from "../RankBadge.jsx";
+import RankUp from "../RankUp.jsx";
+import { RANKS, rankOf, promotion } from "../../game/ranked.js";
 import Confirm from "../Confirm.jsx";
 
 const STATUS = [["PAR", "paralysed"], ["BRN", "burned"], ["PSN", "poisoned"], ["SLP", "put to sleep"], ["FRZ", "frozen solid"]];
@@ -199,6 +201,9 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
   const [deadline, setDeadline] = useState(remote?.deadline ?? null);
   const [left, setLeft] = useState(null);     // seconds on the current decision
   const [rated, setRated] = useState(null);   // what the ladder did with a finished ranked battle
+  // A new rank is a ceremony over the result card, once (RankUp.jsx).
+  const promo = useMemo(() => (remote && rated?.rated ? promotion(rated) : null), [remote, rated]);
+  const [cheered, setCheered] = useState(false);
   const [beat, setBeat] = useState(null);      // the one being played
   const queue = useRef([]);
   const [panel, setPanel] = useState("moves"); // moves | switch | forced | bag | use
@@ -595,6 +600,13 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
             onDone("forfeit");
           }}
         />
+      )}
+      {promo && !cheered && (
+        <RankUp set="battle" ranks={RANKS} from={promo.from} to={promo.to}
+          kicker={promo.from == null ? "Placement complete" : "Rank up"}
+          detail={`Rating ${rated.rating.toLocaleString("en-US")}${rankOf(rated.rating, rated.games).division
+            ? ` · ${RANKS[promo.to].name} ${rankOf(rated.rating, rated.games).division}` : ""}`}
+          onDone={() => setCheered(true)} />
       )}
     </div>
   );

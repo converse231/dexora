@@ -2332,7 +2332,19 @@ const sizes = AREA_IDS
 /* Phase 2. Three things that are each one mistake away from being worse than
    not shipping them: a medal that pays twice, a shiny eaten by a bulk action,
    and an import that accepts a file it cannot actually run. */
-import { MEDALS, MILESTONES, medalsFor, medalById } from "../src/game/medals.js";
+import { MEDALS, MILESTONES, medalsFor, medalById, DEX_RANKS, dexRank } from "../src/game/medals.js";
+import { label as nameOf, HYPHEN_NAMES } from "../src/game/map.js";
+{
+  /* NO SLUG REACHES THE SCREEN: a species whose key has a hyphen is either in
+     NAME_FIX or one of the few real names that keep it lower-case. The check
+     reads the output, so it holds for forms too (their base goes through the
+     same list): no label may show a hyphen followed by a lower-case letter
+     unless that is the species' real name. */
+  const slugged = SPECIES.filter((sp) => /-[a-z]/.test(nameOf(sp))
+    && !HYPHEN_NAMES.some((h) => nameOf(sp).toLowerCase().includes(h)));
+  assert.deepEqual(slugged.map((sp) => nameOf(sp)), [], "a species is named by its slug");
+  console.log(`names ok — ${SPECIES.filter((sp) => sp.name.includes("-") && !sp.form).length} hyphenated slugs, every one named`);
+}
 
 /* Rarest last, so a loop over it reads in ladder order. Every safety case below
    runs for ALL of them: shipping a new tier protected from one bulk action and
@@ -2415,6 +2427,40 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   assert.ok(balls["master-ball"] <= Math.ceil(SPECIES.length / 70),
     `${balls["master-ball"]} Master Balls from the dex over ${SPECIES.length} ` +
     "species - that is a hoard");
+  /* THE POKÉDEX RANK: from nothing to the whole dex, every step strictly
+     further than the last (so none is unreachable or skipped), and each
+     boundary is where `dexRank` changes its answer. The art is looked up by
+     id, so ids are unique. */
+  assert.equal(DEX_RANKS[0].at, 0, "the first Pokédex rank is not where everybody starts");
+  assert.equal(DEX_RANKS.at(-1).at, SPECIES.length, "the last Pokédex rank is not the whole dex");
+  assert.equal(new Set(DEX_RANKS.map((r) => r.id)).size, DEX_RANKS.length, "two Pokédex ranks share an id");
+  for (const [i, r] of DEX_RANKS.entries()) {
+    if (i) assert.ok(r.at > DEX_RANKS[i - 1].at, `${r.name} is not further than ${DEX_RANKS[i - 1].name}`);
+    assert.equal(dexRank(r.at).id, r.id, `${r.at} species is not ${r.name}`);
+    if (i) assert.equal(dexRank(r.at - 1).id, DEX_RANKS[i - 1].id, `${r.at - 1} species is already ${r.name}`);
+  }
+  assert.equal(dexRank(DEX_RANKS[1].at - 5).left, 5, "the count to the next rank is wrong");
+  console.log(`dex ranks ok — ${DEX_RANKS.map((r) => `${r.name} ${r.at}`).join(", ")}`);
+
+  /* THE EMBLEMS ARE THE LADDERS' (npm run ranks): a built file for every rank
+     id on both ladders - one misnamed original ("expedition-keader") left a
+     rank on its stand-in disc with nothing said - square at the size the
+     ceremony draws, and small. The originals shipped at 6.5MB for sixteen;
+     24KB is four times the heaviest built one. Every rank has a colour for
+     its disc and its rank-up glow. */
+  {
+    const { RANKS: R_BATTLE } = await import("../src/game/ranked.js");
+    for (const [set, list] of [["battle", R_BATTLE], ["dex", DEX_RANKS]]) {
+      for (const r of list) {
+        const f = new URL(`../public/ranks/${set}/${r.id}.png`, import.meta.url);
+        assert.ok(existsSync(f), `ranks/${set}/${r.id}.png is missing - is the original in art/ranks/${set}, and was npm run ranks run?`);
+        const png = readFileSync(f);
+        assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [192, 192], `ranks/${set}/${r.id}.png is not the built 192px emblem`);
+        assert.ok(png.length < 24 * 1024, `ranks/${set}/${r.id}.png is ${png.length >> 10}KB - run npm run ranks`);
+        assert.match(r.color ?? "", /^#[0-9a-f]{6}$/, `${r.name} has no colour`);
+      }
+    }
+  }
   console.log(`medals ok — ${MEDALS.length} (${
     ["line", "type", "biome", "dex"].map((k) =>
       `${MEDALS.filter((m) => m.kind === k).length} ${k}`).join(", ")
@@ -6998,7 +7044,7 @@ import { bundle as edgeBundle, RULES as EDGE_RULES } from "./build-edge.mjs";
 /* ============================================================== RANKED, PHASE 6c
    The ladder's words (ranked.js) and its anchors (src/data/anchors.js). The
    ratings themselves are the database's; tradedb and the SQL tests hold them. */
-import { RANKS, rankOf, seasonOf, seasonEnd } from "../src/game/ranked.js";
+import { RANKS, rankOf, seasonOf, seasonEnd, promotion } from "../src/game/ranked.js";
 import { ANCHORS } from "../src/data/anchors.js";
 import { solveAnchors, ANCHOR_SPREAD } from "./rank-anchors.mjs";
 import { nearestAnchor as rNearest } from "../src/game/referee.js";
@@ -7023,6 +7069,20 @@ import { nearestAnchor as rNearest } from "../src/game/referee.js";
     assert.deepEqual(r.steps.map((x) => rankOf(x, R_PLACEMENT).division), ["II", "I"], `${r.name}'s divisions`);
   }
   assert.equal(rankOf(2000, R_PLACEMENT).division, null);
+  /* A PROMOTION, as the result screen reads it off `ranked_outcome`: leaving
+     placement is one (from nothing), every band edge crossed is one, and a
+     division climbed, a draw of the same rank or a loss is none. */
+  for (const [i, r] of RANKS.entries()) {
+    if (!i) continue;
+    assert.deepEqual(promotion({ rating: r.from, games: R_PLACEMENT + 3, delta: 6 }), { from: i - 1, to: i },
+      `crossing into ${r.name} is not a promotion`);
+    assert.equal(promotion({ rating: r.from - 1, games: R_PLACEMENT + 3, delta: 6 }), null,
+      `climbing inside ${RANKS[i - 1].name} was a promotion`);
+    assert.equal(promotion({ rating: r.from - 3, games: R_PLACEMENT + 3, delta: -10 }), null, "a loss was a promotion");
+  }
+  assert.deepEqual(promotion({ rating: 1010, games: R_PLACEMENT, delta: 20 }), { from: null, to: 0 },
+    "leaving placement is not a promotion");
+  assert.equal(promotion({ rating: 1010, games: R_PLACEMENT - 1, delta: 20 }), null, "a placement battle was a promotion");
   // Seasons: a calendar month in UTC, ending where the next begins.
   assert.equal(seasonOf(new Date("2026-10-31T23:59:59Z")), "2026-10");
   assert.equal(seasonEnd("2026-12").toISOString(), "2027-01-01T00:00:00.000Z");
