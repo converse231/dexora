@@ -1019,7 +1019,7 @@ const RESIDENTS = [
     /* THERE IS WATER ON THIS MAP, and `WATERY` below is why it matters.
 
        Declared rather than derived, because deriving it means importing all of
-       `mapdata.js` - every row of eleven maps plus their fixed tile ids - into
+       `mapdata.js` - every row of every map plus their fixed tile ids - into
        the module every encounter roll goes through, to learn one boolean per
        map. check.mjs counts the water characters in `AREAS` and asserts the
        two agree, which is the same shape as `tileBase` against `route.json`:
@@ -1095,8 +1095,11 @@ const RESIDENTS = [
        line: Rock Ridge was composed against the `cave` tileset and stocked
        with what lives in one, so Zubat, Geodude, Clefairy and Onix were
        already the cast of the place it was standing in for. The id is the
-       slot's historical handle - see build_map.py's AREAS. */
-    types: ["rock", "ground", "fighting", "steel", "dragon"],
+       slot's historical handle - see build_map.py's AREAS.
+
+       GROUND WENT TO THE MIRAGE DESERT, which was built to take it: five types
+       made this the second most crowded table in the game. */
+    types: ["rock", "fighting", "steel", "dragon"],
     table: [
       [74, 20], [41, 16], [50, 10], [66, 10], [27, 9], [95, 7], [104, 6],
       [111, 6], [75, 4], [67, 4], [35, 4], [106, 2], [107, 2],
@@ -1349,6 +1352,55 @@ const RESIDENTS = [
       [190, 4], [216, 4], [179, 4], [195, 4], [202, 3], [25, 3],
       [214, 2], [127, 2], [213, 2], [234, 2],
       [241, 1], [113, 1], [115, 1], [128, 1], [123, 1],
+    ],
+  },
+  {
+    id: "desert",
+    water: true,               // the pond by the Winstrate house
+    level: 20,  // MAP_LAST, with the tower and the safari: Surf's level too
+    name: "Mirage Desert",
+    /* EMERALD'S ROUTE 111, AND IT TAKES GROUND FROM MT. MOON. Mt. Moon's table
+       was the second most crowded in the game (190 species at Lv 75) because
+       it claimed five types; with this map in it holds 160 and the desert 62.
+       Only the homing moves - Mt. Moon's own Diglett, Sandshrew, Cubone and
+       Rhyhorn are written there and stay.
+
+       THE ROUTE'S OWN FOUR ARE THE CAST - Sandshrew and Trapinch level, then
+       Baltoy, then Cacnea, the order of Emerald's land slots - with the other
+       regions' deserts filling what four residents cannot:
+
+         - Lileep and Anorith (A): Mirage Tower is where Emerald hands you the
+           Root and Claw Fossils.
+         - Helioptile (B): Kalos's Route 13, beside Trapinch. No Ground type
+           can bring Gen 6, and the filler takes only a shared type.
+         - Rellor (B) and Orthworm (S): Paldea's Asado Desert. Orthworm gives the
+           map an S band, without which Great Tusk and Iron Treads fell back to
+           type alone and each landed as Cinderpeak's and Ember's only S
+           resident (Gen 9 54% over fair); Rellor gives Gen 9 a commoner member
+           than four S-band ones.
+
+       BAND B IS SMALL BECAUSE OF WHEN THE MAP OPENS. A written weight is a rank
+       inside its band, and the band totals are the map's mix at EVERY level -
+       but at Lv 20 only Gens 1-4 are out, and the B band's only open lines are
+       Cacnea, Phanpy and Hippopotas, none of them cast. At a third of the map
+       Cacnea and Phanpy were 16.6% each against the 6% cap; at a tenth all
+       three fit. C and A carry the rest.
+
+       AND NO SANDILE, though Unova's Desert Resort is where it lives. Written
+       here, it was the one Gen 5 in that small B band while Gen 5's A-band
+       rows already met its share, so the fit starved it to 1 in 10 million at
+       Lv 75. Unwritten, the tie on ground goes to Ember, the map declared
+       first, and it is 90 a playthrough there. Lileep and Anorith
+       are 12, not 10: they live nowhere else, and 9 left them 1 in 6,000.
+
+       ROCK FOR LEGENDARIES ALONE (`legends`): the Desert Ruins on this map are
+       Regirock's tomb, and rock in `types` would pull Mt. Moon's rock species
+       here too. */
+    types: ["ground"],
+    legends: ["rock"],
+    table: [
+      [27, 24], [328, 24], [343, 16], [331, 5], [953, 4], [694, 3],
+      [345, 12], [347, 12], [968, 2],
     ],
   },
 ];

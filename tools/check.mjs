@@ -2289,6 +2289,8 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     woods: () => route.monsoon.general,
     // Seaside Road is Route 110: Emerald's General and Mauville, the same way.
     pond: () => route.route110.general,
+    // Mirage Desert is Route 111: the same General and Mauville blocks.
+    desert: () => route.route111.general,
     // Ember Caldera is Magma Hideout: Emerald's General and Lavaridge, as Cinderpeak.
     ember: () => route.safari.general,
     // The first map drawn against a pokefirered primary that is not

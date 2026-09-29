@@ -52,7 +52,7 @@ function readAnimMode() {
    own sky and floor (`.battle[data-area]`), so a League fight is drawn in the
    same world as a wild one. */
 const AREA = {
-  water: "pond", grass: "woods", bug: "woods", fire: "ember", rock: "ridge", ground: "cinder",
+  water: "pond", grass: "woods", bug: "woods", fire: "ember", rock: "ridge", ground: "desert",
   fighting: "cinder", steel: "power", electric: "power", ice: "frost", ghost: "tower",
   dark: "tower", psychic: "tower", poison: "mansion", dragon: "ridge", normal: "meadow",
   flying: "safari", fairy: "meadow",

@@ -848,5 +848,11 @@
     "mauville": 3008,
     "split": 512,
     "floor": 4161
+  },
+  "route111": {
+    "general": 4160,
+    "mauville": 3008,
+    "split": 512,
+    "floor": 3089
   }
 }
