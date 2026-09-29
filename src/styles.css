@@ -6501,23 +6501,51 @@ button:disabled { transition: none; }
   background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-firm);
 }
 .lg-clock i { display: block; height: 100%; background: var(--gold); transform-origin: left; }
-.lg-tpay { font-style: normal; color: var(--gold); font-weight: 700; }
 
-/* A gym's own trainers: a portrait, who, their team, a button - the team on
-   its own line on a phone, where four columns do not fit. */
-.lg-trainers { display: grid; gap: 6px; margin: 0; padding: 8px 0 0; list-style: none; border-top: 2px dashed var(--line); }
-/* `>`: a row's own party is a list too, and must not inherit the row's grid. */
-.lg-trainers > li {
-  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "pic name go" "pic party party";
-  align-items: center; gap: 4px 10px; padding: 6px 8px; border-radius: 12px; background: var(--surface-2);
+/* ---- a gym is a path (rev 5): its trainers in order, then its leader, as
+   steps joined by a line that fills as you win - and under it the STAGE, the
+   one step being looked at. The line and the tick are the only colour: they
+   say how far through the gym you are. */
+.lg-path-wrap { display: grid; gap: 6px; padding-top: 8px; border-top: 2px dashed var(--line); }
+.lg-path { display: flex; flex-wrap: wrap; align-items: center; row-gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lg-path li { display: flex; align-items: center; }
+.lg-path li + li::before {
+  content: ""; width: 12px; height: 3px; border-radius: 2px; background: var(--line-firm);
 }
-.lg-trainers > li.won { box-shadow: inset 0 0 0 2px var(--gold); }
+.lg-path li.beaten + li::before { background: var(--canopy); }
+.lg-path button {
+  position: relative; width: 44px; height: 44px; padding: 0; cursor: pointer; overflow: visible;
+  display: grid; place-items: center; border-radius: 12px;
+  background: var(--surface-2); border: 2px solid var(--line);
+  transition: transform .15s ease, border-color .15s ease;
+}
+.lg-path li.lead button { width: 54px; height: 54px; border-radius: 14px;
+  background: color-mix(in srgb, var(--tc, var(--ink-faint)) 18%, var(--surface-2)); }
+.lg-path button > img:first-child {
+  width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 10px; image-rendering: pixelated;
+}
+.lg-path li.locked button > img:first-child { filter: grayscale(1) opacity(.45); }
+.lg-path li.next button { border-color: var(--canopy); }
+.lg-path button[aria-pressed="true"] { border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 3px 0 var(--shadow-soft); }
+.lg-path button:hover { border-color: var(--line-firm); }
+.lg-path button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.lg-step-won {
+  position: absolute; right: -5px; bottom: -5px; width: 18px; height: 18px; display: grid; place-items: center;
+  font-size: 11px; line-height: 1; color: #fff; background: var(--canopy); border-radius: 50%;
+  border: 2px solid var(--surface);
+}
+.lg-step-badge { position: absolute; right: -7px; bottom: -7px; width: 22px; height: 22px; }
+.lg-path li:not(.beaten) .lg-step-badge { filter: grayscale(1) opacity(.5); }
+.lg-stage {
+  display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: var(--surface-2);
+}
+.lg-stage-who { display: grid; gap: 2px; min-width: 0; }
+.lg-stage-who b { font-size: 15px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-stage .lg-party li { background: var(--surface); }
 .lg-tpic { grid-area: pic; width: 44px; height: 44px; image-rendering: pixelated; object-fit: cover; object-position: top; border-radius: 10px; background: var(--surface); }
 .lg-tname { grid-area: name; display: grid; min-width: 0; }
 .lg-tname i { font-style: normal; font-size: 11px; color: var(--ink-faint); }
 .lg-tname b { font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lg-trainers .lg-party { grid-area: party; }
-.lg-trainers .lg-go { grid-area: go; }
 
 /* ---- choosing a team. The foe you face, the rules, the picker, and a dock
    pinned to the bottom of the screen - the thumb's end of a phone - holding
@@ -6606,12 +6634,38 @@ button:disabled { transition: none; }
 .ft-sprite > img, img.ft-sprite { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .ft-mon > .sprite-showdown { width: 77%; height: 77%; }
 .ft-sprite.flip { transform: scaleX(-1); }
-.ft-mon.in { animation: ft-in .45s cubic-bezier(.2, .9, .3, 1.2) both; }
+.ft-mon.in { animation: ft-in .45s cubic-bezier(.2, .9, .3, 1.2) .42s both; }
+/* THE BALL (`.ball`'s strip and `--f`, tools/build_balls.py): it arcs in from
+   the thrower's side spinning (f00-f03), bursts open (f04-f10) where the
+   Pokemon will stand, and fades as the Pokemon comes out of the light. The
+   cell is sized so the ball reads at the games' size (14 of 64 px) and the
+   burst about a Pokemon's. */
+.ball.ft-ball {
+  position: absolute; z-index: 1; pointer-events: none; aspect-ratio: 1;
+  animation:
+    ball-spin 105ms steps(4) 4,
+    ft-ball-burst calc(var(--bf) * 7) steps(7, jump-none) .42s forwards,
+    ft-ball-arc .42s cubic-bezier(.3, .6, .5, 1) both,
+    ft-ball-gone .16s .72s forwards;
+}
+.ball.ft-ball.foe { right: 15%; top: 16%; width: 17%; --from-x: 140%; --from-y: -90%; }
+.ball.ft-ball.me { left: 16%; bottom: 10%; width: 20%; --from-x: -120%; --from-y: 40%; }
+@keyframes ft-ball-arc {
+  0% { transform: translate(var(--from-x), var(--from-y)); }
+  55% { transform: translate(calc(var(--from-x) * .3), calc(var(--from-y) * .3 - 40%)); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes ft-ball-burst {
+  from { background-position-y: calc(var(--f) * 4); }
+  to { background-position-y: calc(var(--f) * 10); }
+}
+@keyframes ft-ball-gone { to { opacity: 0; } }
 .ft-mon.foe.lunge { animation: ft-lunge-foe .42s ease-in-out; }
 .ft-mon.me.lunge { animation: ft-lunge-me .42s ease-in-out; }
 .ft-mon.hit { animation: ft-hit .5s steps(1, end); }
 .ft-mon.down { animation: ft-down .55s ease-in forwards; }
-@keyframes ft-in { from { transform: scale(.25); opacity: 0; } }
+/* Out of the light: small and white, then itself. */
+@keyframes ft-in { from { transform: scale(.25); opacity: 0; filter: brightness(3); } }
 @keyframes ft-lunge-me { 45% { transform: translate(9%, -7%); } }
 @keyframes ft-lunge-foe { 45% { transform: translate(-9%, 7%); } }
 @keyframes ft-hit {
@@ -6630,7 +6684,7 @@ button:disabled { transition: none; }
    right, as the games lay them out. The bar is a scale, not a width, so its
    fall is a transform. */
 .ft-hp {
-  position: absolute; display: grid; gap: 4px; padding: .9cqw 1.3cqw 1cqw; min-width: 0;
+  position: absolute; z-index: 2; display: grid; gap: 4px; padding: .9cqw 1.3cqw 1cqw; min-width: 0;
   background: var(--glass); border: 2px solid var(--line-firm); border-radius: 1.2cqw;
   box-shadow: 0 .5cqw 0 rgba(0, 0, 0, .18); color: var(--ink);
 }
@@ -6654,9 +6708,18 @@ button:disabled { transition: none; }
 .ft-fill.low { background: var(--bad); }
 .ft-hp-bot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .ft-hp-bot em { font-style: normal; font-family: var(--pixel); font-size: max(9px, 1.6cqw); color: var(--ink-soft); }
-.ft-pips { display: flex; gap: 3px; }
-.ft-pips i { width: max(6px, 1.1cqw); height: max(6px, 1.1cqw); border-radius: 50%; background: var(--bad); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .2); }
-.ft-pips i.out { background: var(--ink-faint); opacity: .5; }
+.ft-pips { display: flex; gap: max(3px, .5cqw); }
+/* A Poke Ball in CSS - red lid, dark band, white base, the button - so it is
+   crisp at any size; the colours are the ball's, in day and night alike. A
+   fainted one is grey, as the games draw it. */
+.ft-pips i {
+  width: max(10px, 1.7cqw); aspect-ratio: 1; border-radius: 50%;
+  background:
+    radial-gradient(circle, #fff 0 17%, #2a2a2a 18% 31%, transparent 32%),
+    linear-gradient(#e8483f 0 43%, #2a2a2a 43% 57%, #f4f4f4 57%);
+  box-shadow: 0 0 0 1px #2a2a2a;
+}
+.ft-pips i.out { filter: grayscale(1); opacity: .4; }
 .ft-st {
   font-family: var(--pixel); font-size: 9px; line-height: 1; padding: 3px 5px 2px; border-radius: 4px; color: #fff;
 }
@@ -6669,6 +6732,27 @@ button:disabled { transition: none; }
 /* `.t-<type>` gives the effect its `--tc` - and a type chip's background,
    which painted the whole box a solid square until this took it back off. */
 .ft-fx { position: absolute; aspect-ratio: 1; pointer-events: none; z-index: 2; background: none; }
+/* MOVE ANIMATIONS (moveAnim.js): a move's background and its tint over the
+   ground and under the mons, as the GBA's background layer; its sprites on a
+   canvas and its flash over the mons (z 1) and under the health boxes (z 2).
+   None of them takes a click. */
+.ft-anim-bg {
+  position: absolute; inset: 0; opacity: 0; pointer-events: none;
+  background: repeat 0 0 / 106.67% auto; image-rendering: pixelated;
+}
+.ft-anim-tint, .ft-anim-flash { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.ft-anim-flash { z-index: 1; }
+/* The bare `canvas` rule is the map's (a green floor, a border): none of it here. */
+.ft-anim {
+  position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; pointer-events: none;
+  background: none; border: 0; border-radius: 0;
+}
+.ft-anim-mode {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 10px; cursor: pointer;
+  font: inherit; font-size: 13px; color: var(--ink-soft); background: var(--glass);
+  border: 2px solid var(--line-firm); border-radius: 999px;
+}
+.ft-anim-mode i { font-style: normal; color: var(--gold); }
 .ft-fx.at-foe { right: 8%; top: 13%; width: 31%; }
 .ft-fx.at-me { left: 5%; bottom: 2%; width: 42%; }
 /* A flash of the type's colour where it lands, a ring that bursts, sparks. */
@@ -7144,20 +7228,50 @@ button:disabled { transition: none; }
 .ft-switch li button:hover:not(:disabled) { border-color: var(--canopy); }
 .ft-switch li button:disabled { opacity: .55; cursor: default; }
 
+/* THE RESULT is one band, not a centred column: it was a title, a line, a
+   badge, a price and two buttons stacked down the middle of a 900px panel,
+   most of it empty. What happened (with who is still standing) on the left,
+   what it won as chips beside it, the next step on the right; a phone stacks
+   them. Its pieces arrive in turn, `transform` and `opacity` only. */
 .ft-result {
-  display: grid; justify-items: center; gap: 6px; padding: 14px; text-align: center;
-  border-radius: 14px; background: var(--surface-2); border: 2px solid var(--line);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px 18px;
+  padding: 14px 16px; border-radius: 14px; background: var(--surface-2); border: 2px solid var(--line);
 }
-/* `>`: the card's own title - a rank inside the card has a <b> of its own. */
-.ft-result > b { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; }
-.ft-result.won > b { color: var(--good); }
-.ft-result.lost > b { color: var(--bad); }
-.ft-result span { font-size: 13px; color: var(--ink-soft); }
-.ft-result-go { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
-/* What the win paid: a first leader win's badge, then the money. */
-.ft-result .ft-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--ink); }
-.ft-badge img { width: 32px; height: 32px; image-rendering: pixelated; }
-.ft-result .ft-pay { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--gold); }
+.ft-result.won { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+.ft-res-head { display: grid; gap: 4px; min-width: 0; animation: ft-res-in .35s ease-out both; }
+.ft-res-title { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; }
+.ft-result.won .ft-res-title { color: var(--good); }
+.ft-result.lost .ft-res-title { color: var(--bad); }
+.ft-res-sub { font-size: 13px; color: var(--ink-soft); }
+.ft-res-team { display: flex; flex-wrap: wrap; gap: 2px; margin: 2px 0 0; padding: 0; list-style: none; }
+.ft-res-team li { width: 34px; height: 34px; display: grid; place-items: center; }
+.ft-res-team img { width: 34px; height: 34px; image-rendering: pixelated; object-fit: contain; }
+.ft-res-team li.out img { filter: grayscale(1); opacity: .4; }
+.ft-loot { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ft-loot li {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 12px;
+  background: var(--surface); border: 2px solid var(--line); animation: ft-res-in .35s ease-out both;
+}
+.ft-loot li:nth-child(2) { animation-delay: .12s; }
+.ft-loot li:nth-child(3) { animation-delay: .24s; }
+.ft-loot img { width: 32px; height: 32px; image-rendering: pixelated; }
+.ft-loot span { display: grid; line-height: 1.1; }
+.ft-loot i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
+.ft-loot b { font-size: 14px; color: var(--ink); white-space: nowrap; }
+.ft-loot .pay b { font-family: var(--display); font-size: 17px; color: var(--gold); }
+.ft-loot .none b { font-weight: 600; color: var(--ink-soft); }
+.ft-coin {
+  width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%;
+  font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--ready-ink);
+  background: var(--gold-soft); border: 2px solid var(--gold);
+}
+.ft-result-go { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+@keyframes ft-res-in { from { opacity: 0; transform: translateY(6px); } }
+@media (max-width: 640px) {
+  .ft-result { grid-template-columns: minmax(0, 1fr); }
+  .ft-result-go { justify-content: stretch; }
+  .ft-result-go .lg-go { flex: 1 1 auto; white-space: nowrap; }
+}
 /* A battle the engine refused: the one card, centred on the fight's ground. */
 .ft.ft-refused { display: grid; place-items: center; padding: 16px; }
 .ft-refused .ft-result { max-width: 420px; }
@@ -7195,6 +7309,12 @@ button:disabled { transition: none; }
   .lg-case img { width: 26px; height: 26px; }
   .lg-hero { padding: 12px 14px; }
 }
+/* At a phone's width the word went and the foe's name with it ("vs ..."):
+   the mark alone says the state, the label and tip the rest. */
+@media (max-width: 420px) {
+  .ft-anim-mode { padding-inline: 9px; }
+  .ft-anim-mode span { display: none; }
+}
 @media (max-width: 380px) {
   .ft-move b { font-size: 14px; }
   .ft-msg { font-size: 15px; }
@@ -7202,7 +7322,9 @@ button:disabled { transition: none; }
   .lg-hero h2 { font-size: 24px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ft-mon.in, .ft-mon.lunge, .ft-mon.hit, .ft-coach, .ft-fx b, .ft-fx i, .ft-fx::before, .ft-more { animation: none; }
+  .ft-mon.in, .ft-mon.lunge, .ft-mon.hit, .ft-coach, .ft-fx b, .ft-fx i, .ft-fx::before, .ft-more,
+  .ft-res-head, .ft-loot li { animation: none; }
+  .ball.ft-ball { display: none; }
   .ft-fx { display: none; }
   .ft-mon.down { animation: none; opacity: 0; }
   .ft-fill { transition: none; }

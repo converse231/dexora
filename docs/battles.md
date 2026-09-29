@@ -47,8 +47,8 @@ Menu ─ League  (#/battle, a page like the Trade Center)
        ├─ region tabs: Kanto · Johto · Hoenn · Sinnoh · Unova · Kalos · Alola · Galar · Paldea
        │    Kanto is open from the start; each later tab opens when the one before is CLEARED
        │    ├─ Gyms, in the game's order: each gym is its trainers, then its leader
-       │    │     a leader opens when the previous leader is beaten
-       │    │     a gym's trainers open with the gym
+       │    │     a gym is reached when the previous leader is beaten
+       │    │     inside it, its trainers in order, then the leader (rev 5)
        │    │     (Alola: the four Kahunas' grand trials, in island order)
        │    └─ Elite Four & Champion   open with the region's badges, each opened by beating the one before
        └─ Friends   ghost battles against a friend's showcase
@@ -64,7 +64,7 @@ Champion of the region beaten. *(rev 4)*
 | | Decided | Why |
 |---|---|---|
 | Where | **A League page, never the map.** `.bt-page`, `#/battle`, built like the Trade Center: pinned header and tabs, one scroll, the modal lock, Back leaves it, a **lazy chunk** holding `battle.js`, the move data and the rosters. The walk engine pauses while it is open. No NPC stands on any map; `build_map.py` does not change. | Catching and battling are different games; a trainer on a map is an obstacle for a player who came to catch. Learnsets, moves and rosters are the heaviest data in the game, and a player who never battles must never download them. |
-| Order in a region *(rev 3)* | **Leaders in the game's order, each opening when the previous leader is beaten.** A gym's own trainers open with the gym and may be fought in any order. | Your call, and the games' own: the badge order is the difficulty order, and the caps climb with it. |
+| Order in a region *(rev 5, 2026-09-29)* | **Leaders in the game's order. A gym is reached when the previous leader is beaten; inside it, its trainers are fought in the roster's order, each opening when the one before is beaten, and the leader opens once every one of its trainers is.** A gym with no trainers (Alola's grand trials, a few in Johto, Galar and Paldea) opens on its leader. **A win is never taken back**: anyone already beaten stays open for a rematch, so a save from rev 3 that beat a leader past its trainers keeps it, and the next gym is reached on that leader as before. | Your call, and the games' own: you walk through a gym's trainers to reach its leader. Rev 3 let the trainers be skipped ("any order", optional until the region's clear). The solver is untouched: the reference player earns candy from catches only, never from prizes, so fighting the trainers first changes no solved level. |
 | Region unlock *(rev 4)* | **Kanto is open from the start. Each later region opens when the previous region is cleared**: every gym trainer, every leader, the Elite Four and the Champion beaten. **No trainer-level gate.** | Your call: one gate, earned by playing the League itself, and the Champion is the region's last door as in the games. Candy is still what makes a region *winnable* (the caps), so a region opened early is open but hard, never broken. |
 | Game per region *(rev 4)* | **Kanto: FireRed/LeafGreen · Johto: HeartGold/SoulSilver · Hoenn: Emerald · Sinnoh: Platinum · Unova: Black 2/White 2 · Kalos: X/Y · Alola: Ultra Sun/Ultra Moon · Galar: Sword/Shield · Paldea: Scarlet/Violet.** **Where the two versions field different opponents, the FIRST-named version wins** (Black 2's Drayden over White 2's Iris; Sword's Bea and Gordie over Shield's Allister and Melony); where one version's opponent is missing a party, the other's is taken. `fetch-leagues.mjs` applies the rule and records which version each opponent came from. | The enhanced or definitive release of each region, whose Bulbapedia sections are complete. One rule instead of a per-region choice, so it can never be applied inconsistently, and it re-applies itself on a re-fetch. FireRed and Emerald also have pret decompilations, which let the fetch cross-check two independent sources (*Sources*). Paldea's gyms can be taken in any order in the game; its order here is the level order (Katy, Brassius, Iono, Kofu, Larry, Ryme, Tulip, Grusha). |
 | Rosters *(rev 3)* | **Generated from Bulbapedia, never typed.** `tools/fetch-leagues.mjs` (`npm run leagues`) reads each gym page's section for the region's game: every `{{Trainerentry}}` (a gym trainer: class, name, species by dex number, levels, sprite) and the leader's `{{Party}}` with its `{{Pokémon}}` rows. Elite Four and Champion come from the region's Pokémon League page the same way. Output: `src/data/leagues.js`, generated. **First battles only; rematch teams are not taken.** | Tested live: Pewter Gym carries Brock's Party per game (RB, Y, GSC, FRLG, HGSS, LGPE), Cortondo Gym its two gym trainers and Katy, Turffield Stadium three gym trainers and Milo. Dex numbers come straight from the page, so no name matching. It is the one source covering all nine regions; pret covers three, and PokéAPI has no trainers. |
@@ -128,6 +128,7 @@ won **88-100%** of the time.
 | Leader, Elite Four and Champion teams; gym trainers | **Bulbapedia**, through its MediaWiki API (`action=parse&prop=wikitext`) | `{{Party}}` + `{{Pokémon}}` blocks per game (dex number, level, moves), and `{{Trainerentry}}` rows for gym trainers (class, name, dex numbers, levels, sprite file), on Pewter Gym, Rustboro Gym, Santalune Gym, Turffield Stadium, Cortondo Gym | The only source covering all nine regions, in one structured shape. pret covers three regions; PokéAPI has none; Serebii is HTML only. |
 | Cross-check for Kanto and Hoenn | **pret** `pokefirered` / `pokeemerald` `trainer_parties.h` | parsed for the prototype | Two independent copies of one fact: the fetch compares FireRed's and Emerald's rosters with pret and **fails on a mismatch** (CLAUDE.md: check copies of one fact against each other). |
 | Portraits: leaders, Elite Four, Champions, gym trainer classes | **Pokémon Showdown** trainer sprites (`play.pokemonshowdown.com/sprites/trainers/`, 1,500 files) | leaders of every region (Brock, Falkner, Roxanne, Roark, Elesa, Viola, Hala, Olivia, Nanu, Hapu, Milo, Nessa, Kabu, Bea, Allister, Opal, Gordie, Melony, Piers, Raihan, Katy, Iono, Geeta; Nemona as `nemona-s`); classes in era variants (`hiker`, `lass`, `swimmerf`, `blackbelt`, `acetrainer` … `-gen1` to `-gen9`) | **One pixel style across all nine regions.** Bulbagarden's in-game sprites exist for Gens 1-5 only (64-80 px); from Gen 6 the games are 3D and Bulbagarden has only illustrated VS art (400-720 px), so taking the games' own art would change style at Kalos. The unsuffixed Showdown name is used for everyone, which is one consistent style. |
+| Move animations *(phase 7)* | **pokeemerald-expansion** (github.com/rh-hideout/pokeemerald-expansion), pinned to one commit by `tools/build_anims.py` | `data/battle_anim_scripts.s` (937 move scripts), `src/battle_anim_*.c` (1,146 sprite templates, their frame and affine tables), `src/data/battle_anim.h` (tag to sheet and palette, backgrounds), `graphics/battle_anims/` (403 sheets, 57 backgrounds); tested live 2026-09-29 | The only source with every move's own animation through Gen 9. pret's `pokeemerald` stops at Gen 3 (279 sheets). Showdown's are AGPL-3.0, code and effect art both. |
 | Badges | **Bulbagarden Archives** (`archives.bulbagarden.net`, MediaWiki API) | the set the *Badge* article uses: `<Name> Badge.png` for Kanto to Galar, `SVbadge_VictoryRoad_<type>.png` for Paldea; transparent PNGs, the smallest 44 px (Trio), others 143-1280 px | Your pick, and one consistent render style for every region. Per-game pixel badges exist only for FRLG (16 px) and HGSS (22 px), so mixing them would change style mid-League. The art script scales each to 32 px. |
 | Pokémon fronts, backs, item icons | PokéAPI and Showdown back strips | already the pipeline | unchanged |
 | Moves, learnsets, the type chart | PokéAPI (`/move`, `/pokemon`, `/type`) | used by the prototype for 588 species and 474 moves | unchanged |
@@ -304,10 +305,67 @@ backgrounds reuse the `.battle` scene's `data-area` art, by the leader's type.
 The overworld character sheet from The Spriters Resource is not needed while
 nobody stands on a map (*Deferred*).
 
-**Move effects are ONE CSS effect per type, 18**, animating only `transform`
-and `opacity`, each drawing a small particle sprite. No source has these as
-separate sprites, so they are **made by you** (GBA-era pixel art, transparent
-background, 1px dark outline, at most 8 colours, matching `public/events/*.png`):
+**Move animations are the games' own, one per move** *(phase 7, 2026-09-29;
+it was ONE CSS burst per type, 18, and "no source has these" was wrong)*.
+Researched live: **pokeemerald-expansion** (rh-hideout, a pret fork) carries an
+animation script for every move through Gen 9 - 937 scripts, 403 sprite
+sheets, 57 backgrounds - and 773 of our 775 moves are there by name (Vise Grip
+and Power Gem under their script's spelling). **Pokémon Showdown's are
+excluded**: its client, effect sprites included, is AGPL-3.0, which would
+bind this game to publishing its source (its maintainer relicenses on
+request; not asked). pret's art is Nintendo's, the same footing as every map
+and tileset here.
+
+A script is a small language (`createsprite`, `delay`, `call`, visual tasks)
+whose motion lives in several hundred C callbacks, so it is **compiled, not
+run**: `tools/build_anims.py` (`npm run anims`, pinned to one commit) walks
+each move's script into a flat timeline at 60 frames a second - every sprite
+it spawns (its sheet, palette, frame sequence and scale/rotation tables,
+which are data in the C and read exactly), when, from which battler, and a
+MOTION; and the tasks as mon shakes, lunges, slides, tints, screen flashes
+and background fades. The most-used callbacks are ported one by one to a
+motion descriptor (the top 100 are 86% of all sprites spawned); the rest are
+classified by the movement helpers their C calls (a straight line, an arc,
+a drift, a circle, in place). Output: `src/data/anims.js` (the League chunk
+only) and `public/battle/anim/` (sheets cut into frame strips, backgrounds
+composed from their tiles). A canvas over the scene plays a timeline;
+the mons' own motion stays on their elements.
+
+**Pace**: a timeline plays at the games' speed; one longer than `ANIM_MAX`
+(2.6s) plays up to 2.5x faster, then is cut there (Barb Barrage's 21 seconds,
+String Shot's 10). **The health bar falls at the IMPACT** (the first hit on
+the target: a hit splat, its shake, a bolt, a tint or a wave), not when the
+move is announced. A tap, Space or Enter skips to the end, the bar falling
+at once. The fight's **Animations** switch (Full / Quick, twice the speed /
+Off, per device, `dexora-anim`) starts Off where the device asks for reduced
+motion; Off plays the type burst below. Every move either side can use is
+fetched as a battle opens, so nothing waits on the network mid-turn (a
+ranked foe's hidden moves load when used and draw as they land). **Sound is
+deferred** (*Deferred*).
+
+**Layers, as the GBA's**: a move's background and its tint (Thunderbolt's
+dark, Earthquake's) over the ground and UNDER the mons - on the GBA a
+background blend never touches a Pokémon; sprites on a canvas and a flash
+over the mons and under the health boxes. Backgrounds are drawn at the GBA's
+scale from their own size (a map is 256 or 512 pixels wide) and wrap. **Surf
+is ported, not guessed** (`AnimTask_CreateSurfWave`): each side's own
+tilemap, 2px across and 1px up a frame, blended to 13/16 and out, 134
+frames.
+
+**What the headless pass found** (2026-09-29, 14 moves each way, 320 and
+800px): the bare `canvas` rule in styles.css (the map's green floor and
+border) painted the whole scene green - `.ft-anim` resets it; background
+tints darkened the health boxes; 512-pixel maps drew at half size; two
+invisible sprites that only move the mons (`AnimShakeMonOrBattlePlatforms`,
+Rock Slide's shake) drew nothing and moved nothing; Precipice Blades named
+its background by number; Struggle had no timeline (it is not in moves.js).
+All fixed. A dev server started before `npm run anims` answers the new
+sheets with its HTML fallback - restart it.
+
+The type burst stays as the fallback: ONE CSS effect per type, 18, animating
+only `transform` and `opacity`. Its particles were to be **made by you**
+(GBA-era pixel art, transparent background, 1px dark outline, at most 8
+colours, matching `public/events/*.png`):
 
 | Path | Size | Prompt |
 |---|---|---|
@@ -324,6 +382,8 @@ background, 1px dark outline, at most 8 colours, matching `public/events/*.png`)
 | 3. League page | **done** - `src/ui/league/` (League, Fight, progress), a lazy chunk of 279KB (81KB gzipped, 66 of it the battle data); the menu's Pokémon League, `#/league`, the engine's `pause` and `battleBegin/Step/End`. Checked in headless Chrome at 320, 360, 390 and 414px phones, a sideways phone (844x390), a tablet (768x1024) and desktop (1280), day and night: nothing wider than its screen (measured by layout, not by boxes - a frozen fade-in reads as overflow otherwise). |
 | 4. Progress | **done** - `src/game/league.js`: the unlock order, refusal, caps that climb with rematch wins, first-win prizes and the rematch clock, read by the engine (which enforces them) and by the page (which shows them). `beaten` and `team` saved; a win's badge and pay on the result card; the prize or rematch meter on every card; the picker starts from your last team; `engine.world().rematches` feeds a League card on the Events board; a News entry and a Help section. |
 | 5. Items | **done** - `HEALS` in items.js (the Shop's Battle shelf, read by `battle.js` for what each does), `{ item, target }` actions in `step`, `canUse`, the fight's Bag (B) with a target picker, and the engine spending each on its turn. Prices re-derived from the rematch guard (*Economy*). |
+| 7b. Polish *(2026-09-29)* | **done** - gyms are walked through (*Order in a region*, rev 5: `gymReached`, the trainers in order, a win never taken back; play.mjs holds all three, each shown to fail with the old rule back); a gym card is its PATH (trainers, then the leader, a line that fills as you win) over a STAGE showing the next opponent or the step tapped; every send-out throws a Poké Ball (the throw strip's f00-f03 in flight, f04-f10 bursting, the Pokémon out of the light); the party under a health bar is Poké Balls; the result is one band (what happened and who stands, the winnings as chips, the next step), stacked on a phone; the Ranked editor's **Suggest a team** (docs/ranked.md). |
+| 7. Move animations | **done** - 760 of 775 moves and Struggle have their own animation (572 of the 580 the rules choose); 15 are one special task each (Substitute's doll, Transform, Minimize) and play the type burst. 11,799 events over 765 sprites, 412 sheets and 45 backgrounds: 457 images, 465KB, and `anims.js` 89KB gzipped in its own chunk, loaded by the League's player alone. Checked in headless Chrome with either side attacking at 320 and 800px, and in a real League battle (the bar holds until the bubbles land; Space skips; the switch cycles and is remembered). |
 | 6. Backend | **badges done** (with ranked 6a, docs/ranked.md): `trainer_cards.badges`, counted in `card_stats` from the stored save's `beaten`, leaders only (`badge_list()`, held equal to the League's by check.mjs), readable by players and written by nobody, shown on the trainer profile. Friend ghost battles became ranked's practice. |
 
 **What the page settled** *(phase 3)*:
@@ -412,6 +472,7 @@ and Cynthia's Roserade had nothing that hits.
 | **3. League page** | `.bt-page` (`#/battle`, lazy chunk, modal lock, `useDismiss`, one Back), region tabs with locks, gym cards (trainers, then the leader) with Battle and Team, team select with refusal reasons, the fight (HUD, turn log, 18 effects), keyboard, the touch layout on `(hover: none) and (pointer: coarse)`, night tokens, the short-screen shape | tools/play drives a battle through the engine: `stepped()` per turn, one `colRev` bump for the result; `engine.js` imports neither `battle.js` nor the rosters or move data (asserted); the page at phone and desktop, day and night, sideways at 360px tall. |
 | **4. Progress** | badges, the unlock rules, first-win prizes, leader rematch clocks and caps, Elite Four runs, the saved fields, `engine.world()` entries (leaders ready for a rematch), a News entry, Help | tools/play: a leader refuses until the previous one is beaten; the Elite Four refuses until the region's badges are all won; a region refuses until the previous one is cleared, Champion included, and opens on that win; a first win pays once; a rematch pays pro rata; a battle leaves every level and `state.xp` unchanged; a reload mid-battle forfeits with nothing spent; a locked and an over-cap Pokémon are refused by the engine. Each saved field has its `savedField` line. |
 | **5. Items** | Potion, Full Heal, Revive, the Battle shelf, the bag in battle | the rematch-net-positive guard; healing is a fraction at every level. |
+| **7. Move animations** | `tools/build_anims.py` → `src/data/anims.js` + `public/battle/anim/`, the timeline player (`src/ui/league/moveAnim.js`), the impact-timed health bar, the Animations switch | check.mjs: every move the rules can choose has a timeline; every sheet and background exists at the size the data says (PNG header), and nothing else is in the folder; every sprite's frames are on its sheet; every event and impact inside its timeline; fewer than 3% of moves fall back; `anims.js` loaded by `moveAnim.js` alone, with `import()`. A headless pass over a spread of moves (projectile, beam, contact, rain, self-buff, background) at phone and desktop. |
 | **6. Backend** | `badges` on the trainer card, friend ghost battles. *(2026-09-28)* **Superseded by [docs/ranked.md](ranked.md)**: ranked battles played live against a CPU ghost of another trainer's defense team, refereed by the server, and a global list; ghost battles become friend practice | `npm run tradedb`: the card's `badges` equals the badges in the stored save and a client cannot write it; a ghost battle saves nothing (tools/play). |
 
 ## Deferred on purpose — each with the trigger that brings it back
@@ -434,6 +495,9 @@ and Cynthia's Roserade had nothing that hits.
 - **Held items; confusion, trapping, weather, hazards, abilities.** Trigger:
   AI 3 being cut, or the fallback list making a well-known Pokémon play wrong.
 - **PvP.** Trigger: server-side battle resolution, the leaderboard's trigger.
+- **Move sounds.** The scripts name every sound effect (`playsewithpan
+  SE_M_FLAMETHROWER`) and pret has them, but the game has no audio at all.
+  Trigger: sound arriving anywhere in the game (a mute switch first).
 
 ## How this was measured (and what the prototype left out)
 

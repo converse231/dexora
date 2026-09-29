@@ -78,18 +78,36 @@ export function regionOpen(rid, beaten) {
   return i === 0 || (i > 0 && regionCleared(REGIONS[i - 1], beaten));
 }
 
-/* MAY THIS OPPONENT BE FOUGHT? Its region open; a leader once the previous
-   leader is beaten; a gym trainer with its gym; the League with every badge
-   of the region and each member after the one before. An id this build does
-   not know is never open. */
+/* A GYM IS REACHED when its region is open and the leader before it is
+   beaten (docs/battles.md, *Order in a region*, rev 5). */
+export function gymReached(gymId, beaten) {
+  const g = GYMTUNE[gymId];
+  if (!g || g.kind !== "leader" || !regionOpen(g.region, beaten)) return false;
+  const list = leadersOf(g.region);
+  const k = list.indexOf(gymId);
+  return k === 0 || won(beaten, list[k - 1]);
+}
+
+/* MAY THIS OPPONENT BE FOUGHT? Inside a reached gym, its trainers in the
+   roster's order, each after the one before, and the leader once every one
+   of them is beaten - you walk through a gym to its leader, as in the games
+   (rev 3 let the trainers be skipped). The League with every badge of the
+   region and each member after the one before. A WIN IS NEVER TAKEN BACK:
+   anyone already beaten stays open for a rematch, so a save that beat a
+   leader under rev 3, past its trainers, keeps it. An id this build does not
+   know is never open. */
 export function isOpen(id, beaten) {
-  if (TRAINERTUNE[id]) return isOpen(TRAINERTUNE[id].gym, beaten);
+  const t = TRAINERTUNE[id];
+  if (t) {
+    if (!gymReached(t.gym, beaten)) return false;
+    const list = trainersOf(t.gym);
+    const k = list.indexOf(id);
+    return won(beaten, id) || k === 0 || won(beaten, list[k - 1]);
+  }
   const g = GYMTUNE[id];
   if (!g || !regionOpen(g.region, beaten)) return false;
   if (g.kind === "leader") {
-    const list = leadersOf(g.region);
-    const k = list.indexOf(id);
-    return k === 0 || won(beaten, list[k - 1]);
+    return gymReached(id, beaten) && (won(beaten, id) || trainersOf(id).every((x) => won(beaten, x)));
   }
   if (!leadersOf(g.region).every((l) => won(beaten, l))) return false;
   const list = leagueOf(g.region);

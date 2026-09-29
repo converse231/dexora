@@ -70,6 +70,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `supabase/functions/ranked-step/rules.js` | `npm run edge` (check.mjs re-bundles and compares) |
 | `src/data/anchors.js` | `npm run anchors` (check.mjs re-solves and compares) |
 | `public/ranks/{battle,dex}/` | `npm run ranks` from the drawn originals in `art/ranks/` (check.mjs: one per rank id, 192px, small) |
+| `src/data/anims.js`, `public/battle/anim/` | `npm run anims` (pokeemerald-expansion, pinned; restart a running dev server after) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
   National Dex alone, read by the fetchers).
@@ -551,9 +552,21 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   is what moves a health bar, so a bar falls with the hit that caused it.
   Health bars are a `scaleX`, never a width. A type's colour is `--tc` on its
   `.t-<type>` class - read it, never copy a hex.
+- **Move animations are the games' own, compiled** (docs/battles.md, Art):
+  `tools/build_anims.py` turns each move's pokeemerald-expansion script into
+  a timeline; `moveAnim.js` is the one player and the only loader of
+  `anims.js` (`import()`, asserted). A move's bar falls at its IMPACT
+  (`onImpact`), and a hurry skips, never cuts the bar. Scripts are written
+  for the player attacking: mirror x when the foe does, unless the game
+  has its own branch (Surf). A background and its tint sit UNDER the mons;
+  sprites and flashes over them and under the boxes. The bare `canvas` rule
+  is the map's - a new canvas resets it. Port a callback from its C; a
+  guessed motion is where the bad frames were.
 - **The engine judges a League battle; `game/league.js` is the one rulebook.**
-  The order (leaders in turn, the Elite Four on every badge, a region on the
-  whole of the last one, gym trainers and Champion included), `refusal`,
+  The order (leaders in turn; inside a reached gym its trainers in the
+  roster's order, then its leader - `gymReached`, rev 5; a win never taken
+  back; the Elite Four on every badge; a region on the whole of the last one,
+  gym trainers and Champion included), `refusal`,
   `capOf`/`topOf` (a rematch win raises both) and `payFor` live there, and
   both the engine and the page read them - the page never decides. It reads
   only `gymtune.js`, which ships in the main bundle for this (each opponent's

@@ -24,7 +24,7 @@ import Sprite from "../Sprite.jsx";
 import Types from "../Types.jsx";
 import Picker, { keyOf } from "../trade/Picker.jsx";
 import Fight from "./Fight.jsx";
-import { standing, tuneOf } from "./progress.js";
+import { standing, tuneOf, trainerName } from "./progress.js";
 import Ranked from "./Ranked.jsx";
 import { CHAR_PIC } from "../../game/ranked.js";
 import { rankedStep } from "../../net/cloud.js";
@@ -67,43 +67,47 @@ function Party({ team, small = false }) {
   );
 }
 
-/* ONE OPPONENT: a leader, a League member or its Champion. */
+/* WHO, as every card heads it: the portrait on its type's ground, the
+   role, the name, the facts and the stamp. */
+function Head({ o, kind, region, order, tune, stamp }) {
+  const champ = kind === "champion";
+  return (
+    <div className="lg-card-head">
+      <div className="lg-portrait">
+        <img src={asset(`trainers/${o.pic}.png`)} alt="" loading="lazy" />
+      </div>
+      <div className="lg-who">
+        <span className="lg-kicker">
+          {kind === "leader" ? (region.id === "alola" ? `Grand trial ${order}` : `Gym ${order}`)
+            : champ ? "Champion" : `League · ${order}`}
+        </span>
+        <h4>{o.name}</h4>
+        <div className="lg-facts">
+          {o.type && kind === "leader" && <Types of={[o.type]} />}
+          <span className="lg-cap" data-tip="The highest level you may bring">Lv {tune.cap} cap</span>
+          {tune.top > 100 && <span className="lg-trained" data-tip="Trained past Lv 100: its stats run higher than its level says">TRAINED</span>}
+        </div>
+        {kind === "leader" && (
+          <span className="lg-badge">
+            <img src={asset(`badges/${o.id}.png`)} alt="" loading="lazy" />{o.badge}
+          </span>
+        )}
+      </div>
+      <span className={`lg-stamp ${stamp}`}>
+        {stamp === "won" ? "BEATEN" : stamp === "open" ? "OPEN" : <><Lock />LOCKED</>}
+      </span>
+    </div>
+  );
+}
+
+/* ONE LEAGUE OPPONENT: an Elite Four member or the Champion. */
 function Card({ o, kind, st, region, onBattle, order, beaten, steps }) {
   const tune = tuneOf(o, beaten, steps);
   const team = useMemo(() => teamOf(o, beaten), [o, beaten]);
-  const trained = tune.top > 100;
-  const champ = kind === "champion";
-  const [open, setOpen] = useState(false);
   return (
-    <article className={`lg-card t-${o.type ?? "normal"}${champ ? " champ" : ""}${st.won ? " won" : ""}${st.open ? "" : " shut"}`}>
-      <div className="lg-card-head">
-        <div className="lg-portrait">
-          <img src={asset(`trainers/${o.pic}.png`)} alt="" loading="lazy" />
-        </div>
-        <div className="lg-who">
-          <span className="lg-kicker">
-            {kind === "leader" ? (region.id === "alola" ? `Grand trial ${order}` : `Gym ${order}`)
-              : champ ? "Champion" : `League · ${order}`}
-          </span>
-          <h4>{o.name}</h4>
-          <div className="lg-facts">
-            {o.type && kind === "leader" && <Types of={[o.type]} />}
-            <span className="lg-cap" data-tip="The highest level you may bring">Lv {tune.cap} cap</span>
-            {trained && <span className="lg-trained" data-tip="Trained past Lv 100: its stats run higher than its level says">TRAINED</span>}
-          </div>
-          {kind === "leader" && (
-            <span className="lg-badge">
-              <img src={asset(`badges/${o.id}.png`)} alt="" loading="lazy" />{o.badge}
-            </span>
-          )}
-        </div>
-        <span className={`lg-stamp${st.won ? " won" : st.open ? " open" : ""}`}>
-          {st.won ? "BEATEN" : st.open ? "OPEN" : <><Lock />LOCKED</>}
-        </span>
-      </div>
-
+    <article className={`lg-card t-${o.type ?? "normal"}${kind === "champion" ? " champ" : ""}${st.won ? " won" : ""}${st.open ? "" : " shut"}`}>
+      <Head o={o} kind={kind} region={region} order={order} tune={tune} stamp={st.won ? "won" : st.open ? "open" : ""} />
       <Party team={team} />
-
       <div className="lg-card-go">
         {st.open ? (
           <span className="lg-go-row">
@@ -113,40 +117,81 @@ function Card({ o, kind, st, region, onBattle, order, beaten, steps }) {
             <Prize tune={tune} won={st.won} />
           </span>
         ) : <p className="lg-why"><Lock />{st.why}</p>}
-        {kind === "leader" && o.trainers.length > 0 && (
-          <button type="button" className="lg-more" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-            {o.trainers.length} gym trainer{o.trainers.length > 1 ? "s" : ""}
-            <span aria-hidden="true">{open ? "▴" : "▾"}</span>
-          </button>
-        )}
       </div>
-
-      {open && (
-        <ul className="lg-trainers">
-          {o.trainers.map((t, k) => {
-            const ts = st.trainers[k];
-            return (
-              <li key={t.id} className={ts.won ? "won" : ""}>
-                <img className="lg-tpic" src={asset(`trainers/${t.pic}.png`)} alt="" loading="lazy" />
-                <span className="lg-tname">
-                  <i>{t.cls}{!ts.won && <em className="lg-tpay"> · {yen(tuneOf(t, beaten, steps).pay)}</em>}</i>
-                  <b>{t.name === t.cls ? "" : t.name}</b>
-                </span>
-                <TrainerParty t={t} beaten={beaten} />
-                <button type="button" className="lg-go small" disabled={!ts.open} onClick={() => onBattle(t, "trainer")}>
-                  {ts.won ? "Again" : "Battle"}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
     </article>
   );
 }
-function TrainerParty({ t, beaten }) {
-  const team = useMemo(() => teamOf(t, beaten), [t, beaten]);
-  return <Party team={team} small />;
+
+/* A GYM IS A PATH (docs/battles.md, *Order in a region*, rev 5): its
+   trainers in the roster's order, then its leader, each opening when the one
+   before is beaten - you walk through a gym to its leader, as in the games.
+   The path is drawn as steps; under it, the STAGE shows whoever is next (or
+   the step you tap: anyone beaten can be fought again). */
+function GymCard({ g, st, region, order, beaten, steps, onBattle }) {
+  const tune = tuneOf(g, beaten, steps);
+  const path = useMemo(() => [
+    ...g.trainers.map((t, k) => ({ o: t, kind: "trainer", st: st.trainers[k] })),
+    { o: g, kind: "leader", st },
+  ], [g, st]);
+  const next = path.findIndex((p) => p.st.open && !p.st.won);
+  const [sel, setSel] = useState(null);
+  const at = sel ?? (next >= 0 ? next : path.length - 1);
+  const done = st.trainers.filter((t) => t.won).length;
+  return (
+    <article className={`lg-card lg-gym t-${g.type ?? "normal"}${st.won ? " won" : ""}${st.reached ? "" : " shut"}`}>
+      <Head o={g} kind="leader" region={region} order={order} tune={tune} stamp={st.won ? "won" : st.reached ? "open" : ""} />
+      {path.length > 1 && (
+        <div className="lg-path-wrap">
+          <span className="lg-kicker">Gym trainers · {done}/{g.trainers.length}</span>
+          <ol className="lg-path" aria-label={`${g.name}'s gym, in order`}>
+            {path.map((p, k) => {
+              const name = p.kind === "leader" ? `Leader ${g.name}` : trainerName(p.o);
+              const state = p.st.won ? "beaten" : p.st.open ? "next" : "locked";
+              return (
+                <li key={p.o.id} className={`${state}${p.kind === "leader" ? " lead" : ""}`}>
+                  <button type="button" aria-pressed={k === at} onClick={() => setSel(k)}
+                    aria-label={`${name}, ${state}`} data-tip={name}>
+                    <img src={asset(`trainers/${p.o.pic}.png`)} alt="" loading="lazy" />
+                    {p.kind === "leader" && <img className="lg-step-badge" src={asset(`badges/${g.id}.png`)} alt="" loading="lazy" />}
+                    {p.st.won && p.kind !== "leader" && <b className="lg-step-won" aria-hidden="true">✓</b>}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
+      <Stage p={path[at]} next={at === next} leader={g} beaten={beaten} steps={steps} onBattle={onBattle} />
+    </article>
+  );
+}
+
+/* THE STAGE: one step of a gym - who, their team, what a win pays, and the
+   button (or what opens it). */
+function Stage({ p, next, leader, beaten, steps, onBattle }) {
+  const tune = tuneOf(p.o, beaten, steps);
+  const team = useMemo(() => teamOf(p.o, beaten), [p.o, beaten]);
+  const lead = p.kind === "leader";
+  return (
+    <div className={`lg-stage${lead ? " lead" : ""}`}>
+      <div className="lg-stage-who">
+        <span className="lg-kicker">{p.st.won ? (lead ? "Beaten" : "Beaten · no prize again") : next ? "Next up" : "Locked"}</span>
+        <b>{lead ? `Leader ${leader.name}` : trainerName(p.o)}</b>
+      </div>
+      <Party team={team} small={!lead} />
+      <div className="lg-card-go">
+        {p.st.open ? (
+          <span className="lg-go-row">
+            <button type="button" className={`lg-go${lead ? "" : " small"}`} onClick={() => onBattle(p.o, p.kind)}>
+              {p.st.won ? (lead ? "Rematch" : "Again") : "Battle"}
+            </button>
+            {lead ? <Prize tune={tune} won={p.st.won} />
+              : !p.st.won && <span className="lg-prize">Prize <b>{yen(tune.pay)}</b></span>}
+          </span>
+        ) : <p className="lg-why"><Lock />{p.st.why}</p>}
+      </div>
+    </div>
+  );
 }
 
 /* WHAT A WIN PAYS, the engine's own answer (`payFor`): the prize before the
@@ -421,7 +466,7 @@ export default function League({ engine, box = [], beaten = {}, steps = 0, team 
             <h3 className="lg-section">{region.id === "alola" ? "Island Kahunas" : "Gyms"}</h3>
             <div className="lg-list">
               {region.gyms.map((g, k) => (
-                <Card key={g.id} o={g} kind="leader" st={rs.gyms[k]} region={region} order={k + 1}
+                <GymCard key={g.id} g={g} st={rs.gyms[k]} region={region} order={k + 1}
                   beaten={beaten} steps={steps} onBattle={(o, kind) => setPick({ o, kind })} />
               ))}
             </div>

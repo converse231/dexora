@@ -184,11 +184,11 @@ export default function Help({ onClose }) {
           <h4>Pokémon League</h4>
           <ul className="vr-notes">
             <li>
-              <b>The League</b> is in the menu. Each region&rsquo;s leaders open
-              one at a time, in their games&rsquo; order; all of a region&rsquo;s
-              badges open its Elite Four, one at a time, then its Champion.
-              Beating everyone in a region, gym trainers included, opens the
-              next.
+              <b>The League</b> is in the menu. Each region&rsquo;s gyms open
+              one at a time, in their games&rsquo; order, and inside a gym you
+              beat its trainers one by one before its leader will battle you.
+              All of a region&rsquo;s badges open its Elite Four, one at a time,
+              then its Champion. Beating everyone in a region opens the next.
             </li>
             <li>
               <b>Your team.</b> Up to {TEAM_MAX} Pokémon (no more than your
