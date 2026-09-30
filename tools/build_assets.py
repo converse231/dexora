@@ -22,6 +22,24 @@ import urllib.request
 import numpy as np
 from PIL import Image
 
+
+def save_png(arr, path):
+    """An RGBA array as the smallest EXACT png: a palette of its colours (and
+    their alphas) where it has 256 or fewer, else plain RGBA. The upper layer
+    has 212 colours and came out at 69KB as RGBA and 31KB as a palette -
+    and it is on the first paint's critical path (2026-09-30). Lossless:
+    decoded back and compared, or this stops."""
+    flat = arr.reshape(-1, 4)
+    colours, index = np.unique(flat, axis=0, return_inverse=True)
+    if len(colours) > 256:
+        Image.fromarray(arr, "RGBA").save(path, optimize=True)
+        return
+    img = Image.fromarray(index.reshape(arr.shape[:2]).astype(np.uint8), "P")
+    img.putpalette(colours[:, :3].flatten().tolist())
+    img.save(path, optimize=True, transparency=bytes(colours[:, 3].tolist()))
+    back = np.asarray(Image.open(path).convert("RGBA"))
+    assert (back == arr).all(), f"{path}: the palette png does not decode to what was drawn"
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, ".assets-src")
 PUB = os.path.join(ROOT, "public")
@@ -577,7 +595,7 @@ def build_tileset():
     assert top.shape == atlas.shape, \
         f"the overlay atlas is {top.shape} against the atlas's {atlas.shape} - " \
         "every id past the first mismatch would draw the wrong upper layer"
-    Image.fromarray(top, "RGBA").save(os.path.join(PUB, "tilesets", "route_top.png"))
+    save_png(top, os.path.join(PUB, "tilesets", "route_top.png"))
 
     # Metatile ids read off a real FireRed map rather than picked by eye:
     # data/layouts/Route1/map.bin was decoded and its tile usage counted, so

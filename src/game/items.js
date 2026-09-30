@@ -1117,7 +1117,11 @@ export function evoLevel(row) {
   return at;
 }
 
-export const evolutionsOf = (id) => EVO_ROWS.filter((r) => r.from === id);
+/* By species, built once: the Box asks this for every row it draws, and a
+   filter over every evolution row a call was the Box's rebuild. */
+const EVO_FROM = new Map();
+for (const r of EVO_ROWS) (EVO_FROM.get(r.from) ?? EVO_FROM.set(r.from, []).get(r.from)).push(r);
+export const evolutionsOf = (id) => EVO_FROM.get(id) ?? [];
 
 export const stoneFor = (row) => (row.kind === "stone" ? row.item : null);
 

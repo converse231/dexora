@@ -28,6 +28,15 @@
     <link rel="preload" href="fonts/nunito-sans.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="fonts/fredoka.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="fonts/geist-pixel.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- THE MAP'S ART, in parallel with the bundle too: loadArt asked for it only
+         once the script had run, and on a slow line the map drew 1.7s after
+         the page (route.png, 368KB) - measured 2026-09-30. -->
+    <link rel="preload" href="tilesets/route.png" as="image" />
+    <link rel="preload" href="tilesets/route_top.png" as="image" />
+    <link rel="preload" href="tilesets/player.png" as="image" />
+    <link rel="preload" href="tilesets/grassfx.png" as="image" />
+    <link rel="preload" href="tilesets/route.json" as="fetch" crossorigin />
+    <link rel="preload" href="tilesets/player.json" as="fetch" crossorigin />
   </head>
   <body>
     <div id="root"></div>

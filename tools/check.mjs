@@ -7037,6 +7037,71 @@ import { learnable as bLearnable, movesOf as bMovesOf, movesAt as bMovesAt, MAX_
     `prize ¥${HARD_PRIZE}, fee ¥${HARD_FEE}; the full Region Charm ×${full}; ${HEALS.length} battle items; the Tutor's lists hold (${Math.round((Date.now() - t0) / 1000)}s)`);
 }
 
+/* WHAT'S NEW stays short and keyed (News.jsx, read as text - Node does not
+   import JSX). Every entry's id is its own: "seen" and React's keys both
+   read it, and two entries once shared one. Every entry has its emoji, and
+   every item is a line a phone shows in two (reported as long and boring). */
+{
+  const news = readFileSync(new URL("../src/ui/News.jsx", import.meta.url), "utf8");
+  const list = news.slice(news.indexOf("export const NEWS = ["), news.indexOf("export const NEWS_ID"));
+  const ids = [...list.matchAll(/\bid: "([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(new Set(ids).size, ids.length, `two What's new entries share an id: ${ids.filter((x, k) => ids.indexOf(x) !== k).join(", ")}`);
+  assert.equal([...list.matchAll(/\bicon: "[^"]+"/g)].length, ids.length, "a What's new entry has no emoji");
+  const items = [...list.matchAll(/\["([^"]+)", "((?:[^"\\]|\\.)*)"\]/g)];
+  const long = items.filter((m) => m[1].length + m[2].length > 120).map((m) => m[1]);
+  assert.deepEqual(long, [], `What's new items longer than two phone lines: ${long.join(", ")}`);
+  console.log(`news ok — ${ids.length} entries, each its own id and emoji, ${items.length} items each under two lines`);
+}
+
+/* ============================================================== SUGGEST A TEAM
+   src/ui/league/suggest.js: the League's team pick and ranked's editor. Held
+   by relations - a style does what its name says against another style -
+   and every famous lineup's ids against the names it was checked by. */
+import { suggestTeam, STYLES as SG_STYLES, FAMOUS_LINEUPS, LINEUPS, lineOf as sgLine } from "../src/ui/league/suggest.js";
+import { label as sgLabel } from "../src/game/map.js";
+{
+  // Every famous member is the Pokemon its name says, and every lineup is a team.
+  for (const [id, name, members] of FAMOUS_LINEUPS) {
+    assert.ok(members.length >= 1 && members.length <= 6, `${name} is not a team`);
+    for (const [sp, written] of members) assert.equal(sgLabel(lSpecies(sp)), written, `${id}: #${sp} is not ${written}`);
+  }
+  assert.equal(LINEUPS.length - FAMOUS_LINEUPS.length, LEAGUES.length, "not every region's Champion is a lineup");
+  // A Box of every seventh species at Lv 100 - varied types, one each.
+  const pool = SPECIES.filter((sp, k) => k % 7 === 0 && !lSpecies(sp.id)?.legendary).map((sp, k) => ({ uid: k + 1, species: sp.id, level: 100 }));
+  const st = (m) => lSpecies(m.species).stats;
+  const mean = (team, f) => team.reduce((n, m) => n + f(st(m)), 0) / team.length;
+  const pick = (style, extra = {}) => suggestTeam(pool, { size: 6, style, ...extra }).team;
+  for (const [style] of SG_STYLES) {
+    const t = pick(style, { foes: [["fire"], ["fire", "flying"]] });
+    assert.equal(t.length, 6, `${style} did not fill a team of six`);
+    assert.equal(new Set(t.map((m) => m.species)).size, 6, `${style} took one species twice`);
+    assert.ok(t.every((m) => pool.includes(m)), `${style} suggested a Pokemon that is not in the Box`);
+  }
+  // Attack hits harder than Defense; Defense is bulkier than Attack.
+  const hit = ([, a, , c, , s]) => Math.max(a, c) + s, bulk = ([h, , d, , sd]) => h + d + sd;
+  const atk = pick("attack"), def = pick("defense");
+  assert.ok(mean(atk, hit) > mean(def, hit), "All-out attack hits no harder than the defensive team");
+  assert.ok(mean(def, bulk) > mean(atk, bulk), "Wall of defense is no bulkier than the attacking team");
+  // Balanced spreads its types: more distinct types than the six highest totals alone.
+  const types = (team) => new Set(team.flatMap((m) => lSpecies(m.species).types)).size;
+  const byTotal = [...pool].sort((a, b) => st(b).reduce((x, y) => x + y) - st(a).reduce((x, y) => x + y)).slice(0, 6);
+  assert.ok(types(pick("balanced")) > types(byTotal), "Balanced spreads its types no wider than stat totals alone");
+  // Counter hits a Fire team better than Balanced does.
+  const fire = [["fire"], ["fire"], ["fire", "flying"]];
+  const hitsFire = (team) => team.filter((m) => lSpecies(m.species).types.some((t) => ["water", "rock", "ground"].includes(t))).length;
+  assert.ok(hitsFire(pick("counter", { foes: fire })) > hitsFire(pick("balanced")), "Counter does not answer a Fire team better than Balanced");
+  // A lineup takes a member's evolution line when the species itself is missing, and names who is not there.
+  const box = [{ uid: 1, species: 5, level: 30 }, { uid: 2, species: 25, level: 30 }, ...pool.slice(0, 20)];
+  const ash = suggestTeam(box, { size: 6, style: "ash-kanto" });
+  assert.ok(ash.team.some((m) => m.species === 5), "Ash's Charizard slot did not take a Charmeleon");
+  assert.ok(ash.team.some((m) => m.species === 25) && ash.team.length === 6, "a lineup did not fill its team");
+  assert.ok(ash.missing.includes("Butterfree") && !ash.missing.includes("Charizard"), "a lineup named the wrong missing members");
+  assert.equal(sgLine(6), sgLine(4), "Charizard's line is not Charmander's");
+  console.log(`suggest ok — ${SG_STYLES.length} styles and ${LINEUPS.length} lineups (${FAMOUS_LINEUPS.length} famous, ` +
+    `${LEAGUES.length} Champions): each fills a team from the Box, one of each; attack out-hits defense and defense out-lasts attack; ` +
+    `balanced spreads ${types(pick("balanced"))} types to stat totals' ${types(byTotal)}; a lineup takes a line and names who is missing`);
+}
+
 /* ============================================================== RANKED, PHASE 6a
    docs/ranked.md. The format, the species clause, the legendary rule the
    League now reads off the data, and the server's copies of all of it. */

@@ -3462,4 +3462,37 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   console.log("idle draw ok — a still scene paints nothing, a step and a resize paint");
 }
 
+/* A WALK TELLS REACT A FEW TIMES A SECOND (engine `walked`): steps bump `rev`
+   at once but hand the UI one notice per WALK_NOTICE ms, and anything else
+   that changes notifies at once. The clock here is the fake one, so a whole
+   walk runs before the real timer can fire. (The baked ground needs the
+   tile art, which Node never loads: it was held pixel for pixel against the
+   tile loop in a browser, every map - docs/decisions.md.) */
+{
+  const b = boot({ ...SAVE });
+  const { e } = b;
+  tick(16, 4);
+  const start = [e.state.player.x, e.state.player.y];
+  const rev0 = e.state.rev, n0 = b.changes();
+  for (const dir of ["right", "left", "down", "up"]) {
+    e.press(dir);
+    tick(16, 40);
+    e.clearHeld(); tick(16, 20);
+  }
+  const moved = e.state.rev - rev0;
+  assert.ok(moved >= 4, `the walk took ${moved} steps - this test is asserting nothing`);
+  assert.ok(b.changes() - n0 <= 1, `a walk of ${moved} steps notified the UI ${b.changes() - n0} times`);
+  await new Promise((r) => setTimeout(r, 320));
+  assert.ok(b.changes() - n0 >= 1, "a walk never told the UI at all");
+  const n1 = b.changes();
+  e.press("right"); tick(16, 12); e.clearHeld();
+  e.buy("poke-ball", 1);
+  assert.equal(b.changes(), n1 + 1, "a purchase mid-walk waited for the walk's notice");
+  await new Promise((r) => setTimeout(r, 320));
+  assert.equal(b.changes(), n1 + 1, "the walk's pending notice fired after a change had already told the UI");
+  e.destroy();
+  void start;
+  console.log(`walk ok — ${moved} steps told the UI once, a purchase at once`);
+}
+
 console.log("play ok — the frame loop never stopped");

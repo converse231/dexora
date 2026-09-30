@@ -266,9 +266,13 @@ session, remembered).
   database cannot see the dex's forms); 6b's function re-checks it.
 - **The Ranked tab**, first in the League's strip: three team slots edited
   with the League's picker (one of each species, through `kin`) and its
-  **Suggest a team**: the Box's strongest species by base stat total, one of
-  each, no two sharing a primary type while the Box allows, nothing in a
-  trade - the format sets every level, so the species is all that decides; and
+  **Suggest a team** (`ui/league/suggest.js`, shared with the League's team
+  pick): Balanced, All-out attack or Wall of defense by the species' stats,
+  built so the team spreads its types and never stacks one weakness, or a
+  famous lineup (Ash's per series, Gary's, Red's, every Champion's) found in
+  your Box by species or evolution line; one of each by the clause, nothing
+  in a trade - the format sets every level, so the species is all that
+  decides; and
   **practice** against a friend's teams - blind, ranked's format, the CPU at
   AI 3, no Bag, nothing handed to the engine. "Another team" draws again.
 - **The friend's trainer** is drawn from Showdown's FireRed/LeafGreen art

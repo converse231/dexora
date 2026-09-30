@@ -508,7 +508,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   and computes research from `state.research`; every number on it is a live
   constant. The corner's event cards are buttons that open it. **What's new
   (`News.jsx`) is a list, newest first**: add an entry at the top with a new
-  id and the menu's dot returns. "Seen" is localStorage, never the save.
+  id and the menu's dot returns. An entry is an `icon` (one emoji) and a
+  title, its items a line each - the headline, never the design notes
+  (check.mjs: ids unique, every entry an emoji, items under two phone lines);
+  the two newest open, the rest a row each. "Seen" is localStorage, never the save.
 - **The Dex sheet has two tabs, Forms and Info** (four left three mostly
   white space). Info is one board of Events' `ev-card`s (field notes,
   research checklist, evolution, where to look); the type-tinted hero carries
@@ -560,6 +563,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   the next battle** of its own sequence (`nextAfter` in League.jsx: a gym's
   path, the League run, the hard run), starting it with the same team when
   all of it may enter, else its team pick.
+- **Suggesting a team is `ui/league/suggest.js`**, for the League's team
+  pick and ranked's editor both (`Suggest.jsx`): styles score, a greedy
+  build spreads types and weaknesses, and a lineup is found by species or
+  evolution line. Famous lineups are typed by dex id WITH the name they
+  were checked by (check.mjs holds each id to its `label`); Champions come
+  from leagues.js, never typed.
 - **The profile is the Trade Center in `profile` mode**: your card alone,
   titled, no trading tabs, its editing and sharing unchanged - one loader,
   one editor. The top bar's name (with its Pokédex rank medal) opens it.
@@ -866,6 +875,18 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   map has no clock-driven animation, so anything new drawn on the canvas that
   changes by itself must join that condition. Standing still, the redraw was
   half of a phone's idle main thread (tools/play counts the paints).
+- **The ground is baked in chunks** (`CHUNK` 16 tiles, at most `CHUNK_MAX`
+  a layer, least recently drawn first): the same `drawTile` calls into
+  offscreen canvases, one missing neighbour baked a frame, the upper layer
+  its own canvas where there is canopy, each cell's tile id kept for the
+  overlays. Pixel-identical to the tile loop (compared per map in a browser,
+  2026-09-30). A new map or new art starts it over; anything that makes a
+  tile change mid-map must clear it. One map-sized canvas is too big for an
+  iPhone's Safari.
+- **A walk tells React a few times a second** (`walked()`, `WALK_NOTICE`):
+  a step bumps `rev` at once (the canvas redraws on it) and hands the UI one
+  notice per 250ms; `changed()`/`stepped()` notify at once and take a
+  pending one with them. tools/play holds both.
 - **Stalls are paid back in `frame()`**: any gap over `STALL` pushes every live
   deadline forward (`move.startedAt`, `encounter.until`, `fishing.until`) and
   drops held keys. A new timer joins that list.
