@@ -11,6 +11,8 @@ import { levelProgress } from "../game/biomes.js";
 import Daily from "./Daily.jsx";
 import { SPECIES } from "../data/dex.js";
 import { themeChoice, setTheme } from "./theme.js";
+import { dexRank } from "../game/medals.js";
+import { RankMedal } from "./RankBadge.jsx";
 
 /* "+3 +2 balls" - the whole parcel in one short line, because four separate
    floating numbers over one counter is confetti, not information. */
@@ -124,6 +126,7 @@ const ICON = {
   swap: "M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7",
   trophy: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3",
   moon: "M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a6.6 6.6 0 0 0 9.7 9.7z",
+  user: "M20 21a8 8 0 0 0-16 0M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
 };
 // Night mode cycles: follow the system, always on, always off.
 const THEME_NEXT = { auto: "dark", dark: "light", light: "auto" };
@@ -137,7 +140,7 @@ function Glyph({ of }) {
   );
 }
 
-function Menu({ onSettings, onHelp, onForms, onEvents, onLeague, onTrade, tradeAlert, onNews, unread, onLogOut, onReset }) {
+function Menu({ onSettings, onHelp, onForms, onEvents, onLeague, onTrade, onProfile, tradeAlert, onNews, unread, onLogOut, onReset }) {
   const [open, setOpen] = useState(false);
   const [theme, setThemeState] = useState(themeChoice);
   const box = useRef(null);
@@ -187,6 +190,11 @@ function Menu({ onSettings, onHelp, onForms, onEvents, onLeague, onTrade, tradeA
           {onLeague && (
             <button type="button" role="menuitem" onClick={run(onLeague)}>
               <Glyph of="trophy" />Pokémon League
+            </button>
+          )}
+          {onProfile && (
+            <button type="button" role="menuitem" onClick={run(onProfile)}>
+              <Glyph of="user" />Profile
             </button>
           )}
           {onTrade && (
@@ -241,7 +249,7 @@ function Menu({ onSettings, onHelp, onForms, onEvents, onLeague, onTrade, tradeA
 export default function TopBar({
   caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp, onReset,
   onLogOut = null, onSettings = null, onHelp = null, onForms = null,
-  onEvents = null, onLeague = null, onTrade = null, onNews = null, unread = false, tradeAlert = false,
+  onEvents = null, onLeague = null, onTrade = null, onProfile = null, onNews = null, unread = false, tradeAlert = false,
   trainerName = null,
   stale = null,
   daily, onClaimDaily, claimNote,
@@ -256,8 +264,23 @@ export default function TopBar({
           the tab, the login card and the loading screen, while the name is the
           one thing here that says whose game this is. Local mode has no
           account and therefore no name, so it keeps the title. */}
+      {/* THE POKEDEX RANK, beside the name it belongs to, and the name opens
+          the profile - the card other trainers see. Local mode has no
+          account, so no card: the medal and the title stay, as a label. */}
       <div className="tb-brand">
-        <span className="title">{trainerName ?? "Dexora"}</span>
+        {(() => {
+          const r = dexRank(caught);
+          const medal = <span className="tb-medal"><RankMedal set="dex" id={r.id} color={r.color} /></span>;
+          const tip = `${r.name}${r.next ? ` - ${r.left} more species to ${r.next.name}` : ""}`;
+          return onProfile ? (
+            <button type="button" className="tb-me" onClick={onProfile} data-tip={`${tip}. Open your profile.`}
+              aria-label={`${trainerName ?? "Your"} profile - Pokédex rank ${r.name}`}>
+              {medal}<span className="title">{trainerName ?? "Dexora"}</span>
+            </button>
+          ) : (
+            <span className="tb-me" data-tip={tip}>{medal}<span className="title">{trainerName ?? "Dexora"}</span></span>
+          );
+        })()}
       </div>
 
       <div
@@ -351,6 +374,7 @@ export default function TopBar({
         onEvents={onEvents}
         onLeague={onLeague}
         onTrade={onTrade}
+        onProfile={onProfile}
         tradeAlert={tradeAlert}
         onNews={onNews}
         unread={unread}

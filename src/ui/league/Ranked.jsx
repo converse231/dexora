@@ -27,10 +27,14 @@ import { Standings, DefenseLog } from "./Standings.jsx";
 import Picker, { keyOf } from "../trade/Picker.jsx";
 
 const asset = (path) => new URL(path, document.baseURI).href;
-const present = (team) => (team ?? []).filter((m) => !m.missing);
+/* WHO MAY PLAY: a member still in the Box and at Lv 100 (docs/ranked.md,
+   Entry) - the server leaves anyone else out the same way. */
+const ready = (m) => !m.missing && (m.level ?? 0) >= RANKED_LEVEL;
+const present = (team) => (team ?? []).filter(ready);
 // The server's refusals, in the game's words (db/ranked.sql).
 const say = (error) => (/not in your saved box/.test(error ?? "")
   ? "Your save is still uploading - try again in a moment."
+  : /under level 100/.test(error ?? "") ? `Only Lv ${RANKED_LEVEL} Pokémon may join a ranked team.`
   : /twice/.test(error ?? "") ? "A Pokémon is in the team twice."
     : error || "Could not reach the server. Try again.");
 // The referee's answers (handler.js, cloud.js `rankedStep`), in words.
@@ -38,6 +42,7 @@ const RANKED_SAYS = {
   nobody: "Nobody to battle right now - ranked needs other trainers with two defense teams. Try again later.",
   uploading: "Your save is still uploading - try again in a moment.",
   twice: "A Pokémon is in that team twice.",
+  level: `Only Lv ${RANKED_LEVEL} Pokémon may battle in ranked - raise them in the League's Train tab.`,
   clause: "That team has two of one species - a form counts as its species.",
   size: "A team is one to six Pokémon.",
   version: "A new version of Dexora is out - reload the page to battle.",
@@ -53,7 +58,7 @@ const RANKED_SAYS = {
 function Rules() {
   return (
     <ul className="lg-rules">
-      <li>Everyone at <b>Lv {RANKED_LEVEL}</b></li>
+      <li>Lv <b>{RANKED_LEVEL}</b> Pokémon only</li>
       <li><b>One</b> of each species</li>
       <li>Same IVs for all</li>
       <li>No items</li>
@@ -65,11 +70,12 @@ function Members({ team }) {
   return (
     <ul className="lg-party" aria-label="Team">
       {team.map((m) => (
-        <li key={m.uid} className={m.missing ? "rk-gone" : ""}>
+        <li key={m.uid} className={ready(m) ? "" : "rk-gone"}
+          data-tip={m.missing ? undefined : ready(m) ? undefined : `Sits out until it reaches Lv ${RANKED_LEVEL}`}>
           {m.missing
             ? <span className="rk-gone-mark" aria-label="No longer in your Box">?</span>
             : <Sprite id={m.species} variant={m.tier} alt={label(speciesById(m.species))} />}
-          <i>{m.missing ? "Gone" : `Lv ${RANKED_LEVEL}`}</i>
+          <i>{m.missing ? "Gone" : `Lv ${m.level ?? RANKED_LEVEL}`}</i>
         </li>
       ))}
     </ul>
@@ -78,8 +84,10 @@ function Members({ team }) {
 
 /* ONE TEAM'S EDITOR: the League's picker, six at most, one of each species
    (a form counts as its species), and one button that saves it. */
-function Editor({ slot, team, box, onSaved }) {
-  const mons = useMemo(() => box.map((m) => ({ ...m, tier: variantOf(m) })), [box]);
+function Editor({ slot, team, box, onSaved, onTrain }) {
+  const all = useMemo(() => box.map((m) => ({ ...m, tier: variantOf(m) })), [box]);
+  const mons = useMemo(() => all.filter(ready), [all]);
+  const under = all.length - mons.length;
   /* By uid, then keyed as the Picker keys it: a Pokemon registered for trading
      is keyed by its server id, not its uid (`keyOf`). */
   const byUid = useMemo(() => new Map(mons.map((m) => [m.uid, m])), [mons]);
@@ -125,6 +133,12 @@ function Editor({ slot, team, box, onSaved }) {
         <span className="lg-kicker">Defense team {TEAM_NAME[slot - 1]}</span>
         <h4>Choose up to {TEAM_MAX}</h4>
         <Rules />
+        {under > 0 && (
+          <p className="rk-under">
+            Only Lv {RANKED_LEVEL} Pokémon may join - {under} of yours {under === 1 ? "is" : "are"} not there yet.
+            {onTrain && <button type="button" className="tp-quiet" onClick={onTrain}>Raise them in Train</button>}
+          </p>
+        )}
       </section>
       <div className="lg-pick-head">
         <h4>Your team</h4>
@@ -138,7 +152,8 @@ function Editor({ slot, team, box, onSaved }) {
         prefer="high"
         limit={() => 1}
         kin={baseOf}
-        empty="Your Box is empty - catch some Pokémon first."
+        empty={all.length ? `None of your Pokémon is Lv ${RANKED_LEVEL} yet - raise one with Rare Candy in the Train tab.`
+          : "Your Box is empty - catch some Pokémon first."}
       />
       {error && <p className="lg-refused" role="alert">{error}</p>}
       <div className="lg-dock">
@@ -215,7 +230,7 @@ function Standing({ me }) {
   );
 }
 
-export default function Ranked({ box, signedIn, editing, setEditing, onPractice, onRanked, nonce = 0, onDefense }) {
+export default function Ranked({ box, signedIn, editing, setEditing, onPractice, onRanked, nonce = 0, onDefense, onTrain }) {
   const [teams, setTeams] = useState(null);       // [{slot, team}] as the server has them
   const [friends, setFriends] = useState(null);
   const [error, setError] = useState(null);
@@ -298,7 +313,7 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
   }
 
   if (editing) {
-    return <Editor slot={editing} team={bySlot.get(editing)} box={box}
+    return <Editor slot={editing} team={bySlot.get(editing)} box={box} onTrain={onTrain}
       onSaved={(d) => { setTeams(d); onDefense?.(d); setEditing(null); }} />;
   }
 

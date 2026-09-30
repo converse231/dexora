@@ -7107,7 +7107,7 @@ import { LEAGUES as R_LEAGUES } from "../src/data/leagues.js";
   const rlim = Object.fromEntries([...rsql.matchAll(/when '(\w+)' then (\d+)/g)].map((m) => [m[1], Number(m[2])]));
   // Every limit the game also knows is the game's; K, the window and the list sizes are the SQL's alone.
   const shared = { SLOTS: DEFENSE_SLOTS, TEAM: R_TEAM, MIN: R_DEFENSE_MIN, ABANDON_MINUTES: R_ABANDON,
-    PLACEMENT: R_PLACEMENT, DAILY: R_DAILY };
+    PLACEMENT: R_PLACEMENT, DAILY: R_DAILY, LEVEL: RANKED_LEVEL };
   for (const [k, v] of Object.entries(shared)) assert.equal(rlim[k], v, `db/ranked.sql's ranked_limit('${k}') and the game disagree`);
   assert.match(rsql, new RegExp(`check \\(slot between 1 and ${DEFENSE_SLOTS}\\)`), "the defense table's slot CHECK moved");
   assert.match(rsql, new RegExp(`check \\(cardinality\\(uids\\) between 1 and ${R_TEAM}\\)`), "the defense table's size CHECK moved");

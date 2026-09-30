@@ -60,6 +60,7 @@ moderation (below) and the Help page says so plainly.
 |---|---|---|
 | Size | Singles, up to 6 a side | The League's format and screen. |
 | Level | **100, for everyone** | Your call. |
+| Entry *(2026-09-30)* | **Only a Pokémon at Lv 100 in your Box may join a team** (`RANKED_LEVEL`, `ranked_limit('LEVEL')`). Its battle is still the format's - Lv 100, fixed IVs, level-up moves - so a save that claims the level gains nothing it could not have bought. The server refuses an under-level member when a team is saved or a challenger's team is read, and leaves one out of a stored team (as a member gone from the Box) when matching or practising. The League page sells Rare Candy and levels Pokémon (its Train tab), so the way in is one page away. | Your call: raising a team is the game's progress, and every Pokémon lifted to 100 for free made candy pointless for ranked. |
 | IVs | Fixed and equal for everyone | A uid decides IVs today, and a save can choose its uids. |
 | Moves | The level-up rule at Lv 100 (`movesAt`) | Deterministic; nothing to forge. |
 | Species clause | One of each species; a form counts as its species | Not a ban - it stops six Eternamax. Without it, forging one species would be forging a whole team. |

@@ -553,6 +553,18 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   is what moves a health bar, so a bar falls with the hit that caused it.
   Health bars are a `scaleX`, never a width. A type's colour is `--tc` on its
   `.t-<type>` class - read it, never copy a hex.
+- **The League page's own tabs** sit beside Ranked in its strip: **Shop**
+  (the Battle shelf) and **Train** (Rare Candy bought and spent, and the Move
+  Tutor), which reads the Box fresh each render - the engine raises a level
+  in place, so a memoised copy showed the old level. **A won fight offers
+  the next battle** of its own sequence (`nextAfter` in League.jsx: a gym's
+  path, the League run, the hard run), starting it with the same team when
+  all of it may enter, else its team pick.
+- **The profile is the Trade Center in `profile` mode**: your card alone,
+  titled, no trading tabs, its editing and sharing unchanged - one loader,
+  one editor. The top bar's name (with its Pokédex rank medal) opens it.
+- **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`
+  rules): its rim drains with steps left over the item's own `steps`.
 - **Hard mode is designed in docs/battles.md, phase 8.** A cleared region's
   leaders, Elite Four and Champion again, ids `<id>:hard`, on the strongest
   core-series party each trainer has (`hard` in leagues.js, fetched), all at
@@ -610,7 +622,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Ranked is designed in docs/ranked.md** - change a decision there first.
   **Its format is species, nothing else**: `rankedFighter` (battle.js) takes
   the level, IVs and moves from `ranked.js`, because a save can choose its
-  levels and uids (a uid picks IVs); asserted. `ranked.js` is the one
+  levels and uids (a uid picks IVs); asserted. **Entry asks for Lv 100 in the
+  Box** (`RANKED_LEVEL`, `ranked_limit('LEVEL')`, held equal): the SQL refuses
+  an under-level member when a team is saved or a challenger's read, and
+  leaves one out of a stored team when matching or practising; the page's
+  `present` is the same filter. A gate, never a strength: the battle is still
+  the format's. `ranked.js` is the one
   rulebook (the page reads it; 6b's server function bundles it). The species
   clause counts a form as its species (`baseOf`), through the Picker's `kin`.
   **Defense teams live on the server** (`db/ranked.sql`, applied AFTER

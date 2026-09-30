@@ -66,6 +66,17 @@ body {
   font-family: var(--pixel); font-size: 12.5px; color: var(--ink-soft);
 }
 .tb-brand { display: flex; align-items: center; gap: 10px; }
+/* The name and its Pokedex rank: one button to the profile. */
+.tb-me {
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 2px 8px 2px 2px;
+  font: inherit; color: inherit; background: transparent; border: 0; border-radius: 12px;
+}
+button.tb-me { cursor: pointer; }
+button.tb-me:hover { background: var(--surface-2); }
+button.tb-me:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.tb-medal { width: 30px; height: 30px; flex: none; display: grid; place-items: center; }
+.tb-medal > .rk-medal { width: 30px; height: 30px; }
+.tb-me .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar .title { font-family: var(--display); font-size: 21px; font-weight: 600; color: var(--ink); }
 
 .topbar b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
@@ -5146,6 +5157,15 @@ button:disabled { transition: none; }
   background: rgba(18, 26, 16, .92); box-shadow: 0 0 0 1.5px var(--gold) inset;
 }
 .rift-ring:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+/* A running item (`fx-ring`): the rift's ring in the item's family colour,
+   its icon lit, the steps left on the edge. */
+.fx-ring { cursor: default; }
+.fx-ring.fx-repel { --rc: #7fc8ff; }
+.fx-ring.fx-rarity { --rc: #f0f4ff; }
+.fx-ring.fx-variant { --rc: var(--gold); }
+.fx-ring > img, .fx-ring > .item-fx { position: relative; width: 28px; height: 28px; opacity: 1; }
+.fx-ring > .item-fx > img { width: 100%; height: 100%; }
+.fx-ring b { box-shadow: 0 0 0 1.5px var(--rc) inset; }
 
 /* IT WORE OFF, and this is the same card gone cold rather than a new object.
    An effect ending is the one thing that happens in this corner with no tell
@@ -5352,6 +5372,10 @@ button:disabled { transition: none; }
   background: var(--ink-faint); color: var(--surface);
 }
 .runbtn:hover kbd { background: var(--canopy); }
+/* One cell for RUN and the hint, so neither decides the box's height. */
+.textbox > .tb-msg { grid-column: 1; grid-row: 1; }
+.textbox > .runbtn, .textbox > .tb-hint { grid-column: 2; grid-row: 1; }
+.runbtn.off { visibility: hidden; }
 
 /* ------------------------------------------------------------ casting a line
 
@@ -6603,6 +6627,16 @@ button:disabled { transition: none; }
 /* The Move Tutor: the Pokemon, its four slots (the one to fill is pressed,
    a new move is marked), what it costs, and what it can learn. */
 .lg-tutor-lede { margin: 0; font-size: 13px; color: var(--ink-soft); }
+/* Train's level panel: where it is, the candy you hold, and the raises. */
+.lg-raise { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: var(--surface); border: 2px solid var(--line); }
+.lg-raise-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.lg-raise-top b { font-family: var(--display); font-size: 20px; color: var(--ink); }
+.lg-raise-top i { font-style: normal; font-size: 12.5px; color: var(--ink-soft); }
+.lg-candy { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--ink); }
+.lg-candy img { width: 22px; height: 22px; image-rendering: pixelated; }
+.lg-raise-go { display: flex; flex-wrap: wrap; gap: 8px; }
+.lg-moves-head { margin-top: 4px; }
+.rk-under { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; font-size: 13px; color: var(--ink-soft); }
 .lg-tutor-mon {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
   padding: 8px 12px; border-radius: 14px; background: var(--surface); border: 2px solid var(--line);

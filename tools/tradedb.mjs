@@ -714,8 +714,10 @@ await A.c.from("trainer_cards").update({ badges: 68 }).eq("user_id", A.id);
 assert.equal(await cardA(), 2, "a trainer wrote their own badges");
 
 // ---- 43. defense teams: checked against the stored save, read-own, write-none ------------------
-await save(A, [P(1, 25), P(2, 6, 50), P(3, 9, 40, { shiny: 1 }), P(4, 3), P(5, 150, 70)]);
+// Every member at Lv 100: only those may join a team (docs/ranked.md, Entry) - uid 6 is one short.
+await save(A, [P(1, 25, 100), P(2, 6, 100), P(3, 9, 100, { shiny: 1 }), P(4, 3, 100), P(5, 150, 100), P(6, 10, 99)]);
 const d43 = await rpc(A, "set_defense_team", { slot: 1, uids: [2, 3, 5] });
+await refuses(rpc(A, "set_defense_team", { slot: 2, uids: [2, 6] }), "a Lv 99 Pokemon joined a ranked team");
 assert.deepEqual(d43[0].team.map((m) => m.species), [6, 9, 150], "a defense team does not read the stored save");
 await refuses(rpc(A, "set_defense_team", { slot: 2, uids: [2, 99] }), "a team naming a uid not in the stored save was taken");
 await refuses(rpc(A, "set_defense_team", { slot: 2, uids: [2, 2] }), "a Pokemon went into a team twice");
@@ -747,13 +749,15 @@ await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
     return data;
   };
   const call = (who, body, now = Date.now()) => handle({ user: who.id, body: { version: RULES_VERSION, ...body }, rpc: service, now });
-  await save(B, [P(11, 445, 60, { shiny: 1 }), P(12, 248), P(13, 373), P(14, 94)]);
+  await save(B, [P(11, 445, 100, { shiny: 1 }), P(12, 248, 100), P(13, 373, 100), P(14, 94, 100)]);
   await rpc(B, "set_defense_team", { slot: 1, uids: [11, 12] });
   // One team is not enough to be met: the SQL's own filter, which keeps the candidate list short.
   assert.ok(!(await service("ranked_candidates", { me: A.id })).candidates.some((c) => c.user_id === B.id),
     "ranked_candidates offered a trainer with one team");
   await rpc(B, "set_defense_team", { slot: 2, uids: [13, 14] });
-  await save(A, [P(1, 25), P(2, 6, 50), P(3, 9, 40)]);
+  await save(A, [P(1, 25, 100), P(2, 6, 100), P(3, 9, 100), P(4, 10, 99)]);
+  const low = await call(A, { op: "start", uids: [1, 4] });
+  assert.equal(low.body.error, "level", `a challenger brought a Lv 99 Pokemon: ${JSON.stringify(low.body)}`);
   const s45 = await call(A, { op: "start", uids: [1, 2, 3] });
   assert.equal(s45.status, 200, `a battle did not start: ${JSON.stringify(s45.body)}`);
   assert.ok(!("state" in s45.body) && !JSON.stringify(s45.body).includes('"seed"'), "the seed or state went out");
