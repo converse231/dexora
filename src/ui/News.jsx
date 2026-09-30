@@ -13,6 +13,19 @@ export const NEWS = [
   {
     id: "2026-10-13",
     date: "October 2026",
+    title: "Train for ranked",
+    items: [
+      ["Ranked wants Lv 100", "Only Pokémon at Lv 100 in your Box can join a ranked team now - raising your team is part of the climb. A team member below it sits out until it gets there."],
+      ["Train", "The Pokémon League has a Train tab: buy Rare Candy, raise any Pokémon to Lv 100 in a tap, and teach it moves - all in one place."],
+      ["Next battle", "Win a gym battle and the next trainer in that gym is one tap away, with the same team."],
+      ["Your profile", "Your trainer card has its own page now - tap your name at the top. Your Pokédex rank sits beside it."],
+      ["Item rings", "Honey, Repels and the White Flute count down as rings in the corner, like a rift."],
+      ["Steadier text box", "The message box in an encounter no longer changes height when the Run button comes and goes."],
+    ],
+  },
+  {
+    id: "2026-10-13",
+    date: "October 2026",
     title: "The Mirage Desert",
     items: [
       ["A new map", "The Mirage Desert opens at Lv 20: Hoenn's Route 111, from the rocky grass past the Old Lady's rest stop, through the sandstorm desert with Mirage Tower and the Desert Ruins, down to the Winstrates' pond."],

@@ -343,14 +343,15 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           scene is taller now: five buttons were taking a quarter of it. */}
       <div className="textbox">
         <p className="tb-msg">{enc.msg || " "}</p>
-        {idle ? (
-          <button className="runbtn" type="button" onClick={onFlee}>
-            <span>RUN</span>
-            <kbd>R</kbd>
-          </button>
-        ) : (
-          <div className="tb-hint">{animating ? "CLICK TO SKIP" : " "}</div>
-        )}
+        {/* RUN IS ALWAYS THERE, only hidden while it cannot be pressed, and
+            the hint sits in its cell: swapping the button for a line of text
+            changed the box's height every throw (reported from play). */}
+        <button className={`runbtn${idle ? "" : " off"}`} type="button" onClick={onFlee}
+          disabled={!idle} aria-hidden={!idle} tabIndex={idle ? 0 : -1}>
+          <span>RUN</span>
+          <kbd>R</kbd>
+        </button>
+        {!idle && <div className="tb-hint">{animating ? "CLICK TO SKIP" : " "}</div>}
         {idle && outOfBalls && (
           <p className="tb-warn">Out of balls — sell spares in the BOX tab.</p>
         )}

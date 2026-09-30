@@ -626,6 +626,7 @@ export default function App({
             dexOf={(x) => st?.dex[dexIndex(x)] ?? 0}
             openName={trade.name}
             openBoard={trade.board ?? null}
+            profile={Boolean(trade.profile)}
             offers={offerAlert}
             inbox={inbox}
             onClose={() => {
@@ -650,6 +651,7 @@ export default function App({
             bag={st?.bag ?? {}}
             level={level}
             stats={st?.stats ?? null}
+            candy={st?.candy ?? 0}
             signedIn={Boolean(account)}
             onClose={() => {
               setLeague(false);
@@ -741,6 +743,7 @@ export default function App({
         onEvents={() => setEvents(true)}
         onLeague={() => setLeague(true)}
         onTrade={() => setTrade({ name: null })}
+        onProfile={account ? () => setTrade({ name: null, profile: true }) : null}
         tradeAlert={offerAlert > 0 || (inbox?.friend_requests ?? 0) > 0}
         onNews={() => setNews(true)}
         unread={unread}
@@ -856,27 +859,23 @@ export default function App({
               </button>
             )))}
 
-            {FAMILIES.some((f) => st?.field?.[f]) && (
-              <div className="fieldbox" role="status">
-                {FAMILIES.map((fam) => {
-                  const run = st.field[fam];
-                  const item = run && fieldById(run.id);
-                  if (!item) return null;
-                  return (
-                    <span
-                      key={fam}
-                      data-tip={`${item.name} — ${item.blurb}. ${run.steps} steps left.`}
-                    >
-                      <ItemIcon item={item} />
-                      <u>
-                        <b>{run.steps}</b>
-                        <i>STEPS</i>
-                      </u>
-                    </span>
-                  );
-                })}
-              </div>
-            )}
+            {/* A RUNNING ITEM IS A RING, as the rift is: the rim drains with
+                its steps (`--p`, steps left over the item's own), the count
+                on its edge - a card's width of corner for a glance's worth. */}
+            {FAMILIES.map((fam) => {
+              const run = st?.field?.[fam];
+              const item = run && fieldById(run.id);
+              if (!item) return null;
+              return (
+                <span key={fam} className={`rift-ring fx-ring fx-${fam}`} role="status"
+                  data-tip={`${item.name} — ${item.blurb}. ${run.steps} steps left.`}
+                  aria-label={`${item.name}: ${run.steps} steps left`}
+                  style={{ "--p": Math.min(1, run.steps / (item.steps || run.steps)) }}>
+                  <ItemIcon item={item} />
+                  <b>{run.steps}</b>
+                </span>
+              );
+            })}
 
             {/* THE CLOCK, OVER THE WORLD IT LIGHTS. It sat in the top bar
                 among the money and the step count, which is a row of things you

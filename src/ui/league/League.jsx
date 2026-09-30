@@ -19,7 +19,7 @@ import {
   teamSize, REMATCH_CAP_STEP, isOpen, hardOpen, hardCleared, charmOf, giftOf, feeFor, CHARM_MAX, REGIONS,
 } from "../../game/league.js";
 import { MOVES } from "../../data/moves.js";
-import { HEALS, TUTOR_PRICE } from "../../game/items.js";
+import { HEALS, TUTOR_PRICE, CANDY_PRICE } from "../../game/items.js";
 import { pricedAt } from "../../game/trainer.js";
 import { ShopShelf } from "../Shop.jsx";
 import { REMATCH_STEPS } from "../../data/gymtune.js";
@@ -40,8 +40,8 @@ import { rankedStep } from "../../net/cloud.js";
 /* The Ranked tab sits first in the region strip under its own id, which is
    not a region's; the strip remembers it like one. */
 const RANKED = "ranked";
-// The League's shop and Move Tutor (phase 8) sit beside it, under ids no region has.
-const SHOP = "shop", TUTOR = "tutor";
+// The League's shop and Train tab (phase 8) sit beside it, under ids no region has.
+const SHOP = "shop", TRAIN = "train";
 
 const asset = (path) => new URL(path, document.baseURI).href;
 const REGION_KEY = "dexora-league-region";
@@ -229,6 +229,31 @@ function Prize({ tune, won }) {
 /* A HARD-MODE OPPONENT (docs/battles.md, phase 8): the same trainer on its
    strongest team, every member at Lv 100, under its own id. */
 const hardOf = (o) => ({ ...o, id: `${o.id}:hard`, party: hardParty(o.hard), base: o });
+// A League member's type is its ace's, where the roster names none.
+const leagueOf = (p) => ({ ...p, type: p.type ?? speciesById(p.party.at(-1)[0]).types[0] });
+
+/* EVERY SEQUENCE AN OPPONENT STANDS IN: each gym's path (its trainers, then
+   its leader), the League run, and the hard run - `{ o, kind }` in order. */
+function sequencesOf(r) {
+  return [
+    ...r.gyms.map((g) => [...g.trainers.map((t) => ({ o: t, kind: "trainer" })), { o: g, kind: "leader" }]),
+    r.league.map((p) => ({ o: leagueOf(p), kind: p.champion ? "champion" : "league" })),
+    [...r.gyms.map((g) => ({ o: hardOf(g), kind: "hard" })),
+      ...r.league.map((p) => ({ o: { ...hardOf(p), type: leagueOf(p).type }, kind: "hard" }))],
+  ];
+}
+/* THE NEXT BATTLE after `id` in its own sequence: the first one open and not
+   yet beaten after it - the gym's next trainer, then its leader. Null at the
+   end of the gym (or run), or when the next door is not open yet. */
+export function nextAfter(id, beaten) {
+  for (const r of LEAGUES) {
+    for (const seq of sequencesOf(r)) {
+      const k = seq.findIndex((x) => x.o.id === id);
+      if (k >= 0) return seq.slice(k + 1).find((x) => isOpen(x.o.id, beaten) && !beaten[x.o.id]) ?? null;
+    }
+  }
+  return null;
+}
 const tierWord = (t) => (t ? t[0].toUpperCase() + t.slice(1) : "");
 
 /* WHAT HARD MODE GIVES, shown whether or not it is open yet - a locked door
@@ -302,8 +327,7 @@ function HardView({ region, beaten, steps, money, onBattle }) {
   const run = useMemo(() => [
     ...region.gyms.map((g, k) => ({ o: hardOf(g), kind: "leader", order: k + 1 })),
     ...region.league.map((p, k) => ({
-      o: { ...hardOf(p), type: p.type ?? speciesById(p.party.at(-1)[0]).types[0] },
-      kind: p.champion ? "champion" : "league", order: k + 1,
+      o: { ...hardOf(p), type: leagueOf(p).type }, kind: p.champion ? "champion" : "league", order: k + 1,
     })),
   ], [region]);
   const say = (h, k) => (!open ? `Clear ${region.name} first: every gym, its trainers and its League.`
@@ -339,20 +363,32 @@ function BattleShop({ money, bag, level, stats, onBuy }) {
   );
 }
 
-/* THE MOVE TUTOR (phase 8): choose a Pokemon, tap one of its four moves,
-   tap a move its line learns by its level to put there, and pay for each new
-   one. League battles only - ranked's format sets every move. */
-function Tutor({ engine, box, money, stats }) {
-  const mons = useMemo(() => box.map((m) => ({ ...m, tier: variantOf(m) })), [box]);
+/* TRAIN (phase 8): choose a Pokemon, then RAISE it - Rare Candy bought and
+   spent here, so a team for a cap or for ranked's Lv 100 is one page away -
+   and TEACH it: tap one of its four moves, tap a move its line learns by its
+   level to put there, and pay for each new one. Moves are League battles
+   only - ranked's format sets every move.
+
+   Read fresh from the Box every render: the engine raises a level IN PLACE,
+   so a memoised copy showed the old level after every candy. */
+function Train({ engine, box, money, stats, candy }) {
+  const mons = box.map((m) => ({ ...m, tier: variantOf(m) }));
   const [picked, setPicked] = useState([]);
   const mon = mons.find((m) => keyOf(m) === picked[0]) ?? null;
-  const now = useMemo(() => (mon ? movesOf(mon) : []), [mon]);
+  const taught = mon?.moves?.join() ?? "";
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const now = useMemo(() => (mon ? movesOf(mon) : []), [mon?.uid, mon?.species, mon?.level, taught]);
   const [draft, setDraft] = useState([]);
   const [slot, setSlot] = useState(0);
   const [q, setQ] = useState("");
   const [note, setNote] = useState(null);
   useEffect(() => { setDraft(now); setSlot(0); setNote(null); }, [now]);
-  const can = useMemo(() => (mon ? learnable(mon.species, mon.level) : []), [mon]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const can = useMemo(() => (mon ? learnable(mon.species, mon.level) : []), [mon?.species, mon?.level]);
+  const candyPrice = pricedAt(CANDY_PRICE, stats);
+  const toTop = mon ? Math.max(0, 100 - mon.level) : 0;
+  const raise = (n) => engine.levelUp(mon.uid, Math.min(n, toTop, candy));
+  const lacking = Math.max(0, toTop - candy);
   const price = pricedAt(TUTOR_PRICE, stats);
   const fresh = draft.filter((i) => !now.includes(i)).length;
   const cost = fresh * price;
@@ -373,9 +409,9 @@ function Tutor({ engine, box, money, stats }) {
   return (
     <div className="lg-pick lg-tutor">
       <section className="rk-edit-head">
-        <span className="lg-kicker">Move Tutor</span>
-        <h4>Teach a move its line learns</h4>
-        <p className="lg-tutor-lede">Any move its evolution line learns by its level, {yen(price)} for each new one. League battles only - ranked sets every move.</p>
+        <span className="lg-kicker">Train</span>
+        <h4>Raise a Pokémon and teach it moves</h4>
+        <p className="lg-tutor-lede">Rare Candy raises it a level each ({yen(candyPrice)} a candy). The Move Tutor teaches any move its evolution line learns by its level, {yen(price)} for each new one - League battles only; ranked sets every move.</p>
       </section>
       {!mon ? (
         <Picker mons={mons} picked={picked} max={1} onChange={setPicked} prefer="high" sort="level" level
@@ -390,6 +426,33 @@ function Tutor({ engine, box, money, stats }) {
             </div>
             <button type="button" className="tp-quiet" onClick={() => setPicked([])}>Another Pokémon</button>
           </section>
+          <section className="lg-raise" aria-label="Raise its level">
+            <div className="lg-raise-top">
+              <span className="lg-kicker">Level</span>
+              <b>Lv {mon.level}</b>
+              <i>{toTop ? `${toTop} to Lv 100` : "Lv 100 - ready for ranked"}</i>
+              <span className="lg-candy"><img src={asset("items/rare-candy.png")} alt="" />{candy.toLocaleString("en-US")}</span>
+            </div>
+            {toTop > 0 && (
+              <div className="lg-raise-go">
+                {[1, 10].map((n) => (
+                  <button key={n} type="button" className="lg-go small quiet" disabled={!candy}
+                    onClick={() => raise(n)}>+{Math.min(n, toTop)} Lv</button>
+                ))}
+                <button type="button" className="lg-go small" disabled={!candy} onClick={() => raise(toTop)}>
+                  {candy >= toTop ? "To Lv 100" : `+${candy} Lv`}
+                </button>
+                {lacking > 0 && (
+                  <button type="button" className="lg-go small quiet" disabled={money < candyPrice * lacking}
+                    data-tip={`${lacking} Rare Candy for ${yen(candyPrice * lacking)}`}
+                    onClick={() => engine.buyCandy(lacking)}>
+                    Buy {lacking} candy · {yen(candyPrice * lacking)}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+          <span className="lg-kicker lg-moves-head">Moves</span>
           <ol className="lg-slots" aria-label="Its four moves">
             {[0, 1, 2, 3].map((k) => {
               const i = draft[k];
@@ -528,7 +591,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
 
 export default function League({
   engine, box = [], beaten = {}, steps = 0, team = [], signedIn = false, onClose,
-  money = 0, bag = {}, level = 1, stats = null,
+  money = 0, bag = {}, level = 1, stats = null, candy = 0,
 }) {
   useModalLock();
   const page = useRef(null);
@@ -536,7 +599,7 @@ export default function League({
   const st = useMemo(() => standing(beaten), [beaten]);
   const firstOpen = () => {
     const saved = readRegion();
-    if ([RANKED, SHOP, TUTOR].includes(saved)) return saved;
+    if ([RANKED, SHOP, TRAIN].includes(saved)) return saved;
     if (saved && st[LEAGUES.findIndex((r) => r.id === saved)]?.open) return saved;
     const k = st.findIndex((s) => s.open && !s.cleared);
     return LEAGUES[k >= 0 ? k : 0].id;
@@ -546,7 +609,7 @@ export default function League({
   const [fight, setFight] = useState(null);  // { o, kind, team, n }
   const [editing, setEditing] = useState(null);   // the defense team slot being edited
   const [nonce, setNonce] = useState(0);          // a ranked battle closed: the Ranked tab reloads its standing
-  const ranked = regionId === RANKED, shop = regionId === SHOP, tutor = regionId === TUTOR;
+  const ranked = regionId === RANKED, shop = regionId === SHOP, train = regionId === TRAIN;
   // Normal or hard: one switch for every region, remembered while the page is open.
   const [hard, setHard] = useState(false);
   const ri = LEAGUES.findIndex((r) => r.id === regionId);
@@ -589,6 +652,24 @@ export default function League({
 
   const choose = (id) => { setRegionId(id); writeRegion(id); };
   const totalBadges = st.reduce((n, s) => n + s.badges, 0);
+
+  /* THE NEXT BATTLE, straight from the result card: the same team, re-read
+     from the Box, when all of it may enter; else its team pick, which starts
+     from that team. */
+  const upNext = fight && !fight.remote && fight.kind !== "practice" ? nextAfter(fight.o.id, beaten) : null;
+  const goNext = () => {
+    const nx = upNext;
+    const mons = fight.mons.map((m) => box.find((x) => x.uid === m.uid)).filter(Boolean)
+      .map((m) => ({ ...m, tier: variantOf(m) }));
+    const cap = tuneOf(nx.o, beaten, steps).cap;
+    const fits = mons.length && mons.length === fight.mons.length && mons.length <= sizeOf(nx.o)
+      && mons.every((m) => !refusal(m, cap));
+    setFight(null);
+    if (fits && (nx.kind !== "hard" || feeFor(nx.o.id) <= money)) {
+      setPick(null);
+      setFight({ o: nx.o, kind: nx.kind, n: fight.n + 1, mine: mons.map(playerFighter), mons, foe: teamOf(nx.o, beaten) });
+    } else setPick({ o: nx.o, kind: nx.kind });
+  };
 
   const startFight = (team) => {
     const { o, kind } = pick;
@@ -650,10 +731,10 @@ export default function League({
                 <b>Shop</b>
                 <em>{yen(money)}</em>
               </button>
-              <button type="button" role="tab" aria-selected={tutor}
-                className={`rk-tab${tutor ? " on" : ""}`} onClick={() => choose(TUTOR)}>
-                <b>Tutor</b>
-                <em>Moves</em>
+              <button type="button" role="tab" aria-selected={train}
+                className={`rk-tab${train ? " on" : ""}`} onClick={() => choose(TRAIN)}>
+                <b>Train</b>
+                <em>Levels · moves</em>
               </button>
               {LEAGUES.map((r, k) => (
                 <button key={r.id} type="button" role="tab" aria-selected={r.id === regionId}
@@ -673,11 +754,12 @@ export default function League({
           <TeamPick o={pick.o} kind={pick.kind} box={box} last={team} beaten={beaten} steps={steps} onFight={startFight} />
         ) : shop ? (
           <BattleShop money={money} bag={bag} level={level} stats={stats} onBuy={(id, n) => engine.buy(id, n)} />
-        ) : tutor ? (
-          <Tutor engine={engine} box={box} money={money} stats={stats} />
+        ) : train ? (
+          <Train engine={engine} box={box} money={money} stats={stats} candy={candy} />
         ) : ranked ? (
           <Ranked box={box} signedIn={signedIn} editing={editing} setEditing={setEditing}
-            onPractice={startPractice} onRanked={startRanked} nonce={nonce} onDefense={engine.setDefense} />
+            onPractice={startPractice} onRanked={startRanked} nonce={nonce} onDefense={engine.setDefense}
+            onTrain={() => { setEditing(null); choose(TRAIN); }} />
         ) : (
           <>
             <section className={`lg-hero${rs.open ? "" : " shut"}`}>
@@ -745,9 +827,11 @@ export default function League({
           myMons={fight.mons}
           foeMons={fight.foeMons ?? null}
           badge={fight.kind === "leader" ? { id: fight.o.id, name: fight.o.badge } : null}
+          nextLabel={upNext ? (upNext.kind === "trainer" ? trainerName(upNext.o) : upNext.kind === "hard" ? `${upNext.o.name} (hard)` : upNext.o.name) : null}
           ai={AI_FOR[fight.kind] ?? 3}
           onDone={(result, again) => {
             if (fight.kind === "ranked") setNonce((n) => n + 1);
+            if (again === "next" && upNext) { goNext(); return; }
             if (again && fight.again) {
               setFight(null);
               fight.again();        // practice or ranked: a fresh blind team from the server

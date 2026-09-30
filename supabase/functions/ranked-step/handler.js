@@ -17,7 +17,7 @@ const deadlineFrom = (now) => new Date(now + TURN_SECONDS * 1000).toISOString();
 // The words a service-only SQL function raises, as the game's error codes.
 const FROM_SQL = [
   [/not in your saved box/, "uploading"], [/twice/, "twice"], [/team size/, "size"], [/already in a battle/, "busy"],
-  [/daily cap/, "cap"], [/voided/, "voided"],
+  [/daily cap/, "cap"], [/voided/, "voided"], [/under level 100/, "level"],
 ];
 
 /* WHOM THEY ARE AGAINST: a trainer (name, sprite, rating) or a League anchor

@@ -213,10 +213,13 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
 
 export default function TradeCenter({
   signedIn, engine, sync, onTraded, box = [], dexOf = () => 0, openName = null, openBoard = null,
-  offers = 0, inbox = null, onClose,
+  offers = 0, inbox = null, onClose, profile = false,
 }) {
   useModalLock();
-  const [tab, setTab] = useState(openBoard ? "board" : "trainers");
+  /* THE PROFILE PAGE is this page on your card alone (`profile`): its own
+     title, no trading tabs, the card's editing and sharing as they were - one
+     loader and one editor, never a second copy of either. */
+  const [tab, setTab] = useState(profile ? "card" : openBoard ? "board" : "trainers");
   const page = useRef(null);
   const head = useRef(null);
   const [blocked, setBlocked] = useState([]);
@@ -479,7 +482,7 @@ export default function TradeCenter({
                   ))}
                 </ul>
               )
-              : <p className="ev-quiet">No friends yet. Share your code from My card, or add theirs above.</p>}
+              : <p className="ev-quiet">No friends yet. Share your code from your profile (tap your name up top), or add theirs above.</p>}
           {sent.length > 0 && <p className="ev-quiet">Waiting on {sent.map((f) => f.card.username).join(", ")}.</p>}
         </section>
 
@@ -523,14 +526,14 @@ export default function TradeCenter({
             <span aria-hidden="true">‹</span> {stacked ? "Back" : "Game"}
           </button>
           <div className="tc-titles">
-            <h3>Trade Center</h3>
-            <span>Trainers, offers, the board, Surprise Trade and your card</span>
+            <h3>{profile ? "Your profile" : "Trade Center"}</h3>
+            <span>{profile ? "Your trainer card: what other trainers see" : "Trainers, offers, the board and Surprise Trade"}</span>
           </div>
         </div>
-        {signedIn && !closed && !stacked && (
+        {signedIn && !closed && !stacked && !profile && (
           <div className="tc-tabbar"><div className="sheet-tabs tc-tabs" role="tablist">
             {[["trainers", "Trainers", incoming.length || null], ["offers", "Offers", offers || null],
-              ["board", "Board", null], ["surprise", "Surprise", null], ["card", "My card", null]].map(([id, name, n]) => (
+              ["board", "Board", null], ["surprise", "Surprise", null]].map(([id, name, n]) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id}
                 className={tab === id ? "on" : ""} onClick={() => { setTab(id); setNote(null); }}>
                 {name}{n ? <em>{n}</em> : null}

@@ -33,6 +33,7 @@ returns int language sql immutable set search_path = '' as $$
     when 'TOP' then 100
     when 'PAST_TOP' then 10
     when 'SHOW_TEAM' then 10
+    when 'LEVEL' then 100   -- a member must be this level in the stored box (docs/ranked.md, Entry)
   end
 $$;
 
@@ -108,6 +109,10 @@ begin
   if exists (select 1 from jsonb_array_elements(public.defense_snapshot(coalesce(box, '[]'), asked)) m where m ? 'missing') then
     raise exception 'not in your saved box';
   end if;
+  if exists (select 1 from jsonb_array_elements(public.defense_snapshot(box, asked)) m
+              where coalesce((m->>'level')::int, 0) < public.ranked_limit('LEVEL')) then
+    raise exception 'under level 100';
+  end if;
   insert into public.defense_teams (owner, slot, uids) values (me, set_defense_team.slot, asked)
   on conflict (owner, slot) do update set uids = excluded.uids, updated_at = now();
   return public.my_defense();
@@ -131,10 +136,12 @@ begin
     select public.defense_snapshot(sv.data->'box', d.uids) as team
       from public.defense_teams d left join public.saves sv on sv.user_id = d.owner
      where d.owner = who) x
-   where exists (select 1 from jsonb_array_elements(x.team) m where not (m ? 'missing'))
+   where exists (select 1 from jsonb_array_elements(x.team) m
+                  where not (m ? 'missing') and coalesce((m->>'level')::int, 0) >= public.ranked_limit('LEVEL'))
    order by random() limit 1;
   if t is null then return null; end if;
-  return (select jsonb_agg(m) from jsonb_array_elements(t) m where not (m ? 'missing'));
+  return (select jsonb_agg(m) from jsonb_array_elements(t) m
+           where not (m ? 'missing') and coalesce((m->>'level')::int, 0) >= public.ranked_limit('LEVEL'));
 end;
 $$;
 
@@ -193,6 +200,9 @@ begin
   select public.defense_snapshot(sv.data->'box', asked) into snap from public.saves sv where sv.user_id = me;
   if snap is null or exists (select 1 from jsonb_array_elements(snap) m where m ? 'missing') then
     raise exception 'not in your saved box';
+  end if;
+  if exists (select 1 from jsonb_array_elements(snap) m where coalesce((m->>'level')::int, 0) < public.ranked_limit('LEVEL')) then
+    raise exception 'under level 100';
   end if;
   return snap;
 end;
@@ -387,7 +397,7 @@ begin
             cross join lateral (
               select coalesce(jsonb_agg(m), '[]') as team
                 from jsonb_array_elements(public.defense_snapshot(sv.data->'box', d.uids)) m
-               where not (m ? 'missing')) t
+               where not (m ? 'missing') and coalesce((m->>'level')::int, 0) >= public.ranked_limit('LEVEL')) t
            where d.owner <> me and jsonb_array_length(t.team) > 0
            group by d.owner
           having count(*) >= public.ranked_limit('MIN')) o

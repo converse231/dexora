@@ -205,7 +205,7 @@ function Mon({ f, mon, side, anim }) {
    answers with the turn's log and the next view, and the beats play from
    those as from a local turn. `{id, view, deadline, resumed, turn, forfeit,
    resync}`; a resumed battle opens where it stands, without the opening. */
-export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = null, practice = false, remote = null, badge = null, ai, onDone, engine }) {
+export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = null, practice = false, remote = null, badge = null, nextLabel = null, ai, onDone, engine }) {
   useModalLock();
   const rng = useMemo(() => mulberry32((Date.now() ^ 0x5eed) >>> 0), []);
   const foeName = `${opponent.cls ? `${opponent.cls} ` : ""}${opponent.name}`;
@@ -576,7 +576,13 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
               </ul>
             ) : null}
             <div className="ft-result-go">
-              <button type="button" className="lg-go" onClick={() => onDone(over, "again")}>
+              {/* THE NEXT BATTLE in this gym (or run), once this one is won. */}
+              {over === "won" && nextLabel && (
+                <button type="button" className="lg-go" onClick={() => onDone(over, "next")}>
+                  Next: {nextLabel}
+                </button>
+              )}
+              <button type="button" className={`lg-go${over === "won" && nextLabel ? " quiet" : ""}`} onClick={() => onDone(over, "again")}>
                 {remote ? "Find another" : practice ? "Another team" : over === "won" ? "Rematch" : "Try again"}
               </button>
               <button type="button" className="lg-go quiet" onClick={() => onDone(over)}>Back to the League</button>

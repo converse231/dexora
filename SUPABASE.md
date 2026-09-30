@@ -507,6 +507,21 @@ stand. It lasts the season; the next one starts them clean.
 **Order:** SQL, then the function, then the game. `npm run tradedb` tests all
 of it against the TEST project.
 
+## 3h. Ranked asks for Lv 100, and the Kanto movesets — **run this once, after 3g** (added 2026-09-30)
+
+docs/ranked.md, *Entry* and *Versioning*. Tested on the TEST project
+(`npm run tradedb`, 2026-09-30). Then live:
+
+1. **`db/ranked.sql` again** - paste the whole file and run it. Saving a team
+   and starting a battle now refuse a member under Lv 100
+   (`ranked_limit('LEVEL')`), and matchmaking and practice leave one out of a
+   stored team, as a Pokemon gone from the Box. Re-runnable.
+2. **Redeploy the function** - the same command as §3f step 2. It carries
+   `RULES_VERSION` 2 (Kanto's movesets are Scarlet/Violet's now), the
+   re-solved anchors, and the handler's new `level` answer. Until it is
+   deployed, the new game and the old function refuse each other.
+3. **Check it took**: `select public.ranked_limit('LEVEL');` is 100.
+
 ## 4. Turn off email confirmation — **you have to do this one**
 
 It is the only step that cannot be done from here: the setting lives in GoTrue's
