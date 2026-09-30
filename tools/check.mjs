@@ -1173,6 +1173,20 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
         `${sel} must beat the tier filter, which is !important - or the sprite ` +
         "never whitens and there is no transformation in the scene");
     }
+
+    /* A TIER'S OWN ANIMATION IS OFF IN THE CYCLE if it moves `transform`: the
+       scene scales both sprites through an inline transform, and an animation
+       outranks an inline style - Glitched's `glitch-shift` held both at full
+       size for the whole cycle (reported as a glitchy evolution). Read off the
+       CSS: any `.sprite-<tier>` whose animation's keyframes set `transform`
+       needs the scene's rule, which leaves only Showdown's strip running. */
+    const moving = [...css.matchAll(/\.sprite-([a-z]+)\s*\{[^}]*?animation:\s*([a-z-]+)/g)]
+      .filter(([, , name]) => new RegExp(`@keyframes ${name}\\s*\\{[\\s\\S]*?transform`).test(
+        css.slice(css.indexOf(`@keyframes ${name}`), css.indexOf("\n}", css.indexOf(`@keyframes ${name}`)))))
+      .map(([, tier]) => tier).filter((t) => t !== "showdown");
+    assert.ok(moving.includes("glitched"), "no tier animation moves `transform` - this check reads nothing");
+    assert.ok(/\.evo:not\(\.evo-reveal\) \.evo-mon:not\(\.sprite-showdown\)\s*\{\s*animation:\s*none/.test(css),
+      `${moving.join(", ")} animate transform, and the evolution cycle does not switch it off - the scale swap cannot play`);
   }
 
   console.log(`evolution ok — ${chains} chains, ${synthetic} synthetic levels, ` +
