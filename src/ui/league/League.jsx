@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LEAGUES } from "../../data/leagues.js";
 import {
-  opponent, playerFighter, rankedFighter, refusal, effectiveness, AI_FOR, hardParty, learnable, movesOf,
+  opponent, playerFighter, rankedFighter, refusal, AI_FOR, hardParty, learnable, movesOf,
 } from "../../game/battle.js";
 import {
   teamSize, REMATCH_CAP_STEP, isOpen, hardOpen, hardCleared, charmOf, giftOf, feeFor, CHARM_MAX, REGIONS,
@@ -32,6 +32,8 @@ import Sprite from "../Sprite.jsx";
 import Types from "../Types.jsx";
 import Picker, { keyOf } from "../trade/Picker.jsx";
 import Fight, { moveName } from "./Fight.jsx";
+import Suggest from "./Suggest.jsx";
+import { TYPES } from "../../data/types.js";
 import { standing, tuneOf, trainerName } from "./progress.js";
 import Ranked from "./Ranked.jsx";
 import { CHAR_PIC } from "../../game/ranked.js";
@@ -513,19 +515,8 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
     .map(keyOf).slice(0, size));
   const team = picked.map((k) => byKey.get(k)).filter(Boolean);
 
-  /* ONE TAP FOR A SENSIBLE TEAM: your highest levels, one of each species,
-     favouring what hits their ace's types - the reference player the League
-     is tuned against does the same. */
-  const suggest = () => {
-    const ace = theirs.reduce((a, f) => (f.level > a.level ? f : a), theirs[0]);
-    // A type that hits their ace is worth a few levels; one of each species.
-    const hits = (m) => speciesById(m.species).types.some((t) => effectiveness(t, ace.types) > 1);
-    const score = (m) => m.level + (hits(m) ? 4 : 0);
-    const seen = new Set();
-    const best = [...ok].sort((a, b) => score(b) - score(a))
-      .filter((m) => (seen.has(m.species) ? false : seen.add(m.species)));
-    setPicked(best.slice(0, size).map(keyOf));
-  };
+  // Their team's types, for the suggestion that counters them (suggest.js).
+  const foes = useMemo(() => theirs.map((f) => f.types.map((i) => TYPES[i])), [theirs]);
 
   const cap = tune.cap;
   const refusedCount = why.level + why.legend + why.locked;
@@ -550,7 +541,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
 
       <div className="lg-pick-head">
         <h4>Your team</h4>
-        {ok.length > 0 && <button type="button" className="tp-quiet" onClick={suggest}>Suggest a team</button>}
+        <Suggest mons={ok} size={size} foes={foes} onPick={(t) => setPicked(t.map(keyOf))} />
       </div>
       <Picker
         mons={ok}

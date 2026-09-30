@@ -956,10 +956,28 @@ export function createEngine(canvas, onChange, mini = null) {
      `rev` still bumps on every step, so the top bar, the step counter and the
      money float are untouched. It is only the two heavy panels that read
      `colRev`. */
+  /* A WALK TELLS REACT A FEW TIMES A SECOND, NOT EVERY STEP (2026-09-30,
+     reported as lag walking; profiled, each step's App render - the top bar,
+     the HUD, the corner - and the garbage after it were the long frames once
+     the map itself was cheap). `walked()` bumps `rev` at once, so the canvas
+     redraws on it, but hands React one notice per WALK_NOTICE ms; any other
+     `changed()` or `stepped()` notifies at once and takes the pending one
+     with it. A step's readouts - the step counter, the clock, the rift's ring
+     - are at most that late. */
+  const WALK_NOTICE = 250;
+  let walkNotice = null;
+  const notify = () => {
+    if (walkNotice) { clearTimeout(walkNotice); walkNotice = null; }
+    onChange();
+  };
+  const walked = () => {
+    state.rev++;
+    walkNotice ??= setTimeout(() => { walkNotice = null; onChange(); }, WALK_NOTICE);
+  };
   const changed = () => {
     state.colRev++;
     state.rev++;
-    onChange();
+    notify();
   };
 
   /* A step moved the trainer and nothing else. The ONE caller is the end of
@@ -975,7 +993,7 @@ export function createEngine(canvas, onChange, mini = null) {
      the encounter closing still call `changed()`, once each. */
   const stepped = () => {
     state.rev++;
-    onChange();
+    notify();
   };
 
   /* A SAVE THAT STOPS WORKING MUST SAY SO. This swallowed every error with the
@@ -1338,7 +1356,7 @@ export function createEngine(canvas, onChange, mini = null) {
     save();
     /* A parcel hands over balls and cash, which the Box and the shop both
        show; a plain step hands over nothing. */
-    if (parcel || found) changed(); else stepped();
+    if (parcel || found) changed(); else walked();
   }
 
   /* A RIFT: open ones run down a step at a time and may turn something up;
@@ -2226,6 +2244,65 @@ export function createEngine(canvas, onChange, mini = null) {
 
   // ------------------------------------------------------------ render
 
+  /* THE GROUND IS BAKED IN CHUNKS (2026-09-30, reported as lag walking the
+     maps, Safari especially). The map has no clock-driven animation, yet a
+     step repainted the whole view tile by tile - some 300 `drawImage`s a
+     frame, the largest cost in a walk's profile. So the tiles are drawn ONCE
+     into CHUNK x CHUNK canvases by the same `drawTile` calls with the same
+     arguments (pixel for pixel what the loop drew), and a frame blits the
+     few chunks in view. Each chunk keeps the tile id `drawTile` chose per
+     cell, for the overlays over the trainer, and a second canvas for the
+     upper layer where it has any canopy. Chunks, not one image of the map:
+     Ember Caldera would be a 3040x3936 canvas - twice, with its upper layer -
+     and an iPhone's Safari caps canvas memory. At most CHUNK_MAX a layer, the
+     least recently drawn going first; one missing neighbour is baked a frame,
+     so walking into a new chunk finds it ready. A new map or new art starts
+     the cache over. */
+  const CHUNK = 16;
+  const CHUNK_MAX = 40;
+  let chunks = new Map();
+  let chunkOf = null;             // which map and which art the cache was baked from
+  const chunkKey = (cx, cy) => cy * 4096 + cx;
+  function bakeChunk(cx, cy) {
+    const size = CHUNK * TILE;
+    const base = document.createElement("canvas");
+    base.width = size; base.height = size;
+    const b = base.getContext("2d");
+    b.imageSmoothingEnabled = false;
+    const ids = new Int16Array(CHUNK * CHUNK).fill(-1);
+    let canopy = false;
+    for (let j = 0; j < CHUNK; j++) {
+      for (let i = 0; i < CHUNK; i++) {
+        const x = cx * CHUNK + i, y = cy * CHUNK + j;
+        // The loop reached one column and row past the map (drawn as tree); no view reaches further.
+        if (x > MAP_W || y > MAP_H) continue;
+        const ch = at(x, y) || rows[0][0];
+        ids[j * CHUNK + i] = drawTile(b, art.atlas, ch, i * TILE, j * TILE, x, y, at,
+                                      fixed ? fixed[y * MAP_W + x] : -1);
+        canopy ||= at(x, y) === "c";
+      }
+    }
+    let top = null;
+    if (canopy) {
+      top = document.createElement("canvas");
+      top.width = size; top.height = size;
+      const t = top.getContext("2d");
+      t.imageSmoothingEnabled = false;
+      drawOverhangs(t, art.atlas, cx * CHUNK, cy * CHUNK, CHUNK - 1, CHUNK - 1, cx * CHUNK * TILE, cy * CHUNK * TILE, at,
+                    (x, y) => (fixed ? fixed[y * MAP_W + x] : -1));
+    }
+    return { base, top, ids };
+  }
+  function chunkAt(cx, cy) {
+    const key = chunkKey(cx, cy);
+    let c = chunks.get(key);
+    if (c) { chunks.delete(key); chunks.set(key, c); return c; }   // the most recently drawn goes last
+    c = bakeChunk(cx, cy);
+    chunks.set(key, c);
+    if (chunks.size > CHUNK_MAX) chunks.delete(chunks.keys().next().value);
+    return c;
+  }
+
   function render(now) {
     const p = state.player;
     const t = move.active ? clamp((now - move.startedAt) / move.ms, 0, 1) : 1;
@@ -2251,7 +2328,34 @@ export function createEngine(canvas, onChange, mini = null) {
     const px = Math.round(wx / TILE);
     const py = Math.round(wy / TILE);
     const over = [];
-    for (let y = y0; y <= y0 + VIEW_H; y++) {
+    const baked = Boolean(art.atlas);
+    if (baked) {
+      const which = `${state.areaId}`;
+      if (chunkOf?.area !== which || chunkOf?.atlas !== art.atlas) { chunks = new Map(); chunkOf = { area: which, atlas: art.atlas }; }
+      const cx0 = Math.floor(x0 / CHUNK), cx1 = Math.floor((x0 + viewW) / CHUNK);
+      const cy0 = Math.floor(y0 / CHUNK), cy1 = Math.floor((y0 + VIEW_H) / CHUNK);
+      for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          ctx.drawImage(chunkAt(cx, cy).base, Math.round(cx * CHUNK * TILE - camX), Math.round(cy * CHUNK * TILE - camY));
+        }
+      }
+      // The tiles he could be standing behind, as the tile pass chose them.
+      for (let y = Math.max(y0, py - 2); y <= Math.min(y0 + VIEW_H, py); y++) {
+        for (let x = Math.max(x0, px - 1); x <= Math.min(x0 + viewW, px + 1); x++) {
+          const id = chunkAt(Math.floor(x / CHUNK), Math.floor(y / CHUNK)).ids[(y % CHUNK) * CHUNK + (x % CHUNK)];
+          if (walkable(rows, x, y) || raisedOver(x, y)) over.push([x, y, id]);
+        }
+      }
+      // One neighbour a frame, so the next chunk a walk enters is already baked.
+      warm: for (let cy = Math.max(0, cy0 - 1); cy <= cy1 + 1; cy++) {
+        for (let cx = Math.max(0, cx0 - 1); cx <= cx1 + 1; cx++) {
+          if (cx * CHUNK > MAP_W || cy * CHUNK > MAP_H || chunks.has(chunkKey(cx, cy))) continue;
+          chunkAt(cx, cy);
+          break warm;
+        }
+      }
+    }
+    for (let y = y0; !baked && y <= y0 + VIEW_H; y++) {
       for (let x = x0; x <= x0 + viewW; x++) {
         // Off the map draws as tree so the void reads as forest, but neighbour
         // lookups get "" there - otherwise the tree depth walk never ends.
@@ -2325,8 +2429,18 @@ export function createEngine(canvas, onChange, mini = null) {
 
     drawBobber(ctx, state.fishing, now, camX, camY);
 
-    drawOverhangs(ctx, art.atlas, x0, y0, viewW, VIEW_H, camX, camY, at,
-                  (x, y) => (fixed ? fixed[y * MAP_W + x] : -1));
+    if (baked) {
+      // The upper layer, from the same chunks.
+      for (let cy = Math.floor(y0 / CHUNK); cy <= Math.floor((y0 + VIEW_H) / CHUNK); cy++) {
+        for (let cx = Math.floor(x0 / CHUNK); cx <= Math.floor((x0 + viewW) / CHUNK); cx++) {
+          const top = chunks.get(chunkKey(cx, cy))?.top;
+          if (top) ctx.drawImage(top, Math.round(cx * CHUNK * TILE - camX), Math.round(cy * CHUNK * TILE - camY));
+        }
+      }
+    } else {
+      drawOverhangs(ctx, art.atlas, x0, y0, viewW, VIEW_H, camX, camY, at,
+                    (x, y) => (fixed ? fixed[y * MAP_W + x] : -1));
+    }
     if (!high) drawOverlays(ctx, art.atlas, over, camX, camY);
 
     drawMini(camX, camY, wx, wy);
@@ -3177,6 +3291,7 @@ export function createEngine(canvas, onChange, mini = null) {
       halted = true;
       cancelAnimationFrame(raf);
       clearTimeout(saveTimer);
+      clearTimeout(walkNotice);
       globalThis.removeEventListener?.("storage", rival);
       globalThis.removeEventListener?.("pagehide", leaving);
       globalThis.removeEventListener?.("visibilitychange", hidden);

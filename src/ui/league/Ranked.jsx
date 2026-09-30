@@ -25,6 +25,7 @@ import { RankMedal } from "../RankBadge.jsx";
 import RankUp from "../RankUp.jsx";
 import { Standings, DefenseLog } from "./Standings.jsx";
 import Picker, { keyOf } from "../trade/Picker.jsx";
+import Suggest from "./Suggest.jsx";
 
 const asset = (path) => new URL(path, document.baseURI).href;
 /* WHO MAY PLAY: a member still in the Box and at Lv 100 (docs/ranked.md,
@@ -97,25 +98,10 @@ function Editor({ slot, team, box, onSaved, onTrain }) {
   const byKey = useMemo(() => new Map(mons.map((m) => [keyOf(m), m])), [mons]);
   const chosen = picked.map((k) => byKey.get(k)).filter(Boolean);
 
-  /* ONE TAP FOR A SENSIBLE TEAM. Everyone fights at Lv 100 with the same IVs,
-     so what a Pokemon IS decides, not its level: the strongest species (base
-     stat total), one of each (a form counts as its species, the clause), and
-     no two sharing a primary type while the Box allows, so one weakness does
-     not sweep the team. A Pokemon in a trade may leave, so it is not offered. */
-  const suggest = () => {
-    const bst = (m) => speciesById(m.species).stats.reduce((a, b) => a + b, 0);
-    const pool = mons.filter((m) => !m.lock).sort((a, b) => bst(b) - bst(a));
-    const kin = new Set(), types = new Set(), team = [];
-    for (const spread of [true, false]) {
-      for (const m of pool) {
-        if (team.length >= TEAM_MAX) break;
-        const type = speciesById(m.species).types[0];
-        if (kin.has(baseOf(m.species)) || (spread && types.has(type))) continue;
-        kin.add(baseOf(m.species)); types.add(type); team.push(m);
-      }
-    }
-    setPicked(team.map(keyOf));
-  };
+  /* ONE TAP FOR A TEAM (suggest.js): everyone fights at Lv 100 with the same
+     IVs, so the species decides; one of each by the species clause (`baseOf`).
+     A Pokemon in a trade may leave, so it is not offered. */
+  const offer = useMemo(() => mons.filter((m) => !m.lock), [mons]);
 
   const save = async (uids) => {
     setBusy(true); setError(null);
@@ -142,7 +128,7 @@ function Editor({ slot, team, box, onSaved, onTrain }) {
       </section>
       <div className="lg-pick-head">
         <h4>Your team</h4>
-        {mons.length > 0 && <button type="button" className="tp-quiet" onClick={suggest}>Suggest a team</button>}
+        <Suggest mons={offer} size={TEAM_MAX} kin={baseOf} onPick={(t) => setPicked(t.map(keyOf))} />
       </div>
       <Picker
         mons={mons}
