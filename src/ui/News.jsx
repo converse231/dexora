@@ -23,6 +23,7 @@ export const NEWS = [
     items: [
       ["No more stutter", "Walking on every map is smooth again - the map is drawn once, not every step."],
       ["Loads sooner", "The map's art starts downloading with the game, so it appears faster."],
+      ["Clean evolutions", "Glitched Pokémon evolve smoothly again."],
     ],
   },
   {

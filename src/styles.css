@@ -4772,6 +4772,15 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 
 /* Before the cycle only the original is on screen; after it, only the result. */
 .evo-intro .evo-post, .evo-whiten .evo-post { visibility: hidden; }
+/* UNTIL THE REVEAL, A TIER'S OWN ANIMATION IS OFF on the two sprites (reported
+   as a glitchy evolution for Glitched ones). The cycle scales them through
+   an inline `transform`, and an animation outranks an inline style: Glitched's
+   `glitch-shift` sets `transform` in every frame, so both silhouettes stood
+   at full size, jittering, with no tug-of-war at all; Projection's flicker
+   dimmed the white. Showdown keeps its own, which steps a strip and never
+   touches `transform`. The reveal is the tier's moment, and `VariantFx`
+   plays it there. */
+.evo:not(.evo-reveal) .evo-mon:not(.sprite-showdown) { animation: none; }
 .evo-flash .evo-pre, .evo-reveal .evo-pre { visibility: hidden; }
 .evo-reveal .evo-post { transform: scale(1) !important; animation: evo-pop .32s ease-out; }
 @keyframes evo-pop { from { transform: scale(1.14) !important; } }

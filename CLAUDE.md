@@ -255,6 +255,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `run(picked)` never falls back to the full list.
 - **An evolution can cost a tier** when the target has no such art; warn with
   `lockedTiers(target)`.
+- **The evolution cycle switches a tier's own animation off** until the
+  reveal (Showdown's strip excepted): it scales both sprites through an
+  inline `transform`, and Glitched's `glitch-shift`, which sets `transform`,
+  held both at full size for the whole cycle. check.mjs reads any tier
+  animation that moves `transform` and asks for the rule.
 - **A tier's `filter` carries `!important`; its `animation` must not.** An
   animation outranks a plain declaration, and `.mon.captured` / `.mon.gone`
   carry `!important` so capture and flee beat any tier idle.
