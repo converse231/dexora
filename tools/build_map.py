@@ -46,6 +46,7 @@ import io
 import json
 import os
 import random
+import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -96,6 +97,15 @@ AREAS = [
     # Takes Ground from Mt. Moon, whose 190-species table was the second most
     # crowded in the game.
     dict(id="desert", name="Mirage Desert", drawn="route111"),
+    # COPIED: Emerald's Route 120, the rain-soaked route east of Fortree - see
+    # route120(). The first map past Lv 20.
+    dict(id="rainwood", name="Rainwood Crossing", drawn="route120"),
+    # COPIED: Emerald's Meteor Falls, all five rooms and Steven's cave, on
+    # shelves like Ember Caldera's - see meteor_falls(). Dragon's own home.
+    dict(id="falls", name="Meteor Falls", drawn="meteor_falls"),
+    # COPIED: Emerald's Shoal Cave at low tide, all five rooms - see
+    # shoal_cave(). Ice and Water's second home, the last rung.
+    dict(id="shoal", name="Shoal Cave", drawn="shoal_cave"),
 ]
 
 SOLID = set("TwRMIPHLFCWXBEVkKdtYGAZJQ")
@@ -2672,7 +2682,10 @@ MB_JUMP_SOUTH = 0x3B
 MB_RAIL_V = frozenset((0xD3, 0xD5))    # isolated / continuing vertical rail
 MB_RAIL_H = frozenset((0xD4, 0xD6))    # isolated / continuing horizontal rail
 MB_LONG_GRASS = frozenset((0x03, 0x09))    # long grass, and its south edge
-MB_BRIDGE = frozenset((0x70,))             # a bridge over ocean water
+# A bridge over ocean water, and the pond bridges (low, medium, high and the
+# two edge pieces of each) - Route 120's. Every one is walked over and surfed
+# under, so every one is `N`.
+MB_BRIDGE = frozenset((0x70, 0x71, 0x72, 0x73, 0x7A, 0x7B, 0x7C, 0x7D))
 MB_WATERFALL = 0x13
 
 
@@ -3238,6 +3251,281 @@ def route111():
     rows = ["".join(r) for r in g]
     return (rows, spawn, [i for row in tiles for i in row], GB, None,
             {"elev": elev_rows(elev)})
+
+
+# -------------------------------------------------------------- Emerald layouts
+
+def em_layout(layout, secondary, general, sec_base):
+    """One Emerald layout, read as every copied Emerald route reads it: the
+    metatile ids, collision and elevation out of its map.bin, each cell's
+    behaviour out of the right tileset's attributes, its 2x2 border block and
+    its map.json events. `general` and `sec_base` are the atlas bases the ids
+    rebase onto (route.json's). Written once the fourth copy of it came along:
+    route110(), route111() and monsoon_trail() each carry their own."""
+    import numpy as np
+    import build_assets as BA
+
+    layouts = json.load(io.open(
+        BA.fetch("data/layouts/layouts.json", "em/layouts.json", root=BA.EMERALD),
+        encoding="utf-8"))["layouts"]
+    lay = next(q for q in layouts if q["name"] == layout + "_Layout")
+    W, H = lay["width"], lay["height"]
+    raw = np.frombuffer(io.open(BA.fetch(
+        lay["blockdata_filepath"], f"em/{layout}.bin", root=BA.EMERALD), "rb").read(),
+        dtype="<u2")[:W * H]
+    attr = {
+        False: np.frombuffer(io.open(BA.fetch(
+            "data/tilesets/primary/general/metatile_attributes.bin",
+            "em/general/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+        True: np.frombuffer(io.open(BA.fetch(
+            f"data/tilesets/secondary/{secondary}/metatile_attributes.bin",
+            f"em/{secondary}/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+    }
+    split = 512                                 # NUM_METATILES_IN_PRIMARY, Emerald's
+    border = [int(v) & 0x3FF for v in np.frombuffer(io.open(BA.fetch(
+        lay["border_filepath"], f"em/{layout}_border.bin", root=BA.EMERALD), "rb").read(),
+        dtype="<u2")]
+    assert len(border) == 4, f"{layout}: the border block is not 2x2"
+    folder = lay["blockdata_filepath"].split("/")[2]
+    events = json.load(io.open(BA.fetch(
+        f"data/maps/{folder}/map.json", f"em/{folder}_map.json", root=BA.EMERALD),
+        encoding="utf-8"))
+    return {
+        "W": W, "H": H,
+        "ids": (raw & 0x3FF).reshape(H, W),
+        "col": ((raw >> 10) & 3).reshape(H, W),
+        "elev": [[int(e) for e in r] for r in ((raw >> 12) & 0xF).reshape(H, W)],
+        "behave": lambda i: int(attr[i >= split][i if i < split else i - split] & 0x1FF),
+        "rebase": lambda i: (general + i) if i < split else (sec_base + i - split),
+        "border": border, "events": events,
+    }
+
+
+def route120():
+    """Rainwood Crossing is Emerald's Route 120, cell for cell: 40x100 of long
+    grass, ponds, puddles and the pond bridges east of Fortree. General plus
+    Fortree - Monsoon Trail's pair - so it costs no art.
+
+    Long grass is laid as General's tall grass, as Monsoon Trail's is. Its two
+    doors - the Ancient Tomb and the Scorched Slab - lead to interiors we do
+    not have, so they are sealed, read off its own `warp_events`. The Kecleon
+    blocking the bridge and the Cut trees are OBJECTS in Emerald, so the ground
+    under them is open. Fortree and Route 121 are not here: the outer ring is
+    the layout's own border block, and the way in is from Fortree, the west."""
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))["monsoon"]
+    L = em_layout("Route120", "fortree", meta["general"], meta["fortree"])
+    W, H, ids, col, elev, behave, rebase = (L[k] for k in ("W", "H", "ids", "col", "elev", "behave", "rebase"))
+    assert (W, H) == (40, 100), f"route120: Route 120 is {W}x{H}, not 40x100"
+
+    g = [[None] * W for _ in range(H)]
+    tiles = [[-1] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            i = int(ids[y][x])
+            if behave(i) in MB_LONG_GRASS:
+                i = EM_TALL_GRASS
+            g[y][x] = em_cell(behave(i), int(col[y][x]))
+            tiles[y][x] = rebase(i)
+
+    shut = [(w["x"], w["y"]) for w in L["events"]["warp_events"]]
+    assert len(shut) == 2, f"route120: {len(shut)} warps, the note above names two"
+    for x, y in shut:
+        g[y][x] = "T"
+
+    border = L["border"]
+    for x in range(W):
+        for y in (0, H - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+    for y in range(H):
+        for x in (0, W - 1):
+            g[y][x] = "T"
+            tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+
+    seal_hidden(g, tiles, "T", elev)
+
+    # The way in is from Fortree, at the west: the westmost open cell, the
+    # highest of them (Fortree joins the route's top rows).
+    open_ = sorted((x, y) for y in range(H) for x in range(W) if g[y][x] not in SOLID)
+    spawn = open_[0]
+
+    # The cull and the landing rule to a fixed point, walking and surfing.
+    while True:
+        seen = reach(g, [spawn], elev, surf=True)
+        cut = 0
+        for y in range(H):
+            for x in range(W):
+                if g[y][x] not in SOLID and (x, y) not in seen:
+                    g[y][x] = "T"
+                    cut += 1
+        if not cut and not land_ledges(g, "T"):
+            break
+
+    rows = ["".join(r) for r in g]
+    return (rows, spawn, [i for row in tiles for i in row], meta["general"], None,
+            {"elev": elev_rows(elev)})
+
+
+# -------------------------------------------------------------- Meteor Falls
+
+# The five rooms, and where they sit: the upper rooms and Steven's cave on the
+# top shelf, the way in (1F_1R) and the basement beside it below.
+FALLS_ROOMS = ("1F_1R", "1F_2R", "B1F_1R", "B1F_2R", "StevensCave")
+FALLS_SHELVES = ((1, 3, 4), (0, 2))
+FALLS_GUT = 2
+FALLS_IN = "MAP_ROUTE114"          # the Fallarbor side: the way in
+
+
+def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mouths, remap):
+    """Emerald rooms, cell for cell, on shelves on one grid, joined by their
+    real warps - read out of each room's map.json and kept only where they
+    answer each other, as Ember Caldera's are. `way_in` is the map the entrance
+    warp leads to (it becomes the spawn); every other warp out of the rooms
+    leads to a map we do not have and is sealed. `remap` turns `em_cell`'s
+    outdoor characters into the cave's own, so the minimap draws rock, not
+    grass. Shared by Meteor Falls and Shoal Cave."""
+    rooms = []
+    for name in names:
+        L = em_layout(f"{prefix}_{name}", secondary, meta["general"], sec_base)
+        # The game's constant for the room: StevensCave is STEVENS_CAVE.
+        L["const"] = f"MAP_{re.sub(r'(?<=[a-z])(?=[A-Z])', '_', prefix).upper()}_" + \
+            re.sub(r"(?<=[a-z])(?=[A-Z])", "_", name).upper()
+        rooms.append(L)
+    index = {r["const"]: i for i, r in enumerate(rooms)}
+    rebase = rooms[0]["rebase"]
+
+    pairs, out = set(), []
+    for i, r in enumerate(rooms):
+        wv_all = r["events"]["warp_events"]
+        for wv in wv_all:
+            j = index.get(wv["dest_map"])
+            if j is None:
+                out.append((i, wv["x"], wv["y"], wv["dest_map"]))
+                continue
+            back = rooms[j]["events"]["warp_events"][int(wv["dest_warp_id"])]
+            if index.get(back["dest_map"]) == i and wv_all[int(back["dest_warp_id"])] is wv:
+                pairs.add(tuple(sorted(((i, wv["x"], wv["y"]), (j, back["x"], back["y"])))))
+    assert len(out) == mouths, f"{tag}: {len(out)} ways out, not {mouths}"
+    assert sorted(i for s_ in shelves for i in s_) == list(range(len(rooms))), \
+        f"{tag}: every room must sit on exactly one shelf"
+
+    origin, y = {}, 0
+    for shelf in shelves:
+        x = 0
+        for i in shelf:
+            origin[i] = (x, y)
+            x += rooms[i]["W"] + FALLS_GUT
+        y += max(rooms[i]["H"] for i in shelf) + FALLS_GUT
+    W = max(origin[i][0] + rooms[i]["W"] for i in origin)
+    H = max(origin[i][1] + rooms[i]["H"] for i in origin)
+
+    B = rooms[0]["border"]
+    g = [["M"] * W for _ in range(H)]
+    tiles = [[rebase(B[(yy % 2) * 2 + (xx % 2)]) for xx in range(W)] for yy in range(H)]
+    elev = [[0] * W for _ in range(H)]
+    doors = {c for pair in pairs for c in pair}
+    for i, r in enumerate(rooms):
+        ox, oy = origin[i]
+        for yy in range(r["H"]):
+            for xx in range(r["W"]):
+                mid = int(r["ids"][yy][xx])
+                b = r["behave"](mid)
+                ch = remap(b, em_cell(b, int(r["col"][yy][xx]), solid="M"))
+                if (i, xx, yy) in doors:
+                    ch = "l"
+                g[oy + yy][ox + xx] = ch
+                tiles[oy + yy][ox + xx] = rebase(mid)
+                elev[oy + yy][ox + xx] = r["elev"][yy][xx]
+
+    spawn = None
+    for i, mx, my, dest in out:
+        at = (origin[i][0] + mx, origin[i][1] + my)
+        if dest == way_in:
+            spawn = at
+        else:
+            g[at[1]][at[0]] = "M"               # to a map we do not have: sealed
+    assert spawn and g[spawn[1]][spawn[0]] not in SOLID, f"{tag}: the way in is walled up"
+
+    for xx in range(W):
+        g[0][xx] = g[H - 1][xx] = "M"
+    for yy in range(H):
+        g[yy][0] = g[yy][W - 1] = "M"
+    seal_hidden(g, tiles, "M", elev)
+
+    warps = []
+    for (fa, xa, ya), (fb, xb, yb) in sorted(pairs):
+        ax, ay = origin[fa][0] + xa, origin[fa][1] + ya
+        bx, by = origin[fb][0] + xb, origin[fb][1] + yb
+        assert g[ay][ax] == "l" and g[by][bx] == "l", \
+            f"{tag}: the warp at ({ax},{ay})/({bx},{by}) is not on a door"
+        warps.append([ax, ay, bx, by])
+    hop = {}
+    for ax, ay, bx, by in warps:
+        hop[(ax, ay)], hop[(bx, by)] = (bx, by), (ax, ay)
+
+    # The cull and the landing rule to a fixed point: walking, the warps, Surf.
+    while True:
+        seen = reach(g, [spawn], elev, hop=hop, surf=True)
+        cut = 0
+        for yy in range(H):
+            for xx in range(W):
+                if g[yy][xx] not in SOLID and (xx, yy) not in seen:
+                    g[yy][xx] = "M"
+                    cut += 1
+        if not cut and not land_ledges(g, "M"):
+            break
+    # A PAIR NOTHING REACHES IS DROPPED with the cells it joins: Shoal Cave's
+    # two high-tide passages link only each other at low tide. One reached
+    # end and one culled would be a door into rock - that still fails.
+    kept = []
+    for ax, ay, bx, by in warps:
+        ends = (g[ay][ax] == "l", g[by][bx] == "l")
+        assert ends[0] == ends[1], f"{tag}: the warp ({ax},{ay})/({bx},{by}) leads into rock"
+        if ends[0]:
+            kept.append([ax, ay, bx, by])
+    warps = kept
+
+    return (["".join(r) for r in g], spawn, [i for row in tiles for i in row], meta["general"], warps,
+            {"elev": elev_rows(elev)})
+
+
+def meteor_falls():
+    """Meteor Falls: Emerald's cave of waterfalls, every room cell for cell,
+    on shelves - see `em_rooms`. The way in is the Route 114 mouth; the Route
+    115 one is sealed. Cave floor and wall are Ember Caldera's characters
+    (`m`, `M`). A waterfall is surfed up, as Monsoon Trail's are - Waterfall is
+    not a move this game has, and without it the upper rooms are walled off."""
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))["meteor"]
+    return em_rooms("falls", "MeteorFalls", FALLS_ROOMS, "meteor_falls", meta, meta["meteor_falls"],
+                    FALLS_SHELVES, FALLS_IN, 2, lambda b, ch: {".": "m", "T": "M"}.get(ch, ch))
+
+
+# -------------------------------------------------------------- Shoal Cave
+
+# Low tide, the tide the rooms' ice and lower floor are reached at. The inner
+# room and the stairs above, then the way in beside the lower and ice rooms.
+SHOAL_ROOMS = ("LowTideEntranceRoom", "LowTideInnerRoom", "LowTideStairsRoom",
+               "LowTideLowerRoom", "LowTideIceRoom")
+SHOAL_SHELVES = ((1, 2), (0, 3, 4))
+SHOAL_IN = "MAP_ROUTE125"
+MB_ICE = 0x20
+
+
+def shoal_cave():
+    """Shoal Cave: Emerald's tidal cave at low tide, every room cell for cell,
+    on shelves - see `em_rooms`. The way in is from Route 125 at sea.
+
+    ICE IS FLOOR, as Frost Hollow's is (`i`): on the GBA it slides you, and this
+    game has no sliding. The IMPASSABLE_NORTH lips are walked like floor - the
+    engine has no one-way cell but a ledge - and the collision-1 ones stay rock.
+    Shallow water is floor you splash through."""
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))["shoal"]
+    return em_rooms("shoal", "ShoalCave", SHOAL_ROOMS, "cave", meta, meta["cave"],
+                    SHOAL_SHELVES, SHOAL_IN, 1,
+                    lambda b, ch: "i" if b == MB_ICE and ch == "." else {".": "m", "T": "M"}.get(ch, ch))
 
 
 # -------------------------------------------------------------- Cinderpeak

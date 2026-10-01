@@ -16,6 +16,29 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-01-cap",
+    icon: "⭐",
+    date: "October 2026",
+    title: "Level 100 and two new stats",
+    items: [
+      ["Level 100", "The trainer cap goes from 75 to 100: 25 more stat points to spend."],
+      ["Lustre", "A new stat: shinies, holos and every rare form turn up more often."],
+      ["Coach", "A new stat: duplicates convert into more Rare Candy for your League team."],
+      ["Fairer late game", "Once every region has arrived, none of them takes over a map."],
+    ],
+  },
+  {
+    id: "2026-10-16",
+    icon: "🗺️",
+    date: "October 2026",
+    title: "Three new maps",
+    items: [
+      ["Rainwood Crossing", "Hoenn's rainy Route 120 opens at Lv 25: long grass, ponds and bridges, and a home for Dark types."],
+      ["Meteor Falls", "The cave of waterfalls opens at Lv 30, all five rooms and Steven's Cave. Dragons live here now."],
+      ["Shoal Cave", "The tidal cave at low tide opens at Lv 35, down to its frozen ice room."],
+    ],
+  },
+  {
     id: "2026-10-15",
     icon: "⚡",
     date: "October 2026",

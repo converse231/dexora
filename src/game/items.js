@@ -622,8 +622,9 @@ export const artOf = (item) => item?.art ?? item?.id ?? "";
 /* Key items: earned at a trainer level, never bought, never used up. They are
    held in the same bag as everything else - a count of 1 means you have it -
    because a second bag for four things is a second thing to keep in sync. */
-/* Lv 20, which is where the map ladder finishes (`MAP_LAST`). Every area is
-   open by then, so this is a reward for having seen all eight rather than a key
+/* Lv 20, which is where the first map ladder finished. Every map of that
+   ladder is open by then (three later maps go on to 35, `MAP_LAST`), so this is
+   a reward for having seen them rather than a key
    to one of them - and it turns the water and the lava those maps are drawn
    with from scenery into somewhere to go. */
 export const SURF_LEVEL = 20;
@@ -754,8 +755,14 @@ export function onShelf(items, level) {
    over, not so many that a Snorlax is worth one"). Ten puts it at 11. A ball
    already paid is never taken back; a new trainer gets five by Lv 50 instead
    of six, and two more past it. A divisor rather than a list, so the cap is
-   the only number that decides. */
-export const MASTER_EVERY = 10;
+   the only number that decides.
+
+   AND 14 AT A LV 100 CAP: ten would have paid ten from levels, fourteen with
+   walking's four. Fourteen keeps levelling at seven (the last at Lv 98), so a
+   whole game is 11 again. A trainer already past Lv 14 under the old divisor
+   keeps every ball paid and meets the next multiple of 14 - at most one over
+   a new trainer's count, still inside the band. */
+export const MASTER_EVERY = 14;
 
 export function levelReward(level) {
   const items = { "poke-ball": plain(5, level) };

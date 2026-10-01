@@ -1098,8 +1098,9 @@ const RESIDENTS = [
        slot's historical handle - see build_map.py's AREAS.
 
        GROUND WENT TO THE MIRAGE DESERT, which was built to take it: five types
-       made this the second most crowded table in the game. */
-    types: ["rock", "fighting", "steel", "dragon"],
+       made this the second most crowded table in the game. And DRAGON WENT
+       TO METEOR FALLS, the cave Emerald's dragons live in. */
+    types: ["rock", "fighting", "steel"],
     table: [
       [74, 20], [41, 16], [50, 10], [66, 10], [27, 9], [95, 7], [104, 6],
       [111, 6], [75, 4], [67, 4], [35, 4], [106, 2], [107, 2],
@@ -1386,6 +1387,11 @@ const RESIDENTS = [
        Cacnea and Phanpy were 16.6% each against the 6% cap; at a tenth all
        three fit. C and A carry the rest.
 
+       CACNEA IS 7, NOT 5, since `bandShares` (2026-10-01): lifting Kalos to
+       its 5% floor here took a little from every cell, and Cacnea alone in
+       (B, Gen 3) fell to 1 in 9,000 at the cap. Any lower C cast was tried for
+       Kanto's 33% and failed the same cell from the other side.
+
        AND NO SANDILE, though Unova's Desert Resort is where it lives. Written
        here, it was the one Gen 5 in that small B band while Gen 5's A-band
        rows already met its share, so the fit starved it to 1 in 10 million at
@@ -1399,8 +1405,68 @@ const RESIDENTS = [
     types: ["ground"],
     legends: ["rock"],
     table: [
-      [27, 24], [328, 24], [343, 16], [331, 5], [953, 4], [694, 3],
+      [27, 24], [328, 24], [343, 16], [331, 7], [953, 4], [694, 3],
       [345, 12], [347, 12], [968, 2],
+    ],
+  },
+  {
+    id: "rainwood",
+    water: true,               // its ponds, fished and surfed
+    level: 25,  // the ladder goes on past Surf: the first of three later maps
+    name: "Rainwood Crossing",
+    /* EMERALD'S ROUTE 120, AND DARK'S SECOND HOME. Dark had one map - the
+       Haunted Tower, which shares it with Ghost - so this takes Dark by type,
+       with Grass for the long grass it is drawn in, and every generation
+       arrives through the fit.
+
+       THE CAST IS THIS GAME'S, NOT THE ROUTE'S: Kanto's grass and pond
+       Pokemon, which set the map's rarity mix - and no water ones: written,
+       Psyduck and Poliwag made surfing its ponds 55% Kanto at the cap, so the
+       ponds take the rods' every-generation pool instead. Route 120's own encounter table
+       was not copied (the player's call, for Seaside Road: the pool comes from
+       this game's rules). */
+    types: ["dark", "grass"],
+    table: [
+      [43, 16], [69, 14], [46, 8], [114, 6], [102, 6],
+    ],
+  },
+  {
+    id: "falls",
+    water: true,               // its pools and falls, fished and surfed
+    level: 30,
+    name: "Meteor Falls",
+    /* EMERALD'S METEOR FALLS, AND DRAGON'S OWN HOME. Dragon was a side type
+       on Mt. Moon, so it moves here; Psychic, which had no map of its own
+       outside the Safari Zone, is its second type - both by type, so every
+       generation's dragons and psychics arrive through the fit, and the
+       dragon and psychic legendaries find a home here too.
+
+       THE CAST IS THIS GAME'S: Kanto's psychics and Dratini, which set the
+       map's rarity mix. The falls' own encounter table was not copied. */
+    types: ["dragon", "psychic"],
+    table: [
+      [63, 14], [96, 14], [122, 4], [147, 6],
+    ],
+  },
+  {
+    id: "shoal",
+    // No `water`: at low tide its pools are shallows you wade, with nothing
+    // to surf or fish - so no fish live here; the Water types that walk do.
+    level: 35,  // MAP_LAST: the last rung
+    name: "Shoal Cave",
+    /* EMERALD'S SHOAL CAVE AT LOW TIDE, AND ICE'S SECOND HOME. Ice had only
+       Frost Hollow; this shares Ice and Water with it, so those species split
+       between two homes and every generation arrives through the fit.
+
+       THE CAST IS THIS GAME'S: Kanto's tide-pool Pokemon, which set the map's
+       rarity mix - none of them fish-shaped (Seel was, and a fish needs water
+       this cave does not have at low tide), and no Jynx, which evolves from
+       Smoochum. Omanyte is the rare band's, which the map needs from its
+       first day: without one it opened at 0% rare and the later generations'
+       rares took it to 8.8%. The cave's own encounter table was not copied. */
+    types: ["ice", "water"],
+    table: [
+      [98, 14], [120, 12], [90, 10], [79, 6], [138, 3],
     ],
   },
 ];
@@ -1409,7 +1475,7 @@ const RESIDENTS = [
    rather than trusted: a level typed into one row and a number quoted in a
    design document are two places for the same fact. */
 export const MAP_FIRST = 1;
-export const MAP_LAST = 20;
+export const MAP_LAST = 35;
 
 /* WHERE EVERYTHING ELSE LIVES, decided by a rule rather than by hand.
 
@@ -1849,10 +1915,16 @@ export const WILD_SPAN = 6;
    check.mjs pins that ceiling, because the failure is invisible: every number
    stays monotone and the economy simply stops mattering. */
 export const WILD_STEP = 0.5;
+/* AND IT STOPS AT LV 20, where the first ladder ended. Maps past it (Rainwood
+   Crossing, 25) at the same half step started wild Pokemon at Lv 14, where a
+   Grass and Dark pool full of Lv 14-18 evolvers handed out free evolutions 21%
+   of the time. A later map is later through what lives there and the balls it
+   costs, not through wild levels that empty the candy sink. */
+export const WILD_TOP = 20;
 
 export function wildBand(biome) {
   const lo = 2 + Math.round(
-    Math.max(0, (biome?.level ?? MAP_FIRST) - MAP_FIRST) * WILD_STEP);
+    Math.max(0, Math.min(biome?.level ?? MAP_FIRST, WILD_TOP) - MAP_FIRST) * WILD_STEP);
   return [lo, lo + WILD_SPAN - 1];
 }
 
@@ -2166,12 +2238,32 @@ export const HEADLINE = 0.2;
 export const GEN_RAMP = 10;
 export const RAMP_MIN = 0.1;
 
+/* AND ONCE EVERY GENERATION HAS GROWN IN, NONE OF THEM RUNS A MAP.
+
+   The roster weighting is right while regions arrive - a generation with
+   twenty fitting species should outweigh one with two - but at the cap it
+   left a few maps with one region in charge for good: the Safari's Johto at
+   24%, Frost Hollow's Galar at 21%, the Tower's Alola at 18%, while Kalos had
+   2% of Ember Caldera. Asked for (2026-10-01): late game, every generation
+   fair. So when every generation on a map is at full ramp, each non-Kanto
+   one is held in [`GEN_LOW`, `GEN_HIGH`] and Kanto under `CAST_TOP` (its
+   `HEADLINE` floor unchanged), the rest re-spread in proportion to the
+   roster. A band, not 1/N: forcing equal shares hands a thin generation's
+   one or two species the whole slice, which is the Pichu-at-31.8% failure
+   above. `SPECIES_CAP` in `genTargets` still bounds what a thin generation
+   can actually carry. */
+export const GEN_LOW = 0.05;
+export const GEN_HIGH = 0.15;
+export const CAST_TOP = 0.25;
+
 export const genShares = (counts, level) => {
   const raw = new Map();
   let sum = 0;
+  let grown = true;
   for (const [g, n] of counts) {
     const ramp = Math.max(RAMP_MIN,
       Math.min(1, (level - (GEN_UNLOCK[g] ?? 1) + 1) / GEN_RAMP));
+    if (ramp < 1) grown = false;
     const w = Math.max(n, 1) * ramp;
     raw.set(g, w);
     sum += w;
@@ -2182,8 +2274,30 @@ export const genShares = (counts, level) => {
     for (const g of out.keys()) if (g !== 1) out.set(g, (out.get(g) * (1 - HEADLINE)) / rest);
     out.set(1, HEADLINE);
   }
+  if (grown && out.size > 1) bandShares(out);
   return out;
 };
+
+/* Clamp each share into its band and re-spread what moved over the shares
+   still free, in proportion, until nothing is outside. */
+function bandShares(out) {
+  const lo = (g) => (g === 1 ? HEADLINE : GEN_LOW);
+  const hi = (g) => (g === 1 ? CAST_TOP : GEN_HIGH);
+  const fixed = new Set();
+  for (let pass = 0; pass <= out.size; pass++) {
+    let moved = 0;
+    for (const [g, t] of out) {
+      if (fixed.has(g)) continue;
+      const c = Math.min(hi(g), Math.max(lo(g), t));
+      if (c !== t) { moved += t - c; out.set(g, c); fixed.add(g); }
+    }
+    if (Math.abs(moved) < 1e-12) return;
+    const free = [...out].filter(([g]) => !fixed.has(g));
+    const base = free.reduce((n, [, t]) => n + t, 0);
+    if (base <= 0) return;
+    for (const [g, t] of free) out.set(g, t + (moved * t) / base);
+  }
+}
 
 /* What a table's own rows say each generation is owed - counted the way the
    fit counts them: residents and homes, not the evolved overlay (a line is one
@@ -2560,6 +2674,16 @@ export const LEVEL_XP = [
   27740, 29710, 31740, 33830, 35980, 38190, 40470, 42820, 45240, 47730,
   50290, 52930, 55650, 58450, 61330, 64300, 67360, 70510, 73750, 77090,
   80530, 84070, 87720, 91480, 95350,
+  /* AND TO 100 (2026-10-01), asked for. Appended only, again. The step stops
+     GROWING here: every level from 76 costs what 75 did (3,870 XP), the
+     smallest step that never makes a later level cheaper than an earlier one.
+     Carrying 3% on put Lv 100 at ~240,000 XP; flat it is 192,100, about
+     another 10,500 encounters past 75 - post-game, and reachable. 99 points
+     now meet 140 ranks (seven stats, see trainer.js), so the cap still cannot
+     buy everything. */
+  99220, 103090, 106960, 110830, 114700, 118570, 122440, 126310, 130180, 134050,
+  137920, 141790, 145660, 149530, 153400, 157270, 161140, 165010, 168880, 172750,
+  176620, 180490, 184360, 188230, 192100,
 ];
 
 export const MAX_LEVEL = LEVEL_XP.length;

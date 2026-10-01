@@ -137,7 +137,7 @@ EMERALD = "https://raw.githubusercontent.com/pret/pokeemerald/master"
 # rebases from route.json when `npm run map` runs, which is the rule.
 # `mauville` is Route 110's, in the Pond & Shore slot - appended after it.
 EM_SECONDARY = [("lavaridge", "general"), ("lilycove", "general"), ("fortree", "general"),
-                ("mauville", "general")]
+                ("mauville", "general"), ("meteor_falls", "general"), ("cave", "general")]
 
 # pokeemerald PRIMARIES we bake WHOLE, because a map drawn against one
 # references its metatiles directly and ours are somebody else's. Ids 0-639
@@ -461,9 +461,12 @@ def build_tileset():
         top = append_rows(top, sheet_top)
         hiding_ids += [base + i for i in hides_here]
         ladder_ids += [base + i for i in LADDERS[-1]]
-        sets[name] = base
+        # Emerald's `cave` shares its name with FireRed's, baked above; the
+        # second one is keyed `em_cave` so neither base is overwritten.
+        key = name if name not in sets else "em_" + name
+        sets[key] = base
         print("  %-18s %3d metatiles at base %d  (pokeemerald, on %s)"
-              % (name, len(smt), base, prim))
+              % (key, len(smt), base, prim))
 
     for prim in FR_PRIMARY:
         pmt, ptiles, ppals = load_primary(prim)
@@ -1000,6 +1003,14 @@ def build_tileset():
         "monsoon": {"general": sets["em_general"], "fortree": sets["fortree"],
                     "split": 512, "floor": sets["em_general"] + 1},
         # SEASIDE ROAD is Route 110 in the pond slot: General plus Mauville.
+        # METEOR FALLS, all five rooms: Emerald's General plus its own set.
+        # Its floor is the cave's plain ground, local 1 (663 of the cells).
+        "meteor": {"general": sets["em_general"], "meteor_falls": sets["meteor_falls"],
+                   "split": 512, "floor": sets["meteor_falls"] + 1},
+        # SHOAL CAVE, the low tide: General plus Emerald's own cave set. Its
+        # floor is the sand, cave local 17 (552 of the cells).
+        "shoal": {"general": sets["em_general"], "cave": sets["em_cave"],
+                  "split": 512, "floor": sets["em_cave"] + 17},
         "route110": {"general": sets["em_general"], "mauville": sets["mauville"],
                      "split": 512, "floor": sets["em_general"] + 1},
         # MIRAGE DESERT is Route 111: the same General and Mauville blocks, so
@@ -1247,6 +1258,11 @@ def build_ground():
         "desert": meta["route111"]["floor"],
         # Monsoon Trail is an Emerald map, so Emerald's grass, as the Safari's.
         "woods": meta["monsoon"]["floor"],
+        # Rainwood Crossing is Route 120: the same General and Fortree blocks.
+        "rainwood": meta["monsoon"]["floor"],
+        # Meteor Falls, a cave: its own ground.
+        "falls": meta["meteor"]["floor"],
+        "shoal": meta["shoal"]["floor"],
         "ridge": meta["cave"]["floor"],
         "power": meta["power"]["floor"],
         "ember": meta["volcano"]["floor"],

@@ -13,8 +13,10 @@
    - the ceiling has not moved, the road to it is twice as long and has twice as
    many decisions on it. The level curve was extended to 50 to pay for them.
 
-   The one number the whole design rests on: 74 points against 100 ranks of
-   capacity (49 while the cap was 50). Being unable to have it all is the only thing that makes the choice
+   The one number the whole design rests on: 99 points against 140 ranks of
+   capacity (74 against 100 at a Lv 75 cap, 49 at 50) - 71%, about what it
+   was. The cap went to 100 and Lustre and Coach came with it, so the
+   ratio held instead of the choice disappearing. Being unable to have it all is the only thing that makes the choice
    mean anything, and check() asserts that inequality directly. Nothing here is
    respeccable for the same reason.
 
@@ -25,9 +27,8 @@
 
 export const MAX_RANK = 20;
 
-/* One point per level after the first. Level 75 is MAX_LEVEL, so 74 in total
-   against 100 ranks of capacity - it was 50 and 49, and a trainer at that cap
-   had nothing left to earn. Still short of 100 on purpose. */
+/* One point per level after the first. Level 100 is MAX_LEVEL, so 99 in total
+   against 140 ranks of capacity. Short of it on purpose. */
 export const earnedPoints = (level) => Math.max(0, level - 1);
 
 export const STATS = [
@@ -69,6 +70,27 @@ export const STATS = [
     glyph: "✧",
     blurb: "You learn more from every catch, so the next level comes sooner.",
     effect: (r) => `+${r * 4}% XP`,
+  },
+  /* THE COLLECTOR'S STAT. It multiplies the tier roll beside pity, honey, an
+     outbreak, a star and the Region Charm, and at rank 20 it is exactly a
+     research star (check.mjs) - a permanent lift on every species, never
+     stronger than the one you earn on one species. */
+  {
+    id: "lustre",
+    name: "Lustre",
+    glyph: "◇",
+    blurb: "Rare forms find you. Every shiny, holo and other tier is likelier.",
+    effect: (r) => `+${Math.round(r * 2.5)}% rare forms`,
+  },
+  /* THE LEAGUE'S STAT. A team is bought with Rare Candy, so this is how a
+     trainer builds one sooner. It pays on converting a duplicate only - not an
+     alpha's candy, not the shop's, which Haggle already discounts. */
+  {
+    id: "coach",
+    name: "Coach",
+    glyph: "▲",
+    blurb: "Duplicates turn into more Rare Candy, so a team is ready sooner.",
+    effect: (r) => `+${r * 2}% candy`,
   },
 ];
 
@@ -143,6 +165,12 @@ export const stepScale = (stats) => 1 - 0.02 * rank(stats, "stride");
 export const sellScale = (stats) => 1 + 0.02 * rank(stats, "haggle");
 export const priceScale = (stats) => 1 - 0.01 * rank(stats, "haggle");
 export const xpScale = (stats) => 1 + 0.04 * rank(stats, "insight");
+export const tierLift = (stats) => 1 + 0.025 * rank(stats, "lustre");
+
+/* What converting duplicates pays: the bonus on the BATCH's base candy,
+   rounded once. Per Pokemon it was nothing - a common is 1 candy, and 1.4
+   rounds back to 1. The Box quotes each batch through this same call. */
+export const candyAt = (base, stats) => Math.round(base * (1 + 0.02 * rank(stats, "coach")));
 
 /* The two sums Haggle changes. Both the engine and the panels that display
    them call these, so a shown price is always the charged price - recomputing

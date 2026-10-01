@@ -17,7 +17,7 @@ import {
 } from "./biomes.js";
 import {
   emptyStats, canSpend, catchMult, weighted, stepScale,
-  pricedAt, valuedAt, xpScale, freePoints,
+  pricedAt, valuedAt, xpScale, freePoints, tierLift, candyAt,
 } from "./trainer.js";
 import {
   TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame, drawGrass,
@@ -1523,7 +1523,8 @@ export function createEngine(canvas, onChange, mini = null) {
       Math.random,
       lockedTiers(sp.id),
       pityBoost(state.dry) * (honey && !honey.tier ? honey.lift : 1)
-        * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.stars) * charmOf(state.beaten),
+        * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.stars) * charmOf(state.beaten)
+        * tierLift(state.stats),
       honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
 
@@ -2724,6 +2725,7 @@ export function createEngine(canvas, onChange, mini = null) {
       got += candyValue(speciesById(mon.species));
       return false;
     });
+    got = candyAt(got, state.stats);
     state.candy += got;
     save();
     changed();

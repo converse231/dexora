@@ -383,18 +383,24 @@ export function signature(o) {
 }
 export function hardPrices(rungs) {
   const inc = incomePerStep();
-  const lifetime = (encountersBy(MAX_LEVEL) / ENCOUNTER_RATE) * (inc.catchPerStep + inc.wagePerStep);
+  const lifetime = (encountersBy(PRICE_LEVEL) / ENCOUNTER_RATE) * (inc.catchPerStep + inc.wagePerStep);
   const prize = Math.floor(HARD_PRIZE_CEIL * lifetime / rungs.length);
   return { prize, fee: Math.round(prize * HARD_FEE_SHARE), lifetime };
 }
 
 // ------------------------------------------------------------------ prices
 
+/* THE GAME THE PRICES ARE MEASURED ON: Lv 75, the cap they were solved at.
+   The cap went to 100 (2026-10-01) as POST-GAME; measuring prizes and the
+   hard fee against the longer game would have doubled every League prize for
+   a trainer who had not moved, because the game got longer after them. */
+export const PRICE_LEVEL = Math.min(75, MAX_LEVEL);
+
 /* WHAT A GAME EARNS, per step, the way the Master Ball is priced: the best
    map's Poké Ball income at the cap, plus the wage. */
 export function incomePerStep() {
   let perEnc = 0;
-  for (const b of BIOMES) perEnc = Math.max(perEnc, mapYield(b, MAX_LEVEL).cash);
+  for (const b of BIOMES) perEnc = Math.max(perEnc, mapYield(b, PRICE_LEVEL).cash);
   let wages = 0;
   for (let s = STEP_PARCEL; s <= 50000; s += STEP_PARCEL) wages += stepReward(s, 30)?.money ?? 0;
   return { catchPerStep: perEnc * ENCOUNTER_RATE, wagePerStep: wages / 50000, perEnc, wages };
@@ -413,7 +419,7 @@ export { REMATCH_SHARE, TRAINER_SHARE };   // league.js's - the shares the engin
    step, rounded up to a walking parcel. */
 export function prices(rungs) {
   const inc = incomePerStep();
-  const steps75 = encountersBy(MAX_LEVEL) / ENCOUNTER_RATE;
+  const steps75 = encountersBy(PRICE_LEVEL) / ENCOUNTER_RATE;
   const lifetime = steps75 * (inc.catchPerStep + inc.wagePerStep);
   const unit = rungs.map((r) => Math.max(1, best(r.T, "cash")));
   const trainerUnits = rungs.reduce((n, r, k) => n + (r.role === "leader" ? r.o.trainers.length * unit[k] * TRAINER_SHARE : 0), 0);

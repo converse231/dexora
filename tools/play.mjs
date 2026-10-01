@@ -703,6 +703,32 @@ function until(e, what, label, max = 2000) {
   console.log("keeper guard ok — sell and convert refuse a variant handed to them directly");
 }
 
+/* COACH PAYS THROUGH THE ENGINE, and the Box quotes the same sum: `convert`
+   rounds the batch once, as the Box's `candyAt` does. Two Rattata, because
+   per Pokemon a common's 1 candy rounded the bonus away entirely. */
+{
+  const { candyValue } = await import("../src/game/items.js");
+  const { candyAt } = await import("../src/game/trainer.js");
+  const { speciesById, LEVEL_XP } = await import("../src/game/biomes.js");
+  store.clear();
+  store.set("meadow-route", JSON.stringify({
+    ...SAVE,
+    xp: LEVEL_XP[40],
+    stats: { coach: 20 },
+    box: [{ uid: 1, species: 19, level: 5 }, { uid: 2, species: 19, level: 5 }],
+    nextUid: 3,
+  }));
+  raf.length = 0;
+  const e = createEngine(canvas(), () => {}, canvas());
+  const base = candyValue(speciesById(19));
+  const candy0 = e.state.candy;
+  const got = e.convert([1, 2]);
+  assert.equal(got, candyAt(2 * base, e.state.stats), "convert() did not pay what the Box quotes");
+  assert.ok(got > 2 * base, `Coach 20 paid ${got} candy for two Rattata, no more than ${2 * base}`);
+  assert.equal(e.state.candy, candy0 + got, "the candy paid never reached the bag");
+  console.log(`coach ok — two Rattata convert to ${got} candy at Coach 20, ${2 * base} without`);
+}
+
 /* AN EVOLUTION IS NOT A CATCH. `state.caught` renders in the top bar under the
    word CAUGHT and means throws that landed; `evolve` incremented it anyway, and
    unconditionally, so re-evolving a species already owned counted too. */
@@ -2063,6 +2089,36 @@ console.log("star ok — asks first, spends the lowest ordinary ones and never a
 }
 console.log("alpha ok — never flees, caught pays candy and research, boxed, unsellable, survives a reload");
 
+/* LUSTRE REACHES THE ENGINE'S TIER ROLL. One fixed roll, 1.25x past the
+   likeliest open tier's odds under the outbreak's lift: no rare form at rank 0,
+   one at rank 20 (x1.5). The outbreak pins the species, as the alpha test's. */
+{
+  const { dayKey } = await import("../src/game/daily.js");
+  const { outbreakPool, OUTBREAK_LIFT } = await import("../src/game/events.js");
+  const { BIOMES, TIER_ODDS, lockedTiers } = await import("../src/game/biomes.js");
+  const id = outbreakPool(BIOMES.find((b) => b.id === "meadow"), 50)[0];
+  const top = Math.max(...TIER_ODDS.filter(([t]) => !lockedTiers(id)?.has(t)).map(([, o]) => o));
+  const met = (lustre) => {
+    const { e } = boot({ ...SAVE, stats: { lustre },
+      outbreak: { key: dayKey(), areaId: "meadow", speciesId: id, left: 5 } });
+    const real = Math.random;
+    try {
+      Math.random = () => top * OUTBREAK_LIFT * 1.25;
+      for (const dir of ["right", "down", "left", "up"]) {
+        e.press(dir);
+        for (let i = 0; i < 30 && !e.state.encounter; i++) tick(16);
+        e.clearHeld();
+        if (e.state.encounter) break;
+      }
+    } finally { Math.random = real; }
+    assert.equal(e.state.encounter?.speciesId, id, "the Lustre test met the wrong species");
+    return e.state.encounter.variant;
+  };
+  assert.equal(met(0), null, "the fixed roll made a rare form with no Lustre - the test proves nothing");
+  assert.ok(met(20), "Lustre 20 did not lift the engine's tier roll");
+}
+console.log("lustre ok — rank 20 turns a roll just past the odds into a rare form");
+
 /* A BOX ENTRY WEARING A TIER PROVES THE TIER. If the tier row lost it (a save
    from before the row existed, a hand edit), loading sets it back from the
    entry - or the Dex says you have never found the one you are holding. */
@@ -2726,9 +2782,12 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
       if (kinds.has(areaId + L.ch)) continue;      // one of each per map is the rule
       kinds.add(areaId + L.ch);
       const [into, back] = DIR[`${L.dx},${L.dy}`];
+      const mapLevel = (await import("../src/game/biomes.js")).biomeFor(areaId).level;
       assert.ok(into, `no direction for a ledge facing ${L.dx},${L.dy}`);
       const at = (x, y) => ({
-        ...SAVE, areaId, xp: LEVEL_XP[24],
+        // At least the map's own level: one opening past Lv 25 sends a
+        // lower save home before it takes a step.
+        ...SAVE, areaId, xp: LEVEL_XP[Math.max(24, mapLevel - 1)],
         bag: { "poke-ball": 5 },
         player: { x, y, dir: into },
         /* UNDER A REPEL, BECAUSE THIS TEST WALKS - the same trap the surf test

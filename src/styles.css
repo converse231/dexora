@@ -319,6 +319,26 @@ canvas {
   --ground-tint: linear-gradient(rgba(255, 230, 200, .10), rgba(70, 34, 22, .30));
   --ground-lip: rgba(60, 28, 18, .28);
 }
+/* Rainwood Crossing: Route 120's weather. A low grey-blue rain sky, and the
+   grass under it wet and dim rather than sunlit. */
+.battle[data-area="shoal"] {
+  --sky: linear-gradient(#5f6f7c 0%, #7f929f 55%, #a9bcc6 100%);
+  --ground-tint: linear-gradient(rgba(200, 230, 245, .12), rgba(30, 50, 64, .30));
+  --ground-lip: rgba(30, 48, 60, .30);
+  --ground-glow: rgba(226, 242, 250, .24);
+}
+.battle[data-area="falls"] {
+  --sky: linear-gradient(#3a3350 0%, #5a5070 55%, #7b7088 100%);
+  --ground-tint: linear-gradient(rgba(190, 170, 220, .08), rgba(20, 14, 40, .34));
+  --ground-lip: rgba(26, 18, 44, .32);
+  --ground-glow: rgba(210, 196, 236, .18);
+}
+.battle[data-area="rainwood"] {
+  --sky: linear-gradient(#8e9fb2 0%, #aebccb 55%, #c9d4de 100%);
+  --ground-tint: linear-gradient(rgba(170, 200, 220, .10), rgba(20, 44, 60, .30));
+  --ground-lip: rgba(24, 52, 64, .28);
+  --ground-glow: rgba(220, 234, 244, .22);
+}
 /* Mirage Desert: sand in the air. A bleached sky going ochre toward the
    horizon, and the ground lit hot from above - the sandstorm, as light. */
 .battle[data-area="desert"] {

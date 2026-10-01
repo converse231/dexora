@@ -6,7 +6,7 @@ import { evoCycleFrames, EVO_SWAPS, SCALE_MAX } from "../src/game/evocycle.js";
 import {
   STATS, MAX_RANK, emptyStats, rank, spentPoints, freePoints, earnedPoints,
   canSpend, catchMult, stepScale, xpScale, pricedAt, valuedAt, weighted,
-  rarityPower, sellScale, priceScale, RARITY_FLOOR,
+  rarityPower, sellScale, priceScale, RARITY_FLOOR, tierLift, candyAt,
 } from "../src/game/trainer.js";
 import {
   catchChance, fleeChance, shakesFor, resolveThrow, NEVER_CERTAIN, GUARANTEED,
@@ -210,6 +210,7 @@ import {
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
   SIZE_MIN, SIZE_MAX, ENCOUNTER_RATE, HEADLINE, genTargets, rowGen,
   SPECIES_CAP, CAST_CEIL, RODS as RODS_ALL, isLegendary,
+  GEN_LOW, GEN_HIGH, CAST_TOP,
 } from "../src/game/biomes.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
@@ -1287,7 +1288,18 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
       "Haggle must strictly cut prices");
     assert.ok(valuedAt(1000, at("haggle", r)) > valuedAt(1000, at("haggle", r - 1)),
       "Haggle must strictly raise sales");
+    assert.ok(tierLift(at("lustre", r)) > tierLift(at("lustre", r - 1)),
+      "Lustre must strictly lift the tier roll");
+    assert.ok(candyAt(100, at("coach", r)) > candyAt(100, at("coach", r - 1)),
+      "Coach must strictly raise converted candy");
   }
+  /* LUSTRE IS NEVER A STAR. A research star is earned on one species; a stat
+     reaching past it on every species would make starring pointless. */
+  assert.equal(tierLift(at("lustre", MAX_RANK)).toFixed(2), "1.50", "Lustre's ceiling moved");
+  assert.ok(tierLift(at("lustre", MAX_RANK)) <= RESEARCH_LIFT,
+    `Lustre (x${tierLift(at("lustre", MAX_RANK))}) outshines a research star (x${RESEARCH_LIFT})`);
+  assert.equal(candyAt(100, at("coach", MAX_RANK)), 140, "Coach's ceiling moved");
+  assert.equal(candyAt(3, emptyStats()), 3, "Coach at rank 0 changes nothing");
   /* THE CEILING, PINNED. Ranks went from 10 to 20 and every coefficient halved
      with them so rank 20 is worth exactly what rank 10 used to be - and the
      monotonicity loop above would not have noticed a coefficient left alone,
@@ -2301,6 +2313,12 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     cinder: () => route.safari.general,       // the same primary, and lavaridge
     // Monsoon Trail is Route 119: Emerald's General again, plus Fortree.
     woods: () => route.monsoon.general,
+    // Rainwood Crossing is Route 120: Monsoon Trail's General and Fortree.
+    rainwood: () => route.monsoon.general,
+    // Meteor Falls: Emerald's General and its own set.
+    falls: () => route.meteor.general,
+    // Shoal Cave: Emerald's General and its own cave set.
+    shoal: () => route.shoal.general,
     // Seaside Road is Route 110: Emerald's General and Mauville, the same way.
     pond: () => route.route110.general,
     // Mirage Desert is Route 111: the same General and Mauville blocks.
@@ -3842,6 +3860,52 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `the headliner share promises at least ${100 * HEADLINE}%`);
     console.log(`headliners ok — Gen 1 holds at least ${(100 * low).toFixed(1)}% ` +
       `of every map at Lv ${MAX_LEVEL} (${lowAt} lowest), against a floor of ${100 * HEADLINE}%`);
+
+    /* LATE GAME, NO GENERATION RUNS A MAP (asked for, 2026-10-01). Once every
+       region has grown in, each non-Kanto generation is held in [GEN_LOW,
+       GEN_HIGH] of a map - or what its residents can carry under SPECIES_CAP,
+       if that is less - and Kanto under CAST_TOP. Measured by line on the
+       finished table, legendaries and costumes out. The slack is the fit's
+       closing band step, which re-lifts a band's rows a little past their
+       targets. Verified by deleting `bandShares`' call, which puts the
+       Safari's Johto back at 24.4%.
+
+       KANTO GETS `SPILL` MORE, measured: `capLines` hands the cast what capped
+       lines cannot hold, and a map whose common band is mostly Kanto spills
+       there for good. The Mirage Desert is the widest at 32.9% - its C band is
+       63% of the map and every common non-Kanto ground species in the dex
+       (six) already lives in it. Shrinking its cast was tried: it starved
+       Cacnea to 1 in 800 million or put it at 8.7% on Lv 20. */
+    {
+      const SLACK = 0.02, SPILL = 0.085;
+      const COSTUME = new Set(SPECIES.filter((sp) => sp.form === "costume").map((sp) => sp.id));
+      let hi = 0, hiAt = "", lo = 1, loAt = "";
+      for (const b of BIOMES) {
+        const rows = encounterTable(b, MAX_LEVEL)
+          .filter((r) => !LEGENDARY.includes(r[0]) && !COSTUME.has(r[0]));
+        const total = rows.reduce((n, r) => n + r[1], 0);
+        const by = new Map(), heads = new Map();
+        for (const r of rows) {
+          const g = rowGen(r);
+          by.set(g, (by.get(g) ?? 0) + r[1] / total);
+          if (!r[2]) heads.set(g, (heads.get(g) ?? 0) + 1);
+        }
+        for (const [g, share] of by) {
+          const top = g === 1 ? CAST_TOP + SPILL - SLACK : GEN_HIGH;
+          const floor = g === 1 ? HEADLINE - 0.03 : Math.min(GEN_LOW, (heads.get(g) ?? 1) * SPECIES_CAP);
+          assert.ok(share <= top + SLACK,
+            `${b.id}: generation ${g} is ${(100 * share).toFixed(1)}% at Lv ${MAX_LEVEL}, over ` +
+            `its ${100 * top}% - one region is running the map`);
+          assert.ok(share >= floor - SLACK,
+            `${b.id}: generation ${g} is ${(100 * share).toFixed(1)}% at Lv ${MAX_LEVEL}, under ` +
+            `its ${(100 * floor).toFixed(1)}% - a region you can barely meet`);
+          if (share - top > hi - 1) { hi = share - top + 1; hiAt = `${b.id} gen ${g} ${(100 * share).toFixed(1)}%`; }
+          if (g !== 1 && share < lo) { lo = share; loAt = `${b.id} gen ${g}`; }
+        }
+      }
+      console.log(`generation band ok — late game, the closest to a ceiling is ${hiAt}; ` +
+        `the thinnest region is ${loAt} at ${(100 * lo).toFixed(1)}%`);
+    }
 
     /* NO ONE SPECIES CARRIES A MAP, UNLESS IT IS THE CAST. Measured before the
        diversity pass: a non-Kanto species held 8% or more of a map 44 times
