@@ -790,6 +790,14 @@ export function createEngine(canvas, onChange, mini = null) {
      walk across; Seafoam's raised shelf draws you over its own lip. Maps
      without `elev` are level ground, always under, as before. */
   let elev = areaOf(state.areaId).elev ?? null;
+  /* THE ROOM YOU ARE IN. A map with floors keeps them side by side on one grid
+     (`rooms`: [x, y, w, h] each, written by build_map), and the camera used
+     to show the next floor across the gap - reported as other floors rendered
+     at the edges. Only the room the trainer stands in is drawn; the rest of
+     the screen is black, and the minimap shows that room alone. */
+  let rooms = areaOf(state.areaId).rooms ?? null;
+  const roomAt = (x, y) => (rooms ?? []).find(([rx, ry, rw, rh]) =>
+    x >= rx && y >= ry && x < rx + rw && y < ry + rh) ?? null;
   const elevAt = (x, y) => (elev ? parseInt(elev[y]?.[x] ?? "0", 16) || 0 : 0);
   let cur = 0;        // the elevation you walk at (0 walks anywhere)
   let high = false;   // drawn above the upper layer
@@ -844,11 +852,15 @@ export function createEngine(canvas, onChange, mini = null) {
   let miniCtx = null;
   let miniArt = null;
 
+  /* The part of the map the minimap draws: the room you are in, or all of it. */
+  let miniRoom = null;
   function bakeMini() {
     if (!mini) return;
-    miniTile = miniScale(MAP_W, MAP_H);
-    const w = MAP_W * miniTile;
-    const h = MAP_H * miniTile;
+    miniRoom = roomAt(state.player.x, state.player.y);
+    const [mx, my, mw, mh] = miniRoom ?? [0, 0, MAP_W, MAP_H];
+    miniTile = miniScale(mw, mh);
+    const w = mw * miniTile;
+    const h = mh * miniTile;
     /* A 2x backing store behind a CSS size of exactly w x h, the same trick
        the route canvas uses: the dot and the camera box are drawn as vectors,
        and at 1x a 1px stroke on a 3px grid lands on half-pixels and blurs. */
@@ -861,9 +873,9 @@ export function createEngine(canvas, onChange, mini = null) {
     miniArt.width = w;
     miniArt.height = h;
     const b = miniArt.getContext("2d");
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        b.fillStyle = MINI[rows[y][x]] ?? MINI_UNKNOWN;
+    for (let y = 0; y < mh; y++) {
+      for (let x = 0; x < mw; x++) {
+        b.fillStyle = MINI[rows[my + y][mx + x]] ?? MINI_UNKNOWN;
         b.fillRect(x * miniTile, y * miniTile, miniTile, miniTile);
       }
     }
@@ -876,6 +888,9 @@ export function createEngine(canvas, onChange, mini = null) {
      drawn with, so the two pictures are the same instant. */
   function drawMini(camX, camY, wx, wy) {
     if (!miniCtx || !miniArt) return;
+    if (rooms && roomAt(state.player.x, state.player.y) !== miniRoom) bakeMini();
+    // World pixels from the drawn room's corner.
+    if (miniRoom) { camX -= miniRoom[0] * TILE; camY -= miniRoom[1] * TILE; wx -= miniRoom[0] * TILE; wy -= miniRoom[1] * TILE; }
     const k = miniTile / TILE;           // world pixels -> minimap pixels
     miniCtx.clearRect(0, 0, miniArt.width, miniArt.height);
     miniCtx.drawImage(miniArt, 0, 0);
@@ -1452,6 +1467,7 @@ export function createEngine(canvas, onChange, mini = null) {
     doors = doorMap(areaOf(areaId));
     enter = enterSet(areaOf(areaId));
     elev = areaOf(areaId).elev ?? null;
+    rooms = areaOf(areaId).rooms ?? null;
     cur = 0;
     high = false;
     wet = false;
@@ -2312,8 +2328,14 @@ export function createEngine(canvas, onChange, mini = null) {
     const wx = (move.fromX + (p.x - move.fromX) * t) * TILE;
     const wy = (move.fromY + (p.y - move.fromY) * t) * TILE;
 
-    const camX = clamp(wx + TILE / 2 - (viewW * TILE) / 2, 0, MAP_W * TILE - viewW * TILE);
-    const camY = clamp(wy + TILE / 2 - (VIEW_H * TILE) / 2, 0, MAP_H * TILE - VIEW_H * TILE);
+    /* The camera stays inside the room you are in (the whole map when it has
+       none), and centres a room smaller than the screen. */
+    const room = rooms ? roomAt(p.x, p.y) : null;
+    const [rx, ry, rw, rh] = room ?? [0, 0, MAP_W, MAP_H];
+    const fit = (want, lo, span, view) => (span <= view ? lo + (span - view) / 2
+      : clamp(want, lo, lo + span - view));
+    const camX = Math.round(fit(wx + TILE / 2 - (viewW * TILE) / 2, rx * TILE, rw * TILE, viewW * TILE));
+    const camY = Math.round(fit(wy + TILE / 2 - (VIEW_H * TILE) / 2, ry * TILE, rh * TILE, VIEW_H * TILE));
 
     const x0 = Math.floor(camX / TILE);
     const y0 = Math.floor(camY / TILE);
@@ -2335,8 +2357,9 @@ export function createEngine(canvas, onChange, mini = null) {
     if (baked) {
       const which = `${state.areaId}`;
       if (chunkOf?.area !== which || chunkOf?.atlas !== art.atlas) { chunks = new Map(); chunkOf = { area: which, atlas: art.atlas }; }
-      const cx0 = Math.floor(x0 / CHUNK), cx1 = Math.floor((x0 + viewW) / CHUNK);
-      const cy0 = Math.floor(y0 / CHUNK), cy1 = Math.floor((y0 + VIEW_H) / CHUNK);
+      // Inside the map: a small room is centred, so the view can start left of 0.
+      const cx0 = Math.max(0, Math.floor(x0 / CHUNK)), cx1 = Math.min(Math.floor((MAP_W - 1) / CHUNK), Math.floor((x0 + viewW) / CHUNK));
+      const cy0 = Math.max(0, Math.floor(y0 / CHUNK)), cy1 = Math.min(Math.floor((MAP_H - 1) / CHUNK), Math.floor((y0 + VIEW_H) / CHUNK));
       for (let cy = cy0; cy <= cy1; cy++) {
         for (let cx = cx0; cx <= cx1; cx++) {
           ctx.drawImage(chunkAt(cx, cy).base, Math.round(cx * CHUNK * TILE - camX), Math.round(cy * CHUNK * TILE - camY));
@@ -2445,6 +2468,17 @@ export function createEngine(canvas, onChange, mini = null) {
                     (x, y) => (fixed ? fixed[y * MAP_W + x] : -1));
     }
     if (!high) drawOverlays(ctx, art.atlas, over, camX, camY);
+
+    // Everything outside the room, black: four bands around it.
+    if (room) {
+      const sx = rx * TILE - camX, sy = ry * TILE - camY, sw = rw * TILE, sh = rh * TILE;
+      const VW = viewW * TILE, VH = VIEW_H * TILE;
+      ctx.fillStyle = "#000";
+      if (sy > 0) ctx.fillRect(0, 0, VW, sy);
+      if (sy + sh < VH) ctx.fillRect(0, sy + sh, VW, VH - sy - sh);
+      if (sx > 0) ctx.fillRect(0, Math.max(0, sy), sx, Math.min(VH, sy + sh) - Math.max(0, sy));
+      if (sx + sw < VW) ctx.fillRect(sx + sw, Math.max(0, sy), VW - sx - sw, Math.min(VH, sy + sh) - Math.max(0, sy));
+    }
 
     drawMini(camX, camY, wx, wy);
   }
