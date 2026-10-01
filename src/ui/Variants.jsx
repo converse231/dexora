@@ -38,6 +38,7 @@ import { OUTBREAK_LIFT } from "../game/events.js";
 import { HONEY_STEPS } from "../game/items.js";
 import { RESEARCH_LIFT, STAR_COST } from "../game/research.js";
 import { PERKS, ALPHA_PERK } from "../game/perks.js";
+import { SAGE_CREDIT } from "../game/biomes.js";
 
 /* FIVE CREATURES EVERYBODY KNOWS. The point of a preview is recognition - you
    are here to learn what a treatment looks like, and you can only see that on
@@ -141,6 +142,7 @@ export default function Variants({ onClose }) {
                 <span className="vr-odds">1 in {oneIn(TIER_ODDS.find(([x]) => x === t)[1])}</span>
                 <span className="vr-tell">{TIER_TELL[t]}</span>
                 <span className="vr-perk">League: {PERKS[t].says}</span>
+                {t === "origin" && <span className="art-credit">After Johto: {SAGE_CREDIT}</span>}
               </div>
             ))}
           </div>

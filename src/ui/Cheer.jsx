@@ -86,6 +86,7 @@ export default function Cheer({ cheer, onDone }) {
         <span className="cheer-kind">{KIND[cheer.kind] ?? "POKÉDEX"}</span>
         <strong className="cheer-title">{cheer.title}</strong>
         {cheer.sub && <span className="cheer-sub">{cheer.sub}</span>}
+        {cheer.credit && <span className="art-credit">{cheer.credit}</span>}
 
         {/* Money reads before the balls, because it is one number and they are
             a row of icons - and a medal that pays both should not bury the

@@ -1,5 +1,6 @@
 import { SPECIES, isForm } from "../data/dex.js";
 import { SHOWDOWN_IDS } from "../data/showdown.js";
+import { SAGE_IDS } from "../data/sage.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 /* One-way: `catch.js` imports nothing, so this cannot cycle. `items.js` is the
    file that must NOT be reached from here - it already imports
@@ -483,7 +484,8 @@ export const TIERS = TIER_ODDS.map(([tier]) => tier);
    by 4/3 - in the one place the game reads a rare tier out loud. A phrase
    describing what the thing IS cannot go stale when a constant moves. */
 export const TIER_TELL = {
-  origin: "the 1996 artwork",
+  // Older art: the 1996/Crystal debut, or SageDeoxys' drawing after Johto.
+  origin: "the old-school artwork",
   holo: "pressed in foil",
   shiny: "the alternate palette",
   astral: "made of starlight",
@@ -743,7 +745,15 @@ export const baseArtGen = (id) => ART_GEN.find(([hi]) => id <= hi)[1];
    art from Gen 4 and qualify - and there is no 1996 drawing of a Mega
    Charizard, because Mega Evolution was invented in 2013. The tier's tell is
    an OLDER drawing; a form has exactly one. */
-export const hasOrigin = (id) => !isForm(id) && genOf(id) < baseArtGen(id);
+export const hasOrigin = (id) => !isForm(id) && (genOf(id) < baseArtGen(id) || SAGE_IDS.has(id));
+
+/* SAGEDEOXYS DREW THE REST (2026-10-02, asked for): Game Boy Color-style
+   sprites for species with no older debut art, so Hoenn to Paldea can wear
+   Origin too (tools/import_sage.py -> art/sage -> build_origin.py, which
+   writes SAGE_IDS from the files). Credited wherever one is shown - the
+   catch banner, the encounter, the Dex portrait and Rare forms. */
+export const sageArt = (id) => SAGE_IDS.has(id);
+export const SAGE_CREDIT = "Sprites by SageDeoxys";
 
 /* SHOWDOWN IS A SECOND FILE TOO, and PokeAPI has no animation for a Mega. The
    same shape as `hasOrigin`: a tier a species has no artwork for is a tier it
