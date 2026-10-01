@@ -29,6 +29,7 @@ export const NEWS = [
       ["Meteor Falls", "Its log bridge no longer strands a surfer under it."],
       ["One water key", "C or A at the water asks: surf or fish?"],
       ["Rosette", "The 4-form badge now says Rosette, not Complete - it never needed every form."],
+      ["Origin for everyone", "260 more Pokémon can be Origin, in sprites by SageDeoxys."],
     ],
   },
   {

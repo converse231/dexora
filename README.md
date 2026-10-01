@@ -3333,6 +3333,11 @@ the community's pret fork, by `tools/build_anims.py`: its animation scripts,
 sprite templates, effect sheets and backgrounds, pinned to one commit.
 Pokémon Showdown's effects were not used: they are AGPL-3.0.
 
+**Origin sprites for every species after Johto are by SageDeoxys** - Game Boy
+Color-style drawings, credited in the game wherever one is shown ("Sprites by
+SageDeoxys"). `tools/import_sage.py` keeps the first frame of each in
+`art/sage/`, and `tools/build_origin.py` frames them like the 1996 art.
+
 **The Poké Ball throw animation is [All Pokeball Sprites for throw animation by
 Anarlaurendil](https://www.deviantart.com/anarlaurendil/art/All-Pokeball-Sprites-for-throw-animation-815730891),
 used under CC BY 3.0 — attribution required, and this line is it.** 28 balls ×

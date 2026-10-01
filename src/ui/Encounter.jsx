@@ -16,6 +16,7 @@ import Types from "./Types.jsx";
 import Gen from "./Gen.jsx";
 import Sprite, { spriteUrl, VariantFx, TierReveal, SCENE_FX } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
+import { sageArt, SAGE_CREDIT } from "../game/biomes.js";
 
   /* THE EVOLUTION CARD IS GONE, and "confusing" was the kind half of it.
 
@@ -158,6 +159,9 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           {enc.alpha && monHere && <span className="alpha-stamp" aria-hidden="true">ALPHA</span>}
           {enc.astral && monHere && <span className="astral-aura" aria-hidden="true" />}
           {enc.origin && monHere && <span className="origin-seal" aria-hidden="true" />}
+          {enc.variant === "origin" && sageArt(enc.speciesId) && (
+            <span className="art-credit scene-credit">{SAGE_CREDIT}</span>
+          )}
 
           <Sprite
             id={enc.speciesId}

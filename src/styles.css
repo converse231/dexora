@@ -5039,6 +5039,12 @@ button:disabled { transition: none; }
   line-height: 1.1; color: var(--ink);
 }
 .cheer-sub { font-size: 13px; color: var(--ink-soft); }
+/* The artist's credit, wherever SageDeoxys' Origin art is shown. */
+.art-credit { font-size: 11px; color: var(--ink-faint); font-style: italic; }
+.scene-credit {
+  position: absolute; left: 8px; bottom: 6px; z-index: 3; pointer-events: none;
+  color: rgba(255, 255, 255, .85); text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+}
 .cheer-items {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px;
   margin-top: 6px; padding-top: 8px;

@@ -12,7 +12,7 @@ import {
   biomeFor, tableFor, bornLevel, areaOpen, speciesById, dexIndex, layoutIds,
   levelFromXp, xpForCatch,
   rodTable, rodBite, surfTable,
-  rollVariant, pityBoost, TIERS, TIER_TELL, isLegendary, LEGENDARY,
+  rollVariant, pityBoost, TIERS, TIER_TELL, isLegendary, LEGENDARY, sageArt, SAGE_CREDIT,
   lockedTiers, wildBand, rollSize, BIOMES, ENCOUNTER_RATE, sizeTag, rollAlpha, alphaSize,
   looksOf, rollLook,
 } from "./biomes.js";
@@ -2141,6 +2141,7 @@ export function createEngine(canvas, onChange, mini = null) {
           kind: roll,
           title: e.name,
           sub: `${TIER_TELL[roll]} — never sold, never fed.`,
+          credit: roll === "origin" && sageArt(e.speciesId) ? SAGE_CREDIT : null,
         });
       }
       // After the box push, so a medal cheer queues behind the shiny one.

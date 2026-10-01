@@ -272,7 +272,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **`rollVariant` walks rarest first** and takes a `locked` set from
   `lockedTiers(id)`, an art check only (one argument). `tiersFor` derives from
   it. Origin means debut art older than the base art (`genOf < baseArtGen`,
-  `ART_GEN` a row per generation). Showdown needs a real strip
+  `ART_GEN` a row per generation) **or a SageDeoxys drawing** (`SAGE_IDS`,
+  written by `build_origin.py` from `art/sage/`, imported once by
+  `tools/import_sage.py`; Kanto and Johto keep their own debut art), and
+  every Sage Origin shown carries `SAGE_CREDIT` (catch banner, encounter
+  corner, Dex header, Rare forms). `build_origin.py` READS the ordinary
+  sprites and never resizes them: they are 64, 80 and 96px by generation,
+  and its old `normalise` shrank 2,062 of them. Showdown needs a real strip
   (`hasShowdown` reads the files).
 - **Pity is a capped multiplier on the whole ladder**; `dry` resets on the roll.
 - **`keeper()` protects variants in the engine**, on `sell` and `convert` both.
