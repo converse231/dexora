@@ -834,13 +834,22 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   Lv 20 only three B lines are open (the 6% cap).
 - **The ladder goes past Surf** (2026-10-16): Rainwood Crossing is Route 120
   (id `rainwood`, Lv 25, Monsoon Trail's Fortree blocks), Meteor Falls (id
-  `falls`, Lv 30, `meteor_falls`) and Shoal Cave at low tide (id `shoal`, Lv
-  35, Emerald's `cave`, keyed `em_cave` in route.json beside FireRed's), and
-  past them Tanoby Ruins (id `tanoby`, Lv 40, FireRed's sea route and its
-  seven chambers through `fr_layout`, the FireRed twin of `em_layout`). A new
-  Emerald map reads its layout through `em_layout`; rooms on shelves go
-  through `em_rooms`, which drops a warp pair only when BOTH ends are culled
-  (Shoal's high-tide passages). Every pond bridge (0x71-0x7D) is `N`, like the
+  `falls`, Lv 30, `meteor_falls`) and Icefall Cave (id `shoal`, Lv 35 -
+  FireRed's, in the slot Emerald's Shoal Cave held until 2026-10-02; General
+  + SeafoamIslands, no art of its own), and past them Tanoby Ruins (id
+  `tanoby`, Lv 40, ONE chamber, the Monean - one floor, asked for). A new
+  Emerald map reads its layout through `em_layout`, a FireRed one through
+  `fr_layout`; rooms on shelves go through `em_rooms` (its `load` reads
+  FireRed's), which drops a warp pair only when BOTH ends are culled.
+  FireRed's ice is 0x23/0x26/0x27 (`FR_ICE`), not Emerald's 0x20. A floor
+  joined only by a GBA script (Icefall's thin ice, then sliding) stays
+  walled off: a one-way hole there was tried and trapped you below.
+- **Only the room you stand in is drawn** (2026-10-02): a map with floors
+  side by side carries `rooms` ([x, y, w, h], from each builder), the camera
+  stays inside the one under the trainer (centring a small one), everything
+  else is black, and the minimap bakes that room alone (`bakeMini` on a room
+  change). Other floors showed across the gap and the minimap drew them all.
+  A new multi-floor builder returns its `rooms`. Every pond bridge (0x71-0x7D) is `N`, like the
   ocean one. Each map's cast is a few Kanto rows that set its rarity mix,
   never the route's own encounter table (your call); the types bring every
   generation. A Kanto water row on a map whose types are not Water made

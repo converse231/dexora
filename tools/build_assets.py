@@ -140,7 +140,7 @@ EMERALD = "https://raw.githubusercontent.com/pret/pokeemerald/master"
 # rebases from route.json when `npm run map` runs, which is the rule.
 # `mauville` is Route 110's, in the Pond & Shore slot - appended after it.
 EM_SECONDARY = [("lavaridge", "general"), ("lilycove", "general"), ("fortree", "general"),
-                ("mauville", "general"), ("meteor_falls", "general"), ("cave", "general")]
+                ("mauville", "general"), ("meteor_falls", "general")]
 
 # pokeemerald PRIMARIES we bake WHOLE, because a map drawn against one
 # references its metatiles directly and ours are somebody else's. Ids 0-639
@@ -1010,10 +1010,10 @@ def build_tileset():
         # Its floor is the cave's plain ground, local 1 (663 of the cells).
         "meteor": {"general": sets["em_general"], "meteor_falls": sets["meteor_falls"],
                    "split": 512, "floor": sets["meteor_falls"] + 1},
-        # SHOAL CAVE, the low tide: General plus Emerald's own cave set. Its
-        # floor is the sand, cave local 17 (552 of the cells).
-        "shoal": {"general": sets["em_general"], "cave": sets["em_cave"],
-                  "split": 512, "floor": sets["em_cave"] + 17},
+        # ICEFALL CAVE, in Shoal Cave's slot: FireRed's General (base 0) plus
+        # SeafoamIslands, both baked since Frost Hollow - no new art. Emerald's
+        # `cave` set went with Shoal Cave, the only map that used it.
+        "icefall": {"general": 0, "seafoam": sets["seafoam_islands"], "split": 640},
         # TANOBY RUINS, FireRed's: the sea route is General (base 0) plus the
         # Sevii set, the chambers Building plus their own. The floor is the
         # chambers' stone, tanoby_ruins local 60 (361 of their cells).
@@ -1271,7 +1271,8 @@ def build_ground():
         "rainwood": meta["monsoon"]["floor"],
         # Meteor Falls, a cave: its own ground.
         "falls": meta["meteor"]["floor"],
-        "shoal": meta["shoal"]["floor"],
+        # Icefall Cave (the `shoal` slot) is Seafoam's ice, as Frost Hollow is.
+        "shoal": meta["frost"]["floor"],
         "tanoby": meta["tanoby"]["floor"],
         "ridge": meta["cave"]["floor"],
         "power": meta["power"]["floor"],

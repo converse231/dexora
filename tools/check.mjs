@@ -2339,9 +2339,9 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     rainwood: () => route.monsoon.general,
     // Meteor Falls: Emerald's General and its own set.
     falls: () => route.meteor.general,
-    // Shoal Cave: Emerald's General and its own cave set.
-    shoal: () => route.shoal.general,
-    // Tanoby Ruins: FireRed's General (base 0), the Sevii set and the chambers'.
+    // Icefall Cave (the shoal slot): FireRed's General (base 0) and SeafoamIslands.
+    shoal: () => route.icefall.general,
+    // Tanoby Ruins: FireRed's General (base 0) and the chamber's sets.
     tanoby: () => route.tanoby.general,
     // Seaside Road is Route 110: Emerald's General and Mauville, the same way.
     pond: () => route.route110.general,

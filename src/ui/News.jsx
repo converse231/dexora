@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-02-maps",
+    icon: "🧊",
+    date: "October 2026",
+    title: "Icefall Cave, and one floor at a time",
+    items: [
+      ["Icefall Cave", "FireRed's frozen cave takes Shoal Cave's place at Lv 35: a pool, a waterfall, ice."],
+      ["Tanoby Ruins", "Now a single chamber - Unown's alone, no sea to cross."],
+      ["One floor at a time", "Caves with many floors show only the one you are on, and so does the minimap."],
+    ],
+  },
+  {
     id: "2026-10-01-rotom",
     icon: "📱",
     date: "October 2026",
@@ -58,7 +69,7 @@ export const NEWS = [
     items: [
       ["Rainwood Crossing", "Hoenn's rainy Route 120 opens at Lv 25: long grass, ponds and bridges, and a home for Dark types."],
       ["Meteor Falls", "The cave of waterfalls opens at Lv 30, all five rooms and Steven's Cave. Dragons live here now."],
-      ["Shoal Cave", "The tidal cave at low tide opens at Lv 35, down to its frozen ice room."],
+      ["Shoal Cave", "The tidal cave at low tide opens at Lv 35, down to its frozen ice room. (Icefall Cave since.)"],
     ],
   },
   {

@@ -1473,17 +1473,19 @@ const RESIDENTS = [
   },
   {
     id: "shoal",
-    // No `water`: at low tide its pools are shallows you wade, with nothing
-    // to surf or fish - so no fish live here; the Water types that walk do.
+    water: true,               // the entrance's pool and the back room's
     level: 35,  // MAP_LAST: the last rung
-    name: "Shoal Cave",
-    /* EMERALD'S SHOAL CAVE AT LOW TIDE, AND ICE'S SECOND HOME. Ice had only
-       Frost Hollow; this shares Ice and Water with it, so those species split
-       between two homes and every generation arrives through the fit.
+    name: "Icefall Cave",
+    /* FIRERED'S ICEFALL CAVE, AND ICE'S SECOND HOME (2026-10-02; Emerald's
+       Shoal Cave held this slot, and the id is still `shoal` because saves
+       store it). Ice had only Frost Hollow; this shares Ice and Water with
+       it, so those species split between two homes and every generation
+       arrives through the fit.
 
        THE CAST IS THIS GAME'S: Kanto's tide-pool Pokemon, which set the map's
-       rarity mix - none of them fish-shaped (Seel was, and a fish needs water
-       this cave does not have at low tide), and no Jynx, which evolves from
+       rarity mix - none of them fish-shaped (they were picked for Shoal Cave's
+       dry low tide; the water Icefall has brings its own fish through the
+       fit and the rods), and no Jynx, which evolves from
        Smoochum. Omanyte is the rare band's, which the map needs from its
        first day: without one it opened at 0% rare and the later generations'
        rares took it to 8.8%. The cave's own encounter table was not copied. */
@@ -1494,16 +1496,15 @@ const RESIDENTS = [
   },
   {
     id: "tanoby",
-    water: true,               // the sea between the islets, surfed
-    level: 40,  // MAP_LAST: after Shoal Cave
+    level: 40,  // MAP_LAST: after Icefall Cave
     name: "Tanoby Ruins",
-    /* UNOWN'S OWN MAP, AND NOBODY ELSE'S (asked for, 2026-10-01): FireRed's
-       Tanoby Ruins and its seven chambers, where the GBA meets nothing but
-       Unown either. `only` is what lets it: no `types`, so nothing is homed
+    /* UNOWN'S OWN MAP, AND NOBODY ELSE'S (asked for, 2026-10-01): one of
+       FireRed's Tanoby chambers - one floor, asked for 2026-10-02, where it
+       was the sea route and all seven - and the GBA meets nothing but Unown
+       there either. `only` is what lets it: no `types`, so nothing is homed
        here and no legendary lives here; the generation and headliner rules
        measure a map's MIX, and a map of one species has none, so check.mjs
-       skips it there and nowhere else; and the sea is the same table
-       (`surfTable`), not the water types of a map that has none. Each meeting
+       skips it there and nowhere else. Each meeting
        rolls one of Unown's 28 letters (`rollLook`). */
     only: true,
     types: [],

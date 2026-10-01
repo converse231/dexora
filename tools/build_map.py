@@ -103,10 +103,11 @@ AREAS = [
     # COPIED: Emerald's Meteor Falls, all five rooms and Steven's cave, on
     # shelves like Ember Caldera's - see meteor_falls(). Dragon's own home.
     dict(id="falls", name="Meteor Falls", drawn="meteor_falls"),
-    # COPIED: Emerald's Shoal Cave at low tide, all five rooms - see
-    # shoal_cave(). Ice and Water's second home, the last rung.
-    dict(id="shoal", name="Shoal Cave", drawn="shoal_cave"),
-    # COPIED: FireRed's Tanoby Ruins and all seven chambers - see tanoby().
+    # COPIED: FireRed's Icefall Cave, all four rooms - see icefall_cave(). It
+    # replaced Emerald's Shoal Cave in this slot; the id stays `shoal` because
+    # saves store it. Ice and Water's second home.
+    dict(id="shoal", name="Icefall Cave", drawn="icefall_cave"),
+    # COPIED: one of FireRed's Tanoby Ruins chambers - see tanoby().
     # Unown's own map, and nobody else's.
     dict(id="tanoby", name="Tanoby Ruins", drawn="tanoby"),
 ]
@@ -1840,7 +1841,8 @@ def magma_hideout():
             break
 
     return (["".join(r) for r in g], spawn, [i for row in tiles for i in row], GB, warps,
-            {"elev": elev_rows(elev)})
+            {"elev": elev_rows(elev),
+             "rooms": [[*origin[i], rooms[i]["w"], rooms[i]["h"]] for i in sorted(origin)]})
 
 
 # THE POKEMON TOWER, ALL SEVEN FLOORS, TRANSCRIBED.
@@ -1990,7 +1992,8 @@ def haunted_tower():
           % (len(seen), culled, sum(1 for r in g for c in r if c in "GA")))
 
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], PB, warps)
+            [i for row in tiles for i in row], PB, warps,
+            {"rooms": [[ox, oy, TOWER_FW, TOWER_FH] for ox, oy in origin]})
 
 
 def seafoam_floor(floor="B3F", rungs=()):
@@ -2292,7 +2295,9 @@ def frost_hollow():
                 elev[y][x] = 0
 
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], base, warps, {"elev": elev_rows(elev)})
+            [i for row in tiles for i in row], base, warps,
+            {"elev": elev_rows(elev),
+             "rooms": [[ox, oy, QW, len(f[0])] for (ox, oy), f in zip(origin, floors)]})
 
 
 def all_connected(g):
@@ -2628,7 +2633,9 @@ def mt_moon():
                    if g[door[1] + dy][door[0] + dx] not in SOLID and g[door[1] + dy][door[0] + dx] != "l"), None)
     assert arrive, "mt moon: nowhere to stand beside the exit ladder"
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], base, warps, {"door": door, "arrive": arrive})
+            [i for row in tiles for i in row], base, warps,
+            {"door": door, "arrive": arrive,
+             "rooms": [[*origin[i], MOON_FLOORS[i][1], MOON_FLOORS[i][2]] for i in range(len(MOON_FLOORS))]})
 
 
 
@@ -3380,17 +3387,18 @@ FALLS_GUT = 2
 FALLS_IN = "MAP_ROUTE114"          # the Fallarbor side: the way in
 
 
-def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mouths, remap):
+def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mouths, remap, load=None):
     """Emerald rooms, cell for cell, on shelves on one grid, joined by their
     real warps - read out of each room's map.json and kept only where they
     answer each other, as Ember Caldera's are. `way_in` is the map the entrance
     warp leads to (it becomes the spawn); every other warp out of the rooms
     leads to a map we do not have and is sealed. `remap` turns `em_cell`'s
     outdoor characters into the cave's own, so the minimap draws rock, not
-    grass. Shared by Meteor Falls and Shoal Cave."""
+    grass. Shared by Meteor Falls and Icefall Cave; `load` reads a layout
+    another way (FireRed's, through `fr_layout`)."""
     rooms = []
     for name in names:
-        L = em_layout(f"{prefix}_{name}", secondary, meta["general"], sec_base)
+        L = (load or (lambda lay: em_layout(lay, secondary, meta["general"], sec_base)))(f"{prefix}_{name}")
         # The game's constant for the room: StevensCave is STEVENS_CAVE.
         L["const"] = f"MAP_{re.sub(r'(?<=[a-z])(?=[A-Z])', '_', prefix).upper()}_" + \
             re.sub(r"(?<=[a-z])(?=[A-Z])", "_", name).upper()
@@ -3409,7 +3417,7 @@ def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mou
             back = rooms[j]["events"]["warp_events"][int(wv["dest_warp_id"])]
             if index.get(back["dest_map"]) == i and wv_all[int(back["dest_warp_id"])] is wv:
                 pairs.add(tuple(sorted(((i, wv["x"], wv["y"]), (j, back["x"], back["y"])))))
-    assert len(out) == mouths, f"{tag}: {len(out)} ways out, not {mouths}"
+    assert mouths is None or len(out) == mouths, f"{tag}: {len(out)} ways out, not {mouths}"
     assert sorted(i for s_ in shelves for i in s_) == list(range(len(rooms))), \
         f"{tag}: every room must sit on exactly one shelf"
 
@@ -3490,7 +3498,8 @@ def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mou
     warps = kept
 
     return (["".join(r) for r in g], spawn, [i for row in tiles for i in row], meta["general"], warps,
-            {"elev": elev_rows(elev)})
+            {"elev": elev_rows(elev),
+             "rooms": [[*origin[i], rooms[i]["W"], rooms[i]["H"]] for i in sorted(origin)]})
 
 
 def meteor_falls():
@@ -3505,36 +3514,50 @@ def meteor_falls():
                     FALLS_SHELVES, FALLS_IN, 2, lambda b, ch: {".": "m", "T": "M"}.get(ch, ch))
 
 
-# -------------------------------------------------------------- Shoal Cave
+# -------------------------------------------------------------- Icefall Cave
 
-# Low tide, the tide the rooms' ice and lower floor are reached at. The inner
-# room and the stairs above, then the way in beside the lower and ice rooms.
-SHOAL_ROOMS = ("LowTideEntranceRoom", "LowTideInnerRoom", "LowTideStairsRoom",
-               "LowTideLowerRoom", "LowTideIceRoom")
-SHOAL_SHELVES = ((1, 2), (0, 3, 4))
-SHOAL_IN = "MAP_ROUTE125"
-MB_ICE = 0x20
+# FireRed's ice cave on Four Island, in Shoal Cave's slot (the id stays
+# `shoal`: saves store it). Shoal Cave was reported as not liked, and Seafoam -
+# the obvious ice cave - is already Frost Hollow. The entrance with its pool,
+# the ice floor above, the basement, and the back room past the waterfall.
+ICEFALL_ROOMS = ("Entrance", "1F", "B1F", "Back")
+ICEFALL_SHELVES = ((0, 3), (1, 2))
+ICEFALL_IN = "MAP_FOUR_ISLAND"
 
 
-def shoal_cave():
-    """Shoal Cave: Emerald's tidal cave at low tide, every room cell for cell,
-    on shelves - see `em_rooms`. The way in is from Route 125 at sea.
+def icefall_cave():
+    """Icefall Cave: FireRed's frozen cave, every room cell for cell, on
+    shelves - see `em_rooms`, reading FireRed layouts through `fr_layout`
+    (General + SeafoamIslands, both baked since Frost Hollow, so no new art).
 
-    ICE IS FLOOR, as Frost Hollow's is (`i`): on the GBA it slides you, and this
-    game has no sliding. The IMPASSABLE_NORTH lips are walked like floor - the
-    engine has no one-way cell but a ledge - and the collision-1 ones stay rock.
-    Shallow water is floor you splash through."""
+    ICE IS FLOOR, as Frost Hollow's is (`i`): on the GBA it slides you and
+    cracks under you, and this game has neither. A waterfall is surfed up, as
+    Meteor Falls' are. The way in is from Four Island; the cracked-floor drops
+    are one-way scripts on the GBA, not warp pairs, so B1F and 1F's two
+    eastern pockets are not reached: on the GBA you fall to B1F through thin
+    ice and come back up into those pockets, then SLIDE across the ice to the
+    rest - and this game has no sliding. A hole was tried (2026-10-02) and
+    left you trapped below, so they stay walled off, art kept; the room
+    masking means B1F is never on screen. What you walk is the entrance and
+    its pool, 1F's west half, and the back room past the waterfall."""
     meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
-                             encoding="utf-8"))["shoal"]
-    return em_rooms("shoal", "ShoalCave", SHOAL_ROOMS, "cave", meta, meta["cave"],
-                    SHOAL_SHELVES, SHOAL_IN, 1,
-                    lambda b, ch: "i" if b == MB_ICE and ch == "." else {".": "m", "T": "M"}.get(ch, ch))
+                             encoding="utf-8"))["icefall"]
+    load = lambda lay: fr_layout(lay, "seafoam_islands", "general", meta["general"], meta["seafoam"])
+    return em_rooms("icefall", "FourIsland_IcefallCave", ICEFALL_ROOMS, None, meta, None,
+                    ICEFALL_SHELVES, ICEFALL_IN, None,
+                    lambda b, ch: "i" if b in FR_ICE and ch == "." else {".": "m", "T": "M"}.get(ch, ch),
+                    load=load)
+
+
+# FireRed's ice behaviours (pokefirered's numbering, not Emerald's 0x20):
+# ice, thin ice, cracked ice.
+FR_ICE = frozenset((0x23, 0x26, 0x27))
+
 
 
 # -------------------------------------------------------------- Tanoby Ruins
 
-TANOBY_CHAMBERS = ("Monean", "Liptoo", "Weepth", "Dilford", "Scufib", "Rixy", "Viapois")
-TANOBY_GUT = 2
+TANOBY_CHAMBER = "Monean"
 
 
 def fr_layout(layout, secondary, primary, prim_base, sec_base):
@@ -3581,98 +3604,47 @@ def fr_layout(layout, secondary, primary, prim_base, sec_base):
 
 
 def tanoby():
-    """Tanoby Ruins: FireRed's sea route off Seven Island and all seven of its
-    chambers, every cell a copy. Unown's home, and the only Pokemon on it.
+    """Tanoby Ruins: ONE of FireRed's Unown chambers, the Monean, cell for cell.
+    Unown's home, and the only Pokemon on it.
 
-    The route on top, the chambers on a shelf below in the order the route
-    meets them west to east, joined by the real doors - read from each map's
-    warp_events and kept only where they answer each other. The way in is
-    the route's north edge, where it joins Sevault Canyon (a map we do not
-    have). The islets are reached by Surf, as on the GBA; the map opens long
-    after Surf does. Ruin walls on the route read as rock (`R`), the chambers
-    as Ember Caldera's cave (`m`, `M`), so the minimap draws ruins, not trees."""
+    It was the sea route and all seven chambers, laid out on one grid. Only
+    Unown live here, so the route (open sea you had to surf) and six more
+    near-identical chambers were floors with nothing new on them - reported
+    as wanting one floor. The way in is the chamber's own door, onto the
+    route we no longer have: it is where you arrive, and it is floor. Walls
+    read as Ember Caldera's cave (`M`), so the minimap draws ruins."""
     meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
                              encoding="utf-8"))["tanoby"]
-    out = fr_layout("SevenIsland_TanobyRuins", "sevii_islands_67", "general",
-                    meta["general"], meta["sevii"])
-    rooms = [fr_layout(f"SevenIsland_TanobyRuins_{n}Chamber", "tanoby_ruins", "building",
-                       meta["building"], meta["ruins"]) for n in TANOBY_CHAMBERS]
-    const = {f"MAP_SEVEN_ISLAND_TANOBY_RUINS_{n.upper()}_CHAMBER": i
-             for i, n in enumerate(TANOBY_CHAMBERS)}
+    r = fr_layout(f"SevenIsland_TanobyRuins_{TANOBY_CHAMBER}Chamber", "tanoby_ruins", "building",
+                  meta["building"], meta["ruins"])
+    W, H = r["W"], r["H"]
+    g = [[{".": "m", "R": "M"}.get(ch, ch) for ch in (
+        em_cell(r["behave"](int(r["ids"][y][x])), int(r["col"][y][x]), solid="R") for x in range(W))]
+        for y in range(H)]
+    tiles = [[r["rebase"](int(r["ids"][y][x])) for x in range(W)] for y in range(H)]
+    elev = [[r["elev"][y][x] for x in range(W)] for y in range(H)]
 
-    # The route's doors, each to one chamber, and the chamber's door back.
-    pairs = []
-    for wv in out["events"]["warp_events"]:
-        i = const[wv["dest_map"]]
-        back = rooms[i]["events"]["warp_events"][int(wv["dest_warp_id"])]
-        assert back["dest_map"] == "MAP_SEVEN_ISLAND_TANOBY_RUINS", f"tanoby: {wv['dest_map']} leads elsewhere"
-        pairs.append(((wv["x"], wv["y"]), i, (back["x"], back["y"])))
-    assert len(pairs) == len(TANOBY_CHAMBERS), "tanoby: a chamber has no door from the route"
-
-    order = sorted(range(len(rooms)), key=lambda i: next(p[0][0] for p in pairs if p[1] == i))
-    oy = out["H"] + TANOBY_GUT
-    origin, x = {}, 0
-    for i in order:
-        origin[i] = (x, oy)
-        x += rooms[i]["W"] + TANOBY_GUT
-    W = max(out["W"], x - TANOBY_GUT)
-    H = oy + max(r["H"] for r in rooms)
-
-    # Between and beside the copies, each band's own 2x2 border block - the
-    # sea's above, the chambers' stone below - as every copied map fills.
-    def edge(src, xx, yy):
-        return src["rebase"](src["border"][(yy % 2) * 2 + (xx % 2)])
-    g = [["M"] * W for _ in range(H)]
-    tiles = [[edge(out if yy < oy else rooms[0], xx, yy) for xx in range(W)] for yy in range(H)]
-    elev = [[0] * W for _ in range(H)]
-
-    def lay(src, ox, oy_, remap):
-        for yy in range(src["H"]):
-            for xx in range(src["W"]):
-                mid = int(src["ids"][yy][xx])
-                g[oy_ + yy][ox + xx] = remap(em_cell(src["behave"](mid), int(src["col"][yy][xx]), solid="R"))
-                tiles[oy_ + yy][ox + xx] = src["rebase"](mid)
-                elev[oy_ + yy][ox + xx] = src["elev"][yy][xx]
-
-    lay(out, 0, 0, lambda ch: ch)
-    for i, r in enumerate(rooms):
-        lay(r, *origin[i], lambda ch: {".": "m", "R": "M"}.get(ch, ch))
-
-    warps = []
-    for (ax, ay), i, (bx, by) in pairs:
-        cx, cy = origin[i][0] + bx, origin[i][1] + by
-        g[ay][ax] = g[cy][cx] = "l"
-        warps.append([ax, ay, cx, cy])
-
-    # The way in: the open ground on the route's north edge (Sevault Canyon).
-    north = [x for x in range(out["W"]) if g[0][x] not in SOLID and g[0][x] not in SURFABLE]
-    assert north, "tanoby: the route has no way in from the north"
-    spawn = (north[len(north) // 2], 1)
-    assert g[1][spawn[0]] not in SOLID, "tanoby: the way in is walled up"
-
+    door = r["events"]["warp_events"][0]
+    spawn = (door["x"], door["y"])
+    g[spawn[1]][spawn[0]] = "m"                 # the door out leads nowhere we have
     for xx in range(W):
-        g[0][xx] = g[H - 1][xx] = "R" if g[0][xx] in SURFABLE or xx < out["W"] else "M"
+        g[0][xx] = g[H - 1][xx] = "M" if (xx, H - 1) != spawn else g[H - 1][xx]
     for yy in range(H):
-        g[yy][0] = g[yy][W - 1] = "R" if yy < out["H"] else "M"
-    seal_hidden(g, tiles, "R", elev)
-
-    hop = {}
-    for ax, ay, bx, by in warps:
-        hop[(ax, ay)], hop[(bx, by)] = (bx, by), (ax, ay)
+        g[yy][0] = g[yy][W - 1] = "M"
+    seal_hidden(g, tiles, "M", elev)
     while True:
-        seen = reach(g, [spawn], elev, hop=hop, surf=True)
+        seen = reach(g, [spawn], elev)
         cut = 0
         for yy in range(H):
             for xx in range(W):
                 if g[yy][xx] not in SOLID and (xx, yy) not in seen:
-                    g[yy][xx] = "R" if yy < out["H"] else "M"
+                    g[yy][xx] = "M"
                     cut += 1
-        if not cut and not land_ledges(g, "R"):
+        if not cut and not land_ledges(g, "M"):
             break
-    for ax, ay, bx, by in warps:
-        assert g[ay][ax] == "l" and g[by][bx] == "l", "tanoby: a chamber is cut off"
+    assert g[spawn[1]][spawn[0]] not in SOLID, "tanoby: the way in is walled up"
 
-    return (["".join(r) for r in g], spawn, [i for row in tiles for i in row], meta["general"], warps,
+    return (["".join(row) for row in g], spawn, [i for row in tiles for i in row], meta["general"], None,
             {"elev": elev_rows(elev)})
 
 
@@ -3935,7 +3907,8 @@ def cinderpeak():
             break
 
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], GB, warps)
+            [i for row in tiles for i in row], GB, warps,
+            {"rooms": [[*origin[i], W, CINDER_FLOORS[i][2]] for i in range(len(CINDER_FLOORS))]})
 
 
 # --- the Pokemon Mansion ----------------------------------------------------
@@ -4148,7 +4121,8 @@ def mansion():
     assert g[arrive[1]][arrive[0]] not in SOLID, "mansion: nothing to stand on inside the door"
     return (["".join(r) for r in g], spawn,
             [i for row in tiles for i in row], PB, warps,
-            {"door": spawn, "arrive": arrive})
+            {"door": spawn, "arrive": arrive,
+             "rooms": [[*origin[i], MANSION_FLOORS[i][1], MANSION_FLOORS[i][2]] for i in range(len(MANSION_FLOORS))]})
 
 
 # DOORS BETWEEN MAPS, as pairs of area ids. Each builder reports its own door
@@ -4167,6 +4141,7 @@ if __name__ == "__main__":
         spec["door"] = made[5] if len(made) > 5 else None
         spec["elev"] = (spec["door"] or {}).get("elev")
         spec["cycling"] = (spec["door"] or {}).get("cycling")
+        spec["rooms"] = (spec["door"] or {}).get("rooms")
         spec["w"], spec["h"] = len(rows[0]), len(rows)
         got, total = check(spec, rows, spawn, tiles, warps)
         out.append((spec, rows, spawn, tiles, base, warps))
@@ -4247,6 +4222,10 @@ if __name__ == "__main__":
             body.append("    elev: [")
             body += ['      "%s",' % r for r in spec["elev"]]
             body.append("    ],")
+        if spec.get("rooms"):
+            # ITS FLOORS, as [x, y, w, h]: the engine draws only the one you
+            # stand in, and the minimap shows that one alone.
+            body.append("    rooms: [%s]," % ", ".join("[%d, %d, %d, %d]" % tuple(r) for r in spec["rooms"]))
         if spec.get("cycling"):
             # Its raised road is bike ground - see route110().
             body.append("    cycling: true,")
