@@ -14,6 +14,7 @@ import {
   rodTable, rodBite, surfTable,
   rollVariant, pityBoost, TIERS, TIER_TELL, isLegendary, LEGENDARY,
   lockedTiers, wildBand, rollSize, BIOMES, ENCOUNTER_RATE, sizeTag, rollAlpha, alphaSize,
+  looksOf, rollLook,
 } from "./biomes.js";
 import {
   emptyStats, canSpend, catchMult, weighted, stepScale,
@@ -1492,7 +1493,8 @@ export function createEngine(canvas, onChange, mini = null) {
     const ob = source === "wild" ? outbreak() : null;
     const flood = !!ob && ob.areaId === state.areaId && Math.random() < OUTBREAK_SHARE;
     if (flood && --ob.left === 0) state.worn.push({ id: "outbreak", event: true, n: ++wornSeq });
-    const sp = flood ? speciesById(ob.speciesId) : pickSpecies(table);
+    // Which of a family's drawings you meet (Unown's letter) - see `rollLook`.
+    const sp = rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(table));
     /* Whether the dex already has this one, read BEFORE the throw can register
        it. It rides on the encounter rather than being looked up while drawing,
        because the panel would then read live state: settling a catch sets the
@@ -2640,6 +2642,11 @@ export function createEngine(canvas, onChange, mini = null) {
 
     if (st.stone) state.bag[st.stone] -= 1;
 
+    /* A FAMILY OF LOOKS IS ROLLED INTO FROM A PARENT WITH NONE: Type: Null
+       becomes some Silvally, Litleo some Pyroar. A parent with looks of its
+       own carries them through its rows (Blue Flabebe -> Blue Floette), so it
+       is never rolled. */
+    if (looksOf(mon.species).length < 2) targetId = rollLook(speciesById(targetId)).id;
     const target = speciesById(targetId);
     const at = dexIndex(targetId);
     /* A TRADED ONE EVOLVES INTO A GIFT: raising someone else's catch is not

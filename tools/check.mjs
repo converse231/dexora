@@ -209,7 +209,7 @@ import {
   GEN_FIRST, GEN_STEP,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
   SIZE_MIN, SIZE_MAX, ENCOUNTER_RATE, HEADLINE, genTargets, rowGen,
-  SPECIES_CAP, CAST_CEIL, RODS as RODS_ALL, isLegendary,
+  SPECIES_CAP, CAST_CEIL, RODS as RODS_ALL, isLegendary, looksOf, rollLook,
   GEN_LOW, GEN_HIGH, CAST_TOP,
 } from "../src/game/biomes.js";
 import {
@@ -824,9 +824,13 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
   for (const b of BIOMES)
     for (const [id] of encounterTable(b, MAX_LEVEL)) reach.add(id);
   for (const rod of RODS) for (const [id] of rod.table) reach.add(id);
+  /* A LOOK IS REACHED WHERE ITS FAMILY IS: meeting or evolving into the base
+     rolls one (`rollLook`), and a look's own rows carry it on. */
   for (let pass = 0; pass < 3; pass++)
-    for (const id of [...reach])
+    for (const id of [...reach]) {
       for (const row of evolutionsOf(id)) reach.add(row.to);
+      for (const look of looksOf(id)) reach.add(look);
+    }
 
   const missing = SPECIES.filter((s) => !reach.has(s.id)).map((s) => s.name);
   assert.equal(missing.length, 0,
@@ -842,7 +846,15 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
       /* A regional row is checked against the SPECIES it copies: a form's
          `from` names its base species, not its pre-evolution, so Alolan
          Raichu's reads "raichu". Read both ends through to their base. */
-      const real = row.regional
+      /* A LOOK'S row copies its species' row too (Blue Flabebe -> Blue
+         Floette), so both ends read through to their base species. */
+      const baseOf_ = (s) => (isForm(s.id) ? speciesById(s.of) : s);
+      const real = row.look
+        ? baseOf_(speciesById(row.to)).from === baseOf_(sp).name
+          && EVOLUTIONS.some((r) => !r.look && r.from === baseOf_(sp).id
+            && r.to === baseOf_(speciesById(row.to)).id && r.kind === row.kind
+            && r.level === row.level && r.item === row.item)
+        : row.regional
         ? speciesById(speciesById(row.to).of).from === (isForm(sp.id) ? sp.from : sp.name)
         : speciesById(row.to).from === sp.name;
       assert.ok(real, `${sp.name} -> ${speciesById(row.to).name} is not a real evolution`);
@@ -2034,11 +2046,15 @@ for (const b of BIOMES) {
   assert.ok(seen.size >= 0.9 * spawnable,
     `${b.id}: only ${seen.size} of ${spawnable} walkable tiles are reachable`);
 
-  assert.ok(b.table.length >= 8, `${b.id} needs a table worth rolling on`);
+  /* An `only` map is one species' home (Tanoby: Unown, 28 letters rolled by
+     `rollLook`) - its roll is the look, not the row. Everywhere else, eight. */
+  assert.ok(b.table.length >= 8 || (b.only && b.table.length === 1 && looksOf(b.table[0][0]).length >= 8),
+    `${b.id} needs a table worth rolling on`);
 
   /* Types are ids now, not a display string, because every one of them is
      rendered as a coloured badge. A typo would silently draw the default grey. */
-  assert.ok(Array.isArray(b.types) && b.types.length, `${b.id} needs a type list`);
+  // No types is what keeps an `only` map nobody else's: nothing homes on none.
+  assert.ok(Array.isArray(b.types) && (b.types.length || b.only), `${b.id} needs a type list`);
   for (const t of b.types)
     assert.ok(KNOWN_TYPES.has(t), `${b.id} lists an unknown type "${t}"`);
   for (const [id, w] of b.table) {
@@ -2086,6 +2102,12 @@ for (const b of BIOMES) {
   for (const lv of [1, 10, GEN_UNLOCK[2], 30, GEN_UNLOCK[4], MAX_LEVEL]) {
     const t = encounterTable(b, lv);
     const total = t.reduce((n, e) => n + e[1], 0);
+    /* Empty only before the map opens: Tanoby is Unown's alone, and Unown is
+       Johto's - nothing of it exists at Lv 1. Open, a map always has a table. */
+    if (!total) {
+      assert.ok(lv < (b.level ?? 1), `${b.id} is open at Lv ${lv} with nothing in it`);
+      continue;
+    }
     const share = t.filter((e) => LEGENDARY.includes(e[0]))
       .reduce((n, e) => n + e[1], 0) / total;
     /* PER BELONGING HEAD, NOT PER OPEN HEAD, and that is the sharper half of
@@ -2319,6 +2341,8 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     falls: () => route.meteor.general,
     // Shoal Cave: Emerald's General and its own cave set.
     shoal: () => route.shoal.general,
+    // Tanoby Ruins: FireRed's General (base 0), the Sevii set and the chambers'.
+    tanoby: () => route.tanoby.general,
     // Seaside Road is Route 110: Emerald's General and Mauville, the same way.
     pond: () => route.route110.general,
     // Mirage Desert is Route 111: the same General and Mauville blocks.
@@ -3615,6 +3639,15 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       if (!isForm(sp.id)) continue;
       const rows = EVOLUTIONS.filter((e) => e.to === sp.id);
 
+      /* A LOOK is met through its family's roll and carried by copied rows -
+         never a spawn row, never a Lv 100 build. */
+      if (sp.form === "look") {
+        assert.ok(!sp.wild, `${sp.name} is a look AND a spawn row - it would be met twice over`);
+        assert.ok(looksOf(sp.of).includes(sp.id), `${sp.name} is a look outside its family`);
+        assert.ok(rows.every((e) => e.look), `${sp.name} is a look built some other way`);
+        continue;
+      }
+
       if (sp.wild) {
         /* BOTH IS ALLOWED NOW, AND `evo` IS WHAT MAKES IT DELIBERATE.
 
@@ -3634,7 +3667,8 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
            So a regional row must MIRROR a real one - same method, level and
            item, from the ordinary parent or that parent's own form - or it is
            a price somebody invented. Everything else is still the old rule. */
-        const declared = rows.filter((e) => !e.regional);
+        // A look's row is a copy too (Sandy Burmy -> Sandy Wormadam), checked above.
+        const declared = rows.filter((e) => !e.regional && !e.look);
         assert.ok(!declared.length || sp.evo,
           `${sp.name} is met in the wild AND evolved into without declaring ` +
           "`evo` - one of the two is an accident");
@@ -3795,11 +3829,16 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      suite measuring against whatever the target says. */
   {
     const gens = GEN_LAST.map((_, i) => i + 1);
+    /* THE MIX SUITES SKIP AN `only` MAP: Tanoby is Unown's alone (asked for),
+       so it has one generation, no Kanto cast and one species at 100% - every
+       rule below measures a mix it does not have. Findability, after them,
+       still counts it. */
+    const MIXED = BIOMES.filter((b) => !b.only);
     const COSTUMED = new Set(SPECIES.filter((sp) => sp.form === "costume").map((sp) => sp.id));
     let worst = 0, worstAt = "";
     let capHeld = 0;
     for (let lv = 1; lv <= MAX_LEVEL; lv++) {
-      for (const b of BIOMES) {
+      for (const b of MIXED) {
         if (lv < (b.level ?? 1)) continue;
         const open = gens.filter((g) => lv >= (GEN_UNLOCK[g] ?? 0));
         const rows = encounterTable(b, lv)
@@ -3848,7 +3887,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
        denominator, so a floor the appended families quietly eat is caught.
        Half a point of slack is what those appended shares cost at most. */
     let low = 1, lowAt = "";
-    for (const b of BIOMES) {
+    for (const b of MIXED) {
       const rows = encounterTable(b, MAX_LEVEL);
       const total = rows.reduce((n, r) => n + r[1], 0);
       const cast = rows.filter((r) => genOf(r[0]) === 1 && !LEGENDARY.includes(r[0]))
@@ -3880,7 +3919,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       const SLACK = 0.02, SPILL = 0.085;
       const COSTUME = new Set(SPECIES.filter((sp) => sp.form === "costume").map((sp) => sp.id));
       let hi = 0, hiAt = "", lo = 1, loAt = "";
-      for (const b of BIOMES) {
+      for (const b of MIXED) {
         const rows = encounterTable(b, MAX_LEVEL)
           .filter((r) => !LEGENDARY.includes(r[0]) && !COSTUME.has(r[0]));
         const total = rows.reduce((n, r) => n + r[1], 0);
@@ -3914,7 +3953,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
        `capLines` is what is under test here; verified by making it return its
        input, which puts Duskull back at 16.8% of the tower. */
     let over = 0, softened = 0, top = 0, topAt = "";
-    for (const b of BIOMES) {
+    for (const b of MIXED) {
       for (let lv = b.level ?? 1; lv <= MAX_LEVEL; lv++) {
         const rows = encounterTable(b, lv)
           .filter((r) => !LEGENDARY.includes(r[0]) && !COSTUMED.has(r[0]));
@@ -3948,7 +3987,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
        27.2% after the tower's weights were rebalanced; verified by putting
        the old weights back (39.8%). */
     let crowd = 0, crowdAt = "";
-    for (const b of BIOMES) {
+    for (const b of MIXED) {
       for (let lv = Math.max(b.level ?? 1, GEN_UNLOCK[4]); lv <= MAX_LEVEL; lv++) {
         const rows = encounterTable(b, lv)
           .filter((r) => !LEGENDARY.includes(r[0]) && !COSTUMED.has(r[0]));
@@ -3974,7 +4013,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     let arrive = 0, arriveAt = "";
     for (const g of gens.slice(1)) {
       const lv = GEN_UNLOCK[g];
-      for (const b of BIOMES) {
+      for (const b of MIXED) {
         if (lv < (b.level ?? 1) || lv > MAX_LEVEL) continue;
         const rows = encounterTable(b, lv)
           .filter((r) => !LEGENDARY.includes(r[0]) && !COSTUMED.has(r[0]));
@@ -4118,8 +4157,10 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         return t.filter((e) => ["A", "S"].includes(bandOf(e[0])))
           .reduce((n, e) => n + e[1], 0) / total;
       };
-      assert.ok(withEvo(MAX_LEVEL) < withEvo(1) * 2.2 + 0.02,
-        `${b.id}: the rare share goes ${(withEvo(1) * 100).toFixed(1)}% -> ` +
+      // From the level the map opens, as the band drift above: Tanoby is empty at Lv 1.
+      const opens = Math.max(1, b.level ?? 1);
+      assert.ok(withEvo(MAX_LEVEL) < withEvo(opens) * 2.2 + 0.02,
+        `${b.id}: the rare share goes ${(withEvo(opens) * 100).toFixed(1)}% -> ` +
         `${(withEvo(MAX_LEVEL) * 100).toFixed(1)}% once everything has arrived - ` +
         "the overlay is meant to enrich a map, not re-rank it");
 
@@ -4638,6 +4679,8 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     };
     for (const b of BIOMES) {
       const t = encounterTable(b, MAX_LEVEL);
+      // One row has nothing to tilt: a rift on Tanoby (Unown alone) only finds.
+      if (t.length < 2) continue;
       const plain = shares(weighted(t, emptyStats(), 0));
       const torn = shares(weighted(t, emptyStats(), RIFT_TILT));
       const top = plain.indexOf(Math.max(...plain));
@@ -4664,6 +4707,11 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     const findValue = RIFT_STEPS * RIFT_FIND * (shelf + RIFT_CANDY * CANDY_PRICE) / 2;
     let worst = 0, where = "";
     for (const b of BIOMES) {
+      /* NOT TANOBY: Unown alone, a commoner, so its sales are the game's
+         lowest and a rift's finds (the same on every map) read as 33% of them.
+         The rule is that a rift never makes a map worth farming for money, and
+         the map that pays least per step cannot be that map. */
+      if (b.only) continue;
       const t = encounterTable(b, MAX_LEVEL);
       const tot = t.reduce((n, r) => n + r[1], 0);
       const avg = t.reduce((n, [id, w]) => n + (w / tot) * sellValue(speciesById(id)), 0);

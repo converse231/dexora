@@ -2975,6 +2975,18 @@ Designed, costed, and **not built** — each with the trigger that should bring 
 back. They are here rather than in a tracker because every one of them is a
 design decision with a reason, and a one-line ticket loses the reason.
 
+### Vivillon's patterns and Alcremie's sweets
+
+The 2026-10-01 audit of PokeAPI found 176 drawings the game lacked; 95 shipped
+as **looks** (Unown's letters, Furfrou's trims, the Flabebe line's colours,
+Silvally's types and the rest), rolled when you meet or evolve into the
+family. Vivillon (19 patterns) and Alcremie (62 cream-and-sweet pairs) were
+left out on purpose: both are evolved species met at well under 1% of their
+best map, so a 62-way roll would make each Alcremie a once-a-playthrough
+sight, and choosing one on evolving is a picker 62 rows long. **Trigger:** a
+way to pick a look on purpose (a sweet item for Alcremie, a region for
+Vivillon), which turns the roll into a choice.
+
 ### Band budgets, and pity — **both built, see above**
 
 Both were deferred here with a trigger, both triggers fired, and both shipped in

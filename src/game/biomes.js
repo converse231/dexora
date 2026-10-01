@@ -520,11 +520,14 @@ export function foundIn(speciesId) {
      "where can I find one this minute". A row that only opens later carries the
      level it opens at, so the sheet can say so rather than quietly promise a
      Venusaur to a Lv 3 trainer. */
+  /* A LOOK lives where its family does, at its share of the family's row:
+     Unown (B) is one meeting in 28 of Tanoby's Unown (`rollLook`). */
+  const family = looksOf(speciesId);
   const areas = [];
   for (const b of BIOMES) {
     const full = encounterTable(b, MAX_LEVEL);
     const total = full.reduce((n, [, w]) => n + w, 0);
-    const row = full.find(([id]) => id === speciesId);
+    const row = full.find(([id]) => id === family[0]);
     if (row) {
       /* ONE NUMBER FOR "NOT BEFORE THIS LEVEL", whatever is holding it back.
 
@@ -541,7 +544,7 @@ export function foundIn(speciesId) {
       areas.push({
         id: b.id,
         name: b.name,
-        share: row[1] / total,
+        share: row[1] / total / family.length,
         /* THREE things can hold a line back now, and they are still one
            number: an evolved form's own unlock, the map's, and the GENERATION's
            - Johto does not appear until 22 and Sinnoh until 35. A Gen 4 entry
@@ -938,6 +941,26 @@ const byId = new Map(SPECIES.map((sp) => [sp.id, sp]));
 const byIndex = new Map(SPECIES.map((sp, i) => [sp.id, i]));
 export const speciesById = (id) => byId.get(id) ?? null;
 export const dexIndex = (id) => byIndex.get(id) ?? -1;
+
+/* A LOOK IS ONE OF A FAMILY'S DRAWINGS (Unown's letters, Furfrou's trims -
+   see fetch-forms). The family is its base and every look, base first. A look
+   is never a spawn row: the base keeps the family's one slot, and meeting it
+   picks a drawing here, evenly. A species with no looks costs no roll, so a
+   seeded test of anything else draws the same numbers it always did. */
+const LOOKS = new Map();
+for (const sp of SPECIES) {
+  if (sp.form !== "look") continue;
+  if (!LOOKS.has(sp.of)) LOOKS.set(sp.of, [sp.of]);
+  LOOKS.get(sp.of).push(sp.id);
+}
+export const looksOf = (id) => {
+  const sp = speciesById(id);
+  return LOOKS.get(sp?.form === "look" ? sp.of : id) ?? [id];
+};
+export const rollLook = (sp, random = Math.random) => {
+  const family = looksOf(sp.id);
+  return family.length < 2 ? sp : speciesById(family[Math.floor(random() * family.length)]);
+};
 
 /* Scaled so the legendaries together come to `LEGEND_SHARE` of the FINAL table
    - hence `total / (1 - share)`, which is the weight that makes a share of the
@@ -1469,13 +1492,32 @@ const RESIDENTS = [
       [98, 14], [120, 12], [90, 10], [79, 6], [138, 3],
     ],
   },
+  {
+    id: "tanoby",
+    water: true,               // the sea between the islets, surfed
+    level: 40,  // MAP_LAST: after Shoal Cave
+    name: "Tanoby Ruins",
+    /* UNOWN'S OWN MAP, AND NOBODY ELSE'S (asked for, 2026-10-01): FireRed's
+       Tanoby Ruins and its seven chambers, where the GBA meets nothing but
+       Unown either. `only` is what lets it: no `types`, so nothing is homed
+       here and no legendary lives here; the generation and headliner rules
+       measure a map's MIX, and a map of one species has none, so check.mjs
+       skips it there and nowhere else; and the sea is the same table
+       (`surfTable`), not the water types of a map that has none. Each meeting
+       rolls one of Unown's 28 letters (`rollLook`). */
+    only: true,
+    types: [],
+    table: [
+      [201, 10],
+    ],
+  },
 ];
 
 /* The last map's level, and the shape of the ladder. Asserted against the table
    rather than trusted: a level typed into one row and a number quoted in a
    design document are two places for the same fact. */
 export const MAP_FIRST = 1;
-export const MAP_LAST = 35;
+export const MAP_LAST = 40;
 
 /* WHERE EVERYTHING ELSE LIVES, decided by a rule rather than by hand.
 
@@ -1594,9 +1636,13 @@ const derivedHomes = () => {
      stone, would have been filtered out by the very row that makes them
      buildable and then been in no table at all. A form says `wild` when it
      belongs here whatever else is true of it. */
+  /* AND NEVER A LOOK: nothing evolves into most of them, so the pool took
+     every Furfrou trim and Flabebe colour as a resident of its own and
+     Tall Grass lost Eevee and Miltank under them. A look is met through its
+     family's one row (`rollLook`). */
   const wild = SPECIES.filter((sp) =>
     (!evolvesInto.has(sp.id) || sp.wild) && !LEGENDARY.includes(sp.id)
-    && !COSTUMES.includes(sp.id));
+    && !COSTUMES.includes(sp.id) && sp.form !== "look");
 
   /* A HOME IS THE PRIMARY TYPE, AND THE OTHER 453 SPECIES WERE NOT GETTING
      THE RULE THE LEGENDARIES HAVE HAD FOR A YEAR.
@@ -2793,6 +2839,8 @@ export const rodTable = (id, level = MAX_LEVEL) =>
 export const SURF_MIN = 4;
 const wet = (id) => { const sp = speciesById(id); return sp.types.includes("water") || sp.shape === "fish"; };
 export function surfTable(biome, level, rodId) {
+  // A one-species map is that species on the water too - see Tanoby's row.
+  if (biome.only) return tableFor(biome, level);
   const own = tableFor(biome, level).filter(([id]) => wet(id));
   return own.length >= SURF_MIN ? own : rodTable(rodId, level);
 }

@@ -2119,6 +2119,52 @@ console.log("alpha ok — never flees, caught pays candy and research, boxed, un
 }
 console.log("lustre ok — rank 20 turns a roll just past the odds into a rare form");
 
+/* LOOKS, THROUGH THE ENGINE (2026-10-01). Walking Tanoby meets Unown in more
+   than one letter; Type: Null evolves into the Silvally the roll picks; a Blue
+   Flabebe evolves into a Blue Floette, by its own row and with no roll. */
+{
+  const { looksOf, speciesById } = await import("../src/game/biomes.js");
+  const { FORMS } = await import("../src/data/forms.js");
+  const letters = new Set();
+  {
+    const { e } = boot({ ...SAVE, areaId: "tanoby" });
+    for (let i = 0; i < 12; i++) {
+      const enc = walkToEncounter(e);
+      assert.ok(enc && looksOf(201).includes(enc.speciesId),
+        `Tanoby met ${enc && speciesById(enc.speciesId)?.name} - it is Unown's alone`);
+      letters.add(enc.speciesId);
+      e.flee();
+      if (e.state.ask) e.answerAsk(true);
+      until(e, (st) => !st.encounter, "the Unown to be left", 4000);
+    }
+    assert.ok(letters.size > 1, "twelve Unown were all one letter - meeting does not roll a look");
+  }
+
+  const silvally = looksOf(773);
+  const pick = silvally.length - 1;
+  const { e } = boot({ ...SAVE, box: [
+    { uid: 1, species: 772, level: 100 },
+    { uid: 2, species: FORMS.find((f) => f.name === "flabebe-blue").id, level: 40 },
+  ], nextUid: 3 });
+  const real = Math.random;
+  try {
+    Math.random = () => (pick + 0.5) / silvally.length;
+    assert.ok(e.evolve(1, 773), "Type: Null would not evolve");
+  } finally { Math.random = real; }
+  assert.equal(e.state.box[0].species, silvally[pick],
+    `Type: Null became ${speciesById(e.state.box[0].species).name}, not the Silvally its roll picked`);
+  e.closeEvolution();
+
+  const blue = FORMS.find((f) => f.name === "floette-blue").id;
+  try {
+    Math.random = () => { throw new Error("a look's own evolution rolled"); };
+    assert.ok(e.evolve(2, blue), "Blue Flabebe would not evolve into Blue Floette");
+  } finally { Math.random = real; }
+  assert.equal(e.state.box[1].species, blue, "Blue Flabebe lost its colour evolving");
+  console.log(`looks ok — ${letters.size} Unown letters in 12 meetings, Type: Null rolled ` +
+    `${speciesById(silvally[pick]).name}, Blue Flabebe kept its colour`);
+}
+
 /* A BOX ENTRY WEARING A TIER PROVES THE TIER. If the tier row lost it (a save
    from before the row existed, a hand edit), loading sets it back from the
    entry - or the Dex says you have never found the one you are holding. */

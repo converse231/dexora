@@ -321,6 +321,12 @@ canvas {
 }
 /* Rainwood Crossing: Route 120's weather. A low grey-blue rain sky, and the
    grass under it wet and dim rather than sunlit. */
+.battle[data-area="tanoby"] {
+  --sky: linear-gradient(#6f8a9a 0%, #93aab4 55%, #c4cfc6 100%);
+  --ground-tint: linear-gradient(rgba(236, 226, 196, .10), rgba(44, 40, 30, .30));
+  --ground-lip: rgba(46, 40, 30, .30);
+  --ground-glow: rgba(240, 232, 208, .22);
+}
 .battle[data-area="shoal"] {
   --sky: linear-gradient(#5f6f7c 0%, #7f929f 55%, #a9bcc6 100%);
   --ground-tint: linear-gradient(rgba(200, 230, 245, .12), rgba(30, 50, 64, .30));

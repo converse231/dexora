@@ -169,6 +169,7 @@ for (const f of FORMS) {
      item makes it a `stone` row, which is the kind the shop already gates and
      check.mjs already holds against `STONES` in both directions. */
   if (f.wild && !f.evo) continue;
+  if (f.form === "look") continue;           // reached by a roll or a carry, below
   rows.push({
     from: f.of, to: f.id,
     kind: f.evo?.item ? "stone" : f.form,
@@ -199,6 +200,24 @@ for (const f of FORMS) {
   for (const r of baseRows.filter((e) => e.to === f.of)) {
     const kin = FORMS.find((g) => g.of === r.from && g.form === f.form && g.wild);
     rows.push({ ...r, from: kin ? kin.id : r.from, to: f.id, regional: true });
+  }
+}
+
+/* A LOOK EVOLVES INTO THE SAME LOOK, where its species' next stage has it:
+   Blue Flabebe -> Blue Floette -> Blue Florges, East Shellos -> East
+   Gastrodon, Sandy Burmy -> Sandy Wormadam (a wild form, matched by name like
+   any look). Where the next stage has no such drawing it lands on the plain
+   one. A copy of the species' own row - method, level, item - marked `look`,
+   never into a Mega (Floette's is the base's to make). A parent with NO looks
+   is not here at all: the engine rolls one on evolving (Type: Null). */
+const named = new Map(FORMS.map((f) => [f.name, f]));
+const nameOf = new Map(SPECIES.map((sp) => [sp.id, sp.name]));
+for (const f of FORMS) {
+  if (f.form !== "look") continue;
+  const tail = f.name.slice(nameOf.get(f.of).length);
+  for (const r of baseRows.filter((e) => e.from === f.of && e.to < 10000)) {
+    const kin = named.get(nameOf.get(r.to) + tail);
+    rows.push({ ...r, from: f.id, to: kin ? kin.id : r.to, look: true });
   }
 }
 

@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-01-unown",
+    icon: "🔤",
+    date: "October 2026",
+    title: "Unown's ruins and 95 new forms",
+    items: [
+      ["Tanoby Ruins", "FireRed's island ruins open at Lv 40. Only Unown live there, in all 28 letters."],
+      ["New forms", "Furfrou trims, Flabébé colours, Silvally types, seasons, Minior cores and more."],
+      ["How you get them", "Each meeting picks a look at random, and evolving keeps it: Blue Flabébé becomes Blue Floette."],
+    ],
+  },
+  {
     id: "2026-10-01-cap",
     icon: "⭐",
     date: "October 2026",

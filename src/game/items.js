@@ -1035,10 +1035,18 @@ export const CANDY = { C: 1, B: 2, A: 4, S: 8 };
    tracks the species in your hand (`sellValue`), so a wild Venusaur is still
    worth what a Venusaur is worth; the two currencies measure different things
    on purpose. */
+/* A LOOK'S COPIED ROW DECIDES A BASE ONLY WHERE NO REAL ROW DOES, and a look
+   reads through to its family's. The Eternal Flower Floette's row into
+   Florges was read as Florges' parent, so Florges was worth a Floette's 2
+   candy, not a Flabebe's 1 - "evolve, then convert" printed candy again. But
+   Sandy Wormadam's only parent IS a look's row (Sandy Burmy), and without it
+   the wild form read its own A tier: 2 candy in, 4 out. */
 const BASE_OF = new Map();
-for (const r of EVO_ROWS) BASE_OF.set(r.to, r.from);
+for (const r of EVO_ROWS) if (!r.look) BASE_OF.set(r.to, r.from);
+for (const r of EVO_ROWS) if (r.look && !BASE_OF.has(r.to)) BASE_OF.set(r.to, r.from);
 const baseForm = (id) => {
-  let at = id;
+  const sp = speciesById(id);
+  let at = sp?.form === "look" ? sp.of : id;
   for (let up = BASE_OF.get(at); up; up = BASE_OF.get(at)) at = up;
   return at;
 };
