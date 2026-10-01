@@ -3186,14 +3186,19 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(begin(e, brock.id, [6]), "locked", "a Pokemon locked in a trade was let into the battle");
     assert.equal(begin(e, brock.id, [99]), "team", "a Pokemon not in the Box was let in");
     assert.equal(begin(e, brock.id, [1, 1]), "team", "one Pokemon was let in twice");
-    // Read off the roster, not teamSize - that is what is under test.
-    assert.ok(brock.party.length < 3, "Brock fields three - this test needs a leader with a smaller party");
-    assert.equal(begin(e, brock.id, [1, 2, 3]), "team", "a bigger team than Brock fields was let in");
     // A fighter that is not the Box's Pokemon at its own level is not that Pokemon.
     const b = battle(e, brock.id, [1]);
     b.sides[0].team[0] = fighter(4, 60, 1);
     assert.equal(e.battleBegin(b, { id: brock.id, uids: [1] }), "team", "a Lv 60 fighter passed as a Lv 5 Charmander");
     assert.equal(e.state.battle, null, "a refused battle was started anyway");
+  }
+
+  // SIX MAY COME TO ANY BATTLE (your call, 2026-10-02): Brock fields two, and a
+  // team of three is not refused for its size. Read off the roster.
+  {
+    const e = at(allOf(brock.trainers.map((t) => t.id)));
+    assert.ok(brock.party.length < 3, "Brock fields three - this test needs a leader with a smaller party");
+    assert.notEqual(begin(e, brock.id, [1, 2, 3]), "team", "a team bigger than Brock's party was refused");
   }
 
   // A gym is walked through (rev 5): its trainers in the roster's order, then its

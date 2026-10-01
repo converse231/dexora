@@ -63,9 +63,10 @@ export const leadersOf = (rid) => inRegion(rid, ["leader"]);
 export const leagueOf = (rid) => inRegion(rid, ["league", "champion"]);
 const TRAINERS = Object.keys(TRAINERTUNE);
 export const trainersOf = (gymId) => TRAINERS.filter((t) => TRAINERTUNE[t].gym === gymId);
-/* How many Pokemon you may bring: six against a gym trainer, and no more than
-   they field against anyone capped (`party` is the length of theirs). */
-export const teamSize = (id, party) => (TRAINERTUNE[id] ? TEAM_MAX : Math.min(TEAM_MAX, party));
+/* How many Pokemon you may bring: six, against anyone (your call, 2026-10-02 -
+   it was no more than a leader fields). The solved levels are what keep a
+   full team against a smaller party a fight; see docs/battles.md. */
+export const teamSize = () => TEAM_MAX;
 
 /* CLEARED is every gym trainer, leader, League member and Champion beaten -
    what opens the next region. */

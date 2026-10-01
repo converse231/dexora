@@ -7001,7 +7001,10 @@ let healNote = "";
      may sit outside the band only when the target lies between its level
      and the next one towards it - replayed here - so no closer level exists.
      Kanto's Bruno is the case that made it: 73% at ace 20, 18% at 22, his
-     Tyrogue-line fighters crossing the level they evolve at. */
+     Tyrogue-line fighters crossing the level they evolve at. A CEILING is the
+     other proof: a player still winning above target against the most
+     training there is (a two-Pokemon leader against six, since the team is
+     never cut to the leader's size) has no harder level left to find. */
   const BAND = 0.15;
   let worst = 0, maxTurns = 0;
   const off = [], moved = [], cliffs = [];
@@ -7011,7 +7014,8 @@ let healNote = "";
     if (Math.abs(d) > Math.abs(worst)) worst = d;
     if (Math.abs(d) > BAND) {
       const next = lWin(r, g.top + (d > 0 ? 1 : -1), { ...L_RECORD, share }).win;
-      if ((next - r.target) * d < 0) {
+      const ceiling = d > 0 && lWin(r, 100 + B_MAX_EFFORT, { ...L_RECORD, share }).win > r.target;
+      if (ceiling || (next - r.target) * d < 0) {
         cliffs.push(`${r.o.name} ${Math.round(g.win * 100)}/${Math.round(next * 100)}% for ${Math.round(r.target * 100)}%`);
         continue;
       }
@@ -7237,6 +7241,32 @@ import {
 } from "../src/game/ranked.js";
 import { ABANDON_MINUTES as R_ABANDON } from "../src/game/referee.js";
 import { rankedFighter as rFighter, refusal as rRefusal, legendLevel as rLegendLevel } from "../src/game/battle.js";
+import { playerFighter as pFighter, fighter as pPlain, movesOf as pMovesOf, step as pStep, mulberry32 as pRng } from "../src/game/battle.js";
+import { PERKS as P_PERKS, ALPHA_PERK as P_ALPHA } from "../src/game/perks.js";
+import { TIERS as P_TIERS } from "../src/game/biomes.js";
+/* RARE FORMS AND ALPHAS HAVE LEAGUE PERKS (perks.js, your call 2026-10-02) -
+   and only there, and only on the player's side. Every tier has one (a new
+   tier without one would fight plain and say nothing); a plain Box Pokemon
+   is exactly the fighter it always was; a form's perk and an alpha's stack;
+   and a plain fighter's battle draws the same rolls (the replays rest on it). */
+{
+  for (const t of P_TIERS) assert.ok(P_PERKS[t]?.says, `the ${t} tier has no League perk`);
+  const mon = { species: 6, level: 50, uid: 7 };
+  const plain = pFighter(mon);
+  assert.deepEqual(plain, pPlain(6, 50, 7, pMovesOf(mon)), "a plain Box Pokemon fights differently from before");
+  assert.equal(plain.perk, undefined, "a plain fighter carries a perk");
+  const gold = pFighter({ ...mon, gold: 1 });
+  assert.ok(gold.st[2] > plain.st[2] && gold.st[0] === plain.st[0], "Gold's Defense perk is not on the fighter");
+  const both = pFighter({ ...mon, gold: 1, alpha: 1 });
+  assert.ok(both.st[2] === gold.st[2] && both.max > plain.max && both.hp === both.max,
+    "a form's perk and an alpha's did not stack");
+  assert.equal(pFighter({ ...mon, projection: 1 }).stages[7], P_PERKS.projection.evade, "Projection does not start evasive");
+  assert.ok(P_ALPHA.st[0] > 1, "the alpha perk lost its HP");
+  // Ranked never reads a box entry, so no perk can reach it.
+  assert.equal(rFighter(6, 7).perk, undefined, "a ranked fighter carries a perk");
+  console.log(`perks ok — ${P_TIERS.length} forms and the alpha each have one, they stack, ` +
+    "and a plain Pokemon (and ranked) fights exactly as before");
+}
 import { legendary as rLegendary } from "../src/game/league.js";
 import { TEAM_MAX as R_TEAM } from "../src/game/league.js";
 import { LEAGUES as R_LEAGUES } from "../src/data/leagues.js";

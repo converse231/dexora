@@ -203,8 +203,8 @@ export default function Help({ onClose }) {
               teaches moves: any move a Pokémon&rsquo;s line learns by its level.
             </li>
             <li>
-              <b>Your team.</b> Up to {TEAM_MAX} Pokémon (no more than your
-              opponent fields), each at or under the battle&rsquo;s level cap; a
+              <b>Your team.</b> Up to {TEAM_MAX} Pokémon in every battle, each at
+              or under the battle&rsquo;s level cap; a
               legendary&rsquo;s cap is lower, the stronger it is. A Pokémon in a
               trade offer stays home. Battles give no EXP - raise your team with
               Rare Candy.

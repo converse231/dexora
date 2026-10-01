@@ -165,9 +165,16 @@ function useRows(ref, count) {
     const el = ref.current;
     if (!el) return undefined;
     const measure = () => {
-      const cs = getComputedStyle(el.firstElementChild ?? el);
-      const cols = cs.gridTemplateColumns.split(" ").filter(Boolean).length || 4;
-      const pitch = (parseFloat(cs.gridAutoRows) || 84) + (parseFloat(cs.rowGap) || 0);
+      const inner = el.firstElementChild ?? el;
+      const cs = getComputedStyle(inner);
+      const tracks = cs.gridTemplateColumns.split(" ").filter(Boolean);
+      const cols = tracks.length || 4;
+      /* SQUARE TILES: a row as tall as a column is wide (reported: not a
+         perfect square). The width is the grid's to decide, so the height is
+         set from it here, where the pitch is read anyway. */
+      const side = parseFloat(tracks[0]);
+      if (side > 0 && Math.abs(side - parseFloat(cs.gridAutoRows)) > 0.5) inner.style.gridAutoRows = `${side}px`;
+      const pitch = (side > 0 ? side : parseFloat(cs.gridAutoRows) || 84) + (parseFloat(cs.rowGap) || 0);
       const first = Math.max(0, Math.floor(el.scrollTop / pitch) - OVERSCAN);
       const last = Math.ceil((el.scrollTop + el.clientHeight) / pitch) + OVERSCAN;
       setWin((w) => (w.first === first && w.last === last && w.cols === cols && w.pitch === pitch

@@ -8,6 +8,7 @@ import Sprite from "./Sprite.jsx";
 import Types from "./Types.jsx";
 import Mark from "./Marks.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
+import { perksOf } from "../game/perks.js";
 
 const STATS = ["HP", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed"];
 // The highest base stat any Pokemon has, so a bar is comparable across species.
@@ -55,6 +56,10 @@ export default function Preview({ group, onClose }) {
             )}
           </div>
           <Types of={sp.types} />
+          {/* What its form and alpha do in a League battle (perks.js). */}
+          {perksOf(group.variant, group.alpha).map((p) => (
+            <span className="pv-perk" key={p.says}>League perk: {p.says}</span>
+          ))}
         </div>
         <dl className="pv-stats">
           {STATS.map((name, i) => (

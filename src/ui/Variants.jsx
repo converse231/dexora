@@ -37,6 +37,7 @@ import {
 import { OUTBREAK_LIFT } from "../game/events.js";
 import { HONEY_STEPS } from "../game/items.js";
 import { RESEARCH_LIFT, STAR_COST } from "../game/research.js";
+import { PERKS, ALPHA_PERK } from "../game/perks.js";
 
 /* FIVE CREATURES EVERYBODY KNOWS. The point of a preview is recognition - you
    are here to learn what a treatment looks like, and you can only see that on
@@ -139,6 +140,7 @@ export default function Variants({ onClose }) {
                 <span className="vr-name">{LABEL(t)}</span>
                 <span className="vr-odds">1 in {oneIn(TIER_ODDS.find(([x]) => x === t)[1])}</span>
                 <span className="vr-tell">{TIER_TELL[t]}</span>
+                <span className="vr-perk">League: {PERKS[t].says}</span>
               </div>
             ))}
           </div>
@@ -156,6 +158,11 @@ export default function Variants({ onClose }) {
               <b>They are kinds, not ranks.</b> The rarest is only about twice
               the wait of the kindest, so chase whichever one you like the look
               of rather than working up a ladder.
+            </li>
+            <li>
+              <b>In the League, each one has a perk</b> (under its card), and an
+              alpha adds {ALPHA_PERK.says.replace(/^M/, "m")} on top. No cost, and
+              ranked battles ignore them: there, a Pok&eacute;mon is its species.
             </li>
             <li>
               <b>A dry run gets easier.</b> Go {PITY_AFTER} encounters without

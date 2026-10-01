@@ -293,7 +293,7 @@ export function playWithKit(mine, theirs, aiO, rng, kit = KIT) {
 /* One opponent against the reference player, `n` battles on a seed. */
 export function winRate(rung, top, { n = 200, seed = 1, share, aiP = 2, team = null, kit = null } = {}) {
   const { o, role, T, cap } = rung;
-  const size = role === "trainer" ? TEAM_MAX : Math.min(TEAM_MAX, o.party.length);
+  const size = TEAM_MAX;                    // six against anyone, as the game allows
   const aiO = AI_FOR[role];
   let wins = 0, turns = 0, maxTurns = 0, spent = 0, used = 0;
   for (let i = 0; i < n; i++) {

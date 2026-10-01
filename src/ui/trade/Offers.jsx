@@ -54,7 +54,7 @@ function Half({ title, mons, get }) {
 const Deal = ({ give, get, past }) => (
   <div className="of-deal">
     <Half title={past ? "Gave" : "You give"} mons={give} />
-    <span className="tx-swap" aria-hidden="true">⇄</span>
+    <span className="tx-swap" aria-hidden="true">↔</span>
     <Half title={past ? "Got" : "You get"} mons={get} get />
   </div>
 );
@@ -167,7 +167,7 @@ export function Composer({ them, box, engine, dexOf, want: want0 = [], give: giv
         <div className="tx-table">
           <DealSide title="You give" mons={inOrder(give, mine, keyOf)} keyFn={keyOf}
             on={side === "give"} onSide={() => setSide("give")} onDrop={(k) => setGive((g) => g.filter((x) => x !== k))} />
-          <span className="tx-swap" aria-hidden="true">⇄</span>
+          <span className="tx-swap" aria-hidden="true">↔</span>
           <DealSide title={`You get`} mons={inOrder(want, theirs, theirKey)} keyFn={theirKey}
             on={side === "get"} onSide={() => setSide("get")} onDrop={(k) => setWant((w) => w.filter((x) => x !== k))} />
         </div>
