@@ -2336,6 +2336,24 @@ last at 98), eleven a game with walking. League prices are measured on a Lv 75
 game (`PRICE_LEVEL`): the cap is post-game, and pricing on it would have
 doubled every prize without the ladder moving.
 
+**LOOKS, AND UNOWN'S OWN MAP (2026-10-01).** A PokeAPI audit (every
+`/pokemon` variety and `/pokemon-form` row against the dex, every sprite
+hashed) found 176 drawings missing: Unown's 27 letters, Alcremie's 62,
+Vivillon's 19, Silvally's 17 types, and smaller families. Asked to add the
+small ones and Unown; rolled when met, carried when evolved (your pick).
+A look is a species that is never a spawn row, so the first run's mistake was
+instructive: `derivedHomes` takes whatever nothing evolves into, which is
+most looks, and Tall Grass grew 31 new residents and lost Eevee and Miltank
+past findable. Kept out, every table and rod hashed identical to before. Two
+more found on the way: the Eternal Flower Floette's copied row into Florges
+became Florges' base in `baseForm` (2 candy for a 1-candy line - the printer
+check), and Sandy Wormadam, whose only parent IS a look row, read its own A
+tier without it; a look row now decides a base only where no real row does.
+Tanoby Ruins is FireRed's sea route and seven chambers, Unown alone
+(`only`): the mix suites skip it, and the rift-finds bound does too, because
+Unown sells cheapest of anything and a rift's fixed finds read as 33% of a
+map that is the worst place in the game to earn.
+
 **COACH ROUNDS THE BATCH, NOT THE POKEMON.** The first version rounded per
 Pokemon so the Box's "count x one" matched the engine, and tools/play's first
 run showed it did nothing: a common is 1 candy and 1.4 rounds to 1. `convert`

@@ -117,7 +117,10 @@ NUM_PRIMARY_TILES = 640
 SECONDARY = [("mt_ember", "general"), ("seafoam_islands", "general"),
              ("power_plant", "building"), ("pokemon_tower", "building"),
              ("cave", "general"), ("viridian_forest", "general"),
-             ("pokemon_mansion", "building")]
+             ("pokemon_mansion", "building"),
+             # Tanoby Ruins: the sea route on the Sevii set, its seven
+             # chambers on their own against Building.
+             ("sevii_islands_67", "general"), ("tanoby_ruins", "building")]
 
 # FireRed PRIMARIES we bake WHOLE, for the same reason `EM_PRIMARY` exists one
 # decomp over: ids 0-639 in this atlas are `gTileset_General`, and a map drawn
@@ -1011,6 +1014,12 @@ def build_tileset():
         # floor is the sand, cave local 17 (552 of the cells).
         "shoal": {"general": sets["em_general"], "cave": sets["em_cave"],
                   "split": 512, "floor": sets["em_cave"] + 17},
+        # TANOBY RUINS, FireRed's: the sea route is General (base 0) plus the
+        # Sevii set, the chambers Building plus their own. The floor is the
+        # chambers' stone, tanoby_ruins local 60 (361 of their cells).
+        "tanoby": {"general": 0, "sevii": sets["sevii_islands_67"],
+                   "building": sets["fr_building"], "ruins": sets["tanoby_ruins"],
+                   "split": 640, "floor": sets["tanoby_ruins"] + 60},
         "route110": {"general": sets["em_general"], "mauville": sets["mauville"],
                      "split": 512, "floor": sets["em_general"] + 1},
         # MIRAGE DESERT is Route 111: the same General and Mauville blocks, so
@@ -1263,6 +1272,7 @@ def build_ground():
         # Meteor Falls, a cave: its own ground.
         "falls": meta["meteor"]["floor"],
         "shoal": meta["shoal"]["floor"],
+        "tanoby": meta["tanoby"]["floor"],
         "ridge": meta["cave"]["floor"],
         "power": meta["power"]["floor"],
         "ember": meta["volcano"]["floor"],

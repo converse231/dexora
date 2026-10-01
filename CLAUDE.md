@@ -2,7 +2,7 @@
 
 A non-commercial browser game: walk, meet, throw, bank the duplicates, evolve.
 It covers the whole National Dex from Kanto to Paldea plus its forms (count:
-`SPECIES.length`) across fifteen maps, most of them tile-for-tile copies of real
+`SPECIES.length`) across sixteen maps, most of them tile-for-tile copies of real
 Gen 3 maps. Inspired by DelugeRPG.
 
 This file is the rulebook: each rule once, with its reason. The full record
@@ -163,6 +163,19 @@ anything done. The run prints each suite; the count is not typed anywhere.
   shown as slugs ("Iron-bundle", "Chi-yu", "Type-null") until 2026-09-29.
 - **`genOf` has its own Map** because it runs at module init, before
   `speciesById` exists.
+- **A look is one of a family's drawings** (`form: "look"`: Unown's letters,
+  Furfrou's trims, Flabebe's colours, Silvally's types - `LOOK_FAMILIES` in
+  fetch-forms, ids `PLATE_BASE` + form id like the plates). It is a species
+  and NEVER a spawn row: the family's base keeps its one slot, and
+  `rollLook` picks the drawing when you meet one (`startEncounter`) or evolve
+  into it from a parent with no looks (Type: Null -> some Silvally).
+  `fetch-evolutions` copies the species' rows for a look, marked `look`
+  (Blue Flabebe -> Blue Floette; Sandy Burmy -> the wild Sandy Wormadam).
+  Kept out of `derivedHomes` (it once took every trim as a resident and
+  pushed Eevee past findable), and out of `baseForm` where a real row
+  decides. A look changes no spawn table: every table and rod hashed
+  identical before and after the 95 arrived. Vivillon and Alcremie (19 and
+  62 looks) were left out on purpose - README's Deferred list.
 
 ## Spawn tables
 
@@ -217,6 +230,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   map decides legendary homes, so widening it is never flavour; `legends`
   (`legendTypes`) adds a type for legendary homes alone - the Mansion's psychic,
   where `types` measured 49% psychic residents. Every legendary must keep a home.
+- **An `only` map is one species' home** (Tanoby: Unown, asked for). No
+  `types`, so nothing homes there and no legendary lives there; surfing it
+  meets the same table (`surfTable`); check.mjs's mix suites (`MIXED`), the
+  eight-row table rule and the rift-finds bound skip it, and nothing else
+  does. Its roll is the look, not the row.
 - **Costumes live where a Pikachu lives**: appended like legendaries at
   `LEGEND_EACH` and homed by the same `legendTier`, so all thirteen (pure
   Electric) are Power Plant only. They were flat on every map once and read
@@ -802,7 +820,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **The ladder goes past Surf** (2026-10-16): Rainwood Crossing is Route 120
   (id `rainwood`, Lv 25, Monsoon Trail's Fortree blocks), Meteor Falls (id
   `falls`, Lv 30, `meteor_falls`) and Shoal Cave at low tide (id `shoal`, Lv
-  35, Emerald's `cave`, keyed `em_cave` in route.json beside FireRed's). A new
+  35, Emerald's `cave`, keyed `em_cave` in route.json beside FireRed's), and
+  past them Tanoby Ruins (id `tanoby`, Lv 40, FireRed's sea route and its
+  seven chambers through `fr_layout`, the FireRed twin of `em_layout`). A new
   Emerald map reads its layout through `em_layout`; rooms on shelves go
   through `em_rooms`, which drops a warp pair only when BOTH ends are culled
   (Shoal's high-tide passages). Every pond bridge (0x71-0x7D) is `N`, like the

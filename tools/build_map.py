@@ -106,6 +106,9 @@ AREAS = [
     # COPIED: Emerald's Shoal Cave at low tide, all five rooms - see
     # shoal_cave(). Ice and Water's second home, the last rung.
     dict(id="shoal", name="Shoal Cave", drawn="shoal_cave"),
+    # COPIED: FireRed's Tanoby Ruins and all seven chambers - see tanoby().
+    # Unown's own map, and nobody else's.
+    dict(id="tanoby", name="Tanoby Ruins", drawn="tanoby"),
 ]
 
 SOLID = set("TwRMIPHLFCWXBEVkKdtYGAZJQ")
@@ -3526,6 +3529,151 @@ def shoal_cave():
     return em_rooms("shoal", "ShoalCave", SHOAL_ROOMS, "cave", meta, meta["cave"],
                     SHOAL_SHELVES, SHOAL_IN, 1,
                     lambda b, ch: "i" if b == MB_ICE and ch == "." else {".": "m", "T": "M"}.get(ch, ch))
+
+
+# -------------------------------------------------------------- Tanoby Ruins
+
+TANOBY_CHAMBERS = ("Monean", "Liptoo", "Weepth", "Dilford", "Scufib", "Rixy", "Viapois")
+TANOBY_GUT = 2
+
+
+def fr_layout(layout, secondary, primary, prim_base, sec_base):
+    """One FireRed layout, the way `em_layout` reads an Emerald one: ids,
+    collision and elevation from its map.bin, each cell's behaviour from the
+    right tileset's attributes (FOUR bytes in pokefirered), its map.json
+    events. FireRed's primary holds 640 metatiles where Emerald's holds 512,
+    and its water, grass and ledge behaviours are Emerald's numbers, so
+    `em_cell` reads its cells unchanged."""
+    import numpy as np
+    import build_assets as BA
+
+    layouts = json.load(io.open(BA.fetch("data/layouts/layouts.json", "fr_layouts.json"),
+                                encoding="utf-8"))["layouts"]
+    lay = next(q for q in layouts if q and q["name"] == layout + "_Layout")
+    W, H = lay["width"], lay["height"]
+    raw = np.frombuffer(io.open(BA.fetch(lay["blockdata_filepath"], f"fr/{layout}.bin"),
+                                "rb").read(), dtype="<u2")[:W * H]
+    attr = {
+        False: np.frombuffer(io.open(BA.fetch(
+            f"data/tilesets/primary/{primary}/metatile_attributes.bin",
+            f"fr/{primary}/attr.bin"), "rb").read(), dtype="<u4"),
+        True: np.frombuffer(io.open(BA.fetch(
+            f"data/tilesets/secondary/{secondary}/metatile_attributes.bin",
+            f"fr/{secondary}/attr.bin"), "rb").read(), dtype="<u4"),
+    }
+    split = 640                                 # NUM_METATILES_IN_PRIMARY, FireRed's
+    folder = lay["blockdata_filepath"].split("/")[2]
+    events = json.load(io.open(BA.fetch(f"data/maps/{folder}/map.json", f"fr_{folder}.json"),
+                               encoding="utf-8"))
+    border = [int(v) & 0x3FF for v in np.frombuffer(io.open(BA.fetch(
+        lay["border_filepath"], f"fr/{layout}_border.bin"), "rb").read(), dtype="<u2")]
+    assert len(border) == 4, f"{layout}: the border block is not 2x2"
+    return {
+        "border": border,
+        "W": W, "H": H,
+        "ids": (raw & 0x3FF).reshape(H, W),
+        "col": ((raw >> 10) & 3).reshape(H, W),
+        "elev": [[int(e) for e in r] for r in ((raw >> 12) & 0xF).reshape(H, W)],
+        "behave": lambda i: int(attr[i >= split][i if i < split else i - split] & 0x1FF),
+        "rebase": lambda i: (prim_base + i) if i < split else (sec_base + i - split),
+        "events": events,
+    }
+
+
+def tanoby():
+    """Tanoby Ruins: FireRed's sea route off Seven Island and all seven of its
+    chambers, every cell a copy. Unown's home, and the only Pokemon on it.
+
+    The route on top, the chambers on a shelf below in the order the route
+    meets them west to east, joined by the real doors - read from each map's
+    warp_events and kept only where they answer each other. The way in is
+    the route's north edge, where it joins Sevault Canyon (a map we do not
+    have). The islets are reached by Surf, as on the GBA; the map opens long
+    after Surf does. Ruin walls on the route read as rock (`R`), the chambers
+    as Ember Caldera's cave (`m`, `M`), so the minimap draws ruins, not trees."""
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))["tanoby"]
+    out = fr_layout("SevenIsland_TanobyRuins", "sevii_islands_67", "general",
+                    meta["general"], meta["sevii"])
+    rooms = [fr_layout(f"SevenIsland_TanobyRuins_{n}Chamber", "tanoby_ruins", "building",
+                       meta["building"], meta["ruins"]) for n in TANOBY_CHAMBERS]
+    const = {f"MAP_SEVEN_ISLAND_TANOBY_RUINS_{n.upper()}_CHAMBER": i
+             for i, n in enumerate(TANOBY_CHAMBERS)}
+
+    # The route's doors, each to one chamber, and the chamber's door back.
+    pairs = []
+    for wv in out["events"]["warp_events"]:
+        i = const[wv["dest_map"]]
+        back = rooms[i]["events"]["warp_events"][int(wv["dest_warp_id"])]
+        assert back["dest_map"] == "MAP_SEVEN_ISLAND_TANOBY_RUINS", f"tanoby: {wv['dest_map']} leads elsewhere"
+        pairs.append(((wv["x"], wv["y"]), i, (back["x"], back["y"])))
+    assert len(pairs) == len(TANOBY_CHAMBERS), "tanoby: a chamber has no door from the route"
+
+    order = sorted(range(len(rooms)), key=lambda i: next(p[0][0] for p in pairs if p[1] == i))
+    oy = out["H"] + TANOBY_GUT
+    origin, x = {}, 0
+    for i in order:
+        origin[i] = (x, oy)
+        x += rooms[i]["W"] + TANOBY_GUT
+    W = max(out["W"], x - TANOBY_GUT)
+    H = oy + max(r["H"] for r in rooms)
+
+    # Between and beside the copies, each band's own 2x2 border block - the
+    # sea's above, the chambers' stone below - as every copied map fills.
+    def edge(src, xx, yy):
+        return src["rebase"](src["border"][(yy % 2) * 2 + (xx % 2)])
+    g = [["M"] * W for _ in range(H)]
+    tiles = [[edge(out if yy < oy else rooms[0], xx, yy) for xx in range(W)] for yy in range(H)]
+    elev = [[0] * W for _ in range(H)]
+
+    def lay(src, ox, oy_, remap):
+        for yy in range(src["H"]):
+            for xx in range(src["W"]):
+                mid = int(src["ids"][yy][xx])
+                g[oy_ + yy][ox + xx] = remap(em_cell(src["behave"](mid), int(src["col"][yy][xx]), solid="R"))
+                tiles[oy_ + yy][ox + xx] = src["rebase"](mid)
+                elev[oy_ + yy][ox + xx] = src["elev"][yy][xx]
+
+    lay(out, 0, 0, lambda ch: ch)
+    for i, r in enumerate(rooms):
+        lay(r, *origin[i], lambda ch: {".": "m", "R": "M"}.get(ch, ch))
+
+    warps = []
+    for (ax, ay), i, (bx, by) in pairs:
+        cx, cy = origin[i][0] + bx, origin[i][1] + by
+        g[ay][ax] = g[cy][cx] = "l"
+        warps.append([ax, ay, cx, cy])
+
+    # The way in: the open ground on the route's north edge (Sevault Canyon).
+    north = [x for x in range(out["W"]) if g[0][x] not in SOLID and g[0][x] not in SURFABLE]
+    assert north, "tanoby: the route has no way in from the north"
+    spawn = (north[len(north) // 2], 1)
+    assert g[1][spawn[0]] not in SOLID, "tanoby: the way in is walled up"
+
+    for xx in range(W):
+        g[0][xx] = g[H - 1][xx] = "R" if g[0][xx] in SURFABLE or xx < out["W"] else "M"
+    for yy in range(H):
+        g[yy][0] = g[yy][W - 1] = "R" if yy < out["H"] else "M"
+    seal_hidden(g, tiles, "R", elev)
+
+    hop = {}
+    for ax, ay, bx, by in warps:
+        hop[(ax, ay)], hop[(bx, by)] = (bx, by), (ax, ay)
+    while True:
+        seen = reach(g, [spawn], elev, hop=hop, surf=True)
+        cut = 0
+        for yy in range(H):
+            for xx in range(W):
+                if g[yy][xx] not in SOLID and (xx, yy) not in seen:
+                    g[yy][xx] = "R" if yy < out["H"] else "M"
+                    cut += 1
+        if not cut and not land_ledges(g, "R"):
+            break
+    for ax, ay, bx, by in warps:
+        assert g[ay][ax] == "l" and g[by][bx] == "l", "tanoby: a chamber is cut off"
+
+    return (["".join(r) for r in g], spawn, [i for row in tiles for i in row], meta["general"], warps,
+            {"elev": elev_rows(elev)})
 
 
 # -------------------------------------------------------------- Cinderpeak

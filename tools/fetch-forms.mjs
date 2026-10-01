@@ -589,6 +589,81 @@ const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix"];
     });
   }
 }
+/* LOOKS: A FAMILY OF DRAWINGS THAT IS ONE POKEMON (2026-10-01).
+   ===============================================================
+
+   Unown's letters, Furfrou's trims, Flabebe's flowers, Deerling's seasons,
+   Silvally's types... `pokemon-form` rows under one variety, so the list above
+   never saw them, and a PokeAPI audit found 176 drawings the game lacked.
+
+   A LOOK IS A SPECIES (own id, dex row, sprite) THAT IS NEVER A SPAWN ROW. A
+   family keeps its base's one slot in every table and `rollLook` picks which
+   drawing you meet - so a map's balance does not move, and Unown's 28 letters
+   are each a 28th of Unown rather than 28 rows fighting the fit. Evolving
+   CARRIES a look (Blue Flabebe -> Blue Floette, `fetch-evolutions`) and rolls
+   one when the parent has none (Type: Null -> some Silvally). Asked for that
+   way; Vivillon and Alcremie (19 and 62) were left out on purpose, see
+   README's Deferred list.
+
+   Ids are ours, as the plates' are: `PLATE_BASE` + the form id. Xerneas's
+   Active Mode is form 716 (PokeAPI files it among the defaults), which would
+   land under `FORM_FIRST`, so a form id under it takes `FORM_FIRST` as well.
+   Every id is asserted unique and inside trading.sql's 1-20000 below. */
+const LOOK_FAMILIES = ["unown", "pichu", "burmy", "cherrim", "shellos", "gastrodon",
+  "deerling", "sawsbuck", "frillish", "jellicent", "genesect", "pyroar", "flabebe",
+  "floette", "florges", "furfrou", "xerneas", "silvally", "sinistea", "polteageist"];
+/* Minior's cores and AZ's Eternal Flower Floette are VARIETIES (their own
+   pokemon ids), not forms - so they come through `one()`. Minior's are one
+   drawing per colour where its six meteors are one between them. The Eternal
+   Flower was a wild species of its own for one run, and its Fairy share on
+   Tall Grass pushed Eevee and Miltank past findable; as one of Floette's
+   looks it costs the map nothing. */
+const LOOK_VARIETIES = [
+  ...["red", "orange", "yellow", "green", "blue", "indigo", "violet"]
+    .map((c) => [`minior-${c}`, "minior", `${c[0].toUpperCase() + c.slice(1)} Core`]),
+  ["floette-eternal", "floette", "Eternal Flower"],
+];
+{
+  const en = (list) => list.find((n) => n.language.name === "en")?.name ?? "";
+  const named = async (sp) => en((await fetch(`${API}/pokemon-species/${sp}`).then((r) => r.json())).names);
+  for (const family of LOOK_FAMILIES) {
+    const base = byName.get(family);
+    // The species' DEFAULT variety: Pyroar's is `pyroar-male`, not `pyroar`.
+    const kind = await fetch(`${API}/pokemon-species/${family}`).then((r) => r.json());
+    const word = en(kind.names);
+    const pk = await fetch(kind.varieties.find((v) => v.is_default).pokemon.url).then((r) => r.json());
+    for (const { url } of pk.forms) {
+      const form = await fetch(url).then((r) => r.json());
+      if (form.is_default || !form.sprites.front_default) continue;
+      const png = await fetch(form.sprites.front_default);
+      if (!png.ok) continue;
+      const id = PLATE_BASE + (form.id < 10000 ? 10000 + form.id : form.id);
+      const art = Buffer.from(await png.arrayBuffer());
+      await writeFile(`public/sprites/${id}.png`, art);
+      const shiny = form.sprites.front_shiny && await fetch(form.sprites.front_shiny);
+      if (shiny?.ok) await writeFile(`public/sprites/shiny/${id}.png`, Buffer.from(await shiny.arrayBuffer()));
+      out.push({
+        id, name: form.name, types: form.types.map((t) => t.type.name), rate: base.rate,
+        tier: base.tier, from: base.name, form: "look", of: base.id, look: form.form_name,
+        legendary: !!base.legendary, genus: base.genus, flavor: base.flavor, shape: base.shape,
+        height: pk.height, weight: pk.weight, stats: base.stats,
+        art: createHash("md5").update(art).digest("hex"),
+        wave: waveOf(form.name), title: `${word} (${en(form.form_names)})`,
+      });
+    }
+  }
+  for (const [name, family, look] of LOOK_VARIETIES) {
+    const base = byName.get(family);
+    const f = await one(name, base, "look", {
+      look, genus: base.genus, wave: waveOf(name), title: `${await named(family)} (${look})`,
+    });
+    if (f) out.push(f);
+  }
+  const ids = out.map((f) => f.id);
+  if (new Set(ids).size !== ids.length) throw new Error("two forms share an id");
+  if (ids.some((id) => id < 10000 || id > 20000)) throw new Error("a form id left 10000-20000");
+}
+
 /* MADE FIRST, MET SECOND - AND THAT ORDER IS A SAVE MIGRATION AVOIDED.
 
    Every save is keyed on POSITION in `SPECIES`, and `SPECIES` is the National
