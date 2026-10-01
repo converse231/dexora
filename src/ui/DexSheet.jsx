@@ -409,7 +409,8 @@ export default function DexSheet({
                         that it wants ANY four rather than every one. */}
                     {every ? (
                       <span className="sf-all">
-                        <Mark tier="complete" size={14} /> COMPLETE
+                        {/* "COMPLETE" read as every form held (reported). */}
+                        <Mark tier="complete" size={14} /> ROSETTE · {heldCount}/{forms.length - 1}
                       </span>
                     ) : (
                       <span className="sf-tally">

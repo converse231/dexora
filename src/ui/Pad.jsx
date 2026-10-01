@@ -90,7 +90,7 @@ const DIRS = [
 
 export default function Pad({
   engine, state, enc, level, onBag, onPickBall, bagOpen, ride = null, onRotom = null, rotomOpen = false,
-  order = [],
+  order = [], both = false, onWater = () => {},
 }) {
   // Before the early return: a hook after one is a hook that does not always run.
   const held = useRef({ t: null, taken: false });
@@ -126,15 +126,13 @@ export default function Pad({
           ),
           off: !ball,
         }
-      /* SURF WHERE FISHING IS NOT POSSIBLE. Both are offered at a shoreline
-         and A cannot be both, so it stays FISH there and the on-screen prompt
-         carries the ride - that prompt is a real button, so a thumb already
-         has it. At LAVA there is nothing to fish, so an A that said FISH and
-         did nothing was the only dead button on the pad. */
-      : ride && !rod
+      /* FACING SOMETHING TO RIDE, A is the water key, as C is (`onWater`):
+         it surfs where that is all there is (lava), and where you could
+         fish too it asks which (asked for, 2026-10-02). */
+      : ride
         ? {
-            label: "A", sub: "SURF",
-            act: tap(() => engine.surf()),
+            label: "A", sub: both ? "WATER" : "SURF",
+            act: tap(onWater),
           }
         : {
             label: "A", sub: "FISH",

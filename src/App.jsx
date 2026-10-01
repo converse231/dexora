@@ -13,6 +13,7 @@ import { inboxToReconcile, freshTrades } from "./game/trade.js";
 import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
+import WaterAsk from "./ui/WaterAsk.jsx";
 import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
 import Variants from "./ui/Variants.jsx";
@@ -298,6 +299,7 @@ export default function App({
      on a coarse pointer and the pad that opens this only exists there.
      `null` | `"all"` (the BAG key) | `"balls"` (holding A). */
   const [bagView, setBagView] = useState(null);
+  const [waterAsk, setWaterAsk] = useState(false);   // "Surf or fish?" (WaterAsk)
   /* "See in Box" crosses two components that do not know each other: the sheet
      lives here and the tab lives in the Rail. A species id parked here is the
      smallest thing that can travel between them, and the Rail clears it once it
@@ -383,13 +385,16 @@ export default function App({
          and it should never have been written: this file's own `KEYS` table is
          eight lines above.
 
-         Its own key rather than a second meaning for F, because at a shoreline
-         BOTH are offered, and one key that did either depending on what you
-         are carrying is a control you cannot trust. **Check `KEYS` before
-         claiming a letter.** */
+         C IS THE WATER KEY (asked for, 2026-10-02): it does the one thing
+         on offer, and where both are - a shoreline you can surf and fish -
+         it ASKS (`WaterAsk`) rather than guessing. F still casts directly.
+         **Check `KEYS` before claiming a letter.** */
       if (ev.key === "c" || ev.key === "C") {
         ev.preventDefault();
-        e.surf();
+        const r = e.castable(), s = e.surfable();
+        if (r && s) setWaterAsk(true);
+        else if (s) e.surf();
+        else if (r) e.fish();
         return;
       }
 
@@ -451,6 +456,12 @@ export default function App({
      and a touch player would otherwise have no way to ride at all. It returns
      the character of the liquid, so the prompt can say which. */
   const ride = engine && !enc && !evo && !fishing ? engine.surfable() : null;
+  // C and the pad's A at the water: one thing on offer is done, two are asked.
+  const water = () => {
+    if (rod && ride) setWaterAsk(true);
+    else if (ride) engine.surf();
+    else if (rod) engine.fish();
+  };
 
   /* Keyed on `worn.n` rather than on the item, so using the same repel again
      and wearing it out again restarts the clock instead of inheriting the
@@ -1052,6 +1063,8 @@ export default function App({
             enc={enc}
             level={level}
             ride={ride}
+            both={!!(rod && ride)}
+            onWater={water}
             order={order}
             bagOpen={bagView === "all"}
             onBag={() => setBagView((v) => (v === "all" ? null : "all"))}
@@ -1164,6 +1177,14 @@ export default function App({
           gone would be a dialog whose YES does nothing. A STAR is the one
           question asked outside an encounter: it comes from the Dex sheet, which is
           why this renders AFTER the sheet - same layer, so the later one is on top. */}
+      {/* Only while both are still on offer: a step or an encounter that
+          takes either away puts the question down with it. */}
+      {waterAsk && rod && ride && (
+        <WaterAsk rod={rod} ride={ride}
+          onSurf={() => { setWaterAsk(false); engine.surf(); }}
+          onFish={() => { setWaterAsk(false); engine.fish(); }}
+          onClose={() => setWaterAsk(false)} />
+      )}
       {st?.ask && (st?.encounter || st.ask.kind === "star" || st.ask.kind === "rift") && (
         <Confirm
           title={st.ask.title}

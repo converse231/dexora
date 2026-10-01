@@ -309,7 +309,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
               /* One row per tier, kindest first, so the menu reads in the
                  same direction the marks on a tile do. */
               ...MARKS.map((t) => [t, t[0].toUpperCase() + t.slice(1), count(t)]),
-              ["complete", "Complete", completed],
+              ["complete", "Rosette", completed],
             ],
           },
           /* ONE REGION AT A TIME. 358 cells is nine screens of scrolling and
