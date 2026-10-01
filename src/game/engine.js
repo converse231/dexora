@@ -824,6 +824,30 @@ export function createEngine(canvas, onChange, mini = null) {
      instead of hopping ashore onto it; see `wet`. A save loaded under one
      counts as afloat where water touches it, so nobody wakes up stranded. */
   const under = (x, y) => !!elev && !high && at(x, y) === "N" && wet;
+  /* WATER WITH NO WAY OUT sends a save to the map's way in. Meteor Falls'
+     river was reachable only by surfing down off its bridge, which the GBA
+     never allows; with that closed, a save already out there (or on the
+     span, which was floor) would paddle forever. Stranded = the water and
+     spans joined to where you float touch no shore you may land on. */
+  {
+    const { x, y } = state.player;
+    const lake = (cx, cy) => rideable(rows, cx, cy) || rows[cy]?.[cx] === "N";
+    if (lake(x, y)) {
+      const seen = new Set([`${x},${y}`]), todo = [[x, y]];
+      let shore = false;
+      while (todo.length && !shore) {
+        const [cx, cy] = todo.pop();
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx + dx, ny = cy + dy, k = `${nx},${ny}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          if (lake(nx, ny)) todo.push([nx, ny]);
+          else if (walkable(rows, nx, ny) && !HIGH_ELEV.has(elevAt(nx, ny))) { shore = true; break; }
+        }
+      }
+      if (!shore) state.player = { ...areaOf(state.areaId).spawn, dir: "down" };
+    }
+  }
   {
     const { x, y } = state.player;
     wet = rideable(rows, x, y) || (rows[y]?.[x] === "N" && [[1, 0], [-1, 0], [0, 1], [0, -1]]
@@ -1700,6 +1724,9 @@ export function createEngine(canvas, onChange, mini = null) {
     if (surfing()) return null;                       // already out there
     if (!canSurf(levelFromXp(state.xp), state.bag)) return null;
     const [fx, fy] = facingXY();
+    /* Never down off raised ground (build_map's `surf_ok`): from Meteor
+       Falls' log bridge you surfed onto the river below it. */
+    if (HIGH_ELEV.has(cur) && elevAt(fx, fy) !== cur) return null;
     return rideable(rows, fx, fy) ? at(fx, fy) : null;
   }
 

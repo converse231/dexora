@@ -17,8 +17,9 @@ import {
   OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_FROM, RIFT_SURE, RIFT_STEPS,
 } from "../game/events.js";
 import {
-  tasksFor, progress, researchLevel, researchPoints, RESEARCH_MAX, RESEARCH_LIFT,
+  tasksFor, progress, researchLevel, researchPoints, RESEARCH_MAX, RESEARCH_LIFT, starCost, starKeeps,
 } from "../game/research.js";
+import { keeper } from "../game/items.js";
 import { badgesOf } from "../game/league.js";
 
 const NEAREST = 4;   // how many unfinished entries the Discovery card lists
@@ -37,6 +38,26 @@ function nearest(research) {
       const next = t && t.steps.find((s) => p.n < s);
       return { ...r, next: t ? `${t.label}${t.steps.length > 1 ? ` ${p.n}/${next}` : ""}` : "" };
     });
+}
+
+/* FINISHED AND NOT YET STARRED, first on the card with the button: a
+   finished entry used to drop off the list the moment it became starrable
+   (reported, Dratini), which is the one moment it needs you. What a star can
+   spend is `engine.star`'s rule - ordinary, unlocked, a legendary keeps one. */
+function starrable(research, stars, box) {
+  return Object.entries(research ?? {})
+    .map(([k, row]) => ({ id: Number(k), row }))
+    .filter((r) => speciesById(r.id) && !stars.includes(r.id) && researchLevel(r.id, r.row) >= RESEARCH_MAX)
+    .map((r) => {
+      const cost = starCost(r.id);
+      const mine = box.filter((m) => m.species === r.id);
+      const spare = mine.filter((m) => !keeper(m) && !m.lock).length;
+      const ready = spare >= cost && mine.length - cost >= starKeeps(r.id);
+      return { ...r, cost, ready, note: ready
+        ? `Complete · costs ${cost === 1 ? "one spare" : `${cost} ordinary`}`
+        : `Complete · needs ${cost} ordinary, have ${spare}` };
+    })
+    .sort((a, b) => b.ready - a.ready || a.id - b.id);
 }
 
 /* Until the day turns, which is when the next outbreak starts - the quest's
@@ -61,7 +82,7 @@ function Pips({ total, spent, label: aria }) {
 /* THE EVENTS BOARD, as the Rotom panel's Events app (2026-10-01). It was a
    dialog off the ☰ menu and the HUD's cards; both now open this app beside
    the game, which is still being played - so it locks no keys. */
-export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague }) {
+export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onStar }) {
   const ob = world?.outbreak ?? null;
   const obSp = ob && speciesById(ob.speciesId);
   const obLive = ob && ob.left > 0;
@@ -77,6 +98,7 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
   const finished = Object.entries(research)
     .filter(([k, row]) => researchLevel(Number(k), row) >= RESEARCH_MAX).length;
   const close = nearest(research);
+  const ready = starrable(research, state?.stars ?? [], state?.box ?? []);
 
   const alphas = (state?.box ?? []).filter((m) => m.alpha).length;
   const badges = badgesOf(state?.beaten);
@@ -164,6 +186,27 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
               <span><b>{touched}</b> studied</span>
               <span><b>{RESEARCH_LIFT}&times;</b> rare odds starred</span>
             </div>
+            {ready.length > 0 && (
+              <ul className="ev-list">
+                {ready.map((r) => (
+                  <li key={r.id} className="ev-starrow">
+                    <button type="button" onClick={() => onSelect(r.id)}>
+                      <span className="ev-ring" style={{ "--p": 1 }}>
+                        <Sprite id={r.id} alt="" />
+                      </span>
+                      <span>
+                        <b>{label(speciesById(r.id))}</b>
+                        <i>{r.note}</i>
+                      </span>
+                    </button>
+                    <button type="button" className="ev-star" disabled={!r.ready || busy}
+                      aria-label={`Star ${label(speciesById(r.id))}`} onClick={() => onStar(r.id)}>
+                      ★ Star
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             {close.length > 0 ? (
               <ul className="ev-list">
                 {close.map((r) => (
@@ -181,7 +224,7 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
                   </li>
                 ))}
               </ul>
-            ) : (
+            ) : !ready.length && (
               <p className="ev-quiet">Catch anything to start its research.</p>
             )}
           </section>

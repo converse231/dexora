@@ -3081,6 +3081,51 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     `and never entered from the water (${dock.x},${dock.y})`);
 }
 
+/* METEOR FALLS' LOG BRIDGE (reported): its span is floor at elevation 15 in
+   Emerald, so it was read as floor - you surfed down off it onto the river,
+   came back under it and were set ashore on the span, with the deck (4)
+   refused on both sides. Now the span is a bridge, nobody surfs down off
+   raised ground (the GBA surfs from elevation 3 only), and a save left out
+   there is sent to the way in. */
+{
+  const { AREAS } = await import("../src/game/mapdata.js");
+  const { LEVEL_XP, BIOMES } = await import("../src/game/biomes.js");
+  const { SURF_LEVEL } = await import("../src/game/items.js");
+  const DIRS = [[1, 0, "right"], [-1, 0, "left"], [0, 1, "down"], [0, -1, "up"]];
+  const quiet = { field: { repel: { id: "max-repel", steps: 9999 } } };
+  const walk = (e, dir) => { e.press(dir); for (let i = 0; i < 14; i++) tick(16); e.clearHeld(); for (let i = 0; i < 20; i++) tick(16); };
+  const a = AREAS.falls;
+  const ch = (x, y) => a.rows[y]?.[x];
+  const E = (x, y) => parseInt(a.elev[y]?.[x] ?? "0", 16);
+  let span = null;
+  for (let y = 1; y < a.rows.length - 1 && !span; y++) {
+    for (let x = 1; x < a.rows[0].length - 1 && !span; x++) {
+      if (ch(x, y) !== "N") continue;
+      const deck = DIRS.find(([dx, dy]) => ch(x - dx, y - dy) === "m" && E(x - dx, y - dy) === 4);
+      const water = DIRS.find(([dx, dy]) => ch(x + dx, y + dy) === "w");
+      if (deck && water) span = { x, y, dx: x - deck[0], dy: y - deck[1], on: deck[2], face: water[2], wx: x + water[0], wy: y + water[1] };
+    }
+  }
+  assert.ok(span, "Meteor Falls has no bridge span between its deck and the river");
+  const lv = Math.max(SURF_LEVEL, BIOMES.find((b) => b.id === "falls").level);
+  const at = (x, y, dir = "down") => boot({ ...SAVE, ...quiet, areaId: "falls", xp: LEVEL_XP[lv], paid: lv + 1,
+    player: { x, y, dir } }).e;
+  {
+    const e = at(span.dx, span.dy, span.on);
+    walk(e, span.on);
+    assert.deepEqual([e.state.player.x, e.state.player.y], [span.x, span.y], "could not walk from the deck onto the span");
+    e.state.player.dir = span.face;
+    assert.equal(e.surfable(), null, `surf was offered down off the bridge at (${span.x},${span.y})`);
+  }
+  for (const [x, y, what] of [[span.x, span.y, "span"], [span.wx, span.wy, "river"]]) {
+    const e = at(x, y);
+    assert.deepEqual([e.state.player.x, e.state.player.y], [a.spawn.x, a.spawn.y],
+      `a save on Meteor Falls' ${what} at (${x},${y}) was left where it cannot get out`);
+  }
+  console.log(`falls bridge ok — the span at (${span.x},${span.y}) is walked from the deck, never surfed down from, ` +
+    "and a save left on it or the river below goes to the way in");
+}
+
 /* THE LEAGUE THROUGH THE ENGINE (docs/battles.md, phase 3). The page computes
    every turn with battle.js and hands it over: a turn is `stepped()` - the
    collection did not move, so `colRev` must not, or the Dex and Box rebuild

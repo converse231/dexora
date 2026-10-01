@@ -25,6 +25,8 @@ export const NEWS = [
       ["Alpha", "An alpha is bigger and hits harder, on top of its form's perk."],
       ["Smoother battles", "Battles open and play faster on phones, even with a full Box."],
       ["Square Dex", "Dex tiles are square again."],
+      ["Star from Events", "Finished research waits in Discovery with a Star button."],
+      ["Meteor Falls", "Its log bridge no longer strands a surfer under it."],
     ],
   },
   {
