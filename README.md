@@ -428,7 +428,7 @@ permanently greyed-out button teaches nothing the shop does not.
 
 Levelling handed out balls and unlocked shop stock. That paces the game but never
 changes how you *play* it — every trainer at level 20 played identically. So a
-level now also grants **one stat point**, spent where you choose across five
+level now also grants **one stat point**, spent where you choose across seven
 stats of **twenty** ranks each.
 
 | Stat | At rank 20 | What it changes |
@@ -438,6 +438,8 @@ stats of **twenty** ranks each.
 | **Stride** | 40% quicker steps | and the Bicycle halves it again on top |
 | **Haggle** | +40% sale, −20% prices | the shop shows the discounted number |
 | **Insight** | +80% XP | so the next level comes sooner |
+| **Lustre** | +50% rare forms | multiplies the tier roll; never more than a research star |
+| **Coach** | +40% candy | from converting duplicates, so a League team comes sooner |
 
 **Ranks were ten, and ten was too few.** A point a level fills a stat every
 eleven levels, so the interesting half of this screen was finished long before
@@ -460,9 +462,10 @@ the row already answers. The button now states what the next rank buys *before*
 you press it, the warning sits on the panel once instead of interrupting every
 click, and the row flashes afterwards so a spend is never silent.
 
-The whole design rests on one number: **74 points against 100 ranks of capacity**
-(49 while the cap was Lv 50 - see *The cap went to 75* below). You reach the level
-cap unable to have finished four stats, so the screen
+The whole design rests on one number: **99 points against 140 ranks of capacity**
+(74 against 100 at the Lv 75 cap, 49 at 50 - see *The cap went to 75* below). The
+cap went to **100** in October 2026 with Lustre and Coach beside it, so the ratio
+held at about 71%. You reach the level cap unable to have finished five stats, so the screen
 is a series of refusals as much as choices — and `npm run check` asserts that
 inequality directly, because the day capacity drops below the points available is
 the day none of it means anything.

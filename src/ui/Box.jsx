@@ -24,7 +24,7 @@ import {
 import { label } from "../game/map.js";
 import Types from "./Types.jsx";
 import FilterBar from "./FilterBar.jsx";
-import { valuedAt } from "../game/trainer.js";
+import { valuedAt, candyAt } from "../game/trainer.js";
 import Confirm from "./Confirm.jsx";
 import { defendNote } from "../game/ranked.js";
 import Note from "./Note.jsx";
@@ -94,6 +94,8 @@ function Box({
 
   // Haggle raises what a duplicate fetches; quote the number that will be paid.
   const worth = (sp) => valuedAt(sellValue(sp), stats);
+  // And Coach raises what a batch converts to - quoted per batch, as paid.
+  const candyOf = (sp, n = 1) => candyAt(n * candyValue(sp), stats);
 
   const { groups, spareUids, spareValue, spareCandy } = useMemo(() => {
     const spare = new Set(duplicateUids(box));
@@ -190,9 +192,9 @@ function Box({
       spareValue: box
         .filter((m) => spare.has(m.uid))
         .reduce((sum, m) => sum + worth(speciesById(m.species)), 0),
-      spareCandy: box
+      spareCandy: candyAt(box
         .filter((m) => spare.has(m.uid))
-        .reduce((sum, m) => sum + candyValue(speciesById(m.species)), 0),
+        .reduce((sum, m) => sum + candyValue(speciesById(m.species)), 0), stats),
     };
     // `colRev` is what changes: the engine mutates box, bag and dex in
     // place, so their references alone would keep this memo stale forever.
@@ -310,7 +312,7 @@ function Box({
           uids: mons.map((m) => m.uid),
           off: rare || Boolean(team),
           why: team ? `DEFENDS · ${team.toUpperCase()}` : rare ? "LEGENDARY" : null,
-          candy: levels.length * candyValue(speciesById(id)),
+          candy: candyOf(speciesById(id), levels.length),
           /* No variant: `duplicateUids` holds every keeper out of the spare
              list entirely, so nothing here is ever anything but ordinary. */
           icon: { id },
@@ -318,7 +320,7 @@ function Box({
           sub: `Lv ${levels.join(", ")}`,
         };
       });
-  }, [box, spareUids, colRev, defense]);
+  }, [box, spareUids, colRev, defense, stats]);
 
   /* THE ARITHMETIC IS A FUNCTION OF WHAT IS STILL TICKED. It was three strings
      built once when the dialog opened, which is fine for a receipt and wrong
@@ -327,7 +329,7 @@ function Box({
   const sweepCount = (uids, candyPayout) => {
     const picked = new Set(uids);
     const taken = box.filter((m) => picked.has(m.uid));
-    const candy = taken.reduce((n, m) => n + candyValue(speciesById(m.species)), 0);
+    const candy = candyAt(taken.reduce((n, m) => n + candyValue(speciesById(m.species)), 0), stats);
     const cash = taken.reduce((n, m) => n + worth(speciesById(m.species)), 0);
     return {
       lines: [
@@ -394,7 +396,7 @@ function Box({
     const sp = speciesById(group.species);
     const uids = group.spares;
     const value = uids.length * worth(sp);
-    const gain = uids.length * candyValue(sp);
+    const gain = candyOf(sp, uids.length);
 
     /* WHICH ONES, not just how many. A sale is the one action in the game with
        no undo, and "8 x Pidgey" asks you to trust that the eight are the eight
@@ -693,7 +695,7 @@ function Box({
                 </span>
                 <Types of={sp.types} className="bx-types" />
                 <span className="bx-meta">
-                  Lv {group.best} best · ¥{worth(sp)} / {candyValue(sp)} candy
+                  Lv {group.best} best · ¥{worth(sp)} / {candyOf(sp)} candy
                 </span>
               </div>
 
@@ -755,10 +757,10 @@ function Box({
                     <button
                       className="candy"
                       onClick={() => confirmSellOne(group, true)}
-                      data-tip={`${spare * candyValue(sp)} Rare Candy`}
+                      data-tip={`${candyOf(sp, spare)} Rare Candy`}
                     >
                       <img src="items/rare-candy.png" alt="" />
-                      {spare * candyValue(sp)}
+                      {candyOf(sp, spare)}
                     </button>
                   </>
                 )}

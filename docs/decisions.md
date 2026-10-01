@@ -2325,6 +2325,38 @@ band (8-12 a whole game, "not so many that a Snorlax is worth one") and 75 / 8
 plus walking's four was 13. A ball already paid is never taken back; a new
 trainer gets five by Lv 50 instead of six, and two more past it.
 
+**THE CAP WENT TO 100 (2026-10-01), WITH TWO STATS BESIDE IT.** Asked for. 99
+points against the old 100 ranks would have left one rank unbought - the choice
+gone in all but name - so Lustre (the tier roll, +2.5% a rank, at rank 20
+exactly a research star and asserted never more) and Coach (converted candy,
++2% a rank) came with it: 99 of 140 is 71%, where 74 of 100 was 74%. Levels
+76-100 each cost what 75 did (3,870 XP); 3% growth put 100 at ~240,000 XP,
+flat it is 192,100. `MASTER_EVERY` 10 -> 14 keeps seven from levelling (the
+last at 98), eleven a game with walking. League prices are measured on a Lv 75
+game (`PRICE_LEVEL`): the cap is post-game, and pricing on it would have
+doubled every prize without the ladder moving.
+
+**COACH ROUNDS THE BATCH, NOT THE POKEMON.** The first version rounded per
+Pokemon so the Box's "count x one" matched the engine, and tools/play's first
+run showed it did nothing: a common is 1 candy and 1.4 rounds to 1. `convert`
+now applies `candyAt` to the batch's base total, and the Box quotes every
+batch through the same call. Shop candy is Haggle's, not Coach's - one lever a
+stat.
+
+**LATE GAME, NO GENERATION RUNS A MAP (`bandShares`, same day).** Measured at
+Lv 55, past every ramp: the roster weighting left the Safari's Johto at 24%,
+Frost Hollow's Galar 21%, the Tower's Alola 18%, Ember's Unova 17% - and Kalos
+2% of Ember. Fair per SPECIES is still the rule (equal per generation hands a
+thin generation's one species the slice - Pichu at 31.8%); once every
+generation has grown in, each non-Kanto one is held in 5-15% and Kanto under
+25%. Kanto still runs over it where `capLines` spills the cast: the Mirage
+Desert at 32%, whose C band is 63% of the map with every common non-Kanto
+ground species in the dex (six) already in it. Shrinking its cast was swept
+eleven ways; each starved Cacnea (alone in its B, Gen 3 cell - 1 in 800
+million at the cap) or put it at 8.7% on Lv 20, so check.mjs bounds Kanto at
+`CAST_TOP` + 8.5 points instead and Cacnea went 5 -> 7, which the Kalos floor
+had made 1 in 9,000.
+
 **EVOLUTION IS CANDY AND A LEVEL, and there is no feed any more.** `evolve`
 takes ONE `uid`, checks `evolveState(mon, bag, row)`, and mutates that entry in
 place - the uid survives, which is what makes it a Pokemon rather than a slot.

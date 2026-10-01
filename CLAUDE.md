@@ -2,7 +2,7 @@
 
 A non-commercial browser game: walk, meet, throw, bank the duplicates, evolve.
 It covers the whole National Dex from Kanto to Paldea plus its forms (count:
-`SPECIES.length`) across eleven maps, most of them tile-for-tile copies of real
+`SPECIES.length`) across fifteen maps, most of them tile-for-tile copies of real
 Gen 3 maps. Inspired by DelugeRPG.
 
 This file is the rulebook: each rule once, with its reason. The full record
@@ -177,7 +177,14 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **`genShares`**: a generation's weight is how many of its species live on the
   map, times an arrival ramp (`GEN_RAMP` levels, floor `RAMP_MIN`). Gen 1, each
   map's classic cast, never drops below `HEADLINE` (20%). No generation is owed
-  more than `SPECIES_CAP` (6%) per species it has there.
+  more than `SPECIES_CAP` (6%) per species it has there. **Once every
+  generation on a map has grown in, `bandShares` holds each non-Kanto one in
+  [`GEN_LOW`, `GEN_HIGH`] (5-15%) and Kanto under `CAST_TOP` (25%)** - fair
+  per species while regions arrive, no region running a map late (asked for,
+  2026-10-01). Not 1/N: equal shares hand a thin generation's one species the
+  whole slice. Kanto may run over `CAST_TOP` only by what `capLines` spills
+  into the cast (the Desert, 32%: every common non-Kanto ground species is
+  already there; shrinking its cast starved Cacnea).
 - **`capLines` holds any non-Kanto line above 6% and any Kanto line above
   `CAST_CEIL` (25%).** A line is a resident plus the evolutions grown from it
   (slot 5), scaled together. The excess goes within its own band: first to
@@ -292,7 +299,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Priced items are checked against the live economy**: a honey costs less
   than its run earns (dearest vs richest map, cheapest vs starting map); the
   Master Ball has a computed floor and ceiling; Master Balls total 8-12 per game
-  (`MASTER_EVERY` 10 at a Lv 75 cap).
+  (`MASTER_EVERY` 14 at a Lv 100 cap).
 - **`liveMult(ball, enc)` is the one answer to what a ball is worth.** The
   engine rolls with it and the rail prints it; berries go through it. `boost`
   must never exceed what `bonus()` can reach. Never type the unboosted value in
@@ -317,10 +324,15 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 ## Trainer and levels
 
 - **`LEVEL_XP` is append-only.** A save holds raw XP, so an edited row re-levels
-  every trainer. The cap is Lv 75.
-- **74 points against 100 ranks**, asserted: a trainer can never max
-  everything. Doubling `MAX_RANK` means halving every coefficient in
-  `trainer.js`, `effect()` strings included.
+  every trainer. The cap is Lv 100; levels 76-100 each cost what 75 did.
+- **99 points against 140 ranks** (seven stats), asserted: a trainer can never
+  max everything. Raising the cap means adding capacity, not erasing the
+  choice. Doubling `MAX_RANK` means halving every coefficient in
+  `trainer.js`, `effect()` strings included. **Lustre** (tier roll) stays at
+  most a research star's lift; **Coach** pays on converting duplicates only.
+- **League prices are measured on a Lv 75 game** (`PRICE_LEVEL` in
+  league-sim): 76-100 is post-game, and pricing against it would have doubled
+  every prize without the ladder moving.
 - **`state.paid` is the highest level whose reward was paid.** `payLevels()`
   pays from there, on every gain and once at boot. Old saves count as paid to
   their level capped at `LEGACY_CAP` (50).
@@ -787,6 +799,20 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   are one-way `L` (no Mach Bike). It took Ground from Mt. Moon, homes Regirock
   through `legends: ["rock"]`, and its written B band stays small because at
   Lv 20 only three B lines are open (the 6% cap).
+- **The ladder goes past Surf** (2026-10-16): Rainwood Crossing is Route 120
+  (id `rainwood`, Lv 25, Monsoon Trail's Fortree blocks), Meteor Falls (id
+  `falls`, Lv 30, `meteor_falls`) and Shoal Cave at low tide (id `shoal`, Lv
+  35, Emerald's `cave`, keyed `em_cave` in route.json beside FireRed's). A new
+  Emerald map reads its layout through `em_layout`; rooms on shelves go
+  through `em_rooms`, which drops a warp pair only when BOTH ends are culled
+  (Shoal's high-tide passages). Every pond bridge (0x71-0x7D) is `N`, like the
+  ocean one. Each map's cast is a few Kanto rows that set its rarity mix,
+  never the route's own encounter table (your call); the types bring every
+  generation. A Kanto water row on a map whose types are not Water made
+  surfing it mostly Kanto; a fish-shaped row on a map with no water fails.
+- **Wild levels stop rising at `WILD_TOP` (Lv 20)**: at the same half step a
+  Lv 25 map met its Grass pool at Lv 14 and handed out free evolutions 21% of
+  the time. Later maps are later through what lives there, not wild levels.
 - **The desktop view widens, never stretches**: App fits VIEW_W to
   `VIEW_W_MAX` columns at the height `.viewport` allows (`engine.setView`,
   `--cols`); phones and tablets keep 15x11.
