@@ -185,7 +185,8 @@ export default function Variants({ onClose }) {
             <li>
               <b>Any {ROSETTE_NEED} earns the rosette.</b> Collect{" "}
               {ROSETTE_NEED} different forms of one Pok&eacute;mon &mdash; any{" "}
-              {ROSETTE_NEED} &mdash; and its Dex entry is marked complete. Going
+              {ROSETTE_NEED} &mdash; and its Dex entry wears the rosette. A form
+              counts once caught, even if you later sell or evolve it. Going
               wide beats getting lucky once.
             </li>
           </ul>

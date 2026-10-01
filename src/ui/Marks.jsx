@@ -16,6 +16,7 @@
    One component so the alt text is written once. These are informative, not
    decorative: "shiny" is the whole reason a row exists, and a screen reader that
    reads out the number and not that is reading out the wrong half. */
+import { ROSETTE_NEED } from "../game/biomes.js";
 
 const TIER_ART = {
   origin: { src: "marks/origin.png", name: "Origin" },
@@ -30,7 +31,8 @@ const TIER_ART = {
   shadow: { src: "marks/shadow.png", name: "Shadow" },
   chaotic: { src: "marks/chaotic.png", name: "Chaotic" },
   projection: { src: "marks/projection.png", name: "Projection" },
-  complete: { src: "marks/complete.png", name: "Every variant" },
+  // ANY FOUR (ROSETTE_NEED), not every one - "Every variant" read as a bug.
+  complete: { src: "marks/complete.png", name: `Rosette: ${ROSETTE_NEED} rare forms caught` },
   /* NOT A TIER, and it sits here anyway because it is the same object: a small
      drawn badge on a sprite, in the same set, at the same size. Legendary is a
      fact about the SPECIES rather than about the one in front of you - every

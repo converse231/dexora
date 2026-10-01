@@ -27,6 +27,8 @@ export const NEWS = [
       ["Square Dex", "Dex tiles are square again."],
       ["Star from Events", "Finished research waits in Discovery with a Star button."],
       ["Meteor Falls", "Its log bridge no longer strands a surfer under it."],
+      ["One water key", "C or A at the water asks: surf or fish?"],
+      ["Rosette", "The 4-form badge now says Rosette, not Complete - it never needed every form."],
     ],
   },
   {

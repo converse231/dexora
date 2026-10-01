@@ -3422,6 +3422,10 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   margin: 0 0 10px; padding-left: 9px; border-left: 0;
 }
 .cf-actions { display: flex; gap: 7px; }
+/* Surf or fish? (WaterAsk): two answers, each with its item and its key. */
+.water-ask .cf-actions button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.water-ask img { width: 22px; height: 22px; image-rendering: pixelated; }
+.water-ask kbd { font: 600 10px var(--pixel); opacity: .75; }
 .cf-actions button {
   flex: 1; font-family: var(--pixel); font-size: 11px; padding: 11px 8px 9px;
   border: 1px solid var(--line-firm); border-radius: 14px;
