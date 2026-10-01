@@ -9,8 +9,6 @@
    PROGRESS IS DRAWN, NOT WRITTEN. "9 left" is a sentence; fifteen pips with
    six of them spent is a raid in progress. The rift's meter shows the zones it
    moves through, and a research level is a ring you watch close. */
-import { useEffect } from "react";
-import { useModalLock, useDismiss } from "./modal.js";
 import Sprite, { eventIcon } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 import { label, AREAS } from "../game/map.js";
@@ -60,14 +58,10 @@ function Pips({ total, spent, label: aria }) {
   );
 }
 
-export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onClose }) {
-  useModalLock();
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, [onClose]);
-
+/* THE EVENTS BOARD, as the Rotom panel's Events app (2026-10-01). It was a
+   dialog off the ☰ menu and the HUD's cards; both now open this app beside
+   the game, which is still being played - so it locks no keys. */
+export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague }) {
   const ob = world?.outbreak ?? null;
   const obSp = ob && speciesById(ob.speciesId);
   const obLive = ob && ob.left > 0;
@@ -89,21 +83,7 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
   const rematches = world?.rematches ?? 0;
   const here = BIOMES.find((b) => b.id === state?.areaId)?.name ?? "";
 
-  return (
-    <div className="sheet" {...useDismiss(onClose)}>
-      <div
-        className="helpcard evcard"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Events"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="set-top">
-          <h3>Events</h3>
-          <span className="set-mail">Today&rsquo;s quest board</span>
-          <button className="set-x" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-
+  const board = (
         <div className="hp-body">
           {/* OUTBREAK - the raid of the day. */}
           <section className={`ev-card ev-raid${obLive ? " live" : ""}`}>
@@ -242,7 +222,6 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
             <button type="button" className="ev-go" disabled={busy} onClick={onLeague}>Open the League ›</button>
           </section>
         </div>
-      </div>
-    </div>
   );
+  return <div className="ev-pane evcard">{board}</div>;
 }

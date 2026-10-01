@@ -11,9 +11,9 @@ export const THEMES = ["auto", "dark", "light"];
 export function themeChoice() {
   try {
     const v = localStorage.getItem(KEY);
-    return THEMES.includes(v) ? v : "auto";
+    return THEMES.includes(v) ? v : "dark";
   } catch {
-    return "auto";
+    return "dark";
   }
 }
 
@@ -22,7 +22,7 @@ export function applyTheme(choice = themeChoice()) {
   document.documentElement.dataset.theme = dark ? "dark" : "light";
   // The browser's own chrome (the phone's status bar) follows along.
   document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", dark ? "#111915" : "#2f6b4c");
+    ?.setAttribute("content", dark ? "#0a0f1e" : "#e8eef8");
 }
 
 export function setTheme(choice) {

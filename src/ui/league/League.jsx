@@ -598,6 +598,13 @@ export default function League({
   const [regionId, setRegionId] = useState(firstOpen);
   const [pick, setPick] = useState(null);    // { o, kind }
   const [fight, setFight] = useState(null);  // { o, kind, team, n }
+  /* A FIGHT OWNS THE WHOLE SCREEN: the app bar and the tab bar step aside
+     (`body.fighting` in styles.css' ROTOM SHELL) - a tab pressed mid-turn
+     would leave a battle half-played under another page. */
+  useEffect(() => {
+    document.body.classList.toggle("fighting", Boolean(fight));
+    return () => document.body.classList.remove("fighting");
+  }, [fight]);
   const [editing, setEditing] = useState(null);   // the defense team slot being edited
   const [nonce, setNonce] = useState(0);          // a ranked battle closed: the Ranked tab reloads its standing
   const ranked = regionId === RANKED, shop = regionId === SHOP, train = regionId === TRAIN;
@@ -697,13 +704,15 @@ export default function League({
   });
 
   return (
-    <div className="tc-page evcard lg-page" role="dialog" aria-modal="true" aria-label="Pokémon League" ref={page}>
+    <div className={`tc-page evcard lg-page${sub ? " sub" : ""}`} role="dialog" aria-modal="true" aria-label="Pokémon League" ref={page}>
       <header className="tc-head" ref={head}>
         <div className="tc-bar">
-          <button type="button" className="tc-home" onClick={sub ? back : onClose}
-            aria-label={sub ? "Back to the League" : "Back to the game"}>
-            <span aria-hidden="true">‹</span> {sub ? "Back" : "Game"}
-          </button>
+          {/* The tabs leave the page now; this is the Back for a sub-view. */}
+          {sub && (
+            <button type="button" className="tc-home" onClick={back} aria-label="Back to the League">
+              <span aria-hidden="true">‹</span> Back
+            </button>
+          )}
           <div className="tc-titles">
             <h3>Pokémon League</h3>
             <span>{totalBadges} badge{totalBadges === 1 ? "" : "s"} · {st.filter((s) => s.cleared).length} of {LEAGUES.length} regions cleared</span>

@@ -353,7 +353,7 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
         </button>
         {!idle && <div className="tb-hint">{animating ? "CLICK TO SKIP" : " "}</div>}
         {idle && outOfBalls && (
-          <p className="tb-warn">Out of balls — sell spares in the BOX tab.</p>
+          <p className="tb-warn">Out of balls — sell spares in the Box, or buy some in the Shop.</p>
         )}
       </div>
     </div>

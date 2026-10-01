@@ -6,39 +6,25 @@ import "./styles.css";
 
 applyTheme();
 
-/* THE PIXEL FACE IS GEIST PIXEL, SELF-HOSTED, AND REGISTERED HERE RATHER
-   THAN IN styles.css. Two reasons, both recorded rules: a relative url() in the
-   stylesheet resolves against the BUILT stylesheet and 404s (every other asset
-   is built against `document.baseURI` for the same reason), and the game must
-   work offline, so its lettering cannot be a request to Google.
-
-   `sizeAdjust` is the one knob, and every size in styles.css keeps meaning
-   what it meant. Measured against the two faces before it: Geist Pixel is
-   PROPORTIONAL and 20% narrower than Silkscreen at the same size (Press Start
-   2P, which it replaced, was 47% WIDER), so at 110% it is larger than either
-   and still narrower than the Silkscreen every chip was sized for - the room
-   that took back is what the horizontal scroll needed. Its own line box
-   (ascent 1.01em, descent 0.30em) is normal and centred on the ink, so unlike
-   Press Start 2P it needs no metric overrides. The font is OFL
-   (public/fonts/OFL.txt). */
-const pixel = new FontFace("Pixel",
-  `url(${new URL("fonts/geist-pixel.woff2", document.baseURI).href})`,
-  { sizeAdjust: "110%", display: "swap" });
-document.fonts.add(pixel);
-pixel.load().catch(() => {});   // a failed load falls back to --pixel's next face
-
-/* THE TWO TEXT FACES, SELF-HOSTED (2026-09-29). They were a Google Fonts
-   stylesheet: a render-blocking request to a third origin and then a second
-   origin for the files, before the first paint - and a game that is fully
-   playable offline lost its headings to the fallback there. Each is one
-   variable woff2 (Latin, SIL OFL - public/fonts/OFL.txt), preloaded by
-   index.html, registered here as the pixel face is, for the same reason: a
-   url() in styles.css would resolve against the built stylesheet. */
-for (const [family, file, weight] of [["Fredoka", "fredoka", "300 700"], ["Nunito Sans", "nunito-sans", "200 1000"]]) {
+/* THE ROTOM FACES, SELF-HOSTED (2026-10-01): Rubik for words, Chakra Petch for
+   labels and numbers - the "screen" voice that took over from the pixel face
+   (`--pixel` keeps its name, so every rule and check.mjs's floor on it still
+   apply). Registered here rather than in styles.css because a url() there
+   resolves against the BUILT stylesheet and 404s, and self-hosted because the
+   game is fully playable offline and a third-party font host was a
+   render-blocking request from two more origins. Each file is Latin, SIL OFL
+   (public/fonts/OFL.txt), preloaded by index.html. Chakra Petch ships three
+   weights, so each file answers for a RANGE: a rule asking 400 gets the 500. */
+for (const [family, file, weight] of [
+  ["Rubik", "rubik", "300 900"],
+  ["Chakra Petch", "chakra-petch-500", "100 550"],
+  ["Chakra Petch", "chakra-petch-600", "551 650"],
+  ["Chakra Petch", "chakra-petch-700", "651 900"],
+]) {
   const face = new FontFace(family, `url(${new URL(`fonts/${file}.woff2`, document.baseURI).href})`,
     { weight, display: "swap" });
   document.fonts.add(face);
-  face.load().catch(() => {});   // a failed load keeps the next face in --display / --body
+  face.load().catch(() => {});   // a failed load keeps the next face in --body / --pixel
 }
 
 createRoot(document.getElementById("root")).render(

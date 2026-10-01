@@ -186,8 +186,8 @@ export default function Bag({
         {view === "all" && useful.length === 0 && (
           <p className="bag-none">
             {enc
-              ? "No berries. They are in the SHOP — a Razz makes a catch likelier, a Nanab stops it running."
-              : "No field items. Repels, flutes and honey are in the SHOP."}
+              ? "No berries. They are in the Shop, in Rotom — a Razz makes a catch likelier, a Nanab stops it running."
+              : "No field items. Repels, flutes and honey are in the Shop, in Rotom."}
           </p>
         )}
       </div>

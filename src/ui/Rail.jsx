@@ -16,25 +16,14 @@ import Dex from "./Dex.jsx";
 import Box from "./Box.jsx";
 import Shop from "./Shop.jsx";
 import Travel from "./Travel.jsx";
-import Trainer from "./Trainer.jsx";
+import Icon from "./Icon.jsx";
 import { evoNext, variantOf } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
-import { freePoints } from "../game/trainer.js";
 
-/* Drawn icons, not glyphs. They were unicode characters - a grid, a ball, a
-   yen sign - picked to be distinct at 15px, which they were, but they were
-   also five different typefaces' idea of a shape in a UI that is otherwise
-   pixel art all the way down.
-
-   They are MASKS, not pictures: `public/icons/<id>.png` is alpha only and the
-   stylesheet fills it with `currentColor`. That is not decoration either - a
-   tab is pale with dark text when idle and dark green with pale text when it
-   is the one you are on, so a fixed-colour icon is invisible in one of those
-   two states. Tinting solves both at once and costs nothing.
-
-   See tools/build_icons.py for how they are normalised. */
-const TABS = ["dex", "box", "shop", "map", "you"];
+/* The apps wear the Rotom line icons (Icon.jsx), which take `currentColor`:
+   pale on the app you are in, faint on the rest, from one drawing. */
+const TABS = ["dex", "box", "shop", "map", "events"];
 
 /* How many species could evolve this second. NOT cheap enough to do every
    render, which is what the comment here used to claim: it is a pass over the
@@ -62,12 +51,19 @@ function readyToEvolve(box, bag) {
   return n;
 }
 
+/* THE ROTOM PANEL (2026-10-01): five apps - the Dex, Box, Shop, Map and the
+   Events board, which moved in from the ☰ menu; the old YOU tab moved out to
+   the You page. App owns which app is up (`tab`), so the HUD's event cards and
+   the Dex's "See in Box" can open the right one. On a phone the panel is a
+   sheet over the game (`open`, the pad's ROTOM key); on a desktop it is
+   docked beside the map and `open` means nothing. */
 export default function Rail({
+  tab = "dex", onTab, open = false, onClose, events = null,
   state, caught, level, busy,
   onSelect, onRank, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
-  onTravel, onSpend, save, account, jumpTo, onJumped, outbreakArea,
+  onTravel, jumpTo, onJumped, outbreakArea,
 }) {
-  const [tab, setTab] = useState("dex");
+  const setTab = onTab;
   /* A VISITED TAB STAYS MOUNTED, HIDDEN. Every switch used to tear the panel
      down and build it again - the Dex's 1,300 tiles each time, the Box's rows
      each time - which on a phone was seconds per tap. Now the first visit
@@ -83,7 +79,7 @@ export default function Rail({
 
   /* Arriving from the Dex's "See in Box". The tab lives here, so the switch
      does too; the Box takes the NAME as a search seed and clears the id. */
-  useEffect(() => { if (jumpTo) setTab("box"); }, [jumpTo]);
+  useEffect(() => { if (jumpTo) setTab("box"); }, [jumpTo, setTab]);
   const seed = jumpTo ? label(speciesById(jumpTo)) : "";
 
   /* THE QUEST MOVED TO THE TOP BAR and took its badge with it. It used to live
@@ -99,11 +95,14 @@ export default function Rail({
      either of these, and `rev` bumps on every step. See engine.js. */
   const badges = useMemo(() => ({
     box: readyToEvolve(box, bag) || null,
-    you: freePoints(state?.stats, level) || null,
-  }), [box, bag, state?.stats, state?.colRev, level]);
+  }), [box, bag, state?.colRev]);
 
   return (
-    <div className="rail">
+    <>
+    {open && <div className="rail-scrim" onClick={onClose} aria-hidden="true" />}
+    <div className={`rail${open ? " open" : ""}`} aria-label="Rotom">
+      <span className="rail-grip" aria-hidden="true" />
+      <button type="button" className="rail-x" onClick={onClose} aria-label="Close Rotom">✕</button>
       <div className="tabs">
         {TABS.map((id) => (
           <button
@@ -112,21 +111,10 @@ export default function Rail({
             aria-current={tab === id ? "page" : undefined}
             onClick={() => setTab(id)}
           >
-            <span
-              className="tab-glyph"
-              aria-hidden="true"
-              /* Absolute, and that is load-bearing: a relative `url()` inside
-                 a custom property resolves against the STYLESHEET that reads
-                 it, not the element that sets it. `icons/dex.png` would be
-                 fetched from /src/ under the dev server and /assets/ in a
-                 build, and a mask that 404s masks nothing - the icon would
-                 simply be a coloured square. This cost the project the whole
-                 Origin reveal once already. */
-              style={{ "--icon": `url(${new URL(`icons/${id}.png`, document.baseURI).href})` }}
-            />
-            <span className="tab-name">{id.toUpperCase()}</span>
+            <span className="tab-glyph" aria-hidden="true"><Icon n={id} size={22} /></span>
+            <span className="tab-name">{id[0].toUpperCase() + id.slice(1)}</span>
             {badges[id] ? (
-              <em data-tip={id === "you" ? "points to spend" : "ready to evolve"}>
+              <em data-tip="ready to evolve">
                 {badges[id]}
               </em>
             ) : null}
@@ -178,18 +166,8 @@ export default function Rail({
         <Travel areaId={state?.areaId} level={level} busy={busy} onTravel={onTravel}
           outbreakArea={outbreakArea} />
       ))}
-      {pane("you", (
-        <>
-          <Trainer
-            stats={state?.stats}
-            level={level}
-            bag={bag}
-            onSpend={onSpend}
-            save={save}
-            account={account}
-          />
-        </>
-      ))}
+      {pane("events", events)}
     </div>
+    </>
   );
 }

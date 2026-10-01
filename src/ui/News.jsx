@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-01-rotom",
+    icon: "📱",
+    date: "October 2026",
+    title: "A new look: Catch, Trade, Battles",
+    items: [
+      ["Three tabs", "Catch, Trade and Battles sit side by side, with You beside them. The menu is gone."],
+      ["Rotom", "Dex, Box, Shop, Map and Events live in one panel. On a phone, the ROTOM key opens it."],
+      ["You", "Your card, stat points, saves, guides and settings, all in one place."],
+      ["Night first", "A darker, calmer screen. Day mode is in You › Appearance."],
+    ],
+  },
+  {
     id: "2026-10-01-unown",
     icon: "🔤",
     date: "October 2026",

@@ -132,7 +132,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 - **The server stamps `updated_at`.** Column grants in `SUPABASE.md` mirror the
   client's profile writes (tools/play holds them together). `SUPABASE.md`
   §3c and §3d (trading) are live since 2026-09-26.
-- **Settings is a dialog off the top bar**, with one profile writer
+- **Settings is a dialog off You**, with one profile writer
   (`updateProfile(patch)`). Email is shown, not editable. Sign-up stores a
   username, a trainer and a birthdate (the age gate: `MIN_AGE` 13 in `name.js`,
   counted on the calendar), and the insert stamps `terms_at`; nothing else
@@ -435,18 +435,15 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   (`useOffscreenPause`, `.dexgrid.offscreen`): on a phone the Dex sits below
   the game, and its unseen loops were a quarter of the idle main thread. **Rail tabs stay mounted once visited** (`.rail-pane`,
   `display: contents`, hidden when not current): a switch never rebuilds.
-- **The pixel font is merged outlines** (`tools/build_font.py`): Geist Pixel
-  drew a contour per pixel (10,492), and every new size on screen re-rasterised
-  thousands of squares on the main thread - seconds on a phone the first time
-  a panel opened. Never ship a pixel font unmerged.
 - **Every face is self-hosted and registered in `main.jsx`** through
   `FontFace` (a url in styles.css would resolve against the built
-  stylesheet), and preloaded by index.html: Geist Pixel as `Pixel`, Fredoka
-  (`--display`) and Nunito Sans (`--body`), one variable woff2 each. No
-  third-party font host: it was a render-blocking stylesheet from two more
-  origins, and offline play lost its headings. **The pixel face** `sizeAdjust` 110% is the one scale knob: it is
-  proportional and narrower than the Silkscreen the layout was sized for.
-  A pixel rule never goes under 9px, never uses a bare `cqw`, and never sets
+  stylesheet), and preloaded by index.html: Rubik (`--display`, `--body`, one
+  variable woff2) and Chakra Petch (`--pixel`, the label-and-number face;
+  three weight files, each answering for a weight RANGE). No third-party font
+  host: it was a render-blocking stylesheet from two more origins, and
+  offline play lost its headings. The pixel font (Geist Pixel) is retired
+  from the interface (Rotom, 2026-10-01); `--pixel` kept its name, so its
+  rules still never go under 9px, never use a bare `cqw`, and never set
   `letter-spacing` (asserted); rules that only inherit the face need the same
   care by hand. Touch targets on a coarse pointer are 36px (end of styles.css).
 - **A banner waits while an encounter is undecided**: `App` holds `cheers`
@@ -606,7 +603,25 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   from leagues.js, never typed.
 - **The profile is the Trade Center in `profile` mode**: your card alone,
   titled, no trading tabs, its editing and sharing unchanged - one loader,
-  one editor. The top bar's name (with its Pokédex rank medal) opens it.
+  one editor. You › Your trainer card opens it (`.sub`: it has a Back to You).
+- **The app is four tabs, and the tabs ARE the pages** (Rotom, 2026-10-01):
+  Catch (the map), Trade (the Trade Center), Battles (the League) and You
+  (`You.jsx`: the card, stat points, saves, key items, guides, settings,
+  log out - everything the ☰ menu and the rail's YOU pane held; there is no
+  menu). `goTab` in App is the one switch: it REPLACES the history entry
+  between pages and pushes one leaving the map, so Back is always one press
+  to the game, and each page reads its own hash (`#/trade`, `#/league`,
+  `#/you`) and pushes nothing. One `nav` in TopBar, placed by CSS (ROTOM
+  SHELL, end of styles.css): the app bar on a desktop, a bottom tab bar on a
+  phone, a left rail held sideways. Layers: pages 56, the Rotom sheet 57,
+  bar and tab bar 58, banners 60, dialogs 70+ - so a dialog covers the tabs.
+  A fight (`body.fighting`, set by League) and a phone encounter (`.app.busy`)
+  hide the bar. No `backdrop-filter` where the map shows through.
+- **The rail is the Rotom panel**: Dex, Box, Shop, Map and Events (the
+  board that was a dialog), its app held in App (`railTab`) so the HUD's
+  event cards and "See in Box" open the right one. On a phone it is a sheet
+  (`.rail.open`, the pad's ROTOM key) - hidden, never unmounted. The quest
+  is a pill on the map (`.hud-left`, beside the area's name).
 - **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`
   rules): its rim drains with steps left over the item's own `steps`.
 - **Hard mode is designed in docs/battles.md, phase 8.** A cleared region's
@@ -881,7 +896,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   it even if solid (`raisedOver`). A test that moves the trainer must load
   him there (`boot`), not write x and y: he keeps the elevation he walks at.
 - **Night mode is tokens.** `data-theme` on <html> (`theme.js`, mirrored in
-  index.html before first paint; a device preference, never the save). Any
+  index.html before first paint; a device preference, never the save; night
+  unless chosen otherwise - Rotom is a screen). The palettes are Rotom's:
+  navy glass at night, frosted white by day; `--cta` is the orange of the one
+  action a screen has, `--accent` cyan is what is selected. Any
   colour that must change at night is a `:root` token redefined in the one
   `[data-theme="dark"]` block at the end of styles.css (check.mjs holds every
   colour token to a night value); a few pastel banners and the silhouettes
