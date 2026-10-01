@@ -291,6 +291,14 @@ def shore_ok(cur, ch, t):
     return t not in EM_HIGH
 
 
+def surf_ok(cur, t):
+    """Can a trainer on land at elevation `cur` push off onto water at `t`?
+    Not from raised ground (4+) onto water below it: Meteor Falls let you surf
+    down off its log bridge, as `shore_ok` already refused the climb back up.
+    Mirrored in engine.js (`surfable`) and check.mjs's fill."""
+    return cur not in EM_HIGH or t == cur
+
+
 def reach(g, starts, elev=None, hop=None, surf=False):
     """Every cell a trainer can get to from `starts`. ONE fill for the maps
     whose elevation decides where you may walk.
@@ -322,6 +330,10 @@ def reach(g, starts, elev=None, hop=None, surf=False):
                     continue
                 if not (g[ny][nx] in SURFABLE or
                         (g[y][x] in SURFABLE and g[ny][nx] not in SOLID)):
+                    continue
+                # ONTO THE WATER, NEVER DOWN FROM RAISED GROUND - a deck or
+                # the top of a bridge (`surf_ok`): the way ashore, reversed.
+                if g[ny][nx] in SURFABLE and g[y][x] not in SURFABLE and not surf_ok(cur, E(nx, ny)):
                     continue
                 # OFF THE WATER, ELEVATION STILL COUNTS (`shore_ok`): under a
                 # bridge only where it is one, never up onto raised ground.
@@ -3443,6 +3455,13 @@ def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mou
                 mid = int(r["ids"][yy][xx])
                 b = r["behave"](mid)
                 ch = remap(b, em_cell(b, int(r["col"][yy][xx]), solid="M"))
+                # A BRIDGE BY ELEVATION ALONE: Meteor Falls' log bridge is
+                # ordinary floor (behaviour 0) at 15, where Seaside Road's
+                # planks carry a bridge behaviour. Read as floor, a surfer
+                # paddling under it was set ashore on the span at 1 and could
+                # step nowhere (the deck is 4) - reported.
+                if r["elev"][yy][xx] == 15 and ch not in SOLID and ch not in SURFABLE:
+                    ch = "N"
                 if (i, xx, yy) in doors:
                     ch = "l"
                 g[oy + yy][ox + xx] = ch

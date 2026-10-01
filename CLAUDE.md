@@ -547,7 +547,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **The Events page (`Events.jsx`) reads the world through `engine.world()`**
   (today's outbreak even once over, the rift where you stand, `sinceTravel`)
   and computes research from `state.research`; every number on it is a live
-  constant. The corner's event cards are buttons that open it. **What's new
+  constant. The corner's event cards are buttons that open it. Discovery
+  lists finished-but-unstarred research first, with its own Star button
+  (`engine.star`'s spend rule), then the nearest unfinished - a finished
+  entry used to vanish the moment it became starrable. **What's new
   (`News.jsx`) is a list, newest first**: add an entry at the top with a new
   id and the menu's dot returns. An entry is an `icon` (one emoji) and a
   title, its items a line each - the headline, never the design notes
@@ -857,6 +860,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   FireRed's ice is 0x23/0x26/0x27 (`FR_ICE`), not Emerald's 0x20. A floor
   joined only by a GBA script (Icefall's thin ice, then sliding) stays
   walled off: a one-way hole there was tried and trapped you below.
+  **A walkable cell at elevation 15 is a bridge (`N`) in `em_rooms`** even
+  with floor behaviour (Meteor Falls' log bridge), and **nobody surfs down
+  off raised ground** (`surf_ok`, the GBA surfs from 3 only; mirrored in
+  `surfable` and check.mjs): you surfed off that bridge onto a river with no
+  shore and were stranded. A save afloat on water with no legal shore is
+  sent to the way in at load.
 - **Only the room you stand in is drawn** (2026-10-02): a map with floors
   side by side carries `rooms` ([x, y, w, h], from each builder), the camera
   stays inside the one under the trainer (centring a small one), everything

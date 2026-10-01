@@ -2003,7 +2003,11 @@ for (const b of BIOMES) {
       if (!n) continue;
       /* SURF IS A WAY THROUGH - onto the water, along it and off it - as the
          generator's fill counts it. Water is crossed, never counted. */
-      if (SURFABLE.includes(n)) { stack.push([nx, ny, next(nx, ny)]); continue; }
+      if (SURFABLE.includes(n)) {
+        // Onto it never down off raised ground: build_map's `surf_ok`.
+        if (wet || !HIGH_ELEV.has(cur) || E(nx, ny) === cur) stack.push([nx, ny, next(nx, ny)]);
+        continue;
+      }
       if (wet) {
         // Off the water: build_map's `shore_ok` - under a span, never into a
         // deck, never up onto raised ground.

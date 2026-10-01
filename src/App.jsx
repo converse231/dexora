@@ -1078,6 +1078,7 @@ export default function App({
               onTravel={(id) => { if (engine.travel(id)) setRotom(false); }}
               onSelect={(id) => setEntry(id)}
               onLeague={() => goTab("battles")}
+              onStar={(id) => engine.star(id)}
             />
           )}
           state={st}
