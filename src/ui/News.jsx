@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-02-perks",
+    icon: "💫",
+    date: "October 2026",
+    title: "Rare forms fight like it",
+    items: [
+      ["Perks", "Each rare form gets a free League perk: Gold is armoured, Chaotic lands more crits."],
+      ["Alpha", "An alpha is bigger and hits harder, on top of its form's perk."],
+      ["Smoother battles", "Battles open and play faster on phones, even with a full Box."],
+      ["Square Dex", "Dex tiles are square again."],
+    ],
+  },
+  {
     id: "2026-10-02-maps",
     icon: "🧊",
     date: "October 2026",
@@ -24,6 +36,7 @@ export const NEWS = [
       ["Icefall Cave", "FireRed's frozen cave takes Shoal Cave's place at Lv 35: a pool, a waterfall, ice."],
       ["Tanoby Ruins", "Now a single chamber - Unown's alone, no sea to cross."],
       ["One floor at a time", "Caves with many floors show only the one you are on, and so does the minimap."],
+      ["A full team", "Bring six Pokémon to any League battle, leaders and Champions included."],
     ],
   },
   {

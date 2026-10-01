@@ -1,5 +1,6 @@
 Copyright 2020 The Rubik Project Authors (https://github.com/googlefonts/rubik) - rubik.woff2
 Copyright 2018 The Chakra Petch Project Authors (https://github.com/m4rc1e/Chakra-Petch) - chakra-petch-500/600/700.woff2
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/symbols) - symbols.woff2 (a subset of Noto Sans Symbols and Symbols 2)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

@@ -138,6 +138,8 @@ function beatsOf(log, battle, foeName) {
     else if (hits && ev.eff < 1) out.push({ text: "It's not very effective..." });
     if (ev.healed) out.push({ text: `${me} regained health!` });
     if (ev.status != null) out.push({ text: `${them} was ${STATUS[ev.status][1]}!` });
+    // A Shiny's perk (perks.js): the status was rolled and did not take.
+    if (ev.shrug) out.push({ text: `${them} shrugged it off!` });
     if (ev.stages) {
       for (const [s, c] of ev.stages.sg) {
         const whose = who(ev.stages.side);
@@ -616,7 +618,7 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
             </div>
             <div className="ft-side">
               <button type="button" className="ft-team-btn" disabled={busy} onClick={() => setPanel("switch")}>
-                <span aria-hidden="true">⇄</span> Pokémon <kbd aria-hidden="true">S</kbd>
+                <span aria-hidden="true">↔</span> Pokémon <kbd aria-hidden="true">S</kbd>
               </button>
               {!practice && (
                 <button type="button" className="ft-team-btn" disabled={busy} onClick={() => setPanel("bag")}>

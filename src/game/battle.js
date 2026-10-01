@@ -19,7 +19,8 @@ import { LEARNSETS } from "../data/learnsets.js";
 import { TYPES, CHART } from "../data/types.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import { speciesById } from "./biomes.js";
-import { evoLevel, HEALS } from "./items.js";
+import { evoLevel, HEALS, variantOf } from "./items.js";
+import { perksOf } from "./perks.js";
 import { hash } from "./daily.js";
 /* Who may enter lives with the rest of what the ENGINE enforces, in a module
    free of the battle data (phase 4); re-exported so the League reads one place. */
@@ -90,7 +91,29 @@ export function movesOf(mon) {
   const taught = (mon.moves ?? []).map((n) => MOVE_INDEX.get(n)).filter((i) => i != null && !MOVES[i].no);
   return taught.length ? taught.slice(0, 4) : movesAt(mon.species, mon.level);
 }
-export const playerFighter = (mon) => fighter(mon.species, mon.level, mon.uid, movesOf(mon));
+export const playerFighter = (mon) =>
+  withPerks(fighter(mon.species, mon.level, mon.uid, movesOf(mon)), perksOf(variantOf(mon), mon.alpha));
+
+/* A RARE FORM'S AND AN ALPHA'S PERKS (perks.js), folded into the fighter once,
+   at the start. Stats multiply; the rest lands on `perk`, which only a
+   fighter with one carries - so a plain fighter draws exactly the rolls it
+   always did, and every recorded battle replays unchanged. */
+function withPerks(f, perks) {
+  if (!perks.length) return f;
+  const perk = { crit: 0, shrug: 0, roll: 0.15, resist: 0.5, super: 1 };
+  for (const p of perks) {
+    if (p.st) f.st = f.st.map((v, i) => Math.floor(v * p.st[i]));
+    perk.crit += p.crit ?? 0;
+    perk.shrug = 1 - (1 - perk.shrug) * (1 - (p.shrug ?? 0));
+    perk.roll = Math.max(perk.roll, p.roll ?? 0);
+    perk.resist = Math.max(perk.resist, p.resist ?? 0);
+    perk.super *= p.super ?? 1;
+    f.stages[7] += p.evade ?? 0;
+  }
+  f.hp = f.max = f.st[0];
+  f.perk = perk;
+  return f;
+}
 
 /* A species whose whole line learns nothing with power (Wobbuffet counters,
    it never attacks). It fights with Struggle, as it all but does in the games. */
@@ -123,8 +146,11 @@ export function stageAt(id, level) {
 
 /* The Gen 3 formula with no EVs and no nature. IVs are 0-31 per stat from a
    hash of the uid, the trick `sizeOf` uses, so every Pokemon already in a save
-   has them. A tier, a size and an alpha change NOTHING here: measured, +5%
-   Speed wins a mirror 88% of the time - there is no "slight" stat. */
+   has them. A size changes NOTHING here: measured, +5% Speed wins a mirror
+   88% of the time - there is no "slight" stat. A rare form and an alpha DO,
+   in the League only and on the player's side only (`withPerks`, your call
+   2026-10-02: perks with no cost); `statsOf` itself stays plain, which is
+   what ranked and every opponent read. */
 export const ivOf = (uid, stat) => (hash(`${uid}:${stat}`) >>> 3) % 32;
 
 /* `effort` is an OPPONENT'S training, 0 to MAX_EFFORT a stat - the Gen 3 EV
@@ -268,8 +294,13 @@ function useMove(b, side, i, rng, first) {
       ? HITS_2_5[Math.floor(rng() * 20)] : m.hits[0] + Math.floor(rng() * (m.hits[1] - m.hits[0] + 1));
     let dealt = 0;
     for (let k = 0; k < n && d.hp > 0; k++) {
-      const crit = rng() < CRIT[Math.min(3, m.cr ?? 0)];
-      let dmg = base(a, d, m, crit) * (crit ? 1.5 : 1) * (0.85 + rng() * 0.15);
+      const crit = rng() < CRIT[Math.min(3, (m.cr ?? 0) + (a.perk?.crit ?? 0))];
+      let dmg = base(a, d, m, crit) * (crit ? 1.5 : 1) * (0.85 + rng() * (a.perk?.roll ?? 0.15));
+      if (a.perk) {
+        const e = effectiveness(m.t, d.types);
+        if (e > 0 && e < 1) dmg *= a.perk.resist / 0.5;
+        else if (e > 1) dmg *= a.perk.super;
+      }
       dmg = Math.max(effectiveness(m.t, d.types) ? 1 : 0, Math.floor(dmg));
       d.hp = Math.max(0, d.hp - dmg);
       dealt += dmg;
@@ -282,7 +313,8 @@ function useMove(b, side, i, rng, first) {
   }
   if (m.h && !m.p) { const before = a.hp; a.hp = Math.min(a.max, a.hp + Math.floor(a.max * m.h / 100)); ev.healed = a.hp - before; }
   if (m.st != null && d.hp > 0 && d.status < 0 && !immuneTo(d, m.st)
-      && (m.c === 2 || rng() * 100 < (m.stc ?? 100))) {
+      && (m.c === 2 || rng() * 100 < (m.stc ?? 100))
+      && !(d.perk?.shrug && rng() < d.perk.shrug && (ev.shrug = true))) {
     d.status = m.st;
     if (m.st === SLP) d.sleep = 2 + Math.floor(rng() * 3);
     ev.status = m.st;

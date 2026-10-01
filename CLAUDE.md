@@ -435,6 +435,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   (`useOffscreenPause`, `.dexgrid.offscreen`): on a phone the Dex sits below
   the game, and its unseen loops were a quarter of the idle main thread. **Rail tabs stay mounted once visited** (`.rail-pane`,
   `display: contents`, hidden when not current): a switch never rebuilds.
+  **The Picker builds tiles a `PAGE` at a time** as its end scrolls near
+  (filters still read the whole box): a 600-Pokemon box blocked a throttled
+  phone's team pick for a second. The League's cards are `content-visibility:
+  auto`.
 - **Every face is self-hosted and registered in `main.jsx`** through
   `FontFace` (a url in styles.css would resolve against the built
   stylesheet), and preloaded by index.html: Rubik (`--display`, `--body`, one
@@ -446,6 +450,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   rules still never go under 9px, never use a bare `cqw`, and never set
   `letter-spacing` (asserted); rules that only inherit the face need the same
   care by hand. Touch targets on a coarse pointer are 36px (end of styles.css).
+  **Every mark Rubik cannot draw is in `Symbols`** (`symbols.woff2`, Noto,
+  made by `python tools/build_symbols.py` from what src/ types - re-run it
+  after adding one; it refuses a mark no Noto face has). Each missing glyph
+  sent a phone to its system fonts mid-layout (37ms of the fight's first
+  frame). News's colour emoji stay the system's (`EMOJI`).
 - **A banner waits while an encounter is undecided**: `App` holds `cheers`
   until the encounter is caught, fled or ran, so it never covers the nameplate.
   Holding UNMOUNTS it, so its clock lives on the entry (`seen`): one shown a
@@ -569,8 +578,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   never mutates the old one, and takes every roll from `rng` (asserted). The
   engine never imports it. **Opponents are built by `opponent()` only** - their
   game movesets, their stage at the solved level, and past Lv 100 training
-  (`effort`); a player's Pokémon never has effort, and a tier, size or alpha
-  changes no stat. **Nothing on the League ladder is typed**: caps, intended
+  (`effort`); a player's Pokémon never has effort, and a size changes no
+  stat. **A rare form and an alpha carry League perks** (`perks.js`, no cost,
+  stacking; your call 2026-10-02), folded in by `playerFighter` alone
+  (`withPerks`): never an opponent's, never ranked's, and a perk's extra roll
+  is drawn only by a fighter that has one, so every recorded battle replays.
+  `perks.js` imports no League data - the Box and Rare forms read it. **Nothing on the League ladder is typed**: caps, intended
   levels, prizes and the rematch clock are derived in `tools/league-sim.mjs`
   and every level is solved by `npm run gyms`; any change to the rules, the
   rosters or the economy means re-running it (check.mjs says so). AI 3 stays

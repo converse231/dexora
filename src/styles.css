@@ -17,11 +17,13 @@
   --glow: rgba(255, 255, 255, .85); --glass: rgba(255, 255, 255, .84);
   --good: #1f9a5a; --bad: #d0453c; --ready: #d8a13a; --ready-ink: #9a6a12;
   color-scheme: light;
-  --display: "Rubik", "Segoe UI", system-ui, sans-serif;
-  --body: "Rubik", "Segoe UI", system-ui, sans-serif;
+  /* "Symbols" draws the marks Rubik has no glyph for (tools/build_symbols.py):
+     each one sent a phone to its system fonts mid-layout. */
+  --display: "Rubik", "Symbols", "Segoe UI", system-ui, sans-serif;
+  --body: "Rubik", "Symbols", "Segoe UI", system-ui, sans-serif;
   /* The label-and-number face. It was a pixel font; the name stayed so every
      rule using it (and check.mjs's floor on them) still reads it. */
-  --pixel: "Chakra Petch", "Rubik", system-ui, sans-serif;
+  --pixel: "Chakra Petch", "Rubik", "Symbols", system-ui, sans-serif;
 
   /* Must match T in game/engine.js. */
   --t-throw: 560ms;
@@ -5977,6 +5979,7 @@ button:disabled { transition: none; }
 .tc-edit { display: grid; gap: 12px; }
 /* No max-height: the page is the one scroll (a scroll in a scroll fought the thumb). */
 .tc-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; padding: 2px; }
+.pk-more { grid-column: 1 / -1; height: 1px; }
 .tc-mon {
   position: relative; aspect-ratio: 1; padding: 4px; cursor: pointer;
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
@@ -6513,6 +6516,9 @@ button:disabled { transition: none; }
   margin: 6px 2px -4px; font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--ink);
 }
 .lg-list { display: grid; gap: 12px; }
+/* A region is 13 cards and a phone shows two: the rest are skipped until
+   scrolled near (opening Battles was 170ms of style and layout at 4x). */
+.lg-list > .lg-card { content-visibility: auto; contain-intrinsic-size: auto 400px; }
 @media (min-width: 820px) { .lg-list { grid-template-columns: 1fr 1fr; align-items: start; } }
 
 /* ---- an opponent: portrait, who, the facts, their team, and one button.
@@ -8486,3 +8492,7 @@ body.fighting .topbar { display: none; }
   .ballwrap .ballrail .br-ball img { width: 30px; height: 30px; }
   .ballwrap.fighting { bottom: 72px; }
 }
+/* A rare form's or an alpha's League perk (perks.js): a line of words, in the
+   form's guide and the Box preview. */
+.vr-perk, .pv-perk { display: block; font: 600 11px var(--pixel); color: var(--accent); line-height: 1.35; }
+.pv-perk { margin-top: 6px; font-size: 12px; }

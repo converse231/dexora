@@ -13,7 +13,7 @@
    forms, alphas, legendaries, a type, and "not in my Pokedex" or "they don't
    have" when the caller can answer it). Nothing here decides what may be
    traded - the caller passes only what may. */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIES } from "../../data/dex.js";
 import { speciesById, isLegendary, TIERS } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
@@ -31,6 +31,10 @@ const groupOf = (m) => `${m.species}:${tierOf(m) ?? ""}:${m.alpha ? 1 : 0}`;
 const TYPE_LIST = [...new Set(SPECIES.flatMap((sp) => sp.types))].sort();
 // Rarest first means TIERS order; an ordinary one sorts after every tier.
 const rank = (m) => { const t = tierOf(m); return (t ? TIERS.indexOf(t) : TIERS.length) - (m.alpha ? 0.5 : 0); };
+/* TILES ARRIVE A PAGE AT A TIME, as the end of the grid scrolls near. A
+   collector's 600-Pokemon box built every tile, sprite and tier layer at
+   once: the League's team pick blocked a 4x-throttled phone for a second. */
+const PAGE = 48;
 
 const SORTS = {
   dex: (a, b) => a.species - b.species || rank(a) - rank(b),
@@ -84,6 +88,16 @@ export default function Picker({
       return true;
     }).sort(SORTS[sort] ?? SORTS.dex);
   }, [groups, q, type, only, sort, missing]);
+  const [upTo, setUpTo] = useState(PAGE);
+  useEffect(() => setUpTo(PAGE), [q, type, only, sort]);
+  const more = useRef(null);
+  useEffect(() => {
+    const el = more.current;
+    if (!el) return undefined;
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setUpTo((n) => n + PAGE), { rootMargin: "600px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [upTo, shown.length]);
 
   const pickedSet = useMemo(() => new Set(picked), [picked]);
   const byKey = useMemo(() => new Map(mons.map((m) => [keyFn(m), m])), [mons, keyFn]);
@@ -146,7 +160,7 @@ export default function Picker({
       )}
       {shown.length ? (
         <div className="tc-pick">
-          {shown.map((g) => {
+          {shown.slice(0, upTo).map((g) => {
             const sp = speciesById(g.species);
             const took = g.members.filter((m) => pickedSet.has(keyFn(m))).length;
             const full = !single && (took === g.members.length || capped(g.species));
@@ -166,6 +180,7 @@ export default function Picker({
               </button>
             );
           })}
+          {upTo < shown.length && <i ref={more} className="pk-more" aria-hidden="true" />}
         </div>
       ) : <p className="ev-quiet">Nothing matches.</p>}
     </div>
