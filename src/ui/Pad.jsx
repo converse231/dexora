@@ -89,7 +89,7 @@ const DIRS = [
 ];
 
 export default function Pad({
-  engine, state, enc, level, onBag, onPickBall, bagOpen, ride = null,
+  engine, state, enc, level, onBag, onPickBall, bagOpen, ride = null, onRotom = null, rotomOpen = false,
   order = [],
 }) {
   // Before the early return: a hook after one is a hook that does not always run.
@@ -188,6 +188,19 @@ export default function Pad({
             <img src="items/poke-ball.png" alt="" />
             <i>BAG</i>
           </button>
+          {/* ROTOM: the Dex, Box, Shop, Map and Events, as a sheet over the
+              game - the phone's way to the panel a desktop docks beside it. */}
+          {onRotom && (
+            <button
+              type="button"
+              className={`pad-s pad-rotom${rotomOpen ? " on" : ""}`}
+              aria-label={rotomOpen ? "Close Rotom" : "Open Rotom: Dex, Box, Shop, Map, Events"}
+              aria-expanded={rotomOpen}
+              {...tap(onRotom)}
+            >
+              <i>ROTOM</i>
+            </button>
+          )}
         </div>
 
         <div className="pad-face">

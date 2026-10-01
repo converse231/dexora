@@ -247,7 +247,7 @@ export default function Settings({ account, onClose }) {
             ["Email", account.email],
             ["Pokédex", `${account.caught} caught`],
           ]}
-          note="Everything goes: your Pokédex, your box, your name. There is no undo and no copy kept. Export your save from the YOU tab first if you want one."
+          note="Everything goes: your Pokédex, your box, your name. There is no undo and no copy kept. Export your save from You first if you want one."
           typeToConfirm={account.name}
           confirmLabel="DELETE FOREVER"
           onCancel={() => setKilling(false)}

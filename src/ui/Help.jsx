@@ -48,6 +48,7 @@ const TOUCH = [
   [["A"], "Throw a ball, cast a rod, or ride out onto lava."],
   [["A", "HOLD"], "Pick which ball to throw."],
   [["BAG"], "Berries in a battle, repels and honey on the map."],
+  [["ROTOM"], "The Dex, Box, Shop, Map and Events, over the game."],
   [["SURF"], "The prompt at a shoreline rides out onto the water."],
 ];
 
@@ -147,7 +148,7 @@ export default function Help({ onClose }) {
           <h4>Trading</h4>
           <ul className="vr-notes">
             <li>
-              <b>The Trade Center</b> is in the menu once you are signed in.
+              <b>Trade</b> is a tab of its own once you are signed in.
               Find trainers by name, add friends with a friend code, and put
               up to {LIMITS.SHELF} Pokémon up for trade on your card.
             </li>
@@ -184,7 +185,7 @@ export default function Help({ onClose }) {
           <h4>Pokémon League</h4>
           <ul className="vr-notes">
             <li>
-              <b>The League</b> is in the menu. Each region&rsquo;s gyms open
+              <b>The League</b> is under Battles. Each region&rsquo;s gyms open
               one at a time, in their games&rsquo; order, and inside a gym you
               beat its trainers one by one before its leader will battle you.
               All of a region&rsquo;s badges open its Elite Four, one at a time,

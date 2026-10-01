@@ -1,6 +1,5 @@
-Copyright 2026 The Geist Project Authors (https://github.com/vercel/geist-font)   - geist-pixel.woff2
-Copyright 2016 The Fredoka Project Authors (https://github.com/hafontia/Fredoka-One) - fredoka.woff2
-Copyright 2016 The Nunito Sans Project Authors (https://github.com/Fonthausen/NunitoSans) - nunito-sans.woff2
+Copyright 2020 The Rubik Project Authors (https://github.com/googlefonts/rubik) - rubik.woff2
+Copyright 2018 The Chakra Petch Project Authors (https://github.com/m4rc1e/Chakra-Petch) - chakra-petch-500/600/700.woff2
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

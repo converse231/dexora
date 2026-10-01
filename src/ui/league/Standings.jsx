@@ -103,7 +103,7 @@ export function Standings({ me }) {
       ) : list === null ? <p className="ev-quiet">Loading…</p> : !list.length ? (
         <p className="ev-quiet">{view === "top"
           ? `Nobody has finished placement yet - ${PLACEMENT} battles puts you on the list.`
-          : "Add friends in the Trade Center to see where they stand."}</p>
+          : "Add friends in Trade to see where they stand."}</p>
       ) : (
         <ol className="rk-list">
           {list.map((e, k) => (

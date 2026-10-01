@@ -482,7 +482,7 @@ export default function TradeCenter({
                   ))}
                 </ul>
               )
-              : <p className="ev-quiet">No friends yet. Share your code from your profile (tap your name up top), or add theirs above.</p>}
+              : <p className="ev-quiet">No friends yet. Share your code from your trainer card (You › Your trainer card), or add theirs above.</p>}
           {sent.length > 0 && <p className="ev-quiet">Waiting on {sent.map((f) => f.card.username).join(", ")}.</p>}
         </section>
 
@@ -518,15 +518,19 @@ export default function TradeCenter({
      does), the tabs go to the game. It was a second "‹ Back" in the body,
      drawn centred by the grid it sat in, under the header's own "‹ Game". */
   return (
-    <div className="tc-page evcard" role="dialog" aria-modal="true" aria-label="Trade Center" ref={page}>
+    <div className={`tc-page evcard${signedIn && !closed && !stacked && !profile ? "" : " sub"}`} role="dialog" aria-modal="true" aria-label="Trade Center" ref={page}>
       <header className="tc-head" ref={head}>
         <div className="tc-bar">
-          <button type="button" className="tc-home" onClick={stacked ? back : onClose}
-            aria-label={stacked ? "Back" : "Back to the game"}>
-            <span aria-hidden="true">‹</span> {stacked ? "Back" : "Game"}
-          </button>
+          {/* The tabs leave the page now; this is the Back for a stacked view,
+              and for your card, which you reached from You. */}
+          {(stacked || profile) && (
+            <button type="button" className="tc-home" onClick={stacked ? back : onClose}
+              aria-label={stacked ? "Back" : "Back to You"}>
+              <span aria-hidden="true">‹</span> Back
+            </button>
+          )}
           <div className="tc-titles">
-            <h3>{profile ? "Your profile" : "Trade Center"}</h3>
+            <h3>{profile ? "Your trainer card" : "Trade"}</h3>
             <span>{profile ? "Your trainer card: what other trainers see" : "Trainers, offers, the board and Surprise Trade"}</span>
           </div>
         </div>

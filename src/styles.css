@@ -1,20 +1,27 @@
 :root {
-  --paper: #f4f8ef; --surface: #fff; --surface-2: #e9f1e3;
-  --ink: #253a2e; --ink-soft: #5f7566; --ink-faint: #8ca091;
-  --line: #d6e2ce; --line-firm: #b9ccb0;
-  --canopy: #2f6b4c; --path: #a4695e; --path-soft: #f0ddd6;
-  --sand: #e5d5a2; --gold: #b4741a;
+  /* ROTOM, DAY (2026-10-01): frosted white over a pale sky. Night is the
+     default ground and lives in the dark block at the end of this file. */
+  --paper: #e8eef8; --surface: #fff; --surface-2: #eef2fa;
+  --ink: #16203a; --ink-soft: #4a5576; --ink-faint: #5f6a8c;
+  --line: #d8e0ef; --line-firm: #c3cde3;
+  --canopy: #2a6fe0; --path: #1b8fcf; --path-soft: #dff3fc;
+  --sand: #f3e6c4; --gold: #b8750e;
+  /* The one primary action a screen has (Throw, Battle, Trade): orange. */
+  --cta: linear-gradient(180deg, #ff9d52, #ff6a2b); --cta-glow: rgba(255, 110, 45, .35);
+  --accent: #1f9fd6; --violet: #7a4ce0;
   /* NAMED, NOT TYPED: every colour that has to change at night is a token,
      redefined once under `[data-theme="dark"]` at the end of this file. */
-  --shadow: rgba(47, 107, 76, .3); --shadow-soft: rgba(47, 107, 76, .2);
-  --scrim: rgba(26, 48, 36, .5);
-  --gold-soft: #fdf6e4; --canopy-soft: #f2f9f0;
-  --glow: rgba(255, 255, 255, .85); --glass: rgba(255, 255, 255, .86);
-  --good: #2f8b52; --bad: #b5483c; --ready: #d8a13a; --ready-ink: #9a6a12;
+  --shadow: rgba(30, 50, 100, .22); --shadow-soft: rgba(30, 50, 100, .12);
+  --scrim: rgba(10, 15, 30, .5);
+  --gold-soft: #fff4dc; --canopy-soft: #e6efff;
+  --glow: rgba(255, 255, 255, .85); --glass: rgba(255, 255, 255, .84);
+  --good: #1f9a5a; --bad: #d0453c; --ready: #d8a13a; --ready-ink: #9a6a12;
   color-scheme: light;
-  --display: "Fredoka", "Trebuchet MS", sans-serif;
-  --body: "Nunito Sans", "Segoe UI", system-ui, sans-serif;
-  --pixel: "Pixel", "Courier New", monospace;
+  --display: "Rubik", "Segoe UI", system-ui, sans-serif;
+  --body: "Rubik", "Segoe UI", system-ui, sans-serif;
+  /* The label-and-number face. It was a pixel font; the name stayed so every
+     rule using it (and check.mjs's floor on them) still reads it. */
+  --pixel: "Chakra Petch", "Rubik", system-ui, sans-serif;
 
   /* Must match T in game/engine.js. */
   --t-throw: 560ms;
@@ -61,15 +68,15 @@ body {
 .topbar {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 11px 15px; margin-bottom: 12px;
-  background: var(--surface); border: 2px solid var(--line-firm);
-  border-radius: 12px; box-shadow: 0 2px 0 var(--line-firm);
+  background: var(--surface); border: 1px solid var(--line-firm);
+  border-radius: 16px; box-shadow: 0 8px 22px var(--shadow-soft);
   font-family: var(--pixel); font-size: 12.5px; color: var(--ink-soft);
 }
 .tb-brand { display: flex; align-items: center; gap: 10px; }
 /* The name and its Pokedex rank: one button to the profile. */
 .tb-me {
   display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 2px 8px 2px 2px;
-  font: inherit; color: inherit; background: transparent; border: 0; border-radius: 12px;
+  font: inherit; color: inherit; background: transparent; border: 0; border-radius: 16px;
 }
 button.tb-me { cursor: pointer; }
 button.tb-me:hover { background: var(--surface-2); }
@@ -88,7 +95,7 @@ button.tb-me:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px
   position: relative;
   display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
   padding: 2px 14px;
-  border-left: 2px solid var(--line);
+  border-left: 1px solid var(--line);
 }
 .tb-stat:first-child { border-left: 0; }
 .tb-stat i {
@@ -130,7 +137,7 @@ button.tb-me:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px
 .topbar .spacer { flex: 1; }
 .topbar button {
   font-family: var(--pixel); font-size: 10.5px; padding: 8px 12px 7px;
-  border: 2px solid var(--line-firm); border-radius: 8px;
+  border: 1px solid var(--line-firm); border-radius: 10px;
   background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
 }
 .topbar button:hover { border-color: var(--path); color: var(--path); }
@@ -144,7 +151,7 @@ button.tb-me:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px
 .tb-lv {
   display: flex; align-items: center; gap: 8px;
   padding: 3px 11px 2px; border-radius: 999px;
-  border: 2px solid var(--line); background: var(--surface-2);
+  border: 1px solid var(--line); background: var(--surface-2);
 }
 .tb-lv-num { font-family: var(--pixel); font-size: 10px; color: var(--ink-soft); }
 .tb-lv-num b { color: var(--canopy); font-size: 13px; }
@@ -178,8 +185,8 @@ button.tb-me:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px
   max-width: 58%;
   display: flex; flex-direction: column; gap: 3px;
   padding: 9px 14px 8px;
-  background: var(--surface); border: 2px solid var(--line-firm);
-  border-radius: 10px; box-shadow: 0 2px 0 var(--line-firm);
+  background: var(--surface); border: 1px solid var(--line-firm);
+  border-radius: 14px; box-shadow: 0 8px 22px var(--shadow-soft);
   font-family: var(--pixel); font-size: 11px; color: var(--ink);
   pointer-events: none;
 }
@@ -225,8 +232,8 @@ button.tb-me:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px
    a ragged gap under the shorter one. */
 
 .screen {
-  background: var(--surface); border: 2px solid var(--line-firm);
-  border-radius: 14px; padding: 10px; box-shadow: 0 2px 0 var(--line-firm);
+  background: var(--surface); border: 1px solid var(--line-firm);
+  border-radius: 18px; padding: 10px; box-shadow: 0 8px 22px var(--shadow-soft);
 }
 /* HOW TALL THE ENCOUNTER'S TEXTBOX IS, declared once and read twice: the
    textbox sets its own `min-height` from it, and the ball rail's wrap stops
@@ -254,7 +261,7 @@ button.tb-me:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px
 @keyframes rift-breathe { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
 canvas {
   display: block; width: 100%; height: auto;
-  border-radius: 9px; border: 2px solid var(--line-firm);
+  border-radius: 9px; border: 1px solid var(--line-firm);
   background: #79c493; touch-action: none;
   image-rendering: pixelated;
 }
@@ -785,7 +792,7 @@ canvas {
   position: absolute; top: 4%; right: 3%;
   display: grid; gap: 3px; justify-items: center; white-space: nowrap;
   padding: 1.6cqw 2.6cqw 1.4cqw; z-index: 6;
-  background: var(--canopy); color: var(--paper); border-radius: 12px;
+  background: var(--canopy); color: var(--paper); border-radius: 16px;
   box-shadow: 0 4px 0 rgba(20, 50, 34, .35);
   font-family: var(--pixel); font-size: max(9px, 1.7cqw);
   animation: shout-in 420ms cubic-bezier(.2, 1.5, .4, 1) both;
@@ -800,7 +807,7 @@ canvas {
   position: absolute; top: 4%; left: 3%;
   display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
   padding: 8px 13px 7px;
-  background: var(--surface); border: 3px solid var(--canopy);
+  background: var(--surface); border: 1px solid var(--line-firm);
   border-radius: 11px; box-shadow: 0 3px 0 var(--shadow);
 }
 /* CLAMPED, BECAUSE `cqw` HAS NO FLOOR AND A PHONE IS A NARROW CONTAINER.
@@ -1445,7 +1452,7 @@ canvas {
 .textbox {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 2.2cqw 3cqw 2cqw;
-  background: var(--surface); border-top: 4px solid var(--canopy);
+  background: var(--surface); border-top: 1px solid var(--line-firm);
   min-height: var(--tb-h);
   display: grid; grid-template-columns: 1fr auto;
   align-items: center; column-gap: 2.4cqw;
@@ -1481,8 +1488,8 @@ canvas {
    labels but unreadable as body text, so anything you actually read - species
    names, item descriptions - uses the body face instead. */
 .rail {
-  background: var(--surface-2); border: 2px solid var(--line-firm);
-  border-radius: 14px; padding: 12px; box-shadow: 0 2px 0 var(--line-firm);
+  background: var(--surface-2); border: 1px solid var(--line-firm);
+  border-radius: 18px; padding: 12px; box-shadow: 0 8px 22px var(--shadow-soft);
 }
 /* Five tabs in a narrow rail, so each is a glyph over a short label rather than
    a word fighting for width. The badge is the point of the redesign: a count is
@@ -1495,7 +1502,7 @@ canvas {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   font-family: var(--pixel); font-size: 9.5px;
   padding: 8px 2px 7px;
-  border: 2px solid var(--line-firm); border-radius: 11px;
+  border: 1px solid var(--line-firm); border-radius: 11px;
   background: var(--surface); color: var(--ink-faint); cursor: pointer;
 }
 /* The icon is a MASK filled with the tab's own text colour, so it is dark on
@@ -1571,7 +1578,7 @@ canvas {
   grid-template-areas: "glyph main add" "pips pips pips";
   gap: 4px 10px; align-items: center;
   padding: 10px 12px;
-  border-radius: 11px; border: 2px solid var(--line);
+  border-radius: 11px; border: 1px solid var(--line);
   background: var(--surface);
 }
 .trrow.maxed { border-color: var(--canopy); background: var(--canopy-soft); }
@@ -1639,8 +1646,8 @@ canvas {
   width: min(360px, 100%);
   display: grid; gap: 10px; justify-items: start;
   padding: 18px 20px 20px;
-  background: var(--surface); border: 3px solid var(--gold);
-  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
+  background: var(--surface); border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
+  border-radius: 16px; box-shadow: 0 24px 60px var(--shadow);
 }
 .hint-tag {
   font-family: var(--pixel); font-size: 9px;
@@ -1651,7 +1658,7 @@ canvas {
 .hint-go {
   justify-self: stretch; cursor: pointer;
   font-family: var(--pixel); font-size: 11px; padding: 11px 10px 9px;
-  border: 2px solid var(--canopy); border-radius: 10px;
+  border: 2px solid var(--canopy); border-radius: 14px;
   background: var(--canopy); color: var(--surface);
 }
 .hint-go:hover { filter: brightness(1.08); }
@@ -1672,8 +1679,8 @@ canvas {
   width: min(400px, 100%);
   display: grid; gap: 4px;
   padding: 24px 26px 26px;
-  background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 18px; box-shadow: 0 6px 0 var(--shadow);
+  background: var(--surface); border: 1px solid var(--line-firm);
+  border-radius: 18px; box-shadow: 0 24px 60px var(--shadow);
 }
 .gate-brand { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .gate-brand .title { font-family: var(--display); font-size: 22px; font-weight: 600; color: var(--ink); }
@@ -1704,7 +1711,7 @@ canvas {
   width: 100%; box-sizing: border-box;
   padding: 11px 12px; font: inherit; font-size: 16px;
   color: var(--ink); background: var(--surface-2);
-  border: 2px solid var(--line-firm); border-radius: 10px;
+  border: 1px solid var(--line-firm); border-radius: 14px;
 }
 .gate-field input:focus-visible { outline: 2px solid var(--canopy); outline-offset: 1px; }
 
@@ -1760,7 +1767,7 @@ canvas {
   flex: 1; cursor: pointer;
   display: grid; justify-items: center; gap: 6px;
   padding: 14px 10px 11px;
-  border: 2px solid var(--line-firm); border-radius: 12px;
+  border: 1px solid var(--line-firm); border-radius: 16px;
   background: var(--surface-2); color: var(--ink-soft);
   font-family: var(--pixel);
 }
@@ -1874,7 +1881,7 @@ canvas {
   position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
   min-width: 172px; display: grid;
   background: var(--surface); border: 2px solid var(--canopy);
-  border-radius: 11px; box-shadow: 0 5px 0 var(--shadow-soft);
+  border-radius: 11px; box-shadow: 0 24px 60px var(--shadow);
   padding: 5px; gap: 1px;
 }
 /* EVERY PROPERTY NAMED, because `.topbar button` is a class and a type and so
@@ -1911,7 +1918,7 @@ canvas {
 /* Leaving is not destroying - it is the quiet key RESET was - so it is set
    apart by a rule rather than by colour, and only says the word. */
 .tb-pop button.tb-danger {
-  border-top: 2px solid var(--line); margin-top: 3px; padding-top: 10px;
+  border-top: 1px solid var(--line); margin-top: 3px; padding-top: 10px;
   border-radius: 0 0 7px 7px;
 }
 .tb-pop button.tb-danger:hover { color: var(--path); border-top-color: var(--line); }
@@ -1939,7 +1946,7 @@ canvas {
   width: 100%; box-sizing: border-box;
   padding: 9px 10px; font: inherit; font-size: 16px;
   color: var(--ink); background: var(--surface-2);
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
 }
 .cf-type input:focus-visible { outline: 2px solid var(--path); outline-offset: 1px; }
 .cf-yes:disabled { opacity: .4; cursor: default; }
@@ -1983,7 +1990,7 @@ canvas {
 .trkey {
   display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center;
   padding: 9px 12px; border-radius: 11px;
-  border: 2px solid var(--line); background: var(--surface);
+  border: 1px solid var(--line); background: var(--surface);
 }
 .trkey.locked { opacity: .5; }
 .trkey img { width: 30px; height: 30px; image-rendering: pixelated; }
@@ -2009,8 +2016,8 @@ canvas {
   padding: 7px 12px 6px; cursor: pointer;
   font-family: var(--pixel); font-size: 10.5px;
   color: var(--canopy); background: var(--surface);
-  border: 2px solid var(--canopy); border-radius: 10px;
-  box-shadow: 0 2px 0 var(--line-firm);
+  border: 2px solid var(--canopy); border-radius: 14px;
+  box-shadow: 0 8px 22px var(--shadow-soft);
   transition: background 140ms ease, color 140ms ease,
               transform 90ms ease, box-shadow 90ms ease;
 }
@@ -2021,7 +2028,7 @@ canvas {
 .hint-act kbd {
   font-family: var(--pixel); font-size: 9px; line-height: 1;
   padding: 5px 5px 4px; min-width: 9px; text-align: center;
-  border: 2px solid var(--line-firm); border-radius: 6px;
+  border: 1px solid var(--line-firm); border-radius: 6px;
   background: var(--surface-2); color: var(--ink);
 }
 .hint-act:hover { background: var(--canopy); color: #fff; }
@@ -2051,7 +2058,7 @@ canvas {
 .bigbtn {
   display: block; width: 100%; margin-bottom: 10px;
   font-family: var(--pixel); font-size: 12px; padding: 12px 10px 10px;
-  border: 3px solid var(--path); border-radius: 11px;
+  border: 1px solid var(--path); border-radius: 11px;
   background: var(--path); color: #fff6f3; cursor: pointer;
   box-shadow: 0 3px 0 #86524a;
 }
@@ -2139,11 +2146,12 @@ canvas {
    padding, which on the scroller would have been height (see Dex.jsx). */
 .dexgrid-in {
   display: grid;
-  /* As many as fit at >= 76px: FOUR in the desktop's 360px rail and a phone's
-     portrait one, as before - and more when the rail is wide (sideways, a
-     tablet), where a fixed four stretched each tile to 200-270px wide and
-     84px tall. `useRows` reads the resolved count off the computed style. */
-  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  /* As many as fit at >= 68px: FOUR in the Rotom panel (its padding and the
+     scrollbar left 76px room for three) and a phone's portrait sheet - and
+     more when the rail is wide (sideways, a tablet), where a fixed four
+     stretched each tile to 200-270px wide and 84px tall. `useRows` reads
+     the resolved count off the computed style. */
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
   grid-auto-rows: 84px; gap: 7px;
   align-content: start;
 }
@@ -2154,8 +2162,8 @@ canvas {
    geometry from `grid-auto-rows` and `gap` above), so there is nothing
    offscreen to skip. */
 .cell {
-  position: relative; border-radius: 8px;
-  border: 2px solid var(--line-firm); background: var(--surface);
+  position: relative; border-radius: 10px;
+  border: 1px solid var(--line-firm); background: var(--surface);
   display: grid; place-items: center; overflow: hidden;
   padding: 0; cursor: pointer; font: inherit;
 }
@@ -2219,7 +2227,7 @@ canvas {
 .sheet-portrait {
   position: relative; display: block; flex: none;
   width: 96px; height: 96px;
-  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px;
 }
 .cell-no {
   position: absolute; bottom: 2px; right: 4px;
@@ -2271,7 +2279,7 @@ canvas {
   gap: 2px 10px;
   padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 14px;
   background: var(--surface);
 }
 /* A row with spares is what the sell button is for, so mark it. */
@@ -2314,10 +2322,10 @@ canvas {
 .preview {
   width: min(360px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto;
   display: grid; gap: 12px; padding: 16px;
-  background: var(--surface); border: 2px solid var(--canopy); border-radius: 14px;
+  background: var(--surface); border: 2px solid var(--canopy); border-radius: 18px;
 }
 .pv-art {
-  position: relative; display: grid; place-items: center; height: 180px; border-radius: 10px;
+  position: relative; display: grid; place-items: center; height: 180px; border-radius: 14px;
   background: radial-gradient(circle at 50% 60%, var(--glow), transparent 70%);
 }
 .pv-tint { position: absolute; inset: 0; border-radius: inherit; opacity: .2; }
@@ -2358,7 +2366,7 @@ canvas {
    which is what made the card feel like mostly button. */
 .boxrow button {
   font-family: var(--pixel); font-size: 10px; padding: 7px 9px 6px;
-  border: 2px solid var(--line-firm); border-radius: 8px;
+  border: 1px solid var(--line-firm); border-radius: 10px;
   background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
 }
 .boxrow button:hover { border-color: var(--path); color: var(--path); background: var(--surface); }
@@ -2378,8 +2386,8 @@ canvas {
   /* Explicit placement: the button auto-placed into column 1 and stretched. */
   display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto;
   gap: 3px 12px; align-items: center; text-align: left;
-  padding: 10px 12px; border-radius: 10px;
-  background: var(--surface); border: 2px solid var(--line);
+  padding: 10px 12px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--line);
   cursor: pointer; font: inherit;
 }
 .arearow:hover:not(:disabled) { border-color: var(--path); transform: translateY(-1px); }
@@ -2397,7 +2405,7 @@ canvas {
 .arearow em {
   grid-column: 2; grid-row: 1 / span 2; justify-self: end; font-style: normal;
   font-family: var(--pixel); font-size: 10px; color: var(--ink-faint);
-  padding: 7px 9px 6px; border: 2px solid var(--line-firm); border-radius: 8px;
+  padding: 7px 9px 6px; border: 1px solid var(--line-firm); border-radius: 10px;
 }
 .arearow.here em { color: var(--path); border-color: var(--path); }
 
@@ -2419,7 +2427,7 @@ canvas {
 
 .shoprow {
   border-radius: 11px;
-  background: var(--surface); border: 2px solid var(--line);
+  background: var(--surface); border: 1px solid var(--line);
 }
 .shoprow.open { border-color: var(--path); background: var(--path-soft); }
 .shoprow.locked { opacity: .5; }
@@ -2467,7 +2475,7 @@ canvas {
 .sh-buy { display: flex; gap: 5px; padding: 0 9px 9px; }
 .sh-buy button {
   font-family: var(--pixel); font-size: 11px; padding: 10px 8px 8px;
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
   background: var(--surface); color: var(--ink-soft); cursor: pointer;
 }
 .sh-buy button:hover:not(:disabled) { border-color: var(--path); color: var(--path); }
@@ -2481,7 +2489,7 @@ canvas {
   width: 46px; text-align: center;
   font-family: var(--pixel); font-size: 13px;
   font-variant-numeric: tabular-nums;
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
   background: var(--surface); color: var(--ink);
   -moz-appearance: textfield;
 }
@@ -2503,7 +2511,7 @@ canvas {
    needs the rule above it and none of the margin it used to carry. */
 .shop-note {
   font-size: 12.5px; line-height: 1.5; color: var(--ink-faint);
-  margin: 0; padding-top: 8px; border-top: 2px solid var(--line);
+  margin: 0; padding-top: 8px; border-top: 1px solid var(--line);
 }
 
 /* ---------- confirm dialog ----------
@@ -2530,8 +2538,8 @@ canvas {
 .settings {
   width: min(430px, 100%); display: flex; flex-direction: column;
   max-height: min(88vh, 680px);
-  background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
+  background: var(--surface); border: 1px solid var(--line-firm);
+  border-radius: 16px; box-shadow: 0 24px 60px var(--shadow);
   overflow: hidden;
 }
 
@@ -2548,15 +2556,15 @@ canvas {
   grid-template-columns: auto 1fr auto;
   grid-template-areas: "face title x" "face mail x";
   align-items: center;
-  padding: 13px 15px 12px; border-bottom: 2px solid var(--line);
+  padding: 13px 15px 12px; border-bottom: 1px solid var(--line);
 }
 /* NO `overflow: hidden` AND NO NUDGE. Both were here for one commit and both
    are how a sprite gets clipped - the box is sized to hold the art, so there
    is nothing to hide and nothing to pull. 32x38 at --z: 2 inside 46x46. */
 .set-face {
   grid-area: face; display: grid; place-items: center;
-  width: 46px; height: 46px; border-radius: 12px;
-  border: 2px solid var(--line-firm); background: var(--surface-2);
+  width: 46px; height: 46px; border-radius: 16px;
+  border: 1px solid var(--line-firm); background: var(--surface-2);
 }
 .set-face .gate-art { --z: 2; }
 .set-top h3 {
@@ -2573,7 +2581,7 @@ canvas {
   grid-area: x; flex: none; cursor: pointer; line-height: 1;
   width: 30px; height: 30px; display: grid; place-items: center;
   font-size: 13px; color: var(--ink-soft);
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
   background: var(--surface);
   transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
 }
@@ -2592,7 +2600,7 @@ canvas {
 .set-row {
   display: grid; grid-template-columns: max-content 1fr;
   align-items: center; gap: 5px 12px;
-  padding: 11px 0; border-bottom: 2px solid var(--line);
+  padding: 11px 0; border-bottom: 1px solid var(--line);
 }
 .set-row:last-of-type { border-bottom: 0; }
 
@@ -2644,7 +2652,7 @@ canvas {
   flex: 1; min-width: 0; box-sizing: border-box;
   padding: 10px 11px; font: inherit; font-size: 16px;
   color: var(--ink); background: var(--surface);
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
   transition: border-color 140ms ease;
 }
 .set-in::placeholder { color: var(--ink-faint); }
@@ -2660,7 +2668,7 @@ canvas {
   font-family: var(--pixel); font-size: 10px; padding: 9px 13px 7px;
   border: 2px solid var(--canopy); border-radius: 9px;
   background: var(--surface); color: var(--canopy);
-  box-shadow: 0 2px 0 var(--line-firm);
+  box-shadow: 0 8px 22px var(--shadow-soft);
   transition: background 140ms ease, color 140ms ease,
               transform 90ms ease, box-shadow 90ms ease;
 }
@@ -2680,9 +2688,9 @@ canvas {
 .set-char {
   flex: none; cursor: pointer; display: grid; justify-items: center; gap: 4px;
   padding: 9px 14px 7px;
-  border: 2px solid var(--line-firm); border-radius: 12px;
+  border: 1px solid var(--line-firm); border-radius: 16px;
   background: var(--surface);
-  box-shadow: 0 2px 0 var(--line-firm);
+  box-shadow: 0 8px 22px var(--shadow-soft);
   transition: border-color 140ms ease, background 140ms ease,
               transform 90ms ease, box-shadow 90ms ease;
 }
@@ -2703,7 +2711,7 @@ canvas {
 /* QUIET, AND LAST. It was a full-width red button, which gave the rarest
    action in the dialog the loudest thing in it. The weight belongs on the
    confirmation, which asks for the trainer's name to be typed. */
-.set-foot { padding-top: 13px; border-top: 2px solid var(--line); }
+.set-foot { padding-top: 13px; border-top: 1px solid var(--line); }
 .set-kill {
   cursor: pointer; background: none; border: 0; padding: 2px 0;
   font: inherit; font-size: 12.5px; color: var(--ink-faint);
@@ -2745,7 +2753,7 @@ canvas {
 .bag-card {
   width: 100%; max-height: 72vh; overflow-y: auto;
   background: var(--surface);
-  border-top: 3px solid var(--canopy);
+  border-top: 1px solid var(--line-firm);
   border-radius: 18px 18px 0 0;
   padding: 7px 0 max(14px, env(safe-area-inset-bottom));
   animation: bag-up .18s ease-out;
@@ -2785,14 +2793,14 @@ canvas {
   scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
 }
 .bag-row > li { flex: none; scroll-snap-align: center; }
-.bag-kit { padding-top: 10px; border-top: 2px solid var(--line); }
+.bag-kit { padding-top: 10px; border-top: 1px solid var(--line); }
 
 .bag-tile {
   position: relative; cursor: pointer;
   width: 74px; min-height: 84px;
   display: grid; justify-items: center; align-content: start; gap: 2px;
   padding: 8px 4px 6px;
-  border: 2px solid var(--line-firm); border-radius: 12px;
+  border: 1px solid var(--line-firm); border-radius: 16px;
   background: var(--surface-2); color: var(--ink);
 }
 /* Child selectors, one size for both: `.bag-tile img` also matched the jar
@@ -2836,8 +2844,8 @@ canvas {
 .helpcard {
   width: min(430px, 100%); display: flex; flex-direction: column;
   max-height: min(86vh, 660px);
-  background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
+  background: var(--surface); border: 1px solid var(--line-firm);
+  border-radius: 16px; box-shadow: 0 24px 60px var(--shadow);
   overflow: hidden;
 }
 .hp-body { overflow-y: auto; padding: 4px 15px 16px; }
@@ -2855,12 +2863,12 @@ canvas {
    pips, the list and the button. The banner rounds its own corners instead. */
 .ev-card {
   display: grid; gap: 9px; min-width: 0; padding: 0 12px 12px;
-  border: 2px solid var(--line); border-radius: 14px; background: var(--surface);
-  box-shadow: 0 3px 0 var(--shadow-soft);
+  border: 1px solid var(--line); border-radius: 18px; background: var(--surface);
+  box-shadow: 0 8px 22px var(--shadow-soft);
 }
 .ev-banner {
   display: flex; align-items: center; gap: 8px; margin: 0 -12px;
-  padding: 8px 12px; background: var(--surface-2); border-bottom: 2px solid var(--line);
+  padding: 8px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line);
   border-radius: 12px 12px 0 0;
 }
 .ev-banner > img { width: 22px; height: 22px; image-rendering: pixelated; flex: none; }
@@ -2925,7 +2933,7 @@ canvas {
 }
 .ev-drain {
   position: relative; height: 20px; overflow: hidden;
-  border-radius: 10px; background: #efe6fd; border: 1px solid #b89be8;
+  border-radius: 14px; background: #efe6fd; border: 1px solid #b89be8;
 }
 .ev-drain i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #6a2fc0, #3cb8d6); }
 .ev-drain b {
@@ -2969,7 +2977,7 @@ canvas {
 .ev-trophy { display: flex; align-items: center; gap: 12px; }
 .ev-trophy > b {
   flex: none; min-width: 56px; height: 56px; display: grid; place-items: center; padding: 0 8px;
-  font-family: var(--display); font-size: 28px; color: #fff; border-radius: 14px;
+  font-family: var(--display); font-size: 28px; color: #fff; border-radius: 18px;
   background: linear-gradient(160deg, #b3162b, #4a0610); box-shadow: 0 3px 0 #3a0008;
 }
 .ev-trophy span { display: grid; gap: 3px; font-size: 14px; font-weight: 600; color: var(--ink); }
@@ -2983,7 +2991,7 @@ canvas {
 .ev-go {
   width: 100%; min-height: 40px; cursor: pointer;
   font-family: var(--pixel); font-size: 11px;
-  border: 2px solid var(--canopy); border-radius: 10px;
+  border: 2px solid var(--canopy); border-radius: 14px;
   background: var(--canopy); color: #fff; box-shadow: 0 3px 0 var(--shadow);
 }
 .ev-go:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
@@ -2994,13 +3002,13 @@ canvas {
 @media (prefers-reduced-motion: reduce) { .ev-stamp.live { animation: none; } }
 /* WHAT'S NEW: a row per update - its emoji, title and month - that opens to
    one line an item. The open ones get the card's ground. */
-.nw-entry { border-radius: 12px; }
+.nw-entry { border-radius: 16px; }
 .nw-entry + .nw-entry { margin-top: 4px; }
 .nw-entry.open { background: var(--surface-2); padding-bottom: 6px; }
 .nw-head {
   width: 100%; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px;
   font: inherit; color: var(--ink); text-align: left; cursor: pointer;
-  background: transparent; border: 0; border-radius: 12px;
+  background: transparent; border: 0; border-radius: 16px;
 }
 .nw-head:hover { background: var(--surface-2); }
 .nw-head:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
@@ -3045,11 +3053,11 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .hp-list kbd {
   font-family: var(--pixel); font-size: 9px; line-height: 1;
   padding: 5px 5px 4px; min-width: 9px; text-align: center;
-  border: 2px solid var(--line-firm); border-radius: 6px;
+  border: 1px solid var(--line-firm); border-radius: 6px;
   background: var(--surface-2); color: var(--ink);
 }
 .hp-note {
-  margin: 14px 0 0; padding-top: 12px; border-top: 2px solid var(--line);
+  margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line);
   font-size: 12.5px; line-height: 1.5; color: var(--ink-soft);
 }
 
@@ -3063,8 +3071,8 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .varcard {
   width: min(520px, 100%); display: flex; flex-direction: column;
   max-height: min(88vh, 720px);
-  background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
+  background: var(--surface); border: 1px solid var(--line-firm);
+  border-radius: 16px; box-shadow: 0 24px 60px var(--shadow);
   overflow: hidden;
 }
 .vr-body { overflow-y: auto; padding: 4px 15px 16px; }
@@ -3085,7 +3093,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .vr-who {
   display: grid; justify-items: center; gap: 1px; cursor: pointer;
   padding: 5px 7px 4px; border-radius: 9px;
-  border: 2px solid var(--line); background: var(--paper);
+  border: 1px solid var(--line); background: var(--paper);
   transition: border-color 140ms ease, background 140ms ease;
 }
 .vr-who img { width: 30px; height: 30px; object-fit: contain; image-rendering: pixelated; }
@@ -3106,8 +3114,8 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .vr-grid { display: grid; gap: 7px; grid-template-columns: repeat(4, 1fr); }
 .vr-one {
   display: grid; justify-items: center; align-content: start; gap: 3px;
-  padding: 10px 5px 9px; border-radius: 10px;
-  border: 2px solid var(--line); background: var(--paper);
+  padding: 10px 5px 9px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--paper);
 }
 /* The box the moving layers are absolute inside. `Sprite fx` returns a
    `position: relative` span, so this only has to give it a size - and every
@@ -3159,14 +3167,14 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .vr-notes { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
 .vr-notes li {
   font-size: 12.5px; line-height: 1.45; color: var(--ink-soft);
-  padding: 8px 10px; border-radius: 8px; background: var(--surface-2);
+  padding: 8px 10px; border-radius: 10px; background: var(--surface-2);
 }
 .vr-notes b { color: var(--ink); font-weight: 600; }
 
 .confirm {
   width: min(400px, 100%);
-  background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 14px; box-shadow: 0 5px 0 var(--shadow);
+  background: var(--surface); border: 1px solid var(--line-firm);
+  border-radius: 18px; box-shadow: 0 24px 60px var(--shadow);
   padding: 15px 17px 13px;
 }
 .cf-title {
@@ -3207,8 +3215,8 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .cf-pickall button {
   font-family: var(--pixel); font-size: 9px;
   padding: 4px 9px 3px; border-radius: 6px; cursor: pointer;
-  border: 2px solid var(--line); background: var(--paper); color: var(--ink);
-  box-shadow: 0 2px 0 var(--line);
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  box-shadow: 0 8px 22px var(--shadow-soft);
 }
 .cf-pickall button:hover { border-color: var(--path); color: var(--path); }
 .cf-pickall button:active { transform: translateY(2px); box-shadow: none; }
@@ -3271,7 +3279,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
    A card, not a panel: it sits above the trainer's stats on the YOU tab and
    has to read as one thing you can finish rather than as a second screen. */
 .daily {
-  border: 2px solid var(--line-firm); border-radius: 12px;
+  border: 1px solid var(--line-firm); border-radius: 16px;
   padding: 11px 12px 10px; margin-bottom: 12px;
   background: var(--surface);
 }
@@ -3334,7 +3342,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .fieldrow {
   display: flex; align-items: center; gap: 9px; width: 100%;
   padding: 8px 11px; text-align: left; font: inherit; cursor: pointer;
-  border: 2px solid var(--line-firm); border-radius: 10px;
+  border: 1px solid var(--line-firm); border-radius: 14px;
   background: var(--surface);
 }
 .fieldrow img { width: 26px; height: 26px; image-rendering: pixelated; }
@@ -3365,7 +3373,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   display: flex; align-items: center; gap: 8px;
   padding: 9px 11px; margin-bottom: 10px;
   background: var(--candy-soft); border: 1px solid var(--candy);
-  border-radius: 10px;
+  border-radius: 14px;
 }
 /* The real PokeAPI item sprite, at the 30px the shelf icons use. A drawn star
    beside eight photographed item icons read as a placeholder for a sprite that
@@ -3401,12 +3409,12 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 
 .cf-note {
   font-size: 12px; line-height: 1.45; color: var(--ink-soft);
-  margin: 0 0 10px; padding-left: 9px; border-left: 3px solid var(--sand);
+  margin: 0 0 10px; padding-left: 9px; border-left: 0;
 }
 .cf-actions { display: flex; gap: 7px; }
 .cf-actions button {
   flex: 1; font-family: var(--pixel); font-size: 11px; padding: 11px 8px 9px;
-  border: 3px solid var(--line-firm); border-radius: 10px;
+  border: 1px solid var(--line-firm); border-radius: 14px;
   background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
 }
 .cf-yes {
@@ -3453,8 +3461,8 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .sheet-card {
   width: min(500px, 100%); max-height: min(88vh, 760px);
   display: flex; flex-direction: column; overflow: hidden;
-  background: var(--surface); border: 3px solid var(--canopy);
-  border-radius: 16px; box-shadow: 0 6px 0 var(--shadow);
+  background: var(--surface); border: 1px solid var(--line-firm);
+  border-radius: 16px; box-shadow: 0 24px 60px var(--shadow);
   padding: 16px 18px;
 }
 /* The header is the only block on the card that gets to be loud: portrait,
@@ -3471,7 +3479,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   position: relative; flex: none;
   display: flex; align-items: center; gap: 14px;
   padding-bottom: 12px; margin-bottom: 10px;
-  border-bottom: 2px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 /* Room for the close button, so a long name wraps before it reaches it. */
 .sheet-id { flex: 1 1 auto; min-width: 0; padding-right: 36px; }
@@ -3479,7 +3487,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   position: absolute; top: 0; right: 0;
   width: 32px; height: 32px; display: grid; place-items: center; cursor: pointer;
   font-size: 13px; line-height: 1; color: var(--ink-soft);
-  border: 2px solid var(--line-firm); border-radius: 9px; background: var(--surface);
+  border: 1px solid var(--line-firm); border-radius: 9px; background: var(--surface);
 }
 .sheet-x:hover { background: var(--path); border-color: var(--path); color: #fff; }
 /* THE HERO: the header tinted by the Pokemon's first type - the type colours
@@ -3519,11 +3527,11 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .sheet-tabs {
   flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px;
   padding: 3px; margin-bottom: 10px;
-  background: var(--surface-2); border: 2px solid var(--line); border-radius: 11px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px;
 }
 .sheet-tabs button {
   min-height: 40px; display: grid; place-items: center; align-content: center; gap: 2px;
-  padding: 4px 2px; cursor: pointer; border: 0; border-radius: 8px;
+  padding: 4px 2px; cursor: pointer; border: 0; border-radius: 10px;
   background: transparent; color: var(--ink-soft); font: inherit;
 }
 .sheet-tabs button span { font-family: var(--display); font-weight: 600; font-size: 13px; line-height: 1; }
@@ -3617,7 +3625,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .sheet-research li > i {
   width: 16px; height: 16px; display: grid; place-items: center;
   font-style: normal; font-size: 11px; line-height: 1; color: #fff;
-  border: 2px solid var(--line-firm); border-radius: 4px; background: var(--surface);
+  border: 1px solid var(--line-firm); border-radius: 4px; background: var(--surface);
 }
 .sheet-research li.done > i { background: var(--canopy); border-color: var(--canopy); }
 .sheet-research li em { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
@@ -3746,8 +3754,8 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .sf-row { display: grid; gap: 6px; grid-template-columns: repeat(3, 1fr); }
 .sf-one {
   display: grid; justify-items: center; align-content: start; gap: 4px;
-  padding: 10px 6px 9px; border-radius: 10px;
-  border: 2px solid var(--line); background: var(--paper);
+  padding: 10px 6px 9px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--paper);
 }
 .sf-one.got { border-color: var(--path); background: var(--path-soft); cursor: pointer; }
 /* Which one the portrait is currently showing. A held tile is a control now,
@@ -3857,7 +3865,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
      which is the other half of why the button was square. */
   flex: none; white-space: nowrap;
   font-family: var(--pixel); font-size: 9px; padding: 0 14px;
-  border: 2px solid var(--canopy); border-radius: 10px;
+  border: 2px solid var(--canopy); border-radius: 14px;
   background: var(--canopy); color: #f4faf2; cursor: pointer;
 }
 .sheet-inbox:hover { filter: brightness(1.12); }
@@ -3865,7 +3873,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .sheet-close {
   display: block; width: 100%; margin-top: 18px;
   font-family: var(--pixel); font-size: 11px; padding: 12px;
-  border: 3px solid var(--line-firm); border-radius: 11px;
+  border: 1px solid var(--line-firm); border-radius: 11px;
   background: var(--surface-2); color: var(--ink-soft); cursor: pointer;
 }
 .sheet-close:hover { border-color: var(--path); color: var(--path); }
@@ -3884,7 +3892,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 
 .worldclock {
   display: flex; align-items: center; gap: 6px;
-  padding: 5px 10px 4px; border-radius: 8px;
+  padding: 5px 10px 4px; border-radius: 10px;
   background: rgba(18, 26, 16, .62);
   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .35) inset;
   font-family: var(--pixel); font-size: 10.5px; color: #fff;
@@ -3905,7 +3913,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
    version of the thing the scene does at full size. */
 .tb-clock {
   flex: none; display: grid; gap: 1px; padding: 4px 10px 3px;
-  border: 2px solid var(--line-firm); border-radius: 10px;
+  border: 1px solid var(--line-firm); border-radius: 14px;
   background: var(--surface); font-variant-numeric: tabular-nums;
 }
 .tb-clock i {
@@ -3971,7 +3979,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .ms-tab {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
   padding: 5px 11px 4px; cursor: pointer;
-  border: 2px solid var(--line-firm); border-radius: 10px;
+  border: 1px solid var(--line-firm); border-radius: 14px;
   background: var(--surface); color: var(--ink);
 }
 .ms-tab i {
@@ -4002,7 +4010,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .ms-pop {
   position: absolute; top: calc(100% + 7px); left: 0; z-index: 60;
   min-width: 268px; padding: 11px;
-  border: 2px solid var(--line-firm); border-radius: 12px;
+  border: 1px solid var(--line-firm); border-radius: 16px;
   background: var(--surface);
   box-shadow: 0 10px 28px rgba(0, 0, 0, .22);
   animation: ms-drop 130ms ease-out both;
@@ -4080,7 +4088,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   }
   .tb-stat {
     align-items: center; padding: 2px 1px;
-    border-left: 2px solid var(--line);
+    border-left: 1px solid var(--line);
   }
   .tb-stat i { font-size: 9px; letter-spacing: .04em; }
   .tb-stat b { font-size: 13px; gap: 2px; }
@@ -4467,7 +4475,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   position: fixed; z-index: 90; pointer-events: none;
   max-width: 260px; padding: 7px 10px;
   transform: translate(-50%, -100%);
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
   background: var(--ink); color: var(--surface);
   font-size: 12px; line-height: 1.35; text-align: center;
   text-wrap: balance;
@@ -4482,7 +4490,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .tip::after {
   content: ""; position: absolute; left: 50%; width: 9px; height: 9px;
   background: var(--ink);
-  border: 2px solid var(--line-firm);
+  border: 1px solid var(--line-firm);
   border-width: 0 2px 2px 0;
   transform: translate(-50%, -50%) rotate(45deg);
   top: 100%;
@@ -4528,8 +4536,8 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
     -webkit-tap-highlight-color: transparent; touch-action: none;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 1px; cursor: pointer; color: var(--ink-soft);
-    border: 2px solid var(--line-firm); background: var(--surface-2);
-    box-shadow: 0 2px 0 var(--line-firm);
+    border: 1px solid var(--line-firm); background: var(--surface-2);
+    box-shadow: 0 8px 22px var(--shadow-soft);
     font-family: var(--pixel);
   }
   /* The press has to be felt, since there is no hover on the way in: the button
@@ -4552,7 +4560,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   /* The dish the arms meet in - not a control, just the middle of the cross. */
   .pad-hub {
     grid-area: 2 / 2; background: var(--surface-2);
-    border-block: 2px solid var(--line-firm);
+    border-block: 1px solid var(--line-firm);
   }
 
   /* --- actions --- */
@@ -4696,7 +4704,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .note {
   margin: 0 0 8px;
   padding: 7px 11px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--line-firm);
   background: var(--surface-2);
   color: var(--ink-soft);
@@ -4825,7 +4833,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .evo-box {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 1.9cqw 2.6cqw 1.7cqw;
-  background: var(--surface); border-top: 4px solid var(--canopy);
+  background: var(--surface); border-top: 1px solid var(--line-firm);
   min-height: 19%;
 }
 .evo-msg {
@@ -4846,7 +4854,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .evo-go {
   font-family: var(--pixel); font-size: 11px; font-size: max(9px, 1.75cqw);
   padding: 1.1cqw 2.4cqw .9cqw;
-  border: 3px solid var(--path); border-radius: 10px;
+  border: 1px solid var(--path); border-radius: 14px;
   background: var(--path); color: #fff6f3;
   box-shadow: 0 3px 0 #86524a; cursor: pointer;
 }
@@ -4976,7 +4984,7 @@ button:disabled { transition: none; }
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 13px 30px 15px;
   border-radius: 16px;
-  border: 3px solid var(--gold);
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
   background: linear-gradient(#fffdf4, #fdf3dc);
   box-shadow: 0 10px 26px var(--shadow);
   animation: cheer-drop 460ms cubic-bezier(.16, 1.5, .4, 1) both,
@@ -5020,7 +5028,7 @@ button:disabled { transition: none; }
 .cheer-items {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px;
   margin-top: 6px; padding-top: 8px;
-  border-top: 2px solid var(--line);
+  border-top: 1px solid var(--line);
   font-family: var(--pixel); font-size: 10px; color: var(--ink-soft);
 }
 .cheer-items span { display: inline-flex; align-items: center; gap: .6ch; }
@@ -5204,7 +5212,7 @@ button:disabled { transition: none; }
 .rift-ring.open { --rc: var(--gold); }
 .rift-ring.open img { opacity: 1; }
 .rift-ring b {
-  position: absolute; right: -6px; bottom: -4px; min-width: 22px; padding: 2px 4px 1px; border-radius: 8px;
+  position: absolute; right: -6px; bottom: -4px; min-width: 22px; padding: 2px 4px 1px; border-radius: 10px;
   font-family: var(--pixel); font-size: 9px; font-weight: 400; line-height: 1; color: #fff; text-align: center;
   background: rgba(18, 26, 16, .92); box-shadow: 0 0 0 1.5px var(--gold) inset;
 }
@@ -5293,7 +5301,7 @@ button:disabled { transition: none; }
 .filterbar input {
   width: 100%; padding: 10px 12px;
   font: inherit; font-size: 13px;
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
   background: var(--surface); color: var(--ink);
 }
 .filterbar input::placeholder { color: var(--ink-faint); }
@@ -5305,7 +5313,7 @@ button:disabled { transition: none; }
 .fb-find input { flex: 1; min-width: 0; }
 .fb-clear {
   flex: 0 0 auto; font-family: var(--pixel); font-size: 9px;
-  padding: 0 11px; border: 2px solid var(--line-firm); border-radius: 9px;
+  padding: 0 11px; border: 1px solid var(--line-firm); border-radius: 9px;
   background: var(--surface); color: var(--ink-faint); cursor: pointer;
 }
 .fb-clear:hover { border-color: var(--path); color: var(--path); }
@@ -5330,7 +5338,7 @@ button:disabled { transition: none; }
 .fb-topen {
   display: flex; align-items: center; gap: 5px;
   height: 100%; padding: 6px 7px; cursor: pointer;
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
   background: var(--paper); font: inherit;
 }
 .fb-topen:hover { border-color: var(--canopy); }
@@ -5354,8 +5362,8 @@ button:disabled { transition: none; }
      separate box landing on top of it. The cap only bites somewhere wider. */
   min-width: 100%; max-width: 300px; width: max-content;
   display: flex; flex-wrap: wrap; gap: 4px;
-  padding: 8px; border-radius: 10px;
-  border: 2px solid var(--line-firm); background: var(--paper);
+  padding: 8px; border-radius: 14px;
+  border: 1px solid var(--line-firm); background: var(--paper);
   box-shadow: 0 10px 24px rgba(0, 0, 0, .2);
 }
 .fb-tmenu .type {
@@ -5391,7 +5399,7 @@ button:disabled { transition: none; }
   width: 100%;
   font-family: var(--body); font-size: 12px; color: var(--ink);
   padding: 7px 22px 7px 9px;
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
   background: var(--surface);
   /* The native arrow cannot be styled, so it is replaced by a drawn one. Two
      gradients rather than an SVG data URI: fewer bytes and no escaping. */
@@ -5414,7 +5422,7 @@ button:disabled { transition: none; }
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: .5cqw; padding: 1.4cqw 2.6cqw 1.1cqw;
   font-family: var(--pixel); font-size: max(9px, 1.7cqw);
-  border: 3px solid var(--line-firm); border-radius: 11px;
+  border: 1px solid var(--line-firm); border-radius: 11px;
   background: var(--surface); color: var(--ink-soft); cursor: pointer;
 }
 .runbtn:hover { border-color: var(--path); color: var(--path); }
@@ -5438,8 +5446,8 @@ button:disabled { transition: none; }
   z-index: 11; display: flex; align-items: baseline; gap: .8cqw;
   padding: .7cqw 1.4cqw .6cqw;
   background: var(--glass);
-  border: 2px solid var(--line-firm); border-radius: 11px;
-  box-shadow: 0 2px 0 var(--line-firm);
+  border: 1px solid var(--line-firm); border-radius: 11px;
+  box-shadow: 0 8px 22px var(--shadow-soft);
   font-family: var(--pixel); white-space: nowrap;
   animation: cheer-drop 260ms cubic-bezier(.2, 1.4, .4, 1) both;
 }
@@ -5542,8 +5550,8 @@ button:disabled { transition: none; }
   display: flex; flex-direction: row; align-items: center; gap: 0;
   padding: .55cqw .7cqw; pointer-events: auto;
   background: var(--glass);
-  border: 2px solid var(--line-firm); border-radius: 13px;
-  box-shadow: 0 2px 0 var(--line-firm);
+  border: 1px solid var(--line-firm); border-radius: 13px;
+  box-shadow: 0 8px 22px var(--shadow-soft);
 }
 
 /* Collapsed, the rail is only this: one ball and the total, which is the
@@ -5551,7 +5559,7 @@ button:disabled { transition: none; }
 .br-tab {
   display: flex; align-items: center; justify-content: center; gap: .5cqw;
   flex: none;
-  padding: .25cqw .55cqw .35cqw; border: 0; border-radius: 8px;
+  padding: .25cqw .55cqw .35cqw; border: 0; border-radius: 10px;
   border-bottom: 2px solid transparent; transition: border-color .22s ease;
   background: transparent; cursor: pointer; font-family: var(--pixel);
 }
@@ -5564,7 +5572,7 @@ button:disabled { transition: none; }
 /* A rule to the RIGHT of the tab now rather than under it: the total heads the
    strip from its near end, which is the same relationship turned 90 degrees. */
 .ballrail:not(.shut) .br-tab {
-  border-bottom-color: transparent; border-right: 2px solid var(--line);
+  border-bottom-color: transparent; border-right: 1px solid var(--line);
   padding-right: .6cqw; margin-right: .2cqw;
 }
 .br-tab img { width: 3.2cqw; min-width: 15px; image-rendering: pixelated; }
@@ -5815,7 +5823,7 @@ button:disabled { transition: none; }
   /* The map grows with the column, so without this a wide window makes it
      taller than the screen and the whole page scrolls. Cap its width by what is
      left of the viewport height, using the canvas's own 15:11 ratio. */
-  .viewport { max-width: calc((100vh - 210px) * var(--cols, 15) / 11); margin-inline: auto; }
+  .viewport { max-width: calc((100vh - 170px) * var(--cols, 15) / 11); margin-inline: auto; }
   /* `align-items: stretch` equalises the two columns to the TALLER one, and the
      rail's natural height is its whole list - so stretching made the map grow
      to match the box rather than the other way round, and the page scrolled.
@@ -5910,13 +5918,13 @@ button:disabled { transition: none; }
 }
 .tc-head {
   position: sticky; top: 0; z-index: 3;
-  background: var(--surface); border-bottom: 2px solid var(--line); box-shadow: 0 2px 0 var(--shadow-soft);
+  background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: 0 8px 22px var(--shadow-soft);
 }
 .tc-bar { display: flex; align-items: center; gap: 12px; max-width: 760px; margin: 0 auto; padding: 10px 16px; }
 .tc-home {
   flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 7px 12px; cursor: pointer;
   font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-soft);
-  background: var(--surface); border: 2px solid var(--line-firm); border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line-firm); border-radius: 14px;
 }
 .tc-home span { font-size: 18px; line-height: .8; }
 .tc-home:hover { border-color: var(--canopy); color: var(--canopy); }
@@ -5936,7 +5944,7 @@ button:disabled { transition: none; }
 .tc-list { display: grid; gap: 12px; }
 .tc-input {
   width: 100%; min-width: 0; font: inherit; font-size: 14px; padding: 9px 11px;
-  color: var(--ink); background: var(--surface); border: 2px solid var(--line-firm); border-radius: 10px;
+  color: var(--ink); background: var(--surface); border: 1px solid var(--line-firm); border-radius: 14px;
 }
 .tc-input:focus { outline: none; border-color: var(--canopy); }
 .tc-code { display: flex; gap: 8px; }
@@ -5950,7 +5958,7 @@ button:disabled { transition: none; }
 .tc-who {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left;
   padding: 6px 10px; cursor: pointer; font: inherit; color: inherit;
-  background: var(--surface-2); border: 2px solid var(--line); border-radius: 11px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px;
 }
 .tc-who:hover { border-color: var(--canopy); }
 .tc-who span { display: grid; min-width: 0; }
@@ -5958,8 +5966,8 @@ button:disabled { transition: none; }
 .tc-who i { font-style: normal; font-size: 11.5px; color: var(--ink-faint); }
 .tc-art.gate-art { --z: 2; flex: none; }
 .tc-yes, .tc-no {
-  flex: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; font-size: 15px;
-  border: 2px solid var(--line-firm); background: var(--surface); color: var(--ink-soft);
+  flex: none; width: 36px; height: 36px; border-radius: 14px; cursor: pointer; font-size: 15px;
+  border: 1px solid var(--line-firm); background: var(--surface); color: var(--ink-soft);
 }
 .tc-yes { border-color: var(--canopy); background: var(--canopy); color: #fff; }
 .tc-no:hover { border-color: var(--bad); color: var(--bad); }
@@ -5971,7 +5979,7 @@ button:disabled { transition: none; }
 .tc-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; padding: 2px; }
 .tc-mon {
   position: relative; aspect-ratio: 1; padding: 4px; cursor: pointer;
-  background: var(--surface-2); border: 2px solid var(--line); border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
 }
 .tc-mon > img, .tc-mon > .sprite-fx, .tc-mon > .sprite-showdown {
   width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;
@@ -5988,14 +5996,14 @@ button:disabled { transition: none; }
 .tp { display: grid; gap: 12px; }
 .tp-hero {
   position: relative; display: flex; align-items: center; gap: 14px; padding: 14px;
-  border-radius: 14px; border: 2px solid var(--line);
+  border-radius: 18px; border: 1px solid var(--line);
   background: linear-gradient(135deg, var(--canopy-soft), var(--surface-2) 70%);
 }
 .tp-hero.ch-leaf { background: linear-gradient(135deg, var(--path-soft), var(--surface-2) 70%); }
 .tp-art-frame {
   flex: none; width: 76px; height: 76px; display: grid; place-items: center; border-radius: 50%;
   background: radial-gradient(circle at 50% 70%, var(--glow), transparent 70%), var(--surface);
-  border: 3px solid var(--canopy); box-shadow: 0 3px 0 var(--shadow-soft);
+  border: 1px solid var(--line-firm); box-shadow: 0 8px 22px var(--shadow-soft);
 }
 .tp-art.gate-art { --z: 3; }
 .tp-id { display: grid; gap: 3px; min-width: 0; }
@@ -6026,7 +6034,7 @@ button:disabled { transition: none; }
   flex: 1 1 0; min-width: 0;
   display: grid; justify-items: center; padding: 5px 4px;
   font-size: 10.5px; color: var(--ink-faint);
-  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
 }
 .tp-stats b { font-family: var(--display); font-size: 16px; color: var(--ink); line-height: 1.1; }
 .tp-ring {
@@ -6042,7 +6050,7 @@ button:disabled { transition: none; }
 .tp-show { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .tp-slot {
   position: relative; margin: 0; display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px;
-  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px; min-width: 0;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; min-width: 0;
 }
 .tp-slot > img, .tp-slot > .sprite-fx { width: 68px; height: 68px; object-fit: contain; image-rendering: pixelated; }
 .tp-slot > .sprite-showdown { width: calc(68px * .77); height: calc(68px * .77); margin: 7.8px; }
@@ -6089,20 +6097,20 @@ button:disabled { transition: none; }
 .tp-actions .ev-go { flex: 1 1 auto; }
 .tp-quiet {
   padding: 8px 12px; cursor: pointer; font: inherit; font-size: 13px; color: var(--ink-soft);
-  background: var(--surface); border: 2px solid var(--line-firm); border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line-firm); border-radius: 14px;
 }
 .tp-quiet:hover { border-color: var(--canopy); color: var(--canopy); }
 .tp-quiet.danger:hover { border-color: var(--bad); color: var(--bad); }
 .tp-badge {
   padding: 8px 12px; font-size: 13px; font-weight: 700; color: var(--canopy);
-  background: var(--canopy-soft); border-radius: 10px;
+  background: var(--canopy-soft); border-radius: 14px;
 }
 /* Block and report: quiet, last, and asked twice. */
 .tp-safety { display: flex; justify-content: flex-end; gap: 8px; }
 .tp-safety .tp-quiet { padding: 5px 10px; font-size: 12px; }
 .tp-ask {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px;
-  border: 2px solid var(--line-firm); border-radius: 12px; background: var(--surface);
+  border: 1px solid var(--line-firm); border-radius: 16px; background: var(--surface);
 }
 .tp-ask p { flex: 1 1 100%; margin: 0; font-size: 13px; }
 /* The confirming press is red before any hover - a phone has none. */
@@ -6125,7 +6133,7 @@ button:disabled { transition: none; }
 .tp-shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; }
 .of-mon {
   position: relative; display: inline-grid; place-items: center; width: 46px; height: 46px;
-  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
 }
 .of-mon > img, .of-mon > .sprite-fx { width: 42px; height: 42px; object-fit: contain; image-rendering: pixelated; }
 .of-mon > .sprite-showdown { width: calc(42px * .77); height: calc(42px * .77); }
@@ -6136,7 +6144,7 @@ button:disabled { transition: none; }
 }
 .of-mon .tp-tier { top: 2px; left: 2px; }
 .of-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.of-card { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: var(--surface-2); border: 2px solid var(--line); }
+.of-card { display: grid; gap: 8px; padding: 10px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); }
 .of-card.done { gap: 6px; padding: 8px 10px; }
 .evcard .of-card p { margin: 0; }
 .of-who { font-size: 13px; color: var(--ink-soft); }
@@ -6162,7 +6170,7 @@ button:disabled { transition: none; }
 .of-deal .tx-swap { align-self: center; }
 .of-half {
   display: grid; align-content: start; gap: 6px; padding: 8px; min-width: 0;
-  border-radius: 12px; background: var(--surface); border: 2px solid var(--line);
+  border-radius: 16px; background: var(--surface); border: 1px solid var(--line);
 }
 .of-half.get { border-color: var(--canopy); background: var(--canopy-soft); }
 .of-label {
@@ -6173,7 +6181,7 @@ button:disabled { transition: none; }
 .of-mons { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
 .of-big {
   position: relative; margin: 0; min-width: 0; display: grid; justify-items: center; gap: 1px; padding: 6px 4px 5px;
-  border-radius: 10px; background: var(--surface-2); border: 2px solid var(--line);
+  border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line);
 }
 .of-big > img, .of-big > .sprite-fx { width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; }
 .of-big > .sprite-showdown { width: calc(64px * .77); height: calc(64px * .77); margin: 7.4px; }
@@ -6342,7 +6350,7 @@ button:disabled { transition: none; }
 .ev-surprise .ev-banner { background: linear-gradient(90deg, #dff1f8, #eef7fb); border-color: #bfe0ec; }
 .tc-send {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 12px; background: var(--canopy-soft); border: 2px solid var(--canopy);
+  padding: 8px 10px; border-radius: 16px; background: var(--canopy-soft); border: 2px solid var(--canopy);
 }
 .tc-send > img, .tc-send > .sprite-fx { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; }
 .tc-send > .sprite-showdown { width: calc(56px * .77); height: calc(56px * .77); margin: 6.4px; }
@@ -6358,19 +6366,19 @@ button:disabled { transition: none; }
 .pk-bar { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; }
 .pk-sel {
   min-width: 0; font: inherit; font-size: 13px; padding: 8px 6px; color: var(--ink);
-  background: var(--surface); border: 2px solid var(--line-firm); border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line-firm); border-radius: 14px;
 }
 .pk-sel:focus { outline: none; border-color: var(--canopy); }
 .pk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .pk-tray {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px;
-  border-radius: 10px; background: var(--canopy-soft); border: 2px solid var(--canopy);
+  border-radius: 14px; background: var(--canopy-soft); border: 2px solid var(--canopy);
 }
 .pk-count { font-family: var(--pixel); font-size: 10px; color: var(--canopy); padding: 0 4px; }
 .pk-took {
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 2px; cursor: pointer;
   font: inherit; font-size: 12px; color: var(--ink); background: var(--surface);
-  border: 2px solid var(--line-firm); border-radius: 9px;
+  border: 1px solid var(--line-firm); border-radius: 9px;
 }
 .pk-took > img { width: 30px; height: 30px; image-rendering: pixelated; }
 .pk-took > .sprite-showdown { width: calc(30px * .77); height: calc(30px * .77); margin: 3.4px; }
@@ -6388,14 +6396,14 @@ button:disabled { transition: none; }
 /* THE ACTION THAT FINISHES A LONG PAGE stays in reach at its bottom. */
 .tc-dock {
   position: sticky; bottom: 0; z-index: 2; margin: 0 -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  background: var(--paper); border-top: 2px solid var(--line); box-shadow: 0 -2px 0 var(--shadow-soft);
+  background: var(--paper); border-top: 1px solid var(--line); box-shadow: 0 -2px 0 var(--shadow-soft);
 }
-.tc-send.tc-dock { margin: 8px 0 0; border-radius: 12px; box-shadow: 0 -4px 12px var(--shadow-soft); }
+.tc-send.tc-dock { margin: 8px 0 0; border-radius: 16px; box-shadow: 0 -4px 12px var(--shadow-soft); }
 
 /* Each card section's own Edit, and "+" where there is nothing yet. */
 .tp-edit {
   flex: none; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700;
-  color: var(--canopy); background: var(--surface); border: 2px solid var(--line-firm); border-radius: 8px;
+  color: var(--canopy); background: var(--surface); border: 1px solid var(--line-firm); border-radius: 10px;
 }
 .tp-edit:hover { border-color: var(--canopy); }
 .tp-slot.empty.add { cursor: pointer; font: inherit; }
@@ -6407,15 +6415,15 @@ button:disabled { transition: none; }
 /* A friend's box (Browse.jsx). */
 .bw-dex { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .bw-dex span {
-  display: grid; justify-items: center; padding: 6px 4px; border-radius: 10px; font-size: 11px;
-  color: var(--ink-soft); background: var(--surface-2); border: 2px solid var(--line);
+  display: grid; justify-items: center; padding: 6px 4px; border-radius: 14px; font-size: 11px;
+  color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line);
 }
 .bw-dex b { font-family: var(--display); font-size: 20px; color: var(--ink); }
 .bw-dex .gap { border-color: var(--gold); }
 .bw-gap { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
 .bw-sp {
   aspect-ratio: 1; padding: 2px; cursor: pointer; background: var(--surface-2);
-  border: 2px solid var(--line); border-radius: 9px;
+  border: 1px solid var(--line); border-radius: 9px;
 }
 .bw-sp img { width: 100%; height: 100%; image-rendering: pixelated; }
 .bw-sp.spare { border-color: var(--canopy); background: var(--canopy-soft); }
@@ -6469,7 +6477,7 @@ button:disabled { transition: none; }
   flex: none; scroll-snap-align: center; min-width: 86px; min-height: 44px;
   display: grid; place-items: center; gap: 2px; padding: 5px 12px; cursor: pointer;
   font: inherit; color: var(--ink-soft); background: var(--surface-2);
-  border: 2px solid var(--line); border-radius: 11px;
+  border: 1px solid var(--line); border-radius: 11px;
 }
 .lg-strip button:first-child { margin-left: 10px; }
 .lg-strip button:last-child { margin-right: 10px; }
@@ -6492,7 +6500,7 @@ button:disabled { transition: none; }
    as its words, and drop under the name only when the line is too short. */
 .lg-hero {
   display: grid; gap: 4px; padding: 14px 18px; border-radius: 16px;
-  border: 2px solid var(--line); box-shadow: 0 3px 0 var(--shadow-soft); background: var(--surface-2);
+  border: 1px solid var(--line); box-shadow: 0 8px 22px var(--shadow-soft); background: var(--surface-2);
 }
 .lg-hero-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
 .lg-hero h2 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1; color: var(--ink); }
@@ -6513,14 +6521,14 @@ button:disabled { transition: none; }
    the side said it a third time. The Champion's gold border is information. */
 .lg-card {
   display: grid; gap: 10px; min-width: 0; padding: 12px;
-  background: var(--surface); border: 2px solid var(--line);
-  border-radius: 16px; box-shadow: 0 3px 0 var(--shadow-soft);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: 0 8px 22px var(--shadow-soft);
 }
 .lg-card.champ { border-color: var(--gold); }
 .lg-card-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; }
 .lg-portrait {
   width: 76px; height: 76px; display: grid; place-items: center; overflow: hidden;
-  border-radius: 14px; background: var(--surface-2);
+  border-radius: 18px; background: var(--surface-2);
   background: color-mix(in srgb, var(--tc, var(--ink-faint)) 18%, var(--surface-2));
 }
 .lg-portrait img { width: 76px; height: 76px; image-rendering: pixelated; }
@@ -6546,7 +6554,7 @@ button:disabled { transition: none; }
 .lg-party { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .lg-party li {
   width: 54px; display: grid; justify-items: center; gap: 1px; padding: 3px 2px 4px;
-  border-radius: 10px; background: var(--surface-2);
+  border-radius: 14px; background: var(--surface-2);
 }
 .lg-party img { width: 44px; height: 44px; image-rendering: pixelated; object-fit: contain; }
 .lg-party i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-soft); }
@@ -6564,14 +6572,14 @@ button:disabled { transition: none; }
 .lg-go:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, .22); }
 .lg-go:disabled { opacity: .45; cursor: default; transform: none; }
 .lg-go:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
-.lg-go.quiet { color: var(--ink); background: var(--surface-2); box-shadow: 0 3px 0 var(--shadow-soft); }
+.lg-go.quiet { color: var(--ink); background: var(--surface-2); box-shadow: 0 8px 22px var(--shadow-soft); }
 .lg-go.small { min-height: 34px; padding: 5px 12px; font-size: 13px; }
 .lg-go.big { min-height: 50px; padding: 10px 26px; font-size: 17px; }
 .lg-card.champ .lg-go { background: var(--gold); }
 .lg-more {
   min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer;
   font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-soft);
-  background: transparent; border: 2px solid var(--line); border-radius: 10px;
+  background: transparent; border: 1px solid var(--line); border-radius: 14px;
 }
 .lg-more:hover { border-color: var(--line-firm); color: var(--ink); }
 .lg-why { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-faint); }
@@ -6599,18 +6607,18 @@ button:disabled { transition: none; }
 .lg-path li.beaten + li::before { background: var(--canopy); }
 .lg-path button {
   position: relative; width: 44px; height: 44px; padding: 0; cursor: pointer; overflow: visible;
-  display: grid; place-items: center; border-radius: 12px;
-  background: var(--surface-2); border: 2px solid var(--line);
+  display: grid; place-items: center; border-radius: 16px;
+  background: var(--surface-2); border: 1px solid var(--line);
   transition: transform .15s ease, border-color .15s ease;
 }
-.lg-path li.lead button { width: 54px; height: 54px; border-radius: 14px;
+.lg-path li.lead button { width: 54px; height: 54px; border-radius: 18px;
   background: color-mix(in srgb, var(--tc, var(--ink-faint)) 18%, var(--surface-2)); }
 .lg-path button > img:first-child {
-  width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 10px; image-rendering: pixelated;
+  width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 14px; image-rendering: pixelated;
 }
 .lg-path li.locked button > img:first-child { filter: grayscale(1) opacity(.45); }
 .lg-path li.next button { border-color: var(--canopy); }
-.lg-path button[aria-pressed="true"] { border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 3px 0 var(--shadow-soft); }
+.lg-path button[aria-pressed="true"] { border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 8px 22px var(--shadow-soft); }
 .lg-path button:hover { border-color: var(--line-firm); }
 .lg-path button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .lg-step-won {
@@ -6621,7 +6629,7 @@ button:disabled { transition: none; }
 .lg-step-badge { position: absolute; right: -7px; bottom: -7px; width: 22px; height: 22px; }
 .lg-path li:not(.beaten) .lg-step-badge { filter: grayscale(1) opacity(.5); }
 .lg-stage {
-  display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: var(--surface-2);
+  display: grid; gap: 8px; padding: 10px; border-radius: 16px; background: var(--surface-2);
 }
 .lg-stage-who { display: grid; gap: 2px; min-width: 0; }
 .lg-stage-who b { font-size: 15px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -6631,26 +6639,26 @@ button:disabled { transition: none; }
 /* Normal or hard: a two-way switch on the region's hero. */
 .lg-modes {
   display: inline-flex; justify-self: start; gap: 2px; padding: 3px; margin-top: 4px;
-  border-radius: 11px; background: var(--surface-2); border: 2px solid var(--line);
+  border-radius: 11px; background: var(--surface-2); border: 1px solid var(--line);
 }
 .lg-modes button {
   display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 4px 14px; cursor: pointer;
   font: inherit; font-weight: 700; font-size: 13px; color: var(--ink-soft);
-  background: transparent; border: 0; border-radius: 8px;
+  background: transparent; border: 0; border-radius: 10px;
 }
 .lg-modes button[aria-selected="true"] { color: #fff; background: var(--canopy); box-shadow: 0 2px 0 rgba(0, 0, 0, .18); }
 .lg-modes button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
 /* What hard mode gives: one band of prizes, readable while it is locked. */
 .lg-hard-rewards {
   display: grid; gap: 10px; padding: 14px; border-radius: 16px;
-  background: var(--surface); border: 2px solid var(--gold); box-shadow: 0 3px 0 var(--shadow-soft);
+  background: var(--surface); border: 2px solid var(--gold); box-shadow: 0 8px 22px var(--shadow-soft);
 }
 .lg-hard-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
 .lg-hard-top b { font-family: var(--display); font-size: 17px; color: var(--ink); }
 .lg-hard-rewards ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .lg-hard-rewards li {
-  display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 12px;
-  background: var(--surface-2); border: 2px solid var(--line);
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 16px;
+  background: var(--surface-2); border: 1px solid var(--line);
 }
 .lg-hard-rewards img { width: 30px; height: 30px; image-rendering: pixelated; }
 .lg-hard-rewards li > span:last-child, .lg-gift > span { display: grid; line-height: 1.15; min-width: 0; }
@@ -6663,8 +6671,8 @@ button:disabled { transition: none; }
 .lg-hard-note { margin: 0; font-size: 12.5px; color: var(--ink-soft); }
 .lg-from { margin: -4px 0 0; font-size: 12px; color: var(--ink-faint); }
 .lg-gift {
-  display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; border-radius: 12px;
-  background: var(--surface-2); border: 2px solid var(--line);
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; border-radius: 16px;
+  background: var(--surface-2); border: 1px solid var(--line);
 }
 .lg-gift img { width: 40px; height: 40px; image-rendering: pixelated; object-fit: contain; }
 .lg-gift.given { opacity: .7; }
@@ -6680,7 +6688,7 @@ button:disabled { transition: none; }
    a new move is marked), what it costs, and what it can learn. */
 .lg-tutor-lede { margin: 0; font-size: 13px; color: var(--ink-soft); }
 /* Train's level panel: where it is, the candy you hold, and the raises. */
-.lg-raise { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: var(--surface); border: 2px solid var(--line); }
+.lg-raise { display: grid; gap: 10px; padding: 12px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); }
 .lg-raise-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .lg-raise-top b { font-family: var(--display); font-size: 20px; color: var(--ink); }
 .lg-raise-top i { font-style: normal; font-size: 12.5px; color: var(--ink-soft); }
@@ -6695,7 +6703,7 @@ button:disabled { transition: none; }
 .rk-under { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; font-size: 13px; color: var(--ink-soft); }
 .lg-tutor-mon {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
-  padding: 8px 12px; border-radius: 14px; background: var(--surface); border: 2px solid var(--line);
+  padding: 8px 12px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line);
 }
 .lg-tutor-mon img { width: 56px; height: 56px; image-rendering: pixelated; object-fit: contain; }
 .lg-tutor-mon b { display: block; font-family: var(--display); font-size: 18px; color: var(--ink); }
@@ -6713,9 +6721,9 @@ button:disabled { transition: none; }
 .lg-tutor-go .lg-prize { margin-right: auto; }
 .lg-tutor-q {
   min-height: 40px; padding: 8px 12px; font: inherit; color: var(--ink);
-  background: var(--surface); border: 2px solid var(--line); border-radius: 11px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 11px;
 }
-.lg-tpic { grid-area: pic; width: 44px; height: 44px; image-rendering: pixelated; object-fit: cover; object-position: top; border-radius: 10px; background: var(--surface); }
+.lg-tpic { grid-area: pic; width: 44px; height: 44px; image-rendering: pixelated; object-fit: cover; object-position: top; border-radius: 14px; background: var(--surface); }
 .lg-tname { grid-area: name; display: grid; min-width: 0; }
 .lg-tname i { font-style: normal; font-size: 11px; color: var(--ink-faint); }
 .lg-tname b { font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -6726,10 +6734,10 @@ button:disabled { transition: none; }
 .lg-pick { display: grid; gap: 12px; padding-bottom: 8px; }
 .lg-foe {
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center;
-  padding: 12px; border-radius: 16px; background: var(--surface); border: 2px solid var(--line);
-  box-shadow: 0 3px 0 var(--shadow-soft);
+  padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 8px 22px var(--shadow-soft);
 }
-.lg-foe-pic { width: 80px; height: 80px; image-rendering: pixelated; border-radius: 14px; background: var(--surface-2); }
+.lg-foe-pic { width: 80px; height: 80px; image-rendering: pixelated; border-radius: 18px; background: var(--surface-2); }
 .lg-foe-who { display: grid; gap: 4px; min-width: 0; }
 .lg-foe-who h4 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 20px; color: var(--ink); }
 .lg-rules { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -6745,7 +6753,7 @@ button:disabled { transition: none; }
   position: sticky; bottom: 0; z-index: 2; margin: 4px -16px -48px;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  background: var(--surface); border-top: 2px solid var(--line); box-shadow: 0 -3px 0 var(--shadow-soft);
+  background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -3px 0 var(--shadow-soft);
 }
 /* ONE ROW, whatever the team size: the slots shrink (to ~26px for six at a
    320px phone) and the button keeps its words on one line. They wrapped - six
@@ -6781,7 +6789,7 @@ button:disabled { transition: none; }
 }
 .ft-top {
   display: flex; align-items: center; gap: 10px; padding: 8px 14px;
-  background: var(--surface); border-bottom: 2px solid var(--line);
+  background: var(--surface); border-bottom: 1px solid var(--line);
 }
 .ft-vs { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .ft-vs img { width: 34px; height: 34px; image-rendering: pixelated; border-radius: 50%; background: var(--surface-2); object-fit: cover; object-position: top; }
@@ -6792,7 +6800,7 @@ button:disabled { transition: none; }
 .ft-stage { min-height: 0; display: grid; place-items: center; padding: 10px; container-type: size; }
 .battle.ft-scene {
   position: relative; inset: auto; width: min(100cqw, 160cqh, 1000px); aspect-ratio: 16 / 10;
-  border-radius: 14px; box-shadow: 0 4px 0 var(--shadow-soft);
+  border-radius: 18px; box-shadow: 0 8px 22px var(--shadow-soft);
 }
 
 .ft-mon { position: absolute; aspect-ratio: 1; display: grid; place-items: center; }
@@ -6858,7 +6866,7 @@ button:disabled { transition: none; }
    fall is a transform. */
 .ft-hp {
   position: absolute; z-index: 2; display: grid; gap: 4px; padding: .9cqw 1.3cqw 1cqw; min-width: 0;
-  background: var(--glass); border: 2px solid var(--line-firm); border-radius: 1.2cqw;
+  background: var(--glass); border: 1px solid var(--line-firm); border-radius: 1.2cqw;
   box-shadow: 0 .5cqw 0 rgba(0, 0, 0, .18); color: var(--ink);
 }
 .ft-hp.foe { left: 3.5%; top: 6%; width: 43%; }
@@ -6923,7 +6931,7 @@ button:disabled { transition: none; }
 .ft-anim-mode {
   display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 10px; cursor: pointer;
   font: inherit; font-size: 13px; color: var(--ink-soft); background: var(--glass);
-  border: 2px solid var(--line-firm); border-radius: 999px;
+  border: 1px solid var(--line-firm); border-radius: 999px;
 }
 .ft-anim-mode i { font-style: normal; color: var(--gold); }
 .ft-fx.at-foe { right: 8%; top: 13%; width: 31%; }
@@ -6965,13 +6973,13 @@ button:disabled { transition: none; }
 /* ---- the controls: what is happening, then what you can do. */
 .ft-panel {
   display: grid; gap: 10px; padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
-  background: var(--surface); border-top: 2px solid var(--line);
+  background: var(--surface); border-top: 1px solid var(--line);
 }
 .ft-panel > * { width: 100%; max-width: 900px; margin-inline: auto; }
 .ft-msg {
   position: relative; min-height: 3.2em; margin: 0 auto; padding: 10px 34px 10px 14px;
   font-family: var(--display); font-weight: 500; font-size: 16px; line-height: 1.3; color: var(--ink);
-  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px;
 }
 .ft-msg.live { cursor: pointer; }
 .ft-more {
@@ -7012,7 +7020,7 @@ button:disabled { transition: none; }
 .ft-team-btn {
   position: relative; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px;
   cursor: pointer; font: inherit; font-weight: 700; font-size: 14px; color: var(--ink);
-  background: var(--surface); border: 2px solid var(--line-firm); border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line-firm); border-radius: 16px;
 }
 .ft-team-btn:hover:not(:disabled) { border-color: var(--canopy); color: var(--canopy); }
 .ft-team-btn:disabled { opacity: .5; cursor: default; }
@@ -7307,7 +7315,7 @@ button:disabled { transition: none; }
 .ru-go {
   margin-top: 8px; min-height: 36px; padding: 9px 26px 8px; cursor: pointer;
   font-family: var(--pixel); font-size: 13px; color: #2b1d00;
-  border: 2px solid #fff0b8; border-radius: 10px;
+  border: 2px solid #fff0b8; border-radius: 14px;
   background: linear-gradient(#ffe38a, #f0b83c); box-shadow: 0 3px 0 #8a6414, 0 0 18px rgba(255, 215, 106, .35);
   animation: ru-up .5s ease-out 4.6s both;
 }
@@ -7333,7 +7341,7 @@ button:disabled { transition: none; }
 .rk-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .rk-row {
   display: grid; grid-template-columns: 30px 40px minmax(0, 1fr) auto; align-items: center; gap: 4px 10px;
-  padding: 6px 10px; border-radius: 12px; background: var(--surface);
+  padding: 6px 10px; border-radius: 16px; background: var(--surface);
 }
 .rk-row.me { background: var(--gold-soft); }
 .rk-place { font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--ink-soft); text-align: right; }
@@ -7373,7 +7381,7 @@ button:disabled { transition: none; }
    placed in implicit tracks, the button top-left and the name bottom-right. */
 .rk-friends > li {
   display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "pic name go";
-  align-items: center; gap: 10px; padding: 6px 8px; border-radius: 12px; background: var(--surface-2);
+  align-items: center; gap: 10px; padding: 6px 8px; border-radius: 16px; background: var(--surface-2);
 }
 .rk-friends .lg-go { grid-area: go; }
 .rk-edit-head { display: grid; gap: 6px; }
@@ -7390,7 +7398,7 @@ button:disabled { transition: none; }
 .ft-switch li button {
   width: 100%; min-height: 52px; display: grid; grid-template-columns: 40px minmax(0, 1fr); grid-template-rows: auto auto;
   gap: 2px 8px; align-items: center; padding: 6px 10px; cursor: pointer; text-align: left; font: inherit; color: var(--ink);
-  background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px;
 }
 .ft-switch li button > img, .ft-switch li button > .sprite-showdown { grid-row: span 2; width: 40px; height: 40px; image-rendering: pixelated; }
 .ft-sw-name { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
@@ -7408,7 +7416,7 @@ button:disabled { transition: none; }
    them. Its pieces arrive in turn, `transform` and `opacity` only. */
 .ft-result {
   display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px 18px;
-  padding: 14px 16px; border-radius: 14px; background: var(--surface-2); border: 2px solid var(--line);
+  padding: 14px 16px; border-radius: 18px; background: var(--surface-2); border: 1px solid var(--line);
 }
 .ft-result.won { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
 .ft-res-head { display: grid; gap: 4px; min-width: 0; animation: ft-res-in .35s ease-out both; }
@@ -7422,8 +7430,8 @@ button:disabled { transition: none; }
 .ft-res-team li.out img { filter: grayscale(1); opacity: .4; }
 .ft-loot { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .ft-loot li {
-  display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 12px;
-  background: var(--surface); border: 2px solid var(--line); animation: ft-res-in .35s ease-out both;
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--line); animation: ft-res-in .35s ease-out both;
 }
 .ft-loot li:nth-child(2) { animation-delay: .12s; }
 .ft-loot li:nth-child(3) { animation-delay: .24s; }
@@ -7464,7 +7472,7 @@ button:disabled { transition: none; }
   .ft { grid-template-columns: minmax(0, 1fr) minmax(280px, 42%); grid-template-rows: auto minmax(0, 1fr); }
   .ft-top { grid-column: 1 / -1; padding: 5px 12px; }
   .ft-stage { padding: 6px; }
-  .ft-panel { overflow-y: auto; border-top: 0; border-left: 2px solid var(--line); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); gap: 8px; }
+  .ft-panel { overflow-y: auto; border-top: 0; border-left: 1px solid var(--line); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); gap: 8px; }
   .ft-msg { font-size: 14px; min-height: 2.8em; padding: 8px 30px 8px 12px; }
   .ft-move { min-height: 48px; padding: 6px 10px; gap: 3px; }
   .ft-move b { font-size: 14px; }
@@ -7505,18 +7513,21 @@ button:disabled { transition: none; }
 
 
 :root[data-theme="dark"] {
+  /* ROTOM, NIGHT: the default. Navy glass, cyan for what is selected. */
   color-scheme: dark;
-  --paper: #111915; --surface: #1a241e; --surface-2: #223029;
-  --ink: #e2ebe3; --ink-soft: #a7b8ab; --ink-faint: #7f9285;
-  --line: #2c3a32; --line-firm: #3b4e42;
-  --canopy: #468f66; --path: #b8766a; --path-soft: #3a2724;
-  --sand: #3d3626; --gold: #d09a3c;
-  --candy: #b376cf; --candy-soft: #33223b;
-  --shadow: rgba(0, 0, 0, .5); --shadow-soft: rgba(0, 0, 0, .35);
-  --scrim: rgba(3, 7, 5, .7);
-  --gold-soft: #33291a; --canopy-soft: #1c3025;
-  --glow: rgba(255, 255, 255, .06); --glass: rgba(26, 36, 30, .9);
-  --good: #6cc48c; --bad: #e27f72; --ready: #c9973e; --ready-ink: #e2b560;
+  --paper: #0a0f1e; --surface: #121a34; --surface-2: #1b2547;
+  --ink: #e9eeff; --ink-soft: #b9c2e4; --ink-faint: #8d9ac4;
+  --line: #222c4c; --line-firm: #2f3b63;
+  --canopy: #2a8bff; --path: #45d4ff; --path-soft: #10283a;
+  --sand: #3a3220; --gold: #ffc46b;
+  --candy: #d6b4ff; --candy-soft: #2c1f44;
+  --shadow: rgba(0, 0, 0, .5); --shadow-soft: rgba(0, 0, 0, .32);
+  --scrim: rgba(5, 8, 18, .66);
+  --gold-soft: #2e2614; --canopy-soft: #14224a;
+  --glow: rgba(255, 255, 255, .06); --glass: rgba(18, 26, 52, .78);
+  --good: #5fe08a; --bad: #ff6a5b; --ready: #e0a83a; --ready-ink: #ffd35c;
+  --accent: #45d4ff; --violet: #8a5cff;
+  --cta: linear-gradient(180deg, #ff9d52, #ff6a2b); --cta-glow: rgba(255, 110, 45, .35);
 }
 
 /* Silhouettes are black at a fifth of full strength - invisible on a dark
@@ -7746,14 +7757,14 @@ button:disabled { transition: none; }
 .tx-deal {
   position: sticky; top: var(--tc-head-h, 0px); z-index: 2;
   display: grid; gap: 8px; margin: 0 -16px; padding: 10px 16px;
-  background: var(--surface); border-bottom: 2px solid var(--line); box-shadow: 0 2px 0 var(--shadow-soft);
+  background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: 0 8px 22px var(--shadow-soft);
 }
 .tx-deal .tc-err { margin: 0; }
 .tx-table { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: start; }
 .tx-swap { align-self: center; font-size: 20px; color: var(--ink-faint); }
 .tx-side {
   display: grid; gap: 6px; padding: 6px; min-width: 0;
-  border: 2px solid var(--line); border-radius: 12px; background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 16px; background: var(--surface-2);
 }
 .tx-side.on { border-color: var(--canopy); background: var(--canopy-soft); }
 .tx-title {
@@ -7767,7 +7778,7 @@ button:disabled { transition: none; }
 .tx-slots { display: grid; grid-template-columns: repeat(auto-fill, 46px); gap: 6px; }
 .tx-slot {
   position: relative; aspect-ratio: 1; min-width: 0; padding: 2px 2px 10px; cursor: pointer; font: inherit;
-  background: var(--surface); border: 2px solid var(--line-firm); border-radius: 9px;
+  background: var(--surface); border: 1px solid var(--line-firm); border-radius: 9px;
 }
 .tx-slot > img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .tx-slot > .sprite-showdown { display: block; width: 77%; height: 77%; margin: 0 auto; }
@@ -8007,4 +8018,471 @@ button:disabled { transition: none; }
   .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i,
   .sprite-projection:not(.mon) { animation: none; }
   .sprite-projection.mon { animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both; }
+}
+
+/* ================================================================ ROTOM SHELL
+   (2026-10-01) Three features side by side - Catch, Trade, Battles - plus You.
+   Last in the file, after the touch layouts, because it overrides them.
+
+   LAYERS: pages (Trade, Battles, You) 56, the phone's Rotom sheet 57, the app
+   bar and tab bar 58 - above a page, so the tabs never leave - and every
+   banner (60) and dialog (70+) above all of them, so a dialog's scrim covers
+   the tabs too and a tab cannot be pressed behind a question.
+
+   NO BACKDROP BLUR anywhere the map shows through: a blurred layer over a
+   canvas that redraws is a full-screen filter every frame, and a phone pays
+   for it in frame rate. The surfaces are near-opaque instead. */
+:root { --bar-h: 64px; --nav-h: 66px; --nav-w: 68px; }
+body {
+  padding: calc(var(--bar-h) + 16px) 16px 16px;
+  background:
+    radial-gradient(900px 520px at 8% -8%, color-mix(in srgb, var(--canopy) 16%, transparent), transparent 70%),
+    radial-gradient(800px 500px at 100% 0%, color-mix(in srgb, var(--violet) 10%, transparent), transparent 70%),
+    var(--paper);
+  background-repeat: no-repeat;
+}
+.tc-page { z-index: 56; top: var(--bar-h); background: var(--paper); }
+body.fighting .tc-page { top: 0; }
+
+/* ---------- the app bar (desktop) */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 58;
+  height: var(--bar-h); margin: 0; padding: 0 252px 0 20px;
+  flex-wrap: nowrap; gap: 18px;
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none;
+  font-family: var(--body); color: var(--ink-soft);
+}
+body.fighting .topbar { display: none; }
+.tb-logo { display: inline-flex; align-items: center; gap: 10px; font: 800 20px var(--display); color: var(--ink); white-space: nowrap; }
+.tb-logo i {
+  width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+  background: linear-gradient(160deg, #45d4ff, #2a7bff); color: #fff;
+}
+.tb-tabs {
+  display: flex; gap: 4px; padding: 4px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.topbar .tb-tab {
+  --fc: #3fc98a;
+  position: relative; display: inline-flex; align-items: center; gap: 8px;
+  height: 40px; padding: 0 18px; border: 0; border-radius: 999px;
+  background: none; color: var(--ink-soft); font: 600 15px var(--body); cursor: pointer;
+}
+.topbar .tb-tab.t-trade { --fc: var(--violet); }
+.topbar .tb-tab.t-battles { --fc: #ff6a2b; }
+.topbar .tb-tab.t-you { --fc: var(--accent); }
+.topbar .tb-tab:hover { color: var(--ink); background: var(--surface-2); border: 0; }
+.topbar .tb-tab.on {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--fc) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fc) 60%, transparent);
+}
+.topbar .tb-tab.on .ic { color: var(--fc); }
+.topbar .tb-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tb-tab em {
+  font-style: normal; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+  display: inline-grid; place-items: center; font: 700 11px var(--body); color: #fff; background: #ff6a2b;
+}
+/* You: the trainer's chip, at the far right of the bar. */
+.topbar .tb-tab.t-you {
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  height: 48px; max-width: 220px; padding: 4px 16px 4px 4px; gap: 10px;
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-firm);
+}
+.topbar .tb-tab.t-you.on { background: color-mix(in srgb, var(--fc) 16%, var(--surface)); box-shadow: inset 0 0 0 1px var(--fc); }
+.tb-tab .tb-medal { width: 38px; height: 38px; border-radius: 50%; background: var(--surface-2); }
+.tb-tab .tb-medal > .rk-medal { width: 30px; height: 30px; }
+.tb-you { display: grid; gap: 1px; min-width: 0; text-align: left; }
+.tb-you b { font: 700 14px var(--body); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-you small { font: 600 10px var(--pixel); text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-you .xpbar { width: 100%; height: 3px; margin-top: 2px; }
+.tb-you-short { display: none; }
+.tb-tab .tb-dot, .tb-bell .tb-dot { top: 6px; right: 8px; box-shadow: 0 0 0 2px var(--paper); }
+.topbar .tb-stats { gap: 18px; align-items: center; }
+.topbar .tb-stat {
+  flex-direction: row; align-items: center; gap: 6px; padding: 0; border: 0;
+  color: var(--ink-faint);
+}
+.topbar .tb-stat b { font: 700 16px var(--pixel); color: var(--ink); }
+.topbar .tb-stat.cash b, .topbar .tb-stat.cash .ic { color: var(--gold); }
+.topbar .tb-stat.candy b { color: var(--candy); }
+.topbar .tb-stat.dex .ic { color: var(--good); }
+.tb-stat .tb-candy { width: 20px; height: 20px; image-rendering: pixelated; }
+.topbar .tb-bell {
+  position: relative; width: 44px; height: 44px; padding: 0; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink-soft);
+}
+.topbar .tb-bell:hover { color: var(--ink); border-color: var(--line-firm); }
+.tb-stale {
+  position: fixed; top: calc(var(--bar-h) + 8px); left: 50%; transform: translateX(-50%);
+  max-width: min(640px, calc(100vw - 32px)); margin: 0; padding: 10px 14px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--bad); box-shadow: 0 10px 28px var(--shadow);
+  font: 13px var(--body); color: var(--ink);
+}
+@media (max-width: 1240px) { .topbar .tb-extra { display: none; } }
+@media (max-width: 1020px) { .tb-logo { font-size: 0; gap: 0; } .topbar .tb-tab { padding: 0 12px; } }
+
+/* ---------- the map's corners */
+.hud-left {
+  position: absolute; top: 12px; left: 12px; z-index: 5; max-width: 62%;
+  display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+}
+.hud-left .biome-tag { position: static; max-width: none; left: auto; top: auto; }
+.biome-tag, .worldclock {
+  background: var(--glass); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--ink); box-shadow: 0 10px 24px var(--shadow-soft);
+}
+.biome-tag { border-radius: 18px; font-family: var(--display); font-size: 15px; font-weight: 700; }
+/* The clock keeps its phase tint (dawn, day, dusk, night are colour that
+   informs), so its words stay light on it in either theme. */
+.worldclock { color: #f2f5ff; border-radius: 999px; }
+.ms-tab {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px;
+  border-radius: 999px; background: var(--glass); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--ink); box-shadow: 0 10px 24px var(--shadow-soft); cursor: pointer;
+}
+.ms-tab i { font-style: normal; font: 600 10px var(--pixel); text-transform: uppercase; color: var(--ink-faint); }
+.ms-tab b { font: 700 15px var(--pixel); color: var(--ink); }
+.ms-pop { left: 0; }
+
+/* ---------- the Rotom panel (desktop: docked beside the map) */
+.rail {
+  background: var(--glass); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 22px; padding: 16px; box-shadow: 0 18px 40px var(--shadow-soft);
+}
+.rail-grip, .rail-x, .rail-scrim { display: none; }
+.rail > .tabs { gap: 6px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.rail .tab {
+  gap: 6px; padding: 0; border: 0; background: none; box-shadow: none;
+  font: 500 12px var(--body); color: var(--ink-soft);
+}
+.rail .tab-glyph {
+  width: 50px; height: 50px; border-radius: 16px; display: grid; place-items: center;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-soft);
+  -webkit-mask: none; mask: none;
+}
+.rail .tab:hover { color: var(--ink); border: 0; }
+.rail .tab:hover .tab-glyph { border-color: var(--line-firm); color: var(--ink); }
+.rail .tab.on { background: none; color: var(--ink); box-shadow: none; }
+.rail .tab.on .tab-glyph {
+  background: linear-gradient(160deg, #45d4ff, #2a7bff); border-color: transparent; color: #fff;
+  box-shadow: 0 8px 20px rgba(60, 170, 255, .35);
+}
+.rail .tab em { top: -6px; right: calc(50% - 32px); background: #ff6a2b; border-color: var(--surface); }
+.ev-pane { display: flex; flex-direction: column; min-height: 0; }
+.ev-pane > .hp-body { overflow-y: auto; flex: 1 1 auto; min-height: 0; padding: 0; }
+
+/* ---------- You */
+.you-main { max-width: 920px; margin: 0 auto; padding: 22px 16px 48px; display: grid; gap: 16px; }
+.you-hero {
+  display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 24px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--violet) 40%, var(--surface)), color-mix(in srgb, var(--canopy) 22%, var(--surface)));
+  border: 1px solid var(--line);
+}
+.you-medal { width: 72px; height: 72px; border-radius: 50%; background: rgba(255, 255, 255, .12); display: grid; place-items: center; flex: none; }
+.you-medal > .rk-medal { width: 56px; height: 56px; }
+.you-who { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.you-who h2 { margin: 0; font: 800 28px var(--display); color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+.you-who > span:not(.xpbar) { font: 600 12px var(--pixel); text-transform: uppercase; color: var(--ink-soft); }
+.you-who .xpbar { width: min(260px, 100%); height: 5px; }
+.you-points {
+  flex: none; height: 40px; padding: 0 16px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--cta); color: #fff; font: 700 14px var(--body); box-shadow: 0 8px 20px var(--cta-glow);
+}
+.you-menu { display: grid; gap: 2px; padding: 6px; border-radius: 22px; background: var(--surface); border: 1px solid var(--line); }
+.you-menu > button, .you-row {
+  position: relative; display: flex; align-items: center; gap: 14px; width: 100%; min-height: 60px;
+  padding: 8px 12px; border: 0; border-radius: 16px; background: none; color: var(--ink); text-align: left; font: inherit;
+}
+.you-menu > button { cursor: pointer; }
+.you-menu > button:hover { background: var(--surface-2); }
+.you-menu > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.you-menu .ic { color: var(--accent); flex: none; }
+.you-menu span { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.you-menu b { font: 600 15px var(--body); }
+.you-menu small { font: 13px var(--body); color: var(--ink-faint); }
+.you-menu .you-chev { color: var(--ink-faint); }
+.you-menu .tb-dot { position: static; flex: none; }
+.you-menu .you-out, .you-menu .you-out .ic { color: var(--bad); }
+.you-seg { display: flex; gap: 3px; padding: 3px; border-radius: 999px; background: var(--surface-2); flex: none; }
+.you-seg button {
+  height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: none; cursor: pointer;
+  font: 600 13px var(--body); color: var(--ink-soft);
+}
+.you-seg button.on { background: var(--ink); color: var(--paper); }
+.you-trainer { padding: 16px; border-radius: 22px; background: var(--surface); border: 1px solid var(--line); }
+@media (min-width: 1100px) {
+  .you-main { grid-template-columns: 340px minmax(0, 1fr); align-items: start; max-width: 1180px; }
+  .you-hero { grid-column: 1 / -1; }
+  .you-menu { position: sticky; top: 16px; }
+}
+
+/* ---------- Trade and Battles: their sections down a side column (desktop) */
+@media (min-width: 1100px) and (hover: hover) {
+  .tc-page .tc-bar, .tc-page .tc-main, .lg-page .tc-main { max-width: 1180px; }
+  .tc-page:not(.you-page) .tc-main { padding-left: 276px; }
+  .tc-page .tc-bar { padding-left: 276px; }
+  .tc-tabbar, .lg-strip-wrap {
+    position: fixed; left: max(16px, calc(50vw - 590px)); top: calc(var(--bar-h) + 16px);
+    width: 244px; max-height: calc(100vh - var(--bar-h) - 32px); overflow-y: auto; padding: 0; margin: 0;
+  }
+  .tc-tabs, .lg-strip { display: flex; flex-direction: column; gap: 4px; overflow: visible; mask: none; -webkit-mask: none; }
+  .tc-tabs button, .lg-strip button {
+    width: 100%; min-height: 48px; margin: 0 !important; padding: 0 14px;
+    flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px;
+    border: 0; border-radius: 16px; background: none; box-shadow: none; text-align: left;
+    color: var(--ink-soft); font: 600 15px var(--body);
+  }
+  .lg-strip button { justify-content: space-between; }
+  .tc-tabs button:hover, .lg-strip button:hover { background: var(--surface); color: var(--ink); }
+  .tc-tabs button.on, .lg-strip button.on, .lg-strip .rk-tab.on {
+    background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); border: 0; box-shadow: none;
+  }
+  .lg-strip button.on em { color: var(--ink-soft); }
+  .lg-strip button:nth-child(3) { margin-bottom: 14px !important; }
+}
+
+/* ================================================================ ROTOM, TOUCH */
+@media (hover: none) and (pointer: coarse) {
+  body { padding: 8px 6px calc(var(--nav-h) + env(safe-area-inset-bottom) + 10px); }
+  .tc-page { top: 0; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
+  body.fighting .tc-page, .app.busy .tc-page { bottom: 0; }
+  /* The bar is a slim row of the three numbers you check while walking;
+     its tabs are the tab bar along the bottom. */
+  .topbar {
+    position: static; height: auto; padding: 8px 12px; margin: 0 0 8px; gap: 10px;
+    border: 1px solid var(--line); border-radius: 18px; background: var(--surface);
+  }
+  .tb-logo, .topbar .tb-bell, .topbar .tb-extra { display: none; }
+  .topbar .tb-stats { gap: 14px; width: 100%; justify-content: space-between; }
+  .topbar .tb-stat b { font-size: 14px; }
+  .tb-tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 58;
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+    padding: 6px 6px env(safe-area-inset-bottom); gap: 0; justify-content: space-around;
+    border: 0; border-top: 1px solid var(--line); border-radius: 0;
+    background: color-mix(in srgb, var(--paper) 97%, transparent);
+  }
+  .app.busy .tb-tabs, body.fighting .tb-tabs { display: none; }
+  .topbar .tb-tab, .topbar .tb-tab.t-you {
+    position: relative; inset: auto; transform: none; flex: 1; max-width: 96px;
+    height: 54px; padding: 0; gap: 3px; flex-direction: column; justify-content: center;
+    font: 600 11px var(--body); background: none; box-shadow: none; border-radius: 14px;
+  }
+  .topbar .tb-tab .ic { width: 54px; height: 28px; padding: 4px 0; border-radius: 14px; box-sizing: border-box; }
+  .topbar .tb-tab.on, .topbar .tb-tab.t-you.on { background: none; box-shadow: none; }
+  .topbar .tb-tab.on .ic { background: color-mix(in srgb, var(--fc) 22%, transparent); }
+  .tb-tab .tb-you { display: none; }
+  .tb-tab .tb-you-short { display: inline; }
+  .tb-tab .tb-medal { width: 28px; height: 28px; background: none; }
+  .tb-tab .tb-medal > .rk-medal { width: 24px; height: 24px; }
+  .topbar .tb-tab.t-you.on .tb-medal { box-shadow: 0 0 0 2px var(--accent); }
+  .tb-tab em { position: absolute; top: 0; left: calc(50% + 6px); min-width: 18px; height: 18px; font-size: 10px; }
+  .tb-tab .tb-dot { top: 2px; right: calc(50% - 18px); }
+  .tb-stale { top: 8px; }
+
+  /* The Rotom panel is a sheet over the game, summoned by the pad's ROTOM
+     key. HIDDEN, never unmounted: an app you visited keeps its place. */
+  .rail { display: none; }
+  .rail.open {
+    position: fixed; left: 0; right: 0; z-index: 57;
+    top: max(8dvh, 40px); bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; height: auto; min-height: 0;
+    padding: 6px 12px 10px; border-radius: 24px 24px 0 0; background: var(--surface);
+    animation: rail-up .22s ease-out;
+  }
+  .rail.open .rail-grip { display: block; width: 44px; height: 5px; margin: 2px auto 8px; border-radius: 3px; background: var(--line-firm); flex: none; }
+  .rail.open .rail-x {
+    display: grid; place-items: center; position: absolute; right: 10px; top: 8px; width: 36px; height: 36px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); color: var(--ink-soft); font: 16px var(--body);
+  }
+  .rail-scrim { display: block; position: fixed; inset: 0; z-index: 57; background: var(--scrim); }
+  .rail.open > .tabs { padding-right: 40px; }
+  .rail .tab-glyph { width: 44px; height: 44px; border-radius: 14px; }
+  .rail.open .rail-pane > .panel, .rail.open > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .rail.open .dexgrid, .rail.open .boxlist, .rail.open .arealist, .rail.open .shopscroll, .rail.open .trscroll {
+    max-height: none; flex: 1 1 auto; min-height: 120px; align-content: start;
+  }
+  .pad-rotom { color: var(--accent); }
+  .pad-rotom.on { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
+}
+@keyframes rail-up { from { transform: translateY(24px); opacity: 0; } }
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  body { padding: 6px 8px 12px calc(var(--nav-w) + 8px + env(safe-area-inset-left)); }
+  .tc-page { left: calc(var(--nav-w) + env(safe-area-inset-left)); bottom: 0; }
+  body.fighting .tc-page { left: 0; }
+  .tb-tabs {
+    top: 0; right: auto; width: calc(var(--nav-w) + env(safe-area-inset-left)); height: auto;
+    flex-direction: column; justify-content: center; gap: 4px;
+    padding: 8px 4px 8px env(safe-area-inset-left);
+    border-top: 0; border-right: 1px solid var(--line);
+  }
+  .topbar .tb-tab, .topbar .tb-tab.t-you { flex: none; height: 58px; width: 100%; max-width: none; }
+  .screen {
+    --view-w: min(calc((100dvh - 36px) * 15 / 11), calc(100vw - var(--nav-w) - 16px - 2 * max(150px, min(22vw, 210px))));
+  }
+  .pad { --pad-c: clamp(46px, calc((100vw - var(--nav-w) - var(--view-w) - 64px) / 4.6), 84px); }
+  .rail.open { left: calc(var(--nav-w) + env(safe-area-inset-left)); top: 6dvh; bottom: 0; }
+}
+/* ---------- Rotom buttons: the one action a screen has is the orange pill. */
+.lg-go:not(.quiet) { background: var(--cta); border-radius: 999px; box-shadow: 0 8px 20px var(--cta-glow); }
+.lg-go.quiet { border-radius: 999px; }
+.ev-go { border-radius: 999px; box-shadow: none; }
+.pad button.pad-a { background: var(--cta); border-color: transparent; box-shadow: 0 10px 24px var(--cta-glow); }
+.pad .pad-a b, .pad .pad-a i { color: #fff; }
+.missions .ms-tab { flex-direction: row; }
+@media (min-width: 1100px) and (hover: hover) {
+  .lg-strip button { display: flex; }
+  .lg-strip b { font: 600 15px var(--body); }
+}
+/* ---------- Rotom components: soft glass cards, pills for what you press. */
+.confirm, .helpcard, .sheet-card, .hintbox { border-radius: 22px; }
+.nameplate {
+  background: var(--glass); border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 18px; box-shadow: 0 12px 28px var(--shadow-soft); padding: 9px 15px 8px;
+}
+.textbox { background: color-mix(in srgb, var(--surface) 96%, transparent); }
+.runbtn { border-width: 1px; border-radius: 999px; }
+.hint-tag { border-radius: 999px; }
+.hint-go, .cf-actions button, .set-x { border-radius: 999px; }
+.hint-go {
+  font: 600 14px var(--body); background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  border-color: transparent; color: var(--ink);
+}
+.cf-yes { background: #d8454f !important; border-color: #d8454f !important; color: #fff !important; box-shadow: none; }
+.cf-yes.buy { background: var(--cta) !important; border-color: transparent !important; box-shadow: 0 8px 20px var(--cta-glow); }
+.cheer-card { border-radius: 22px; }
+.you-hero { flex-wrap: wrap; }
+.you-who { flex: 1 1 200px; }
+.you-who small { font: 12px var(--body); color: var(--ink-faint); }
+@media (max-width: 520px) { .you-points { width: 100%; } .you-who h2 { font-size: 24px; } }
+/* On a phone the play card fills the screen to the tab bar and the pad sits
+   in the middle of what is left under the map: nearer the thumbs, and no
+   empty page below the card. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  .app.tab-catch .screen {
+    display: flex; flex-direction: column;
+    min-height: calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom) - 84px);
+  }
+  .app.tab-catch.busy .screen { min-height: calc(100dvh - 84px); }
+  .app.tab-catch .screen > .pad { margin-block: auto; }
+}
+@media (min-width: 1100px) and (hover: hover) {
+  /* A sub-view (a team pick, a composer, your card) has no side column:
+     centred. A class the page sets, not `:has()`, which a fight's every
+     DOM change would make the browser re-check. */
+  .tc-page.sub .tc-main, .tc-page.sub .tc-bar { padding-left: 16px; max-width: 1000px; }
+}
+/* ================================================================ PHONE ENCOUNTER
+   The scene takes the room the walk does not need: taller than the map, the
+   balls along its foot (the desktop rail, which a phone hid), the pad under. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  .app.busy .viewport { min-height: 56dvh; }
+  .app.busy .viewport > canvas:first-child { visibility: hidden; }
+  .app.busy .ballwrap { display: block; }
+}
+
+/* ================================================================ PAGES, DESKTOP
+   A plain title over the content and a plain list of sections down the left -
+   no band across the page, no box around the list (the band read as a
+   dropdown hanging off the app bar). */
+@media (min-width: 1100px) and (hover: hover) {
+  .tc-page .tc-head { position: static; background: none; border: 0; box-shadow: none; }
+  .tc-page .tc-bar { padding-top: 22px; padding-bottom: 4px; }
+  .tc-titles h3 { font-size: 26px; font-weight: 800; }
+  /* Above the content column, whose box starts at the page's left edge (its
+     padding is what clears the list) and took the list's clicks. */
+  .tc-tabbar, .lg-strip-wrap { top: calc(var(--bar-h) + 22px); z-index: 5; }
+  .tc-tabs, .lg-strip { background: none; border: 0; padding: 0; box-shadow: none; }
+  .tc-tabs button, .lg-strip button {
+    flex-direction: column !important; align-items: flex-start !important; justify-content: center !important;
+    gap: 2px; min-height: 52px;
+  }
+  .lg-strip em { font: 500 12px var(--body); color: var(--ink-faint); }
+  .lg-strip button.shut { opacity: .55; }
+}
+
+/* ================================================================ SHOP GRID
+   The League's Battle shelf in columns of cards, not one long list; an open
+   card is a form and takes the whole row. */
+.lg-shop .shoplist { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.lg-shop .shoprow.open { grid-column: 1 / -1; }
+/* The panel floats over a moving map: nearly opaque, so its lists read. */
+.rail { background: color-mix(in srgb, var(--surface) 95%, transparent); }
+/* Dex tiles: a caught one glows from behind, it is not outlined. */
+.cell { border-radius: 16px; border-color: var(--line); background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
+.cell.caught {
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 18%, transparent), var(--surface-2) 72%);
+}
+.cell.caught .cell-no { color: var(--ink-faint); }
+.cell.caught.full { border-color: color-mix(in srgb, var(--gold) 60%, transparent); }
+/* WHITE ON A COLOURED FILL. These took the page's own token for their text
+   (`--surface`/`--paper`), which was white by day and is navy at night - navy
+   on blue, unreadable. A fill that does not change with the theme carries
+   words that do not either. */
+.shout, .gate-go, .pad-s.on, .br-key, .br-key.first:hover { color: #fff; }
+.gate-go { border-radius: 999px; font: 600 15px var(--body); background: var(--cta); border-color: transparent; box-shadow: 0 8px 20px var(--cta-glow); }
+.gate-go:disabled { background: var(--surface-2); color: var(--ink-faint); box-shadow: none; }
+.sh-buy .sh-go { background: var(--cta); border-color: transparent; color: #fff; border-radius: 999px; box-shadow: 0 8px 20px var(--cta-glow); }
+.sh-buy .sh-go:disabled { background: var(--surface-2); color: var(--ink-faint); box-shadow: none; }
+.sh-buy button { border-radius: 999px; }
+/* The League's strip under the side-column width: chips, as Trade's are. */
+@media (max-width: 1099px), (hover: none) {
+  .lg-strip button, .lg-strip .rk-tab {
+    min-height: 40px; min-width: 0; padding: 0 14px; border-radius: 999px; display: flex; flex-direction: row; gap: 6px;
+    border: 1px solid var(--line); background: none; box-shadow: none;
+  }
+  .lg-strip b { font: 600 14px var(--body); }
+  .lg-strip em { font: 600 11px var(--pixel); }
+  .lg-strip button.on, .lg-strip .rk-tab.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .lg-strip button.on em { color: var(--paper); opacity: .7; }
+}
+/* ================================================================ ENCOUNTER, ROTOM
+   The scene's furniture as the design draws it: a floating text bar with a
+   Run pill, glass ball tiles with their key on the corner, the nameplate in
+   words rather than pixel caps - fixed sizes, not `cqw`, so nothing balloons
+   on a wide window. */
+.battle { border: 1px solid var(--line); }
+.textbox {
+  left: 8px; right: 8px; bottom: 8px; min-height: 0; padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 20px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent); box-shadow: 0 12px 30px var(--shadow-soft);
+}
+.tb-msg { font: 500 15px/1.4 var(--body); }
+.runbtn {
+  flex-direction: row; gap: 8px; height: 40px; padding: 0 16px;
+  border: 1px solid var(--line-firm); border-radius: 999px; background: var(--surface-2);
+  font: 600 14px var(--body); color: var(--ink);
+}
+.runbtn kbd { font: 600 10px var(--pixel); }
+/* Just above the floating text bar - its real height (one line and the Run
+   pill) plus its gap, not the old 16% of the scene it used to fill. */
+.ballwrap.fighting { bottom: 76px; }
+.np-name { font: 700 19px var(--display); }
+.np-lv { font: 600 12px var(--pixel); }
+.ballrail { border-radius: 22px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); box-shadow: 0 14px 32px var(--shadow-soft); }
+.br-list > li { position: relative; }
+.br-ball { border: 1px solid var(--line); border-radius: 16px; background: color-mix(in srgb, var(--surface-2) 70%, transparent); font: 700 14px var(--pixel); min-width: 58px; padding: 14px 8px 6px; gap: 3px; }
+.br-list > li > .br-ball { min-width: 58px; }
+/* The item art is a small ball on a 32px canvas: drawn at 40 it reads. */
+.ballrail .br-ball img { width: 40px; height: 40px; margin: -6px 0 -4px; }
+@media (hover: none) and (pointer: coarse) { .br-list > li > .br-ball { min-width: 50px; padding: 13px 6px 5px; } .ballrail .br-ball img { width: 34px; height: 34px; } }
+.br-list > li > .br-key, .br-list > li > kbd {
+  position: absolute; top: 4px; left: 4px; z-index: 2; min-width: 18px; padding: 2px 5px;
+  border-radius: 7px; font: 600 10px var(--pixel); align-self: auto;
+}
+.shout { border-radius: 18px; background: var(--glass); color: var(--ink); border: 1px solid var(--accent); box-shadow: 0 12px 28px var(--shadow-soft); }
+/* THE PHONE'S BALL STRIP NEVER SCROLLS SIDEWAYS: the balls alone, sharing the
+   width - the total and the berries are in the BAG sheet beside the pad. */
+@media (hover: none) and (pointer: coarse) {
+  .ballwrap .ballrail { left: 3%; right: 3%; max-width: none; justify-content: center; }
+  .ballwrap .br-tab, .ballwrap .br-kit { display: none; }
+  .ballwrap .br-wrap { flex: 1 1 auto; min-width: 0; }
+  .ballwrap .br-list { overflow: visible; width: 100%; }
+  .ballwrap .br-list > li { flex: 1 1 0; min-width: 0; }
+  .ballwrap .br-list > li > .br-ball { min-width: 0; padding: 13px 2px 5px; }
+  .ballwrap .ballrail .br-ball img { width: 30px; height: 30px; }
+  .ballwrap.fighting { bottom: 72px; }
 }

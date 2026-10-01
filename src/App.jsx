@@ -1,7 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createEngine, VIEW_W, VIEW_H, VIEW_W_MAX } from "./game/engine.js";
 import { TILE } from "./game/tileset.js";
-import TopBar from "./ui/TopBar.jsx";
+import TopBar, { Missions } from "./ui/TopBar.jsx";
+import You from "./ui/You.jsx";
+import { freePoints } from "./game/trainer.js";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
@@ -125,11 +127,12 @@ export default function App({
   const miniRef = useRef(null);
   const [engine, setEngine] = useState(null);
   /* A WIDER VIEW ON A DESKTOP. The map is capped by the window's HEIGHT at
-     15:11, which left the card half empty on a wide screen once the rail got
-     narrower. So it shows more tiles across instead of stretching: as many as
-     the card holds at the height `.viewport` is allowed (the same 210px
+     15:11, so it shows more tiles across instead of stretching: as many as
+     the card holds at the height `.viewport` is allowed (the same 170px
      allowance as its cap), 15 to VIEW_W_MAX. Phones and tablets keep 15x11,
-     whose layouts are sized to it. */
+     whose layouts are sized to it. (A full-window map, the Rotom panel
+     floating over it, was tried 2026-10-01 and reverted: twice the pixels a
+     frame, and encounters lost their smoothness.) */
   useEffect(() => {
     const screen = canvasRef.current?.closest(".screen");
     if (!engine || !screen) return undefined;
@@ -140,7 +143,7 @@ export default function App({
       if (wide.matches && !touch.matches) {
         const cs = getComputedStyle(screen);
         const w = screen.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-        const tile = Math.max(1, innerHeight - 210) / VIEW_H;
+        const tile = Math.max(1, innerHeight - 170) / VIEW_H;
         cols = Math.min(VIEW_W_MAX, Math.max(VIEW_W, Math.floor(w / tile)));
       }
       engine.setView(cols);
@@ -176,6 +179,12 @@ export default function App({
   const onLevelUp = useCallback((uid, n) => engine?.levelUp(uid, n), [engine]);
   const onEvolve = useCallback((uid, to) => engine?.evolve(uid, to), [engine]);
   const onJumped = useCallback(() => setBoxJump(null), []);
+  /* THE ROTOM PANEL'S APP (Dex, Box, Shop, Map, Events), held here so the
+     HUD's event cards and the Dex's "See in Box" can open the right one, and
+     whether its sheet is up on a phone (the pad's ROTOM key). */
+  const [railTab, setRailTab] = useState("dex");
+  const [rotom, setRotom] = useState(false);
+  const openRail = useCallback((id) => { setRailTab(id); setRotom(true); }, []);
   const [, force] = useReducer((n) => n + 1, 0);
   const [entry, setEntry] = useState(null);
   /* LOGGING OUT ASKS FIRST. It is not destructive - the account keeps the save
@@ -239,18 +248,46 @@ export default function App({
   // A profile link pasted into a game that is already open opens it too.
   useEffect(() => {
     const onHash = () => {
+      const h = location.hash;
       const name = linkedTrainer();
       if (name) setTrade({ name });
-      else if (!location.hash.startsWith("#/trade")) setTrade(null);   // Back, off the Trade Center page
-      if (!location.hash.startsWith("#/league")) setLeague(false);      // Back, off the League
+      else if (!h.startsWith("#/trade")) setTrade(null);   // Back, off the Trade Center page
+      if (!h.startsWith("#/league")) setLeague(false);      // Back, off the League
+      setYou(h.startsWith("#/you"));                        // Back, onto or off You
     };
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);
   }, []);
   const [league, setLeague] = useState(false);
+  const [you, setYou] = useState(() => location.hash.startsWith("#/you"));
+  /* THE TABS ARE THE PAGES (Rotom, 2026-10-01): Trade is the Trade Center,
+     Battles the League, You its own page; Catch is all of them closed. A
+     switch REPLACES the history entry when you are already on a page, so Back
+     always means "back to the game" in one press, and pushes when you leave
+     the map - each page reads its own hash and pushes nothing of its own. The
+     `tc`/`lg` keys are what the pages' own closers already look for. */
+  const tab = league ? "battles" : trade && !trade.profile ? "trade" : you || trade?.profile ? "you" : "catch";
+  const goTab = useCallback((t) => {
+    const onPage = /^#\/(trade|trainer\/|league|you)/.test(location.hash);
+    setTrade(t === "trade" ? { name: null } : null);
+    setLeague(t === "battles");
+    setYou(t === "you");
+    setRotom(false);
+    if (t === "catch") {
+      if (!onPage) return;
+      if (history.state?.page) history.back();
+      else history.replaceState(null, "", location.pathname + location.search);
+      return;
+    }
+    const st = { page: 1, tc: t === "trade" ? 1 : undefined, lg: t === "battles" ? 1 : undefined };
+    const hash = { trade: "#/trade", battles: "#/league", you: "#/you" }[t];
+    if (onPage) history.replaceState(st, "", hash);
+    else history.pushState(st, "", hash);
+  }, []);
+  // Leaving a page by its own corner button, or Escape: back to the map.
+  const toCatch = useCallback(() => goTab("catch"), [goTab]);
   const [help, setHelp] = useState(false);
   const [forms, setForms] = useState(false);
-  const [events, setEvents] = useState(false);
   const [news, setNews] = useState(false);
   // Read once per render, cheap: one localStorage get. Cleared by opening News.
   const unread = !news && newsUnread();
@@ -526,7 +563,7 @@ export default function App({
   const biome = biomeFor(st?.areaId);
 
   return (
-    <div className="app">
+    <div className={`app tab-${tab}${enc || evo ? " busy" : ""}`}>
       {/* ONE of these, at the root, for the whole app - see Tip.jsx for why it
           is an attribute rather than a wrapper. It renders nothing until
           something is hovered or focused. */}
@@ -614,7 +651,7 @@ export default function App({
       {help && <Help onClose={() => setHelp(false)} />}
       {forms && <Variants onClose={() => setForms(false)} />}
       {news && <News onClose={() => setNews(false)}
-        onEvents={() => { setNews(false); setEvents(true); }} />}
+        onEvents={() => { setNews(false); goTab("catch"); openRail("events"); }} />}
       {trade && (
         <Suspense fallback={null}>
           <TradeCenter
@@ -662,24 +699,39 @@ export default function App({
         </Suspense>
       )}
 
+      {you && (
+        <You
+          trainerName={trainerName}
+          caught={caught}
+          xp={st?.xp ?? 0}
+          stats={st?.stats}
+          bag={st?.bag ?? {}}
+          account={account}
+          unread={unread}
+          onSpend={(id) => engine.spend(id)}
+          save={engine && {
+            read: () => engine.exportSave(),
+            inspect: (obj) => engine.inspectSave(obj),
+            write: (obj) => engine.importSave(obj),
+            recover: () => engine.recoverable(),
+            restore: (which) => engine.restore(which),
+          }}
+          onProfile={account ? () => setTrade({ name: null, profile: true }) : null}
+          onNews={() => setNews(true)}
+          onHelp={() => setHelp(true)}
+          onForms={() => setForms(true)}
+          onSettings={account ? () => setSettings(true) : null}
+          onLogOut={onLogOut ? () => setLeaving(true) : null}
+          onReset={onLogOut ? null : () => engine?.reset()}
+        />
+      )}
+
       {scenes.length > 0 && (
         <Suspense fallback={null}>
           <TradeScene key={scenes[0].id} trade={scenes[0]} onDone={() => setScenes((q) => q.slice(1))} />
         </Suspense>
       )}
 
-      {events && (
-        <Events
-          world={engine?.world()}
-          state={st}
-          level={level}
-          busy={Boolean(enc || evo)}
-          onTravel={(id) => { if (engine.travel(id)) setEvents(false); }}
-          onSelect={(id) => { setEvents(false); setEntry(id); }}
-          onLeague={() => { setEvents(false); setLeague(true); }}
-          onClose={() => setEvents(false)}
-        />
-      )}
 
       {settings && account && (
         <Settings
@@ -714,12 +766,6 @@ export default function App({
       )}
 
       <TopBar
-        /* The quest lives here now rather than on the YOU tab - see Missions in
-           TopBar.jsx. The claim and its note live here too, because the top bar
-           is the only thing on screen in every state of the game. */
-        daily={engine?.daily?.()}
-        onClaimDaily={claimDaily}
-        claimNote={claimNote}
         caught={caught}
         total={st?.caught ?? 0}
         stale={st?.stale ?? null}
@@ -735,16 +781,10 @@ export default function App({
            preference. The account owns the save now, so leaving is logging out
            and the data stays. Reset survives only in local mode, where there is
            nothing to log out of. */
-        onReset={onLogOut ? null : () => engine?.reset()}
-        onLogOut={onLogOut ? () => setLeaving(true) : null}
-        onSettings={account ? () => setSettings(true) : null}
-        onHelp={() => setHelp(true)}
-        onForms={() => setForms(true)}
-        onEvents={() => setEvents(true)}
-        onLeague={() => setLeague(true)}
-        onTrade={() => setTrade({ name: null })}
-        onProfile={account ? () => setTrade({ name: null, profile: true }) : null}
-        tradeAlert={offerAlert > 0 || (inbox?.friend_requests ?? 0) > 0}
+        tab={tab}
+        onTab={goTab}
+        tradeAlert={offerAlert + (inbox?.friend_requests ?? 0)}
+        youAlert={unread || freePoints(st?.stats, level) > 0}
         onNews={() => setNews(true)}
         unread={unread}
         trainerName={trainerName}
@@ -829,7 +869,7 @@ export default function App({
                 type="button"
                 className={`rift-ring${ev.open ? " open" : ""}`}
                 key={ev.id}
-                onClick={() => setEvents(true)}
+                onClick={() => openRail("events")}
                 aria-label={`${ev.tip} Open events.`}
                 data-tip={ev.tip}
                 style={{ "--p": ev.ring }}
@@ -846,7 +886,7 @@ export default function App({
                 type="button"
                 className="fieldbox event"
                 key={ev.id}
-                onClick={() => setEvents(true)}
+                onClick={() => openRail("events")}
                 aria-label={`${ev.tip} Open events.`}
               >
                 <span data-tip={ev.tip}>
@@ -941,10 +981,18 @@ export default function App({
               </div>
             )}
 
-            {biome && !enc && (
-              <div className="biome-tag">
-                <span>{biome.name}</span>
-                <Types of={biome.types} />
+            {/* WHERE YOU ARE AND WHAT TODAY ASKS, top left of the world: the
+                area's name and the quest pill (it was in the top bar; the
+                quest is about this walk, so it lives over it). */}
+            {!enc && !evo && (
+              <div className="hud-left">
+                {biome && (
+                  <div className="biome-tag">
+                    <span>{biome.name}</span>
+                    <Types of={biome.types} />
+                  </div>
+                )}
+                <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />
               </div>
             )}
 
@@ -1008,10 +1056,30 @@ export default function App({
             bagOpen={bagView === "all"}
             onBag={() => setBagView((v) => (v === "all" ? null : "all"))}
             onPickBall={() => setBagView("balls")}
+            rotomOpen={rotom}
+            onRotom={() => setRotom((v) => !v)}
           />
         </div>
 
         <Rail
+          tab={railTab}
+          onTab={setRailTab}
+          open={rotom}
+          onClose={() => setRotom(false)}
+          /* THE EVENTS BOARD AS A ROTOM APP, beside the game - built only
+             while it is the app on screen: it is not memoised, and App
+             renders on every walk notice. */
+          events={railTab === "events" && (
+            <Events
+              world={engine?.world()}
+              state={st}
+              level={level}
+              busy={Boolean(enc || evo)}
+              onTravel={(id) => { if (engine.travel(id)) setRotom(false); }}
+              onSelect={(id) => setEntry(id)}
+              onLeague={() => goTab("battles")}
+            />
+          )}
           state={st}
           caught={caught}
           level={level}
@@ -1067,7 +1135,7 @@ export default function App({
           /* So the sheet can say "finish the dex" rather than "not yet" for a
              variant that cannot currently spawn at all. */
           owned={st?.box?.filter((m) => m.species === entry).length ?? 0}
-          onFindInBox={(id) => { setBoxJump(id); setEntry(null); }}
+          onFindInBox={(id) => { setBoxJump(id); setEntry(null); openRail("box"); }}
           /* Only once the inbox has answered: signed in, and trading open. */
           onFindOnBoard={inbox ? (id) => { setEntry(null); setTrade({ name: null, board: id }); } : null}
           /* Travelling closes the sheet, because the answer to "where do I

@@ -1540,6 +1540,10 @@ you own its Astral, so they are one quiet row of label/value pairs under a rule.
 
 ### The tabs wear drawn icons
 
+*Superseded 2026-10-01: the Rotom panel's apps wear stroked line icons drawn as
+markup (`src/ui/Icon.jsx`), which take `currentColor` the same way. The masks and
+`tools/build_icons.py` are gone. The history:*
+
 They were unicode characters — a grid, a ball, a yen sign — picked to be
 distinct at 15px, which they were, but they were also five different
 typefaces' idea of a shape in a UI that is otherwise pixel art all the way
@@ -3343,11 +3347,10 @@ reference for browsing, not a source: everything in them is in
 [pret/pokeemerald](https://github.com/pret/pokeemerald) with its real palettes,
 layers and collision, which is where map tiles are actually pulled from. If you add any other sheet marked
 ☆ in the source directory, add its artist here before you share the game.
-The pixel lettering is **Geist Pixel by the Geist Project Authors (Vercel)**, under the SIL Open Font
-License 1.1 (`public/fonts/OFL.txt`), self-hosted so the game reads the same offline.
-The shipped file is **modified**: `tools/build_font.py` merges each glyph's pixel squares into
-outlines (same shapes, far fewer points - it rendered slowly on phones). The OFL allows it; the
-font declares no Reserved Font Name.
+The lettering is **Rubik** (the Rubik Project Authors) and **Chakra Petch** (the Chakra Petch
+Project Authors), both under the SIL Open Font License 1.1 (`public/fonts/OFL.txt`), self-hosted
+so the game reads the same offline. (Geist Pixel, the pixel face before the Rotom redesign of
+2026-10-01, is no longer shipped.)
 **The League's rosters** — every gym leader's, gym trainer's, Elite Four
 member's and Champion's party — **are read from [Bulbapedia](https://bulbapedia.bulbagarden.net/)**
 (text under CC BY-NC-SA 2.5) by `tools/fetch-leagues.mjs`, and FireRed's and

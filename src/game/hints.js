@@ -48,7 +48,7 @@ export const HINTS = [
   {
     id: "duplicate",
     when: (e) => e.kind === "caught" && e.duplicate,
-    text: "A second one. Spares sell for cash or convert to Rare Candy in BOX — "
+    text: "A second one. Spares sell for cash or convert to Rare Candy in the Box — "
       + "you pick, every time.",
   },
   /* A COLLECTION WORTH LOSING IS WORTH A COPY, AND THAT IS SAID ONCE. EXPORT
@@ -63,13 +63,13 @@ export const HINTS = [
   {
     id: "backup",
     when: (e) => e.kind === "caught" && e.caught >= BACKUP_AT,
-    text: "That is a collection worth keeping. EXPORT in YOU saves a copy you "
+    text: "That is a collection worth keeping. Export, under You, saves a copy you "
       + "hold yourself — it outlives this browser and any account.",
   },
   {
     id: "candy",
     when: (e) => e.kind === "candy",
-    text: "Rare Candy is levels. Levels are how a Pokémon evolves — raise one in BOX.",
+    text: "Rare Candy is levels. Levels are how a Pokémon evolves — raise one in the Box.",
   },
   {
     id: "point",
@@ -80,7 +80,7 @@ export const HINTS = [
   {
     id: "travel",
     when: (e) => e.kind === "level" && e.opened,
-    text: (e) => `${e.opened} is open. Every map has its own residents — MAP to travel.`,
+    text: (e) => `${e.opened} is open. Every map has its own residents — Map, in Rotom, travels there.`,
   },
 ];
 

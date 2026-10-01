@@ -43,7 +43,7 @@ const RANKED_SAYS = {
   nobody: "Nobody to battle right now - ranked needs other trainers with two defense teams. Try again later.",
   uploading: "Your save is still uploading - try again in a moment.",
   twice: "A Pokémon is in that team twice.",
-  level: `Only Lv ${RANKED_LEVEL} Pokémon may battle in ranked - raise them in the League's Train tab.`,
+  level: `Only Lv ${RANKED_LEVEL} Pokémon may battle in ranked - raise them in Battles › Train.`,
   clause: "That team has two of one species - a form counts as its species.",
   size: "A team is one to six Pokémon.",
   version: "A new version of Dexora is out - reload the page to battle.",
@@ -392,7 +392,7 @@ export default function Ranked({ box, signedIn, editing, setEditing, onPractice,
       {usable.length > 1 && <p className="lg-why">Practice uses the team chosen above: Team {TEAM_NAME[(mine ?? 1) - 1]}.</p>}
       {note && <p className="lg-refused" role="status">{note}</p>}
       {friends === null ? <p className="ev-quiet">Loading friends…</p>
-        : !friends.length ? <p className="ev-quiet">Add friends in the Trade Center to practice against their teams.</p>
+        : !friends.length ? <p className="ev-quiet">Add friends in Trade to practice against their teams.</p>
           : (
             <ul className="rk-friends">
               {friends.map((f) => (
