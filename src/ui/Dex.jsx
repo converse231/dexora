@@ -16,13 +16,13 @@ import { label } from "../game/map.js";
 import {
   LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor, isLegendary,
   ROSETTE_NEED,
-  GEN_UNLOCK,
+  GEN_UNLOCK, REGION_NAME, speciesById,
 } from "../game/biomes.js";
 import FilterBar from "./FilterBar.jsx";
 import Sprite, { VariantFx } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 import { researchLevel, RESEARCH_MAX } from "../game/research.js";
-import { dexRank } from "../game/medals.js";
+import { dexRank, genReward } from "../game/medals.js";
 import { RankMedal } from "./RankBadge.jsx";
 
 const STATE = ["unseen", "seen", "caught"];
@@ -245,6 +245,9 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
       caught: mine.filter((sp) => at(sp.id) === 2).length,
     };
   }, [region, dex, tiers]);
+  // A region's Pokédex reward: claimed, ready, or what it waits on (`genReward`).
+  const reward = useMemo(() => (region === "all" ? null
+    : genReward(Number(region), dex ?? [], tiers?.gifted ?? [], tiers?.medals ?? [])), [region, dex, tiers]);
   const needle = find.trim().toLowerCase();
 
   const shown = SPECIES.filter((sp) => {
@@ -389,6 +392,15 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
         <b>{rank.name}</b>
         {rank.next && <i>{rank.left} more to {rank.next.name}</i>}
       </button>
+      {reward && (reward.claimed || reward.ready || reward.gifts.length > 0) && (
+        <p className={`dx-reward${reward.ready ? " ready" : ""}`} role="status">
+          {reward.claimed ? `${REGION_NAME[region]} Dex Master - reward claimed`
+            : reward.ready ? `${REGION_NAME[region]} complete - claim your reward with the REWARD button on the map`
+            : `The ${REGION_NAME[region]} reward needs your own ${reward.gifts.map((id) => label(speciesById(id))).join(", ")}`
+              + ` - ${reward.gifts.length > 1 ? "these came" : "it came"} by trade or as a gift`
+              + `${reward.left ? `, and ${reward.left} more to catch` : ""}. Catch one, or evolve your own.`}
+        </p>
+      )}
       <div className="count">
         <b>{scope.caught}</b> <span>/ {scope.total}</span>
         <em>{Math.round((scope.caught / Math.max(1, scope.total)) * 100)}%</em>

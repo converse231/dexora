@@ -152,6 +152,22 @@ export const dexCharm = (id, medals = []) => (medals.includes(`gen:${genOf(id)}`
 const owns = (dex, id) => dex[dexIndex(id)] === 2
   || (speciesById(id)?.form !== "look" && looksOf(id).some((x) => dex[dexIndex(x)] === 2));
 
+/* WHERE A GENERATION'S REWARD STANDS, for the Dex's region bar: claimed,
+   ready to claim, or what it still waits on - split into species never
+   caught and species held only as a gift or trade (`gifted`), which fill
+   the Pokédex but count for no reward. Reported 2026-10-03: Johto read
+   137/137 and paid nothing, the only Crobat a hard-mode gift. */
+export function genReward(gen, dex = [], gifted = [], earned = []) {
+  const m = MEDALS.find((x) => x.id === `gen:${gen}`);
+  if (!m) return null;
+  if (earned.includes(m.id)) return { claimed: true, ready: false, gifts: [], left: 0 };
+  const mine = [...dex];
+  for (const id of gifted) mine[dexIndex(id)] = 1;
+  const missing = m.need.filter((id) => !owns(mine, id));
+  const gifts = missing.filter((id) => owns(dex, id));
+  return { claimed: false, ready: !missing.length, gifts, left: missing.length - gifts.length };
+}
+
 // Generation medals a dex has finished and the save has not claimed yet.
 export const genMedalsDue = (dex, earned = []) => MEDALS.filter((m) => m.kind === "gen" && !earned.includes(m.id)
   && m.need.every((id) => owns(dex, id)));
