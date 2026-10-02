@@ -16,6 +16,19 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-03-dexmaster",
+    icon: "🏆",
+    date: "October 2026",
+    title: "Dex Masters and card titles",
+    items: [
+      ["Finish a generation's Pokédex", "¥20,000, a Master Ball, a title and a free box of any set."],
+      ["The Pokédex Charm", "That generation's rare forms and variants turn up 1.5x as often."],
+      ["Titles", "Complete a set, or every printing of one, and wear the title on your card."],
+      ["Show your cards", "Pin up to six cards to your trainer card."],
+      ["Binder covers", "Each set's binder has its cover, gold when it is done."],
+    ],
+  },
+  {
     id: "2026-10-02-cards3",
     icon: "📦",
     date: "October 2026",

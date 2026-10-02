@@ -3,14 +3,14 @@
    the motion sensors), what it is, who drew it, your copies, and the two
    things you can do with it: dust a spare, craft a missing copy. */
 import { useEffect, useRef, useState } from "react";
-import { RARITY, cardId, copiesOf, sparesOf, dustOf, craftCost, canCraft } from "../../game/cards.js";
+import { RARITY, cardId, copiesOf, sparesOf, dustOf, craftCost, canCraft, showKey, CARD_SHOW } from "../../game/cards.js";
 import { useModalLock, useDismiss } from "../modal.js";
 import { RarityMark, VARIANT_NAME } from "./Card.jsx";
 import { cardUrl, hiUrl } from "./load.js";
 
 const CAT = { P: "Pokémon", T: "Trainer", E: "Energy" };
 
-export default function Inspect({ set, localId, cards, dust, dex, onDust, onCraft, onSpecies, onClose }) {
+export default function Inspect({ set, localId, cards, dust, dex, showcase = [], onShow, onDust, onCraft, onSpecies, onClose }) {
   useModalLock();
   const dismiss = useDismiss(onClose);
   const card = set.CARDS.find((c) => c[0] === localId);
@@ -82,9 +82,19 @@ export default function Inspect({ set, localId, cards, dust, dex, onDust, onCraf
             })}
           </ul>
           <p className="cd-sub">You have {dust.toLocaleString()} Card Dust · {copiesOf(row)} cop{copiesOf(row) === 1 ? "y" : "ies"} of this card</p>
-          {card[5].length > 0 && (
-            <button type="button" className="lg-go quiet" onClick={() => onSpecies(card[5][0])}>Open in the Pokédex</button>
-          )}
+          <div className="cd-actions">
+            {/* YOUR TRAINER CARD shows up to CARD_SHOW cards, the printing shown here. */}
+            {row?.[shown] && onShow && (showcase.includes(showKey(cardId(set.SET.id, localId), shown)) ? (
+              <button type="button" className="lg-go quiet" onClick={() => onShow(shown, false)}>On your trainer card ✓</button>
+            ) : (
+              <button type="button" className="lg-go quiet" disabled={showcase.length >= CARD_SHOW} onClick={() => onShow(shown, true)}>
+                Show on trainer card{showcase.length >= CARD_SHOW ? " (full)" : ""}
+              </button>
+            ))}
+            {card[5].length > 0 && (
+              <button type="button" className="lg-go quiet" onClick={() => onSpecies(card[5][0])}>Open in the Pokédex</button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -297,6 +297,36 @@ ca = await card(A);
 assert.ok(!ca.showcase.some((m) => m.uid === 3), "a Pokemon that left the box stayed in the showcase");
 assert.equal(ca.showcase.find((m) => m.uid === 1).species, 18, "the showcase did not follow an evolution");
 
+// ---- 12b. CARDS on the card (docs/cards.md, phase 4) ------------------------------
+// The showcase and the titles come off the STORED save: a card not held in that
+// printing, a malformed key, a repeat and anything past the cap are dropped; the
+// titles are the game's own (titles.js) for the same save.
+{
+  const { titleIds } = await import("../src/game/titles.js");
+  const cardsPayload = {
+    ...payload,
+    cards: { "me01-001": { n: 2, r: 1 }, "me01-187": { h: 1 }, "me01-003": { h: 1 } },
+    cardShowcase: ["me01-187:h", "me01-001:r", "me01-001:r", "me01-999:h", "me01-003:n", "bad key", "me01-001:n",
+      "me01-003:h", "x1-1:n", "x2-2:n", "x3-3:n", "x4-4:n"],
+    milestones: { me01: 5, me02: 4, me025: 2 },
+    medals: ["gen:1", "gen:9", "dex", "gen:10"],
+  };
+  await rpc(A, "save_game", { payload: cardsPayload, sess: "s-a" });
+  const cc = await card(A);
+  assert.deepEqual(cc.card_show, [{ id: "me01-187", v: "h" }, { id: "me01-001", v: "r" }, { id: "me01-001", v: "n" }, { id: "me01-003", v: "h" }],
+    `card showcase ${JSON.stringify(cc.card_show)} - an unheld printing, a repeat or a bad key got through`);
+  assert.deepEqual(cc.titles, titleIds(cardsPayload.milestones, cardsPayload.medals),
+    `titles ${cc.titles} are not the game's ${titleIds(cardsPayload.milestones, cardsPayload.medals)}`);
+  assert.deepEqual(cc.titles, ["dex:1", "dex:9", "master:me01", "set:me01", "set:me02"]);
+  // Sold off: a card that leaves the save leaves the card.
+  await rpc(A, "save_game", { payload: { ...cardsPayload, cards: { "me01-001": { n: 2 } } }, sess: "s-a" });
+  assert.deepEqual((await card(A)).card_show, [{ id: "me01-001", v: "n" }], "a card no longer held stayed on the trainer card");
+  // Readable by another player, through the column grant.
+  const peek = await B.c.from("trainer_cards").select("card_show, titles").eq("user_id", A.id);
+  assert.ok(peek.data?.[0] && Array.isArray(peek.data[0].titles), `another player cannot read card_show/titles: ${peek.error?.message}`);
+  await rpc(A, "save_game", { payload, sess: "s-a" });
+}
+
 // ---- 13. public to players, written by nobody -----------------------------------
 const seen = await B.c.from("trainer_cards").select("username, showcase").eq("user_id", A.id);
 assert.equal(seen.data?.[0]?.username, "TesterA", "a player could not read another trainer's card");

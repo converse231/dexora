@@ -14,6 +14,7 @@ import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
 import WaterAsk from "./ui/WaterAsk.jsx";
+import { titleIds } from "./game/titles.js";
 import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
 import Variants from "./ui/Variants.jsx";
@@ -742,6 +743,7 @@ export default function App({
       {you && (
         <You
           trainerName={trainerName}
+          titles={titleIds(st?.milestones, st?.medals)}
           caught={caught}
           xp={st?.xp ?? 0}
           stats={st?.stats}

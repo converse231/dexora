@@ -76,6 +76,14 @@ export function sparesOf(row, variant) {
 /* SET MILESTONES (docs/cards.md): a share of a set's cards owned pays dust
    once; the whole set is a title too. */
 export const MILESTONES = [[0.25, 200], [0.5, 500], [0.75, 1000], [1, 2000]];
+/* THE MASTER SET: every printing of every card in a set (a reverse holo and a
+   normal of each common count twice). Its own dust, the master title and the
+   gold binder cover - paid once, as the step past MILESTONES. */
+export const MASTER_DUST = 5000;
+export const printingsOf = (cards) => cards.reduce((n, c) => n + c[4].length, 0);
+// How many cards of a showcase a trainer card shows (trade_limit('CARD_SHOW')).
+export const CARD_SHOW = 6;
+export const showKey = (id, variant) => `${id}:${variant}`;
 export const titleOf = (setName) => `${setName} Collector`;
 
 // The Pulls wall keeps your best pulls, newest first.

@@ -115,6 +115,7 @@ returns int language sql immutable set search_path = '' as $$
     when 'LISTING_DAYS' then 7
     when 'MAX_SIDE' then 6
     when 'SHOWCASE' then 6
+    when 'CARD_SHOW' then 6
     when 'SEEKING' then 12
     when 'FRIENDS' then 100
     when 'SHELF' then 12
@@ -620,6 +621,11 @@ create index if not exists trainer_cards_name on public.trainer_cards (lower(use
 -- Badges (battles phase 6, docs/battles.md): the League leaders beaten in the
 -- stored save's `beaten`, counted by `card_stats` like every other number.
 alter table public.trainer_cards add column if not exists badges int not null default 0;
+-- CARDS (docs/cards.md, phase 4): the TCG cards a trainer shows, and the
+-- titles they have earned - both derived from the STORED save by
+-- `card_stats`, never written by a request.
+alter table public.trainer_cards add column if not exists card_show jsonb not null default '[]';
+alter table public.trainer_cards add column if not exists titles text[] not null default '{}';
 
 alter table public.trainer_cards enable row level security;
 drop policy if exists "cards are public to players" on public.trainer_cards;
@@ -631,7 +637,7 @@ create policy "cards are public to players" on public.trainer_cards for select
 -- column is unreadable until it is added here.
 revoke select on public.trainer_cards from anon, authenticated;
 grant select (user_id, username, char, xp, dex_count, variants, stars, trades,
-              showcase, seeking, joined_at, played_at, badges)
+              showcase, seeking, joined_at, played_at, badges, card_show, titles)
   on public.trainer_cards to authenticated;
 
 -- Eight characters with nothing to misread aloud: no 0/O, no 1/I/L.
@@ -708,6 +714,8 @@ begin
     from jsonb_each(case when jsonb_typeof(data->'beaten') = 'object' then data->'beaten' else '{}' end) b
    where b.key = any(public.badge_list())
      and jsonb_typeof(b.value->'wins') = 'number' and coalesce(b.value->>'wins', '') ~ '^[1-9]\d{0,8}$');
+  card.card_show := public.card_showcase(data);
+  card.titles := public.card_titles(data);
   -- A showcased Pokemon that left the box leaves the showcase; one that
   -- evolved or levelled shows as it is now.
   card.showcase := coalesce((
@@ -716,6 +724,39 @@ begin
       join jsonb_array_elements(box) e on e->>'uid' = s.v->>'uid'), '[]');
   return card;
 end;
+$$;
+
+-- THE CARD SHOWCASE: the save's `cardShowcase` ("me01-187:h"), each kept only
+-- while the save's `cards` holds that card in that printing; first mention of
+-- each, in order, then the cap. The same keys the game writes (engine `showCard`).
+create or replace function public.card_showcase(data jsonb)
+returns jsonb language sql immutable set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', z.id, 'v', z.v) order by z.n), '[]') from (
+    select split_part(k, ':', 1) as id, split_part(k, ':', 2) as v, min(n) as n
+      from jsonb_array_elements_text(case when jsonb_typeof(data->'cardShowcase') = 'array'
+                                          then data->'cardShowcase' else '[]' end) with ordinality s(k, n)
+     where k ~ '^[A-Za-z0-9_.]+-[A-Za-z0-9_]+:[nhr]$'
+       and coalesce(data->'cards'->split_part(k, ':', 1)->>split_part(k, ':', 2), '') ~ '^[1-9][0-9]{0,1}$'
+     group by 1, 2
+     order by 3 limit public.trade_limit('CARD_SHOW')) z
+$$;
+
+-- TITLES, as src/game/titles.js derives them: a set's milestones paid
+-- (4 = the whole set, 5 = the master set) and a generation's Pokédex medal.
+create or replace function public.card_titles(data jsonb)
+returns text[] language sql immutable set search_path = '' as $$
+  select coalesce(array_agg(t order by t), '{}') from (
+    select 'set:' || m.key as t
+      from jsonb_each_text(case when jsonb_typeof(data->'milestones') = 'object' then data->'milestones' else '{}' end) m
+     where m.key ~ '^[A-Za-z0-9_.]+$' and m.value ~ '^[0-9]{1,2}$' and m.value::int >= 4
+    union all
+    select 'master:' || m.key
+      from jsonb_each_text(case when jsonb_typeof(data->'milestones') = 'object' then data->'milestones' else '{}' end) m
+     where m.key ~ '^[A-Za-z0-9_.]+$' and m.value ~ '^[0-9]{1,2}$' and m.value::int >= 5
+    union all
+    select 'dex:' || substr(g, 5)
+      from jsonb_array_elements_text(case when jsonb_typeof(data->'medals') = 'array' then data->'medals' else '[]' end) g
+     where g ~ '^gen:[1-9]$') x
 $$;
 
 -- A box entry as a card shows it - fields read off the stored save only.
@@ -739,7 +780,8 @@ begin
   if not found then return new; end if;
   c := public.card_stats(new.data, c);
   update public.trainer_cards set xp = c.xp, dex_count = c.dex_count, variants = c.variants,
-    stars = c.stars, badges = c.badges, showcase = c.showcase, played_at = now()
+    stars = c.stars, badges = c.badges, showcase = c.showcase, card_show = c.card_show,
+    titles = c.titles, played_at = now()
    where user_id = new.user_id;
   return new;
 exception when others then
@@ -767,6 +809,11 @@ update public.trainer_cards c set badges = s.n
   from (select sv.user_id as uid, (public.card_stats(sv.data, c2)).badges as n
           from public.saves sv join public.trainer_cards c2 on c2.user_id = sv.user_id) s
  where s.uid = c.user_id and c.badges <> s.n;
+-- Card showcases and titles arrived later still: the same, for them.
+update public.trainer_cards c set card_show = public.card_showcase(sv.data), titles = public.card_titles(sv.data)
+  from public.saves sv
+ where sv.user_id = c.user_id
+   and (c.card_show <> public.card_showcase(sv.data) or c.titles <> public.card_titles(sv.data));
 
 -- The one thing a trainer writes: which Pokemon to show, which to look for.
 -- Showcase entries are box uids; each is looked up in the STORED save and

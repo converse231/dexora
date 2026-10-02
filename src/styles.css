@@ -8715,6 +8715,29 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-vname.on { border-color: var(--accent); color: var(--ink); }
 .cd-copies li > b { min-width: 30px; font: 700 13px var(--pixel); color: var(--ink); }
 .cd-packonly { font: 600 12px var(--pixel); color: var(--gold); }
+/* A free box of your choice (a generation's Pokédex). */
+.cd-voucher { display: grid; gap: 6px; padding: 14px 16px; border: 1px solid var(--gold); }
+.cd-voucher > b { font: 700 16px var(--display); color: var(--ink); }
+.cd-voucher > span { font-size: 13px; color: var(--ink-soft); }
+/* THE BINDER COVER: locked, foil once complete, gold for the master set. */
+.cd-cover { position: relative; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 14px; overflow: hidden;
+  border: 1px dashed var(--line-firm); background: var(--surface-2); max-width: 760px; }
+.cd-cover img { width: 120px; filter: grayscale(1) opacity(.45); }
+.cd-cover span { display: grid; gap: 2px; min-width: 0; }
+.cd-cover b { font: 700 15px var(--display); color: var(--ink-soft); }
+.cd-cover i { font-style: normal; font-size: 12.5px; color: var(--ink-faint); }
+.cd-cover.done { border: 0; background: linear-gradient(125deg, #2a1d5c, #6b2fa8 40%, #1aa4b8); }
+.cd-cover.done img { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .5)); }
+.cd-cover.done b, .cd-cover.done i { color: #fff; }
+.cd-cover.master { background: linear-gradient(125deg, #7a5200, #f3c64c 40%, #fff1b8 55%, #c58b10); }
+.cd-cover.master b, .cd-cover.master i { color: #3a2600; }
+.cd-cover.done::after { content: ""; position: absolute; top: -20%; bottom: -20%; left: -40%; width: 30%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .45), transparent); animation: cd-sweep 3.4s ease-in-out infinite; }
+/* Earned titles: on You and on a trainer card. */
+.you-titles { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.you-titles i { font-style: normal; font: 700 11px var(--pixel); padding: 3px 8px; border-radius: 999px;
+  color: #3a2600; background: linear-gradient(#ffe27a, #f0b83c); }
+.tp-cards .cd-chase-card { width: 92px; }
 .cd-x { position: absolute; right: 10px; top: 10px; z-index: 2; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
 
 /* ================================================================ THE OPENING */

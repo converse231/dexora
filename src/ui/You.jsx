@@ -13,11 +13,12 @@ import { levelProgress } from "../game/biomes.js";
 import { dexRank } from "../game/medals.js";
 import { freePoints } from "../game/trainer.js";
 import { themeChoice, setTheme, THEMES } from "./theme.js";
+import { titleName } from "../game/titles.js";
 
 const THEME_NAME = { auto: "Auto", dark: "Night", light: "Day" };
 
 export default function You({
-  trainerName, caught, xp, stats, bag, save, account, unread,
+  trainerName, caught, xp, stats, bag, save, account, unread, titles = [],
   onProfile, onNews, onHelp, onForms, onSettings, onLogOut, onReset, onSpend,
 }) {
   useModalLock();
@@ -44,6 +45,10 @@ export default function You({
             <span>LV {level} · {r.name}{r.next ? ` · ${r.left} more to ${r.next.name}` : ""}</span>
             <span className="xpbar" aria-hidden="true"><i style={{ width: `${Math.round(frac * 100)}%` }} /></span>
             <small>{need ? `${into.toLocaleString()} / ${need.toLocaleString()} XP to Lv ${level + 1}` : "Max level"}</small>
+            {/* TITLES, earned: a completed set or master set, a generation's Pokédex. */}
+            {titles.length > 0 && (
+              <span className="you-titles">{titles.map((t) => <i key={t}>{titleName(t)}</i>)}</span>
+            )}
           </div>
           {/* A button, not a #link: the hash is the app's route (App's hashchange). */}
           {free > 0 && (

@@ -16,6 +16,8 @@ import RankBadge, { RankMedal } from "../RankBadge.jsx";
 import { dexRank } from "../../game/medals.js";
 import { peakRank, seasonName } from "../../game/ranked.js";
 import { rankedStanding } from "../../net/cloud.js";
+import { titleName } from "../../game/titles.js";
+import CardShow from "../cards/CardShow.jsx";
 
 /* THEIR RANK (docs/ranked.md, 6c), read from the server when the profile
    opens; nothing while it loads, on a server without ranked, or for a trainer
@@ -236,6 +238,8 @@ export default function TrainerProfile({
             <RankMedal set="dex" id={dexRank(card.dex_count).id} color={dexRank(card.dex_count).color} />
             {dexRank(card.dex_count).name}
           </span>
+          {/* Titles the server derived from the stored save (card_titles). */}
+          {card.titles?.length > 0 && <span className="you-titles">{card.titles.map((t) => <i key={t}>{titleName(t)}</i>)}</span>}
           {self && <FriendCode code={card.friend_code} />}
         </div>
       </header>
@@ -249,6 +253,15 @@ export default function TrainerProfile({
         </header>
         <Showcase list={card.showcase} onAdd={self ? () => onEdit("showcase") : null} />
       </section>
+
+      {(card.card_show?.length > 0 || self) && (
+        <section className="ev-card">
+          <header className="ev-banner">
+            <h4>Cards</h4><span className="tp-count">{card.card_show?.length ?? 0}/{LIMITS.CARD_SHOW}</span>
+          </header>
+          <CardShow list={card.card_show ?? []} self={self} />
+        </section>
+      )}
 
       <section className="ev-card">
         <header className="ev-banner">
