@@ -26,9 +26,9 @@ import { ALPHA_CHANCE } from "../game/biomes.js";
 import { OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_STEPS } from "../game/events.js";
 import { RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } from "../game/research.js";
 import { LIMITS } from "../game/trade.js";
-import { DEX_RANKS } from "../game/medals.js";
+import { DEX_RANKS, DEX_CHARM, MEDALS } from "../game/medals.js";
 import { TEAM_MAX, REMATCH_SHARE, REMATCH_CAP_STEP } from "../game/league.js";
-import { PACK_PRICE, PACK_SIZE, PITY, CRAFT_X, MILESTONES, STREAK_PACK } from "../game/cards.js";
+import { PACK_PRICE, PACK_SIZE, PITY, CRAFT_X, MILESTONES, STREAK_PACK, MASTER_DUST, CARD_SHOW } from "../game/cards.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
    lists want identical rows and a second copy of the row is how one of them
@@ -108,6 +108,13 @@ export default function Help({ onClose }) {
             Your Pokédex rank grows with the species you have caught:{" "}
             {DEX_RANKS.map((r) => `${r.name}${r.at ? ` (${r.at})` : ""}`).join(", ")}.
             It shows on the Dex tab and on your trainer card.
+          </p>
+          {/* A generation's medal: the live medal row, never typed. */}
+          <p className="hp-note">
+            Catch every species of a generation yourself and it pays
+            ¥{(MEDALS.find((m) => m.kind === "gen")?.money ?? 0).toLocaleString()}, a Master Ball, a
+            Dex Master title and a free box of any card set - and that
+            generation&rsquo;s rare forms are {DEX_CHARM}&times; as likely for good.
           </p>
           {/* THE FOUR THINGS THAT HAPPEN TO THE WORLD, and nowhere else says
               them: a system nobody is told about reads as a bug the first time
@@ -200,7 +207,12 @@ export default function Help({ onClose }) {
               <b>Dust.</b> Spare copies become Card Dust; a missing card crafts for {CRAFT_X} spares&rsquo; worth -
               except Special illustration rares and Mega Hyper Rares, which come from packs only.
               You always keep one of each, and earned copies stay. Owning a quarter, half, three quarters and all
-              of a set pays dust too ({MILESTONES.map(([, d]) => d.toLocaleString()).join(" / ")}).
+              of a set pays dust too ({MILESTONES.map(([, d]) => d.toLocaleString()).join(" / ")}), and every
+              printing of it {MASTER_DUST.toLocaleString()} more.
+            </li>
+            <li>
+              <b>Titles and your card.</b> A finished set and a master set each give a title, and up to{" "}
+              {CARD_SHOW} cards can be shown on your trainer card from the card view.
             </li>
             <li>
               <b>Just for collecting.</b> Cards change nothing in the wild or in battle - no catch, spawn or stat.

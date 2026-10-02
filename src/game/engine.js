@@ -41,12 +41,13 @@ import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
 import {
   openPack as rollPack, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX,
   dustOf, craftCost, sparesOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, STREAK_PACK,
+  MASTER_DUST, printingsOf, CARD_SHOW, showKey,
 } from "./cards.js";
 import { CARD_SETS } from "../data/cards/index.js";
 import { defenders, defendNote } from "./ranked.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
-import { medalsFor, milestoneAt, dexRank, rankLine } from "./medals.js";
+import { medalsFor, milestoneAt, dexRank, rankLine, dexCharm, genMedalsDue } from "./medals.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE, TUTOR_PRICE,
   evolveState, evoLevel, startingState, dexBonus, catchBounty, levelReward,
@@ -212,6 +213,8 @@ function freshState() {
     cardLog: [],          // the Pulls wall: `[cardId, variant, at]`, newest first
     milestones: {},       // set id -> how many of MILESTONES it has paid
     cardDay: null,        // the day the last pack opened - the daily first pack
+    boxVouchers: [],      // free boxes of your choice, by where they came from ("dex:1")
+    cardShowcase: [],     // cards on your trainer card, "me01-187:h" - the server checks each
     rift: null,           // an open space-time rift, `{ areaId, left }` - see events.js
     sinceTravel: 0,       // steps since the map last changed, which is what opens a rift
     /* One quest a day. `key` is the local date it belongs to, so a new day is
@@ -622,8 +625,12 @@ function loadState() {
         && typeof e[0] === "string" && /^[\w.]+-\w+$/.test(e[0]) && ["n", "h", "r"].includes(e[1])
         && Number.isFinite(e[2])).slice(0, LOG_MAX),
       milestones: Object.fromEntries(Object.entries(plain(s.milestones))
-        .map(([k, v]) => [k, Math.min(MILESTONES.length, Math.floor(Number(v)))]).filter(([, v]) => v > 0)),
+        .map(([k, v]) => [k, Math.min(MILESTONES.length + 1, Math.floor(Number(v)))]).filter(([, v]) => v > 0)),
       cardDay: typeof s.cardDay === "string" && s.cardDay.length <= 16 ? s.cardDay : null,
+      boxVouchers: (Array.isArray(s.boxVouchers) ? s.boxVouchers : [])
+        .filter((v) => typeof v === "string" && v.length <= 64).slice(0, 50),
+      cardShowcase: [...new Set(Array.isArray(s.cardShowcase) ? s.cardShowcase : [])]
+        .filter((v) => typeof v === "string" && /^[\w.]+-\w+:[nhr]$/.test(v)).slice(0, CARD_SHOW),
       /* A save from before `paid` existed was paid for every level it had
          reached, and never past the old cap of 50 - so that is where it
          stands, and anything above is owed. Never above its own level, so no
@@ -1611,6 +1618,7 @@ export function createEngine(canvas, onChange, mini = null) {
       lockedTiers(sp.id),
       pityBoost(state.dry) * (honey && !honey.tier ? honey.lift : 1)
         * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.stars) * charmOf(state.beaten)
+        * dexCharm(sp.id, state.medals)
         * tierLift(state.stats),
       honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
@@ -2009,6 +2017,7 @@ export function createEngine(canvas, onChange, mini = null) {
   function checkDexRewards(speciesId) {
     for (const medal of medalsFor(speciesId, ownDex(), state.medals)) {
       state.medals.push(medal.id);
+      if (medal.kind === "gen") state.boxVouchers = [...state.boxVouchers, `dex:${medal.gen}`];
       pay(medal.money, medal.items, {
         kind: "medal", title: medal.name, sub: medal.sub,
       });
@@ -2676,6 +2685,17 @@ export function createEngine(canvas, onChange, mini = null) {
   /* And anything a raised cap owes is paid now, with its banner - not on the
      next catch, which would read as one catch paying out nine levels. */
   if (!state.stale && payLevels()) save();
+  /* A GENERATION ALREADY FINISHED pays its medal now: the medals arrived after
+     some Pokédexes were complete, and a medal only checks on a new catch. */
+  if (!state.stale) {
+    const due = genMedalsDue(ownDex(), state.medals);
+    for (const medal of due) {
+      state.medals.push(medal.id);
+      state.boxVouchers = [...state.boxVouchers, `dex:${medal.gen}`];
+      pay(medal.money, medal.items, { kind: "medal", title: medal.name, sub: medal.sub });
+    }
+    if (due.length) save();
+  }
   bakeMini();
   raf = requestAnimationFrame(frame);
 
@@ -2719,13 +2739,40 @@ export function createEngine(canvas, onChange, mini = null) {
 
   /* A REWARD IN PACKS, stamped with where it came from, for the newest set
      open (the first before any is): a badge, a Champion, a streak. */
-  function grantPacks(n, stamp) {
-    const id = newestOpen(levelFromXp(state.xp)) ?? CARD_SETS[0]?.id;
+  function grantPacks(n, stamp, to = null) {
+    const id = to ?? newestOpen(levelFromXp(state.xp)) ?? CARD_SETS[0]?.id;
     if (!id) return null;
     state.packs = { ...state.packs, [id]: (state.packs[id] ?? 0) + n };
     state.earnedPacks = { ...state.earnedPacks, [id]: [...(state.earnedPacks[id] ?? []), ...Array(n).fill(stamp)] };
     teach({ kind: "cardpack" });
     return id;
+  }
+
+  /* A BOX OF YOUR CHOICE (a generation's Pokédex): any shipped set, its box
+     or bundle, every pack earned and stamped where the voucher came from. */
+  function claimBox(setId) {
+    if (!state.boxVouchers.length || !BOXES[setId] || !setById(setId)) return false;
+    const [stamp, ...rest] = state.boxVouchers;
+    state.boxVouchers = rest;
+    grantPacks(BOXES[setId].packs, stamp, setId);
+    save();
+    changed();
+    return true;
+  }
+
+  /* YOUR CARD SHOWCASE: a card you hold, in a printing you hold, on or off
+     your trainer card. The server shows only what the stored save holds. */
+  function showCard(id, variant, on = true) {
+    const key = showKey(id, variant);
+    const list = state.cardShowcase.filter((k) => k !== key);
+    if (on) {
+      if (!state.cards[id]?.[variant] || list.length >= CARD_SHOW) return false;
+      list.push(key);
+    }
+    state.cardShowcase = list;
+    save();
+    changed();
+    return true;
   }
 
   /* OPEN ONE, decided and SAVED before a frame of the scene plays: a reload
@@ -2739,7 +2786,7 @@ export function createEngine(canvas, onChange, mini = null) {
   };
   /* SET MILESTONES pay once each, as a share of the set's cards is reached;
      the whole set is a title too. A cheer per step paid. */
-  function payMilestones(meta) {
+  function payMilestones(meta, cards = null) {
     const owned = Object.keys(state.cards).filter((k) => k.startsWith(`${meta.id}-`)).length;
     let paid = state.milestones[meta.id] ?? 0;
     const was = paid;
@@ -2749,6 +2796,16 @@ export function createEngine(canvas, onChange, mini = null) {
       cheer({ kind: "cards", title: share >= 1 ? titleOf(meta.name).toUpperCase() : `${Math.round(share * 100)}% OF ${meta.name.toUpperCase()}`,
         sub: `${share >= 1 ? "The whole set. " : ""}+${dust.toLocaleString()} Card Dust.` });
       paid++;
+    }
+    /* THE MASTER SET, the step past the milestones: every printing held. */
+    if (paid === MILESTONES.length && cards) {
+      const held = cards.reduce((n, c) => n + c[4].split("").filter((v) => state.cards[cardId(meta.id, c[0])]?.[v]).length, 0);
+      if (held === printingsOf(cards)) {
+        state.dust += MASTER_DUST;
+        cheer({ kind: "cards", title: `${meta.name.toUpperCase()} MASTER SET`,
+          sub: `Every printing. +${MASTER_DUST.toLocaleString()} Card Dust and the gold binder cover.` });
+        paid++;
+      }
     }
     if (paid !== was) state.milestones = { ...state.milestones, [meta.id]: paid };
   }
@@ -2813,7 +2870,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const day = dayKey();
     const daily = state.cardDay !== day;
     state.cardDay = day;
-    payMilestones(meta);
+    payMilestones(meta, set.CARDS);
     return { pulls: out, god, daily };
   }
 
@@ -2880,7 +2937,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if ((row[variant] ?? 0) >= CARD_MAX) return false;
     state.dust -= cost;
     state.cards = { ...state.cards, [key]: { ...row, [variant]: (row[variant] ?? 0) + 1 } };
-    payMilestones(meta);
+    payMilestones(meta, set.CARDS);
     save();
     changed();
     return true;
@@ -3380,6 +3437,8 @@ export function createEngine(canvas, onChange, mini = null) {
     dustCard,
     dustSpares,
     craftCard,
+    claimBox,
+    showCard,
     buyCandy,
     useField,
     useBerry,

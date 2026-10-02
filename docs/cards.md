@@ -690,6 +690,25 @@ now and then when a step started an encounter.
   reveal, then one summary of every pack (boxes and the bundle included).
 - **Types in battle**: each health box shows its Pokémon's types.
 
+## Phase 4 as built *(2026-10-03, gate passed)*
+
+- **Titles**: a whole set ("<Set> Collector"), a master set ("<Set> Master
+  Collector") and a generation's Pokédex ("Kanto Dex Master") - on the Cards
+  header, the You page and the trainer card. `titleIds` in the game and
+  `card_titles` in trading.sql are one rule (tradedb holds them equal).
+- **Binder covers**: a set's own logo on its cover; gold when the set is done,
+  foil when every printing is.
+- **The master set**: every printing of a set (reverses and holos too) is a
+  fifth milestone, paying `MASTER_DUST` (5,000) and the master title.
+- **The card showcase**: up to six cards on your trainer card ("Show on
+  trainer card" in the card view), read by the server off the stored save, so
+  a card you no longer hold leaves the card.
+- **A finished generation** (your call): its whole Pokédex, caught yourself,
+  pays ¥20,000, a Master Ball, a title, a **box of choice** (any set's box or
+  bundle, earned and stamped) and the **Pokédex Charm** - 1.5x that
+  generation's rare forms and variants. A save that finished one before the
+  medal existed is paid at its next load.
+
 ## Deferred on purpose *(each with the trigger that brings it back)*
 
 - **Trading cards** - needs server-minted card rows; trigger: players asking

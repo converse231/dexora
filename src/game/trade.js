@@ -19,6 +19,7 @@ export const LIMITS = {
   SEEKING: 12,            // "looking for" species on a profile
   FRIENDS: 100,           // friends and pending requests, per trainer
   SHELF: 12,              // Pokemon a trainer puts up for trade
+  CARD_SHOW: 6,           // cards shown on a trainer card (docs/cards.md, phase 4)
 };
 
 /* WHY A BOX ENTRY CANNOT MOVE. Set by the engine from what the server says the

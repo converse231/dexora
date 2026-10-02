@@ -17,6 +17,9 @@ import CardFace, { RarityMark } from "./Card.jsx";
 import Inspect from "./Inspect.jsx";
 import Opening, { OpenAll } from "./Opening.jsx";
 import { loadSet, logoUrl, packUrl } from "./load.js";
+import { titleIds, titleName, MASTER_STEP } from "../../game/titles.js";
+import { REGION_NAME } from "../../game/biomes.js";
+import { showKey, CARD_SHOW, printingsOf } from "../../game/cards.js";
 
 const yen = (n) => `¥${n.toLocaleString()}`;
 const oneIn = (p) => Math.round(1 / p);
@@ -102,7 +105,9 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
     setNote(engine.buyPacks(id, n) ? "" : `Not enough money for ${n === 1 ? "a pack" : `${n} packs`}.`);
   };
   const look = (setId, localId) => setInspect({ setId, localId });
-  const titles = CARD_SETS.filter((s) => (st?.milestones?.[s.id] ?? 0) >= MILESTONES.length).map((s) => titleOf(s.name));
+  const titles = titleIds(st?.milestones, st?.medals).map(titleName);
+  const vouchers = st?.boxVouchers ?? [];
+  const from = (stamp) => (stamp.startsWith("dex:") ? `the ${REGION_NAME[stamp.slice(4)] ?? ""} Pokédex` : "a reward");
 
   return (
     <div className={`tc-page evcard cd-page${opening ? " opening" : ""}`} role="dialog" aria-modal="true" aria-label="Cards" ref={page}>
@@ -133,6 +138,20 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
         {tab === "packs" && !opening && (
           <div className="cd-packs">
             {note && <p className="cd-note" role="alert">{note}</p>}
+            {/* A BOX OF YOUR CHOICE, from a completed generation's Pokédex. */}
+            {vouchers.length > 0 && (
+              <section className="ev-card cd-voucher">
+                <b>🎁 A free box{vouchers.length > 1 ? ` (${vouchers.length})` : ""} - from {from(vouchers[0])}</b>
+                <span>Choose a set: every pack in it is earned and carries the stamp.</span>
+                <div className="cd-actions">
+                  {CARD_SETS.map((s) => (
+                    <button key={s.id} type="button" className="lg-go" onClick={() => engine.claimBox(s.id)}>
+                      {s.name} · {BOXES[s.id].packs} packs
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
             {CARD_SETS.map((s) => (
               <PackCard key={s.id} meta={s} set={sets[s.id]} level={level} money={st?.money ?? 0}
                 held={packs[s.id] ?? 0} earned={st?.earnedPacks?.[s.id]?.length ?? 0}
@@ -142,7 +161,8 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
             ))}
           </div>
         )}
-        {tab === "binder" && <Binder sets={sets} cards={cards} dex={dex} log={st?.cardLog ?? []} onLook={look} />}
+        {tab === "binder" && <Binder sets={sets} cards={cards} dex={dex} log={st?.cardLog ?? []} onLook={look}
+          milestones={st?.milestones ?? {}} />}
         {tab === "dex" && <CardDex sets={sets} cards={cards} dex={dex} onLook={look} />}
         {tab === "dust" && <Dust sets={sets} cards={cards} dust={dust} onLook={look}
           onSweep={(id) => engine.dustSpares(sets[id])} />}
@@ -169,6 +189,8 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
       )}
       {inspect && sets[inspect.setId] && (
         <Inspect set={sets[inspect.setId]} localId={inspect.localId} cards={cards} dust={dust} dex={dex}
+          showcase={st?.cardShowcase ?? []}
+          onShow={(v, on) => engine.showCard(cardId(inspect.setId, inspect.localId), v, on)}
           onDust={(v) => engine.dustCard(sets[inspect.setId], inspect.localId, v, 1)}
           onCraft={(v) => engine.craftCard(sets[inspect.setId], inspect.localId, v)}
           onSpecies={(id) => { setInspect(null); onSpecies?.(id); }}
@@ -288,14 +310,18 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
 /* THE BINDER: twelve pockets a page, four across, in set order. An empty
    pocket names the card faintly; a filled one holds the best copy, a count,
    the catch stamp and the earned mark. Above it, the Pulls wall. */
-function Binder({ sets, cards, dex, log, onLook }) {
+function Binder({ sets, cards, dex, log, onLook, milestones }) {
   const [setId, setSetId] = useState(CARD_SETS[0]?.id);
   const [pageNo, setPage] = useState(0);
   const set = sets[setId];
   if (!set) return <p className="ev-quiet">Loading…</p>;
   const key = (c) => cardId(setId, c[0]);
   const ownedN = set.CARDS.filter((c) => cards[key(c)]).length;
-  const variants = set.CARDS.reduce((a, c) => a + c[4].length, 0);
+  const variants = printingsOf(set.CARDS);
+  /* THE COVER: locked until the set is complete, foil when it is, gold for
+     the master set (every printing). */
+  const done = (milestones[setId] ?? 0) >= MILESTONES.length;
+  const masterDone = (milestones[setId] ?? 0) >= MASTER_STEP;
   const master = set.CARDS.reduce((a, c) => a + c[4].split("").filter((v) => cards[key(c)]?.[v]).length, 0);
   const pages = Math.ceil(set.CARDS.length / POCKETS);
   const at = Math.min(pageNo, pages - 1);
@@ -318,6 +344,14 @@ function Binder({ sets, cards, dex, log, onLook }) {
           </div>
         </section>
       )}
+      <div className={`cd-cover${done ? " done" : ""}${masterDone ? " master" : ""}`}>
+        <img src={logoUrl(setId)} alt="" />
+        <span>
+          <b>{masterDone ? "Master set" : done ? "Complete" : "Binder cover"}</b>
+          <i>{masterDone ? `Every printing - ${titleName(`master:${setId}`)}` : done ? `${titleName(`set:${setId}`)} · the gold cover takes every printing`
+            : `Complete the set (${set.CARDS.length - ownedN} to go) for its cover`}</i>
+        </span>
+      </div>
       <div className="cd-progress">
         <b>{ownedN}<u>/{set.CARDS.length}</u></b>
         <i style={{ "--p": ownedN / set.CARDS.length }} />

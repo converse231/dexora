@@ -2524,8 +2524,20 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       }
     }
   }
+  /* A GENERATION'S MEDAL is every national number of it and nothing else (no
+     form), so a region's Pokédex is what the games call one; its charm stays
+     at most a research star's lift (the charm rule). */
+  {
+    const { DEX_CHARM } = await import("../src/game/medals.js");
+    const { RESEARCH_LIFT: RL } = await import("../src/game/research.js");
+    assert.ok(DEX_CHARM <= RL, `the Pokédex Charm ${DEX_CHARM}x is past a research star's ${RL}x`);
+    for (const m of MEDALS.filter((x) => x.kind === "gen")) {
+      assert.ok(m.need.every((id) => !isForm(id) && genOf(id) === m.gen), `${m.id} holds a form or another generation`);
+      assert.equal(m.need.length, SPECIES.filter((sp) => !isForm(sp.id) && genOf(sp.id) === m.gen).length, `${m.id} is missing species`);
+    }
+  }
   console.log(`medals ok — ${MEDALS.length} (${
-    ["line", "type", "biome", "dex"].map((k) =>
+    ["line", "type", "biome", "gen", "dex"].map((k) =>
       `${MEDALS.filter((m) => m.kind === k).length} ${k}`).join(", ")
   }) + ${MILESTONES.length} milestones, ¥${money.toLocaleString()} and ${
     (balls["ultra-ball"] ?? 0)} ultra over a full dex`);

@@ -684,6 +684,18 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   fixed layer measures from. A box/bundle per set (`BOXES`); a Champion pays a box, every
   `STREAK_PACK`th streak day a pack - never the Pokédex rank (a title).
   One open is one `changed()` (`settleOpen`), Open all included.
+  **Phase 4**: every printing of a set is its MASTER step (`MILESTONES.length
+  + 1`, `MASTER_DUST`); titles are `titleIds` (titles.js) and the SQL's
+  `card_titles` the same rule (tradedb holds them equal); the trainer card's
+  `card_show` comes off the STORED save through `card_showcase` (held
+  printings only, `CARD_SHOW` = `trade_limit`), written by the trigger alone.
+- **A finished generation is a medal** (`gen:<g>` in medals.js, your call
+  2026-10-03): its non-form species CAUGHT by you (`ownDex`, never trades),
+  paying money, a Master Ball, a title and a box of choice (`boxVouchers`,
+  `claimBox` spends one). It also gives the Pokedex Charm (`dexCharm`,
+  `DEX_CHARM` 1.5x on that generation's tier roll, a Mega through `genOf`,
+  never above `RESEARCH_LIFT`). A save that finished one before the medal
+  existed is paid once at boot. Not the Pokedex RANK, which counts trades.
 - **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`
   rules): its rim drains with steps left over the item's own `steps`.
 - **Hard mode is designed in docs/battles.md, phase 8.** A cleared region's

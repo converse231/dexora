@@ -27,7 +27,8 @@
 
 import { SPECIES } from "../data/dex.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
-import { BIOMES, speciesById, dexIndex } from "./biomes.js";
+import { BIOMES, speciesById, dexIndex, genOf, REGION_NAME } from "./biomes.js";
+import { isForm } from "../data/dex.js";
 import { label } from "./map.js";
 
 /* Evolution families, by union-find over the evolution edges. A family is the
@@ -93,6 +94,21 @@ function build() {
     ...families().map(line),
     ...[...byType].map(([t, ids]) => typeMedal(t, ids)),
     ...BIOMES.map(biomeMedal),
+    /* A REGION'S POKÉDEX (asked for, 2026-10-02): every species of one
+       generation, caught by you - its national numbers, never its forms. It
+       pays ¥20,000, a Master Ball, a booster box of your choice (engine,
+       `boxVouchers`), the title "<Region> Dex Master" (titles.js) and the
+       Pokédex Charm: that generation's rare forms 1.5x as likely (`dexCharm`). */
+    ...Object.keys(REGION_NAME).map(Number).map((g) => ({
+      id: `gen:${g}`,
+      kind: "gen",
+      gen: g,
+      name: `${REGION_NAME[g].toUpperCase()} COMPLETE`,
+      sub: `Every ${REGION_NAME[g]} Pokémon. A box of your choice, a title, and its rare forms 1.5x as likely.`,
+      need: SPECIES.filter((sp) => !isForm(sp.id) && genOf(sp.id) === g).map((sp) => sp.id),
+      money: 20000,
+      items: { "master-ball": 1 },
+    })).filter((m) => m.need.length),
     {
       id: "dex",
       kind: "dex",
@@ -118,6 +134,15 @@ for (const m of MEDALS)
   }
 
 export const medalById = (id) => MEDALS.find((m) => m.id === id) ?? null;
+
+/* THE POKÉDEX CHARM: a generation you have completed has its rare forms 1.5x
+   as likely - read by the tier roll, a Mega through to its base (`genOf`).
+   At most a research star's lift (CLAUDE.md, the charm rule). */
+export const DEX_CHARM = 1.5;
+export const dexCharm = (id, medals = []) => (medals.includes(`gen:${genOf(id)}`) ? DEX_CHARM : 1);
+// Generation medals a dex has finished but the save has not banked - paid at boot.
+export const genMedalsDue = (dex, earned = []) => MEDALS.filter((m) => m.kind === "gen" && !earned.includes(m.id)
+  && m.need.every((id) => dex[dexIndex(id)] === 2));
 
 /* What a newly registered species just finished off. `earned` is the ids
    already banked, so a medal can never pay twice — which matters, because

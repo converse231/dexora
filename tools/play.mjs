@@ -1869,6 +1869,10 @@ assert.deepEqual(boot({ ...SAVE, cardLog: [["me01-187", "h", 1], ["x y", "h", 1]
   [["me01-187", "h", 1]], "a bad Pulls wall entry was kept, or a good one dropped with it");
 await savedField("milestones", { me01: 2 }, "junk", {});
 await savedField("cardDay", "2026-10-02", 42, null);
+await savedField("boxVouchers", ["dex:1"], "junk", []);
+await savedField("cardShowcase", ["me01-187:h"], "junk", []);
+assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h", "me01-1:q"] }).e.state.cardShowcase,
+  ["me01-187:h"], "a bad showcase key or a repeat was kept");
 {
   const C = await import("../src/game/cards.js");
   const set = await import("../src/data/cards/sets/me01.js");
@@ -1985,6 +1989,63 @@ await savedField("cardDay", "2026-10-02", 42, null);
     assert.ok(won.pack, "a 7th day of a streak paid no pack");
     assert.equal(Object.values(st.state.packs).reduce((a, b) => a + b, 0), before + 1);
     assert.deepEqual(st.state.earnedPacks[won.pack], [`streak:${won.streak}`]);
+  }
+  /* PHASE 4: the box of choice, the showcase, the master set, the titles - and
+     a generation's Pokédex, paid even to a save that finished it before the
+     medal existed (the asker's own case). */
+  {
+    const T = await import("../src/game/titles.js");
+    const M = await import("../src/game/medals.js");
+    const { dexIndex: di, speciesById: byId } = await import("../src/game/biomes.js");
+    const kanto = M.MEDALS.find((m) => m.id === "gen:1");
+    const dex = Array(SAVE.dex.length).fill(0);
+    for (const id of kanto.need) dex[di(id)] = 2;
+    const old = { ...SAVE, dex, medals: [], caught: 151, bag: { ...SAVE.bag, "master-ball": 0 } };
+    const g = boot(old).e;
+    assert.ok(g.state.medals.includes("gen:1"), "a Pokédex finished before the medal was not paid at load");
+    assert.deepEqual(g.state.boxVouchers, ["dex:1"], "the Kanto medal paid no box of choice");
+    assert.equal(g.state.bag["master-ball"], 1, "the Kanto medal paid no Master Ball");
+    assert.equal(g.state.money, old.money + kanto.money, "the Kanto medal did not pay its money");
+    assert.ok(!g.state.medals.includes("gen:2"), "an unfinished generation paid");
+    await new Promise((r) => setTimeout(r, 600));
+    const again = boot(JSON.parse(store.get("meadow-route"))).e;
+    assert.equal(again.state.boxVouchers.length, 1, "the Kanto medal paid twice across a reload");
+    // The Pokédex Charm: Kanto's species only, a Mega through to its base.
+    assert.equal(M.dexCharm(25, g.state.medals), M.DEX_CHARM);
+    assert.equal(M.dexCharm(10033, g.state.medals), M.DEX_CHARM, "Mega Venusaur did not read through to Kanto");
+    assert.equal(M.dexCharm(152, g.state.medals), 1, "Johto took Kanto's charm");
+    // The box of choice: any set, its box, earned and stamped; once.
+    assert.equal(g.claimBox("nope"), false);
+    assert.equal(g.claimBox("me02"), true);
+    assert.equal(g.state.packs.me02, C.BOXES.me02.packs);
+    assert.deepEqual(g.state.earnedPacks.me02, Array(C.BOXES.me02.packs).fill("dex:1"));
+    assert.equal(g.claimBox("me01"), false, "a used voucher claimed a second box");
+    assert.deepEqual(T.titleIds({}, g.state.medals), ["dex:1"]);
+    assert.equal(T.titleName("dex:1"), "Kanto Dex Master");
+
+    // The showcase: held printings only, the cap, off again.
+    const sh = boot({ ...SAVE, cards: { "me01-001": { n: 1 }, "me01-003": { h: 1 } } }).e;
+    assert.equal(sh.showCard("me01-001", "r"), false, "a printing not held went on the trainer card");
+    assert.equal(sh.showCard("me01-001", "n"), true);
+    assert.equal(sh.showCard("me01-003", "h"), true);
+    assert.deepEqual(sh.state.cardShowcase, ["me01-001:n", "me01-003:h"]);
+    sh.showCard("me01-001", "n", false);
+    assert.deepEqual(sh.state.cardShowcase, ["me01-003:h"]);
+    const full = boot({ ...SAVE, cards: { "me01-001": { n: 1 } }, cardShowcase: Array.from({ length: C.CARD_SHOW }, (_, k) => `x-${k}:n`) }).e;
+    assert.equal(full.showCard("me01-001", "n"), false, "the showcase went past its cap");
+
+    // The master set: every printing, once, past the whole-set step.
+    const allButOne = Object.fromEntries(set.CARDS.map((c) => [C.cardId("me01", c[0]),
+      Object.fromEntries(c[4].split("").map((v) => [v, 1]))]));
+    const lastCard = set.CARDS.find((c) => C.canCraft(c[3]) && c[4].includes("r"));
+    allButOne[C.cardId("me01", lastCard[0])] = { [lastCard[4][0]]: 1 };      // the reverse is missing
+    const ms = boot({ ...SAVE, cards: allButOne, milestones: { me01: C.MILESTONES.length }, dust: 1e6 }).e;
+    const d0 = ms.state.dust;
+    assert.equal(ms.craftCard(set, lastCard[0], "r"), true);
+    assert.equal(ms.state.milestones.me01, T.MASTER_STEP, "the last printing did not complete the master set");
+    assert.equal(ms.state.dust, d0 - C.craftCost(lastCard[3], "r") + C.MASTER_DUST, "the master set did not pay its dust");
+    assert.deepEqual(T.titleIds(ms.state.milestones, []), ["master:me01", "set:me01"]);
+    void byId;
   }
   console.log("cards dust ok — spares only (never the last copy or an earned one), rares and the sweep ask, " +
     "crafts cost exactly, milestones pay once, every hit reaches the Pulls wall, and the daily pack is the day's first");
