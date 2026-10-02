@@ -199,7 +199,7 @@ function freshState() {
     outbreak: null,       // today's mass outbreak, frozen at first sight - see events.js
     research: {},         // per-species research counters, keyed by DEX ID - see research.js
     stars: [],            // dex ids whose finished research was starred - see `star`
-    gifted: [],           // dex ids registered only by a trade - see `reconcileTrades`
+    gifted: [],           // LEGACY: dex ids once held back from rewards as trades - paid and cleared at boot
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
     /* CARDS (docs/cards.md): copies by card id (`me01-004`, never a
@@ -1987,16 +1987,13 @@ export function createEngine(canvas, onChange, mini = null) {
      which pays MORE the fuller the dex is - so it has to be the same number
      in both places or the bonus climbs on a different curve from the one the
      milestones are celebrating. */
-  /* YOUR OWN CATCHES, for every reward: a species registered by a trade fills
-     the Pokédex but not a medal, a milestone or the dex bonus (docs/trading.md).
-     The Pokédex display reads `state.dex` directly and counts it. */
-  const ownDex = () => {
-    if (!state.gifted.length) return state.dex;
-    const d = [...state.dex];
-    for (const id of state.gifted) d[dexIndex(id)] = 1;
-    return d;
-  };
-  const caughtSpecies = () => ownDex().reduce((n, v) => n + (v === 2 ? 1 : 0), 0);
+  /* A TRADE COUNTS (your call, 2026-10-03 - "that's how Pokémon does it"):
+     a species registered by a trade or a hard-mode gift fills the Pokédex
+     AND every Pokédex reward - medals, milestones, a generation's claim and
+     the dex bonus. It was held back as a "gift" until then, and a Johto
+     reading 137/137 paid nothing because its only Crobat was Koga's. Rare-form
+     marks are still your own catches (`repairDex` skips traded entries). */
+  const caughtSpecies = () => state.dex.reduce((n, v) => n + (v === 2 ? 1 : 0), 0);
 
   /* A SPECIES REGISTERS HERE, every way one can (a catch, an evolution, a
      trade), so the Pokédex rank is announced whichever way the count moved.
@@ -2014,8 +2011,18 @@ export function createEngine(canvas, onChange, mini = null) {
     }
   }
 
+  /* A SPECIES THAT ARRIVED - a trade or a hard-mode gift - registers like a
+     catch: the Pokédex, what it finishes, and the dex bonus (a trade counts). */
+  function registerGift(id) {
+    const at = dexIndex(id);
+    if (state.dex[at] === 2) return;
+    register(at);
+    checkDexRewards(id);
+    state.money += dexBonus(caughtSpecies(), SPECIES.length);
+  }
+
   function checkDexRewards(speciesId) {
-    for (const medal of medalsFor(speciesId, ownDex(), state.medals)) {
+    for (const medal of medalsFor(speciesId, state.dex, state.medals)) {
       /* A GENERATION IS CLAIMED, not paid here (`claimDex`): the banner only
          says so, and the map's claim button stays until it is. */
       if (medal.kind === "gen") {
@@ -2161,10 +2168,7 @@ export function createEngine(canvas, onChange, mini = null) {
 
     if (phase === "caught") {
       const at = dexIndex(e.speciesId);
-      /* A GIFT BECOMES YOURS the first time you catch one: that is a new
-         species for every reward, and the gift mark goes. */
-      e.isNew = state.dex[at] !== 2 || state.gifted.includes(e.speciesId);
-      state.gifted = state.gifted.filter((id) => id !== e.speciesId);
+      e.isNew = state.dex[at] !== 2;
       register(at);
       noteDaily({ species: speciesById(e.speciesId) });
       state.caught++;
@@ -2690,6 +2694,26 @@ export function createEngine(canvas, onChange, mini = null) {
   /* And anything a raised cap owes is paid now, with its banner - not on the
      next catch, which would read as one catch paying out nine levels. */
   if (!state.stale && payLevels()) save();
+  /* SPECIES ONCE HELD BACK AS GIFTS COUNT NOW (a trade counts, 2026-10-03):
+     what they finish is paid once, here - every medal holding one, and every
+     milestone the count stepped over - and the legacy list is cleared. A
+     generation's medal needs no paying: it is a claim, derived from the dex. */
+  if (!state.stale && state.gifted.length) {
+    const now = caughtSpecies();
+    for (let n = now - state.gifted.length + 1; n <= now; n++) {
+      const stone = milestoneAt(n);
+      if (stone) pay(stone.money, stone.items, { kind: "dex", title: `${n} SPECIES`, sub: `${SPECIES.length - now} left to find.` });
+    }
+    for (const id of state.gifted) {
+      for (const medal of medalsFor(id, state.dex, state.medals)) {
+        if (medal.kind === "gen") continue;
+        state.medals.push(medal.id);
+        pay(medal.money, medal.items, { kind: "medal", title: medal.name, sub: medal.sub });
+      }
+    }
+    state.gifted = [];
+    save();
+  }
   bakeMini();
   raf = requestAnimationFrame(frame);
 
@@ -2750,12 +2774,12 @@ export function createEngine(canvas, onChange, mini = null) {
      of choice from before (`boxVouchers`) is claimed the same way, rolled.
      Answers what was won, for the reel, or null. */
   const dexClaims = () => [
-    ...genMedalsDue(ownDex(), state.medals).map((m) => m.gen),
+    ...genMedalsDue(state.dex, state.medals).map((m) => m.gen),
     ...state.boxVouchers.map((s) => Number(s.slice(4))),
   ];
   function claimDex(random = Math.random) {
     if (state.stale) return null;
-    const medal = genMedalsDue(ownDex(), state.medals)[0];
+    const medal = genMedalsDue(state.dex, state.medals)[0];
     const stamp = medal ? `dex:${medal.gen}` : state.boxVouchers[0];
     if (!stamp) return null;
     if (medal) {
@@ -3020,13 +3044,10 @@ export function createEngine(canvas, onChange, mini = null) {
     if (looksOf(mon.species).length < 2) targetId = rollLook(speciesById(targetId)).id;
     const target = speciesById(targetId);
     const at = dexIndex(targetId);
-    /* A TRADED ONE EVOLVES INTO A GIFT: raising someone else's catch is not
-       catching the next form. Your own evolving into a gifted species makes
-       it yours, the same rule as catching one. */
+    /* Evolving registers the new species, a traded one's too (a trade counts);
+       only its rare-form mark stays a mark of your own play (`gift`, below). */
     const gift = !!mon.traded;
-    const isNew = !gift && (state.dex[at] !== 2 || state.gifted.includes(targetId));
-    if (gift && state.dex[at] !== 2) state.gifted.push(targetId);
-    if (!gift) state.gifted = state.gifted.filter((id) => id !== targetId);
+    const isNew = state.dex[at] !== 2;
     register(at);
     /* NO `state.caught++` HERE, and it used to be. That counter renders in the
        top bar under the word CAUGHT, where it means throws that landed - and
@@ -3282,12 +3303,7 @@ export function createEngine(canvas, onChange, mini = null) {
       });
       if (entry.size === undefined) delete entry.size;
       state.box.push(entry);
-      // It fills the Pokedex - as a gift, which no reward counts.
-      const at = dexIndex(sp.id);
-      if (state.dex[at] !== 2) {
-        register(at);
-        if (!state.gifted.includes(sp.id)) state.gifted.push(sp.id);
-      }
+      registerGift(sp.id);
       study(sp.id, ["trade"]);
       moved = true;
     }
@@ -3425,11 +3441,7 @@ export function createEngine(canvas, onChange, mini = null) {
           gift = g;
           state.box.push({ uid: state.nextUid++, species: g.species, level: g.level,
             ...(g.tier ? { [g.tier]: 1 } : {}), traded: 1, at: Date.now() });
-          const at = dexIndex(g.species);
-          if (state.dex[at] !== 2) {
-            register(at);
-            if (!state.gifted.includes(g.species)) state.gifted.push(g.species);
-          }
+          registerGift(g.species);
         }
         // The whole hard run of a region: a Master Ball and a step of the Region Charm.
         if (region && !clearedBefore && hardCleared(region, state.beaten)) {

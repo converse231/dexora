@@ -697,8 +697,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `card_show` comes off the STORED save through `card_showcase` (held
   printings only, `CARD_SHOW` = `trade_limit`), written by the trigger alone.
 - **A finished generation is a medal** (`gen:<g>` in medals.js, your call
-  2026-10-03): its non-form species CAUGHT by you (`ownDex`, never trades),
-  and a family of LOOKS is held by any one drawing (`owns`: catching Unown
+  2026-10-03): its non-form species in your Pokédex (trades and gifts
+  count), and a family of LOOKS is held by any one drawing (`owns`: catching Unown
   registers a letter, and Johto waited on Unown A). It is CLAIMED, never
   paid on the catch: what is due is derived (`dexClaims`, the map's REWARD
   pill), and `claimDex` banks the medal, money and Master Ball and a RANDOM
@@ -706,8 +706,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `boxVouchers` entry is claimed the same way, rolled). The medal gives the
   title and the Pokedex Charm (`dexCharm`, `DEX_CHARM` 2x on that
   generation's tier roll, a Mega through `genOf`; between `RESEARCH_LIFT`
-  and `OUTBREAK_LIFT`, your call 2026-10-03). Not the Pokedex RANK, which
-  counts trades.
+  and `OUTBREAK_LIFT`, your call 2026-10-03).
 - **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`
   rules): its rim drains with steps left over the item's own `steps`.
 - **Hard mode is designed in docs/battles.md, phase 8.** A cleared region's
@@ -717,8 +716,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   gymtune.js, replayed exactly by check.mjs; a team the most training leaves
   above it stays at the most. Every attempt pays `HARD_FEE` in `battleBegin`,
   given back with the win in `battleEnd`, which also gives a first win's
-  signature Pokemon (`giftOf`, arriving `traded: 1`, so it fills the dex as a
-  gift and nothing counts it) and a run's Master Ball. The Region Charm
+  signature Pokemon (`giftOf`, arriving `traded: 1`: it counts for the dex
+  like a trade, never a tier row) and a run's Master Ball. The Region Charm
   (`charmOf`) is derived from `beaten` and multiplies the tier roll; it stays
   at most a research star's lift. **The Move Tutor** saves up to four move
   NAMES on a box entry (`moves`, `cleanTaught` drops a bad field alone);
@@ -826,8 +825,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `DEX_RANKS` in medals.js, SHARES of `SPECIES.length` (never counts, so a new
   generation moves them) ending on the whole dex. It reads the Pokédex as
   the card counts it (`dex_count`, trades included), so a profile works out
-  anyone's rank with nothing on the server; the dex rewards still count your
-  own catches. Every registration goes through the engine's `register(at)`,
+  anyone's rank with nothing on the server. Every registration goes through the engine's `register(at)`,
   which is what announces a step, whichever way the count moved.
 - **A new rank is a ceremony, never a banner** (`RankUp.jsx`, both ladders):
   App plays a `kind: "rank"` cheer through it (held with the banners while
@@ -858,8 +856,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   trigger strips a `mid` someone else owns, keeps an unknown one, completes a
   delivery when it is saved, and never fails an upload. What the server says
   reaches the engine through ONE call, `reconcileTrades`; locks (`lock` on a
-  box entry) are enforced in the engine; a trade fills the dex only (`gifted`
-  is excluded from every reward, and tier rows ignore `traded` entries).
+  box entry) are enforced in the engine; **a trade counts** (your call,
+  2026-10-03, as in the games): a species that arrives by trade or as a
+  hard-mode gift registers like a catch through `registerGift` - every
+  medal, milestone, a generation's claim and the dex bonus - and only the
+  tier rows ignore `traded` entries. `gifted` is legacy: a save's list is
+  paid what it finishes once at boot, then cleared.
   `trade.js` LIMITS equal the SQL's `trade_limit()` (asserted). `npm run
   tradedb` tests the SQL against the TEST project and refuses the live one.
   Trainer cards are written by triggers and `update_card` only (the showcase

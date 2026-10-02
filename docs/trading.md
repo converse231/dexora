@@ -173,9 +173,12 @@ direct upsert, and `save_game` itself is untouched):
   field is dropped, never the entry. Each is a `savedField` line in tools/play.
 - **Locks are enforced in the engine** - `sell`, `convert`, `evolve`, `star`,
   `levelUp` refuse a locked entry, and the sweep's spare list skips it.
-- **`state.gifted`** - dex ids registered only by a trade. Medals, milestones,
-  the rosette, tier rows (`repairDex` skips traded entries) and the dex bonus
-  read it; catching one yourself removes it.
+- **A trade counts** *(your call, 2026-10-03, as in the games)*: a species
+  that arrives by trade registers like a catch - medals, milestones, a
+  generation's claim and the dex bonus. Only tier rows stay your own play
+  (`repairDex` skips traded entries). `state.gifted`, which held traded
+  species back from every reward until then, is legacy: a save's list is
+  paid what it finishes once at boot and cleared.
 - **Research** gains an appended *bonus* task, "Get one in a trade".
 - **`net/cloud.js` stays the only file that imports Supabase** - every trade
   call lives there, answering `{ok, ...}` like `pull`.
