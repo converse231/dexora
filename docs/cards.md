@@ -671,6 +671,19 @@ sets rendered behind the scene (the page is no longer rendered under one, and
 Open all is two tasks); a tools/play paint test walked unrepelled and failed
 now and then when a step started an encounter.
 
+## Before phase 4 *(2026-10-02, your calls)*
+
+- **No glow before a tap**: a hit's gold halo was a spoiler and is gone. A
+  hit and the last card charge white on their tap; the rarity's colour comes
+  with the card.
+- **The reveal turns under the flash** (0 -> 180 degrees in about 120ms, while
+  the flash is at its brightest): a slow turn after it showed the back first.
+- **Fast**: the single-pack scene turns its commons by itself; a hit and the
+  last card still charge and reveal, then move on.
+- **Open 10 and Open all reveal the hits only**, best last, each with the full
+  reveal, then one summary of every pack (boxes and the bundle included).
+- **Types in battle**: each health box shows its Pokémon's types.
+
 ## Deferred on purpose *(each with the trigger that brings it back)*
 
 - **Trading cards** - needs server-minted card rows; trigger: players asking

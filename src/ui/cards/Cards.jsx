@@ -11,7 +11,7 @@ import { CARD_SETS } from "../../data/cards/index.js";
 import { WRAPPERS } from "../../data/cards/art.js";
 import {
   RARITY, CARD_RARITIES, RATES, PITY, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
-  copiesOf, chanceOf, freshPity, sparesOf, dustOf, craftCost, rungOf, titleOf, canCraft,
+  copiesOf, chanceOf, freshPity, sparesOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit,
 } from "../../game/cards.js";
 import CardFace, { RarityMark } from "./Card.jsx";
 import Inspect from "./Inspect.jsx";
@@ -83,13 +83,18 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   }, [engine, sets, onScene]);
   /* Two tasks, not one: the scene first ("Opening 6 packs…"), then the rolls
      and the summary - together they were a 100ms task on a throttled phone. */
-  const openAll = (id) => {
+  /* OPEN 10 / OPEN ALL: the hits revealed one by one (best last), then one
+     summary. Two tasks: the scene first ("Opening 6 packs…"), then the rolls -
+     together they were a 100ms task on a throttled phone. */
+  const openAll = (id, max = Infinity) => {
     const set = sets[id];
-    if (!set || (packs[id] ?? 0) < 1) return;
-    setOpening((o) => ({ set, all: [], waiting: packs[id], n: (o?.n ?? 0) + 1 }));
+    const n = Math.min(max, packs[id] ?? 0);
+    if (!set || n < 1) return;
+    setOpening((o) => ({ set, all: [], waiting: n, n: (o?.n ?? 0) + 1 }));
     setTimeout(() => {
-      const results = engine.openAllPacks(set);
-      setOpening((o) => (o?.waiting ? (results ? { ...o, all: results, waiting: 0 } : null) : o));
+      const results = engine.openAllPacks(set, max);
+      const hits = results?.flatMap((r) => r.pulls).filter((p) => isHit(p.rarity)).sort((a, b) => rungOf(a.rarity) - rungOf(b.rarity));
+      setOpening((o) => (o?.waiting ? (results ? { ...o, all: results, waiting: 0, reveal: hits.length ? hits : null } : null) : o));
     }, 30);
   };
   const buyBox = (id) => setNote(engine.buyBox(id) ? "" : `Not enough money for a ${BOXES[id].name.toLowerCase()}.`);
@@ -132,7 +137,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
               <PackCard key={s.id} meta={s} set={sets[s.id]} level={level} money={st?.money ?? 0}
                 held={packs[s.id] ?? 0} earned={st?.earnedPacks?.[s.id]?.length ?? 0}
                 pity={st?.cardPity?.[s.id] ?? freshPity()} cards={cards} log={st?.cardLog ?? []}
-                onOpen={() => open(s.id)} onOpenAll={() => openAll(s.id)} onBuy={(n) => buy(s.id, n)}
+                onOpen={() => open(s.id)} onOpenAll={(max) => openAll(s.id, max)} onBuy={(n) => buy(s.id, n)}
                 onBox={() => buyBox(s.id)} onLook={(localId) => look(s.id, localId)} />
             ))}
           </div>
@@ -147,7 +152,11 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
         </p>
       </main>
 
-      {opening?.all && (
+      {opening?.reveal && (
+        <Opening key={`r${opening.n}`} set={opening.set} result={{ pulls: opening.reveal, god: false, daily: false }}
+          hitsOnly onScene={onScene} onFinish={() => setOpening((o) => ({ ...o, reveal: null }))} />
+      )}
+      {opening?.all && !opening.reveal && (
         <OpenAll key={opening.n} set={opening.set} results={opening.all} waiting={opening.waiting}
           onBinder={() => { setOpening(null); setTab("binder"); }} onDone={() => setOpening(null)} />
       )}
@@ -234,8 +243,11 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
               Open a pack · {held}{earned ? ` (${earned} earned)` : ""}
             </button>
           )}
+          {held >= 10 && (
+            <button type="button" className="lg-go quiet" onClick={() => onOpenAll(10)} disabled={!set}>Open 10</button>
+          )}
           {held > 1 && (
-            <button type="button" className="lg-go quiet" onClick={onOpenAll} disabled={!set}>Open all {held}</button>
+            <button type="button" className="lg-go quiet" onClick={() => onOpenAll()} disabled={!set}>Open all {held}</button>
           )}
           {isOpen ? (
             <>

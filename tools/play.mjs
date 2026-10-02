@@ -1968,6 +1968,10 @@ await savedField("cardDay", "2026-10-02", 42, null);
     assert.equal(allChanges() - n0, 1, "Open all was not one changed()");
     assert.equal(all.state.packs.me01, undefined);
     assert.equal(all.openAllPacks(set), null, "Open all with nothing held opened something");
+    // Open 10 opens ten, no more.
+    const ten = boot({ ...SAVE, packs: { me01: 12 } }).e;
+    assert.equal(ten.openAllPacks(set, 10).length, 10, "Open 10 did not open ten");
+    assert.equal(ten.state.packs.me01, 2, "Open 10 opened more than ten");
 
     const { dayKey } = await import("../src/game/daily.js");
     const { dailyFor } = await import("../src/game/daily.js");
@@ -3830,7 +3834,8 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
    tile art, which Node never loads: it was held pixel for pixel against the
    tile loop in a browser, every map - docs/decisions.md.) */
 {
-  const b = boot({ ...SAVE });
+  // Repelled, like the paint test: a step that started an encounter cut the walk short now and then.
+  const b = boot({ ...SAVE, field: { ...SAVE.field, repel: { id: "max-repel", steps: 9999 } } });
   const { e } = b;
   tick(16, 4);
   const start = [e.state.player.x, e.state.player.y];

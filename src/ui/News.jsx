@@ -25,6 +25,8 @@ export const NEWS = [
       ["Boxes and bundles", "36 packs for ¥96,000, or Ascended Heroes' 6-pack bundle - and Open all at once."],
       ["Champions and streaks", "A region's Champion gives a box; every 7th day of a daily streak, a pack."],
       ["The last card", "Every pack now ends on a reveal."],
+      ["Fast and Open 10", "Fast turns the commons for you; Open 10 and Open all reveal just the hits."],
+      ["Types in battle", "Every Pokémon's types now show beside its health."],
     ],
   },
   {

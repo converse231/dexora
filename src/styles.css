@@ -6913,6 +6913,7 @@ button:disabled { transition: none; }
 .ft-fill.mid { background: var(--ready); }
 .ft-fill.low { background: var(--bad); }
 .ft-hp-bot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.ft-types { display: flex; gap: 3px; flex-wrap: wrap; margin-right: auto; }
 .ft-hp-bot em { font-style: normal; font-family: var(--pixel); font-size: max(9px, 1.6cqw); color: var(--ink-soft); }
 .ft-pips { display: flex; gap: max(3px, .5cqw); }
 /* A Poke Ball in CSS - red lid, dark band, white base, the button - so it is
@@ -8730,8 +8731,10 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-open::before { content: ""; position: fixed; inset: 0; background: #000; opacity: 0; transition: opacity .5s; pointer-events: none; }
 .cd-open.dim::before { opacity: .45; }
 .cd-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.cd-ctl { position: fixed; top: calc(14px + env(safe-area-inset-top)); right: 16px; z-index: 5; display: flex; gap: 8px; }
+.cd-skip.on { background: #fff; color: #060812; }
 .cd-skip {
-  position: fixed; top: calc(14px + env(safe-area-inset-top)); right: 16px; z-index: 5; min-height: 36px;
+  min-height: 36px;
   padding: 0 16px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .3);
   background: rgba(255, 255, 255, .08); color: #fff; font: 600 14px var(--body); cursor: pointer;
 }
@@ -8801,17 +8804,10 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   animation: cd-glow .9s ease-in-out .15s infinite;
 }
 .cd-flip.last { animation: cd-in .28s ease-out, cd-tremble .5s linear .3s infinite; }
-.cd-flip.r-double { --tell: #ffcb3d; }
-.cd-flip.r-ultra { --tell: #dfe8ff; }
-.cd-flip.r-illustration { --tell: #33e0c4; }
-.cd-flip.r-special { --tell: #ff4fbf; }
-.cd-flip.r-mega { --tell: #ffd24a; }
-.cd-flip.tell::before {
-  content: ""; position: absolute; inset: -3px; border-radius: 6%; opacity: 0;
-  box-shadow: 0 0 30px 10px var(--tell), inset 0 0 22px 6px var(--tell);
-  animation: cd-glow 1s ease-in-out .15s infinite;
-}
-.cd-flip.tell { animation: cd-in .28s ease-out, cd-tremble .5s linear .3s infinite; }
+/* A REVEAL TURNS UNDER THE FLASH: the slow turn after the white showed the
+   back for a second, then the front (reported as a glitch). The card snaps
+   face up while the flash is at its brightest and stays at its charged size. */
+.cd-flip.boom { transition-duration: .12s !important; scale: 1.06; }
 @keyframes cd-glow { 50% { opacity: 1; } }
 @keyframes cd-tremble { 25% { rotate: -1.2deg; } 75% { rotate: 1.2deg; } }
 .cd-flip.build { animation: cd-swell .7s ease-in both; }
