@@ -13,6 +13,7 @@ import { SPECIES } from "../data/dex.js";
 import Icon from "./Icon.jsx";
 import { dexRank } from "../game/medals.js";
 import { RankMedal } from "./RankBadge.jsx";
+import { useModalLock, useDismiss } from "./modal.js";
 
 /* "+3 +2 balls" - the whole parcel in one short line, because four separate
    floating numbers over one counter is confetti, not information. */
@@ -89,9 +90,26 @@ export function Missions({ daily, onClaim, note }) {
 /* THE APP BAR (Rotom, 2026-10-01). The ☰ menu is gone: Dexora is three
    features side by side - Catch, Trade, Battles - plus You, which holds what the
    menu held. One `nav`, and CSS decides where it stands: in this bar on a
-   desktop, a tab bar along the bottom of a phone, a rail down the left of a
-   sideways one (see ROTOM SHELL at the end of styles.css). */
+   desktop, a tab bar along the bottom of a phone, a menu behind a corner
+   button on a sideways one (see ROTOM SHELL at the end of styles.css). */
 export const TABS = [["catch", "Catch", "ball"], ["trade", "Trade", "swap"], ["battles", "Battles", "trophy"]];
+
+/* HELD SIDEWAYS, THE TABS ARE A MENU (2026-10-02). A rail down the left took
+   68px of a 360px-tall phone's width from the game, reported as the screen
+   being too small; one corner button gives it back. Open, it is a dialog like
+   any other: the modal lock (the map's keys stop), Escape, and a scrim that
+   closes only on a tap that began on it. Mounted only while open, so the lock
+   is held exactly that long. */
+function MenuScrim({ onClose }) {
+  useModalLock();
+  const dismiss = useDismiss(onClose);
+  useEffect(() => {
+    const esc = (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); onClose(); } };
+    addEventListener("keydown", esc, true);
+    return () => removeEventListener("keydown", esc, true);
+  }, [onClose]);
+  return <div className="tb-scrim" {...dismiss} />;
+}
 
 export default function TopBar({
   tab = "catch", onTab, caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp,
@@ -101,22 +119,32 @@ export default function TopBar({
 }) {
   const { level, into, need, frac } = levelProgress(xp);
   const r = dexRank(caught);
+  const [menu, setMenu] = useState(false);
+  const go = (id) => { setMenu(false); onTab(id); };
 
   return (
     <header className="topbar">
       <span className="tb-logo" aria-hidden="true"><i><Icon n="ball" size={18} /></i>Dexora</span>
 
-      <nav className="tb-tabs" aria-label="Main">
+      {/* Shown only held sideways on a touch screen (ROTOM SHELL). */}
+      <button type="button" className="tb-menu" aria-label="Menu" aria-expanded={menu}
+        onClick={() => setMenu((v) => !v)}>
+        <Icon n="menu" size={22} />
+        {(tradeAlert || youAlert) && <i className="tb-dot" aria-label="Something new" />}
+      </button>
+      {menu && <MenuScrim onClose={() => setMenu(false)} />}
+
+      <nav className={`tb-tabs${menu ? " open" : ""}`} aria-label="Main">
         {TABS.map(([id, name, ic]) => (
           <button key={id} type="button" className={`tb-tab t-${id}${tab === id ? " on" : ""}`}
-            aria-current={tab === id ? "page" : undefined} onClick={() => onTab(id)}>
+            aria-current={tab === id ? "page" : undefined} onClick={() => go(id)}>
             <Icon n={ic} size={19} /><span>{name}</span>
             {id === "trade" && tradeAlert ? <em aria-label={`${tradeAlert} waiting`}>{tradeAlert}</em> : null}
           </button>
         ))}
         {/* YOU: the trainer's chip on a desktop, the fourth tab on a phone. */}
         <button type="button" className={`tb-tab t-you${tab === "you" ? " on" : ""}`}
-          aria-current={tab === "you" ? "page" : undefined} onClick={() => onTab("you")}
+          aria-current={tab === "you" ? "page" : undefined} onClick={() => go("you")}
           /* No tip: a tip shows on focus, and a tapped tab keeps focus - it
              sat over the page it had just opened. You says it all in full. */
           aria-label={`You: ${trainerName ?? "your trainer"}, level ${level}, ${r.name}`}>

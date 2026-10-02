@@ -635,7 +635,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   to the game, and each page reads its own hash (`#/trade`, `#/league`,
   `#/you`) and pushes nothing. One `nav` in TopBar, placed by CSS (ROTOM
   SHELL, end of styles.css): the app bar on a desktop, a bottom tab bar on a
-  phone, a left rail held sideways. Layers: pages 56, the Rotom sheet 57,
+  phone, and held sideways a MENU behind one corner button (`.tb-menu`,
+  TopBar's `MenuScrim`: modal lock, Escape, `useDismiss`) - the left rail it
+  replaced took 68px of a sideways phone's width from the game (2026-10-02). Layers: pages 56, the Rotom sheet 57,
   bar and tab bar 58, banners 60, dialogs 70+ - so a dialog covers the tabs.
   A fight (`body.fighting`, set by League) and a phone encounter (`.app.busy`)
   hide the bar. No `backdrop-filter` where the map shows through.
