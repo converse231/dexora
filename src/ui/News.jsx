@@ -22,7 +22,7 @@ export const NEWS = [
     title: "Two more sets, boxes and bundles",
     items: [
       ["Phantasmal Flames and Ascended Heroes", "Open at Lv 25 and Lv 40, in their real wrappers."],
-      ["Boxes and bundles", "36 packs for ¥72,000, or Ascended Heroes' 6-pack bundle - and Open all at once."],
+      ["Boxes and bundles", "36 packs for ¥96,000, or Ascended Heroes' 6-pack bundle - and Open all at once."],
       ["Champions and streaks", "A region's Champion gives a box; every 7th day of a daily streak, a pack."],
       ["The last card", "Every pack now ends on a reveal."],
     ],
@@ -33,7 +33,7 @@ export const NEWS = [
     date: "October 2026",
     title: "Cards: the fifth tab",
     items: [
-      ["Mega Evolution packs", "188 real cards. ¥2,400 a pack, and about every other pack holds a hit."],
+      ["Mega Evolution packs", "188 real cards. ¥3,200 a pack, and about every other pack holds a hit."],
       ["Every hit is guaranteed", "Meters show when a Double rare, a Special illustration rare and a Mega Hyper Rare must come."],
       ["God Packs", "1 pack in 300 is all foils and Illustration rares."],
       ["Badges pay packs", "Every first gym badge gives a pack, and its cards carry the badge's stamp."],

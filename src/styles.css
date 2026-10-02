@@ -6509,7 +6509,8 @@ button:disabled { transition: none; }
 .lg-strip button.on em { color: #cfe8d8; }
 .lg-strip button.shut { opacity: .72; }
 .lg-strip button.done:not(.on) { border-color: var(--gold); }
-.lg-strip button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+/* Inside the button: the desktop sidebar scrolls, and an outline outside it was clipped (reported). */
+.lg-strip button:focus-visible { outline: 3px solid var(--gold); outline-offset: -3px; }
 .lg-lock {
   width: 11px; height: 11px; flex: none; vertical-align: -1px;
   fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
@@ -8619,8 +8620,12 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-earned { position: absolute; right: 5px; top: 4px; z-index: 2; color: #ffd24a; font-size: 14px; text-shadow: 0 1px 2px #000; }
 
 /* ---- Packs: the real wrappers fanned, the words, the chase */
-.cd-set { display: grid; gap: 18px; grid-template-columns: 1fr; padding: 16px; }
-@container (min-width: 640px) { .cd-set { grid-template-columns: 250px 1fr; } }
+/* `minmax(0, ...)`: a bare 1fr is at least its widest child's content, and the
+   chase row's 1,458px of cards held the column at 350px on a 360px phone -
+   the odds, the meters and the best pull ran off the card (reported). */
+.cd-set { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); padding: 16px; }
+.cd-set > * { min-width: 0; }
+@container (min-width: 640px) { .cd-set { grid-template-columns: 250px minmax(0, 1fr); } }
 .cd-set.shut .cd-wrap { filter: grayscale(.8); opacity: .7; }
 .cd-wrap { position: relative; height: 290px; }
 .cd-wrappers img {
@@ -8648,7 +8653,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 /* One line each, so the buttons share a height and wrap as whole buttons -
    a held count on its own line made Open taller than its neighbours. */
 .cd-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.cd-actions .lg-go { white-space: nowrap; }
+.cd-actions .lg-go { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .cd-actions .lg-go small { display: block; font-size: 11px; font-weight: 500; opacity: .85; }
 .cd-open-btn { animation: cd-call 1.8s ease-in-out infinite; }
 @keyframes cd-call { 50% { scale: 1.04; } }

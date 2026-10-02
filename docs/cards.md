@@ -51,7 +51,7 @@ nothing in `game/` except the engine's card actions, and never by `catch.js`,
 | Link to the game | Through the **National Dex number** (`dexId`), and for a **Mega card, the game's Mega form** (your call, 2026-10-02): its catch stamp and Dex link are the form's. | The binder becomes a record of *your* journey. |
 | Where it lives | **A fifth tab, Cards** (your call, 2026-10-02), beside Catch, Trade, Battles and You. | It is a place you go, like the League, not a setting. |
 | Images | **`low.webp` for all 613 cards shipped (~11 MB); `high.webp` fetched when a card is inspected** and cached by the browser (your call, 2026-10-02). | A pack opening never waits on the network; the 39 MB of large art is only paid for by cards you look at. |
-| Pull rates | **Ours, not the real print run's** (your call, 2026-10-02): about half of all packs hold a hit, every pack shows its odds, and every chase has a visible, honest guarantee. | It is the main cash sink, so a pack has to feel worth ¥2,400 nearly every time; real rates are built to sell boxes, not to be fun with play money. |
+| Pull rates | **Ours, not the real print run's** (your call, 2026-10-02): about half of all packs hold a hit, every pack shows its odds, and every chase has a visible, honest guarantee. | It is the main cash sink, so a pack has to feel worth ¥3,200 nearly every time; real rates are built to sell boxes, not to be fun with play money. |
 | Honest odds | **Every rate, pity count and guarantee is shown on screen**, from the same constants the roll uses. Never a hidden rate, never a "luckier" pack you can pay for, never real money. | Engaging is fine; deceptive is not. The non-commercial rule is what keeps this a game. |
 | Trading cards | **Not in the first releases.** Deferred. | trading.md decided "Pokémon for Pokémon only": a client-owned card is the duplication problem. |
 | Ranking | **Nothing card-related is ranked.** | There is no trust boundary: a save can claim any card. |
@@ -162,7 +162,7 @@ and read by both the roll and the Packs tab:
 | any of the above | - | ~49% | **every other pack** |
 | a holo rare (when the rare slot is not upgraded) | Rare | 65% | most packs |
 
-What that means for a player, at ¥2,400 a pack:
+What that means for a player, at ¥3,200 a pack (raised from ¥2,400, 2026-10-02):
 - **About every second pack holds a hit**, and every pack holds at least two
   reverse holos and a rare - nothing opens to only commons.
 - **An Illustration rare** (the full-art cards people collect) about every 6
@@ -250,9 +250,9 @@ Cards are the sink that has no ceiling and buys no advantage.
 
 | Item | Price (*proposed*) | Bound check.mjs holds |
 |---|---|---|
-| Booster pack (any set) | ¥2,400 | between 150 and 400 steps of median income at the level its set opens |
-| Booster box, `me01` / `me02` (36 packs) | ¥72,000 (≈17% off) | never beats packs by more than 20% |
-| **Bundle, `me02.5` (6 packs)** | ¥12,960 (10% off) | never beats packs by more than 20%; never cheaper per pack than a box |
+| Booster pack (any set) | ¥3,200 (was ¥2,400) | between 150 and 400 steps of median income at the level its set opens |
+| Booster box, `me01` / `me02` (36 packs) | ¥96,000 (≈17% off) | never beats packs by more than 20% |
+| **Bundle, `me02.5` (6 packs)** | ¥17,280 (10% off) | never beats packs by more than 20%; never cheaper per pack than a box |
 | Card craft | dust only | never buyable with ¥ |
 
 Ascended Heroes is a special set sold in collection products, not booster

@@ -243,7 +243,7 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
               <button type="button" className="lg-go quiet" disabled={money < PACK_PRICE * 10} onClick={() => onBuy(10)}>Buy 10 · {yen(PACK_PRICE * 10)}</button>
               {box && (
                 <button type="button" className="lg-go quiet" disabled={money < box.price} onClick={onBox}>
-                  {box.name} · {box.packs} packs · {yen(box.price)} ({Math.round((1 - box.price / (box.packs * PACK_PRICE)) * 100)}% off)
+                  {box.name.replace("Booster ", "").replace(/^./, (c) => c.toUpperCase())} of {box.packs} · {yen(box.price)} (−{Math.round((1 - box.price / (box.packs * PACK_PRICE)) * 100)}%)
                 </button>
               )}
             </>

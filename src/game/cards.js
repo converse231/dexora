@@ -81,15 +81,17 @@ export const titleOf = (setName) => `${setName} Collector`;
 // The Pulls wall keeps your best pulls, newest first.
 export const LOG_MAX = 50;
 
-export const PACK_PRICE = 2400;
+/* ¥3,200 (was 2,400 - raised, your call, 2026-10-02: a pack should be worth
+   earning for). About 300 steps of income; check.mjs holds 150-400. */
+export const PACK_PRICE = 3200;
 /* THE DISCOUNTED MULTI-PACK, one per set (your call, 2026-10-02): a booster
    box for the two main sets, a bundle for Ascended Heroes, which was never
    sold in boxes. check.mjs: no discount past 20%, and a bundle never cheaper
    a pack than a box. */
 export const BOXES = {
-  me01: { name: "Booster box", packs: 36, price: 72000 },
-  me02: { name: "Booster box", packs: 36, price: 72000 },
-  "me02.5": { name: "Booster bundle", packs: 6, price: 12960 },
+  me01: { name: "Booster box", packs: 36, price: 96000 },
+  me02: { name: "Booster box", packs: 36, price: 96000 },
+  "me02.5": { name: "Booster bundle", packs: 6, price: 17280 },
 };
 // Every 7th day of a daily-quest streak pays a pack.
 export const STREAK_PACK = 7;
