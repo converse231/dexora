@@ -29,7 +29,30 @@ const CHARGE = 650, TEAR = 520, DEAL = 620, BUILD = 700;
 const BIG = new Set(["illustration", "special", "mega"]);
 const LOUD = new Set(["special", "mega"]);
 const SPARKS = Array.from({ length: 14 }, (_, i) => i);
-const CONFETTI = Array.from({ length: 28 }, (_, i) => i);
+/* CONFETTI CANNONS, one in each bottom corner (asked for: it only fell, and
+   looked it). Each piece's arc is fixed here - a cheap hash of its index, so
+   every burst is the same shape and nothing rolls at render: how far across
+   (--dx), how high (--dy), how much it spins (--r) and when it leaves (--d).
+   Odd pieces fire from the left, even from the right, mirrored. */
+const rnd = (i, k) => ((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
+const CONFETTI = Array.from({ length: 36 }, (_, i) => {
+  const left = i % 2 === 0;
+  return {
+    i, left,
+    style: {
+      // A share of the room beside the card (styles.css' --reach), not of the screen.
+      "--dx": (left ? 1 : -1) * (0.25 + rnd(i, 1) * 0.75),
+      "--dy": `${48 + rnd(i, 2) * 40}vh`,
+      "--r": `${(rnd(i, 3) - 0.5) * 1440}deg`,
+      "--d": `${Math.round(rnd(i, 4) * 220)}ms`,
+    },
+  };
+});
+const Confetti = () => (
+  <span className="cd-confetti" aria-hidden="true">
+    {CONFETTI.map((c) => <i key={c.i} className={c.left ? "l" : "r"} style={c.style} />)}
+  </span>
+);
 // A hit is always holo, so it is named by its rarity; below a hit the foil is the news.
 const kindOf = (p) => (isHit(p.rarity) || p.variant === "n" ? RARITY[p.rarity].name : `${RARITY[p.rarity].name} · ${VARIANT_NAME[p.variant]}`);
 
@@ -158,6 +181,10 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
         </div>
       )}
 
+      {/* Out here, not in the stage: the stage's quake is a transform, which
+          made it the box a fixed layer measures from - the cannons fired from
+          the card's corners, over its art. Behind the card, from the screen's. */}
+      {loud && <Confetti key={`c${stage.k}`} />}
       {cur && (
         <div className={`cd-stage${stage.build ? " build" : ""}`} onClick={next}>
           {big && <span className="cd-rays loop" aria-hidden="true" />}
@@ -178,7 +205,6 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
               {curHit && <strong key={`s${stage.k}`} className={`cd-banner r-${cur.rarity}`}>{RARITY[cur.rarity].name}!</strong>}
             </>
           )}
-          {loud && <span key={`c${stage.k}`} className="cd-confetti" aria-hidden="true">{CONFETTI.map((i) => <i key={i} style={{ "--i": i }} />)}</span>}
           {shownUp && (
             <div className="cd-caption">
               {cur.isNew && <b className="cd-new">NEW</b>}
@@ -195,7 +221,7 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
 
       {stage === "summary" && !onFinish && (
         <div className="cd-summary">
-          {result.god && <span className="cd-confetti" aria-hidden="true">{CONFETTI.map((i) => <i key={i} style={{ "--i": i }} />)}</span>}
+          {result.god && <Confetti />}
           <h3>{result.god ? "God Pack!" : hits.length ? `${hits.length} hit${hits.length === 1 ? "" : "s"}!` : set.SET.name}</h3>
           {hits.length > 0 && (
             <div className="cd-hits">
@@ -250,7 +276,7 @@ export function OpenAll({ set, results, waiting = 0, onBinder, onDone }) {
   return (
     <div className={`cd-open${best && rungOf(best.rarity) >= rungOf("special") ? " loud tone-" + best.rarity : ""}`} role="dialog" aria-modal="true" aria-label={`Opened ${results.length} packs`}>
       <span className="cd-room" aria-hidden="true" />
-      {best && rungOf(best.rarity) >= rungOf("special") && <span className="cd-confetti" aria-hidden="true">{CONFETTI.map((i) => <i key={i} style={{ "--i": i }} />)}</span>}
+      {best && rungOf(best.rarity) >= rungOf("special") && <Confetti />}
       <div className="cd-summary">
         <h3>{results.length} packs · {hits.length} hit{hits.length === 1 ? "" : "s"}{gods ? ` · ${gods} God Pack${gods === 1 ? "" : "s"}!` : ""}</h3>
         {hits.length > 0 && (
