@@ -71,6 +71,22 @@ export const HINTS = [
     when: (e) => e.kind === "candy",
     text: "Rare Candy is levels. Levels are how a Pokémon evolves — raise one in the Box.",
   },
+  // CARDS (docs/cards.md): the first earned pack, the first spare, the first craft.
+  {
+    id: "cardpack",
+    when: (e) => e.kind === "cardpack",
+    text: "A card pack! Open it in Cards — every card in an earned pack carries the stamp of where it came from.",
+  },
+  {
+    id: "cardspare",
+    when: (e) => e.kind === "cardspare",
+    text: "A spare card. In Cards › Dust, spares become Card Dust — and dust crafts any card you are missing.",
+  },
+  {
+    id: "craftable",
+    when: (e) => e.kind === "craftable",
+    text: "You have enough Card Dust to craft a card. Open any missing card in Cards to make it.",
+  },
   {
     id: "point",
     when: (e) => e.kind === "level" && e.free > 0,

@@ -3333,6 +3333,12 @@ the community's pret fork, by `tools/build_anims.py`: its animation scripts,
 sprite templates, effect sheets and backgrounds, pinned to one commit.
 Pokémon Showdown's effects were not used: they are AGPL-3.0.
 
+**Pokémon TCG cards - data and the small card images - come from
+[TCGdex](https://tcgdex.dev/)** (`npm run cards`), and the card back and booster
+wrappers from [Bulbagarden Archives](https://archives.bulbagarden.net/); every card is drawn by the
+illustrator TCGdex names, and the cards are © Nintendo, Creatures and GAME
+FREAK, used here non-commercially like the rest of the game's art.
+
 **Origin sprites for every species after Johto are by SageDeoxys** - Game Boy
 Color-style drawings, credited in the game wherever one is shown ("Sprites by
 SageDeoxys"). `tools/import_sage.py` keeps the first frame of each in

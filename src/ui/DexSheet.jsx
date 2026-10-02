@@ -30,6 +30,7 @@ import {
 import { evoLevel, itemById } from "../game/items.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
+import DexCards from "./cards/DexCards.jsx";
 import { sageArt, SAGE_CREDIT } from "../game/biomes.js";
 import {
   tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT, starCost, starKeeps,
@@ -238,6 +239,7 @@ export default function DexSheet({
   starred = false, ordinary = 0, onStar = () => {},
   level = 1, here = null, busy = false,
   onClose, onFindInBox, onFindOnBoard = null, onTravel, onSelect = null, dexOf = () => 0,
+  cards = {}, onCards = null,
 }) {
   const sp = speciesById(id);
   const caught = state === 2;
@@ -552,6 +554,11 @@ export default function DexSheet({
                   <section className="ev-card">
                     <header className="ev-banner"><h4>Evolution</h4></header>
                     <Line id={id} dexOf={dexOf} onSelect={onSelect} />
+                  </section>
+                  {/* Cards of this Pokemon or its Mega form (docs/cards.md). */}
+                  <section className="ev-card">
+                    <header className="ev-banner"><h4>Cards</h4></header>
+                    <DexCards id={id} cards={cards} onOpen={onCards} />
                   </section>
                   <section className="ev-card">
                     <header className="ev-banner"><h4>Where to look</h4></header>

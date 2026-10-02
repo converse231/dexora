@@ -538,7 +538,31 @@ skipped state; reduced motion lands on the summary; the binder and the
 five-tab bar fit at 390×844 and 844×390 without horizontal scroll; a binder
 page of nine finishes holds frame rate on a 4x-throttled phone.
 
-## Phases *(each ends with `npm run check` and `npx vite build` passing)*
+## Phases *(each ends with its QA gate passed and your go-ahead)*
+
+**One phase at a time, and nothing starts until the last one's gate is
+passed and reviewed** (your call, 2026-10-02). The gate, every phase:
+
+1. **Rules**: `npm run check` and `npx vite build` pass; every new assertion
+   is shown to fail with its bug put back (the Testing rule).
+2. **Engine**: tools/play drives every new engine action through the real
+   engine - success, each refusal, money/dust exact, one `changed()` - and a
+   `savedField` line holds each new save field.
+3. **Saves (the backend)**: an old save loads with the new fields empty; a
+   reload mid-action loses nothing; export and import carry the fields; the
+   cloud path is read through (`persisted`, `mirror`, and the save trigger in
+   `db/trading.sql`, which must leave the new fields untouched) and, with test
+   credentials, a round trip on the TEST project.
+4. **Frontend, in a browser** (the dev server, pointer emulated): desktop
+   1440×900, phone 390×844, sideways 844×390, night and day; every new screen
+   screenshotted and looked at; no console error, no sideways scroll; keyboard,
+   Escape and Back work; reduced motion lands on the end state.
+5. **Performance**: the new screens on a 4×-throttled phone profile - no long
+   task over 100ms on open, the opening scene at frame rate.
+6. **Regression**: the four existing tabs, an encounter, a League fight and the
+   Trade Center still open and work.
+7. **Report**: what was built, the screenshots, what the gate found and fixed,
+   and anything deferred - then wait for the go-ahead.
 
 1. **Mega Evolution, end to end.** The fetcher and generated files for
    `me01`; `game/cards.js` (ladder, `RATES`, profile, `openPack`, the three
@@ -553,6 +577,99 @@ page of nine finishes holds frame rate on a 4x-throttled phone.
    Heroes bundle; the remaining rewards (Champion, streak, ranks).
 4. **Show-off:** set-completion titles and binder covers; a card showcase on
    the trainer card (SQL first).
+
+## Phase 1 as built *(2026-10-02, gate passed - awaiting your go-ahead)*
+
+- Built: `npm run cards` (me01, 188 cards, 4.2 MB of small images); `game/cards.js`
+  (ladder, `RATES`, the three pity counters, the God Pack, dust values);
+  `cards`, `packs`, `earnedPacks`, `cardPity` in the save; `buyPacks` and
+  `openCardPack`; the badge pack; the fifth tab with Packs (odds, pity meters,
+  chase list, Buy 1 / Buy 10) and Binder; the opening scene end to end.
+- Measured with pity running (20,000 packs): a hit in 52% of packs, a Special
+  illustration rare about 1 in 19, a Mega Hyper Rare about 1 in 75, no streak
+  past a guarantee. A pack is about 224 steps of income (the band is 150-400).
+- Not art files yet: the tab icon is drawn in `Icon.jsx` and the card back in
+  CSS; the God Pack overlay is a CSS glow. The art list above still stands
+  for when you make them.
+- Found by the gate and fixed: Skip during the tear was undone by the tear's
+  timers; on a phone the tab bar covered the summary's buttons; the selected
+  strip tab's label was white on white (League's too); a tapped tab kept its
+  hover fill on touch screens.
+- Not run: the TEST-project round trip (no test credentials here). The save
+  path was read through instead: the new fields are not VOLATILE, and the
+  server's save trigger rewrites only `box`.
+
+## Phase 1 revisions and Phase 2 as built *(2026-10-02, gate passed - awaiting your go-ahead)*
+
+Revisions asked for after phase 1:
+- **The real card back and the real wrappers** (`tools/fetch_card_art.py`,
+  Bulbagarden Archives): Mega Evolution has four (Mega Venusaur, Gardevoir,
+  Lucario, Kangaskhan); a pack opens in one of them at random, cosmetically.
+  Phantasmal Flames' four and Ascended Heroes' one are listed for phase 3.
+- **The binder is four across**, twelve pockets a page.
+- **The foil follows the real frame** (measured window, mask tested with the
+  foil painted solid): reverse holo everywhere but the art, holo rare only in
+  it, hits all over; unowned cards wear none.
+- **A chase gallery** on each set: every Mega Hyper Rare and Special
+  illustration rare, owned or still out there, each with its odds, tap to look.
+- **The opening, rebuilt for suspense and payoff**: the pack charges (shakes,
+  light leaks) and tears in sparks; a hit's back trembles and glows with a
+  line ("Something incredible…"); its tap charges, flashes white, flips,
+  bursts and stamps its rarity; Illustration and up add rays and a tinted
+  room, Special and Mega a screen shake and confetti; pips track the pack;
+  the summary shows the hits large.
+
+Phase 2: the Card Dex (filters, sort, paged tiles), Dust (the sweep, spares,
+missing cards and their craft cost), the card view (pointer-tilt foil and
+glare, every printing, dust a spare, craft, open in the Pokédex), set
+milestones (25/50/75/100%: 200/500/1,000/2,000 dust, the title at 100%), the
+Pulls wall and your best pull on the pack, the daily first pack (its hits'
+pips glow from the start; presentation only), the Dex sheet's Cards card,
+three hints and a Help section. **Craft is 16 spares' worth** (`CRAFT_X`), not
+8: measured over 40 seeded collectors, 8x put a full set at 26% of a game's
+money, 16x at 35% (about 230 packs).
+
+Found by the gate and fixed: the spare-card tip and a milestone banner fired
+over the pack before it was torn (and a frame of the tip cost 46ms); the
+binder's cards did not open the card view (it passed no set); the inspect view
+showed the plain copy over a foil you own; a missing card's sparkle drew over
+its greyed face; opening a pack (104ms) and the Card Dex (103ms) broke the
+100ms budget - both now under 81ms. Not built yet: binder covers and the
+master-set reward (phase 4), boxes and bundles (phase 3).
+
+## Phase 2 revisions and Phase 3 as built *(2026-10-02, gate passed - awaiting your go-ahead)*
+
+Your calls after phase 2:
+- **Every pack ends on a reveal**: the last card always charges, flashes white
+  and turns, whatever it is. It pulses white beforehand ("Last card…"), never
+  its rarity's colour, so the suspense is real; a hit's colour comes in only
+  during the charge. A rarity banner still stamps only for a hit.
+- **The chase is packs only**: a Special illustration rare and a Mega Hyper
+  Rare can never be crafted (`PACK_ONLY`). Measured over 40 seeded collectors:
+  completing Mega Evolution now costs a median **76%** of a full game's money
+  (505 packs, 250-1,060 by luck) - past the 25-60% band this plan held, on
+  purpose: the collection outlives the playthrough.
+- **Cards are their own collection**: no catch indicator on any card (the
+  Pokédex link in the card view and the Dex sheet's Cards card stay).
+- **The Open button keeps its neighbours' height**: the count is inline, and
+  every action stays on one line.
+
+Phase 3: Phantasmal Flames (130 cards, Lv 25) and Ascended Heroes (295, Lv
+40), with their real wrappers; a **booster box** for each main set (36 packs,
+¥72,000, 17% off) and a **bundle** for Ascended Heroes (6 packs, ¥12,960, 10%
+off); **Open all** (every held pack of a set, one summary of every hit, rolled
+in a second task so the scene shows first); a **region's Champion** pays the
+newest set's box (or bundle); every **7th day of a daily streak** pays a pack.
+**Not built: a pack per Pokédex rank** - CLAUDE.md holds the rank "a title,
+never a reward" because it counts traded Pokémon, so paying for it would pay
+for trades. An alternative that counts only your own catches is open.
+
+Found by the gate and fixed: the charge's glow never drew (no `content`); the
+swelling card covered "Last card…"; the box label wrapped and made its button
+taller on a phone; opening a pack and Open all crept back over 100ms with three
+sets rendered behind the scene (the page is no longer rendered under one, and
+Open all is two tasks); a tools/play paint test walked unrepelled and failed
+now and then when a step started an encounter.
 
 ## Deferred on purpose *(each with the trigger that brings it back)*
 

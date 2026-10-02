@@ -22,6 +22,7 @@ const P = {
   news: "M4 5h13v14H6a2 2 0 0 1-2-2zM17 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5",
   star: "M12 2l2.6 6.3L21 9l-5 4.4L17.5 20 12 16.6 6.5 20 8 13.4 3 9l6.4-.7z",
   card: "M3 6h18v12H3zM7 10h4M7 14h7M15 10h2",
+  cards: "M9 3h11v15H9zM5 6v15h11",
   flag: "M5 21V4h11l-2 4 2 4H5",
   chev: "M9 6l6 6-6 6",
   menu: "M4 7h16M4 12h16M4 17h16",

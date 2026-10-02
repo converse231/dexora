@@ -8066,7 +8066,7 @@ body {
   background-repeat: no-repeat;
 }
 .tc-page { z-index: 56; top: var(--bar-h); background: var(--paper); }
-body.fighting .tc-page { top: 0; }
+body.fighting .tc-page, body.cd-opening .tc-page { top: 0; }
 
 /* ---------- the app bar (desktop) */
 .topbar {
@@ -8077,7 +8077,7 @@ body.fighting .tc-page { top: 0; }
   border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none;
   font-family: var(--body); color: var(--ink-soft);
 }
-body.fighting .topbar { display: none; }
+body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .tb-logo { display: inline-flex; align-items: center; gap: 10px; font: 800 20px var(--display); color: var(--ink); white-space: nowrap; }
 .tb-logo i {
   width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
@@ -8096,7 +8096,9 @@ body.fighting .topbar { display: none; }
 .topbar .tb-tab.t-trade { --fc: var(--violet); }
 .topbar .tb-tab.t-battles { --fc: #ff6a2b; }
 .topbar .tb-tab.t-you { --fc: var(--accent); }
-.topbar .tb-tab:hover { color: var(--ink); background: var(--surface-2); border: 0; }
+/* A pointer that hovers only: on a phone a tapped tab kept its hover fill and
+   read as selected beside the real one. */
+@media (hover: hover) { .topbar .tb-tab:hover { color: var(--ink); background: var(--surface-2); border: 0; } }
 .topbar .tb-tab.on {
   color: var(--ink);
   background: color-mix(in srgb, var(--fc) 20%, transparent);
@@ -8271,7 +8273,7 @@ body.fighting .topbar { display: none; }
 @media (hover: none) and (pointer: coarse) {
   body { padding: 8px 6px calc(var(--nav-h) + env(safe-area-inset-bottom) + 10px); }
   .tc-page { top: 0; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
-  body.fighting .tc-page, .app.busy .tc-page { bottom: 0; }
+  body.fighting .tc-page, body.cd-opening .tc-page, .app.busy .tc-page { bottom: 0; }
   /* The bar is a slim row of the three numbers you check while walking;
      its tabs are the tab bar along the bottom. */
   .topbar {
@@ -8288,7 +8290,7 @@ body.fighting .topbar { display: none; }
     border: 0; border-top: 1px solid var(--line); border-radius: 0;
     background: color-mix(in srgb, var(--paper) 97%, transparent);
   }
-  .app.busy .tb-tabs, body.fighting .tb-tabs { display: none; }
+  .app.busy .tb-tabs, body.fighting .tb-tabs, body.cd-opening .tb-tabs { display: none; }
   .topbar .tb-tab, .topbar .tb-tab.t-you {
     position: relative; inset: auto; transform: none; flex: 1; max-width: 96px;
     height: 54px; padding: 0; gap: 3px; flex-direction: column; justify-content: center;
@@ -8349,7 +8351,7 @@ body.fighting .topbar { display: none; }
     box-shadow: 0 8px 20px var(--shadow-soft);
   }
   .tb-menu .tb-dot { top: 6px; right: 6px; }
-  .app.busy .tb-menu, body.fighting .tb-menu { display: none; }
+  .app.busy .tb-menu, body.fighting .tb-menu, body.cd-opening .tb-menu { display: none; }
   .tb-scrim { display: block; position: fixed; inset: 0; z-index: 58; background: var(--scrim); }
   .tb-tabs { display: none; }
   .tb-tabs.open {
@@ -8487,7 +8489,8 @@ body.fighting .topbar { display: none; }
   .lg-strip b { font: 600 14px var(--body); }
   .lg-strip em { font: 600 11px var(--pixel); }
   .lg-strip button.on, .lg-strip .rk-tab.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-  .lg-strip button.on em { color: var(--paper); opacity: .7; }
+  /* `.rk-tab` too: its own white label outranked this, white on the pale pill. */
+  .lg-strip button.on em, .lg-strip .rk-tab.on em { color: var(--paper); opacity: .7; }
 }
 /* ================================================================ ENCOUNTER, ROTOM
    The scene's furniture as the design draws it: a floating text bar with a
@@ -8540,3 +8543,338 @@ body.fighting .topbar { display: none; }
    form's guide and the Box preview. */
 .vr-perk, .pv-perk { display: block; font: 600 11px var(--pixel); color: var(--accent); line-height: 1.35; }
 .pv-perk { margin-top: 6px; font-size: 12px; }
+
+/* ================================================================ CARDS
+   The fifth tab (docs/cards.md): Packs, Binder, Card Dex, Dust, the card view
+   and the pack opening. Every loop moves `transform`, `opacity` or the
+   individual `rotate`/`scale`/`translate` properties; reduced motion lands
+   every scene on its end. */
+.topbar .tb-tab.t-cards { --fc: #e8579b; }
+.cd-main { container-type: inline-size; }
+/* Under the opening, the page is not drawn at all (opening a pack was a 104ms task). */
+.cd-page.opening .cd-main { content-visibility: hidden; }
+.cd-packs { display: grid; gap: 16px; }
+.cd-note { margin: 0; color: var(--bad); font-size: 13px; }
+.cd-credit { margin: 18px 0 4px; font-size: 11.5px; color: var(--ink-faint); }
+.cd-sub { margin: 2px 0 8px; font-size: 13px; color: var(--ink-soft); }
+.cd-h { margin: 18px 0 8px; font: 700 15px var(--display); color: var(--ink); }
+.cd-h span, .cd-wall h5 span { font: 500 12px var(--body); color: var(--ink-faint); margin-left: 6px; }
+
+/* ---- one card, its finish on the real frame */
+.cd-card {
+  position: relative; display: block; width: 100%; aspect-ratio: 63 / 88; border-radius: 4.6% / 3.3%;
+  overflow: hidden; background: var(--surface-2);
+}
+.cd-card > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.cd-foil { position: absolute; inset: 0; display: none; pointer-events: none; overflow: hidden; mix-blend-mode: color-dodge; }
+.cd-card.v-r .cd-foil, .cd-card.r-rare.v-h .cd-foil, .cd-card.r-double .cd-foil, .cd-card.r-ultra .cd-foil,
+.cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil, .cd-card.r-mega .cd-foil { display: block; }
+/* At rest a foil is a faint rainbow; the band sweeps over it when shown. */
+.cd-foil {
+  background: linear-gradient(125deg, rgba(255, 110, 190, .16), rgba(110, 220, 255, .2) 35%, rgba(255, 236, 130, .16) 65%, rgba(170, 120, 255, .18));
+}
+/* A REVERSE HOLO shines everywhere BUT the art window; a HOLO RARE only in it.
+   The window, measured off the faces: 6.6% in, 9.6% down, 84.5% x 38% - so
+   the mask's position is 6.6 / (100 - 84.5) and 9.6 / (100 - 38), because a
+   percentage position aligns that share of the layer with that share of the box. */
+.cd-card.v-r .cd-foil {
+  -webkit-mask: linear-gradient(#000 0 0) 0 0 / 100% 100% no-repeat, linear-gradient(#000 0 0) 42.6% 15.5% / 84.5% 38% no-repeat;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) 0 0 / 100% 100% no-repeat exclude, linear-gradient(#000 0 0) 42.6% 15.5% / 84.5% 38% no-repeat;
+}
+.cd-card.r-rare.v-h .cd-foil { inset: 9.6% 8.9% 52.4% 6.6%; }
+.cd-card.r-ultra .cd-foil { background: repeating-linear-gradient(115deg, rgba(230, 240, 255, .14) 0 2px, transparent 2px 6px), linear-gradient(125deg, rgba(220, 235, 255, .2), rgba(255, 255, 255, .06)); }
+.cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil {
+  background: radial-gradient(rgba(255, 255, 255, .13) 0 .6px, transparent 1px) 0 0 / 6px 6px,
+    linear-gradient(125deg, rgba(255, 110, 190, .14), rgba(110, 220, 255, .16) 50%, rgba(255, 236, 130, .14));
+}
+/* A Mega Hyper Rare is printed in gold already: a light hand, or its etching washes out. */
+.cd-card.r-mega .cd-foil { background: linear-gradient(125deg, rgba(255, 230, 150, .12), rgba(255, 255, 255, .05) 50%, rgba(255, 220, 120, .12)); }
+.cd-foil::after {
+  content: ""; position: absolute; top: -10%; bottom: -10%; left: -70%; width: 60%; opacity: 0;
+  background: linear-gradient(100deg, transparent, rgba(255, 120, 200, .55), rgba(120, 220, 255, .65), rgba(255, 240, 140, .55), transparent);
+}
+.cd-card.r-ultra .cd-foil::after { background: linear-gradient(100deg, transparent, rgba(235, 245, 255, .8), transparent); }
+.cd-card.r-special .cd-foil::after, .cd-card.r-mega .cd-foil::after { background: linear-gradient(100deg, transparent, rgba(255, 220, 120, .8), rgba(255, 255, 255, .7), transparent); }
+.cd-card:not(.still):not(.live) .cd-foil::after { animation: cd-sweep 2.6s ease-in-out .3s infinite; }
+@keyframes cd-sweep { 0% { opacity: 1; transform: translateX(0); } 55%, 100% { opacity: 1; transform: translateX(400%); } }
+/* Under the pointer (the card view): the band and a glare follow it, the card tilts. */
+.cd-card.live { transition: transform .12s ease-out; transform: perspective(900px) rotateY(calc((var(--mx, .5) - .5) * 18deg)) rotateX(calc((.5 - var(--my, .5)) * 18deg)); }
+.cd-card.live .cd-foil::after { opacity: .9; transform: translateX(calc(var(--mx, .5) * 280%)); }
+.cd-glare { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .2s;
+  background: radial-gradient(circle at calc(var(--mx, .5) * 100%) calc(var(--my, .5) * 100%), rgba(255, 255, 255, .38), transparent 46%); }
+.cd-card.live.held .cd-glare { opacity: 1; }
+@media (hover: none) { .cd-card.live:not(.held) .cd-foil::after { animation: cd-sweep 3.2s ease-in-out infinite; } }
+.cd-card.missing > img { filter: grayscale(.85) brightness(.75); }
+/* A card you do not own has no finish yet: a sparkle over a greyed card read as noise. */
+.cd-card.missing .cd-foil, .cd-chase-card:not(.got) .cd-foil, .cd-tile:not(.got) .cd-foil { display: none; }
+.cd-rar { font-style: normal; font-size: 12px; min-width: 20px; text-align: center; color: var(--ink-faint); }
+.cd-rar.r-double, .cd-rar.r-ultra { color: var(--ink); }
+.cd-rar.r-illustration, .cd-rar.r-special, .cd-rar.r-mega { color: var(--gold); }
+.cd-stamp {
+  position: absolute; left: 5px; bottom: 5px; width: 15px; height: 15px; border-radius: 50%; z-index: 2;
+  background: linear-gradient(#e33 0 45%, #222 45% 55%, #fff 55%); box-shadow: 0 0 0 1.5px #222;
+}
+.cd-stamp.inline { position: relative; display: inline-block; left: 0; bottom: 0; vertical-align: -2px; margin-right: 4px; }
+.cd-earned { position: absolute; right: 5px; top: 4px; z-index: 2; color: #ffd24a; font-size: 14px; text-shadow: 0 1px 2px #000; }
+
+/* ---- Packs: the real wrappers fanned, the words, the chase */
+.cd-set { display: grid; gap: 18px; grid-template-columns: 1fr; padding: 16px; }
+@container (min-width: 640px) { .cd-set { grid-template-columns: 250px 1fr; } }
+.cd-set.shut .cd-wrap { filter: grayscale(.8); opacity: .7; }
+.cd-wrap { position: relative; height: 290px; }
+.cd-wrappers img {
+  position: absolute; left: 50%; bottom: 8px; width: 132px; margin-left: -66px; transform-origin: 50% 100%;
+  rotate: calc((var(--k) - (var(--n) - 1) / 2) * 9deg); z-index: calc(10 - var(--k));
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .45));
+}
+.cd-wrappers img:first-child { animation: cd-float 3.4s ease-in-out infinite; }
+@keyframes cd-float { 50% { translate: 0 -7px; } }
+.cd-best { position: absolute; right: 0; bottom: 0; width: 74px; z-index: 12; padding: 0; border: 0; background: none; cursor: pointer; text-align: center; }
+.cd-best .cd-card { box-shadow: 0 6px 14px rgba(0, 0, 0, .5), 0 0 0 2px var(--gold); }
+.cd-best span { display: block; margin-top: 4px; font: 600 10px var(--pixel); color: var(--gold); }
+.cd-set-body h4 { margin: 0; font: 800 21px var(--display); color: var(--ink); }
+.cd-odds { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+.cd-odds li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
+.cd-odds li span { flex: 1; }
+.cd-odds li b { font: 700 12px var(--pixel); color: var(--ink); }
+.cd-odds .cd-god { color: var(--gold); }
+.cd-pity { display: grid; gap: 8px; margin-bottom: 14px; }
+.cd-meter { display: grid; gap: 3px; font-size: 12.5px; color: var(--ink-soft); }
+.cd-meter em { font-style: normal; color: var(--ink); font-weight: 600; }
+.cd-meter small { font-size: 11.5px; color: var(--gold); }
+.cd-meter i, .cd-progress i { display: block; height: 6px; border-radius: 3px; background: var(--line); position: relative; overflow: hidden; }
+.cd-meter i::after, .cd-progress i::after { content: ""; position: absolute; inset: 0; background: var(--accent); transform-origin: left; transform: scaleX(var(--p)); }
+/* One line each, so the buttons share a height and wrap as whole buttons -
+   a held count on its own line made Open taller than its neighbours. */
+.cd-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cd-actions .lg-go { white-space: nowrap; }
+.cd-actions .lg-go small { display: block; font-size: 11px; font-weight: 500; opacity: .85; }
+.cd-open-btn { animation: cd-call 1.8s ease-in-out infinite; }
+@keyframes cd-call { 50% { scale: 1.04; } }
+.cd-lock { font-size: 13px; color: var(--ink-faint); }
+.cd-chase { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 12px; min-width: 0; }
+.cd-chase-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.cd-chase-head h5, .cd-wall h5 { margin: 0; font: 700 15px var(--display); color: var(--ink); }
+.cd-chase-head span { font-size: 12px; color: var(--ink-faint); }
+.cd-chase-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: thin; }
+.cd-chase-card { flex: none; width: 112px; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; }
+.cd-chase-card .cd-card { box-shadow: 0 5px 12px rgba(0, 0, 0, .35); }
+.cd-chase-card:not(.got) .cd-card > img { filter: grayscale(.9) brightness(.6); }
+.cd-chase-card.got .cd-card { box-shadow: 0 5px 12px rgba(0, 0, 0, .35), 0 0 0 2px var(--gold); }
+.cd-chase-card > span { display: flex; align-items: center; gap: 3px; margin-top: 5px; font: 600 11px var(--pixel); color: var(--ink-soft); }
+
+/* ---- Binder: four across, a card's own shape */
+.cd-binder { display: grid; gap: 14px; }
+.cd-wall { display: grid; gap: 6px; }
+.cd-progress { display: grid; gap: 6px; }
+.cd-progress b { font: 800 22px var(--display); color: var(--ink); }
+.cd-progress u { text-decoration: none; font-size: 15px; color: var(--ink-faint); }
+.cd-progress small { font-size: 12px; color: var(--ink-faint); }
+.cd-page-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 760px; }
+.cd-pocket { position: relative; padding: 0; border: 1px dashed var(--line-firm); border-radius: 8px; background: var(--surface-2); aspect-ratio: 63 / 88; cursor: pointer; overflow: hidden; }
+.cd-pocket.got { border: 0; background: none; box-shadow: 0 4px 12px var(--shadow-soft); }
+.cd-pocket.got .cd-card { position: absolute; inset: 0; height: 100%; }
+.cd-pocket em, .cd-tile em {
+  position: absolute; right: 5px; bottom: 5px; z-index: 2; font: 700 11px var(--pixel); font-style: normal;
+  padding: 2px 6px; border-radius: 999px; background: rgba(10, 14, 32, .8); color: #fff;
+}
+.cd-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 2px; padding: 6px; font-size: 11px; color: var(--ink-faint); }
+.cd-empty b { font: 700 12px var(--pixel); color: var(--ink-faint); }
+.cd-turn { display: flex; align-items: center; gap: 12px; }
+.cd-turn span { font-size: 13px; color: var(--ink-soft); }
+
+/* ---- Card Dex and Dust */
+.cd-dex, .cd-dustpage { display: grid; gap: 8px; }
+.cd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.cd-tile { position: relative; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; content-visibility: auto; contain-intrinsic-size: auto 160px; }
+.cd-tile:not(.got) .cd-card > img { filter: grayscale(.85) brightness(.6); }
+.cd-tile em { bottom: auto; top: 5px; }
+.cd-tile-cap { display: flex; align-items: center; gap: 3px; margin-top: 4px; font: 600 11px var(--pixel); color: var(--ink-soft); white-space: nowrap; overflow: hidden; }
+.cd-dusthead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; }
+.cd-dusthead > b { font: 800 30px var(--display); color: var(--ink); }
+.cd-dusthead > span { flex: 1; min-width: 180px; display: grid; font-weight: 700; color: var(--ink); }
+.cd-dusthead small { font-weight: 400; font-size: 12.5px; color: var(--ink-soft); }
+
+/* ---- the card view */
+.cd-inspect-card { position: relative; width: min(760px, 100%); display: grid; gap: 18px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .cd-inspect-card { grid-template-columns: minmax(220px, 300px) 1fr; } }
+.cd-inspect-art { display: grid; place-items: center; }
+.cd-card.big { width: min(300px, 68vw); box-shadow: 0 14px 34px rgba(0, 0, 0, .45); touch-action: none; }
+.cd-inspect-body h3 { margin: 0 32px 2px 0; font: 800 22px var(--display); color: var(--ink); }
+.cd-kind { display: flex; align-items: center; gap: 6px; margin: 4px 0 6px; font-weight: 700; color: var(--ink); }
+.cd-copies { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+.cd-copies li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cd-vname { min-width: 104px; min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--ink-soft); font: 600 13px var(--body); text-align: left; cursor: pointer; }
+.cd-vname.on { border-color: var(--accent); color: var(--ink); }
+.cd-copies li > b { min-width: 30px; font: 700 13px var(--pixel); color: var(--ink); }
+.cd-packonly { font: 600 12px var(--pixel); color: var(--gold); }
+.cd-x { position: absolute; right: 10px; top: 10px; z-index: 2; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+
+/* ================================================================ THE OPENING */
+.cd-open { --rc: #6c7cff; position: fixed; inset: 0; z-index: 75; display: grid; place-items: center; overflow: auto; padding: 20px 16px; background: #060812; color: #fff; }
+.cd-open.tone-rare { --rc: #e8eeff; }
+.cd-open.tone-double { --rc: #ffcb3d; }
+.cd-open.tone-ultra { --rc: #cfe0ff; }
+.cd-open.tone-illustration { --rc: #33e0c4; }
+.cd-open.tone-special { --rc: #ff4fbf; }
+.cd-open.tone-mega { --rc: #ffd24a; }
+.cd-room { position: fixed; inset: 0; pointer-events: none; opacity: .45; transition: opacity .6s;
+  background: radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--rc) 42%, transparent), transparent 62%); }
+.cd-open[class*="tone-"] .cd-room { opacity: 1; }
+.cd-open::before { content: ""; position: fixed; inset: 0; background: #000; opacity: 0; transition: opacity .5s; pointer-events: none; }
+.cd-open.dim::before { opacity: .45; }
+.cd-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.cd-skip {
+  position: fixed; top: calc(14px + env(safe-area-inset-top)); right: 16px; z-index: 5; min-height: 36px;
+  padding: 0 16px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .3);
+  background: rgba(255, 255, 255, .08); color: #fff; font: 600 14px var(--body); cursor: pointer;
+}
+.cd-daily { position: fixed; top: calc(70px + env(safe-area-inset-top)); left: 0; right: 0; text-align: center; margin: 0; font: 700 14px var(--display); color: #ffd24a; }
+
+/* the pack: floats, charges, tears, falls away */
+.cd-bigpack { position: relative; width: min(54vw, 250px); padding: 0; border: 0; background: none; color: #fff; cursor: pointer; animation: cd-float 3.2s ease-in-out infinite; }
+.cd-bigpack > img { display: block; width: 100%; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .6)); }
+.cd-sheen { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.cd-sheen::after { content: ""; position: absolute; top: -10%; bottom: -10%; left: -60%; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .45), transparent); mix-blend-mode: overlay; animation: cd-sweep 3s ease-in-out 1s infinite; }
+.cd-bigpack em { position: absolute; left: 0; right: 0; bottom: -40px; font: 700 14px var(--display); font-style: normal; animation: cd-blink 1.4s ease-in-out infinite; }
+@keyframes cd-blink { 50% { opacity: .35; } }
+.cd-tear { position: absolute; left: 0; right: 0; top: 0; height: 9%; background-size: 100% auto; background-position: top; opacity: 0; }
+.cd-bigpack.is-charge { animation: cd-charge .65s linear both; }
+@keyframes cd-charge {
+  0% { rotate: 0deg; scale: 1; } 20% { rotate: -1.5deg; } 40% { rotate: 2deg; scale: 1.03; }
+  60% { rotate: -2.5deg; scale: 1.05; } 80% { rotate: 3deg; scale: 1.07; } 100% { rotate: 0deg; scale: 1.08; }
+}
+.cd-leak { position: absolute; left: 6%; right: 6%; top: 8%; height: 3px; border-radius: 3px; background: #fff;
+  box-shadow: 0 0 18px 6px color-mix(in srgb, var(--rc) 70%, #fff); animation: cd-leak .65s ease-in both; }
+@keyframes cd-leak { from { opacity: 0; scale: .2 1; } to { opacity: 1; scale: 1 1; } }
+.cd-bigpack.is-tear, .cd-bigpack.is-deal { animation: none; scale: 1.08; }
+.cd-bigpack.is-tear > img, .cd-bigpack.is-deal > img { clip-path: inset(9% 0 0 0); }
+.cd-bigpack.is-tear .cd-tear { opacity: 1; animation: cd-rip .5s cubic-bezier(.3, .6, .4, 1) forwards; }
+@keyframes cd-rip { to { transform: translate(55%, -160%) rotate(28deg); opacity: 0; } }
+.cd-bigpack.is-deal { animation: cd-away .62s ease-in forwards; }
+@keyframes cd-away { to { translate: 0 60%; opacity: 0; scale: .9; } }
+.cd-open.god .cd-bigpack > img { filter: drop-shadow(0 0 26px rgba(255, 214, 90, .9)) drop-shadow(0 0 60px rgba(160, 100, 255, .7)); }
+.cd-godword { position: absolute; left: 0; right: 0; top: 40%; font: 900 32px var(--display); color: #ffe27a; text-shadow: 0 2px 12px #000, 0 0 30px #ff9a00; animation: cd-stamp .5s cubic-bezier(.2, 1.6, .4, 1) both; }
+
+/* sparks from a point: the tear, and every hit */
+.cd-burst { position: absolute; left: 50%; top: 45%; width: 0; height: 0; pointer-events: none; z-index: 4; }
+.cd-burst.at-top { top: 9%; }
+.cd-burst i {
+  position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 10px 3px var(--rc);
+  rotate: calc(var(--i) * 25.7deg); animation: cd-spark .8s cubic-bezier(.1, .7, .3, 1) both;
+}
+@keyframes cd-spark { from { transform: translateY(0) scale(1.2); opacity: 1; } to { transform: translateY(-170px) scale(.3); opacity: 0; } }
+
+/* the deal */
+.cd-fan { position: absolute; width: min(60vw, 290px); aspect-ratio: 63 / 88; }
+.cd-fan i { position: absolute; inset: 0; border-radius: 4.6% / 3.3%; background-size: cover; box-shadow: 0 8px 20px rgba(0, 0, 0, .5);
+  animation: cd-deal .5s cubic-bezier(.2, .8, .3, 1) calc(var(--k) * 30ms) both; }
+@keyframes cd-deal { from { transform: translateY(80%) scale(.55); opacity: 0; } }
+
+/* one card at a time */
+.cd-stage { position: relative; z-index: 1; display: grid; justify-items: center; gap: 12px; cursor: pointer; }
+.cd-open.loud .cd-stage { animation: cd-quake .55s linear .05s; }
+@keyframes cd-quake { 20% { translate: -7px 3px; } 40% { translate: 6px -4px; } 60% { translate: -5px 2px; } 80% { translate: 3px -1px; } }
+.cd-tease { position: absolute; top: -34px; margin: 0; font: 800 17px var(--display); color: var(--rc-t, #fff); text-shadow: 0 0 14px rgba(255, 255, 255, .5); animation: cd-blink 1s ease-in-out infinite; }
+.cd-flip { position: relative; width: min(64vw, 310px); aspect-ratio: 63 / 88; transform-style: preserve-3d; transition: transform .24s ease-out; animation: cd-in .28s ease-out; }
+@keyframes cd-in { from { translate: 0 34px; scale: .92; opacity: 0; } }
+.cd-flip.up { transform: rotateY(180deg); }
+.cd-flip.up.r-illustration, .cd-flip.up.r-special, .cd-flip.up.r-mega { transition-duration: 1.1s; transition-timing-function: cubic-bezier(.3, .1, .2, 1); }
+.cd-back, .cd-side { position: absolute; inset: 0; border-radius: 4.6% / 3.3%; backface-visibility: hidden; overflow: hidden; }
+.cd-back { background-size: cover; background-position: center; box-shadow: 0 12px 30px rgba(0, 0, 0, .55); }
+.cd-side { transform: rotateY(180deg); box-shadow: 0 14px 36px rgba(0, 0, 0, .6); }
+.cd-side .cd-card { height: 100%; border-radius: 0; }
+/* THE TELL: a hit's back trembles and glows its colour; the charge swells it. */
+/* The last card's white: its pulse before the tap, and the charge of a card
+   that is not a hit (a hit's own colour wins below). */
+.cd-flip { --tell: #ffffff; }
+.cd-flip.last::before {
+  content: ""; position: absolute; inset: -3px; border-radius: 6%; opacity: 0;
+  box-shadow: 0 0 30px 10px rgba(255, 255, 255, .85), inset 0 0 22px 6px rgba(255, 255, 255, .7);
+  animation: cd-glow .9s ease-in-out .15s infinite;
+}
+.cd-flip.last { animation: cd-in .28s ease-out, cd-tremble .5s linear .3s infinite; }
+.cd-flip.r-double { --tell: #ffcb3d; }
+.cd-flip.r-ultra { --tell: #dfe8ff; }
+.cd-flip.r-illustration { --tell: #33e0c4; }
+.cd-flip.r-special { --tell: #ff4fbf; }
+.cd-flip.r-mega { --tell: #ffd24a; }
+.cd-flip.tell::before {
+  content: ""; position: absolute; inset: -3px; border-radius: 6%; opacity: 0;
+  box-shadow: 0 0 30px 10px var(--tell), inset 0 0 22px 6px var(--tell);
+  animation: cd-glow 1s ease-in-out .15s infinite;
+}
+.cd-flip.tell { animation: cd-in .28s ease-out, cd-tremble .5s linear .3s infinite; }
+@keyframes cd-glow { 50% { opacity: 1; } }
+@keyframes cd-tremble { 25% { rotate: -1.2deg; } 75% { rotate: 1.2deg; } }
+.cd-flip.build { animation: cd-swell .7s ease-in both; }
+/* The charge's glow is its own layer: it had no `content` and never drew (found in QA). */
+.cd-flip.build::before {
+  content: ""; position: absolute; inset: -3px; border-radius: 6%;
+  opacity: 1; box-shadow: 0 0 60px 26px var(--tell), inset 0 0 40px 14px var(--tell); animation: cd-fade .3s ease-out both;
+}
+.cd-stage.build .cd-tease { top: -60px; }
+.cd-tease.cd-wait { position: static; }
+@keyframes cd-swell { 0% { scale: 1; rotate: 0deg; } 30% { rotate: -2deg; } 60% { rotate: 2.5deg; scale: 1.08; } 100% { rotate: 0deg; scale: 1.14; } }
+.cd-flash { position: fixed; inset: 0; z-index: 6; background: #fff; pointer-events: none; animation: cd-flash .55s ease-out forwards; }
+@keyframes cd-flash { from { opacity: .95; } to { opacity: 0; } }
+.cd-banner {
+  position: absolute; top: -48px; z-index: 5; white-space: nowrap; font: 900 26px var(--display);
+  color: var(--rc); text-shadow: 0 2px 0 #000, 0 0 22px var(--rc); animation: cd-stamp .55s cubic-bezier(.2, 1.6, .4, 1) .15s both;
+}
+@keyframes cd-stamp { from { scale: 2.4; opacity: 0; } }
+.cd-rays {
+  position: absolute; left: 50%; top: 46%; width: 900px; height: 900px; margin: -450px 0 0 -450px; z-index: -1;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--rc) 30%, transparent) 0 6deg, transparent 6deg 18deg);
+  -webkit-mask: radial-gradient(closest-side, #000 25%, transparent); mask: radial-gradient(closest-side, #000 25%, transparent);
+  animation: cd-spin 20s linear infinite, cd-fade .9s ease-out both;
+}
+@keyframes cd-spin { to { transform: rotate(360deg); } }
+@keyframes cd-fade { from { opacity: 0; } }
+.cd-confetti { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+.cd-confetti i {
+  position: absolute; top: -20px; left: calc(var(--i) * 3.55% + 1%); width: 8px; height: 13px; border-radius: 2px; background: #ffd24a;
+  animation: cd-fall calc(1.6s + var(--i) * 41ms) cubic-bezier(.3, .2, .6, 1) calc(var(--i) * 23ms + .4s) both;
+}
+.cd-confetti i:nth-child(4n + 2) { background: #ff4fbf; }
+.cd-confetti i:nth-child(4n + 3) { background: #33e0c4; }
+.cd-confetti i:nth-child(4n) { background: #fff; }
+@keyframes cd-fall { from { transform: translateY(0) rotate(0deg); opacity: 1; } to { transform: translateY(110vh) rotate(calc(var(--i) * 77deg + 360deg)); opacity: .9; } }
+.cd-caption { display: flex; align-items: center; gap: 8px; font: 700 15px var(--body); animation: cd-stamp .35s ease-out both; }
+.cd-caption .cd-rar { color: #ffd24a; font-size: 15px; }
+.cd-new { padding: 2px 8px; border-radius: 999px; background: linear-gradient(#ffe27a, #f0b83c); color: #4a3000; font: 800 11px var(--display); }
+.cd-pips { display: flex; gap: 7px; margin-top: 4px; }
+.cd-pips i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .35); }
+.cd-pips i.seen { background: rgba(255, 255, 255, .55); border-color: transparent; }
+.cd-pips i.seen.r-rare { background: #e8eeff; }
+.cd-pips i.r-double { --pc: #ffcb3d; } .cd-pips i.r-ultra { --pc: #cfe0ff; } .cd-pips i.r-illustration { --pc: #33e0c4; }
+.cd-pips i.r-special { --pc: #ff4fbf; } .cd-pips i.r-mega { --pc: #ffd24a; }
+.cd-pips i.seen[class*="r-"]:not(.r-common):not(.r-uncommon):not(.r-rare) { background: var(--pc); box-shadow: 0 0 8px var(--pc); }
+.cd-pips i.tell { border-color: var(--pc); box-shadow: 0 0 10px var(--pc); animation: cd-glow 1s ease-in-out infinite; }
+.cd-pips i.cur { scale: 1.35; }
+
+/* the summary: hits large, the rest in a row */
+.cd-summary { position: relative; display: grid; gap: 14px; justify-items: center; width: min(820px, 100%); }
+.cd-summary h3 { margin: 0; font: 900 26px var(--display); }
+.cd-hits { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+.cd-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; width: 100%; }
+.cd-sum { position: relative; margin: 0; display: grid; gap: 4px; animation: cd-stamp .35s ease-out both; }
+.cd-sum.hit { width: min(38vw, 180px); }
+.cd-sum.hit .cd-card { box-shadow: 0 0 0 2px #ffd24a, 0 10px 26px rgba(0, 0, 0, .6); }
+.cd-sum .cd-new { position: absolute; top: -6px; left: -4px; z-index: 3; }
+.cd-sum .cd-stamp { bottom: auto; top: 6px; left: auto; right: 6px; }
+.cd-sum figcaption { display: flex; align-items: center; gap: 4px; font-size: 11px; color: rgba(255, 255, 255, .82); min-width: 0; }
+.cd-sum figcaption em { font-style: normal; color: #ffd24a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-sum .cd-rar { color: #ffd24a; min-width: 0; }
+.cd-dust { margin: 0; font-size: 13px; color: rgba(255, 255, 255, .85); text-align: center; }
+.cd-dust b { color: #ffd24a; }
+.cd-open .lg-go.quiet { color: #fff; background: rgba(255, 255, 255, .1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cd-open *, .cd-open *::before, .cd-open *::after, .cd-page *, .cd-page *::after {
+    animation-duration: 1ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important;
+  }
+  .cd-rays, .cd-confetti, .cd-flash { display: none; }
+}

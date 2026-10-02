@@ -35,6 +35,7 @@ const KIND = {
   research: "RESEARCH",
   alpha: "ALPHA",
   rift: "SPACE-TIME RIFT",
+  cards: "CARDS",
   ...Object.fromEntries(
     Object.entries(TIER_TELL).map(([t, tell]) => [t, tell.toUpperCase()]),
   ),

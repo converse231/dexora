@@ -37,7 +37,12 @@ import {
   isOpen, refusal, capOf, payFor, teamSize, rematchesReady, cleanBeaten, TEAM_MAX,
   feeFor, giftOf, hardCleared, charmOf, cleanTaught, taughtOk,
 } from "./league.js";
-import { HARDTUNE } from "../data/gymtune.js";
+import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
+import {
+  openPack as rollPack, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX,
+  dustOf, craftCost, sparesOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, STREAK_PACK,
+} from "./cards.js";
+import { CARD_SETS } from "../data/cards/index.js";
 import { defenders, defendNote } from "./ranked.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
@@ -196,6 +201,17 @@ function freshState() {
     gifted: [],           // dex ids registered only by a trade - see `reconcileTrades`
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
+    /* CARDS (docs/cards.md): copies by card id (`me01-004`, never a
+       position) as `{ n, h, r, earned }`; unopened packs and which of them
+       were earned, by set; and each set's pity counters. */
+    cards: {},
+    packs: {},
+    earnedPacks: {},
+    cardPity: {},
+    dust: 0,              // Card Dust: spares turned in, spent crafting
+    cardLog: [],          // the Pulls wall: `[cardId, variant, at]`, newest first
+    milestones: {},       // set id -> how many of MILESTONES it has paid
+    cardDay: null,        // the day the last pack opened - the daily first pack
     rift: null,           // an open space-time rift, `{ areaId, left }` - see events.js
     sinceTravel: 0,       // steps since the map last changed, which is what opens a rift
     /* One quest a day. `key` is the local date it belongs to, so a new day is
@@ -437,6 +453,9 @@ export function recoverable() {
    fresh game, and uploads it. `verdict` is null for a clean load, "outdated"
    for that case and "unreadable" for everything else, and either one stops the
    session reaching the account. */
+// A saved object field, or an empty one: never an array, never null.
+const plain = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+
 function loadState() {
   const raw = read(SAVE_KEY);
   try {
@@ -586,6 +605,25 @@ function loadState() {
       // Entry by entry, never the whole record: badges are years of play.
       beaten: cleanBeaten(s.beaten),
       team: [...new Set(Array.isArray(s.team) ? s.team : [])].filter(Number.isInteger).slice(0, TEAM_MAX),
+      /* CARDS, row by row: a bad row is dropped, never the collection. An id
+         from a set this build does not ship is KEPT (a newer build's), shown
+         nowhere. */
+      cards: Object.fromEntries(Object.entries(plain(s.cards))
+        .filter(([k]) => /^[\w.]+-\w+$/.test(k)).map(([k, v]) => [k, cleanCard(v)]).filter(([, v]) => v)),
+      packs: Object.fromEntries(Object.entries(plain(s.packs))
+        .map(([k, v]) => [k, Math.min(9999, Math.floor(Number(v)))]).filter(([k, v]) => /^[\w.]+$/.test(k) && v > 0)),
+      earnedPacks: Object.fromEntries(Object.entries(plain(s.earnedPacks))
+        .map(([k, v]) => [k, (Array.isArray(v) ? v : []).filter((x) => typeof x === "string" && x.length <= 64)])
+        .filter(([, v]) => v.length)),
+      cardPity: Object.fromEntries(Object.entries(plain(s.cardPity)).map(([k, v]) => [k,
+        Object.fromEntries(Object.keys(freshPity()).map((c) => [c, Math.max(0, Math.floor(Number(v?.[c]) || 0))]))])),
+      dust: Math.max(0, Math.floor(Number(s.dust) || 0)),
+      cardLog: (Array.isArray(s.cardLog) ? s.cardLog : []).filter((e) => Array.isArray(e)
+        && typeof e[0] === "string" && /^[\w.]+-\w+$/.test(e[0]) && ["n", "h", "r"].includes(e[1])
+        && Number.isFinite(e[2])).slice(0, LOG_MAX),
+      milestones: Object.fromEntries(Object.entries(plain(s.milestones))
+        .map(([k, v]) => [k, Math.min(MILESTONES.length, Math.floor(Number(v)))]).filter(([, v]) => v > 0)),
+      cardDay: typeof s.cardDay === "string" && s.cardDay.length <= 16 ? s.cardDay : null,
       /* A save from before `paid` existed was paid for every level it had
          reached, and never past the old cap of 50 - so that is where it
          stands, and anything above is owed. Never above its own level, so no
@@ -626,6 +664,11 @@ function loadState() {
     loaded.gifted = loaded.gifted.filter((id) => loaded.dex[dexIndex(id)] === 2);
     // The last team names Pokemon, and one sold or traded since is not on it.
     loaded.team = loaded.team.filter((uid) => loaded.box.some((m) => m.uid === uid));
+    // Earned packs are some of the unopened ones, never more.
+    for (const [k, v] of Object.entries(loaded.earnedPacks)) {
+      loaded.earnedPacks[k] = v.slice(0, loaded.packs[k] ?? 0);
+      if (!loaded.earnedPacks[k].length) delete loaded.earnedPacks[k];
+    }
     return [loaded, null];
   } catch {
     keep(mine(BROKEN_KEY), raw);
@@ -1266,9 +1309,11 @@ export function createEngine(canvas, onChange, mini = null) {
     for (const [id, n] of Object.entries(won.items)) {
       state.bag[id] = (state.bag[id] ?? 0) + n;
     }
+    // Every STREAK_PACK-th day in a row pays a card pack (docs/cards.md).
+    const pack = d.streak % STREAK_PACK === 0 ? grantPacks(1, `streak:${d.streak}`) : null;
     save();
     changed();
-    return { ...won, streak: d.streak };
+    return { ...won, streak: d.streak, pack };
   }
 
   /* Monotonic, and that is the point: the notice is keyed on it, so wearing
@@ -1887,9 +1932,9 @@ export function createEngine(canvas, onChange, mini = null) {
      at most one, or none. Banked immediately so a reload cannot repeat it -
      the tip is cheap and being told twice is what makes one annoying. */
   function teach(event) {
-    if (state.hint) return;                 // one on screen is the whole rule
+    if (state.hint) return false;           // one on screen is the whole rule
     const hit = nextHint(event, state.hints);
-    if (!hit) return;
+    if (!hit) return false;
     state.hints = [...state.hints, hit.id];
     state.hint = hit;
     /* AND THE TRAINER STOPS. A tip is the only modal that opens UNPROMPTED,
@@ -1903,6 +1948,7 @@ export function createEngine(canvas, onChange, mini = null) {
     state.running = false;
     save();
     changed();
+    return true;
   }
 
   function cheer(entry) {
@@ -2645,6 +2691,201 @@ export function createEngine(canvas, onChange, mini = null) {
      wallet. The UI floors its input; the engine is where every caller meets. */
   const whole = (n) => (Number.isFinite(n) && n >= 1 ? Math.floor(n) : 0);
 
+  /* CARDS (docs/cards.md): the only writers of `cards`, `packs` and
+     `cardPity`. A pack is bought for a set this level has open; one already
+     held opens whatever the level (a badge can pay one before its set opens). */
+  function buyPacks(setId, qty = 1) {
+    qty = whole(qty);
+    if (!qty || !setOpen(setId, levelFromXp(state.xp))) return false;
+    const cost = PACK_PRICE * qty;
+    if (state.money < cost) return false;
+    state.money -= cost;
+    state.packs = { ...state.packs, [setId]: (state.packs[setId] ?? 0) + qty };
+    save();
+    changed();
+    return true;
+  }
+
+  // A box or bundle: the set's discounted multi-pack.
+  function buyBox(setId) {
+    const box = BOXES[setId];
+    if (!box || !setOpen(setId, levelFromXp(state.xp)) || state.money < box.price) return false;
+    state.money -= box.price;
+    state.packs = { ...state.packs, [setId]: (state.packs[setId] ?? 0) + box.packs };
+    save();
+    changed();
+    return true;
+  }
+
+  /* A REWARD IN PACKS, stamped with where it came from, for the newest set
+     open (the first before any is): a badge, a Champion, a streak. */
+  function grantPacks(n, stamp) {
+    const id = newestOpen(levelFromXp(state.xp)) ?? CARD_SETS[0]?.id;
+    if (!id) return null;
+    state.packs = { ...state.packs, [id]: (state.packs[id] ?? 0) + n };
+    state.earnedPacks = { ...state.earnedPacks, [id]: [...(state.earnedPacks[id] ?? []), ...Array(n).fill(stamp)] };
+    teach({ kind: "cardpack" });
+    return id;
+  }
+
+  /* OPEN ONE, decided and SAVED before a frame of the scene plays: a reload
+     mid-opening loses nothing. `set` is `{ SET, CARDS }` from the lazy page
+     (the engine never imports card data); it must be the set it says it is.
+     An earned pack opens first and stamps its cards. One `changed()`. */
+  // A set handed over by the page is the set it says it is, or nothing.
+  const realSet = (set) => {
+    const meta = setById(set?.SET?.id);
+    return meta && Array.isArray(set.CARDS) && set.CARDS.length === meta.total ? meta : null;
+  };
+  /* SET MILESTONES pay once each, as a share of the set's cards is reached;
+     the whole set is a title too. A cheer per step paid. */
+  function payMilestones(meta) {
+    const owned = Object.keys(state.cards).filter((k) => k.startsWith(`${meta.id}-`)).length;
+    let paid = state.milestones[meta.id] ?? 0;
+    const was = paid;
+    while (paid < MILESTONES.length && owned >= Math.ceil(MILESTONES[paid][0] * meta.total)) {
+      const [share, dust] = MILESTONES[paid];
+      state.dust += dust;
+      cheer({ kind: "cards", title: share >= 1 ? titleOf(meta.name).toUpperCase() : `${Math.round(share * 100)}% OF ${meta.name.toUpperCase()}`,
+        sub: `${share >= 1 ? "The whole set. " : ""}+${dust.toLocaleString()} Card Dust.` });
+      paid++;
+    }
+    if (paid !== was) state.milestones = { ...state.milestones, [meta.id]: paid };
+  }
+
+  /* ONE changed() an open, however many packs: the spare-card tip, when it
+     fires, is that changed() (it saves and notifies itself). */
+  const settleOpen = (spare) => {
+    save();
+    if (!(spare && teach({ kind: "cardspare" }))) changed();
+  };
+
+  function openCardPack(set) {
+    const got = rollCardPack(set);
+    if (!got) return null;
+    settleOpen(got.pulls.some((p) => !p.isNew));
+    return got;
+  }
+
+  /* OPEN ALL a set's held packs at once (a box's "Open all"): every pack
+     rolled and recorded as one would be, then one save and one changed(). */
+  function openAllPacks(set) {
+    const out = [];
+    for (let got = rollCardPack(set); got; got = rollCardPack(set)) out.push(got);
+    if (!out.length) return null;
+    settleOpen(out.some((r) => r.pulls.some((p) => !p.isNew)));
+    return out;
+  }
+
+  function rollCardPack(set) {
+    const id = set?.SET?.id;
+    const meta = realSet(set);
+    if (!meta) return null;
+    if ((state.packs[id] ?? 0) < 1) return null;
+    const stamp = state.earnedPacks[id]?.[0] ?? null;
+    const { pulls, pity, god } = rollPack(set.CARDS, Math.random, state.cardPity[id] ?? freshPity());
+    const cards = { ...state.cards };
+    const out = pulls.map((p) => {
+      const key = cardId(id, p.localId);
+      const row = { ...(cards[key] ?? {}) };
+      const isNew = !cards[key];
+      row[p.variant] = Math.min(CARD_MAX, (row[p.variant] ?? 0) + 1);
+      if (stamp) row.earned = [...(row.earned ?? []), stamp].slice(0, CARD_MAX);
+      cards[key] = row;
+      return { ...p, id: key, isNew, earned: stamp };
+    });
+    state.cards = cards;
+    state.packs = { ...state.packs, [id]: state.packs[id] - 1 };
+    if (!state.packs[id]) delete state.packs[id];
+    if (stamp) {
+      const left = state.earnedPacks[id].slice(1);
+      state.earnedPacks = { ...state.earnedPacks, [id]: left };
+      if (!left.length) delete state.earnedPacks[id];
+    }
+    state.cardPity = { ...state.cardPity, [id]: pity };
+    /* THE PULLS WALL keeps every hit, newest first. */
+    const now = Date.now();
+    const hits = out.filter((p) => isHit(p.rarity)).sort((a, b) => rungOf(b.rarity) - rungOf(a.rarity))
+      .map((p) => [p.id, p.variant, now]);
+    if (hits.length) state.cardLog = [...hits, ...state.cardLog].slice(0, LOG_MAX);
+    /* THE DAILY FIRST PACK shows every hit's tell at once - presentation only:
+       the pack above was rolled before this was read. */
+    const day = dayKey();
+    const daily = state.cardDay !== day;
+    state.cardDay = day;
+    payMilestones(meta);
+    return { pulls: out, god, daily };
+  }
+
+  /* DUST: spares only (`sparesOf` - never the last copy of a card and variant,
+     never below its earned stamps). A rare or better asks first. */
+  function dustCard(set, localId, variant, n = 1, confirmed = false) {
+    const meta = realSet(set);
+    const card = meta && set.CARDS.find((c) => c[0] === localId);
+    n = whole(n);
+    if (!card || !n) return false;
+    const key = cardId(meta.id, localId);
+    const row = state.cards[key];
+    if (n > sparesOf(row, variant)) return false;
+    const gain = n * dustOf(card[3], variant);
+    if (!confirmed && rungOf(card[3]) >= rungOf("rare")) {
+      ask("dust", () => dustCard(set, localId, variant, n, true), `Dust ${n === 1 ? "a spare" : `${n} spares`} of ${card[1]}?`,
+        `${RARITY[card[3]].name}${variant === "r" ? ", reverse holo" : ""}. You keep at least one, and get ${gain} Card Dust.`);
+      return true;
+    }
+    state.cards = { ...state.cards, [key]: { ...row, [variant]: row[variant] - n } };
+    state.dust += gain;
+    if (state.dust >= craftCost("common", "n")) teach({ kind: "craftable" });
+    save();
+    changed();
+    return true;
+  }
+
+  /* THE SWEEP: every spare of a common or uncommon, normal copies only - foils
+     and anything rare stay for you to decide. Asks first, saying how much. */
+  function dustSpares(set, confirmed = false) {
+    const meta = realSet(set);
+    if (!meta) return false;
+    const take = set.CARDS.filter((c) => rungOf(c[3]) < rungOf("rare"))
+      .map((c) => [c, sparesOf(state.cards[cardId(meta.id, c[0])], "n")]).filter(([, n]) => n > 0);
+    if (!take.length) return false;
+    const gain = take.reduce((a, [c, n]) => a + n * dustOf(c[3], "n"), 0);
+    if (!confirmed) {
+      ask("sweep", () => dustSpares(set, true), `Dust ${take.reduce((a, [, n]) => a + n, 0)} spares?`,
+        `Every spare common and uncommon in ${meta.name}, normal copies only. You keep one of each, and get ${gain} Card Dust.`);
+      return true;
+    }
+    const cards = { ...state.cards };
+    for (const [c, n] of take) {
+      const key = cardId(meta.id, c[0]);
+      cards[key] = { ...cards[key], n: cards[key].n - n };
+    }
+    state.cards = cards;
+    state.dust += gain;
+    if (state.dust >= craftCost("common", "n")) teach({ kind: "craftable" });
+    save();
+    changed();
+    return true;
+  }
+
+  /* CRAFT one copy of a card in a variant it is printed in, for dust. */
+  function craftCard(set, localId, variant) {
+    const meta = realSet(set);
+    const card = meta && set.CARDS.find((c) => c[0] === localId);
+    if (!card || !card[4].includes(variant) || !canCraft(card[3])) return false;
+    const cost = craftCost(card[3], variant);
+    if (state.dust < cost) return false;
+    const key = cardId(meta.id, localId);
+    const row = state.cards[key] ?? {};
+    if ((row[variant] ?? 0) >= CARD_MAX) return false;
+    state.dust -= cost;
+    state.cards = { ...state.cards, [key]: { ...row, [variant]: (row[variant] ?? 0) + 1 } };
+    payMilestones(meta);
+    save();
+    changed();
+    return true;
+  }
+
   function buy(itemId, qty = 1) {
     const item = itemById(itemId);
     qty = whole(qty);
@@ -3077,7 +3318,7 @@ export function createEngine(canvas, onChange, mini = null) {
        forfeit and a battle cut short record and pay nothing. */
     battleEnd() {
       const over = state.battle?.over ?? -1;
-      let pay = 0, first = false, fee = 0, gift = null, master = false, charm = null;
+      let pay = 0, first = false, fee = 0, gift = null, master = false, charm = null, pack = null;
       if (over === 0 && fight) {
         const was = state.beaten[fight.id];
         first = !was;
@@ -3090,6 +3331,15 @@ export function createEngine(canvas, onChange, mini = null) {
         /* A FIRST HARD WIN GIVES ITS SIGNATURE POKEMON (phase 8), arriving
            as a traded one does: it fills the Pokedex as a gift, and no catch
            reward or research counts it. */
+        /* A FIRST BADGE PAYS A CARD PACK (docs/cards.md, Rewards): the newest
+           set open at your level, or the first set before any is - held, it
+           opens whatever the level - stamped with the badge. */
+        if (first && GYMTUNE[fight.id]?.kind === "leader") pack = grantPacks(1, `badge:${fight.id}`);
+        /* A REGION'S CHAMPION, first win: the newest open set's box or bundle. */
+        if (first && GYMTUNE[fight.id]?.kind === "champion") {
+          const id = newestOpen(levelFromXp(state.xp)) ?? CARD_SETS[0]?.id;
+          if (id) pack = grantPacks(BOXES[id]?.packs ?? 1, `champion:${fight.id}`);
+        }
         const g = first ? giftOf(fight.id) : null;
         if (g) {
           gift = g;
@@ -3119,10 +3369,17 @@ export function createEngine(canvas, onChange, mini = null) {
       state.battle = null;
       fight = null;
       changed();
-      return { over, pay, first, fee, gift, master, charm };
+      return { over, pay, first, fee, gift, master, charm, pack };
     },
     travel,
     buy,
+    buyPacks,
+    buyBox,
+    openCardPack,
+    openAllPacks,
+    dustCard,
+    dustSpares,
+    craftCard,
     buyCandy,
     useField,
     useBerry,
