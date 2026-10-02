@@ -6914,6 +6914,12 @@ let healNote = "";
   const rematchRate = p.prize.reduce((a, b) => a + b, 0) * REMATCH_SHARE / REMATCH_STEPS;
   assert.ok(rematchRate <= REMATCH_CEIL * p.perStep,
     `rematches pay ¥${rematchRate.toFixed(2)} a step against catching's ¥${p.perStep.toFixed(2)}`);
+  /* A CARD PACK costs 150-400 steps of what walking and catching pay
+     (docs/cards.md, Economy): dearer and it is a tax, cheaper and it is not
+     a sink. */
+  const { PACK_PRICE: CD_PRICE } = await import("../src/game/cards.js");
+  assert.ok(CD_PRICE / p.perStep >= 150 && CD_PRICE / p.perStep <= 400,
+    `a card pack costs ${Math.round(CD_PRICE / p.perStep)} steps of income`);
 
   /* THE MASTER BALL IS STILL PRICED AGAINST EVERYTHING A PLAYTHROUGH EARNS,
      battles included: the first wins a playthrough reaches plus rematches at
@@ -7276,6 +7282,115 @@ import { TIERS as P_TIERS } from "../src/game/biomes.js";
   assert.equal(rFighter(6, 7).perk, undefined, "a ranked fighter carries a perk");
   console.log(`perks ok — ${P_TIERS.length} forms and the alpha each have one, they stack, ` +
     "and a plain Pokemon (and ranked) fights exactly as before");
+}
+
+/* CARDS (docs/cards.md). A collection, never a strength: no rule module
+   reads a card. The data is what the fetcher said it is, every Mega card
+   links to its Mega form, the rates are ours to the letter, pity never lets
+   a streak pass its guarantee, and the set data reaches only the lazy page. */
+import * as CD from "../src/game/cards.js";
+import { CARD_SETS as CD_SETS } from "../src/data/cards/index.js";
+import { gzipSync as cdGzip } from "node:zlib";
+import { statSync } from "node:fs";
+{
+  const src = (p) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
+  for (const p of ["catch.js", "game/biomes.js", "game/battle.js", "game/league.js", "game/trainer.js",
+    "game/items.js", "game/perks.js", "game/research.js", "game/events.js"]) {
+    assert.ok(!/cards\.js|data\/cards\//.test(src(p)), `${p} imports card rules or data - cards are never a strength`);
+  }
+  // Set data only through the Cards page's lazy loader; the page only by lazy().
+  const { readdirSync: cdDir } = await import("node:fs");
+  const walk = (d) => cdDir(new URL(`../src/${d}`, import.meta.url), { withFileTypes: true })
+    .flatMap((f) => (f.isDirectory() ? walk(`${d}/${f.name}`) : [`${d}/${f.name}`]));
+  for (const f of walk("").map((f) => f.replace(/^\//, "")).filter((f) => /\.(js|jsx)$/.test(f))) {
+    const t = src(f);
+    if (/(from\s+|import\(|glob\()["'`][^"'`]*data\/cards\/sets/.test(t)) assert.equal(f, "ui/cards/load.js", `${f} names a card set file - only ui/cards/load.js may, lazily`);
+    if (/ui\/cards\/Cards\.jsx/.test(t)) {
+      assert.ok(/lazy\(\(\) => import\("\.\/ui\/cards\/Cards\.jsx"\)\)/.test(t), `${f} imports the Cards page outside lazy()`);
+    }
+  }
+  const idx = readFileSync(new URL("../src/data/cards/index.js", import.meta.url));
+  assert.ok(cdGzip(idx).length < 1024, `the main bundle's card index is ${cdGzip(idx).length} bytes gzipped`);
+
+  let n = 0;
+  for (const meta of CD_SETS) {
+    const { SET, CARDS } = await import(`../src/data/cards/sets/${meta.id}.js`);
+    assert.equal(CARDS.length, meta.total, `${meta.id}: the index and the set disagree on its size`);
+    assert.ok(CD.SET_LEVEL[meta.id], `${meta.id} has no level it opens at`);
+    assert.ok(existsSync(new URL(`../public/cards/${meta.id}/logo.webp`, import.meta.url)), `${meta.id} has no logo`);
+    for (const [localId, name, cat, rarity, variants, sp] of CARDS) {
+      const at = `${SET.id}-${localId} ${name}`;
+      assert.ok(CD.CARD_RARITIES.includes(rarity), `${at}: rarity ${rarity} is not on the ladder`);
+      assert.ok(/^(nr?|hr?)$/.test(variants), `${at}: variants ${variants}`);
+      assert.ok(sp.every((id) => speciesById(id)), `${at}: links a species the game does not have`);
+      assert.equal(cat === "P", sp.length > 0, `${at}: a Pokémon card without a species, or a species on a Trainer`);
+      if (cat === "P" && /^Mega /.test(name)) {
+        assert.ok(sp.length === 1 && isForm(sp[0]) && nameOf(speciesById(sp[0])) === name.replace(/ ex$/, ""),
+          `${at}: a Mega card must link its Mega form (your call, 2026-10-02)`);
+      }
+      const img = new URL(`../public/cards/${meta.id}/${localId}.webp`, import.meta.url);
+      assert.ok(existsSync(img) && statSync(img).size < 40 * 1024, `${at}: image missing or over 40KB`);
+      n++;
+    }
+
+    /* THE RATES ARE OURS, held two ways: with pity held at zero every pack
+       lands each rate within 15%; with pity running, no streak passes its
+       guarantee and no pack holds a card twice. 20,000 seeded packs each. */
+    const N = 20000;
+    const count = (pity) => {
+      const rng = pRng(11), hits = {};
+      let p = CD.freshPity(), god = 0;
+      const dry = { hit: 0, special: 0, mega: 0 };
+      for (let i = 0; i < N; i++) {
+        const o = CD.openPack(CARDS, rng, pity ? p : CD.freshPity());
+        assert.equal(o.pulls.length, CD.PACK_SIZE);
+        assert.equal(new Set(o.pulls.map((x) => x.localId)).size, CD.PACK_SIZE, "a card came twice in one pack");
+        if (o.god) { god++; continue; }
+        for (const r of new Set(o.pulls.map((x) => x.rarity))) hits[r] = (hits[r] ?? 0) + 1;
+        for (const k of Object.keys(dry)) dry[k] = Math.max(dry[k], o.pity[k]);
+        p = o.pity;
+      }
+      return { hits, god, dry };
+    };
+    const flat = count(false);
+    for (const [r, rate] of Object.entries(CD.RATES)) {
+      const got = (flat.hits[r] ?? 0) / N;
+      assert.ok(Math.abs(got - rate) <= 0.15 * rate, `${meta.id}: ${r} came 1 in ${(1 / got).toFixed(1)}, not 1 in ${(1 / rate).toFixed(1)}`);
+    }
+    assert.ok(Math.abs(flat.god / N - CD.GOD_PACK) <= 0.3 * CD.GOD_PACK, `${meta.id}: God Packs came ${flat.god} in ${N}`);
+    const run = count(true);
+    for (const [k, v] of Object.entries(CD.PITY)) {
+      assert.ok(run.dry[k] < v.hard, `${meta.id}: ${run.dry[k]} packs ran dry of ${k} - its guarantee is ${v.hard}`);
+    }
+  }
+  // The Packs tab prints odds from RATES and PITY, never a typed number.
+  const page = src("ui/cards/Cards.jsx");
+  assert.ok(/RATES\./.test(page) && /PITY\[/.test(page) && !/1 in \d/.test(page), "the Packs tab types its odds");
+  /* A CRAFT IS CRAFT_X SPARES' WORTH, for every rarity and variant - the one
+     ratio that sets what a full set costs (measured: 16x is 35% of a game). */
+  for (const r of CD.CARD_RARITIES) for (const v of ["n", "h", "r"]) {
+    assert.equal(CD.craftCost(r, v), CD.CRAFT_X * CD.dustOf(r, v), `crafting a ${r} ${v} is not ${CD.CRAFT_X} spares' worth`);
+  }
+  /* EVERY SET HAS ONE DISCOUNTED MULTI-PACK: no discount past 20% (past that
+     a single pack is a mistake), and a bundle never cheaper a pack than a box. */
+  const perPack = (b) => b.price / b.packs;
+  for (const s of CD_SETS) {
+    const b = CD.BOXES[s.id];
+    assert.ok(b, `${s.id} has no box or bundle`);
+    const off = 1 - perPack(b) / CD.PACK_PRICE;
+    assert.ok(off > 0 && off <= 0.2, `${s.id}'s ${b.name} is ${Math.round(off * 100)}% off`);
+  }
+  const boxes = Object.values(CD.BOXES).filter((b) => b.packs >= 36), bundles = Object.values(CD.BOXES).filter((b) => b.packs < 36);
+  for (const u of bundles) for (const x of boxes) assert.ok(perPack(u) >= perPack(x), "a bundle is cheaper a pack than a box");
+  // The chase is packs only.
+  assert.ok(!CD.canCraft("special") && !CD.canCraft("mega") && CD.canCraft("illustration"), "the chase can be crafted");
+  // Spares never take the last copy, nor a copy an earned stamp stands on.
+  assert.equal(CD.sparesOf({ n: 1 }, "n"), 0, "the last copy counted as a spare");
+  assert.equal(CD.sparesOf({ n: 3 }, "n"), 2);
+  assert.equal(CD.sparesOf({ n: 3, earned: ["a", "b", "c"] }, "n"), 0, "an earned copy counted as a spare");
+  assert.equal(CD.sparesOf({ n: 2, r: 2, earned: ["a", "b"] }, "n"), 1);
+  console.log(`cards ok — ${n} cards in ${CD_SETS.length} set(s), every Mega card on its Mega form, ` +
+    "the rates within 15% of ours, no streak past its guarantee, and nothing in the game reads a card");
 }
 import { legendary as rLegendary } from "../src/game/league.js";
 import { TEAM_MAX as R_TEAM } from "../src/game/league.js";

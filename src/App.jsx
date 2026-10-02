@@ -44,6 +44,8 @@ const TradeScene = lazy(() => import("./ui/trade/TradeScene.jsx"));
 /* THE LEAGUE, the same way: the battle rules, rosters and moves are the
    heaviest data in the game, and only this chunk carries them (asserted). */
 const League = lazy(() => import("./ui/league/League.jsx"));
+// The fifth tab (docs/cards.md): its page, and every set's cards, load only when opened.
+const Cards = lazy(() => import("./ui/cards/Cards.jsx"));
 /* Which trades this DEVICE has shown its scene for - a per-device nicety like
    "seen" news, so localStorage and never the save. */
 const SEEN_TRADES = "dexora-trades-seen";
@@ -254,12 +256,15 @@ export default function App({
       if (name) setTrade({ name });
       else if (!h.startsWith("#/trade")) setTrade(null);   // Back, off the Trade Center page
       if (!h.startsWith("#/league")) setLeague(false);      // Back, off the League
+      if (!h.startsWith("#/cards")) setCards(false);        // Back, off Cards
       setYou(h.startsWith("#/you"));                        // Back, onto or off You
     };
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);
   }, []);
   const [league, setLeague] = useState(false);
+  const [cards, setCards] = useState(false);
+  const [cardScene, setCardScene] = useState(false);
   const [you, setYou] = useState(() => location.hash.startsWith("#/you"));
   /* THE TABS ARE THE PAGES (Rotom, 2026-10-01): Trade is the Trade Center,
      Battles the League, You its own page; Catch is all of them closed. A
@@ -267,11 +272,12 @@ export default function App({
      always means "back to the game" in one press, and pushes when you leave
      the map - each page reads its own hash and pushes nothing of its own. The
      `tc`/`lg` keys are what the pages' own closers already look for. */
-  const tab = league ? "battles" : trade && !trade.profile ? "trade" : you || trade?.profile ? "you" : "catch";
+  const tab = league ? "battles" : cards ? "cards" : trade && !trade.profile ? "trade" : you || trade?.profile ? "you" : "catch";
   const goTab = useCallback((t) => {
-    const onPage = /^#\/(trade|trainer\/|league|you)/.test(location.hash);
+    const onPage = /^#\/(trade|trainer\/|league|cards|you)/.test(location.hash);
     setTrade(t === "trade" ? { name: null } : null);
     setLeague(t === "battles");
+    setCards(t === "cards");
     setYou(t === "you");
     setRotom(false);
     if (t === "catch") {
@@ -280,8 +286,9 @@ export default function App({
       else history.replaceState(null, "", location.pathname + location.search);
       return;
     }
-    const st = { page: 1, tc: t === "trade" ? 1 : undefined, lg: t === "battles" ? 1 : undefined };
-    const hash = { trade: "#/trade", battles: "#/league", you: "#/you" }[t];
+    const st = { page: 1, tc: t === "trade" ? 1 : undefined, lg: t === "battles" ? 1 : undefined,
+      cd: t === "cards" ? 1 : undefined };
+    const hash = { trade: "#/trade", battles: "#/league", cards: "#/cards", you: "#/you" }[t];
     if (onPage) history.replaceState(st, "", hash);
     else history.pushState(st, "", hash);
   }, []);
@@ -438,7 +445,11 @@ export default function App({
      rift find or a finished research entry raised on the step that started an
      encounter covered the name of the thing you were choosing a ball for.
      Held, not dropped: it plays the moment the encounter resolves. */
-  const held = enc && !["caught", "fled", "ran"].includes(enc.phase);
+  /* AND WHILE A PACK IS STILL FACE DOWN (`cardScene`, from the opening): a
+     milestone banner or a "spare card" tip raised by the open covered the pack
+     before it was torn and told you what was in it (found in QA). They play
+     on the summary. */
+  const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene;
   const cheer = held ? null : st?.cheers?.[0] ?? null;
   // The Dex's rank line replays your rank-up: the step you hold, from the one below.
   const [replay, setReplay] = useState(null);
@@ -710,6 +721,24 @@ export default function App({
         </Suspense>
       )}
 
+      {cards && (
+        <Suspense fallback={null}>
+          <Cards
+            engine={engine}
+            st={st}
+            level={level}
+            onSpecies={(id) => setEntry(id)}
+            onScene={setCardScene}
+            onClose={() => {
+              setCards(false);
+              setCardScene(false);
+              if (history.state?.cd) history.back();
+              else if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+            }}
+          />
+        </Suspense>
+      )}
+
       {you && (
         <You
           trainerName={trainerName}
@@ -772,7 +801,7 @@ export default function App({
           it is about, never again. See hints.js for why there is no sequence,
           and Hint.jsx for why it is a dialog rather than the bar it started as:
           a tip somebody scrolls past is a tip nobody read. */}
-      {st?.hint && (
+      {st?.hint && !cardScene && (
         <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 
@@ -795,6 +824,7 @@ export default function App({
         tab={tab}
         onTab={goTab}
         tradeAlert={offerAlert + (inbox?.friend_requests ?? 0)}
+        cardAlert={Object.values(st?.packs ?? {}).reduce((a, b) => a + b, 0)}
         youAlert={unread || freePoints(st?.stats, level) > 0}
         onNews={() => setNews(true)}
         unread={unread}
@@ -1126,6 +1156,8 @@ export default function App({
       {entry !== null && (
         <DexSheet
           id={entry}
+          cards={st?.cards ?? {}}
+          onCards={() => { setEntry(null); goTab("cards"); }}
           state={st?.dex[dexIndex(entry)] ?? 0}
           variant={rarestOf(st, entry)}
           /* Which variants of THIS species are registered. Built from the
@@ -1185,12 +1217,12 @@ export default function App({
           onFish={() => { setWaterAsk(false); engine.fish(); }}
           onClose={() => setWaterAsk(false)} />
       )}
-      {st?.ask && (st?.encounter || st.ask.kind === "star" || st.ask.kind === "rift") && (
+      {st?.ask && (st?.encounter || ["star", "rift", "dust", "sweep"].includes(st.ask.kind)) && (
         <Confirm
           title={st.ask.title}
           tone="warn"
           note={st.ask.body}
-          confirmLabel={{ flee: "RUN", star: "STAR", rift: "LEAVE" }[st.ask.kind] ?? "THROW"}
+          confirmLabel={{ flee: "RUN", star: "STAR", rift: "LEAVE", dust: "DUST", sweep: "DUST" }[st.ask.kind] ?? "THROW"}
           onCancel={() => engine.answerAsk(false)}
           onConfirm={() => engine.answerAsk(true)}
         />

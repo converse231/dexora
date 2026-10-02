@@ -1806,6 +1806,185 @@ async function savedField(name, good, bad, empty, base = SAVE) {
     `a garbage "${name}" was trusted instead of dropped to empty`);
 }
 await savedField("dry", 123, "lots", 0);
+/* CARDS (docs/cards.md): each field loads empty from an old save, survives a
+   reload, and drops garbage - row by row for the collection. */
+await savedField("cards", { "me01-001": { n: 2, r: 1, earned: ["badge:kanto-brock"] } }, "junk", {});
+assert.deepEqual(boot({ ...SAVE, cards: { "me01-001": { n: 1 }, "me01-002": { n: "lots" }, "x y": { n: 1 } } }).e.state.cards,
+  { "me01-001": { n: 1 } }, "one bad card row cost the collection, or a bad row was kept");
+await savedField("packs", { me01: 3 }, "junk", {});
+await savedField("earnedPacks", { me01: ["badge:kanto-brock"] }, "junk", {}, { ...SAVE, packs: { me01: 1 } });
+assert.deepEqual(boot({ ...SAVE, packs: { me01: 1 }, earnedPacks: { me01: ["a", "b"] } }).e.state.earnedPacks,
+  { me01: ["a"] }, "more earned packs than unopened ones were kept");
+await savedField("cardPity", { me01: { hit: 2, special: 14, mega: 61 } }, "junk", {});
+
+/* BUYING AND OPENING, through the real engine: a pack costs exactly its
+   price, a refused buy changes nothing, an open is saved before any scene
+   plays (a reload keeps it), calls `changed()` once, never puts a card twice
+   in a pack, and an earned pack opens first and stamps its cards. */
+{
+  const C = await import("../src/game/cards.js");
+  const set = await import("../src/data/cards/sets/me01.js");
+  const { LEVEL_XP } = await import("../src/game/biomes.js");
+  const low = boot({ ...SAVE, xp: LEVEL_XP[C.SET_LEVEL.me01 - 3], paid: C.SET_LEVEL.me01 - 2 }).e;
+  const m0 = low.state.money;
+  assert.equal(low.buyPacks("me01", 1), false, "a pack was sold below its set's level");
+  assert.equal(low.state.money, m0);
+
+  const { e, changes } = boot({ ...SAVE, money: C.PACK_PRICE * 3 + 5 });
+  assert.equal(e.buyPacks("me01", 1.5), true);
+  assert.equal(e.state.money, C.PACK_PRICE * 2 + 5, "a pack and a half was not a pack");
+  assert.equal(e.buyPacks("me01", 3), false, "packs were sold past the wallet");
+  assert.equal(e.buyPacks("nope", 1), false, "a pack of an unknown set was sold");
+  assert.equal(e.state.money, C.PACK_PRICE * 2 + 5, "a refused buy moved money");
+  assert.equal(e.openCardPack({ SET: { id: "me01" }, CARDS: set.CARDS.slice(1) }), null, "a set that is not what it says opened");
+
+  e.state.packs = { me01: 2 };
+  e.state.earnedPacks = { me01: ["badge:kanto-brock"] };
+  const c0 = changes();
+  const got = e.openCardPack(set);
+  assert.equal(changes() - c0, 1, "an open must be one changed()");
+  assert.equal(got.pulls.length, C.PACK_SIZE);
+  assert.equal(new Set(got.pulls.map((p) => p.id)).size, C.PACK_SIZE, "a card came twice in one pack");
+  assert.ok(got.pulls.every((p) => p.earned === "badge:kanto-brock" && e.state.cards[p.id].earned.includes(p.earned)),
+    "the earned pack did not open first, or did not stamp its cards");
+  assert.equal(e.state.packs.me01, 1);
+  assert.equal(e.state.earnedPacks.me01, undefined);
+  await new Promise((r) => setTimeout(r, 600));
+  const back = boot(JSON.parse(store.get("meadow-route"))).e;
+  assert.deepEqual(back.state.cards, e.state.cards, "an opened pack did not survive a reload");
+  assert.equal(back.state.packs.me01, 1);
+  const second = back.openCardPack(set);
+  assert.ok(second.pulls.every((p) => !p.earned), "a bought pack stamped its cards");
+  assert.equal(back.state.packs.me01, undefined, "the last pack was not used up");
+  assert.equal(back.openCardPack(set), null, "a pack opened with none held");
+  console.log("cards ok — a pack is bought at its price and level only, opened once, saved before the scene, " +
+    "never twice a card, and an earned pack opens first and stamps");
+}
+
+/* PHASE 2 (docs/cards.md): dust, the sweep, crafting, milestones, the Pulls
+   wall and the daily first pack, through the real engine. */
+await savedField("dust", 1234, "lots", 0);
+await savedField("cardLog", [["me01-187", "h", 1730000000000]], "junk", []);
+assert.deepEqual(boot({ ...SAVE, cardLog: [["me01-187", "h", 1], ["x y", "h", 1], ["me01-1", "q", 1]] }).e.state.cardLog,
+  [["me01-187", "h", 1]], "a bad Pulls wall entry was kept, or a good one dropped with it");
+await savedField("milestones", { me01: 2 }, "junk", {});
+await savedField("cardDay", "2026-10-02", 42, null);
+{
+  const C = await import("../src/game/cards.js");
+  const set = await import("../src/data/cards/sets/me01.js");
+  const common = set.CARDS.find((c) => c[3] === "common");
+  const rare = set.CARDS.find((c) => c[3] === "rare");
+  const key = (c) => C.cardId("me01", c[0]);
+
+  // DUST: spares only, exact, and a rare asks first.
+  const { e } = boot({ ...SAVE, cards: { [key(common)]: { n: 3 }, [key(rare)]: { h: 2 } } });
+  assert.equal(e.dustCard(set, common[0], "n", 3), false, "the last copy was dusted");
+  assert.equal(e.dustCard(set, common[0], "n", 2), true);
+  assert.equal(e.state.cards[key(common)].n, 1);
+  assert.equal(e.state.dust, 2 * C.dustOf("common", "n"), "dust did not pay its value");
+  assert.equal(e.dustCard(set, rare[0], "h", 1), true);
+  assert.equal(e.state.ask?.kind, "dust", "a rare was dusted without asking");
+  assert.equal(e.state.cards[key(rare)].h, 2, "asking already took the card");
+  e.answerAsk(true);
+  assert.equal(e.state.cards[key(rare)].h, 1);
+  assert.equal(e.state.dust, 2 * C.dustOf("common", "n") + C.dustOf("rare", "h"));
+
+  // EARNED copies are not spares.
+  const ear = boot({ ...SAVE, cards: { [key(common)]: { n: 2, earned: ["badge:x", "badge:y"] } } }).e;
+  assert.equal(ear.dustCard(set, common[0], "n", 1), false, "an earned copy was dusted as a spare");
+
+  // THE SWEEP: asks, then takes every spare common/uncommon normal copy, nothing else.
+  const sw = boot({ ...SAVE, cards: { [key(common)]: { n: 4, r: 3 }, [key(rare)]: { h: 3 } } }).e;
+  assert.equal(sw.dustSpares(set), true);
+  assert.equal(sw.state.ask?.kind, "sweep", "the sweep did not ask first");
+  sw.answerAsk(true);
+  assert.deepEqual(sw.state.cards[key(common)], { n: 1, r: 3 }, "the sweep took a foil, or the last copy");
+  assert.equal(sw.state.cards[key(rare)].h, 3, "the sweep took a rare");
+  assert.equal(sw.state.dust, 3 * C.dustOf("common", "n"));
+
+  // CRAFT: exact cost, a variant it is printed in, refused when short.
+  const cr = boot({ ...SAVE, dust: C.craftCost("common", "n") }).e;
+  // THE CHASE IS PACKS ONLY: no dust buys a Special illustration rare or a Mega Hyper Rare.
+  const rich = boot({ ...SAVE, dust: 1e7 }).e;
+  for (const r of C.PACK_ONLY) {
+    const chase = set.CARDS.find((c) => c[3] === r);
+    assert.equal(rich.craftCard(set, chase[0], "h"), false, `a ${r} was crafted`);
+  }
+  assert.equal(rich.state.dust, 1e7, "a refused craft spent dust");
+  // With dust for any craft at all, so only the printing can refuse it.
+  assert.equal(boot({ ...SAVE, dust: 1e6 }).e.craftCard(set, common[0], "h"), false,
+    "a common was crafted in a holo it is never printed in");
+  assert.equal(cr.craftCard(set, rare[0], "h"), false, "a craft was paid for with dust not held");
+  assert.equal(cr.craftCard(set, common[0], "n"), true);
+  assert.equal(cr.state.dust, 0);
+  assert.equal(cr.state.cards[key(common)].n, 1);
+
+  // MILESTONES pay once, as a share is reached, and never again.
+  const quarter = Math.ceil(C.MILESTONES[0][0] * set.CARDS.length);
+  const most = Object.fromEntries(set.CARDS.slice(0, quarter - 1).map((c) => [key(c), { [c[4][0]]: 1 }]));
+  const ms = boot({ ...SAVE, cards: most, dust: C.craftCost(set.CARDS[quarter - 1][3], set.CARDS[quarter - 1][4][0]) * 2 }).e;
+  const d0 = ms.state.dust;
+  ms.craftCard(set, set.CARDS[quarter - 1][0], set.CARDS[quarter - 1][4][0]);
+  assert.equal(ms.state.milestones.me01, 1, "reaching a quarter of the set paid no milestone");
+  assert.equal(ms.state.dust, d0 - C.craftCost(set.CARDS[quarter - 1][3], set.CARDS[quarter - 1][4][0]) + C.MILESTONES[0][1]);
+  const d1 = ms.state.dust;
+  ms.craftCard(set, set.CARDS[quarter - 1][0], set.CARDS[quarter - 1][4][0]);
+  assert.equal(ms.state.milestones.me01, 1, "a milestone paid twice");
+  assert.ok(ms.state.dust < d1, "a second craft paid a milestone again");
+
+  // THE PULLS WALL and THE DAILY FIRST PACK: every hit logged; the first pack
+  // of a day says so, the second does not, and the rolls ignore it.
+  const real = Math.random;
+  try {
+    Math.random = () => 0.05;                // the rare slot is an ultra, the second reverse an illustration
+    const lg = boot({ ...SAVE, packs: { me01: 2 }, cardDay: null }).e;
+    const a = lg.openCardPack(set);
+    assert.equal(a.daily, true, "the day's first pack was not the daily one");
+    assert.ok(lg.state.cardLog.length >= 2 && lg.state.cardLog.every(([id]) => id.startsWith("me01-")), "the hits were not logged");
+    assert.ok(C.isHit(set.CARDS.find((c) => key(c) === lg.state.cardLog[0][0])[3]));
+    const b = lg.openCardPack(set);
+    assert.equal(b.daily, false, "a second pack the same day was daily too");
+  } finally { Math.random = real; }
+  /* PHASE 3: a box costs its price for its packs, at its set's level only;
+     Open all opens every held pack as one save; a 7th day of a streak pays
+     a pack. */
+  {
+    const { LEVEL_XP } = await import("../src/game/biomes.js");
+    const B = boot({ ...SAVE, money: C.BOXES.me01.price + 1 }).e;
+    assert.equal(B.buyBox("me01"), true);
+    assert.equal(B.state.money, 1, "a box did not cost its price");
+    assert.equal(B.state.packs.me01, C.BOXES.me01.packs, "a box did not hold its packs");
+    assert.equal(B.buyBox("me01"), false, "a box was sold past the wallet");
+    const lowB = boot({ ...SAVE, money: 1e6, xp: LEVEL_XP[C.SET_LEVEL["me02.5"] - 3], paid: C.SET_LEVEL["me02.5"] - 2 }).e;
+    assert.equal(lowB.buyBox("me02.5"), false, "a bundle was sold below its set's level");
+    for (const id of Object.keys(C.BOXES)) {
+      assert.ok(C.BOXES[id].price < C.BOXES[id].packs * C.PACK_PRICE, `${id}'s ${C.BOXES[id].name} is no discount`);
+    }
+
+    const { e: all, changes: allChanges } = boot({ ...SAVE, packs: { me01: 5 } });
+    const n0 = allChanges();
+    const got = all.openAllPacks(set);
+    assert.equal(got.length, 5, "Open all did not open every held pack");
+    assert.equal(allChanges() - n0, 1, "Open all was not one changed()");
+    assert.equal(all.state.packs.me01, undefined);
+    assert.equal(all.openAllPacks(set), null, "Open all with nothing held opened something");
+
+    const { dayKey } = await import("../src/game/daily.js");
+    const { dailyFor } = await import("../src/game/daily.js");
+    const today = dayKey();
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const st = boot({ ...SAVE, daily: { key: today, done: dailyFor(today).need, claimed: false,
+      streak: C.STREAK_PACK - 1, last: dayKey(y) } }).e;
+    const before = Object.values(st.state.packs).reduce((a, b) => a + b, 0);
+    const won = st.claimDaily();
+    assert.equal(won.streak % C.STREAK_PACK, 0, "the test's streak did not reach its pack day");
+    assert.ok(won.pack, "a 7th day of a streak paid no pack");
+    assert.equal(Object.values(st.state.packs).reduce((a, b) => a + b, 0), before + 1);
+    assert.deepEqual(st.state.earnedPacks[won.pack], [`streak:${won.streak}`]);
+  }
+  console.log("cards dust ok — spares only (never the last copy or an earned one), rares and the sweep ask, " +
+    "crafts cost exactly, milestones pay once, every hit reaches the Pulls wall, and the daily pack is the day's first");
+}
 {
   const { dayKey } = await import("../src/game/daily.js");
   const { outbreakPool } = await import("../src/game/events.js");
@@ -3223,6 +3402,22 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   const everyone = (r) => [...r.gyms.flatMap((g) => [g.id, ...g.trainers.map((t) => t.id)]), ...r.league.map((p) => p.id)];
   const allOf = (ids) => Object.fromEntries(ids.map((id) => [id, { wins: 1, at: 0 }]));
 
+  /* A REGION'S CHAMPION PAYS A BOX of the newest open set (docs/cards.md,
+     phase 3) - the bundle's worth for Ascended Heroes - every pack earned. */
+  {
+    const C = await import("../src/game/cards.js");
+    const { levelFromXp } = await import("../src/game/biomes.js");
+    const region = LEAGUES[0];
+    const champ = region.league.find((p) => GYMTUNE[p.id].kind === "champion");
+    const e = at(allOf(everyone(region).filter((id) => id !== champ.id)));
+    const set = C.newestOpen(levelFromXp(e.state.xp));
+    const r = win(e, champ.id);
+    assert.equal(r.pack, set, "a first Champion win paid no box");
+    assert.equal(e.state.packs[set], C.BOXES[set].packs, "the Champion's box is not the set's box");
+    assert.deepEqual(e.state.earnedPacks[set], Array(C.BOXES[set].packs).fill(`champion:${champ.id}`),
+      "the Champion's packs are not all earned");
+  }
+
   // Who may come: the engine's refusal, reason by reason, and nothing starts.
   {
     const e = at(allOf(brock.trainers.map((t) => t.id)));
@@ -3258,9 +3453,17 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     const before = JSON.stringify({ box: e.state.box, xp: e.state.xp, candy: e.state.candy });
     const money = e.state.money;
     const was = e.state.beaten;
+    /* A FIRST BADGE PAYS A CARD PACK (docs/cards.md): the newest set open,
+       held as earned so its cards carry the badge's stamp. */
+    const { newestOpen } = await import("../src/game/cards.js");
+    const { levelFromXp: lvOf } = await import("../src/game/biomes.js");
+    const newest = newestOpen(lvOf(e.state.xp));      // the newest set this level has open
+    const packs0 = e.state.packs[newest] ?? 0;
     const r = win(e, brock.id);
+    assert.deepEqual(r, { over: 0, pay: GYMTUNE[brock.id].prize, first: true, fee: 0, gift: null, master: false, charm: null, pack: newest });
+    assert.equal(e.state.packs[newest], packs0 + 1, "a first badge did not add its pack");
+    assert.deepEqual(e.state.earnedPacks[newest].slice(-1), [`badge:${brock.id}`], "the badge pack is not marked earned");
     assert.notEqual(e.state.beaten, was, "a win was written into `beaten` in place - the League page's memo never sees it");
-    assert.deepEqual(r, { over: 0, pay: GYMTUNE[brock.id].prize, first: true, fee: 0, gift: null, master: false, charm: null });
     assert.equal(e.state.money, money + GYMTUNE[brock.id].prize, "the first win did not pay its prize");
     assert.deepEqual(e.state.beaten[brock.id], { wins: 1, at: e.state.steps });
     assert.equal(L.badgesOf(e.state.beaten), 1);
@@ -3272,12 +3475,12 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(begin(e, misty.trainers[0].id, [1]), null, "Misty's first gym trainer stayed shut after Brock was beaten");
     // Losing, forfeiting or leaving pays and records nothing.
     const lost = e.battleEnd();
-    assert.deepEqual(lost, { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null }, "a battle left unfinished paid");
+    assert.deepEqual(lost, { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null, pack: null }, "a battle left unfinished paid");
     assert.ok(!e.state.beaten[misty.trainers[0].id], "a battle left unfinished was recorded as a win");
 
     // A rematch at once pays nothing; the clock refills as you walk.
     const again = win(e, brock.id);
-    assert.deepEqual(again, { over: 0, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null }, "a rematch straight after the win paid");
+    assert.deepEqual(again, { over: 0, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null, pack: null }, "a rematch straight after the win paid");
     assert.equal(e.state.beaten[brock.id].wins, 2);
     assert.equal(L.capOf(brock.id, e.state.beaten), Math.min(100, cap + 2 * L.REMATCH_CAP_STEP),
       "each win did not raise Brock's cap");
@@ -3435,7 +3638,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(back.state.battle, null, "a battle survived a reload");
     assert.deepEqual(back.state.beaten, {}, "a reload mid-battle recorded a win");
     assert.equal(back.state.money, saved.money);
-    assert.deepEqual(back.battleEnd(), { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null }, "the reloaded game paid for the old battle");
+    assert.deepEqual(back.battleEnd(), { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null, pack: null }, "the reloaded game paid for the old battle");
     assert.equal(JSON.stringify(back.state.box.map(({ uid, species, level }) => [uid, species, level])),
       JSON.stringify(saved.box.map(({ uid, species, level }) => [uid, species, level])), "a reload mid-battle changed the Box");
   }
@@ -3596,7 +3799,10 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
    and a resize (which clears a canvas) paints once. */
 {
   const { VIEW_W } = await import("../src/game/engine.js");
-  const { e } = boot({ ...SAVE });
+  /* Repelled: this walks to test painting, and a step that started an
+     encounter stopped the walk it measures ("a step was not painted", now
+     and then, 2026-10-02). */
+  const { e } = boot({ ...SAVE, field: { ...SAVE.field, repel: { id: "max-repel", steps: 9999 } } });
   tick(16, 4);
   draws = 0;
   tick(16, 30);

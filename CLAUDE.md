@@ -646,6 +646,41 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   event cards and "See in Box" open the right one. On a phone it is a sheet
   (`.rail.open`, the pad's ROTOM key) - hidden, never unmounted. The quest
   is a pill on the map (`.hud-left`, beside the area's name).
+- **Cards are designed in docs/cards.md** - change a decision there first, and
+  build one phase at a time behind its QA gate. **A collection, never a
+  strength**: no rule module (`catch`, `biomes`, `battle`, `league`, `trainer`,
+  `items`, `perks`, `research`, `events`) imports `game/cards.js` or card
+  data (asserted). Cards is the FIFTH tab (`#/cards`, `goTab`), a lazy page
+  (`ui/cards/`); `ui/cards/load.js` is the only module that names
+  `data/cards/sets/*` (a lazy glob - the Dex sheet's Cards card loads through
+  it too) and the main bundle carries `data/cards/index.js` alone. `npm run
+  cards` (`tools/fetch-cards.mjs`, TCGdex: the sets and small images; then
+  `tools/fetch_card_art.py`, Bulbagarden: the real card back and each set's
+  wrappers, cosmetic) writes them;
+  a Mega card links its Mega FORM by `label()`, and the fetch stops on a Mega
+  it cannot match or a rarity not on `CARD_RARITIES`. The engine's
+  `buyPacks` and `openCardPack(set)` are the only writers of `cards`,
+  `packs`, `earnedPacks` and `cardPity`; a pack is decided and SAVED before
+  the scene plays, an earned pack opens first and stamps its cards, and a
+  first badge pays one (`battleEnd`'s `pack`). `RATES`, `PITY` and
+  `GOD_PACK` are ours (your call, 2026-10-02) and the Packs tab prints them,
+  never a typed number. The opening hides the bars (`body.cd-opening`), and
+  each beat moves on only from the beat it follows (a skip mid-tear was
+  dragged back by its timers). **While cards are face down, App holds
+  banners and tips** (`cardScene`, raised by the page BEFORE the open, in the
+  same render: a frame of the spare-card tip cost 46ms and spoiled the pack).
+  Dust is spares only (`sparesOf`: never the last copy of a card and variant,
+  never below its earned stamps); a craft costs `CRAFT_X` (16) spares' worth -
+  the one ratio that sets what a set costs (35% of a game, measured; scaling
+  `DUST` moves nothing). A card's finish follows the real frame (`CardFace`):
+  a reverse holo everywhere but the art window, a holo rare only in it, a hit
+  all over; a card you do not own wears none. **The chase is packs only**
+  (`PACK_ONLY`: Special illustration and Mega Hyper Rares never craft; your
+  call, a set then costs ~76% of a game). Cards carry no catch indicator.
+  The last card of every pack charges, flashes and turns (white until the
+  charge). A box/bundle per set (`BOXES`); a Champion pays a box, every
+  `STREAK_PACK`th streak day a pack - never the Pokédex rank (a title).
+  One open is one `changed()` (`settleOpen`), Open all included.
 - **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`
   rules): its rim drains with steps left over the item's own `steps`.
 - **Hard mode is designed in docs/battles.md, phase 8.** A cleared region's

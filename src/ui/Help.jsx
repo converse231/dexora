@@ -28,6 +28,7 @@ import { RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } from "../game/research.js";
 import { LIMITS } from "../game/trade.js";
 import { DEX_RANKS } from "../game/medals.js";
 import { TEAM_MAX, REMATCH_SHARE, REMATCH_CAP_STEP } from "../game/league.js";
+import { PACK_PRICE, PACK_SIZE, PITY, CRAFT_X, MILESTONES, STREAK_PACK } from "../game/cards.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
    lists want identical rows and a second copy of the row is how one of them
@@ -178,6 +179,31 @@ export default function Help({ onClose }) {
               <b>Block or report</b> from any trainer&rsquo;s profile. A block
               works both ways: neither of you can find, friend or trade with
               the other.
+            </li>
+          </ul>
+          {/* CARDS (docs/cards.md). Every number is cards.js's live constant. */}
+          <h4>Cards</h4>
+          <ul className="vr-notes">
+            <li>
+              <b>Packs</b> are in the Cards tab: {PACK_SIZE} real Pokémon TCG cards for ¥{PACK_PRICE.toLocaleString()},
+              about every second pack holding a hit. Every first gym badge gives one too, and its cards carry the
+              badge&rsquo;s stamp; a region&rsquo;s Champion gives a whole box, and every {STREAK_PACK}th day of
+              a daily-quest streak a pack. A box or bundle is the cheapest way to buy, and Open all opens every
+              pack you hold at once.
+            </li>
+            <li>
+              <b>Guaranteed.</b> A Double rare or better comes at least every {PITY.hit.hard} packs, a Special
+              illustration rare by {PITY.special.hard}, a Mega Hyper Rare by {PITY.mega.hard} - the Packs tab shows
+              how close each is.
+            </li>
+            <li>
+              <b>Dust.</b> Spare copies become Card Dust; a missing card crafts for {CRAFT_X} spares&rsquo; worth -
+              except Special illustration rares and Mega Hyper Rares, which come from packs only.
+              You always keep one of each, and earned copies stay. Owning a quarter, half, three quarters and all
+              of a set pays dust too ({MILESTONES.map(([, d]) => d.toLocaleString()).join(" / ")}).
+            </li>
+            <li>
+              <b>Just for collecting.</b> Cards change nothing in the wild or in battle - no catch, spawn or stat.
             </li>
           </ul>
           {/* THE LEAGUE. The order and the pay are league.js's, which the

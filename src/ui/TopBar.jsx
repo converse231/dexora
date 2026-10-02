@@ -92,7 +92,8 @@ export function Missions({ daily, onClaim, note }) {
    menu held. One `nav`, and CSS decides where it stands: in this bar on a
    desktop, a tab bar along the bottom of a phone, a menu behind a corner
    button on a sideways one (see ROTOM SHELL at the end of styles.css). */
-export const TABS = [["catch", "Catch", "ball"], ["trade", "Trade", "swap"], ["battles", "Battles", "trophy"]];
+export const TABS = [["catch", "Catch", "ball"], ["trade", "Trade", "swap"], ["battles", "Battles", "trophy"],
+  ["cards", "Cards", "cards"]];
 
 /* HELD SIDEWAYS, THE TABS ARE A MENU (2026-10-02). A rail down the left took
    68px of a 360px-tall phone's width from the game, reported as the screen
@@ -113,7 +114,7 @@ function MenuScrim({ onClose }) {
 
 export default function TopBar({
   tab = "catch", onTab, caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp,
-  onNews = null, unread = false, tradeAlert = 0, youAlert = false,
+  onNews = null, unread = false, tradeAlert = 0, youAlert = false, cardAlert = 0,
   trainerName = null,
   stale = null,
 }) {
@@ -130,7 +131,7 @@ export default function TopBar({
       <button type="button" className="tb-menu" aria-label="Menu" aria-expanded={menu}
         onClick={() => setMenu((v) => !v)}>
         <Icon n="menu" size={22} />
-        {(tradeAlert || youAlert) && <i className="tb-dot" aria-label="Something new" />}
+        {(tradeAlert || youAlert || cardAlert) && <i className="tb-dot" aria-label="Something new" />}
       </button>
       {menu && <MenuScrim onClose={() => setMenu(false)} />}
 
@@ -140,6 +141,7 @@ export default function TopBar({
             aria-current={tab === id ? "page" : undefined} onClick={() => go(id)}>
             <Icon n={ic} size={19} /><span>{name}</span>
             {id === "trade" && tradeAlert ? <em aria-label={`${tradeAlert} waiting`}>{tradeAlert}</em> : null}
+            {id === "cards" && cardAlert ? <em aria-label={`${cardAlert} packs to open`}>{cardAlert}</em> : null}
           </button>
         ))}
         {/* YOU: the trainer's chip on a desktop, the fourth tab on a phone. */}

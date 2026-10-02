@@ -24,7 +24,8 @@
     "edge": "node tools/build-edge.mjs",
     "anchors": "node tools/rank-anchors.mjs",
     "ranks": "python tools/build_ranks.py",
-    "anims": "python tools/build_anims.py"
+    "anims": "python tools/build_anims.py",
+    "cards": "node tools/fetch-cards.mjs && python tools/fetch_card_art.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
