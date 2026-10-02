@@ -16,6 +16,50 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-03-rates",
+    icon: "🎴",
+    date: "October 2026",
+    title: "Rarer pulls",
+    items: [
+      ["Hits are rarer", "Every rarity is a little harder to pull, so a full set means more."],
+      ["Longer guarantees", "Pity still promises each chase card - it just waits a little longer."],
+    ],
+  },
+  {
+    id: "2026-10-03-sets5",
+    icon: "✨",
+    date: "October 2026",
+    title: "151 and Prismatic Evolutions",
+    items: [
+      ["Two new sets", "151 opens at Lv 50 and Prismatic Evolutions at Lv 60, each with a bundle."],
+      ["Hyper rares and ACE SPECs", "The gold Hyper rares are the chase in both; Prismatic adds ACE SPECs."],
+      ["Items stack", "Use a Honey, Repel or Flute while one runs and its steps add on."],
+      ["Pokédex Charm 2x", "A finished generation's rare forms are now twice as likely."],
+    ],
+  },
+  {
+    id: "2026-10-03-dexclaim",
+    icon: "🎰",
+    date: "October 2026",
+    title: "Claim your Pokédex rewards",
+    items: [
+      ["Fixed: Johto paid nothing", "Any Unown letter now counts - a finished Johto is ready to claim."],
+      ["Claim on the map", "A finished generation shows a reward button; press it to claim."],
+      ["Roll for a box", "The free box is a random set now, on a spinning reel."],
+    ],
+  },
+  {
+    id: "2026-10-03-team",
+    icon: "🛡️",
+    date: "October 2026",
+    title: "Your own team, no level caps",
+    items: [
+      ["No level caps", "Bring any Pokémon, at any level, to any League battle."],
+      ["Your team", "Build it on the League's Team tab - every battle starts from it."],
+      ["Drag to reorder", "Drag your team into order; the first one leads."],
+    ],
+  },
+  {
     id: "2026-10-03-dexmaster",
     icon: "🏆",
     date: "October 2026",

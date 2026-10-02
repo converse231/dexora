@@ -706,8 +706,36 @@ now and then when a step started an encounter.
 - **A finished generation** (your call): its whole Pokédex, caught yourself,
   pays ¥20,000, a Master Ball, a title, a **box of choice** (any set's box or
   bundle, earned and stamped) and the **Pokédex Charm** - 1.5x that
-  generation's rare forms and variants. A save that finished one before the
-  medal existed is paid at its next load.
+  generation's rare forms and variants. **Since 2026-10-03 it is claimed,
+  and the box is a roll**: a REWARD pill on the map opens the claim, and a
+  reel of the set logos slows onto a random set (one in three is Ascended
+  Heroes' 6-pack bundle). Johto had paid nothing for a finished Pokédex:
+  its medal waited on Unown A, where catching Unown registers the letter
+  met - a look now holds its family's place.
+
+## 151 and Prismatic Evolutions *(2026-10-03, your calls)*
+
+- **Two Scarlet & Violet sets**: 151 (207 cards, Lv 50) and Prismatic
+  Evolutions (180, Lv 60), each a 6-pack bundle (neither was sold in booster
+  boxes), with their real wrappers (151's one, Prismatic's four).
+- **One rate table for every era**: a roll lands on the first rung at or
+  below it that the set prints (`landsOn`). Two rungs joined the ladder:
+  `hyper` (Hyper rare, under `mega`: the top roll in a set with no Mega
+  Hyper Rare, and what the top pity resets on) and `ace` (ACE SPEC Rare,
+  under `illustration`: Prismatic prints no Illustration rare, so that roll
+  is an ACE SPEC there, 1 in 6). A Hyper rare is packs only, like a Mega
+  Hyper Rare. The Packs tab names each rate as its set gives it.
+- **Measured with pity running** (300,000 seeded packs a set): a hit 1 in
+  1.94, a Double rare 1 in 3.8, the illustration roll 1 in 6.3, an Ultra
+  Rare 1 in 9.6, a Special illustration rare 1 in 18, the top rarity 1 in
+  73 (1 in 120 before pity), a God Pack 1 in 289.
+- **Rarer, the same day** (your call: a set was too easy to finish): Double
+  1 in 5, Illustration 1 in 8, Ultra 1 in 12, Special 1 in 32, the top 1 in
+  180, a God Pack 1 in 500; pity at 6, 45 and 220 packs (soft from 25 and
+  150). Measured with pity: a hit 1 in 2.35, Special 1 in 22, the top 1 in
+  107, a God Pack 1 in 545.
+- Prismatic's Poké Ball and Master Ball reverse holos are not separate
+  printings: TCGdex lists one reverse a card.
 
 ## Deferred on purpose *(each with the trigger that brings it back)*
 

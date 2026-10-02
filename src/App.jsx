@@ -14,6 +14,7 @@ import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
 import WaterAsk from "./ui/WaterAsk.jsx";
+import DexClaim from "./ui/DexClaim.jsx";
 import { titleIds } from "./game/titles.js";
 import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
@@ -29,7 +30,7 @@ import {
 import { ItemIcon, eventIcon, preloadSprites } from "./ui/Sprite.jsx";
 import { EVENT_NAME } from "./game/events.js";
 import {
-  biomeFor, levelFromXp, TIERS, dexIndex, tableFor,
+  biomeFor, levelFromXp, TIERS, dexIndex, tableFor, REGION_NAME,
 } from "./game/biomes.js";
 import DexSheet from "./ui/DexSheet.jsx";
 import { modalOpen } from "./ui/modal.js";
@@ -308,6 +309,7 @@ export default function App({
      `null` | `"all"` (the BAG key) | `"balls"` (holding A). */
   const [bagView, setBagView] = useState(null);
   const [waterAsk, setWaterAsk] = useState(false);   // "Surf or fish?" (WaterAsk)
+  const [claimGen, setClaimGen] = useState(null);     // a finished generation's reward, being claimed (DexClaim)
   /* "See in Box" crosses two components that do not know each other: the sheet
      lives here and the tab lives in the Rail. A species id parked here is the
      smallest thing that can travel between them, and the Rail clears it once it
@@ -450,7 +452,10 @@ export default function App({
      milestone banner or a "spare card" tip raised by the open covered the pack
      before it was torn and told you what was in it (found in QA). They play
      on the summary. */
-  const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene;
+  /* And while a Pokédex reward rolls (DexClaim): the "new packs" tip over the reel. */
+  const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene || claimGen != null;
+  // Finished generations not yet claimed - derived, so it is a button until pressed.
+  const claims = engine?.dexClaims?.() ?? [];
   const cheer = held ? null : st?.cheers?.[0] ?? null;
   // The Dex's rank line replays your rank-up: the step you hold, from the one below.
   const [replay, setReplay] = useState(null);
@@ -803,7 +808,7 @@ export default function App({
           it is about, never again. See hints.js for why there is no sequence,
           and Hint.jsx for why it is a dialog rather than the bar it started as:
           a tip somebody scrolls past is a tip nobody read. */}
-      {st?.hint && !cardScene && (
+      {st?.hint && !cardScene && claimGen == null && (
         <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 
@@ -953,7 +958,7 @@ export default function App({
                 <span key={fam} className={`rift-ring fx-ring fx-${fam}`} role="status"
                   data-tip={`${item.name} — ${item.blurb}. ${run.steps} steps left.`}
                   aria-label={`${item.name}: ${run.steps} steps left`}
-                  style={{ "--p": Math.min(1, run.steps / (item.steps || run.steps)) }}>
+                  style={{ "--p": Math.min(1, run.steps / (run.total || item.steps || run.steps)) }}>
                   <ItemIcon item={item} />
                   <b>{run.steps}</b>
                 </span>
@@ -1036,6 +1041,13 @@ export default function App({
                   </div>
                 )}
                 <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />
+                {claims.length > 0 && (
+                  <button type="button" className="ms-tab ready dc-pill" onClick={() => setClaimGen(claims[0])}
+                    data-tip="A finished Pokédex - claim its reward">
+                    <i>REWARD</i>
+                    <b>{REGION_NAME[claims[0]]} complete<em className="ms-dot" aria-hidden="true">!</em></b>
+                  </button>
+                )}
               </div>
             )}
 
@@ -1213,6 +1225,11 @@ export default function App({
           why this renders AFTER the sheet - same layer, so the later one is on top. */}
       {/* Only while both are still on offer: a step or an encounter that
           takes either away puts the question down with it. */}
+      {claimGen != null && (
+        <DexClaim gen={claimGen} onClaim={() => engine.claimDex()}
+          onCards={() => { setClaimGen(null); goTab("cards"); }}
+          onClose={() => setClaimGen(null)} />
+      )}
       {waterAsk && rod && ride && (
         <WaterAsk rod={rod} ride={ride}
           onSurf={() => { setWaterAsk(false); engine.surf(); }}

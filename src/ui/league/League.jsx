@@ -13,10 +13,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LEAGUES } from "../../data/leagues.js";
 import {
-  opponent, playerFighter, rankedFighter, refusal, AI_FOR, hardParty, learnable, movesOf,
+  opponent, playerFighter, rankedFighter, refusal, AI_FOR, hardParty, learnable, movesOf, TEAM_MAX,
 } from "../../game/battle.js";
 import {
-  teamSize, REMATCH_CAP_STEP, isOpen, hardOpen, hardCleared, charmOf, giftOf, feeFor, CHARM_MAX, REGIONS,
+  teamSize, isOpen, hardOpen, hardCleared, charmOf, giftOf, feeFor, CHARM_MAX, REGIONS,
 } from "../../game/league.js";
 import { MOVES } from "../../data/moves.js";
 import { HEALS, TUTOR_PRICE, CANDY_PRICE } from "../../game/items.js";
@@ -43,7 +43,9 @@ import { rankedStep } from "../../net/cloud.js";
    not a region's; the strip remembers it like one. */
 const RANKED = "ranked";
 // The League's shop and Train tab (phase 8) sit beside it, under ids no region has.
-const SHOP = "shop", TRAIN = "train";
+const SHOP = "shop", TRAIN = "train", TEAM = "team";
+// One slot moved to another, the rest closing up: the team's order.
+const moved = (list, from, to) => { const n = [...list]; n.splice(to, 0, ...n.splice(from, 1)); return n; };
 
 const asset = (path) => new URL(path, document.baseURI).href;
 const REGION_KEY = "dexora-league-region";
@@ -96,7 +98,6 @@ function Head({ o, kind, region, order, tune, stamp, hard = false }) {
         <h4>{o.name}</h4>
         <div className="lg-facts">
           {o.type && kind === "leader" && <Types of={[o.type]} />}
-          <span className="lg-cap" data-tip="The highest level you may bring">Lv {tune.cap} cap</span>
           {tune.top > 100 && <span className="lg-trained" data-tip="Trained past Lv 100: its stats run higher than its level says">TRAINED</span>}
         </div>
         {kind === "leader" && (
@@ -215,7 +216,7 @@ function Prize({ tune, won }) {
   const left = Math.ceil((1 - tune.clock) * REMATCH_STEPS);
   return (
     <span className="lg-prize" data-tip={tune.clock >= 1
-      ? `Ready: a rematch win pays in full, and raises the cap by ${REMATCH_CAP_STEP}`
+      ? "Ready: a rematch win pays in full, and they come back stronger"
       : `Refills as you walk: full in ${left.toLocaleString("en-US")} steps`}>
       <span className="lg-clock" role="meter" aria-label="Rematch prize" aria-valuemin={0} aria-valuemax={100}
         aria-valuenow={Math.round(tune.clock * 100)}>
@@ -366,7 +367,7 @@ function BattleShop({ money, bag, level, stats, onBuy }) {
 }
 
 /* TRAIN (phase 8): choose a Pokemon, then RAISE it - Rare Candy bought and
-   spent here, so a team for a cap or for ranked's Lv 100 is one page away -
+   spent here, so a team for the League or for ranked's Lv 100 is one page away -
    and TEACH it: tap one of its four moves, tap a move its line learns by its
    level to put there, and pay for each new one. Moves are League battles
    only - ranked's format sets every move.
@@ -493,6 +494,84 @@ function Train({ engine, box, money, stats, candy }) {
   );
 }
 
+/* THE TEAM IN ORDER (your call, 2026-10-03): drag a Pokemon onto another
+   slot to move it there - the first leads. Pointer events on the window,
+   never setPointerCapture (CLAUDE.md, mobile), the held index in a ref; the
+   arrow keys do the same for a keyboard. */
+function TeamOrder({ team, size, onMove, big = false }) {
+  const list = useRef(null);
+  const from = useRef(null);
+  const move = useRef(onMove);
+  move.current = onMove;
+  const [held, setHeld] = useState(null);
+  const n = team.length;
+  useEffect(() => {
+    if (held == null) return undefined;
+    const over = (e) => {
+      const to = Number(document.elementFromPoint(e.clientX, e.clientY)?.closest?.("[data-slot]")?.dataset.slot);
+      if (!Number.isInteger(to) || to === from.current || to >= n) return;
+      move.current(from.current, to);
+      from.current = to;
+      setHeld(to);
+    };
+    const up = () => { from.current = null; setHeld(null); };
+    window.addEventListener("pointermove", over);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", over);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [held, n]);
+  const key = (e, k) => {
+    const to = k + (e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : 0);
+    if (to === k || to < 0 || to >= n) return;
+    e.preventDefault();
+    onMove(k, to);
+    requestAnimationFrame(() => list.current?.querySelector(`[data-slot="${to}"]`)?.focus());
+  };
+  return (
+    <ol className={`lg-dock-team lg-order${big ? " big" : ""}`} ref={list} aria-label="Your team, in battle order">
+      {Array.from({ length: size }, (_, k) => {
+        const m = team[k];
+        return (
+          <li key={k} data-slot={k} className={`${m ? "on" : ""}${held === k ? " held" : ""}`}
+            tabIndex={m && n > 1 ? 0 : undefined}
+            aria-label={m ? `${k + 1}: ${label(speciesById(m.species))}, Lv ${m.level}${n > 1 ? " - drag or use the arrow keys to move" : ""}` : `${k + 1}: empty`}
+            onPointerDown={m && n > 1 ? (e) => { if (e.button) return; e.preventDefault(); from.current = k; setHeld(k); } : undefined}
+            onKeyDown={m ? (e) => key(e, k) : undefined}>
+            {m && <Sprite id={m.species} variant={m.tier} alt="" />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/* YOUR TEAM (your call, 2026-10-03): six of your own, picked by hand and put
+   in order, which every team pick starts from - the suggestion is a shortcut
+   on the team pick, not the only way to build one. Saved as box uids
+   (`engine.setTeam`); a battle saves the team it took the same way. */
+function MyTeam({ engine, box, team }) {
+  const mons = useMemo(() => box.filter((m) => !refusal(m)).map((m) => ({ ...m, tier: variantOf(m) })), [box]);
+  const byKey = useMemo(() => new Map(mons.map((m) => [keyOf(m), m])), [mons]);
+  const picked = team.map((uid) => mons.find((m) => m.uid === uid)).filter(Boolean).map(keyOf);
+  const set = (keys) => engine.setTeam(keys.map((k) => byKey.get(k)?.uid).filter((u) => u != null));
+  return (
+    <div className="lg-pick">
+      <section className="rk-edit-head">
+        <span className="lg-kicker">Team</span>
+        <h4>Your team</h4>
+        <p className="lg-tutor-lede">Pick up to {TEAM_MAX}, then drag them into order - the first one leads. Every battle starts with this team, and any you fight with becomes it.</p>
+      </section>
+      <TeamOrder team={picked.map((k) => byKey.get(k))} size={TEAM_MAX} big onMove={(a, b) => set(moved(picked, a, b))} />
+      <Picker mons={mons} picked={picked} max={TEAM_MAX} onChange={set} prefer="high" sort="level" level
+        empty="Your Box is empty - catch some Pokémon first." />
+    </div>
+  );
+}
+
 /* CHOOSING A TEAM: who may come (and, for everyone else, why not), picked
    with the Trade Center's picker - a tap takes your highest level of that
    Pokemon - and one pinned button to go. */
@@ -501,12 +580,8 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
   const size = sizeOf(o);
   const theirs = useMemo(() => teamOf(o, beaten), [o, beaten]);
   const mons = useMemo(() => box.map((m) => ({ ...m, tier: variantOf(m) })), [box]);
-  const ok = useMemo(() => mons.filter((m) => !refusal(m, tune.cap)), [mons, tune.cap]);
-  const why = useMemo(() => {
-    const n = { level: 0, legend: 0, locked: 0 };
-    for (const m of mons) { const r = refusal(m, tune.cap); if (r) n[r]++; }
-    return n;
-  }, [mons, tune.cap]);
+  const ok = useMemo(() => mons.filter((m) => !refusal(m)), [mons]);
+  const locked = mons.length - ok.length;
   const byKey = useMemo(() => new Map(ok.map((m) => [keyOf(m), m])), [ok]);
   /* The last team you took, as much of it as may come to this one - found by
      uid, then keyed as the Picker keys it (a Pokemon registered for trading
@@ -518,8 +593,6 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
   // Their team's types, for the suggestion that counters them (suggest.js).
   const foes = useMemo(() => theirs.map((f) => f.types.map((i) => TYPES[i])), [theirs]);
 
-  const cap = tune.cap;
-  const refusedCount = why.level + why.legend + why.locked;
   return (
     <div className="lg-pick">
       <section className="lg-foe">
@@ -533,8 +606,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
 
       <ul className="lg-rules">
         <li><b>{size}</b> Pokémon at most</li>
-        {kind !== "trainer" && <li>Up to <b>Lv {cap}</b></li>}
-        {kind !== "trainer" && <li>Legendaries: a lower limit, <b>by strength</b></li>}
+        <li>Any level</li>
         <li>{tune.wins ? "Rematch" : "Prize"} <b>{yen(tune.pay)}</b></li>
         {feeFor(o.id) > 0 && <li>Entry <b>{yen(feeFor(o.id))}</b>, back on a win</li>}
       </ul>
@@ -552,26 +624,13 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
         sort="level"
         level
         empty={box.length
-          ? `None of your Pokémon may enter: this fight takes Lv ${cap} and under. Catch a fresh one, or raise a young one with Rare Candy.`
+          ? "Every one of your Pokémon is in a trade right now."
           : "Your Box is empty - catch some Pokémon first."}
       />
-      {refusedCount > 0 && (
-        <p className="lg-refused">
-          Not allowed here:{" "}
-          {[why.level && `${why.level} over Lv ${cap}`,
-            why.legend && `${why.legend} legendar${why.legend > 1 ? "ies" : "y"} over its limit`,
-            why.locked && `${why.locked} in a trade`].filter(Boolean).join(" · ")}
-        </p>
-      )}
+      {locked > 0 && <p className="lg-refused">Not allowed here: {locked} in a trade</p>}
 
       <div className="lg-dock">
-        <span className="lg-dock-team" aria-label="Your team">
-          {Array.from({ length: size }, (_, k) => (
-            <i key={k} className={team[k] ? "on" : ""}>
-              {team[k] && <Sprite id={team[k].species} variant={team[k].tier} alt="" />}
-            </i>
-          ))}
-        </span>
+        <TeamOrder team={team} size={size} onMove={(a, b) => setPicked(moved(picked.filter((k) => byKey.has(k)), a, b))} />
         <button type="button" className="lg-go big" disabled={!team.length} onClick={() => onFight(team)}>
           Battle!
         </button>
@@ -590,7 +649,7 @@ export default function League({
   const st = useMemo(() => standing(beaten), [beaten]);
   const firstOpen = () => {
     const saved = readRegion();
-    if ([RANKED, SHOP, TRAIN].includes(saved)) return saved;
+    if ([RANKED, SHOP, TRAIN, TEAM].includes(saved)) return saved;
     if (saved && st[LEAGUES.findIndex((r) => r.id === saved)]?.open) return saved;
     const k = st.findIndex((s) => s.open && !s.cleared);
     return LEAGUES[k >= 0 ? k : 0].id;
@@ -607,7 +666,7 @@ export default function League({
   }, [fight]);
   const [editing, setEditing] = useState(null);   // the defense team slot being edited
   const [nonce, setNonce] = useState(0);          // a ranked battle closed: the Ranked tab reloads its standing
-  const ranked = regionId === RANKED, shop = regionId === SHOP, train = regionId === TRAIN;
+  const ranked = regionId === RANKED, shop = regionId === SHOP, train = regionId === TRAIN, mine = regionId === TEAM;
   // Normal or hard: one switch for every region, remembered while the page is open.
   const [hard, setHard] = useState(false);
   const ri = LEAGUES.findIndex((r) => r.id === regionId);
@@ -659,9 +718,8 @@ export default function League({
     const nx = upNext;
     const mons = fight.mons.map((m) => box.find((x) => x.uid === m.uid)).filter(Boolean)
       .map((m) => ({ ...m, tier: variantOf(m) }));
-    const cap = tuneOf(nx.o, beaten, steps).cap;
     const fits = mons.length && mons.length === fight.mons.length && mons.length <= sizeOf(nx.o)
-      && mons.every((m) => !refusal(m, cap));
+      && mons.every((m) => !refusal(m));
     setFight(null);
     if (fits && (nx.kind !== "hard" || feeFor(nx.o.id) <= money)) {
       setPick(null);
@@ -726,6 +784,11 @@ export default function League({
                 <b>Ranked</b>
                 <em>Teams</em>
               </button>
+              <button type="button" role="tab" aria-selected={mine}
+                className={`rk-tab${mine ? " on" : ""}`} onClick={() => choose(TEAM)}>
+                <b>Team</b>
+                <em>{team.length} of {TEAM_MAX}</em>
+              </button>
               <button type="button" role="tab" aria-selected={shop}
                 className={`rk-tab${shop ? " on" : ""}`} onClick={() => choose(SHOP)}>
                 <b>Shop</b>
@@ -752,6 +815,8 @@ export default function League({
       <main className="hp-body tc-main lg-main">
         {pick ? (
           <TeamPick o={pick.o} kind={pick.kind} box={box} last={team} beaten={beaten} steps={steps} onFight={startFight} />
+        ) : mine ? (
+          <MyTeam engine={engine} box={box} team={team} />
         ) : shop ? (
           <BattleShop money={money} bag={bag} level={level} stats={stats} onBuy={(id, n) => engine.buy(id, n)} />
         ) : train ? (

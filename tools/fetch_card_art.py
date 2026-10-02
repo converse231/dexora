@@ -30,6 +30,10 @@ WRAPPERS = {
     "me02": ["ME2 Booster Mega Charizard X.png", "ME2 Booster Mega Gengar.png",
              "ME2 Booster Mega Heracross.png", "ME2 Booster Mega Lopunny.png"],
     "me02.5": ["Ascended Heroes Booster.png"],
+    "sv03.5": ["151 Booster.png"],
+    "sv08.5": ["Prismatic Evolutions Booster Eevee Sylveon.png", "Prismatic Evolutions Booster Espeon Umbreon.png",
+               "Prismatic Evolutions Booster Leafeon Glaceon.png",
+               "Prismatic Evolutions Booster Vaporeon Jolteon Flareon.png"],
 }
 PACK_W = 300          # shown at most ~230px wide, twice that on a dense screen is wasted here
 BACK_W = 490

@@ -24,7 +24,7 @@ import { perksOf } from "./perks.js";
 import { hash } from "./daily.js";
 /* Who may enter lives with the rest of what the ENGINE enforces, in a module
    free of the battle data (phase 4); re-exported so the League reads one place. */
-export { LEGEND_BST, legendLevel, refusal, TEAM_MAX } from "./league.js";
+export { refusal, TEAM_MAX } from "./league.js";
 import { RANKED_LEVEL, RANKED_IV } from "./ranked.js";
 
 // ------------------------------------------------------------------ limits

@@ -34,7 +34,7 @@ import {
 } from "./research.js";
 import { cleanTradeFields } from "./trade.js";
 import {
-  isOpen, refusal, capOf, payFor, teamSize, rematchesReady, cleanBeaten, TEAM_MAX,
+  isOpen, refusal, payFor, teamSize, rematchesReady, cleanBeaten, TEAM_MAX,
   feeFor, giftOf, hardCleared, charmOf, cleanTaught, taughtOk,
 } from "./league.js";
 import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
@@ -648,7 +648,7 @@ function loadState() {
         const run = s.field?.[fam];
         const ok = run && typeof run === "object"
           && fieldById(run.id)?.family === fam && run.steps > 0;
-        return [fam, ok ? { id: run.id, steps: run.steps } : null];
+        return [fam, ok ? { id: run.id, steps: run.steps, total: Math.max(run.steps, Number(run.total) || 0) } : null];
       })),
       /* MIGRATION. Running was a level check before it was an item, so a save
          written then is past level 15 with an empty shoe slot - and would
@@ -2016,8 +2016,13 @@ export function createEngine(canvas, onChange, mini = null) {
 
   function checkDexRewards(speciesId) {
     for (const medal of medalsFor(speciesId, ownDex(), state.medals)) {
+      /* A GENERATION IS CLAIMED, not paid here (`claimDex`): the banner only
+         says so, and the map's claim button stays until it is. */
+      if (medal.kind === "gen") {
+        cheer({ kind: "medal", title: medal.name, sub: "Every one caught - claim your reward on the map." });
+        continue;
+      }
       state.medals.push(medal.id);
-      if (medal.kind === "gen") state.boxVouchers = [...state.boxVouchers, `dex:${medal.gen}`];
       pay(medal.money, medal.items, {
         kind: "medal", title: medal.name, sub: medal.sub,
       });
@@ -2685,17 +2690,6 @@ export function createEngine(canvas, onChange, mini = null) {
   /* And anything a raised cap owes is paid now, with its banner - not on the
      next catch, which would read as one catch paying out nine levels. */
   if (!state.stale && payLevels()) save();
-  /* A GENERATION ALREADY FINISHED pays its medal now: the medals arrived after
-     some Pokédexes were complete, and a medal only checks on a new catch. */
-  if (!state.stale) {
-    const due = genMedalsDue(ownDex(), state.medals);
-    for (const medal of due) {
-      state.medals.push(medal.id);
-      state.boxVouchers = [...state.boxVouchers, `dex:${medal.gen}`];
-      pay(medal.money, medal.items, { kind: "medal", title: medal.name, sub: medal.sub });
-    }
-    if (due.length) save();
-  }
   bakeMini();
   raf = requestAnimationFrame(frame);
 
@@ -2748,16 +2742,33 @@ export function createEngine(canvas, onChange, mini = null) {
     return id;
   }
 
-  /* A BOX OF YOUR CHOICE (a generation's Pokédex): any shipped set, its box
-     or bundle, every pack earned and stamped where the voucher came from. */
-  function claimBox(setId) {
-    if (!state.boxVouchers.length || !BOXES[setId] || !setById(setId)) return false;
-    const [stamp, ...rest] = state.boxVouchers;
-    state.boxVouchers = rest;
-    grantPacks(BOXES[setId].packs, stamp, setId);
+  /* A FINISHED GENERATION, CLAIMED (asked for, 2026-10-03): what is due is
+     DERIVED - a generation's Pokédex done and its medal not yet banked - so
+     nothing is stored until the press. Then, in one save before the reel
+     plays: the medal (its title and Pokédex Charm), its money and Master
+     Ball, and the box of a RANDOM set, every pack earned and stamped. A box
+     of choice from before (`boxVouchers`) is claimed the same way, rolled.
+     Answers what was won, for the reel, or null. */
+  const dexClaims = () => [
+    ...genMedalsDue(ownDex(), state.medals).map((m) => m.gen),
+    ...state.boxVouchers.map((s) => Number(s.slice(4))),
+  ];
+  function claimDex(random = Math.random) {
+    if (state.stale) return null;
+    const medal = genMedalsDue(ownDex(), state.medals)[0];
+    const stamp = medal ? `dex:${medal.gen}` : state.boxVouchers[0];
+    if (!stamp) return null;
+    if (medal) {
+      state.medals.push(medal.id);
+      if (medal.money) state.money += medal.money;
+      give(medal.items);
+    } else state.boxVouchers = state.boxVouchers.slice(1);
+    const set = CARD_SETS[Math.floor(random() * CARD_SETS.length)].id;
+    grantPacks(BOXES[set].packs, stamp, set);
     save();
     changed();
-    return true;
+    return { gen: Number(stamp.slice(4)), set, packs: BOXES[set].packs,
+      money: medal?.money ?? 0, items: medal?.items ?? {}, medal: !!medal };
   }
 
   /* YOUR CARD SHOWCASE: a card you hold, in a printing you hold, on or off
@@ -3146,9 +3157,11 @@ export function createEngine(canvas, onChange, mini = null) {
      it in the field you are standing in. They are ordinary bag items now, sold
      by the same shelf as the balls and used from the same floating rail.
 
-     Starting one while another of its FAMILY runs replaces it, and the steps
-     on the old one are lost - the slot is the family, and a player who wants
-     both effects can have a repel and a honey, just not two honeys. */
+     STARTING ONE WHILE ITS FAMILY RUNS STACKS (asked for, 2026-10-03): the
+     new item's effect takes the slot and the steps left on the old one carry
+     over onto it - a second Honey is 600 more steps, not a lost 300. The
+     slot is still the family, so it is one effect at a time, and `total`
+     (the stack's length) is what its ring drains against. */
   function useField(id) {
     const item = fieldById(id);
     if (!item || (state.bag[item.id] ?? 0) <= 0) return false;
@@ -3170,12 +3183,13 @@ export function createEngine(canvas, onChange, mini = null) {
 
        The family slot still stops two of the SAME kind - a Max Repel replaces a
        Repel by being written to the same key - so nothing about that changed. */
+    const carry = state.field[item.family]?.steps ?? 0;
     if (item.family === "repel") {
       for (const fam of FAMILIES) state.field[fam] = null;
     } else if (state.field.repel) {
       state.field.repel = null;
     }
-    state.field[item.family] = { id: item.id, steps: item.steps };
+    state.field[item.family] = { id: item.id, steps: carry + item.steps, total: carry + item.steps };
     save();
     changed();
     return true;
@@ -3311,11 +3325,10 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!Array.isArray(uids) || !uids.length || new Set(uids).size !== uids.length
       || !Array.isArray(mine) || mine.length !== uids.length || !theirs?.length
       || uids.length > teamSize(id, theirs.length)) return "team";
-    const cap = capOf(id, state.beaten);
     for (const [k, uid] of uids.entries()) {
       const mon = state.box.find((m) => m.uid === uid);
       if (!mon || mine[k].id !== mon.species || mine[k].level !== mon.level) return "team";
-      const no = refusal(mon, cap);
+      const no = refusal(mon);
       if (no) return no;
     }
     /* HARD MODE'S ENTRY FEE (phase 8), paid here and given back with the win:
@@ -3353,6 +3366,16 @@ export function createEngine(canvas, onChange, mini = null) {
     },
     paused: () => pausedAt !== null,
     battleBegin,
+    /* YOUR TEAM (your call, 2026-10-03): the League's Team tab sets it, every
+       team pick starts from it, and its order is the order they fight in -
+       `battleBegin` keeps the team you last took the same way. Box uids
+       only, each once, at most six. */
+    setTeam(uids) {
+      if (!Array.isArray(uids)) return;
+      state.team = [...new Set(uids)].filter((u) => state.box.some((m) => m.uid === u)).slice(0, TEAM_MAX);
+      save();
+      stepped();
+    },
     tutor,
     /* A TURN, and the one place a Battle-shelf item is spent: each the turn
        used (its log says so) comes out of the bag here, and a turn using one
@@ -3437,7 +3460,8 @@ export function createEngine(canvas, onChange, mini = null) {
     dustCard,
     dustSpares,
     craftCard,
-    claimBox,
+    claimDex,
+    dexClaims,
     showCard,
     buyCandy,
     useField,

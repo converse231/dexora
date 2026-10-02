@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CARD_SETS } from "../../data/cards/index.js";
 import { WRAPPERS } from "../../data/cards/art.js";
 import {
-  RARITY, CARD_RARITIES, RATES, PITY, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
+  RARITY, CARD_RARITIES, landsOn, RATES, HIT_RATE, PITY, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
   copiesOf, chanceOf, freshPity, sparesOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit,
 } from "../../game/cards.js";
 import CardFace, { RarityMark } from "./Card.jsx";
@@ -18,7 +18,6 @@ import Inspect from "./Inspect.jsx";
 import Opening, { OpenAll } from "./Opening.jsx";
 import { loadSet, logoUrl, packUrl } from "./load.js";
 import { titleIds, titleName, MASTER_STEP } from "../../game/titles.js";
-import { REGION_NAME } from "../../game/biomes.js";
 import { showKey, CARD_SHOW, printingsOf } from "../../game/cards.js";
 
 const yen = (n) => `¥${n.toLocaleString()}`;
@@ -28,7 +27,7 @@ const POCKETS = 12;            // a page: four across, three down
 /* THE CARD DEX ADDS TILES A PAGE AT A TIME as its end scrolls near (the
    Picker's rule): 188 tiles at once was a 103ms task on a throttled phone. */
 const TILE_PAGE = 48;
-const CHASE = ["mega", "special"];
+const CHASE = ["mega", "hyper", "special"];
 // The best copy a card is held in: a foil over a plain one.
 const bestVariant = (row, card) => ["h", "r", "n"].find((v) => row?.[v] && card[4].includes(v)) ?? card[4][0];
 
@@ -106,8 +105,6 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   };
   const look = (setId, localId) => setInspect({ setId, localId });
   const titles = titleIds(st?.milestones, st?.medals).map(titleName);
-  const vouchers = st?.boxVouchers ?? [];
-  const from = (stamp) => (stamp.startsWith("dex:") ? `the ${REGION_NAME[stamp.slice(4)] ?? ""} Pokédex` : "a reward");
 
   return (
     <div className={`tc-page evcard cd-page${opening ? " opening" : ""}`} role="dialog" aria-modal="true" aria-label="Cards" ref={page}>
@@ -138,20 +135,6 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
         {tab === "packs" && !opening && (
           <div className="cd-packs">
             {note && <p className="cd-note" role="alert">{note}</p>}
-            {/* A BOX OF YOUR CHOICE, from a completed generation's Pokédex. */}
-            {vouchers.length > 0 && (
-              <section className="ev-card cd-voucher">
-                <b>🎁 A free box{vouchers.length > 1 ? ` (${vouchers.length})` : ""} - from {from(vouchers[0])}</b>
-                <span>Choose a set: every pack in it is earned and carries the stamp.</span>
-                <div className="cd-actions">
-                  {CARD_SETS.map((s) => (
-                    <button key={s.id} type="button" className="lg-go" onClick={() => engine.claimBox(s.id)}>
-                      {s.name} · {BOXES[s.id].packs} packs
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
             {CARD_SETS.map((s) => (
               <PackCard key={s.id} meta={s} set={sets[s.id]} level={level} money={st?.money ?? 0}
                 held={packs[s.id] ?? 0} earned={st?.earnedPacks?.[s.id]?.length ?? 0}
@@ -214,12 +197,16 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
     const mine = log.filter(([id]) => id.startsWith(`${meta.id}-`)).map(([id, v]) => [set?.CARDS.find((c) => cardId(meta.id, c[0]) === id), v]).filter(([c]) => c);
     return mine.sort((a, b) => rungOf(b[0][3]) - rungOf(a[0][3]))[0] ?? null;
   }, [log, set, meta.id]);
+  /* Each rate under the rarity it gives IN THIS SET (`landsOn`): Prismatic's
+     illustration roll is an ACE SPEC, a Scarlet & Violet set's top roll a
+     Hyper rare. */
+  const as = (r) => (set ? landsOn(set.CARDS, r) ?? r : r);
   const odds = [["double", RATES.double], ["illustration", RATES.illustration], ["ultra", RATES.ultra],
-    ["special", RATES.special], ["mega", RATES.mega]];
+    ["special", RATES.special], ["mega", RATES.mega]].map(([r, p]) => [as(r), p]);
   const meters = [
     ["hit", "A Double rare or better", pity.hit],
     ["special", "A Special illustration rare", pity.special],
-    ["mega", "A Mega Hyper Rare", pity.mega],
+    ["mega", `A ${RARITY[as("mega")].name}`, pity.mega],
   ];
   const got = chase.filter((c) => cards[cardId(meta.id, c[0])]).length;
   return (
@@ -240,12 +227,12 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
       </div>
       <div className="cd-set-body">
         <h4>{meta.name}</h4>
-        <p className="cd-sub">{meta.total} cards · {PACK_SIZE} a pack · a hit about every other pack · {yen(PACK_PRICE)}</p>
+        <p className="cd-sub">{meta.total} cards · {PACK_SIZE} a pack · a hit about 1 pack in {(1 / HIT_RATE).toFixed(1)} · {yen(PACK_PRICE)}</p>
         <ul className="cd-odds" aria-label="Odds per pack">
           {odds.map(([r, p]) => (
             <li key={r}><RarityMark rarity={r} /><span>{RARITY[r].name}</span><b>1 in {oneIn(p)}</b></li>
           ))}
-          <li className="cd-god"><span>God Pack: all foils, three Illustration rares</span><b>1 in {oneIn(GOD_PACK)}</b></li>
+          <li className="cd-god"><span>God Pack: all foils, three {RARITY[as("illustration")].name}s or better</span><b>1 in {oneIn(GOD_PACK)}</b></li>
         </ul>
         <div className="cd-pity">
           {meters.map(([k, name, n]) => {
