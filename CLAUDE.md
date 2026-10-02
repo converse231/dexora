@@ -335,7 +335,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   fleeing were tuned in opposite directions; retune them as a pair.
 - **Field items: each family moves one lever** (`rate`, `tilt` or `lift`), and
   `state.field` is keyed by family. A repel is total and cancels everything;
-  the White Flute and a honey stack. `rarityPower` is the only rarity transform.
+  the White Flute and a honey run together. Using one while its family runs
+  STACKS: the new effect takes the slot and the old one's steps carry over
+  (`total` is what the ring drains against; asked for, 2026-10-03). `rarityPower` is the only rarity transform.
 - **Berries each move one roll**: the same berry deepens, a different one
   replaces, and one at its cap is refused (`berryRoom`), never eaten. A Nanab
   is a lock.
@@ -684,6 +686,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   fixed layer measures from. A box/bundle per set (`BOXES`); a Champion pays a box, every
   `STREAK_PACK`th streak day a pack - never the Pokédex rank (a title).
   One open is one `changed()` (`settleOpen`), Open all included.
+  **A roll lands on the first rung at or below it the set prints**
+  (`landsOn`): one `RATES` table serves every era - the top roll is a Mega
+  Hyper Rare or a Hyper rare (`isTop`, what the top pity resets on), and
+  Prismatic's illustration roll an ACE SPEC (`ace` sits under
+  `illustration`). The Packs tab names each rate through it.
   **Phase 4**: every printing of a set is its MASTER step (`MILESTONES.length
   + 1`, `MASTER_DUST`); titles are `titleIds` (titles.js) and the SQL's
   `card_titles` the same rule (tradedb holds them equal); the trainer card's
@@ -691,11 +698,16 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   printings only, `CARD_SHOW` = `trade_limit`), written by the trigger alone.
 - **A finished generation is a medal** (`gen:<g>` in medals.js, your call
   2026-10-03): its non-form species CAUGHT by you (`ownDex`, never trades),
-  paying money, a Master Ball, a title and a box of choice (`boxVouchers`,
-  `claimBox` spends one). It also gives the Pokedex Charm (`dexCharm`,
-  `DEX_CHARM` 1.5x on that generation's tier roll, a Mega through `genOf`,
-  never above `RESEARCH_LIFT`). A save that finished one before the medal
-  existed is paid once at boot. Not the Pokedex RANK, which counts trades.
+  and a family of LOOKS is held by any one drawing (`owns`: catching Unown
+  registers a letter, and Johto waited on Unown A). It is CLAIMED, never
+  paid on the catch: what is due is derived (`dexClaims`, the map's REWARD
+  pill), and `claimDex` banks the medal, money and Master Ball and a RANDOM
+  set's box in one save before `DexClaim`'s reel plays (an old
+  `boxVouchers` entry is claimed the same way, rolled). The medal gives the
+  title and the Pokedex Charm (`dexCharm`, `DEX_CHARM` 2x on that
+  generation's tier roll, a Mega through `genOf`; between `RESEARCH_LIFT`
+  and `OUTBREAK_LIFT`, your call 2026-10-03). Not the Pokedex RANK, which
+  counts trades.
 - **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`
   rules): its rim drains with steps left over the item's own `steps`.
 - **Hard mode is designed in docs/battles.md, phase 8.** A cleared region's
@@ -747,11 +759,14 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   healers the reference player spends at every capped opponent, replayed on
   `KIT_RECORD`); the solved levels are measured without items. The CPU uses
   none.
-- **A legendary is what its data says**: `legendary(id)` in league.js
-  (`isLegendary` OR the species' `legendary` field). `isLegendary()` is the
-  spawn tables' answer and is false for the 17 forms of legendaries, which
-  walked into the League's Lv 100 caps at full level. Never gate a battle
-  rule on `isLegendary` alone.
+- **There is no level cap** (your call, 2026-10-03): `refusal` refuses only
+  a trade lock, so any level and any legendary enter any battle; `capOf`
+  only scales a rematch's opponent. **Your team is the save's `team`**
+  (`engine.setTeam`, the League's Team tab, ordered by drag - `TeamOrder`,
+  window pointer events, arrow keys); every team pick starts from it and a
+  battle taken replaces it. If a battle rule ever gates legendaries, use the
+  species' `legendary` field too - `isLegendary()` is false for the 17
+  legendary forms.
 - **Ranked is designed in docs/ranked.md** - change a decision there first.
   **Its format is species, nothing else**: `rankedFighter` (battle.js) takes
   the level, IVs and moves from `ranked.js`, because a save can choose its
@@ -836,9 +851,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   ±15 points of target unless a replayed neighbour proves a cliff, and keeps
   gym trainers over 85% (lowered by the solver, never above their leader's
   proportion). The League opens when a counter can be caught (5% of an open
-  map); opened at the first encounter it solved Brock to Lv 2. A legendary
-  enters at `cap × 360 / BST` (`legendLevel`): wild legendary forms exist, and
-  a flat 80% let one take 7 of Kanto's 8 leaders alone.
+  map); opened at the first encounter it solved Brock to Lv 2.
 - **Trading is designed in docs/trading.md** - change a decision there first.
   A Pokémon that enters trading gets a server row (`mons`) and moves only
   through `db/trading.sql`'s functions, one locked transaction each. The save

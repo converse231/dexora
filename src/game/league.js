@@ -11,42 +11,17 @@
    `beaten` is the save's `{ [opponent id]: { wins, at } }`, `at` the step
    count at the last win (the rematch clock). */
 import { GYMTUNE, TRAINERTUNE, REMATCH_STEPS, HARDTUNE, HARD_PRIZE, HARD_FEE } from "../data/gymtune.js";
-import { speciesById, isLegendary, TIERS, tiersFor } from "./biomes.js";
+import { TIERS, tiersFor } from "./biomes.js";
 
 // ------------------------------------------------------------------ refusal
 
 export const TEAM_MAX = 6;
 
-/* A LEGENDARY ENTERS AT A LEVEL SCALED BY ITS STRENGTH: at or under
-   cap x LEGEND_BST / its base stat total. It has no evolution floor, so
-   refusal alone does not hold it. A flat 80% of the cap was the first rule,
-   and measured on the League's own ladder it let a wild Complete Zygarde (708)
-   win 7 of Kanto's 8 leaders alone and Mewtwo 5. Against the solved leaders,
-   420 over BST still let Zygarde and Crowned Zacian take 4; at 360 none takes
-   more than 3 (check.mjs's bound), while a Moltres (580) may still bring 62%
-   of the cap and a weak legendary the whole of it (docs/battles.md). */
-export const LEGEND_BST = 360;
-export const legendLevel = (speciesId, cap) => {
-  const bst = speciesById(speciesId).stats.reduce((a, b) => a + b, 0);
-  return Math.floor(cap * Math.min(1, LEGEND_BST / bst));
-};
-
-/* A LEGENDARY IS WHAT ITS DATA SAYS, FORMS INCLUDED. `isLegendary()` is the
-   spawn tables' answer and is false for the 17 forms of legendaries (Mega
-   Mewtwo X and Y, the Primals, Mega Rayquaza, Eternamax...), all Lv 100
-   evolutions - so at a cap of 100 a Lv 100 Eternamax (BST 1,125) walked in
-   at the full cap, where this rule holds it to Lv 32. */
-export const legendary = (id) => isLegendary(id) || speciesById(id)?.legendary === true;
-
-/* WHO MAY ENTER. Over the cap is REFUSED, never scaled down: scaled, a Lv 100
-   Metagross is still a Metagross and won 5 of 11 gyms alone; refused, it only
-   exists from Lv 45. `null` is yes; otherwise the reason, for the picker. */
-export function refusal(mon, cap) {
-  if (mon.lock) return "locked";
-  if (legendary(mon.species) && mon.level > legendLevel(mon.species, cap)) return "legend";
-  if (mon.level > cap) return "level";
-  return null;
-}
+/* WHO MAY ENTER: anyone not locked in a trade. There is NO level cap and no
+   legendaries' limit by strength any more (your call, 2026-10-03): bring any
+   team to any battle. `capOf` survives only as the rematch's scale on the
+   opponent's level. `null` is yes; otherwise the reason, for the picker. */
+export const refusal = (mon) => (mon.lock ? "locked" : null);
 
 // ------------------------------------------------------------------ the order
 

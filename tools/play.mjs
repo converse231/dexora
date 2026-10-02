@@ -485,9 +485,18 @@ function until(e, what, label, max = 2000) {
     "the clock landed outside every phase");
   assert.equal(e.useField("honey"), true, "a honey refused to start");
   assert.equal(e.state.field.variant.id, "honey", "the honey did not land in its family slot");
+  const honeyLeft = e.state.field.variant.steps;
   assert.equal(e.useField("honey-shiny"), true, "a shiny honey refused to start");
   assert.equal(e.state.field.variant.id, "honey-shiny",
-    "a second honey did not REPLACE the first - two variant tilts can run at once");
+    "a second honey did not take the slot - two variant tilts can run at once");
+  /* AND IT STACKS (asked for, 2026-10-03): the first honey's steps carry over
+     onto the second, and the ring drains against the whole stack. */
+  const { fieldById } = await import("../src/game/items.js");
+  const stacked = honeyLeft + fieldById("honey-shiny").steps;
+  assert.equal(e.state.field.variant.steps, stacked, "a second honey did not add its steps to the first's");
+  assert.equal(e.state.field.variant.total, stacked, "the stack's length is not what its ring reads");
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(boot(JSON.parse(store.get("meadow-route"))).e.state.field.variant.total, stacked, "a stack's length did not survive a reload");
   /* A REPEL IS EXCLUSIVE, because it is total: it stops every encounter, so a
      honey burning its 600 steps underneath one is buying odds on encounters
      that cannot happen. Starting the honey therefore cancelled the repel. */
@@ -1912,6 +1921,7 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
   const rich = boot({ ...SAVE, dust: 1e7 }).e;
   for (const r of C.PACK_ONLY) {
     const chase = set.CARDS.find((c) => c[3] === r);
+    if (!chase) continue;                       // a rung this set does not print (a Hyper rare in Mega Evolution)
     assert.equal(rich.craftCard(set, chase[0], "h"), false, `a ${r} was crafted`);
   }
   assert.equal(rich.state.dust, 1e7, "a refused craft spent dust");
@@ -1997,29 +2007,53 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
     const T = await import("../src/game/titles.js");
     const M = await import("../src/game/medals.js");
     const { dexIndex: di, speciesById: byId } = await import("../src/game/biomes.js");
+    const { SPECIES } = await import("../src/data/dex.js");
+    const { CARD_SETS } = await import("../src/data/cards/index.js");
     const kanto = M.MEDALS.find((m) => m.id === "gen:1");
     const dex = Array(SAVE.dex.length).fill(0);
     for (const id of kanto.need) dex[di(id)] = 2;
     const old = { ...SAVE, dex, medals: [], caught: 151, bag: { ...SAVE.bag, "master-ball": 0 } };
+    /* CLAIMED, NEVER PAID ON ITS OWN (asked for, 2026-10-03): a finished
+       Kanto is a claim at load, and nothing moves until it is pressed. */
     const g = boot(old).e;
-    assert.ok(g.state.medals.includes("gen:1"), "a Pokédex finished before the medal was not paid at load");
-    assert.deepEqual(g.state.boxVouchers, ["dex:1"], "the Kanto medal paid no box of choice");
+    assert.deepEqual(g.dexClaims(), [1], "a finished Kanto is not a claim");
+    assert.ok(!g.state.medals.includes("gen:1") && g.state.money === old.money, "a finished Pokédex paid without a claim");
+    const won = g.claimDex(() => 0.999);
+    const last = CARD_SETS.at(-1).id;
+    assert.deepEqual([won.gen, won.set, won.packs], [1, last, C.BOXES[last].packs], "the claim did not roll the set it said");
+    assert.ok(g.state.medals.includes("gen:1"), "the claim banked no medal");
     assert.equal(g.state.bag["master-ball"], 1, "the Kanto medal paid no Master Ball");
     assert.equal(g.state.money, old.money + kanto.money, "the Kanto medal did not pay its money");
+    assert.deepEqual(g.state.earnedPacks[last], Array(C.BOXES[last].packs).fill("dex:1"), "the box's packs are not earned and stamped");
+    assert.equal(g.claimDex(), null, "a claimed Pokédex claimed twice");
+    assert.deepEqual(g.dexClaims(), [], "a claimed Pokédex is still a claim");
     assert.ok(!g.state.medals.includes("gen:2"), "an unfinished generation paid");
     await new Promise((r) => setTimeout(r, 600));
     const again = boot(JSON.parse(store.get("meadow-route"))).e;
-    assert.equal(again.state.boxVouchers.length, 1, "the Kanto medal paid twice across a reload");
+    assert.deepEqual(again.dexClaims(), [], "the Kanto claim came back after a reload");
+    // A box of choice from before is a claim too, rolled; the medal is not paid again.
+    const vou = boot({ ...old, medals: ["gen:1"], boxVouchers: ["dex:1"] }).e;
+    assert.deepEqual(vou.dexClaims(), [1]);
+    const v = vou.claimDex(() => 0);
+    assert.deepEqual([v.set, v.medal, vou.state.money], [CARD_SETS[0].id, false, old.money], "an old voucher paid its medal again");
+    assert.deepEqual(vou.state.boxVouchers, [], "an old voucher was not spent");
+
+    /* A LOOK FINISHES ITS FAMILY: Johto with Unown B and never Unown A is
+       finished (reported: a whole Johto paid nothing). */
+    const johto = M.MEDALS.find((m) => m.id === "gen:2");
+    const jd = Array(SAVE.dex.length).fill(0);
+    for (const id of johto.need) jd[di(id)] = 2;
+    jd[di(201)] = 0;
+    const unownB = SPECIES.find((sp) => sp.form === "look" && sp.of === 201).id;
+    jd[di(unownB)] = 2;
+    assert.deepEqual(M.genMedalsDue(jd).map((m) => m.id), ["gen:2"], "Johto with a lettered Unown is not finished");
+    assert.ok(M.medalsFor(unownB, jd).some((m) => m.id === "gen:2"), "catching a lettered Unown did not finish Johto");
+    jd[di(unownB)] = 0;
+    assert.deepEqual(M.genMedalsDue(jd), [], "Johto without any Unown is finished");
     // The Pokédex Charm: Kanto's species only, a Mega through to its base.
     assert.equal(M.dexCharm(25, g.state.medals), M.DEX_CHARM);
     assert.equal(M.dexCharm(10033, g.state.medals), M.DEX_CHARM, "Mega Venusaur did not read through to Kanto");
     assert.equal(M.dexCharm(152, g.state.medals), 1, "Johto took Kanto's charm");
-    // The box of choice: any set, its box, earned and stamped; once.
-    assert.equal(g.claimBox("nope"), false);
-    assert.equal(g.claimBox("me02"), true);
-    assert.equal(g.state.packs.me02, C.BOXES.me02.packs);
-    assert.deepEqual(g.state.earnedPacks.me02, Array(C.BOXES.me02.packs).fill("dex:1"));
-    assert.equal(g.claimBox("me01"), false, "a used voucher claimed a second box");
     assert.deepEqual(T.titleIds({}, g.state.medals), ["dex:1"]);
     assert.equal(T.titleName("dex:1"), "Kanto Dex Master");
 
@@ -3439,11 +3473,10 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   const kanto = LEAGUES[0], johto = LEAGUES[1];
   const [brock, misty] = kanto.gyms;
   const cap = GYMTUNE[brock.id].cap;
-  const legend = L.legendLevel(150, cap);
   const box = [
     { uid: 1, species: 4, level: 5 }, { uid: 2, species: 7, level: 5 }, { uid: 3, species: 1, level: 5 },
-    { uid: 4, species: 1, level: cap + 1 },                  // over Brock's cap
-    { uid: 5, species: 150, level: legend + 1 },             // a legendary over its share of it
+    { uid: 4, species: 1, level: 100 },                      // far over what Brock was solved for
+    { uid: 5, species: 150, level: 100 },                    // a legendary at full strength
     { uid: 6, species: 16, level: 5 },                       // locked in a trade, below
   ];
   const at = (beaten = {}) => {
@@ -3486,8 +3519,6 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   // Who may come: the engine's refusal, reason by reason, and nothing starts.
   {
     const e = at(allOf(brock.trainers.map((t) => t.id)));
-    assert.equal(begin(e, brock.id, [4]), "level", "a Pokemon over the cap was let into the battle");
-    assert.equal(begin(e, brock.id, [5]), "legend", "a legendary over its share of the cap was let in");
     assert.equal(begin(e, brock.id, [6]), "locked", "a Pokemon locked in a trade was let into the battle");
     assert.equal(begin(e, brock.id, [99]), "team", "a Pokemon not in the Box was let in");
     assert.equal(begin(e, brock.id, [1, 1]), "team", "one Pokemon was let in twice");
@@ -3496,6 +3527,27 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     b.sides[0].team[0] = fighter(4, 60, 1);
     assert.equal(e.battleBegin(b, { id: brock.id, uids: [1] }), "team", "a Lv 60 fighter passed as a Lv 5 Charmander");
     assert.equal(e.state.battle, null, "a refused battle was started anyway");
+  }
+
+  // NO LEVEL CAP (your call, 2026-10-03): a Lv 100 and a Lv 100 Mewtwo walk into Brock, in the order given.
+  {
+    const e = at(allOf(brock.trainers.map((t) => t.id)));
+    assert.equal(begin(e, brock.id, [5, 4]), null, "a Lv 100 team was refused by Brock");
+    assert.deepEqual(e.state.team, [5, 4], "the team taken was not kept in its order");
+  }
+
+  // YOUR TEAM (engine.setTeam): box uids only, each once, six at most, in order, and saved.
+  {
+    const e = at();
+    e.setTeam([3, 1, 99, 3, 2]);
+    assert.deepEqual(e.state.team, [3, 1, 2], "setTeam kept a uid not in the Box, or a repeat, or lost the order");
+    e.setTeam([1, 2, 3, 4, 5, 6, 1]);
+    assert.equal(e.state.team.length, L.TEAM_MAX);
+    e.setTeam("junk");
+    assert.equal(e.state.team.length, L.TEAM_MAX, "setTeam took garbage");
+    e.setTeam([2, 1]);
+    await new Promise((r) => setTimeout(r, 600));
+    assert.deepEqual(boot(JSON.parse(store.get("meadow-route"))).e.state.team, [2, 1], "your team did not survive a reload");
   }
 
   // SIX MAY COME TO ANY BATTLE (your call, 2026-10-02): Brock fields two, and a

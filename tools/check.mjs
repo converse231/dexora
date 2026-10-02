@@ -2525,12 +2525,14 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     }
   }
   /* A GENERATION'S MEDAL is every national number of it and nothing else (no
-     form), so a region's Pokédex is what the games call one; its charm stays
-     at most a research star's lift (the charm rule). */
+     form), so a region's Pokédex is what the games call one; its charm is
+     at least a research star's lift (a whole generation outranks one
+     species, your call 2026-10-03) and no more than an outbreak's. */
   {
     const { DEX_CHARM } = await import("../src/game/medals.js");
     const { RESEARCH_LIFT: RL } = await import("../src/game/research.js");
-    assert.ok(DEX_CHARM <= RL, `the Pokédex Charm ${DEX_CHARM}x is past a research star's ${RL}x`);
+    const { OUTBREAK_LIFT: OL } = await import("../src/game/events.js");
+    assert.ok(DEX_CHARM >= RL && DEX_CHARM <= OL, `the Pokédex Charm ${DEX_CHARM}x is outside a research star's ${RL}x to an outbreak's ${OL}x`);
     for (const m of MEDALS.filter((x) => x.kind === "gen")) {
       assert.ok(m.need.every((id) => !isForm(id) && genOf(id) === m.gen), `${m.id} holds a form or another generation`);
       assert.equal(m.need.length, SPECIES.filter((sp) => !isForm(sp.id) && genOf(sp.id) === m.gen).length, `${m.id} is missing species`);
@@ -4913,8 +4915,8 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       // Using one spends a BAG item; it must not charge money a second time.
       assert.ok(/state\.bag\[item\.id\] -= 1;/.test(eng) && !/function useField[\s\S]{0,400}state\.money/.test(eng),
         "useField must spend from the bag - these are bought in the shop now");
-      assert.ok(/state\.field\[item\.family\] = \{ id: item\.id, steps: item\.steps \};/.test(eng),
-        "a field item must be written to its FAMILY slot, or two honeys can run at once");
+      assert.ok(/state\.field\[item\.family\] = \{ id: item\.id, steps: carry \+ item\.steps, total: carry \+ item\.steps \};/.test(eng),
+        "a field item must be written to its FAMILY slot (stacking its steps), or two honeys can run at once");
     }
 
     /* THE SHELF. All of them bought, all of them gated, all of them drawn. */
@@ -6806,7 +6808,7 @@ import { SHEETS as A_SHEETS, SPRITES as A_SPRITES, BGS as A_BGS, ANIMS as A_ANIM
    - one reference player, so the two cannot measure different things. */
 import {
   step as bStep, newBattle as bNew, simulate as bSim, fighter as bFighter, refusal as bRefusal,
-  TURN_LIMIT, legendLevel as bLegendLevel, LEGEND_BST, TEAM_MAX as B_TEAM, canUse as bCanUse,
+  TURN_LIMIT, TEAM_MAX as B_TEAM, canUse as bCanUse,
 } from "../src/game/battle.js";
 import { HEALS } from "../src/game/items.js";
 import { SHARE as T_SHARE, GYM_PRIZE, REMATCH_STEPS, GYMTUNE, TRAINERTUNE } from "../src/data/gymtune.js";
@@ -6817,7 +6819,6 @@ import {
   KIT_RECORD,
 } from "./league-sim.mjs";
 import { isLegendary as lLegend, MAX_LEVEL as L_MAX } from "../src/game/biomes.js";
-import { evolutionsOf as lEvos, evoLevel as lEvoLevel } from "../src/game/items.js";
 let healNote = "";
 {
   const t0 = Date.now();
@@ -6856,17 +6857,11 @@ let healNote = "";
     assert.equal(sent.turn, t, "sending a replacement took a turn");
   }
 
-  /* REFUSED, NOT SCALED DOWN (docs/battles.md, *Level cap*): over the cap,
-     a legendary over its share of it (LEGEND_BST over its base stat total),
-     and anything locked in a trade. A weak legendary may bring the whole cap. */
-  assert.equal(bRefusal({ species: 6, level: 30 }, 30), null);
-  assert.equal(bRefusal({ species: 6, level: 31 }, 30), "level");
-  assert.equal(bRefusal({ species: 150, level: bLegendLevel(150, 30) }, 30), null);
-  assert.equal(bRefusal({ species: 150, level: bLegendLevel(150, 30) + 1 }, 30), "legend");
-  assert.ok(bLegendLevel(150, 30) < 30, "Mewtwo may bring the whole cap");
-  assert.equal(bLegendLevel(SPECIES.find((sp) => sp.name === "cosmog").id, 30), 30,
-    "a legendary weaker than LEGEND_BST is held under the cap anyway");
-  assert.equal(bRefusal({ species: 6, level: 5, lock: "offer" }, 30), "locked");
+  /* NO LEVEL CAP (your call, 2026-10-03): any level and any legendary may
+     enter; only a Pokemon locked in a trade is refused. */
+  assert.equal(bRefusal({ species: 6, level: 100 }), null, "a Lv 100 was refused");
+  assert.equal(bRefusal({ species: 890, level: 100 }), null, "a Lv 100 legendary was refused");
+  assert.equal(bRefusal({ species: 6, level: 5, lock: "offer" }), "locked");
 
   /* THE BATTLE SHELF HEALS A SHARE, AT EVERY LEVEL (phase 5). A flat amount
      was measured to LOWER a late gym's win rate (a sliver of a Lv 60's HP for
@@ -6989,31 +6984,6 @@ let healNote = "";
   assert.ok(ai21 >= 0.65, `AI 2 beats AI 1 only ${Math.round(ai21 * 100)}%`);
   assert.ok(ai32 >= 0.55, `AI 3 beats AI 2 only ${Math.round(ai32 * 100)}% - by the design's rule it goes`);
 
-  /* NO ONE POKEMON WINS A REGION ALONE. The strongest there are - the six
-     legendaries and six others with the highest base stats - each brought
-     alone at the most it may be (the cap, a legendary's `legendLevel` of it,
-     never below the level its species can exist at), against every leader. */
-  const LEGEND_WINS = 3;
-  const bstOf = (sp) => sp.stats.reduce((a, b) => a + b, 0);
-  const floorOf = new Map();
-  for (const sp of SPECIES) for (const e of lEvos(sp.id)) if (!floorOf.has(e.to)) floorOf.set(e.to, lEvoLevel(e));
-  const strongest = [
-    ...SPECIES.filter((sp) => lLegend(sp.id)).sort((a, b) => bstOf(b) - bstOf(a)).slice(0, 6),
-    ...SPECIES.filter((sp) => !lLegend(sp.id)).sort((a, b) => bstOf(b) - bstOf(a)).slice(0, 6),
-  ];
-  const solos = [];
-  for (const sp of strongest) {
-    const wins = new Map();
-    for (const r of rungs.filter((x) => x.role === "leader")) {
-      const lv = lLegend(sp.id) ? bLegendLevel(sp.id, r.cap) : r.cap;
-      if (lv < (floorOf.get(sp.id) ?? 1)) continue;
-      const w = lWin(r, GYMTUNE[r.o.id].top, { n: 12, seed: 31, share, team: (rng) => [bFighter(sp.id, lv, Math.floor(rng() * 1e9))] }).win;
-      if (w >= 0.5) wins.set(r.region.name, (wins.get(r.region.name) ?? 0) + 1);
-    }
-    for (const [region, n] of wins) if (n > LEGEND_WINS) solos.push(`${sp.name} wins ${n} of ${region}'s leaders alone`);
-  }
-  assert.equal(solos.length, 0, solos.join(", "));
-
   /* EVERY OPPONENT WINS NEAR ITS TARGET, AND STILL WINS WHAT IT WAS SOLVED
      TO. Two questions, held apart:
 
@@ -7084,7 +7054,7 @@ let healNote = "";
     `or on a proved cliff (${cliffs.join(", ") || "none"}), ${Object.keys(TRAINERTUNE).length} gym trainers all over ` +
     `${L_TRAINER_FLOOR * 100}% (${lowTrainers.length} lowered to get there), ` +
     `AI 2 beats 1 ${Math.round(ai21 * 100)}% and 3 beats 2 ${Math.round(ai32 * 100)}%, ` +
-    `no single Pokémon takes more than ${LEGEND_WINS} leaders of a region, longest battle ${maxTurns} turns, ` +
+    `longest battle ${maxTurns} turns, ` +
     `first wins ¥${p.oneOff} and a ${REMATCH_STEPS}-step rematch clock, ${healNote} (${Math.round((Date.now() - t0) / 1000)}s)`);
 }
 
@@ -7268,7 +7238,7 @@ import {
   PLACEMENT as R_PLACEMENT, DAILY_BATTLES as R_DAILY,
 } from "../src/game/ranked.js";
 import { ABANDON_MINUTES as R_ABANDON } from "../src/game/referee.js";
-import { rankedFighter as rFighter, refusal as rRefusal, legendLevel as rLegendLevel } from "../src/game/battle.js";
+import { rankedFighter as rFighter } from "../src/game/battle.js";
 import { playerFighter as pFighter, fighter as pPlain, movesOf as pMovesOf, step as pStep, mulberry32 as pRng } from "../src/game/battle.js";
 import { PERKS as P_PERKS, ALPHA_PERK as P_ALPHA } from "../src/game/perks.js";
 import { TIERS as P_TIERS } from "../src/game/biomes.js";
@@ -7365,9 +7335,13 @@ import { statSync } from "node:fs";
       return { hits, god, dry };
     };
     const flat = count(false);
+    /* Each roll is counted as the rarity it gives in this set (`landsOn`):
+       a Hyper rare is the top roll where no Mega Hyper Rare is printed. */
     for (const [r, rate] of Object.entries(CD.RATES)) {
-      const got = (flat.hits[r] ?? 0) / N;
-      assert.ok(Math.abs(got - rate) <= 0.15 * rate, `${meta.id}: ${r} came 1 in ${(1 / got).toFixed(1)}, not 1 in ${(1 / rate).toFixed(1)}`);
+      const as = CD.landsOn(CARDS, r);
+      assert.ok(CD.rungOf(as) >= CD.rungOf("double"), `${meta.id}: the ${r} roll lands on ${as}, not a hit`);
+      const got = (flat.hits[as] ?? 0) / N;
+      assert.ok(Math.abs(got - rate) <= 0.15 * rate, `${meta.id}: ${r} (${as}) came 1 in ${(1 / got).toFixed(1)}, not 1 in ${(1 / rate).toFixed(1)}`);
     }
     assert.ok(Math.abs(flat.god / N - CD.GOD_PACK) <= 0.3 * CD.GOD_PACK, `${meta.id}: God Packs came ${flat.god} in ${N}`);
     const run = count(true);
@@ -7395,7 +7369,8 @@ import { statSync } from "node:fs";
   const boxes = Object.values(CD.BOXES).filter((b) => b.packs >= 36), bundles = Object.values(CD.BOXES).filter((b) => b.packs < 36);
   for (const u of bundles) for (const x of boxes) assert.ok(perPack(u) >= perPack(x), "a bundle is cheaper a pack than a box");
   // The chase is packs only.
-  assert.ok(!CD.canCraft("special") && !CD.canCraft("mega") && CD.canCraft("illustration"), "the chase can be crafted");
+  assert.ok(CD.CARD_RARITIES.filter(CD.isTop).every((r) => !CD.canCraft(r)) && !CD.canCraft("special")
+    && CD.canCraft("illustration"), "the chase can be crafted");
   // Spares never take the last copy, nor a copy an earned stamp stands on.
   assert.equal(CD.sparesOf({ n: 1 }, "n"), 0, "the last copy counted as a spare");
   assert.equal(CD.sparesOf({ n: 3 }, "n"), 2);
@@ -7404,7 +7379,6 @@ import { statSync } from "node:fs";
   console.log(`cards ok — ${n} cards in ${CD_SETS.length} set(s), every Mega card on its Mega form, ` +
     "the rates within 15% of ours, no streak past its guarantee, and nothing in the game reads a card");
 }
-import { legendary as rLegendary } from "../src/game/league.js";
 import { TEAM_MAX as R_TEAM } from "../src/game/league.js";
 import { LEAGUES as R_LEAGUES } from "../src/data/leagues.js";
 {
@@ -7434,19 +7408,6 @@ import { LEAGUES as R_LEAGUES } from "../src/data/leagues.js";
   for (const sp of SPECIES.filter((x) => x.id >= 10000)) {
     assert.ok(speciesById(rBase(sp.id)), `${sp.name} has no species to count as`);
     assert.ok(rBase(sp.id) < 10000, `${sp.name} counts as another form, not a species`);
-  }
-
-  /* A LEGENDARY IS WHAT ITS DATA SAYS, forms included. `isLegendary()` is
-     false for the forms of legendaries (Mega Mewtwo, the Primals, Eternamax),
-     and the League's refusal read it - a Lv 100 Eternamax (BST 1,125) walked
-     into a cap of 100. Every legendary form now meets the rule at every cap. */
-  const legendForms = SPECIES.filter((sp) => sp.legendary && !lLegend(sp.id));
-  assert.ok(legendForms.length >= 17, "the legendary forms this guards are gone - re-read the rule");
-  for (const sp of legendForms) {
-    assert.ok(rLegendary(sp.id), `${sp.name} is not a legendary to the League`);
-    const top = rLegendLevel(sp.id, 100);
-    if (top < 100) assert.equal(rRefusal({ species: sp.id, level: top + 1 }, 100), "legend",
-      `a Lv ${top + 1} ${sp.name} was let in at a cap of 100`);
   }
 
   /* THE SERVER'S COPIES, held equal to the game's. `badge_list()` is the
@@ -7485,8 +7446,8 @@ import { LEAGUES as R_LEAGUES } from "../src/data/leagues.js";
   }
 
   console.log(`ranked ok — a ranked fighter is its species alone (Lv ${RANKED_LEVEL}, IV ${RANKED_IV}), the species clause ` +
-    `counts ${SPECIES.filter((x) => x.id >= 10000).length} forms as their species, ${legendForms.length} legendary forms meet ` +
-    "the League's legendary rule, and the server's badges, slots and team size are the game's");
+    `counts ${SPECIES.filter((x) => x.id >= 10000).length} forms as their species, ` +
+    "and the server's badges, slots and team size are the game's");
 }
 
 /* ============================================================== RANKED, PHASE 6b

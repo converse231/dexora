@@ -87,8 +87,7 @@ Champion of the region beaten. *(rev 4)*
 | AI 3's kill criterion | **Shipped only if it beats AI 2 at least 55% on identical teams; otherwise deleted, and its users take AI 2.** Held by check.mjs every run. | Difficulty comes from solved levels, not the AI, so a third level must earn its code. |
 | Difficulty | **Solved, not typed.** A party keeps its game's level spread, and its ace level is **solved per leader** - and past Lv 100, its training (`top` = 100 + effort, `MAX_EFFORT` 63) *(phase 2)* so a reference player wins a target share: **85% at a region's first leader falling to 60% at its eighth; 50% an Elite Four member; 40% the Champion.** A gym's trainers keep their game's levels in the same ratio to their leader. `tools/tune-gyms.mjs` (`npm run gyms`) writes a generated file. *(phase 2)* Each solved rate is measured on a fixed record (200 battles, one seed) that check.mjs **replays exactly**, so any change to the rules or rosters says to re-solve, and holds within **±15 points** of target. | Measured: a flat edge gave 0% at a cap-13 gym and 98% at a cap-53 one; a proportional one still spread gyms 1-99%, because difficulty is the party and what counters it (Glacia crosses Walrein's evolution level between +0% and +10%: 98% to 16%). Solved, all eleven prototype gyms landed within 14 points of target (table below). |
 | Reference player | **AI 2, type-aware**, picking from up to 250 catches off the maps open at the leader's intended level, raised lowest-first with the candy of that level. | Measured: ignoring the gym's type made Wattson 1% and Flannery 98%. |
-| Level cap | **Every leader has a cap; a Pokémon over it is REFUSED, not scaled down.** Caps come from the ladder (next row) and never go down it. Gym trainers have no cap. | Measured: scaled down, a Lv 100 Metagross is still a Metagross and **won 5 of 11 gyms alone; Groudon 8**. Refused, Metagross exists only from Lv 45. |
-| Legendaries *(phase 2)* | **A legendary enters at or under `cap × min(1, 360 / its base stat total)`** (`legendLevel`, `LEGEND_BST` 360): Mewtwo (680) may bring 52% of the cap, Moltres (580) 62%, a legendary weaker than 360 the whole of it. | No evolution floor, so refusal alone does not hold a legendary. The first rule, a flat 80%, measured on the League's own ladder let a wild Complete Zygarde (708) win 7 of Kanto's 8 leaders alone and Mewtwo 5 - several legendary forms are wild, so a lucky early player can own one. Against the solved leaders 420 over BST still let Zygarde and Crowned Zacian take 4; at 360 none takes more than 3 of a region's leaders (the check's bound), and a weak legendary is not punished for a strong one's sake. |
+| Level cap | **None** *(your call, 2026-10-03)*: any level and any legendary may enter any battle; only a Pokémon locked in a trade is refused. `capOf` survives as the rematch's scale on the opponent's level. | It was: a Pokémon over a leader's cap REFUSED (scaled down, a Lv 100 Metagross won 5 of 11 gyms alone), and a legendary held to `cap × 360 / BST`. Asked to remove: the solved levels now set the fight only for a team at the old cap, and a strong team walks through. |
 | The ladder *(phase 2)* | **The League is spread over one playthrough and candy sets every cap.** **The League opens when a counter can be caught**: the first trainer level at which, for every one of Kanto's leaders' types, some open map is at least 5% things super effective against it (`QUEST_SHARE`, the daily quest's measure of a task) - trainer Lv 9, when Mt. Moon's Ground-types arrive. From there the 115 capped opponents, in order, are intended at even steps to the end of a playthrough's 3,500 encounters, so each region is about a ninth of the game. Opened at the first encounter instead, Brock faced two Lv 7 catches with nothing that hits Rock and solved to a Lv 2 ace; a floor at his cap then made him unwinnable (24% for 85%). Opened at Lv 9 he solves to Lv 7, near his challenger's own level. An opponent's cap is what a full team can be raised to by then with `share` of the candy earned, over the best wild level on offer, and **`share` is solved so the last Champion asks for a Lv 100 team exactly as the playthrough ends** (7.7%). The first cap falls out of the same sum: Kanto runs 11 to 25, Johto 26 to 34, Hoenn 36 to 43, Sinnoh 46 to 53, Unova to 63, Kalos to 70, Alola to 79, Galar to 89, Paldea 89 to 100. | The first draft's fixed step (+5 a leader) put every region after Johto on the Lv 100 ceiling - thirteen capped opponents a region - where a level stops being a difficulty. `GYM_CAP_FIRST`, `GYM_CAP_STEP` and `CANDY_SHARE` are gone: nothing on the ladder is typed. |
 | A trainer's Pokémon *(phase 2)* | **The stage of its line that its solved level reaches**, both ways: below its evolution level it is the stage before, and past the price of any evolution a player could buy (a level, a stone, a trade, a bond) it is the stage after. | Derived from `evoLevel`: a solved level below a Pokémon's evolution level must not field a species a player cannot own at that level. Level rows alone left Brassius's Petilil (a Sun Stone) a Petilil at Lv 100. |
 | Badges and HMs | **A badge gates nothing in the world.** Surf and the bike stay tied to level and key items. No HMs are added. | A badge must never take away what a save already has. |
@@ -157,7 +156,6 @@ Maniac classes.
 | Constant | Value | |
 |---|---|---|
 | `TEAM_MAX` | 6 | every battle, whatever the opponent fields |
-| `LEGEND_BST` | 360 | a legendary enters at or under cap × 360 / its base stat total |
 | `SHARE` | solved (0.077) | the candy share every cap is built on; `gymtune.js` carries it |
 | `target()` | 0.85 → 0.60 | a region's first to last leader; a League member 0.50, its Champion 0.40 |
 | `GYM_BAND` | 0.15 | check.mjs's tolerance around each target |
@@ -304,11 +302,11 @@ is the one thing that derives a back path.
 
 *(phase 4)* **The engine is the judge of a League battle.** `battleBegin(battle,
 { id, uids })` refuses one that is not open (`isOpen`: the order above) or a
-team with a Pokémon it would refuse (`refusal` at `capOf(id)`), and
+team with a Pokémon it would refuse (`refusal`: only one locked in a trade, since 2026-10-03), and
 `battleEnd()` records the win in `beaten` and pays `payFor(id)` - a first
 win's prize, or a rematch's share of it on its clock. All of it is
 `src/game/league.js`, a module with no roster or move data in it, so the
-engine can import it; `battle.js` re-exports `refusal` and `legendLevel` from
+engine can import it; `battle.js` re-exports `refusal` from
 it, one definition. A gym trainer is fought once for money; a rematch of one
 pays nothing. A rematch win raises that opponent's cap by `REMATCH_CAP_STEP`
 (to 100) and its level in the same ratio, so the fight grows with you.
@@ -499,6 +497,19 @@ and Cynthia's Roserade had nothing that hits.
 | **5. Items** | Potion, Full Heal, Revive, the Battle shelf, the bag in battle | the rematch-net-positive guard; healing is a fraction at every level. |
 | **7. Move animations** | `tools/build_anims.py` → `src/data/anims.js` + `public/battle/anim/`, the timeline player (`src/ui/league/moveAnim.js`), the impact-timed health bar, the Animations switch | check.mjs: every move the rules can choose has a timeline; every sheet and background exists at the size the data says (PNG header), and nothing else is in the folder; every sprite's frames are on its sheet; every event and impact inside its timeline; fewer than 3% of moves fall back; `anims.js` loaded by `moveAnim.js` alone, with `import()`. A headless pass over a spread of moves (projectile, beam, contact, rain, self-buff, background) at phone and desktop. |
 | **6. Backend** | `badges` on the trainer card, friend ghost battles. *(2026-09-28)* **Superseded by [docs/ranked.md](ranked.md)**: ranked battles played live against a CPU ghost of another trainer's defense team, refereed by the server, and a global list; ghost battles become friend practice | `npm run tradedb`: the card's `badges` equals the badges in the stored save and a client cannot write it; a ghost battle saves nothing (tools/play). |
+
+## Your team, and no cap *(2026-10-03, your calls)*
+
+- **No level cap and no legendaries' limit**: bring anything to any battle
+  (`refusal` refuses only a trade lock). The "no one Pokémon wins a region
+  alone" guard went with it - it guarded the cap.
+- **Your team is your own**: the League's **Team** tab picks up to six by hand
+  and orders them (`engine.setTeam`, saved as `team`); every team pick starts
+  from it, and a battle you take becomes it, in its order. The suggestion
+  stays a shortcut on the team pick.
+- **Drag to reorder**, on the Team tab and the team pick's dock: pointer
+  events on the window (no `setPointerCapture`), arrow keys for a keyboard;
+  the first slot leads.
 
 ## Deferred on purpose — each with the trigger that brings it back
 

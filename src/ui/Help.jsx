@@ -27,8 +27,8 @@ import { OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_STEPS } from "../game/events.js";
 import { RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } from "../game/research.js";
 import { LIMITS } from "../game/trade.js";
 import { DEX_RANKS, DEX_CHARM, MEDALS } from "../game/medals.js";
-import { TEAM_MAX, REMATCH_SHARE, REMATCH_CAP_STEP } from "../game/league.js";
-import { PACK_PRICE, PACK_SIZE, PITY, CRAFT_X, MILESTONES, STREAK_PACK, MASTER_DUST, CARD_SHOW } from "../game/cards.js";
+import { TEAM_MAX, REMATCH_SHARE } from "../game/league.js";
+import { PACK_PRICE, PACK_SIZE, PITY, HIT_RATE, CRAFT_X, MILESTONES, STREAK_PACK, MASTER_DUST, CARD_SHOW } from "../game/cards.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
    lists want identical rows and a second copy of the row is how one of them
@@ -113,8 +113,9 @@ export default function Help({ onClose }) {
           <p className="hp-note">
             Catch every species of a generation yourself and it pays
             ¥{(MEDALS.find((m) => m.kind === "gen")?.money ?? 0).toLocaleString()}, a Master Ball, a
-            Dex Master title and a free box of any card set - and that
-            generation&rsquo;s rare forms are {DEX_CHARM}&times; as likely for good.
+            Dex Master title and a box of a random card set - claim it from the
+            reward button on the map - and that generation&rsquo;s rare forms are
+            {DEX_CHARM}&times; as likely for good.
           </p>
           {/* THE FOUR THINGS THAT HAPPEN TO THE WORLD, and nowhere else says
               them: a system nobody is told about reads as a bug the first time
@@ -193,14 +194,14 @@ export default function Help({ onClose }) {
           <ul className="vr-notes">
             <li>
               <b>Packs</b> are in the Cards tab: {PACK_SIZE} real Pokémon TCG cards for ¥{PACK_PRICE.toLocaleString()},
-              about every second pack holding a hit. Every first gym badge gives one too, and its cards carry the
+              about 1 pack in {(1 / HIT_RATE).toFixed(1)} holding a hit. Every first gym badge gives one too, and its cards carry the
               badge&rsquo;s stamp; a region&rsquo;s Champion gives a whole box, and every {STREAK_PACK}th day of
               a daily-quest streak a pack. A box or bundle is the cheapest way to buy, and Open all opens every
               pack you hold at once.
             </li>
             <li>
               <b>Guaranteed.</b> A Double rare or better comes at least every {PITY.hit.hard} packs, a Special
-              illustration rare by {PITY.special.hard}, a Mega Hyper Rare by {PITY.mega.hard} - the Packs tab shows
+              illustration rare by {PITY.special.hard}, a Mega Hyper Rare (a Hyper rare in older sets) by {PITY.mega.hard} - the Packs tab shows
               how close each is.
             </li>
             <li>
@@ -241,18 +242,17 @@ export default function Help({ onClose }) {
               teaches moves: any move a Pokémon&rsquo;s line learns by its level.
             </li>
             <li>
-              <b>Your team.</b> Up to {TEAM_MAX} Pokémon in every battle, each at
-              or under the battle&rsquo;s level cap; a
-              legendary&rsquo;s cap is lower, the stronger it is. A Pokémon in a
-              trade offer stays home. Battles give no EXP - raise your team with
-              Rare Candy.
+              <b>Your team.</b> Up to {TEAM_MAX} Pokémon of any level in every
+              battle. Build yours on the League&rsquo;s Team tab and drag them into
+              order - the first leads. A Pokémon in a trade offer stays home.
+              Battles give no EXP - raise your team with Rare Candy.
             </li>
             <li>
               <b>Prizes.</b> A first win pays a prize, and a leader&rsquo;s first
               win its badge. A leader, Elite Four member or Champion can be
               fought again: a rematch pays up to {Math.round(REMATCH_SHARE * 100)}%
-              of the prize, refilling as you walk, and each rematch win raises
-              their cap by {REMATCH_CAP_STEP} levels. Losing costs nothing.
+              of the prize, refilling as you walk, and each rematch win makes
+              them stronger. Losing costs nothing.
             </li>
             <li>
               <b>In battle</b>, keys 1-4 pick a move, S changes Pokémon, B opens

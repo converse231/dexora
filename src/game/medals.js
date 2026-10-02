@@ -27,7 +27,7 @@
 
 import { SPECIES } from "../data/dex.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
-import { BIOMES, speciesById, dexIndex, genOf, REGION_NAME } from "./biomes.js";
+import { BIOMES, speciesById, dexIndex, genOf, REGION_NAME, looksOf } from "./biomes.js";
 import { isForm } from "../data/dex.js";
 import { label } from "./map.js";
 
@@ -96,15 +96,17 @@ function build() {
     ...BIOMES.map(biomeMedal),
     /* A REGION'S POKÉDEX (asked for, 2026-10-02): every species of one
        generation, caught by you - its national numbers, never its forms. It
-       pays ¥20,000, a Master Ball, a booster box of your choice (engine,
-       `boxVouchers`), the title "<Region> Dex Master" (titles.js) and the
-       Pokédex Charm: that generation's rare forms 1.5x as likely (`dexCharm`). */
+       is CLAIMED, never paid on the catch (engine `claimDex`, asked for
+       2026-10-03): ¥20,000, a Master Ball, a booster box of a RANDOM set
+       (rolled in DexClaim.jsx's reel), the title "<Region> Dex Master"
+       (titles.js) and the Pokédex Charm: that generation's rare forms 1.5x
+       as likely (`dexCharm`). Both of the last arrive with the claim. */
     ...Object.keys(REGION_NAME).map(Number).map((g) => ({
       id: `gen:${g}`,
       kind: "gen",
       gen: g,
       name: `${REGION_NAME[g].toUpperCase()} COMPLETE`,
-      sub: `Every ${REGION_NAME[g]} Pokémon. A box of your choice, a title, and its rare forms 1.5x as likely.`,
+      sub: `Every ${REGION_NAME[g]} Pokémon. Claim a box of cards, a title, and its rare forms 1.5x as likely.`,
       need: SPECIES.filter((sp) => !isForm(sp.id) && genOf(sp.id) === g).map((sp) => sp.id),
       money: 20000,
       items: { "master-ball": 1 },
@@ -135,23 +137,36 @@ for (const m of MEDALS)
 
 export const medalById = (id) => MEDALS.find((m) => m.id === id) ?? null;
 
-/* THE POKÉDEX CHARM: a generation you have completed has its rare forms 1.5x
+/* THE POKÉDEX CHARM: a generation you have completed has its rare forms 2x
    as likely - read by the tier roll, a Mega through to its base (`genOf`).
-   At most a research star's lift (CLAUDE.md, the charm rule). */
-export const DEX_CHARM = 1.5;
+   It was 1.5x, a research star's lift; raised past it (your call,
+   2026-10-03) - a whole generation outranks one species' research. */
+export const DEX_CHARM = 2;
 export const dexCharm = (id, medals = []) => (medals.includes(`gen:${genOf(id)}`) ? DEX_CHARM : 1);
-// Generation medals a dex has finished but the save has not banked - paid at boot.
+/* HELD, FOR A MEDAL: the species caught - or, for the base of a family of
+   LOOKS, any one of its drawings. Catching Unown registers the letter you
+   met (Unown B is its own entry), so Johto's medal waited on Unown A, one
+   meeting in 28, and a finished Johto paid nothing (reported 2026-10-03). A
+   look itself still needs itself, so the whole-dex medal still asks for
+   every letter. */
+const owns = (dex, id) => dex[dexIndex(id)] === 2
+  || (speciesById(id)?.form !== "look" && looksOf(id).some((x) => dex[dexIndex(x)] === 2));
+
+// Generation medals a dex has finished and the save has not claimed yet.
 export const genMedalsDue = (dex, earned = []) => MEDALS.filter((m) => m.kind === "gen" && !earned.includes(m.id)
-  && m.need.every((id) => dex[dexIndex(id)] === 2));
+  && m.need.every((id) => owns(dex, id)));
 
 /* What a newly registered species just finished off. `earned` is the ids
    already banked, so a medal can never pay twice — which matters, because
-   evolving into a species you have caught before still fills a dex slot. */
+   evolving into a species you have caught before still fills a dex slot. A
+   look counts for its family's medals too (`owns`). */
 export function medalsFor(speciesId, dex, earned = []) {
   const out = [];
-  for (const m of BY_SPECIES.get(speciesId) ?? []) {
+  const sp = speciesById(speciesId);
+  const ids = sp?.form === "look" ? [speciesId, sp.of] : [speciesId];
+  for (const m of new Set(ids.flatMap((id) => BY_SPECIES.get(id) ?? []))) {
     if (earned.includes(m.id)) continue;
-    if (m.need.every((id) => dex[dexIndex(id)] === 2)) out.push(m);
+    if (m.need.every((id) => owns(dex, id))) out.push(m);
   }
   return out;
 }
