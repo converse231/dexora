@@ -2048,8 +2048,15 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
     jd[di(unownB)] = 2;
     assert.deepEqual(M.genMedalsDue(jd).map((m) => m.id), ["gen:2"], "Johto with a lettered Unown is not finished");
     assert.ok(M.medalsFor(unownB, jd).some((m) => m.id === "gen:2"), "catching a lettered Unown did not finish Johto");
+    /* A GIFT FILLS THE DEX BUT NOT THE REWARD, and the Dex says which
+       (reported: Johto read 137/137, the only Crobat a hard-mode gift). */
+    const gifted = M.genReward(2, jd, [169]);
+    assert.deepEqual([gifted.ready, gifted.gifts, gifted.left], [false, [169], 0], "a gifted Crobat was not named as what Johto waits on");
+    assert.equal(M.genReward(2, jd, []).ready, true, "Johto with every species was not ready");
+    assert.equal(M.genReward(2, jd, [], ["gen:2"]).claimed, true);
     jd[di(unownB)] = 0;
     assert.deepEqual(M.genMedalsDue(jd), [], "Johto without any Unown is finished");
+    assert.equal(M.genReward(2, jd, []).left, 1, "Johto without any Unown is not one short");
     // The Pokédex Charm: Kanto's species only, a Mega through to its base.
     assert.equal(M.dexCharm(25, g.state.medals), M.DEX_CHARM);
     assert.equal(M.dexCharm(10033, g.state.medals), M.DEX_CHARM, "Mega Venusaur did not read through to Kanto");

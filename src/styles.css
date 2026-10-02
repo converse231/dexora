@@ -6795,6 +6795,9 @@ button:disabled { transition: none; }
 /* A FINISHED POKÉDEX, CLAIMED (DexClaim.jsx): the map's pill, then a reel of
    the set logos that slows onto the rolled set and pops when it lands. */
 .dc-pill { margin-top: 6px; border-color: var(--ready); }
+/* The Dex's region bar says where that generation's reward stands. */
+.dx-reward { margin: 2px 0 6px; font-size: 12px; line-height: 1.35; color: var(--ink-soft); }
+.dx-reward.ready { color: var(--ready-ink); font-weight: 600; }
 .dx-claim { text-align: center; max-width: 380px; }
 .dc-kicker { font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
 .dc-lede { margin: 6px 0 10px; color: var(--ink-soft); font-size: 14px; }
