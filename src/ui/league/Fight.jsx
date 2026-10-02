@@ -169,6 +169,11 @@ function HpBox({ f, shown, side, level, team, statusAt }) {
         <span className="ft-pips" aria-label={`${team.filter((x) => x.hp > 0).length} of ${team.length} able to fight`}>
           {team.map((x, k) => <i key={k} className={x.hp > 0 ? "" : "out"} />)}
         </span>
+        {/* Its types, as every other screen shows them - a battle is where they
+            matter most, and the box never had them (reported). */}
+        <span className="ft-types">
+          {f.types.map((t) => <span key={t} className={`type t-${TYPES[t]}`}>{TYPES[t].toUpperCase()}</span>)}
+        </span>
         {!side && <em>{shown.hp}/{f.max}</em>}
       </div>
     </div>

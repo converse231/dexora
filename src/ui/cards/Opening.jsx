@@ -5,11 +5,13 @@
    mounts, so a reload mid-scene loses nothing, and nothing here can change a
    card. Beats: the pack, in one of the set's real wrappers, floats; a tap
    CHARGES it (it shakes, light leaks from the top), it TEARS in a spark
-   burst, and the cards are dealt face down. Commons flip fast. A hit's back
-   trembles and glows its rarity's colour - a plain rare does not, so the glow
-   is the tell - and its tap charges, flashes white, flips, bursts and stamps
-   its rarity; an Illustration rare or better dims the room and turns slowly
-   under rays, a Special or Mega shakes the screen and rains confetti. Pips
+   burst, and the cards are dealt face down. Commons flip fast. NOTHING GLOWS
+   BEFORE A TAP (a hit's gold halo was a spoiler, removed): a hit - and the
+   last card of every pack, whatever it is - charges white on its tap, then
+   turns UNDER the flash (a slow turn after it showed the back first), bursts
+   and, for a hit, stamps its rarity; an Illustration rare or better tints the
+   room under rays, a Special or Mega shakes the screen and rains confetti.
+   Fast turns the commons by itself. Pips
    along the foot fill as you go (the daily first pack lights its hits'
    pips from the start). Skip goes straight to the summary, which is also
    where reduced motion lands.
@@ -30,10 +32,10 @@ const SPARKS = Array.from({ length: 14 }, (_, i) => i);
 const CONFETTI = Array.from({ length: 28 }, (_, i) => i);
 // A hit is always holo, so it is named by its rarity; below a hit the foil is the news.
 const kindOf = (p) => (isHit(p.rarity) || p.variant === "n" ? RARITY[p.rarity].name : `${RARITY[p.rarity].name} · ${VARIANT_NAME[p.variant]}`);
-const TEASE = { double: "Something's here…", ultra: "Something shines…", illustration: "Something special…",
-  special: "Something very special…", mega: "Something incredible…" };
 
-export default function Opening({ set, result, wrapper, again, onAgain, onBinder, onDone, onScene }) {
+/* `hitsOnly`: the multi-pack scene (Open 10, Open all) - the hits alone, best
+   last, each with the full reveal, then `onFinish` shows the packs' summary. */
+export default function Opening({ set, result, wrapper, again, onAgain, onBinder, onDone, onScene, hitsOnly = false, onFinish = null }) {
   useModalLock();
   /* THE SCENE OWNS THE SCREEN: the bars step aside (`body.cd-opening`). It
      sits inside the page's layer, under the tab bar's, and on a phone the
@@ -46,13 +48,17 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
   const pulls = result.pulls;
   const rowOf = (p) => set.CARDS.find((c) => c[0] === p.localId);
   // "pack" | "charge" | "tear" | "deal" | { k, up, build } | "summary"
-  const [stage, setStage] = useState("pack");
+  const [stage, setStage] = useState(hitsOnly ? { k: 0, up: false } : "pack");
+  /* FAST: commons turn themselves; a hit and the last card still charge and
+     reveal, then the scene moves on (asked for, 2026-10-02). */
+  const [fast, setFast] = useState(false);
   const [ready, setReady] = useState(false);
   const keep = useRef([]);
   const live = useRef(null);
   /* Banners and tips wait while cards are face down (App's `cardScene`). */
   const hidden = stage !== "summary";
   useEffect(() => { onScene?.(hidden); }, [hidden, onScene]);
+  useEffect(() => { if (stage === "summary" && onFinish) onFinish(); }, [stage, onFinish]);
   useEffect(() => () => onScene?.(false), [onScene]);
 
   // Every face, the back and the wrapper load before the tear: no blank flip.
@@ -78,7 +84,7 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
     const p = pulls[stage.k];
     if (!stage.up) {
       const announce = () => { if (live.current) live.current.textContent = `${p.isNew ? "New! " : ""}${RARITY[p.rarity].name}: ${rowOf(p)?.[1] ?? ""}`; };
-      if (isHit(p.rarity) || stage.k === pulls.length - 1) {
+      if (isHit(p.rarity) || stage.k === pulls.length - 1 || hitsOnly) {
         /* A hit charges before it turns - and so does THE LAST CARD, whatever
            it is (your call, 2026-10-02): every pack ends on a reveal. */
         const k = stage.k;
@@ -89,6 +95,12 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
     else setStage("summary");
   };
 
+  // Fast mode advances itself: a quick beat for a common, a held one for a reveal.
+  useEffect(() => {
+    if (!fast || typeof stage !== "object" || stage.build) return undefined;
+    const t = setTimeout(next, stage.up ? (dramatic ? 1500 : 260) : (dramatic ? 300 : 120));
+    return () => clearTimeout(t);
+  });
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === " " || e.key === "Enter") { if (stage !== "summary") { e.preventDefault(); next(); } }
@@ -103,7 +115,7 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
   /* THE LAST CARD keeps its secret: it pulses white, never its rarity's
      colour, until the charge - which is where a hit's colour comes in. */
   const last = cur && stage.k === pulls.length - 1;
-  const dramatic = cur && (curHit || last);
+  const dramatic = cur && (curHit || last || hitsOnly);
   const shownUp = cur && stage.up;
   const tone = shownUp && curHit ? cur.rarity : stage === "summary" && result.god ? "special" : null;
   const big = shownUp && BIG.has(cur.rarity);
@@ -119,8 +131,14 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
       role="dialog" aria-modal="true" aria-label={`Opening a ${set.SET.name} pack`}>
       <div className="cd-live" aria-live="polite" ref={live} />
       <span className="cd-room" aria-hidden="true" />
-      {stage !== "summary" && <button type="button" className="cd-skip" onClick={() => setStage("summary")}>Skip</button>}
+      {stage !== "summary" && (
+        <div className="cd-ctl">
+          {!hitsOnly && <button type="button" className={`cd-skip${fast ? " on" : ""}`} aria-pressed={fast} onClick={() => setFast((f) => !f)}>Fast</button>}
+          <button type="button" className="cd-skip" onClick={() => setStage("summary")}>Skip</button>
+        </div>
+      )}
       {result.daily && stage === "pack" && <p className="cd-daily">Daily first pack: its hits glow from the start</p>}
+      {hitsOnly && stage !== "summary" && <p className="cd-daily">{pulls.length} hit{pulls.length === 1 ? "" : "s"} to reveal</p>}
 
       {["pack", "charge", "tear", "deal"].includes(stage) && (
         <button type="button" className={`cd-bigpack is-${stage}`} onClick={next}
@@ -143,8 +161,11 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
       {cur && (
         <div className={`cd-stage${stage.build ? " build" : ""}`} onClick={next}>
           {big && <span className="cd-rays loop" aria-hidden="true" />}
-          {!stage.up && dramatic && <p className="cd-tease">{last ? "Last card…" : TEASE[cur.rarity]}</p>}
-          <div key={stage.k} className={`cd-flip${stage.up ? " up" : ""}${!stage.up && !stage.build ? (last ? " last" : curHit ? " tell" : "") : ""}${stage.build ? " build" : ""} r-${cur.rarity}`}>
+          {/* NOTHING GLOWS BEFORE THE TAP (your call): the gold halo on a hit's
+              back was a spoiler. Only the last card says it is the last, and
+              every charge is white - the colour comes with the card. */}
+          {!stage.up && (last || stage.build) && <p className="cd-tease">{last && !hitsOnly ? "Last card…" : "…"}</p>}
+          <div key={stage.k} className={`cd-flip${stage.up ? " up" : ""}${!stage.up && !stage.build && last && !hitsOnly ? " last" : ""}${stage.build ? " build" : ""}${stage.up && dramatic ? " boom" : ""} r-${cur.rarity}`}>
             <span className="cd-back" aria-hidden="true" style={{ backgroundImage: `url(${backUrl()})` }} />
             <span className="cd-side">
               <CardFace setId={id} card={rowOf(cur)} variant={cur.variant} />
@@ -172,7 +193,7 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
         </div>
       )}
 
-      {stage === "summary" && (
+      {stage === "summary" && !onFinish && (
         <div className="cd-summary">
           {result.god && <span className="cd-confetti" aria-hidden="true">{CONFETTI.map((i) => <i key={i} style={{ "--i": i }} />)}</span>}
           <h3>{result.god ? "God Pack!" : hits.length ? `${hits.length} hit${hits.length === 1 ? "" : "s"}!` : set.SET.name}</h3>

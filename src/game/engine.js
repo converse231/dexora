@@ -2769,9 +2769,9 @@ export function createEngine(canvas, onChange, mini = null) {
 
   /* OPEN ALL a set's held packs at once (a box's "Open all"): every pack
      rolled and recorded as one would be, then one save and one changed(). */
-  function openAllPacks(set) {
+  function openAllPacks(set, max = Infinity) {
     const out = [];
-    for (let got = rollCardPack(set); got; got = rollCardPack(set)) out.push(got);
+    for (let got = out.length < max && rollCardPack(set); got; got = out.length < max && rollCardPack(set)) out.push(got);
     if (!out.length) return null;
     settleOpen(out.some((r) => r.pulls.some((p) => !p.isNew)));
     return out;
