@@ -2048,15 +2048,12 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
     jd[di(unownB)] = 2;
     assert.deepEqual(M.genMedalsDue(jd).map((m) => m.id), ["gen:2"], "Johto with a lettered Unown is not finished");
     assert.ok(M.medalsFor(unownB, jd).some((m) => m.id === "gen:2"), "catching a lettered Unown did not finish Johto");
-    /* A GIFT FILLS THE DEX BUT NOT THE REWARD, and the Dex says which
-       (reported: Johto read 137/137, the only Crobat a hard-mode gift). */
-    const gifted = M.genReward(2, jd, [169]);
-    assert.deepEqual([gifted.ready, gifted.gifts, gifted.left], [false, [169], 0], "a gifted Crobat was not named as what Johto waits on");
-    assert.equal(M.genReward(2, jd, []).ready, true, "Johto with every species was not ready");
-    assert.equal(M.genReward(2, jd, [], ["gen:2"]).claimed, true);
+    // Where the reward stands, for the Dex's region bar.
+    assert.equal(M.genReward(2, jd).ready, true, "Johto with every species was not ready");
+    assert.equal(M.genReward(2, jd, ["gen:2"]).claimed, true);
     jd[di(unownB)] = 0;
     assert.deepEqual(M.genMedalsDue(jd), [], "Johto without any Unown is finished");
-    assert.equal(M.genReward(2, jd, []).left, 1, "Johto without any Unown is not one short");
+    assert.equal(M.genReward(2, jd).left, 1, "Johto without any Unown is not one short");
     // The Pokédex Charm: Kanto's species only, a Mega through to its base.
     assert.equal(M.dexCharm(25, g.state.medals), M.DEX_CHARM);
     assert.equal(M.dexCharm(10033, g.state.medals), M.DEX_CHARM, "Mega Venusaur did not read through to Kanto");
@@ -2486,10 +2483,21 @@ console.log("stranded ok — a saved spot on rock or off the map loads at the ma
   const M = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
   const dexWith = (...ids) => SAVE.dex.map((v, i) => (ids.some((id) => dexIndex(id) === i) ? 2 : v));
 
-  // gifted: a dex entry registered only by a trade.
-  await savedField("gifted", [16], "junk", [], { ...SAVE, dex: dexWith(16) });
-  assert.deepEqual(boot({ ...SAVE, gifted: [16] }).e.state.gifted, [],
-    "a gift the dex does not hold as caught survived loading");
+  /* A TRADE COUNTS (your call, 2026-10-03). A save from before, whose traded
+     species were held back as `gifted`, is paid what they finish ONCE at load:
+     here the smallest medal there is, finished by the trade of one of it. */
+  {
+    const { MEDALS } = await import("../src/game/medals.js");
+    const line = MEDALS.filter((m) => m.kind !== "gen" && m.kind !== "dex").sort((a, b) => a.need.length - b.need.length)[0];
+    const old = { ...SAVE, dex: dexWith(...line.need), gifted: [line.need[0]], medals: [] };
+    const g = boot(old).e;
+    assert.ok(g.state.medals.includes(line.id), "a medal finished by a traded species was not paid at load");
+    assert.equal(g.state.money, old.money + line.money, "the medal a trade finished paid the wrong money");
+    assert.deepEqual(g.state.gifted, [], "the legacy gift list was not cleared once paid");
+    await new Promise((r) => setTimeout(r, 600));
+    const again = boot(JSON.parse(store.get("meadow-route"))).e;
+    assert.equal(again.state.money, g.state.money, "a medal finished by a trade paid twice across a reload");
+  }
 
   // A box entry's trade fields: kept when sound, each dropped alone when not.
   const good = { uid: 1, species: 16, level: 5, size: 100, at: 1, mid: M(1), ot: "Ash", traded: 2, lock: "offer" };
@@ -2532,8 +2540,8 @@ console.log("stranded ok — a saved spot on rock or off the map loads at the ma
   e.reconcileTrades({ gone: [M(1)] });
   assert.ok(!e.state.box.some((m) => m.uid === 1), "a Pokemon traded away stayed in the box");
 
-  // ARRIVED: fills the dex as a gift, and nothing else moves.
-  const money = e.state.money, medals = e.state.medals.length, pika = dexIndex(25);
+  // ARRIVED: fills the dex and counts like a catch; its tier row stays yours alone.
+  const money = e.state.money, pika = dexIndex(25);
   const gift = { mid: M(9), species: 25, level: 12, size: 100, tier: "shiny", alpha: false, ot: "Misty", traded: 1 };
   e.reconcileTrades({ arrived: [gift] });
   e.reconcileTrades({ arrived: [gift] });
@@ -2542,26 +2550,22 @@ console.log("stranded ok — a saved spot on rock or off the map loads at the ma
   assert.equal(got[0].shiny, 1, "the arriving Pokemon lost its tier");
   assert.equal(got[0].ot, "Misty", "the arriving Pokemon lost its original trainer");
   assert.equal(e.state.dex[pika], 2, "a traded Pokemon did not fill the Pokedex");
-  assert.ok(e.state.gifted.includes(25), "a species registered by trade is not marked a gift");
   assert.equal(e.state.shiny[pika] ?? 0, 0, "a traded shiny set the tier row - a mark of your own play");
-  assert.equal(e.state.money, money, "a trade paid the dex bonus");
-  assert.equal(e.state.medals.length, medals, "a trade earned a medal");
+  assert.ok(e.state.money > money, "a trade's new species paid no dex bonus - a trade counts");
   assert.equal(e.state.research[25]?.[TASKS.findIndex((t) => t.id === "trade")], 1,
     "receiving one did not count the trade research task");
 
-  // Evolving your OWN into a gifted species makes it yours; a traded one stays a gift.
-  const own = boot({ ...SAVE, dex: dexWith(16, 17), gifted: [17], candy: 50, nextUid: 3,
-    box: [{ uid: 1, species: 16, level: 40, size: 100, at: 1 }, { uid: 2, species: 16, level: 3, size: 100, at: 1 }] }).e;
-  assert.ok(own.evolve(1, 17), "a Pidgey at Lv 40 could not evolve");
-  assert.ok(!own.state.gifted.includes(17), "evolving your own into a gifted species left it a gift");
+  // A traded Pokemon evolving registers the new species, and it counts; its tier row does not.
   const theirs = boot({ ...SAVE, dex: dexWith(16), nextUid: 3,
     box: [{ uid: 1, species: 16, level: 40, size: 100, at: 1, mid: M(5), traded: 1, shiny: 1 },
       { uid: 2, species: 16, level: 3, size: 100, at: 1 }] }).e;
+  const before = theirs.state.money;
   assert.ok(theirs.evolve(1, 17), "a traded Pidgey could not evolve");
-  assert.ok(theirs.state.gifted.includes(17), "a traded Pokemon evolved into your own catch");
+  assert.equal(theirs.state.dex[dexIndex(17)], 2, "a traded Pokemon's evolution did not register");
+  assert.ok(theirs.state.money > before, "a traded Pokemon's new evolution paid no dex bonus");
   assert.equal(theirs.state.shiny[dexIndex(17)] ?? 0, 0, "evolving a traded shiny set the tier row");
 }
-console.log("trade foundation ok — trade fields load clean, locks freeze every action, reconcile assigns/locks/removes/receives idempotently, a trade fills only the dex");
+console.log("trade foundation ok — trade fields load clean, locks freeze every action, reconcile assigns/locks/removes/receives idempotently, a trade counts for the dex and its rewards, never a tier row");
 
 /* A RIFT, through real steps. Opening, counting down, finding and closing all
    happen in `onArrive`, which only a walk reaches - so each is one real step
@@ -3670,8 +3674,11 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(e.state.money, m0 - HARD_FEE, "a hard battle left unfinished gave its fee back");
     // A first win: the fee back, the prize, the signature Pokemon as a gift.
     const boxBefore = e.state.box.length, m1 = e.state.money;
+    // A gift that is a new species counts like a catch (a trade counts): the dex bonus on top.
+    const fresh = e.state.dex[dexIndex(L.giftOf(run[0]).species)] !== 2;
     const r = hwin(e, run[0]);
-    assert.equal(e.state.money, m1 + HARD_PRIZE, "a first hard win did not give the fee back and pay the prize");
+    if (fresh) assert.ok(e.state.money > m1 + HARD_PRIZE, "a gift of a new species paid no dex bonus");
+    else assert.equal(e.state.money, m1 + HARD_PRIZE, "a first hard win did not give the fee back and pay the prize");
     assert.equal(r.pay, HARD_PRIZE);
     const gift = L.giftOf(run[0]);
     assert.deepEqual(r.gift, gift, "the result does not name the gift given");

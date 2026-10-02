@@ -179,9 +179,9 @@ export default function Help({ onClose }) {
             <li>
               <b>What counts.</b> You always keep the last of each species -
               counted over the whole offer. Up to {LIMITS.TRADES_PER_DAY}{" "}
-              trades a day. A traded Pokémon fills your Pokédex and its
-              research, but medals, milestones and rare-form marks are for
-              ones you caught.
+              trades a day. A traded Pokémon fills your Pokédex and counts for
+              every Pokédex reward, as in the games; only rare-form marks are
+              for ones you caught.
             </li>
             <li>
               <b>Block or report</b> from any trainer&rsquo;s profile. A block

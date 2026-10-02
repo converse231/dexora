@@ -16,6 +16,16 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-03-tradecounts",
+    icon: "🤝",
+    date: "October 2026",
+    title: "Trades count for your Pokédex",
+    items: [
+      ["Traded Pokémon count", "A trade or a gift now counts for every Pokédex reward, as in the games."],
+      ["Paid on your next visit", "Medals and milestones your trades already finished pay out now."],
+    ],
+  },
+  {
     id: "2026-10-03-rates",
     icon: "🎴",
     date: "October 2026",
