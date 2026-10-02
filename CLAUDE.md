@@ -677,8 +677,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   all over; a card you do not own wears none. **The chase is packs only**
   (`PACK_ONLY`: Special illustration and Mega Hyper Rares never craft; your
   call, a set then costs ~76% of a game). Cards carry no catch indicator.
-  The last card of every pack charges, flashes and turns (white until the
-  charge). A box/bundle per set (`BOXES`); a Champion pays a box, every
+  The last card of every pack charges and flashes (white until the charge),
+  and a revealed card runs NO animation or transition (`.boom`): leaving the
+  charge restarted the entrance animation and faded it in after the flash.
+  Confetti lives outside the stage, whose quake transform made it the box a
+  fixed layer measures from. A box/bundle per set (`BOXES`); a Champion pays a box, every
   `STREAK_PACK`th streak day a pack - never the Pokédex rank (a title).
   One open is one `changed()` (`settleOpen`), Open all included.
 - **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`

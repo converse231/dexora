@@ -676,8 +676,14 @@ now and then when a step started an encounter.
 - **No glow before a tap**: a hit's gold halo was a spoiler and is gone. A
   hit and the last card charge white on their tap; the rarity's colour comes
   with the card.
-- **The reveal turns under the flash** (0 -> 180 degrees in about 120ms, while
-  the flash is at its brightest): a slow turn after it showed the back first.
+- **The revealed card is simply face up when the flash clears** - no turn, no
+  animation. The first fix (a fast turn) measured fine on rotation, but
+  leaving the charge restarted the card's entrance animation, which faded it
+  in from opacity 0 right after the flash: about 20 bad frames, found by
+  sampling opacity as well and confirmed by putting the old rule back.
+- **Confetti fires from cannons** in the bottom-left and bottom-right corners,
+  arcs up and drifts down, behind the card, its reach the room beside the card
+  (the side margins on a phone, a wide fan on a desktop).
 - **Fast**: the single-pack scene turns its commons by itself; a hit and the
   last card still charge and reveal, then move on.
 - **Open 10 and Open all reveal the hits only**, best last, each with the full
