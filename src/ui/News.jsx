@@ -16,6 +16,19 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-04-fixes",
+    icon: "🔧",
+    date: "October 2026",
+    title: "Fixes",
+    items: [
+      ["Your trainer card opens", "It was opening behind the You page."],
+      ["Unown stays home", "Unown now appear only in Tanoby Ruins."],
+      ["Cleaner water on phones", "The pad's A asks Surf or fish - the extra buttons are gone."],
+      ["Card reveals fit the screen", "Rare-card celebrations no longer scroll on a phone."],
+      ["Walking pays less", "Steps now pay half the cash they did."],
+    ],
+  },
+  {
     id: "2026-10-03-tradecounts",
     icon: "🤝",
     date: "October 2026",

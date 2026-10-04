@@ -860,7 +860,9 @@ const plain = (n, level) => Math.max(1, Math.round(n * plainShare(level)));
    for a sharper reason here: at 50,000 it is not a ball, it is the thing you
    are saving FOR, and pricing a wage against it would pay ¥200,000 a parcel
    the moment you passed Lv 30. */
-export const STEP_WAGE = 2;
+/* Halved from 2 (your call, 2026-10-04): with trades, the League's prizes and
+   the dex bonus all paying, walking made money too easy. */
+export const STEP_WAGE = 1;
 export const STEP_WAGE_HAUL = 3;   // the haul multiplies the balls; it multiplies this too
 
 export const stepWage = (level, haul = false) => {

@@ -1631,6 +1631,9 @@ export const GEN_HOME_MIN = 4;
 const WATERY = new Set(RESIDENTS.filter((b) => b.water).map((b) => b.id));
 const isFish = (id) => speciesById(id)?.shape === "fish";
 
+// Species an `only` map keeps to itself (Tanoby's Unown): no other map may home them.
+const KEPT = new Set(RESIDENTS.filter((b) => b.only).flatMap((b) => b.table.map(([id]) => id)));
+
 const derivedHomes = () => {
   const placed = new Set(RESIDENTS.flatMap((b) => b.table.map(([id]) => id)));
   const evolvesInto = new Set(EVOLUTIONS.map((e) => e.to));
@@ -1800,8 +1803,11 @@ const derivedHomes = () => {
          only this pool could have put them there. Two pools, one rule. */
       const fits = (sp) => sp.types.some((t) => b.types.includes(t))
         && (b.water || !isFish(sp.id));
+      /* AND NEVER A SPECIES AN `only` MAP KEEPS: the Gen 2 filler put Unown
+         in Meteor Falls (psychic), when Tanoby is its one home (reported
+         2026-10-04). The homing loop skips it already (`placed`). */
       const pool = wild
-        .filter((sp) => genOf(sp.id) === gen && !here.has(sp.id)
+        .filter((sp) => genOf(sp.id) === gen && !here.has(sp.id) && !KEPT.has(sp.id)
                      && bands.has(bandFor(sp.id)) && fits(sp))
         .slice(0, short);
       for (const sp of pool) {
