@@ -16,6 +16,19 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-04-economy",
+    icon: "💰",
+    date: "October 2026",
+    title: "Money and fixes",
+    items: [
+      ["Research pays less", "Each research level now pays half what it did."],
+      ["New species bonus", "The bonus for a new Pokédex entry now tops out at ¥500."],
+      ["Packs cost more", "¥4,000 a pack; boxes and bundles keep their discount."],
+      ["Steadier encounters on phones", "The screen no longer jumps when a wild Pokémon appears."],
+      ["Fixes", "Buy dialogs stay on top in battle, and Rotom's lists scroll properly."],
+    ],
+  },
+  {
     id: "2026-10-04-fixes",
     icon: "🔧",
     date: "October 2026",

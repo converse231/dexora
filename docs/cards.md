@@ -250,9 +250,9 @@ Cards are the sink that has no ceiling and buys no advantage.
 
 | Item | Price (*proposed*) | Bound check.mjs holds |
 |---|---|---|
-| Booster pack (any set) | ¥3,200 (was ¥2,400) | between 150 and 400 steps of median income at the level its set opens |
-| Booster box, `me01` / `me02` (36 packs) | ¥96,000 (≈17% off) | never beats packs by more than 20% |
-| **Bundle, `me02.5` (6 packs)** | ¥17,280 (10% off) | never beats packs by more than 20%; never cheaper per pack than a box |
+| Booster pack (any set) | ¥4,000 (¥2,400, then ¥3,200; raised 2026-10-04) | between 150 and 500 steps of median income at the level its set opens |
+| Booster box, `me01` / `me02` (36 packs) | ¥120,000 (≈17% off) | never beats packs by more than 20% |
+| **Bundle, `me02.5`, `sv03.5`, `sv08.5` (6 packs)** | ¥21,600 (10% off) | never beats packs by more than 20%; never cheaper per pack than a box |
 | Card craft | dust only | never buyable with ¥ |
 
 Ascended Heroes is a special set sold in collection products, not booster

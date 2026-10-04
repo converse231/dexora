@@ -6,6 +6,7 @@
    never "are you sure" but "what will this cost me". */
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useModalLock, useDismiss } from "./modal.js";
 
 import Sprite from "./Sprite.jsx";
@@ -98,7 +99,11 @@ export default function Confirm({
     // dialog opened - which is the one moment it is guaranteed to be wrong.
   }, [onConfirm, onCancel, armed, pickable, keptUids.join(",")]);
 
-  return (
+  /* AT THE PAGE'S ROOT, wherever it is called from: the Rotom panel is a size
+     container (`container: rail`), and containment makes it the box a fixed
+     layer is placed and stacked in - so the Shop's buy dialog sat inside the
+     panel, under a wild encounter (reported 2026-10-04). */
+  return createPortal(
     <div className="sheet" {...useDismiss(onCancel)}>
       <div
         className="confirm"
@@ -221,6 +226,7 @@ export default function Confirm({
           {armed ? "ENTER to confirm · ESC to cancel" : "ESC to cancel"}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

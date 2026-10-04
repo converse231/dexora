@@ -143,8 +143,13 @@ export function bump(row, ids) {
    species' own worth, so a common's research is small change and a rare's is
    a real prize. A whole sale per level was measured first and came to up to
    49% of what the catches themselves earned - an S-band first catch crosses
-   three levels at once - which is the research becoming the income. */
-export const RESEARCH_PAY = 0.25;
+   three levels at once - which is the research becoming the income.
+
+   HALVED to an eighth (your call, 2026-10-04): audited, research to Lv 10 on
+   every species was ~¥2.0M with Haggle - more than everything catching and
+   selling earns in a Lv 75 game (~¥1.4M) - and it is what flooded the late
+   game with money. */
+export const RESEARCH_PAY = 0.125;
 export const researchPay = (sellEach, levels) =>
   Math.round(Math.max(0, levels) * sellEach * RESEARCH_PAY);
 

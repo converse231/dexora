@@ -323,7 +323,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   (`stepWage`, denominated in the dearest ball that can still fail;
   `STEP_WAGE` 1 throw since 2026-10-04, halved - money came too easily; it
   moves the rematch clock, so `npm run gyms` after). The dex
-  bonus climbs but is not income.
+  bonus climbs (`DEX_CLIMB` 4: ¥100 to ¥500) but is not income. **The
+  late game's money is the one-off pools** (research, the dex bonus,
+  medals), not the renewable streams - audited 2026-10-04 at ~2.8x a Lv 75
+  game's catch income before research and the dex bonus were cut; measure
+  them before touching catch or walking.
 - **Priced items are checked against the live economy**: a honey costs less
   than its run earns (dearest vs richest map, cheapest vs starting map); the
   Master Ball has a computed floor and ceiling; Master Balls total 8-12 per game
@@ -530,8 +534,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   star costs `starCost` 1 and `starKeeps` 1, so it needs a second catch.
   Catches and `STAR_COST` are both 5 (10 was reported as too many).
   The Box offers RAISE to Lv 100 for a legendary with no evolution left. XS and XL are one task (`xl` kept, asked of nobody). A
-  level pays a quarter of a sale (`RESEARCH_PAY`, under a fifth of catch
-  income, measured). Lv 10 only OFFERS the lift: `star(id)` spends
+  level pays an eighth of a sale (`RESEARCH_PAY`, halved 2026-10-04: every
+  species to Lv 10 was ~¥2.0M, more than a Lv 75 game's catch income). Lv 10 only OFFERS the lift: `star(id)` spends
   `STAR_COST` ordinary box entries (lowest level first, never a keeper,
   asked first) into `state.stars`, and `researchLift(id, stars)` multiplies
   that species' tier roll by `RESEARCH_LIFT`, weaker than an outbreak.
