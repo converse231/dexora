@@ -3858,6 +3858,14 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
        rule below measures a mix it does not have. Findability, after them,
        still counts it. */
     const MIXED = BIOMES.filter((b) => !b.only);
+    /* AN `only` MAP'S SPECIES LIVE NOWHERE ELSE - walking, surfing or on a
+       rod. The Gen 2 filler put Unown in Meteor Falls (reported 2026-10-04). */
+    const kept = new Set(BIOMES.filter((b) => b.only).flatMap((b) => b.table.map(([id]) => id)));
+    for (const b of MIXED) for (const lv of [b.level, MAX_LEVEL]) {
+      const stray = [...tableFor(b, lv), ...surfTable(b, lv, "super-rod")].find(([id]) => kept.has(id));
+      assert.ok(!stray, `${speciesById(stray?.[0])?.name} lives in ${b.id} at Lv ${lv} - it is kept to its own map`);
+    }
+    for (const r of RODS) assert.ok(!rodTable(r.id, MAX_LEVEL).some(([id]) => kept.has(id)), `${r.id} bites a species kept to its own map`);
     const COSTUMED = new Set(SPECIES.filter((sp) => sp.form === "costume").map((sp) => sp.id));
     let worst = 0, worstAt = "";
     let capHeld = 0;

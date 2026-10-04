@@ -230,7 +230,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   map decides legendary homes, so widening it is never flavour; `legends`
   (`legendTypes`) adds a type for legendary homes alone - the Mansion's psychic,
   where `types` measured 49% psychic residents. Every legendary must keep a home.
-- **An `only` map is one species' home** (Tanoby: Unown, asked for). No
+- **An `only` map is one species' home** (Tanoby: Unown, asked for), and
+  NO OTHER map homes its species (`KEPT`: the Gen 2 filler put Unown in
+  Meteor Falls; check.mjs holds every map, surf and rod clear). No
   `types`, so nothing homes there and no legendary lives there; surfing it
   meets the same table (`surfTable`); check.mjs's mix suites (`MIXED`), the
   eight-row table rule and the rift-finds bound skip it, and nothing else
@@ -318,7 +320,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   back more candy than the evolution spent.
 - **Income must be renewable.** `catchBounty` pays on every variant catch (never
   more than half of what an encounter pays). Walking pays a wage
-  (`stepWage`, denominated in the dearest ball that can still fail). The dex
+  (`stepWage`, denominated in the dearest ball that can still fail;
+  `STEP_WAGE` 1 throw since 2026-10-04, halved - money came too easily; it
+  moves the rematch clock, so `npm run gyms` after). The dex
   bonus climbs but is not income.
 - **Priced items are checked against the live economy**: a honey costs less
   than its run earns (dearest vs richest map, cheapest vs starting map); the
@@ -627,7 +631,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   from leagues.js, never typed.
 - **The profile is the Trade Center in `profile` mode**: your card alone,
   titled, no trading tabs, its editing and sharing unchanged - one loader,
-  one editor. You › Your trainer card opens it (`.sub`: it has a Back to You).
+  one editor. You › Your trainer card opens it (`.sub`: it has a Back to You),
+  and You is NOT rendered under it: both are pages at one layer and You
+  comes later, so the card opened behind it and the button read as dead.
 - **The app is four tabs, and the tabs ARE the pages** (Rotom, 2026-10-01):
   Catch (the map), Trade (the Trade Center), Battles (the League) and You
   (`You.jsx`: the card, stat points, saves, key items, guides, settings,
@@ -683,7 +689,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.
   Confetti lives outside the stage, whose quake transform made it the box a
-  fixed layer measures from. A box/bundle per set (`BOXES`); a Champion pays a box, every
+  fixed layer measures from. **The scene never scrolls** (`.cd-open`
+  `overflow: hidden`, the page under it locked): its rays, tear and
+  confetti bleed past the screen by design, so the card and pack are held
+  to the screen's height instead, and only a summary (`.scroll`) scrolls,
+  downwards. A box/bundle per set (`BOXES`); a Champion pays a box, every
   `STREAK_PACK`th streak day a pack - never the Pokédex rank (a title).
   One open is one `changed()` (`settleOpen`), Open all included.
   **A roll lands on the first rung at or below it the set prints**

@@ -150,7 +150,7 @@ export default function Opening({ set, result, wrapper, again, onAgain, onBinder
   const packArt = wrapper ? packUrl(id, wrapper) : logoUrl(id);
 
   return (
-    <div className={`cd-open${big ? " dim" : ""}${loud ? " loud" : ""}${result.god ? " god" : ""}${tone ? ` tone-${tone}` : ""}`}
+    <div className={`cd-open${big ? " dim" : ""}${loud ? " loud" : ""}${result.god ? " god" : ""}${tone ? ` tone-${tone}` : ""}${stage === "summary" ? " scroll" : ""}`}
       role="dialog" aria-modal="true" aria-label={`Opening a ${set.SET.name} pack`}>
       <div className="cd-live" aria-live="polite" ref={live} />
       <span className="cd-room" aria-hidden="true" />
@@ -274,7 +274,7 @@ export function OpenAll({ set, results, waiting = 0, onBinder, onDone }) {
     );
   }
   return (
-    <div className={`cd-open${best && rungOf(best.rarity) >= rungOf("special") ? " loud tone-" + best.rarity : ""}`} role="dialog" aria-modal="true" aria-label={`Opened ${results.length} packs`}>
+    <div className={`cd-open scroll${best && rungOf(best.rarity) >= rungOf("special") ? " loud tone-" + best.rarity : ""}`} role="dialog" aria-modal="true" aria-label={`Opened ${results.length} packs`}>
       <span className="cd-room" aria-hidden="true" />
       {best && rungOf(best.rarity) >= rungOf("special") && <Confetti />}
       <div className="cd-summary">

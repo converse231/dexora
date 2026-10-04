@@ -745,7 +745,10 @@ export default function App({
         </Suspense>
       )}
 
-      {you && (
+      {/* NOT UNDER THE PROFILE: both are pages at one layer and You comes later,
+          so "Your trainer card" opened the card BEHIND You and the button read
+          as dead (reported 2026-10-04). The profile's Back brings You back. */}
+      {you && !trade?.profile && (
         <You
           trainerName={trainerName}
           titles={titleIds(st?.milestones, st?.medals)}
