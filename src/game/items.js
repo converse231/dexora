@@ -992,7 +992,10 @@ export const catchBounty = (sp, variant) =>
    pays ¥820 instead of ¥100, so the thing that got harder got better. The
    income that actually holds up is `catchBounty`, which is renewable. */
 export const DEX_BONUS = 100;
-export const DEX_CLIMB = 9;
+/* 9 until 2026-10-04 (a late find paid ¥1,000); 4 tops it at ¥500 - every
+   species once came to ~¥779k over a game, the second-largest one-off pool
+   (your call: the late game earned too easily). */
+export const DEX_CLIMB = 4;
 export const dexBonus = (caught, total) =>
   Math.round(DEX_BONUS * (1 + DEX_CLIMB * Math.min(1, (caught ?? 0) / (total || 1))));
 

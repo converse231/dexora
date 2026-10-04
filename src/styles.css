@@ -8349,6 +8349,12 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
     padding: 6px 12px 10px; border-radius: 24px 24px 0 0; background: var(--surface);
     animation: rail-up .22s ease-out;
   }
+  /* A SWIPE IN THE SHEET SCROLLS THE SHEET: on a phone a drag that began on
+     its tabs or filters, or ran past a list's end, scrolled the page behind
+     instead (the Dex, reported 2026-10-04). The page is held still while the
+     sheet is up, and nothing in the sheet hands its scroll on. */
+  html:has(.rail.open), body:has(.rail.open) { overflow: hidden; }
+  .rail.open, .rail.open * { overscroll-behavior: contain; }
   .rail.open .rail-grip { display: block; width: 44px; height: 5px; margin: 2px auto 8px; border-radius: 3px; background: var(--line-firm); flex: none; }
   .rail.open .rail-x {
     display: grid; place-items: center; position: absolute; right: 10px; top: 8px; width: 36px; height: 36px;
@@ -8365,6 +8371,28 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   .pad-rotom.on { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
 }
 @keyframes rail-up { from { transform: translateY(24px); opacity: 0; } }
+/* A SHORT SHEET (a phone held sideways, ~370px of it) GIVES ITS ROOM TO THE
+   LIST: the tabs, the Dex's filters, rank and count stacked ~300px over a
+   grid held at a 120px minimum, so one part-row of the Dex showed, ran off
+   the bottom, and nearly every swipe landed on something that did not
+   scroll (reported 2026-10-04). Tabs in one slim row, search and filters
+   side by side, the rank line dropped (the You page and the Dex's rank
+   replay keep it), and no minimum on the list. */
+@media (hover: none) and (pointer: coarse) and (max-height: 500px) {
+  .rail.open { padding-top: 4px; }
+  .rail.open .rail-grip { display: none; }
+  .rail.open .rail-x { top: 4px; width: 32px; height: 32px; }
+  /* The corner menu sat on the Dex tab; with the sheet up it is put away, as in an encounter. */
+  body:has(.rail.open) .tb-menu { display: none; }
+  .rail.open > .tabs { margin-bottom: 6px; padding-bottom: 6px; }
+  .rail.open > .tabs > .tab { flex-direction: row; gap: 6px; }
+  .rail.open .tab-glyph { width: 32px; height: 32px; border-radius: 10px; }
+  .rail.open .filterbar { display: flex; align-items: stretch; margin-bottom: 6px; }
+  .rail.open .fb-find { flex: 1 1 34%; min-width: 0; }
+  .rail.open .fb-row { flex: 1 1 66%; min-width: 0; flex-wrap: nowrap; }
+  .rail.open .dx-rank { display: none; }
+  .rail.open .dexgrid, .rail.open .boxlist, .rail.open .arealist, .rail.open .shopscroll, .rail.open .trscroll { min-height: 0; }
+}
 .tb-menu, .tb-scrim { display: none; }
 /* HELD SIDEWAYS the tabs are a menu behind one corner button (see TopBar's
    MenuScrim): the rail they were took 68px of width from the game. */
@@ -8441,15 +8469,17 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .you-who small { font: 12px var(--body); color: var(--ink-faint); }
 @media (max-width: 520px) { .you-points { width: 100%; } .you-who h2 { font-size: 24px; } }
 /* On a phone the play card fills the screen to the tab bar and the pad sits
-   in the middle of what is left under the map: nearer the thumbs, and no
-   empty page below the card. */
+   at its foot, by the thumbs. ONE HEIGHT, walking or in an encounter: the
+   encounter used to grow the card (the tab bar's room) and re-centre the
+   pad, so the page overflowed and the pad jumped 135px as a Pokemon
+   appeared (reported 2026-10-04). Now the scene grows into the room above
+   the pad and nothing else moves. */
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
   .app.tab-catch .screen {
     display: flex; flex-direction: column;
     min-height: calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom) - 84px);
   }
-  .app.tab-catch.busy .screen { min-height: calc(100dvh - 84px); }
-  .app.tab-catch .screen > .pad { margin-block: auto; }
+  .app.tab-catch .screen > .pad { margin-top: auto; }
 }
 @media (min-width: 1100px) and (hover: hover) {
   /* A sub-view (a team pick, a composer, your card) has no side column:
@@ -8461,7 +8491,9 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
    The scene takes the room the walk does not need: taller than the map, the
    balls along its foot (the desktop rail, which a phone hid), the pad under. */
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
-  .app.busy .viewport { min-height: 56dvh; }
+  /* As tall as the room above the pad allows, never taller: on a short phone
+     56dvh pushed the pad off the card. */
+  .app.busy .viewport { flex: 1 1 auto; min-height: min(56dvh, 100%); }
   .app.busy .viewport > canvas:first-child { visibility: hidden; }
   .app.busy .ballwrap { display: block; }
 }

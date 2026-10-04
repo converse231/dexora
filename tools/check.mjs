@@ -6929,11 +6929,13 @@ let healNote = "";
   const rematchRate = p.prize.reduce((a, b) => a + b, 0) * REMATCH_SHARE / REMATCH_STEPS;
   assert.ok(rematchRate <= REMATCH_CEIL * p.perStep,
     `rematches pay ¥${rematchRate.toFixed(2)} a step against catching's ¥${p.perStep.toFixed(2)}`);
-  /* A CARD PACK costs 150-400 steps of what walking and catching pay
+  /* A CARD PACK costs 150-500 steps of what walking and catching pay
      (docs/cards.md, Economy): dearer and it is a tax, cheaper and it is not
-     a sink. */
+     a sink. The top was 400 until 2026-10-04, when the wage was halved and
+     the pack raised to ¥4,000 together (your call: money came too easily;
+     ~420 steps). */
   const { PACK_PRICE: CD_PRICE } = await import("../src/game/cards.js");
-  assert.ok(CD_PRICE / p.perStep >= 150 && CD_PRICE / p.perStep <= 400,
+  assert.ok(CD_PRICE / p.perStep >= 150 && CD_PRICE / p.perStep <= 500,
     `a card pack costs ${Math.round(CD_PRICE / p.perStep)} steps of income`);
 
   /* THE MASTER BALL IS STILL PRICED AGAINST EVERYTHING A PLAYTHROUGH EARNS,
