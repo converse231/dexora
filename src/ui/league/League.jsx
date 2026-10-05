@@ -29,6 +29,7 @@ import { variantOf } from "../../game/items.js";
 import { hash } from "../../game/daily.js";
 import { useModalLock } from "../modal.js";
 import Sprite from "../Sprite.jsx";
+import Icon from "../Icon.jsx";
 import Types from "../Types.jsx";
 import Picker, { keyOf } from "../trade/Picker.jsx";
 import Fight, { moveName } from "./Fight.jsx";
@@ -781,21 +782,25 @@ export default function League({
             <div className="lg-strip" ref={strip} role="tablist">
               <button type="button" role="tab" aria-selected={ranked}
                 className={`rk-tab${ranked ? " on" : ""}`} onClick={() => choose(RANKED)}>
+                <Icon n="star" className="side-ic" />
                 <b>Ranked</b>
                 <em>Teams</em>
               </button>
               <button type="button" role="tab" aria-selected={mine}
                 className={`rk-tab${mine ? " on" : ""}`} onClick={() => choose(TEAM)}>
+                <Icon n="ball" className="side-ic" />
                 <b>Team</b>
                 <em>{team.length} of {TEAM_MAX}</em>
               </button>
               <button type="button" role="tab" aria-selected={shop}
                 className={`rk-tab${shop ? " on" : ""}`} onClick={() => choose(SHOP)}>
+                <Icon n="shop" className="side-ic" />
                 <b>Shop</b>
                 <em>{yen(money)}</em>
               </button>
               <button type="button" role="tab" aria-selected={train}
-                className={`rk-tab${train ? " on" : ""}`} onClick={() => choose(TRAIN)}>
+                className={`rk-tab split${train ? " on" : ""}`} onClick={() => choose(TRAIN)}>
+                <Icon n="train" className="side-ic" />
                 <b>Train</b>
                 <em>Levels · moves</em>
               </button>
@@ -803,6 +808,8 @@ export default function League({
                 <button key={r.id} type="button" role="tab" aria-selected={r.id === regionId}
                   className={`${r.id === regionId ? "on" : ""}${st[k].open ? "" : " shut"}${st[k].cleared ? " done" : ""}`}
                   onClick={() => choose(r.id)}>
+                  {/* A region wears its first gym's badge: nine of one map icon said nothing. */}
+                  <img className="side-ic side-badge" src={asset(`badges/${r.gyms[0].id}.png`)} alt="" loading="lazy" />
                   <b>{r.name}</b>
                   <em>{st[k].open ? `${st[k].badges}/${r.gyms.length}` : <Lock />}</em>
                 </button>

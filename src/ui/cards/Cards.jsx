@@ -17,12 +17,13 @@ import CardFace, { RarityMark } from "./Card.jsx";
 import Inspect from "./Inspect.jsx";
 import Opening, { OpenAll } from "./Opening.jsx";
 import { loadSet, logoUrl, packUrl } from "./load.js";
+import Icon from "../Icon.jsx";
 import { titleIds, titleName, MASTER_STEP } from "../../game/titles.js";
 import { showKey, CARD_SHOW, printingsOf } from "../../game/cards.js";
 
 const yen = (n) => `¥${n.toLocaleString()}`;
 const oneIn = (p) => Math.round(1 / p);
-const TABS = [["packs", "Packs"], ["binder", "Binder"], ["dex", "Card Dex"], ["dust", "Dust"]];
+const TABS = [["packs", "Packs", "cards"], ["binder", "Binder", "book"], ["dex", "Card Dex", "dex"], ["dust", "Dust", "forms"]];
 const POCKETS = 12;            // a page: four across, three down
 /* THE CARD DEX ADDS TILES A PAGE AT A TIME as its end scrolls near (the
    Picker's rule): 188 tiles at once was a 103ms task on a throttled phone. */
@@ -118,9 +119,10 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
         </div>
         <nav className="lg-strip-wrap" aria-label="Cards">
           <div className="lg-strip" role="tablist">
-            {TABS.map(([id, name]) => (
+            {TABS.map(([id, name, ic]) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id}
                 className={`rk-tab${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>
+                <Icon n={ic} className="side-ic" />
                 <b>{name}</b>
                 <em>{{ packs: yen(st?.money ?? 0), binder: `${owned} owned`, dex: "Every card", dust: `${dust.toLocaleString()} dust` }[id]}</em>
               </button>
