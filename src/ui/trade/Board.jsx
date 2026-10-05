@@ -1,6 +1,7 @@
-/* THE TRADE BOARD (docs/trading.md): friends' "offering these, looking for
-   that". A listing is a BUNDLE - up to MAX_SIDE of yours - for one wanted
-   species (and tier, if named); a friend whose box fits completes it in one
+/* THE TRADE BOARD (docs/trading.md): everybody's "offering these, looking
+   for that" - global since 2026-10-06 (it was friends only), never across a
+   block. A listing is a BUNDLE - up to MAX_SIDE of yours - for one wanted
+   species (and tier, if named); anyone whose box fits completes it in one
    tap. The server checks everything again; `fits` only lets the button say so.
 
    FIND is the other half: pick any species and see who has one - listings,
@@ -99,7 +100,7 @@ function Post({ box, dexOf, engine, onPosted, onCancel }) {
   );
 }
 
-export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, friends, initialQ = null, onOpenTrainer, onBrowse }) {
+export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, initialQ = null, onOpenTrainer, onBrowse }) {
   const [list, setList] = useState(null);
   const [q, setQ] = useState(initialQ);
   const [who, setWho] = useState(null);
@@ -222,8 +223,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, fr
       </section>
 
       <section className="ev-card">
-        <header className="ev-banner"><h4>Friends&rsquo; listings</h4></header>
-        {friends === 0 && <p className="ev-quiet">The board shows your friends&rsquo; listings. Add friends in Trainers.</p>}
+        <header className="ev-banner"><h4>Listings</h4></header>
         {say && <p className="tc-note" role="status">{say}</p>}
         {list === null ? <p className="ev-quiet">Loading the board…</p> : others.length ? (
           <ul className="of-list">

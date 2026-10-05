@@ -1258,8 +1258,9 @@ begin
 end;
 $$;
 
--- What your friends (and you) have up, newest first; `q` narrows it to a
--- species, whether offered or wanted.
+-- What EVERYBODY has up, newest first - the board is global (your call,
+-- 2026-10-06; it was friends only) - except across a block, either way;
+-- `q` narrows it to a species, whether offered or wanted.
 create or replace function public.trade_board(q int default null)
 returns jsonb
 language sql stable security definer set search_path = '' as $$
@@ -1274,7 +1275,7 @@ language sql stable security definer set search_path = '' as $$
         join public.mons m on m.id = l.mon and m.status = 'listed' and m.owner = l.owner
         join public.trainer_cards c on c.user_id = l.owner
        where l.status = 'open'
-         and (l.owner = auth.uid() or public.are_friends(auth.uid(), l.owner))
+         and (l.owner = auth.uid() or not public.blocked_between(auth.uid(), l.owner))
          and (q is null or l.want_species = q
               or exists (select 1 from public.mons x where x.id = any(l.mon || l.bundle) and x.species = q))
        order by l.created_at desc
@@ -1296,7 +1297,7 @@ declare
 begin
   if me is null then raise exception 'not signed in'; end if;
   select * into l from public.listings where id = lid for update;
-  if not found or l.status <> 'open' or l.owner = me or not public.are_friends(me, l.owner) then
+  if not found or l.status <> 'open' or l.owner = me or public.blocked_between(me, l.owner) then
     return jsonb_build_object('status', 'gone');
   end if;
   perform 1 from public.mons where id = any(l.mon || l.bundle || mid) order by id for update;

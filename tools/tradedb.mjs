@@ -499,10 +499,13 @@ assert.ok((await rpc(B, "trade_board", { q: 16 })).some((x) => x.id === lid), "s
 assert.ok(!(await rpc(B, "trade_board", { q: 19 })).some((x) => x.id === lid), "a species search listed an unrelated listing");
 assert.equal((await rpc(A, "trade_inbox", {})).listings.length, 1, "the inbox does not show your own listing");
 
-// ---- 27. friends only -------------------------------------------------------------------
+// ---- 27. global, but never across a block (your call, 2026-10-06: it was friends only) ----
 await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
-assert.ok(!(await rpc(B, "trade_board", {})).some((x) => x.id === lid), "a stranger's listing showed on the board");
-assert.equal((await rpc(B, "fulfil_listing", { lid, mid: b4[75] })).status, "gone", "a stranger completed a listing");
+assert.ok((await rpc(B, "trade_board", {})).some((x) => x.id === lid), "a stranger's listing is missing from the global board");
+await q("insert into public.blocks (blocker, blocked) values ($1, $2)", [A.id, B.id]);
+assert.ok(!(await rpc(B, "trade_board", {})).some((x) => x.id === lid), "a listing showed across a block");
+assert.equal((await rpc(B, "fulfil_listing", { lid, mid: b4[75] })).status, "gone", "a listing was completed across a block");
+await q("delete from public.blocks where blocker = $1 and blocked = $2", [A.id, B.id]);
 await q("insert into public.friends (a, b, status) values ($1, $2, 'accepted')", [A.id, B.id]);
 
 // ---- 28. only what was asked for ------------------------------------------------------------
@@ -873,7 +876,7 @@ console.log("tradedb phase 2 ok — a completed trade frees the offers it fails,
   "the daily cap holds, a week-old deposit comes home");
 console.log("tradedb phase 3 ok — the shelf is read off the stored save, registered, capped and replaced whole; others see only " +
   "the shelf; an offer can ask only for what is on it; the inbox names the trainer and message; a traded Pokemon leaves the shelf");
-console.log("tradedb phase 4 ok — a listing locks its Pokemon and shows to friends only, search by offered or wanted species, " +
+console.log("tradedb phase 4 ok — a listing locks its Pokemon and shows to everyone not blocked, search by offered or wanted species, " +
   "only the asked-for species and tier completes it, racing completions make one trade, any-form listings, arriving Pokemon " +
   "cannot pay, withdraw, the cap, a week-old listing comes home");
 console.log("tradedb phase 5 ok — friend codes readable only by their trainer, a request by trainer, the inbox counts requests, " +

@@ -39,7 +39,7 @@ import {
 } from "./league.js";
 import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
 import {
-  openPack as rollPack, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX,
+  openPack as rollPack, rulesOf, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX,
   dustOf, craftCost, sparesOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, STREAK_PACK,
   MASTER_DUST, printingsOf, CARD_SHOW, showKey,
 } from "./cards.js";
@@ -2875,7 +2875,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!meta) return null;
     if ((state.packs[id] ?? 0) < 1) return null;
     const stamp = state.earnedPacks[id]?.[0] ?? null;
-    const { pulls, pity, god } = rollPack(set.CARDS, Math.random, state.cardPity[id] ?? freshPity());
+    const { pulls, pity, god } = rollPack(set.CARDS, Math.random, state.cardPity[id] ?? freshPity(), rulesOf(id));
     const cards = { ...state.cards };
     const out = pulls.map((p) => {
       const key = cardId(id, p.localId);

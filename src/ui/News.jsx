@@ -16,6 +16,28 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-06-board",
+    icon: "🌍",
+    date: "October 2026",
+    title: "A global Trade Board",
+    items: [
+      ["The board is open to everyone", "Post and complete listings with any trainer, not just friends."],
+      ["Friends on your card", "Requests, friends and your code now live on You › Your trainer card."],
+      ["Filters that show what you asked", "Filter the Dex by a tier and every tile wears it; the Box can filter Alphas."],
+    ],
+  },
+  {
+    id: "2026-10-06-realrates",
+    icon: "🎴",
+    date: "October 2026",
+    title: "Real-life pull rates",
+    items: [
+      ["Packs pull like the real thing", "Every set now opens at its real English booster odds."],
+      ["A safety net, not a schedule", "Each set's guarantee comes far past its usual odds - the Packs tab shows how far."],
+      ["God Packs stay", "Still 1 in 500, as a treat."],
+    ],
+  },
+  {
     id: "2026-10-04-economy",
     icon: "💰",
     date: "October 2026",
