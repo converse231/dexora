@@ -28,6 +28,7 @@ import { enterTrading } from "./enter.js";
 import BoardTab from "./Board.jsx";
 import { useModalLock } from "../modal.js";
 import Sprite, { TrainerArt } from "../Sprite.jsx";
+import Icon from "../Icon.jsx";
 import Mark from "../Marks.jsx";
 import TrainerProfile from "./TrainerProfile.jsx";
 
@@ -554,11 +555,12 @@ export default function TradeCenter({
         </div>
         {signedIn && !closed && !stacked && !profile && (
           <div className="tc-tabbar"><div className="sheet-tabs tc-tabs" role="tablist">
-            {[["trainers", "Trainers", null], ["offers", "Offers", offers || null],
-              ["board", "Board", null], ["surprise", "Surprise", null]].map(([id, name, n]) => (
+            {[["trainers", "Trainers", null, "users"], ["offers", "Offers", offers || null, "swap"],
+              ["board", "Board", null, "board"], ["surprise", "Surprise", null, "gift"]].map(([id, name, n, ic]) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id}
                 className={tab === id ? "on" : ""} onClick={() => { setTab(id); setNote(null); }}>
-                {name}{n ? <em>{n}</em> : null}
+                <Icon n={ic} className="side-ic" />
+                <b>{name}</b>{n ? <em>{n}</em> : null}
               </button>
             ))}
           </div></div>
