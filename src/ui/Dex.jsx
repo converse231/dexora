@@ -427,7 +427,10 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
           return (
             <Cell
               key={sp.id} sp={sp} state={state} onSelect={onSelect}
-              variant={state > 0 ? rarest(sp.id) : null}
+              /* Filtered to a tier, every tile wears THAT tier (asked for,
+                 2026-10-06): the filter only lists species holding it, and
+                 the rarest one held showed a Gold under "Shiny". */
+              variant={state > 0 ? (TIERS.includes(only) ? only : rarest(sp.id)) : null}
               marks={MARKS.filter((t) => has(t, sp.id)).join(",")}
               full={complete(sp.id)}
               studied={researchLevel(sp.id, tiers?.research?.[sp.id]) >= RESEARCH_MAX}

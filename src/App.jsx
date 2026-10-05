@@ -767,6 +767,7 @@ export default function App({
             restore: (which) => engine.restore(which),
           }}
           onProfile={account ? () => setTrade({ name: null, profile: true }) : null}
+          requests={inbox?.friend_requests ?? 0}
           onNews={() => setNews(true)}
           onHelp={() => setHelp(true)}
           onForms={() => setForms(true)}
@@ -833,9 +834,10 @@ export default function App({
            nothing to log out of. */
         tab={tab}
         onTab={goTab}
-        tradeAlert={offerAlert + (inbox?.friend_requests ?? 0)}
+        tradeAlert={offerAlert}
         cardAlert={Object.values(st?.packs ?? {}).reduce((a, b) => a + b, 0)}
-        youAlert={unread || freePoints(st?.stats, level) > 0}
+        // Friend requests live on your card now (You › Your trainer card), so they light You.
+        youAlert={unread || freePoints(st?.stats, level) > 0 || (inbox?.friend_requests ?? 0) > 0}
         onNews={() => setNews(true)}
         unread={unread}
         trainerName={trainerName}

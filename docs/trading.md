@@ -76,7 +76,8 @@ that duplicates under a double-click.
 - `surprise_deposit(mon)` - matches immediately against a **friend's** waiting
   deposit, or waits (≤7 days, then comes home).
 - `post_listing(mon, wants)` / `fulfil_listing(listing, mon)` /
-  `withdraw_listing(id)` - the board, friends-only.
+  `withdraw_listing(id)` - the board, global since 2026-10-06 (it was
+  friends-only), never across a block.
 - `trade_inbox()` - one round trip with exactly what `reconcileTrades` takes:
   what arrived, what is locked, what is gone, the open offers. It also
   expires the caller's stale offers on the way (a lazy sweep: no cron).
@@ -114,9 +115,11 @@ game has not learned those server ids, which is the one new hazard:
   sends a friend request (it reads as an unknown code) or proposes an offer.
 - **Blocking ends the friendship and closes every open offer between the
   two**, freeing what each had locked. Friending refuses across a block, so
-  *friends implies no block* - which is what covers the friends-only Board
-  and Surprise Trade without a second check in each.
-- Only the blocker sees or lifts it (`my_blocks`, the Trainers tab).
+  *friends implies no block* - which is what covers Surprise Trade without
+  a second check. The Board, global since 2026-10-06, checks
+  `blocked_between` itself.
+- Only the blocker sees or lifts it (`my_blocks`, under your trainer card
+  with your friends since 2026-10-06).
 - **A report** is a reason from a fixed list (`REPORT_REASONS`, append-only:
   the server stores the index), once per pair per day, no free text. Players
   cannot read reports; SUPABASE.md §3d says where they are.

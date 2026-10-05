@@ -28,7 +28,7 @@ import { RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } from "../game/research.js";
 import { LIMITS } from "../game/trade.js";
 import { DEX_RANKS, DEX_CHARM, MEDALS } from "../game/medals.js";
 import { TEAM_MAX, REMATCH_SHARE } from "../game/league.js";
-import { PACK_PRICE, PACK_SIZE, PITY, HIT_RATE, CRAFT_X, MILESTONES, STREAK_PACK, MASTER_DUST, CARD_SHOW } from "../game/cards.js";
+import { PACK_PRICE, PACK_SIZE, CRAFT_X, MILESTONES, STREAK_PACK, MASTER_DUST, CARD_SHOW } from "../game/cards.js";
 
 /* A key, then what it does. Written as data rather than markup because the two
    lists want identical rows and a second copy of the row is how one of them
@@ -194,15 +194,14 @@ export default function Help({ onClose }) {
           <ul className="vr-notes">
             <li>
               <b>Packs</b> are in the Cards tab: {PACK_SIZE} real Pokémon TCG cards for ¥{PACK_PRICE.toLocaleString()},
-              about 1 pack in {(1 / HIT_RATE).toFixed(1)} holding a hit. Every first gym badge gives one too, and its cards carry the
+              at each set&rsquo;s real-life pull rates. Every first gym badge gives one too, and its cards carry the
               badge&rsquo;s stamp; a region&rsquo;s Champion gives a whole box, and every {STREAK_PACK}th day of
               a daily-quest streak a pack. A box or bundle is the cheapest way to buy, and Open all opens every
               pack you hold at once.
             </li>
             <li>
-              <b>Guaranteed.</b> A Double rare or better comes at least every {PITY.hit.hard} packs, a Special
-              illustration rare by {PITY.special.hard}, a Mega Hyper Rare (a Hyper rare in older sets) by {PITY.mega.hard} - the Packs tab shows
-              how close each is.
+              <b>A safety net.</b> Every set&rsquo;s chase has a guarantee far past its usual odds, so the
+              unluckiest run still ends - each set&rsquo;s Packs card shows its odds and how close each guarantee is.
             </li>
             <li>
               <b>Dust.</b> Spare copies become Card Dust; a missing card crafts for {CRAFT_X} spares&rsquo; worth -

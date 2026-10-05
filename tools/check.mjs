@@ -7325,16 +7325,21 @@ import { statSync } from "node:fs";
       n++;
     }
 
-    /* THE RATES ARE OURS, held two ways: with pity held at zero every pack
-       lands each rate within 15%; with pity running, no streak passes its
-       guarantee and no pack holds a card twice. 20,000 seeded packs each. */
-    const N = 20000;
+    /* REAL-LIFE RATES, ONE ROW A SET (your call, 2026-10-06), held two ways:
+       with pity held at zero every pack lands each rate within 15% (or four
+       standard errors, for a rate too rare for 15% to be measurable); with
+       pity running, no streak passes its guarantee and no pack holds a card
+       twice. A set with no row is not shipped - a future expansion brings
+       its own real numbers. */
+    const rules = CD.rulesOf(meta.id);
+    assert.ok(rules, `${meta.id} has no row in SET_RATES - add its real pull rates`);
+    const N = 60000;
     const count = (pity) => {
       const rng = pRng(11), hits = {};
       let p = CD.freshPity(), god = 0;
       const dry = { hit: 0, special: 0, mega: 0 };
       for (let i = 0; i < N; i++) {
-        const o = CD.openPack(CARDS, rng, pity ? p : CD.freshPity());
+        const o = CD.openPack(CARDS, rng, pity ? p : CD.freshPity(), rules);
         assert.equal(o.pulls.length, CD.PACK_SIZE);
         assert.equal(new Set(o.pulls.map((x) => x.localId)).size, CD.PACK_SIZE, "a card came twice in one pack");
         if (o.god) { god++; continue; }
@@ -7347,21 +7352,26 @@ import { statSync } from "node:fs";
     const flat = count(false);
     /* Each roll is counted as the rarity it gives in this set (`landsOn`):
        a Hyper rare is the top roll where no Mega Hyper Rare is printed. */
-    for (const [r, rate] of Object.entries(CD.RATES)) {
+    // Against the set's OWN row, not what `rulesOf` handed the pack: a lookup
+    // that gave every set Mega Evolution's rates agreed with itself.
+    for (const [r, rate] of Object.entries(CD.SET_RATES[meta.id])) {
       const as = CD.landsOn(CARDS, r);
       assert.ok(CD.rungOf(as) >= CD.rungOf("double"), `${meta.id}: the ${r} roll lands on ${as}, not a hit`);
       const got = (flat.hits[as] ?? 0) / N;
-      assert.ok(Math.abs(got - rate) <= 0.15 * rate, `${meta.id}: ${r} (${as}) came 1 in ${(1 / got).toFixed(1)}, not 1 in ${(1 / rate).toFixed(1)}`);
+      const room = Math.max(0.15 * rate, 4 * Math.sqrt(rate * (1 - rate) / N));
+      assert.ok(Math.abs(got - rate) <= room, `${meta.id}: ${r} (${as}) came 1 in ${(1 / got).toFixed(1)}, not 1 in ${(1 / rate).toFixed(1)}`);
     }
     assert.ok(Math.abs(flat.god / N - CD.GOD_PACK) <= 0.3 * CD.GOD_PACK, `${meta.id}: God Packs came ${flat.god} in ${N}`);
     const run = count(true);
-    for (const [k, v] of Object.entries(CD.PITY)) {
+    for (const [k, v] of Object.entries(rules.pity)) {
       assert.ok(run.dry[k] < v.hard, `${meta.id}: ${run.dry[k]} packs ran dry of ${k} - its guarantee is ${v.hard}`);
     }
   }
-  // The Packs tab prints odds from RATES and PITY, never a typed number.
+  // The Packs tab prints odds from the set's own rules, never a typed number.
   const page = src("ui/cards/Cards.jsx");
-  assert.ok(/RATES\./.test(page) && /PITY\[/.test(page) && !/1 in \d/.test(page), "the Packs tab types its odds");
+  assert.ok(/rulesOf\(meta\.id\)/.test(page) && !/1 in \d/.test(page), "the Packs tab types its odds");
+  // Every shipped set has its row, and nothing else does.
+  assert.deepEqual(Object.keys(CD.SET_RATES).sort(), CD_SETS.map((s) => s.id).sort(), "SET_RATES and the shipped sets disagree");
   /* A CRAFT IS CRAFT_X SPARES' WORTH, for every rarity and variant - the one
      ratio that sets what a full set costs (measured: 16x is 35% of a game). */
   for (const r of CD.CARD_RARITIES) for (const v of ["n", "h", "r"]) {

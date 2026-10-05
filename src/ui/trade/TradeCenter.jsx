@@ -372,6 +372,76 @@ export default function TradeCenter({
   const accepted = friends?.filter((f) => f.status === "accepted") ?? [];
   const sent = friends?.filter((f) => f.status === "pending" && !f.incoming) ?? [];
 
+  /* YOUR FRIENDS LIVE ON YOUR CARD (asked for, 2026-10-06): requests, the
+     list, adding by code and who you have blocked sit under your trainer
+     card (You › Your trainer card), where your friend code already is;
+     the Trainers tab keeps the search. */
+  const friendsPanel = (
+    <div className="tc-list">
+      <section className="ev-card">
+        <header className="ev-banner"><h4>Add a friend</h4></header>
+        <form className="tc-code" onSubmit={(e) => { e.preventDefault(); act(() => addFriend(code), (r) => ADD_SAYS[r]); setCode(""); }}>
+          <input className="tc-input" value={code} maxLength={8} onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="Friend code" aria-label="Add a friend by code" autoCapitalize="characters" />
+          <button type="submit" className="ev-go" disabled={busy || code.trim().length !== 8}>Add</button>
+        </form>
+      </section>
+
+      {incoming.length > 0 && (
+        <section className="ev-card live">
+          <header className="ev-banner"><h4>Friend requests</h4><span className="ev-stamp live">{incoming.length}</span></header>
+          <ul className="tc-rows">
+            {incoming.map((f) => (
+              <Row key={f.card.user_id} card={f.card} onOpen={setViewing}>
+                <button type="button" className="tc-yes" disabled={busy} aria-label={`Accept ${f.card.username}`}
+                  onClick={() => act(() => answerFriend(f.card.user_id, true), () => "You are friends now!")}>✓</button>
+                <button type="button" className="tc-no" disabled={busy} aria-label={`Decline ${f.card.username}`}
+                  onClick={() => act(() => answerFriend(f.card.user_id, false))}>✕</button>
+              </Row>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="ev-card">
+        <header className="ev-banner"><h4>Friends</h4><span className="tp-count">{accepted.length}</span></header>
+        {friends === null
+          ? <p className="ev-quiet">{fail ? "" : "Loading…"}</p>
+          : accepted.length
+            ? (
+              <ul className="tc-rows">
+                {accepted.map((f) => (
+                  <Row key={f.card.user_id} card={f.card} onOpen={setViewing}>
+                    <button type="button" className="tp-quiet tc-browse" aria-label={`Browse ${f.card.username}'s Pokémon`}
+                      onClick={() => setBrowsing({ card: f.card, query: "" })}>Pokémon</button>
+                  </Row>
+                ))}
+              </ul>
+            )
+            : <p className="ev-quiet">No friends yet. Share your friend code from your card above, or add theirs.</p>}
+        {sent.length > 0 && <p className="ev-quiet">Waiting on {sent.map((f) => f.card.username).join(", ")}.</p>}
+      </section>
+
+      {blocked.length > 0 && (
+        <section className="ev-card">
+          <header className="ev-banner"><h4>Blocked</h4><span className="tp-count">{blocked.length}</span></header>
+          <ul className="tc-rows">
+            {blocked.map((c) => (
+              <li key={c.user_id} className="tc-row">
+                <span className="tc-who still">
+                  <TrainerArt char={c.char} className="tc-art" />
+                  <span><b>{c.username}</b><i>Can&rsquo;t find you or trade with you</i></span>
+                </span>
+                <button type="button" className="tp-quiet" disabled={busy}
+                  onClick={() => act(() => unblockUser(c.user_id), () => `${c.username} is unblocked.`)}>Unblock</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+
   let body;
   if (!signedIn) {
     body = <p className="tc-gate">Trading needs an account - sign in, and your Pokémon and friends come with you.</p>;
@@ -423,7 +493,7 @@ export default function TradeCenter({
     );
   } else if (tab === "board") {
     body = <BoardTab box={box} dexOf={dexOf} engine={engine} inbox={inbox} sync={sync} onTraded={onTraded}
-      friends={friends === null ? null : accepted.length} initialQ={openBoard} onOpenTrainer={openTrainer}
+      initialQ={openBoard} onOpenTrainer={openTrainer}
       onBrowse={(card, query) => setBrowsing({ card, query })} />;
   } else if (tab === "offers") {
     body = <OffersTab inbox={inbox} sync={sync} onTraded={onTraded} onOpenTrainer={openTrainer} onCounter={counter} />;
@@ -432,7 +502,12 @@ export default function TradeCenter({
       friends={friends === null ? null : accepted.length} />;
   } else if (tab === "card") {
     body = me
-      ? <TrainerProfile card={me} self dexOf={dexOf} shelf={myShelf} onEdit={setEditing} onShare={() => share(me.username)} />
+      ? (
+        <>
+          <TrainerProfile card={me} self dexOf={dexOf} shelf={myShelf} onEdit={setEditing} onShare={() => share(me.username)} />
+          {friendsPanel}
+        </>
+      )
       : <p className="ev-quiet">{fail ? "" : "Loading your card…"}</p>;
   } else {
     body = (
@@ -444,65 +519,8 @@ export default function TradeCenter({
           {found && (found.length
             ? <ul className="tc-rows">{found.map((c) => <Row key={c.user_id} card={c} onOpen={setViewing} />)}</ul>
             : <p className="ev-quiet">No trainer by that name.</p>)}
-          <form className="tc-code" onSubmit={(e) => { e.preventDefault(); act(() => addFriend(code), (r) => ADD_SAYS[r]); setCode(""); }}>
-            <input className="tc-input" value={code} maxLength={8} onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="Friend code" aria-label="Add a friend by code" autoCapitalize="characters" />
-            <button type="submit" className="ev-go" disabled={busy || code.trim().length !== 8}>Add</button>
-          </form>
+          <p className="ev-quiet">Your friends, requests and friend code are on your trainer card: You › Your trainer card.</p>
         </section>
-
-        {incoming.length > 0 && (
-          <section className="ev-card live">
-            <header className="ev-banner"><h4>Friend requests</h4><span className="ev-stamp live">{incoming.length}</span></header>
-            <ul className="tc-rows">
-              {incoming.map((f) => (
-                <Row key={f.card.user_id} card={f.card} onOpen={setViewing}>
-                  <button type="button" className="tc-yes" disabled={busy} aria-label={`Accept ${f.card.username}`}
-                    onClick={() => act(() => answerFriend(f.card.user_id, true), () => "You are friends now!")}>✓</button>
-                  <button type="button" className="tc-no" disabled={busy} aria-label={`Decline ${f.card.username}`}
-                    onClick={() => act(() => answerFriend(f.card.user_id, false))}>✕</button>
-                </Row>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <section className="ev-card">
-          <header className="ev-banner"><h4>Friends</h4><span className="tp-count">{accepted.length}</span></header>
-          {friends === null
-            ? <p className="ev-quiet">{fail ? "" : "Loading…"}</p>
-            : accepted.length
-              ? (
-                <ul className="tc-rows">
-                  {accepted.map((f) => (
-                    <Row key={f.card.user_id} card={f.card} onOpen={setViewing}>
-                      <button type="button" className="tp-quiet tc-browse" aria-label={`Browse ${f.card.username}'s Pokémon`}
-                        onClick={() => setBrowsing({ card: f.card, query: "" })}>Pokémon</button>
-                    </Row>
-                  ))}
-                </ul>
-              )
-              : <p className="ev-quiet">No friends yet. Share your code from your trainer card (You › Your trainer card), or add theirs above.</p>}
-          {sent.length > 0 && <p className="ev-quiet">Waiting on {sent.map((f) => f.card.username).join(", ")}.</p>}
-        </section>
-
-        {blocked.length > 0 && (
-          <section className="ev-card">
-            <header className="ev-banner"><h4>Blocked</h4><span className="tp-count">{blocked.length}</span></header>
-            <ul className="tc-rows">
-              {blocked.map((c) => (
-                <li key={c.user_id} className="tc-row">
-                  <span className="tc-who still">
-                    <TrainerArt char={c.char} className="tc-art" />
-                    <span><b>{c.username}</b><i>Can&rsquo;t find you or trade with you</i></span>
-                  </span>
-                  <button type="button" className="tp-quiet" disabled={busy}
-                    onClick={() => act(() => unblockUser(c.user_id), () => `${c.username} is unblocked.`)}>Unblock</button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
       </div>
     );
   }
@@ -536,7 +554,7 @@ export default function TradeCenter({
         </div>
         {signedIn && !closed && !stacked && !profile && (
           <div className="tc-tabbar"><div className="sheet-tabs tc-tabs" role="tablist">
-            {[["trainers", "Trainers", incoming.length || null], ["offers", "Offers", offers || null],
+            {[["trainers", "Trainers", null], ["offers", "Offers", offers || null],
               ["board", "Board", null], ["surprise", "Surprise", null]].map(([id, name, n]) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id}
                 className={tab === id ? "on" : ""} onClick={() => { setTab(id); setNote(null); }}>

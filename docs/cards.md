@@ -737,6 +737,26 @@ now and then when a step started an encounter.
 - Prismatic's Poké Ball and Master Ball reverse holos are not separate
   printings: TCGdex lists one reverse a card.
 
+## Real-life pull rates *(2026-10-06, your calls)*
+
+- **Every set opens at its English booster's measured rates** (TCGplayer's
+  community data, per pack): `SET_RATES`, one row a set, read through
+  `rulesOf(setId)`. A set with no row fails check.mjs - a future expansion
+  ships with its own real numbers or not at all. Where a figure is not
+  published (Phantasmal Flames' Mega Hyper Rare) the same era's stands in;
+  where TCGdex folds a rarity into another (Ascended Heroes' Mega Attack
+  Rares are Ultra Rares there), the two rates are added.
+- **Pity is a safety net**, scaled to each set: the odds rise from 1.5x the
+  average wait and are certain at 3x (Mega Evolution: an SIR by pack 303,
+  a Mega Hyper Rare by 3,750). Measured with it running, the chase comes
+  ~20-25% more often than real life (Mega Evolution SIR 1 in 80 for 1 in
+  101; MHR 1 in 971 for 1 in 1,260).
+- **God Packs stay** (1 in 500), a treat English packs do not have.
+- The second slot's rolls are conditioned on the ones before missing, so
+  each rarity lands at its published per-pack rate.
+- A complete set now costs far more: a given Mega Hyper Rare is ~1 in 1,900
+  Mega Evolution packs, and the chase is packs only.
+
 ## Deferred on purpose *(each with the trigger that brings it back)*
 
 - **Trading cards** - needs server-minted card rows; trigger: players asking

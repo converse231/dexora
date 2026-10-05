@@ -44,26 +44,59 @@ export function landsOn(cards, rarity) {
   return null;
 }
 
-/* OUR PULL RATES, not the print run's (your call, 2026-10-02): a hit about
-   every second pack at first; each made rarer (your call, 2026-10-03: a set
-   was too easy to finish) - Double 1 in 4 -> 5, Illustration 6 -> 8, Ultra
-   10 -> 12, Special 25 -> 32, the top 120 -> 180. Per pack; the Packs tab
-   prints these, never a typed copy. `double` and `ultra` upgrade the rare
-   slot; `illustration`, `special` and `mega` (the top roll) the second
-   reverse slot. */
-export const RATES = { double: 1 / 5, ultra: 1 / 12, illustration: 1 / 8, special: 1 / 32, mega: 1 / 180 };
-// A pack holding a hit, before pity: what the Packs tab and Help say in words.
-export const HIT_RATE = 1 - (1 - RATES.mega - RATES.special - RATES.illustration) * (1 - RATES.double - RATES.ultra);
+/* REAL-LIFE PULL RATES, ONE ROW A SET (your call, 2026-10-06): each set opens
+   at the rates its English booster measures, from TCGplayer's community
+   data - per pack, the chance of at least one card of that rarity. They were
+   ours until then (a hit every second pack, then a little rarer). A NEW SET
+   IS NOT SHIPPED WITHOUT ITS ROW: check.mjs fails a set with none, so a
+   future expansion arrives with its own real numbers, never a default.
 
-/* PITY, three counters a set, each shown as a meter. `hard` is the pack that
-   is guaranteed one (the 6th after five dry, the 45th, the 220th - each
-   lengthened with the rates, 2026-10-03); from `soft` packs on, each pack
-   adds `step` to the chance. A better hit resets the counters below it. */
-export const PITY = {
-  hit: { hard: 6 },
-  special: { soft: 25, step: 0.02, hard: 45 },
-  mega: { soft: 150, step: 0.01, hard: 220 },
+   The keys are ROLLS, not rarities: `double` and `ultra` upgrade the rare
+   slot; `illustration`, `special` and `mega` (the top roll) the second
+   reverse slot, and each lands on the first rung the set prints
+   (`landsOn`) - Prismatic's illustration roll is its ACE SPEC rate, a
+   Scarlet & Violet set's top roll its Hyper rare rate.
+
+   - me01 Mega Evolution: DR 20.91%, IR 10.89%, UR 8.23%, SIR 0.99%, MHR 0.08%.
+   - me02 Phantasmal Flames: DR 20.77%, IR 10.97%, UR 8.06%, SIR 1.25%; its
+     MHR rate is not published, so Mega Evolution's (the same era) stands in.
+   - me02.5 Ascended Heroes: DR 20.37%, IR 11.25%, UR 4.81% + Mega Attack
+     Rare 3.47% (TCGdex prints those as Ultra Rares, so one roll), SIR 1.44%,
+     MHR 0.19%.
+   - sv03.5 151: DR ~1 in 8, IR 8.50%, UR 6.44%, SIR 3.11%, HR 1.94%.
+   - sv08.5 Prismatic Evolutions: DR 16.51%, ACE SPEC 4.68%, UR 7.46%,
+     SIR 2.22%, HR 0.56% (its Poke Ball and Master Ball reverses are not
+     separate printings here). */
+export const SET_RATES = {
+  me01: { double: 0.2091, illustration: 0.1089, ultra: 0.0823, special: 0.0099, mega: 0.0008 },
+  me02: { double: 0.2077, illustration: 0.1097, ultra: 0.0806, special: 0.0125, mega: 0.0008 },
+  "me02.5": { double: 0.2037, illustration: 0.1125, ultra: 0.0481 + 0.0347, special: 0.0144, mega: 0.0019 },
+  "sv03.5": { double: 1 / 8, illustration: 0.085, ultra: 0.0644, special: 0.0311, mega: 0.0194 },
+  "sv08.5": { double: 0.1651, illustration: 0.0468, ultra: 0.0746, special: 0.0222, mega: 0.0056 },
 };
+// A pack holding a hit (a Double rare or better), at a set's rates.
+export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration) * (1 - r.double - r.ultra);
+
+/* PITY IS A SAFETY NET, NOT A SCHEDULE (your call, 2026-10-06): real packs
+   have none, so each set's is scaled to its own rates - the odds start to
+   rise at `PITY_NET[0]` times the average wait and the pull is certain at
+   `PITY_NET[1]` times it. Almost everyone pulls at the real rate; only the
+   unluckiest run is rescued (Mega Evolution: an SIR by pack 303, a Mega
+   Hyper Rare by 3,750). It was a fixed 45 and 220, which at real rates
+   would have made pulls far easier than real life. Three counters a set,
+   each a meter; a better hit resets the counters below it. */
+export const PITY_NET = [1.5, 3];
+const net = (p) => ({ soft: Math.round(PITY_NET[0] / p), hard: Math.round(PITY_NET[1] / p) });
+
+/* EVERYTHING A SET'S PACKS FOLLOW: its rates, its hit rate and its pity.
+   Null for a set with no row (which check.mjs refuses to ship). */
+export function rulesOf(setId) {
+  const rates = SET_RATES[setId];
+  if (!rates) return null;
+  const hit = hitRateOf(rates);
+  return { rates, hit, pity: { hit: { hard: Math.round(PITY_NET[1] / hit) }, special: net(rates.special), mega: net(rates.mega) } };
+}
+
 export const freshPity = () => ({ hit: 0, special: 0, mega: 0 });
 
 // A GOD PACK: seven reverse holos and three Illustration rares or better (1 in 300 until 2026-10-03).
@@ -142,19 +175,22 @@ export const newestOpen = (level) => [...CARD_SETS].reverse().find((s) => setOpe
 
 export const cardId = (setId, localId) => `${setId}-${localId}`;
 
-/* The chance of a `special` or a `mega` on this pack, with soft pity: `n` is
-   packs already opened dry of it, so this pack is the (n + 1)th. */
-export function chanceOf(kind, n) {
-  const p = PITY[kind];
+/* The chance of a `special` or a `mega` on this pack, under a set's `rules`:
+   `n` is packs already opened dry of it, so this pack is the (n + 1)th. Past
+   the soft pack it climbs in a straight line to certain at the hard one. */
+export function chanceOf(kind, n, rules) {
+  const p = rules.pity[kind], r = rules.rates[kind];
   if (n + 1 >= p.hard) return 1;
-  return Math.min(1, RATES[kind] + Math.max(0, n + 1 - p.soft) * p.step);
+  if (n + 1 <= p.soft) return r;
+  return Math.min(1, r + (n + 1 - p.soft) * (1 - r) / (p.hard - p.soft));
 }
 
 /* OPEN ONE PACK. `cards` are the set's rows; returns `{ pulls, pity, god }`,
    `pulls` in REVEAL ORDER - the eight base cards, then the two upgradeable
    slots with the better last, because the order is the drama. Each pull is
    `{ localId, rarity, variant }`; no card twice in a pack. */
-export function openPack(cards, rng, pity = freshPity()) {
+export function openPack(cards, rng, pity = freshPity(), rules) {
+  const { rates } = rules;
   const pools = {};
   for (const row of cards) (pools[row[3]] ??= []).push(row);
   const reversible = cards.filter((r) => r[4].includes("r"));
@@ -190,19 +226,23 @@ export function openPack(cards, rng, pity = freshPity()) {
     ...Array.from({ length: 3 }, () => of("uncommon", "n")),
     reverse(),
   ];
-  // The second reverse slot: a mega, a special, an illustration, or a reverse.
+  /* The second reverse slot: a mega, a special, an illustration, or a reverse.
+     The rolls are in turn, so each is CONDITIONED on the ones before having
+     missed - that is what lands each rarity at its published per-pack rate
+     rather than a shade under it. */
   let slot2;
-  if (rng() < chanceOf("mega", pity.mega)) slot2 = of("mega", "h");
-  else if (rng() < chanceOf("special", pity.special)) slot2 = of("special", "h");
-  else if (rng() < RATES.illustration) slot2 = of("illustration", "h");
+  const m = chanceOf("mega", pity.mega, rules), s = chanceOf("special", pity.special, rules);
+  if (rng() < m) slot2 = of("mega", "h");
+  else if (rng() < Math.min(1, s / (1 - m))) slot2 = of("special", "h");
+  else if (rng() < Math.min(1, rates.illustration / Math.max(1e-9, 1 - m - s))) slot2 = of("illustration", "h");
   else slot2 = reverse();
   // The rare slot: an ultra, a double, or a holo rare - forced to a hit
   // on the `hit` pity's hard pack when nothing else in the pack is one.
   const r = rng();
-  const forced = pity.hit + 1 >= PITY.hit.hard && !isHit(slot2.rarity);
-  const rareSlot = r < RATES.ultra || (forced && r < RATES.ultra / (RATES.ultra + RATES.double))
+  const forced = pity.hit + 1 >= rules.pity.hit.hard && !isHit(slot2.rarity);
+  const rareSlot = r < rates.ultra || (forced && r < rates.ultra / (rates.ultra + rates.double))
     ? of("ultra", "h")
-    : r < RATES.ultra + RATES.double || forced ? of("double", "h") : of("rare", "h");
+    : r < rates.ultra + rates.double || forced ? of("double", "h") : of("rare", "h");
 
   const pulls = [...base, ...sortTail([slot2, rareSlot])];
   const best = Math.max(...pulls.map((p) => rungOf(p.rarity)));

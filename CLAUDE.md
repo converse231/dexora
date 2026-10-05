@@ -674,9 +674,14 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `buyPacks` and `openCardPack(set)` are the only writers of `cards`,
   `packs`, `earnedPacks` and `cardPity`; a pack is decided and SAVED before
   the scene plays, an earned pack opens first and stamps its cards, and a
-  first badge pays one (`battleEnd`'s `pack`). `RATES`, `PITY` and
-  `GOD_PACK` are ours (your call, 2026-10-02) and the Packs tab prints them,
-  never a typed number. The opening hides the bars (`body.cd-opening`), and
+  first badge pays one (`battleEnd`'s `pack`). **Pull rates are real life,
+  one row a set** (`SET_RATES`, TCGplayer's per-pack data; your call
+  2026-10-06): `rulesOf(setId)` is a set's rates, hit rate and pity, and
+  `openPack` takes it. A set with no row fails check.mjs, so a new
+  expansion ships with its own real numbers. Pity is a safety net scaled
+  to each set (`PITY_NET`: rising from 1.5x the average wait, certain at
+  3x), which makes the chase ~20-25% kinder than real; `GOD_PACK` is ours,
+  kept as a treat. The Packs tab prints all of it, never a typed number. The opening hides the bars (`body.cd-opening`), and
   each beat moves on only from the beat it follows (a skip mid-tear was
   dragged back by its timers). **While cards are face down, App holds
   banners and tips** (`cardScene`, raised by the page BEFORE the open, in the
@@ -889,8 +894,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   for what is on the other trainer's SHELF. A Pokemon enters trading through
   one path, `enterTrading` (flush, register, assign). App holds the ONE inbox
   every tab reads (a tab's own copy went stale when a trade finished).
-  A board listing is one Pokemon for a species (+ tier if named), friends
-  only; `fits` in trade.js mirrors `fulfil_listing`'s rule for the button.
+  A board listing is one Pokemon for a species (+ tier if named), and the
+  board is GLOBAL (your call, 2026-10-06; it was friends only) - anyone not
+  blocked either way sees and completes it (`blocked_between` in
+  `trade_board` and `fulfil_listing`); `fits` in trade.js mirrors
+  `fulfil_listing`'s rule for the button. **Friends live on your trainer
+  card** (the profile's Friends panel: requests, the list, add by code,
+  blocked; their count lights You, not Trade); the Trainers tab is search.
   **A block works both ways and ends the friendship**, and friending refuses
   across one, so friends implies no block and the friends-only modes need no
   check of their own; every other read (search, card, shelf, offer, request)

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CARD_SETS } from "../../data/cards/index.js";
 import { WRAPPERS } from "../../data/cards/art.js";
 import {
-  RARITY, CARD_RARITIES, landsOn, RATES, HIT_RATE, PITY, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
+  RARITY, CARD_RARITIES, landsOn, rulesOf, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
   copiesOf, chanceOf, freshPity, sparesOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit,
 } from "../../game/cards.js";
 import CardFace, { RarityMark } from "./Card.jsx";
@@ -183,7 +183,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   );
 }
 
-/* ONE SET'S PACKS: its real wrappers fanned, the odds (read from `RATES`,
+/* ONE SET'S PACKS: its real wrappers fanned, the odds (its own real-life rates, `rulesOf`,
    never typed), the three pity meters, your best pull, and the chase gallery
    - every Mega Hyper Rare and Special illustration rare, owned or still out
    there, each with its own odds. */
@@ -197,12 +197,16 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
     const mine = log.filter(([id]) => id.startsWith(`${meta.id}-`)).map(([id, v]) => [set?.CARDS.find((c) => cardId(meta.id, c[0]) === id), v]).filter(([c]) => c);
     return mine.sort((a, b) => rungOf(b[0][3]) - rungOf(a[0][3]))[0] ?? null;
   }, [log, set, meta.id]);
-  /* Each rate under the rarity it gives IN THIS SET (`landsOn`): Prismatic's
-     illustration roll is an ACE SPEC, a Scarlet & Violet set's top roll a
-     Hyper rare. */
+  /* THIS SET'S OWN RULES (`rulesOf`): its real-life rates and the pity scaled
+     to them. Each rate under the rarity it gives IN THIS SET (`landsOn`):
+     Prismatic's illustration roll is an ACE SPEC, a Scarlet & Violet set's
+     top roll a Hyper rare. */
+  const rules = rulesOf(meta.id);
+  const { rates, pity: net } = rules;
   const as = (r) => (set ? landsOn(set.CARDS, r) ?? r : r);
-  const odds = [["double", RATES.double], ["illustration", RATES.illustration], ["ultra", RATES.ultra],
-    ["special", RATES.special], ["mega", RATES.mega]].map(([r, p]) => [as(r), p]);
+  const odds = ["double", "illustration", "ultra", "special", "mega"].map((r) => [as(r), rates[r]]);
+  // The rate a rarity is pulled at here: the roll that lands on it.
+  const rateOf = (rarity) => rates[Object.keys(rates).find((k) => as(k) === rarity)] ?? 0;
   const meters = [
     ["hit", "A Double rare or better", pity.hit],
     ["special", "A Special illustration rare", pity.special],
@@ -227,7 +231,7 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
       </div>
       <div className="cd-set-body">
         <h4>{meta.name}</h4>
-        <p className="cd-sub">{meta.total} cards · {PACK_SIZE} a pack · a hit about 1 pack in {(1 / HIT_RATE).toFixed(1)} · {yen(PACK_PRICE)}</p>
+        <p className="cd-sub">{meta.total} cards · {PACK_SIZE} a pack · a hit about 1 pack in {(1 / rules.hit).toFixed(1)} · {yen(PACK_PRICE)}</p>
         <ul className="cd-odds" aria-label="Odds per pack">
           {odds.map(([r, p]) => (
             <li key={r}><RarityMark rarity={r} /><span>{RARITY[r].name}</span><b>1 in {oneIn(p)}</b></li>
@@ -236,12 +240,12 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
         </ul>
         <div className="cd-pity">
           {meters.map(([k, name, n]) => {
-            const left = PITY[k].hard - n;
+            const left = net[k].hard - n;
             return (
               <div key={k} className="cd-meter">
-                <span>{name} <em>within {left} pack{left === 1 ? "" : "s"}</em></span>
-                <i style={{ "--p": n / PITY[k].hard }} />
-                {k !== "hit" && n + 1 > PITY[k].soft && <small>Odds up: {Math.round(chanceOf(k, n) * 100)}% this pack</small>}
+                <span>{name} <em>within {left.toLocaleString()} pack{left === 1 ? "" : "s"}</em></span>
+                <i style={{ "--p": n / net[k].hard }} />
+                {k !== "hit" && n + 1 > net[k].soft && <small>Odds up: {Math.round(chanceOf(k, n, rules) * 100)}% this pack</small>}
               </div>
             );
           })}
@@ -283,7 +287,7 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
               return (
                 <button key={c[0]} type="button" className={`cd-chase-card${row ? " got" : ""}`} onClick={() => onLook(c[0])}>
                   <CardFace setId={meta.id} card={c} variant="h" still lazy />
-                  <span><RarityMark rarity={c[3]} /> 1 in {oneIn(RATES[c[3]] / count(c[3]))}</span>
+                  <span><RarityMark rarity={c[3]} /> 1 in {oneIn(rateOf(c[3]) / count(c[3])).toLocaleString()}</span>
                 </button>
               );
             })}

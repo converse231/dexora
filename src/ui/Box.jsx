@@ -268,7 +268,9 @@ function Box({
     if (only === "evolves" && !g.paths.length) return false;
     // `plain` is the ordinary pile; anything else names one tier exactly.
     if (rare === "plain" && g.variant) return false;
-    if (rare !== "all" && rare !== "plain" && g.variant !== rare) return false;
+    // An alpha is a layer, not a tier (any tier can be one): its own filter.
+    if (rare === "alpha") { if (!g.alpha) return false; }
+    else if (rare !== "all" && rare !== "plain" && g.variant !== rare) return false;
     if (!needle) return true;
     return (
       label(sp).toLowerCase().includes(needle) ||
@@ -579,6 +581,7 @@ function Box({
                   v ? v[0].toUpperCase() + v.slice(1) : "Ordinary",
                   groups.filter((g) => (g.variant ?? null) === v).length,
                 ]),
+                ["alpha", "Alpha", groups.filter((g) => g.alpha).length],
               ],
             },
             {

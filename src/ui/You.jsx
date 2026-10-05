@@ -18,7 +18,7 @@ import { titleName } from "../game/titles.js";
 const THEME_NAME = { auto: "Auto", dark: "Night", light: "Day" };
 
 export default function You({
-  trainerName, caught, xp, stats, bag, save, account, unread, titles = [],
+  trainerName, caught, xp, stats, bag, save, account, unread, titles = [], requests = 0,
   onProfile, onNews, onHelp, onForms, onSettings, onLogOut, onReset, onSpend,
 }) {
   useModalLock();
@@ -28,7 +28,8 @@ export default function You({
   const free = freePoints(stats, level);
 
   const items = [
-    onProfile && ["card", "Your trainer card", "What other trainers see", onProfile],
+    onProfile && ["card", "Your trainer card",
+      requests ? `${requests} friend request${requests === 1 ? "" : "s"}` : "Your card and your friends", onProfile, requests > 0],
     ["news", "What's new", unread ? "New since you last looked" : "Updates to the game", onNews, unread],
     ["help", "How to play", "Keys, touch, and how it all works", onHelp],
     ["forms", "Rare forms", "The twelve kinds, and their odds", onForms],
