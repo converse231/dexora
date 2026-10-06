@@ -21,6 +21,7 @@ import Help from "./ui/Help.jsx";
 import Variants from "./ui/Variants.jsx";
 import Wardrobe from "./ui/Wardrobe.jsx";
 import Party from "./ui/Party.jsx";
+import CheckIn from "./ui/CheckIn.jsx";
 import { followSheet, PARTY_MAX } from "./game/cosmetics.js";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
@@ -51,6 +52,8 @@ const TradeScene = lazy(() => import("./ui/trade/TradeScene.jsx"));
 const League = lazy(() => import("./ui/league/League.jsx"));
 // The walking party's editor: the trade picker, kept out of the main bundle.
 const PartyPick = lazy(() => import("./ui/PartyPick.jsx"));
+// The weekly roulette: only a spin loads it.
+const Roulette = lazy(() => import("./ui/Roulette.jsx"));
 // The fifth tab (docs/cards.md): its page, and every set's cards, load only when opened.
 const Cards = lazy(() => import("./ui/cards/Cards.jsx"));
 /* Which trades this DEVICE has shown its scene for - a per-device nicety like
@@ -197,6 +200,11 @@ export default function App({
   // Stable like the rest: the Box is memo()'d, and a fresh arrow here rebuilt every row on every walk notice.
   const onPickBuddy = useCallback((uid) => engine?.setBuddy(uid), [engine]);
   const [partyPick, setPartyPick] = useState(false);
+  /* THE DAILY CHECK-IN asks once a session, on the first visit of a day;
+     dismissed, it waits as a pill on the map. The roulette opens from it. */
+  const [checkinOpen, setCheckinOpen] = useState(false);
+  const [rouletteOpen, setRouletteOpen] = useState(false);
+  const askedCheckin = useRef(false);
   const onEditParty = useCallback(() => setPartyPick(true), []);
   const onJumped = useCallback(() => setBoxJump(null), []);
   /* THE ROTOM PANEL'S APP (Dex, Box, Shop, Map, Events), held here so the
@@ -472,9 +480,20 @@ export default function App({
      before it was torn and told you what was in it (found in QA). They play
      on the summary. */
   /* And while a Pokédex reward rolls (DexClaim): the "new packs" tip over the reel. */
-  const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene || claimGen != null;
+  const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene || claimGen != null
+    || checkinOpen || rouletteOpen;
+  const checkin = engine?.checkinStatus?.() ?? null;
+  const spins = st?.checkin?.spins ?? 0;
   // Finished generations not yet claimed - derived, so it is a button until pressed.
   const claims = engine?.dexClaims?.() ?? [];
+  /* First visit of the day: the check-in asks by itself, once a session -
+     never over an encounter or before the trainer is chosen. */
+  useEffect(() => {
+    if (askedCheckin.current || !engine || !checkin?.due || enc || !st?.char) return;
+    askedCheckin.current = true;
+    setCheckinOpen(true);
+  }, [engine, checkin?.due, enc, st?.char]);
+
   // The walking party's Box entries, for the strip on the map: rebuilt only when the party or the Box moves.
   const partyMons = useMemo(() => (st?.party ?? []).map((u) => st.box.find((m) => m.uid === u)).filter(Boolean),
     [st?.party, st?.colRev]);
@@ -701,6 +720,20 @@ export default function App({
       {help && <Help onClose={() => setHelp(false)} />}
       {forms && <Variants onClose={() => setForms(false)} />}
       {wardrobe && engine && st && <Wardrobe engine={engine} state={st} onClose={() => setWardrobe(false)} />}
+      {checkinOpen && checkin && (
+        <CheckIn status={checkin} best={st?.checkin?.best ?? 0}
+          onCheckIn={() => engine.checkIn()}
+          onSpin={() => { setCheckinOpen(false); setRouletteOpen(true); }}
+          onClose={() => setCheckinOpen(false)} />
+      )}
+      {rouletteOpen && engine && (
+        <Suspense fallback={null}>
+          <Roulette spins={spins} onSpin={() => engine.spinRoulette()}
+            onCards={() => { setRouletteOpen(false); goTab("cards"); }}
+            onBox={() => { setRouletteOpen(false); goTab("catch"); openRail("box"); }}
+            onClose={() => setRouletteOpen(false)} />
+        </Suspense>
+      )}
       {partyPick && engine && st && (
         <Suspense fallback={null}>
           <PartyPick engine={engine} box={st.box} party={st.party} onClose={() => setPartyPick(false)} />
@@ -841,7 +874,8 @@ export default function App({
           it is about, never again. See hints.js for why there is no sequence,
           and Hint.jsx for why it is a dialog rather than the bar it started as:
           a tip somebody scrolls past is a tip nobody read. */}
-      {st?.hint && !cardScene && claimGen == null && (
+      {/* Tips wait for the check-in and the roulette too: a pack's first-time tip named the prize mid-spin. */}
+      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && (
         <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 
@@ -1076,6 +1110,20 @@ export default function App({
                 )}
                 <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />
                 <Party mons={partyMons} buddy={st?.buddy ?? null} onPick={onPickBuddy} onEdit={onEditParty} />
+                {checkin?.due && !checkinOpen && (
+                  <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setCheckinOpen(true)}
+                    data-tip="Check in for today's reward and keep your streak">
+                    <i>DAY {checkin.day}</i>
+                    <b>Check in<em className="ms-dot" aria-hidden="true">!</em></b>
+                  </button>
+                )}
+                {spins > 0 && !rouletteOpen && (
+                  <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setRouletteOpen(true)}
+                    data-tip="A banked roulette spin">
+                    <i>ROULETTE</i>
+                    <b>Spin{spins > 1 ? ` ×${spins}` : ""}<em className="ms-dot" aria-hidden="true">!</em></b>
+                  </button>
+                )}
                 {claims.length > 0 && (
                   <button type="button" className="ms-tab ready dc-pill" onClick={() => setClaimGen(claims[0])}
                     data-tip="A finished Pokédex - claim its reward">

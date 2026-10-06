@@ -16,6 +16,29 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-07-checkin",
+    icon: "🔥",
+    date: "October 2026",
+    title: "Daily check-in",
+    items: [
+      ["Check in every day", "One tap a day pays a reward and grows your streak. Miss a day and it starts over."],
+      ["The weekly roulette", "Every 7th day spins the roulette: 3 card packs or a Gold Pokémon."],
+      ["Streak milestones", "Days 7, 30, 100 and 365 get a celebration of their own."],
+    ],
+  },
+  {
+    id: "2026-10-07-partners",
+    icon: "🐾",
+    date: "October 2026",
+    title: "Partners on the road",
+    items: [
+      ["Abilities in the field", "Your walking Pokémon lends its ability: Pickup finds items, Static draws Electric types."],
+      ["Friendship", "Walk together to fill five hearts; a good friend finds things on the way."],
+      ["A party of three", "Tap + on the map to build your walking party; switch with a tap or Q."],
+      ["Dex Master badges", "Finished regions now show as medals on your card."],
+    ],
+  },
+  {
     id: "2026-10-06-cosmetics",
     icon: "👟",
     date: "October 2026",

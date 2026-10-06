@@ -16,7 +16,7 @@ import RankBadge, { RankMedal } from "../RankBadge.jsx";
 import { dexRank } from "../../game/medals.js";
 import { peakRank, seasonName } from "../../game/ranked.js";
 import { rankedStanding } from "../../net/cloud.js";
-import { titleName } from "../../game/titles.js";
+import TitleBadges from "../TitleBadges.jsx";
 import CardShow from "../cards/CardShow.jsx";
 
 /* THEIR RANK (docs/ranked.md, 6c), read from the server when the profile
@@ -239,7 +239,7 @@ export default function TrainerProfile({
             {dexRank(card.dex_count).name}
           </span>
           {/* Titles the server derived from the stored save (card_titles). */}
-          {card.titles?.length > 0 && <span className="you-titles">{card.titles.map((t) => <i key={t}>{titleName(t)}</i>)}</span>}
+          <TitleBadges titles={card.titles} />
           {self && <FriendCode code={card.friend_code} />}
         </div>
       </header>

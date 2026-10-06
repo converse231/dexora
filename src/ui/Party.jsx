@@ -10,6 +10,7 @@ import { label } from "../game/map.js";
 import { speciesById } from "../game/biomes.js";
 import { variantOf } from "../game/items.js";
 import { PARTY_MAX } from "../game/cosmetics.js";
+import { abilityOf, abilityName, fieldText, heartsOf, HEARTS } from "../game/abilities.js";
 
 function Party({ mons, buddy, onPick, onEdit }) {
   const full = mons.length >= PARTY_MAX;
@@ -18,10 +19,13 @@ function Party({ mons, buddy, onPick, onEdit }) {
       {mons.map((m) => {
         const name = label(speciesById(m.species));
         const on = m.uid === buddy;
+        // Its ability, what it does out here, and its friendship - the tooltip's second line.
+        const what = fieldText(m);
+        const about = `${abilityName(abilityOf(m))}${what ? ` (${what.toLowerCase()})` : ""} · friendship ${heartsOf(m.walked)}/${HEARTS.length}`;
         return (
           <button key={m.uid} type="button" className={`party-mon${on ? " on" : ""}`} aria-pressed={on}
             aria-label={on ? `${name} is walking with you. Put it in its ball` : `Walk with ${name}`}
-            data-tip={on ? `${name} · tap to rest · Q to switch` : `Walk with ${name}`}
+            data-tip={on ? `${name} · ${about} · tap to rest, Q to switch` : `Walk with ${name} · ${about}`}
             onClick={() => onPick(on ? null : m.uid)}>
             <Sprite id={m.species} variant={variantOf(m)} alt="" eager />
           </button>

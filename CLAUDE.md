@@ -78,6 +78,8 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/data/anims.js`, `public/battle/anim/` | `npm run anims` (pokeemerald-expansion, pinned; restart a running dev server after) |
 | `public/follow/`, `src/data/follow.js` | `npm run follow` (the same pin; check.mjs reads each header) |
 | `public/skins/` | `npm run skins` (from `SKINS` in cosmetics.js plus the tool's `SRC`) |
+| `src/data/abilities.js` | `npm run abilities` (PokeAPI, cached in .assets-src/abilities) |
+| `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
   National Dex alone, read by the fetchers).
@@ -753,6 +755,20 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   **There is no bike pose** for anyone - a rail is the walk or the run.
   The Box preview is PORTALLED to the body (`container: rail` trapped it under
   the ball rail).
+- **The walking Pokemon lends its field ability and grows friendship**
+  (`abilities.js`, docs/cosmetics.md): only while it is out (`walker()` - not
+  riding), each effect one lever - encounter `rate`, a type's weight in
+  `pickSpecies` (`TYPE_PULL`), or a `find` - never the tier roll. An entry's
+  ability is its species' regular one by uid, an alpha's its hidden one.
+  Steps together count on the box entry (`walked`) IN PLACE: a heart or a find
+  is the one `changed()`, or a big Box rebuilds every step.
+- **The daily check-in and the weekly roulette are designed in
+  docs/checkin.md** (`checkin.js`): one stamp a day (`dayKey`), a streak kept
+  by yesterday, the week's ladder `CHECKIN_REWARDS`, and day 7 banks a spin.
+  `checkIn` and `spinRoulette` pay and SAVE before any stamp or reel plays;
+  the roulette's Gold Pokemon counts as caught
+  (species and Gold row), 2 slots in 15.
+  Tips and banners wait while either is open.
 - **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`
   rules): its rim drains with steps left over the item's own `steps`.
 - **Hard mode is designed in docs/battles.md, phase 8.** A cleared region's

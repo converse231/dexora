@@ -25,6 +25,12 @@ export function titleIds(milestones = {}, medals = []) {
   return out.sort();
 }
 
+/* THE DRAWN ONES: public/titles/<kind>-<id>.png (art/titles, npm run ranks).
+   Every region's Dex Master so far; a card set's gets a line here once its
+   art exists (check.mjs holds each named file to the disk). */
+const DRAWN = /^dex:[1-9]$/;
+export const titleBadge = (t) => (DRAWN.test(t) ? `titles/${t.replace(":", "-")}.png` : null);
+
 const setName = (id) => CARD_SETS.find((s) => s.id === id)?.name ?? id;
 export function titleName(t) {
   const [kind, id] = t.split(":");

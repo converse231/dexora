@@ -7567,6 +7567,128 @@ button:disabled { transition: none; }
 }
 
 
+/* ================================================================ CHECK-IN
+   (docs/checkin.md) The day's one press: a streak flame, the week as seven
+   tiles, today lit in the call-to-action orange, the seventh in roulette
+   gold. Loops move transform and opacity only. */
+.ci-card {
+  position: relative; width: min(470px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto;
+  display: grid; gap: 14px; justify-items: center; text-align: center; padding: 22px 18px 18px;
+  background: var(--surface); border: 1px solid var(--line-firm); border-radius: 22px;
+  box-shadow: 0 30px 70px var(--shadow); animation: ci-in 340ms cubic-bezier(.2, 1.3, .4, 1);
+}
+@keyframes ci-in { from { transform: scale(.9) translateY(14px); opacity: 0; } }
+.ci-x { position: absolute; top: 12px; right: 12px; }
+.ci-kicker { font: 600 11px var(--pixel); text-transform: uppercase; color: var(--accent); }
+.ci-streak { display: flex; align-items: center; gap: 10px; }
+.ci-streak > .ic { color: #ff7a38; filter: drop-shadow(0 0 10px rgba(255, 122, 56, .6)); animation: ci-flicker 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes ci-flicker { 50% { transform: scale(1.08, 1.12) rotate(-2deg); } }
+.ci-streak > b { font: 800 56px/1 var(--display); color: var(--ink); animation: ci-count 500ms cubic-bezier(.2, 1.5, .4, 1); }
+@keyframes ci-count { from { transform: scale(.6); opacity: .3; } }
+.ci-streak > span { display: grid; text-align: left; font: 700 15px var(--display); color: var(--ink-soft); }
+.ci-streak > span i { font: 600 10px var(--pixel); font-style: normal; color: var(--ink-faint); text-transform: uppercase; }
+.ci-broke { margin: -4px 0 0; font-size: 13px; color: var(--ink-soft); }
+.ci-week { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.ci-day {
+  position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; padding: 8px 2px 7px;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); min-width: 0;
+}
+.ci-day em { font: 600 9px var(--pixel); font-style: normal; color: var(--ink-faint); text-transform: uppercase; }
+.ci-day b { font: 700 10px/1.15 var(--display); color: var(--ink); overflow-wrap: anywhere; }
+.ci-day .ci-ic { width: 26px; height: 26px; object-fit: contain; display: grid; place-items: center; image-rendering: pixelated; }
+.ci-yen { color: #ffcf4a; }
+.ci-day.spin { background: linear-gradient(160deg, color-mix(in srgb, #ffcf4a 30%, var(--surface-2)), var(--surface-2)); border-color: color-mix(in srgb, #ffcf4a 60%, transparent); }
+.ci-spin { color: #ffcf4a; }
+.ci-day.later { opacity: .62; }
+.ci-day.past { opacity: .55; }
+.ci-day.today { border-color: #ff7a38; opacity: 1; }
+.ci-day.today::after { content: ""; position: absolute; inset: -3px; border-radius: 14px; pointer-events: none;
+  box-shadow: 0 0 16px rgba(255, 122, 56, .7); animation: ci-glow 1.4s ease-in-out infinite; }
+@keyframes ci-glow { 50% { opacity: .25; } }
+.ci-check { position: absolute; top: -6px; right: -4px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: #2fbf71; color: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .35); }
+.ci-day.stamp { opacity: 1; animation: ci-tile 600ms ease-out; }
+.ci-day.stamp .ci-check { animation: ci-stamp 520ms cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes ci-stamp { from { transform: scale(2.4) rotate(-25deg); opacity: 0; } }
+@keyframes ci-tile { 30% { transform: scale(1.12); } }
+.ci-got { display: grid; gap: 6px; justify-items: center; width: 100%; animation: ci-rise 480ms cubic-bezier(.2, 1.3, .4, 1); }
+@keyframes ci-rise { from { transform: translateY(16px); opacity: 0; } }
+.ci-got > span { font: 600 10px var(--pixel); text-transform: uppercase; color: #2fbf71; }
+.ci-got > b { font: 800 20px var(--display); color: var(--ink); }
+.ci-go {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; padding: 0 20px;
+  border: 0; border-radius: 999px; cursor: pointer; background: var(--cta); color: #fff; font: 800 17px var(--display);
+  box-shadow: 0 10px 26px var(--cta-glow); transition: transform 140ms ease;
+}
+.ci-go:hover { transform: translateY(-1px); }
+.ci-go:active { transform: translateY(1px); }
+.ci-go:disabled { opacity: .5; cursor: default; }
+.ci-go.quiet { background: var(--surface-2); color: var(--ink); box-shadow: none; border: 1px solid var(--line-firm); }
+.ci-foot { margin: 0; font-size: 12px; color: var(--ink-faint); }
+.ci-pill b { color: #ff7a38; }
+/* The milestone: the whole screen, a turning burst, confetti, the number. */
+.ci-party { position: fixed; inset: 0; z-index: 90; display: grid; place-content: center; justify-items: center; gap: 10px; overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, rgba(40, 20, 6, .92), rgba(6, 10, 22, .96) 70%); cursor: pointer; animation: ci-fade 300ms ease; }
+@keyframes ci-fade { from { opacity: 0; } }
+.ci-rays { position: absolute; left: 50%; top: 45%; width: 160vmax; height: 160vmax; margin: -80vmax 0 0 -80vmax; pointer-events: none;
+  background: repeating-conic-gradient(rgba(255, 170, 60, .16) 0 8deg, transparent 8deg 20deg); animation: ci-turn 24s linear infinite; }
+@keyframes ci-turn { to { transform: rotate(360deg); } }
+.ci-medal { position: relative; display: grid; justify-items: center; animation: ci-boom 700ms cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes ci-boom { from { transform: scale(.2); opacity: 0; } }
+.ci-medal .ic { color: #ff7a38; filter: drop-shadow(0 0 22px rgba(255, 122, 56, .9)); animation: ci-flicker 1.4s ease-in-out infinite; transform-origin: 50% 90%; }
+.ci-medal b { font: 900 110px/0.95 var(--display); background: linear-gradient(180deg, #fff6c8, #ffcf4a 45%, #ff8a2b); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 6px 18px rgba(255, 140, 40, .55)); }
+.ci-medal span { font: 700 16px var(--pixel); color: #ffe7a8; }
+.ci-party p { position: relative; margin: 6px 0 0; font: 700 18px var(--display); color: #fff; }
+.ci-party small { position: relative; font-size: 12px; color: rgba(255, 255, 255, .6); }
+.ci-bit { position: absolute; top: -4vh; left: calc(var(--k) * 5.6%); width: 9px; height: 14px; border-radius: 2px; pointer-events: none;
+  background: hsl(calc(var(--k) * 40), 90%, 62%); animation: ci-fall calc(2.4s + var(--k) * .09s) linear calc(var(--k) * -.17s) infinite; }
+@keyframes ci-fall { to { transform: translateY(112vh) rotate(calc(var(--k) * 80deg + 360deg)); } }
+
+/* ================================================================ ROULETTE
+   CS2 case opening: a strip under a marker that races and settles. The
+   strip is the one thing that moves (a transform transition). Packs wear
+   the blue rim, a Gold Pokemon the gold. */
+.rl-card { width: min(760px, 100%); display: grid; gap: 14px; padding: 18px; justify-items: center; text-align: center;
+  background: var(--surface); border: 1px solid var(--line-firm); border-radius: 22px; box-shadow: 0 30px 70px var(--shadow);
+  animation: ci-in 340ms cubic-bezier(.2, 1.3, .4, 1); }
+.rl-head { position: relative; width: 100%; display: grid; gap: 2px; }
+.rl-head h3 { margin: 0; font: 800 22px var(--display); color: var(--ink); }
+.rl-head .set-x { position: absolute; top: 0; right: 0; }
+.rl-view { position: relative; width: 100%; overflow: hidden; border-radius: 14px; background: #0a1120;
+  border: 1px solid var(--line-firm); cursor: pointer;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+.rl-strip { list-style: none; margin: 0; padding: 18px 0; display: flex; gap: 12px; width: max-content; will-change: transform; }
+.rl-cell { flex: none; width: 120px; height: 140px; display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center;
+  padding: 8px 6px 6px; border-radius: 10px; background: linear-gradient(180deg, #1b2740, #121b2e); border-bottom: 4px solid #4b69ff; }
+.rl-cell.gold { border-bottom-color: #e4ae39; background: linear-gradient(180deg, #3a2f12, #181307); }
+.rl-cell img { max-width: 92px; max-height: 96px; object-fit: contain; }
+.rl-cell.gold img { width: 84px; height: 84px; image-rendering: pixelated; }
+.rl-cell span { max-width: 100%; font: 600 10px var(--pixel); color: #c8d3e6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-cell.win { box-shadow: 0 0 0 2px #ffd23f, 0 0 26px rgba(255, 210, 63, .6); animation: rl-win 700ms cubic-bezier(.2, 1.5, .4, 1); }
+@keyframes rl-win { 35% { transform: scale(1.1); } }
+.rl-marker { position: absolute; top: 6px; bottom: 6px; left: 50%; width: 3px; margin-left: -1.5px; background: #ffd23f; pointer-events: none;
+  box-shadow: 0 0 12px rgba(255, 210, 63, .8); }
+.rl-marker::before, .rl-marker::after { content: ""; position: absolute; left: 50%; margin-left: -8px; border: 8px solid transparent; }
+.rl-marker::before { top: -6px; border-top-color: #ffd23f; }
+.rl-marker::after { bottom: -6px; border-bottom-color: #ffd23f; }
+.rl-hint { margin: 0; font: 600 11px var(--pixel); color: var(--ink-faint); text-transform: uppercase; }
+.rl-odds { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 12px; color: var(--ink-soft); }
+.rl-dot { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px; background: #4b69ff; }
+.rl-dot.gold { background: #e4ae39; }
+.rl-won { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; align-items: center; text-align: left;
+  padding: 12px; border-radius: 14px; background: linear-gradient(120deg, color-mix(in srgb, #ffd23f 18%, var(--surface-2)), var(--surface-2));
+  animation: ci-rise 480ms cubic-bezier(.2, 1.3, .4, 1); }
+.rl-won > img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; }
+.rl-won > div { display: grid; gap: 2px; }
+.rl-won b { font: 800 18px var(--display); color: var(--ink); }
+.rl-won span { font-size: 13px; color: var(--ink-soft); }
+.rl-won .ci-go { grid-column: 1 / -1; }
+@media (max-width: 520px) { .ci-week { gap: 4px; } .ci-day b { font-size: 9px; } .ci-medal b { font-size: 88px; } }
+@media (prefers-reduced-motion: reduce) {
+  .ci-streak > .ic, .ci-medal .ic, .ci-rays, .ci-bit, .ci-day.today::after { animation: none; }
+}
+
 :root[data-theme="dark"] {
   /* ROTOM, NIGHT: the default. Navy glass, cyan for what is selected. */
   color-scheme: dark;
@@ -8698,11 +8820,26 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .pp-slots li.empty { border-style: dashed; align-content: center; color: var(--ink-faint); font-size: 12px; background: transparent; }
 .pp-slots img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
 .pp-slots b { font: 600 13px var(--display); color: var(--ink); line-height: 1.15; overflow-wrap: anywhere; }
+.pp-slots small { font-size: 11px; line-height: 1.25; color: var(--ink-soft); }
+/* Friendship as five pips, filled with the accent: a heart glyph would send a phone to its system fonts. */
+.pp-hearts { display: flex; gap: 3px; }
+.pp-hearts i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-firm); }
+.pp-hearts i.on { background: #ff6b8b; }
 .pp-slots button { padding: 5px 10px; border-radius: 8px; cursor: pointer; font: 600 12px var(--display);
   color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line-firm); }
 .pp-slots button:hover { color: var(--bad); border-color: var(--bad); }
 .partypick { width: min(560px, 100%); }
 @media (prefers-reduced-motion: reduce) { .party-mon.on > img { animation: none; } }
+/* ON A PHONE THE PARTY SITS BOTTOM-LEFT of the map (asked for, 2026-10-07):
+   up top it took a third row under the area and the quest. The corner is
+   free there - the minimap only shows on a wide layout. `.hud-left` runs the
+   map's height so the strip can sit at its foot; it lets touches through
+   everywhere but its own buttons. */
+@media (hover: none) and (pointer: coarse) {
+  .hud-left { bottom: 12px; align-content: flex-start; pointer-events: none; }
+  .hud-left > * { pointer-events: auto; }
+  .hud-left > .party { position: absolute; left: 0; bottom: 0; }
+}
 
 /* ================================================================ CARDS
    The fifth tab (docs/cards.md): Packs, Binder, Card Dex, Dust, the card view
@@ -8889,7 +9026,9 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-cover.done::after { content: ""; position: absolute; top: -20%; bottom: -20%; left: -40%; width: 30%; pointer-events: none;
   background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .45), transparent); animation: cd-sweep 3.4s ease-in-out infinite; }
 /* Earned titles: on You and on a trainer card. */
-.you-titles { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.you-titles { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 4px; }
+/* A drawn title: the medal alone, its name in the tooltip (TitleBadges). */
+.title-badge { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
 .you-titles i { font-style: normal; font: 700 11px var(--pixel); padding: 3px 8px; border-radius: 999px;
   color: #3a2600; background: linear-gradient(#ffe27a, #f0b83c); }
 .tp-cards .cd-chase-card { width: 92px; }
