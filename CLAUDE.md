@@ -23,7 +23,11 @@ should bring it back.
   touching each other's saves; it does not make a save honest. So nothing the
   browser decides is ranked: the one leaderboard, ranked battles
   (docs/ranked.md), is played and rated on the server, in a format where a
-  save can claim a species but never a stronger one.
+  save can claim a species but never a stronger one. **A save cannot outrun
+  the clock** (`check_save_pace` in trading.sql, 2026-10-07, after MORPH's
+  forged million-step save): steps and catches past real time since the last
+  save flag the account, which keeps its game but leaves trading - the one
+  road a forged save has to other players. Flag, never refuse.
 - **Players' collections must never be lost or overwritten.** Every save-path
   rule below serves this; when in doubt, keep the data.
 
@@ -1062,6 +1066,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   map's table through `preloadSprites` in idle time and KEEPS the Images
   (the host answers `no-cache`; a dropped one revalidated and drew late),
   and the battle's `<Sprite eager>` is never lazy.
+- **`vercel.json` sets the cache headers** (2026-10-07): hashed `/assets/`
+  for a year, fonts a month, every art folder a day plus a week stale. With
+  Vercel's default every visit re-checked every sprite, and the free tier's
+  1M CDN requests ran to 75%. A new art folder joins its list.
 - **The page never scrolls sideways**: `html, body { overflow-x: clip }` is the
   guard, not the fix - an overflow is still a bug to find and size down.
 - **Irreversible presses ask first, gated in the engine** (`state.ask` in
