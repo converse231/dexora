@@ -21,13 +21,14 @@ import Help from "./ui/Help.jsx";
 import Variants from "./ui/Variants.jsx";
 import Wardrobe from "./ui/Wardrobe.jsx";
 import Party from "./ui/Party.jsx";
+import { followSheet, PARTY_MAX } from "./game/cosmetics.js";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
 import Bag from "./ui/Bag.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import {
-  BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall, keeper,
+  BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall, keeper, variantOf,
 } from "./game/items.js";
 import { ItemIcon, eventIcon, preloadSprites } from "./ui/Sprite.jsx";
 import { EVENT_NAME } from "./game/events.js";
@@ -48,6 +49,8 @@ const TradeScene = lazy(() => import("./ui/trade/TradeScene.jsx"));
 /* THE LEAGUE, the same way: the battle rules, rosters and moves are the
    heaviest data in the game, and only this chunk carries them (asserted). */
 const League = lazy(() => import("./ui/league/League.jsx"));
+// The walking party's editor: the trade picker, kept out of the main bundle.
+const PartyPick = lazy(() => import("./ui/PartyPick.jsx"));
 // The fifth tab (docs/cards.md): its page, and every set's cards, load only when opened.
 const Cards = lazy(() => import("./ui/cards/Cards.jsx"));
 /* Which trades this DEVICE has shown its scene for - a per-device nicety like
@@ -127,6 +130,12 @@ const typing = (ev) => {
    happening to have been edited on the same day. */
 const rarestOf = (st, id) => TIERS.find((t) => st?.[t]?.[dexIndex(id)]) ?? null;
 
+/* Which of a species' Box entries walks when the Dex adds it: the rarest
+   tier, an alpha before a plain one, then the highest level. */
+const rank = (m) => { const t = TIERS.indexOf(variantOf(m)); return t < 0 ? TIERS.length : t; };
+const bestOf = (box, id) => box.filter((m) => m.species === id)
+  .sort((a, b) => rank(a) - rank(b) || (b.alpha ? 1 : 0) - (a.alpha ? 1 : 0) || b.level - a.level)[0] ?? null;
+
 export default function App({
   onLogOut = null, onEngine = null, trainerName = null, account = null,
 }) {
@@ -186,8 +195,9 @@ export default function App({
   const onLevelUp = useCallback((uid, n) => engine?.levelUp(uid, n), [engine]);
   const onEvolve = useCallback((uid, to) => engine?.evolve(uid, to), [engine]);
   // Stable like the rest: the Box is memo()'d, and a fresh arrow here rebuilt every row on every walk notice.
-  const onParty = useCallback((uids) => engine?.setParty(uids), [engine]);
   const onPickBuddy = useCallback((uid) => engine?.setBuddy(uid), [engine]);
+  const [partyPick, setPartyPick] = useState(false);
+  const onEditParty = useCallback(() => setPartyPick(true), []);
   const onJumped = useCallback(() => setBoxJump(null), []);
   /* THE ROTOM PANEL'S APP (Dex, Box, Shop, Map, Events), held here so the
      HUD's event cards and the Dex's "See in Box" can open the right one, and
@@ -691,6 +701,11 @@ export default function App({
       {help && <Help onClose={() => setHelp(false)} />}
       {forms && <Variants onClose={() => setForms(false)} />}
       {wardrobe && engine && st && <Wardrobe engine={engine} state={st} onClose={() => setWardrobe(false)} />}
+      {partyPick && engine && st && (
+        <Suspense fallback={null}>
+          <PartyPick engine={engine} box={st.box} party={st.party} onClose={() => setPartyPick(false)} />
+        </Suspense>
+      )}
       {news && <News onClose={() => setNews(false)}
         onEvents={() => { setNews(false); goTab("catch"); openRail("events"); }} />}
       {trade && (
@@ -1060,7 +1075,7 @@ export default function App({
                   </div>
                 )}
                 <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />
-                <Party mons={partyMons} buddy={st?.buddy ?? null} onPick={onPickBuddy} />
+                <Party mons={partyMons} buddy={st?.buddy ?? null} onPick={onPickBuddy} onEdit={onEditParty} />
                 {claims.length > 0 && (
                   <button type="button" className="ms-tab ready dc-pill" onClick={() => setClaimGen(claims[0])}
                     data-tip="A finished Pokédex - claim its reward">
@@ -1172,7 +1187,6 @@ export default function App({
           onBuy={(id, n) => engine.buy(id, n)}
           onBuyCandy={(n) => engine.buyCandy(n)}
           onEvolve={onEvolve}
-          onParty={onParty}
           jumpTo={boxJump}
           onJumped={onJumped}
           onSpend={(id) => engine.spend(id)}
@@ -1217,6 +1231,19 @@ export default function App({
              variant that cannot currently spawn at all. */
           owned={st?.box?.filter((m) => m.species === entry).length ?? 0}
           onFindInBox={(id) => { setBoxJump(id); setEntry(null); openRail("box"); }}
+          /* THE WALKING PARTY from the Dex: this species' best Box entry joins,
+             or leaves; a full party opens the editor to make room. */
+          walk={(() => {
+            if (followSheet(entry) == null || !st?.box?.some((m) => m.species === entry)) return null;
+            const member = st.party.find((u) => st.box.find((m) => m.uid === u)?.species === entry) ?? null;
+            return { member, full: member == null && st.party.length >= PARTY_MAX };
+          })()}
+          onWalk={() => {
+            const member = st.party.find((u) => st.box.find((m) => m.uid === u)?.species === entry);
+            if (member != null) engine.setParty(st.party.filter((u) => u !== member));
+            else if (st.party.length >= PARTY_MAX) { setEntry(null); setPartyPick(true); }
+            else { const m = bestOf(st.box, entry); if (m) engine.setParty([...st.party, m.uid]); }
+          }}
           /* Only once the inbox has answered: signed in, and trading open. */
           onFindOnBoard={inbox ? (id) => { setEntry(null); setTrade({ name: null, board: id }); } : null}
           /* Travelling closes the sheet, because the answer to "where do I

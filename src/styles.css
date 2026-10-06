@@ -8631,13 +8631,6 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
    (docs/cosmetics.md) Walk with me on the Box preview, and the Wardrobe off
    You: a skin is its walk's front-facing stand frame, read off its sheet
    (48x128, drawn at 2x: column 1 of 3, row 0). */
-.pv-walk {
-  width: 100%; padding: 11px; border-radius: 11px; cursor: pointer;
-  font: 600 13px var(--display); color: var(--accent);
-  border: 1px solid var(--accent); background: transparent;
-}
-.pv-walk.on { background: var(--surface-2); border-color: var(--line-firm); }
-.preview > .pv-walk + .sheet-close { margin-top: 0; }
 .wd-buddy {
   display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 9px 12px;
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2);
@@ -8684,12 +8677,31 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   transition: background-color 160ms ease;
 }
 .party-mon > img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated;
-  opacity: .5; transform: scale(.88); transition: opacity 160ms ease, transform 160ms ease; }
+  opacity: .72; transform: scale(.88); transition: opacity 160ms ease, transform 160ms ease; }
 .party-mon:hover > img { opacity: .85; }
 .party-mon.on { background: color-mix(in srgb, var(--accent) 26%, transparent); }
 .party-mon.on > img { opacity: 1; transform: scale(1.06); animation: party-pop 300ms cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes party-pop { from { transform: scale(.55); opacity: .4; } }
-.party-mon:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.party-mon:focus-visible, .party-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* + while there is room, edit once full: quieter than a member, the same size. */
+.party-add {
+  width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); transition: background-color 160ms ease;
+}
+.party-add.edit { border-style: solid; border-color: transparent; color: var(--ink-soft); background: transparent; }
+.party-add:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+/* The editor: three slots over the picker, each member with its way out. */
+.pp-slots { list-style: none; margin: 12px 0 14px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pp-slots li { display: grid; justify-items: center; align-content: start; gap: 4px; padding: 8px 6px; min-height: 112px;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); text-align: center; }
+.pp-slots li.empty { border-style: dashed; align-content: center; color: var(--ink-faint); font-size: 12px; background: transparent; }
+.pp-slots img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
+.pp-slots b { font: 600 13px var(--display); color: var(--ink); line-height: 1.15; overflow-wrap: anywhere; }
+.pp-slots button { padding: 5px 10px; border-radius: 8px; cursor: pointer; font: 600 12px var(--display);
+  color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line-firm); }
+.pp-slots button:hover { color: var(--bad); border-color: var(--bad); }
+.partypick { width: min(560px, 100%); }
 @media (prefers-reduced-motion: reduce) { .party-mon.on > img { animation: none; } }
 
 /* ================================================================ CARDS

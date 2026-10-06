@@ -1,15 +1,18 @@
 /* THE WALKING PARTY, on the map (docs/cosmetics.md): up to three Pokemon
    from the Box, one walking behind you. Tap one to send it out, tap the one
-   walking to put it back in its ball; Q cycles them. The engine plays the
-   release on the canvas, so this is buttons only. Hidden with no party. */
+   walking to put it back in its ball; Q cycles them. A + while there is
+   room, an edit button once it is full - both open the party picker. The
+   engine plays the release on the canvas, so this is buttons only. */
 import { memo } from "react";
 import Sprite from "./Sprite.jsx";
+import Icon from "./Icon.jsx";
 import { label } from "../game/map.js";
 import { speciesById } from "../game/biomes.js";
 import { variantOf } from "../game/items.js";
+import { PARTY_MAX } from "../game/cosmetics.js";
 
-function Party({ mons, buddy, onPick }) {
-  if (!mons.length) return null;
+function Party({ mons, buddy, onPick, onEdit }) {
+  const full = mons.length >= PARTY_MAX;
   return (
     <div className="party" role="group" aria-label="Walking party">
       {mons.map((m) => {
@@ -24,6 +27,11 @@ function Party({ mons, buddy, onPick }) {
           </button>
         );
       })}
+      <button type="button" className={`party-add${full ? " edit" : ""}`} onClick={onEdit}
+        aria-label={full ? "Change your walking party" : "Add a Pokémon to your walking party"}
+        data-tip={full ? "Change your walking party" : mons.length ? "Add another to walk with" : "Walk with a Pokémon"}>
+        <Icon n={full ? "edit" : "plus"} size={full ? 16 : 18} />
+      </button>
     </div>
   );
 }
