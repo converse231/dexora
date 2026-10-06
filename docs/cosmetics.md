@@ -54,6 +54,40 @@ battle.
 - **Not built, on purpose:** friendship, items it finds, mood lines and
   ribbons. They would turn a companion into a source of income.
 
+## Field abilities and friendship (2026-10-07)
+
+The one walking with you is no longer only a look. The rule moved on purpose:
+it is still never the tier roll, a battle or ranked.
+
+- **Field abilities** (`src/game/abilities.js`). A Box entry has one of its
+  species' regular abilities, picked by its uid, so the same Pokémon always
+  has the same one. An alpha has the hidden ability. A form without its own
+  data reads its species'. The data is `npm run abilities` (PokeAPI).
+- **Only while it is out.** Riding puts it in its ball and switches it off.
+  Each effect moves one of the levers a field item does:
+
+  | Ability | Effect |
+  |---|---|
+  | Illuminate, Arena Trap, No Guard, Swarm | More encounters (×1.25) |
+  | Stench, White Smoke, Quick Feet, Infiltrator | Fewer encounters (×0.5) |
+  | Intimidate, Keen Eye | A few fewer encounters (×0.75) |
+  | Static, Lightning Rod, Magnet Pull, Flash Fire, Storm Drain, Harvest | That type weighs `TYPE_PULL` (2×) in the species roll |
+  | Pickup | A ball or berry about every 150 steps |
+  | Compound Eyes, Super Luck | The same finds, about every 300 steps |
+  | Honey Gather | A Honey about every 1,500 steps |
+
+  Abilities with nothing to act on here (eggs, natures, held items) do
+  nothing. About 265 species have a copy with a field ability.
+- **Friendship.** Steps taken together while it is out count on the Box entry
+  (`walked`, reset by a trade, as in the games). Five hearts at
+  `HEARTS` (200, 800, 2,000, 4,000 and 8,000 steps).
+  - Each new heart is announced.
+  - From `FRIEND_FINDS` (3) hearts, any Pokémon also finds a ball or berry
+    about every 400 steps.
+  - The count changes in place, and only a heart or a find is a `changed()`.
+- **Finds are items, never money.** Pickup is about ¥700 of items per 1,000
+  steps, beside a walking wage of about ¥9,500.
+
 ## Trainer skins
 
 - **`state.skins` lists the skins bought; `state.skin` is the one worn**

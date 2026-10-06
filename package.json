@@ -27,6 +27,7 @@
     "anims": "python tools/build_anims.py",
     "follow": "python tools/build_follow.py",
     "skins": "python tools/build_skins.py",
+    "abilities": "node tools/fetch-abilities.mjs",
     "cards": "node tools/fetch-cards.mjs && python tools/fetch_card_art.py"
   },
   "dependencies": {

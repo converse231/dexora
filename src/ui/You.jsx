@@ -13,7 +13,7 @@ import { levelProgress } from "../game/biomes.js";
 import { dexRank } from "../game/medals.js";
 import { freePoints } from "../game/trainer.js";
 import { themeChoice, setTheme, THEMES } from "./theme.js";
-import { titleName } from "../game/titles.js";
+import TitleBadges from "./TitleBadges.jsx";
 
 const THEME_NAME = { auto: "Auto", dark: "Night", light: "Day" };
 
@@ -48,9 +48,7 @@ export default function You({
             <span className="xpbar" aria-hidden="true"><i style={{ width: `${Math.round(frac * 100)}%` }} /></span>
             <small>{need ? `${into.toLocaleString()} / ${need.toLocaleString()} XP to Lv ${level + 1}` : "Max level"}</small>
             {/* TITLES, earned: a completed set or master set, a generation's Pokédex. */}
-            {titles.length > 0 && (
-              <span className="you-titles">{titles.map((t) => <i key={t}>{titleName(t)}</i>)}</span>
-            )}
+            <TitleBadges titles={titles} />
           </div>
           {/* A button, not a #link: the hash is the app's route (App's hashchange). */}
           {free > 0 && (

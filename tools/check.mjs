@@ -2523,6 +2523,22 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       }
     }
   }
+  /* EVERY TITLE THE CODE DRAWS AS A BADGE has its built file (titleBadge,
+     npm run ranks), 128px and small: a missing one is an empty img on every
+     trainer card that holds the title. */
+  {
+    const { titleBadge } = await import("../src/game/titles.js");
+    const drawn = [...Array(9)].map((_, i) => `dex:${i + 1}`).map(titleBadge);
+    assert.ok(drawn.every(Boolean), "a region's Dex Master has no badge path");
+    for (const b of drawn) {
+      const f = new URL(`../public/${b}`, import.meta.url);
+      assert.ok(existsSync(f), `${b} is missing - is the original in art/titles, and was npm run ranks run?`);
+      const png = readFileSync(f);
+      assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [128, 128], `${b} is not the built 128px badge`);
+      assert.ok(png.length < 24 * 1024, `${b} is ${png.length >> 10}KB - run npm run ranks`);
+    }
+    assert.equal(titleBadge("set:me01"), null, "a card set's title claims a badge that is not drawn");
+  }
   /* A GENERATION'S MEDAL is every national number of it and nothing else (no
      form), so a region's Pokédex is what the games call one; its charm is
      at least a research star's lift (a whole generation outranks one
@@ -7310,6 +7326,22 @@ import * as COS from "../src/game/cosmetics.js";
   // Two species have no drawing upstream (Alcremie's); a big drop means the build lost some.
   assert.ok(walkers.length >= SPECIES.length - 5, `only ${walkers.length} of ${SPECIES.length} species can follow you`);
   console.log(`cosmetics ok — ${COS.SKINS.length} skins, each a walk set with a price; ${walkers.length} of ${SPECIES.length} species can follow you, from ${files.size} sheets; no rule module reads either`);
+}
+
+/* FIELD ABILITIES (abilities.js): every ability the table names is a real
+   one in the data (a typo would be an effect that never fires), every species
+   resolves to an ability, every find is an item the bag knows, and no find
+   is a coin - finds are items, never income. */
+{
+  const AB = await import("../src/game/abilities.js");
+  const { ABILITY_NAMES } = await import("../src/data/abilities.js");
+  const { itemById } = await import("../src/game/items.js");
+  for (const k of Object.keys(AB.FIELD)) assert.ok(ABILITY_NAMES.includes(k), `FIELD names "${k}", which no species has - a typo?`);
+  const none = SPECIES.filter((sp) => !AB.abilityOf({ uid: 1, species: sp.id }));
+  assert.equal(none.length, 0, `${none.length} species have no ability (${none.slice(0, 5).map((s) => s.name)}) - npm run abilities`);
+  for (const [kind, f] of Object.entries(AB.FINDS)) for (const [id] of f.pool) assert.ok(itemById(id), `the ${kind} find gives "${id}", which is no item`);
+  assert.deepEqual([...AB.HEARTS].sort((a, b) => a - b), AB.HEARTS, "friendship hearts are out of order");
+  console.log(`abilities ok — ${Object.keys(AB.FIELD).length} field abilities, all real; every species has an ability; finds are items`);
 }
 
 /* CARDS (docs/cards.md). A collection, never a strength: no rule module

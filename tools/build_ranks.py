@@ -16,6 +16,12 @@ place (24px lists, 48px titles) scales it down in the browser.
 check.mjs holds the output to the ladders: a file for every rank id in
 `RANKS` and `DEX_RANKS`, at SIZE, under a size bound.
 
+TITLE BADGES go the same way (2026-10-07): art/titles/<kind>-<id>.png (dex-1
+is Kanto's Dex Master; set-/master- a card set's) to public/titles/, at
+TITLE_SIZE - a badge is drawn at 40 CSS px at most, so 128 covers a 3x
+screen. `titleBadge` in titles.js names the file; a title without one keeps
+its text pill.
+
 Run: npm run ranks
 """
 from pathlib import Path
@@ -28,7 +34,12 @@ SIZE = 192
 MARGIN = 0.04   # of the side, each edge
 
 
-def build(src: Path, dst: Path) -> int:
+TITLES = ROOT / "art" / "titles"
+TITLE_OUT = ROOT / "public" / "titles"
+TITLE_SIZE = 128
+
+
+def build(src: Path, dst: Path, size: int = SIZE) -> int:
     im = Image.open(src).convert("RGBA")
     box = im.getchannel("A").point(lambda a: 255 if a > 8 else 0).getbbox()
     if box:
@@ -36,7 +47,7 @@ def build(src: Path, dst: Path) -> int:
     side = round(max(im.size) / (1 - 2 * MARGIN))
     square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
     square.paste(im, ((side - im.width) // 2, (side - im.height) // 2))
-    small = square.resize((SIZE, SIZE), Image.LANCZOS)
+    small = square.resize((size, size), Image.LANCZOS)
     small = small.quantize(colors=255, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
     dst.parent.mkdir(parents=True, exist_ok=True)
     small.save(dst, optimize=True)
@@ -49,4 +60,8 @@ if __name__ == "__main__":
         n = build(src, OUT / src.parent.name / src.name)
         total += n
         print(f"{src.parent.name}/{src.name}: {n // 1024}KB")
+    for src in sorted(TITLES.glob("*.png")):
+        n = build(src, TITLE_OUT / src.name, TITLE_SIZE)
+        total += n
+        print(f"titles/{src.name}: {n // 1024}KB")
     print(f"{total // 1024}KB for all")

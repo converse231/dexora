@@ -1877,6 +1877,150 @@ await savedField("cardPity", { me01: { hit: 2, special: 14, mega: 61 } }, "junk"
   console.log("cosmetics ok — follower, skins and the skin worn load, save and refuse what they must");
 }
 
+/* FIELD ABILITIES AND FRIENDSHIP (abilities.js): the one walking lends its
+   ability's overworld effect and grows friendship, counted on its Box entry -
+   and only while it is out. Each effect through a real step. */
+{
+  const AB = await import("../src/game/abilities.js");
+  const { ENCOUNTER_RATE } = await import("../src/game/biomes.js");
+  const real = Math.random;
+  // One step that arrives, from whichever direction is open, with Math.random pinned.
+  const stepWith = (e, r) => {
+    Math.random = typeof r === "function" ? r : () => r;
+    try {
+      for (const dir of ["right", "down", "left", "up"]) {
+        const n = e.state.steps;
+        e.press(dir);
+        for (let i = 0; i < 30 && e.state.steps === n; i++) tick(16);
+        e.clearHeld();
+        for (let i = 0; i < 12; i++) tick(16);
+        if (e.state.steps > n) return true;
+      }
+      return false;
+    } finally { Math.random = real; }
+  };
+  const walking = (species, uid, extra = {}) => boot({ ...SAVE, box: [{ uid, species, level: 20, at: 1, ...extra }],
+    nextUid: uid + 1, party: [uid], buddy: uid }).e;
+  assert.equal(AB.abilityOf({ uid: 2, species: 52 }), "pickup", "the sample Meowth lost Pickup - pick another uid");
+  assert.equal(AB.abilityOf({ uid: 2, species: 88 }), "stench");
+  assert.equal(AB.abilityOf({ uid: 3, species: 25, alpha: 1 }), "lightning-rod", "an alpha did not get its hidden ability");
+
+  // Friendship: a step out together counts; a new heart says so and is one changed().
+  {
+    const e = walking(25, 1, { walked: AB.HEARTS[0] - 1 });
+    const col = e.state.colRev;
+    assert.ok(stepWith(e, 0.999));
+    const mon = e.state.box.find((m) => m.uid === 1);
+    assert.equal(mon.walked, AB.HEARTS[0], "a step together was not counted");
+    assert.equal(AB.heartsOf(mon.walked), 1);
+    assert.ok(e.state.worn.some((w) => w.id === "friend"), "a new heart was not announced");
+    assert.ok(e.state.colRev > col, "a new heart did not tell the UI");
+    const col2 = e.state.colRev;
+    stepWith(e, 0.999);
+    assert.equal(e.state.colRev, col2, "a plain step together rebuilt the collection");
+    e.setBuddy(null);
+    const w = mon.walked;
+    stepWith(e, 0.999);
+    assert.equal(mon.walked, w, "friendship grew with the Pokemon in its ball");
+  }
+  // Pickup: a low roll on a step finds something, into the bag.
+  {
+    const e = walking(52, 2);
+    const before = JSON.stringify(e.state.bag);
+    let calls = 0;
+    // Low for the find rolls, high for everything else (no encounter).
+    assert.ok(stepWith(e, () => (++calls <= 2 ? 0.0001 : 0.999)));
+    assert.ok(e.state.worn.some((w) => w.id === "find"), "Pickup found nothing on a sure roll");
+    assert.notEqual(JSON.stringify(e.state.bag), before, "the find did not reach the bag");
+  }
+  // Stench halves the encounter rate: a roll between the halved and the full rate meets nothing.
+  {
+    const between = ENCOUNTER_RATE * 0.75;
+    const plain = walking(25, 1);
+    stepWith(plain, between);
+    assert.ok(plain.state.encounter, "the test roll should meet something without Stench");
+    const smelly = walking(88, 2);
+    stepWith(smelly, between);
+    assert.equal(smelly.state.encounter, null, "Stench did not cut the encounter rate");
+  }
+  // A bad step count is dropped, never the Pokemon.
+  {
+    const e = boot({ ...SAVE, box: [{ uid: 1, species: 25, level: 5, at: 1, walked: "lots" }, { uid: 2, species: 25, level: 5, at: 1, walked: 40 }], nextUid: 3 }).e;
+    assert.equal(e.state.box.length, 2, "a bad step count cost the Pokemon");
+    assert.equal(e.state.box[0].walked, undefined, "a garbage step count was kept");
+    assert.equal(e.state.box[1].walked, 40, "a good step count was dropped");
+  }
+  console.log("abilities ok — friendship counts only while out and announces each heart once, Pickup finds into the bag, Stench halves encounters, an alpha has its hidden ability, a bad count drops alone");
+}
+
+/* THE DAILY CHECK-IN (checkin.js): once a day, a streak kept by yesterday
+   and broken by a gap, the week's rewards in order, and every seventh day a
+   roulette spin - decided and saved before any reel, packs or a Gold gift. */
+{
+  const CI = await import("../src/game/checkin.js");
+  const { dayKey } = await import("../src/game/daily.js");
+  const { dexIndex } = await import("../src/game/biomes.js");
+  const ago = (n) => dayKey(new Date(Date.now() - n * 86400000));
+  await savedField("checkin", { last: ago(1), streak: 3, best: 5, spins: 1 }, "junk", { last: null, streak: 0, best: 0, spins: 0 });
+
+  // A first check-in: day 1, paid once; the second press the same day is nothing.
+  {
+    const e = boot({ ...SAVE }).e;
+    assert.equal(e.checkinStatus().due, true);
+    const money = e.state.money;
+    const r = e.checkIn();
+    assert.equal(r.streak, 1);
+    assert.equal(e.state.money, money + CI.CHECKIN_REWARDS[0].money, "day 1 did not pay");
+    assert.equal(e.checkIn(), null, "a day was checked in twice");
+    assert.equal(e.checkinStatus().due, false);
+    await new Promise((res) => setTimeout(res, 600));
+    assert.equal(JSON.parse(store.get("meadow-route")).checkin.last, dayKey(), "the check-in was not saved");
+  }
+  // Yesterday keeps it: day 7 banks a spin and is a milestone; a gap breaks it.
+  {
+    const e = boot({ ...SAVE, checkin: { last: ago(1), streak: 6, best: 6, spins: 0 } }).e;
+    const r = e.checkIn();
+    assert.equal(r.streak, 7, "yesterday's streak was not kept");
+    assert.equal(r.day, 7);
+    assert.ok(r.milestone, "day 7 was not a milestone");
+    assert.equal(e.state.checkin.spins, 1, "the seventh day banked no spin");
+    const gap = boot({ ...SAVE, checkin: { last: ago(3), streak: 12, best: 12, spins: 0 } }).e;
+    assert.ok(gap.checkinStatus().broken, "a gap did not read as a broken streak");
+    assert.equal(gap.checkIn().streak, 1, "a gap kept the streak");
+    assert.equal(gap.state.checkin.best, 12, "breaking the streak lost the best");
+  }
+  // The roulette: a pack slot gives a set's packs, earned; a Gold slot a gift; no spin, no roll.
+  {
+    const e = boot({ ...SAVE, checkin: { last: ago(1), streak: 7, best: 7, spins: 2 } }).e;
+    const before = Object.values(e.state.packs ?? {}).reduce((a, b) => a + b, 0);
+    const seq = (...v) => () => v.shift() ?? 0;
+    const p = e.spinRoulette(seq(0, 0));
+    assert.equal(p.kind, "pack");
+    assert.equal(Object.values(e.state.packs).reduce((a, b) => a + b, 0), before + CI.ROULETTE_PACKS, "the packs did not arrive");
+    assert.equal(e.state.earnedPacks[p.set].length, CI.ROULETTE_PACKS, "roulette packs were not stamped as earned");
+    const g = e.spinRoulette(seq(0.999, 0.5));
+    assert.equal(g.kind, "gold");
+    const mon = e.state.box.find((m) => m.uid === g.uid);
+    assert.ok(mon?.gold && !mon.traded, "the Gold prize did not arrive as a caught Gold");
+    assert.equal(e.state.gold[dexIndex(g.species)], 1, "the Gold prize left the Dex's Gold mark empty");
+    assert.equal(e.state.dex[dexIndex(g.species)], 2, "the Gold gift did not register its species");
+    assert.equal(e.spinRoulette(), null, "a spin was rolled with none banked");
+    assert.equal(e.state.checkin.spins, 0);
+  }
+  // Fifteen equal slots: packs two thirds, every set alike; Gold a third.
+  {
+    const sets = ["a", "b", "c", "d", "e"];
+    const n = { gold: 0 }; for (const s of sets) n[s] = 0;
+    let x = 7;
+    const rng = () => { x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648; };
+    for (let i = 0; i < 30000; i++) { const r = CI.rollRoulette(sets, [25], rng); n[r.kind === "gold" ? "gold" : r.set]++; }
+    const slots = CI.ROULETTE.pack + CI.ROULETTE.gold;
+    assert.ok(Math.abs(n.gold / 30000 - CI.ROULETTE.gold / slots) < 0.01, `Gold landed ${n.gold / 300}% of spins`);
+    for (const s of sets) assert.ok(Math.abs(n[s] / 30000 - CI.ROULETTE.pack / slots / sets.length) < 0.015, `set ${s} landed ${n[s] / 300}%`);
+  }
+  console.log("check-in ok — once a day, kept by yesterday and broken by a gap (the best kept), day 7 banks a spin, a spin gives earned packs or a caught Gold, the odds are 15 equal slots");
+}
+
 /* A SLOW FRAME IS NOT A TAB AWAY (2026-10-07): a gap over STALL with the
    window focused pays the deadlines back but neither drops a held walk nor
    bumps colRev - it did both, and a big Box rebuilding on the bump made the

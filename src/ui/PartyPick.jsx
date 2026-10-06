@@ -11,6 +11,7 @@ import { PARTY_MAX, followSheet } from "../game/cosmetics.js";
 import { variantOf } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
+import { abilityOf, abilityName, fieldText, heartsOf, HEARTS } from "../game/abilities.js";
 
 export default function PartyPick({ engine, box, party, onClose }) {
   useModalLock();
@@ -30,7 +31,7 @@ export default function PartyPick({ engine, box, party, onClose }) {
       <div className="varcard partypick" role="dialog" aria-modal="true" aria-label="Walking party" onClick={(e) => e.stopPropagation()}>
         <div className="set-top">
           <h3>Walking party</h3>
-          <span className="set-mail">Up to {PARTY_MAX}. One walks behind you; switch on the map or with Q.</span>
+          <span className="set-mail">Up to {PARTY_MAX}. The one walking lends its ability.</span>
           <button type="button" className="set-x" aria-label="Close" onClick={onClose}>✕</button>
         </div>
         <div className="vr-body">
@@ -41,6 +42,10 @@ export default function PartyPick({ engine, box, party, onClose }) {
                   <>
                     <Sprite id={m.species} variant={m.tier} alt="" eager />
                     <b>{label(speciesById(m.species))}</b>
+                    <small>{abilityName(abilityOf(m))}{fieldText(m) ? `: ${fieldText(m)}` : ""}</small>
+                    <span className="pp-hearts" aria-label={`Friendship ${heartsOf(m.walked)} of ${HEARTS.length}`}>
+                      {HEARTS.map((_, i) => <i key={i} className={i < heartsOf(m.walked) ? "on" : ""} />)}
+                    </span>
                     <button type="button" aria-label={`Take ${label(speciesById(m.species))} out of the party`}
                       onClick={() => engine.setParty(party.filter((u) => u !== m.uid))}>Remove</button>
                   </>

@@ -25,6 +25,8 @@ import {
   drawFollower,
 } from "./tileset.js";
 import { followSheet, skinById, skinPrice, PARTY_MAX } from "./cosmetics.js";
+import { fieldOf, rollFind, heartsOf, TYPE_PULL, FRIEND_FINDS, HEARTS } from "./abilities.js";
+import { CHECKIN_REWARDS, checkinStatus, rollRoulette, STREAK_MILESTONES, ROULETTE_LEVEL } from "./checkin.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
@@ -205,6 +207,7 @@ function freshState() {
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
     party: [],            // up to PARTY_MAX box uids you can walk with - see `setParty`
+    checkin: { last: null, streak: 0, best: 0, spins: 0 },   // the daily check-in - see checkin.js
     buddy: null,          // the one of them walking behind you now - see `setBuddy`
     skin: null,           // the trainer skin worn, null for your own - see cosmetics.js
     skins: [],            // the skins bought - see `buySkin`
@@ -534,7 +537,10 @@ function loadState() {
     const box = pool.filter(sound).map((m) => {
       if (!seen.has(m.uid)) { seen.add(m.uid); return m; }
       return { ...m, uid: nextUid++ };
-    }).map(cleanTradeFields).map(cleanTaught);
+    }).map(cleanTradeFields).map(cleanTaught)
+      // Steps walked with you (abilities.js): a count, or nothing - never a reason to drop the entry.
+      .map((m) => (m.walked === undefined || (Number.isInteger(m.walked) && m.walked >= 0) ? m
+        : (({ walked, ...rest }) => rest)(m)));
 
     const fresh = freshState();
     const loaded = {
@@ -615,6 +621,13 @@ function loadState() {
       beaten: cleanBeaten(s.beaten),
       team: [...new Set(Array.isArray(s.team) ? s.team : [])].filter(Number.isInteger).slice(0, TEAM_MAX),
       party: [...new Set(Array.isArray(s.party) ? s.party : [])].filter(Number.isInteger).slice(0, PARTY_MAX),
+      /* The check-in, field by field: a bad count is 0, a bad day forgets the
+         last stamp (today asks again) - never the rest. */
+      checkin: ((c) => {
+        const n = (v, cap) => (Number.isInteger(v) && v >= 0 ? Math.min(v, cap) : 0);
+        return { last: typeof c?.last === "string" && /^\d{8}$/.test(c.last) ? c.last : null,
+          streak: n(c?.streak, 100000), best: n(c?.best, 100000), spins: n(c?.spins, 520) };
+      })(s.checkin && typeof s.checkin === "object" ? s.checkin : {}),
       buddy: Number.isInteger(s.buddy) ? s.buddy : null,
       /* A skin id this build does not know is KEPT, bought in a newer one:
          a purchase is never lost. It draws as your own trainer here. */
@@ -1035,6 +1048,12 @@ export function createEngine(canvas, onChange, mini = null) {
     Object.assign(buddy, { x, y, fromX: x, fromY: y, hop: false });
   };
   const ridden = (x, y) => afloat(x, y) || !!RAIL[at(x, y)] || onRoad(x, y);
+  /* WHO IS OUT WITH YOU: the one walking, unless you ride (then it is in its
+     ball). Its ability works and its friendship grows only while it is out. */
+  const walker = () => {
+    if (state.buddy == null || ridden(state.player.x, state.player.y)) return null;
+    return state.box.find((m) => m.uid === state.buddy) ?? null;
+  };
   function trail(fromX, fromY) {
     const p = state.player;
     if (ridden(fromX, fromY) || ridden(p.x, p.y)) { snapBuddy(); return; }
@@ -1507,6 +1526,32 @@ export function createEngine(canvas, onChange, mini = null) {
     /* Every tile in an area belongs to that area's biome, and standing on a
        tile already proves it is walkable, so there is nothing left to test -
        anywhere you can put your feet, something can appear. */
+    /* WALKING TOGETHER (abilities.js): a step out with you is a step of
+       friendship, counted on the Box entry in place - no colRev, or a big Box
+       rebuilds every step - and a heart or a find is the one `changed()`. */
+    let bonded = false;
+    {
+      const mate = walker();
+      if (mate) {
+        const was = heartsOf(mate.walked);
+        mate.walked = (mate.walked ?? 0) + 1;
+        const name = label(speciesById(mate.species));
+        if (heartsOf(mate.walked) > was) {
+          bonded = true;
+          const h = heartsOf(mate.walked);
+          state.worn.push({ id: "friend", title: `${name} is happy`, sub: h >= HEARTS.length ? "BEST FRIENDS" : `${h} OF ${HEARTS.length} HEARTS`, n: ++wornSeq });
+        }
+        const kind = fieldOf(mate)?.find;
+        const item = (kind && rollFind(kind, Math.random))
+          || (heartsOf(mate.walked) >= FRIEND_FINDS ? rollFind("friend", Math.random) : null);
+        if (item) {
+          bonded = true;
+          give({ [item]: 1 });
+          state.worn.push({ id: "find", title: `${name} found something`, sub: (itemById(item)?.name ?? item).toUpperCase(), n: ++wornSeq });
+        }
+      }
+    }
+
     /* A DOOR TAKES YOU THROUGH, late in the step so the step still counts -
        parcels, effects and the rift clock all ticked above - and before the
        encounter roll, because nothing jumps out on a doormat. */
@@ -1539,7 +1584,8 @@ export function createEngine(canvas, onChange, mini = null) {
        never what it is - which is what keeps it off the table the White Flute
        and Fortune are already moving, and is the honest reading of what a
        repel is for: crossing a map you have already farmed. */
-    const rate = ENCOUNTER_RATE * (running("repel")?.rate ?? 1);
+    const mate = walker();
+    const rate = ENCOUNTER_RATE * (running("repel")?.rate ?? 1) * (fieldOf(mate)?.rate ?? 1);
     if (biome && !state.evolution && Math.random() < rate) {
       /* The level is part of the table, not a modifier on the roll: past Lv 8
          a map starts turning up the evolved forms of what already lives there.
@@ -1556,7 +1602,7 @@ export function createEngine(canvas, onChange, mini = null) {
     save();
     /* A parcel hands over balls and cash, which the Box and the shop both
        show; a plain step hands over nothing. */
-    if (parcel || found) changed(); else walked();
+    if (parcel || found || bonded) changed(); else walked();
   }
 
   /* A RIFT: open ones run down a step at a time and may turn something up;
@@ -1678,8 +1724,11 @@ export function createEngine(canvas, onChange, mini = null) {
      odds still sum to one and no entry can ever be dropped or invented. */
   function pickSpecies(table) {
     // The flute feeds the SAME exponent Fortune does - see `rarityPower`.
+    const pull = fieldOf(walker())?.type;
     const rolled = weighted(table, state.stats,
-      (running("rarity")?.tilt ?? 0) + (riftHere() ? RIFT_TILT : 0));
+      (running("rarity")?.tilt ?? 0) + (riftHere() ? RIFT_TILT : 0))
+      // Its ability pulls a type (Static, Magnet Pull...): those rows weigh more.
+      .map(([id, w]) => [id, pull && speciesById(id)?.types.includes(pull) ? w * TYPE_PULL : w]);
     const total = rolled.reduce((n, e) => n + e[1], 0);
     let r = Math.random() * total;
     for (const [id, w] of rolled) if ((r -= w) < 0) return speciesById(id);
@@ -2984,6 +3033,49 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
+  /* THE DAILY CHECK-IN (checkin.js): the one press a day. Paid and SAVED
+     before any stamp or celebration plays; answers what it gave, or null
+     when today is already stamped. The seventh day of every week banks a
+     roulette spin. */
+  function checkIn() {
+    if (state.stale) return null;
+    const st = checkinStatus(state.checkin);
+    if (!st.due) return null;
+    const reward = CHECKIN_REWARDS[st.day - 1];
+    if (reward.money) state.money += reward.money;
+    if (reward.candy) state.candy += reward.candy;
+    if (reward.items) give(reward.items);
+    state.checkin = {
+      last: dayKey(), streak: st.streak, best: Math.max(state.checkin.best, st.streak),
+      spins: state.checkin.spins + (reward.spin ?? 0),
+    };
+    save();
+    changed();
+    return { ...st, reward, milestone: STREAK_MILESTONES.includes(st.streak) };
+  }
+  /* THE ROULETTE: one banked spin, decided and SAVED before the reel moves -
+     a card set's packs, earned and stamped, or a Gold Pokemon that counts as
+     CAUGHT (your call, 2026-10-07: a won Gold that left the Dex's Gold mark
+     empty read as a bug) - species and Gold row both. Answers the prize for
+     the reel, or null with no spin banked. */
+  const GOLDS = SPECIES.filter((sp) => sp.id <= 1025 && !sp.legendary).map((sp) => sp.id);
+  function spinRoulette(rng = Math.random) {
+    if (state.stale || state.checkin.spins < 1) return null;
+    const prize = rollRoulette(CARD_SETS.map((s) => s.id), GOLDS, rng);
+    state.checkin = { ...state.checkin, spins: state.checkin.spins - 1 };
+    if (prize.kind === "pack") {
+      grantPacks(prize.n, `roulette:${state.checkin.streak}`, prize.set);
+    } else {
+      prize.uid = state.nextUid++;
+      state.box.push({ uid: prize.uid, species: prize.species, level: ROULETTE_LEVEL, gold: 1, at: Date.now() });
+      registerGift(prize.species);
+      state.gold[dexIndex(prize.species)] = 1;
+    }
+    save();
+    changed();
+    return prize;
+  }
+
   // A box or bundle: the set's discounted multi-pack.
   function buyBox(setId) {
     const box = BOXES[setId];
@@ -3626,6 +3718,9 @@ export function createEngine(canvas, onChange, mini = null) {
        team pick starts from it, and its order is the order they fight in -
        `battleBegin` keeps the team you last took the same way. Box uids
        only, each once, at most six. */
+    checkIn,
+    spinRoulette,
+    checkinStatus: () => checkinStatus(state.checkin),
     buySkin,
     wearSkin,
     setBuddy,
