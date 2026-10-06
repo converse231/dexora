@@ -124,9 +124,10 @@ export default function Help({ onClose }) {
           <h4>Out in the world</h4>
           <ul className="vr-notes">
             <li>
-              <b>Walk together.</b> Open a Pokémon in the Box and choose Walk
-              with me: it follows a step behind you, and goes back in its ball
-              on the water. You &rsaquo; Wardrobe sells trainer skins for the
+              <b>Walk together.</b> Open a Pokémon in the Box and add it to
+              your walking party - up to three. One follows a step behind you;
+              tap another on the map, or press Q, to switch. It goes back in
+              its ball on the water. You &rsaquo; Wardrobe sells trainer skins for the
               map. Both are only looks.
             </li>
             <li>

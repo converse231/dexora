@@ -8669,6 +8669,29 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 }
 .wd-skin .gate-art { --z: 2; margin: 13px 0; }
 
+/* THE WALKING PARTY on the map, a glass pill beside the quest: the one
+   walking sits lit on an accent fill (no ring - colour only where it says
+   something), the others rest dimmed. Switching pops the new one; only
+   transform and opacity move. */
+.party {
+  display: flex; gap: 4px; padding: 4px; border-radius: 999px;
+  background: var(--glass); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 10px 24px var(--shadow-soft);
+}
+.party-mon {
+  width: 38px; height: 38px; padding: 2px; border: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; background: transparent;
+  transition: background-color 160ms ease;
+}
+.party-mon > img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated;
+  opacity: .5; transform: scale(.88); transition: opacity 160ms ease, transform 160ms ease; }
+.party-mon:hover > img { opacity: .85; }
+.party-mon.on { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+.party-mon.on > img { opacity: 1; transform: scale(1.06); animation: party-pop 300ms cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes party-pop { from { transform: scale(.55); opacity: .4; } }
+.party-mon:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) { .party-mon.on > img { animation: none; } }
+
 /* ================================================================ CARDS
    The fifth tab (docs/cards.md): Packs, Binder, Card Dex, Dust, the card view
    and the pack opening. Every loop moves `transform`, `opacity` or the

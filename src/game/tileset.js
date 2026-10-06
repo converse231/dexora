@@ -758,9 +758,9 @@ const SURF_SIT = 12;
    standing on it, so a 64px Lugia spans four tiles as it does on the GBA.
    The second frame of a facing is the stride (`sAnim_GoSouth2F`). */
 const FOLLOW_COL = { down: 0, up: 2, left: 4, right: 6 };
-export function drawFollower(ctx, img, px, py, dir, moving, progress, shiny, lift = 0) {
+export function drawFollower(ctx, img, px, py, dir, moving, progress, shiny, lift = 0, scale = 1) {
   const s = img.height / 2;
-  const w = s * 2;
+  const w = s * 2 * scale;
   const col = (FOLLOW_COL[dir] ?? 0) + (moving && progress >= 0.25 && progress < 0.75 ? 1 : 0);
   if (lift > 0.5) {
     ctx.save();

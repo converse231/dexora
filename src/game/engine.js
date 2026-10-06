@@ -24,7 +24,7 @@ import {
   TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame, drawGrass,
   drawFollower,
 } from "./tileset.js";
-import { followSheet, skinById, skinPrice } from "./cosmetics.js";
+import { followSheet, skinById, skinPrice, PARTY_MAX } from "./cosmetics.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
@@ -204,7 +204,8 @@ function freshState() {
     gifted: [],           // LEGACY: dex ids once held back from rewards as trades - paid and cleared at boot
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
-    buddy: null,          // the box uid walking behind you - see `setBuddy`
+    party: [],            // up to PARTY_MAX box uids you can walk with - see `setParty`
+    buddy: null,          // the one of them walking behind you now - see `setBuddy`
     skin: null,           // the trainer skin worn, null for your own - see cosmetics.js
     skins: [],            // the skins bought - see `buySkin`
     /* CARDS (docs/cards.md): copies by card id (`me01-004`, never a
@@ -613,6 +614,7 @@ function loadState() {
       // Entry by entry, never the whole record: badges are years of play.
       beaten: cleanBeaten(s.beaten),
       team: [...new Set(Array.isArray(s.team) ? s.team : [])].filter(Number.isInteger).slice(0, TEAM_MAX),
+      party: [...new Set(Array.isArray(s.party) ? s.party : [])].filter(Number.isInteger).slice(0, PARTY_MAX),
       buddy: Number.isInteger(s.buddy) ? s.buddy : null,
       /* A skin id this build does not know is KEPT, bought in a newer one:
          a purchase is never lost. It draws as your own trainer here. */
@@ -682,7 +684,11 @@ function loadState() {
     // The last team names Pokemon, and one sold or traded since is not on it.
     loaded.team = loaded.team.filter((uid) => loaded.box.some((m) => m.uid === uid));
     // The follower is one of yours, and the skin one you bought.
+    loaded.party = loaded.party.filter((uid) => loaded.box.some((m) => m.uid === uid));
     if (!loaded.box.some((m) => m.uid === loaded.buddy)) loaded.buddy = null;
+    // A save from the one-follower days: the one walking is the party.
+    if (loaded.buddy != null && !loaded.party.length) loaded.party = [loaded.buddy];
+    if (!loaded.party.includes(loaded.buddy)) loaded.buddy = null;
     if (!loaded.skins.includes(loaded.skin)) loaded.skin = null;
     // Earned packs are some of the unopened ones, never more.
     for (const [k, v] of Object.entries(loaded.earnedPacks)) {
@@ -1044,26 +1050,42 @@ export function createEngine(canvas, onChange, mini = null) {
     const grass = GRASS[at(buddy.x, buddy.y)];
     if (grass && (dx || dy)) grassFx.push({ x: buddy.x, y: buddy.y, g: grass, start: move.startedAt });
   }
-  /* Its sheet, loaded when first wanted and only the one: 1,253 files ship
-     and a game draws one. `img` is null until it arrives (the draw key says
-     when), and a sheet that fails stays null - no follower, never an error. */
-  let buddySheet = { id: null, img: null };
-  let buddyAt = { key: "", mon: null };
-  function buddyArt() {
-    const key = `${state.colRev}|${state.buddy}`;
-    if (buddyAt.key !== key) buddyAt = { key, mon: state.buddy == null ? null : state.box.find((m) => m.uid === state.buddy) ?? null };
-    const id = buddyAt.mon && followSheet(buddyAt.mon.species);
-    if (id == null) return null;
-    if (buddySheet.id !== id) {
-      const mine = buddySheet = { id, img: null };
+  /* Its sheet, and the party's: loaded when first wanted, three at most of
+     1,253, so a switch never waits on the network. `img` is null until it
+     arrives (the draw key says when), and a sheet that fails stays null - no
+     follower, never an error. */
+  const sheets = new Map();
+  const sheetOf = (id) => {
+    if (!sheets.has(id)) {
+      const mine = { img: null };
+      sheets.set(id, mine);
       if (typeof Image !== "undefined") {
         const img = new Image();
         img.onload = () => { mine.img = img; };
         img.src = `follow/${id}.png`;
       }
     }
-    return buddySheet.img;
+    return sheets.get(id).img;
+  };
+  let buddyAt = { key: "", mon: null };
+  function buddyArt() {
+    const key = `${state.colRev}|${state.buddy}|${state.party.join()}`;
+    if (buddyAt.key !== key) {
+      buddyAt = { key, mon: state.buddy == null ? null : state.box.find((m) => m.uid === state.buddy) ?? null };
+      for (const uid of state.party) {
+        const m = state.box.find((b) => b.uid === uid);
+        const f = m && followSheet(m.species);
+        if (f != null) sheetOf(f);
+      }
+    }
+    const id = buddyAt.mon && followSheet(buddyAt.mon.species);
+    return id == null ? null : sheetOf(id);
   }
+  /* A SWITCH IS A RELEASE: the new one grows out of a white flash where the
+     old one stood. Pending until its sheet is in and it is on screen; a
+     follower in its ball (on you, or riding) simply comes out next step. */
+  const SWAP_MS = 380;
+  let swap = null;
   /* THE SKIN'S SHEET, the same way: player.json's shape with the walk set
      alone (see `drawPlayer`), and the Surf blob it rides. */
   let skinSheet = { id: null, sheet: null };
@@ -2611,8 +2633,30 @@ export function createEngine(canvas, onChange, mini = null) {
        never the one in front (it drew over his head on every step south). */
     const front = showBuddy && bwy > wy;
     const frontY = front ? buddy.y : p.y;
-    const follower = () => drawFollower(ctx, bImg, Math.round(bwx - camX), Math.round(bwy - camY),
-      buddy.dir, move.active, t, !!buddyAt.mon.shiny, buddy.hop && move.active ? Math.sin(Math.PI * t) * 11 : 0);
+    /* Waiting on its sheet keeps the release (2s at most - a sheet that
+       never comes must not hold the redraw open); in its ball drops it. */
+    if (swap?.pending != null) {
+      if (showBuddy) swap = { at: now };
+      else if (bImg || now - swap.pending > 2000) swap = null;
+    } else if (swap && !showBuddy) swap = null;
+    const grown = swap ? Math.min(1, (now - swap.at) / SWAP_MS) : 1;
+    if (grown >= 1) swap = null;
+    const follower = () => {
+      const fx = Math.round(bwx - camX), fy = Math.round(bwy - camY);
+      // Out of the ball: it grows from a third of its size, overshooting a touch, as the flash fades.
+      const scale = grown >= 1 ? 1 : 0.35 + 0.65 * (1 + 2.2 * (grown - 1) ** 3 + 1.2 * (grown - 1) ** 2);
+      drawFollower(ctx, bImg, fx, fy, buddy.dir, move.active, t, !!buddyAt.mon.shiny,
+        buddy.hop && move.active ? Math.sin(Math.PI * t) * 11 : 0, scale);
+      if (grown < 1) {
+        ctx.save();
+        ctx.globalAlpha = (1 - grown) * 0.85;
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(fx + TILE / 2, fy + TILE / 2, TILE * (0.25 + 0.55 * grown), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    };
     const rustle = (behind) => {
       if (!art.grass) return;
       for (const f of grassFx) {
@@ -2698,6 +2742,7 @@ export function createEngine(canvas, onChange, mini = null) {
      few milliseconds of encounter timer and nothing else, so the threshold is
      deliberately generous. */
   const STALL = 400;
+  const AWAY = 2000;               // a gap this long drops held keys even with focus: a sleep
   let lastFrame = performance.now();
   let battleSince = null;
   /* WHAT THE CANVAS LAST SHOWED, as a key: a still scene is not drawn again.
@@ -2751,10 +2796,22 @@ export function createEngine(canvas, onChange, mini = null) {
       /* Keys are dropped because a keyup fired while we were away never
          reached us, and a held direction would walk the trainer on his own.
          `running` with it, or the rail shows RUN over somebody standing still.
-         `changed()` because React has been told nothing for however long. */
-      held.clear();
-      state.running = false;
-      changed();
+         `stepped()` because React has been told nothing for however long.
+
+         A SLOW FRAME IS NOT A TAB AWAY (2026-10-07). This was `changed()` and
+         dropped the keys on every gap: one heavy frame - a big Box rebuilding
+         - read as a stall, `changed()` bumped `colRev`, the Box rebuilt again,
+         and the next frame stalled too. A loop, and each turn of it stopped a
+         held walk: reported as walking gone choppy. The collection did not
+         move, so it is `stepped()`; and a keyup during a long frame still
+         arrives, so keys go only when the window lost focus or the gap is
+         long enough to be a sleep. */
+      const away = gap > AWAY || typeof document === "undefined" || document.hidden || !document.hasFocus?.();
+      if (away) {
+        held.clear();
+        state.running = false;
+      }
+      stepped();
     }
 
     if (pausedAt !== null) {
@@ -2782,8 +2839,8 @@ export function createEngine(canvas, onChange, mini = null) {
          each one's arrival is in the key. A rustle redraws while it PLAYS:
          a finished one kept as the rest frame is still. */
       const key = `${state.rev}|${p.x},${p.y},${p.dir}|${viewW}|${!!art.atlas}${!!art.player}|${state.running}`
-        + `|${!!buddySheet.img}${!!skinSheet.sheet}${!!blob}`;
-      if (key !== drawnKey || move.active || state.fishing || battleSince !== null
+        + `|${!!buddyArt()}${!!skinSheet.sheet}${!!blob}`;
+      if (key !== drawnKey || move.active || state.fishing || battleSince !== null || swap
         || grassFx.some((f) => now - f.start < f.g.seq.length * f.g.ms)) {
         render(now);
         drawnKey = key;
@@ -2889,10 +2946,39 @@ export function createEngine(canvas, onChange, mini = null) {
   /* One Pokemon walks behind you: a uid in the Box, or null for none. A
      species with no drawing (`followSheet`) is refused. Changed, not
      stepped: the Box marks the one walking. */
+  /* WHO WALKS NOW: one of the party, or null for all in their balls. A
+     switch is `stepped()`, never `changed()` - it moves nothing in the
+     collection, and a colRev bump rebuilds a big Box mid-walk. */
   function setBuddy(uid) {
-    const mon = uid === null ? null : state.box.find((m) => m.uid === uid);
-    if (uid !== null && (!mon || followSheet(mon.species) == null)) return false;
+    if (uid !== null && !state.party.includes(uid)) return false;
+    if (uid === state.buddy) return true;
     state.buddy = uid;
+    swap = uid === null ? null : { pending: performance.now() };
+    save();
+    stepped();
+    return true;
+  }
+  // The next of the party, round and round (Q on the map).
+  function cycleBuddy() {
+    if (!state.party.length) return false;
+    const i = state.party.indexOf(state.buddy);
+    return setBuddy(state.party[(i + 1) % state.party.length]);
+  }
+  /* THE WALKING PARTY (2026-10-07): up to PARTY_MAX Box uids, each once, each
+     a species with a drawing. The one walking stays if it is still in the
+     party, else the first takes over. `changed()`: the Box marks members. */
+  function setParty(uids) {
+    if (!Array.isArray(uids)) return false;
+    const next = [...new Set(uids)].filter((u) => {
+      const m = state.box.find((b) => b.uid === u);
+      return m && followSheet(m.species) != null;
+    }).slice(0, PARTY_MAX);
+    if (next.length !== new Set(uids).size) return false;
+    state.party = next;
+    if (!next.includes(state.buddy)) {
+      state.buddy = next[0] ?? null;
+      swap = state.buddy == null ? null : { pending: performance.now() };
+    }
     save();
     changed();
     return true;
@@ -3543,6 +3629,8 @@ export function createEngine(canvas, onChange, mini = null) {
     buySkin,
     wearSkin,
     setBuddy,
+    cycleBuddy,
+    setParty,
     setTeam(uids) {
       if (!Array.isArray(uids)) return;
       state.team = [...new Set(uids)].filter((u) => state.box.some((m) => m.uid === u)).slice(0, TEAM_MAX);

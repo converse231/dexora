@@ -27,6 +27,7 @@ export default function Wardrobe({ engine, state, onClose }) {
   const owned = new Set(state.skins);
   const worn = owned.has(state.skin) ? state.skin : null;
   const buddy = state.buddy == null ? null : state.box.find((m) => m.uid === state.buddy);
+  const resting = (state.party ?? []).length - (buddy ? 1 : 0);
   const buy = (s, price) => setPending({
     title: `Buy ${s.name}?`,
     lines: [["Cost", `¥${price.toLocaleString()}`], ["Money left", `¥${(money - price).toLocaleString()}`]],
@@ -48,11 +49,11 @@ export default function Wardrobe({ engine, state, onClose }) {
             {buddy ? (
               <>
                 <Sprite id={buddy.species} variant={variantOf(buddy)} alt="" />
-                <span><b>{label(speciesById(buddy.species))}</b> walks with you</span>
+                <span><b>{label(speciesById(buddy.species))}</b> walks with you{resting > 0 ? `, ${resting} more in your party (Q to switch)` : ""}</span>
                 <button type="button" onClick={() => engine.setBuddy(null)}>Back to its ball</button>
               </>
             ) : (
-              <span>No one walks with you. Open a Pokémon's preview in the Box and choose <b>Walk with me</b>.</span>
+              <span>No one walks with you. Open a Pokémon's preview in the Box and choose <b>Add to walking party</b> - up to three, switched on the map.</span>
             )}
           </div>
 
