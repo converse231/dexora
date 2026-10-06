@@ -163,6 +163,10 @@ declare
   out jsonb := '[]';
 begin
   if me is null then raise exception 'not signed in'; end if;
+  -- A save that outran the clock leaves trading (PACE, at the end of this file).
+  if exists (select 1 from public.profiles where user_id = me and flagged_at is not null) then
+    raise exception 'This account cannot trade: its save moved faster than the game allows.';
+  end if;
   if jsonb_typeof(snaps) is distinct from 'array' or jsonb_array_length(snaps) > 20 then
     raise exception 'bad request';
   end if;
@@ -1494,3 +1498,94 @@ revoke all on function public.friend_box(uuid) from public, anon;
 revoke all on function public.trade_search(int) from public, anon;
 grant execute on function public.friend_box(uuid) to authenticated;
 grant execute on function public.trade_search(int) to authenticated;
+
+-- =================================================================== PACE
+-- A SAVE CAN SAY ANYTHING, BUT IT CANNOT OUTRUN THE CLOCK (2026-10-07).
+-- There is no trust boundary: the browser decides every roll and the server
+-- stores the result. MORPH, an account a day old, uploaded a finished
+-- Pokedex with 1,001,321 steps and 100,000,544 XP, and had two Pokemon in
+-- the Surprise pool on their way to real players. A save is never refused
+-- (a collection must never be lost), so an impossible one is FLAGGED: the
+-- account keeps its game and leaves trading - its Pokemon come off the
+-- server (listings, the pool and offers with them) and register_mons gives
+-- it nothing. Trading is the only way a forged save reaches anyone else.
+--
+-- The bound is real time. The fastest step is 150ms x 0.7 (running) x 0.6
+-- (Stride maxed) = 63ms, about 16 a second: 20 is the ceiling. A catch is
+-- an encounter and a throw, never under 1.5s. Since the last cloud save the
+-- clock is old.updated_at; a first save counts from the account's creation,
+-- with room for a guest game brought in at sign-in. The slack absorbs a
+-- device that played offline beside another. Clear a false flag with
+--   update public.profiles set flagged_at = null, flag_reason = null where user_id = '...';
+alter table public.profiles add column if not exists flagged_at timestamptz;
+alter table public.profiles add column if not exists flag_reason text;
+
+create or replace function public.save_int(v jsonb)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when jsonb_typeof(v) = 'number' then greatest(0, least((v #>> '{}')::numeric, 9e15))::bigint else 0 end
+$$;
+
+create or replace function public.check_save_pace()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  since numeric;
+  first boolean := tg_op = 'INSERT';
+  steps bigint := public.save_int(new.data->'steps') - case when tg_op = 'UPDATE' then public.save_int(old.data->'steps') else 0 end;
+  caught bigint := public.save_int(new.data->'caught') - case when tg_op = 'UPDATE' then public.save_int(old.data->'caught') else 0 end;
+  why text;
+  -- In variables: plpgsql reads an IF's condition up to its first THEN, so a CASE inside one breaks it.
+  step_room int := case when tg_op = 'INSERT' then 150000 else 20000 end;
+  catch_room int := case when tg_op = 'INSERT' then 3000 else 1000 end;
+begin
+  if first then
+    select extract(epoch from now() - u.created_at) into since from auth.users u where u.id = new.user_id;
+  else
+    since := extract(epoch from now() - coalesce(old.updated_at, now()));
+  end if;
+  since := greatest(0, coalesce(since, 0));
+  if steps > since * 20 + step_room then
+    why := format('steps +%s in %ss', steps, round(since));
+  elsif caught > since / 1.5 + catch_room then
+    why := format('caught +%s in %ss', caught, round(since));
+  end if;
+  if why is not null then
+    update public.profiles set flagged_at = now(), flag_reason = why
+     where user_id = new.user_id and flagged_at is null;
+    delete from public.mons where owner = new.user_id;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.check_save_pace() from public, anon, authenticated;
+drop trigger if exists saves_check_pace on public.saves;
+create trigger saves_check_pace after insert or update of data on public.saves
+  for each row execute function public.check_save_pace();
+
+-- A flagged account registers nothing: every road into trading starts here.
+create or replace function public.refuse_flagged_mons()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if exists (select 1 from public.profiles where user_id = new.owner and flagged_at is not null) then
+    return null;            -- skipped quietly: the caller sees nothing registered
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.refuse_flagged_mons() from public, anon, authenticated;
+drop trigger if exists mons_refuse_flagged on public.mons;
+create trigger mons_refuse_flagged before insert on public.mons
+  for each row execute function public.refuse_flagged_mons();

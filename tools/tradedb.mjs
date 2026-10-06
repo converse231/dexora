@@ -102,6 +102,7 @@ await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
 // A browser pass signed in as a test trainer owns its save now (one writer per
 // save): the harness takes the claim back, or every upload here is refused.
 await q("update public.saves set session = null where user_id = any($1)", [both]);
+await q("update public.profiles set flagged_at = null, flag_reason = null where user_id = any($1)", [both]);
 await q("update public.trainer_cards set trades = 0, showcase = '[]', seeking = '{}' where user_id = any($1)", [both]);
 
 const rpc = async (who, fn, args) => {
@@ -865,6 +866,34 @@ await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
 await q("delete from public.defense_teams where owner = any($1)", [both]);
 await q("delete from public.ranked_battles where challenger = any($1) or defender = any($1)", [both]);
 await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
+/* PACE (2026-10-07): a save that outruns the clock flags its account. It is
+   still stored - a save is never refused - but the account's Pokemon leave
+   trading and it registers nothing more. An ordinary save is untouched. */
+{
+  const C = await trainer("pace");
+  const flag = async () => (await q("select flagged_at, flag_reason from public.profiles where user_id = $1", [C.id]))[0];
+  await q("delete from public.mons where owner = $1", [C.id]);
+  await q("delete from public.saves where user_id = $1", [C.id]);
+  await q("update public.profiles set flagged_at = null, flag_reason = null where user_id = $1", [C.id]);
+  const box = [P(1, 16, 5), P(2, 19, 6)];
+  const base = { dex: [2], box, nextUid: 3, steps: 120, caught: 2, xp: 300 };
+  assert.equal(await rpc(C, "save_game", { payload: base, sess: "s-pace" }), true);
+  await rpc(C, "save_game", { payload: { ...base, steps: 400, caught: 4 }, sess: "s-pace" });
+  assert.equal((await flag()).flagged_at, null, "an ordinary save flagged its account");
+  assert.equal((await rpc(C, "register_mons", { snaps: [{ uid: 1, species: 16, level: 5 }] })).length, 1, "an honest account could not register");
+  assert.equal(await rpc(C, "save_game", { payload: { ...base, steps: 1001321, caught: 1431, xp: 100000544 }, sess: "s-pace" }), true,
+    "an impossible save was refused - it must be stored, and flagged");
+  assert.ok((await flag()).flagged_at && /steps/.test((await flag()).flag_reason), "a million steps in a second did not flag the account");
+  assert.equal((await q("select count(*)::int n from public.mons where owner = $1", [C.id]))[0].n, 0, "a flagged account kept Pokemon in trading");
+  await refuses(rpc(C, "register_mons", { snaps: [{ uid: 2, species: 19, level: 6 }] }), "a flagged account registered a Pokemon");
+  await q("insert into public.mons (owner, local_uid, species, level) values ($1, 2, 19, 6)", [C.id]);
+  assert.equal((await q("select count(*)::int n from public.mons where owner = $1", [C.id]))[0].n, 0, "a flagged account's Pokemon got onto the server another way");
+  assert.equal((await stored(C)).steps, 1001321, "the flagged save was not kept");
+  await q("delete from public.saves where user_id = $1", [C.id]);
+  await q("update public.profiles set flagged_at = null, flag_reason = null where user_id = $1", [C.id]);
+  console.log("tradedb pace ok — an honest save passes, an impossible one is stored and flags its account, whose Pokemon leave trading and which registers nothing");
+}
+
 await db.end();
 console.log("tradedb ok — never-traded saves untouched, registration checked against the stored save, RLS read-own/write-none, " +
   "two racing accepts make one trade, inbox matches reconcile, stale copies stripped, arrivals completed by saving, " +
