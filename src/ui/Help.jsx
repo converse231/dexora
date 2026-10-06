@@ -124,6 +124,12 @@ export default function Help({ onClose }) {
           <h4>Out in the world</h4>
           <ul className="vr-notes">
             <li>
+              <b>Walk together.</b> Open a Pokémon in the Box and choose Walk
+              with me: it follows a step behind you, and goes back in its ball
+              on the water. You &rsaquo; Wardrobe sells trainer skins for the
+              map. Both are only looks.
+            </li>
+            <li>
               <b>Mass outbreaks.</b> Once a day one map is overrun by one
               species for {OUTBREAK_SIZE} encounters, and its rare forms are{" "}
               {OUTBREAK_LIFT}&times; as likely. The map list marks which.

@@ -19,6 +19,7 @@ import { titleIds } from "./game/titles.js";
 import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
 import Variants from "./ui/Variants.jsx";
+import Wardrobe from "./ui/Wardrobe.jsx";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
 import Bag from "./ui/Bag.jsx";
@@ -298,6 +299,7 @@ export default function App({
   const toCatch = useCallback(() => goTab("catch"), [goTab]);
   const [help, setHelp] = useState(false);
   const [forms, setForms] = useState(false);
+  const [wardrobe, setWardrobe] = useState(false);
   const [news, setNews] = useState(false);
   // Read once per render, cheap: one localStorage get. Cleared by opening News.
   const unread = !news && newsUnread();
@@ -678,6 +680,7 @@ export default function App({
 
       {help && <Help onClose={() => setHelp(false)} />}
       {forms && <Variants onClose={() => setForms(false)} />}
+      {wardrobe && engine && st && <Wardrobe engine={engine} state={st} onClose={() => setWardrobe(false)} />}
       {news && <News onClose={() => setNews(false)}
         onEvents={() => { setNews(false); goTab("catch"); openRail("events"); }} />}
       {trade && (
@@ -771,6 +774,7 @@ export default function App({
           onNews={() => setNews(true)}
           onHelp={() => setHelp(true)}
           onForms={() => setForms(true)}
+          onWardrobe={() => setWardrobe(true)}
           onSettings={account ? () => setSettings(true) : null}
           onLogOut={onLogOut ? () => setLeaving(true) : null}
           onReset={onLogOut ? null : () => engine?.reset()}
@@ -1157,6 +1161,7 @@ export default function App({
           onBuy={(id, n) => engine.buy(id, n)}
           onBuyCandy={(n) => engine.buyCandy(n)}
           onEvolve={onEvolve}
+          onBuddy={(uid) => engine.setBuddy(uid)}
           jumpTo={boxJump}
           onJumped={onJumped}
           onSpend={(id) => engine.spend(id)}

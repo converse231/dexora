@@ -60,7 +60,7 @@ function readyToEvolve(box, bag) {
 export default function Rail({
   tab = "dex", onTab, open = false, onClose, events = null,
   state, caught, level, busy,
-  onSelect, onRank, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve,
+  onSelect, onRank, onSell, onConvert, onLevelUp, onBuy, onBuyCandy, onEvolve, onBuddy,
   onTravel, jumpTo, onJumped, outbreakArea,
 }) {
   const setTab = onTab;
@@ -154,6 +154,8 @@ export default function Rail({
           onConvert={onConvert}
           onLevelUp={onLevelUp}
           onEvolve={onEvolve}
+          buddy={state?.buddy ?? null}
+          onBuddy={onBuddy}
           candy={state?.candy ?? 0}
         />
       ))}

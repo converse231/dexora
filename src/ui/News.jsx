@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-06-cosmetics",
+    icon: "👟",
+    date: "October 2026",
+    title: "Walk together, dress up",
+    items: [
+      ["Pokémon follow you", "Open one in the Box and choose Walk with me. Shinies walk shiny."],
+      ["The Wardrobe", "49 trainer skins on You › Wardrobe, from Youngster to Steven."],
+      ["One look on the bike", "Rails are ridden in your walk or run, so every skin fits everywhere."],
+    ],
+  },
+  {
     id: "2026-10-06-board",
     icon: "🌍",
     date: "October 2026",

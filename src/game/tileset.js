@@ -692,7 +692,12 @@ export const fishFrame = (dir, phase) =>
    leaving a shadow on the ground, so that is what a lift does here. */
 export function drawPlayer(ctx, sheet, px, py, dir, step, moving, progress = 1, mode = {}) {
   if (sheet?.sets) {
-    const set = sheet.sets[mode.set] ?? sheet.sets.walk;
+    /* A SKIN HAS ONLY ITS WALK (docs/cosmetics.md), so every other pose is
+       drawn from it: the rod and a hop with the walk, the water standing on
+       the Surf blob. `mode.frame` belongs to the set that asked for it, so a
+       stand-in set ignores it rather than picking a stride by accident. */
+    const own = sheet.sets[mode.set];
+    const set = own ?? sheet.sets.walk;
     const scale = sheet.scale ?? 2;
     /* WHICH CHARACTER, as a row offset rather than a second sheet. The rip
        carries both playable trainers and `build_player` cuts them into one
@@ -702,9 +707,10 @@ export function drawPlayer(ctx, sheet, px, py, dir, step, moving, progress = 1, 
        drawing nothing. */
     const base = sheet.chars?.[mode.char] ?? 0;
     const row = base + ((sheet.dirs ?? DIR_ROW)[dir] ?? 0);
-    const col = (mode.frame != null
+    const afloat = !own && mode.set === "surf" && sheet.blob;
+    const col = (own && mode.frame != null
       ? mode.frame
-      : (!moving || progress >= STRIDE
+      : (!moving || progress >= STRIDE || afloat
           ? NEUTRAL
           : STRIDE_COLS[step % STRIDE_COLS.length])) % set.frames;
     // The sheet is authored against 16px tiles while we draw tiles at TILE, so
@@ -713,9 +719,14 @@ export function drawPlayer(ctx, sheet, px, py, dir, step, moving, progress = 1, 
     // tile puts the rod's overhang where it belongs with no per-set nudge.
     const w = set.w * scale;
     const h = set.h * scale;
-    const lift = mode.lift ?? 0;
+    const lift = (mode.lift ?? 0) + (afloat ? SURF_SIT : 0);
+    if (afloat) {
+      const b = 32 * scale;
+      ctx.drawImage(sheet.blob, (BLOB_COL[dir] ?? 0) * 32, 0, 32, 32,
+        px + (TILE - b) / 2, py + TILE - b + 4, b, b);
+    }
 
-    if (lift > 0.5) {
+    if (lift > 0.5 && !afloat) {
       // The shadow stays on the ground the trainer left, which is the only
       // thing that reads the arc as a jump rather than as a glide.
       ctx.save();
@@ -734,6 +745,33 @@ export function drawPlayer(ctx, sheet, px, py, dir, step, moving, progress = 1, 
     return;
   }
   drawPlayerProcedural(ctx, px, py, dir, step, moving, progress);
+}
+
+/* The Surf blob's facings (skins/surf.png), and how far a skin stands up
+   out of it: the blob's back sits about at the trainer's knees. */
+const BLOB_COL = { down: 0, up: 1, left: 2, right: 3 };
+const SURF_SIT = 12;
+
+/* THE FOLLOWER (docs/cosmetics.md): one of `npm run follow`'s sheets - eight
+   square frames a row (down, up, west, east, two each), the normal palette
+   over the shiny - drawn at the trainer's scale, centred on its tile and
+   standing on it, so a 64px Lugia spans four tiles as it does on the GBA.
+   The second frame of a facing is the stride (`sAnim_GoSouth2F`). */
+const FOLLOW_COL = { down: 0, up: 2, left: 4, right: 6 };
+export function drawFollower(ctx, img, px, py, dir, moving, progress, shiny, lift = 0) {
+  const s = img.height / 2;
+  const w = s * 2;
+  const col = (FOLLOW_COL[dir] ?? 0) + (moving && progress >= 0.25 && progress < 0.75 ? 1 : 0);
+  if (lift > 0.5) {
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "#1d2b22";
+    ctx.beginPath();
+    ctx.ellipse(px + TILE / 2, py + TILE - 4, 8, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.drawImage(img, col * s, shiny ? s : 0, s, s, px + (TILE - w) / 2, py + TILE - w - lift, w, w);
 }
 
 function drawPlayerProcedural(ctx, px, py, dir, step, moving, progress = 1) {

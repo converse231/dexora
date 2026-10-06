@@ -1857,7 +1857,6 @@ import { canRun, RUN_LEVEL } from "../src/game/items.js";
      and not a stride. */
   const want = {
     walk: [16, 3], run: [16, 3], fish: [32, 4], surf: [32, 2], jump: [32, 1],
-    bike: [32, 3],          // the Acro Bike, on the rails
   };
   let widest = 0;
   for (const [name, [w, frames]] of Object.entries(want)) {
@@ -7274,6 +7273,43 @@ import { TIERS as P_TIERS } from "../src/game/biomes.js";
   assert.equal(rFighter(6, 7).perk, undefined, "a ranked fighter carries a perk");
   console.log(`perks ok — ${P_TIERS.length} forms and the alpha each have one, they stack, ` +
     "and a plain Pokemon (and ranked) fights exactly as before");
+}
+
+/* COSMETICS (docs/cosmetics.md). A look, never a strength: no rule module
+   reads cosmetics.js. Every skin's sheet is player.json's walk set in shape
+   (three 16x32 frames, four facings: 48x128) and the Surf blob has its four
+   facings; every species that walks with you names a sheet that ships, and
+   every sheet is eight square frames over two palettes (32 or 64px). Read
+   off the PNG headers, never from the build tools' own constants. */
+import * as COS from "../src/game/cosmetics.js";
+{
+  const src = (p) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
+  for (const p of ["catch.js", "game/biomes.js", "game/battle.js", "game/league.js", "game/trainer.js",
+    "game/items.js", "game/perks.js", "game/research.js", "game/events.js", "game/cards.js"]) {
+    assert.ok(!/cosmetics\.js|data\/follow\.js/.test(src(p)), `${p} imports cosmetics - a look is never a strength`);
+  }
+  const head = (p) => {
+    const b = readFileSync(new URL(`../public/${p}`, import.meta.url));
+    return [b.readUInt32BE(16), b.readUInt32BE(20)];
+  };
+  assert.equal(new Set(COS.SKINS.map((s) => s.id)).size, COS.SKINS.length, "two skins share an id - saves store it");
+  for (const s of COS.SKINS) {
+    assert.deepEqual(head(`skins/${s.id}.png`), [48, 128], `${s.id}'s sheet is not a walk set - npm run skins`);
+    assert.ok(COS.skinPrice(s.id) > 0, `${s.id} has no price (its tier is not in SKIN_TIERS)`);
+  }
+  assert.deepEqual(head("skins/surf.png"), [128, 32], "the Surf blob is not four 32px facings");
+  const files = new Set(readdirSync(new URL("../public/follow/", import.meta.url)));
+  const walkers = SPECIES.filter((sp) => COS.followSheet(sp.id) != null);
+  for (const sp of walkers) {
+    assert.ok(files.has(`${COS.followSheet(sp.id)}.png`), `${nameOf(sp)} walks with a sheet that does not ship`);
+  }
+  for (const f of files) {
+    const [w, h] = head(`follow/${f}`);
+    assert.ok(w === h * 4 && (h === 64 || h === 128), `follow/${f} is ${w}x${h}, not eight square frames over two palettes`);
+  }
+  // Two species have no drawing upstream (Alcremie's); a big drop means the build lost some.
+  assert.ok(walkers.length >= SPECIES.length - 5, `only ${walkers.length} of ${SPECIES.length} species can follow you`);
+  console.log(`cosmetics ok — ${COS.SKINS.length} skins, each a walk set with a price; ${walkers.length} of ${SPECIES.length} species can follow you, from ${files.size} sheets; no rule module reads either`);
 }
 
 /* CARDS (docs/cards.md). A collection, never a strength: no rule module
