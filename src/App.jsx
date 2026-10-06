@@ -778,6 +778,8 @@ export default function App({
             level={level}
             stats={st?.stats ?? null}
             candy={st?.candy ?? 0}
+            road={st?.road ?? null}
+            areaId={st?.areaId ?? null}
             signedIn={Boolean(account)}
             onClose={() => {
               setLeague(false);

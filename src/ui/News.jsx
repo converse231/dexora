@@ -16,15 +16,26 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-07-road",
+    icon: "⚔️",
+    date: "October 2026",
+    title: "Trainers on the road",
+    items: [
+      ["Road trainers", "Battles › Trainers: four on every map, new each day, from Rookie to Lv 100 Veteran."],
+      ["Fight for money", "Each pays once a day. Their teams come from the map they stand on."],
+      ["Count one form", "Filter the Dex by a rare form to track it: Gold 12 / 1,415, by region too."],
+    ],
+  },
+  {
     id: "2026-10-07-sets",
     icon: "🃏",
     date: "October 2026",
-    title: "Four new card sets",
+    title: "Five new card sets",
     items: [
-      ["New sets", "Perfect Order, Chaos Rising, Pitch Black and 30th Celebration, each at its real pull rates."],
+      ["New sets", "Perfect Order, Chaos Rising, Pitch Black, Surging Sparks and 30th Celebration."],
       ["30th Celebration", "A Pikachu in every pack, and Futuristic Rare Mew ex and Mewtwo ex to chase."],
-      ["A tidier Packs tab", "Every set is a tile now: open or buy in one tap, tap a set for its odds and chase cards."],
-      ["Dust buys packs", "400 Card Dust buys a pack of any open set. Crafting now stops at Double rares; Illustration rares and up are packs only."],
+      ["The Card Shop", "Pick 1, 5, 10 packs or a box, add to cart and check out. Open them in My Packs."],
+      ["Dust buys packs", "400 dust buys a pack. Crafting stops at Double rares; the rest is packs only."],
     ],
   },
   {

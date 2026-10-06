@@ -716,6 +716,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   downwards. A box/bundle per set (`BOXES`); a Champion pays a box, every
   `STREAK_PACK`th streak day a pack - never the Pokédex rank (a title).
   One open is one `changed()` (`settleOpen`), Open all included.
+  **The Card Shop is a store** (2026-10-07, `CardShop.jsx`): tiles, a product
+  page of variants (`variantsOf`: 1, 5, 10 or the set's box), a cart kept on
+  the device (`dexora-cart`, never the save), and `engine.checkout(lines)`,
+  which buys the WHOLE cart or none of it. My Packs opens what you hold.
   **A roll lands on the first rung at or below it the set prints**
   (`landsOn`): one `RATES` table serves every era - the top roll is a Mega
   Hyper Rare or a Hyper rare (`isTop`, what the top pity resets on), and
@@ -764,6 +768,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   ability is its species' regular one by uid, an alpha's its hidden one.
   Steps together count on the box entry (`walked`) IN PLACE: a heart or a find
   is the one `changed()`, or a big Box rebuilds every step.
+- **Road trainers are designed in docs/battles.md** (`road.js`): four a
+  map a day, a hash of day, map and slot; parties from the map's own table;
+  `battleBegin` judges them by `roadOpen`, `battleEnd` pays once a day into
+  `state.road` - never `beaten`, so the League's solved ladder is untouched.
+  A road trainer carries `road: true`, which `tuneOf` reads.
 - **The daily check-in and the weekly roulette are designed in
   docs/checkin.md** (`checkin.js`): one stamp a day (`dayKey`), a streak kept
   by yesterday, the week's ladder `CHECKIN_REWARDS`, and day 7 banks a spin.

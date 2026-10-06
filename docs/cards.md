@@ -644,6 +644,12 @@ Your calls after phase 2:
   and turns, whatever it is. It pulses white beforehand ("Last card…"), never
   its rarity's colour, so the suspense is real; a hit's colour comes in only
   during the charge. A rarity banner still stamps only for a hit.
+- **The Card Shop** (2026-10-07): the Packs tab became a store. A product
+  page sells 1, 5 or 10 packs, or the set's box or bundle at its discount;
+  lines go into a cart (kept on the device, never the save) and
+  `engine.checkout` buys the whole cart or none of it, in one save. **My
+  Packs** holds every pack, bought or earned, and opens them; the page opens
+  on it while any wait.
 - **Crafting ends at the Double rare** (2026-10-07; it was every rung below a
   Special illustration rare): an Illustration rare and everything above it, the
   ACE SPEC too, come from packs only (`PACK_ONLY`). Dust's other use is a pack

@@ -3529,8 +3529,23 @@ def meteor_falls():
     not a move this game has, and without it the upper rooms are walled off."""
     meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
                              encoding="utf-8"))["meteor"]
-    return em_rooms("falls", "MeteorFalls", FALLS_ROOMS, "meteor_falls", meta, meta["meteor_falls"],
-                    FALLS_SHELVES, FALLS_IN, 2, lambda b, ch: {".": "m", "T": "M"}.get(ch, ch))
+    out = em_rooms("falls", "MeteorFalls", FALLS_ROOMS, "meteor_falls", meta, meta["meteor_falls"],
+                   FALLS_SHELVES, FALLS_IN, 2, lambda b, ch: {".": "m", "T": "M"}.get(ch, ch))
+    # AN INVISIBLE DOOR, DRAWN (reported 2026-10-07): the warp at FALLS_BARE is
+    # a walk-in door laid on plain wall - the room's own metatiles have no mouth
+    # there - so it read as rock you could walk into. The 3x2 cave mouth from a
+    # door that has one (FALLS_MOUTH, the same tileset) is copied over it.
+    rows, tiles = out[0], out[2]
+    W = len(rows[0])
+    (mx, my), (dx, dy) = FALLS_MOUTH, FALLS_BARE
+    for oy in (-1, 0):
+        for ox in (-1, 0, 1):
+            tiles[(dy + oy) * W + dx + ox] = tiles[(my + oy) * W + mx + ox]
+    return out
+
+
+# A drawn cave mouth, and the warp that lacks one (both on the mouth's own row).
+FALLS_MOUTH, FALLS_BARE = (10, 37), (4, 36)
 
 
 # -------------------------------------------------------------- Icefall Cave

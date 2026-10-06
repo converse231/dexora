@@ -18,12 +18,14 @@ import Inspect from "./Inspect.jsx";
 import Opening, { OpenAll } from "./Opening.jsx";
 import { loadSet, logoUrl, packUrl } from "./load.js";
 import Icon from "../Icon.jsx";
+import { ShopGrid, Product, Cart, Done, MyPacks, readCart, writeCart, variantsOf } from "./CardShop.jsx";
 import { titleIds, titleName, MASTER_STEP } from "../../game/titles.js";
 import { showKey, CARD_SHOW, printingsOf } from "../../game/cards.js";
 
 const yen = (n) => `¥${n.toLocaleString()}`;
 const oneIn = (p) => Math.round(1 / p);
-const TABS = [["packs", "Packs", "cards"], ["binder", "Binder", "book"], ["dex", "Card Dex", "dex"], ["dust", "Dust", "forms"]];
+// The store, then what you hold (asked for, 2026-10-07: shop, cart, checkout, My Packs).
+const TABS = [["shop", "Card Shop", "shop"], ["mine", "My Packs", "cards"], ["binder", "Binder", "book"], ["dex", "Card Dex", "dex"], ["dust", "Dust", "forms"]];
 const POCKETS = 12;            // a page: four across, three down
 /* THE CARD DEX ADDS TILES A PAGE AT A TIME as its end scrolls near (the
    Picker's rule): 188 tiles at once was a 103ms task on a throttled phone. */
@@ -33,12 +35,30 @@ const CHASE = ["mega", "hyper", "futuristic", "special"];
 const bestVariant = (row, card) => ["h", "r", "n"].find((v) => row?.[v] && card[4].includes(v)) ?? card[4][0];
 
 export default function Cards({ engine, st, level, onClose, onSpecies, onScene }) {
-  const [tab, setTab] = useState("packs");
+  // Packs waiting (a reward, the roulette, a checkout) open on My Packs; otherwise the shop.
+  const [tab, setTab] = useState(() => (Object.values(st?.packs ?? {}).some((n) => n > 0) ? "mine" : "shop"));
   const [sets, setSets] = useState({});            // id -> { SET, CARDS }, as each loads
   const [opening, setOpening] = useState(null);    // { set, result, wrapper, n }
   const [inspect, setInspect] = useState(null);    // { setId, localId }
   const [note, setNote] = useState("");
-  const [pick, setPick] = useState(null);           // the set whose full card is open, or the grid
+  // The shop's view: the grid, a product, the cart, or the order just placed.
+  const [shop, setShop] = useState({ v: "grid" });
+  const [cart, setCart] = useState(readCart);
+  useEffect(() => { writeCart(cart); }, [cart]);
+  const cartCount = cart.reduce((a, l) => a + l.qty, 0);
+  const addToCart = (line) => setCart((c) => {
+    const i = c.findIndex((l) => l.set === line.set && l.key === line.key);
+    if (i < 0) return [...c, line];
+    return c.map((l, k) => (k === i ? { ...l, qty: Math.min(20, l.qty + line.qty) } : l));
+  });
+  const checkout = () => {
+    const lines = cart.map((l) => { const v = variantsOf(l.set).find((x) => x.key === l.key); return { set: l.set, n: v.n, box: Boolean(v.box), qty: l.qty }; });
+    const order = engine.checkout(lines);
+    if (!order) { setNote("That cart could not be bought - check your money and that every set is open to you."); return; }
+    setNote("");
+    setCart([]);
+    setShop({ v: "done", order });
+  };
   const page = useRef(null);
 
   // The game underneath stops while this covers it, as under the League.
@@ -63,16 +83,13 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, [opening, inspect, onClose, engine]);
-  useEffect(() => { page.current?.scrollTo(0, 0); }, [tab]);
+  useEffect(() => { page.current?.scrollTo(0, 0); }, [tab, shop.v, shop.id]);
 
   const cards = st?.cards ?? {};
   const packs = st?.packs ?? {};
-  // The grid's order: packs waiting first, then sets you can buy, then the locked ones.
-  const shown = CARD_SETS.find((s) => s.id === pick) ?? null;
-  const order = [...CARD_SETS].sort((a, b) => {
-    const rank = (s) => ((packs[s.id] ?? 0) > 0 ? 0 : setOpen(s.id, level) ? 1 : 2);
-    return rank(a) - rank(b);
-  });
+  // The store's order: sets you can buy, newest released first, then the locked ones.
+  const shown = shop.v === "product" ? CARD_SETS.find((s) => s.id === shop.id) ?? null : null;
+  const order = [...CARD_SETS].sort((a, b) => (setOpen(b.id, level) - setOpen(a.id, level)) || b.released.localeCompare(a.released));
   const dex = st?.dex ?? [];
   const dust = st?.dust ?? 0;
   const unopened = Object.values(packs).reduce((a, b) => a + b, 0);
@@ -107,10 +124,6 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
       setOpening((o) => (o?.waiting ? (results ? { ...o, all: results, waiting: 0, reveal: hits.length ? hits : null } : null) : o));
     }, 30);
   };
-  const buyBox = (id) => setNote(engine.buyBox(id) ? "" : `Not enough money for a ${BOXES[id].name.toLowerCase()}.`);
-  const buy = (id, n) => {
-    setNote(engine.buyPacks(id, n) ? "" : `Not enough money for ${n === 1 ? "a pack" : `${n} packs`}.`);
-  };
   const look = (setId, localId) => setInspect({ setId, localId });
   const titles = titleIds(st?.milestones, st?.medals).map(titleName);
 
@@ -118,6 +131,10 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
     <div className={`tc-page evcard cd-page${opening ? " opening" : ""}`} role="dialog" aria-modal="true" aria-label="Cards" ref={page}>
       <header className="tc-head">
         <div className="tc-bar">
+          <button type="button" className="cs-cartbtn" aria-label={`Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
+            onClick={() => { setTab("shop"); setShop({ v: "cart" }); }}>
+            <Icon n="shop" size={20} />{cartCount > 0 && <em>{cartCount}</em>}
+          </button>
           <div className="tc-titles">
             <h3>Cards</h3>
             <span>{owned} cards collected · {unopened} pack{unopened === 1 ? "" : "s"} to open · {dust.toLocaleString()} dust
@@ -131,7 +148,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
                 className={`rk-tab${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>
                 <Icon n={ic} className="side-ic" />
                 <b>{name}</b>
-                <em>{{ packs: yen(st?.money ?? 0), binder: `${owned} owned`, dex: "Every card", dust: `${dust.toLocaleString()} dust` }[id]}</em>
+                <em>{{ shop: yen(st?.money ?? 0), mine: `${unopened} to open`, binder: `${owned} owned`, dex: "Every card", dust: `${dust.toLocaleString()} dust` }[id]}</em>
               </button>
             ))}
           </div>
@@ -141,33 +158,43 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
       <main className="hp-body tc-main cd-main">
         {/* NOT RENDERED UNDER A SCENE: three sets and their chase galleries
             re-rendered on every open, and an open went back over 100ms. */}
-        {/* THE SETS AS A GRID (asked for, 2026-10-07): nine sets one under
-            another was a long scroll. A tile each - the pack, what you hold,
-            one press to open or buy - and a tap opens the set's full card:
-            odds, pity, chase cards, every way to buy. */}
-        {tab === "packs" && !opening && !shown && (
+        {/* THE CARD SHOP (asked for, 2026-10-07): grid -> product -> cart ->
+            checkout -> done. Nothing is spent until checkout, and checkout
+            buys the whole cart or none of it (`engine.checkout`). */}
+        {tab === "shop" && !opening && (
           <div className="cd-packs">
             {note && <p className="cd-note" role="alert">{note}</p>}
-            <div className="cd-setgrid">
-              {order.map((s) => (
-                <SetTile key={s.id} meta={s} level={level} money={st?.money ?? 0} held={packs[s.id] ?? 0} ready={!!sets[s.id]}
-                  onPick={() => setPick(s.id)} onOpen={() => open(s.id)} onBuy={() => buy(s.id, 1)} />
-              ))}
-            </div>
+            {shop.v !== "grid" && shop.v !== "done" && (
+              <button type="button" className="cd-allsets" onClick={() => setShop({ v: "grid" })}>
+                <Icon n="chev" size={16} className="cd-allsets-ic" /> All sets
+              </button>
+            )}
+            {shop.v === "grid" && <ShopGrid order={order} level={level} held={packs} onSee={(id) => setShop({ v: "product", id })} />}
+            {shown && (
+              <Product key={shown.id} meta={shown} level={level} money={st?.money ?? 0} onAdd={addToCart}
+                onCart={() => setShop({ v: "cart" })} cartCount={cartCount}>
+                <PackCard meta={shown} set={sets[shown.id]} level={level} money={st?.money ?? 0}
+                  pity={st?.cardPity?.[shown.id] ?? freshPity()} cards={cards} log={st?.cardLog ?? []}
+                  onLook={(localId) => look(shown.id, localId)} />
+              </Product>
+            )}
+            {shop.v === "cart" && (
+              <Cart cart={cart} money={st?.money ?? 0} level={level}
+                onQty={(i, q) => setCart((c) => c.map((l, k) => (k === i ? { ...l, qty: q } : l)))}
+                onRemove={(i) => setCart((c) => c.filter((_, k) => k !== i))}
+                onCheckout={checkout} onShop={() => setShop({ v: "grid" })} />
+            )}
+            {shop.v === "done" && (
+              <Done order={shop.order} onOpen={(id) => { setShop({ v: "grid" }); setTab("mine"); open(id); }}
+                onMine={() => { setShop({ v: "grid" }); setTab("mine"); }} onShop={() => setShop({ v: "grid" })} />
+            )}
           </div>
         )}
-        {tab === "packs" && !opening && shown && (
+        {tab === "mine" && !opening && (
           <div className="cd-packs">
             {note && <p className="cd-note" role="alert">{note}</p>}
-            <button type="button" className="cd-allsets" onClick={() => setPick(null)}>
-              <Icon n="chev" size={16} className="cd-allsets-ic" /> All sets
-            </button>
-            <PackCard key={shown.id} meta={shown} set={sets[shown.id]} level={level} money={st?.money ?? 0}
-              dust={dust} onDustPack={() => engine.dustPack(shown.id)}
-              held={packs[shown.id] ?? 0} earned={st?.earnedPacks?.[shown.id]?.length ?? 0}
-              pity={st?.cardPity?.[shown.id] ?? freshPity()} cards={cards} log={st?.cardLog ?? []}
-              onOpen={() => open(shown.id)} onOpenAll={(max) => openAll(shown.id, max)} onBuy={(n) => buy(shown.id, n)}
-              onBox={() => buyBox(shown.id)} onLook={(localId) => look(shown.id, localId)} />
+            <MyPacks held={packs} earnedOf={(id) => st?.earnedPacks?.[id]?.length ?? 0} ready={(id) => Boolean(sets[id])}
+              onOpen={open} onOpenAll={(id) => openAll(id)} onShop={() => { setTab("shop"); setShop({ v: "grid" }); }} />
           </div>
         )}
         {tab === "binder" && <Binder sets={sets} cards={cards} dex={dex} log={st?.cardLog ?? []} onLook={look}
@@ -209,36 +236,11 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   );
 }
 
-/* A SET IN THE GRID: its pack, its name, what you hold, and one press -
-   open what you hold, or buy one. The rest is a tap away (PackCard). */
-function SetTile({ meta, level, money, held, ready, onPick, onOpen, onBuy }) {
-  const isOpen = setOpen(meta.id, level);
-  const w = WRAPPERS[meta.id]?.[0];
-  return (
-    <article className={`cd-st${isOpen || held ? "" : " shut"}`}>
-      <button type="button" className="cd-st-main" onClick={onPick} aria-label={`${meta.name}: odds, pity and chase cards`}>
-        <img src={w ? packUrl(meta.id, w) : logoUrl(meta.id)} alt="" loading="lazy" draggable="false" />
-        <b>{meta.name}</b>
-        <small>{isOpen || held ? `${meta.total} cards` : `Opens at Lv ${SET_LEVEL[meta.id]}`}</small>
-        {held > 0 && <em className="cd-st-held" aria-label={`${held} to open`}>{held}</em>}
-      </button>
-      {held > 0 ? (
-        <button type="button" className="lg-go cd-st-go" disabled={!ready} onClick={onOpen}>Open{held > 1 ? ` · ${held}` : ""}</button>
-      ) : isOpen ? (
-        <button type="button" className="lg-go quiet cd-st-go" disabled={money < PACK_PRICE} onClick={onBuy}>Buy · {yen(PACK_PRICE)}</button>
-      ) : null}
-    </article>
-  );
-}
-
 /* ONE SET'S PACKS: its real wrappers fanned, the odds (its own real-life rates, `rulesOf`,
    never typed), the three pity meters, your best pull, and the chase gallery
    - every Mega Hyper Rare and Special illustration rare, owned or still out
    there, each with its own odds. */
-function PackCard({ meta, set, level, money, dust = 0, held, earned, pity, cards, log, onOpen, onOpenAll, onBuy, onBox, onLook, onDustPack }) {
-  const box = BOXES[meta.id];
-  const isOpen = setOpen(meta.id, level);
-  const wraps = WRAPPERS[meta.id] ?? [];
+function PackCard({ meta, set, pity, cards, log, onLook }) {
   const chase = useMemo(() => (set ? CHASE.flatMap((r) => set.CARDS.filter((c) => c[3] === r)) : []), [set]);
   const count = (r) => set?.CARDS.filter((c) => c[3] === r).length ?? 1;
   const best = useMemo(() => {
@@ -253,7 +255,7 @@ function PackCard({ meta, set, level, money, dust = 0, held, earned, pity, cards
   const { rates, pity: net } = rules;
   const as = (r) => (set ? landsOn(set.CARDS, r) ?? r : r);
   // A roll the set does not have (rate 0: 30th Celebration's ultra) is not listed.
-  const odds = ["double", "illustration", "ultra", "special", "mega"].filter((r) => rates[r] > 0).map((r) => [as(r), rates[r]]);
+  const odds = ["double", "illustration", "ace", "ultra", "special", "mega"].filter((r) => rates[r] > 0).map((r) => [as(r), rates[r]]);
   // The rate a rarity is pulled at here: the roll that lands on it.
   const rateOf = (rarity) => rates[Object.keys(rates).find((k) => as(k) === rarity)] ?? 0;
   const meters = [
@@ -263,23 +265,18 @@ function PackCard({ meta, set, level, money, dust = 0, held, earned, pity, cards
   ];
   const got = chase.filter((c) => cards[cardId(meta.id, c[0])]).length;
   return (
-    <section className={`ev-card cd-set${isOpen || held ? "" : " shut"}`}>
-      <div className="cd-wrap">
-        <div className="cd-wrappers" style={{ "--n": wraps.length }}>
-          {wraps.map((w, k) => (
-            <img key={w} src={packUrl(meta.id, w)} alt={k === 0 ? `${meta.name} booster pack` : ""} style={{ "--k": k }} />
-          ))}
-          {!wraps.length && <img src={logoUrl(meta.id)} alt={meta.name} />}
-        </div>
-        {best && (
+    <section className={`ev-card cd-set${best ? "" : " solo"}`}>
+      {/* The pack itself is the product page's, above: here, what is inside it. */}
+      {best && (
+        <div className="cd-wrap">
           <button type="button" className="cd-best" onClick={() => onLook(best[0][0])}>
             <CardFace setId={meta.id} card={best[0]} variant={best[1]} still />
             <span>Your best pull</span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
       <div className="cd-set-body">
-        <h4>{meta.name}</h4>
+        <h4>What is inside</h4>
         <p className="cd-sub">{meta.total} cards · {PACK_SIZE} a pack · a hit about 1 pack in {(1 / rules.hit).toFixed(1)} · {yen(PACK_PRICE)}</p>
         <ul className="cd-odds" aria-label="Odds per pack">
           {odds.map(([r, p]) => (
@@ -298,36 +295,6 @@ function PackCard({ meta, set, level, money, dust = 0, held, earned, pity, cards
               </div>
             );
           })}
-        </div>
-        <div className="cd-actions">
-          {held > 0 && (
-            <button type="button" className="lg-go cd-open-btn" onClick={onOpen} disabled={!set}>
-              Open a pack · {held}{earned ? ` (${earned} earned)` : ""}
-            </button>
-          )}
-          {held >= 10 && (
-            <button type="button" className="lg-go quiet" onClick={() => onOpenAll(10)} disabled={!set}>Open 10</button>
-          )}
-          {held > 1 && (
-            <button type="button" className="lg-go quiet" onClick={() => onOpenAll()} disabled={!set}>Open all {held}</button>
-          )}
-          {isOpen ? (
-            <>
-              <button type="button" className="lg-go quiet" disabled={money < PACK_PRICE} onClick={() => onBuy(1)}>Buy 1 · {yen(PACK_PRICE)}</button>
-              <button type="button" className="lg-go quiet" disabled={money < PACK_PRICE * 10} onClick={() => onBuy(10)}>Buy 10 · {yen(PACK_PRICE * 10)}</button>
-              {onDustPack && (
-                <button type="button" className="lg-go quiet" disabled={dust < DUST_PACK} onClick={onDustPack}
-                  data-tip={`You have ${dust.toLocaleString()} Card Dust`}>
-                  1 pack · {DUST_PACK} dust
-                </button>
-              )}
-              {box && (
-                <button type="button" className="lg-go quiet" disabled={money < box.price} onClick={onBox}>
-                  {box.name.replace("Booster ", "").replace(/^./, (c) => c.toUpperCase())} of {box.packs} · {yen(box.price)} (−{Math.round((1 - box.price / (box.packs * PACK_PRICE)) * 100)}%)
-                </button>
-              )}
-            </>
-          ) : <span className="cd-lock">Opens at Lv {SET_LEVEL[meta.id]}</span>}
         </div>
       </div>
       {chase.length > 0 && (

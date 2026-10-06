@@ -48,7 +48,10 @@ export function standing(beaten = {}) {
 /* What an opponent is NOW: its cap (a trainer has none), its ace `top` (both
    climb with each rematch win), what a win pays at this step, how full its
    rematch clock is, and how often it has been beaten. */
-export const tuneOf = (o, beaten = {}, steps = 0) => ({
+export const tuneOf = (o, beaten = {}, steps = 0) => (o.road ? {
+  // A road trainer (road.js): its own level and prize, no cap, no rematch clock.
+  cap: 100, top: o.top, pay: o.pay, clock: 0, wins: 0,
+} : {
   cap: capOf(o.id, beaten), top: topOf(o.id, beaten), pay: payFor(o.id, beaten, steps),
   clock: clockOf(o.id, beaten, steps), wins: beaten[o.id]?.wins ?? 0,
 });

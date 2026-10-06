@@ -26,7 +26,9 @@ import { REMATCH_STEPS } from "../../data/gymtune.js";
 import { speciesById } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { variantOf } from "../../game/items.js";
-import { hash } from "../../game/daily.js";
+import { hash, dayKey } from "../../game/daily.js";
+import { roadOf, roadMaps, ROAD_PER_MAP } from "../../game/road.js";
+import { AREAS } from "../../game/mapdata.js";
 import { useModalLock } from "../modal.js";
 import Sprite from "../Sprite.jsx";
 import Icon from "../Icon.jsx";
@@ -45,6 +47,8 @@ import { rankedStep } from "../../net/cloud.js";
 const RANKED = "ranked";
 // The League's shop and Train tab (phase 8) sit beside it, under ids no region has.
 const SHOP = "shop", TRAIN = "train", TEAM = "team";
+// Road trainers (road.js): battles off the League, on the maps.
+const ROAD = "road";
 // One slot moved to another, the rest closing up: the team's order.
 const moved = (list, from, to) => { const n = [...list]; n.splice(to, 0, ...n.splice(from, 1)); return n; };
 
@@ -573,6 +577,58 @@ function MyTeam({ engine, box, team }) {
   );
 }
 
+/* ROAD TRAINERS (docs/battles.md): today's four on each map you have opened,
+   the map you stand on first. A win pays once a trainer a day; tomorrow
+   brings new ones. The engine judges it (`battleBegin`), this only shows. */
+function RoadView({ level, road, here, onBattle }) {
+  const maps = roadMaps(level);
+  const [at, setAt] = useState(() => (maps.includes(here) ? here : maps[0]));
+  const day = dayKey();
+  const list = useMemo(() => (at ? roadOf(at, day) : []), [at, day]);
+  const done = (id) => road?.day === day && road.won?.includes(id);
+  const beat = maps.reduce((n, m) => n + roadOf(m, day).filter((t) => done(t.id)).length, 0);
+  return (
+    <div className="rd-page">
+      <section className="lg-hero rd-hero">
+        <span className="lg-kicker">Trainers on the maps</span>
+        <h2>Road trainers</h2>
+        <p>Four on every map you have opened, new each day. Beat them for money - {beat} of {maps.length * ROAD_PER_MAP} today.</p>
+      </section>
+      <div className="rd-maps" role="tablist" aria-label="Map">
+        {maps.map((m) => {
+          const left = roadOf(m, day).filter((t) => !done(t.id)).length;
+          return (
+            <button key={m} type="button" role="tab" aria-selected={m === at} className={m === at ? "on" : ""} onClick={() => setAt(m)}>
+              {AREAS[m]?.name ?? m}{m === here ? " · here" : ""}<em>{left ? `${left} left` : "done"}</em>
+            </button>
+          );
+        })}
+      </div>
+      <div className="rd-list">
+        {list.map((o) => {
+          const won = done(o.id);
+          return (
+            <article key={o.id} className={`rd-card r-${o.rung.toLowerCase()}${won ? " won" : ""}`}>
+              <img className="rd-pic" src={asset(`trainers/${o.pic}.png`)} alt="" loading="lazy" />
+              <div className="rd-who">
+                <span className="lg-kicker">{o.rung} · Lv {o.top}</span>
+                <b>{trainerName(o)}</b>
+                <Party team={teamOf(o)} small />
+              </div>
+              <div className="rd-go">
+                <span className="rd-pay">{won ? "Beaten today" : yen(o.pay)}</span>
+                <button type="button" className={`lg-go${won ? " quiet" : ""}`} disabled={won} onClick={() => onBattle(o)}>
+                  {won ? "Back tomorrow" : "Battle"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* CHOOSING A TEAM: who may come (and, for everyone else, why not), picked
    with the Trade Center's picker - a tap takes your highest level of that
    Pokemon - and one pinned button to go. */
@@ -599,8 +655,8 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
       <section className="lg-foe">
         <img className="lg-foe-pic" src={asset(`trainers/${o.pic}.png`)} alt="" />
         <div className="lg-foe-who">
-          <span className="lg-kicker">{kind === "trainer" ? o.cls : kind === "hard" ? "Hard mode · Lv 100" : kind === "champion" ? "Champion" : kind === "league" ? "Elite Four" : "Leader"}</span>
-          <h4>{o.name}</h4>
+          <span className="lg-kicker">{kind === "road" ? `${o.rung} · ${o.map}` : kind === "trainer" ? o.cls : kind === "hard" ? "Hard mode · Lv 100" : kind === "champion" ? "Champion" : kind === "league" ? "Elite Four" : "Leader"}</span>
+          <h4>{kind === "road" ? trainerName(o) : o.name}</h4>
           <Party team={theirs} small />
         </div>
       </section>
@@ -642,7 +698,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
 
 export default function League({
   engine, box = [], beaten = {}, steps = 0, team = [], signedIn = false, onClose,
-  money = 0, bag = {}, level = 1, stats = null, candy = 0,
+  money = 0, bag = {}, level = 1, stats = null, candy = 0, road = null, areaId = null,
 }) {
   useModalLock();
   const page = useRef(null);
@@ -650,7 +706,7 @@ export default function League({
   const st = useMemo(() => standing(beaten), [beaten]);
   const firstOpen = () => {
     const saved = readRegion();
-    if ([RANKED, SHOP, TRAIN, TEAM].includes(saved)) return saved;
+    if ([RANKED, SHOP, TRAIN, TEAM, ROAD].includes(saved)) return saved;
     if (saved && st[LEAGUES.findIndex((r) => r.id === saved)]?.open) return saved;
     const k = st.findIndex((s) => s.open && !s.cleared);
     return LEAGUES[k >= 0 ? k : 0].id;
@@ -668,6 +724,7 @@ export default function League({
   const [editing, setEditing] = useState(null);   // the defense team slot being edited
   const [nonce, setNonce] = useState(0);          // a ranked battle closed: the Ranked tab reloads its standing
   const ranked = regionId === RANKED, shop = regionId === SHOP, train = regionId === TRAIN, mine = regionId === TEAM;
+  const roadTab = regionId === ROAD;
   // Normal or hard: one switch for every region, remembered while the page is open.
   const [hard, setHard] = useState(false);
   const ri = LEAGUES.findIndex((r) => r.id === regionId);
@@ -786,6 +843,12 @@ export default function League({
                 <b>Ranked</b>
                 <em>Teams</em>
               </button>
+              <button type="button" role="tab" aria-selected={roadTab}
+                className={`rk-tab${roadTab ? " on" : ""}`} onClick={() => choose(ROAD)}>
+                <Icon n="users" className="side-ic" />
+                <b>Trainers</b>
+                <em>On the maps</em>
+              </button>
               <button type="button" role="tab" aria-selected={mine}
                 className={`rk-tab${mine ? " on" : ""}`} onClick={() => choose(TEAM)}>
                 <Icon n="ball" className="side-ic" />
@@ -822,6 +885,8 @@ export default function League({
       <main className="hp-body tc-main lg-main">
         {pick ? (
           <TeamPick o={pick.o} kind={pick.kind} box={box} last={team} beaten={beaten} steps={steps} onFight={startFight} />
+        ) : roadTab ? (
+          <RoadView level={level} road={road} here={areaId} onBattle={(o) => setPick({ o, kind: "road" })} />
         ) : mine ? (
           <MyTeam engine={engine} box={box} team={team} />
         ) : shop ? (
@@ -900,7 +965,7 @@ export default function League({
           foeMons={fight.foeMons ?? null}
           badge={fight.kind === "leader" ? { id: fight.o.id, name: fight.o.badge } : null}
           nextLabel={upNext ? (upNext.kind === "trainer" ? trainerName(upNext.o) : upNext.kind === "hard" ? `${upNext.o.name} (hard)` : upNext.o.name) : null}
-          ai={AI_FOR[fight.kind] ?? 3}
+          ai={fight.o.ai ?? AI_FOR[fight.kind] ?? 3}
           onDone={(result, again) => {
             if (fight.kind === "ranked") setNonce((n) => n + 1);
             if (again === "next" && upNext) { goNext(); return; }
