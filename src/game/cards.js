@@ -83,7 +83,11 @@ export function landsOn(cards, rarity) {
      (cardprice.com ~800 packs, DigitalTQ 420) agree near DR 25%, IR 19%,
      SIR 5.1%, Futuristic Rare 0.9% (the top roll), a Pikachu in every pack
      (`pikachu` slot), and no Ultra Rares (that roll is 0). Revisit when
-     TCGplayer's own numbers settle. */
+     TCGplayer's own numbers settle.
+   - sv08 Surging Sparks (community aggregate, cardcodex / tcgtalk): DR 16.9%,
+     IR 7.7%, ACE SPEC 5.0%, UR 6.8%, SIR 1.15%, HR 0.53%. It prints both
+     Illustration rares and ACE SPECs, so the ACE SPEC has its own roll
+     (`ace`, optional: a set whose row names it). */
 export const SET_RATES = {
   me01: { double: 0.2091, illustration: 0.1089, ultra: 0.0823, special: 0.0099, mega: 0.0008 },
   me02: { double: 0.2077, illustration: 0.1097, ultra: 0.0806, special: 0.0125, mega: 0.0008 },
@@ -94,9 +98,10 @@ export const SET_RATES = {
   me04: { double: 0.2030, illustration: 0.1066, ultra: 0.0829, special: 0.0121, mega: 0.0010 },
   me05: { double: 0.2102, illustration: 0.1101, ultra: 0.0830, special: 0.0125, mega: 0.0009 },
   "30th": { double: 0.25, illustration: 0.19, ultra: 0, special: 0.051, mega: 0.009 },
+  sv08: { double: 0.169, illustration: 0.077, ace: 0.05, ultra: 0.068, special: 0.0115, mega: 0.0053 },
 };
 // A pack holding a hit (a Double rare or better), at a set's rates.
-export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration) * (1 - r.double - r.ultra);
+export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration - (r.ace ?? 0)) * (1 - r.double - r.ultra);
 
 /* PITY IS A SAFETY NET, NOT A SCHEDULE (your call, 2026-10-06): real packs
    have none, so each set's is scaled to its own rates - the odds start to
@@ -193,13 +198,14 @@ export const BOXES = {
   me05: { name: "Booster box", packs: 36, price: 120000 },
   // A celebration set, sold in bundles rather than boxes.
   "30th": { name: "Booster bundle", packs: 6, price: 21600 },
+  sv08: { name: "Booster box", packs: 36, price: 120000 },
 };
 // Every 7th day of a daily-quest streak pays a pack.
 export const STREAK_PACK = 7;
 export const PACK_SIZE = 10;
 export const CARD_MAX = 99;
 // The level each set opens at (docs/cards.md, Economy).
-export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45, "sv03.5": 50, me05: 55, "sv08.5": 60, "30th": 70 };
+export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45, "sv03.5": 50, me05: 55, "sv08.5": 60, sv08: 65, "30th": 70 };
 
 export const setById = (id) => CARD_SETS.find((s) => s.id === id) ?? null;
 export const setOpen = (id, level) => !!setById(id) && level >= (SET_LEVEL[id] ?? Infinity);
@@ -271,6 +277,8 @@ export function openPack(cards, rng, pity = freshPity(), rules) {
   if (rng() < m) slot2 = of("mega", "h");
   else if (rng() < Math.min(1, s / (1 - m))) slot2 = of("special", "h");
   else if (rng() < Math.min(1, rates.illustration / Math.max(1e-9, 1 - m - s))) slot2 = of("illustration", "h");
+  // An ACE SPEC beside the Illustration rares (Surging Sparks): its own roll, after them.
+  else if (rates.ace && rng() < Math.min(1, rates.ace / Math.max(1e-9, 1 - m - s - rates.illustration))) slot2 = of("ace", "h");
   else slot2 = reverse();
   // The rare slot: an ultra, a double, or a holo rare - forced to a hit
   // on the `hit` pity's hard pack when nothing else in the pack is one.

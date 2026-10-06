@@ -35,7 +35,7 @@ const ROOT = new URL("../", import.meta.url);
 const CACHE = new URL(".assets-src/tcgdex/", ROOT);
 const API = "https://api.tcgdex.net/v2/en";
 // Shipped sets, in the order they open (docs/cards.md, Phases).
-const SETS = ["me01", "me02", "me02.5", "sv03.5", "sv08.5", "me03", "me04", "me05", "30th"];
+const SETS = ["me01", "me02", "me02.5", "sv03.5", "sv08.5", "me03", "me04", "me05", "30th", "sv08"];
 
 const RARITY = {
   "Common": "common", "Uncommon": "uncommon", "Rare": "rare", "Double rare": "double",

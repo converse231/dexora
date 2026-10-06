@@ -235,16 +235,27 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
      One object so the three readings - total, seen, caught - cannot come from
      three different filters, which is exactly how "113 / 358" ended up over a
      grid of 151. */
+  /* AND THE TIER, when SHOW names one (asked for, 2026-10-07): "Gold 3 /
+     1,412" counts the Gold ones you hold, out of the species that CAN be Gold
+     (`tiersFor` - an Origin is not drawn for every species, and a total you
+     cannot finish is not a goal). Labelled with the tier, so a smaller number
+     never reads as Pokemon lost; the rank above stays the whole dex's. */
+  const tier = TIERS.includes(only) ? only : null;
   const scope = useMemo(() => {
-    const mine = region === "all"
+    let mine = region === "all"
       ? SPECIES
       : SPECIES.filter((sp) => genOf(sp.id) === Number(region));
+    if (tier) {
+      mine = mine.filter((sp) => tiersFor(sp.id).includes(tier));
+      const got = mine.filter((sp) => has(tier, sp.id)).length;
+      return { total: mine.length, seen: got, caught: got };
+    }
     return {
       total: mine.length,
       seen: mine.filter((sp) => at(sp.id) >= 1).length,
       caught: mine.filter((sp) => at(sp.id) === 2).length,
     };
-  }, [region, dex, tiers]);
+  }, [region, dex, tiers, tier]);
   // A region's Pokédex reward: claimed, ready, or what it waits on (`genReward`).
   const reward = useMemo(() => (region === "all" ? null
     : genReward(Number(region), dex ?? [], tiers?.medals ?? [])), [region, dex, tiers]);
@@ -398,8 +409,9 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
             : `${REGION_NAME[region]} complete - claim your reward with the REWARD button on the map`}
         </p>
       )}
-      <div className="count">
-        <b>{scope.caught}</b> <span>/ {scope.total}</span>
+      <div className={`count${tier ? ` tiered t-${tier}` : ""}`}>
+        {tier && <span className="dx-tier"><Mark tier={tier} size={13} />{tier[0].toUpperCase() + tier.slice(1)}{region !== "all" ? ` · ${REGION_NAME[region]}` : ""}</span>}
+        <b>{scope.caught}</b> <span>/ {scope.total.toLocaleString()}</span>
         <em>{Math.round((scope.caught / Math.max(1, scope.total)) * 100)}%</em>
       </div>
       {/* Two fills in one track: everything met, and everything caught. `seen`
@@ -411,7 +423,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
         aria-valuemin={0}
         aria-valuemax={scope.total}
         aria-valuenow={scope.caught}
-        aria-label={`${scope.caught} caught and ${scope.seen} seen of ${scope.total}`}
+        aria-label={tier ? `${scope.caught} of ${scope.total} in ${tier}` : `${scope.caught} caught and ${scope.seen} seen of ${scope.total}`}
       >
         <b style={{ width: `${(scope.seen / Math.max(1, scope.total)) * 100}%` }} />
         <i style={{ width: `${(scope.caught / Math.max(1, scope.total)) * 100}%` }} />

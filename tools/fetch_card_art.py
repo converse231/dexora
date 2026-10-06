@@ -41,6 +41,8 @@ WRAPPERS = {
     "me05": ["ME5 Booster Mega Darkrai.png", "ME5 Booster Mega Zeraora.png", "ME5 Booster Mega Chandelure.png",
              "ME5 Booster Mega Excadrill.png"],
     "30th": ["30th Celebration Booster.png"],
+    "sv08": ["SV8 Booster Pikachu.png", "SV8 Booster Latias.png", "SV8 Booster Archaludon.png",
+             "SV8 Booster Alolan Exeggutor.png"],
 }
 # A set TCGdex has no logo for gets one from here (fetch-cards leaves it out).
 LOGOS = {"30th": "30th Anniversary logo.png"}

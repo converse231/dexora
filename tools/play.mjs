@@ -2221,6 +2221,27 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
   assert.equal(sw.state.cards[key(rare)].h, 3, "the sweep took a rare");
   assert.equal(sw.state.dust, 3 * C.dustOf("common", "n"));
 
+  /* THE CARD SHOP'S CHECKOUT: the whole cart or none of it - a cart past your
+     money, with a shut set, or with a bad line buys nothing at all. */
+  {
+    const box = C.BOXES.me01;
+    const cost = 5 * C.PACK_PRICE * 2 + box.price;
+    const ok = boot({ ...SAVE, money: cost + 3 }).e;
+    const order = ok.checkout([{ set: "me01", n: 5, qty: 2 }, { set: "me01", box: true, qty: 1 }]);
+    assert.ok(order, "a cart the trainer can pay for was refused");
+    assert.equal(order.total, cost);
+    assert.equal(ok.state.money, 3, "checkout did not charge exactly the cart");
+    assert.equal(ok.state.packs.me01, 10 + box.packs, "the cart's packs did not all arrive");
+    const poor = boot({ ...SAVE, money: cost - 1 }).e;
+    assert.equal(poor.checkout([{ set: "me01", n: 5, qty: 2 }, { set: "me01", box: true, qty: 1 }]), null, "a cart past the money was bought");
+    assert.equal(poor.state.money, cost - 1, "a refused cart spent money");
+    assert.equal(poor.state.packs?.me01 ?? 0, 0, "a refused cart gave packs");
+    const shut = boot({ ...SAVE, money: 1e7, xp: 0, paid: 1 }).e;
+    assert.equal(shut.checkout([{ set: "me01", n: 1 }, { set: "30th", n: 1 }]), null, "a cart with a shut set was bought");
+    assert.equal(shut.state.money, 1e7, "a cart with a shut set spent part of itself");
+    assert.equal(ok.checkout([{ set: "me01", n: "lots" }]), null, "a garbage line was bought");
+    assert.equal(ok.checkout([]), null, "an empty cart checked out");
+  }
   // A PACK FOR DUST: exactly DUST_PACK, into the set's packs (bought, not earned); refused when short or the set is shut.
   {
     const dp = boot({ ...SAVE, dust: C.DUST_PACK + 7 }).e;
@@ -3828,6 +3849,38 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   };
   const everyone = (r) => [...r.gyms.flatMap((g) => [g.id, ...g.trainers.map((t) => t.id)]), ...r.league.map((p) => p.id)];
   const allOf = (ids) => Object.fromEntries(ids.map((id) => [id, { wins: 1, at: 0 }]));
+
+  /* ROAD TRAINERS (road.js): today's, on an opened map, once a day each. A
+     win pays its prize and is noted in `road`, never `beaten`; a trainer on a
+     map not yet open, from another day, or already beaten today is refused. */
+  {
+    const RD = await import("../src/game/road.js");
+    const { dayKey } = await import("../src/game/daily.js");
+    const roadBattle = (e, id, uids) => newBattle([
+      uids.map((uid) => { const m = e.state.box.find((x) => x.uid === uid); return fighter(m.species, m.level, uid); }),
+      opponent(RD.roadTrainer(id).party, RD.roadTrainer(id).top, (k) => k + 1),
+    ], [null, 1]);
+    const e = at();
+    const [t] = RD.roadOf("meadow");
+    const money = e.state.money;
+    assert.equal(e.battleBegin(roadBattle(e, t.id, [4]), { id: t.id, uids: [4] }), null, "today's road trainer was refused");
+    e.battleStep({ ...e.state.battle, over: 0 });
+    const r = e.battleEnd();
+    assert.equal(r.pay, t.pay, "a road win did not pay its prize");
+    assert.equal(e.state.money, money + t.pay);
+    assert.deepEqual(e.state.road, { day: dayKey(), won: [t.id] }, "the road win was not noted");
+    assert.equal(e.state.beaten[t.id], undefined, "a road win touched the League's beaten");
+    assert.equal(e.battleBegin(roadBattle(e, t.id, [4]), { id: t.id, uids: [4] }), "shut", "a road trainer was fought twice in a day");
+    const old = RD.roadId("20200101", "meadow", 0);
+    assert.equal(e.battleBegin(roadBattle(e, RD.roadOf("meadow")[1].id, [4]), { id: old, uids: [4] }), "shut", "another day's road trainer was fought");
+    const far = RD.roadOf("falls")[0];
+    const low = boot({ ...SAVE, box, nextUid: 7, xp: 0, paid: 1 }).e;
+    assert.equal(low.battleBegin(roadBattle(low, far.id, [4]), { id: far.id, uids: [4] }), "shut", "a road trainer on a shut map was fought");
+    assert.equal(RD.roadOf("tanoby").length, 0, "Tanoby (one species) has road trainers");
+    assert.ok(RD.roadOf("meadow").every((x) => x.party.every(([sp]) => sp < 10000)), "a road trainer fielded a form");
+    await savedField("road", { day: dayKey(), won: [t.id] }, "junk", { day: null, won: [] });
+    console.log(`road ok — today's trainer fights and pays ¥${t.pay} once, noted in road and never beaten; another day, a shut map and a second try are refused`);
+  }
 
   /* A REGION'S CHAMPION PAYS A BOX of the newest open set (docs/cards.md,
      phase 3) - the bundle's worth for Ascended Heroes - every pack earned. */

@@ -27,6 +27,7 @@ import {
 import { followSheet, skinById, skinPrice, PARTY_MAX } from "./cosmetics.js";
 import { fieldOf, rollFind, heartsOf, TYPE_PULL, FRIEND_FINDS, HEARTS } from "./abilities.js";
 import { CHECKIN_REWARDS, checkinStatus, rollRoulette, STREAK_MILESTONES, ROULETTE_LEVEL } from "./checkin.js";
+import { isRoad, roadOpen, roadTrainer } from "./road.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
@@ -208,6 +209,7 @@ function freshState() {
     team: [],             // the last League team, box uids - see `battleBegin`
     party: [],            // up to PARTY_MAX box uids you can walk with - see `setParty`
     checkin: { last: null, streak: 0, best: 0, spins: 0 },   // the daily check-in - see checkin.js
+    road: { day: null, won: [] },   // road trainers beaten today - see road.js
     buddy: null,          // the one of them walking behind you now - see `setBuddy`
     skin: null,           // the trainer skin worn, null for your own - see cosmetics.js
     skins: [],            // the skins bought - see `buySkin`
@@ -623,6 +625,10 @@ function loadState() {
       party: [...new Set(Array.isArray(s.party) ? s.party : [])].filter(Number.isInteger).slice(0, PARTY_MAX),
       /* The check-in, field by field: a bad count is 0, a bad day forgets the
          last stamp (today asks again) - never the rest. */
+      // Road trainers beaten today: a day and its ids, or nothing - a bad one is no wins.
+      road: s.road && typeof s.road === "object" && /^\d{8}$/.test(s.road.day ?? "")
+        ? { day: s.road.day, won: (Array.isArray(s.road.won) ? s.road.won : []).filter(isRoad).slice(0, 200) }
+        : { day: null, won: [] },
       checkin: ((c) => {
         const n = (v, cap) => (Number.isInteger(v) && v >= 0 ? Math.min(v, cap) : 0);
         return { last: typeof c?.last === "string" && /^\d{8}$/.test(c.last) ? c.last : null,
@@ -3076,6 +3082,36 @@ export function createEngine(canvas, onChange, mini = null) {
     return prize;
   }
 
+  /* THE CARD SHOP'S CHECKOUT (asked for, 2026-10-07): a cart of lines -
+     `{ set, n }` packs, or `{ set, box: true }` the set's box or bundle -
+     checked WHOLE before anything is spent: every set open to you, every
+     count whole, the total within your money. Then one save. A cart is never
+     half-bought. Answers `{ total, packs: { set: n } }`, or null. */
+  function checkout(lines) {
+    if (!Array.isArray(lines) || !lines.length || lines.length > 50) return null;
+    const level = levelFromXp(state.xp);
+    let total = 0;
+    const add = {};
+    for (const l of lines) {
+      if (!l || !setOpen(l.set, level)) return null;
+      const box = l.box ? BOXES[l.set] : null;
+      const qty = whole(l.qty ?? 1);
+      if ((l.box && !box) || !qty) return null;
+      const n = box ? box.packs * qty : whole(l.n) * qty;
+      if (!n) return null;
+      total += box ? box.price * qty : PACK_PRICE * n;
+      add[l.set] = (add[l.set] ?? 0) + n;
+    }
+    if (state.money < total) return null;
+    state.money -= total;
+    const packs = { ...state.packs };
+    for (const [id, n] of Object.entries(add)) packs[id] = (packs[id] ?? 0) + n;
+    state.packs = packs;
+    save();
+    changed();
+    return { total, packs: add };
+  }
+
   // A box or bundle: the set's discounted multi-pack.
   function buyBox(setId) {
     const box = BOXES[setId];
@@ -3679,7 +3715,10 @@ export function createEngine(canvas, onChange, mini = null) {
      battle itself. */
   let fight = null;
   function battleBegin(battle, { id, uids } = {}) {
-    if (!isOpen(id, state.beaten)) return "shut";
+    /* A ROAD TRAINER (road.js) is judged by its own rule - today's, on an
+       opened map, not yet beaten today - and never by the League's. */
+    const road = isRoad(id);
+    if (road ? !roadOpen(id, levelFromXp(state.xp), state.road) : !isOpen(id, state.beaten)) return "shut";
     const mine = battle?.sides?.[0]?.team, theirs = battle?.sides?.[1]?.team;
     if (!Array.isArray(uids) || !uids.length || new Set(uids).size !== uids.length
       || !Array.isArray(mine) || mine.length !== uids.length || !theirs?.length
@@ -3692,10 +3731,10 @@ export function createEngine(canvas, onChange, mini = null) {
     }
     /* HARD MODE'S ENTRY FEE (phase 8), paid here and given back with the win:
        a loss, a forfeit or a reload keeps it. */
-    const fee = feeFor(id);
+    const fee = road ? 0 : feeFor(id);
     if (fee > state.money) return "fee";
     state.money -= fee;
-    fight = { id, fee };
+    fight = { id, fee, road };
     state.battle = battle;
     state.team = [...uids];
     save();
@@ -3766,7 +3805,20 @@ export function createEngine(canvas, onChange, mini = null) {
     battleEnd() {
       const over = state.battle?.over ?? -1;
       let pay = 0, first = false, fee = 0, gift = null, master = false, charm = null, pack = null;
-      if (over === 0 && fight) {
+      /* A ROAD WIN pays its money, once a trainer a day, and is noted in
+         `road` - never `beaten`: the League's ladder does not move. */
+      if (over === 0 && fight?.road) {
+        const t = roadTrainer(fight.id);
+        const day = fight.id.split(":")[1];
+        const won = state.road.day === day ? state.road.won : [];
+        if (t && !won.includes(fight.id)) {
+          pay = t.pay;
+          first = true;
+          state.money += pay;
+          state.road = { day, won: [...won, fight.id] };
+          save();
+        }
+      } else if (over === 0 && fight) {
         const was = state.beaten[fight.id];
         first = !was;
         pay = payFor(fight.id, state.beaten, state.steps);
@@ -3818,6 +3870,7 @@ export function createEngine(canvas, onChange, mini = null) {
     buy,
     buyPacks,
     buyBox,
+    checkout,
     dustPack,
     openCardPack,
     openAllPacks,
