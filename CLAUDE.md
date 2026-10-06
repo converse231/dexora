@@ -700,9 +700,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   the one ratio that sets what a set costs (35% of a game, measured; scaling
   `DUST` moves nothing). A card's finish follows the real frame (`CardFace`):
   a reverse holo everywhere but the art window, a holo rare only in it, a hit
-  all over; a card you do not own wears none. **The chase is packs only**
-  (`PACK_ONLY`: Special illustration and Mega Hyper Rares never craft; your
-  call, a set then costs ~76% of a game). Cards carry no catch indicator.
+  all over; a card you do not own wears none. **Crafting ends at the Double rare**
+  (`canCraft`, your call 2026-10-07): an Illustration rare and up - the ACE
+  SPEC too - is packs only (`PACK_ONLY`, derived). Dust's other use is a pack
+  of an open set (`DUST_PACK` 400, `dustPack`), held above what a pack of
+  spares dusts to (check.mjs re-measures every set). Cards carry no catch indicator.
   The last card of every pack charges and flashes (white until the charge),
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.

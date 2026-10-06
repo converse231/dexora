@@ -26,8 +26,8 @@ import CardFace, { RarityMark, VARIANT_NAME } from "./Card.jsx";
 import { cardUrl, backUrl, packUrl, logoUrl } from "./load.js";
 
 const CHARGE = 650, TEAR = 520, DEAL = 620, BUILD = 700;
-const BIG = new Set(["illustration", "special", "hyper", "mega"]);
-const LOUD = new Set(["special", "hyper", "mega"]);
+const BIG = new Set(["illustration", "special", "futuristic", "hyper", "mega"]);
+const LOUD = new Set(["special", "futuristic", "hyper", "mega"]);
 const SPARKS = Array.from({ length: 14 }, (_, i) => i);
 /* CONFETTI CANNONS, one in each bottom corner (asked for: it only fell, and
    looked it). Each piece's arc is fixed here - a cheap hash of its index, so

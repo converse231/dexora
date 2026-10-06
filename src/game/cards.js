@@ -19,24 +19,30 @@ import { CARD_SETS } from "../data/cards/index.js";
    set has them and a Hyper rare where it does not, and Prismatic, which
    prints no Illustration rare, answers that roll with an ACE SPEC - so
    `ace` sits just under `illustration` and `hyper` just under `mega`. */
-export const CARD_RARITIES = ["common", "uncommon", "rare", "double", "ace", "illustration", "ultra", "special", "hyper", "mega"];
+/* Low to high. `pikachu` and `futuristic` are 30th Celebration's (2026):
+   a Pikachu in every pack (not a hit), and its Mew ex and Mewtwo ex - the
+   set's top chase, where an era's Hyper or Mega Hyper Rare would be. No save
+   or server row stores a rung, so a new one is inserted where it ranks. */
+export const CARD_RARITIES = ["common", "uncommon", "rare", "pikachu", "double", "ace", "illustration", "ultra", "special", "futuristic", "hyper", "mega"];
 export const RARITY = {
   common:       { name: "Common", icon: "●" },
   uncommon:     { name: "Uncommon", icon: "◆" },
   rare:         { name: "Rare", icon: "★" },
+  pikachu:      { name: "Pikachu Rare", icon: "★" },
   double:       { name: "Double rare", icon: "★★" },
   ace:          { name: "ACE SPEC Rare", icon: "◆" },
   illustration: { name: "Illustration rare", icon: "★" },
   ultra:        { name: "Ultra Rare", icon: "★★" },
   special:      { name: "Special illustration rare", icon: "★★" },
+  futuristic:   { name: "Futuristic Rare", icon: "✦" },
   hyper:        { name: "Hyper rare", icon: "✦" },
   mega:         { name: "Mega Hyper Rare", icon: "✦" },
 };
 export const rungOf = (rarity) => CARD_RARITIES.indexOf(rarity);
 // A HIT is a Double rare or better - what the `hit` pity counts.
 export const isHit = (rarity) => rungOf(rarity) >= rungOf("double");
-// The chase: a Special illustration rare and the top rung (a Hyper or Mega Hyper Rare).
-export const isTop = (rarity) => rungOf(rarity) >= rungOf("hyper");
+// The chase: a Special illustration rare and the top rung (a Futuristic, Hyper or Mega Hyper Rare).
+export const isTop = (rarity) => rungOf(rarity) >= rungOf("futuristic");
 /* WHAT A ROLL GIVES IN THIS SET: the first rung at or below `rarity` that
    its cards print - what the Packs tab names each rate and meter. */
 export function landsOn(cards, rarity) {
@@ -66,13 +72,28 @@ export function landsOn(cards, rarity) {
    - sv03.5 151: DR ~1 in 8, IR 8.50%, UR 6.44%, SIR 3.11%, HR 1.94%.
    - sv08.5 Prismatic Evolutions: DR 16.51%, ACE SPEC 4.68%, UR 7.46%,
      SIR 2.22%, HR 0.56% (its Poke Ball and Master Ball reverses are not
-     separate printings here). */
+     separate printings here).
+   - me03 Perfect Order (TCGplayer, 3,500+ packs): DR 20.00%, IR 11.11%,
+     UR 8.33%, SIR 1.23%, MHR 0.06% (Mega Zygarde ex).
+   - me04 Chaos Rising (TCGplayer, 8,500+ packs): DR 20.30%, IR 10.66%,
+     UR 8.29%, SIR 1.21%, MHR 0.10%.
+   - me05 Pitch Black (TCGplayer, 4,000+ packs): DR 21.02%, IR 11.01%,
+     UR 8.30%, SIR 1.25%, MHR 0.09%.
+   - 30th 30th Celebration (2026-10-07): no official odds; two community logs
+     (cardprice.com ~800 packs, DigitalTQ 420) agree near DR 25%, IR 19%,
+     SIR 5.1%, Futuristic Rare 0.9% (the top roll), a Pikachu in every pack
+     (`pikachu` slot), and no Ultra Rares (that roll is 0). Revisit when
+     TCGplayer's own numbers settle. */
 export const SET_RATES = {
   me01: { double: 0.2091, illustration: 0.1089, ultra: 0.0823, special: 0.0099, mega: 0.0008 },
   me02: { double: 0.2077, illustration: 0.1097, ultra: 0.0806, special: 0.0125, mega: 0.0008 },
   "me02.5": { double: 0.2037, illustration: 0.1125, ultra: 0.0481 + 0.0347, special: 0.0144, mega: 0.0019 },
   "sv03.5": { double: 1 / 8, illustration: 0.085, ultra: 0.0644, special: 0.0311, mega: 0.0194 },
   "sv08.5": { double: 0.1651, illustration: 0.0468, ultra: 0.0746, special: 0.0222, mega: 0.0056 },
+  me03: { double: 0.2000, illustration: 0.1111, ultra: 0.0833, special: 0.0123, mega: 0.0006 },
+  me04: { double: 0.2030, illustration: 0.1066, ultra: 0.0829, special: 0.0121, mega: 0.0010 },
+  me05: { double: 0.2102, illustration: 0.1101, ultra: 0.0830, special: 0.0125, mega: 0.0009 },
+  "30th": { double: 0.25, illustration: 0.19, ultra: 0, special: 0.051, mega: 0.009 },
 };
 // A pack holding a hit (a Double rare or better), at a set's rates.
 export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration) * (1 - r.double - r.ultra);
@@ -104,7 +125,7 @@ export const GOD_PACK = 1 / 500;
 
 /* WHAT A SPARE COPY IS WORTH IN DUST (docs/cards.md): a foil copy of a common,
    uncommon or rare counts as `foil`. Crafting costs eight times this. */
-export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, double: 80, ace: 90, illustration: 100, ultra: 150, special: 300, hyper: 400, mega: 400 };
+export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, pikachu: 40, double: 80, ace: 90, illustration: 100, ultra: 150, special: 300, futuristic: 400, hyper: 400, mega: 400 };
 export const dustOf = (rarity, variant) =>
   (rungOf(rarity) <= rungOf("rare") && variant !== "n" ? DUST.foil : DUST[rarity]);
 /* A CRAFT COSTS SIXTEEN SPARES' WORTH. Measured over 40 seeded collectors
@@ -114,12 +135,19 @@ export const dustOf = (rarity, variant) =>
    DUST moves nothing; only this ratio does. */
 export const CRAFT_X = 16;
 export const craftCost = (rarity, variant) => CRAFT_X * dustOf(rarity, variant);
-/* THE CHASE IS PACKS ONLY (your call, 2026-10-02): a Special illustration rare
-   and a Mega Hyper Rare can never be crafted. Measured: completing a set then
-   costs a median 76% of a game's money (505 packs, 250-1,060 by luck) - the
-   collection outlives the playthrough, which is the sink's point. */
-export const PACK_ONLY = new Set(["special", "hyper", "mega"]);
-export const canCraft = (rarity) => !PACK_ONLY.has(rarity);
+/* CRAFTING ENDS AT THE DOUBLE RARE (your call, 2026-10-07; it was every
+   rung below the Special illustration rare): a Common up to a Double rare can
+   be made from dust, so a set never stalls on one missing common; an
+   Illustration rare and everything above it - the ACE SPEC too, which is
+   Prismatic's illustration roll - comes from packs only. Dust's other use is
+   a pack (DUST_PACK). */
+export const PACK_ONLY = new Set(CARD_RARITIES.filter((r) => rungOf(r) > rungOf("double")));
+export const canCraft = (rarity) => rungOf(rarity) >= 0 && rungOf(rarity) <= rungOf("double");
+/* A PACK FOR DUST, of any set you have open. Measured: a pack whose every
+   card is a spare dusts to about 230 (177 for 30th Celebration's), so 400
+   gives back at most ~57% - dust turns duplicates into more chances, never
+   into a loop of free packs. check.mjs re-measures it. */
+export const DUST_PACK = 400;
 /* SPARES: every copy beyond the first of a card and variant, and never so many
    that the card would hold fewer copies than its earned stamps. */
 export function sparesOf(row, variant) {
@@ -160,13 +188,18 @@ export const BOXES = {
   // 151 and Prismatic Evolutions were never sold in booster boxes either.
   "sv03.5": { name: "Booster bundle", packs: 6, price: 21600 },
   "sv08.5": { name: "Booster bundle", packs: 6, price: 21600 },
+  me03: { name: "Booster box", packs: 36, price: 120000 },
+  me04: { name: "Booster box", packs: 36, price: 120000 },
+  me05: { name: "Booster box", packs: 36, price: 120000 },
+  // A celebration set, sold in bundles rather than boxes.
+  "30th": { name: "Booster bundle", packs: 6, price: 21600 },
 };
 // Every 7th day of a daily-quest streak pays a pack.
 export const STREAK_PACK = 7;
 export const PACK_SIZE = 10;
 export const CARD_MAX = 99;
 // The level each set opens at (docs/cards.md, Economy).
-export const SET_LEVEL = { me01: 10, me02: 25, "me02.5": 40, "sv03.5": 50, "sv08.5": 60 };
+export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45, "sv03.5": 50, me05: 55, "sv08.5": 60, "30th": 70 };
 
 export const setById = (id) => CARD_SETS.find((s) => s.id === id) ?? null;
 export const setOpen = (id, level) => !!setById(id) && level >= (SET_LEVEL[id] ?? Infinity);
@@ -221,8 +254,11 @@ export function openPack(cards, rng, pity = freshPity(), rules) {
     return { pulls: [...pulls, ...sortTail(tail)].filter(Boolean), pity: { ...pity }, god: true };
   }
 
+  // 30th Celebration's Pikachu: one in every pack, in place of a common.
+  const pikachu = pools.pikachu?.length ? [of("pikachu", "h")] : [];
   const base = [
-    ...Array.from({ length: 4 }, () => of("common", "n")),
+    ...Array.from({ length: 4 - pikachu.length }, () => of("common", "n")),
+    ...pikachu,
     ...Array.from({ length: 3 }, () => of("uncommon", "n")),
     reverse(),
   ];
