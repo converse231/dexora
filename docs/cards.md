@@ -46,7 +46,7 @@ nothing in `game/` except the engine's card actions, and never by `catch.js`,
 | Pack contents | **The era's real booster structure** (slots), from `SET_PROFILES` in `game/cards.js`, at measured pull rates. | Authentic packs are the whole appeal. |
 | Money | Packs, boxes and bundles are bought with **¥ only**. No real money, ever. | Non-commercial; a paid pack would make this a gambling product. |
 | Earned too | Packs are also **rewards** (badges, Champions, streaks, Pokédex ranks). | A sink you also earn by playing reads as a reward track, not a tax. |
-| Duplicates | **Kept as a count; spare copies can be turned into Card Dust, and dust crafts any card you are missing.** Never automatic. | A sink and a pity in one, and it bounds the cost of completing a set. |
+| Duplicates | **Kept as a count; spare copies can be turned into Card Dust. Dust buys packs (`DUST_PACK`) and crafts missing cards up to a Double rare; an Illustration rare and up are packs only (2026-10-07).** Never automatic. | A sink and a pity in one, and it bounds the cost of completing a set. |
 | Pity | **A capped "dry" counter per set** guarantees a hit, like `dry` on the tier ladder. | Twenty packs with nothing is the moment a player quits. |
 | Link to the game | Through the **National Dex number** (`dexId`), and for a **Mega card, the game's Mega form** (your call, 2026-10-02): its catch stamp and Dex link are the form's. | The binder becomes a record of *your* journey. |
 | Where it lives | **A fifth tab, Cards** (your call, 2026-10-02), beside Catch, Trade, Battles and You. | It is a place you go, like the League, not a setting. |
@@ -222,7 +222,7 @@ A pocket in the binder shows the best copy and a "×3" badge. Nothing is ever
 dusted automatically: a duplicate sits in the binder until you choose.
 
 **Dust.** Spare copies (anything beyond your first of that card and variant)
-can be dusted; dust crafts a missing card.
+can be dusted; dust buys a pack, or crafts a missing card up to a Double rare.
 
 | Rarity | Dust for a duplicate | Craft cost |
 |---|---|---|
@@ -644,11 +644,14 @@ Your calls after phase 2:
   and turns, whatever it is. It pulses white beforehand ("Last card…"), never
   its rarity's colour, so the suspense is real; a hit's colour comes in only
   during the charge. A rarity banner still stamps only for a hit.
-- **The chase is packs only**: a Special illustration rare and a Mega Hyper
-  Rare can never be crafted (`PACK_ONLY`). Measured over 40 seeded collectors:
-  completing Mega Evolution now costs a median **76%** of a full game's money
-  (505 packs, 250-1,060 by luck) - past the 25-60% band this plan held, on
-  purpose: the collection outlives the playthrough.
+- **Crafting ends at the Double rare** (2026-10-07; it was every rung below a
+  Special illustration rare): an Illustration rare and everything above it, the
+  ACE SPEC too, come from packs only (`PACK_ONLY`). Dust's other use is a pack
+  of any open set at `DUST_PACK` (400). A pack whose cards are all spares dusts
+  to about 230, so the trade gives back at most ~57% and duplicates cannot loop
+  into free packs (check.mjs re-measures every set). The old measure (a set at
+  a median 76% of a game with the chase pack-only) is now a floor: the
+  Illustration rares joined the chase.
 - **Cards are their own collection**: no catch indicator on any card (the
   Pokédex link in the card view and the Dex sheet's Cards card stay).
 - **The Open button keeps its neighbours' height**: the count is inline, and

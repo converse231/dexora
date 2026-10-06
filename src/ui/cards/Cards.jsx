@@ -11,7 +11,7 @@ import { CARD_SETS } from "../../data/cards/index.js";
 import { WRAPPERS } from "../../data/cards/art.js";
 import {
   RARITY, CARD_RARITIES, landsOn, rulesOf, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
-  copiesOf, chanceOf, freshPity, sparesOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit,
+  copiesOf, chanceOf, freshPity, sparesOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit, DUST_PACK,
 } from "../../game/cards.js";
 import CardFace, { RarityMark } from "./Card.jsx";
 import Inspect from "./Inspect.jsx";
@@ -28,7 +28,7 @@ const POCKETS = 12;            // a page: four across, three down
 /* THE CARD DEX ADDS TILES A PAGE AT A TIME as its end scrolls near (the
    Picker's rule): 188 tiles at once was a 103ms task on a throttled phone. */
 const TILE_PAGE = 48;
-const CHASE = ["mega", "hyper", "special"];
+const CHASE = ["mega", "hyper", "futuristic", "special"];
 // The best copy a card is held in: a foil over a plain one.
 const bestVariant = (row, card) => ["h", "r", "n"].find((v) => row?.[v] && card[4].includes(v)) ?? card[4][0];
 
@@ -38,6 +38,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   const [opening, setOpening] = useState(null);    // { set, result, wrapper, n }
   const [inspect, setInspect] = useState(null);    // { setId, localId }
   const [note, setNote] = useState("");
+  const [pick, setPick] = useState(null);           // the set whose full card is open, or the grid
   const page = useRef(null);
 
   // The game underneath stops while this covers it, as under the League.
@@ -66,6 +67,12 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
 
   const cards = st?.cards ?? {};
   const packs = st?.packs ?? {};
+  // The grid's order: packs waiting first, then sets you can buy, then the locked ones.
+  const shown = CARD_SETS.find((s) => s.id === pick) ?? null;
+  const order = [...CARD_SETS].sort((a, b) => {
+    const rank = (s) => ((packs[s.id] ?? 0) > 0 ? 0 : setOpen(s.id, level) ? 1 : 2);
+    return rank(a) - rank(b);
+  });
   const dex = st?.dex ?? [];
   const dust = st?.dust ?? 0;
   const unopened = Object.values(packs).reduce((a, b) => a + b, 0);
@@ -134,23 +141,40 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
       <main className="hp-body tc-main cd-main">
         {/* NOT RENDERED UNDER A SCENE: three sets and their chase galleries
             re-rendered on every open, and an open went back over 100ms. */}
-        {tab === "packs" && !opening && (
+        {/* THE SETS AS A GRID (asked for, 2026-10-07): nine sets one under
+            another was a long scroll. A tile each - the pack, what you hold,
+            one press to open or buy - and a tap opens the set's full card:
+            odds, pity, chase cards, every way to buy. */}
+        {tab === "packs" && !opening && !shown && (
           <div className="cd-packs">
             {note && <p className="cd-note" role="alert">{note}</p>}
-            {CARD_SETS.map((s) => (
-              <PackCard key={s.id} meta={s} set={sets[s.id]} level={level} money={st?.money ?? 0}
-                held={packs[s.id] ?? 0} earned={st?.earnedPacks?.[s.id]?.length ?? 0}
-                pity={st?.cardPity?.[s.id] ?? freshPity()} cards={cards} log={st?.cardLog ?? []}
-                onOpen={() => open(s.id)} onOpenAll={(max) => openAll(s.id, max)} onBuy={(n) => buy(s.id, n)}
-                onBox={() => buyBox(s.id)} onLook={(localId) => look(s.id, localId)} />
-            ))}
+            <div className="cd-setgrid">
+              {order.map((s) => (
+                <SetTile key={s.id} meta={s} level={level} money={st?.money ?? 0} held={packs[s.id] ?? 0} ready={!!sets[s.id]}
+                  onPick={() => setPick(s.id)} onOpen={() => open(s.id)} onBuy={() => buy(s.id, 1)} />
+              ))}
+            </div>
+          </div>
+        )}
+        {tab === "packs" && !opening && shown && (
+          <div className="cd-packs">
+            {note && <p className="cd-note" role="alert">{note}</p>}
+            <button type="button" className="cd-allsets" onClick={() => setPick(null)}>
+              <Icon n="chev" size={16} className="cd-allsets-ic" /> All sets
+            </button>
+            <PackCard key={shown.id} meta={shown} set={sets[shown.id]} level={level} money={st?.money ?? 0}
+              dust={dust} onDustPack={() => engine.dustPack(shown.id)}
+              held={packs[shown.id] ?? 0} earned={st?.earnedPacks?.[shown.id]?.length ?? 0}
+              pity={st?.cardPity?.[shown.id] ?? freshPity()} cards={cards} log={st?.cardLog ?? []}
+              onOpen={() => open(shown.id)} onOpenAll={(max) => openAll(shown.id, max)} onBuy={(n) => buy(shown.id, n)}
+              onBox={() => buyBox(shown.id)} onLook={(localId) => look(shown.id, localId)} />
           </div>
         )}
         {tab === "binder" && <Binder sets={sets} cards={cards} dex={dex} log={st?.cardLog ?? []} onLook={look}
           milestones={st?.milestones ?? {}} />}
         {tab === "dex" && <CardDex sets={sets} cards={cards} dex={dex} onLook={look} />}
         {tab === "dust" && <Dust sets={sets} cards={cards} dust={dust} onLook={look}
-          onSweep={(id) => engine.dustSpares(sets[id])} />}
+          onSweep={(id) => engine.dustSpares(sets[id])} level={level} onDustPack={(id) => engine.dustPack(id)} />}
         <p className="cd-credit">
           Card data and small images from TCGdex; pack and card-back art from Bulbagarden Archives; each card names
           its illustrator. Pokémon and the TCG are © Nintendo, Creatures and GAME FREAK. Cards change nothing in the wild.
@@ -185,11 +209,33 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   );
 }
 
+/* A SET IN THE GRID: its pack, its name, what you hold, and one press -
+   open what you hold, or buy one. The rest is a tap away (PackCard). */
+function SetTile({ meta, level, money, held, ready, onPick, onOpen, onBuy }) {
+  const isOpen = setOpen(meta.id, level);
+  const w = WRAPPERS[meta.id]?.[0];
+  return (
+    <article className={`cd-st${isOpen || held ? "" : " shut"}`}>
+      <button type="button" className="cd-st-main" onClick={onPick} aria-label={`${meta.name}: odds, pity and chase cards`}>
+        <img src={w ? packUrl(meta.id, w) : logoUrl(meta.id)} alt="" loading="lazy" draggable="false" />
+        <b>{meta.name}</b>
+        <small>{isOpen || held ? `${meta.total} cards` : `Opens at Lv ${SET_LEVEL[meta.id]}`}</small>
+        {held > 0 && <em className="cd-st-held" aria-label={`${held} to open`}>{held}</em>}
+      </button>
+      {held > 0 ? (
+        <button type="button" className="lg-go cd-st-go" disabled={!ready} onClick={onOpen}>Open{held > 1 ? ` · ${held}` : ""}</button>
+      ) : isOpen ? (
+        <button type="button" className="lg-go quiet cd-st-go" disabled={money < PACK_PRICE} onClick={onBuy}>Buy · {yen(PACK_PRICE)}</button>
+      ) : null}
+    </article>
+  );
+}
+
 /* ONE SET'S PACKS: its real wrappers fanned, the odds (its own real-life rates, `rulesOf`,
    never typed), the three pity meters, your best pull, and the chase gallery
    - every Mega Hyper Rare and Special illustration rare, owned or still out
    there, each with its own odds. */
-function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onOpen, onOpenAll, onBuy, onBox, onLook }) {
+function PackCard({ meta, set, level, money, dust = 0, held, earned, pity, cards, log, onOpen, onOpenAll, onBuy, onBox, onLook, onDustPack }) {
   const box = BOXES[meta.id];
   const isOpen = setOpen(meta.id, level);
   const wraps = WRAPPERS[meta.id] ?? [];
@@ -206,7 +252,8 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
   const rules = rulesOf(meta.id);
   const { rates, pity: net } = rules;
   const as = (r) => (set ? landsOn(set.CARDS, r) ?? r : r);
-  const odds = ["double", "illustration", "ultra", "special", "mega"].map((r) => [as(r), rates[r]]);
+  // A roll the set does not have (rate 0: 30th Celebration's ultra) is not listed.
+  const odds = ["double", "illustration", "ultra", "special", "mega"].filter((r) => rates[r] > 0).map((r) => [as(r), rates[r]]);
   // The rate a rarity is pulled at here: the roll that lands on it.
   const rateOf = (rarity) => rates[Object.keys(rates).find((k) => as(k) === rarity)] ?? 0;
   const meters = [
@@ -268,6 +315,12 @@ function PackCard({ meta, set, level, money, held, earned, pity, cards, log, onO
             <>
               <button type="button" className="lg-go quiet" disabled={money < PACK_PRICE} onClick={() => onBuy(1)}>Buy 1 · {yen(PACK_PRICE)}</button>
               <button type="button" className="lg-go quiet" disabled={money < PACK_PRICE * 10} onClick={() => onBuy(10)}>Buy 10 · {yen(PACK_PRICE * 10)}</button>
+              {onDustPack && (
+                <button type="button" className="lg-go quiet" disabled={dust < DUST_PACK} onClick={onDustPack}
+                  data-tip={`You have ${dust.toLocaleString()} Card Dust`}>
+                  1 pack · {DUST_PACK} dust
+                </button>
+              )}
               {box && (
                 <button type="button" className="lg-go quiet" disabled={money < box.price} onClick={onBox}>
                   {box.name.replace("Booster ", "").replace(/^./, (c) => c.toUpperCase())} of {box.packs} · {yen(box.price)} (−{Math.round((1 - box.price / (box.packs * PACK_PRICE)) * 100)}%)
@@ -465,7 +518,7 @@ function CardDex({ sets, cards, dex, onLook }) {
 /* DUST: your spares and what they are worth, the one sweep, and what a
    missing card costs to craft. Every individual dust or craft happens in the
    card view, which asks first for anything rare. */
-function Dust({ sets, cards, dust, onLook, onSweep }) {
+function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack }) {
   const [setId, setSetId] = useState(CARD_SETS[0]?.id);
   const set = sets[setId];
   if (!set) return <p className="ev-quiet">Loading…</p>;
@@ -482,9 +535,14 @@ function Dust({ sets, cards, dust, onLook, onSweep }) {
       <SetChips setId={setId} onSet={setSetId} />
       <section className="ev-card cd-dusthead">
         <b>{dust.toLocaleString()}</b>
-        <span>Card Dust<small>Spares become dust; dust crafts any card you are missing. You always keep one of each.</small></span>
+        <span>Card Dust<small>Spares become dust. Dust buys packs, and crafts the cards you are missing up to a Double rare - Illustration rares and up come from packs only. You always keep one of each.</small></span>
         <button type="button" className="lg-go" disabled={!sweep} onClick={() => onSweep(setId)}>
           Dust spare commons and uncommons · +{sweep}
+        </button>
+        {/* Dust's other use: a pack of this set, if it is open to you. */}
+        <button type="button" className="lg-go quiet" disabled={dust < DUST_PACK || !setOpen(setId, level)} onClick={() => onDustPack(setId)}
+          data-tip={setOpen(setId, level) ? "Added to your packs on the Packs tab" : `Opens at Lv ${SET_LEVEL[setId]}`}>
+          {setOpen(setId, level) ? `1 ${set.SET?.name ?? ""} pack · ${DUST_PACK} dust` : `Opens at Lv ${SET_LEVEL[setId]}`}
         </button>
       </section>
       <h5 className="cd-h">Spares <span>{spares.length} cards</span></h5>

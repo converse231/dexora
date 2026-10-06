@@ -44,7 +44,7 @@ import {
 import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
 import {
   openPack as rollPack, rulesOf, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX,
-  dustOf, craftCost, sparesOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, STREAK_PACK,
+  dustOf, craftCost, sparesOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, STREAK_PACK, DUST_PACK,
   MASTER_DUST, printingsOf, CARD_SHOW, showKey,
 } from "./cards.js";
 import { CARD_SETS } from "../data/cards/index.js";
@@ -3292,6 +3292,17 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
+  /* A PACK FOR DUST (DUST_PACK) of a set you have open - bought, not earned,
+     like a pack bought with money. */
+  function dustPack(setId) {
+    if (!setOpen(setId, levelFromXp(state.xp)) || state.dust < DUST_PACK) return false;
+    state.dust -= DUST_PACK;
+    state.packs = { ...state.packs, [setId]: (state.packs[setId] ?? 0) + 1 };
+    save();
+    changed();
+    return true;
+  }
+
   /* CRAFT one copy of a card in a variant it is printed in, for dust. */
   function craftCard(set, localId, variant) {
     const meta = realSet(set);
@@ -3807,6 +3818,7 @@ export function createEngine(canvas, onChange, mini = null) {
     buy,
     buyPacks,
     buyBox,
+    dustPack,
     openCardPack,
     openAllPacks,
     dustCard,

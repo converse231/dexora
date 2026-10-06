@@ -34,7 +34,17 @@ WRAPPERS = {
     "sv08.5": ["Prismatic Evolutions Booster Eevee Sylveon.png", "Prismatic Evolutions Booster Espeon Umbreon.png",
                "Prismatic Evolutions Booster Leafeon Glaceon.png",
                "Prismatic Evolutions Booster Vaporeon Jolteon Flareon.png"],
+    "me03": ["ME3 Booster Mega Zygarde.png", "ME3 Booster Mega Clefable.png", "ME3 Booster Mega Starmie.png",
+             "ME3 Booster Meowth.png"],
+    "me04": ["ME4 Booster Mega Greninja.png", "ME4 Booster Mega Floette.png", "ME4 Booster Mega Dragalge.png",
+             "ME4 Booster Mega Pyroar.png"],
+    "me05": ["ME5 Booster Mega Darkrai.png", "ME5 Booster Mega Zeraora.png", "ME5 Booster Mega Chandelure.png",
+             "ME5 Booster Mega Excadrill.png"],
+    "30th": ["30th Celebration Booster.png"],
 }
+# A set TCGdex has no logo for gets one from here (fetch-cards leaves it out).
+LOGOS = {"30th": "30th Anniversary logo.png"}
+LOGO_W = 400
 PACK_W = 300          # shown at most ~230px wide, twice that on a dense screen is wasted here
 BACK_W = 490
 
@@ -74,6 +84,8 @@ def main():
         names = WRAPPERS.get(s["id"])
         if not names:
             raise SystemExit(f"{s['id']} has no wrapper art listed - add it to WRAPPERS")
+        if s["id"] in LOGOS:
+            print(s["id"], "logo.webp", save(original(LOGOS[s["id"]]), LOGO_W, os.path.join(ROOT, "public", "cards", s["id"], "logo.webp")), "bytes")
         art[s["id"]] = []
         for name in names:
             slug = re.sub(r"[^a-z0-9]+", "-", name.lower().rsplit(".", 1)[0].split("booster", 1)[-1]).strip("-") or "pack"

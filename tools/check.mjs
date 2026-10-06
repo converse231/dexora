@@ -7344,6 +7344,9 @@ import * as COS from "../src/game/cosmetics.js";
   console.log(`abilities ok — ${Object.keys(AB.FIELD).length} field abilities, all real; every species has an ability; finds are items`);
 }
 
+// fetch-cards' MEGA_PENDING, read from its source so the two cannot disagree.
+const MEGA_PENDING = new Set(Object.keys(JSON.parse(readFileSync(new URL("./fetch-cards.mjs", import.meta.url), "utf8")
+  .match(/const MEGA_PENDING = (\{[^}]*\})/)?.[1] ?? "{}")));
 /* CARDS (docs/cards.md). A collection, never a strength: no rule module
    reads a card. The data is what the fetcher said it is, every Mega card
    links to its Mega form, the rates are ours to the letter, pity never lets
@@ -7384,7 +7387,10 @@ import { statSync } from "node:fs";
       assert.ok(/^(nr?|hr?)$/.test(variants), `${at}: variants ${variants}`);
       assert.ok(sp.every((id) => speciesById(id)), `${at}: links a species the game does not have`);
       assert.equal(cat === "P", sp.length > 0, `${at}: a Pokémon card without a species, or a species on a Trainer`);
-      if (cat === "P" && /^Mega /.test(name)) {
+      // A Mega newer than our Pokedex links its species until the form arrives (fetch-cards' MEGA_PENDING).
+      if (cat === "P" && /^Mega /.test(name) && MEGA_PENDING.has(name.replace(/ ex$/, ""))) {
+        assert.ok(sp.length === 1 && !isForm(sp[0]), `${at}: a pending Mega should link its species`);
+      } else if (cat === "P" && /^Mega /.test(name)) {
         assert.ok(sp.length === 1 && isForm(sp[0]) && nameOf(speciesById(sp[0])) === name.replace(/ ex$/, ""),
           `${at}: a Mega card must link its Mega form (your call, 2026-10-02)`);
       }
@@ -7423,6 +7429,7 @@ import { statSync } from "node:fs";
     // Against the set's OWN row, not what `rulesOf` handed the pack: a lookup
     // that gave every set Mega Evolution's rates agreed with itself.
     for (const [r, rate] of Object.entries(CD.SET_RATES[meta.id])) {
+      if (!rate) continue;               // a roll the set does not have (30th Celebration's ultra)
       const as = CD.landsOn(CARDS, r);
       assert.ok(CD.rungOf(as) >= CD.rungOf("double"), `${meta.id}: the ${r} roll lands on ${as}, not a hit`);
       const got = (flat.hits[as] ?? 0) / N;
@@ -7456,9 +7463,24 @@ import { statSync } from "node:fs";
   }
   const boxes = Object.values(CD.BOXES).filter((b) => b.packs >= 36), bundles = Object.values(CD.BOXES).filter((b) => b.packs < 36);
   for (const u of bundles) for (const x of boxes) assert.ok(perPack(u) >= perPack(x), "a bundle is cheaper a pack than a box");
-  // The chase is packs only.
+  // Crafting ends at the Double rare: an Illustration rare and up (the ACE SPEC too) are packs only.
   assert.ok(CD.CARD_RARITIES.filter(CD.isTop).every((r) => !CD.canCraft(r)) && !CD.canCraft("special")
-    && CD.canCraft("illustration"), "the chase can be crafted");
+    && !CD.canCraft("illustration") && !CD.canCraft("ace") && CD.canCraft("double") && CD.canCraft("common"),
+    "crafting does not end at the Double rare");
+  /* A PACK FOR DUST NEVER PAYS FOR ITSELF: what a pack of nothing but spares
+     dusts to, measured on every set, stays under two thirds of DUST_PACK -
+     or duplicates would buy packs that buy packs. */
+  {
+    let x = 11;
+    const rng = () => { x = (x * 16807) % 2147483647; return x / 2147483647; };
+    for (const s of CD_SETS) {
+      const { CARDS } = await import(`../src/data/cards/sets/${s.id}.js`);
+      const rules = CD.rulesOf(s.id);
+      let p = CD.freshPity(), sum = 0;
+      for (let i = 0; i < 3000; i++) { const o = CD.openPack(CARDS, rng, p, rules); p = o.pity; sum += o.pulls.reduce((a, c) => a + CD.dustOf(c.rarity, c.variant), 0); }
+      assert.ok(sum / 3000 < CD.DUST_PACK * 2 / 3, `${s.id}: a pack of spares dusts to ${Math.round(sum / 3000)}, too near DUST_PACK ${CD.DUST_PACK}`);
+    }
+  }
   // Spares never take the last copy, nor a copy an earned stamp stands on.
   assert.equal(CD.sparesOf({ n: 1 }, "n"), 0, "the last copy counted as a spare");
   assert.equal(CD.sparesOf({ n: 3 }, "n"), 2);

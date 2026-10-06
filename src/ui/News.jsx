@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-07-sets",
+    icon: "🃏",
+    date: "October 2026",
+    title: "Four new card sets",
+    items: [
+      ["New sets", "Perfect Order, Chaos Rising, Pitch Black and 30th Celebration, each at its real pull rates."],
+      ["30th Celebration", "A Pikachu in every pack, and Futuristic Rare Mew ex and Mewtwo ex to chase."],
+      ["A tidier Packs tab", "Every set is a tile now: open or buy in one tap, tap a set for its odds and chase cards."],
+      ["Dust buys packs", "400 Card Dust buys a pack of any open set. Crafting now stops at Double rares; Illustration rares and up are packs only."],
+    ],
+  },
+  {
     id: "2026-10-07-checkin",
     icon: "🔥",
     date: "October 2026",

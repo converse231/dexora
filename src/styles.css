@@ -7689,6 +7689,34 @@ button:disabled { transition: none; }
   .ci-streak > .ic, .ci-medal .ic, .ci-rays, .ci-bit, .ci-day.today::after { animation: none; }
 }
 
+
+/* THE PACKS TAB AS A GRID (2026-10-07): a tile a set - its pack, its name,
+   what you hold, one press - and a tap for the full card. auto-fill sizes
+   it: two across on a phone, more as the screen widens. */
+/* `cd-setgrid`, never `cd-grid`: that is the Card Dex's, and sharing it gave
+   both grids each other's columns. */
+.cd-setgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+@media (max-width: 400px) { .cd-setgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
+.cd-st { position: relative; display: grid; grid-template-rows: 1fr auto; gap: 8px; padding: 10px; min-width: 0;
+  border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+.cd-st.shut { opacity: .55; }
+.cd-st-main { display: grid; justify-items: center; align-content: start; gap: 3px; padding: 4px 0 0; border: 0; background: none;
+  color: var(--ink); text-align: center; cursor: pointer; min-width: 0; }
+.cd-st-main img { width: 100%; height: 150px; object-fit: contain; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .35));
+  transition: transform 180ms ease; }
+.cd-st-main:hover img { transform: translateY(-4px) rotate(-1.5deg); }
+.cd-st-main b { margin-top: 4px; font: 700 14px/1.15 var(--display); }
+.cd-st-main small { font-size: 11px; color: var(--ink-faint); }
+.cd-st-held { position: absolute; top: 8px; right: 8px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px;
+  display: grid; place-items: center; background: var(--cta); color: #fff; font: 800 13px var(--display); font-style: normal;
+  box-shadow: 0 4px 12px var(--cta-glow); }
+.cd-st-go { width: 100%; white-space: nowrap; font-size: 13px; padding-inline: 8px; }
+/* Above the set card: its fanned wrappers reach up over this row and took its taps. */
+.cd-allsets { position: relative; z-index: 3; justify-self: start; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 10px; padding: 7px 12px 7px 8px; border-radius: 999px;
+  border: 1px solid var(--line-firm); background: var(--surface); color: var(--ink-soft); font: 600 13px var(--display); cursor: pointer; }
+.cd-allsets-ic { transform: rotate(180deg); }
+@media (max-width: 520px) { .cd-st-main img { height: 120px; } .cd-st { padding: 8px; } }
+
 :root[data-theme="dark"] {
   /* ROTOM, NIGHT: the default. Navy glass, cyan for what is selected. */
   color-scheme: dark;
@@ -8881,18 +8909,19 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 }
 .cd-card.r-rare.v-h .cd-foil { inset: 9.6% 8.9% 52.4% 6.6%; }
 .cd-card.r-ultra .cd-foil { background: repeating-linear-gradient(115deg, rgba(230, 240, 255, .14) 0 2px, transparent 2px 6px), linear-gradient(125deg, rgba(220, 235, 255, .2), rgba(255, 255, 255, .06)); }
-.cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil {
-  background: radial-gradient(rgba(255, 255, 255, .13) 0 .6px, transparent 1px) 0 0 / 6px 6px,
-    linear-gradient(125deg, rgba(255, 110, 190, .14), rgba(110, 220, 255, .16) 50%, rgba(255, 236, 130, .14));
+/* No dot texture (asked for, 2026-10-07): a 6px grid of dots over the art
+   read as blur. The sheen alone. */
+.cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil, .cd-card.r-pikachu .cd-foil {
+  background: linear-gradient(125deg, rgba(255, 110, 190, .14), rgba(110, 220, 255, .16) 50%, rgba(255, 236, 130, .14));
 }
 /* A Mega Hyper Rare is printed in gold already: a light hand, or its etching washes out. */
-.cd-card.r-hyper .cd-foil, .cd-card.r-mega .cd-foil { background: linear-gradient(125deg, rgba(255, 230, 150, .12), rgba(255, 255, 255, .05) 50%, rgba(255, 220, 120, .12)); }
+.cd-card.r-hyper .cd-foil, .cd-card.r-mega .cd-foil, .cd-card.r-futuristic .cd-foil { background: linear-gradient(125deg, rgba(255, 230, 150, .12), rgba(255, 255, 255, .05) 50%, rgba(255, 220, 120, .12)); }
 .cd-foil::after {
   content: ""; position: absolute; top: -10%; bottom: -10%; left: -70%; width: 60%; opacity: 0;
   background: linear-gradient(100deg, transparent, rgba(255, 120, 200, .55), rgba(120, 220, 255, .65), rgba(255, 240, 140, .55), transparent);
 }
 .cd-card.r-ultra .cd-foil::after { background: linear-gradient(100deg, transparent, rgba(235, 245, 255, .8), transparent); }
-.cd-card.r-special .cd-foil::after, .cd-card.r-hyper .cd-foil::after, .cd-card.r-mega .cd-foil::after { background: linear-gradient(100deg, transparent, rgba(255, 220, 120, .8), rgba(255, 255, 255, .7), transparent); }
+.cd-card.r-special .cd-foil::after, .cd-card.r-hyper .cd-foil::after, .cd-card.r-mega .cd-foil::after, .cd-card.r-futuristic .cd-foil::after { background: linear-gradient(100deg, transparent, rgba(255, 220, 120, .8), rgba(255, 255, 255, .7), transparent); }
 .cd-card:not(.still):not(.live) .cd-foil::after { animation: cd-sweep 2.6s ease-in-out .3s infinite; }
 @keyframes cd-sweep { 0% { opacity: 1; transform: translateX(0); } 55%, 100% { opacity: 1; transform: translateX(400%); } }
 /* Under the pointer (the card view): the band and a glare follow it, the card tilts. */

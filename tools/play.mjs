@@ -2221,6 +2221,18 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
   assert.equal(sw.state.cards[key(rare)].h, 3, "the sweep took a rare");
   assert.equal(sw.state.dust, 3 * C.dustOf("common", "n"));
 
+  // A PACK FOR DUST: exactly DUST_PACK, into the set's packs (bought, not earned); refused when short or the set is shut.
+  {
+    const dp = boot({ ...SAVE, dust: C.DUST_PACK + 7 }).e;
+    const open = "me01";
+    assert.equal(dp.dustPack("no-such-set"), false, "a pack of a set that does not exist was sold for dust");
+    assert.equal(dp.dustPack(open), true);
+    assert.equal(dp.state.dust, 7, "a pack did not cost exactly DUST_PACK");
+    assert.equal(dp.state.packs[open], 1, "the dust pack did not arrive");
+    assert.equal(dp.dustPack(open), false, "a pack was sold for dust the trainer did not have");
+    const shut = boot({ ...SAVE, xp: 0, paid: 1, dust: 1e6 }).e;
+    assert.equal(shut.dustPack(open), false, "a shut set sold a pack for dust");
+  }
   // CRAFT: exact cost, a variant it is printed in, refused when short.
   const cr = boot({ ...SAVE, dust: C.craftCost("common", "n") }).e;
   // THE CHASE IS PACKS ONLY: no dust buys a Special illustration rare or a Mega Hyper Rare.
