@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { createEngine, VIEW_W, VIEW_H, VIEW_W_MAX } from "./game/engine.js";
 import { TILE } from "./game/tileset.js";
 import TopBar, { Missions } from "./ui/TopBar.jsx";
@@ -20,6 +20,7 @@ import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
 import Variants from "./ui/Variants.jsx";
 import Wardrobe from "./ui/Wardrobe.jsx";
+import Party from "./ui/Party.jsx";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
 import Bag from "./ui/Bag.jsx";
@@ -184,6 +185,9 @@ export default function App({
   const onConvert = useCallback((uids) => engine?.convert(uids), [engine]);
   const onLevelUp = useCallback((uid, n) => engine?.levelUp(uid, n), [engine]);
   const onEvolve = useCallback((uid, to) => engine?.evolve(uid, to), [engine]);
+  // Stable like the rest: the Box is memo()'d, and a fresh arrow here rebuilt every row on every walk notice.
+  const onParty = useCallback((uids) => engine?.setParty(uids), [engine]);
+  const onPickBuddy = useCallback((uid) => engine?.setBuddy(uid), [engine]);
   const onJumped = useCallback(() => setBoxJump(null), []);
   /* THE ROTOM PANEL'S APP (Dex, Box, Shop, Map, Events), held here so the
      HUD's event cards and the Dex's "See in Box" can open the right one, and
@@ -410,6 +414,9 @@ export default function App({
         return;
       }
 
+      // Q: the next of the walking party (Q and E were free; check `KEYS` first).
+      if (ev.key === "q" || ev.key === "Q") { ev.preventDefault(); e.cycleBuddy(); return; }
+
       if (ev.key === "Shift") { e.setRunning(true); return; }
 
       const dir = KEYS[ev.key];
@@ -458,6 +465,9 @@ export default function App({
   const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene || claimGen != null;
   // Finished generations not yet claimed - derived, so it is a button until pressed.
   const claims = engine?.dexClaims?.() ?? [];
+  // The walking party's Box entries, for the strip on the map: rebuilt only when the party or the Box moves.
+  const partyMons = useMemo(() => (st?.party ?? []).map((u) => st.box.find((m) => m.uid === u)).filter(Boolean),
+    [st?.party, st?.colRev]);
   const cheer = held ? null : st?.cheers?.[0] ?? null;
   // The Dex's rank line replays your rank-up: the step you hold, from the one below.
   const [replay, setReplay] = useState(null);
@@ -1050,6 +1060,7 @@ export default function App({
                   </div>
                 )}
                 <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />
+                <Party mons={partyMons} buddy={st?.buddy ?? null} onPick={onPickBuddy} />
                 {claims.length > 0 && (
                   <button type="button" className="ms-tab ready dc-pill" onClick={() => setClaimGen(claims[0])}
                     data-tip="A finished Pokédex - claim its reward">
@@ -1161,7 +1172,7 @@ export default function App({
           onBuy={(id, n) => engine.buy(id, n)}
           onBuyCandy={(n) => engine.buyCandy(n)}
           onEvolve={onEvolve}
-          onBuddy={(uid) => engine.setBuddy(uid)}
+          onParty={onParty}
           jumpTo={boxJump}
           onJumped={onJumped}
           onSpend={(id) => engine.spend(id)}

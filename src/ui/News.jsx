@@ -21,7 +21,7 @@ export const NEWS = [
     date: "October 2026",
     title: "Walk together, dress up",
     items: [
-      ["Pokémon follow you", "Open one in the Box and choose Walk with me. Shinies walk shiny."],
+      ["Pokémon follow you", "Add up to three from the Box to your walking party; tap one on the map or press Q to switch."],
       ["The Wardrobe", "49 trainer skins on You › Wardrobe, from Youngster to Steven."],
       ["One look on the bike", "Rails are ridden in your walk or run, so every skin fits everywhere."],
     ],

@@ -57,7 +57,7 @@ const ACTIONABLE = (a, b) =>
    five handlers are `useCallback`ed over an engine that is set once. */
 function Box({
   box, bag, dex, candy, colRev, stats, busy, findSeed, onSeedUsed,
-  onSell, onConvert, onLevelUp, onEvolve, defense = null, buddy = null, onBuddy,
+  onSell, onConvert, onLevelUp, onEvolve, defense = null, party, onParty,
 }) {
   const [pending, setPending] = useState(null);
   const [flash, setFlash] = useState(null);
@@ -773,7 +773,7 @@ function Box({
         })}
       </div>
 
-      {peek && <Preview group={peek} buddy={buddy} onBuddy={onBuddy} onClose={() => setPeek(null)} />}
+      {peek && <Preview group={peek} party={party} onParty={onParty} onClose={() => setPeek(null)} />}
 
       {pending && (
         <Confirm

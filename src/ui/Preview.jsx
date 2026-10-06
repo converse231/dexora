@@ -1,7 +1,7 @@
 /* A CLOSER LOOK at one Box row: the art big enough to appreciate, and what the
    row has no room for - its base stats. Every action that SPENDS a Pokemon
    stays on the row, so there is one place to sell or evolve one; the one
-   control here is a look - Walk with me (docs/cosmetics.md). */
+   control here is a look - the walking party (docs/cosmetics.md). */
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { speciesById, sizeTag } from "../game/biomes.js";
@@ -11,13 +11,13 @@ import Types from "./Types.jsx";
 import Mark from "./Marks.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
 import { perksOf } from "../game/perks.js";
-import { followSheet } from "../game/cosmetics.js";
+import { followSheet, PARTY_MAX } from "../game/cosmetics.js";
 
 const STATS = ["HP", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed"];
 // The highest base stat any Pokemon has, so a bar is comparable across species.
 const STAT_MAX = 255;
 
-export default function Preview({ group, buddy = null, onBuddy, onClose }) {
+export default function Preview({ group, party = [], onParty, onClose }) {
   useModalLock();
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
@@ -30,9 +30,10 @@ export default function Preview({ group, buddy = null, onBuddy, onClose }) {
   const total = sp.stats.reduce((a, b) => a + b, 0);
   // A traded one's story: whose it first was, and how many hands since.
   const traded = group.mons.find((m) => m.traded);
-  // The one walking with you, if it is in this row; otherwise the row's own.
-  const walking = group.mons.some((m) => m.uid === buddy);
-  const canWalk = onBuddy && followSheet(group.species) != null;
+  // This row's member of the walking party, if it has one.
+  const member = group.mons.find((m) => party.includes(m.uid))?.uid ?? null;
+  const full = member == null && party.length >= PARTY_MAX;
+  const canWalk = onParty && followSheet(group.species) != null;
   /* ON THE BODY, as Confirm is: the Box lives in the rail, a size container,
      and a fixed layer inside one is laid out and stacked inside it - the
      ball rail drew over the preview's bottom buttons (2026-10-06). */
@@ -83,9 +84,11 @@ export default function Preview({ group, buddy = null, onBuddy, onClose }) {
           <div className="pv-total"><dt>Total</dt><dd><b>{total}</b></dd></div>
         </dl>
         {canWalk && (
-          <button type="button" className={`pv-walk${walking ? " on" : ""}`} aria-pressed={walking}
-            onClick={() => onBuddy(walking ? null : group.hero.uid)}>
-            {walking ? "Walking with you · Back to its ball" : "Walk with me"}
+          <button type="button" className={`pv-walk${member != null ? " on" : ""}`} aria-pressed={member != null}
+            disabled={full}
+            onClick={() => onParty(member != null ? party.filter((u) => u !== member) : [...party, group.hero.uid])}>
+            {member != null ? "In your walking party · Remove"
+              : full ? `Walking party is full (${PARTY_MAX} of ${PARTY_MAX})` : "Add to walking party"}
           </button>
         )}
         <button type="button" className="sheet-close" onClick={onClose}>CLOSE</button>

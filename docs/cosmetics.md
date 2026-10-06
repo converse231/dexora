@@ -7,6 +7,15 @@ battle.
 
 ## Followers
 
+- **The walking party (2026-10-07): up to three.** `state.party` holds up to
+  `PARTY_MAX` Box uids, added and removed from the Box preview (`setParty`);
+  `state.buddy` is the one walking, always one of them. The strip on the map
+  (`Party.jsx`, beside the quest) switches with a tap - tapping the one
+  walking puts it in its ball - and Q cycles. A switch is `stepped()` (a big
+  Box must not rebuild mid-walk) and grows the next out of a white flash on
+  the same tile. All three sheets are loaded with the party, so a switch
+  never waits. A save from the one-follower days gets `party = [buddy]`.
+
 - **One Pokémon walks behind you.** `state.buddy` is a Box uid. You choose it
   with **Walk with me** in the Box preview, and send it back from the same
   button or from the Wardrobe. `setBuddy` is the only writer, and it refuses a

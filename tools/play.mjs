@@ -1834,6 +1834,8 @@ await savedField("cardPity", { me01: { hit: 2, special: 14, mega: 61 } }, "junk"
 {
   const pika = { ...SAVE, box: [{ uid: 1, species: 25, level: 5, shiny: 1, at: 1 }], nextUid: 2 };
   await savedField("buddy", 1, "x", null, pika);
+  await savedField("party", [1], "junk", [], pika);
+  assert.deepEqual(boot({ ...pika, party: [1, 7] }).e.state.party, [1], "a party member not in the Box was kept");
   assert.equal(boot({ ...pika, buddy: 7 }).e.state.buddy, null, "a follower not in the Box was kept");
   await savedField("skins", ["giovanni", "from_a_newer_build"], "junk", []);
   await savedField("skin", "lass", 42, null, { ...SAVE, skins: ["lass"] });
@@ -1851,13 +1853,68 @@ await savedField("cardPity", { me01: { hit: 2, special: 14, mega: 61 } }, "junk"
   assert.equal(e.wearSkin(null), true);
   assert.equal(e.state.skin, null, "taking a skin off did not give your own trainer back");
 
-  const f = boot(pika).e;
-  assert.equal(f.setBuddy(99), false, "a follower not in the Box was taken");
-  assert.equal(f.setBuddy(1), true);
-  assert.equal(f.state.buddy, 1);
+  // THE WALKING PARTY: up to three, each once, from the Box; the one walking is one of them.
+  const four = { ...pika, box: [1, 2, 3, 4].map((uid) => ({ uid, species: [25, 1, 4, 7][uid - 1], level: 5, at: 1 })), nextUid: 5 };
+  const f = boot(four).e;
+  assert.equal(f.setBuddy(1), false, "a Pokemon outside the party was sent walking");
+  assert.equal(f.setParty([1, 99]), false, "a party with a uid not in the Box was taken");
+  assert.equal(f.setParty([1, 2, 3, 4]), false, "a party of four was taken");
+  const col = f.state.colRev;
+  assert.equal(f.setParty([1, 2, 3]), true);
+  assert.equal(f.state.buddy, 1, "the first of a new party did not start walking");
+  assert.ok(f.state.colRev > col, "joining the party did not tell the Box");
+  const col2 = f.state.colRev;
+  assert.equal(f.cycleBuddy(), true);
+  assert.equal(f.state.buddy, 2, "Q did not send out the next of the party");
+  f.cycleBuddy(); f.cycleBuddy();
+  assert.equal(f.state.buddy, 1, "the party does not cycle round");
+  assert.equal(f.state.colRev, col2, "switching who walks rebuilt the collection - a big Box stutters on it");
   assert.equal(f.setBuddy(null), true);
   assert.equal(f.state.buddy, null);
+  f.setBuddy(3);
+  assert.equal(f.setParty([1, 2]), true);
+  assert.equal(f.state.buddy, 1, "the one walking left the party and nobody took over");
   console.log("cosmetics ok — follower, skins and the skin worn load, save and refuse what they must");
+}
+
+/* A SLOW FRAME IS NOT A TAB AWAY (2026-10-07): a gap over STALL with the
+   window focused pays the deadlines back but neither drops a held walk nor
+   bumps colRev - it did both, and a big Box rebuilding on the bump made the
+   next frame slow too, in a loop. A long gap, or no focus, still drops keys. */
+{
+  const e = boot({ ...SAVE }).e;
+  globalThis.document.hasFocus = () => true;
+  const real = Math.random;
+  Math.random = () => 0.999;
+  try {
+    for (let i = 0; i < 10; i++) tick(16);
+    const col = e.state.colRev;
+    tick(800);                              // one slow frame, standing still
+    assert.equal(e.state.colRev, col, "a slow frame marked the collection changed");
+    // A direction with room to walk, found rather than named.
+    const dir = ["right", "left", "down", "up"].find((d) => {
+      const n = e.state.steps;
+      e.press(d);
+      for (let i = 0; i < 30; i++) tick(16);
+      e.clearHeld();
+      for (let i = 0; i < 20; i++) tick(16);
+      return e.state.steps > n;
+    });
+    const steps = e.state.steps;
+    e.press(dir);
+    tick(16); tick(800);                    // and one mid-walk, focused
+    for (let i = 0; i < 40; i++) tick(16);
+    assert.ok(e.state.steps > steps + 1, "a slow frame dropped the held walk");
+    tick(2500);                             // a sleep
+    const after = e.state.steps;
+    for (let i = 0; i < 40; i++) tick(16);
+    assert.ok(e.state.steps <= after + 1, "a long gap kept walking on a key that may have been let go");
+  } finally {
+    Math.random = real;
+    delete globalThis.document.hasFocus;
+    e.clearHeld();
+  }
+  console.log("slow frame ok — a focused slow frame keeps the walk and the collection; a long gap drops held keys");
 }
 
 /* THE FOLLOWER WALKS ONE STEP BEHIND, read off what the frame actually
@@ -1870,17 +1927,17 @@ await savedField("cardPity", { me01: { hit: 2, special: 14, mega: 61 } }, "junk"
   globalThis.Image = class {
     set src(v) { this.url = v; this.width = 256; this.height = 64; queueMicrotask(() => this.onload?.()); }
   };
-  const e = boot({ ...SAVE, box: [{ uid: 1, species: 25, level: 5, shiny: 1, at: 1 }], nextUid: 2, buddy: 1 }).e;
+  const e = boot({ ...SAVE, box: [{ uid: 1, species: 25, level: 5, shiny: 1, at: 1 }, { uid: 2, species: 1, level: 5, at: 1 }], nextUid: 3, buddy: 1 }).e;
   tick(16);                                        // the first frame asks for the sheet
   await new Promise((r) => setTimeout(r, 0));      // and it arrives
   // A still scene is not redrawn, so each look asks for one (a rev bump).
-  const frame = () => {
-    e.setBuddy(1);
+  const frame = (sheet = 25) => {
+    e.wearSkin(null);
     calls = [];
     tick(16);
     const out = calls;
     calls = null;
-    const fol = out.filter(([k, img]) => k === "drawImage" && /follow\/25\.png$/.test(img?.url ?? ""));
+    const fol = out.filter(([k, img]) => k === "drawImage" && (img?.url ?? "").endsWith(`follow/${sheet}.png`));
     const me = out.find(([k]) => k === "ellipse");   // the stand-in trainer's shadow: ellipse(px + 16, py + 29)
     return { fol, me };
   };
@@ -1913,11 +1970,22 @@ await savedField("cardPity", { me01: { hit: 2, special: 14, mega: 61 } }, "junk"
   assert.equal(sy, 32, "a shiny follower was drawn from the normal palette's row");
   assert.equal(dw, 64, "a 32px follower frame was not drawn at the trainer's scale");
   assert.equal(sx % sw, 0);
+  /* A SWITCH IS A RELEASE: the next of the party grows out of a flash on the
+     same tile - smaller than a full frame at first, whole once it settles. */
+  assert.equal(e.setParty([1, 2]), true);
+  e.cycleBuddy();
+  tick(16);
+  await new Promise((r) => setTimeout(r, 0));     // Bulbasaur's sheet arrives (preloaded with the party)
+  const popping = frame(1);
+  assert.equal(popping.fol.length, 1, "the next of the party did not come out where the last one stood");
+  assert.ok(popping.fol[0][8] < 64, "the switch did not play: it appeared at full size at once");
+  for (let i = 0; i < 30; i++) tick(16);
+  assert.equal(frame(1).fol[0][8], 64, "the released Pokemon never grew to its full size");
   e.travel("meadow");
   settle();
-  assert.equal(frame().fol.length, 0, "the follower was left standing after a warp");
+  assert.equal(frame(1).fol.length, 0, "the follower was left standing after a warp");
   globalThis.Image = OldImage;
-  console.log(`follower ok — unseen after a load, one tile behind after two steps ${walked}, shiny row for a shiny, back in its ball after a warp`);
+  console.log(`follower ok — unseen after a load, one tile behind after two steps ${walked}, shiny row for a shiny, a switch grows the next out of a flash, back in its ball after a warp`);
 }
 
 /* BUYING AND OPENING, through the real engine: a pack costs exactly its

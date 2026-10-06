@@ -7,6 +7,8 @@ import { SAME, NONE } from "../data/follow.js";
    public/follow/<id>.png (`npm run follow`), a form without its own drawing
    walking as its species, null for the two with none. */
 const NO_FOLLOW = new Set(NONE);
+// How many can be in the walking party - switched on the map, one walking at a time.
+export const PARTY_MAX = 3;
 export const followSheet = (id) => (NO_FOLLOW.has(id) ? null : SAME[id] ?? id);
 
 /* TRAINER SKINS: what you look like walking the map.

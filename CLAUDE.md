@@ -735,8 +735,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   and `OUTBREAK_LIFT`, your call 2026-10-03).
 - **Cosmetics are designed in docs/cosmetics.md** - a look, never a
   strength: no rule module imports `game/cosmetics.js` or `data/follow.js`
-  (asserted). **The follower** (`state.buddy`, a Box uid, `setBuddy` the one
-  writer, Walk with me on the Box preview) takes the tile you just left
+  (asserted). **The walking party** (`state.party`, up to `PARTY_MAX` 3 Box
+  uids, `setParty` from the Box preview; `state.buddy` the one walking, one of
+  them, `setBuddy`/`cycleBuddy` from the strip on the map or Q) - a switch is
+  `stepped()`, never `changed()`, and grows the next out of a flash
+  (`SWAP_MS`, which holds the redraw open). **The follower** takes the tile you just left
   (`trail` in `tryStep` and `surf`); its position is never saved, and every
   teleport (`goThrough`, a ladder, `travel`) stands it on you unseen
   (`snapBuddy`); afloat, on a rail or a bike road it is in its ball. Only its
@@ -1112,8 +1115,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   notice per 250ms; `changed()`/`stepped()` notify at once and take a
   pending one with them. tools/play holds both.
 - **Stalls are paid back in `frame()`**: any gap over `STALL` pushes every live
-  deadline forward (`move.startedAt`, `encounter.until`, `fishing.until`) and
-  drops held keys. A new timer joins that list.
+  deadline forward (`move.startedAt`, `encounter.until`, `fishing.until`). A
+  new timer joins that list. It is `stepped()`, and it drops held keys only
+  without focus or past `AWAY`: as `changed()` on every gap, one heavy frame
+  (a big Box rebuilding) bumped colRev, rebuilt the Box, stalled again - a loop
+  that stopped every held walk (reported as choppy walking, 2026-10-07).
 - **Alias imports a local function might shadow** (`advance as advanceGoal`).
 - **A stored size is copied from the encounter to the box entry**; the uid hash
   is only the fallback.
