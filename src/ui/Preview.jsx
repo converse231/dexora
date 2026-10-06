@@ -1,7 +1,9 @@
 /* A CLOSER LOOK at one Box row: the art big enough to appreciate, and what the
-   row has no room for - its base stats. Read-only on purpose; every action
-   stays on the row, so there is one place to sell or evolve a Pokemon. */
+   row has no room for - its base stats. Every action that SPENDS a Pokemon
+   stays on the row, so there is one place to sell or evolve one; the one
+   control here is a look - Walk with me (docs/cosmetics.md). */
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { speciesById, sizeTag } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import Sprite from "./Sprite.jsx";
@@ -9,12 +11,13 @@ import Types from "./Types.jsx";
 import Mark from "./Marks.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
 import { perksOf } from "../game/perks.js";
+import { followSheet } from "../game/cosmetics.js";
 
 const STATS = ["HP", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed"];
 // The highest base stat any Pokemon has, so a bar is comparable across species.
 const STAT_MAX = 255;
 
-export default function Preview({ group, onClose }) {
+export default function Preview({ group, buddy = null, onBuddy, onClose }) {
   useModalLock();
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
@@ -27,7 +30,13 @@ export default function Preview({ group, onClose }) {
   const total = sp.stats.reduce((a, b) => a + b, 0);
   // A traded one's story: whose it first was, and how many hands since.
   const traded = group.mons.find((m) => m.traded);
-  return (
+  // The one walking with you, if it is in this row; otherwise the row's own.
+  const walking = group.mons.some((m) => m.uid === buddy);
+  const canWalk = onBuddy && followSheet(group.species) != null;
+  /* ON THE BODY, as Confirm is: the Box lives in the rail, a size container,
+     and a fixed layer inside one is laid out and stacked inside it - the
+     ball rail drew over the preview's bottom buttons (2026-10-06). */
+  return createPortal(
     <div className="sheet" {...useDismiss(onClose)}>
       <div className="preview" role="dialog" aria-modal="true" aria-label={label(sp)}
         onClick={(e) => e.stopPropagation()}>
@@ -73,8 +82,15 @@ export default function Preview({ group, onClose }) {
           ))}
           <div className="pv-total"><dt>Total</dt><dd><b>{total}</b></dd></div>
         </dl>
+        {canWalk && (
+          <button type="button" className={`pv-walk${walking ? " on" : ""}`} aria-pressed={walking}
+            onClick={() => onBuddy(walking ? null : group.hero.uid)}>
+            {walking ? "Walking with you · Back to its ball" : "Walk with me"}
+          </button>
+        )}
         <button type="button" className="sheet-close" onClick={onClose}>CLOSE</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

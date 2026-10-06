@@ -1050,7 +1050,7 @@ def build_player():
 
       walk  x   8,  25,  42        16x32   3 frames   stand / step / step
       run   x  68,  85, 102        16x32   3 frames   the same cycle, leaning
-      bike  x 128, 161, 194        32x32   3 frames   (not used yet)
+      bike  x 128, 161, 194        32x32   3 frames   (not cut - see SETS)
       fish  x 236, 269, 302, 335   32x32   4 frames   the cast
       surf  x 377, 410             32x32   2 frames   (not used yet)
       surf  x 452, 485             32x32   2 frames   on GREEN  (not used yet)
@@ -1091,10 +1091,10 @@ def build_player():
             # are real art. Two poses, which is a paddle cycle rather than a
             # walk cycle: the trainer does not stride on water.
             ("surf",      377,    33,    32,      2),
-            ("jump",      527,    33,    32,      1),
-            # THE BIKE, for the Acro Bike rails - appended LAST so every set
-            # above keeps its offset in player.png. Three frames, pedalling.
-            ("bike",      128,    33,    32,      3)]
+            ("jump",      527,    33,    32,      1)]
+    # NO BIKE SET (2026-10-06): the rails are ridden in the walk or the run,
+    # the one cycle every trainer skin has (docs/cosmetics.md). It was
+    # appended last at x 128, pitch 33, three frames, if it is ever wanted.
 
     # BOTH PLAYABLE CHARACTERS ARE ON THIS SHEET, and only one was ever cut out
     # of it. The rip is titled "Playable CharacterS" and is 638px tall, where the

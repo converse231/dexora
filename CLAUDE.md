@@ -41,6 +41,7 @@ npm run battleart  League portraits, badges, back sprites
 npm run gyms     solve every League opponent's level (~30 min)
 npm run edge     bundle the referee into the ranked-step Edge Function
 npm run anchors  solve the League anchors' ranked ratings (then npm run edge)
+npm run follow   follower sheets         npm run skins    trainer skins
 ```
 
 Run `npm run check` after any logic change and `npx vite build` before calling
@@ -71,6 +72,8 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/data/anchors.js` | `npm run anchors` (check.mjs re-solves and compares) |
 | `public/ranks/{battle,dex}/` | `npm run ranks` from the drawn originals in `art/ranks/` (check.mjs: one per rank id, 192px, small) |
 | `src/data/anims.js`, `public/battle/anim/` | `npm run anims` (pokeemerald-expansion, pinned; restart a running dev server after) |
+| `public/follow/`, `src/data/follow.js` | `npm run follow` (the same pin; check.mjs reads each header) |
+| `public/skins/` | `npm run skins` (from `SKINS` in cosmetics.js plus the tool's `SRC`) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
   National Dex alone, read by the fetchers).
@@ -726,6 +729,22 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   title and the Pokedex Charm (`dexCharm`, `DEX_CHARM` 2x on that
   generation's tier roll, a Mega through `genOf`; between `RESEARCH_LIFT`
   and `OUTBREAK_LIFT`, your call 2026-10-03).
+- **Cosmetics are designed in docs/cosmetics.md** - a look, never a
+  strength: no rule module imports `game/cosmetics.js` or `data/follow.js`
+  (asserted). **The follower** (`state.buddy`, a Box uid, `setBuddy` the one
+  writer, Walk with me on the Box preview) takes the tile you just left
+  (`trail` in `tryStep` and `surf`); its position is never saved, and every
+  teleport (`goThrough`, a ladder, `travel`) stands it on you unseen
+  (`snapBuddy`); afloat, on a rail or a bike road it is in its ball. Only its
+  own sheet loads, and the draw key carries its arrival. Its sprite box joins
+  the trainer's for the upper layer, whoever is lower draws in front, and the
+  grass goes between. `public/follow/` is `npm run follow` (indexed,
+  asserted lossless). **Skins** (`skins` bought by `buySkin` and kept even when
+  unknown, `skin` worn) are the walk set alone in player.json's shape (`npm
+  run skins`); every other pose is drawn from it, water on the Surf blob.
+  **There is no bike pose** for anyone - a rail is the walk or the run.
+  The Box preview is PORTALLED to the body (`container: rail` trapped it under
+  the ball rail).
 - **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`
   rules): its rim drains with steps left over the item's own `steps`.
 - **Hard mode is designed in docs/battles.md, phase 8.** A cleared region's

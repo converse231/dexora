@@ -19,7 +19,7 @@ const THEME_NAME = { auto: "Auto", dark: "Night", light: "Day" };
 
 export default function You({
   trainerName, caught, xp, stats, bag, save, account, unread, titles = [], requests = 0,
-  onProfile, onNews, onHelp, onForms, onSettings, onLogOut, onReset, onSpend,
+  onProfile, onNews, onHelp, onForms, onWardrobe, onSettings, onLogOut, onReset, onSpend,
 }) {
   useModalLock();
   const [theme, setThemeState] = useState(themeChoice);
@@ -33,6 +33,7 @@ export default function You({
     ["news", "What's new", unread ? "New since you last looked" : "Updates to the game", onNews, unread],
     ["help", "How to play", "Keys, touch, and how it all works", onHelp],
     ["forms", "Rare forms", "The twelve kinds, and their odds", onForms],
+    onWardrobe && ["shirt", "Wardrobe", "Trainer skins, and who walks with you", onWardrobe],
     onSettings && ["gear", "Settings", "Name, trainer, birthday, password", onSettings],
   ].filter(Boolean);
 

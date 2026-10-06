@@ -22,7 +22,9 @@ import {
 } from "./trainer.js";
 import {
   TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame, drawGrass,
+  drawFollower,
 } from "./tileset.js";
+import { followSheet, skinById, skinPrice } from "./cosmetics.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
@@ -202,6 +204,9 @@ function freshState() {
     gifted: [],           // LEGACY: dex ids once held back from rewards as trades - paid and cleared at boot
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
+    buddy: null,          // the box uid walking behind you - see `setBuddy`
+    skin: null,           // the trainer skin worn, null for your own - see cosmetics.js
+    skins: [],            // the skins bought - see `buySkin`
     /* CARDS (docs/cards.md): copies by card id (`me01-004`, never a
        position) as `{ n, h, r, earned }`; unopened packs and which of them
        were earned, by set; and each set's pity counters. */
@@ -608,6 +613,11 @@ function loadState() {
       // Entry by entry, never the whole record: badges are years of play.
       beaten: cleanBeaten(s.beaten),
       team: [...new Set(Array.isArray(s.team) ? s.team : [])].filter(Number.isInteger).slice(0, TEAM_MAX),
+      buddy: Number.isInteger(s.buddy) ? s.buddy : null,
+      /* A skin id this build does not know is KEPT, bought in a newer one:
+         a purchase is never lost. It draws as your own trainer here. */
+      skins: [...new Set(Array.isArray(s.skins) ? s.skins : [])].filter((id) => typeof id === "string" && /^\w{1,32}$/.test(id)),
+      skin: typeof s.skin === "string" ? s.skin : null,
       /* CARDS, row by row: a bad row is dropped, never the collection. An id
          from a set this build does not ship is KEPT (a newer build's), shown
          nowhere. */
@@ -671,6 +681,9 @@ function loadState() {
     loaded.gifted = loaded.gifted.filter((id) => loaded.dex[dexIndex(id)] === 2);
     // The last team names Pokemon, and one sold or traded since is not on it.
     loaded.team = loaded.team.filter((uid) => loaded.box.some((m) => m.uid === uid));
+    // The follower is one of yours, and the skin one you bought.
+    if (!loaded.box.some((m) => m.uid === loaded.buddy)) loaded.buddy = null;
+    if (!loaded.skins.includes(loaded.skin)) loaded.skin = null;
     // Earned packs are some of the unopened ones, never more.
     for (const [k, v] of Object.entries(loaded.earnedPacks)) {
       loaded.earnedPacks[k] = v.slice(0, loaded.packs[k] ?? 0);
@@ -809,6 +822,7 @@ export function createEngine(canvas, onChange, mini = null) {
       move.fromY = p.y;
       move.active = false;
       rise();
+      snapBuddy();
       held.clear();
       save();
       changed();
@@ -1004,6 +1018,76 @@ export function createEngine(canvas, onChange, mini = null) {
     startedAt: 0, ms: STEP_MS, hop: false, leap: false,
   };
   let art = { atlas: null, player: null };
+  /* THE FOLLOWER (docs/cosmetics.md) takes the tile you just left, so it is
+     one step behind and walks your exact path - a ledge, a door, a bend.
+     Session state, never saved: a load or a warp stands it on you, unseen,
+     and it steps out behind you with your first step. On the water or a
+     bike road it is in its ball, as in HGSS. */
+  const buddy = { x: state.player.x, y: state.player.y, fromX: state.player.x, fromY: state.player.y, dir: "down", hop: false };
+  const snapBuddy = () => {
+    const { x, y } = state.player;
+    Object.assign(buddy, { x, y, fromX: x, fromY: y, hop: false });
+  };
+  const ridden = (x, y) => afloat(x, y) || !!RAIL[at(x, y)] || onRoad(x, y);
+  function trail(fromX, fromY) {
+    const p = state.player;
+    if (ridden(fromX, fromY) || ridden(p.x, p.y)) { snapBuddy(); return; }
+    // From where it stands when that is a step away; from your old tile (no glide) after a warp.
+    const near = Math.abs(buddy.x - fromX) + Math.abs(buddy.y - fromY) <= 2;
+    buddy.fromX = near ? buddy.x : fromX;
+    buddy.fromY = near ? buddy.y : fromY;
+    buddy.x = fromX;
+    buddy.y = fromY;
+    const dx = buddy.x - buddy.fromX, dy = buddy.y - buddy.fromY;
+    if (dx || dy) buddy.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+    buddy.hop = Math.abs(dx) + Math.abs(dy) > 1;           // the ledge you hopped, a step later
+    const grass = GRASS[at(buddy.x, buddy.y)];
+    if (grass && (dx || dy)) grassFx.push({ x: buddy.x, y: buddy.y, g: grass, start: move.startedAt });
+  }
+  /* Its sheet, loaded when first wanted and only the one: 1,253 files ship
+     and a game draws one. `img` is null until it arrives (the draw key says
+     when), and a sheet that fails stays null - no follower, never an error. */
+  let buddySheet = { id: null, img: null };
+  let buddyAt = { key: "", mon: null };
+  function buddyArt() {
+    const key = `${state.colRev}|${state.buddy}`;
+    if (buddyAt.key !== key) buddyAt = { key, mon: state.buddy == null ? null : state.box.find((m) => m.uid === state.buddy) ?? null };
+    const id = buddyAt.mon && followSheet(buddyAt.mon.species);
+    if (id == null) return null;
+    if (buddySheet.id !== id) {
+      const mine = buddySheet = { id, img: null };
+      if (typeof Image !== "undefined") {
+        const img = new Image();
+        img.onload = () => { mine.img = img; };
+        img.src = `follow/${id}.png`;
+      }
+    }
+    return buddySheet.img;
+  }
+  /* THE SKIN'S SHEET, the same way: player.json's shape with the walk set
+     alone (see `drawPlayer`), and the Surf blob it rides. */
+  let skinSheet = { id: null, sheet: null };
+  let blob = null;
+  function skinArt() {
+    const id = skinById(state.skin) ? state.skin : null;
+    if (!id) return null;
+    if (skinSheet.id !== id && typeof Image !== "undefined") {
+      const mine = skinSheet = { id, sheet: null };
+      const img = new Image();
+      img.onload = () => {
+        mine.sheet = { img, blob, scale: 2, dirs: { down: 0, up: 1, left: 2, right: 3 },
+          sets: { walk: { x: 0, y: 0, w: 16, h: 32, frames: 3 } } };
+      };
+      img.src = `skins/${id}.png`;
+      if (!blob) {
+        const b = new Image();
+        b.onload = () => { blob = b; if (mine.sheet) mine.sheet.blob = b; };
+        b.src = "skins/surf.png";
+      }
+    }
+    if (skinSheet.sheet && !skinSheet.sheet.blob) skinSheet.sheet.blob = blob;
+    return skinSheet.sheet;
+  }
   let walkFrame = 0;
   let raf = 0;
   let saveTimer = null;
@@ -1256,6 +1340,7 @@ export function createEngine(canvas, onChange, mini = null) {
     p.x = nx;
     p.y = ny;
     rise();
+    trail(move.fromX, move.fromY);
     const grass = GRASS[at(nx, ny)];
     if (grass) grassFx.push({ x: nx, y: ny, g: grass, start: move.startedAt });
   }
@@ -1345,6 +1430,7 @@ export function createEngine(canvas, onChange, mini = null) {
       move.fromY = who.y;
       move.active = false;
       rise();            // a ladder lands you at the floor's own elevation
+      snapBuddy();
     }
     walkFrame++;
     state.steps++;
@@ -1557,6 +1643,7 @@ export function createEngine(canvas, onChange, mini = null) {
     move.active = false;
     move.fromX = spawn.x;
     move.fromY = spawn.y;
+    snapBuddy();
     held.clear();
     save();
     changed();
@@ -1806,6 +1893,7 @@ export function createEngine(canvas, onChange, mini = null) {
     p.x = fx;
     p.y = fy;
     rise();
+    trail(move.fromX, move.fromY);   // onto the water: into its ball
     changed();
     return true;
   }
@@ -2444,6 +2532,23 @@ export function createEngine(canvas, onChange, mini = null) {
        a hop's lift. */
     const px = Math.round(wx / TILE);
     const py = Math.round(wy / TILE);
+    /* The follower, where it is drawn now - never on your own tile (a
+       load or a warp put it there, unseen), never more than its step away,
+       never in another room. Its sprite's box joins his for the upper layer:
+       a square frame centred on its tile and standing on it, plus a hop. */
+    const bImg = buddyArt();
+    const bwx = (buddy.fromX + (buddy.x - buddy.fromX) * t) * TILE;
+    const bwy = (buddy.fromY + (buddy.y - buddy.fromY) * t) * TILE;
+    const showBuddy = !!bImg && (buddy.x !== p.x || buddy.y !== p.y)
+      && Math.abs(buddy.x - p.x) + Math.abs(buddy.y - p.y) <= 2
+      && (!rooms || roomAt(buddy.x, buddy.y) === room);
+    const boxes = [[px - 1, px + 1, py - 2, py]];
+    if (showBuddy) {
+      const span = (bImg.height / 2) * 2 / TILE;           // 2 tiles, or 4 for a big one
+      const hw = Math.ceil((span - 1) / 2), bx = Math.round(bwx / TILE), by = Math.round(bwy / TILE);
+      boxes.push([bx - hw, bx + hw, by - (span - 1) - (buddy.hop ? 1 : 0), by]);
+    }
+    const inBox = (x, y) => boxes.some(([a, b, c, d]) => x >= a && x <= b && y >= c && y <= d);
     const over = [];
     const baked = Boolean(art.atlas);
     if (baked) {
@@ -2458,8 +2563,11 @@ export function createEngine(canvas, onChange, mini = null) {
         }
       }
       // The tiles he could be standing behind, as the tile pass chose them.
-      for (let y = Math.max(y0, py - 2); y <= Math.min(y0 + VIEW_H, py); y++) {
-        for (let x = Math.max(x0, px - 1); x <= Math.min(x0 + viewW, px + 1); x++) {
+      const yLo = Math.min(...boxes.map((b) => b[2])), yHi = Math.max(...boxes.map((b) => b[3]));
+      const xLo = Math.min(...boxes.map((b) => b[0])), xHi = Math.max(...boxes.map((b) => b[1]));
+      for (let y = Math.max(y0, yLo, 0); y <= Math.min(y0 + VIEW_H, yHi, MAP_H - 1); y++) {
+        for (let x = Math.max(x0, xLo, 0); x <= Math.min(x0 + viewW, xHi, MAP_W - 1); x++) {
+          if (!inBox(x, y)) continue;
           const id = chunkAt(Math.floor(x / CHUNK), Math.floor(y / CHUNK)).ids[(y % CHUNK) * CHUNK + (x % CHUNK)];
           if (walkable(rows, x, y) || raisedOver(x, y)) over.push([x, y, id]);
         }
@@ -2488,8 +2596,7 @@ export function createEngine(canvas, onChange, mini = null) {
            his head. Read off the cell rather than baked into the tile, because
            collision belongs to the map - five of that map's metatiles are laid
            both walkable and solid in different places. */
-        if (x >= px - 1 && x <= px + 1 && y >= py - 2 && y <= py
-            && (walkable(rows, x, y) || raisedOver(x, y))) over.push([x, y, id]);
+        if (inBox(x, y) && (walkable(rows, x, y) || raisedOver(x, y))) over.push([x, y, id]);
       }
     }
 
@@ -2499,8 +2606,35 @@ export function createEngine(canvas, onChange, mini = null) {
     const cast = state.fishing;
     /* Either kind of hop draws the same way: the mid-air pose and an arc. */
     const airborne = move.active && (move.hop || move.leap);
-    drawPlayer(
-      ctx, art.player, Math.round(wx - camX), Math.round(wy - camY),
+    /* WHO IS IN FRONT is whoever stands lower on the screen, and the grass
+       goes in between: a rustle on the tile behind covers the one behind and
+       never the one in front (it drew over his head on every step south). */
+    const front = showBuddy && bwy > wy;
+    const frontY = front ? buddy.y : p.y;
+    const follower = () => drawFollower(ctx, bImg, Math.round(bwx - camX), Math.round(bwy - camY),
+      buddy.dir, move.active, t, !!buddyAt.mon.shiny, buddy.hop && move.active ? Math.sin(Math.PI * t) * 11 : 0);
+    const rustle = (behind) => {
+      if (!art.grass) return;
+      for (const f of grassFx) {
+        if ((f.y < frontY) !== behind) continue;
+        const i = Math.floor((now - f.start) / f.g.ms);
+        drawGrass(ctx, art.grass, Math.round(f.x * TILE - camX), Math.round(f.y * TILE - camY),
+          i < f.g.seq.length ? f.g.seq[i] : 0);
+      }
+    };
+    /* Over the trainer, under the tree tops. A finished rustle stays only on
+       the tile you (or it) are standing on, as its rest frame; the rest drop
+       out. A save that loads you standing in grass has no rustle, so the rest
+       frame is drawn for the tile you are on whatever the list says. */
+    if (art.grass) {
+      grassFx = grassFx.filter((f) => now - f.start < f.g.seq.length * f.g.ms
+        || (f.x === p.x && f.y === p.y) || (showBuddy && f.x === buddy.x && f.y === buddy.y));
+      if (GRASS[at(p.x, p.y)] && !move.active && !grassFx.some((f) => f.x === p.x && f.y === p.y)) {
+        grassFx.push({ x: p.x, y: p.y, g: GRASS[at(p.x, p.y)], start: -Infinity });
+      }
+    }
+    const me = () => drawPlayer(
+      ctx, skinArt() ?? art.player, Math.round(wx - camX), Math.round(wy - camY),
       p.dir, walkFrame, move.active, t,
       {
         /* THE HOP OUTRANKS THE RIDE, and the order is the whole fix. During a
@@ -2512,9 +2646,10 @@ export function createEngine(canvas, onChange, mini = null) {
            Otherwise riding beats everything, including running: the shoes do
            not help on water, and a trainer striding across a lake is the one
            thing here that would look like a bug rather than a feature. */
+        /* NO BIKE POSE (2026-10-06): a rail is ridden in the walk or the run,
+           the one cycle every skin has (docs/cosmetics.md). */
         set: airborne ? "jump"
           : surfing() ? "surf"
-          : RAIL[at(p.x, p.y)] || onRoad(p.x, p.y) ? "bike"
           : cast ? "fish"
           : state.running && move.active ? "run" : "walk",
         frame: cast ? fishFrame(p.dir, cast.phase) : undefined,
@@ -2523,27 +2658,9 @@ export function createEngine(canvas, onChange, mini = null) {
         char: state.char,
       },
     );
-
-    /* Over the trainer, under the tree tops. A finished rustle stays only on
-       the tile you are standing on, as its rest frame; the rest drop out. A
-       save that loads you standing in grass has no rustle, so the rest frame is
-       drawn for the tile you are on whatever the list says. */
-    if (art.grass) {
-      grassFx = grassFx.filter((f) => now - f.start < f.g.seq.length * f.g.ms
-        || (f.x === p.x && f.y === p.y));
-      let underfoot = false;
-      for (const f of grassFx) {
-        const i = Math.floor((now - f.start) / f.g.ms);
-        const here = f.x === p.x && f.y === p.y;
-        underfoot ||= here;
-        drawGrass(ctx, art.grass, Math.round(f.x * TILE - camX), Math.round(f.y * TILE - camY),
-          i < f.g.seq.length ? f.g.seq[i] : 0);
-      }
-      const g = GRASS[at(p.x, p.y)];
-      if (g && !underfoot && !move.active) {
-        drawGrass(ctx, art.grass, Math.round(p.x * TILE - camX), Math.round(p.y * TILE - camY), 0);
-      }
-    }
+    if (front) { me(); rustle(true); follower(); }
+    else { if (showBuddy) follower(); rustle(true); me(); }
+    rustle(false);
 
     drawBobber(ctx, state.fishing, now, camX, camY);
 
@@ -2661,8 +2778,13 @@ export function createEngine(canvas, onChange, mini = null) {
     if (state.encounter) battleSince ??= now; else battleSince = null;
     if (battleSince === null || now - battleSince < BATTLE_FADE) {
       const p = state.player;
-      const key = `${state.rev}|${p.x},${p.y},${p.dir}|${viewW}|${!!art.atlas}${!!art.player}|${state.running}`;
-      if (key !== drawnKey || move.active || grassFx.length || state.fishing || battleSince !== null) {
+      /* The follower's and the skin's sheets arrive on their own clock, so
+         each one's arrival is in the key. A rustle redraws while it PLAYS:
+         a finished one kept as the rest frame is still. */
+      const key = `${state.rev}|${p.x},${p.y},${p.dir}|${viewW}|${!!art.atlas}${!!art.player}|${state.running}`
+        + `|${!!buddySheet.img}${!!skinSheet.sheet}${!!blob}`;
+      if (key !== drawnKey || move.active || state.fishing || battleSince !== null
+        || grassFx.some((f) => now - f.start < f.g.seq.length * f.g.ms)) {
         render(now);
         drawnKey = key;
       }
@@ -2739,6 +2861,38 @@ export function createEngine(canvas, onChange, mini = null) {
     if (state.money < cost) return false;
     state.money -= cost;
     state.packs = { ...state.packs, [setId]: (state.packs[setId] ?? 0) + qty };
+    save();
+    changed();
+    return true;
+  }
+
+  /* COSMETICS (docs/cosmetics.md): the only writers of `buddy`, `skin` and
+     `skins`. A skin is bought once and worn as often as you like; buying one
+     wears it. `null` takes it off - your own trainer again. */
+  function buySkin(id) {
+    const price = skinPrice(id);
+    if (price == null || state.skins.includes(id) || state.money < price) return false;
+    state.money -= price;
+    state.skins = [...state.skins, id];
+    state.skin = id;
+    save();
+    changed();
+    return true;
+  }
+  function wearSkin(id) {
+    if (id !== null && !state.skins.includes(id)) return false;
+    state.skin = id;
+    save();
+    stepped();
+    return true;
+  }
+  /* One Pokemon walks behind you: a uid in the Box, or null for none. A
+     species with no drawing (`followSheet`) is refused. Changed, not
+     stepped: the Box marks the one walking. */
+  function setBuddy(uid) {
+    const mon = uid === null ? null : state.box.find((m) => m.uid === uid);
+    if (uid !== null && (!mon || followSheet(mon.species) == null)) return false;
+    state.buddy = uid;
     save();
     changed();
     return true;
@@ -3386,6 +3540,9 @@ export function createEngine(canvas, onChange, mini = null) {
        team pick starts from it, and its order is the order they fight in -
        `battleBegin` keeps the team you last took the same way. Box uids
        only, each once, at most six. */
+    buySkin,
+    wearSkin,
+    setBuddy,
     setTeam(uids) {
       if (!Array.isArray(uids)) return;
       state.team = [...new Set(uids)].filter((u) => state.box.some((m) => m.uid === u)).slice(0, TEAM_MAX);

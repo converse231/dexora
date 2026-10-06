@@ -28,9 +28,11 @@ const raf = [];
 const noop = () => {};
 // Every call on a 2D context is counted: `draws` is how much the engine painted.
 let draws = 0;
+let calls = null;       // set to [] to record every call as [name, ...args]
 const paint = () => { draws++; };
 const ctx2d = new Proxy({}, {
-  get: (_, k) => (k === "canvas" ? { width: 0, height: 0 } : paint),
+  get: (_, k) => (k === "canvas" ? { width: 0, height: 0 }
+    : calls ? (...a) => { draws++; calls.push([k, ...a]); } : paint),
   set: () => true,
 });
 const canvas = () => ({
@@ -1825,6 +1827,98 @@ await savedField("earnedPacks", { me01: ["badge:kanto-brock"] }, "junk", {}, { .
 assert.deepEqual(boot({ ...SAVE, packs: { me01: 1 }, earnedPacks: { me01: ["a", "b"] } }).e.state.earnedPacks,
   { me01: ["a"] }, "more earned packs than unopened ones were kept");
 await savedField("cardPity", { me01: { hit: 2, special: 14, mega: 61 } }, "junk", {});
+
+/* COSMETICS (docs/cosmetics.md): the follower is a Box uid, the skins are
+   bought ids (one from a newer build is KEPT - a purchase is never lost),
+   and the skin worn is one of them. */
+{
+  const pika = { ...SAVE, box: [{ uid: 1, species: 25, level: 5, shiny: 1, at: 1 }], nextUid: 2 };
+  await savedField("buddy", 1, "x", null, pika);
+  assert.equal(boot({ ...pika, buddy: 7 }).e.state.buddy, null, "a follower not in the Box was kept");
+  await savedField("skins", ["giovanni", "from_a_newer_build"], "junk", []);
+  await savedField("skin", "lass", 42, null, { ...SAVE, skins: ["lass"] });
+  assert.equal(boot({ ...SAVE, skin: "lass" }).e.state.skin, null, "a skin worn but never bought was kept");
+
+  const C = await import("../src/game/cosmetics.js");
+  const e = boot({ ...SAVE, money: C.skinPrice("lass") + 10 }).e;
+  assert.equal(e.buySkin("nobody"), false, "a skin that does not exist was sold");
+  assert.equal(e.buySkin("giovanni"), false, "a skin was sold to someone who cannot pay");
+  assert.equal(e.buySkin("lass"), true);
+  assert.equal(e.state.money, 10, "a skin did not cost exactly its price");
+  assert.equal(e.state.skin, "lass", "buying a skin did not wear it");
+  assert.equal(e.buySkin("lass"), false, "a skin was sold twice");
+  assert.equal(e.wearSkin("giovanni"), false, "a skin not bought was worn");
+  assert.equal(e.wearSkin(null), true);
+  assert.equal(e.state.skin, null, "taking a skin off did not give your own trainer back");
+
+  const f = boot(pika).e;
+  assert.equal(f.setBuddy(99), false, "a follower not in the Box was taken");
+  assert.equal(f.setBuddy(1), true);
+  assert.equal(f.state.buddy, 1);
+  assert.equal(f.setBuddy(null), true);
+  assert.equal(f.state.buddy, null);
+  console.log("cosmetics ok — follower, skins and the skin worn load, save and refuse what they must");
+}
+
+/* THE FOLLOWER WALKS ONE STEP BEHIND, read off what the frame actually
+   draws: its sheet arrives (an Image that loads), it is unseen on your tile
+   after a load, then stands on the tile you left - drawn a tile behind the
+   trainer, in the shiny row for a shiny - and it is back in its ball after
+   travel. Every draw is recorded; the follower's are the ones from its sheet. */
+{
+  const OldImage = globalThis.Image;
+  globalThis.Image = class {
+    set src(v) { this.url = v; this.width = 256; this.height = 64; queueMicrotask(() => this.onload?.()); }
+  };
+  const e = boot({ ...SAVE, box: [{ uid: 1, species: 25, level: 5, shiny: 1, at: 1 }], nextUid: 2, buddy: 1 }).e;
+  tick(16);                                        // the first frame asks for the sheet
+  await new Promise((r) => setTimeout(r, 0));      // and it arrives
+  // A still scene is not redrawn, so each look asks for one (a rev bump).
+  const frame = () => {
+    e.setBuddy(1);
+    calls = [];
+    tick(16);
+    const out = calls;
+    calls = null;
+    const fol = out.filter(([k, img]) => k === "drawImage" && /follow\/25\.png$/.test(img?.url ?? ""));
+    const me = out.find(([k]) => k === "ellipse");   // the stand-in trainer's shadow: ellipse(px + 16, py + 29)
+    return { fol, me };
+  };
+  const settle = () => { for (let i = 0; i < 40; i++) tick(16); };
+  settle();
+  assert.equal(frame().fol.length, 0, "the follower was drawn on the trainer's own tile after a load");
+  // One step that arrives, with every encounter roll missed; two the same way.
+  const real = Math.random;
+  Math.random = () => 0.999;
+  const step = (d) => {
+    const n = e.state.steps;
+    e.press(d);
+    for (let i = 0; i < 30 && e.state.steps === n; i++) tick(16);
+    e.clearHeld();
+    settle();
+    return e.state.steps > n;
+  };
+  let walked = null;
+  try {
+    for (const d of ["right", "left", "down", "up"]) if (step(d) && step(d)) { walked = d; break; }
+  } finally { Math.random = real; }
+  assert.ok(walked && !e.state.encounter, "the trainer could not take two steps one way from the spawn");
+  const { fol, me } = frame();
+  assert.equal(fol.length, 1, "the follower was not drawn behind the trainer after two steps");
+  const [, , sx, sy, sw, , dx, dy, dw] = fol[0];
+  const [ddx, ddy] = { right: [-1, 0], left: [1, 0], down: [0, -1], up: [0, 1] }[walked];
+  const px = me[1] - 16, py = me[2] - 29;
+  assert.equal(dx - (32 - dw) / 2, px + ddx * 32, "the follower is not one tile behind the trainer");
+  assert.equal(dy - (32 - dw), py + ddy * 32, "the follower is not one tile behind the trainer");
+  assert.equal(sy, 32, "a shiny follower was drawn from the normal palette's row");
+  assert.equal(dw, 64, "a 32px follower frame was not drawn at the trainer's scale");
+  assert.equal(sx % sw, 0);
+  e.travel("meadow");
+  settle();
+  assert.equal(frame().fol.length, 0, "the follower was left standing after a warp");
+  globalThis.Image = OldImage;
+  console.log(`follower ok — unseen after a load, one tile behind after two steps ${walked}, shiny row for a shiny, back in its ball after a warp`);
+}
 
 /* BUYING AND OPENING, through the real engine: a pack costs exactly its
    price, a refused buy changes nothing, an open is saved before any scene
