@@ -8,7 +8,8 @@ battle.
 ## Followers
 
 - **The walking party (2026-10-07): up to three.** `state.party` holds up to
-  `PARTY_MAX` Box uids, added and removed from the Box preview (`setParty`);
+  `PARTY_MAX` Box uids, added from the Dex sheet (its best Box entry: rarest tier, alpha, highest level) or the
+  strip's + and edit buttons, which open `PartyPick` (`setParty`);
   `state.buddy` is the one walking, always one of them. The strip on the map
   (`Party.jsx`, beside the quest) switches with a tap - tapping the one
   walking puts it in its ball - and Q cycles. A switch is `stepped()` (a big

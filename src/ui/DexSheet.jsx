@@ -239,7 +239,7 @@ export default function DexSheet({
   starred = false, ordinary = 0, onStar = () => {},
   level = 1, here = null, busy = false,
   onClose, onFindInBox, onFindOnBoard = null, onTravel, onSelect = null, dexOf = () => 0,
-  cards = {}, onCards = null,
+  cards = {}, onCards = null, walk = null, onWalk = null,
 }) {
   const sp = speciesById(id);
   const caught = state === 2;
@@ -597,6 +597,14 @@ export default function DexSheet({
             <button className="sheet-inbox" onClick={() => onFindOnBoard(id)}
               data-tip={`Friends' Trade Board listings with ${label(sp)}`}>
               ON THE BOARD
+            </button>
+          )}
+          {/* The walking party: up to three, one at your heels (docs/cosmetics.md). */}
+          {walk && onWalk && (
+            <button className={`sheet-inbox${walk.member != null ? " on" : ""}`} onClick={onWalk}
+              data-tip={walk.member != null ? `Take ${label(sp)} out of your walking party`
+                : walk.full ? "Your walking party is full - choose who to swap out" : `${label(sp)} walks with you - switch on the map or with Q`}>
+              {walk.member != null ? "IN PARTY · REMOVE" : walk.full ? "PARTY FULL · EDIT" : "WALK WITH ME"}
             </button>
           )}
           <button className="sheet-close" onClick={onClose}>CLOSE</button>

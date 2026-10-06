@@ -736,7 +736,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Cosmetics are designed in docs/cosmetics.md** - a look, never a
   strength: no rule module imports `game/cosmetics.js` or `data/follow.js`
   (asserted). **The walking party** (`state.party`, up to `PARTY_MAX` 3 Box
-  uids, `setParty` from the Box preview; `state.buddy` the one walking, one of
+  uids, `setParty` from the Dex sheet or the strip's +/edit (`PartyPick.jsx`,
+  lazy, the trade Picker); `state.buddy` the one walking, one of
   them, `setBuddy`/`cycleBuddy` from the strip on the map or Q) - a switch is
   `stepped()`, never `changed()`, and grows the next out of a flash
   (`SWAP_MS`, which holds the redraw open). **The follower** takes the tile you just left
