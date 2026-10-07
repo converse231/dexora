@@ -23,24 +23,30 @@ import { CARD_SETS } from "../data/cards/index.js";
    a Pikachu in every pack (not a hit), and its Mew ex and Mewtwo ex - the
    set's top chase, where an era's Hyper or Mega Hyper Rare would be. No save
    or server row stores a rung, so a new one is inserted where it ranks. */
-export const CARD_RARITIES = ["common", "uncommon", "rare", "pikachu", "double", "ace", "illustration", "ultra", "special", "futuristic", "hyper", "mega"];
+/* `holo` is Base Set's holo rare (2026-10-07): its hit, so the hit line
+   starts there (`isHit`) - no other set prints the rung. `blackwhite` is
+   Black Bolt's and White Flare's top chase, under `hyper` so their top roll
+   lands on it. */
+export const CARD_RARITIES = ["common", "uncommon", "rare", "pikachu", "holo", "double", "ace", "illustration", "ultra", "special", "futuristic", "blackwhite", "hyper", "mega"];
 export const RARITY = {
   common:       { name: "Common", icon: "●" },
   uncommon:     { name: "Uncommon", icon: "◆" },
   rare:         { name: "Rare", icon: "★" },
   pikachu:      { name: "Pikachu Rare", icon: "★" },
+  holo:         { name: "Holo Rare", icon: "★" },
   double:       { name: "Double rare", icon: "★★" },
   ace:          { name: "ACE SPEC Rare", icon: "◆" },
   illustration: { name: "Illustration rare", icon: "★" },
   ultra:        { name: "Ultra Rare", icon: "★★" },
   special:      { name: "Special illustration rare", icon: "★★" },
   futuristic:   { name: "Futuristic Rare", icon: "✦" },
+  blackwhite:   { name: "Black White Rare", icon: "✦" },
   hyper:        { name: "Hyper rare", icon: "✦" },
   mega:         { name: "Mega Hyper Rare", icon: "✦" },
 };
 export const rungOf = (rarity) => CARD_RARITIES.indexOf(rarity);
-// A HIT is a Double rare or better - what the `hit` pity counts.
-export const isHit = (rarity) => rungOf(rarity) >= rungOf("double");
+// A HIT is a Holo Rare (Base Set's) or a Double rare or better - what the `hit` pity counts.
+export const isHit = (rarity) => rungOf(rarity) >= rungOf("holo");
 // The chase: a Special illustration rare and the top rung (a Futuristic, Hyper or Mega Hyper Rare).
 export const isTop = (rarity) => rungOf(rarity) >= rungOf("futuristic");
 /* WHAT A ROLL GIVES IN THIS SET: the first rung at or below `rarity` that
@@ -87,7 +93,20 @@ export function landsOn(cards, rarity) {
    - sv08 Surging Sparks (community aggregate, cardcodex / tcgtalk): DR 16.9%,
      IR 7.7%, ACE SPEC 5.0%, UR 6.8%, SIR 1.15%, HR 0.53%. It prints both
      Illustration rares and ACE SPECs, so the ACE SPEC has its own roll
-     (`ace`, optional: a set whose row names it). */
+     (`ace`, optional: a set whose row names it).
+   - sv09 Journey Together (TCGplayer): DR 1 in 5, IR 1 in 9, SIR 1 in 83, HR
+     1 in 956 for a given one (three printed: 1 in ~319); its Ultra Rares are
+     not in that report, so a 500-pack community log stands (full-art
+     Pokemon 1 in 35 + trainers 1 in 63).
+   - sv10 Destined Rivals (TCGplayer, 8,000+ packs): DR 1 in 5, IR 1 in 12,
+     UR 1 in 16, SIR 1 in 94, HR 1 in 149.
+   - sv10.5b/w Black Bolt and White Flare (one report, both sets): DR
+     21.11%, IR 16.39%, UR 5.83%, SIR 1.25%; the Black White Rare unpulled
+     in 700 packs, community estimate 1 in 360-450 (1 in 400 here). Their
+     Poke Ball and Master Ball reverses are not separate printings here.
+   - base1 Base Set 1st Edition (1999): one rare a pack, a holo one pack in
+     three - the double roll, which lands on `holo`. Nothing else is printed:
+     every other roll is 0. */
 export const SET_RATES = {
   me01: { double: 0.2091, illustration: 0.1089, ultra: 0.0823, special: 0.0099, mega: 0.0008 },
   me02: { double: 0.2077, illustration: 0.1097, ultra: 0.0806, special: 0.0125, mega: 0.0008 },
@@ -99,6 +118,11 @@ export const SET_RATES = {
   me05: { double: 0.2102, illustration: 0.1101, ultra: 0.0830, special: 0.0125, mega: 0.0009 },
   "30th": { double: 0.25, illustration: 0.19, ultra: 0, special: 0.051, mega: 0.009 },
   sv08: { double: 0.169, illustration: 0.077, ace: 0.05, ultra: 0.068, special: 0.0115, mega: 0.0053 },
+  sv09: { double: 1 / 5, illustration: 1 / 9, ultra: 1 / 35 + 1 / 63, special: 1 / 83, mega: 3 / 956 },
+  sv10: { double: 1 / 5, illustration: 1 / 12, ultra: 1 / 16, special: 1 / 94, mega: 1 / 149 },
+  "sv10.5b": { double: 0.2111, illustration: 0.1639, ultra: 0.0583, special: 0.0125, mega: 1 / 400 },
+  "sv10.5w": { double: 0.2111, illustration: 0.1639, ultra: 0.0583, special: 0.0125, mega: 1 / 400 },
+  base1: { double: 1 / 3, illustration: 0, ultra: 0, special: 0, mega: 0 },
 };
 // A pack holding a hit (a Double rare or better), at a set's rates.
 export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration - (r.ace ?? 0)) * (1 - r.double - r.ultra);
@@ -130,7 +154,7 @@ export const GOD_PACK = 1 / 500;
 
 /* WHAT A SPARE COPY IS WORTH IN DUST (docs/cards.md): a foil copy of a common,
    uncommon or rare counts as `foil`. Crafting costs eight times this. */
-export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, pikachu: 40, double: 80, ace: 90, illustration: 100, ultra: 150, special: 300, futuristic: 400, hyper: 400, mega: 400 };
+export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, pikachu: 40, holo: 60, double: 80, ace: 90, illustration: 100, ultra: 150, special: 300, futuristic: 400, blackwhite: 400, hyper: 400, mega: 400 };
 export const dustOf = (rarity, variant) =>
   (rungOf(rarity) <= rungOf("rare") && variant !== "n" ? DUST.foil : DUST[rarity]);
 /* A CRAFT COSTS SIXTEEN SPARES' WORTH. Measured over 40 seeded collectors
@@ -199,13 +223,20 @@ export const BOXES = {
   // A celebration set, sold in bundles rather than boxes.
   "30th": { name: "Booster bundle", packs: 6, price: 21600 },
   sv08: { name: "Booster box", packs: 36, price: 120000 },
+  sv09: { name: "Booster box", packs: 36, price: 120000 },
+  sv10: { name: "Booster box", packs: 36, price: 120000 },
+  // Black Bolt and White Flare were never sold in booster boxes.
+  "sv10.5b": { name: "Booster bundle", packs: 6, price: 21600 },
+  "sv10.5w": { name: "Booster bundle", packs: 6, price: 21600 },
+  base1: { name: "Booster box", packs: 36, price: 120000 },
 };
 // Every 7th day of a daily-quest streak pays a pack.
 export const STREAK_PACK = 7;
 export const PACK_SIZE = 10;
 export const CARD_MAX = 99;
 // The level each set opens at (docs/cards.md, Economy).
-export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45, "sv03.5": 50, me05: 55, "sv08.5": 60, sv08: 65, "30th": 70 };
+export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45, "sv03.5": 50, me05: 55, "sv08.5": 60, sv08: 65, "30th": 70,
+  sv09: 75, sv10: 80, "sv10.5b": 85, "sv10.5w": 85, base1: 90 };
 
 export const setById = (id) => CARD_SETS.find((s) => s.id === id) ?? null;
 export const setOpen = (id, level) => !!setById(id) && level >= (SET_LEVEL[id] ?? Infinity);
@@ -254,7 +285,8 @@ export function openPack(cards, rng, pity = freshPity(), rules) {
     return row ? { localId: row[0], rarity: row[3], variant: "r" } : of("common", "n");
   };
 
-  if (rng() < GOD_PACK) {
+  // No God Pack where nothing prints a reverse holo (Base Set): it would be seven commons.
+  if (reversible.length && rng() < GOD_PACK) {
     const pulls = Array.from({ length: 7 }, reverse);
     const tail = [of("illustration", "h"), of("illustration", "h"), of(rng() < 1 / 3 ? "special" : "illustration", "h")];
     return { pulls: [...pulls, ...sortTail(tail)].filter(Boolean), pity: { ...pity }, god: true };
@@ -291,7 +323,7 @@ export function openPack(cards, rng, pity = freshPity(), rules) {
   const pulls = [...base, ...sortTail([slot2, rareSlot])];
   const best = Math.max(...pulls.map((p) => rungOf(p.rarity)));
   const next = {
-    hit: best >= rungOf("double") ? 0 : pity.hit + 1,
+    hit: isHit(CARD_RARITIES[best]) ? 0 : pity.hit + 1,
     special: best >= rungOf("special") ? 0 : pity.special + 1,
     mega: isTop(CARD_RARITIES[best]) ? 0 : pity.mega + 1,
   };

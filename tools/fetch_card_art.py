@@ -43,12 +43,23 @@ WRAPPERS = {
     "30th": ["30th Celebration Booster.png"],
     "sv08": ["SV8 Booster Pikachu.png", "SV8 Booster Latias.png", "SV8 Booster Archaludon.png",
              "SV8 Booster Alolan Exeggutor.png"],
+    "sv09": ["SV9 Booster Hop Zacian.png", "SV9 Booster Lillie Clefairy.png", "SV9 Booster N Zoroark.png",
+             "SV9 Booster Iono Bellibolt.png"],
+    "sv10": ["SV10 Booster Team Rocket.png", "SV10 Booster Cynthia Garchomp.png",
+             "SV10 Booster Giovanni Mewtwo.png", "SV10 Booster Ethan Ho-Oh.png"],
+    "sv10.5b": ["SV10.5 BLK Booster EN.png"],
+    "sv10.5w": ["SV10.5 WHT Booster EN.png"],
+    # The 1999 wrappers (Bulbagarden's "Shadowless" scans: the first print run).
+    "base1": ["Base Set Booster Charizard Shadowless.jpg", "Base Set Booster Blastoise Shadowless.jpg",
+              "Base Set Booster Venusaur Shadowless.jpg"],
 }
 # A set TCGdex has no logo for gets one from here (fetch-cards leaves it out).
 LOGOS = {"30th": "30th Anniversary logo.png"}
 LOGO_W = 400
 PACK_W = 300          # shown at most ~230px wide, twice that on a dense screen is wasted here
 BACK_W = 490
+CARD_MAX = 40 * 1024     # check.mjs's ceiling on a card image
+CARD_W = 245          # TCGdex's `low` card width, what every other card ships at
 
 
 def get(url):
@@ -83,6 +94,18 @@ def main():
     print("back.webp", save(original(BACK), BACK_W, os.path.join(ROOT, "public", "cards", "back.webp")), "bytes")
     art = {}
     for s in shipped:
+        # A card fetch-cards could only get as a png: the webp the rest are, at their size.
+        folder = os.path.join(ROOT, "public", "cards", s["id"])
+        for f in [f for f in os.listdir(folder) if f.endswith(".png")]:
+            png = os.path.join(folder, f)
+            print(s["id"], f, "->", save(Image.open(png), CARD_W, png[:-4] + ".webp"), "bytes")
+            os.remove(png)
+        # A card over check.mjs's 40KB (Black Bolt's Seismitoad, 2026-10-07) is re-encoded smaller.
+        for f in [f for f in os.listdir(folder) if re.fullmatch(r"[\w-]+\.webp", f) and not f.startswith(("pack-", "logo"))]:
+            path = os.path.join(folder, f)
+            if os.path.getsize(path) > CARD_MAX:
+                Image.open(path).convert("RGBA").save(path, "WEBP", quality=70, method=6)
+                print(s["id"], f, "re-encoded", os.path.getsize(path), "bytes")
         names = WRAPPERS.get(s["id"])
         if not names:
             raise SystemExit(f"{s['id']} has no wrapper art listed - add it to WRAPPERS")
