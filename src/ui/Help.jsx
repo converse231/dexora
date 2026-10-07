@@ -212,7 +212,7 @@ export default function Help({ onClose }) {
             </li>
             <li>
               <b>Dust.</b> Spare copies become Card Dust; a missing card crafts for {CRAFT_X} spares&rsquo; worth -
-              except Special illustration rares and Mega Hyper Rares, which come from packs only.
+              up to a Double rare. Illustration rares and everything rarer come from packs only.
               You always keep one of each, and earned copies stay. Owning a quarter, half, three quarters and all
               of a set pays dust too ({MILESTONES.map(([, d]) => d.toLocaleString()).join(" / ")}), and every
               printing of it {MASTER_DUST.toLocaleString()} more.

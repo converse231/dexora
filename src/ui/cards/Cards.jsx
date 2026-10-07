@@ -30,7 +30,7 @@ const POCKETS = 12;            // a page: four across, three down
 /* THE CARD DEX ADDS TILES A PAGE AT A TIME as its end scrolls near (the
    Picker's rule): 188 tiles at once was a 103ms task on a throttled phone. */
 const TILE_PAGE = 48;
-const CHASE = ["mega", "hyper", "futuristic", "special"];
+const CHASE = ["mega", "hyper", "blackwhite", "futuristic", "special"];
 // The best copy a card is held in: a foil over a plain one.
 const bestVariant = (row, card) => ["h", "r", "n"].find((v) => row?.[v] && card[4].includes(v)) ?? card[4][0];
 
@@ -241,7 +241,12 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
    - every Mega Hyper Rare and Special illustration rare, owned or still out
    there, each with its own odds. */
 function PackCard({ meta, set, pity, cards, log, onLook }) {
-  const chase = useMemo(() => (set ? CHASE.flatMap((r) => set.CARDS.filter((c) => c[3] === r)) : []), [set]);
+  // A set with none of those (Base Set) chases its holos.
+  const chase = useMemo(() => {
+    if (!set) return [];
+    const top = CHASE.flatMap((r) => set.CARDS.filter((c) => c[3] === r));
+    return top.length ? top : set.CARDS.filter((c) => c[3] === "holo");
+  }, [set]);
   const count = (r) => set?.CARDS.filter((c) => c[3] === r).length ?? 1;
   const best = useMemo(() => {
     const mine = log.filter(([id]) => id.startsWith(`${meta.id}-`)).map(([id, v]) => [set?.CARDS.find((c) => cardId(meta.id, c[0]) === id), v]).filter(([c]) => c);
@@ -258,11 +263,12 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
   const odds = ["double", "illustration", "ace", "ultra", "special", "mega"].filter((r) => rates[r] > 0).map((r) => [as(r), rates[r]]);
   // The rate a rarity is pulled at here: the roll that lands on it.
   const rateOf = (rarity) => rates[Object.keys(rates).find((k) => as(k) === rarity)] ?? 0;
+  // A meter a set has a roll for: Base Set has only the hit.
   const meters = [
-    ["hit", "A Double rare or better", pity.hit],
+    ["hit", `A ${RARITY[as("double")].name} or better`, pity.hit],
     ["special", "A Special illustration rare", pity.special],
     ["mega", `A ${RARITY[as("mega")].name}`, pity.mega],
-  ];
+  ].filter(([k]) => k === "hit" || rates[k] > 0);
   const got = chase.filter((c) => cards[cardId(meta.id, c[0])]).length;
   return (
     <section className={`ev-card cd-set${best ? "" : " solo"}`}>
@@ -302,7 +308,7 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
           {odds.map(([r, p]) => (
             <li key={r}><RarityMark rarity={r} /><span>{RARITY[r].name}</span><b>1 in {oneIn(p)}</b></li>
           ))}
-          <li className="cd-god"><span>God Pack: all foils, three {RARITY[as("illustration")].name}s or better</span><b>1 in {oneIn(GOD_PACK)}</b></li>
+          {set?.CARDS.some((c) => c[4].includes("r")) && <li className="cd-god"><span>God Pack: all foils, three {RARITY[as("illustration")].name}s or better</span><b>1 in {oneIn(GOD_PACK)}</b></li>}
         </ul>
         <div className="cd-pity">
           {meters.map(([k, name, n]) => {

@@ -35,7 +35,11 @@ const ROOT = new URL("../", import.meta.url);
 const CACHE = new URL(".assets-src/tcgdex/", ROOT);
 const API = "https://api.tcgdex.net/v2/en";
 // Shipped sets, in the order they open (docs/cards.md, Phases).
-const SETS = ["me01", "me02", "me02.5", "sv03.5", "sv08.5", "me03", "me04", "me05", "30th", "sv08"];
+const SETS = ["me01", "me02", "me02.5", "sv03.5", "sv08.5", "me03", "me04", "me05", "30th", "sv08",
+  "sv09", "sv10", "sv10.5b", "sv10.5w", "base1"];
+/* A set shipped under the name its packs carried: TCGdex's Base Set is the
+   1999 print, and the packs here are its 1st Edition (asked for, 2026-10-07). */
+const NAME = { base1: "Base Set 1st Edition" };
 
 const RARITY = {
   "Common": "common", "Uncommon": "uncommon", "Rare": "rare", "Double rare": "double",
@@ -43,7 +47,11 @@ const RARITY = {
   "Special illustration rare": "special", "Mega Hyper Rare": "mega",
   "Hyper rare": "hyper", "ACE SPEC Rare": "ace",
   "Pikachu Rare": "pikachu", "Futuristic Rare": "futuristic",
+  "Black White Rare": "blackwhite",
 };
+/* BASE SET PRINTS ITS HOLOS AS "Rare" with only a holo variant; they are the
+   set's hit, one pack in three, so they are their own rung (`holo`). */
+const rarityOf = (c, set) => (set === "base1" && c.rarity === "Rare" && c.variants?.holo ? "holo" : RARITY[c.rarity]);
 const CATEGORY = { Pokemon: "P", Trainer: "T", Energy: "E" };
 
 mkdirSync(CACHE, { recursive: true });
@@ -111,10 +119,12 @@ function speciesOf(card) {
   return ids;
 }
 
-function variantsOf(card, rarity) {
+function variantsOf(card, rarity, set) {
   const v = card.variants ?? {};
   if (rarity === "common" || rarity === "uncommon") return "n" + (v.reverse ? "r" : "");
-  if (rarity === "rare") return "h" + (v.reverse ? "r" : "");
+  // A rare printed without a holo (Base Set's) is a plain card.
+  // Not 30th Celebration's, which TCGdex prints the same way: saves hold those as "h".
+  if (rarity === "rare") return (set === "base1" && v.holo === false && v.normal ? "n" : "h") + (v.reverse ? "r" : "");
   return "h";
 }
 
@@ -123,11 +133,11 @@ for (const id of SETS) {
   const set = await cached(`set-${id}`, `${API}/sets/${id}`);
   const cards = await pool(set.cards, 4, (c) => cached(`card-${c.id}`, `${API}/cards/${c.id}`));
   const rows = cards.map((c) => {
-    const rarity = RARITY[c.rarity];
+    const rarity = rarityOf(c, id);
     if (!rarity) throw new Error(`${c.id}: unknown rarity "${c.rarity}" - add it to CARD_RARITIES first`);
     const cat = CATEGORY[c.category];
     if (!cat) throw new Error(`${c.id}: unknown category "${c.category}"`);
-    return [c.localId, c.name, cat, rarity, variantsOf(c, rarity), speciesOf(c), c.illustrator ?? ""];
+    return [c.localId, c.name, cat, rarity, variantsOf(c, rarity, id), speciesOf(c), c.illustrator ?? ""];
   });
 
   const dir = new URL(`public/cards/${id}/`, ROOT);
@@ -136,7 +146,11 @@ for (const id of SETS) {
   await pool(cards, 4, async (c) => {
     const file = new URL(`${c.localId}.webp`, dir);
     if (existsSync(file)) return;
-    writeFileSync(file, await get(`${c.image}/low.webp`, true));
+    /* A webp TCGdex never made (Destined Rivals' Arcanine, 2026-10-07): its
+       png lands beside it and fetch_card_art.py converts it. */
+    const webp = await get(`${c.image}/low.webp`, true).catch(() => null);
+    if (webp) writeFileSync(file, webp);
+    else writeFileSync(new URL(`${c.localId}.png`, dir), await get(`${c.image}/low.png`, true));
     fetched++;
   });
   const logo = new URL("logo.webp", dir);
@@ -149,10 +163,10 @@ for (const id of SETS) {
   mkdirSync(new URL("src/data/cards/sets/", ROOT), { recursive: true });
   writeFileSync(new URL(`src/data/cards/sets/${id}.js`, ROOT),
     head + `export const SET = ${JSON.stringify({
-      id, name: set.name, released: set.releaseDate, asset,
+      id, name: NAME[id] ?? set.name, released: set.releaseDate, asset,
       official: set.cardCount.official, total: set.cardCount.total,
     })};\r\nexport const CARDS = [\r\n${rows.map((r) => JSON.stringify(r)).join(",\r\n")},\r\n];\r\n`);
-  index.push({ id, name: set.name, released: set.releaseDate, total: rows.length });
+  index.push({ id, name: NAME[id] ?? set.name, released: set.releaseDate, total: rows.length });
   console.log(`${id} ${set.name}: ${rows.length} cards, ${fetched} images fetched`);
 }
 

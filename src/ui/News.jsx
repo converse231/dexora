@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-07-packs",
+    icon: "🃏",
+    date: "October 2026",
+    title: "Five new packs",
+    items: [
+      ["New sets", "Journey Together, Destined Rivals, Black Bolt, White Flare and Base Set 1st Edition."],
+      ["Real pull rates", "Each opens at its real odds: a holo in one Base Set pack in three, a Black White Rare about 1 in 400."],
+      ["Open as you level", "They join the Card Shop from Lv 75 to Lv 90."],
+    ],
+  },
+  {
     id: "2026-10-07-inside",
     icon: "🏠",
     date: "October 2026",

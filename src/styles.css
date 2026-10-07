@@ -9006,7 +9006,8 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-card > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .cd-foil { position: absolute; inset: 0; display: none; pointer-events: none; overflow: hidden; mix-blend-mode: color-dodge; }
 .cd-card.v-r .cd-foil, .cd-card.r-rare.v-h .cd-foil, .cd-card.r-double .cd-foil, .cd-card.r-ace .cd-foil, .cd-card.r-ultra .cd-foil,
-.cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil, .cd-card.r-hyper .cd-foil, .cd-card.r-mega .cd-foil { display: block; }
+.cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil, .cd-card.r-hyper .cd-foil, .cd-card.r-mega .cd-foil,
+.cd-card.r-holo .cd-foil, .cd-card.r-futuristic .cd-foil, .cd-card.r-blackwhite .cd-foil { display: block; }
 /* At rest a foil is a faint rainbow; the band sweeps over it when shown. */
 .cd-foil {
   background: linear-gradient(125deg, rgba(255, 110, 190, .16), rgba(110, 220, 255, .2) 35%, rgba(255, 236, 130, .16) 65%, rgba(170, 120, 255, .18));
@@ -9021,6 +9022,8 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   mask: linear-gradient(#000 0 0) 0 0 / 100% 100% no-repeat exclude, linear-gradient(#000 0 0) 42.6% 15.5% / 84.5% 38% no-repeat;
 }
 .cd-card.r-rare.v-h .cd-foil { inset: 9.6% 8.9% 52.4% 6.6%; }
+/* A 1999 holo shines in its art window, which sits a little lower and narrower on the old frame. */
+.cd-card.r-holo .cd-foil { inset: 11% 10% 50% 10%; }
 .cd-card.r-ultra .cd-foil { background: repeating-linear-gradient(115deg, rgba(230, 240, 255, .14) 0 2px, transparent 2px 6px), linear-gradient(125deg, rgba(220, 235, 255, .2), rgba(255, 255, 255, .06)); }
 /* No dot texture (asked for, 2026-10-07): a 6px grid of dots over the art
    read as blur. The sheen alone. */
@@ -9028,13 +9031,13 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   background: linear-gradient(125deg, rgba(255, 110, 190, .14), rgba(110, 220, 255, .16) 50%, rgba(255, 236, 130, .14));
 }
 /* A Mega Hyper Rare is printed in gold already: a light hand, or its etching washes out. */
-.cd-card.r-hyper .cd-foil, .cd-card.r-mega .cd-foil, .cd-card.r-futuristic .cd-foil { background: linear-gradient(125deg, rgba(255, 230, 150, .12), rgba(255, 255, 255, .05) 50%, rgba(255, 220, 120, .12)); }
+.cd-card.r-hyper .cd-foil, .cd-card.r-mega .cd-foil, .cd-card.r-futuristic .cd-foil, .cd-card.r-blackwhite .cd-foil { background: linear-gradient(125deg, rgba(255, 230, 150, .12), rgba(255, 255, 255, .05) 50%, rgba(255, 220, 120, .12)); }
 .cd-foil::after {
   content: ""; position: absolute; top: -10%; bottom: -10%; left: -70%; width: 60%; opacity: 0;
   background: linear-gradient(100deg, transparent, rgba(255, 120, 200, .55), rgba(120, 220, 255, .65), rgba(255, 240, 140, .55), transparent);
 }
 .cd-card.r-ultra .cd-foil::after { background: linear-gradient(100deg, transparent, rgba(235, 245, 255, .8), transparent); }
-.cd-card.r-special .cd-foil::after, .cd-card.r-hyper .cd-foil::after, .cd-card.r-mega .cd-foil::after, .cd-card.r-futuristic .cd-foil::after { background: linear-gradient(100deg, transparent, rgba(255, 220, 120, .8), rgba(255, 255, 255, .7), transparent); }
+.cd-card.r-special .cd-foil::after, .cd-card.r-hyper .cd-foil::after, .cd-card.r-mega .cd-foil::after, .cd-card.r-futuristic .cd-foil::after, .cd-card.r-blackwhite .cd-foil::after { background: linear-gradient(100deg, transparent, rgba(255, 220, 120, .8), rgba(255, 255, 255, .7), transparent); }
 .cd-card:not(.still):not(.live) .cd-foil::after { animation: cd-sweep 2.6s ease-in-out .3s infinite; }
 @keyframes cd-sweep { 0% { opacity: 1; transform: translateX(0); } 55%, 100% { opacity: 1; transform: translateX(400%); } }
 /* Under the pointer (the card view): the band and a glare follow it, the card tilts. */
@@ -9049,7 +9052,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-card.missing .cd-foil, .cd-chase-card:not(.got) .cd-foil, .cd-tile:not(.got) .cd-foil { display: none; }
 .cd-rar { font-style: normal; font-size: 12px; min-width: 20px; text-align: center; color: var(--ink-faint); }
 .cd-rar.r-double, .cd-rar.r-ace, .cd-rar.r-ultra { color: var(--ink); }
-.cd-rar.r-illustration, .cd-rar.r-special, .cd-rar.r-hyper, .cd-rar.r-mega { color: var(--gold); }
+.cd-rar.r-illustration, .cd-rar.r-special, .cd-rar.r-hyper, .cd-rar.r-mega, .cd-rar.r-blackwhite { color: var(--gold); }
 .cd-stamp {
   position: absolute; left: 5px; bottom: 5px; width: 15px; height: 15px; border-radius: 50%; z-index: 2;
   background: linear-gradient(#e33 0 45%, #222 45% 55%, #fff 55%); box-shadow: 0 0 0 1.5px #222;
@@ -9342,7 +9345,7 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .cd-pips i.seen { background: rgba(255, 255, 255, .55); border-color: transparent; }
 .cd-pips i.seen.r-rare { background: #e8eeff; }
 .cd-pips i.r-double { --pc: #ffcb3d; } .cd-pips i.r-ultra { --pc: #cfe0ff; } .cd-pips i.r-illustration { --pc: #33e0c4; }
-.cd-pips i.r-special { --pc: #ff4fbf; } .cd-pips i.r-mega, .cd-pips i.r-hyper { --pc: #ffd24a; }
+.cd-pips i.r-special { --pc: #ff4fbf; } .cd-pips i.r-mega, .cd-pips i.r-hyper, .cd-pips i.r-blackwhite { --pc: #ffd24a; }
 .cd-pips i.r-ace { --pc: #ff6fae; }
 .cd-pips i.seen[class*="r-"]:not(.r-common):not(.r-uncommon):not(.r-rare) { background: var(--pc); box-shadow: 0 0 8px var(--pc); }
 .cd-pips i.tell { border-color: var(--pc); box-shadow: 0 0 10px var(--pc); animation: cd-glow 1s ease-in-out infinite; }

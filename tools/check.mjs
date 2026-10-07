@@ -7439,12 +7439,14 @@ import { statSync } from "node:fs";
     for (const [r, rate] of Object.entries(CD.SET_RATES[meta.id])) {
       if (!rate) continue;               // a roll the set does not have (30th Celebration's ultra)
       const as = CD.landsOn(CARDS, r);
-      assert.ok(CD.rungOf(as) >= CD.rungOf("double"), `${meta.id}: the ${r} roll lands on ${as}, not a hit`);
+      assert.ok(CD.isHit(as), `${meta.id}: the ${r} roll lands on ${as}, not a hit`);
       const got = (flat.hits[as] ?? 0) / N;
       const room = Math.max(0.15 * rate, 4 * Math.sqrt(rate * (1 - rate) / N));
       assert.ok(Math.abs(got - rate) <= room, `${meta.id}: ${r} (${as}) came 1 in ${(1 / got).toFixed(1)}, not 1 in ${(1 / rate).toFixed(1)}`);
     }
-    assert.ok(Math.abs(flat.god / N - CD.GOD_PACK) <= 0.3 * CD.GOD_PACK, `${meta.id}: God Packs came ${flat.god} in ${N}`);
+    // A set printing no reverse holo (Base Set) has no God Pack.
+    const godRate = CARDS.some((c) => c[4].includes("r")) ? CD.GOD_PACK : 0;
+    assert.ok(Math.abs(flat.god / N - godRate) <= 0.3 * CD.GOD_PACK, `${meta.id}: God Packs came ${flat.god} in ${N}`);
     const run = count(true);
     for (const [k, v] of Object.entries(rules.pity)) {
       assert.ok(run.dry[k] < v.hard, `${meta.id}: ${run.dry[k]} packs ran dry of ${k} - its guarantee is ${v.hard}`);
