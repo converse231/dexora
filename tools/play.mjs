@@ -3087,31 +3087,42 @@ console.log("purchases ok — whole numbers only, NaN refused");
   assert.equal(e.state.areaId, "woods", "the Mansion's front door did not lead back to Monsoon Trail");
   assert.deepEqual([e.state.player.x, e.state.player.y], [home[3], home[4]], "the way back is not the paired tile");
 
-  /* MT MOON'S EXIT LADDER CLIMBS OUT TO THE POWER PLANT (reported from play
-     as a ladder that did nothing): stepped on, as a ladder is, and back
-     through the Power Plant's front door, walked into, as a door is. */
+  /* MT MOON'S EXIT LADDER CLIMBS OUT AT THE MOUTH, and the Power Plant's
+     front door is a doormat: the two were a pair, and walking out of the
+     Power Plant came out on a cave ladder (reported 2026-10-07). */
   {
-    const [mx, my, mto, max_, may] = AREAS.ridge.doors[0];
-    const [px, py, pto, rax, ray] = AREAS.power.doors[0];
-    assert.deepEqual([mto, pto], ["power", "ridge"], "Mt Moon's exit and the Power Plant's door are not a pair");
-    // LEVEL_XP[k] is the XP that reaches level k + 1.
-    const at = (areaId, x, y, lv = 20) => boot({ ...SAVE, areaId, xp: LEVEL_XP[lv - 1], paid: lv, player: { x, y, dir: "up" },
-      field: { repel: { id: "max-repel", steps: 9999 } } }).e;
-    const m = at("ridge", rax, ray);
-    // From the arrival tile beside it, the one step onto the ladder.
-    const toLadder = { "0,-1": "up", "0,1": "down", "-1,0": "left", "1,0": "right" }[`${mx - rax},${my - ray}`];
-    assert.ok(toLadder, "Mt Moon's arrival tile is not beside its exit ladder");
-    walk(m, toLadder);
-    assert.equal(m.state.areaId, "power", "Mt Moon's exit ladder did not reach the Power Plant");
-    assert.deepEqual([m.state.player.x, m.state.player.y], [max_, may], "the Power Plant arrival is not inside its door");
-    walk(m, "down");
-    assert.equal(m.state.areaId, "ridge", "walking out of the Power Plant's front door did not reach Mt Moon");
-    assert.deepEqual([m.state.player.x, m.state.player.y], [rax, ray], "the way back is not beside the exit ladder");
-    // Below the Power Plant's level the ladder stays shut, and says why.
-    const shut = at("ridge", rax, ray, BIOMES.find((b) => b.id === "power").level - 1);
-    walk(shut, toLadder);
-    assert.equal(shut.state.areaId, "ridge", "Mt Moon's exit opened onto a map the level has not reached");
-    assert.ok(shut.state.worn.some((w) => w.id === "door"), "Mt Moon's shut exit said nothing");
+    assert.ok(!AREAS.power.doors && !AREAS.ridge.doors, "the Power Plant and Mt Moon are a door pair again");
+    const out = AREAS.ridge.warps.find((w) => w[4] === 1);
+    assert.ok(out, "Mt Moon's exit ladder leads nowhere");
+    assert.deepEqual([out[2], out[3]], [AREAS.ridge.spawn.x, AREAS.ridge.spawn.y], "Mt Moon's exit ladder does not come out at the mouth");
+  }
+
+  /* THE ROOMS BEHIND THE DOORS (attach_inside): in through a route's door,
+     no encounter however long you walk indoors, and out the way you came. */
+  {
+    const inside = Object.keys(AREAS).filter((id) => AREAS[id].rooms?.some((r) => r[4] === 1));
+    assert.ok(inside.length >= 4, `only ${inside.length} map(s) have rooms behind their doors`);
+    const [rx, ry, rw, rh] = AREAS.desert.rooms.find((r) => r[4] === 1);
+    const [dx, dy, mx, my] = AREAS.desert.warps.find((w) => w[2] >= rx && w[2] < rx + rw && w[3] >= ry && w[3] < ry + rh && !w[4]);
+    const e = boot({ ...SAVE, areaId: "desert", xp: LEVEL_XP[29], paid: 30, player: { x: dx, y: dy + 1, dir: "up" } }).e;
+    assert.ok(walk(e, "up"), "walking into a Mirage Desert house went nowhere");
+    assert.deepEqual([e.state.player.x, e.state.player.y], [mx, my], "the door did not come out on its mat");
+    const real = Math.random;
+    try {
+      Math.random = () => 0;                     // every step would meet something outdoors
+      let met = false;
+      for (const d of ["up", "up", "down"]) {
+        e.press(d);
+        for (let i = 0; i < 40; i++) { tick(16); met ||= !!e.state.encounter; }
+        e.clearHeld();
+        for (let i = 0; i < 20; i++) tick(16);
+      }
+      assert.ok(!met, "something jumped out indoors");
+    } finally { Math.random = real; }
+    assert.deepEqual([e.state.player.x, e.state.player.y], [mx, my - 1], "the walk indoors did not come back above the mat");
+    // Down onto the mat points into the wall below it: that is the way out.
+    walk(e, "down");
+    assert.deepEqual([e.state.player.x, e.state.player.y], [dx, dy], "walking out of the house did not come out at its door");
   }
 
   // Below the Mansion's level the door stays shut, and says why.
@@ -3541,8 +3552,12 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
       for (let i = 0; i < 40; i++) tick(16);
       e.clearHeld();
       for (let i = 0; i < 20; i++) tick(16);
-      assert.deepEqual([e.state.player.x, e.state.player.y], [bx, by],
-        `${areaId}: stepping onto the landing at ${[bx, by]} took you somewhere - an invisible hole`);
+      // A landing that is itself another warp's end is a DOOR, by design: a
+      // room's second mat cell walks out of the same door (attach_inside).
+      if (!area.warps.some((w) => !w[4] && ((w[0] === bx && w[1] === by) || (w[2] === bx && w[3] === by)))) {
+        assert.deepEqual([e.state.player.x, e.state.player.y], [bx, by],
+          `${areaId}: stepping onto the landing at ${[bx, by]} took you somewhere - an invisible hole`);
+      }
     }
     const ways = oneWay ? [[[ax, ay], [bx, by]]] : [[[ax, ay], [bx, by]], [[bx, by], [ax, ay]]];
     dirs += ways.length;

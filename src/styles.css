@@ -9098,7 +9098,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-open-btn { animation: cd-call 1.8s ease-in-out infinite; }
 @keyframes cd-call { 50% { scale: 1.04; } }
 .cd-lock { font-size: 13px; color: var(--ink-faint); }
-.cd-chase { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 12px; min-width: 0; }
+.cd-chase { min-width: 0; margin: 10px 0 14px; }
 .cd-chase-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .cd-chase-head h5, .cd-wall h5 { margin: 0; font: 700 15px var(--display); color: var(--ink); }
 .cd-chase-head span { font-size: 12px; color: var(--ink-faint); }

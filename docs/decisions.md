@@ -4386,6 +4386,31 @@ that ships and it therefore says nothing — that is the point. A badge that
 arrives the same day as the thing it distinguishes reads as a label; one that was
 always there reads as information.
 
+## Rooms behind the doors (2026-10-07)
+
+Reported: houses and small caves on the maps were walls, and the Power
+Plant's entrance came out on Mt Moon's ladder. Done:
+
+- **Eight rooms**, each the real Emerald layout its route's door leads to:
+  the Trick House entrance (Route 110), the Winstrates' house, the rest stop,
+  the Desert Ruins and Mirage Tower 1F (Route 111), the Route 119 house, the
+  Ancient Tomb (Route 120). They live on a shelf under the route on the same
+  grid, joined by warp pairs, like the gatehouses and Mt Moon's floors, so
+  `rooms` keeps the camera in one and the follower, saves and checks work
+  unchanged. Separate areas were the other way, and every area is a spawn
+  table, a Travel row and road trainers.
+- **No encounters indoors**: a fifth element on the room. Encounters roll on
+  every step of every tile, so without it a living room spawned Sandshrew.
+- **Art**: GenericBuilding (on Emerald's Building primary), Emerald's Cave
+  and Mirage Tower, baked only up to the last metatile used: +752px of atlas
+  and ~110KB, where the whole sets were ~1,600 metatiles.
+- **Left shut**: New Mauville's and Trainer Hill's lobbies (another ~800
+  metatiles for two rooms leading nowhere), the Scorched Slab (its door is
+  surfed up to, and every warp needs a walkable neighbour), and every door
+  further in.
+- **Power Plant <-> Mt Moon unpaired.** The Power Plant's mat is plain
+  floor; Mt Moon's exit ladder is one way onto its mouth.
+
 ## The engine itself: tools/play.mjs
 
 **Twenty-five suites tested every function the engine calls and nothing tested

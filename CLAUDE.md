@@ -415,9 +415,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   (`FROST_HOLES`) warps down only, its landing is plain floor, and every
   fill (build_map's `check()`, the engine's `warpMap`, check.mjs) is
   directed; two-way, Frost Hollow's landings bounced you back up. A ladder
-  whose warp leaves the game's maps becomes a door (`MOON_EXIT`: Mt Moon
-  B1F's Route 4 ladder is the door to the Power Plant's real mat, read from
-  its `warp_events`), never a dead rung. Area ids never change (`ridge` is Mt Moon, `tower`
+  whose warp leaves the game's maps is never a dead rung: `MOON_EXIT` (Mt
+  Moon B1F's Route 4 ladder) is one way onto the cave's mouth, Route 4 being
+  outside both. It was the door to the Power Plant once, and walking out of
+  the Power Plant onto a cave ladder read as a bug (2026-10-07); the Power
+  Plant's front door is a doormat. Area ids never change (`ridge` is Mt Moon, `tower`
   the Pokémon Tower, `ember` Magma Hideout, `woods` Monsoon Trail), because
   saves store them. A map replaced under its id can leave a save standing on
   rock: `createEngine` sends a spot with nowhere to stand to the map's spawn.
@@ -1056,6 +1058,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   door and arrival tile, `mapdata` carries `doors: [x, y, area, ax, ay]`, and
   the engine takes one late in `onArrive` (the step counts, no encounter). A
   door to a map your level has not opened stays shut and says so.
+- **A route's houses and small caves are ROOMS on its own grid**
+  (`attach_inside`, `INSIDE` in build_map.py; asked for, 2026-10-07): the
+  real Emerald layout each door's `warp_events` names, on a shelf under the
+  route, joined by a warp pair door <-> mat (a second mat cell one way onto
+  the door - tools/play's hole test excuses a landing that is another warp's
+  end). A room is `rooms` [x, y, w, h, 1]; the fifth element is INDOORS and
+  `onArrive` rolls no encounter there. Its art is baked only up to the last
+  metatile any room uses (`EM_UPTO` in build_assets, `inside.n` asserted).
+  Doors further in stay shut; New Mauville, Trainer Hill (lobbies to whole
+  facilities) and the Scorched Slab (surfed up to: a warp reached only afloat
+  has nothing to step off onto) stay sealed.
 - **Grass is a field effect** (`grassfx.png`, Emerald's frames on every map):
   stepping into `,` rustles once, then the rest frame covers your feet;
   drawn after the trainer and before the overhangs, never saved.

@@ -887,6 +887,9 @@ export function createEngine(canvas, onChange, mini = null) {
   let rooms = areaOf(state.areaId).rooms ?? null;
   const roomAt = (x, y) => (rooms ?? []).find(([rx, ry, rw, rh]) =>
     x >= rx && y >= ry && x < rx + rw && y < ry + rh) ?? null;
+  /* A room behind a route's door (build_map's `attach_inside`, a fifth
+     element 1) is INDOORS: nothing jumps out in somebody's house. */
+  const indoors = () => roomAt(state.player.x, state.player.y)?.[4] === 1;
   const elevAt = (x, y) => (elev ? parseInt(elev[y]?.[x] ?? "0", 16) || 0 : 0);
   let cur = 0;        // the elevation you walk at (0 walks anywhere)
   let high = false;   // drawn above the upper layer
@@ -1592,7 +1595,7 @@ export function createEngine(canvas, onChange, mini = null) {
        repel is for: crossing a map you have already farmed. */
     const mate = walker();
     const rate = ENCOUNTER_RATE * (running("repel")?.rate ?? 1) * (fieldOf(mate)?.rate ?? 1);
-    if (biome && !state.evolution && Math.random() < rate) {
+    if (biome && !state.evolution && !indoors() && Math.random() < rate) {
       /* The level is part of the table, not a modifier on the roll: past Lv 8
          a map starts turning up the evolved forms of what already lives there.
          `tableFor` caches, because this is asked on every step that spawns. */

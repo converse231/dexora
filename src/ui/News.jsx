@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-07-inside",
+    icon: "🏠",
+    date: "October 2026",
+    title: "Step inside",
+    items: [
+      ["Houses and ruins open", "Walk into the houses, the Desert Ruins, Mirage Tower and the Ancient Tomb."],
+      ["Quiet indoors", "Nothing jumps out inside a room."],
+      ["Chase cards first", "A set's chase cards now lead its What is inside panel."],
+      ["Power Plant fixed", "Its front door no longer drops you on Mt Moon's ladder."],
+    ],
+  },
+  {
     id: "2026-10-07-road",
     icon: "⚔️",
     date: "October 2026",
