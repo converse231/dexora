@@ -1114,6 +1114,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   for a year, fonts a month, every art folder a day plus a week stale. With
   Vercel's default every visit re-checked every sprite, and the free tier's
   1M CDN requests ran to 75%. A new art folder joins its list.
+  **The atlas urls carry `ATLAS_REV`** (mapdata.js, the sha1 of route.png,
+  route_top.png and route.json; tileset.js and the index.html preloads via
+  vite.config's `stampAtlas`; check.mjs re-hashes): every tile id is an
+  index into that atlas, and after a re-bake a cached old one drew every
+  map's tiles wrong with sprite ghosts (reported 2026-10-07).
 - **The page never scrolls sideways**: `html, body { overflow-x: clip }` is the
   guard, not the fix - an overflow is still a bug to find and size down.
 - **Irreversible presses ask first, gated in the engine** (`state.ask` in

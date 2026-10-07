@@ -16,6 +16,8 @@
      pond   the rim on a water body's top and sides, plus four inner corners
             for whatever stands in the middle of it. */
 
+import { ATLAS_REV } from "./mapdata.js";
+
 export const TILE = 32;
 
 const COLORS = {
@@ -48,25 +50,26 @@ function loadImage(src) {
   });
 }
 
-async function loadPair(base) {
-  const res = await fetch(`${base}.json`);
+async function loadPair(base, rev = "") {
+  const res = await fetch(`${base}.json${rev}`);
   if (!res.ok) throw new Error("no json");
   const meta = await res.json();
-  return { ...meta, img: await loadImage(`${base}.png`) };
+  return { ...meta, img: await loadImage(`${base}.png${rev}`) };
 }
 
 /* Resolves to { atlas, player }, either of which may be null. A missing sheet
    is the normal case, not an error - don't let it reject. */
 export async function loadArt() {
   const [atlas, player, top, grass] = await Promise.all([
-    loadPair("tilesets/route").catch(() => null),
+    // Stamped with the atlas's hash (mapdata's ATLAS_REV): the map's tile ids are only right against its own atlas.
+    loadPair("tilesets/route", `?v=${ATLAS_REV}`).catch(() => null),
     loadPair("tilesets/player").catch(() => null),
     /* THE UPPER LAYER, AT THE SAME IDS. A Gen 3 metatile's keyed layer draws
        over sprites; our atlas composites both into one image, so it draws under
        instead. `route_top.png` is that layer on its own, the same size and the
        same ids, so `drawOverlays` needs no lookup. Optional like everything
        else here - without it the game is exactly what it was. */
-    loadImage("tilesets/route_top.png").catch(() => null),
+    loadImage(`tilesets/route_top.png?v=${ATLAS_REV}`).catch(() => null),
     // The grass you walk through - see `drawGrass`. Optional like the rest.
     loadImage("tilesets/grassfx.png").catch(() => null),
   ]);

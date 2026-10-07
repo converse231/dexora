@@ -1,8 +1,18 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "node:fs";
+
+/* THE ATLAS PRELOADS CARRY ITS STAMP (mapdata's ATLAS_REV, the url tileset.js
+   fetches): unstamped, a preload is a second download of a file the host
+   caches a day, and the stale copy drew every map's tiles wrong. */
+const atlasRev = () => readFileSync("src/game/mapdata.js", "utf8").match(/ATLAS_REV = "(\w+)"/)[1];
+const stampAtlas = {
+  name: "stamp-atlas",
+  transformIndexHtml: (html) => html.replace(/tilesets\/(route(?:_top)?\.(?:png|json))"/g, `tilesets/$1?v=${atlasRev()}"`),
+};
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), stampAtlas],
   base: "./", // ponytail: relative base so `vite build` output opens from any path
 
   /* A SAVE LIVES ON AN ORIGIN, AND A PORT IS PART OF ONE. Vite's default is to

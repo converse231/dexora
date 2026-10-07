@@ -3980,3 +3980,5 @@ export const AREAS = {
 };
 
 export const AREA_IDS = ["meadow", "woods", "pond", "ridge", "power", "ember", "cinder", "frost", "mansion", "tower", "safari", "desert", "rainwood", "falls", "shoal", "tanoby"];
+
+export const ATLAS_REV = "bf530ce0c8";

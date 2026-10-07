@@ -4407,6 +4407,16 @@ if __name__ == "__main__":
     body.append("};\n")
     body.append("export const AREA_IDS = %s;\n"
                 % json.dumps([s["id"] for s, *_rest in out]))
+    # THE ATLAS'S OWN STAMP, which tileset.js puts on its urls. Every id above
+    # is an index into route.png, and the host caches the art a day: a new
+    # atlas under an old url drew the old one's tiles at the new ids - the
+    # wrong art, and sprite ghosts where an id fell past its end (reported
+    # 2026-10-07). check.mjs re-hashes the files.
+    import hashlib
+    h = hashlib.sha1()
+    for f in ("route.png", "route_top.png", "route.json"):
+        h.update(io.open(os.path.join(ROOT, "public", "tilesets", f), "rb").read())
+    body.append('export const ATLAS_REV = "%s";\n' % h.hexdigest()[:10])
     io.open(os.path.join(ROOT, "src", "game", "mapdata.js"), "w",
             encoding="utf-8").write("\n".join(body))
     print("   wrote src/game/mapdata.js  (%d areas)" % len(out))
