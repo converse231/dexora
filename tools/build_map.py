@@ -58,13 +58,13 @@ AREAS = [
     # COPIED: Emerald's Route 119, as Monsoon Trail - see monsoon_trail(). The
     # id is the slot's historical handle (this was Deep Woods); renaming it
     # would move every save standing here.
-    dict(id="woods", name="Monsoon Trail", drawn="monsoon_trail"),
+    dict(id="woods", name="Monsoon Trail", drawn="monsoon_trail", inside="Route119"),
     # Several lakes, not one: water is solid and only the bank spawns, so a
     # single pond leaves a whole map with a 17-tile shoreline to pace.
     # COPIED: Emerald's Route 110 and the Seaside Cycling Road, in the slot the
     # hand-drawn Pond & Shore held - see route110(). The id stays `pond`
     # because saves store it.
-    dict(id="pond", name="Seaside Road", drawn="route110"),
+    dict(id="pond", name="Seaside Road", drawn="route110", inside="Route110"),
     # No grass patches: there are no transition metatiles between grass and
     # rock, so the two met along hard rectangular edges that read as a bug.
     # COPIED, and the first area with more than one floor - see mt_moon().
@@ -96,10 +96,10 @@ AREAS = [
     # COPIED: Emerald's Route 111, the sandstorm desert - see route111().
     # Takes Ground from Mt. Moon, whose 190-species table was the second most
     # crowded in the game.
-    dict(id="desert", name="Mirage Desert", drawn="route111"),
+    dict(id="desert", name="Mirage Desert", drawn="route111", inside="Route111"),
     # COPIED: Emerald's Route 120, the rain-soaked route east of Fortree - see
     # route120(). The first map past Lv 20.
-    dict(id="rainwood", name="Rainwood Crossing", drawn="route120"),
+    dict(id="rainwood", name="Rainwood Crossing", drawn="route120", inside="Route120"),
     # COPIED: Emerald's Meteor Falls, all five rooms and Steven's cave, on
     # shelves like Ember Caldera's - see meteor_falls(). Dragon's own home.
     dict(id="falls", name="Meteor Falls", drawn="meteor_falls"),
@@ -2468,20 +2468,11 @@ def power_plant():
             if g[y][x] not in SOLID and (x, y) not in seen:
                 g[y][x] = "P"                   # solid, and still its own tile
 
-    # THE FRONT DOOR LEADS SOMEWHERE NOW - Mt Moon's exit, see DOOR_PAIRS. It
-    # is the real map's own Route 10 mat, READ from its warp_events (the one
-    # warp above the bottom row), not the spawn: that is the middle of the
-    # lowest floor, which is where you are put, not where the door is.
-    events = json.load(io.open(BA.fetch("data/maps/PowerPlant/map.json", "PowerPlant.map.json"),
-                               encoding="utf-8"))["warp_events"]
-    mats = [(w["x"], w["y"]) for w in events if w["dest_map"] == "MAP_ROUTE10" and w["y"] == H - 2]
-    assert len(mats) == 1, f"power plant: expected one front-door mat, found {mats}"
-    door = mats[0]
-    arrive = (door[0], door[1] - 1)
-    assert g[door[1]][door[0]] not in SOLID, "power plant: the front door is walled up"
-    assert g[arrive[1]][arrive[0]] not in SOLID, "power plant: nothing to stand on inside the door"
+    # The front door leads to Route 10, which we do not have: a doormat. It
+    # was paired with Mt Moon's exit ladder for a while, and walking out of
+    # the Power Plant into a cave read as a bug (reported 2026-10-07).
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], base, None, {"door": door, "arrive": arrive})
+            [i for row in tiles for i in row], base)
 
 
 # ------------------------------------------------------------------- Mt Moon
@@ -2532,9 +2523,10 @@ MOON_LADDERS = (
 )
 MOON_MOUTH = (0, 18, 37)          # the way in from Route 4 - and so the spawn
 # B1F's exit ladder climbs out to Route 4's far side on the GBA (warp_events,
-# MAP_ROUTE4), and Route 4 runs on to Cerulean and Route 10, where the Power
-# Plant stands - the next map up the level ladder. It was a ladder that did
-# nothing (reported from play); it is the door between the two (DOOR_PAIRS).
+# MAP_ROUTE4). It was a ladder that did nothing (reported from play), then the
+# door to the Power Plant - and the Power Plant's front door came out on a
+# cave ladder (reported 2026-10-07). Route 4 is outside both ends of the
+# cave, so it takes you out the way you came in: one way, onto the mouth.
 MOON_EXIT = (1, 45, 4)
 
 
@@ -2639,15 +2631,12 @@ def mt_moon():
                 tiles[y][x] = -1
 
     ef, ex, ey = MOON_EXIT
-    door = (origin[ef][0] + ex, origin[ef][1] + ey)
-    assert door in seen, "mt moon: the exit ladder is out of reach"
-    arrive = next(((door[0] + dx, door[1] + dy) for dx, dy in ((0, 1), (-1, 0), (1, 0), (0, -1))
-                   if g[door[1] + dy][door[0] + dx] not in SOLID and g[door[1] + dy][door[0] + dx] != "l"), None)
-    assert arrive, "mt moon: nowhere to stand beside the exit ladder"
+    out_ = (origin[ef][0] + ex, origin[ef][1] + ey)
+    assert out_ in seen, "mt moon: the exit ladder is out of reach"
+    warps.append([*out_, *spawn, 1])           # a hole's shape: one way, onto plain floor
     return (["".join(r) for r in g], spawn,
             [i for row in tiles for i in row], base, warps,
-            {"door": door, "arrive": arrive,
-             "rooms": [[*origin[i], MOON_FLOORS[i][1], MOON_FLOORS[i][2]] for i in range(len(MOON_FLOORS))]})
+            {"rooms": [[*origin[i], MOON_FLOORS[i][1], MOON_FLOORS[i][2]] for i in range(len(MOON_FLOORS))]})
 
 
 
@@ -4162,12 +4151,153 @@ def mansion():
 # DOORS BETWEEN MAPS, as pairs of area ids. Each builder reports its own door
 # tile and the tile you arrive on when you come through it; walking onto one
 # map's door puts you on the other's arrival tile. One pair today.
-DOOR_PAIRS = [("woods", "mansion"), ("ridge", "power")]
+# ------------------------------------------------------------------ Interiors
+
+# THE ROOMS BEHIND THE DOORS (asked for, 2026-10-07): the houses and small
+# caves a route's own `warp_events` lead to, each its real Emerald layout,
+# laid on a shelf UNDER the route on one grid and joined by its doormat - a
+# same-map warp pair, as the gatehouses are - so a door is a walk in and out
+# rather than a sealed wall. The doors further in (Mirage Tower's stairs, the
+# Trick House's puzzle, the regi chambers' sealed ends) lead to maps we do
+# not have and stay shut, art kept. Indoors nothing jumps out: each room is
+# `rooms` [x, y, w, h, 1], and the engine rolls no encounter in a room with
+# the flag. New Mauville and Trainer Hill are left shut: lobbies to whole
+# facilities, and 800 metatiles of new art for two rooms with nothing past.
+# The Scorched Slab too: its door is surfed up to, and a warp reached only
+# afloat has nothing to step off onto (check()).
+INSIDE = {
+    "MAP_ROUTE110_TRICK_HOUSE_ENTRANCE": "Route110_TrickHouseEntrance",
+    "MAP_ROUTE111_WINSTRATE_FAMILYS_HOUSE": "Route111_WinstrateFamilysHouse",
+    "MAP_ROUTE111_OLD_LADYS_REST_STOP": "Route111_OldLadysRestStop",
+    "MAP_DESERT_RUINS": "DesertRuins",
+    "MAP_MIRAGE_TOWER_1F": "MirageTower_1F",
+    "MAP_ROUTE119_HOUSE": "Route119_House",
+    "MAP_ANCIENT_TOMB": "AncientTomb",
+}
+
+
+def attach_inside(folder, rows, spawn, tiles, base, warps, extra):
+    """A built route plus the INSIDE rooms its doors lead to - the same tuple
+    a builder returns, grown downwards (and sideways when the shelf is wider).
+    `folder` is the route's decomp folder, whose `warp_events` name the doors."""
+    import numpy as np
+    import build_assets as BA
+    em = lambda rel, dest: BA.fetch(rel, dest, root=BA.EMERALD)
+    M = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                          encoding="utf-8"))["inside"]
+    layouts = {q["id"]: q for q in json.load(io.open(em("data/layouts/layouts.json", "em/layouts.json"),
+                                                     encoding="utf-8"))["layouts"] if q}
+    route = json.load(io.open(em(f"data/maps/{folder}/map.json", f"em/{folder}_map.json"), encoding="utf-8"))
+    attr = lambda kind, name: np.frombuffer(io.open(em(
+        f"data/tilesets/{kind}/{name}/metatile_attributes.bin", f"em/{name}/attr.bin"), "rb").read(), dtype="<u2")
+    snake = lambda s: "".join("_" + c.lower() if c.isupper() else c for c in s).lstrip("_")
+
+    W, H = len(rows[0]), len(rows)
+    g = [list(r) for r in rows]
+    t = [tiles[y * W:(y + 1) * W] for y in range(H)]
+    el = [[int(c, 16) for c in r] for r in extra["elev"]]
+    rooms = [list(r) for r in (extra.get("rooms") or [[0, 0, W, H]])]
+    warps = list(warps or [])
+    filler = t[0][0]            # the ring's own art: copied, and never drawn (outside every room)
+    x0 = 1
+    for k, w in enumerate(route["warp_events"]):
+        name = INSIDE.get(w["dest_map"])
+        if not name:
+            continue
+        m = json.load(io.open(em(f"data/maps/{name}/map.json", f"em/{name}_map.json"), encoding="utf-8"))
+        lay = layouts[m["layout"]]
+        prim = snake(lay["primary_tileset"][len("gTileset_"):])
+        sec = snake(lay["secondary_tileset"][len("gTileset_"):])
+        iw, ih = lay["width"], lay["height"]
+        raw = np.frombuffer(io.open(em(lay["blockdata_filepath"], "em/" + lay["blockdata_filepath"].replace("/", "_")),
+                                    "rb").read(), dtype="<u2")[:iw * ih]
+        ids = (raw & 0x3FF).reshape(ih, iw)
+        pa, sa = attr("primary", prim), attr("secondary", sec)
+        behave = lambda i: int((pa[i] if i < 512 else sa[i - 512]) & 0x1FF)
+        floor, wall = ("q", "Q") if sec == "generic_building" else ("r", "R")
+        ig = [[None] * iw for _ in range(ih)]
+        it = [[-1] * iw for _ in range(ih)]
+        ie = [[int(v) for v in r] for r in ((raw >> 12) & 0xF).reshape(ih, iw)]
+        for y in range(ih):
+            for x in range(iw):
+                i = int(ids[y][x])
+                if i < 512:
+                    # Only Emerald's General is baked whole; the Building primary is not.
+                    assert prim == "general", f"{name}: primary metatile {i} on {prim}"
+                    it[y][x] = M["general"] + i
+                else:
+                    assert i - 512 < M["n"][sec], f"{name}: {sec} local {i - 512} is past the baked {M['n'][sec]}"
+                    it[y][x] = M["sec"][sec] + i - 512
+                c = em_cell(behave(i), int((raw[y * iw + x] >> 10) & 3))
+                ig[y][x] = floor if c in ".,#" else wall if c == "T" else c
+
+        # Its own warps: the mats back out, pairs inside it, and the rest shut.
+        mats, hop, inner = [], {}, []
+        for j, v in enumerate(m["warp_events"]):
+            if v["dest_map"] == "MAP_" + snake(folder).upper() and int(v["dest_warp_id"]) == k:
+                mats.append((v["x"], v["y"]))
+            elif v["dest_map"] == w["dest_map"]:
+                back = m["warp_events"][int(v["dest_warp_id"])]
+                hop[(v["x"], v["y"])] = (back["x"], back["y"])
+                if j < int(v["dest_warp_id"]):
+                    inner.append((v["x"], v["y"], back["x"], back["y"]))
+            else:
+                ig[v["y"]][v["x"]] = wall
+        assert mats, f"{name}: no mat leads back to {folder} warp {k}"
+        for x, y in mats:
+            ig[y][x] = "l"
+        for ax, ay, bx, by in inner:
+            ig[ay][ax] = ig[by][bx] = "l"
+        seal_hidden(ig, it, wall, ie)
+        seen = reach(ig, [mats[0]], ie, hop=hop, surf=True)
+        for y in range(ih):
+            for x in range(iw):
+                if ig[y][x] not in SOLID and (x, y) not in seen:
+                    ig[y][x] = wall
+        if extra.get("cycling"):
+            # Elevation 4 is bike ground on a cycling map; no room may carry it.
+            assert not any(ie[y][x] == 4 for y in range(ih) for x in range(iw) if ig[y][x] not in SOLID), \
+                f"{name}: elevation 4 indoors would be bike ground"
+
+        # Onto the shelf: one solid column between rooms, a solid row under
+        # them, so every mat on a room's bottom edge is walked into.
+        need_w, need_h = x0 + iw + 1, H + ih + 1
+        for r, fill in ((g, "T"), (t, filler), (el, 0)):
+            for row in r:
+                row += [fill] * max(0, need_w - len(row))
+            while len(r) < need_h:
+                r.append([fill] * len(r[0]))
+        for y in range(ih):
+            for x in range(iw):
+                g[H + y][x0 + x], t[H + y][x0 + x], el[H + y][x0 + x] = ig[y][x], it[y][x], ie[y][x]
+        dx, dy = w["x"], w["y"]
+        assert g[dy + 1][dx] not in SOLID, f"{folder}: nothing to stand on below the door to {name}"
+        g[dy][dx] = "l"
+        (mx, my), *more = mats
+        warps.append([dx, dy, x0 + mx, H + my])
+        # A second mat cell walks out of the same door: one-way, onto it.
+        warps += [[x0 + x, H + y, dx, dy, 1] for x, y in more]
+        warps += [[x0 + ax, H + ay, x0 + bx, H + by] for ax, ay, bx, by in inner]
+        rooms.append([x0, H, iw, ih, 1])
+        x0 += iw + 1
+
+    # The rows grown for one room are filler wherever a shorter one stands.
+    Wn = max(len(r) for r in g)
+    for r, fill in ((g, "T"), (t, filler), (el, 0)):
+        for row in r:
+            row += [fill] * (Wn - len(row))
+    extra = dict(extra, elev=elev_rows(el), rooms=rooms)
+    return (["".join(r) for r in g], spawn, [i for row in t for i in row], base, warps, extra)
+
+
+DOOR_PAIRS = [("woods", "mansion")]
 
 if __name__ == "__main__":
     out = []
     for spec in AREAS:
         made = globals()[spec["drawn"]]() if spec.get("drawn") else build(spec)
+        if spec.get("inside"):
+            made = attach_inside(spec["inside"], *made)
         rows, spawn = made[0], made[1]
         tiles, base = (made[2], made[3]) if len(made) > 2 else (None, None)
         # A map with more than one floor carries the ladders that join them.
@@ -4259,7 +4389,8 @@ if __name__ == "__main__":
         if spec.get("rooms"):
             # ITS FLOORS, as [x, y, w, h]: the engine draws only the one you
             # stand in, and the minimap shows that one alone.
-            body.append("    rooms: [%s]," % ", ".join("[%d, %d, %d, %d]" % tuple(r) for r in spec["rooms"]))
+            # A fifth element, 1, is INDOORS (attach_inside): no encounters.
+            body.append("    rooms: [%s]," % ", ".join("[%s]" % ", ".join(str(v) for v in r) for r in spec["rooms"]))
         if spec.get("cycling"):
             # Its raised road is bike ground - see route110().
             body.append("    cycling: true,")

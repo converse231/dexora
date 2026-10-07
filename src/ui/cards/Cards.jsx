@@ -278,6 +278,26 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
       <div className="cd-set-body">
         <h4>What is inside</h4>
         <p className="cd-sub">{meta.total} cards · {PACK_SIZE} a pack · a hit about 1 pack in {(1 / rules.hit).toFixed(1)} · {yen(PACK_PRICE)}</p>
+        {/* The chase first: what a pack can hold is the headline (asked for, 2026-10-07). */}
+        {chase.length > 0 && (
+          <div className="cd-chase">
+            <div className="cd-chase-head">
+              <h5>Chase cards</h5>
+              <span>{got} of {chase.length} found</span>
+            </div>
+            <div className="cd-chase-row">
+              {chase.map((c) => {
+                const row = cards[cardId(meta.id, c[0])];
+                return (
+                  <button key={c[0]} type="button" className={`cd-chase-card${row ? " got" : ""}`} onClick={() => onLook(c[0])}>
+                    <CardFace setId={meta.id} card={c} variant="h" still lazy />
+                    <span><RarityMark rarity={c[3]} /> 1 in {oneIn(rateOf(c[3]) / count(c[3])).toLocaleString()}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <ul className="cd-odds" aria-label="Odds per pack">
           {odds.map(([r, p]) => (
             <li key={r}><RarityMark rarity={r} /><span>{RARITY[r].name}</span><b>1 in {oneIn(p)}</b></li>
@@ -297,25 +317,6 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
           })}
         </div>
       </div>
-      {chase.length > 0 && (
-        <div className="cd-chase">
-          <div className="cd-chase-head">
-            <h5>Chase cards</h5>
-            <span>{got} of {chase.length} found</span>
-          </div>
-          <div className="cd-chase-row">
-            {chase.map((c) => {
-              const row = cards[cardId(meta.id, c[0])];
-              return (
-                <button key={c[0]} type="button" className={`cd-chase-card${row ? " got" : ""}`} onClick={() => onLook(c[0])}>
-                  <CardFace setId={meta.id} card={c} variant="h" still lazy />
-                  <span><RarityMark rarity={c[3]} /> 1 in {oneIn(rateOf(c[3]) / count(c[3])).toLocaleString()}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </section>
   );
 }

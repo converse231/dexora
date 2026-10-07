@@ -139,8 +139,17 @@ EMERALD = "https://raw.githubusercontent.com/pret/pokeemerald/master"
 # block before it keeps its base; the ones after move, and every copied map
 # rebases from route.json when `npm run map` runs, which is the rule.
 # `mauville` is Route 110's, in the Pond & Shore slot - appended after it.
+# The last three are the INTERIORS behind the routes' doors (build_map's
+# `INSIDE`): the houses are GenericBuilding on Emerald's Building primary, the
+# regi chambers Emerald's Cave, Mirage Tower its own set.
 EM_SECONDARY = [("lavaridge", "general"), ("lilycove", "general"), ("fortree", "general"),
-                ("mauville", "general"), ("meteor_falls", "general")]
+                ("mauville", "general"), ("meteor_falls", "general"),
+                ("generic_building", "building"), ("cave", "general"), ("mirage_tower", "general")]
+# BAKED ONLY UP TO THE LAST METATILE AN INTERIOR USES: a few rooms reach the
+# first 296, 274 and 171 of sets 512, 414 and 414 long, and the atlas is every
+# player's download. Truncating the tail keeps every id below it where it was;
+# build_map asserts each interior inside its count (route.json `inside.n`).
+EM_UPTO = {"generic_building": 296, "cave": 274, "mirage_tower": 171}
 
 # pokeemerald PRIMARIES we bake WHOLE, because a map drawn against one
 # references its metatiles directly and ours are somebody else's. Ids 0-639
@@ -427,7 +436,7 @@ def build_tileset():
     # Each secondary tileset is appended whole, on a row boundary, so a tile is
     # just base + its local index. One atlas, one drawImage path, no renderer
     # changes - a fire biome is only a different set of tile numbers.
-    sets = {}
+    sets, counts = {}, {}
     primaries = {"general": (tiles, pals)}
     for name, prim in SECONDARY:
         if prim not in primaries:
@@ -453,6 +462,7 @@ def build_tileset():
 
     for name, prim in EM_SECONDARY:
         smt, stiles, spals = load_emerald(name, prim)
+        smt = smt[:EM_UPTO.get(name, len(smt))]
         sheet = render_metatiles(smt, stiles, spals, cols)
         base = (atlas.shape[0] // 16) * cols
         atlas = append_rows(atlas, sheet)
@@ -468,6 +478,7 @@ def build_tileset():
         # second one is keyed `em_cave` so neither base is overwritten.
         key = name if name not in sets else "em_" + name
         sets[key] = base
+        counts[key] = len(smt)
         print("  %-18s %3d metatiles at base %d  (pokeemerald, on %s)"
               % (key, len(smt), base, prim))
 
@@ -1027,6 +1038,11 @@ def build_tileset():
         # 449 of the route's 690 deep-sand cells.
         "route111": {"general": sets["em_general"], "mauville": sets["mauville"],
                      "split": 512, "floor": sets["mauville"] + 81},
+        # THE INTERIORS behind the Emerald routes' doors - see EM_UPTO, and
+        # build_map's `INSIDE`. Keyed by the decomp's secondary name.
+        "inside": {"general": sets["em_general"], "split": 512,
+                   "sec": {n: sets["em_cave" if n == "cave" else n] for n in EM_UPTO},
+                   "n": {n: counts["em_cave" if n == "cave" else n] for n in EM_UPTO}},
     }
     with io.open(os.path.join(PUB, "tilesets", "route.json"), "w") as f:
         json.dump(meta, f, indent=2)
