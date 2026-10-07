@@ -2380,6 +2380,14 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     assert.ok(area.tiles.every((t) => t >= -1 && t <= top),
       `${id}: a transcribed tile id falls outside the atlas`);
   }
+  /* AND THE ATLAS'S STAMP IS THE ATLAS's: tileset.js and the preloads put
+     ATLAS_REV on its urls, so a new atlas is never drawn from a cached old
+     one (reported 2026-10-07 as every map's tiles wrong after a re-bake). */
+  const { createHash } = await import("node:crypto");
+  const { ATLAS_REV } = await import("../src/game/mapdata.js");
+  const h = createHash("sha1");
+  for (const f of ["route.png", "route_top.png", "route.json"]) h.update(readFileSync(`public/tilesets/${f}`));
+  assert.equal(ATLAS_REV, h.digest("hex").slice(0, 10), "ATLAS_REV is not the atlas's hash - re-run npm run map");
 }
 
 /* SORTED, because the print reads as a range. It was AREA_IDS order and
