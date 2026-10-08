@@ -7387,8 +7387,17 @@ import { statSync } from "node:fs";
     const t = src(f);
     if (/(from\s+|import\(|glob\()["'`][^"'`]*data\/cards\/sets/.test(t)) assert.equal(f, "ui/cards/load.js", `${f} names a card set file - only ui/cards/load.js may, lazily`);
     if (/ui\/cards\/Cards\.jsx/.test(t)) {
-      assert.ok(/lazy\(\(\) => import\("\.\/ui\/cards\/Cards\.jsx"\)\)/.test(t), `${f} imports the Cards page outside lazy()`);
+      assert.ok(/lazyPage\(\(\) => import\("\.\/ui\/cards\/Cards\.jsx"\)\)/.test(t), `${f} imports the Cards page outside lazyPage()`);
     }
+  }
+  /* EVERY LAZY PAGE GOES THROUGH `lazyPage` (ui/crash.jsx). A bare `lazy()`
+     rethrows a missing chunk into Suspense, and after a deploy - when the
+     chunk really is gone - that unmounted the whole game to a blank page.
+     Put the bug back by changing one of these to `lazy(`. */
+  {
+    const bare = walk("").map((f) => f.replace(/^\//, "")).filter((f) => /\.(js|jsx)$/.test(f))
+      .filter((f) => /[^a-zA-Z]lazy\(\(\) => import\(/.test(stripComments(src(f))));
+    assert.deepEqual(bare, [], `${bare.join(", ")}: a lazy page outside lazyPage() blanks the game when its chunk is gone`);
   }
   const idx = readFileSync(new URL("../src/data/cards/index.js", import.meta.url));
   assert.ok(cdGzip(idx).length < 1024, `the main bundle's card index is ${cdGzip(idx).length} bytes gzipped`);
