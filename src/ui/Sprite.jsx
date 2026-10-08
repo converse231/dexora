@@ -208,6 +208,7 @@ export function VariantFx({ id, variant, art = null }) {
         <>
           <span className="em-rad" aria-hidden="true"><i /></span>
           <span className="em-depth" style={{ "--art": url }} aria-hidden="true"><i /></span>
+          <span className="em-glint" aria-hidden="true"><i /><i /><i /><i /></span>
         </>
       );
     }

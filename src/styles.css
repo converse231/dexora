@@ -8321,13 +8321,13 @@ button:disabled { transition: none; }
 
 .gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
 .chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .cad-breath,
-.plat-sweep, .dia-fire, .em-depth, .em-rad {
+.plat-sweep, .dia-fire, .em-depth, .em-rad, .em-glint {
   position: absolute; inset: 0; pointer-events: none;
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */
 .shadow-aura, .chaos-aura, .proj-beam, .proj-base, .em-rad { z-index: 0; }
 .gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines,
-.plat-sweep, .dia-fire, .em-depth { z-index: 3; }
+.plat-sweep, .dia-fire, .em-depth, .em-glint { z-index: 3; }
 /* Masked to the creature's own outline, or they are rectangles over the grass. */
 .gold-shine, .chaos-neg, .proj-lines, .plat-sweep, .em-depth {
   overflow: hidden;
@@ -8565,28 +8565,66 @@ button:disabled { transition: none; }
    a radiance. Its floor never drops, so it reads as steady emission with a
    slow swell rather than a breath. */
 .em-rad { mix-blend-mode: screen; }
-/* STRONGER AND WIDER (reported 2026-10-09: "should be more noticeable too").
-   It was a wash at .5 alpha fading out by 74% - on a green-tinted sprite that
-   is nearly invisible, which is the one case it has to work on. Carried
-   further (-22%), brighter at the core, and the floor raised so it never
-   falls back to almost nothing between swells. Still a drift, never a pulse:
-   the swell is 8% of scale over 6.8s, slow enough that it reads as emission
-   rather than Cadence's breath. */
+/* TIGHT, NOT BRIGHT (reported 2026-10-09: "too obvious", after I had been
+   told it was too faint and overshot). Two numbers were doing the damage and
+   only one of them was the alpha: at -22% inset the halo was WIDER than the
+   creature, so on a battle sprite it read as a spotlight thrown on the floor
+   behind it rather than light coming off the stone. Pulled in to -8% and
+   dimmed, it hugs the silhouette, which is what emission looks like.
+
+   The glimmer below is what carries the tier now; this only has to say the
+   stone is lit. Still a drift and never a pulse - that tell is Cadence's. */
 .em-rad i {
-  position: absolute; inset: -22%;
-  background: radial-gradient(circle at 50% 56%, rgba(130, 255, 190, .72) 0 20%,
-              rgba(60, 230, 140, .44) 40%, rgba(32, 195, 112, .2) 60%, transparent 78%);
+  position: absolute; inset: -8%;
+  background: radial-gradient(circle at 50% 56%, rgba(120, 255, 180, .4) 0 16%,
+              rgba(55, 225, 135, .22) 36%, rgba(30, 190, 108, .08) 56%, transparent 72%);
   animation: em-rad 6.8s ease-in-out infinite;
 }
 @keyframes em-rad {
-  0%, 100% { transform: scale(.96); opacity: .78; }
-  50% { transform: scale(1.08); opacity: 1; }
+  0%, 100% { transform: scale(.97); opacity: .6; }
+  50% { transform: scale(1.05); opacity: .85; }
+}
+
+/* AND IT GLIMMERS (asked for, 2026-10-09: "like diamond and gold"). Four
+   facets catching light, and the SHAPE is what keeps it off the other three:
+   Gold's glint is an eight-point star, Shiny's a fat four-point one, Diamond's
+   a long thin cross - this is a plain RHOMBUS, the step cut's own facet, which
+   is also the shape of its mark. Mint rather than white, fewer than Diamond's
+   six and slower, because this tier was just told it shouts. */
+/* A SIX-POINT STAR, after a rhombus and then a smaller rhombus both failed.
+   A sparkle has to be mostly EMPTY: that is why Gold's eight-point star works
+   at 18% and Diamond's thin cross at 26%, while a rhombus FILLS its box and
+   read as a solid chip at any size I tried - a grey-green slab at 17%, a
+   white domino at 9%.
+
+   Six points, so the shape is its own in a set that already has eight (Gold),
+   four fat (Shiny) and a long thin cross (Diamond); mint rather than white or
+   gold, which is what tells it from them at a glance. Four of them on a 2.9s
+   cycle - fewer and slower than Diamond's six on 2.2s, because this tier was
+   just told it shouts. */
+.em-glint i {
+  position: absolute; width: 14%; aspect-ratio: 1;
+  background: radial-gradient(circle, #fff 0 20%, rgba(175, 255, 215, .98) 50%, rgba(110, 255, 175, .85) 100%);
+  clip-path: polygon(50% 0%, 61% 31%, 93% 25%, 72% 50%, 93% 75%, 61% 69%,
+                     50% 100%, 39% 69%, 7% 75%, 28% 50%, 7% 25%, 39% 31%);
+  filter: drop-shadow(0 0 5px rgba(70, 240, 150, 1));
+  transform: scale(0); animation: em-glint 2.9s ease-out infinite;
+}
+.em-glint i:nth-child(1) { top: 6%; left: 14%; }
+.em-glint i:nth-child(2) { top: 20%; right: 4%; width: 12%; animation-delay: -.72s; }
+.em-glint i:nth-child(3) { bottom: 10%; right: 18%; width: 13%; animation-delay: -1.45s; }
+.em-glint i:nth-child(4) { bottom: 18%; left: 2%; width: 10%; animation-delay: -2.18s; }
+@keyframes em-glint {
+  0%, 100% { transform: scale(0) rotate(0); opacity: 0; }
+  10% { transform: scale(1.1) rotate(12deg); opacity: 1; }
+  24% { transform: scale(.8) rotate(22deg); opacity: .85; }
+  40% { transform: scale(0) rotate(34deg); opacity: 0; }
 }
 
 /* In a Dex tile the sprite is 84% of the cell and centred (see `.cell .holo-foil`),
    so the layers that register to it come in by the same 8%. */
 .cell .gold-shine, .cell .gold-glint, .cell .chaos-neg, .cell .chaos-cut, .cell .proj-lines { inset: 8%; }
-.cell .plat-sweep, .cell .dia-fire, .cell .em-depth { inset: 8%; }
+.cell .plat-sweep, .cell .dia-fire, .cell .em-depth, .cell .em-glint { inset: 8%; }
 .cell .em-rad { inset: 2%; }
 .cell .shadow-aura { inset: 0 4% 6%; }
 .cell .chaos-aura { inset: 8%; }
@@ -8596,7 +8634,7 @@ button:disabled { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .gold-shine i, .gold-glint i, .shadow-aura i, .chaos-aura::before, .chaos-aura i,
   .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i,
-  .plat-sweep i, .dia-fire i, .em-depth i, .em-rad i,
+  .plat-sweep i, .dia-fire i, .em-depth i, .em-rad i, .em-glint i,
   .sprite-projection:not(.mon) { animation: none; }
   .sprite-projection.mon { animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both; }
 }
