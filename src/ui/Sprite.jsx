@@ -24,13 +24,13 @@
 
 import { artOf } from "../game/items.js";
 
-const FOLDER = { shiny: "shiny/", origin: "origin/", showdown: "showdown/", living: "living/" };
+const FOLDER = { shiny: "shiny/", origin: "origin/", showdown: "showdown/", cadence: "cadence/" };
 /* THE TIERS THAT ARE A STRIP RATHER THAN A PICTURE. They share one class,
    `.sprite-strip`, because every container that draws a Pokemon has to SIZE
    them (a span has no intrinsic size and renders zero wide) - and that was
    24 rules naming `.sprite-showdown` by the time there were two of them.
    One hook means a third strip tier costs no CSS at all. */
-export const STRIP_TIERS = new Set(["showdown", "living"]);
+export const STRIP_TIERS = new Set(["showdown", "cadence"]);
 
 /* SHOWDOWN SHIPS NOW, AS AN EIGHT-FRAME STRIP.
 
@@ -88,7 +88,7 @@ export const spriteUrl = (id, variant = null) =>
    its own; every tier drawn as a filter wears the ordinary back under the same
    `sprite-<tier>` class. Origin (the 1996 art) and Showdown (a strip) have no
    back, so this answers null and the caller draws the front, flipped. */
-const NO_BACK = new Set(["origin", "showdown", "living"]);
+const NO_BACK = new Set(["origin", "showdown", "cadence"]);
 export const backUrl = (id, variant = null) => (NO_BACK.has(variant) ? null
   : new URL(`sprites/back/${variant === "shiny" ? "shiny/" : ""}${id}.png`, document.baseURI).href);
 
@@ -238,15 +238,15 @@ export function VariantFx({ id, variant, art = null }) {
       </span>
     );
   }
-  /* LIVING'S BREATH. The waking is the entrance and a Dex tile has no
+  /* CADENCE'S BREATH. The waking is the entrance and a Dex tile has no
      entrance, so without this the tier is "a sprite that moves" in exactly
      the place Showdown already is. One masked bloom low on the body, on the
      breath's own clock - opacity and transform only, because forty of these
      animate at once on a Dex sheet. */
-  if (variant === "living") {
+  if (variant === "cadence") {
     return (
       <span
-        className="live-breath"
+        className="cad-breath"
         style={{ "--art": `url(${art ?? spriteUrl(id)})` }}
         aria-hidden="true"
       />
@@ -284,7 +284,7 @@ const REVEAL = {
   vivid: "burst", shiny: "burst",
   astral: "implode", noir: "implode",
   holo: "scan", showdown: "scan",
-  /* Living gets NONE, for Origin's reason: its entrance is already the thing
+  /* Cadence gets NONE, for Origin's reason: its entrance is already the thing
      it is for - it arrives frozen like every ordinary sprite and then wakes -
      and a reveal firing over that would step on the one beat that sells it. */
   glitched: "tear",
@@ -295,7 +295,7 @@ const REVEAL = {
    Holo, Astral, Origin) are hand-rolled in Encounter.jsx and predate the
    component; everything since goes through it, so a battle and a Box row can
    never draw one tier two ways. */
-export const SCENE_FX = new Set(["glitched", "gold", "shadow", "chaotic", "projection", "living"]);
+export const SCENE_FX = new Set(["glitched", "gold", "shadow", "chaotic", "projection", "cadence"]);
 
 export function TierReveal({ id, variant }) {
   const motion = REVEAL[variant];
@@ -327,13 +327,13 @@ export default function Sprite({
      goes BEFORE the `fx` branch, because `VariantFx` returns null for a strip
      tier anyway and wrapping it twice would only nest two boxes.
 
-     LIVING WEARS ITS OWN LAYER ON TOP (the breath), so it is the one strip
+     CADENCE WEARS ITS OWN LAYER ON TOP (the breath), so it is the one strip
      tier that still wants `sprite-fx` around it when a caller asks for fx. */
   if (STRIP_TIERS.has(variant)) {
     /* A strip tier that has a layer of its own (`SCENE_FX`) takes the `fx`
        wrapper, so the layer has something to be absolute inside; one without
        stays a bare span. Read off the SET rather than typed twice as
-       `variant === "living"`, which is the thing `STRIP_TIERS` exists to
+       `variant === "cadence"`, which is the thing `STRIP_TIERS` exists to
        avoid - a second such tier would otherwise need two more edits. */
     const wrap = fx && SCENE_FX.has(variant);
     const strip = (

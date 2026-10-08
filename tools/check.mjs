@@ -1144,7 +1144,7 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
          stuttering - which names `img` - cannot reach it, and an entry nobody
          has caught would have a black shape idling in it. */
       const sheet = readFileSync(new URL("../src/ui/DexSheet.jsx", import.meta.url), "utf8");
-      /* STRIP-AGNOSTIC SINCE LIVING JOINED (2026-10-08). This named Showdown
+      /* STRIP-AGNOSTIC SINCE CADENCE JOINED (2026-10-08). This named Showdown
          as a string, so the second strip tier would have passed the check by
          doing nothing at all - the guard is about the KIND, not the tier. */
       assert.ok(sheet.includes("STRIP_TIERS.has(t) && !got(t) ? null : t"),

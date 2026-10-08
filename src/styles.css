@@ -1395,7 +1395,7 @@ canvas {
 .bx-vtag.shadow { background: #5a2bb0; }
 .bx-vtag.chaotic { background: #b3121f; color: #ffe36a; }
 .bx-vtag.projection { background: #1c8fa3; }
-.bx-vtag.living { background: #1f8f6d; }
+.bx-vtag.cadence { background: #1f8f6d; }
 /* One badge, used everywhere a type is named. It was sized in cqw, which only
    resolves inside the battle overlay, so it could not be reused in the rail -
    which is why the map tag and the travel list printed types as prose. Plain px
@@ -2202,8 +2202,8 @@ canvas {
    the thing it is meant to be damaging. */
 .cell .glitch-ghost, .cell .glitch-tear, .cell .glitch-blocks { inset: 8%; }
 /* 16%, not 8%: a cell draws a STRIP at 68% where it draws an `<img>` at 84%,
-   so Living's bloom needs the tighter inset to sit on the creature. */
-.cell .live-breath { inset: 16%; }
+   so Cadence's bloom needs the tighter inset to sit on the creature. */
+.cell .cad-breath { inset: 16%; }
 .cell .astral-aura { inset: -2%; }
 .cell .shiny-spark i { width: 6px; height: 6px; box-shadow: 0 0 4px rgba(255, 226, 150, .95); }
 .cell .shiny-spark i:nth-child(2),
@@ -4317,8 +4317,8 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .tv-shadow   { --tv: #b98cff; --tv2: #3a0f80; }
 .tv-chaotic  { --tv: #ff2a2a; --tv2: #ffd400; }
 .tv-projection { --tv: #8ff8ff; --tv2: #1c9fb3; }
-/* No `.tv-living`: `TierReveal` emits `tv-<tier>` only for a tier with a
-   REVEAL motion, and Living has none on purpose - its entrance is the wake. */
+/* No `.tv-cadence`: `TierReveal` emits `tv-<tier>` only for a tier with a
+   REVEAL motion, and Cadence has none on purpose - its entrance is the wake. */
 
 /* The flood: the tier's colour poured INTO the creature's own outline, so it
    reads as the Pokemon being that thing rather than as a light shone at it.
@@ -5907,7 +5907,7 @@ button:disabled { transition: none; }
    `.sprite-fx`, because the wrapper is sized exactly as the `<img>` was.
    `.boxrow` is the one exception: it sizes img, wrapper and strip all at 62px,
    so there the wrapped strip has to fill its wrapper instead. A blanket
-   `100%` here fixed the Box and silently drew Living ~30% larger than a
+   `100%` here fixed the Box and silently drew Cadence ~30% larger than a
    Showdown of the same species in all fifteen of the others. */
 .boxrow > .sprite-fx > .sprite-strip { width: 100%; height: 100%; margin: 0; }
 .sprite-strip {
@@ -5923,38 +5923,38 @@ button:disabled { transition: none; }
   from { background-position-y: 0%; }
   to { background-position-y: 100%; }
 }
-/* LIVING ARRIVES STILL AND THEN WAKES, which is the whole separation from
+/* CADENCE ARRIVES STILL AND THEN WAKES, which is the whole separation from
    Showdown: two tiers that both move would otherwise be one tier drawn twice.
-   Every sprite in the game is a frozen picture, so a Living one is a frozen
+   Every sprite in the game is a frozen picture, so a Cadence one is a frozen
    picture too for the first beat - and then it starts breathing. The delay is
    on the animation rather than in a keyframe, so the resting style IS frame
-   one and a paused or reduced-motion Living simply never wakes.
+   one and a paused or reduced-motion Cadence simply never wakes.
 
    Slower than Showdown's 900ms on purpose: this is the game's own idle, and
    it is a breath rather than a performance. */
-.sprite-living { animation: living-idle 1180ms steps(8, jump-none) 900ms infinite; }
-@keyframes living-idle {
+.sprite-cadence { animation: cadence-idle 1180ms steps(8, jump-none) 900ms infinite; }
+@keyframes cadence-idle {
   from { background-position-y: 0%; }
   to { background-position-y: 100%; }
 }
-/* THE BREATH, and it is the only thing Living hangs beside the sprite. A warm
+/* THE BREATH, and it is the only thing Cadence hangs beside the sprite. A warm
    bloom low on the body that swells and fades on the same clock the strip
    steps to, masked to the creature's own outline - unmasked it is a glowing
    rectangle over the grass. It waits for the waking like the strip does, so a
-   still Living stays completely still. */
-.live-breath {
+   still Cadence stays completely still. */
+.cad-breath {
   -webkit-mask: var(--art) center / contain no-repeat;
           mask: var(--art) center / contain no-repeat;
   background: radial-gradient(ellipse at 50% 72%, rgba(120, 255, 205, .45), transparent 62%);
   opacity: 0; mix-blend-mode: screen;
-  animation: live-breath 4600ms ease-in-out 900ms infinite;
+  animation: cad-breath 4600ms ease-in-out 900ms infinite;
 }
-@keyframes live-breath {
+@keyframes cad-breath {
   0%, 100% { opacity: .1; transform: scale(.97); }
   50% { opacity: .55; transform: scale(1.03); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sprite-strip, .live-breath { animation: none; }
+  .sprite-strip, .cad-breath { animation: none; }
 }
 
 /* TOUCH TARGETS. Measured on a coarse pointer at 390px: the candy +1/+5/+10
@@ -6130,7 +6130,7 @@ button:disabled { transition: none; }
 .tp-slot.has-astral { border-color: #6f5bff; }
 .tp-slot.has-origin { border-color: #b8862a; }
 .tp-slot.has-showdown { border-color: #3cb8d6; }
-.tp-slot.has-living { border-color: #35c99a; }
+.tp-slot.has-cadence { border-color: #35c99a; }
 .tp-slot.has-glitched { border-color: #e0335f; }
 .tp-slot.has-noir { border-color: #6b6b78; }
 .tp-slot.has-vivid { border-color: #e84f9a; }
@@ -6264,7 +6264,7 @@ button:disabled { transition: none; }
 .of-big.has-astral { border-color: #6f5bff; }
 .of-big.has-origin { border-color: #b8862a; }
 .of-big.has-showdown { border-color: #3cb8d6; }
-.of-big.has-living { border-color: #35c99a; }
+.of-big.has-cadence { border-color: #35c99a; }
 .of-big.has-glitched { border-color: #e0335f; }
 .of-big.has-noir { border-color: #6b6b78; }
 .of-big.has-vivid { border-color: #e84f9a; }
@@ -8248,7 +8248,7 @@ button:disabled { transition: none; }
 }
 
 .gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
-.chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .live-breath {
+.chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .cad-breath {
   position: absolute; inset: 0; pointer-events: none;
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */

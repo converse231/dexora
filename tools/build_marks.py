@@ -48,7 +48,7 @@ SIZE = 24
 SHEET_ORDER = ["origin", "shiny", "astral", "complete"]
 # Everything the game asks for. `src/ui/Marks.jsx` names the same set.
 ICONS = ["origin", "shiny", "holo", "astral", "glitched", "vivid", "noir",
-         "showdown", "gold", "shadow", "chaotic", "projection", "living",
+         "showdown", "gold", "shadow", "chaotic", "projection", "cadence",
          "complete", "legendary", "research", "alpha"]
 
 # THE SHAPE HAS TO CARRY IT, NOT THE COLOUR. Eight of these sit in a row on a
@@ -77,10 +77,10 @@ STAND_IN = {
                                    (36, 50), (6, 18)]),
     "projection": ((90, 228, 250), [(8, 6), (92, 6), (60, 70), (84, 94), (16, 94),
                                     (40, 70)]),
-    # Living: a heartbeat traced left to right. No other mark is a long
+    # Cadence: a heartbeat traced left to right. No other mark is a long
     # horizontal, so it is tellable from all twelve in greyscale - which is
     # what the note above asks of every one of them.
-    "living":     ((91, 232, 181), [(6, 48), (36, 48), (44, 14), (52, 76), (60, 48),
+    "cadence":    ((91, 232, 181), [(6, 48), (36, 48), (44, 14), (52, 76), (60, 48),
                                     (94, 48), (94, 60), (64, 60), (52, 88), (44, 26),
                                     (32, 60), (6, 60)]),
 }
