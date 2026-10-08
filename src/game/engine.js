@@ -3565,9 +3565,33 @@ export function createEngine(canvas, onChange, mini = null) {
      over onto it - a second Honey is 600 more steps, not a lost 300. The
      slot is still the family, so it is one effect at a time, and `total`
      (the stack's length) is what its ring drains against. */
-  function useField(id) {
+  /* TWO FIELD ITEMS ARE INTERCHANGEABLE IF THEY BAIT THE SAME TIER. Every
+     repel and the plain Honey bait none (undefined === undefined); a coloured
+     jar baits its own. It is the one field that decides whether their steps
+     mean the same thing, which is the only question pooling has to answer. */
+  const sameEffect = (a, b) => !!a && !!b && a.tier === b.tier;
+
+  function useField(id, confirmed = false) {
     const item = fieldById(id);
     if (!item || (state.bag[item.id] ?? 0) <= 0) return false;
+    /* AND IT ASKS BEFORE IT THROWS STEPS AWAY (your call, 2026-10-09). The
+       swap below is not reversible and the jar is already spent, so this is
+       the same press `star` and `travel`-out-of-a-rift are: gated HERE rather
+       than in the rail, so the bag sheet, the shop and any later caller are
+       all covered by construction. */
+    const held = state.field[item.family];
+    if (!confirmed && held && !sameEffect(fieldById(held.id), item)) {
+      const old = fieldById(held.id);
+      ask("field", () => useField(id, true), `Start ${item.name}?`,
+        `${old?.name ?? "What is running"} has ${held.steps} steps left, and they go with it - `
+        + "the two shape the odds differently, so they cannot be pooled or run together.");
+      /* FALSE, where `star` and `travel` answer true to the same situation.
+         Both callers here read the answer as "did one leave the bag" and play
+         a pop if it did - and their own comments say why that matters: an
+         animation for something that did not happen is a lie about state.
+         Nothing has been spent yet; the dialog is the feedback until it is. */
+      return false;
+    }
     state.bag[item.id] -= 1;
     /* A REPEL IS EXCLUSIVE; THE OTHER TWO STACK - and this is narrower than the
        rule it replaces, deliberately.
@@ -3586,7 +3610,29 @@ export function createEngine(canvas, onChange, mini = null) {
 
        The family slot still stops two of the SAME kind - a Max Repel replaces a
        Repel by being written to the same key - so nothing about that changed. */
-    const carry = state.field[item.family]?.steps ?? 0;
+    /* STEPS CARRY ONLY ONTO THE SAME ITEM (reported 2026-10-09: "I have a
+       normal honey then activated gold honey, it stacked").
+
+       The carry rule above was written for a family whose items are
+       INTERCHANGEABLE - a Max Repel over a Repel is the same effect, longer,
+       so pooling the steps is simply generous. The variant family stopped
+       being that the day the coloured honeys arrived. A plain Honey LIFTS the
+       whole ladder; a coloured one baits one tier and damps every other by
+       `FAVOUR_DAMP` (0.25). Pooling across them converted the plain honey's
+       remaining steps into gold-bait steps, so a player who had paid ¥1,500
+       for "every tier likelier" silently got "one tier likelier and the other
+       fifteen four times WORSE" for the rest of it. That is not a stack, it is
+       a swap that costs you something and never says so.
+
+       SAME EFFECT, not same id - and the first fix got that wrong. Keying on
+       the id also stopped a Max Repel pooling onto a Repel, and those two ARE
+       interchangeable: both stop every encounter, only the length differs, so
+       pooling them was never anything but generous. What makes two field items
+       interchangeable is whether they bait the same tier: every repel and the
+       plain Honey bait none, a coloured jar baits its own. */
+    const run = state.field[item.family];
+    const carry = run && sameEffect(fieldById(run.id), item) ? run.steps : 0;
+    if (run && !carry) state.worn.push({ id: run.id, n: ++wornSeq });
     if (item.family === "repel") {
       for (const fam of FAMILIES) state.field[fam] = null;
     } else if (state.field.repel) {

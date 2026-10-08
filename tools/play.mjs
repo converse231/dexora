@@ -502,20 +502,49 @@ function until(e, what, label, max = 2000) {
   assert.ok(e.state.steps > SAVE.steps, "walking did not advance the step counter");
   assert.ok(PHASES.some((p) => p.id === phaseAt(e.state.steps).id),
     "the clock landed outside every phase");
+  const { fieldById } = await import("../src/game/items.js");
+  e.state.bag.honey = 3; e.state.bag["honey-shiny"] = 2;
   assert.equal(e.useField("honey"), true, "a honey refused to start");
   assert.equal(e.state.field.variant.id, "honey", "the honey did not land in its family slot");
   const honeyLeft = e.state.field.variant.steps;
-  assert.equal(e.useField("honey-shiny"), true, "a shiny honey refused to start");
+  /* THE SAME JAR POOLS (asked for, 2026-10-03): a second Honey is 600 more
+     steps, not a lost 300, and the ring drains against the whole stack. */
+  assert.equal(e.useField("honey"), true, "a second honey refused to start");
+  const pooled = honeyLeft + fieldById("honey").steps;
+  assert.equal(e.state.field.variant.steps, pooled, "a second jar of the same honey did not add its steps");
+  assert.equal(e.state.field.variant.total, pooled, "the stack's length is not what its ring reads");
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(boot(JSON.parse(store.get("meadow-route"))).e.state.field.variant.total, pooled, "a stack's length did not survive a reload");
+  /* A DIFFERENT JAR DOES NOT (reported 2026-10-09). A plain Honey lifts the
+     WHOLE ladder; a coloured one baits one tier and damps every other by
+     FAVOUR_DAMP. Pooling across them spent steps bought for "every tier
+     likelier" on "one tier likelier, the other fifteen four times worse", and
+     never said so. The new jar takes the slot with its own steps, and the one
+     it replaced is announced. Put the bug back by carrying `run.steps`
+     whatever the id. */
+  const wornBefore = e.state.worn.length;
+  const jars = e.state.bag["honey-shiny"];
+  /* AND IT ASKS FIRST (your call, 2026-10-09), because the steps are gone and
+     the jar is spent. Gated in the engine, so every caller is covered: the
+     press is answered, and the answer re-runs it. */
+  /* FALSE while it asks: the rail and the bag sheet both pop a jar when the
+     answer is not false, and nothing has left the bag yet. */
+  assert.equal(e.useField("honey-shiny"), false, "a jar popped in the bag for a swap nobody has agreed to yet");
+  assert.equal(e.state.ask?.kind, "field", "swapping to a different honey did not ask");
+  assert.equal(e.state.field.variant.id, "honey", "the question started the new jar before it was answered");
+  assert.equal(e.state.bag["honey-shiny"], jars, "the question spent the jar before it was answered");
+  e.answerAsk(false);
+  assert.equal(e.state.field.variant.id, "honey", "cancelling the question started it anyway");
+  assert.equal(e.state.bag["honey-shiny"], jars, "cancelling the question still spent the jar");
+  e.useField("honey-shiny");
+  e.answerAsk(true);
   assert.equal(e.state.field.variant.id, "honey-shiny",
     "a second honey did not take the slot - two variant tilts can run at once");
-  /* AND IT STACKS (asked for, 2026-10-03): the first honey's steps carry over
-     onto the second, and the ring drains against the whole stack. */
-  const { fieldById } = await import("../src/game/items.js");
-  const stacked = honeyLeft + fieldById("honey-shiny").steps;
-  assert.equal(e.state.field.variant.steps, stacked, "a second honey did not add its steps to the first's");
-  assert.equal(e.state.field.variant.total, stacked, "the stack's length is not what its ring reads");
-  await new Promise((r) => setTimeout(r, 600));
-  assert.equal(boot(JSON.parse(store.get("meadow-route"))).e.state.field.variant.total, stacked, "a stack's length did not survive a reload");
+  assert.equal(e.state.field.variant.steps, fieldById("honey-shiny").steps,
+    "a DIFFERENT honey pooled the plain one's steps - that converts a broad lift into a bait that damps fifteen tiers");
+  assert.equal(e.state.field.variant.total, fieldById("honey-shiny").steps,
+    "the ring reads a length the effect does not have");
+  assert.ok(e.state.worn.length > wornBefore, "replacing a running honey with a different one said nothing");
   /* A REPEL IS EXCLUSIVE, because it is total: it stops every encounter, so a
      honey burning its 600 steps underneath one is buying odds on encounters
      that cannot happen. Starting the honey therefore cancelled the repel. */
@@ -536,6 +565,17 @@ function until(e, what, label, max = 2000) {
   assert.equal(e.useField("repel"), true, "a repel refused to start over the others");
   assert.equal(e.state.field.variant, null, "a repel left a honey running underneath it");
   assert.equal(e.state.field.rarity, null, "a repel left a flute running underneath it");
+  /* A REPEL OVER A REPEL IS NOT A SWAP: all three stop every encounter, so
+     they are interchangeable, their steps still pool, and nothing is asked.
+     Keying the pool on the ITEM ID rather than on what the item BAITS broke
+     this on the way to fixing the honeys, and nothing caught it - hence this. */
+  e.state.bag.repel = (e.state.bag.repel ?? 0) + 1;
+  e.state.bag["max-repel"] = (e.state.bag["max-repel"] ?? 0) + 1;
+  const repelLeft = e.state.field.repel.steps;
+  assert.equal(e.useField("max-repel"), true, "a max repel refused to start over a repel");
+  assert.equal(e.state.ask, null, "a max repel over a repel asked - they are the same effect");
+  assert.equal(e.state.field.repel.steps, repelLeft + fieldById("max-repel").steps,
+    "a max repel did not pool the repel's steps - every repel stops every encounter, only the length differs");
   /* AND IT SAYS SO WHEN IT RUNS OUT. The only event in the game with no tell
      of its own: the card in the corner stops being there, which is what
      nothing happening also looks like. Driven through the real step handler,

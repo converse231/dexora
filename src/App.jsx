@@ -1335,12 +1335,12 @@ export default function App({
           onFish={() => { setWaterAsk(false); engine.fish(); }}
           onClose={() => setWaterAsk(false)} />
       )}
-      {st?.ask && (st?.encounter || ["star", "rift", "dust", "sweep"].includes(st.ask.kind)) && (
+      {st?.ask && (st?.encounter || ["star", "rift", "dust", "sweep", "field"].includes(st.ask.kind)) && (
         <Confirm
           title={st.ask.title}
           tone="warn"
           note={st.ask.body}
-          confirmLabel={{ flee: "RUN", star: "STAR", rift: "LEAVE", dust: "DUST", sweep: "DUST" }[st.ask.kind] ?? "THROW"}
+          confirmLabel={{ flee: "RUN", star: "STAR", rift: "LEAVE", dust: "DUST", sweep: "DUST", field: "USE IT" }[st.ask.kind] ?? "THROW"}
           onCancel={() => engine.answerAsk(false)}
           onConfirm={() => engine.answerAsk(true)}
         />
