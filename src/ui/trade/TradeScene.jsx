@@ -1,5 +1,10 @@
 /* THE TRADE SCENE (docs/trading.md): the moment Pokemon change hands.
 
+   THE LINK CABLE (your call, 2026-10-08, from three scenes mocked up): the
+   two games are wired together, and the cable is what carries the trade. Of
+   the three it is the only one whose length a bundle changes, which is the
+   price of reading as a cable at all.
+
    Your Pokemon fold into their balls, ONE BALL PER POKEMON each way - a
    three-for-one sends three and brings one back - riding a glowing link cable
    from either end, crossing in a burst, and what comes to you opens on your
@@ -38,6 +43,9 @@ export default function TradeScene({ trade, onDone }) {
   const got = (trade.got ?? []).filter((m) => speciesById(m.species));
 
   useEffect(() => {
+    // Nothing this build can draw (a species it does not have): finish, rather
+    // than render null and hold the modal lock - and the queue - for ever.
+    if (!got.length) { onDone(); return undefined; }
     const t = setTimeout(() => setDone(true), REVEAL_AT);
     return () => clearTimeout(t);
   }, []);

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { createEngine, VIEW_W, VIEW_H, VIEW_W_MAX } from "./game/engine.js";
 import { TILE } from "./game/tileset.js";
 import TopBar, { Missions } from "./ui/TopBar.jsx";
@@ -15,6 +15,7 @@ import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
 import WaterAsk from "./ui/WaterAsk.jsx";
 import DexClaim from "./ui/DexClaim.jsx";
+import { lazyPage } from "./ui/crash.jsx";
 import { titleIds } from "./game/titles.js";
 import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
@@ -45,17 +46,17 @@ import Types from "./ui/Types.jsx";
 import Evolve from "./ui/Evolve.jsx";
 /* ON DEMAND: the Trade Center is its own chunk, fetched the first time it
    opens, so the game's first load does not grow for anyone who never trades. */
-const TradeCenter = lazy(() => import("./ui/trade/TradeCenter.jsx"));
-const TradeScene = lazy(() => import("./ui/trade/TradeScene.jsx"));
+const TradeCenter = lazyPage(() => import("./ui/trade/TradeCenter.jsx"));
+const TradeScene = lazyPage(() => import("./ui/trade/TradeScene.jsx"));
 /* THE LEAGUE, the same way: the battle rules, rosters and moves are the
    heaviest data in the game, and only this chunk carries them (asserted). */
-const League = lazy(() => import("./ui/league/League.jsx"));
+const League = lazyPage(() => import("./ui/league/League.jsx"));
 // The walking party's editor: the trade picker, kept out of the main bundle.
-const PartyPick = lazy(() => import("./ui/PartyPick.jsx"));
+const PartyPick = lazyPage(() => import("./ui/PartyPick.jsx"));
 // The weekly roulette: only a spin loads it.
-const Roulette = lazy(() => import("./ui/Roulette.jsx"));
+const Roulette = lazyPage(() => import("./ui/Roulette.jsx"));
 // The fifth tab (docs/cards.md): its page, and every set's cards, load only when opened.
-const Cards = lazy(() => import("./ui/cards/Cards.jsx"));
+const Cards = lazyPage(() => import("./ui/cards/Cards.jsx"));
 /* Which trades this DEVICE has shown its scene for - a per-device nicety like
    "seen" news, so localStorage and never the save. */
 const SEEN_TRADES = "dexora-trades-seen";

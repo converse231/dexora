@@ -6323,7 +6323,9 @@ button:disabled { transition: none; }
 }
 @keyframes ts-pulse { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
 .ts-end {
-  position: absolute; top: calc(50% + 16px); font-family: var(--pixel); font-size: 9px; color: #7fa7c0;
+  position: absolute; top: calc(50% + 14px); padding: 2px 7px; border-radius: 7px;
+  border: 1px solid #2f5f7e; background: rgba(13, 24, 36, .85);
+  font-family: var(--pixel); font-size: 9px; color: #9fd8ff;
   max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ts-end.you { left: 2%; }
@@ -6332,7 +6334,11 @@ button:disabled { transition: none; }
   animation: ts-fold .7s ease-in .15s both; }
 .ts-gave > img, .ts-gave > .sprite-fx { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .ts-gave > .sprite-strip { width: 77%; height: 77%; margin: 11.5%; }
-@keyframes ts-fold { to { transform: scale(0) rotate(-20deg); opacity: 0; } }
+@keyframes ts-fold {
+  0% { transform: none; opacity: 1; filter: none; }
+  34% { transform: scale(1.07); opacity: 1; filter: brightness(3.4) saturate(0); }
+  100% { transform: scale(0) rotate(-20deg); opacity: 0; filter: brightness(3.4) saturate(0); }
+}
 /* ONE BALL PER POKEMON: `--d` staggers each one's start and `--y` fans them
    apart, both set per ball in TradeScene.jsx (squeezed to land by the reveal). */
 .ts-ball {
@@ -6382,7 +6388,11 @@ button:disabled { transition: none; }
 .ts-one { position: relative; width: 84px; height: 84px; display: grid; place-items: center; }
 .ts-one > img, .ts-one > .sprite-fx { width: 84px; height: 84px; object-fit: contain; image-rendering: pixelated; }
 .ts-one > .sprite-strip { width: calc(84px * .77); height: calc(84px * .77); }
-@keyframes ts-rise { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
+@keyframes ts-rise {
+  0% { opacity: 0; transform: scale(.3); filter: brightness(3) saturate(.15); }
+  55% { opacity: 1; transform: scale(1.06); filter: brightness(1.5) saturate(.7); }
+  100% { opacity: 1; transform: none; filter: none; }
+}
 .ts-flash {
   position: absolute; inset: -30px; border-radius: 50%; opacity: 0; pointer-events: none;
   background: radial-gradient(circle, rgba(255, 255, 255, .95) 0 25%, rgba(159, 216, 255, .5) 45%, transparent 70%);

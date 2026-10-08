@@ -521,6 +521,15 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Cards in a wide rail row are one height** (stretch); the buttons sit on
   the card's floor, and an open shop row spans the row. `#root` fills
   `body`'s flex row, so the app's width never depends on what is inside it.
+- **Nothing may blank the game** (`ui/crash.jsx`, 2026-10-08): React unmounts
+  the whole tree when render throws, so with no boundary a crash left an empty
+  page - which is what accepting a trade did when the tab had been open across
+  a deploy and `TradeScene`'s chunk was gone from the CDN. `Boundary` wraps
+  `Boot` in main.jsx and answers with a card and a Reload, and EVERY `lazy()`
+  goes through `lazyPage`, which reloads the tab ONCE (`dexora-stale` in
+  sessionStorage, so never a loop) when the failure is a module that would not
+  load - the fix for a stale build being literally a reload. A lazy page added
+  with a bare `lazy()` can still blank on the next deploy.
 - **Every dialog closes through `useDismiss`**, never a bare `onClick` on a
   scrim, and takes the modal lock (`App` ignores keys while `modalOpen()`).
   Custom listboxes carry keyboard handling, focus return and the lock.
