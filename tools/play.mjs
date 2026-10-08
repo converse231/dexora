@@ -230,7 +230,7 @@ function until(e, what, label, max = 2000) {
   const { e } = boot(SAVE);
   const paid = {};
 
-  for (const tier of [null, "showdown"]) {
+  for (const tier of [null, "showdown", "living"]) {
     let enc = e.state.encounter ?? walkToEncounter(e);
     assert.ok(enc, "walked a whole map and met nothing");
     if (enc.phase !== "idle")
@@ -241,6 +241,10 @@ function until(e, what, label, max = 2000) {
     // And research already finished, because a research level pays too.
     e.state.research[enc.speciesId] = TASKS.map((t) => t.steps.at(-1));
     const sp = speciesById(enc.speciesId);
+    // The shared save carries two Master Balls and this loop throws one per
+    // tier, so it ran dry the moment a third tier joined - and a dry bag
+    // fails as "the gate is not in the engine", which it is.
+    e.state.bag["master-ball"] = 1;
     const before = e.state.money;
     /* THE MASTER BALL ASKS NOW, so this drives the real path rather than
        reaching past it - the press, the question, the answer. This test broke
@@ -263,8 +267,21 @@ function until(e, what, label, max = 2000) {
 
   assert.equal(paid.ordinary, 0, "an ordinary catch paid a variant bounty");
   assert.ok(paid.showdown > 0, "the rarest tier in the game paid nothing");
-  console.log(`bounty ok — an ordinary catch pays ¥0 and a showdown pays ` +
-    `¥${paid.showdown}, both through a real throw`);
+  assert.ok(paid.living > 0, "the second strip tier paid nothing");
+  /* AND LIVING OUTPAYS SHOWDOWN ON THE SAME SPECIES, because it is rarer.
+     ON THE SAME SPECIES is the whole assertion: `catchBounty` is the species'
+     SELL band times the tier's pay, and the loop above meets a different
+     creature each time - so comparing what those two throws actually paid
+     compares sell bands, not tiers, and said Living was the cheaper tier. */
+  {
+    const one = speciesById(6);
+    assert.ok(catchBounty(one, "living") > catchBounty(one, "showdown"),
+      `on one species Living pays ¥${catchBounty(one, "living")} and Showdown ` +
+      `¥${catchBounty(one, "showdown")} - Living is rarer and the bounty does not know it`);
+  }
+  console.log(`bounty ok — an ordinary catch pays ¥0, a showdown ¥${paid.showdown} ` +
+    `and a living ¥${paid.living}, all through a real throw, and Living outpays ` +
+    "Showdown on one species");
 }
 
 /* TWO PRESSES THAT CANNOT BE TAKEN BACK HAVE TO ASK, AND ONLY THE ENGINE CAN

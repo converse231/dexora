@@ -1395,6 +1395,7 @@ canvas {
 .bx-vtag.shadow { background: #5a2bb0; }
 .bx-vtag.chaotic { background: #b3121f; color: #ffe36a; }
 .bx-vtag.projection { background: #1c8fa3; }
+.bx-vtag.living { background: #1f8f6d; }
 /* One badge, used everywhere a type is named. It was sized in cqw, which only
    resolves inside the battle overlay, so it could not be reused in the rail -
    which is why the map tag and the travel list printed types as prose. Plain px
@@ -2182,7 +2183,7 @@ canvas {
    84% x 0.77 is 65% of the tile, level with the Showdown's 68% x 1.00, and
    still clear of the number and the marks in the corners. */
 .cell img:not(.mark) { width: 84%; height: 84%; object-fit: contain; image-rendering: pixelated; }
-.cell .sprite-showdown { width: 68%; height: 68%; image-rendering: pixelated; }
+.cell .sprite-strip { width: 68%; height: 68%; image-rendering: pixelated; }
 
 /* ---- a tier moves in the grid too -------------------------------------
    `inset: 8%` on the foil, and it is not a nudge: the sprite is drawn at 84%
@@ -2200,6 +2201,9 @@ canvas {
    centred, so a layer at `inset: 0` masks itself to a silhouette larger than
    the thing it is meant to be damaging. */
 .cell .glitch-ghost, .cell .glitch-tear, .cell .glitch-blocks { inset: 8%; }
+/* 16%, not 8%: a cell draws a STRIP at 68% where it draws an `<img>` at 84%,
+   so Living's bloom needs the tighter inset to sit on the creature. */
+.cell .live-breath { inset: 16%; }
 .cell .astral-aura { inset: -2%; }
 .cell .shiny-spark i { width: 6px; height: 6px; box-shadow: 0 0 4px rgba(255, 226, 150, .95); }
 .cell .shiny-spark i:nth-child(2),
@@ -2292,7 +2296,7 @@ canvas {
 .boxrow.spare { border-color: var(--path); background: var(--path-soft); }
 /* The Pokémon is the row. It was a 42px thumbnail against three lines of text
    and a full-width button bar, so the card read as chrome with a sticker on it. */
-/* `.sprite-showdown` IS IN THIS SELECTOR BECAUSE IT IS NOT AN `img`.
+/* `.sprite-strip` IS IN THIS SELECTOR BECAUSE IT IS NOT AN `img`.
 
    Reported as Showdown having no preview in the Box, and it had none: the
    strip renders as a `<span>` with a background, `Sprite.jsx` returns it
@@ -2301,11 +2305,11 @@ canvas {
    auto-sized grid track, and came out zero wide. Nothing failed; there was
    simply a gap where a Pokemon should be.
 
-   `Sprite.jsx`'s own comment already states the rule - *"`.sprite-showdown`
+   `Sprite.jsx`'s own comment already states the rule - *"`.sprite-strip`
    has to be sized wherever an `img` was"* - and this is the fourth place that
    has to obey it, which is why check.mjs now asserts it rather than trusting
    the next person to read that line. */
-.boxrow > img, .boxrow > .sprite-fx, .boxrow > .sprite-showdown {
+.boxrow > img, .boxrow > .sprite-fx, .boxrow > .sprite-strip {
   grid-area: img; width: 62px; height: 62px; align-self: center;
   object-fit: contain; image-rendering: pixelated;
 }
@@ -2339,7 +2343,7 @@ canvas {
   position: relative; width: 170px; height: 170px; object-fit: contain; image-rendering: pixelated;
 }
 .pv-art .sprite-fx > img { width: 100%; height: 100%; }
-.pv-art > .sprite-showdown { position: relative; width: calc(170px * .77); height: calc(170px * .77); }
+.pv-art > .sprite-strip { position: relative; width: calc(170px * .77); height: calc(170px * .77); }
 .pv-head { display: grid; gap: 4px; justify-items: start; }
 .pv-head h3 { margin: 0; font-family: var(--display); font-size: 22px; color: var(--ink); }
 .pv-no { font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
@@ -3156,7 +3160,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   width: 100%; height: 100%;
   object-fit: contain; image-rendering: pixelated;
 }
-.vr-art > .sprite-showdown { width: 77%; height: 77%; }
+.vr-art > .sprite-strip { width: 77%; height: 77%; }
 .vr-name {
   font-family: var(--pixel); font-size: 9px;
   color: var(--ink); text-align: center;
@@ -3785,7 +3789,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 /* A plain sprite fills its box; only Showdown (whose frame fills its canvas)
    is held to 77% - both at 77% drew every ordinary form half Showdown's size. */
 .sf-art img:not(.mark) { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-.sf-art .sprite-showdown { width: 77%; height: 77%; image-rendering: pixelated; }
+.sf-art .sprite-strip { width: 77%; height: 77%; image-rendering: pixelated; }
 /* Not held: a flat silhouette, so the shape is a hint and the colours are not
    given away.
 
@@ -4277,12 +4281,6 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
   65% { opacity: 0; }
 }
 
-/* SHOWDOWN HAS NO FILTER AT ALL - it is a different FILE, an animated GIF
-   from PokeAPI's CDN, so the browser plays it and CSS has nothing to add.
-   The rule exists to say so, because an absent class in a list of eight
-   reads as an omission. */
-.sprite-showdown { image-rendering: auto; }
-
 @media (prefers-reduced-motion: reduce) {
   .sprite-glitched { animation: none !important; }
 }
@@ -4319,6 +4317,8 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .tv-shadow   { --tv: #b98cff; --tv2: #3a0f80; }
 .tv-chaotic  { --tv: #ff2a2a; --tv2: #ffd400; }
 .tv-projection { --tv: #8ff8ff; --tv2: #1c9fb3; }
+/* No `.tv-living`: `TierReveal` emits `tv-<tier>` only for a tier with a
+   REVEAL motion, and Living has none on purpose - its entrance is the wake. */
 
 /* The flood: the tier's colour poured INTO the creature's own outline, so it
    reads as the Pokemon being that thing rather than as a light shone at it.
@@ -4793,7 +4793,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 }
 
 /* A SHOWDOWN STRIP IS SIZED AGAINST THIS BOX, NOT AGAINST ITS PARENT.
-   `.sprite-showdown` says `width: 77%` further down this file, and for a span
+   `.sprite-strip` says `width: 77%` further down this file, and for a span
    a percentage is of the CONTAINING block - in the encounter that is the
    Pokemon's own slot, which is what the 77% was measured for, but here it is
    the whole `.evo-stage`. Same specificity, later in the file, so it beat
@@ -4801,7 +4801,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
    the creature beside it. Reported with a screenshot of a Trumbeak filling the
    stage. The 0.77 is the same measured fill (an ordinary sprite fills 0.77 of
    its canvas, a Showdown frame 1.00); check.mjs holds this to `.evo-mon`. */
-.evo-mon.sprite-showdown {
+.evo-mon.sprite-strip {
   width: calc(30cqw * .77); height: calc(30cqw * .77);
 }
 
@@ -4832,7 +4832,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
    dimmed the white. Showdown keeps its own, which steps a strip and never
    touches `transform`. The reveal is the tier's moment, and `VariantFx`
    plays it there. */
-.evo:not(.evo-reveal) .evo-mon:not(.sprite-showdown) { animation: none; }
+.evo:not(.evo-reveal) .evo-mon:not(.sprite-strip) { animation: none; }
 .evo-flash .evo-pre, .evo-reveal .evo-pre { visibility: hidden; }
 .evo-reveal .evo-post { transform: scale(1) !important; animation: evo-pop .32s ease-out; }
 @keyframes evo-pop { from { transform: scale(1.14) !important; } }
@@ -5900,21 +5900,61 @@ button:disabled { transition: none; }
    killed in the encounter by `mon-appear`, because an animation outranks a
    plain declaration - this file records that trap three times. Sizing the
    element leaves both the frame maths and the animation alone. */
-.sprite-showdown {
+/* A WRAPPED STRIP MATCHES WHAT A BARE ONE GETS IN THE SAME CONTAINER, and
+   that is not one number. Nearly every container holds a strip to 77% of the
+   box an `<img>` fills (a strip frame fills its canvas where a sprite fills
+   0.77) - the base rule below already does that, and it keeps doing it inside
+   `.sprite-fx`, because the wrapper is sized exactly as the `<img>` was.
+   `.boxrow` is the one exception: it sizes img, wrapper and strip all at 62px,
+   so there the wrapped strip has to fill its wrapper instead. A blanket
+   `100%` here fixed the Box and silently drew Living ~30% larger than a
+   Showdown of the same species in all fifteen of the others. */
+.boxrow > .sprite-fx > .sprite-strip { width: 100%; height: 100%; margin: 0; }
+.sprite-strip {
   display: block; width: 77%; height: 77%; margin: auto;
   background-image: var(--strip);
   background-repeat: no-repeat;
   background-size: 100% 800%;
   background-position: 0 0;
   image-rendering: pixelated;
-  animation: showdown-idle 900ms steps(8, jump-none) infinite;
 }
+.sprite-showdown { animation: showdown-idle 900ms steps(8, jump-none) infinite; }
 @keyframes showdown-idle {
   from { background-position-y: 0%; }
   to { background-position-y: 100%; }
 }
+/* LIVING ARRIVES STILL AND THEN WAKES, which is the whole separation from
+   Showdown: two tiers that both move would otherwise be one tier drawn twice.
+   Every sprite in the game is a frozen picture, so a Living one is a frozen
+   picture too for the first beat - and then it starts breathing. The delay is
+   on the animation rather than in a keyframe, so the resting style IS frame
+   one and a paused or reduced-motion Living simply never wakes.
+
+   Slower than Showdown's 900ms on purpose: this is the game's own idle, and
+   it is a breath rather than a performance. */
+.sprite-living { animation: living-idle 1180ms steps(8, jump-none) 900ms infinite; }
+@keyframes living-idle {
+  from { background-position-y: 0%; }
+  to { background-position-y: 100%; }
+}
+/* THE BREATH, and it is the only thing Living hangs beside the sprite. A warm
+   bloom low on the body that swells and fades on the same clock the strip
+   steps to, masked to the creature's own outline - unmasked it is a glowing
+   rectangle over the grass. It waits for the waking like the strip does, so a
+   still Living stays completely still. */
+.live-breath {
+  -webkit-mask: var(--art) center / contain no-repeat;
+          mask: var(--art) center / contain no-repeat;
+  background: radial-gradient(ellipse at 50% 72%, rgba(120, 255, 205, .45), transparent 62%);
+  opacity: 0; mix-blend-mode: screen;
+  animation: live-breath 4600ms ease-in-out 900ms infinite;
+}
+@keyframes live-breath {
+  0%, 100% { opacity: .1; transform: scale(.97); }
+  50% { opacity: .55; transform: scale(1.03); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .sprite-showdown { animation: none; }
+  .sprite-strip, .live-breath { animation: none; }
 }
 
 /* TOUCH TARGETS. Measured on a coarse pointer at 390px: the candy +1/+5/+10
@@ -6006,10 +6046,10 @@ button:disabled { transition: none; }
   position: relative; aspect-ratio: 1; padding: 4px; cursor: pointer;
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
 }
-.tc-mon > img, .tc-mon > .sprite-fx, .tc-mon > .sprite-showdown {
+.tc-mon > img, .tc-mon > .sprite-fx, .tc-mon > .sprite-strip {
   width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;
 }
-.tc-mon > .sprite-showdown { width: 77%; height: 77%; margin: 11.5%; }
+.tc-mon > .sprite-strip { width: 77%; height: 77%; margin: 11.5%; }
 .tc-mon.on { border-color: var(--canopy); background: var(--canopy-soft); }
 .tc-mon em {
   position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; display: grid; place-items: center;
@@ -6078,7 +6118,7 @@ button:disabled { transition: none; }
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; min-width: 0;
 }
 .tp-slot > img, .tp-slot > .sprite-fx { width: 68px; height: 68px; object-fit: contain; image-rendering: pixelated; }
-.tp-slot > .sprite-showdown { width: calc(68px * .77); height: calc(68px * .77); margin: 7.8px; }
+.tp-slot > .sprite-strip { width: calc(68px * .77); height: calc(68px * .77); margin: 7.8px; }
 .tp-slot figcaption { display: grid; justify-items: center; min-width: 0; max-width: 100%; }
 .tp-slot figcaption b { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tp-slot figcaption i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
@@ -6090,6 +6130,7 @@ button:disabled { transition: none; }
 .tp-slot.has-astral { border-color: #6f5bff; }
 .tp-slot.has-origin { border-color: #b8862a; }
 .tp-slot.has-showdown { border-color: #3cb8d6; }
+.tp-slot.has-living { border-color: #35c99a; }
 .tp-slot.has-glitched { border-color: #e0335f; }
 .tp-slot.has-noir { border-color: #6b6b78; }
 .tp-slot.has-vivid { border-color: #e84f9a; }
@@ -6151,7 +6192,7 @@ button:disabled { transition: none; }
   .tp-art-frame { width: 62px; height: 62px; }
   .tp-art.gate-art { --z: 2.5; }
   .tp-slot > img, .tp-slot > .sprite-fx { width: 56px; height: 56px; }
-  .tp-slot > .sprite-showdown { width: calc(56px * .77); height: calc(56px * .77); margin: 6.4px; }
+  .tp-slot > .sprite-strip { width: calc(56px * .77); height: calc(56px * .77); margin: 6.4px; }
 }
 
 /* ------------------------------------------------ offers */
@@ -6161,7 +6202,7 @@ button:disabled { transition: none; }
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
 }
 .of-mon > img, .of-mon > .sprite-fx { width: 42px; height: 42px; object-fit: contain; image-rendering: pixelated; }
-.of-mon > .sprite-showdown { width: calc(42px * .77); height: calc(42px * .77); }
+.of-mon > .sprite-strip { width: calc(42px * .77); height: calc(42px * .77); }
 .of-mon.big { width: auto; height: auto; aspect-ratio: 1; padding: 4px 4px 14px; }
 .of-mon.big > img, .of-mon.big > .sprite-fx { width: 100%; height: 100%; }
 .of-mon.big i {
@@ -6209,7 +6250,7 @@ button:disabled { transition: none; }
   border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line);
 }
 .of-big > img, .of-big > .sprite-fx { width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; }
-.of-big > .sprite-showdown { width: calc(64px * .77); height: calc(64px * .77); margin: 7.4px; }
+.of-big > .sprite-strip { width: calc(64px * .77); height: calc(64px * .77); margin: 7.4px; }
 .of-big figcaption { display: grid; justify-items: center; min-width: 0; max-width: 100%; }
 .of-big figcaption b {
   max-width: 100%; font-size: 12px; font-weight: 700; color: var(--ink);
@@ -6223,6 +6264,7 @@ button:disabled { transition: none; }
 .of-big.has-astral { border-color: #6f5bff; }
 .of-big.has-origin { border-color: #b8862a; }
 .of-big.has-showdown { border-color: #3cb8d6; }
+.of-big.has-living { border-color: #35c99a; }
 .of-big.has-glitched { border-color: #e0335f; }
 .of-big.has-noir { border-color: #6b6b78; }
 .of-big.has-vivid { border-color: #e84f9a; }
@@ -6289,7 +6331,7 @@ button:disabled { transition: none; }
 .ts-gave { position: absolute; left: 2%; top: 50%; width: 72px; height: 72px; margin-top: -48px;
   animation: ts-fold .7s ease-in .15s both; }
 .ts-gave > img, .ts-gave > .sprite-fx { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-.ts-gave > .sprite-showdown { width: 77%; height: 77%; margin: 11.5%; }
+.ts-gave > .sprite-strip { width: 77%; height: 77%; margin: 11.5%; }
 @keyframes ts-fold { to { transform: scale(0) rotate(-20deg); opacity: 0; } }
 /* ONE BALL PER POKEMON: `--d` staggers each one's start and `--y` fans them
    apart, both set per ball in TradeScene.jsx (squeezed to land by the reveal). */
@@ -6334,12 +6376,12 @@ button:disabled { transition: none; }
   opacity: 0; animation: ts-rise .6s cubic-bezier(.2, 1.4, .4, 1) 3s both;
 }
 .ts-got > img, .ts-got > .sprite-fx { position: relative; width: 150px; height: 150px; object-fit: contain; image-rendering: pixelated; }
-.ts-got > .sprite-showdown { position: relative; width: calc(150px * .77); height: calc(150px * .77); }
+.ts-got > .sprite-strip { position: relative; width: calc(150px * .77); height: calc(150px * .77); }
 /* Several arriving: a row of smaller portraits, each with its marks. */
 .ts-got.many { width: min(100%, 460px); height: auto; min-height: 100px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .ts-one { position: relative; width: 84px; height: 84px; display: grid; place-items: center; }
 .ts-one > img, .ts-one > .sprite-fx { width: 84px; height: 84px; object-fit: contain; image-rendering: pixelated; }
-.ts-one > .sprite-showdown { width: calc(84px * .77); height: calc(84px * .77); }
+.ts-one > .sprite-strip { width: calc(84px * .77); height: calc(84px * .77); }
 @keyframes ts-rise { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
 .ts-flash {
   position: absolute; inset: -30px; border-radius: 50%; opacity: 0; pointer-events: none;
@@ -6371,14 +6413,14 @@ button:disabled { transition: none; }
 .tc-who.still:hover { border-color: var(--line); }
 .tc-who.still > img, .tc-who.still > .sprite-fx { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; flex: none; }
 /* A Showdown strip is 77% of the box a sprite would fill (40px here). */
-.bd-want > .sprite-showdown, .tc-who.still > .sprite-showdown { width: calc(40px * .77); height: calc(40px * .77); margin: 4.6px; flex: none; }
+.bd-want > .sprite-strip, .tc-who.still > .sprite-strip { width: calc(40px * .77); height: calc(40px * .77); margin: 4.6px; flex: none; }
 .ev-surprise .ev-banner { background: linear-gradient(90deg, #dff1f8, #eef7fb); border-color: #bfe0ec; }
 .tc-send {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
   padding: 8px 10px; border-radius: 16px; background: var(--canopy-soft); border: 2px solid var(--canopy);
 }
 .tc-send > img, .tc-send > .sprite-fx { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; }
-.tc-send > .sprite-showdown { width: calc(56px * .77); height: calc(56px * .77); margin: 6.4px; }
+.tc-send > .sprite-strip { width: calc(56px * .77); height: calc(56px * .77); margin: 6.4px; }
 .tc-send span { display: grid; min-width: 0; }
 .tc-send b { font-size: 15px; }
 .tc-send i { font-style: normal; font-size: 12px; color: var(--ink-soft); }
@@ -6406,7 +6448,7 @@ button:disabled { transition: none; }
   border: 1px solid var(--line-firm); border-radius: 9px;
 }
 .pk-took > img { width: 30px; height: 30px; image-rendering: pixelated; }
-.pk-took > .sprite-showdown { width: calc(30px * .77); height: calc(30px * .77); margin: 3.4px; }
+.pk-took > .sprite-strip { width: calc(30px * .77); height: calc(30px * .77); margin: 3.4px; }
 .pk-took i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-soft); }
 .pk-took b { color: var(--ink-faint); font-weight: 400; }
 .pk-took:hover { border-color: var(--bad); }
@@ -6871,7 +6913,7 @@ button:disabled { transition: none; }
 .ft-mon.me .ft-base { bottom: 0; }
 .ft-sprite { position: relative; width: 100%; height: 100%; }
 .ft-sprite > img, img.ft-sprite { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-.ft-mon > .sprite-showdown { width: 77%; height: 77%; }
+.ft-mon > .sprite-strip { width: 77%; height: 77%; }
 .ft-sprite.flip { transform: scaleX(-1); }
 .ft-mon.in { animation: ft-in .45s cubic-bezier(.2, .9, .3, 1.2) .42s both; }
 /* THE BALL (`.ball`'s strip and `--f`, tools/build_balls.py): it arcs in from
@@ -7459,7 +7501,7 @@ button:disabled { transition: none; }
   gap: 2px 8px; align-items: center; padding: 6px 10px; cursor: pointer; text-align: left; font: inherit; color: var(--ink);
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px;
 }
-.ft-switch li button > img, .ft-switch li button > .sprite-showdown { grid-row: span 2; width: 40px; height: 40px; image-rendering: pixelated; }
+.ft-switch li button > img, .ft-switch li button > .sprite-strip { grid-row: span 2; width: 40px; height: 40px; image-rendering: pixelated; }
 .ft-sw-name { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .ft-sw-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .ft-sw-name i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
@@ -7576,13 +7618,15 @@ button:disabled { transition: none; }
    tiles, today lit in the call-to-action orange, the seventh in roulette
    gold. Loops move transform and opacity only. */
 .ci-card {
-  position: relative; width: min(470px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto;
-  display: grid; gap: 14px; justify-items: center; text-align: center; padding: 22px 18px 18px;
+  position: relative; width: min(540px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto;
+  display: grid; gap: 18px; justify-items: center; text-align: center; padding: 28px 24px 22px;
   background: var(--surface); border: 1px solid var(--line-firm); border-radius: 22px;
   box-shadow: 0 30px 70px var(--shadow); animation: ci-in 340ms cubic-bezier(.2, 1.3, .4, 1);
 }
 @keyframes ci-in { from { transform: scale(.9) translateY(14px); opacity: 0; } }
-.ci-x { position: absolute; top: 12px; right: 12px; }
+/* `grid-area: auto`: .set-x names a grid area, and an absolute child of a grid takes that
+   area as its containing block - the button sat 70px down, under the Day 4 tile. */
+.ci-x { position: absolute; top: 12px; right: 12px; grid-area: auto; z-index: 2; }
 .ci-kicker { font: 600 11px var(--pixel); text-transform: uppercase; color: var(--accent); }
 .ci-streak { display: flex; align-items: center; gap: 10px; }
 .ci-streak > .ic { color: #ff7a38; filter: drop-shadow(0 0 10px rgba(255, 122, 56, .6)); animation: ci-flicker 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
@@ -7592,14 +7636,24 @@ button:disabled { transition: none; }
 .ci-streak > span { display: grid; text-align: left; font: 700 15px var(--display); color: var(--ink-soft); }
 .ci-streak > span i { font: 600 10px var(--pixel); font-style: normal; color: var(--ink-faint); text-transform: uppercase; }
 .ci-broke { margin: -4px 0 0; font-size: 13px; color: var(--ink-soft); }
-.ci-week { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+/* THE WEEK, ROOMY (2026-10-08, reported as cramped): four across, and day 7 -
+   the spin - a wide prize tile on the second row, instead of seven slivers. */
+.ci-week { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .ci-day {
-  position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; padding: 8px 2px 7px;
-  border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); min-width: 0;
+  position: relative; display: grid; justify-items: center; align-content: center; gap: 6px; padding: 12px 6px 11px; min-height: 104px;
+  border-radius: 16px; border: 1px solid var(--line); background: var(--surface-2); min-width: 0;
 }
-.ci-day em { font: 600 9px var(--pixel); font-style: normal; color: var(--ink-faint); text-transform: uppercase; }
-.ci-day b { font: 700 10px/1.15 var(--display); color: var(--ink); overflow-wrap: anywhere; }
-.ci-day .ci-ic { width: 26px; height: 26px; object-fit: contain; display: grid; place-items: center; image-rendering: pixelated; }
+.ci-day em { font: 600 10px var(--pixel); font-style: normal; color: var(--ink-faint); text-transform: uppercase; }
+.ci-day b { font: 700 13px/1.2 var(--display); color: var(--ink); }
+.ci-day .ci-ic { width: 36px; height: 36px; object-fit: contain; display: grid; place-items: center; image-rendering: pixelated; }
+.ci-day.spin { grid-column: span 2; grid-template-columns: auto minmax(0, 1fr); justify-items: start; text-align: left; column-gap: 12px; padding: 12px 16px; }
+.ci-day.spin em { grid-column: 1 / -1; }
+.ci-day.spin .ci-ic { width: 44px; height: 44px; }
+.ci-day.spin b { font-size: 16px; }
+.ci-prize { display: grid; gap: 1px; min-width: 0; }
+.ci-prize small { font: 700 12px var(--display); color: #ffcf4a; }
+/* The prize reads as a prize before you reach it: dimmed less than the other days to come. */
+.ci-day.spin.later { opacity: .9; }
 .ci-yen { color: #ffcf4a; }
 .ci-day.spin { background: linear-gradient(160deg, color-mix(in srgb, #ffcf4a 30%, var(--surface-2)), var(--surface-2)); border-color: color-mix(in srgb, #ffcf4a 60%, transparent); }
 .ci-spin { color: #ffcf4a; }
@@ -7658,7 +7712,7 @@ button:disabled { transition: none; }
   animation: ci-in 340ms cubic-bezier(.2, 1.3, .4, 1); }
 .rl-head { position: relative; width: 100%; display: grid; gap: 2px; }
 .rl-head h3 { margin: 0; font: 800 22px var(--display); color: var(--ink); }
-.rl-head .set-x { position: absolute; top: 0; right: 0; }
+.rl-head .set-x { position: absolute; top: 0; right: 0; grid-area: auto; }   /* see .ci-x */
 .rl-view { position: relative; width: 100%; overflow: hidden; border-radius: 14px; background: #0a1120;
   border: 1px solid var(--line-firm); cursor: pointer;
   -webkit-mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
@@ -7688,7 +7742,28 @@ button:disabled { transition: none; }
 .rl-won b { font: 800 18px var(--display); color: var(--ink); }
 .rl-won span { font-size: 13px; color: var(--ink-soft); }
 .rl-won .ci-go { grid-column: 1 / -1; }
-@media (max-width: 520px) { .ci-week { gap: 4px; } .ci-day b { font-size: 9px; } .ci-medal b { font-size: 88px; } }
+@media (max-width: 520px) {
+  .ci-card { padding: 24px 16px 18px; gap: 16px; }
+  .ci-week { gap: 8px; }
+  .ci-day { min-height: 96px; padding: 10px 4px; }
+  .ci-day b { font-size: 12px; }
+  .ci-medal b { font-size: 88px; }
+}
+/* A sideways phone (360-430px tall): the streak and the week shrink, the footnote goes, and
+   the whole card fits with its button on screen - it opened scrolled past its own header. */
+@media (max-height: 460px) {
+  .ci-card { padding: 14px 18px 14px; gap: 10px; width: min(600px, 100%); }
+  .ci-kicker { display: none; }
+  .ci-streak > b { font-size: 36px; }
+  .ci-streak > .ic { width: 26px; height: 26px; }
+  .ci-week { gap: 6px; }
+  .ci-day { min-height: 0; padding: 7px 4px; gap: 3px; }
+  .ci-day .ci-ic { width: 26px; height: 26px; }
+  .ci-day.spin { padding: 7px 12px; }
+  .ci-day.spin .ci-ic { width: 32px; height: 32px; }
+  .ci-go { min-height: 44px; }
+  .ci-foot { display: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .ci-streak > .ic, .ci-medal .ic, .ci-rays, .ci-bit, .ci-day.today::after { animation: none; }
 }
@@ -8099,7 +8174,7 @@ button:disabled { transition: none; }
   background: var(--surface); border: 1px solid var(--line-firm); border-radius: 9px;
 }
 .tx-slot > img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-.tx-slot > .sprite-showdown { display: block; width: 77%; height: 77%; margin: 0 auto; }
+.tx-slot > .sprite-strip { display: block; width: 77%; height: 77%; margin: 0 auto; }
 .tx-slot i {
   position: absolute; left: 0; right: 0; bottom: 2px; text-align: center;
   font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-soft);
@@ -8173,7 +8248,7 @@ button:disabled { transition: none; }
 }
 
 .gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
-.chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines {
+.chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .live-breath {
   position: absolute; inset: 0; pointer-events: none;
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */

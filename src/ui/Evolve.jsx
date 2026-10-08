@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import { evoCycleFrames, SCALE_MAX } from "../game/evocycle.js";
-import { spriteUrl, VariantFx } from "./Sprite.jsx";
+import { spriteUrl, VariantFx, STRIP_TIERS } from "./Sprite.jsx";
 
 const FRAME = 1000 / 60; // the GBA's frame, which every number below counts in
 const CYCLE = evoCycleFrames();
@@ -64,10 +64,10 @@ export default function Evolve({ evo, onDone }) {
      The refs are untouched by the swap: they set `style.transform` and
      nothing else, which a span takes exactly as an image does. */
   const Mon = ({ innerRef, id, className }) =>
-    evo.variant === "showdown" ? (
+    STRIP_TIERS.has(evo.variant) ? (
       <span
         ref={innerRef}
-        className={`sprite-showdown ${className}`}
+        className={`sprite-strip sprite-${evo.variant} ${className}`}
         style={{ "--strip": `url(${art(id)})` }}
         aria-hidden="true"
       />

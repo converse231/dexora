@@ -22,7 +22,7 @@ import { useEffect, useState } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
 import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
-import Sprite, { spriteUrl, VariantFx } from "./Sprite.jsx";
+import Sprite, { spriteUrl, VariantFx, STRIP_TIERS } from "./Sprite.jsx";
 import {
   foundIn, howOften, speciesById, areaOpen, BIOMES, tiersFor, ROSETTE_NEED,
   TIER_TELL, genOf, dexIndex,
@@ -482,7 +482,7 @@ export default function DexSheet({
                               larger than its eight neighbours. */}
                           <Sprite
                             id={id}
-                            variant={t === "showdown" && !got(t) ? null : t}
+                            variant={STRIP_TIERS.has(t) && !got(t) ? null : t}
                             alt={`${name} ${label(sp)}`}
                           />
                           <VariantFx id={id} variant={t} />

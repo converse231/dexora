@@ -27,6 +27,7 @@ const TIER_ART = {
   vivid: { src: "marks/vivid.png", name: "Vivid" },
   noir: { src: "marks/noir.png", name: "Noir" },
   showdown: { src: "marks/showdown.png", name: "Showdown" },
+  living: { src: "marks/living.png", name: "Living" },
   gold: { src: "marks/gold.png", name: "Gold" },
   shadow: { src: "marks/shadow.png", name: "Shadow" },
   chaotic: { src: "marks/chaotic.png", name: "Chaotic" },

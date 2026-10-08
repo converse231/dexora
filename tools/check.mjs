@@ -1144,8 +1144,11 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
          stuttering - which names `img` - cannot reach it, and an entry nobody
          has caught would have a black shape idling in it. */
       const sheet = readFileSync(new URL("../src/ui/DexSheet.jsx", import.meta.url), "utf8");
-      assert.ok(sheet.includes('t === "showdown" && !got(t) ? null : t'),
-        "the FORMS strip asks for an unheld Showdown - a strip animates, so " +
+      /* STRIP-AGNOSTIC SINCE LIVING JOINED (2026-10-08). This named Showdown
+         as a string, so the second strip tier would have passed the check by
+         doing nothing at all - the guard is about the KIND, not the tier. */
+      assert.ok(sheet.includes("STRIP_TIERS.has(t) && !got(t) ? null : t"),
+        "the FORMS strip asks for an unheld strip tier - a strip animates, so " +
         "the silhouette would idle in a cell nobody has earned");
 
       /* 5. A MARK IS PROOF OF OWNERSHIP, NEVER A GREYED-OUT LABEL. The strip
@@ -1194,12 +1197,19 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
        size for the whole cycle (reported as a glitchy evolution). Read off the
        CSS: any `.sprite-<tier>` whose animation's keyframes set `transform`
        needs the scene's rule, which leaves only Showdown's strip running. */
+    /* THE STRIP TIERS ARE READ OUT OF `Sprite.jsx`, never named here: the
+       exemption is about being a strip, and a third one must cost no edit. */
+    const stripSrc = readFileSync(new URL("../src/ui/Sprite.jsx", import.meta.url), "utf8");
+    const strips = [...(stripSrc.match(/STRIP_TIERS = new Set\(\[([^\]]*)\]\)/)?.[1] ?? "")
+      .matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
+    assert.ok(strips.length >= 2,
+      `only ${strips.length} strip tier(s) parsed out of Sprite.jsx - the read is wrong`);
     const moving = [...css.matchAll(/\.sprite-([a-z]+)\s*\{[^}]*?animation:\s*([a-z-]+)/g)]
       .filter(([, , name]) => new RegExp(`@keyframes ${name}\\s*\\{[\\s\\S]*?transform`).test(
         css.slice(css.indexOf(`@keyframes ${name}`), css.indexOf("\n}", css.indexOf(`@keyframes ${name}`)))))
-      .map(([, tier]) => tier).filter((t) => t !== "showdown");
+      .map(([, tier]) => tier).filter((t) => !strips.includes(t));
     assert.ok(moving.includes("glitched"), "no tier animation moves `transform` - this check reads nothing");
-    assert.ok(/\.evo:not\(\.evo-reveal\) \.evo-mon:not\(\.sprite-showdown\)\s*\{\s*animation:\s*none/.test(css),
+    assert.ok(/\.evo:not\(\.evo-reveal\) \.evo-mon:not\(\.sprite-strip\)\s*\{\s*animation:\s*none/.test(css),
       `${moving.join(", ")} animate transform, and the evolution cycle does not switch it off - the scale swap cannot play`);
   }
 
@@ -3466,7 +3476,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      gives it nothing. It then takes its own `width: 77%` of an auto-sized
      grid track and comes out zero wide. Reported as Showdown having no
      preview in the Box, where exactly that had happened; `Sprite.jsx`'s own
-     comment states the rule - *"`.sprite-showdown` has to be sized wherever
+     comment states the rule - *"`.sprite-strip` has to be sized wherever
      an `img` was"* - and prose does not fail a build.
 
      A LIST, AND DEFENSIBLY SO. The blanket version ("every rule that sizes
@@ -3579,9 +3589,9 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     }
 
     for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon", ".ts-got", ".ts-gave", ".tc-send", ".of-mon", ".bd-want", ".tc-who.still", ".ts-one", ".pk-took"]) {
-      assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-showdown`).test(css),
-        `${box} draws a Pokemon and never sizes .sprite-showdown - the one ` +
-        "variant that is a span will render zero wide there, silently");
+      assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-strip`).test(css),
+        `${box} draws a Pokemon and never sizes .sprite-strip - a tier that ` +
+        "is a span will render zero wide there, silently");
     }
 
     /* AND THE EVOLUTION SCENE SIZES IT AGAINST ITS OWN BOX. `.evo-mon` is a
@@ -3591,7 +3601,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
        own number, so the two cannot drift. Verified by deleting the rule. */
     const evoSize = /\.evo-mon \{[^}]*width:\s*([\d.]+)cqw/.exec(css)?.[1];
     assert.ok(evoSize, ".evo-mon no longer has a cqw width to hold the strip to");
-    assert.ok(new RegExp(`\\.evo-mon\\.sprite-showdown\\s*\\{[^}]*width:\\s*calc\\(${evoSize}cqw \\* \\.77\\)`).test(css),
+    assert.ok(new RegExp(`\\.evo-mon\\.sprite-strip\\s*\\{[^}]*width:\\s*calc\\(${evoSize}cqw \\* \\.77\\)`).test(css),
       `a Showdown evolution is not sized to .evo-mon's ${evoSize}cqw - its 77% is ` +
       "of the whole stage and it draws two and a half times too big");
   }

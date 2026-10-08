@@ -22,7 +22,7 @@
 -- re-added from it every run.
 create or replace function public.tier_list()
 returns text[] language sql immutable set search_path = '' as $$
-  select array['gold','showdown','shiny','shadow','astral','chaotic','glitched','projection','holo','origin','noir','vivid']::text[]
+  select array['gold','living','showdown','shiny','shadow','astral','chaotic','glitched','projection','holo','origin','noir','vivid']::text[]
 $$;
 
 -- ------------------------------------------------------------------ tables

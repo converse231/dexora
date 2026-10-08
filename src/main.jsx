@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
 import Boot from "./Boot.jsx";
 import { applyTheme } from "./ui/theme.js";
 import "./styles.css";
@@ -29,8 +30,19 @@ for (const [family, file, weight] of [
   face.load().catch(() => {});   // a failed load keeps the next face in --body / --pixel
 }
 
+/* PAGE VIEWS, AND THE `react` ENTRY RATHER THAN `next` (2026-10-08). Vercel's
+   own instructions say `@vercel/analytics/next`; this is a Vite app, and that
+   entry pulls Next's router hooks and fails at build.
+
+   It is cookieless and sends no personal data, which is the only kind this
+   game is allowed to collect. It loads `/_vercel/insights/script.js` from the
+   deployment, so OFFLINE AND IN LOCAL MODE IT SIMPLY 404s AND STOPS - local
+   mode is the game rather than a fallback, and nothing here may change that.
+   It is inert in dev (Vercel's own environment check), so StrictMode's
+   double-invoked effects cannot count a view twice. */
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <Boot />
+    <Analytics />
   </StrictMode>
 );

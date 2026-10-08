@@ -79,6 +79,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/follow/`, `src/data/follow.js` | `npm run follow` (the same pin; check.mjs reads each header) |
 | `public/skins/` | `npm run skins` (from `SKINS` in cosmetics.js plus the tool's `SRC`) |
 | `src/data/abilities.js` | `npm run abilities` (PokeAPI, cached in .assets-src/abilities) |
+| `public/sprites/living/`, `src/data/living.js` | `npm run living` (Black and White's own idle, 8-frame strips) |
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
@@ -277,12 +278,27 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   is the one list the CHECKs and functions read (asserted equal to `TIERS`),
   and the constraints are re-added from it every run. A new tier is SQL first:
   a box entry in a tier the server does not know cannot enter trading.
+- **A tier that is a STRIP shares one class, `.sprite-strip`** (`STRIP_TIERS`
+  in Sprite.jsx: Showdown and Living). A strip is a span with a background
+  stepped by `steps(8, jump-none)`, and a span has no intrinsic size, so every
+  container drawing a Pokemon must size it - 15 of them, asserted. Naming the
+  tier instead of the kind made that 24 rules for one tier; the shared hook
+  makes a third strip cost no CSS. **Living is Showdown's twin and must not
+  read as it**: Showdown is the Showdown community's animation, Living is the
+  one Black and White played, so the tell is life (`it breathes`) and not
+  motion. It ARRIVES STILL and wakes after a beat, which is the whole
+  separation - every other sprite in the game is a frozen picture, so a Living
+  one is too, until it starts breathing. Its `live-breath` bloom is the only
+  persistent tell a Dex tile gets, because a tile has no arrival.
 - **A tier added since Glitched draws its motion through `VariantFx`**
   (`SCENE_FX` in the battle): a `.sprite-<tier>` filter for the bare `<img>`
   plus a few layers in the sprite's box, sized for forty Dex tiles at once.
 - **`rollVariant` walks rarest first** and takes a `locked` set from
   `lockedTiers(id)`, an art check only (one argument). `tiersFor` derives from
-  it. Origin means debut art older than the base art (`genOf < baseArtGen`,
+  it. **The art gates are a LIST (`ART_GATES`), and the answer is memoised on
+  which of them failed** - Origin, Showdown and Living are three gates and all
+  eight combinations occur in the dex, so the old "three named Sets and a
+  branch" shape does not survive a third one. A fourth gate is one row. Origin means debut art older than the base art (`genOf < baseArtGen`,
   `ART_GEN` a row per generation) **or a SageDeoxys drawing** (`SAGE_IDS`,
   written by `build_origin.py` from `art/sage/`, imported once by
   `tools/import_sage.py`; Kanto and Johto keep their own debut art), and
