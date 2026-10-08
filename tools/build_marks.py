@@ -49,6 +49,7 @@ SHEET_ORDER = ["origin", "shiny", "astral", "complete"]
 # Everything the game asks for. `src/ui/Marks.jsx` names the same set.
 ICONS = ["origin", "shiny", "holo", "astral", "glitched", "vivid", "noir",
          "showdown", "gold", "shadow", "chaotic", "projection", "cadence",
+         "diamond", "platinum", "emerald",
          "complete", "legendary", "research", "alpha"]
 
 # THE SHAPE HAS TO CARRY IT, NOT THE COLOUR. Eight of these sit in a row on a
@@ -64,6 +65,16 @@ STAND_IN = {
                                   (78, 92), (50, 71), (22, 92), (34, 58),
                                   (6, 38), (40, 38)]),
     "noir":     ((225, 228, 236), None),          # a half-disc, drawn below
+    # THE TREASURE SET. Gold already holds the crown, so these take the three
+    # shapes a jeweller would cut: a brilliant (Diamond, point down), an ingot
+    # (Platinum, a flat-topped bar) and a step cut (Emerald, a cornered
+    # rectangle). None shares an outline with the crown or with each other,
+    # which is the only thing this file actually enforces.
+    "diamond":  ((214, 240, 255), [(10, 34), (30, 10), (70, 10), (90, 34),
+                                   (50, 94)]),
+    "platinum": ((198, 214, 232), [(26, 24), (74, 24), (92, 76), (8, 76)]),
+    "emerald":  ((80, 230, 150), [(26, 10), (74, 10), (92, 28), (92, 72),
+                                  (74, 90), (26, 90), (8, 72), (8, 28)]),
     "showdown": ((120, 210, 255), [(24, 12), (88, 50), (24, 88)]),
     # The four that joined together, and again none shares an outline with
     # the rest: a crown, a flame, a cross of shards and a beam over its base.

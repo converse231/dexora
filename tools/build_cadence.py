@@ -88,10 +88,27 @@ def strip(path):
         picked.append(picked[-1])
 
     scale = min(SIZE / w, SIZE / h)
+    # THE FILTER FOLLOWS THE DIRECTION, and LANCZOS was wrong in both.
+    #
+    # Black and White's own sprites are not one size: 37x38 for Bulbasaur,
+    # 119x105 for a Gen 9 one, so 325 of the 868 are scaled UP to reach this
+    # canvas and 498 are scaled DOWN. A smooth filter invents colours between
+    # the artist's own when it enlarges - which is what "the Cadence sprites
+    # look blurry" was, reported 2026-10-08 - and rings around a one-pixel
+    # outline when it shrinks. Then `quantize` bands whatever it produced.
+    #
+    # UP is NEAREST: no colour appears that the sprite did not already have.
+    # DOWN is BOX, an area average: plain NEAREST drops a one-pixel outline
+    # outright (Charizard lost its wing edges), and BOX keeps it present
+    # without LANCZOS's ringing.
+    #
+    # Sharper AND smaller, because the palette stays flat: 34% fewer bytes
+    # over a sample of eight, measured before the change was made.
+    filt = Image.NEAREST if scale >= 1 else Image.BOX
     out = Image.new("RGBA", (SIZE, SIZE * FRAMES), (0, 0, 0, 0))
     for k, fr in enumerate(picked):
         r = fr.resize((max(1, round(w * scale)), max(1, round(h * scale))),
-                      Image.LANCZOS)
+                      filt)
         out.alpha_composite(r, ((SIZE - r.width) // 2,
                                 SIZE * k + (SIZE - r.height)))
     return out.quantize(colors=COLORS, method=Image.FASTOCTREE)
@@ -104,10 +121,12 @@ def main():
     made, missing, bytes_out = [], [], 0
     for n, i in enumerate(ids, 1):
         dst = os.path.join(OUT, f"{i}.png")
-        if os.path.exists(dst):
-            made.append(i)
-            bytes_out += os.path.getsize(dst)
-            continue
+        # NO SKIP ON THE OUTPUT. `grab` already caches the download, which is
+        # the slow part; re-encoding 868 local gifs costs seconds. Skipping an
+        # existing png meant a change to `strip` below silently did nothing on
+        # a re-run - the filter fix of 2026-10-08 was written, run, and left
+        # every strip exactly as it was. A generator you cannot re-run is not
+        # a generator.
         src = grab(i)
         if not src:
             missing.append(i)

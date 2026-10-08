@@ -270,10 +270,18 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   tiers (FORMS strip, catch banner, `Variants.jsx`) takes its order from `TIERS`
   and its prose from `TIER_TELL`, which never quotes a number. `Variants.jsx`
   computes odds from `TIER_ODDS`.
-- **The twelve tiers are kinds, not strengths.** Keep the spread narrow; move
+- **The sixteen tiers are kinds, not strengths.** Keep the spread narrow; move
   the ratio, never the base. Vivid stays rarer than 1 in 100. A new tier keeps
   the any-variant RATE (every rung moves up to make room, held for a species
   without Origin); Gold alone sits above the 2.0x spread, as the chase.
+- **The treasure set is Gold's** (2026-10-08, your call): Diamond, Platinum and
+  Emerald sit directly under it, so the four rarest tiers are one material
+  each. Each is ONE filter and ONE idea of motion, and the three ideas are
+  disjoint on purpose - a sweep, a flash, a drift - because the filters alone
+  are three bright metals and do not separate on a 56px Box row. Platinum takes
+  the sweep so Gold keeps the sparkle; Diamond's points are round where Shiny's
+  are four-pointed; Emerald drifts and never pulses, because a pulse is
+  Cadence's breath and that tell is all that separates it from Showdown.
 - **A tier also lives in the SQL**: `public.tier_list()` in `db/trading.sql`
   is the one list the CHECKs and functions read (asserted equal to `TIERS`),
   and the constraints are re-added from it every run. A new tier is SQL first:
@@ -469,6 +477,16 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   queries add no specificity (overrides go last); `<details open>` in React
   needs owned state; a flex item's `min-height` is `auto`; a percentage size is
   of the containing block.
+- **A LOOP NOBODY CAN SEE IS NOT FREE** (`ui/pause.js`, 2026-10-08): neither
+  `content-visibility: auto` nor windowing stops an animation's clock, and at
+  sixteen tiers a 400-entry Box ran two hundred of them at once - 39fps
+  scrolling it, 60fps with only the loops off (the masks, the blend modes and
+  the sprite filters were each tried alone and none of them mattered).
+  `useOffscreenPause` quiets a whole grid, `usePauseOffscreenRows` one row of a
+  long list. Pausing them WHILE THE LIST SCROLLS was tried and is a LOSS -
+  restyling a `*` subtree once per gesture costs more than the loops save,
+  19fps against 27 on a continuous flick - so an observer, never a scroll
+  handler.
 - **Long lists skip what is off screen**: the Box's rows use
   `content-visibility: auto`; the Dex is WINDOWED (`useRows` renders the rows
   in view, geometry read off `.dexgrid`'s CSS) - at 1,300 tiles

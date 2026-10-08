@@ -11,6 +11,7 @@
    each other; at ~76px they each have a place. */
 
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useOffscreenPause } from "./pause.js";
 import { SPECIES } from "../data/dex.js";
 import { label } from "../game/map.js";
 import {
@@ -148,16 +149,6 @@ const Cell = memo(function Cell({ sp, state, variant, marks, full, studied, onSe
    game, off screen - measured 2026-09-29, those unseen loops were a quarter of
    a throttled phone's main thread while standing still. `.offscreen` pauses
    every animation inside until the grid scrolls back into view. */
-function useOffscreenPause(ref) {
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver !== "function") return undefined;
-    const io = new IntersectionObserver(([e]) => el.classList.toggle("offscreen", !e.isIntersecting));
-    io.observe(el);
-    return () => io.disconnect();
-  }, [ref]);
-}
-
 const OVERSCAN = 3;
 function useRows(ref, count) {
   const [win, setWin] = useState({ first: 0, last: 12, cols: 4, pitch: 91 });
