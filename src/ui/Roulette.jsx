@@ -1,9 +1,10 @@
 /* THE ROULETTE (docs/checkin.md): a horizontal strip of prizes under a
    marker, CS2's case opening - it races, slows, and settles on the prize.
    The prize is decided and SAVED by `engine.spinRoulette` before the strip
-   moves; the strip is dressed around it. A tap or Enter lands it at once,
-   reduced motion lands it at once. Lazy: only a spin loads it. */
-import { useEffect, useMemo, useRef, useState } from "react";
+   moves; the strip is dressed around it. The motion itself is `Reel.jsx`,
+   shared with the Pokedex reward's booster box. Lazy: only a spin loads it. */
+import { useEffect, useMemo, useState } from "react";
+import Reel, { CELLS, WIN_AT } from "./Reel.jsx";
 import Sprite from "./Sprite.jsx";
 import Icon from "./Icon.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
@@ -14,11 +15,6 @@ import { ROULETTE, ROULETTE_PACKS } from "../game/checkin.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
 
-const CELL = 132;            // a card and its gap, px (matches .rl-cell)
-const CELLS = 56;
-const WIN_AT = 49;           // the prize sits here, near the end of the strip
-const SPIN_MS = 7000;
-const still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const art = (set) => (WRAPPERS[set]?.[0] ? packUrl(set, WRAPPERS[set][0]) : logoUrl(set));
 const setName = (id) => CARD_SETS.find((s) => s.id === id)?.name ?? id;
 
@@ -46,19 +42,9 @@ export default function Roulette({ spins, onSpin, onCards, onBox, onClose }) {
   const [prize, setPrize] = useState(null);
   const [phase, setPhase] = useState("ready");      // ready -> rolling -> won
   const [left, setLeft] = useState(spins);
-  const strip = useRef(null);
-  const view = useRef(null);
-  const timer = useRef(0);
   const golds = useMemo(() => [1, 4, 7, 25, 133, 143, 149, 248, 445, 635, 448, 658, 887, 6, 94, 130], []);
   const [cells, setCells] = useState(() => Array.from({ length: CELLS }, () => filler(golds)));
 
-  const land = () => {
-    clearTimeout(timer.current);
-    const s = strip.current;
-    if (s) { s.style.transition = "none"; s.style.transform = `translateX(${target.current}px)`; }
-    setPhase("won");
-  };
-  const target = useRef(0);
   const spin = () => {
     const p = onSpin();
     if (!p) return;
@@ -69,27 +55,9 @@ export default function Roulette({ spins, onSpin, onCards, onBox, onClose }) {
     setCells(next);
     setPhase("rolling");
   };
-  // Once the new strip is in the DOM: from the start, ease to the prize - off its centre by a little, as CS2 does.
-  useEffect(() => {
-    if (phase !== "rolling") return undefined;
-    const s = strip.current, v = view.current;
-    if (!s || !v) return undefined;
-    const jitter = (Math.random() - 0.5) * (CELL * 0.6);
-    target.current = Math.round(v.clientWidth / 2 - (WIN_AT * CELL + CELL / 2) + jitter);
-    s.style.transition = "none";
-    s.style.transform = "translateX(0px)";
-    if (still()) { land(); return undefined; }
-    void s.offsetWidth;                                 // commit the start before the move
-    s.style.transition = `transform ${SPIN_MS}ms cubic-bezier(.12, .72, .14, 1)`;
-    s.style.transform = `translateX(${target.current}px)`;
-    timer.current = setTimeout(() => setPhase("won"), SPIN_MS + 80);
-    return () => clearTimeout(timer.current);
-  }, [phase, cells]);
-
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape" && phase !== "rolling") { e.preventDefault(); onClose(); }
-      else if ((e.key === "Enter" || e.key === " ") && phase === "rolling") { e.preventDefault(); land(); }
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
@@ -104,12 +72,9 @@ export default function Roulette({ spins, onSpin, onCards, onBox, onClose }) {
           <h3>{phase === "won" ? "You won!" : "Spin for a prize"}</h3>
           {phase !== "rolling" && <button type="button" className="set-x" aria-label="Close" onClick={onClose}>✕</button>}
         </div>
-        <div className="rl-view" ref={view} onClick={() => phase === "rolling" && land()}>
-          <ol className="rl-strip" ref={strip}>
-            {cells.map((c, i) => <Cell key={i} c={c} win={phase === "won" && i === WIN_AT} />)}
-          </ol>
-          <i className="rl-marker" aria-hidden="true" />
-        </div>
+        <Reel rolling={phase === "rolling"} cells={cells} onDone={() => setPhase("won")}>
+          {cells.map((c, i) => <Cell key={i} c={c} win={phase === "won" && i === WIN_AT} />)}
+        </Reel>
         {phase === "won" && prize ? (
           <div className="rl-won" role="status">
             {prize.kind === "pack" ? (
