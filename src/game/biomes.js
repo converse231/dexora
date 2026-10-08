@@ -305,7 +305,7 @@ export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower",
    handful of shinies in a whole playthrough - rare enough that each one is a
    story, common enough that they are not a rumour. Do not tune this one alone:
    it is one rung of the ladder below, and they move together. */
-export const SHINY_ODDS = 1 / 305;
+export const SHINY_ODDS = 1 / 336;
 
 /* Four rarities above ordinary, and they are not variations on one idea -
    each is a different KIND of rare, which is what lets all four stand together
@@ -356,9 +356,9 @@ export const SHINY_ODDS = 1 / 305;
    trade this is deliberately making - a FULLY complete 151-species dex is not
    reachable at any odds that leave a rare feeling rare, and no number here
    pretends otherwise. */
-export const ASTRAL_ODDS = 1 / 275;
-export const ORIGIN_ODDS = 1 / 190;
-export const HOLO_ODDS = 1 / 190;
+export const ASTRAL_ODDS = 1 / 298;
+export const ORIGIN_ODDS = 1 / 235;
+export const HOLO_ODDS = 1 / 235;
 
 /* FOUR MORE, AND THE LADDER GOT KINDER RATHER THAN LONGER.
 
@@ -448,16 +448,36 @@ export const HOLO_ODDS = 1 / 190;
    most likely to be confused with, so the two moving tiers are not neighbours
    and the rarer of them is the one whose animation the games themselves drew.
    1/350 leaves it 7.9% off Gold and 7.7% off Showdown - spaced like the rest
-   of the ladder rather than crowding the chase. */
-export const VIVID_ODDS = 1 / 165;
-export const NOIR_ODDS = 1 / 180;
-export const PROJECTION_ODDS = 1 / 205;
-export const GLITCH_ODDS = 1 / 230;
-export const CHAOTIC_ODDS = 1 / 255;
-export const SHADOW_ODDS = 1 / 290;
-export const SHOWDOWN_ODDS = 1 / 325;
-export const CADENCE_ODDS = 1 / 350;
-export const GOLD_ODDS = 1 / 380;
+   of the ladder rather than crowding the chase.
+
+   THE TREASURE SET joined (2026-10-08, your call): Diamond, Platinum and
+   Emerald, directly under Gold, so the four rarest tiers in the game are one
+   material each. The rate is held as always - 1 in 20.9 for a species without
+   Origin, before and after - and the spread is still exactly 2.30x, so no rung
+   changes character. The scale is 1.264x, which is three rungs' worth.
+
+   FIFTEEN RUNGS FOR SIXTEEN TIERS: HOLO AND ORIGIN SHARE ONE, as they always
+   have. An even geometric ladder untied them, and because `rollVariant` walks
+   rarest first and takes the FIRST hit, the tier listed second then measured
+   rarer than its odds said it was - check.mjs caught it over 400k rolls. The
+   tie is not a rounding artefact; it is what keeps a sequential roll honest
+   between two tiers nobody ever ranked against each other.
+
+   And three more tiers cost the League what the thirteenth did, three times
+   over - see the income note above. The fix is the healer anchor, never the
+   ladder. */
+export const VIVID_ODDS = 1 / 209;
+export const NOIR_ODDS = 1 / 221;
+export const PROJECTION_ODDS = 1 / 249;
+export const GLITCH_ODDS = 1 / 265;
+export const CHAOTIC_ODDS = 1 / 281;
+export const SHADOW_ODDS = 1 / 317;
+export const SHOWDOWN_ODDS = 1 / 357;
+export const CADENCE_ODDS = 1 / 378;
+export const EMERALD_ODDS = 1 / 402;
+export const PLATINUM_ODDS = 1 / 426;
+export const DIAMOND_ODDS = 1 / 453;
+export const GOLD_ODDS = 1 / 480;
 
 /* THE LADDER, rarest first - and the single source for it.
 
@@ -469,6 +489,9 @@ export const GOLD_ODDS = 1 / 380;
    Adding a fifth means adding a row here and drawing an icon. */
 export const TIER_ODDS = [
   ["gold", GOLD_ODDS],
+  ["diamond", DIAMOND_ODDS],
+  ["platinum", PLATINUM_ODDS],
+  ["emerald", EMERALD_ODDS],
   ["cadence", CADENCE_ODDS],
   ["showdown", SHOWDOWN_ODDS],
   ["shiny", SHINY_ODDS],
@@ -528,6 +551,13 @@ export const TIER_TELL = {
   // animation it is - this one is the game's own, so the tell is life.
   cadence: "it breathes",
   gold: "cast in gold",
+  /* THE TREASURE SET (your call, 2026-10-08). Gold was alone; these three
+     finish it. Each tell names the MATERIAL, never the motion, because the
+     motion is what separates them from each other and a word cannot carry it:
+     Platinum sweeps, Diamond flashes, Emerald drifts. */
+  diamond: "cut and polished",
+  platinum: "struck in platinum",
+  emerald: "cut from emerald",
   shadow: "sealed in darkness",
   chaotic: "unstable energy",
   projection: "a projection of light",

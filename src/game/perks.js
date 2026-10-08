@@ -18,6 +18,12 @@
    super-effective hit. */
 export const PERKS = {
   gold:       { says: "Defense +15%", st: [1, 1, 1.15, 1, 1, 1] },
+  /* The treasure set, each one the material made into an edge. Platinum is
+     DelugeRPG's Metallic without its immunity: an absolute is a different
+     game, a coin flip is a look that happens to help. */
+  diamond:    { says: "Defense and Sp. Def +10%", st: [1, 1, 1.1, 1, 1.1, 1] },
+  platinum:   { says: "Half of all status moves fail", shrug: 0.5 },
+  emerald:    { says: "Attack +15%", st: [1, 1.15, 1, 1, 1, 1] },
   showdown:   { says: "Speed +10%", st: [1, 1, 1, 1, 1, 1.1] },
   cadence:    { says: "Max HP +6% and Speed +6%", st: [1.06, 1, 1, 1, 1, 1.06] },
   shiny:      { says: "25% chance to shrug off a status", shrug: 0.25 },

@@ -7167,6 +7167,20 @@ button:disabled { transition: none; }
 .rk-title .rk-medal.art { width: 48px; height: 48px; }
 .rk-title .rk-medal:not(.art) { width: 26px; height: 26px; }
 .lg-case .rk-medal { width: 24px; height: 24px; }
+/* A BOX ROW OUT OF VIEW RUNS NO TIER LOOP EITHER (Box.jsx), and for the same
+   reason the Dex grid does not: two hundred infinite animations tick whether
+   or not anything can see them. `content-visibility: auto` on the row skips
+   its paint and does NOT stop its clock - measured at 39fps scrolling a
+   400-entry Box, 60fps with the loops off. */
+/* EVERYTHING inside it, not a list of the layers that have loops today: a
+   named list silently misses the next tier's, and an offscreen row has
+   nothing whose animation anybody can see. Pseudo-elements too - Chaotic's
+   aura runs on one. */
+.boxrow.offscreen *, .boxrow.offscreen *::before, .boxrow.offscreen *::after {
+  animation: none !important;
+}
+
+
 /* A Dex grid out of view pauses its tiles' tier loops (Dex.jsx `useOffscreenPause`). */
 .dexgrid.offscreen *, .dexgrid.offscreen *::before, .dexgrid.offscreen *::after { animation-play-state: paused !important; }
 .dx-rank {
@@ -8225,6 +8239,27 @@ button:disabled { transition: none; }
   filter: grayscale(1) sepia(1) saturate(3.4) hue-rotate(-12deg) brightness(1.2) contrast(1.28)
           drop-shadow(0 0 2px rgba(255, 196, 60, .85)) !important;
 }
+/* ---- THE TREASURE SET (2026-10-08). Gold was alone; Platinum, Diamond and
+   Emerald finish it. Each is ONE filter and ONE idea of motion, and the three
+   ideas are deliberately disjoint - a sweep, a flash, a drift - because the
+   filters alone are three bright metals and would not be tellable apart on a
+   56px Box row at a glance. */
+.sprite-platinum {
+  filter: grayscale(1) sepia(.22) hue-rotate(186deg) saturate(1.35) contrast(1.34) brightness(1.02)
+          drop-shadow(0 0 2px rgba(190, 220, 255, .85)) !important;
+}
+/* The prism split is drawn by the filter, not a layer: two opposed
+   drop-shadows cost nothing and cannot be outranked, which is the lesson
+   `.sprite-glitched` records above. */
+.sprite-diamond {
+  filter: grayscale(1) brightness(1.62) contrast(1.95)
+          drop-shadow(2px 0 0 rgba(0, 235, 255, .75)) drop-shadow(-2px 0 0 rgba(255, 70, 220, .7))
+          drop-shadow(0 0 9px rgba(255, 255, 255, .9)) !important;
+}
+.sprite-emerald {
+  filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(3.8) brightness(.98) contrast(1.32)
+          drop-shadow(0 0 3px rgba(60, 255, 150, .8)) !important;
+}
 .sprite-shadow {
   filter: brightness(.55) sepia(.6) hue-rotate(222deg) saturate(1.7)
           drop-shadow(0 0 3px rgba(150, 70, 255, .9)) drop-shadow(0 0 8px rgba(110, 40, 230, .55)) !important;
@@ -8257,14 +8292,16 @@ button:disabled { transition: none; }
 }
 
 .gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
-.chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .cad-breath {
+.chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .cad-breath,
+.plat-sweep, .dia-fire, .em-depth {
   position: absolute; inset: 0; pointer-events: none;
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */
 .shadow-aura, .chaos-aura, .proj-beam, .proj-base { z-index: 0; }
-.gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines { z-index: 3; }
+.gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines,
+.plat-sweep, .dia-fire, .em-depth { z-index: 3; }
 /* Masked to the creature's own outline, or they are rectangles over the grass. */
-.gold-shine, .chaos-neg, .proj-lines {
+.gold-shine, .chaos-neg, .proj-lines, .plat-sweep, .em-depth, .dia-fire {
   overflow: hidden;
   -webkit-mask: var(--art) center / contain no-repeat;
           mask: var(--art) center / contain no-repeat;
@@ -8407,9 +8444,56 @@ button:disabled { transition: none; }
 }
 @keyframes proj-roll { to { transform: translateY(7.4%); } }
 
+/* ---- The treasure set's motion. Three disjoint ideas, and each one is a
+   SINGLE animated element: the whole set costs three loops where Gold alone
+   costs four, because the filters are already doing the colour.
+
+   PLATINUM is a hard cold line - half Gold's width, twice its speed, and a
+   longer rest between passes, which is what separates polished steel from
+   treasure. No glint: the sweep is this tier's and the sparkle is Gold's.
+   DIAMOND is fire - two round points out of step with each other. Round, not
+   Shiny's four-point star, and chromatic rather than white.
+   EMERALD is depth - light moving INSIDE the stone. It drifts and never
+   pulses: a pulse would read as Cadence's breath, which is the one tell that
+   tier owns and the only thing separating it from Showdown. */
+.plat-sweep i {
+  position: absolute; top: -20%; bottom: -20%; left: -30%; width: 13%;
+  background: linear-gradient(90deg, transparent, rgba(232, 246, 255, 1), transparent);
+  transform: skewX(-16deg); animation: plat-sweep 4.8s cubic-bezier(.6, 0, .35, 1) infinite;
+}
+.plat-sweep { mix-blend-mode: screen; }
+@keyframes plat-sweep {
+  0%, 66% { transform: skewX(-16deg) translateX(0); }
+  88%, 100% { transform: skewX(-16deg) translateX(900%); }
+}
+.dia-fire i {
+  position: absolute; width: 20%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 20%, rgba(190, 245, 255, .9) 40%, transparent 72%);
+  transform: scale(0); animation: dia-fire 3.6s ease-out infinite;
+}
+.dia-fire i:nth-child(1) { top: 22%; left: 26%; }
+.dia-fire i:nth-child(2) { bottom: 26%; right: 20%; width: 15%; animation-delay: -1.8s; }
+@keyframes dia-fire {
+  0%, 100% { transform: scale(0); opacity: 0; }
+  8% { transform: scale(1); opacity: 1; }
+  20% { transform: scale(0); opacity: 0; }
+}
+.em-depth { mix-blend-mode: screen; opacity: .8; }
+.em-depth i {
+  position: absolute; inset: -12%;
+  background: radial-gradient(58% 44% at 30% 34%, rgba(165, 255, 205, .85), transparent 70%),
+              radial-gradient(44% 58% at 72% 66%, rgba(50, 255, 155, .7), transparent 72%);
+  animation: em-drift 9.4s ease-in-out infinite;
+}
+@keyframes em-drift {
+  0%, 100% { transform: translate(-5%, -3%); }
+  50% { transform: translate(6%, 4%); }
+}
+
 /* In a Dex tile the sprite is 84% of the cell and centred (see `.cell .holo-foil`),
    so the layers that register to it come in by the same 8%. */
 .cell .gold-shine, .cell .gold-glint, .cell .chaos-neg, .cell .chaos-cut, .cell .proj-lines { inset: 8%; }
+.cell .plat-sweep, .cell .dia-fire, .cell .em-depth { inset: 8%; }
 .cell .shadow-aura { inset: 0 4% 6%; }
 .cell .chaos-aura { inset: 8%; }
 .cell .proj-beam { inset: 8% 14% 4%; }
@@ -8418,6 +8502,7 @@ button:disabled { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .gold-shine i, .gold-glint i, .shadow-aura i, .chaos-aura::before, .chaos-aura i,
   .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i,
+  .plat-sweep i, .dia-fire i, .em-depth i,
   .sprite-projection:not(.mon) { animation: none; }
   .sprite-projection.mon { animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both; }
 }

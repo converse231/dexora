@@ -15,7 +15,8 @@
    past the best of each species and never a variant, and both payouts itemise
    what they are about to take before they take it. */
 
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { usePauseOffscreenRows } from "./pause.js";
 import { SPECIES } from "../data/dex.js";
 import {
   sellValue, candyValue, duplicateUids, evolutionsOf, evolveState, itemById,
@@ -261,6 +262,7 @@ function Box({
      name comparator calls `label(speciesById(id))` on both sides of every
      comparison, which is O(n log n) string builds over the whole box - and it
      was running on every render, including the ones a step caused. */
+  const list = useRef(null);
   const shown = useMemo(() => groups.filter((g) => {
     const sp = speciesById(g.species);
     if (only === "ready" && !g.ready) return false;
@@ -278,6 +280,7 @@ function Box({
     );
   }).sort((a, b) => SORTS[sort](a, b) || a.species - b.species),
   [groups, only, rare, needle, sort]);
+  usePauseOffscreenRows(list, shown.length);
 
   /* Built here rather than in the dialog: it is a pass over the whole box and
      the dialog is rebuilt on every keystroke of the search field. */
@@ -648,7 +651,7 @@ function Box({
         <p className="empty">Nothing matches that.</p>
       )}
 
-      <div className="boxlist">
+      <div className="boxlist" ref={list}>
         {shown.map((group) => {
           const sp = speciesById(group.species);
           const spare = group.spares.length;

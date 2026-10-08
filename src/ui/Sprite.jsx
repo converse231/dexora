@@ -191,6 +191,21 @@ export function VariantFx({ id, variant, art = null }) {
      transform and opacity only, and nothing that animates the sprite itself
      (`.mon`'s appear and absorb own its animation). `--art` is the jar for a
      coloured honey, as with the foil. */
+  /* THE TREASURE SET: one layer each, where Gold needs two. The filter is
+     already carrying the colour, so each of these only has to carry the one
+     idea of motion that tells it from its neighbours. Masked to `--art` like
+     the rest, or they are rectangles of light over the grass. */
+  if (variant === "platinum" || variant === "diamond" || variant === "emerald") {
+    const url = `url(${art ?? spriteUrl(id)})`;
+    if (variant === "platinum") {
+      return <span className="plat-sweep" style={{ "--art": url }} aria-hidden="true"><i /></span>;
+    }
+    if (variant === "emerald") {
+      return <span className="em-depth" style={{ "--art": url }} aria-hidden="true"><i /></span>;
+    }
+    // Diamond's prism split is in the filter; this is only the fire.
+    return <span className="dia-fire" style={{ "--art": url }} aria-hidden="true"><i /><i /></span>;
+  }
   if (variant === "gold" || variant === "chaotic" || variant === "projection" || variant === "shadow") {
     const url = `url(${art ?? spriteUrl(id)})`;
     if (variant === "gold") {
@@ -295,7 +310,8 @@ const REVEAL = {
    Holo, Astral, Origin) are hand-rolled in Encounter.jsx and predate the
    component; everything since goes through it, so a battle and a Box row can
    never draw one tier two ways. */
-export const SCENE_FX = new Set(["glitched", "gold", "shadow", "chaotic", "projection", "cadence"]);
+export const SCENE_FX = new Set(["glitched", "gold", "shadow", "chaotic", "projection", "cadence",
+  "platinum", "diamond", "emerald"]);
 
 export function TierReveal({ id, variant }) {
   const motion = REVEAL[variant];
