@@ -201,10 +201,18 @@ export function VariantFx({ id, variant, art = null }) {
       return <span className="plat-sweep" style={{ "--art": url }} aria-hidden="true"><i /></span>;
     }
     if (variant === "emerald") {
-      return <span className="em-depth" style={{ "--art": url }} aria-hidden="true"><i /></span>;
+      /* Two layers, and the second is the point: `em-rad` is UNMASKED and sits
+         behind the creature, so the light leaves the stone instead of being
+         clipped to it. Masked, it would be a highlight. */
+      return (
+        <>
+          <span className="em-rad" aria-hidden="true"><i /></span>
+          <span className="em-depth" style={{ "--art": url }} aria-hidden="true"><i /></span>
+        </>
+      );
     }
-    // Diamond's prism split is in the filter; this is only the fire.
-    return <span className="dia-fire" style={{ "--art": url }} aria-hidden="true"><i /><i /></span>;
+    // Diamond's prism split is in the filter; these are the glints.
+    return <span className="dia-fire" aria-hidden="true"><i /><i /><i /></span>;
   }
   if (variant === "gold" || variant === "chaotic" || variant === "projection" || variant === "shadow") {
     const url = `url(${art ?? spriteUrl(id)})`;

@@ -8244,9 +8244,18 @@ button:disabled { transition: none; }
    ideas are deliberately disjoint - a sweep, a flash, a drift - because the
    filters alone are three bright metals and would not be tellable apart on a
    56px Box row at a glance. */
+/* POLISHED, NOT GREY (reported 2026-10-09: "too similar to noir").
+   At saturate 1.35 the blue cast was a tint over a neutral, and Noir IS a
+   neutral - so at a glance they read as the same tier twice. 2.7 with contrast
+   1.8 reads as cold worked metal instead: the shadows go blue-steel and the
+   highlights near-white, which is what separates a polished surface from a
+   grey one. Further was tried and rejected - at saturate 3.3 it stops being
+   metal and becomes a BLUE Pokemon, a colour treatment rather than a
+   material. Diamond is the other neighbour and stays clear by being
+   near-white with a prism fringe where this keeps its mid-tones. */
 .sprite-platinum {
-  filter: grayscale(1) sepia(.22) hue-rotate(186deg) saturate(1.35) contrast(1.34) brightness(1.02)
-          drop-shadow(0 0 2px rgba(190, 220, 255, .85)) !important;
+  filter: grayscale(1) sepia(.5) hue-rotate(190deg) saturate(2.7) contrast(1.8) brightness(1.1)
+          drop-shadow(0 0 4px rgba(150, 205, 255, .95)) !important;
 }
 /* The prism split is drawn by the filter, not a layer: two opposed
    drop-shadows cost nothing and cannot be outranked, which is the lesson
@@ -8300,15 +8309,15 @@ button:disabled { transition: none; }
 
 .gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
 .chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .cad-breath,
-.plat-sweep, .dia-fire, .em-depth {
+.plat-sweep, .dia-fire, .em-depth, .em-rad {
   position: absolute; inset: 0; pointer-events: none;
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */
-.shadow-aura, .chaos-aura, .proj-beam, .proj-base { z-index: 0; }
+.shadow-aura, .chaos-aura, .proj-beam, .proj-base, .em-rad { z-index: 0; }
 .gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines,
 .plat-sweep, .dia-fire, .em-depth { z-index: 3; }
 /* Masked to the creature's own outline, or they are rectangles over the grass. */
-.gold-shine, .chaos-neg, .proj-lines, .plat-sweep, .em-depth, .dia-fire {
+.gold-shine, .chaos-neg, .proj-lines, .plat-sweep, .em-depth {
   overflow: hidden;
   -webkit-mask: var(--art) center / contain no-repeat;
           mask: var(--art) center / contain no-repeat;
@@ -8458,32 +8467,59 @@ button:disabled { transition: none; }
    PLATINUM is a hard cold line - half Gold's width, twice its speed, and a
    longer rest between passes, which is what separates polished steel from
    treasure. No glint: the sweep is this tier's and the sparkle is Gold's.
-   DIAMOND is fire - two round points out of step with each other. Round, not
-   Shiny's four-point star, and chromatic rather than white.
-   EMERALD is depth - light moving INSIDE the stone. It drifts and never
-   pulses: a pulse would read as Cadence's breath, which is the one tell that
-   tier owns and the only thing separating it from Showdown. */
+   DIAMOND is fire - three glints out of step with each other. They ARE
+   four-pointed now (asked for, 2026-10-09), so the thing keeping them off
+   Shiny's is no longer the shape: Shiny's sparks are compact warm squares
+   with a gold bloom, these are a LONG THIN icy cross, smaller, and they sit
+   on the facets rather than scattered. Gold's glint is an eight-point star,
+   also warm. Three cool crosses read as a cut stone catching light.
+   EMERALD is depth plus RADIANCE (asked for, 2026-10-09): the caustics drift
+   inside the stone, and a soft green light leaves it. The halo is what keeps
+   it off Cadence, which is the tier it could have collided with - Cadence's
+   bloom is MASKED TO THE BODY and swells with it, a thing breathing; this one
+   sits BEHIND the creature, spreads past its outline and never changes its
+   opacity floor, a thing emitting. Inside versus outside, and swelling versus
+   spreading. Neither borrows the other's word. */
 .plat-sweep i {
-  position: absolute; top: -20%; bottom: -20%; left: -30%; width: 13%;
-  background: linear-gradient(90deg, transparent, rgba(232, 246, 255, 1), transparent);
-  transform: skewX(-16deg); animation: plat-sweep 4.8s cubic-bezier(.6, 0, .35, 1) infinite;
+  position: absolute; top: -20%; bottom: -20%; left: -30%; width: 17%;
+  background: linear-gradient(90deg, transparent, rgba(245, 252, 255, 1) 45% 55%, transparent);
+  transform: skewX(-16deg); animation: plat-sweep 3.4s cubic-bezier(.45, 0, .35, 1) infinite;
 }
 .plat-sweep { mix-blend-mode: screen; }
+/* IT SWEEPS FIRST AND RESTS AFTER (reported 2026-10-09: "it takes a while and
+   it looks noir still"). It used to rest for 66% of a 4.8s cycle - 3.2
+   seconds of a static cool-grey sprite before anything moved, which is the
+   whole time anybody spends looking at a Box row, and a Platinum holding
+   still IS a Noir. The sheen is not decoration on this tier, it is the half
+   of the tell the filter cannot carry, so it leads.
+
+   A side effect worth keeping: a row scrolling back into view restarts the
+   animation (`usePauseOffscreenRows` clears it), so the metal catches the
+   light exactly as it arrives. */
 @keyframes plat-sweep {
-  0%, 66% { transform: skewX(-16deg) translateX(0); }
-  88%, 100% { transform: skewX(-16deg) translateX(900%); }
+  0% { transform: skewX(-16deg) translateX(0); }
+  30%, 100% { transform: skewX(-16deg) translateX(900%); }
 }
+/* UNMASKED, unlike the other layers here: a glint has to break the outline or
+   it is invisible on a pale sprite - measured at full opacity and unseeable in
+   a Box row before this. They sit on the edges for the same reason, and carry
+   their own bloom so they read on dark ground and light alike. */
 .dia-fire i {
-  position: absolute; width: 20%; aspect-ratio: 1; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, .85) 0 18%, rgba(190, 245, 255, .7) 40%, transparent 72%);
+  position: absolute; width: 26%; aspect-ratio: 1;
+  background: radial-gradient(circle, #fff 0 14%, rgba(205, 248, 255, .9) 34%, transparent 70%);
+  filter: drop-shadow(0 0 3px rgba(120, 240, 255, .9));
+  /* A LONG THIN CROSS: slim waist, far points - the glint off a facet, where
+     Shiny's spark is a fat compact star and Gold's has eight arms. */
+  clip-path: polygon(50% 0, 54% 46%, 100% 50%, 54% 54%, 50% 100%, 46% 54%, 0 50%, 46% 46%);
   transform: scale(0); animation: dia-fire 3.6s ease-out infinite;
 }
-.dia-fire i:nth-child(1) { top: 22%; left: 26%; }
-.dia-fire i:nth-child(2) { bottom: 26%; right: 20%; width: 15%; animation-delay: -1.8s; }
+.dia-fire i:nth-child(1) { top: 6%; left: 10%; }
+.dia-fire i:nth-child(2) { bottom: 12%; right: 6%; width: 21%; animation-delay: -1.3s; }
+.dia-fire i:nth-child(3) { top: 40%; right: 30%; width: 17%; animation-delay: -2.5s; }
 @keyframes dia-fire {
-  0%, 100% { transform: scale(0); opacity: 0; }
-  8% { transform: scale(1); opacity: 1; }
-  20% { transform: scale(0); opacity: 0; }
+  0%, 100% { transform: scale(0) rotate(0); opacity: 0; }
+  7% { transform: scale(1) rotate(25deg); opacity: 1; }
+  18% { transform: scale(0) rotate(50deg); opacity: 0; }
 }
 .em-depth { mix-blend-mode: screen; opacity: .8; }
 .em-depth i {
@@ -8496,11 +8532,26 @@ button:disabled { transition: none; }
   0%, 100% { transform: translate(-5%, -3%); }
   50% { transform: translate(6%, 4%); }
 }
+/* Unmasked on purpose: a halo clipped to the silhouette is a highlight, not
+   a radiance. Its floor never drops, so it reads as steady emission with a
+   slow swell rather than a breath. */
+.em-rad { mix-blend-mode: screen; }
+.em-rad i {
+  position: absolute; inset: -14%;
+  background: radial-gradient(circle at 50% 56%, rgba(90, 255, 165, .5) 0 18%,
+              rgba(45, 215, 125, .28) 38%, rgba(30, 180, 105, .1) 56%, transparent 74%);
+  animation: em-rad 6.8s ease-in-out infinite;
+}
+@keyframes em-rad {
+  0%, 100% { transform: scale(.94); opacity: .62; }
+  50% { transform: scale(1.06); opacity: .95; }
+}
 
 /* In a Dex tile the sprite is 84% of the cell and centred (see `.cell .holo-foil`),
    so the layers that register to it come in by the same 8%. */
 .cell .gold-shine, .cell .gold-glint, .cell .chaos-neg, .cell .chaos-cut, .cell .proj-lines { inset: 8%; }
 .cell .plat-sweep, .cell .dia-fire, .cell .em-depth { inset: 8%; }
+.cell .em-rad { inset: 2%; }
 .cell .shadow-aura { inset: 0 4% 6%; }
 .cell .chaos-aura { inset: 8%; }
 .cell .proj-beam { inset: 8% 14% 4%; }
@@ -8509,7 +8560,7 @@ button:disabled { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .gold-shine i, .gold-glint i, .shadow-aura i, .chaos-aura::before, .chaos-aura i,
   .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i,
-  .plat-sweep i, .dia-fire i, .em-depth i,
+  .plat-sweep i, .dia-fire i, .em-depth i, .em-rad i,
   .sprite-projection:not(.mon) { animation: none; }
   .sprite-projection.mon { animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both; }
 }
