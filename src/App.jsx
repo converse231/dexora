@@ -32,11 +32,13 @@ import BallRail from "./ui/BallRail.jsx";
 import {
   BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall, keeper, variantOf,
 } from "./game/items.js";
-import { ItemIcon, eventIcon, preloadSprites } from "./ui/Sprite.jsx";
+import Sprite, { ItemIcon, eventIcon, preloadSprites } from "./ui/Sprite.jsx";
+import { abilityOf, abilityName, fieldText, heartsOf, HEARTS } from "./game/abilities.js";
 import { EVENT_NAME } from "./game/events.js";
 import {
-  biomeFor, levelFromXp, TIERS, dexIndex, tableFor, REGION_NAME,
+  biomeFor, levelFromXp, TIERS, dexIndex, tableFor, REGION_NAME, speciesById,
 } from "./game/biomes.js";
+import { label } from "./game/map.js";
 import DexSheet from "./ui/DexSheet.jsx";
 import { modalOpen } from "./ui/modal.js";
 import Cheer from "./ui/Cheer.jsx";
@@ -496,6 +498,18 @@ export default function App({
   }, [engine, checkin?.due, enc, st?.char]);
 
   // The walking party's Box entries, for the strip on the map: rebuilt only when the party or the Box moves.
+  /* WHAT THE ONE WALKING IS DOING OUT HERE, or null. Derived, never stored -
+     the ability is a function of the entry's uid, and `fieldText` is the one
+     place that turns it into words (the Box and the picker read the same). */
+  const walkerFx = useMemo(() => {
+    const mon = st?.buddy == null ? null : st.box?.find((m) => m.uid === st.buddy);
+    const what = mon && fieldText(mon);
+    if (!what) return null;
+    const hearts = heartsOf(mon.walked);
+    return { mon, what, name: abilityName(abilityOf(mon)),
+      tip: `${label(speciesById(mon.species))} · ${abilityName(abilityOf(mon))}: ${what.toLowerCase()}`
+        + ` · friendship ${hearts}/${HEARTS.length}` };
+  }, [st?.buddy, st?.colRev, st?.rev]);
   const partyMons = useMemo(() => (st?.party ?? []).map((u) => st.box.find((m) => m.uid === u)).filter(Boolean),
     [st?.party, st?.colRev]);
   const cheer = held ? null : st?.cheers?.[0] ?? null;
@@ -1017,6 +1031,27 @@ export default function App({
                 </span>
               </button>
             )))}
+
+            {/* AND SO DOES THE ONE WALKING WITH YOU (reported 2026-10-09: "I'm
+                not sure what effects are there as I am walking"). Its ability
+                was in a `data-tip` and nowhere else - a tooltip is hover-only
+                on a desktop and nothing at all on a phone, so on the device
+                most of this game is played on the effect was invisible.
+
+                It belongs in THIS corner rather than on the party strip
+                because it answers the corner's question - what is acting on
+                this map - which is the same question the item rings answer. A
+                follower with no field effect shows nothing, which is most of
+                them: only 12.4% of species-and-uid pairs have one. */}
+            {walkerFx && (
+              <span className="fieldbox walker" role="status" data-tip={walkerFx.tip}
+                aria-label={walkerFx.tip}>
+                <span>
+                  <Sprite id={walkerFx.mon.species} variant={variantOf(walkerFx.mon)} alt="" eager />
+                  <u><b>{walkerFx.what}</b><i>{walkerFx.name}</i></u>
+                </span>
+              </span>
+            )}
 
             {/* A RUNNING ITEM IS A RING, as the rift is: the rim drains with
                 its steps (`--p`, steps left over the item's own), the count

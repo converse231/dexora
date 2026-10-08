@@ -23,11 +23,18 @@ function Party({ mons, buddy, onPick, onEdit }) {
         const what = fieldText(m);
         const about = `${abilityName(abilityOf(m))}${what ? ` (${what.toLowerCase()})` : ""} · friendship ${heartsOf(m.walked)}/${HEARTS.length}`;
         return (
-          <button key={m.uid} type="button" className={`party-mon${on ? " on" : ""}`} aria-pressed={on}
-            aria-label={on ? `${name} is walking with you. Put it in its ball` : `Walk with ${name}`}
+          <button key={m.uid} type="button" className={`party-mon${on ? " on" : ""}${what ? " fx" : ""}`} aria-pressed={on}
+            aria-label={`${on ? `${name} is walking with you. Put it in its ball` : `Walk with ${name}`}`
+              + (what ? `. ${what}` : "")}
             data-tip={on ? `${name} · ${about} · tap to rest, Q to switch` : `Walk with ${name} · ${about}`}
             onClick={() => onPick(on ? null : m.uid)}>
             <Sprite id={m.species} variant={variantOf(m)} alt="" eager />
+            {/* A DOT, NOT A RING: this says only "this one does something out
+                here", and the corner card says what. Its absence is the
+                information most of the time - seven followers in eight have no
+                field effect at all, and without a mark there is no way to tell
+                "nothing happens" from "I cannot see it". */}
+            {what && <i className="party-fx" aria-hidden="true" />}
           </button>
         );
       })}
