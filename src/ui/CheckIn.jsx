@@ -12,9 +12,17 @@ import { CHECKIN_REWARDS, WEEK, STREAK_MILESTONES } from "../game/checkin.js";
 
 const yen = (n) => `¥${n.toLocaleString()}`;
 // A reward's icon and its words.
-function Reward({ r, big = false }) {
-  if (r.spin) return <><span className="ci-ic ci-spin"><Icon n="gift" size={big ? 30 : 22} /></span><b>Spin</b></>;
-  if (r.money) return <><span className="ci-ic ci-yen"><Icon n="yen" size={big ? 30 : 22} /></span><b>{yen(r.money)}</b></>;
+function Reward({ r }) {
+  // Day 7, the wide tile: its money and the spin together.
+  if (r.spin) {
+    return (
+      <>
+        <span className="ci-ic ci-spin"><Icon n="gift" size={30} /></span>
+        <span className="ci-prize">{r.money ? <><b>{yen(r.money)}</b><small>+ Roulette spin</small></> : <b>Roulette spin</b>}</span>
+      </>
+    );
+  }
+  if (r.money) return <><span className="ci-ic ci-yen"><Icon n="yen" size={26} /></span><b>{yen(r.money)}</b></>;
   if (r.candy) return <><ItemIcon item={{ id: "rare-candy" }} className="ci-ic" /><b>{r.candy} Candy</b></>;
   const [id, n] = Object.entries(r.items)[0];
   return <><ItemIcon item={itemById(id)} className="ci-ic" /><b>{n > 1 ? `${n} ` : ""}{itemById(id)?.short ?? itemById(id)?.name}</b></>;

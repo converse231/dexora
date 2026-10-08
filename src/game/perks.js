@@ -19,6 +19,7 @@
 export const PERKS = {
   gold:       { says: "Defense +15%", st: [1, 1, 1.15, 1, 1, 1] },
   showdown:   { says: "Speed +10%", st: [1, 1, 1, 1, 1, 1.1] },
+  living:     { says: "Max HP +6% and Speed +6%", st: [1.06, 1, 1, 1, 1, 1.06] },
   shiny:      { says: "25% chance to shrug off a status", shrug: 0.25 },
   shadow:     { says: "Attack and Sp. Atk +8%", st: [1, 1.08, 1, 1.08, 1, 1] },
   astral:     { says: "Sp. Atk +12%", st: [1, 1, 1, 1.12, 1, 1] },

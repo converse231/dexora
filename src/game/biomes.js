@@ -1,5 +1,6 @@
 import { SPECIES, isForm } from "../data/dex.js";
 import { SHOWDOWN_IDS } from "../data/showdown.js";
+import { LIVING_IDS } from "../data/living.js";
 import { SAGE_IDS } from "../data/sage.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 /* One-way: `catch.js` imports nothing, so this cannot cycle. `items.js` is the
@@ -304,7 +305,7 @@ export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower",
    handful of shinies in a whole playthrough - rare enough that each one is a
    story, common enough that they are not a rumour. Do not tune this one alone:
    it is one rung of the ladder below, and they move together. */
-export const SHINY_ODDS = 1 / 285;
+export const SHINY_ODDS = 1 / 305;
 
 /* Four rarities above ordinary, and they are not variations on one idea -
    each is a different KIND of rare, which is what lets all four stand together
@@ -355,9 +356,9 @@ export const SHINY_ODDS = 1 / 285;
    trade this is deliberately making - a FULLY complete 151-species dex is not
    reachable at any odds that leave a rare feeling rare, and no number here
    pretends otherwise. */
-export const ASTRAL_ODDS = 1 / 260;
-export const ORIGIN_ODDS = 1 / 180;
-export const HOLO_ODDS = 1 / 180;
+export const ASTRAL_ODDS = 1 / 275;
+export const ORIGIN_ODDS = 1 / 190;
+export const HOLO_ODDS = 1 / 190;
 
 /* FOUR MORE, AND THE LADDER GOT KINDER RATHER THAN LONGER.
 
@@ -414,20 +415,49 @@ export const HOLO_ODDS = 1 / 180;
    with Origin locked - 1 in 21.0 before, 1 in 20.9 now. A Gen 1 species, which
    can wear all twelve, goes 1 in 18.1 -> 1 in 18.8.
 
-   The spread is 2.3x (Vivid 1/155 to Gold 1/360), a little wider than the
+   The spread is 2.3x (Vivid 1/170 to Gold 1/380), a little wider than the
    2.0x the paragraph above argues for, and only at the top: Gold is the one
    tier asked to be THE chase, so it sits above Showdown alone. Vivid stays
    well inside check.mjs's "rarer than 1 in 100". The bounties move with it
    for free (`variantPay` is relative to the kindest), and a variant's share
    of income is unchanged because the total rate is. */
-export const VIVID_ODDS = 1 / 155;
-export const NOIR_ODDS = 1 / 170;
-export const PROJECTION_ODDS = 1 / 195;
-export const GLITCH_ODDS = 1 / 215;
-export const CHAOTIC_ODDS = 1 / 240;
-export const SHADOW_ODDS = 1 / 275;
-export const SHOWDOWN_ODDS = 1 / 305;
-export const GOLD_ODDS = 1 / 360;
+/* THIRTEEN, AND A VARIANT IS STILL NO MORE COMMON THAN IT WAS AT EIGHT.
+
+   Living joined (2026-10-08) and the rate was held again: every rung moved up
+   by 1.0618x and the new one went in among them. Typical (Origin locked) is
+   1 in 20.9 before and after; a Gen 1 species goes 1 in 18.8 -> 1 in 18.9.
+   The spread is unchanged at 2.30x, so Gold still sits alone as the chase.
+
+   WHAT A THIRTEENTH TIER COSTS THE LEAGUE, AND WHY THE FIX IS A PRICE.
+   A tier's expected income does not depend on its odds: `variantPay` is
+   proportional to a tier's denominator and its chance is one over that same
+   denominator, so every rung contributes about the same per encounter
+   whatever its rarity. Adding one therefore adds ~9% to variant income NO
+   MATTER WHERE ON THE LADDER IT GOES, and holding the rate leaves that in.
+   It lands on the League, because prizes are denominated in encounters of
+   catch income (`gymPrize`): richer encounters buy fewer of them, the unit
+   fell 7 to 6, and the rematch guard failed at Lance by ¥2.
+
+   Scaling the ladder cannot fix that - `lifetime` and `perPrize` BOTH move
+   with income, so the quotient barely shifts (6.99 at every scale tried) and
+   the only thing bought is rarer variants. The guard exists to bound the
+   HEALER PRICES, so that is the lever: the Potion anchor went ¥8 -> ¥7 and
+   the shelf rescaled on the games' own ratios. See items.js's HEALS.
+
+   LIVING SITS BETWEEN GOLD AND SHOWDOWN, asked for: rarer than the tier it is
+   most likely to be confused with, so the two moving tiers are not neighbours
+   and the rarer of them is the one whose animation the games themselves drew.
+   1/350 leaves it 7.9% off Gold and 7.7% off Showdown - spaced like the rest
+   of the ladder rather than crowding the chase. */
+export const VIVID_ODDS = 1 / 165;
+export const NOIR_ODDS = 1 / 180;
+export const PROJECTION_ODDS = 1 / 205;
+export const GLITCH_ODDS = 1 / 230;
+export const CHAOTIC_ODDS = 1 / 255;
+export const SHADOW_ODDS = 1 / 290;
+export const SHOWDOWN_ODDS = 1 / 325;
+export const LIVING_ODDS = 1 / 350;
+export const GOLD_ODDS = 1 / 380;
 
 /* THE LADDER, rarest first - and the single source for it.
 
@@ -439,6 +469,7 @@ export const GOLD_ODDS = 1 / 360;
    Adding a fifth means adding a row here and drawing an icon. */
 export const TIER_ODDS = [
   ["gold", GOLD_ODDS],
+  ["living", LIVING_ODDS],
   ["showdown", SHOWDOWN_ODDS],
   ["shiny", SHINY_ODDS],
   ["shadow", SHADOW_ODDS],
@@ -493,6 +524,9 @@ export const TIER_TELL = {
   vivid: "the colours turned up",
   noir: "no colour at all",
   showdown: "it moves",
+  // Not "it moves" twice: what separates Living from Showdown is whose
+  // animation it is - this one is the game's own, so the tell is life.
+  living: "it breathes",
   gold: "cast in gold",
   shadow: "sealed in darkness",
   chaotic: "unstable energy",
@@ -764,6 +798,12 @@ export const SAGE_CREDIT = "Sprites by SageDeoxys";
    whose picture does not exist. */
 export const hasShowdown = (id) => SHOWDOWN_IDS.has(id);
 
+/* AND LIVING IS A THIRD FILE (2026-10-08). Game Freak animated through Black
+   and White and the community carried it part of the way after, so 868 of the
+   1,025 have one and Paldea is mostly missing - a wider gap than Showdown's,
+   and the reason this is a gate rather than an assumption. */
+export const hasLiving = (id) => LIVING_IDS.has(id);
+
 /* THE ORIGIN GATE IS GONE, and what is left is only the art check.
 
    Origin used to be locked until every ordinary Pokemon of its generation was
@@ -778,19 +818,28 @@ export const hasShowdown = (id) => SHOWDOWN_IDS.has(id);
    wear Showdown, because the file is not there. No `dex` argument any more,
    which is the deletion stated in the signature.
 
-   THE FOUR ANSWERS ARE MEMOISED. This is asked once per encounter and the
-   result is one of four constant Sets, so allocating one per wild Pidgey to
-   say "nothing missing here" is the sort of thing that adds up. */
-const NO_ORIGIN = new Set(["origin"]);
-const NO_SHOWDOWN = new Set(["showdown"]);
-const NEITHER = new Set(["origin", "showdown"]);
+   THE ANSWERS ARE MEMOISED, AND THE TABLE IS BUILT RATHER THAN SPELLED OUT.
+   This is asked once per encounter, so allocating a Set per wild Pidgey to say
+   "nothing missing here" is the sort of thing that adds up - but with two
+   gates it was three named Sets and a three-branch `if`, and adding Living as
+   a third would have been seven Sets and a branch nobody could read. The gates
+   are a list, the answer is keyed on which of them failed, and a fourth gate
+   is one row. */
+const ART_GATES = [["origin", hasOrigin], ["showdown", hasShowdown], ["living", hasLiving]];
+const LOCKED = new Map();
 
 export function lockedTiers(speciesId) {
-  const og = hasOrigin(speciesId);
-  const sd = hasShowdown(speciesId);
-  if (og && sd) return null;
-  if (!og && !sd) return NEITHER;
-  return og ? NO_SHOWDOWN : NO_ORIGIN;
+  let key = 0;
+  for (let i = 0; i < ART_GATES.length; i++) {
+    if (!ART_GATES[i][1](speciesId)) key |= 1 << i;
+  }
+  if (!key) return null;                     // every gated tier has its art
+  let off = LOCKED.get(key);
+  if (!off) {
+    off = new Set(ART_GATES.filter((_, i) => key & (1 << i)).map(([tier]) => tier));
+    LOCKED.set(key, off);
+  }
+  return off;
 }
 
 /* The tiers a species can ever wear, DERIVED FROM THE SAME ANSWER the roll

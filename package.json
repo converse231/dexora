@@ -28,17 +28,19 @@
     "follow": "python tools/build_follow.py",
     "skins": "python tools/build_skins.py",
     "abilities": "node tools/fetch-abilities.mjs",
+    "living": "python tools/build_living.py",
     "cards": "node tools/fetch-cards.mjs && python tools/fetch_card_art.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
+    "@vercel/analytics": "^2.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "esbuild": "^0.21.5",
     "pg": "^8.23.0",
-    "vite": "^5.4.11",
-    "esbuild": "^0.21.5"
+    "vite": "^5.4.11"
   }
 }

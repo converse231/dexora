@@ -543,32 +543,39 @@ export const berryById = (id) => BERRIES.find((b) => b.id === id) ?? null;
    turn. `battle.js` reads what each does from here, so the shelf and the
    rules are one list; the CPU uses none. */
 export const HEALS = [
-  { id: "potion", name: "Potion", price: 8, level: 6, heal: 0.5,
+  { id: "potion", name: "Potion", price: 7, level: 6, heal: 0.5,
     blurb: "Heals half its HP, in a League battle" },
-  { id: "full-heal", name: "Full Heal", price: 10, level: 6, cure: true,
+  { id: "full-heal", name: "Full Heal", price: 9, level: 6, cure: true,
     blurb: "Cures a burn, poison, paralysis, sleep or freeze" },
-  { id: "revive", name: "Revive", price: 40, level: 15, revive: 0.5,
+  { id: "revive", name: "Revive", price: 35, level: 15, revive: 0.5,
     blurb: "A fainted Pokémon back at half its HP" },
   /* PHASE 8 (docs/battles.md): the rest of the games' shelf, at THEIR price
-     ratios to the Potion (¥300 there is ¥8 here): Hyper Potion 1,200, Max
+     ratios to the Potion (¥300 there is ¥7 here): Hyper Potion 1,200, Max
      Potion 2,500, Full Restore 3,000, an X item 1,000 (Gen 7's +2 stages); a
      Max Revive, never sold, at two Revives, which is what it sells for. The
      rematch guard's `KIT` is the three above and does not move. `stage` is
-     [stat, stages] on the Pokemon out: battle.js's stage indices. */
-  { id: "hyper-potion", name: "Hyper Potion", price: 32, level: 20, heal: 0.75,
+     [stat, stages] on the Pokemon out: battle.js's stage indices.
+
+     THE ANCHOR WAS ¥8 AND IS ¥7 (2026-10-08). Adding the Living tier put ~9%
+     more variant income in the game, prizes are denominated in encounters of
+     that income, so the prize unit fell 7 to 6 and a full-clock rematch at
+     Lance stopped covering the healers it takes to win - by ¥2. This shelf is
+     what the guard bounds, so this is where it is paid. Every price is still
+     the games' own ratio to the Potion; only the anchor moved. */
+  { id: "hyper-potion", name: "Hyper Potion", price: 28, level: 20, heal: 0.75,
     blurb: "Heals three quarters of its HP" },
-  { id: "max-potion", name: "Max Potion", price: 67, level: 30, heal: 1,
+  { id: "max-potion", name: "Max Potion", price: 58, level: 30, heal: 1,
     blurb: "Heals all of its HP" },
-  { id: "full-restore", name: "Full Restore", price: 80, level: 40, heal: 1, cure: true,
+  { id: "full-restore", name: "Full Restore", price: 70, level: 40, heal: 1, cure: true,
     blurb: "Heals all of its HP and cures its status" },
-  { id: "max-revive", name: "Max Revive", price: 80, level: 40, revive: 1,
+  { id: "max-revive", name: "Max Revive", price: 70, level: 40, revive: 1,
     blurb: "A fainted Pokémon back at full HP" },
-  { id: "x-attack", name: "X Attack", price: 27, level: 20, stage: [1, 2], blurb: "Sharply raises the Attack of the Pokémon out" },
-  { id: "x-defense", name: "X Defense", price: 27, level: 20, stage: [2, 2], blurb: "Sharply raises the Defense of the Pokémon out" },
-  { id: "x-sp-atk", name: "X Sp. Atk", price: 27, level: 20, stage: [3, 2], blurb: "Sharply raises the Sp. Atk of the Pokémon out" },
-  { id: "x-sp-def", name: "X Sp. Def", price: 27, level: 20, stage: [4, 2], blurb: "Sharply raises the Sp. Def of the Pokémon out" },
-  { id: "x-speed", name: "X Speed", price: 27, level: 20, stage: [5, 2], blurb: "Sharply raises the Speed of the Pokémon out" },
-  { id: "x-accuracy", name: "X Accuracy", price: 27, level: 20, stage: [6, 2], blurb: "Sharply raises the accuracy of the Pokémon out" },
+  { id: "x-attack", name: "X Attack", price: 23, level: 20, stage: [1, 2], blurb: "Sharply raises the Attack of the Pokémon out" },
+  { id: "x-defense", name: "X Defense", price: 23, level: 20, stage: [2, 2], blurb: "Sharply raises the Defense of the Pokémon out" },
+  { id: "x-sp-atk", name: "X Sp. Atk", price: 23, level: 20, stage: [3, 2], blurb: "Sharply raises the Sp. Atk of the Pokémon out" },
+  { id: "x-sp-def", name: "X Sp. Def", price: 23, level: 20, stage: [4, 2], blurb: "Sharply raises the Sp. Def of the Pokémon out" },
+  { id: "x-speed", name: "X Speed", price: 23, level: 20, stage: [5, 2], blurb: "Sharply raises the Speed of the Pokémon out" },
+  { id: "x-accuracy", name: "X Accuracy", price: 23, level: 20, stage: [6, 2], blurb: "Sharply raises the accuracy of the Pokémon out" },
 ];
 
 /* WHAT IS BEING EATEN, AS A NUMBER, and one function per system so no screen

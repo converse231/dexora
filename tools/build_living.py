@@ -1,0 +1,144 @@
+# -*- coding: utf-8 -*-
+"""Living sprites - the Gen 5 games' OWN idle animation - as 8-frame strips.
+
+THE SAME SHAPE AS build_showdown.py, AND DELIBERATELY SO. That file worked out
+what an animated tier costs and why (one zlib stream over eight near-identical
+frames beats WebP and APNG five to one); this reuses the answer rather than
+re-deriving it. Read its docstring for the measurements.
+
+WHAT MAKES THIS A DIFFERENT TIER FROM SHOWDOWN, given both move: provenance.
+Showdown's sprites are the Showdown community's animations. These are the ones
+Black and White actually played on the cartridge - Origin's logic ("the
+old-school artwork") applied to motion rather than to the drawing. The two
+are not the same files; checked across six species before this was built.
+
+COVERAGE IS WORSE THAN SHOWDOWN'S AND THAT IS THE POINT OF `LIVING_IDS`.
+Game Freak animated through Gen 5 and the community carried it part of the way
+after; 868 of 1,025 have one and Paldea is mostly missing. `lockedTiers` reads
+the generated set, so the tier is simply unavailable on a species with no art -
+exactly as Origin is for a species with no older drawing.
+
+Run: python tools/build_living.py   (about 42 MB of fetches, cached)
+"""
+import io
+import json
+import os
+import time
+import urllib.error
+import urllib.request
+
+from PIL import Image, ImageSequence
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CDN = ("https://raw.githubusercontent.com/PokeAPI/sprites/master/"
+       "sprites/pokemon/versions/generation-v/black-white/animated/")
+CACHE = os.path.join(ROOT, ".assets-src", "living")
+OUT = os.path.join(ROOT, "public", "sprites", "living")
+
+SIZE = 64
+FRAMES = 8          # as Showdown: 8 reads as a loop and 16 doubles the repo
+COLORS = 64
+
+
+def species_ids():
+    """The ids that ship, read out of the generated dex rather than a range."""
+    src = io.open(os.path.join(ROOT, "src", "data", "species.js"),
+                  encoding="utf-8").read()
+    import re
+    return sorted({int(m) for m in re.findall(r'"id"\s*:\s*(\d+)', src)})
+
+
+def grab(i):
+    """One GIF, cached on disk. A miss is a fact about the dex, not an error."""
+    path = os.path.join(CACHE, f"{i}.gif")
+    miss = os.path.join(CACHE, f"{i}.none")
+    if os.path.exists(path):
+        return path
+    if os.path.exists(miss):
+        return None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(CDN + f"{i}.gif", timeout=45) as r:
+                data = r.read()
+            io.open(path, "wb").write(data)
+            return path
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                io.open(miss, "w").write("")
+                return None
+            time.sleep(1 + attempt * 2)
+        except Exception:
+            time.sleep(1 + attempt * 2)
+    return None
+
+
+def strip(path):
+    """Eight frames, each on its own 64px canvas, stacked into one column.
+
+    THE CANVAS IS RESIZED, NEVER THE CREATURE, and feet stay on the floor -
+    build_origin.py's lesson, which build_showdown.py already carries."""
+    im = Image.open(path)
+    frames = [f.convert("RGBA") for f in ImageSequence.Iterator(im)]
+    if not frames:
+        return None
+    w, h = im.size
+    step = max(1, len(frames) // FRAMES)
+    picked = frames[::step][:FRAMES]
+    while len(picked) < FRAMES:            # a short loop repeats its last pose
+        picked.append(picked[-1])
+
+    scale = min(SIZE / w, SIZE / h)
+    out = Image.new("RGBA", (SIZE, SIZE * FRAMES), (0, 0, 0, 0))
+    for k, fr in enumerate(picked):
+        r = fr.resize((max(1, round(w * scale)), max(1, round(h * scale))),
+                      Image.LANCZOS)
+        out.alpha_composite(r, ((SIZE - r.width) // 2,
+                                SIZE * k + (SIZE - r.height)))
+    return out.quantize(colors=COLORS, method=Image.FASTOCTREE)
+
+
+def main():
+    os.makedirs(CACHE, exist_ok=True)
+    os.makedirs(OUT, exist_ok=True)
+    ids = species_ids()
+    made, missing, bytes_out = [], [], 0
+    for n, i in enumerate(ids, 1):
+        dst = os.path.join(OUT, f"{i}.png")
+        if os.path.exists(dst):
+            made.append(i)
+            bytes_out += os.path.getsize(dst)
+            continue
+        src = grab(i)
+        if not src:
+            missing.append(i)
+            continue
+        sheet = strip(src)
+        if sheet is None:
+            missing.append(i)
+            continue
+        sheet.save(dst, "PNG", optimize=True)
+        made.append(i)
+        bytes_out += os.path.getsize(dst)
+        if n % 50 == 0:
+            print(f"  {n}/{len(ids)}  {len(made)} made, {len(missing)} missing,"
+                  f" {bytes_out/1048576:.1f} MB", flush=True)
+
+    # WHICH SPECIES HAVE ONE IS A FACT ABOUT THE FILES, NOT A GUESS - the same
+    # reason showdown.js is generated rather than stated as a rule.
+    io.open(os.path.join(ROOT, "src", "data", "living.js"), "w",
+            encoding="utf-8").write(
+        "/* GENERATED by tools/build_living.py - which species ship an animated\n"
+        "   Living strip (Black and White's own idle). Derived from the files on\n"
+        "   disk, because PokeAPI's coverage is not a rule anyone can state. */\n"
+        "export const LIVING_IDS = new Set(%s);\n"
+        % json.dumps(made, separators=(",", ":")))
+
+    print(f"\n{len(made)} strips, {bytes_out/1048576:.1f} MB in public/sprites/living")
+    print(f"{len(missing)} species have no Living sprite")
+    assert len(made) > 800, f"only {len(made)} strips - the fetch went wrong"
+    assert bytes_out < 16 * 1048576, \
+        f"{bytes_out/1048576:.1f} MB is past what this was measured to cost"
+
+
+if __name__ == "__main__":
+    main()
