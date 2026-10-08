@@ -1,69 +1,51 @@
 /* A FINISHED GENERATION'S REWARD, CLAIMED (asked for, 2026-10-03): the map's
    claim button opens this, the press decides and SAVES everything first
-   (`engine.claimDex`, like a card pack), and then a reel of the set logos
-   runs down to the set that was rolled - the box was a choice once; a roll
-   is the suspense. A tap on the reel lands it at once, and reduced motion
-   skips it. */
-import { useEffect, useRef, useState } from "react";
+   (`engine.claimDex`, like a card pack), and then the set that was rolled
+   comes in on the weekly roulette's own strip - the box was a choice once; a
+   roll is the suspense. One reel in the game, `Reel.jsx`: this was a logo
+   flicking in place, which read as a loading spinner next to it. */
+import { useEffect, useState } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
+import Reel, { CELLS, WIN_AT } from "./Reel.jsx";
 import { CARD_SETS } from "../data/cards/index.js";
+import { WRAPPERS } from "../data/cards/art.js";
 import { REGION_NAME } from "../game/biomes.js";
 import { DEX_CHARM } from "../game/medals.js";
-import { logoUrl } from "./cards/load.js";
+import { packUrl, logoUrl } from "./cards/load.js";
 
-// The reel's beats: quick, then slowing - each a little longer than the last.
-const BEATS = (() => {
-  const out = [];
-  for (let d = 55; d < 520; d *= 1.12) out.push(Math.round(d));
-  return out;
-})();
-const still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Every prize here is a box of a set, so every cell is one - the roulette's
+// pack art, falling back to the logo for a set with no wrapper drawn yet.
+const art = (set) => (WRAPPERS[set]?.[0] ? packUrl(set, WRAPPERS[set][0]) : logoUrl(set));
+const filler = () => CARD_SETS[Math.floor(Math.random() * CARD_SETS.length)].id;
 
 export default function DexClaim({ gen, onClaim, onCards, onClose }) {
   useModalLock();
   const [won, setWon] = useState(null);     // what claimDex answered
-  const [at, setAt] = useState(0);          // the logo showing
-  const [step, setStep] = useState(0);      // beats played
+  const [cells, setCells] = useState(null); // the strip, once there is a prize
   const [done, setDone] = useState(false);
-  const timer = useRef(0);
   const region = REGION_NAME[gen] ?? "";
-  const n = CARD_SETS.length;
-
-  // THE REEL: BEATS.length steps, timed so the last lands on the won set.
-  useEffect(() => {
-    if (!won || done) return undefined;
-    if (step >= BEATS.length) { setDone(true); return undefined; }
-    timer.current = setTimeout(() => {
-      setAt((a) => (a + 1) % n);
-      setStep((s) => s + 1);
-    }, BEATS[step]);
-    return () => clearTimeout(timer.current);
-  }, [won, step, done, n]);
 
   const claim = () => {
     const r = onClaim();
     if (!r) { onClose(); return; }
-    const target = CARD_SETS.findIndex((s) => s.id === r.set);
+    const next = Array.from({ length: CELLS }, filler);
+    next[WIN_AT] = r.set;
+    setCells(next);
     setWon(r);
-    if (still()) { setAt(target); setDone(true); return; }
-    setAt(((target - BEATS.length) % n + n) % n);
   };
-  const land = () => { if (won && !done) { clearTimeout(timer.current); setAt(CARD_SETS.findIndex((s) => s.id === won.set)); setDone(true); } };
 
   useEffect(() => {
     const onKey = (ev) => {
       if (ev.key === "Escape" && (!won || done)) { ev.preventDefault(); onClose(); }
-      else if ((ev.key === "Enter" || ev.key === " ") && won && !done) { ev.preventDefault(); land(); }
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   });
 
-  const set = CARD_SETS[at];
   const prize = CARD_SETS.find((s) => s.id === won?.set);
   return (
     <div className="sheet" {...useDismiss(() => { if (!won || done) onClose(); })}>
-      <div className={`confirm dx-claim${done ? " done" : ""}`} role="dialog" aria-modal="true"
+      <div className={`confirm dx-claim${won ? " rolling" : ""}${done ? " done" : ""}`} role="dialog" aria-modal="true"
         aria-label={`${region} Pokédex reward`} onClick={(e) => e.stopPropagation()}>
         <span className="dc-kicker">Pokédex complete</span>
         <h3 className="cf-title">{region.toUpperCase()} COMPLETE</h3>
@@ -82,10 +64,14 @@ export default function DexClaim({ gen, onClaim, onCards, onClose }) {
           </>
         ) : (
           <>
-            <button type="button" className={`dc-reel${done ? " landed" : ""}`} onClick={land}
-              aria-label={done ? prize?.name : "Rolling - tap to stop"} aria-live="polite">
-              <img key={done ? "won" : step} src={logoUrl(set.id)} alt={done ? prize?.name : ""} />
-            </button>
+            <Reel rolling={!done} cells={cells} onDone={() => setDone(true)}>
+              {cells.map((id, i) => (
+                <li key={i} className={`rl-cell pack${done && i === WIN_AT ? " win" : ""}`}>
+                  <img className="rl-pack" src={art(id)} alt="" draggable="false" />
+                  <span>{CARD_SETS.find((s) => s.id === id)?.name ?? id}</span>
+                </li>
+              ))}
+            </Reel>
             {done ? (
               <>
                 <p className="dc-won"><b>{prize?.name}</b> · {won.packs} packs</p>
@@ -99,7 +85,7 @@ export default function DexClaim({ gen, onClaim, onCards, onClose }) {
                   <button type="button" className="cf-no" onClick={onClose}>Later</button>
                 </div>
               </>
-            ) : <p className="dc-lede">Rolling…</p>}
+            ) : <p className="rl-hint">Tap to stop</p>}
           </>
         )}
       </div>

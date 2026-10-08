@@ -35,8 +35,12 @@ you came back.
 ## The roulette (`engine.spinRoulette`, `Roulette.jsx`, lazy)
 
 - **CS2's case opening:** a horizontal strip under a marker. It races, slows
-  and settles slightly off-centre on the prize. A tap or Enter lands it at once,
-  and reduced motion lands it straight away.
+  and settles slightly off-centre on the prize. A tap, Enter or Space lands it
+  at once, and reduced motion lands it straight away.
+- **The motion is `Reel.jsx`, and there is one of it.** A finished generation's
+  booster box (`DexClaim.jsx`) rolls on the same strip; the caller owns the
+  cells and draws them, so the two can never drift apart. That reward was a
+  logo flicking in place until 2026-10-08, which read as a loading spinner.
 - **The prize is decided and SAVED before the strip moves.** The strip is
   dressed around it; the filler cells are drawn from the same odds.
 - **Fifteen equal slots** (`ROULETTE`):
