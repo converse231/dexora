@@ -16,13 +16,13 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
-    id: "2026-10-08-living",
+    id: "2026-10-08-cadence",
     icon: "\u{1F49A}",
     date: "October 2026",
-    title: "A new rare form: Living",
+    title: "A new rare form: Cadence",
     items: [
       ["It breathes", "The animation Black and White themselves played. It arrives still, like any sprite, and then wakes."],
-      ["Rarer than Showdown", "1 in 350, and it has its own Living Honey on the shelf."],
+      ["Rarer than Showdown", "1 in 350, and it has its own Cadence Honey on the shelf."],
       ["Not every species", "868 of them have one; the rest can never wear it, the way Origin works."],
     ],
   },

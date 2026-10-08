@@ -230,7 +230,7 @@ function until(e, what, label, max = 2000) {
   const { e } = boot(SAVE);
   const paid = {};
 
-  for (const tier of [null, "showdown", "living"]) {
+  for (const tier of [null, "showdown", "cadence"]) {
     let enc = e.state.encounter ?? walkToEncounter(e);
     assert.ok(enc, "walked a whole map and met nothing");
     if (enc.phase !== "idle")
@@ -267,20 +267,20 @@ function until(e, what, label, max = 2000) {
 
   assert.equal(paid.ordinary, 0, "an ordinary catch paid a variant bounty");
   assert.ok(paid.showdown > 0, "the rarest tier in the game paid nothing");
-  assert.ok(paid.living > 0, "the second strip tier paid nothing");
-  /* AND LIVING OUTPAYS SHOWDOWN ON THE SAME SPECIES, because it is rarer.
+  assert.ok(paid.cadence > 0, "the second strip tier paid nothing");
+  /* AND CADENCE OUTPAYS SHOWDOWN ON THE SAME SPECIES, because it is rarer.
      ON THE SAME SPECIES is the whole assertion: `catchBounty` is the species'
      SELL band times the tier's pay, and the loop above meets a different
      creature each time - so comparing what those two throws actually paid
-     compares sell bands, not tiers, and said Living was the cheaper tier. */
+     compares sell bands, not tiers, and said Cadence was the cheaper tier. */
   {
     const one = speciesById(6);
-    assert.ok(catchBounty(one, "living") > catchBounty(one, "showdown"),
-      `on one species Living pays ¥${catchBounty(one, "living")} and Showdown ` +
-      `¥${catchBounty(one, "showdown")} - Living is rarer and the bounty does not know it`);
+    assert.ok(catchBounty(one, "cadence") > catchBounty(one, "showdown"),
+      `on one species Cadence pays ¥${catchBounty(one, "cadence")} and Showdown ` +
+      `¥${catchBounty(one, "showdown")} - Cadence is rarer and the bounty does not know it`);
   }
   console.log(`bounty ok — an ordinary catch pays ¥0, a showdown ¥${paid.showdown} ` +
-    `and a living ¥${paid.living}, all through a real throw, and Living outpays ` +
+    `and a cadence ¥${paid.cadence}, all through a real throw, and Cadence outpays ` +
     "Showdown on one species");
 }
 

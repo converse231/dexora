@@ -1,6 +1,6 @@
 import { SPECIES, isForm } from "../data/dex.js";
 import { SHOWDOWN_IDS } from "../data/showdown.js";
-import { LIVING_IDS } from "../data/living.js";
+import { CADENCE_IDS } from "../data/cadence.js";
 import { SAGE_IDS } from "../data/sage.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 /* One-way: `catch.js` imports nothing, so this cannot cycle. `items.js` is the
@@ -423,7 +423,7 @@ export const HOLO_ODDS = 1 / 190;
    of income is unchanged because the total rate is. */
 /* THIRTEEN, AND A VARIANT IS STILL NO MORE COMMON THAN IT WAS AT EIGHT.
 
-   Living joined (2026-10-08) and the rate was held again: every rung moved up
+   Cadence joined (2026-10-08) and the rate was held again: every rung moved up
    by 1.0618x and the new one went in among them. Typical (Origin locked) is
    1 in 20.9 before and after; a Gen 1 species goes 1 in 18.8 -> 1 in 18.9.
    The spread is unchanged at 2.30x, so Gold still sits alone as the chase.
@@ -444,7 +444,7 @@ export const HOLO_ODDS = 1 / 190;
    HEALER PRICES, so that is the lever: the Potion anchor went ¥8 -> ¥7 and
    the shelf rescaled on the games' own ratios. See items.js's HEALS.
 
-   LIVING SITS BETWEEN GOLD AND SHOWDOWN, asked for: rarer than the tier it is
+   CADENCE SITS BETWEEN GOLD AND SHOWDOWN, asked for: rarer than the tier it is
    most likely to be confused with, so the two moving tiers are not neighbours
    and the rarer of them is the one whose animation the games themselves drew.
    1/350 leaves it 7.9% off Gold and 7.7% off Showdown - spaced like the rest
@@ -456,7 +456,7 @@ export const GLITCH_ODDS = 1 / 230;
 export const CHAOTIC_ODDS = 1 / 255;
 export const SHADOW_ODDS = 1 / 290;
 export const SHOWDOWN_ODDS = 1 / 325;
-export const LIVING_ODDS = 1 / 350;
+export const CADENCE_ODDS = 1 / 350;
 export const GOLD_ODDS = 1 / 380;
 
 /* THE LADDER, rarest first - and the single source for it.
@@ -469,7 +469,7 @@ export const GOLD_ODDS = 1 / 380;
    Adding a fifth means adding a row here and drawing an icon. */
 export const TIER_ODDS = [
   ["gold", GOLD_ODDS],
-  ["living", LIVING_ODDS],
+  ["cadence", CADENCE_ODDS],
   ["showdown", SHOWDOWN_ODDS],
   ["shiny", SHINY_ODDS],
   ["shadow", SHADOW_ODDS],
@@ -524,9 +524,9 @@ export const TIER_TELL = {
   vivid: "the colours turned up",
   noir: "no colour at all",
   showdown: "it moves",
-  // Not "it moves" twice: what separates Living from Showdown is whose
+  // Not "it moves" twice: what separates Cadence from Showdown is whose
   // animation it is - this one is the game's own, so the tell is life.
-  living: "it breathes",
+  cadence: "it breathes",
   gold: "cast in gold",
   shadow: "sealed in darkness",
   chaotic: "unstable energy",
@@ -798,11 +798,11 @@ export const SAGE_CREDIT = "Sprites by SageDeoxys";
    whose picture does not exist. */
 export const hasShowdown = (id) => SHOWDOWN_IDS.has(id);
 
-/* AND LIVING IS A THIRD FILE (2026-10-08). Game Freak animated through Black
+/* AND CADENCE IS A THIRD FILE (2026-10-08). Game Freak animated through Black
    and White and the community carried it part of the way after, so 868 of the
    1,025 have one and Paldea is mostly missing - a wider gap than Showdown's,
    and the reason this is a gate rather than an assumption. */
-export const hasLiving = (id) => LIVING_IDS.has(id);
+export const hasCadence = (id) => CADENCE_IDS.has(id);
 
 /* THE ORIGIN GATE IS GONE, and what is left is only the art check.
 
@@ -821,11 +821,11 @@ export const hasLiving = (id) => LIVING_IDS.has(id);
    THE ANSWERS ARE MEMOISED, AND THE TABLE IS BUILT RATHER THAN SPELLED OUT.
    This is asked once per encounter, so allocating a Set per wild Pidgey to say
    "nothing missing here" is the sort of thing that adds up - but with two
-   gates it was three named Sets and a three-branch `if`, and adding Living as
+   gates it was three named Sets and a three-branch `if`, and adding Cadence as
    a third would have been seven Sets and a branch nobody could read. The gates
    are a list, the answer is keyed on which of them failed, and a fourth gate
    is one row. */
-const ART_GATES = [["origin", hasOrigin], ["showdown", hasShowdown], ["living", hasLiving]];
+const ART_GATES = [["origin", hasOrigin], ["showdown", hasShowdown], ["cadence", hasCadence]];
 const LOCKED = new Map();
 
 export function lockedTiers(speciesId) {

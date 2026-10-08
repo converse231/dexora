@@ -556,7 +556,7 @@ export const HEALS = [
      rematch guard's `KIT` is the three above and does not move. `stage` is
      [stat, stages] on the Pokemon out: battle.js's stage indices.
 
-     THE ANCHOR WAS ¥8 AND IS ¥7 (2026-10-08). Adding the Living tier put ~9%
+     THE ANCHOR WAS ¥8 AND IS ¥7 (2026-10-08). Adding the Cadence tier put ~9%
      more variant income in the game, prizes are denominated in encounters of
      that income, so the prize unit fell 7 to 6 and a full-clock rematch at
      Lance stopped covering the healers it takes to win - by ¥2. This shelf is
