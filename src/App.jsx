@@ -35,7 +35,7 @@ import {
   BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall, keeper, variantOf,
 } from "./game/items.js";
 import Sprite, { ItemIcon, eventIcon, preloadSprites } from "./ui/Sprite.jsx";
-import { abilityOf, abilityName, fieldText, heartsOf, HEARTS } from "./game/abilities.js";
+import { perkName, fieldText, heartsOf, HEARTS } from "./game/abilities.js";
 import { EVENT_NAME } from "./game/events.js";
 import {
   biomeFor, levelFromXp, TIERS, dexIndex, tableFor, REGION_NAME, speciesById,
@@ -510,8 +510,8 @@ export default function App({
     const what = mon && fieldText(mon);
     if (!what) return null;
     const hearts = heartsOf(mon.walked);
-    return { mon, what, name: abilityName(abilityOf(mon)),
-      tip: `${label(speciesById(mon.species))} · ${abilityName(abilityOf(mon))}: ${what.toLowerCase()}`
+    return { mon, what, name: perkName(mon),
+      tip: `${label(speciesById(mon.species))} · ${perkName(mon)}: ${what.toLowerCase()}`
         + ` · friendship ${hearts}/${HEARTS.length}` };
   }, [st?.buddy, st?.colRev, st?.rev]);
   const partyMons = useMemo(() => (st?.party ?? []).map((u) => st.box.find((m) => m.uid === u)).filter(Boolean),

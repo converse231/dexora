@@ -7383,6 +7383,10 @@ import * as COS from "../src/game/cosmetics.js";
   const none = SPECIES.filter((sp) => !AB.abilityOf({ uid: 1, species: sp.id }));
   assert.equal(none.length, 0, `${none.length} species have no ability (${none.slice(0, 5).map((s) => s.name)}) - npm run abilities`);
   for (const [kind, f] of Object.entries(AB.FINDS)) for (const [id] of f.pool) assert.ok(itemById(id), `the ${kind} find gives "${id}", which is no item`);
+  // EVERY ONE HAS A PERK, and it is one the engine acts on: a rate or a known find.
+  const idle = SPECIES.filter((sp) => { const f = AB.fieldOf({ uid: 1, species: sp.id }); return !f || !(f.rate || AB.FINDS[f.find]); });
+  assert.equal(idle.length, 0, `${idle.length} species walk with no perk (${idle.slice(0, 5).map((s) => s.name)})`);
+  assert.ok(Object.values(AB.FIELD).every((f) => f.rate || AB.FINDS[f.find]), "a field ability names an effect the engine has none of");
   assert.deepEqual([...AB.HEARTS].sort((a, b) => a - b), AB.HEARTS, "friendship hearts are out of order");
   console.log(`abilities ok — ${Object.keys(AB.FIELD).length} field abilities, all real; every species has an ability; finds are items`);
 }
@@ -7533,6 +7537,9 @@ import { statSync } from "node:fs";
       let p = CD.freshPity(), sum = 0;
       for (let i = 0; i < 3000; i++) { const o = CD.openPack(CARDS, rng, p, rules); p = o.pity; sum += o.pulls.reduce((a, c) => a + CD.dustOf(c.rarity, c.variant), 0); }
       assert.ok(sum / 3000 < CD.DUST_PACK * 2 / 3, `${s.id}: a pack of spares dusts to ${Math.round(sum / 3000)}, too near DUST_PACK ${CD.DUST_PACK}`);
+      // A set's chase - its highest rarity - is never crafted (Base Set's Holo rare).
+      const top = CARDS.reduce((k, c) => Math.max(k, CD.rungOf(c[3])), -1);
+      assert.ok(CARDS.filter((c) => CD.rungOf(c[3]) === top).every((c) => !CD.canCraft(c[3], CARDS)), `${s.id}'s top cards craft`);
     }
   }
   // Spares never take the last copy, nor a copy an earned stamp stands on.

@@ -509,7 +509,7 @@ function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack }) {
       <SetChips setId={setId} onSet={setSetId} />
       <section className="ev-card cd-dusthead">
         <b>{dust.toLocaleString()}</b>
-        <span>Card Dust<small>Spares become dust. Dust buys packs, and crafts the cards you are missing up to a Double rare - Illustration rares and up come from packs only. You always keep one of each.</small></span>
+        <span>Card Dust<small>Spares become dust. Dust buys packs, and crafts the cards you are missing up to a Double rare - Illustration rares and up, and a set's own top rarity, come from packs only. You always keep one of each.</small></span>
         <button type="button" className="lg-go" disabled={!sweep} onClick={() => onSweep(setId)}>
           Dust spare commons and uncommons · +{sweep}
         </button>
@@ -536,7 +536,7 @@ function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack }) {
         {missing.map((c) => (
           <button key={c[0]} type="button" className="cd-tile" onClick={() => onLook(setId, c[0])}>
             <CardFace setId={setId} card={c} variant={c[4][0]} still lazy />
-            <span className="cd-tile-cap"><RarityMark rarity={c[3]} />{canCraft(c[3]) ? craftCost(c[3], c[4][0]).toLocaleString() : "Packs only"}</span>
+            <span className="cd-tile-cap"><RarityMark rarity={c[3]} />{canCraft(c[3], set.CARDS) ? craftCost(c[3], c[4][0]).toLocaleString() : "Packs only"}</span>
           </button>
         ))}
       </div>

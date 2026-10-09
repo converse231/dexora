@@ -253,15 +253,24 @@ function sequencesOf(r) {
 /* THE NEXT BATTLE after `id` in its own sequence: the first one open and not
    yet beaten after it - the gym's next trainer, then its leader. Null at the
    end of the gym (or run), or when the next door is not open yet. */
-export function nextAfter(id, beaten) {
-  for (const r of LEAGUES) {
-    for (const seq of sequencesOf(r)) {
-      const k = seq.findIndex((x) => x.o.id === id);
-      if (k >= 0) return seq.slice(k + 1).find((x) => isOpen(x.o.id, beaten) && !beaten[x.o.id]) ?? null;
-    }
-  }
+function sequenceOf(id) {
+  for (const r of LEAGUES) for (const seq of sequencesOf(r)) if (seq.some((x) => x.o.id === id)) return seq;
   return null;
 }
+export function nextAfter(id, beaten) {
+  const seq = sequenceOf(id);
+  if (!seq) return null;
+  const k = seq.findIndex((x) => x.o.id === id);
+  return seq.slice(k + 1).find((x) => isOpen(x.o.id, beaten) && !beaten[x.o.id]) ?? null;
+}
+/* WHERE IN THE RUN A BATTLE IS (asked for, 2026-10-10): every step of its
+   sequence - a gym's trainers then its leader, the Elite Four to the
+   Champion, a hard run - for the strip under the opponent's name. Null for
+   a battle in no sequence (a road trainer, ranked). */
+const pathOf = (id, beaten) => sequenceOf(id)?.map((x) => ({
+  id: x.o.id, won: !!beaten[x.o.id],
+  name: x.kind === "trainer" ? trainerName(x.o) : x.kind === "leader" ? `Leader ${x.o.name}` : x.o.name,
+})) ?? null;
 const tierWord = (t) => (t ? t[0].toUpperCase() + t.slice(1) : "");
 
 /* WHAT HARD MODE GIVES, shown whether or not it is open yet - a locked door
@@ -964,6 +973,7 @@ export default function League({
           myMons={fight.mons}
           foeMons={fight.foeMons ?? null}
           badge={fight.kind === "leader" ? { id: fight.o.id, name: fight.o.badge } : null}
+          path={fight.remote || fight.kind === "practice" || fight.kind === "ranked" ? null : pathOf(fight.o.id, beaten)}
           nextLabel={upNext ? (upNext.kind === "trainer" ? trainerName(upNext.o) : upNext.kind === "hard" ? `${upNext.o.name} (hard)` : upNext.o.name) : null}
           ai={fight.o.ai ?? AI_FOR[fight.kind] ?? 3}
           onDone={(result, again) => {

@@ -71,10 +71,10 @@ it is still never the tier roll, a battle or ranked.
   | Illuminate, Arena Trap, No Guard, Swarm | More encounters (×1.25) |
   | Stench, White Smoke, Quick Feet, Infiltrator | Fewer encounters (×0.5) |
   | Intimidate, Keen Eye | A few fewer encounters (×0.75) |
-  | Static, Lightning Rod, Magnet Pull, Flash Fire, Storm Drain, Harvest | That type weighs `TYPE_PULL` (2×) in the species roll |
   | Pickup | A ball or berry about every 150 steps |
   | Compound Eyes, Super Luck | The same finds, about every 300 steps |
   | Honey Gather | A Honey about every 1,500 steps |
+  | Any other (a **Forager**) | Grass, Bug, Fairy, Poison, Normal, Water and Flying first types forage a berry, the rest a Poké, Great or Ultra Ball, about every 300 steps |
 
   Abilities with nothing to act on here (eggs, natures, held items) do
   nothing. About 265 species have a copy with a field ability.

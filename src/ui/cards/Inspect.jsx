@@ -72,7 +72,7 @@ export default function Inspect({ set, localId, cards, dust, dex, showcase = [],
                       Dust a spare · +{dustOf(card[3], v)}
                     </button>
                   )}
-                  {canCraft(card[3]) ? (
+                  {canCraft(card[3], set.CARDS) ? (
                     <button type="button" className={`lg-go${have ? " quiet" : ""}`} disabled={dust < cost} onClick={() => onCraft(v)}>
                       Craft · {cost.toLocaleString()} dust
                     </button>

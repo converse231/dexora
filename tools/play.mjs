@@ -2007,6 +2007,16 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
     assert.ok(e.state.worn.some((w) => w.id === "find"), "Pickup found nothing on a sure roll");
     assert.notEqual(JSON.stringify(e.state.bag), before, "the find did not reach the bag");
   }
+  // A FORAGER: an ability with nothing to do here still finds, by its first type (Bulbasaur: berries).
+  {
+    assert.ok(AB.fieldOf({ uid: 5, species: 1 })?.forage, "this Bulbasaur does not forage - pick another uid");
+    const e = walking(1, 5);
+    const berries = () => ["razz-berry", "pinap-berry", "nanab-berry"].reduce((n, b) => n + (e.state.bag[b] ?? 0), 0);
+    const before = berries();
+    let calls = 0;
+    assert.ok(stepWith(e, () => (++calls <= 2 ? 0.0001 : 0.999)));
+    assert.equal(berries(), before + 1, "a Grass forager did not find a berry on a sure roll");
+  }
   // Stench halves the encounter rate: a roll between the halved and the full rate meets nothing.
   {
     const between = ENCOUNTER_RATE * 0.75;
@@ -2338,6 +2348,14 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
     assert.equal(rich.craftCard(set, chase[0], "h"), false, `a ${r} was crafted`);
   }
   assert.equal(rich.state.dust, 1e7, "a refused craft spent dust");
+  // A SET'S OWN CHASE TOO: Base Set's Holo rare (its top) is packs only; its plain rare still crafts.
+  {
+    const base = await import("../src/data/cards/sets/base1.js");
+    const holo = base.CARDS.find((c) => c[3] === "holo"), plain = base.CARDS.find((c) => c[3] === "rare");
+    assert.equal(rich.craftCard(base, holo[0], holo[4][0]), false, "a Base Set Holo rare was crafted");
+    assert.equal(rich.state.dust, 1e7, "a refused Base Set craft spent dust");
+    assert.equal(rich.craftCard(base, plain[0], plain[4][0]), true, "a Base Set rare could not be crafted");
+  }
   // With dust for any craft at all, so only the printing can refuse it.
   assert.equal(boot({ ...SAVE, dust: 1e6 }).e.craftCard(set, common[0], "h"), false,
     "a common was crafted in a holo it is never printed in");
@@ -4009,6 +4027,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     const set = C.newestOpen(levelFromXp(e.state.xp));
     const r = win(e, champ.id);
     assert.equal(r.pack, set, "a first Champion win paid no box");
+    assert.equal(r.packs, C.BOXES[set].packs, "the result card would name the wrong number of packs");
     assert.equal(e.state.packs[set], C.BOXES[set].packs, "the Champion's box is not the set's box");
     assert.deepEqual(e.state.earnedPacks[set], Array(C.BOXES[set].packs).fill(`champion:${champ.id}`),
       "the Champion's packs are not all earned");
@@ -4075,7 +4094,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     const newest = newestOpen(lvOf(e.state.xp));      // the newest set this level has open
     const packs0 = e.state.packs[newest] ?? 0;
     const r = win(e, brock.id);
-    assert.deepEqual(r, { over: 0, pay: GYMTUNE[brock.id].prize, first: true, fee: 0, gift: null, master: false, charm: null, pack: newest });
+    assert.deepEqual(r, { over: 0, pay: GYMTUNE[brock.id].prize, first: true, fee: 0, gift: null, master: false, charm: null, pack: newest, packs: 1 });
     assert.equal(e.state.packs[newest], packs0 + 1, "a first badge did not add its pack");
     assert.deepEqual(e.state.earnedPacks[newest].slice(-1), [`badge:${brock.id}`], "the badge pack is not marked earned");
     assert.notEqual(e.state.beaten, was, "a win was written into `beaten` in place - the League page's memo never sees it");
@@ -4090,12 +4109,12 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(begin(e, misty.trainers[0].id, [1]), null, "Misty's first gym trainer stayed shut after Brock was beaten");
     // Losing, forfeiting or leaving pays and records nothing.
     const lost = e.battleEnd();
-    assert.deepEqual(lost, { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null, pack: null }, "a battle left unfinished paid");
+    assert.deepEqual(lost, { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null, pack: null, packs: 0 }, "a battle left unfinished paid");
     assert.ok(!e.state.beaten[misty.trainers[0].id], "a battle left unfinished was recorded as a win");
 
     // A rematch at once pays nothing; the clock refills as you walk.
     const again = win(e, brock.id);
-    assert.deepEqual(again, { over: 0, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null, pack: null }, "a rematch straight after the win paid");
+    assert.deepEqual(again, { over: 0, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null, pack: null, packs: 0 }, "a rematch straight after the win paid");
     assert.equal(e.state.beaten[brock.id].wins, 2);
     assert.equal(L.capOf(brock.id, e.state.beaten), Math.min(100, cap + 2 * L.REMATCH_CAP_STEP),
       "each win did not raise Brock's cap");
@@ -4256,7 +4275,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.equal(back.state.battle, null, "a battle survived a reload");
     assert.deepEqual(back.state.beaten, {}, "a reload mid-battle recorded a win");
     assert.equal(back.state.money, saved.money);
-    assert.deepEqual(back.battleEnd(), { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null, pack: null }, "the reloaded game paid for the old battle");
+    assert.deepEqual(back.battleEnd(), { over: -1, pay: 0, first: false, fee: 0, gift: null, master: false, charm: null, pack: null, packs: 0 }, "the reloaded game paid for the old battle");
     assert.equal(JSON.stringify(back.state.box.map(({ uid, species, level }) => [uid, species, level])),
       JSON.stringify(saved.box.map(({ uid, species, level }) => [uid, species, level])), "a reload mid-battle changed the Box");
   }

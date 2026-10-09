@@ -652,7 +652,8 @@ Your calls after phase 2:
   on it while any wait.
 - **Crafting ends at the Double rare** (2026-10-07; it was every rung below a
   Special illustration rare): an Illustration rare and everything above it, the
-  ACE SPEC too, come from packs only (`PACK_ONLY`). Dust's other use is a pack
+  ACE SPEC too, come from packs only (`PACK_ONLY`) - and so does a set's own
+  highest rarity (Base Set's Holo rare, 2026-10-10). Dust's other use is a pack
   of any open set at `DUST_PACK` (400). A pack whose cards are all spares dusts
   to about 230, so the trade gives back at most ~57% and duplicates cannot loop
   into free packs (check.mjs re-measures every set). The old measure (a set at
