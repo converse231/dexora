@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-10-achievements",
+    icon: "🏆",
+    date: "October 2026",
+    title: "Achievements",
+    items: [
+      ["A page of its own", "You › Achievements: catching, rare forms, research, battles, cards, trading and your trainer."],
+      ["Already counted", "Everything your save has done is there now. Claim each step for balls, money and card packs."],
+      ["Badges on your card", "Every gym badge you have won now shows on your trainer card."],
+    ],
+  },
+  {
     id: "2026-10-08-cadence",
     icon: "\u{1F49A}",
     date: "October 2026",

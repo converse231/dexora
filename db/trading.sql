@@ -625,6 +625,9 @@ create index if not exists trainer_cards_name on public.trainer_cards (lower(use
 -- Badges (battles phase 6, docs/battles.md): the League leaders beaten in the
 -- stored save's `beaten`, counted by `card_stats` like every other number.
 alter table public.trainer_cards add column if not exists badges int not null default 0;
+-- WHICH badges, in the League's order (2026-10-10: the card drew a count, and
+-- a count cannot say which - an old save may hold leaders out of order).
+alter table public.trainer_cards add column if not exists badge_ids text[] not null default '{}';
 -- CARDS (docs/cards.md, phase 4): the TCG cards a trainer shows, and the
 -- titles they have earned - both derived from the STORED save by
 -- `card_stats`, never written by a request.
@@ -641,7 +644,7 @@ create policy "cards are public to players" on public.trainer_cards for select
 -- column is unreadable until it is added here.
 revoke select on public.trainer_cards from anon, authenticated;
 grant select (user_id, username, char, xp, dex_count, variants, stars, trades,
-              showcase, seeking, joined_at, played_at, badges, card_show, titles)
+              showcase, seeking, joined_at, played_at, badges, badge_ids, card_show, titles)
   on public.trainer_cards to authenticated;
 
 -- Eight characters with nothing to misread aloud: no 0/O, no 1/I/L.
@@ -714,10 +717,13 @@ begin
   -- A badge is a leader's id in `beaten` with a whole number of wins - a JSON
   -- NUMBER, as the game's own `cleanBeaten` keeps one ("3" is not); anything
   -- else counts for nothing.
-  card.badges := (select count(*)
-    from jsonb_each(case when jsonb_typeof(data->'beaten') = 'object' then data->'beaten' else '{}' end) b
-   where b.key = any(public.badge_list())
-     and jsonb_typeof(b.value->'wins') = 'number' and coalesce(b.value->>'wins', '') ~ '^[1-9]\d{0,8}$');
+  card.badge_ids := array(select l
+    from unnest(public.badge_list()) with ordinality u(l, n)
+   where jsonb_typeof(data->'beaten') = 'object'
+     and jsonb_typeof(data->'beaten'->l->'wins') = 'number'
+     and coalesce(data->'beaten'->l->>'wins', '') ~ '^[1-9]\d{0,8}$'
+   order by n);
+  card.badges := cardinality(card.badge_ids);
   card.card_show := public.card_showcase(data);
   card.titles := public.card_titles(data);
   -- A showcased Pokemon that left the box leaves the showcase; one that
@@ -784,7 +790,7 @@ begin
   if not found then return new; end if;
   c := public.card_stats(new.data, c);
   update public.trainer_cards set xp = c.xp, dex_count = c.dex_count, variants = c.variants,
-    stars = c.stars, badges = c.badges, showcase = c.showcase, card_show = c.card_show,
+    stars = c.stars, badges = c.badges, badge_ids = c.badge_ids, showcase = c.showcase, card_show = c.card_show,
     titles = c.titles, played_at = now()
    where user_id = new.user_id;
   return new;
@@ -809,10 +815,10 @@ update public.trainer_cards c set
 -- Badges arrived after the cards did: every card with a save gets its count
 -- now, not at its trainer's next upload. Only rows that differ are written,
 -- so running the file again writes nothing.
-update public.trainer_cards c set badges = s.n
-  from (select sv.user_id as uid, (public.card_stats(sv.data, c2)).badges as n
+update public.trainer_cards c set badges = cardinality(s.ids), badge_ids = s.ids
+  from (select sv.user_id as uid, (public.card_stats(sv.data, c2)).badge_ids as ids
           from public.saves sv join public.trainer_cards c2 on c2.user_id = sv.user_id) s
- where s.uid = c.user_id and c.badges <> s.n;
+ where s.uid = c.user_id and c.badge_ids <> s.ids;
 -- Card showcases and titles arrived later still: the same, for them.
 update public.trainer_cards c set card_show = public.card_showcase(sv.data), titles = public.card_titles(sv.data)
   from public.saves sv

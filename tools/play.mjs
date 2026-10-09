@@ -1885,6 +1885,23 @@ assert.deepEqual(boot({ ...SAVE, packs: { me01: 1 }, earnedPacks: { me01: ["a", 
   { me01: ["a"] }, "more earned packs than unopened ones were kept");
 await savedField("cardPity", { me01: { hit: 2, special: 14, mega: 61 } }, "junk", {});
 
+/* ACHIEVEMENTS (achievements.js): steps claimed, by id - one from a newer
+   build kept. A save that has done things opens with them DUE, a claim pays
+   every step met exactly once, and the last step of a ladder brings a pack. */
+await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
+{
+  const { e } = boot({ ...SAVE, caught: 600, steps: 12000 });
+  const money = e.state.money, great = e.state.bag["great-ball"], ultra = e.state.bag["ultra-ball"];
+  const got = e.claimAchievements(["catches", "steps"]);
+  assert.equal(got?.steps, 4, "a claim did not pay every step met (100 and 500 caught, 1,000 and 10,000 walked)");
+  assert.deepEqual([e.state.money - money, e.state.bag["great-ball"] - great, e.state.bag["ultra-ball"] - ultra],
+    [got.money, got.items["great-ball"], got.items["ultra-ball"]], "a claim said one reward and paid another");
+  assert.deepEqual(e.state.achieved, { catches: 2, steps: 2 }, "a claim did not record its steps");
+  assert.equal(e.claimAchievements(["catches", "steps"]), null, "a step was paid twice, or one not met was paid");
+  const top = boot({ ...SAVE, caught: 10000 }).e.claimAchievements(["catches"]);
+  assert.equal(top?.packs, 1, "the last step of a ladder did not bring its card pack");
+}
+
 /* COSMETICS (docs/cosmetics.md): the follower is a Box uid, the skins are
    bought ids (one from a newer build is KEPT - a purchase is never lost),
    and the skin worn is one of them. */

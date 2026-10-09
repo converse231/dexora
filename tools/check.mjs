@@ -2413,6 +2413,7 @@ const sizes = AREA_IDS
    not shipping them: a medal that pays twice, a shiny eaten by a bulk action,
    and an import that accepts a file it cannot actually run. */
 import { MEDALS, MILESTONES, medalsFor, medalById, DEX_RANKS, dexRank } from "../src/game/medals.js";
+import { ACHIEVEMENTS, STEP_PAY, GROUPS, cleanAchieved } from "../src/game/achievements.js";
 import { label as nameOf, HYPHEN_NAMES } from "../src/game/map.js";
 {
   /* NO SLUG REACHES THE SCREEN: a species whose key has a hyphen is either in
@@ -2507,6 +2508,24 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   assert.ok(balls["master-ball"] <= Math.ceil(SPECIES.length / 70),
     `${balls["master-ball"]} Master Balls from the dex over ${SPECIES.length} ` +
     "species - that is a hoard");
+  /* ACHIEVEMENTS ARE A ONE-OFF POOL, and the late game's money is those
+     pools (CLAUDE.md, Economy): every step of every ladder, all claimed, stays
+     under half of what the Pokedex pays above. No step pays a Master Ball -
+     their count per game is held elsewhere (MASTER_EVERY). A ladder rises
+     strictly and fits STEP_PAY, and an id fits `cleanAchieved`, or a claimed
+     step would be dropped on the next load and paid again. */
+  const feats = ACHIEVEMENTS.reduce((n, a) => n + a.steps.reduce((m, _, k) => m + STEP_PAY[k].money, 0), 0);
+  assert.ok(feats < money / 2, `achievements pay ¥${feats}, against ¥${money} from the Pokedex - over half`);
+  assert.ok(STEP_PAY.every((p) => !p.items["master-ball"]), "an achievement step pays a Master Ball");
+  for (const a of ACHIEVEMENTS) {
+    assert.ok(a.steps.length >= 1 && a.steps.length <= STEP_PAY.length, `${a.id} has more steps than STEP_PAY pays`);
+    assert.ok(a.steps.every((n, i) => n > 0 && (i === 0 || n > a.steps[i - 1])), `${a.id}'s steps do not rise`);
+    assert.ok(GROUPS.some(([g]) => g === a.group), `${a.id} is in no group the page draws`);
+    assert.deepEqual(cleanAchieved({ [a.id]: a.steps.length }), { [a.id]: a.steps.length }, `a save drops ${a.id}`);
+  }
+  assert.equal(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length, "two achievements share an id");
+  console.log(`achievements ok — ${ACHIEVEMENTS.length} ladders, ${ACHIEVEMENTS.reduce((n, a) => n + a.steps.length, 0)} steps, ` +
+    `¥${feats.toLocaleString()} against the Pokedex's ¥${money.toLocaleString()}`);
   /* THE POKÉDEX RANK: from nothing to the whole dex, every step strictly
      further than the last (so none is unreachable or skipped), and each
      boundary is where `dexRank` changes its answer. The art is looked up by

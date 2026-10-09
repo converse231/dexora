@@ -70,6 +70,29 @@ function Stats({ card }) {
   );
 }
 
+/* THE BADGES WON, in the League's order (`badge_ids`, card_stats). Named from
+   the id: leagues.js is the League's alone (asserted), and the id already says
+   "kanto-lt-surge". A server that has not run the SQL sends none. */
+const badgeName = (id) => {
+  const [region, ...who] = id.split("-");
+  const cap = (w) => w[0].toUpperCase() + w.slice(1);
+  return `${who.map(cap).join(" ")} · ${cap(region)}`;
+};
+function Badges({ ids }) {
+  if (!ids?.length) return null;
+  return (
+    <section className="ev-card">
+      <header className="ev-banner"><h4>Gym badges</h4><span className="tp-count">{ids.length}</span></header>
+      <div className="tp-badges">
+        {ids.map((id) => (
+          <img key={id} src={new URL(`badges/${id}.png`, document.baseURI).href}
+               alt={badgeName(id)} data-tip={badgeName(id)} loading="lazy" />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /* An empty slot on YOUR card is a "+" that opens the showcase picker; on
    anybody else's it is only an empty frame. */
 function Showcase({ list, onAdd }) {
@@ -246,6 +269,7 @@ export default function TrainerProfile({
 
       <Stats card={card} />
       <Ranked who={card.user_id} />
+      <Badges ids={card.badge_ids} />
 
       <section className="ev-card">
         <header className="ev-banner">

@@ -14,12 +14,13 @@ import { dexRank } from "../game/medals.js";
 import { freePoints } from "../game/trainer.js";
 import { themeChoice, setTheme, THEMES } from "./theme.js";
 import TitleBadges from "./TitleBadges.jsx";
+import { TIERS } from "../game/biomes.js";
 
 const THEME_NAME = { auto: "Auto", dark: "Night", light: "Day" };
 
 export default function You({
-  trainerName, caught, xp, stats, bag, save, account, unread, titles = [], requests = 0,
-  onProfile, onNews, onHelp, onForms, onWardrobe, onSettings, onLogOut, onReset, onSpend,
+  trainerName, caught, xp, stats, bag, save, account, unread, titles = [], requests = 0, due = 0,
+  onProfile, onAchievements, onNews, onHelp, onForms, onWardrobe, onSettings, onLogOut, onReset, onSpend,
 }) {
   useModalLock();
   const [theme, setThemeState] = useState(themeChoice);
@@ -30,9 +31,11 @@ export default function You({
   const items = [
     onProfile && ["card", "Your trainer card",
       requests ? `${requests} friend request${requests === 1 ? "" : "s"}` : "Your card and your friends", onProfile, requests > 0],
+    onAchievements && ["trophy", "Achievements",
+      due ? `${due} step${due === 1 ? "" : "s"} to claim` : "Catching, battles, cards, trading", onAchievements, due > 0],
     ["news", "What's new", unread ? "New since you last looked" : "Updates to the game", onNews, unread],
     ["help", "How to play", "Keys, touch, and how it all works", onHelp],
-    ["forms", "Rare forms", "The twelve kinds, and their odds", onForms],
+    ["forms", "Rare forms", `The ${TIERS.length} kinds, and their odds`, onForms],
     onWardrobe && ["shirt", "Wardrobe", "Trainer skins, and who walks with you", onWardrobe],
     onSettings && ["gear", "Settings", "Name, trainer, birthday, password", onSettings],
   ].filter(Boolean);
