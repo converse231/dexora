@@ -53,6 +53,7 @@ import { defenders, defendNote } from "./ranked.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
 import { medalsFor, milestoneAt, dexRank, rankLine, dexCharm, genMedalsDue } from "./medals.js";
+import { ACHIEVEMENTS, standing, payOf, cleanAchieved } from "./achievements.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE, TUTOR_PRICE,
   evolveState, evoLevel, startingState, dexBonus, catchBounty, levelReward,
@@ -252,6 +253,7 @@ function freshState() {
     ...Object.fromEntries(TIERS.map((t) => [t, new Array(SPECIES.length).fill(0)])),
     // Medal ids already banked, so none can ever pay twice.
     medals: [],
+    achieved: {},              // achievement id -> steps claimed - see achievements.js
     // Where the levels go. Ranks are spent, never refunded.
     stats: emptyStats(),
     running: false,
@@ -575,6 +577,7 @@ function loadState() {
       origin: normalise(s.origin ?? s.astral, SPECIES.length),
       astral: normalise(s.origin ? s.astral : null, SPECIES.length),
       medals: Array.isArray(s.medals) ? s.medals.filter((m) => typeof m === "string") : [],
+      achieved: cleanAchieved(s.achieved),
       // A save from before stats existed has none, and a hand-edited one could
       // hold anything; the trainer module clamps each rank as it reads it.
       stats: { ...emptyStats(), ...(s.stats ?? {}) },
@@ -3138,6 +3141,33 @@ export function createEngine(canvas, onChange, mini = null) {
     return id;
   }
 
+  /* ACHIEVEMENTS, CLAIMED (achievements.js): every step met and not yet
+     claimed, of the ones named - all of them when none are - paid together
+     in one save and one `changed()`, so "Claim all" is one press and one
+     rebuild. What is due is derived; `achieved` is all that is written. */
+  function claimAchievements(ids = null) {
+    const got = { money: 0, items: {}, packs: 0, steps: 0 };
+    for (const a of ACHIEVEMENTS) {
+      if (ids && !ids.includes(a.id)) continue;
+      const { claimed, due } = standing(a, state);
+      if (!due) continue;
+      for (let k = claimed; k < claimed + due; k++) {
+        const p = payOf(a, k);
+        got.money += p.money;
+        for (const [it, n] of Object.entries(p.items)) got.items[it] = (got.items[it] ?? 0) + n;
+        if (p.pack && grantPacks(1, `feat:${a.id}`)) got.packs++;
+        got.steps++;
+      }
+      state.achieved = { ...state.achieved, [a.id]: claimed + due };
+    }
+    if (!got.steps) return null;
+    state.money += got.money;
+    give(got.items);
+    save();
+    changed();
+    return got;
+  }
+
   /* A FINISHED GENERATION, CLAIMED (asked for, 2026-10-03): what is due is
      DERIVED - a generation's Pokédex done and its medal not yet banked - so
      nothing is stored until the press. Then, in one save before the reel
@@ -3928,6 +3958,7 @@ export function createEngine(canvas, onChange, mini = null) {
     dustSpares,
     craftCard,
     claimDex,
+    claimAchievements,
     dexClaims,
     showCard,
     buyCandy,

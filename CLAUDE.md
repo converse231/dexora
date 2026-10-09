@@ -801,6 +801,24 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   title and the Pokedex Charm (`dexCharm`, `DEX_CHARM` 2x on that
   generation's tier roll, a Mega through `genOf`; between `RESEARCH_LIFT`
   and `OUTBREAK_LIFT`, your call 2026-10-03).
+- **Achievements are DERIVED, never counted** (`achievements.js`, a page
+  off You, 2026-10-10): each is a ladder of steps over a number the save
+  already holds (`caught`, `steps`, tier rows, `beaten`, research rows -
+  which cap once per species, so "kinds traded" cannot be farmed by passing
+  one Pokemon back and forth - `cards`, `milestones`, `checkin.best`), so an
+  old save opens with what it did. A step is CLAIMED on the page
+  (`claimAchievements`, one save and one `changed()`), never paid on the
+  moment - an old save would boot into a wall of banners - and `achieved`
+  (id -> steps claimed) is the only thing stored. Marked done, never drawn
+  (your call). `STEP_PAY` is balls first and small money; the last step of a
+  ladder adds a card pack (`feat:<id>`). It is a one-off pool: check.mjs
+  holds every step's money under half of the Pokedex's medals and
+  milestones, and no step pays a Master Ball. The Pokedex medals show there
+  as counts; they still pay on the catch.
+- **The trainer card draws the badges won** (`badge_ids`, card_stats in
+  trading.sql, League order): the count alone cannot say which, because an
+  old save may hold leaders out of order. Named from the id (`kanto-lt-surge`),
+  since leagues.js is the League's alone.
 - **Cosmetics are designed in docs/cosmetics.md** - a look, never a
   strength: no rule module imports `game/cosmetics.js` or `data/follow.js`
   (asserted). **The walking party** (`state.party`, up to `PARTY_MAX` 3 Box

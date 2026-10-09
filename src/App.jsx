@@ -21,6 +21,8 @@ import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
 import Variants from "./ui/Variants.jsx";
 import Wardrobe from "./ui/Wardrobe.jsx";
+import Achievements from "./ui/Achievements.jsx";
+import { dueCount } from "./game/achievements.js";
 import Party from "./ui/Party.jsx";
 import CheckIn from "./ui/CheckIn.jsx";
 import { followSheet, PARTY_MAX } from "./game/cosmetics.js";
@@ -325,6 +327,8 @@ export default function App({
   const [help, setHelp] = useState(false);
   const [forms, setForms] = useState(false);
   const [wardrobe, setWardrobe] = useState(false);
+  const [feats, setFeats] = useState(false);   // Achievements, a page off You
+  useEffect(() => { if (!you) setFeats(false); }, [you]);   // a tab away lands back on You
   const [news, setNews] = useState(false);
   // Read once per render, cheap: one localStorage get. Cleared by opening News.
   const unread = !news && newsUnread();
@@ -609,6 +613,9 @@ export default function App({
 
   const caught = st ? st.dex.filter((v) => v === 2).length : 0;
   const level = levelFromXp(st?.xp ?? 0);
+  /* Steps due, for the You dot. On the collection's rev and the thousand
+     steps (every walking step is a multiple of 1,000): not on every step. */
+  const due = useMemo(() => (st ? dueCount(st) : 0), [st?.colRev, level, Math.floor((st?.steps ?? 0) / 1000)]);
   /* The map's encounter sprites, fetched before anything is met - see
      `preloadSprites`. On the map and the level, the two things the table is. */
   const areaId = st?.areaId;
@@ -826,8 +833,11 @@ export default function App({
       {/* NOT UNDER THE PROFILE: both are pages at one layer and You comes later,
           so "Your trainer card" opened the card BEHIND You and the button read
           as dead (reported 2026-10-04). The profile's Back brings You back. */}
-      {you && !trade?.profile && (
+      {you && feats && engine && st && <Achievements engine={engine} state={st} onClose={() => setFeats(false)} />}
+      {you && !trade?.profile && !feats && (
         <You
+          due={due}
+          onAchievements={() => setFeats(true)}
           trainerName={trainerName}
           titles={titleIds(st?.milestones, st?.medals)}
           caught={caught}
@@ -917,7 +927,7 @@ export default function App({
         tradeAlert={offerAlert}
         cardAlert={Object.values(st?.packs ?? {}).reduce((a, b) => a + b, 0)}
         // Friend requests live on your card now (You › Your trainer card), so they light You.
-        youAlert={unread || freePoints(st?.stats, level) > 0 || (inbox?.friend_requests ?? 0) > 0}
+        youAlert={unread || freePoints(st?.stats, level) > 0 || (inbox?.friend_requests ?? 0) > 0 || due > 0}
         onNews={() => setNews(true)}
         unread={unread}
         trainerName={trainerName}

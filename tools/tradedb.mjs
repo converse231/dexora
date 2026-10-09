@@ -746,6 +746,12 @@ assert.equal(await cardA(), 2, "a card's badges are not the leaders beaten in th
 assert.equal((await rpc(B, "card_by_name", { name: "TesterA" })).badges, 2, "a player cannot see another's badges");
 await A.c.from("trainer_cards").update({ badges: 68 }).eq("user_id", A.id);
 assert.equal(await cardA(), 2, "a trainer wrote their own badges");
+// WHICH ones, in the League's order whatever order the save lists them.
+assert.deepEqual((await rpc(B, "card_by_name", { name: "TesterA" })).badge_ids, ["kanto-brock", "kanto-misty"],
+  "a card's badge ids are not the stored save's leaders, in League order");
+await A.c.from("trainer_cards").update({ badge_ids: ["paldea-grusha"] }).eq("user_id", A.id);
+assert.deepEqual((await q("select badge_ids from public.trainer_cards where user_id = $1", [A.id]))[0].badge_ids,
+  ["kanto-brock", "kanto-misty"], "a trainer wrote their own badge ids");
 
 // ---- 43. defense teams: checked against the stored save, read-own, write-none ------------------
 // Every member at Lv 100: only those may join a team (docs/ranked.md, Entry) - uid 6 is one short.

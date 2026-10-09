@@ -6137,6 +6137,8 @@ button:disabled { transition: none; }
 }
 .tp-ring i { font-style: normal; font-size: 9px; }
 .tp-count { font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
+.tp-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.tp-badges img { width: 32px; height: 32px; image-rendering: pixelated; }  /* the art's own size */
 .tp-show { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .tp-slot {
   position: relative; margin: 0; display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px;
@@ -8853,6 +8855,37 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   .you-main { grid-template-columns: 340px minmax(0, 1fr); align-items: start; max-width: 1180px; }
   .you-hero { grid-column: 1 / -1; }
   .you-menu { position: sticky; top: 16px; }
+}
+
+/* ---------- Achievements (Achievements.jsx): a page off You. One row a
+   ladder, marked done and never drawn; colour only where it says something -
+   the CTA on a claim, the accent on a due pip. */
+.ach-main { display: grid; gap: 14px; }
+.ach-all {
+  margin-left: auto; flex: none; height: 34px; padding: 0 14px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--cta); color: #fff; font: 700 13px var(--body); box-shadow: 0 6px 16px var(--cta-glow);
+}
+.ach-got { margin: 0; padding: 10px 14px; border-radius: 14px; background: var(--surface-2); color: var(--ink); font-size: 13px; }
+.ach-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.ach-row { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-top: 1px solid var(--line); }
+.ach-row:first-child { border-top: 0; }
+.ach-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.ach-text b { font: 600 14px var(--body); color: var(--ink); }
+.ach-text small { font-size: 12px; color: var(--ink-faint); }
+.ach-row.done .ach-text b { color: var(--ink-soft); }
+.ach-pips { display: flex; gap: 4px; margin-top: 3px; }
+.ach-pips i { width: 14px; height: 4px; border-radius: 2px; background: var(--line); }
+.ach-pips i.got { background: var(--good); }
+.ach-pips i.due { background: var(--accent); }
+.ach-side { display: grid; justify-items: end; gap: 4px; flex: none; max-width: 48%; text-align: right; }
+.ach-num { font: 600 12px var(--pixel); color: var(--ink-soft); }
+.ach-bar { width: 96px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.ach-bar i { display: block; height: 100%; background: var(--accent); transform-origin: left; }
+.ach-pay { font-size: 11px; color: var(--ink-faint); }
+.ach-done { display: inline-flex; align-items: center; gap: 4px; font: 600 12px var(--pixel); color: var(--good); }
+.ach-claim {
+  height: 32px; padding: 0 14px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--cta); color: #fff; font: 700 13px var(--body);
 }
 
 /* ---------- Trade and Battles: their sections down a side column (desktop) */
