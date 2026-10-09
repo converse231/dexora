@@ -25,7 +25,7 @@ import {
   drawFollower,
 } from "./tileset.js";
 import { followSheet, skinById, skinPrice, PARTY_MAX } from "./cosmetics.js";
-import { fieldOf, rollFind, heartsOf, TYPE_PULL, FRIEND_FINDS, HEARTS } from "./abilities.js";
+import { fieldOf, rollFind, heartsOf, FRIEND_FINDS, HEARTS } from "./abilities.js";
 import { CHECKIN_REWARDS, checkinStatus, rollRoulette, STREAK_MILESTONES, ROULETTE_LEVEL } from "./checkin.js";
 import { isRoad, roadOpen, roadTrainer } from "./road.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
@@ -1736,11 +1736,8 @@ export function createEngine(canvas, onChange, mini = null) {
      odds still sum to one and no entry can ever be dropped or invented. */
   function pickSpecies(table) {
     // The flute feeds the SAME exponent Fortune does - see `rarityPower`.
-    const pull = fieldOf(walker())?.type;
     const rolled = weighted(table, state.stats,
-      (running("rarity")?.tilt ?? 0) + (riftHere() ? RIFT_TILT : 0))
-      // Its ability pulls a type (Static, Magnet Pull...): those rows weigh more.
-      .map(([id, w]) => [id, pull && speciesById(id)?.types.includes(pull) ? w * TYPE_PULL : w]);
+      (running("rarity")?.tilt ?? 0) + (riftHere() ? RIFT_TILT : 0));
     const total = rolled.reduce((n, e) => n + e[1], 0);
     let r = Math.random() * total;
     for (const [id, w] of rolled) if ((r -= w) < 0) return speciesById(id);
@@ -3377,7 +3374,7 @@ export function createEngine(canvas, onChange, mini = null) {
   function craftCard(set, localId, variant) {
     const meta = realSet(set);
     const card = meta && set.CARDS.find((c) => c[0] === localId);
-    if (!card || !card[4].includes(variant) || !canCraft(card[3])) return false;
+    if (!card || !card[4].includes(variant) || !canCraft(card[3], set.CARDS)) return false;
     const cost = craftCost(card[3], variant);
     if (state.dust < cost) return false;
     const key = cardId(meta.id, localId);
@@ -3884,7 +3881,7 @@ export function createEngine(canvas, onChange, mini = null) {
        forfeit and a battle cut short record and pay nothing. */
     battleEnd() {
       const over = state.battle?.over ?? -1;
-      let pay = 0, first = false, fee = 0, gift = null, master = false, charm = null, pack = null;
+      let pay = 0, first = false, fee = 0, gift = null, master = false, charm = null, pack = null, packs = 0;
       /* A ROAD WIN pays its money, once a trainer a day, and is noted in
          `road` - never `beaten`: the League's ladder does not move. */
       if (over === 0 && fight?.road) {
@@ -3913,11 +3910,12 @@ export function createEngine(canvas, onChange, mini = null) {
         /* A FIRST BADGE PAYS A CARD PACK (docs/cards.md, Rewards): the newest
            set open at your level, or the first set before any is - held, it
            opens whatever the level - stamped with the badge. */
-        if (first && GYMTUNE[fight.id]?.kind === "leader") pack = grantPacks(1, `badge:${fight.id}`);
+        if (first && GYMTUNE[fight.id]?.kind === "leader") { pack = grantPacks(1, `badge:${fight.id}`); packs = 1; }
         /* A REGION'S CHAMPION, first win: the newest open set's box or bundle. */
         if (first && GYMTUNE[fight.id]?.kind === "champion") {
           const id = newestOpen(levelFromXp(state.xp)) ?? CARD_SETS[0]?.id;
-          if (id) pack = grantPacks(BOXES[id]?.packs ?? 1, `champion:${fight.id}`);
+          packs = BOXES[id]?.packs ?? 1;
+          if (id) pack = grantPacks(packs, `champion:${fight.id}`);
         }
         const g = first ? giftOf(fight.id) : null;
         if (g) {
@@ -3944,7 +3942,8 @@ export function createEngine(canvas, onChange, mini = null) {
       state.battle = null;
       fight = null;
       changed();
-      return { over, pay, first, fee, gift, master, charm, pack };
+      // `pack` is the set the packs went to, `packs` how many - the result card says so.
+      return { over, pay, first, fee, gift, master, charm, pack: pack && packs ? pack : null, packs };
     },
     travel,
     buy,

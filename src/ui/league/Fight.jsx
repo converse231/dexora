@@ -24,6 +24,9 @@ import RankUp from "../RankUp.jsx";
 import { RANKS, rankOf, promotion } from "../../game/ranked.js";
 import Confirm from "../Confirm.jsx";
 import { loadAnims, preload, hasAnim, play as playAnim, SPEEDS } from "./moveAnim.js";
+import { CARD_SETS } from "../../data/cards/index.js";
+import { WRAPPERS } from "../../data/cards/art.js";
+import { packUrl, logoUrl } from "../cards/load.js";
 
 const STATUS = [["PAR", "paralysed"], ["BRN", "burned"], ["PSN", "poisoned"], ["SLP", "put to sleep"], ["FRZ", "frozen solid"]];
 const STAT = [null, "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed", "accuracy", "evasiveness"];
@@ -212,7 +215,7 @@ function Mon({ f, mon, side, anim }) {
    answers with the turn's log and the next view, and the beats play from
    those as from a local turn. `{id, view, deadline, resumed, turn, forfeit,
    resync}`; a resumed battle opens where it stands, without the opening. */
-export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = null, practice = false, remote = null, badge = null, nextLabel = null, ai, onDone, engine }) {
+export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = null, practice = false, remote = null, badge = null, nextLabel = null, path = null, ai, onDone, engine }) {
   useModalLock();
   const rng = useMemo(() => mulberry32((Date.now() ^ 0x5eed) >>> 0), []);
   const foeName = `${opponent.cls ? `${opponent.cls} ` : ""}${opponent.name}`;
@@ -455,7 +458,20 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
         </button>
         <div className="ft-vs">
           <img src={new URL(`trainers/${opponent.pic}.png`, document.baseURI).href} alt="" />
-          <span><i>vs</i> <b>{foeName}</b>{opponent.rating != null && <em className="ft-opp-rating"> {opponent.rating.toLocaleString("en-US")}</em>}</span>
+          <div className="ft-vs-who">
+            <span><i>vs</i> <b>{foeName}</b>{opponent.rating != null && <em className="ft-opp-rating"> {opponent.rating.toLocaleString("en-US")}</em>}</span>
+            {/* WHERE IN THE GYM (or run) THIS IS: a pip a battle, the last its leader. */}
+            {path?.length > 1 && (() => {
+              const at = path.findIndex((p) => p.id === opponent.id);
+              return (
+                <span className="ft-path" data-tip={path.map((p) => p.name).join(" › ")}
+                  aria-label={`Battle ${at + 1} of ${path.length}, ending with ${path.at(-1).name}`}>
+                  {path.map((p, k) => <i key={p.id} className={k === at ? "now" : p.won ? "won" : ""} />)}
+                  <em>{at + 1} / {path.length}{at < path.length - 1 ? ` · ${path.at(-1).name} last` : ""}</em>
+                </span>
+              );
+            })()}
+          </div>
         </div>
         <button type="button" className="ft-anim-mode" aria-label={`Move animations: ${ANIM_SAYS[animMode]}`}
           data-tip="Move animations: full, quick or off"
@@ -553,6 +569,16 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
                   <li className="gift">
                     <Sprite id={paid.gift.species} variant={paid.gift.tier} alt="" />
                     <span><i>JOINS YOUR BOX · LV {paid.gift.level}</i><b>{nameOf(paid.gift.species)}{paid.gift.tier ? `, ${paid.gift.tier[0].toUpperCase()}${paid.gift.tier.slice(1)}` : ""}</b></span>
+                  </li>
+                )}
+                {/* CARD PACKS (a first badge, a Champion's box): they go to the Cards tab, so say so here. */}
+                {over === "won" && paid?.pack && (
+                  <li className="pack">
+                    <img src={WRAPPERS[paid.pack]?.[0] ? packUrl(paid.pack, WRAPPERS[paid.pack][0]) : logoUrl(paid.pack)} alt="" />
+                    <span>
+                      <i>{paid.packs > 1 ? `${paid.packs} CARD PACKS` : "A CARD PACK"} · ON YOUR CARDS TAB</i>
+                      <b>{CARD_SETS.find((s) => s.id === paid.pack)?.name ?? paid.pack}</b>
+                    </span>
                   </li>
                 )}
                 {over === "won" && paid?.master && (

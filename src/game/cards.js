@@ -171,7 +171,14 @@ export const craftCost = (rarity, variant) => CRAFT_X * dustOf(rarity, variant);
    Prismatic's illustration roll - comes from packs only. Dust's other use is
    a pack (DUST_PACK). */
 export const PACK_ONLY = new Set(CARD_RARITIES.filter((r) => rungOf(r) > rungOf("double")));
-export const canCraft = (rarity) => rungOf(rarity) >= 0 && rungOf(rarity) <= rungOf("double");
+/* AND A SET'S OWN CHASE IS PACKS ONLY (your call, 2026-10-10): Base Set's
+   top card is a Holo rare - under the Double rare on the modern ladder, so
+   the Charizard every Base Set pack is opened for crafted for 960 dust.
+   Given the set's cards, its highest rung is refused too; a modern set's is
+   a Hyper rare or above already. */
+const topRung = (cards) => cards.reduce((k, c) => Math.max(k, rungOf(c[3])), -1);
+export const canCraft = (rarity, cards = null) => rungOf(rarity) >= 0 && rungOf(rarity) <= rungOf("double")
+  && !(cards && rungOf(rarity) >= topRung(cards));
 /* A PACK FOR DUST, of any set you have open. Measured: a pack whose every
    card is a spare dusts to about 230 (177 for 30th Celebration's), so 400
    gives back at most ~57% - dust turns duplicates into more chances, never

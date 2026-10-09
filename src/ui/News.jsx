@@ -16,6 +16,20 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-10-partners",
+    icon: "🐾",
+    date: "October 2026",
+    title: "Every partner helps, and smoother play",
+    items: [
+      ["Every Pokémon has a perk", "One whose ability does nothing out here forages: berries or Poké Balls, by its type."],
+      ["No more type pulls", "Static and the like now forage too - maps already decide which types live there."],
+      ["Where you are in a gym", "A strip under the opponent's name counts the battles to the leader."],
+      ["Packs you win are shown", "A badge's or a Champion's card packs now appear on the victory card."],
+      ["Base Set's Holo rares", "Packs only now, like every set's chase cards."],
+      ["Smoother encounters", "Panels you opened earlier no longer slow down every encounter."],
+    ],
+  },
+  {
     id: "2026-10-10-achievements",
     icon: "🏆",
     date: "October 2026",

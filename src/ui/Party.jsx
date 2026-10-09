@@ -10,7 +10,7 @@ import { label } from "../game/map.js";
 import { speciesById } from "../game/biomes.js";
 import { variantOf } from "../game/items.js";
 import { PARTY_MAX } from "../game/cosmetics.js";
-import { abilityOf, abilityName, fieldText, heartsOf, HEARTS } from "../game/abilities.js";
+import { perkName, fieldText, heartsOf, HEARTS } from "../game/abilities.js";
 
 function Party({ mons, buddy, onPick, onEdit }) {
   const full = mons.length >= PARTY_MAX;
@@ -21,20 +21,14 @@ function Party({ mons, buddy, onPick, onEdit }) {
         const on = m.uid === buddy;
         // Its ability, what it does out here, and its friendship - the tooltip's second line.
         const what = fieldText(m);
-        const about = `${abilityName(abilityOf(m))}${what ? ` (${what.toLowerCase()})` : ""} · friendship ${heartsOf(m.walked)}/${HEARTS.length}`;
+        const about = `${perkName(m)}${what ? ` (${what.toLowerCase()})` : ""} · friendship ${heartsOf(m.walked)}/${HEARTS.length}`;
         return (
-          <button key={m.uid} type="button" className={`party-mon${on ? " on" : ""}${what ? " fx" : ""}`} aria-pressed={on}
+          <button key={m.uid} type="button" className={`party-mon${on ? " on" : ""}`} aria-pressed={on}
             aria-label={`${on ? `${name} is walking with you. Put it in its ball` : `Walk with ${name}`}`
               + (what ? `. ${what}` : "")}
             data-tip={on ? `${name} · ${about} · tap to rest, Q to switch` : `Walk with ${name} · ${about}`}
             onClick={() => onPick(on ? null : m.uid)}>
             <Sprite id={m.species} variant={variantOf(m)} alt="" eager />
-            {/* A DOT, NOT A RING: this says only "this one does something out
-                here", and the corner card says what. Its absence is the
-                information most of the time - seven followers in eight have no
-                field effect at all, and without a mark there is no way to tell
-                "nothing happens" from "I cannot see it". */}
-            {what && <i className="party-fx" aria-hidden="true" />}
           </button>
         );
       })}

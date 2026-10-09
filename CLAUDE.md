@@ -762,7 +762,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   a reverse holo everywhere but the art window, a holo rare only in it, a hit
   all over; a card you do not own wears none. **Crafting ends at the Double rare**
   (`canCraft`, your call 2026-10-07): an Illustration rare and up - the ACE
-  SPEC too - is packs only (`PACK_ONLY`, derived). Dust's other use is a pack
+  SPEC too - is packs only (`PACK_ONLY`, derived), and so is a set's own top rarity
+  (`canCraft(rarity, cards)`: Base Set's Holo rare, 2026-10-10). Dust's other use is a pack
   of an open set (`DUST_PACK` 400, `dustPack`), held above what a pack of
   spares dusts to (check.mjs re-measures every set). Cards carry no catch indicator.
   The last card of every pack charges and flashes (white until the charge),
@@ -841,9 +842,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   the ball rail).
 - **The walking Pokemon lends its field ability and grows friendship**
   (`abilities.js`, docs/cosmetics.md): only while it is out (`walker()` - not
-  riding), each effect one lever - encounter `rate`, a type's weight in
-  `pickSpecies` (`TYPE_PULL`), or a `find` - never the tier roll. An entry's
-  ability is its species' regular one by uid, an alpha's its hidden one.
+  riding), each effect one lever - encounter `rate` or a `find` - never the
+  tier roll. An entry's ability is its species' regular one by uid, an
+  alpha's its hidden one. EVERY ONE HAS A PERK: an ability with nothing to do
+  here FORAGES by its first type (`forageOf`). There are no type pulls -
+  every map is already its types, so one did nothing (2026-10-10).
   Steps together count on the box entry (`walked`) IN PLACE: a heart or a find
   is the one `changed()`, or a big Box rebuilds every step.
 - **Road trainers are designed in docs/battles.md** (`road.js`): four a

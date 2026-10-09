@@ -6926,6 +6926,12 @@ button:disabled { transition: none; }
 .ft-vs span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--ink); }
 .ft-vs i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
 .ft-vs b { font-family: var(--display); font-weight: 700; }
+.ft-vs-who { display: grid; gap: 3px; min-width: 0; }
+.ft-path { display: flex; align-items: center; gap: 3px; }
+.ft-vs .ft-path i { flex: none; width: 10px; height: 4px; border-radius: 2px; background: var(--line); }
+.ft-vs .ft-path i.won { background: var(--good); }
+.ft-vs .ft-path i.now { width: 16px; background: var(--accent); }
+.ft-path em { margin-left: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 600 10px var(--pixel); font-style: normal; color: var(--ink-faint); }
 .ft-turn { min-width: 58px; text-align: right; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
 .ft-stage { min-height: 0; display: grid; place-items: center; padding: 10px; container-type: size; }
 .battle.ft-scene {
@@ -7560,7 +7566,9 @@ button:disabled { transition: none; }
    what it won as chips beside it, the next step on the right; a phone stacks
    them. Its pieces arrive in turn, `transform` and `opacity` only. */
 .ft-result {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px 18px;
+  /* The loot may shrink and wrap: a badge, a pack and a prize side by side
+     squeezed the summary until the team ran over them. */
+  display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, auto) auto; align-items: center; gap: 12px 18px;
   padding: 14px 16px; border-radius: 18px; background: var(--surface-2); border: 1px solid var(--line);
 }
 .ft-result.won { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
@@ -7581,6 +7589,7 @@ button:disabled { transition: none; }
 .ft-loot li:nth-child(2) { animation-delay: .12s; }
 .ft-loot li:nth-child(3) { animation-delay: .24s; }
 .ft-loot img { width: 32px; height: 32px; image-rendering: pixelated; }
+.ft-loot .pack img { width: auto; height: 40px; image-rendering: auto; }   /* a wrapper is a photo, tall */
 .ft-loot span { display: grid; line-height: 1.1; }
 .ft-loot i { font-style: normal; font-family: var(--pixel); font-size: 9px; color: var(--ink-faint); }
 .ft-loot b { font-size: 14px; color: var(--ink); white-space: nowrap; }
@@ -9289,18 +9298,8 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .party-mon > img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated;
   opacity: .72; transform: scale(.88); transition: opacity 160ms ease, transform 160ms ease; }
 .party-mon:hover > img { opacity: .85; }
-.party-mon.on { background: color-mix(in srgb, var(--accent) 26%, transparent); }
-/* A FIELD EFFECT IS A DOT (2026-10-09). The strip is where you CHOOSE who
-   walks, so it is where the choice has to be informed - and seven
-   followers in eight have no field effect, which makes the absence of the
-   dot the information most of the time. The card in the HUD corner says
-   what the effect is; this only says there is one. `.party-mon` is round
-   and 38px, so the dot sits on the rim rather than over the creature. */
 .party-mon { position: relative; }
-.party-fx {
-  position: absolute; right: 1px; bottom: 1px; width: 9px; height: 9px; border-radius: 50%;
-  background: var(--accent); box-shadow: 0 0 0 2px var(--surface);
-}
+.party-mon.on { background: color-mix(in srgb, var(--accent) 26%, transparent); }
 .party-mon.on > img { opacity: 1; transform: scale(1.06); animation: party-pop 300ms cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes party-pop { from { transform: scale(.55); opacity: .4; } }
 .party-mon:focus-visible, .party-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

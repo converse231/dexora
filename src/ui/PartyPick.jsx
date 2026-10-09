@@ -11,7 +11,7 @@ import { PARTY_MAX, followSheet } from "../game/cosmetics.js";
 import { variantOf } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
-import { abilityOf, abilityName, fieldText, heartsOf, HEARTS } from "../game/abilities.js";
+import { perkName, fieldText, heartsOf, HEARTS } from "../game/abilities.js";
 
 export default function PartyPick({ engine, box, party, onClose }) {
   useModalLock();
@@ -42,7 +42,7 @@ export default function PartyPick({ engine, box, party, onClose }) {
                   <>
                     <Sprite id={m.species} variant={m.tier} alt="" eager />
                     <b>{label(speciesById(m.species))}</b>
-                    <small>{abilityName(abilityOf(m))}{fieldText(m) ? `: ${fieldText(m)}` : ""}</small>
+                    <small>{perkName(m)}{fieldText(m) ? `: ${fieldText(m)}` : ""}</small>
                     <span className="pp-hearts" aria-label={`Friendship ${heartsOf(m.walked)} of ${HEARTS.length}`}>
                       {HEARTS.map((_, i) => <i key={i} className={i < heartsOf(m.walked) ? "on" : ""} />)}
                     </span>

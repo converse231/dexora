@@ -11,7 +11,7 @@
    left only ever appears when pressing the tab would achieve something: a
    Pokémon ready to evolve, a stat point unspent. */
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import Dex from "./Dex.jsx";
 import Box from "./Box.jsx";
 import Shop from "./Shop.jsx";
@@ -57,6 +57,18 @@ function readyToEvolve(box, bag) {
    the Dex's "See in Box" can open the right one. On a phone the panel is a
    sheet over the game (`open`, the pad's ROTOM key); on a desktop it is
    docked beside the map and `open` means nothing. */
+/* A HIDDEN PANE DOES NOT RENDER EITHER (2026-10-10). `display: none` stops
+   layout and paint, but React still rebuilt every visited pane on every
+   render of App - a walk notice four times a second, every wage, every
+   encounter - so a session that had opened the Shop, the Box and the Map
+   paid for all three on each one: an encounter appearing cost 150-200ms on
+   a 4x-throttled desktop against 30ms fresh, and a reload "fixed" it by
+   unmounting them (reported as lag with a rift, a honey and a flute
+   running). Hidden to hidden keeps the last render; shown again, it renders
+   with what is current. */
+const Pane = memo(({ show, children }) => <div className="rail-pane" hidden={!show}>{children}</div>,
+  (a, b) => !a.show && !b.show);
+
 export default function Rail({
   tab = "dex", onTab, open = false, onClose, events = null,
   state, caught, level, busy,
@@ -74,8 +86,7 @@ export default function Rail({
   useEffect(() => {
     setSeen((s) => (s.has(tab) ? s : new Set(s).add(tab)));
   }, [tab]);
-  const pane = (id, el) => (seen.has(id) || tab === id
-    ? <div key={id} className="rail-pane" hidden={tab !== id}>{el}</div> : null);
+  const pane = (id, el) => (seen.has(id) || tab === id ? <Pane key={id} show={tab === id}>{el}</Pane> : null);
 
   /* Arriving from the Dex's "See in Box". The tab lives here, so the switch
      does too; the Box takes the NAME as a search seed and clears the id. */
