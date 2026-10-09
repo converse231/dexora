@@ -19,7 +19,6 @@ import {
 import {
   tasksFor, progress, researchLevel, researchPoints, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../game/research.js";
-import { keeper } from "../game/items.js";
 import { badgesOf } from "../game/league.js";
 
 const NEAREST = 4;   // how many unfinished entries the Discovery card lists
@@ -45,7 +44,7 @@ function nearest(research) {
    (reported, Dratini), which is the one moment it needs you. Starring costs
    nothing since 2026-10-09, so finished research is ALWAYS ready - there is no
    longer a "complete but you cannot afford it" state to sort below the rest. */
-function starrable(research, stars, box) {
+function starrable(research, stars) {
   return Object.entries(research ?? {})
     .map(([k, row]) => ({ id: Number(k), row }))
     .filter((r) => speciesById(r.id) && !stars.includes(r.id) && researchLevel(r.id, r.row) >= RESEARCH_MAX)
@@ -91,7 +90,7 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
   const finished = Object.entries(research)
     .filter(([k, row]) => researchLevel(Number(k), row) >= RESEARCH_MAX).length;
   const close = nearest(research);
-  const ready = starrable(research, state?.stars ?? [], state?.box ?? []);
+  const ready = starrable(research, state?.stars ?? []);
 
   const alphas = (state?.box ?? []).filter((m) => m.alpha).length;
   const badges = badgesOf(state?.beaten);
