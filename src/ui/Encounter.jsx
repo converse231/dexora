@@ -16,6 +16,7 @@ import Types from "./Types.jsx";
 import Gen from "./Gen.jsx";
 import Sprite, { spriteUrl, VariantFx, TierReveal, SCENE_FX } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
+import { RESEARCH_LIFT } from "../game/research.js";
 import { sageArt, SAGE_CREDIT } from "../game/biomes.js";
 
   /* THE EVOLUTION CARD IS GONE, and "confusing" was the kind half of it.
@@ -325,6 +326,18 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
             `knownForm`, NOT `known`: a Holo Pikachu is not the Pikachu you
             caught, and the badge said it was. See the engine for why the two
             are separate fields rather than one. */}
+        {/* STARRED RESEARCH, asked for 2026-10-09. It is the one thing about a
+            wild Pokemon you EARNED rather than rolled - this species' tier
+            roll is lifted for the rest of the game - and the plate said
+            nothing about it, so the lift you paid five duplicates for was
+            invisible at the only moment it is acting. A badge, so the phone
+            rule keeps it: the flavour drops at 520px, badges never do. */}
+        {enc.starred && (
+          <span className="np-star"
+            data-tip={`Starred research: this species' rare forms turn up ${RESEARCH_LIFT}x as often`}>
+            <span aria-label="Starred research">★</span>
+          </span>
+        )}
         {enc.knownForm && (
           <span
             className="np-caught"

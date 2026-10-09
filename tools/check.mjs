@@ -224,7 +224,7 @@ import {
 import { ALPHA_CATCH, ALPHA_CANDY, alphaCandy } from "../src/game/items.js";
 import {
   TASKS, tasksFor, bump, researchLevel, researchPoints, researchLift, researchPay,
-  cleanRow, RESEARCH_MAX, RESEARCH_LIFT, STAR_COST, RESEARCH_PAY, starCost, starKeeps,
+  cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../src/game/research.js";
 
 const poke = ballById("poke-ball");
@@ -2565,7 +2565,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     const { DEX_CHARM } = await import("../src/game/medals.js");
     const { RESEARCH_LIFT: RL } = await import("../src/game/research.js");
     const { OUTBREAK_LIFT: OL } = await import("../src/game/events.js");
-    assert.ok(DEX_CHARM >= RL && DEX_CHARM <= OL, `the Pokédex Charm ${DEX_CHARM}x is outside a research star's ${RL}x to an outbreak's ${OL}x`);
+    assert.ok(DEX_CHARM > RL && DEX_CHARM <= OL, `the Pokédex Charm ${DEX_CHARM}x does not outrank a research star's ${RL}x, or beats an outbreak's ${OL}x`);
     for (const m of MEDALS.filter((x) => x.kind === "gen")) {
       assert.ok(m.need.every((id) => !isForm(id) && genOf(id) === m.gen), `${m.id} holds a form or another generation`);
       assert.equal(m.need.length, SPECIES.filter((sp) => !isForm(sp.id) && genOf(sp.id) === m.gen).length, `${m.id} is missing species`);
@@ -4541,8 +4541,6 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(researchLevel(leg, full(legTasks.filter((x) => x !== t))) < RESEARCH_MAX,
         `a legendary finished its research without "${t}"`);
     }
-    assert.ok(starCost(leg) === 1 && starKeeps(leg) === 1 && starCost(starter) === STAR_COST
-      && starKeeps(starter) === 0, "the star's price is wrong for a legendary or an ordinary species");
     // An evolved form is raised: nothing only a wild encounter can do is asked of it.
     const raised = EVOLUTIONS[0].to;
     assert.ok(!tasksFor(raised).some((t) => ["night", "first", "fed"].includes(t.id))
@@ -4587,10 +4585,18 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       `a finished entry lifts ×${RESEARCH_LIFT} against an outbreak's ×${OUTBREAK_LIFT}`);
     assert.equal(researchLift(evolver, []), 1, "an unstarred species' odds are lifted");
     assert.equal(researchLift(evolver, [evolver]), RESEARCH_LIFT, "a starred species' odds are not lifted");
-    /* A STAR IS A SINK: it spends more in sales than all ten levels of that
-       species' research ever paid, or starring would be income. */
-    assert.ok(STAR_COST > RESEARCH_MAX * RESEARCH_PAY,
-      `a star costs ${STAR_COST} sales against ${RESEARCH_MAX * RESEARCH_PAY} paid by research`);
+    /* ONE SPECIES NEVER OUTRANKS NINE HARD RUNS. A star cost five ordinary
+       ones until 2026-10-09 and this asserted it was a sink; free, what can go
+       wrong is no longer its price but its SIZE. Every finished species gets
+       one now, so the lift is closer to a global multiplier than a bonus, and
+       the ladder it must stay under is the Region Charm (all nine regions
+       cleared on hard) and the Pokedex Charm (a whole generation, asserted
+       beside MEDALS). Raising it to 2x was proposed; this is what refuses it. */
+    {
+      const { CHARM_MAX } = await import("../src/game/league.js");
+      assert.ok(RESEARCH_LIFT <= 1 + CHARM_MAX,
+        `a research star (x${RESEARCH_LIFT}) beats clearing every region on hard (x${1 + CHARM_MAX})`);
+    }
     /* AND THE ENGINE ASKS IT. A finished entry's odds are a probability, so
        play cannot see a missing call - an import is not a call, and the one
        place the tier is rolled has to name it. Comments stripped first. */

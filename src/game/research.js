@@ -27,10 +27,11 @@ const evolves = new Set(EVOLUTIONS.filter((e) => e.level < 100).map((e) => e.fro
    a 1-in-250 roll, and required it left 0 to 2 species finishable in a whole
    playthrough (measured) against 16 without it.
 
-   SLOT 0 COUNTS ORDINARY CATCHES ONLY - no tier, no alpha - because they are
-   what a star spends (`STAR_COST`). It counted every catch up to 20 before;
-   old counters are kept, clamped to 10, since nearly all of them were
-   ordinary anyway. */
+   SLOT 0 COUNTS ORDINARY CATCHES ONLY - no tier, no alpha. It counted every
+   catch up to 20 before; old counters are kept, clamped to 10, since nearly
+   all of them were ordinary anyway. This is where the game asks you to catch
+   the same species more than once, and since 2026-10-09 it is the ONLY place
+   it does - see RESEARCH_LIFT below. */
 /* A LEGENDARY'S RESEARCH IS ONE CATCH AND WHAT YOU DO WITH IT: catch one
    (`legend`), feed it a berry in that encounter, win a League battle with one
    on your team (`league`), and raise one to Lv 100 (`hundred`). It asked for
@@ -39,8 +40,8 @@ const evolves = new Set(EVOLUTIONS.filter((e) => e.level < 100).map((e) => e.fro
    play), where a League win is something you can set out to do. Hunting on its home map, one specific
    legendary is met about once a playthrough (1 in 3,333 encounters), so a
    count of catches is out of reach - one catch was too easy, three was three
-   playthroughs. Its star spends ONE spare (`starCost`) and never the last you
-   hold, so starring asks for a second catch: the endgame, not the research.
+   playthroughs. Its star cost one spare until 2026-10-09, which asked for a
+   second catch of a thing met once a playthrough; nothing is spent now.
 
    XS AND XL ARE ONE TASK, either size: needing both was the tightest of the
    luck tasks, and folding them doubled what a playthrough finishes (12 to 26
@@ -56,8 +57,8 @@ const grown = new Set(EVOLUTIONS.map((e) => e.to));
 const met = (id) => plain(id) && !grown.has(id);
 const metOrLegend = (id) => isLegendary(id) || met(id);
 export const TASKS = [
-  /* 1, 3, 5 - it was 1, 4, 10, reported from play as too many; the star
-     spends the same five (`STAR_COST`). */
+  /* 1, 3, 5 - it was 1, 4, 10, reported from play as too many. These five
+     ARE the duplicate incentive now that the star spends nothing. */
   { id: "catch", label: "Catch ordinary ones", steps: [1, 3, 5], points: 10, when: plain },
   { id: "night", label: "Catch one at night", steps: [1], points: 10, when: met },
   { id: "xs", label: "Catch an XS or XL one", steps: [1], points: 10, when: plain },
@@ -83,17 +84,23 @@ export const RESEARCH_MAX = 10;
    Deliberately weaker than an outbreak: a permanent bonus that out-did a
    daily event would make the event pointless on every species you finished.
 
-   A STAR IS BOUGHT, NOT GIVEN. Finishing the research only offers it; the
-   price is `STAR_COST` ordinary ones out of the Box - the same five the catch
-   task counted. Five sales against the two and a half that ten research
-   levels paid, so every star is still a sink for the duplicates the game is
-   built on. Ten, reported from play as too many; three would have left a
-   permanent 1.5x lift costing barely more than the research paid. */
+   A STAR IS FREE, AND USED TO COST FIVE ORDINARY ONES (your call,
+   2026-10-09). The price was the same five the catch task already counted, so
+   it was never what made anybody catch duplicates - the TASK does that. What
+   it did instead was make the Box's sweep a trap: convert your spares, finish
+   the research, and the five you needed were gone, so you had to catch four
+   more. Reported from play as the reason to stop converting at all, which
+   cost the player the candy stream as well as the star.
+
+   THE LIFT STAYS AT 1.5x, and that is deliberate now that every finished
+   species gets one. A free star is no longer a per-species choice: a
+   completionist ends with the whole dex lifted, so this is closer to a global
+   multiplier than a bonus - any variant goes 1 in 19 to 1 in 13 across the
+   board, and variant bounty is a renewable stream the League's prize unit is
+   denominated in. At 2x it would also outrank the Pokedex Charm (2x, a whole
+   generation) and the Region Charm (1.5x, nine hard runs beaten), which say
+   in their own comments that they outrank one species. */
 export const RESEARCH_LIFT = 1.5;
-export const STAR_COST = 5;
-/* What a star spends, and how many of the species must be left after it. */
-export const starCost = (id) => (isLegendary(id) ? 1 : STAR_COST);
-export const starKeeps = (id) => (isLegendary(id) ? 1 : 0);
 
 /* Cached: `when` reads only static data, and the Dex asks for every tile on
    every collection change - 1,300 filters of eleven closures, each time. */

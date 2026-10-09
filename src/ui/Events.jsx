@@ -17,7 +17,7 @@ import {
   OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_FROM, RIFT_SURE, RIFT_STEPS,
 } from "../game/events.js";
 import {
-  tasksFor, progress, researchLevel, researchPoints, RESEARCH_MAX, RESEARCH_LIFT, starCost, starKeeps,
+  tasksFor, progress, researchLevel, researchPoints, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../game/research.js";
 import { keeper } from "../game/items.js";
 import { badgesOf } from "../game/league.js";
@@ -42,22 +42,15 @@ function nearest(research) {
 
 /* FINISHED AND NOT YET STARRED, first on the card with the button: a
    finished entry used to drop off the list the moment it became starrable
-   (reported, Dratini), which is the one moment it needs you. What a star can
-   spend is `engine.star`'s rule - ordinary, unlocked, a legendary keeps one. */
+   (reported, Dratini), which is the one moment it needs you. Starring costs
+   nothing since 2026-10-09, so finished research is ALWAYS ready - there is no
+   longer a "complete but you cannot afford it" state to sort below the rest. */
 function starrable(research, stars, box) {
   return Object.entries(research ?? {})
     .map(([k, row]) => ({ id: Number(k), row }))
     .filter((r) => speciesById(r.id) && !stars.includes(r.id) && researchLevel(r.id, r.row) >= RESEARCH_MAX)
-    .map((r) => {
-      const cost = starCost(r.id);
-      const mine = box.filter((m) => m.species === r.id);
-      const spare = mine.filter((m) => !keeper(m) && !m.lock).length;
-      const ready = spare >= cost && mine.length - cost >= starKeeps(r.id);
-      return { ...r, cost, ready, note: ready
-        ? `Complete · costs ${cost === 1 ? "one spare" : `${cost} ordinary`}`
-        : `Complete · needs ${cost} ordinary, have ${spare}` };
-    })
-    .sort((a, b) => b.ready - a.ready || a.id - b.id);
+    .map((r) => ({ ...r, ready: true, note: "Complete · free to star" }))
+    .sort((a, b) => a.id - b.id);
 }
 
 /* Until the day turns, which is when the next outbreak starts - the quest's
