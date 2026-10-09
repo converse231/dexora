@@ -915,6 +915,7 @@ canvas {
   .np-tier { padding: 2px 5px 1px; }
   .np-tier .mark, .np-alpha .mark { width: 12px; height: 12px; }
   .np-caught { padding: 2px; }
+  .np-star { width: 16px; height: 16px; font-size: 10px; }
   .np-caught img { width: 11px; height: 11px; }
 }
 /* The narrowest phones: the alpha's red chip and mark say it without the word. */
@@ -934,6 +935,18 @@ canvas {
   background: var(--canopy); box-shadow: 0 0 0 1.5px #1d4630 inset;
 }
 .np-caught img { width: 13px; height: 13px; image-rendering: pixelated; display: block; }
+
+/* STARRED RESEARCH on the nameplate. Gold and a star, the same two things
+   the Dex sheet says it with (`.sr-starred`), so the two screens are
+   obviously about one thing. Round like `.np-caught` beside it - both are
+   facts about this species rather than tiers, and a second chip shape would
+   read as a second KIND of fact. */
+.np-star {
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+  width: 19px; height: 19px; border-radius: 50%; font-size: 12px;
+  color: var(--gold); background: var(--gold-soft);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gold) 55%, transparent) inset;
+}
 
 /* One badge shape for all three tiers, wearing the drawn icon and its own
    colour. They were three near-identical chips with a star glyph typed into

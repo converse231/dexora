@@ -36,7 +36,7 @@ import {
 } from "../game/biomes.js";
 import { OUTBREAK_LIFT } from "../game/events.js";
 import { HONEY_STEPS } from "../game/items.js";
-import { RESEARCH_LIFT, STAR_COST } from "../game/research.js";
+import { RESEARCH_LIFT } from "../game/research.js";
 import { PERKS, ALPHA_PERK } from "../game/perks.js";
 import { SAGE_CREDIT } from "../game/biomes.js";
 
@@ -175,8 +175,8 @@ export default function Variants({ onClose }) {
             <li>
               <b>Outbreaks and research lift it.</b> The species in today's
               outbreak is {OUTBREAK_LIFT}&times; as likely to wear one, and a
-              species you have starred (research finished, {STAR_COST} ordinary
-              ones given up) stays {RESEARCH_LIFT}&times; as likely for good.
+              species you have starred - research finished, and starring is
+              free - stays {RESEARCH_LIFT}&times; as likely for good.
             </li>
             <li>
               <b>Honey aims the roll.</b> A coloured jar from the shop makes its

@@ -24,7 +24,10 @@ import { useModalLock, useDismiss } from "./modal.js";
 import { RUN_LEVEL, SURF_LEVEL } from "../game/items.js";
 import { ALPHA_CHANCE } from "../game/biomes.js";
 import { OUTBREAK_SIZE, OUTBREAK_LIFT, RIFT_STEPS } from "../game/events.js";
-import { RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } from "../game/research.js";
+import { RESEARCH_MAX, RESEARCH_LIFT, TASKS } from "../game/research.js";
+/* The catch task's own last step, not a number typed twice: it read off
+   `STAR_COST` while the star spent the same five, and that constant is gone. */
+const CATCHES = TASKS.find((t) => t.id === "catch").steps.at(-1);
 import { LIMITS } from "../game/trade.js";
 import { DEX_RANKS, DEX_CHARM, MEDALS } from "../game/medals.js";
 import { TEAM_MAX, REMATCH_SHARE } from "../game/league.js";
@@ -137,16 +140,15 @@ export default function Help({ onClose }) {
             </li>
             <li>
               <b>Research.</b> Every species has a level up to {RESEARCH_MAX}:
-              catch {STAR_COST} ordinary ones, one at night, a tiny or a huge
+              catch {CATCHES} ordinary ones, one at night, a tiny or a huge
               one, one with the first ball and one rare form, feed it a berry
               and evolve it if it can. Evolving into a species counts as owning
               one, and an evolved form skips the night, first-ball and berry
               tasks. Each level pays. Finish every task (an alpha is a bonus) and
-              you can star it: give up {STAR_COST} ordinary ones and its rare
+              you can star it, free, and its rare
               forms are {RESEARCH_LIFT}&times; as likely for good. A legendary's
               research is catching one, feeding it, winning a League battle
-              with one and raising one to Lv 100; its star spends a spare,
-              never the last.
+              with one and raising one to Lv 100.
             </li>
             <li>
               <b>Alphas.</b> About one Pokémon in {Math.round(1 / ALPHA_CHANCE)} is

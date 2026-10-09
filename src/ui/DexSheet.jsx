@@ -33,7 +33,7 @@ import Mark from "./Marks.jsx";
 import DexCards from "./cards/DexCards.jsx";
 import { sageArt, SAGE_CREDIT } from "../game/biomes.js";
 import {
-  tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT, starCost, starKeeps,
+  tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../game/research.js";
 
 /* Kindest first, so the row reads as progress toward the rarest. Origin and
@@ -109,11 +109,9 @@ function whereToFind(id) {
    is. Every task is derived from the data in research.js, so a species that
    cannot evolve simply has no "Evolve one" row. A task with several steps
    counts towards the next one; a task with one is done or it is not. */
-function Research({ id, row, starred, ordinary, owned, onStar }) {
+function Research({ id, row, starred, onStar }) {
   const level = researchLevel(id, row);
-  const cost = starCost(id), keeps = starKeeps(id);
-  const spend = cost === 1 ? "one spare" : `${cost} ordinary ones`;
-  const ready = ordinary >= cost && owned - cost >= keeps;
+
   return (
     <div className="sheet-research">
       <div className="sr-bar"><i style={{ width: `${(level / RESEARCH_MAX) * 100}%` }} /></div>
@@ -131,20 +129,21 @@ function Research({ id, row, starred, ordinary, owned, onStar }) {
           );
         })}
       </ul>
-      {/* THE STAR: offered by finished research, bought with ordinary ones. */}
+      {/* THE STAR: offered by finished research, and free since 2026-10-09 -
+          so there is no price to quote and no state where it is complete but
+          out of reach. */}
       {level < RESEARCH_MAX ? (
         <p className="sr-note">
-          Finish every task, then star it: {spend} for {RESEARCH_LIFT}x rare forms.
+          Finish every task, then star it free: {RESEARCH_LIFT}x rare forms.
         </p>
       ) : starred ? (
         <p className="sr-note sr-starred">★ Starred: its rare forms turn up {RESEARCH_LIFT}x as often.</p>
       ) : (
         <div className="sr-star">
           <p className="sr-note">
-            Complete. Give up {spend} (you hold {keeps ? owned : ordinary}{keeps ? ", one stays" : ""}) and
-            its rare forms turn up {RESEARCH_LIFT}x as often.
+            Complete. Star it and its rare forms turn up {RESEARCH_LIFT}x as often.
           </p>
-          <button type="button" className="sheet-inbox" disabled={!ready} onClick={onStar}>
+          <button type="button" className="sheet-inbox" onClick={onStar}>
             ★ GET STAR
           </button>
         </div>
@@ -236,7 +235,7 @@ let lastTab = "forms";   // the tab this session last used - see `tabs` below
 
 export default function DexSheet({
   id, state, variant = null, held = {}, owned = 0, research = null,
-  starred = false, ordinary = 0, onStar = () => {},
+  starred = false, onStar = () => {},
   level = 1, here = null, busy = false,
   onClose, onFindInBox, onFindOnBoard = null, onTravel, onSelect = null, dexOf = () => 0,
   cards = {}, onCards = null, walk = null, onWalk = null,
@@ -548,8 +547,7 @@ export default function DexSheet({
                         {starred ? "★ STARRED" : `LV ${rLevel}/${RESEARCH_MAX}`}
                       </span>
                     </header>
-                    <Research id={id} row={research} starred={starred} ordinary={ordinary}
-                      owned={owned} onStar={onStar} />
+                    <Research id={id} row={research} starred={starred} onStar={onStar} />
                   </section>
                   <section className="ev-card">
                     <header className="ev-banner"><h4>Evolution</h4></header>

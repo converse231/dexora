@@ -2599,18 +2599,23 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
 }
 console.log("research ok — counts a real catch, a first ball and a berry, pays the level, banners the tenth");
 
-/* A STAR: finished research, paid for in ordinary ones. Which ten go is the
-   part that can hurt a collection - the lowest levels, never a keeper - so the
-   box holds more than ten, at different levels, beside a shiny and an alpha. */
+/* A STAR: finished research, and FREE since 2026-10-09. What could hurt a
+   collection was which ones it spent; it spends none, so what is asserted now
+   is that the Box comes out untouched - including the shiny and the alpha,
+   which a keeper rule used to be what protected. */
 {
-  const { TASKS, researchLift, RESEARCH_LIFT, STAR_COST } = await import("../src/game/research.js");
+  const { TASKS, researchLift, RESEARCH_LIFT } = await import("../src/game/research.js");
   await savedField("stars", [16], "junk", []);
   assert.deepEqual(boot({ ...SAVE, stars: [16, 16, 99999, "x"] }).e.state.stars, [16],
     "a damaged star list kept its garbage or lost its good entry");
 
   const id = 16;
   const done = TASKS.map((t) => t.steps.at(-1));
-  const box = Array.from({ length: STAR_COST + 2 }, (_, i) =>
+  /* Seven ordinary ones at different levels: the star spends none of them
+     now, so the count only has to be enough that "it took nothing" is a
+     statement about a real pile rather than about an empty Box. It was
+     `STAR_COST + 2` while there was a price, and that constant is gone. */
+  const box = Array.from({ length: 7 }, (_, i) =>
     ({ uid: i + 1, species: id, level: 5 + i, size: 100, at: 1 }));
   box.push({ uid: 50, species: id, level: 1, size: 100, shiny: 1, at: 1 },
     { uid: 51, species: id, level: 1, size: 150, alpha: 1, at: 1 });
@@ -2618,23 +2623,60 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
     research: { [id]: done }, ...extra }).e;
 
   const e = fresh();
-  assert.equal(e.star(id), true, "finished research with enough ordinary ones could not be starred");
-  assert.equal(e.state.ask?.kind, "star", "starring did not ask first");
-  assert.deepEqual(e.state.stars, [], "the star was taken before the answer");
-  e.answerAsk(true);
-  assert.deepEqual(e.state.stars, [id], "answering yes did not star it");
-  assert.deepEqual(e.state.box.map((m) => m.uid).sort((a, b) => a - b), [STAR_COST + 1, STAR_COST + 2, 50, 51],
-    "the star spent the wrong ones - a keeper, or higher levels before lower");
+  assert.equal(e.star(id), true, "finished research could not be starred");
+  assert.deepEqual(e.state.stars, [id], "starring did not take");
   assert.equal(researchLift(id, e.state.stars), RESEARCH_LIFT, "a starred species is not lifted");
   assert.equal(e.star(id), false, "a species was starred twice");
 
-  assert.equal(fresh({ box: structuredClone(box).slice(0, STAR_COST - 1) }).star(id), false,
-    "a star was offered with fewer than its ordinary ones");
+  /* IT SPENDS NOTHING (your call, 2026-10-09). It took five ordinary ones out
+     of the Box until then - the same five the catch task had already counted -
+     which made the Box's sweep a trap: convert your spares and the five you
+     needed were gone. Put the bug back by having `star` filter the box. */
+  assert.deepEqual(e.state.box.map((m) => m.uid).sort((a, b) => a - b),
+    structuredClone(box).map((m) => m.uid).sort((a, b) => a - b),
+    "starring took Pokemon out of the Box - it is free");
+  assert.equal(e.state.ask, null, "starring asked a question, and there is nothing to confirm");
+
+  /* AND IT DOES NOT ASK WHAT YOU STILL HOLD. The research is what you DID, so
+     a player who sold their last one after finishing it has still finished it
+     - and a player who swept every spare must not be locked out of the star
+     that sweep used to cost them. */
+  assert.equal(fresh({ box: [] }).star(id), true,
+    "a finished species could not be starred with none of it in the Box");
+  assert.equal(fresh({ box: structuredClone(box).slice(0, 1) }).star(id), true,
+    "a finished species could not be starred holding only one");
+
   assert.equal(fresh({ research: { [id]: done.map((n, i) => (i === 0 ? n - 1 : n)) } }).star(id), false,
     "unfinished research was starred");
 
+  /* AND THE WILD ENCOUNTER SAYS SO (asked for, 2026-10-09). The lift a star
+     buys acts on the tier roll, which is invisible - so the nameplate is the
+     only place it can be seen, and it showed nothing.
+
+     Both directions, through the REAL walk rather than `startEncounter`: an
+     engine that has starred everything must plate every encounter starred,
+     and one that has starred nothing must plate none. Asserting only the
+     second passes while the field is hard-wired false. */
+  {
+    const { SPECIES } = await import("../src/data/dex.js");
+    const all = SPECIES.map((sp) => sp.id);
+    const lit = walkToEncounter(fresh({ stars: all }));
+    const dark = walkToEncounter(fresh({ stars: [] }));
+    assert.ok(lit && dark, "no encounter turned up to read a nameplate from");
+    assert.equal(lit.starred, true, "a starred species did not say so on the nameplate");
+    assert.equal(dark.starred, false, "an unstarred species claimed a star");
+    /* FROZEN, like `known` beside it: starring mid-encounter must not make a
+       badge appear on the Pokemon already in front of you. */
+    const mid = fresh({ stars: [] });
+    const enc = walkToEncounter(mid);
+    mid.state.stars.push(enc.speciesId);
+    assert.equal(mid.state.encounter.starred, false,
+      "a star taken during an encounter reached the Pokemon already on screen");
+  }
+
   /* A LEGENDARY: its catch credited from the dex on load, Lv 100 credited by
-     candy - and its star spends one, never the last one you hold. */
+     candy. Its star asked for a SECOND catch until 2026-10-09 (it spent one
+     and kept one) - of a thing met about once a playthrough. One is enough. */
   const { LEGENDARY, dexIndex } = await import("../src/game/biomes.js");
   const { researchLevel, RESEARCH_MAX } = await import("../src/game/research.js");
   const leg = LEGENDARY[0];
@@ -2648,24 +2690,15 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
   assert.equal(le.state.research[leg][at("hundred")], 1, "raising a legendary to Lv 100 did not count");
   const legDone = TASKS.map((t) => t.steps.at(-1));
   assert.equal(researchLevel(leg, legDone), RESEARCH_MAX, "the finished legendary row is not finished");
-  const two = [...one, { uid: 61, species: leg, level: 70, size: 100, at: 1 }];
-  assert.equal(boot({ ...SAVE, dex, box: structuredClone(one), nextUid: 99, research: { [leg]: legDone } }).e.star(leg),
-    false, "a legendary's star spent the only one held");
-  const ls = boot({ ...SAVE, dex, box: structuredClone(two), nextUid: 99, research: { [leg]: legDone } }).e;
-  assert.equal(ls.star(leg), true, "a finished legendary with a spare could not be starred");
-  ls.answerAsk(true);
-  assert.deepEqual(ls.state.box.filter((m) => m.species === leg).map((m) => m.uid), [61],
-    "a legendary's star did not spend exactly the lower-level one");
-  const no = fresh();
-  no.star(id);
-  no.answerAsk(false);
-  assert.equal(no.state.box.length, box.length, "cancelling the star still spent the ordinary ones");
+  const ls = boot({ ...SAVE, dex, box: structuredClone(one), nextUid: 99, research: { [leg]: legDone } }).e;
+  assert.equal(ls.star(leg), true, "a legendary could not be starred holding the only one");
+  assert.deepEqual(ls.state.box.filter((m) => m.species === leg).map((m) => m.uid), [60],
+    "a legendary's star took the only one you hold");
 
-  /* A DEFENDER GOES LAST, AND SAYS SO (docs/ranked.md, the warning deferred
-     from 6c). `setDefense` takes `my_defense` as the server answers it; a
-     member gone from the saved box defends nothing; the lowest-level one here
-     defends, so the star passes over it, and the question names it when a
-     star cannot. Never saved: it is the server's, read again at sign-in. */
+  /* WHO DEFENDS IS STILL VOLATILE, and the star no longer has anything to say
+     about it: it took the lowest ordinary ones and passed over a defender,
+     and now it takes nothing at all. `defenders` is still the Box's and every
+     trading screen's, so its naming is still asserted. */
   const { defenders } = await import("../src/game/ranked.js");
   const teams = [{ slot: 1, team: [{ uid: 1, species: id }, { uid: 77, missing: true }] },
     { slot: 2, team: [{ uid: 1, species: id }] }];
@@ -2673,16 +2706,10 @@ console.log("research ok — counts a real catch, a first ball and a berry, pays
   const d = fresh();
   d.setDefense(teams);
   d.star(id);
-  assert.ok(!/defends/.test(d.state.ask.body), "the star asked about a defender it did not have to take");
-  d.answerAsk(true);
-  assert.ok(d.state.box.some((m) => m.uid === 1), "the star spent a defender while ordinary ones were left");
+  assert.ok(d.state.box.some((m) => m.uid === 1), "the star took a defender - it takes nothing");
   assert.ok(!("defense" in d.exportSave()), "who defends rode in the save");
-  const forced = fresh({ box: structuredClone(box).slice(0, STAR_COST) });
-  forced.setDefense(teams);
-  forced.star(id);
-  assert.match(forced.state.ask.body, /\(Teams A and B\) defends in ranked/, "a star that must take a defender did not say so");
 }
-console.log("star ok — asks first, spends the lowest ordinary ones and never a keeper, once, only when finished; a defender last, and named");
+console.log("star ok — free, spends nothing, needs none in the Box, once, only when finished; and the nameplate says so");
 
 /* AN ALPHA, END TO END, through a real step and real throws - it is a flag on
    the encounter that four different places have to read (the flee roll, the

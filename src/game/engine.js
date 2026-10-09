@@ -35,7 +35,7 @@ import {
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
-  starCost, starKeeps, HUNDRED,
+  HUNDRED,
 } from "./research.js";
 import { cleanTradeFields } from "./trade.js";
 import {
@@ -1821,6 +1821,12 @@ export function createEngine(canvas, onChange, mini = null) {
       known,
       knownForm,
       ownedForm,
+      /* ITS RESEARCH IS STARRED, so this species' tier roll is already lifted
+         (`researchLift`) - the one thing about a wild Pokemon you earned
+         rather than rolled, and nothing on the nameplate said it. Frozen with
+         `known` and for the same reason: everything the plate reads is fixed
+         when the Pokemon appears. */
+      starred: (state.stars ?? []).includes(sp.id),
       variant,
       /* The same word as four booleans, so a panel can ask `enc.holo` without
          re-deriving anything. Spread from `TIERS` rather than typed out: the
@@ -2251,35 +2257,30 @@ export function createEngine(canvas, onChange, mini = null) {
     return cash;
   }
 
-  /* A STAR: finished research, paid for with `starCost` ordinary ones out of
-     the Box, makes that species' rare forms `RESEARCH_LIFT`x as likely for
-     good. The LOWEST-LEVEL ones go, so candy spent levelling one towards an
-     evolution is never what pays; a keeper (any tier, any alpha) never goes.
-     Refused mid-evolution, whose scene holds a uid that could be one of them.
-     It cannot be taken back, so it asks first, here, like a Master Ball. */
-  function star(id, confirmed = false) {
+  /* A STAR: finished research makes that species' rare forms `RESEARCH_LIFT`x
+     as likely, for good, and COSTS NOTHING (your call, 2026-10-09).
+
+     It spent five ordinary ones out of the Box until then - the same five the
+     catch task had already counted, so the price never made anybody catch
+     duplicates; the TASK does that. What it did was turn the Box's sweep into
+     a trap: convert your spares, finish the research, and the five you needed
+     had gone to candy. Reported from play as the reason to stop converting.
+
+     EVERYTHING THE PRICE DRAGGED WITH IT IS GONE TOO, and each piece only
+     existed to make spending Pokemon safe: which ones went (lowest level
+     first, never a keeper), how many had to be left (a legendary kept one),
+     the warning when one of them was defending in ranked, the refusal while
+     an evolution scene was holding a uid this might take, and the question
+     itself. Nothing leaves the Box, so none of them has anything to guard -
+     and a confirmation for a free, one-way, purely good press is noise.
+
+     It does NOT ask whether you still hold one. The research is what you did,
+     not what you kept, and a player who sold their last Pidgey after finishing
+     its research has still finished its research. */
+  function star(id) {
     const sp = speciesById(id);
-    if (!sp || state.evolution || state.stars.includes(id)) return false;
+    if (!sp || state.stars.includes(id)) return false;
     if (researchLevel(id, state.research[id]) < RESEARCH_MAX) return false;
-    const cost = starCost(id);
-    // A defender goes last (`state.defense`), and the question says so if one must.
-    const defends = (m) => Number(Boolean(state.defense?.[m.uid]));
-    const give = state.box.filter((m) => m.species === id && !keeper(m) && !m.lock)
-      .sort((a, b) => defends(a) - defends(b) || a.level - b.level || a.uid - b.uid)
-      .slice(0, cost);
-    // A legendary's star never spends the last one you hold (`starKeeps`).
-    const held = state.box.filter((m) => m.species === id).length;
-    if (give.length < cost || held - cost < starKeeps(id)) return false;
-    if (!confirmed) {
-      ask("star", () => star(id, true), `Star ${label(sp)}?`,
-        `${cost === 1 ? "Your lowest-level ordinary" : `${cost} ordinary`} ${label(sp)} `
-        + `${cost === 1 ? "leaves" : "leave"} the Box for good. `
-        + `Its rare forms turn up ${RESEARCH_LIFT}x as often from then on.`
-        + (defendNote(give, state.defense, () => label(sp)) ? ` ${defendNote(give, state.defense, () => label(sp))}` : ""));
-      return true;
-    }
-    const gone = new Set(give.map((m) => m.uid));
-    state.box = state.box.filter((m) => !gone.has(m.uid));
     state.stars.push(id);
     cheer({ kind: "research", title: label(sp).toUpperCase(),
       sub: `Starred. Its rare forms are ${RESEARCH_LIFT}x as likely for good.` });

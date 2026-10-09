@@ -585,14 +585,29 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   plus `fed`, `league` (a League win with it on the team, credited to every
   Pokemon that fought in `battleEnd`) and `hundred` (Lv 100, by candy or
   evolution); `first` is not asked of it (luck on luck, reported). Its
-  star costs `starCost` 1 and `starKeeps` 1, so it needs a second catch.
-  Catches and `STAR_COST` are both 5 (10 was reported as too many).
+  star asked for a second catch until 2026-10-09; it is free now like every
+  other. The catch task is 1, 3, 5 (10 was reported as too many), and those
+  five ARE the duplicate incentive.
   The Box offers RAISE to Lv 100 for a legendary with no evolution left. XS and XL are one task (`xl` kept, asked of nobody). A
   level pays an eighth of a sale (`RESEARCH_PAY`, halved 2026-10-04: every
-  species to Lv 10 was ~¥2.0M, more than a Lv 75 game's catch income). Lv 10 only OFFERS the lift: `star(id)` spends
-  `STAR_COST` ordinary box entries (lowest level first, never a keeper,
-  asked first) into `state.stars`, and `researchLift(id, stars)` multiplies
-  that species' tier roll by `RESEARCH_LIFT`, weaker than an outbreak.
+  species to Lv 10 was ~¥2.0M, more than a Lv 75 game's catch income). Lv 10 only OFFERS the lift: `star(id)`
+  pushes the id into `state.stars` and `researchLift(id, stars)` multiplies
+  that species' tier roll by `RESEARCH_LIFT`.
+  **A STAR IS FREE AND SPENDS NOTHING** (your call, 2026-10-09). It took five
+  ordinary ones - the same five the catch task had already counted, so the
+  price never made anybody catch duplicates; the TASK does. What it did was
+  make the Box's sweep a trap: convert your spares, finish the research, and
+  the five you needed had gone to candy, which was reported as the reason to
+  stop converting at all. Free, it also asks nothing about what you still
+  HOLD: the research is what you did, not what you kept. Everything the price
+  needed went with it - which ones went, how many stayed, the ranked-defender
+  warning, the mid-evolution refusal, and the confirm dialog (`state.ask` has
+  no `star` kind). **The lift stays 1.5x BECAUSE it is free**: every finished
+  species gets one, so it is closer to a global multiplier than a bonus (any
+  variant 1 in 19 -> 1 in 13 across the dex, and variant bounty is renewable
+  income the League's prize unit is denominated in). At 2x one species would
+  also outrank the Pokedex Charm (2x, a whole generation) and the Region Charm
+  (1.5x, nine hard runs) - check.mjs refuses both.
   `loadState` drops a bad row, never the whole object.
 - **An alpha is a LAYER, not a tier**: `rollAlpha` (1 in `ALPHA_CHANCE`, never
   a legendary or costume, `canBeAlpha`) rolls BESIDE the tier, so an Alpha
