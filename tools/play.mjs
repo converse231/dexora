@@ -2549,7 +2549,7 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
   const { outbreakPool } = await import("../src/game/events.js");
   const { BIOMES, speciesById } = await import("../src/game/biomes.js");
   const { sellValue } = await import("../src/game/items.js");
-  const { TASKS, researchLevel, researchPay, researchLift, RESEARCH_MAX, RESEARCH_LIFT, STAR_COST } =
+  const { TASKS, researchLevel, researchPay, researchLift, RESEARCH_MAX, RESEARCH_LIFT } =
     await import("../src/game/research.js");
   const slot = (id) => TASKS.findIndex((t) => t.id === id);
 
