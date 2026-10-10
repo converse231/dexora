@@ -16,6 +16,7 @@ import Confirm from "./ui/Confirm.jsx";
 import WaterAsk from "./ui/WaterAsk.jsx";
 import DexClaim from "./ui/DexClaim.jsx";
 import { lazyPage } from "./ui/crash.jsx";
+import { useNewVersion } from "./ui/update.js";
 import { titleIds } from "./game/titles.js";
 import Settings from "./ui/Settings.jsx";
 import Help from "./ui/Help.jsx";
@@ -476,6 +477,14 @@ export default function App({
   const st = engine?.state;
   const enc = st?.encounter ?? null;
   const evo = st?.evolution ?? null;
+  /* A NEWER BUILD IS LIVE (ui/update.js): take it the moment nothing would be
+     lost - on the map, no encounter, evolution or dialog; the save is written
+     locally every 400ms and flushed on `pagehide`. Anywhere else the pill
+     below asks, so a wild encounter is never thrown away by an update. */
+  const fresh = useNewVersion();
+  useEffect(() => {
+    if (fresh && tab === "catch" && !enc && !evo && !modalOpen()) location.reload();
+  }, [fresh, tab, enc, evo]);
   const fishing = st?.fishing ?? null;
   /* A BANNER WAITS WHILE AN ENCOUNTER IS UNDECIDED. It is fixed across the top
      of the screen, which on a phone is exactly where the nameplate is - so a
@@ -917,6 +926,11 @@ export default function App({
         <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 
+      {fresh && (
+        <button type="button" className="update-pill" onClick={() => location.reload()}>
+          New version ready · Reload
+        </button>
+      )}
       <TopBar
         caught={caught}
         total={st?.caught ?? 0}
