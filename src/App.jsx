@@ -514,6 +514,17 @@ export default function App({
       tip: `${label(speciesById(mon.species))} · ${perkName(mon)}: ${what.toLowerCase()}`
         + ` · friendship ${hearts}/${HEARTS.length}` };
   }, [st?.buddy, st?.colRev, st?.rev]);
+  /* ON A PHONE THE PERK FOLDS TO ITS SPRITE (reported 2026-10-10: the corner
+     was too crowded). It opens for a beat when a partner comes out, so a new
+     perk still says what it is, opens again on a tap, and folds back. The
+     desktop ignores `open`: its corner has the room. */
+  const [perkOpen, setPerkOpen] = useState(false);
+  useEffect(() => { if (walkerFx?.mon.uid != null) setPerkOpen(true); }, [walkerFx?.mon.uid]);
+  useEffect(() => {
+    if (!perkOpen) return undefined;
+    const t = setTimeout(() => setPerkOpen(false), 4000);
+    return () => clearTimeout(t);
+  }, [perkOpen]);
   const partyMons = useMemo(() => (st?.party ?? []).map((u) => st.box.find((m) => m.uid === u)).filter(Boolean),
     [st?.party, st?.colRev]);
   const cheer = held ? null : st?.cheers?.[0] ?? null;
@@ -1050,17 +1061,18 @@ export default function App({
 
                 It belongs in THIS corner rather than on the party strip
                 because it answers the corner's question - what is acting on
-                this map - which is the same question the item rings answer. A
-                follower with no field effect shows nothing, which is most of
-                them: only 12.4% of species-and-uid pairs have one. */}
+                this map - which is the same question the item rings answer.
+                Every partner has a perk now, so it is always here while one
+                walks. A button: on a phone a tap unfolds it. */}
             {walkerFx && (
-              <span className="fieldbox walker" role="status" data-tip={walkerFx.tip}
-                aria-label={walkerFx.tip}>
+              <button type="button" className={`fieldbox walker${perkOpen ? " open" : ""}`}
+                data-tip={walkerFx.tip} aria-label={walkerFx.tip} aria-expanded={perkOpen}
+                onClick={() => setPerkOpen((o) => !o)}>
                 <span>
                   <Sprite id={walkerFx.mon.species} variant={variantOf(walkerFx.mon)} alt="" eager />
                   <u><b>{walkerFx.what}</b><i>{walkerFx.name}</i></u>
                 </span>
-              </span>
+              </button>
             )}
 
             {/* A RUNNING ITEM IS A RING, as the rift is: the rim drains with

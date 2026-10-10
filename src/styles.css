@@ -5321,6 +5321,10 @@ button:disabled { transition: none; }
   .fieldbox > span > img, .fieldbox .item-fx { width: 26px; height: 26px; }
   .fieldbox b { font-size: 15px; }
   .fieldbox i { font-size: 9px; }
+  /* THE PARTNER FOLDS TO ITS SPRITE, a round chip like the rings beside it;
+     `.open` (a tap, or a partner coming out) unfolds the card. */
+  .fieldbox.walker:not(.open) > span { padding: 4px; border-radius: 50%; }
+  .fieldbox.walker:not(.open) u { display: none; }
 }
 
 .minimap {
