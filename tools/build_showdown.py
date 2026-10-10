@@ -42,7 +42,9 @@ import time
 import urllib.error
 import urllib.request
 
-from PIL import Image, ImageSequence
+# The strip itself is shared with the other builder (strip_frames.py).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from strip_frames import strip  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CDN = ("https://raw.githubusercontent.com/PokeAPI/sprites/master/"
@@ -50,9 +52,6 @@ CDN = ("https://raw.githubusercontent.com/PokeAPI/sprites/master/"
 CACHE = os.path.join(ROOT, ".assets-src", "showdown")
 OUT = os.path.join(ROOT, "public", "sprites", "showdown")
 
-SIZE = 64
-FRAMES = 8          # measured: 8 reads as a loop and 16 doubles the repo
-COLORS = 64
 
 
 def species_ids():
@@ -88,26 +87,6 @@ def grab(i):
     return None
 
 
-def strip(path):
-    """Eight frames, each on its own 64px canvas, stacked into one column."""
-    im = Image.open(path)
-    frames = [f.convert("RGBA") for f in ImageSequence.Iterator(im)]
-    if not frames:
-        return None
-    w, h = im.size
-    step = max(1, len(frames) // FRAMES)
-    picked = frames[::step][:FRAMES]
-    while len(picked) < FRAMES:            # a short loop repeats its last pose
-        picked.append(picked[-1])
-
-    scale = min(SIZE / w, SIZE / h)
-    out = Image.new("RGBA", (SIZE, SIZE * FRAMES), (0, 0, 0, 0))
-    for k, fr in enumerate(picked):
-        r = fr.resize((max(1, round(w * scale)), max(1, round(h * scale))),
-                      Image.LANCZOS)
-        out.alpha_composite(r, ((SIZE - r.width) // 2,
-                                SIZE * k + (SIZE - r.height)))
-    return out.quantize(colors=COLORS, method=Image.FASTOCTREE)
 
 
 def main():
@@ -117,10 +96,8 @@ def main():
     made, missing, bytes_out = [], [], 0
     for n, i in enumerate(ids, 1):
         dst = os.path.join(OUT, f"{i}.png")
-        if os.path.exists(dst):
-            made.append(i)
-            bytes_out += os.path.getsize(dst)
-            continue
+        # NO SKIP ON THE OUTPUT (build_cadence.py learned it first): with one,
+        # a change to the strip silently did nothing on a re-run.
         src = grab(i)
         if not src:
             missing.append(i)
@@ -150,7 +127,7 @@ def main():
     print(f"\n{len(made)} strips, {bytes_out/1048576:.1f} MB in public/sprites/showdown")
     print(f"{len(missing)} species have no Showdown sprite")
     assert len(made) > 900, f"only {len(made)} strips - the fetch went wrong"
-    assert bytes_out < 16 * 1048576, \
+    assert bytes_out < 48 * 1048576, \
         f"{bytes_out/1048576:.1f} MB is past what this was measured to cost"
 
 

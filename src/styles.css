@@ -5897,18 +5897,19 @@ button:disabled { transition: none; }
 }
 
 
-/* SHOWDOWN: EIGHT FRAMES IN ONE PNG, STEPPED.
+/* SHOWDOWN AND CADENCE: SIXTEEN FRAMES IN ONE PNG, STEPPED (eight until
+   2026-10-10; `FRAMES` in tools/strip_frames.py, which check.mjs holds to the
+   `steps()` and the `background-size` below).
 
    The same mechanism as the ball throw, and the same trap: percentage
    `background-position` is not "scroll by p%", it aligns the p% point of the
-   IMAGE with the p% point of the BOX. With the strip at `800%` the image is
-   eight box-heights tall, so frame i sits at `100i/7`% - frames 0 to 7 land on
-   0% to 100% exactly.
+   IMAGE with the p% point of the BOX. With the strip at `1600%` the image is
+   sixteen box-heights tall, so frame i sits at `100i/15`% - frames 0 to 15
+   land on 0% to 100% exactly.
 
-   `jump-none` is what makes that true: it takes eight values INCLUSIVE of both
-   ends, each held for an eighth of the run, then wraps. Plain `steps(8)` would
-   take 0, 12.5, 25 ... 87.5, which is not where the frames are, and would show
-   seven and a half of them. */
+   `jump-none` is what makes that true: it takes sixteen values INCLUSIVE of
+   both ends, each held for a sixteenth of the run, then wraps. Plain
+   `steps(16)` would stop short of the last frame and show half of it. */
 /* 77%, AND IT IS MEASURED RATHER THAN EYEBALLED.
 
    Reported as the Showdown variants being far too big, and they were, by a
@@ -5943,11 +5944,11 @@ button:disabled { transition: none; }
   display: block; width: 77%; height: 77%; margin: auto;
   background-image: var(--strip);
   background-repeat: no-repeat;
-  background-size: 100% 800%;
+  background-size: 100% 1600%;
   background-position: 0 0;
   image-rendering: pixelated;
 }
-.sprite-showdown { animation: showdown-idle 900ms steps(8, jump-none) infinite; }
+.sprite-showdown { animation: showdown-idle 900ms steps(16, jump-none) infinite; }
 @keyframes showdown-idle {
   from { background-position-y: 0%; }
   to { background-position-y: 100%; }
@@ -5961,7 +5962,7 @@ button:disabled { transition: none; }
 
    Slower than Showdown's 900ms on purpose: this is the game's own idle, and
    it is a breath rather than a performance. */
-.sprite-cadence { animation: cadence-idle 1180ms steps(8, jump-none) 900ms infinite; }
+.sprite-cadence { animation: cadence-idle 1180ms steps(16, jump-none) 900ms infinite; }
 @keyframes cadence-idle {
   from { background-position-y: 0%; }
   to { background-position-y: 100%; }

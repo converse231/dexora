@@ -1133,6 +1133,30 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
          comment naming a host in prose is fine; one containing a URL would
          trip this, and that is a trade worth making for a check whose whole
          job is to find a URL. */
+      /* THE STRIP'S FRAMES ARE ONE NUMBER: `FRAMES` in strip_frames.py, the
+         `steps()` that walks them and the `background-size` that stacks them,
+         and every PNG's height over its width. Built at 8 and drawn at 16, a
+         Showdown would play half a creature and half of the next frame. */
+      {
+        const FR = Number(/^FRAMES = (\d+)/m.exec(readFileSync(new URL("../tools/strip_frames.py", import.meta.url), "utf8"))[1]);
+        const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+        for (const t of ["showdown", "cadence"])
+          assert.ok(new RegExp(`\\.sprite-${t} \\{ animation: [^;]*steps\\(${FR}, jump-none\\)`).test(css),
+            `.sprite-${t} does not step ${FR} frames`);
+        assert.ok(css.includes(`background-size: 100% ${FR * 100}%;`), `the strip is not stacked ${FR} high`);
+        let bad = [], n = 0;
+        for (const t of ["showdown", "cadence"]) {
+          const dir = new URL(`../public/sprites/${t}/`, import.meta.url);
+          for (const f of readdirSync(dir)) {
+            const b = readFileSync(new URL(f, dir));
+            const w = b.readUInt32BE(16), h = b.readUInt32BE(20);
+            n++;
+            if (h !== w * FR) bad.push(`${t}/${f} ${w}x${h}`);
+          }
+        }
+        assert.deepEqual(bad.slice(0, 5), [], `${bad.length} strips are not ${FR} frames high - npm run cadence / python tools/build_showdown.py`);
+        console.log(`strips ok — ${n} Showdown and Cadence strips, ${FR} frames each, stepped and stacked to match`);
+      }
       assert.ok(!/https?:\/\//.test(sprite),
         "Sprite.jsx fetches art from a URL - every sprite this game draws is " +
         "in the repo, and local mode is the game rather than a fallback");

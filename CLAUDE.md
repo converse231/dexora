@@ -79,7 +79,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/follow/`, `src/data/follow.js` | `npm run follow` (the same pin; check.mjs reads each header) |
 | `public/skins/` | `npm run skins` (from `SKINS` in cosmetics.js plus the tool's `SRC`) |
 | `src/data/abilities.js` | `npm run abilities` (PokeAPI, cached in .assets-src/abilities) |
-| `public/sprites/cadence/`, `src/data/cadence.js` | `npm run cadence` (Black and White's own idle, 8-frame strips) |
+| `public/sprites/cadence/`, `src/data/cadence.js` | `npm run cadence` (Black and White's own idle, 16-frame strips at native pixels; `tools/strip_frames.py`, shared with Showdown's builder) |
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
@@ -288,7 +288,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   a box entry in a tier the server does not know cannot enter trading.
 - **A tier that is a STRIP shares one class, `.sprite-strip`** (`STRIP_TIERS`
   in Sprite.jsx: Showdown and Cadence). A strip is a span with a background
-  stepped by `steps(8, jump-none)`, and a span has no intrinsic size, so every
+  stepped by `steps(16, jump-none)`, and a span has no intrinsic size, so every
   container drawing a Pokemon must size it - 15 of them, asserted. Naming the
   tier instead of the kind made that 24 rules for one tier; the shared hook
   makes a third strip cost no CSS. **Cadence is Showdown's twin and must not
@@ -337,8 +337,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   descendant `img` also reaches the one inside it (the Rare forms dialog drew
   its creatures at 77% of 77%, top-left, every effect off to the side).
   Asserted in check.mjs.
-- **Showdown is an 8-frame strip on a span, not an `<img>`**, stepped with
-  `steps(8, jump-none)`. It is sized to 77% of its box (a Showdown frame fills
+- **Showdown is a 16-frame strip on a span, not an `<img>`**, stepped with
+  `steps(16, jump-none)`. Both strips keep the source GIF's own pixels on a
+  square canvas (`CAP` 192) with the full 256 colours - a 64px, 64-colour canvas
+  was the blur (2026-10-10) - and their frames are picked by time; check.mjs
+  holds `FRAMES` to the CSS and to every PNG's height. It is sized to 77% of its box (a Showdown frame fills
   its canvas where an ordinary sprite fills 0.77), and that must be set in each
   container that draws it. A percentage is of the containing block, so the
   evolution scene sizes it against `.evo-mon`'s `cqw` (asserted).
