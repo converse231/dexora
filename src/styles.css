@@ -7635,6 +7635,19 @@ button:disabled { transition: none; }
   .ft-move { min-height: 48px; padding: 6px 10px; gap: 3px; }
   .ft-move b { font-size: 14px; }
   .ft-switch ul { grid-template-columns: minmax(0, 1fr); }
+  /* THE RESULT, in the side column (reported 2026-10-10): its three columns
+     were laid out for the full width and ran off both edges of this one -
+     "Victory!" cut on the left, the loot on the right. One column: the
+     summary, the loot wrapping, the buttons. */
+  .ft-result { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; }
+  .ft-loot li { min-width: 0; }
+  .ft-loot b { white-space: normal; }
+  .ft-result-go { justify-content: stretch; }
+  .ft-result-go .lg-go { flex: 1 1 auto; }
+  /* Room for the buttons: the team is on the scene beside it already. */
+  .ft-res-team { display: none; }
+  .ft-loot { gap: 6px; }
+  .ft-loot li { padding: 5px 10px; }
 }
 /* A TOUCH SCREEN: no key hints, and nothing under the 36px floor. */
 @media (hover: none) and (pointer: coarse) {
@@ -9829,19 +9842,25 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
   .app {
     --side: max(136px, min(21vw, 210px));
-    --view-w: min(calc((100dvh - 20px) * 15 / 11), calc(100vw - 16px - 2 * var(--side)));
-    --col: calc((100vw - var(--view-w) - 28px) / 2);
+    /* SVH, NOT DVH (reported 2026-10-10 from an iPhone): Safari's own bar
+       covers part of a sideways screen, and sized to the whole of it the
+       screen ran under the bar - the map's top cut off, the D-pad pushed up
+       into the numbers. The small viewport is the height with the bar shown. */
+    --view-w: min(calc((100svh - 20px) * 15 / 11), calc(100vw - 16px - 2 * var(--side)));
+    --col: min(220px, calc((100vw - var(--view-w)) / 2 - 30px));   /* a clear gap before the map */
   }
   html:has(.app.tab-catch), body:has(.app.tab-catch) { overflow: hidden; }
   body { padding: 0 calc(8px + env(safe-area-inset-right)) 0 calc(8px + env(safe-area-inset-left)); }
   .screen {
-    height: 100dvh; min-height: 0; margin: 0; padding: 8px 4px; box-sizing: border-box;
+    height: 100svh; min-height: 0; margin: 0; padding: 8px 4px; box-sizing: border-box;
     border-radius: 0; border-top: 0; border-bottom: 0;
     grid-template-rows: minmax(0, 1fr);
     --view-w: inherit;   /* one width, read by the bar too (an older rule set it here) */
   }
   .viewport { align-self: center; }
-  .pad { --pad-c: clamp(44px, calc((100vw - var(--view-w) - 64px) / 4.6), 80px); }
+  /* The D-pad is three rows of .68 of this; under the bar's ~150px head it
+     gets what is left, so the two cannot overlap at any height. */
+  .pad { --pad-c: clamp(34px, min(calc((100vw - var(--view-w) - 64px) / 4.6), calc((100svh - 184px) / 2.05)), 80px); }
   .pad-dir { align-self: end; margin-bottom: 14px; }
   .pad-act { align-self: end; margin-bottom: 10px; }
 
@@ -9857,7 +9876,14 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
     border-radius: 999px; font: 700 13px var(--body);
   }
   .tb-menu-word { display: inline; }
-  .topbar .tb-stats { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; width: 100%; }
+  /* THE NUMBERS RIDE THE RIGHT COLUMN (asked for, 2026-10-10): under the
+     Menu key they met the D-pad on a phone whose browser bar ate the height.
+     The right column's top was empty above Bag and Rotom; the left now holds
+     the Menu key alone, so the D-pad has the whole column under it. */
+  .topbar .tb-stats {
+    position: fixed; top: 8px; right: calc(10px + env(safe-area-inset-right)); width: var(--col);
+    display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px;
+  }
   .topbar .tb-stat.tb-extra { display: none; }
   .topbar .tb-stat {
     display: flex; justify-content: flex-start; gap: 7px; height: 28px; padding: 0 10px;
@@ -9865,6 +9891,13 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   }
   .topbar .tb-stat b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .topbar .tb-stat .deltas { display: none; }
+  @media (max-height: 340px) {
+    .topbar { gap: 4px; }
+    .topbar .tb-menu { height: 34px; }
+    .topbar .tb-stat { height: 24px; }
+    .topbar .tb-stat b { font-size: 12px; }
+    .pad { --pad-c: clamp(32px, min(calc((100vw - var(--view-w) - 64px) / 4.6), calc((100svh - 150px) / 2.05)), 80px); }
+  }
   /* Off the map, or in an encounter: the key alone, as the corner icon it was. */
   .app:not(.tab-catch) .topbar .tb-stats, .app.busy .topbar .tb-stats { display: none; }
   .app:not(.tab-catch) .topbar { width: 44px; }
