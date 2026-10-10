@@ -131,6 +131,8 @@ export default function TopBar({
       <button type="button" className="tb-menu" aria-label="Menu" aria-expanded={menu}
         onClick={() => setMenu((v) => !v)}>
         <Icon n="menu" size={22} />
+        {/* Held sideways on the map it is a labelled key, like a GBA's START. */}
+        <span className="tb-menu-word" aria-hidden="true">Menu</span>
         {(tradeAlert || youAlert || cardAlert) && <i className="tb-dot" aria-label="Something new" />}
       </button>
       {menu && <MenuScrim onClose={() => setMenu(false)} />}

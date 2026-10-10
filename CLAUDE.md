@@ -718,7 +718,15 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   SHELL, end of styles.css): the app bar on a desktop, a bottom tab bar on a
   phone, and held sideways a MENU behind one corner button (`.tb-menu`,
   TopBar's `MenuScrim`: modal lock, Escape, `useDismiss`) - the left rail it
-  replaced took 68px of a sideways phone's width from the game (2026-10-02). Layers: pages 56, the Rotom sheet 57,
+  replaced took 68px of a sideways phone's width from the game (2026-10-02).
+  **Held sideways the catch screen IS the screen** (SIDEWAYS, REDESIGNED at
+  the end of styles.css, 2026-10-10): no page scroll; the bar is the left
+  column's head (a labelled Menu key and money, candy, Pokedex), the D-pad and
+  A/B sit in the bottom corners, `--view-w` lives on `.app` so the bar and the
+  screen agree; the menu is a full-height DRAWER with your trainer card on
+  top; off the map the key is a corner icon in each page header's gutter, and
+  the numbers are never drawn over a page. The Bag is a right-hand panel, the
+  Rotom panel the whole screen. Audit at 844x390, 740x360 and 667x375. Layers: pages 56, the Rotom sheet 57,
   bar and tab bar 58, banners 60, dialogs 70+ - so a dialog covers the tabs.
   A fight (`body.fighting`, set by League) and a phone encounter (`.app.busy`)
   hide the bar. No `backdrop-filter` where the map shows through.

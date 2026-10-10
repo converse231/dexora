@@ -9806,3 +9806,139 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
    to do it that covered the game (asked for, 2026-10-04). The desktop keeps
    them as the reminder of C and F. Last, so it beats the row's sideways placement. */
 @media (hover: none) and (pointer: coarse) { .hint-row { display: none; } }
+
+/* ================================================================ SIDEWAYS, REDESIGNED
+   (2026-10-10, audited at 844x390, 740x360 and 667x375.) Held sideways the
+   game was a page you scrolled: the money, candy and Pokedex count sat under
+   the screen, the menu button floated over the card's corner and opened a
+   dropdown over the map, and on every page the status row floated over the
+   content - over the team pick's Battle! button, over the League, over You.
+
+   - THE CATCH SCREEN IS EXACTLY THE SCREEN. The top bar becomes the head of
+     the left column - the menu key and the three numbers - so nothing sits
+     below the game and the body never scrolls. The D-pad and A/B drop to the
+     bottom corners, under the thumbs; Bag and Rotom ride above A/B.
+   - `--view-w` lives on `.app` so the bar can size itself to the column the
+     screen leaves; the side columns are narrower than before (136px floor),
+     which gives a 667px phone a 390px map instead of 350.
+   - THE MENU IS A DRAWER: full height from the left, your trainer card at the
+     top, then a row for each tab. Off the map the menu key is the corner icon
+     it was, and the numbers go - the page has its own.
+   Last in the file: media queries add no specificity, so overrides go last. */
+.tb-menu-word { display: none; }
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .app {
+    --side: max(136px, min(21vw, 210px));
+    --view-w: min(calc((100dvh - 20px) * 15 / 11), calc(100vw - 16px - 2 * var(--side)));
+    --col: calc((100vw - var(--view-w) - 28px) / 2);
+  }
+  html:has(.app.tab-catch), body:has(.app.tab-catch) { overflow: hidden; }
+  body { padding: 0 calc(8px + env(safe-area-inset-right)) 0 calc(8px + env(safe-area-inset-left)); }
+  .screen {
+    height: 100dvh; min-height: 0; margin: 0; padding: 8px 4px; box-sizing: border-box;
+    border-radius: 0; border-top: 0; border-bottom: 0;
+    grid-template-rows: minmax(0, 1fr);
+    --view-w: inherit;   /* one width, read by the bar too (an older rule set it here) */
+  }
+  .viewport { align-self: center; }
+  .pad { --pad-c: clamp(44px, calc((100vw - var(--view-w) - 64px) / 4.6), 80px); }
+  .pad-dir { align-self: end; margin-bottom: 14px; }
+  .pad-act { align-self: end; margin-bottom: 10px; }
+
+  /* The bar: the left column's head. */
+  .topbar {
+    position: fixed; z-index: 58; top: 8px; left: calc(10px + env(safe-area-inset-left));
+    width: var(--col); height: auto; margin: 0; padding: 0;
+    display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+    background: none; border: 0; border-radius: 0; box-shadow: none;
+  }
+  .topbar .tb-menu {
+    position: static; width: 100%; height: 40px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    border-radius: 999px; font: 700 13px var(--body);
+  }
+  .tb-menu-word { display: inline; }
+  .topbar .tb-stats { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; width: 100%; }
+  .topbar .tb-stat.tb-extra { display: none; }
+  .topbar .tb-stat {
+    display: flex; justify-content: flex-start; gap: 7px; height: 28px; padding: 0 10px;
+    border-radius: 10px; background: var(--surface); border: 1px solid var(--line);
+  }
+  .topbar .tb-stat b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar .tb-stat .deltas { display: none; }
+  /* Off the map, or in an encounter: the key alone, as the corner icon it was. */
+  .app:not(.tab-catch) .topbar .tb-stats, .app.busy .topbar .tb-stats { display: none; }
+  .app:not(.tab-catch) .topbar { width: 44px; }
+  .app:not(.tab-catch) .topbar .tb-menu { width: 44px; height: 44px; border-radius: 14px; }
+  .app:not(.tab-catch) .tb-menu-word { display: none; }
+  .topbar .tb-menu .tb-dot { position: absolute; top: 4px; left: 30px; }
+  .topbar .tb-menu { position: relative; }
+
+  /* THE DRAWER. */
+  .tb-tabs.open {
+    position: fixed; top: 0; bottom: 0; left: 0; right: auto; z-index: 59;
+    width: min(320px, 50vw); height: 100dvh; max-height: none; overflow-y: auto;
+    padding: 12px 12px 12px calc(12px + env(safe-area-inset-left)); gap: 4px;
+    border: 0; border-right: 1px solid var(--line); border-radius: 0 24px 24px 0;
+    box-shadow: 18px 0 48px var(--shadow); animation: drawer-in .2s ease-out;
+  }
+  .topbar .tb-tabs.open .tb-tab { height: 50px; flex: none; }
+  /* Your trainer card heads it. */
+  .topbar .tb-tabs.open .tb-tab.t-you {
+    order: -1; height: 68px; margin-bottom: 6px; padding: 0 12px;
+    background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .tb-tabs.open .tb-tab .tb-you { display: grid; flex: 1; }
+  .tb-tabs.open .tb-tab .tb-you-short { display: none; }
+  .tb-tabs.open .tb-tab .tb-medal { width: 48px; height: 48px; background: var(--surface); border-radius: 50%; }
+  .tb-tabs.open .tb-tab .tb-medal > .rk-medal { width: 40px; height: 40px; }
+  .topbar .tb-tabs.open .tb-tab.t-you.on .tb-medal { box-shadow: 0 0 0 2px var(--accent); }
+
+  /* PAGES: the menu key sits in the header's own gutter. You has no header,
+     so its column starts past the key instead of under it. */
+  .you-page .you-main { padding-top: 60px; }
+  .tc-page .tc-bar { padding-left: calc(74px + env(safe-area-inset-left)); }
+  /* The Rotom panel is the whole screen and has its own close: the bar steps aside. */
+  body:has(.rail.open) .topbar { display: none; }
+
+  /* THE ROTOM PANEL: the whole screen, not a sheet with a strip of card above it. */
+  .rail.open { top: 0; bottom: 0; border-radius: 0; padding-top: 8px; }
+  .rail.open .rail-grip { display: none; }
+
+  /* THE BAG: a panel down the right, over the face buttons it opens from,
+     instead of a sheet rising over the D-pad. */
+  .bagsheet { align-items: stretch; justify-content: flex-end; }
+  .bag-card {
+    width: min(400px, 52vw); max-width: none; max-height: none; margin: 0;
+    border-radius: 24px 0 0 24px; border-top: 0; border-left: 1px solid var(--line-firm);
+    padding: 10px 0 10px; animation: drawer-from-right .2s ease-out;
+  }
+  .bag-grip { display: none; }
+
+  /* CARDS: one row of sets that scrolls, not three rows of them. */
+  .cd-page .pk-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .cd-page .pk-chips::-webkit-scrollbar { display: none; }
+  .cd-page .pk-chips > * { flex: none; }
+  /* The cart is the header's last thing, not wedged after the menu key. */
+  .cd-page .cs-cartbtn { order: 2; margin-left: auto; }
+}
+@keyframes drawer-in { from { transform: translateX(-100%); } }
+@keyframes drawer-from-right { from { transform: translateX(100%); } }
+
+/* SHORT SCREENS, any device. The Dex entry's tinted hero filled only its
+   content's height and stopped halfway down the column. */
+@media (max-height: 540px) {
+  .sheet-card > .sheet-top { align-self: stretch; }
+  /* THE REWARD: two columns - the trophy and what was finished, then what it
+     paid and the button - so Awesome! is never under the fold. */
+  .rw-card {
+    width: min(780px, 100%); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 22px; row-gap: 8px; align-items: center; padding: 18px 20px;
+  }
+  .rw-trophy { grid-column: 1; grid-row: 1; width: 56px; height: 56px; }
+  .rw-kicker { grid-column: 1; grid-row: 2; margin: 0; }
+  .rw-title { grid-column: 1; grid-row: 3; font-size: 22px; }
+  .rw-done { grid-column: 1; grid-row: 4; }
+  .rw-prizes { grid-column: 2; grid-row: 1 / span 4; margin: 0; align-self: center; }
+  .rw-ok { grid-column: 2; grid-row: 5; justify-self: center; margin: 0; }
+  .rw-rays { left: 25%; top: 46px; }
+}
