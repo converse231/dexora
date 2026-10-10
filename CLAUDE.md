@@ -551,6 +551,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   sessionStorage, so never a loop) when the failure is a module that would not
   load - the fix for a stale build being literally a reload. A lazy page added
   with a bare `lazy()` can still blank on the next deploy.
+- **A tab notices a new deploy** (`ui/update.js`, 2026-10-10): iOS keeps a
+  backgrounded page alive for days, and an old page fetching NEW art drew
+  every Cadence twice (16-frame strips under 8-frame CSS). On returning to
+  view (and every ten minutes) it compares the live page's hashed main script
+  with its own; newer means reload at once on the map with nothing open, and
+  the "New version ready" pill anywhere else - an encounter is never lost to
+  an update. The page itself is `must-revalidate`, so a reload always lands.
 - **Every dialog closes through `useDismiss`**, never a bare `onClick` on a
   scrim, and takes the modal lock (`App` ignores keys while `modalOpen()`).
   Custom listboxes carry keyboard handling, focus return and the lock.

@@ -9844,6 +9844,13 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
      it was, and the numbers go - the page has its own.
    Last in the file: media queries add no specificity, so overrides go last. */
 .tb-menu-word { display: none; }
+/* A NEWER BUILD IS LIVE (ui/update.js), and this is not a safe moment to take
+   it: one pill, above the banners (60) and under the dialogs (70+). */
+.update-pill {
+  position: fixed; z-index: 61; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translateX(-50%);
+  height: 38px; padding: 0 18px; border: 0; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  background: var(--cta); color: #fff; font: 700 13px var(--body); box-shadow: 0 8px 22px var(--cta-glow);
+}
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
   .app {
     --side: max(136px, min(21vw, 210px));
