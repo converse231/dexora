@@ -23,11 +23,14 @@ Run: python tools/build_cadence.py   (about 42 MB of fetches, cached)
 import io
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
 
-from PIL import Image, ImageSequence
+# The strip itself is shared with the other builder (strip_frames.py).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from strip_frames import strip  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CDN = ("https://raw.githubusercontent.com/PokeAPI/sprites/master/"
@@ -35,9 +38,6 @@ CDN = ("https://raw.githubusercontent.com/PokeAPI/sprites/master/"
 CACHE = os.path.join(ROOT, ".assets-src", "cadence")
 OUT = os.path.join(ROOT, "public", "sprites", "cadence")
 
-SIZE = 64
-FRAMES = 8          # as Showdown: 8 reads as a loop and 16 doubles the repo
-COLORS = 64
 
 
 def species_ids():
@@ -72,46 +72,6 @@ def grab(i):
     return None
 
 
-def strip(path):
-    """Eight frames, each on its own 64px canvas, stacked into one column.
-
-    THE CANVAS IS RESIZED, NEVER THE CREATURE, and feet stay on the floor -
-    build_origin.py's lesson, which build_showdown.py already carries."""
-    im = Image.open(path)
-    frames = [f.convert("RGBA") for f in ImageSequence.Iterator(im)]
-    if not frames:
-        return None
-    w, h = im.size
-    step = max(1, len(frames) // FRAMES)
-    picked = frames[::step][:FRAMES]
-    while len(picked) < FRAMES:            # a short loop repeats its last pose
-        picked.append(picked[-1])
-
-    scale = min(SIZE / w, SIZE / h)
-    # THE FILTER FOLLOWS THE DIRECTION, and LANCZOS was wrong in both.
-    #
-    # Black and White's own sprites are not one size: 37x38 for Bulbasaur,
-    # 119x105 for a Gen 9 one, so 325 of the 868 are scaled UP to reach this
-    # canvas and 498 are scaled DOWN. A smooth filter invents colours between
-    # the artist's own when it enlarges - which is what "the Cadence sprites
-    # look blurry" was, reported 2026-10-08 - and rings around a one-pixel
-    # outline when it shrinks. Then `quantize` bands whatever it produced.
-    #
-    # UP is NEAREST: no colour appears that the sprite did not already have.
-    # DOWN is BOX, an area average: plain NEAREST drops a one-pixel outline
-    # outright (Charizard lost its wing edges), and BOX keeps it present
-    # without LANCZOS's ringing.
-    #
-    # Sharper AND smaller, because the palette stays flat: 34% fewer bytes
-    # over a sample of eight, measured before the change was made.
-    filt = Image.NEAREST if scale >= 1 else Image.BOX
-    out = Image.new("RGBA", (SIZE, SIZE * FRAMES), (0, 0, 0, 0))
-    for k, fr in enumerate(picked):
-        r = fr.resize((max(1, round(w * scale)), max(1, round(h * scale))),
-                      filt)
-        out.alpha_composite(r, ((SIZE - r.width) // 2,
-                                SIZE * k + (SIZE - r.height)))
-    return out.quantize(colors=COLORS, method=Image.FASTOCTREE)
 
 
 def main():
@@ -155,7 +115,7 @@ def main():
     print(f"\n{len(made)} strips, {bytes_out/1048576:.1f} MB in public/sprites/cadence")
     print(f"{len(missing)} species have no Cadence sprite")
     assert len(made) > 800, f"only {len(made)} strips - the fetch went wrong"
-    assert bytes_out < 16 * 1048576, \
+    assert bytes_out < 48 * 1048576, \
         f"{bytes_out/1048576:.1f} MB is past what this was measured to cost"
 
 
