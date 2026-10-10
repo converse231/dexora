@@ -5948,7 +5948,11 @@ button:disabled { transition: none; }
   background-position: 0 0;
   image-rendering: pixelated;
 }
-.sprite-showdown { animation: showdown-idle 900ms steps(16, jump-none) infinite; }
+/* NEARER THE SOURCE'S OWN PACE (reported 2026-10-10 as far too fast): a
+   Showdown loop runs a median 1.8s and a Black and White idle 6s, and both
+   were squeezed into about one. Cadence stays the slower of the two - it is
+   the breath, not the performance. */
+.sprite-showdown { animation: showdown-idle 1700ms steps(16, jump-none) infinite; }
 @keyframes showdown-idle {
   from { background-position-y: 0%; }
   to { background-position-y: 100%; }
@@ -5962,7 +5966,7 @@ button:disabled { transition: none; }
 
    Slower than Showdown's 900ms on purpose: this is the game's own idle, and
    it is a breath rather than a performance. */
-.sprite-cadence { animation: cadence-idle 1180ms steps(16, jump-none) 900ms infinite; }
+.sprite-cadence { animation: cadence-idle 2600ms steps(16, jump-none) 900ms infinite; }
 @keyframes cadence-idle {
   from { background-position-y: 0%; }
   to { background-position-y: 100%; }
@@ -5977,7 +5981,7 @@ button:disabled { transition: none; }
           mask: var(--art) center / contain no-repeat;
   background: radial-gradient(ellipse at 50% 72%, rgba(120, 255, 205, .45), transparent 62%);
   opacity: 0; mix-blend-mode: screen;
-  animation: cad-breath 4600ms ease-in-out 900ms infinite;
+  animation: cad-breath 5200ms ease-in-out 900ms infinite;   /* two of the strip's 2600ms loops */
 }
 @keyframes cad-breath {
   0%, 100% { opacity: .1; transform: scale(.97); }

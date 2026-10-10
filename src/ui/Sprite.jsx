@@ -80,8 +80,17 @@ export const onSpriteError = (ev) => {
 
    `document.baseURI` rather than a leading slash, because `vite.config.js` sets
    `base: "./"` so a build can be opened from any path. */
+/* A STRIP'S URL CARRIES ITS FRAME COUNT (2026-10-10). The art is cached for a
+   day and served stale for a week (vercel.json), the CSS that steps it is
+   not: when the strips went from 8 frames to 16, a phone kept the old PNGs
+   under the new `steps(16)` and `1600%` - every Pokemon drawn at twice its
+   size, cropped, and animating twice as fast. A new count is a new URL, so the
+   two can never be paired again. `FRAMES` in tools/strip_frames.py; check.mjs
+   holds the two equal. */
+export const STRIP_FRAMES = 16;
 export const spriteUrl = (id, variant = null) =>
-  new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png`, document.baseURI).href;
+  new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png${STRIP_TIERS.has(variant) ? `?f=${STRIP_FRAMES}` : ""}`,
+    document.baseURI).href;
 
 /* A POKEMON FROM BEHIND, for your side of a League battle - the one place a
    back path is derived (docs/battles.md, *Data model*). Shiny has back art of

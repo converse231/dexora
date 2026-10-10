@@ -1144,6 +1144,9 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
           assert.ok(new RegExp(`\\.sprite-${t} \\{ animation: [^;]*steps\\(${FR}, jump-none\\)`).test(css),
             `.sprite-${t} does not step ${FR} frames`);
         assert.ok(css.includes(`background-size: 100% ${FR * 100}%;`), `the strip is not stacked ${FR} high`);
+        // And the URL names the count, so a cached old strip is never paired with new CSS.
+        assert.equal(Number(/export const STRIP_FRAMES = (\d+);/.exec(sprite)?.[1]), FR,
+          `Sprite.jsx's STRIP_FRAMES is not ${FR} - a phone holding the old strips would draw them under the new steps`);
         let bad = [], n = 0;
         for (const t of ["showdown", "cadence"]) {
           const dir = new URL(`../public/sprites/${t}/`, import.meta.url);
