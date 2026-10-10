@@ -8878,7 +8878,72 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   margin-left: auto; flex: none; height: 34px; padding: 0 14px; border: 0; border-radius: 999px; cursor: pointer;
   background: var(--cta); color: #fff; font: 700 13px var(--body); box-shadow: 0 6px 16px var(--cta-glow);
 }
-.ach-got { margin: 0; padding: 10px 14px; border-radius: 14px; background: var(--surface-2); color: var(--ink); font-size: 13px; }
+/* THE CLAIM (Achievements.jsx `Reward`): a night stage in both themes, like
+   the trade scene, with the card's pieces arriving in turn (`--i`). Every
+   delayed animation RESTS on its end state, so reduced motion is the end. */
+.rw-scrim {
+  position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px;
+  background: radial-gradient(ellipse at 50% 42%, rgba(40, 52, 110, .92), rgba(6, 10, 22, .96) 70%);
+  animation: rw-in .25s ease-out both;
+}
+@keyframes rw-in { from { opacity: 0; } }
+.rw-card {
+  position: relative; z-index: 1; width: min(440px, 100%); max-height: calc(100dvh - 32px); overflow: hidden auto;
+  display: grid; justify-items: center; gap: 10px; padding: 26px 20px 20px; border-radius: 26px; text-align: center;
+  background: linear-gradient(180deg, #1d2a57, #121a36); border: 1px solid rgba(255, 210, 74, .45);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 60px rgba(255, 196, 60, .18);
+  animation: rw-pop .5s cubic-bezier(.2, 1.5, .4, 1) both;
+}
+@keyframes rw-pop { from { transform: scale(.6); opacity: 0; } }
+/* Rays behind the trophy: a turning wheel, faded out at its rim. */
+.rw-rays {
+  position: absolute; left: 50%; top: 58px; width: 420px; height: 420px; margin: -210px 0 0 -210px; z-index: -1;
+  background: repeating-conic-gradient(rgba(255, 214, 102, .22) 0 10deg, transparent 10deg 24deg);
+  -webkit-mask: radial-gradient(circle, #000 18%, transparent 62%); mask: radial-gradient(circle, #000 18%, transparent 62%);
+  animation: rw-spin 14s linear infinite;
+}
+@keyframes rw-spin { to { transform: rotate(360deg); } }
+.rw-trophy {
+  width: 68px; height: 68px; display: grid; place-items: center; border-radius: 50%; color: #3a2a05;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, #ffd24a 45%, #e59a12);
+  box-shadow: 0 0 0 4px rgba(255, 210, 74, .25), 0 10px 30px rgba(255, 180, 40, .5);
+  animation: rw-bounce .7s cubic-bezier(.2, 1.6, .4, 1) .15s both;
+}
+@keyframes rw-bounce { from { transform: scale(0) rotate(-30deg); } }
+.rw-kicker { margin: 4px 0 0; font: 600 11px var(--pixel); color: #ffd66b; }
+.rw-title { margin: 0; font: 800 26px var(--display); color: #fff; }
+.rw-done { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.rw-done li {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px;
+  font-size: 12px; color: #dff6e8; background: rgba(80, 220, 140, .14); border: 1px solid rgba(80, 220, 140, .35);
+  animation: rw-chip .35s ease-out calc(.35s + var(--i) * 60ms) both;
+}
+.rw-done li .ic { color: #6be39b; }
+@keyframes rw-chip { from { opacity: 0; transform: translateY(6px); } }
+.rw-prizes { list-style: none; margin: 6px 0 0; padding: 0; width: 100%; display: grid; gap: 8px; }
+.rw-prizes li {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 16px; text-align: left;
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .1);
+  animation: rw-prize .45s cubic-bezier(.2, 1.5, .4, 1) calc(.6s + var(--i) * 180ms) both;
+}
+@keyframes rw-prize { from { opacity: 0; transform: scale(.7) translateY(10px); } }
+.rw-prizes li > img, .rw-prizes li > .item-fx { width: 36px; height: 36px; flex: none; image-rendering: pixelated; }
+.rw-prizes li > img.rw-pack { width: 30px; height: 42px; border-radius: 3px; image-rendering: auto; box-shadow: 0 4px 12px rgba(0, 0, 0, .4); }
+.rw-coin {
+  width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 50%;
+  font: 800 18px var(--display); color: #3a2a05; background: radial-gradient(circle at 35% 30%, #fff3c4, #ffd24a 50%, #d98a0e);
+}
+.rw-prizes span { display: grid; min-width: 0; }
+.rw-prizes b { font: 800 20px var(--display); color: #fff; font-variant-numeric: tabular-nums; }
+.rw-prizes small { font-size: 12px; color: #a9b8e0; }
+.rw-ok {
+  margin-top: 6px; height: 46px; min-width: 180px; padding: 0 24px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--cta); color: #fff; font: 800 16px var(--display); box-shadow: 0 10px 26px var(--cta-glow);
+  animation: rw-chip .35s ease-out calc(.7s + var(--i) * 180ms) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rw-scrim, .rw-card, .rw-trophy, .rw-done li, .rw-prizes li, .rw-ok, .rw-rays { animation: none; }
+}
 .ach-list { list-style: none; margin: 0; padding: 0; display: grid; }
 .ach-row { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-top: 1px solid var(--line); }
 .ach-row:first-child { border-top: 0; }
