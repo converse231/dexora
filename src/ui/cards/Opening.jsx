@@ -22,6 +22,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RARITY, isHit, rungOf, dustOf } from "../../game/cards.js";
 import { useModalLock } from "../modal.js";
+import Confetti from "../Confetti.jsx";
 import CardFace, { RarityMark, VARIANT_NAME } from "./Card.jsx";
 import { cardUrl, backUrl, packUrl, logoUrl } from "./load.js";
 
@@ -29,30 +30,6 @@ const CHARGE = 650, TEAR = 520, DEAL = 620, BUILD = 700;
 const BIG = new Set(["holo", "illustration", "special", "futuristic", "blackwhite", "hyper", "mega"]);
 const LOUD = new Set(["special", "futuristic", "blackwhite", "hyper", "mega"]);
 const SPARKS = Array.from({ length: 14 }, (_, i) => i);
-/* CONFETTI CANNONS, one in each bottom corner (asked for: it only fell, and
-   looked it). Each piece's arc is fixed here - a cheap hash of its index, so
-   every burst is the same shape and nothing rolls at render: how far across
-   (--dx), how high (--dy), how much it spins (--r) and when it leaves (--d).
-   Odd pieces fire from the left, even from the right, mirrored. */
-const rnd = (i, k) => ((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
-const CONFETTI = Array.from({ length: 36 }, (_, i) => {
-  const left = i % 2 === 0;
-  return {
-    i, left,
-    style: {
-      // A share of the room beside the card (styles.css' --reach), not of the screen.
-      "--dx": (left ? 1 : -1) * (0.25 + rnd(i, 1) * 0.75),
-      "--dy": `${48 + rnd(i, 2) * 40}vh`,
-      "--r": `${(rnd(i, 3) - 0.5) * 1440}deg`,
-      "--d": `${Math.round(rnd(i, 4) * 220)}ms`,
-    },
-  };
-});
-const Confetti = () => (
-  <span className="cd-confetti" aria-hidden="true">
-    {CONFETTI.map((c) => <i key={c.i} className={c.left ? "l" : "r"} style={c.style} />)}
-  </span>
-);
 // A hit is always holo, so it is named by its rarity; below a hit the foil is the news.
 const kindOf = (p) => (isHit(p.rarity) || p.variant === "n" ? RARITY[p.rarity].name : `${RARITY[p.rarity].name} · ${VARIANT_NAME[p.variant]}`);
 
