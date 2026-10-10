@@ -133,7 +133,8 @@ export default function TopBar({
         <Icon n="menu" size={22} />
         {/* Held sideways on the map it is a labelled key, like a GBA's START. */}
         <span className="tb-menu-word" aria-hidden="true">Menu</span>
-        {(tradeAlert || youAlert || cardAlert) && <i className="tb-dot" aria-label="Something new" />}
+        {/* A boolean, never the count: `0 && ...` drew "Menu 0". */}
+        {!!(tradeAlert || youAlert || cardAlert) && <i className="tb-dot" aria-label="Something new" />}
       </button>
       {menu && <MenuScrim onClose={() => setMenu(false)} />}
 

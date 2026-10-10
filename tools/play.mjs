@@ -81,7 +81,7 @@ const { createEngine } = await import("../src/game/engine.js");
 const { BALLS, berryById, levelReward } = await import("../src/game/items.js");
 const { PHASES, phaseAt } = await import("../src/game/clock.js");
 const {
-  wildBand, biomeFor, bornLevel, SIZE_MIN, SIZE_MAX,
+  wildBand, biomeFor, bornLevel, SIZE_MIN, SIZE_MAX, ALPHA_SIZE,
 } = await import("../src/game/biomes.js");
 
 // --------------------------------------------------------------- the harness
@@ -181,8 +181,10 @@ function until(e, what, label, max = 2000) {
      enormous Rattata you threw six balls at is an ordinary one in the Box,
      because `sizeOf` quietly falls back to the uid hash when nothing was
      stored. Only a real catch goes through that copy. */
-  assert.ok(caught.size >= SIZE_MIN && caught.size <= SIZE_MAX,
-    `a caught Pokémon came out of the ball with size ${caught.size}`);
+  // An alpha is bigger on purpose (ALPHA_SIZE): a walk that met one failed here at random.
+  const [lo, hi] = caught.alpha ? ALPHA_SIZE : [SIZE_MIN, SIZE_MAX];
+  assert.ok(caught.size >= lo && caught.size <= hi,
+    `a caught ${caught.alpha ? "alpha" : "Pokémon"} came out of the ball with size ${caught.size}`);
 
   /* THE CLOCK IS FROZEN ONTO THE ENCOUNTER, and only a real one goes through
      that copy. A ball that read the clock at throw time would change value
