@@ -23,6 +23,7 @@
    screenful is ever visible. */
 
 import { artOf } from "../game/items.js";
+import { lockedTiers } from "../game/biomes.js";
 
 const FOLDER = { shiny: "shiny/", origin: "origin/", showdown: "showdown/", cadence: "cadence/" };
 /* THE TIERS THAT ARE A STRIP RATHER THAN A PICTURE. They share one class,
@@ -31,6 +32,17 @@ const FOLDER = { shiny: "shiny/", origin: "origin/", showdown: "showdown/", cade
    24 rules naming `.sprite-showdown` by the time there were two of them.
    One hook means a third strip tier costs no CSS at all. */
 export const STRIP_TIERS = new Set(["showdown", "cadence"]);
+/* A STRIP TIER IS DRAWN AS A STRIP ONLY WHEN THE SPECIES HAS ONE (2026-10-13).
+   An `<img>` that 404s falls back to the plain sprite (`onSpriteError`); a
+   background cannot, it just paints nothing. The tier travels with the
+   creature (`engine.evolve`), so a Cadence Pokemon evolved into a species
+   with no Cadence strip yet drew as an empty tile wearing only its breath -
+   reported from the Dex preview. `lockedTiers` is the art check the roll and
+   the Dex already use. Without its strip the creature wears its plain
+   picture and keeps the tier's layer, and the strip arrives by itself the
+   day `npm run cadence` draws it. Evolve.jsx builds its own span and reads
+   this too. */
+export const drawsStrip = (id, variant) => STRIP_TIERS.has(variant) && !lockedTiers(id)?.has(variant);
 
 /* SHOWDOWN SHIPS NOW, AS AN EIGHT-FRAME STRIP.
 
@@ -356,6 +368,8 @@ export default function Sprite({
   /* Lazy is right for a Box of hundreds; the battle's one Pokemon is the
      point of the screen and must not wait for layout to be asked for. */
   const load = eager ? { loading: "eager", fetchpriority: "high" } : { loading: "lazy" };
+  // A strip tier reaching the `<img>` paths below has no strip: draw the plain picture.
+  const src = spriteUrl(id, STRIP_TIERS.has(variant) ? null : variant);
   /* THE TIERS THAT ARE NOT IMAGES. A strip in an `<img>` is eight creatures
      stacked in a column, so these have to be a box with a background - and it
      goes BEFORE the `fx` branch, because `VariantFx` returns null for a strip
@@ -363,7 +377,7 @@ export default function Sprite({
 
      CADENCE WEARS ITS OWN LAYER ON TOP (the breath), so it is the one strip
      tier that still wants `sprite-fx` around it when a caller asks for fx. */
-  if (STRIP_TIERS.has(variant)) {
+  if (drawsStrip(id, variant)) {
     /* A strip tier that has a layer of its own (`SCENE_FX`) takes the `fx`
        wrapper, so the layer has something to be absolute inside; one without
        stays a bare span. Read off the SET rather than typed twice as
@@ -391,7 +405,7 @@ export default function Sprite({
       <span className={`sprite-fx ${className}`.trim()}>
         <img
           className={variant ? `sprite-${variant}` : ""}
-          src={spriteUrl(id, variant)}
+          src={src}
           alt={alt}
           {...load}
           data-plain={id}
@@ -404,7 +418,7 @@ export default function Sprite({
   return (
     <img
       className={`${variant ? `sprite-${variant} ` : ""}${className}`.trim()}
-      src={spriteUrl(id, variant)}
+      src={src}
       alt={alt}
       {...load}
       data-plain={id}

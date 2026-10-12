@@ -31,6 +31,7 @@ UA = "Dexora/0.2 (non-commercial fan game; fetches its League art once and cache
 SHOWDOWN = "https://play.pokemonshowdown.com/sprites/trainers/"
 ARCHIVES = "https://archives.bulbagarden.net/w/api.php"
 POKEAPI = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/"
+FORM_API = "https://pokeapi.co/api/v2/pokemon-form/"
 BADGE = 32
 _last = [0.0]
 
@@ -143,13 +144,35 @@ def badges(regions):
 
 # ---------------------------------------------------------------- backs
 
+def form_backs():
+    """A FORM'S BACKS COME FROM ITS OWN POKEAPI RECORD (2026-10-12). Arceus's
+    types and every look (Unown's letters, Silvally's types...) carry OUR ids
+    (PLATE_BASE + the form id, fetch-forms.mjs), which PokeAPI's sprite folder
+    does not know - so all 112 shipped with no back, and the battle drew a
+    broken image for yours. The form record names its back sprites by url,
+    the same record their fronts were taken from. {our id: {kind: url}}."""
+    src = io.open(os.path.join(ROOT, "src", "data", "forms.js"), encoding="utf-8").read()
+    out = {}
+    for sid, name in re.findall(r'"id":(\d+),"name":"([^"]+)"', src):
+        raw = cached(f"pokeapi-forms/{name}.json", f"{FORM_API}{name}")
+        if not raw:
+            continue
+        sprites = json.loads(raw).get("sprites") or {}
+        out[int(sid)] = {"back": sprites.get("back_default"), "back/shiny": sprites.get("back_shiny")}
+    return out
+
+
 def backs():
     fronts = sorted(int(f[:-4]) for f in os.listdir(os.path.join(ROOT, "public", "sprites"))
                     if re.fullmatch(r"\d+\.png", f))
+    forms = form_backs()
     got = {"back": 0, "back/shiny": 0}
     for i, sid in enumerate(fronts):
         for kind in got:
             data = cached(f"pokeapi-backs/{kind.replace('/', '-')}-{sid}.png", f"{POKEAPI}{kind}/{sid}.png")
+            url = forms.get(sid, {}).get(kind)
+            if not data and url:
+                data = cached(f"pokeapi-backs/{kind.replace('/', '-')}-{sid}-form.png", url)
             if data:
                 write_png(Image.open(io.BytesIO(data)), "sprites", *kind.split("/"), f"{sid}.png")
                 got[kind] += 1

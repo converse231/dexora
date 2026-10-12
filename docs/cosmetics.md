@@ -17,6 +17,15 @@ battle.
   the same tile. All three sheets are loaded with the party, so a switch
   never waits. A save from the one-follower days gets `party = [buddy]`.
 
+- **A partner is earned (2026-10-13).** Its species' research must reach
+  `PARTNER_LEVEL` (5) to join (`partnerRule` in cosmetics.js, read by
+  `setParty` and every screen that offers one). A Pokémon already in the party
+  is never refused, which covers older saves and a partner that evolved into
+  a species not yet researched. While no species you hold has reached Lv 5,
+  one Pokémon may walk alone (the free first partner). Mastery (research
+  Lv 10) adds `MASTERED_BOND`: friendship counts twice. The picker lists only
+  what may join and says how many wait; the Dex button shows the research
+  level instead of a press the engine would refuse.
 - **One Pokémon walks behind you.** `state.buddy` is a Box uid. You choose it
   with **Walk with me** in the Box preview, and send it back from the same
   button or from the Wardrobe. `setBuddy` is the only writer, and it refuses a

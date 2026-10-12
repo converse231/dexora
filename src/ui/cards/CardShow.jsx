@@ -7,7 +7,7 @@ import { loadSet } from "./load.js";
 
 const setOf = (id) => id.replace(/-[^-]+$/, "");
 
-export default function CardShow({ list, self }) {
+export default function CardShow({ list, self, onAdd = null }) {
   const [sets, setSets] = useState({});
   const ids = [...new Set(list.map((c) => setOf(c.id)))].join(",");
   useEffect(() => {
@@ -16,6 +16,14 @@ export default function CardShow({ list, self }) {
     return () => { live = false; };
   }, [ids]);
   if (!list.length) {
+    // YOUR empty section is a way in, like the Showcase's empty slots.
+    if (onAdd) {
+      return (
+        <button type="button" className="cse-add" onClick={onAdd}>
+          <span aria-hidden="true">+</span>Pick cards to show
+        </button>
+      );
+    }
     return <p className="ev-quiet">{self ? "Open any card in Cards and choose Show on trainer card." : "No cards shown yet."}</p>;
   }
   return (

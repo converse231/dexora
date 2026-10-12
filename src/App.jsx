@@ -26,7 +26,7 @@ import Achievements from "./ui/Achievements.jsx";
 import { dueCount } from "./game/achievements.js";
 import Party from "./ui/Party.jsx";
 import CheckIn from "./ui/CheckIn.jsx";
-import { followSheet, PARTY_MAX } from "./game/cosmetics.js";
+import { followSheet, PARTY_MAX, PARTNER_LEVEL, partnerRule, isMastered } from "./game/cosmetics.js";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
 import Bag from "./ui/Bag.jsx";
@@ -536,6 +536,9 @@ export default function App({
   }, [perkOpen]);
   const partyMons = useMemo(() => (st?.party ?? []).map((u) => st.box.find((m) => m.uid === u)).filter(Boolean),
     [st?.party, st?.colRev]);
+  // The party's mastered species (cosmetics.js): a research level moves with colRev.
+  const partyMastered = useMemo(() => new Set(partyMons.map((m) => m.species).filter((id) => isMastered(id, st?.research))),
+    [partyMons, st?.colRev]);
   const cheer = held ? null : st?.cheers?.[0] ?? null;
   // The Dex's rank line replays your rank-up: the step you hold, from the one below.
   const [replay, setReplay] = useState(null);
@@ -778,7 +781,7 @@ export default function App({
       )}
       {partyPick && engine && st && (
         <Suspense fallback={null}>
-          <PartyPick engine={engine} box={st.box} party={st.party} onClose={() => setPartyPick(false)} />
+          <PartyPick engine={engine} box={st.box} party={st.party} research={st.research} onClose={() => setPartyPick(false)} />
         </Suspense>
       )}
       {news && <News onClose={() => setNews(false)}
@@ -1183,7 +1186,7 @@ export default function App({
                   </div>
                 )}
                 <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />
-                <Party mons={partyMons} buddy={st?.buddy ?? null} onPick={onPickBuddy} onEdit={onEditParty} />
+                <Party mons={partyMons} buddy={st?.buddy ?? null} mastered={partyMastered} onPick={onPickBuddy} onEdit={onEditParty} />
                 {checkin?.due && !checkinOpen && (
                   <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setCheckinOpen(true)}
                     data-tip="Check in for today's reward and keep your streak">
@@ -1357,7 +1360,13 @@ export default function App({
           walk={(() => {
             if (followSheet(entry) == null || !st?.box?.some((m) => m.species === entry)) return null;
             const member = st.party.find((u) => st.box.find((m) => m.uid === u)?.species === entry) ?? null;
-            return { member, full: member == null && st.party.length >= PARTY_MAX };
+            /* Not researched far enough: the button says how far, instead of
+               offering a press the engine refuses. A lone first partner is free. */
+            const rule = partnerRule(st);
+            const lv = rule.level(entry);
+            const locked = member == null && !(rule.starter && !st.party.length) && lv < PARTNER_LEVEL;
+            return { member, full: member == null && st.party.length >= PARTY_MAX,
+              locked: locked ? lv : null, need: PARTNER_LEVEL };
           })()}
           onWalk={() => {
             const member = st.party.find((u) => st.box.find((m) => m.uid === u)?.species === entry);

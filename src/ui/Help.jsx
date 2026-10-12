@@ -140,15 +140,14 @@ export default function Help({ onClose }) {
             </li>
             <li>
               <b>Research.</b> Every species has a level up to {RESEARCH_MAX}:
-              catch {CATCHES} ordinary ones, one at night, a tiny or a huge
+              catch {CATCHES} of them (any form), one at night, a tiny or a huge
               one, one with the first ball and one rare form, feed it a berry
               and evolve it if it can. Evolving into a species counts as owning
               one, and an evolved form skips the night, first-ball and berry
               tasks. Each level pays. Finish every task (an alpha is a bonus) and
               you can star it, free, and its rare
               forms are {RESEARCH_LIFT}&times; as likely for good. A legendary's
-              research is catching one, feeding it, winning a League battle
-              with one and raising one to Lv 100.
+              research is catching two, feeding one and raising one to Lv 100.
             </li>
             <li>
               <b>Alphas.</b> About one Pokémon in {Math.round(1 / ALPHA_CHANCE)} is

@@ -24,7 +24,7 @@ import {
   TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame, drawGrass,
   drawFollower,
 } from "./tileset.js";
-import { followSheet, skinById, skinPrice, PARTY_MAX } from "./cosmetics.js";
+import { followSheet, skinById, skinPrice, PARTY_MAX, partnerRule, isMastered, MASTERED_BOND } from "./cosmetics.js";
 import { fieldOf, rollFind, heartsOf, FRIEND_FINDS, HEARTS } from "./abilities.js";
 import { CHECKIN_REWARDS, checkinStatus, rollRoulette, STREAK_MILESTONES, ROULETTE_LEVEL } from "./checkin.js";
 import { isRoad, roadOpen, roadTrainer } from "./road.js";
@@ -1546,7 +1546,8 @@ export function createEngine(canvas, onChange, mini = null) {
       const mate = walker();
       if (mate) {
         const was = heartsOf(mate.walked);
-        mate.walked = (mate.walked ?? 0) + 1;
+        // A mastered species bonds faster (cosmetics.js, `MASTERED_BOND`).
+        mate.walked = (mate.walked ?? 0) + (isMastered(mate.species, state.research) ? MASTERED_BOND : 1);
         const name = label(speciesById(mate.species));
         if (heartsOf(mate.walked) > was) {
           bonded = true;
@@ -2230,14 +2231,15 @@ export function createEngine(canvas, onChange, mini = null) {
      silently - a 3.2s banner per level would bury the medal and new-entry
      cheers on every first catch - and only a finished entry raises one,
      because that is the level that changes the game. */
-  /* WHAT OWNING ONE TEACHES, caught or evolved into: an ordinary one (the ten
-     a star spends), a rare form, an alpha, a size - and a legendary's one task.
+  /* WHAT OWNING ONE TEACHES, caught or evolved into: one more toward the five
+     catches (any form, an alpha too), a rare form, an alpha, a size - and a
+     legendary's catches.
      Evolving counts because it is how most evolved forms are met at all: on
      wild catches alone, 475 of them finished half an entry a playthrough. */
   const owned = (id, tier, alpha, size, level = 0) => [
     ...(isLegendary(id) ? ["legend"] : []),
     ...(level >= HUNDRED ? ["hundred"] : []),
-    ...(tier || alpha ? [] : ["catch"]),
+    "catch",
     ...(tier ? ["variant"] : []),
     ...(alpha ? ["alpha"] : []),
     ...(sizeTag(size) ? ["xs"] : []),
@@ -3033,6 +3035,11 @@ export function createEngine(canvas, onChange, mini = null) {
       return m && followSheet(m.species) != null;
     }).slice(0, PARTY_MAX);
     if (next.length !== new Set(uids).size) return false;
+    /* EARNED (cosmetics.js, `partnerRule`): research at PARTNER_LEVEL or
+       already in the party; the one exception is a lone first partner. */
+    const rule = partnerRule(state);
+    const unearned = next.filter((u) => !rule.can(state.box.find((b) => b.uid === u)));
+    if (unearned.length && !(rule.starter && next.length === 1)) return false;
     state.party = next;
     if (!next.includes(state.buddy)) {
       state.buddy = next[0] ?? null;
@@ -3371,6 +3378,38 @@ export function createEngine(canvas, onChange, mini = null) {
   }
 
   /* CRAFT one copy of a card in a variant it is printed in, for dust. */
+  /* CRAFT A BATCH (asked for, 2026-10-12): the Dust tab's "Craft all", so a
+     set is not completed one press at a time. Each pick passes exactly the
+     checks `craftCard` makes; they go CHEAPEST FIRST, as many as the dust
+     covers - sorted, so the first that does not fit ends it - and the whole
+     batch is one save, one milestone pass and one `changed()`. */
+  function craftCards(set, picks) {
+    const meta = realSet(set);
+    if (!meta || !Array.isArray(picks)) return null;
+    const plan = picks.map(([localId, v]) => {
+      const card = set.CARDS.find((c) => c[0] === localId);
+      return card && card[4].includes(v) && canCraft(card[3], set.CARDS) ? { card, v, cost: craftCost(card[3], v) } : null;
+    }).filter(Boolean).sort((a, b) => a.cost - b.cost);
+    const cards = { ...state.cards };
+    let made = 0, spent = 0;
+    for (const { card, v, cost } of plan) {
+      if (state.dust - spent < cost) break;
+      const key = cardId(meta.id, card[0]);
+      const row = cards[key] ?? {};
+      if ((row[v] ?? 0) >= CARD_MAX) continue;
+      cards[key] = { ...row, [v]: (row[v] ?? 0) + 1 };
+      spent += cost;
+      made++;
+    }
+    if (!made) return null;
+    state.dust -= spent;
+    state.cards = cards;
+    payMilestones(meta, set.CARDS);
+    save();
+    changed();
+    return { made, spent };
+  }
+
   function craftCard(set, localId, variant) {
     const meta = realSet(set);
     const card = meta && set.CARDS.find((c) => c[0] === localId);
@@ -3930,13 +3969,6 @@ export function createEngine(canvas, onChange, mini = null) {
           state.bag["master-ball"] = (state.bag["master-ball"] ?? 0) + 1;
           charm = charmOf(state.beaten);
         }
-        /* A LEAGUE WIN TEACHES: research's `league` task (a legendary's) is
-           credited to every Pokemon that fought - the team `battleBegin`
-           checked and kept. */
-        for (const uid of state.team) {
-          const mon = state.box.find((m) => m.uid === uid);
-          if (mon) study(mon.species, ["league"]);
-        }
         save();
       }
       state.battle = null;
@@ -3956,6 +3988,7 @@ export function createEngine(canvas, onChange, mini = null) {
     dustCard,
     dustSpares,
     craftCard,
+    craftCards,
     claimDex,
     claimAchievements,
     dexClaims,

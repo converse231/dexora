@@ -16,6 +16,30 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-13-partners",
+    icon: "🤝",
+    date: "October 2026",
+    title: "Partners are earned",
+    items: [
+      ["Research Lv 5 to walk", "A Pokémon joins your walking party once its species' research reaches Lv 5."],
+      ["Nobody leaves", "Partners already walking with you stay, even ones not researched yet."],
+      ["Your first is free", "Until a species reaches Lv 5, any one Pokémon can walk with you."],
+      ["Mastery bonds faster", "A mastered species (Lv 10) earns friendship twice as fast, marked with a star."],
+    ],
+  },
+  {
+    id: "2026-10-12-research",
+    icon: "🔬",
+    date: "October 2026",
+    title: "Research, card dust and battle sprites",
+    items: [
+      ["Any catch counts", "Research's five catches now count rare forms and alphas too."],
+      ["Legendaries: catch two", "Two catches replace winning a League battle with one."],
+      ["Craft any printing", "Dust's Missing list shows the holo and reverse holo of cards you hold."],
+      ["Every Pokémon from behind", "Arceus's types, Unown, Silvally and every other form now have back sprites in battle."],
+    ],
+  },
+  {
     id: "2026-10-10-partners",
     icon: "🐾",
     date: "October 2026",

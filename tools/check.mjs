@@ -1160,6 +1160,16 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
         assert.deepEqual(bad.slice(0, 5), [], `${bad.length} strips are not ${FR} frames high - npm run cadence / python tools/build_showdown.py`);
         console.log(`strips ok — ${n} Showdown and Cadence strips, ${FR} frames each, stepped and stacked to match`);
       }
+      /* EVERY SPECIES HAS A BACK, and a shiny one (2026-10-12): Arceus's types
+         and all 95 looks shipped without, and your side of a battle drew a
+         broken image. tools/build_battle_art.py reads a form's from its own
+         PokeAPI record; the battle also falls back to the front, flipped. */
+      {
+        const noBack = SPECIES.filter((sp) => !["", "shiny/"].every((k) =>
+          existsSync(new URL(`../public/sprites/back/${k}${sp.id}.png`, import.meta.url))));
+        assert.deepEqual(noBack.slice(0, 5).map((sp) => sp.name), [],
+          `${noBack.length} species have no back or shiny back sprite - python tools/build_battle_art.py`);
+      }
       assert.ok(!/https?:\/\//.test(sprite),
         "Sprite.jsx fetches art from a URL - every sprite this game draws is " +
         "in the repo, and local mode is the game rather than a fallback");
@@ -4575,14 +4585,18 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     });
     assert.ok(!tasksFor(megaOnly.id).some((t) => t.id === "evolve"),
       `${megaOnly.name} is asked to evolve, and its only evolution costs Lv 100`);
-    /* A LEGENDARY'S RESEARCH IS ONE CATCH AND WHAT YOU DO WITH IT - met about
-       once a playthrough even hunted, so no count of catches - and every one
-       of those tasks is required. Its star spends one and keeps one. */
+    /* A LEGENDARY'S RESEARCH IS TWO CATCHES AND WHAT YOU DO WITH THEM - met
+       about once a playthrough even hunted, so two and no more - and every
+       one of those tasks is required. No League win (2026-10-12). */
     const leg = LEGENDARY[0], starter = EVOLUTIONS[0].from;
     const legTasks = tasksFor(leg).filter((t) => !t.bonus).map((t) => t.id);
-    assert.deepEqual(legTasks.sort(), ["fed", "hundred", "league", "legend"],
+    assert.deepEqual(legTasks.sort(), ["fed", "hundred", "legend"],
       `${speciesById(leg).name}'s research is ${legTasks.join(", ")}`);
     assert.equal(researchLevel(leg, full(legTasks)), RESEARCH_MAX, "a legendary cannot finish its research");
+    assert.ok(researchLevel(leg, bump(full(["fed", "hundred"]), ["legend"])) < RESEARCH_MAX,
+      "one catch finished a legendary's research - it asks for two");
+    assert.equal(researchLevel(leg, bump(bump(full(["fed", "hundred"]), ["legend"]), ["legend"])), RESEARCH_MAX,
+      "two catches, a berry and Lv 100 did not finish a legendary's research");
     for (const t of legTasks) {
       assert.ok(researchLevel(leg, full(legTasks.filter((x) => x !== t))) < RESEARCH_MAX,
         `a legendary finished its research without "${t}"`);
@@ -4675,7 +4689,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         const sp = speciesById(id);
         const v = rollVariant(rng, lockedTiers(id));
         const size = sizeTag(rollSize(rng));
-        const did = [...(v ? ["variant"] : ["catch"]), ...(rng() < 0.3 ? ["night"] : []),
+        const did = ["catch", ...(v ? ["variant"] : []), ...(rng() < 0.3 ? ["night"] : []),
           ...(size ? ["xs"] : []), "legend",
           ...(rng() < 0.4 ? ["first"] : []),
           ...(rng() < 0.1 ? ["fed"] : []), ...(rng() < 0.1 ? ["evolve"] : [])];

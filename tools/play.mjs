@@ -1929,8 +1929,37 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
   assert.equal(e.wearSkin(null), true);
   assert.equal(e.state.skin, null, "taking a skin off did not give your own trainer back");
 
+  /* A PARTNER IS EARNED (cosmetics.js): research at PARTNER_LEVEL, or already
+     walking; a lone first partner is free until a species gets there. Rows
+     are built from TASKS and checked against the level they claim, so a
+     retuned task list fails here rather than silently testing nothing. */
+  const RS = await import("../src/game/research.js");
+  const row = (done) => RS.TASKS.map((t) => (done.includes(t.id) ? t.steps.at(-1) : 0));
+  const halfway = row(["catch", "night", "first"]);
+  const mastered = RS.TASKS.map((t) => t.steps.at(-1));
+  for (const id of [25, 1, 4]) {
+    assert.ok(RS.researchLevel(id, halfway) >= C.PARTNER_LEVEL, `the test row no longer reaches Lv ${C.PARTNER_LEVEL} for #${id}`);
+  }
+  // A species met in the wild needs more than catches; an evolved one (Pikachu) has fewer tasks and does not.
+  for (const id of [1, 4]) {
+    assert.ok(RS.researchLevel(id, row(["catch"])) < C.PARTNER_LEVEL, `five catches alone already make #${id} a partner`);
+  }
+  const boxOf4 = [1, 2, 3, 4].map((uid) => ({ uid, species: [25, 1, 4, 7][uid - 1], level: 5, at: 1 }));
+  {
+    const g = boot({ ...pika, box: boxOf4, nextUid: 5 }).e;
+    assert.equal(g.setParty([1, 2]), false, "two unresearched partners walked - only the first is free");
+    assert.equal(g.setParty([2]), true, "a new game could not choose its free first partner");
+    const h = boot({ ...pika, box: boxOf4, nextUid: 5, research: { 25: halfway } }).e;
+    assert.equal(h.setParty([2]), false, "an unresearched partner walked after a species reached Lv 5");
+    assert.equal(h.setParty([1]), true, "a species at research Lv 5 could not walk");
+    const kept = boot({ ...pika, box: boxOf4, nextUid: 5, research: { 25: halfway }, party: [4], buddy: 4 }).e;
+    assert.deepEqual(kept.state.party, [4], "a partner from before the rule was taken away on load");
+    assert.equal(kept.setParty([4, 1]), true, "a partner already walking was refused beside an earned one");
+    assert.equal(kept.setParty([1, 2]), false, "an unresearched partner joined by swapping");
+  }
+
   // THE WALKING PARTY: up to three, each once, from the Box; the one walking is one of them.
-  const four = { ...pika, box: [1, 2, 3, 4].map((uid) => ({ uid, species: [25, 1, 4, 7][uid - 1], level: 5, at: 1 })), nextUid: 5 };
+  const four = { ...pika, box: boxOf4, nextUid: 5, research: { 25: halfway, 1: halfway, 4: halfway } };
   const f = boot(four).e;
   assert.equal(f.setBuddy(1), false, "a Pokemon outside the party was sent walking");
   assert.equal(f.setParty([1, 99]), false, "a party with a uid not in the Box was taken");
@@ -1998,6 +2027,17 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
     const w = mon.walked;
     stepWith(e, 0.999);
     assert.equal(mon.walked, w, "friendship grew with the Pokemon in its ball");
+  }
+  // Mastery bonds faster: a step with a mastered species counts MASTERED_BOND.
+  {
+    const C2 = await import("../src/game/cosmetics.js");
+    const RS2 = await import("../src/game/research.js");
+    const full = RS2.TASKS.map((t) => t.steps.at(-1));
+    const e = boot({ ...SAVE, box: [{ uid: 1, species: 25, level: 20, at: 1, walked: 0 }], nextUid: 2,
+      party: [1], buddy: 1, research: { 25: full } }).e;
+    assert.ok(C2.isMastered(25, e.state.research), "the test row does not master Pikachu");
+    assert.ok(stepWith(e, 0.999));
+    assert.equal(e.state.box[0].walked, C2.MASTERED_BOND, "a mastered partner's step did not bond faster");
   }
   // Pickup: a low roll on a step finds something, into the bag.
   {
@@ -2157,7 +2197,11 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
   globalThis.Image = class {
     set src(v) { this.url = v; this.width = 256; this.height = 64; queueMicrotask(() => this.onload?.()); }
   };
-  const e = boot({ ...SAVE, box: [{ uid: 1, species: 25, level: 5, shiny: 1, at: 1 }, { uid: 2, species: 1, level: 5, at: 1 }], nextUid: 3, buddy: 1 }).e;
+  // Bulbasaur is researched to a partner (cosmetics.js, `partnerRule`), so the switch below can add it.
+  const { TASKS } = await import("../src/game/research.js");
+  const partnerRow = TASKS.map((t) => (["catch", "night", "first"].includes(t.id) ? t.steps.at(-1) : 0));
+  const e = boot({ ...SAVE, box: [{ uid: 1, species: 25, level: 5, shiny: 1, at: 1 }, { uid: 2, species: 1, level: 5, at: 1 }], nextUid: 3, buddy: 1,
+    research: { 1: partnerRow } }).e;
   tick(16);                                        // the first frame asks for the sheet
   await new Promise((r) => setTimeout(r, 0));      // and it arrives
   // A still scene is not redrawn, so each look asks for one (a rev bump).
@@ -2365,6 +2409,23 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
   assert.equal(cr.craftCard(set, common[0], "n"), true);
   assert.equal(cr.state.dust, 0);
   assert.equal(cr.state.cards[key(common)].n, 1);
+
+  /* CRAFT ALL: cheapest first, only as far as the dust goes, a packs-only card
+     never, and the whole batch one save and one changed(). */
+  {
+    const two = set.CARDS.find((c) => c[3] === "common" && c[4].includes("n") && c[4].includes("r"));
+    const chase = set.CARDS.find((c) => !C.canCraft(c[3], set.CARDS));
+    const n = C.craftCost(two[3], "n"), r = C.craftCost(two[3], "r");
+    const b = boot({ ...SAVE, dust: n + r - 1 }).e;           // one short of both
+    const col = b.state.colRev;
+    const got = b.craftCards(set, [[two[0], "r"], [two[0], "n"], [chase[0], chase[4][0]]]);
+    assert.deepEqual(got, { made: 1, spent: n }, "craft all did not take the cheapest first within the dust");
+    assert.deepEqual(b.state.cards[key(two)], { n: 1 }, "craft all crafted the wrong printing");
+    assert.equal(b.state.cards[key(chase)], undefined, "craft all crafted a packs-only card");
+    assert.equal(b.state.dust, r - 1, "craft all spent dust it did not craft with");
+    assert.equal(b.state.colRev, col + 1, "a batch was more than one changed()");
+    assert.equal(boot({ ...SAVE, dust: 0 }).e.craftCards(set, [[two[0], "n"]]), null, "craft all with no dust did something");
+  }
 
   // MILESTONES pay once, as a share is reached, and never again.
   const quarter = Math.ceil(C.MILESTONES[0][0] * set.CARDS.length);
@@ -2811,9 +2872,9 @@ console.log("star ok — free, spends nothing, needs none in the Box, once, only
     assert.ok(e.state.cheers.some((c) => c.kind === "alpha"), "catching an alpha raised no banner");
     assert.equal(e.state.research[id][TASKS.findIndex((t) => t.id === "alpha")], 1,
       "an alpha catch did not count for research");
-    // An alpha rare form is not an ordinary one: a star must never count it.
-    assert.equal(e.state.research[id][TASKS.findIndex((t) => t.id === "catch")], 0,
-      "an alpha rare form counted as an ordinary catch");
+    // Every catch counts toward the five, an alpha rare form too (2026-10-12).
+    assert.equal(e.state.research[id][TASKS.findIndex((t) => t.id === "catch")], 1,
+      "an alpha rare form did not count toward the five catches");
   } finally { Math.random = real; }
   until(e, (st) => !st.encounter, "the encounter to close", 4000);
 
@@ -4365,35 +4426,6 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   assert.equal(e.state.encounter.ownedForm, frozen, "the count moved mid-encounter");
   console.log(`owned ok — the nameplate's count is the Box's for that species in that tier (${frozen} ` +
     `for this ${enc.variant ?? "ordinary"} #${enc.speciesId}), frozen at the start`);
-}
-
-/* A LEAGUE WIN TEACHES (research's `league` task, a legendary's in place of
-   the first ball): credited in `battleEnd` to every Pokemon that fought, on a
-   win and never on a loss. */
-{
-  const { newBattle, fighter, opponent } = await import("../src/game/battle.js");
-  const { topOf } = await import("../src/game/league.js");
-  const { TASKS } = await import("../src/game/research.js");
-  const { LEAGUES } = await import("../src/data/leagues.js");
-  const slot = TASKS.findIndex((t) => t.id === "league");
-  const brock = LEAGUES[0].gyms[0];
-  const box = [{ uid: 1, species: 146, level: 5 }, { uid: 2, species: 16, level: 5 }];
-  const play = (over) => {
-    // Brock's gym trainers beaten, so Brock is open (a gym is walked through).
-    const beaten = Object.fromEntries(brock.trainers.map((t) => [t.id, { wins: 1, at: 0 }]));
-    const { e } = boot({ ...SAVE, box, nextUid: 3, beaten });
-    const b = newBattle([[fighter(146, 5, 1), fighter(16, 5, 2)], opponent(brock.party, topOf(brock.id, {}), (k) => k + 1)], [null, 2]);
-    assert.equal(e.battleBegin(b, { id: brock.id, uids: [1, 2] }), null, "the battle was refused");
-    e.battleStep({ ...b, over });
-    e.battleEnd();
-    return e.state.research;
-  };
-  const lost = play(1);
-  assert.ok(!(lost[146]?.[slot] > 0), "a lost League battle credited the league task");
-  const won = play(0);
-  assert.equal(won[146]?.[slot], 1, "a League win did not credit the legendary that fought");
-  assert.equal(won[16]?.[slot], 1, "a League win did not credit every Pokemon that fought");
-  console.log("league research ok — a League win credits `league` to every Pokemon that fought, a loss credits nothing");
 }
 
 /* THE POKÉDEX RANK IS ANNOUNCED whichever way the count crosses a step - an

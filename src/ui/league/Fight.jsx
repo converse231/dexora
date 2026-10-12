@@ -188,13 +188,18 @@ function HpBox({ f, shown, side, level, team, statusAt }) {
    remounts it and plays its entrance. */
 function Mon({ f, mon, side, anim }) {
   const tier = mon?.tier ?? null;
-  const back = side === 0 ? backUrl(f.id, tier) : null;
+  /* A BACK THAT WILL NOT LOAD FALLS BACK TO THE FRONT, FLIPPED - what the art
+     tool always said happens to a species with no back art, and never did:
+     every form with no back file drew a broken image (Arceus's types,
+     reported 2026-10-12). */
+  const [noBack, setNoBack] = useState(false);
+  const back = side === 0 && !noBack ? backUrl(f.id, tier) : null;
   return (
     <div className={`ft-mon ${side ? "foe" : "me"} ${anim}`}>
       <span className="ft-base" aria-hidden="true" />
       {side === 0 && back ? (
         <span className="sprite-fx ft-sprite">
-          <img className={tier ? `sprite-${tier}` : ""} src={back} alt={nameOf(f.id)} />
+          <img className={tier ? `sprite-${tier}` : ""} src={back} alt={nameOf(f.id)} onError={() => setNoBack(true)} />
           <VariantFx id={f.id} variant={tier} art={back} />
         </span>
       ) : (
