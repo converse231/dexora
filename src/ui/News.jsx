@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-13-scarlet-violet",
+    icon: "🃏",
+    date: "October 2026",
+    title: "Nine more card sets",
+    items: [
+      ["The rest of Scarlet & Violet", "Paldea Evolved, Obsidian Flames, Stellar Crown and four more."],
+      ["Two special sets", "Paldean Fates, with its shiny vault, and Shrouded Fable, sold in bundles."],
+      ["Real pull rates", "Every new set opens at its real-life odds, from Lv 15 to Lv 70."],
+    ],
+  },
+  {
     id: "2026-10-13-partners",
     icon: "🤝",
     date: "October 2026",

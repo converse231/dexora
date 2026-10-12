@@ -26,18 +26,22 @@ import { CARD_SETS } from "../data/cards/index.js";
 /* `holo` is Base Set's holo rare (2026-10-07): its hit, so the hit line
    starts there (`isHit`) - no other set prints the rung. `blackwhite` is
    Black Bolt's and White Flare's top chase, under `hyper` so their top roll
-   lands on it. */
-export const CARD_RARITIES = ["common", "uncommon", "rare", "pikachu", "holo", "double", "ace", "illustration", "ultra", "special", "futuristic", "blackwhite", "hyper", "mega"];
+   lands on it. `shiny` and `shinyultra` are Paldean Fates' shiny vault
+   (2026-10-13): a Shiny rare sits just under the Double rare, so its 120
+   cards can be crafted, and a Shiny Ultra Rare beside the Ultra Rare. */
+export const CARD_RARITIES = ["common", "uncommon", "rare", "pikachu", "holo", "shiny", "double", "ace", "illustration", "ultra", "shinyultra", "special", "futuristic", "blackwhite", "hyper", "mega"];
 export const RARITY = {
   common:       { name: "Common", icon: "●" },
   uncommon:     { name: "Uncommon", icon: "◆" },
   rare:         { name: "Rare", icon: "★" },
   pikachu:      { name: "Pikachu Rare", icon: "★" },
   holo:         { name: "Holo Rare", icon: "★" },
+  shiny:        { name: "Shiny rare", icon: "★" },
   double:       { name: "Double rare", icon: "★★" },
   ace:          { name: "ACE SPEC Rare", icon: "◆" },
   illustration: { name: "Illustration rare", icon: "★" },
   ultra:        { name: "Ultra Rare", icon: "★★" },
+  shinyultra:   { name: "Shiny Ultra Rare", icon: "★★" },
   special:      { name: "Special illustration rare", icon: "★★" },
   futuristic:   { name: "Futuristic Rare", icon: "✦" },
   blackwhite:   { name: "Black White Rare", icon: "✦" },
@@ -104,6 +108,18 @@ export function landsOn(cards, rarity) {
      21.11%, IR 16.39%, UR 5.83%, SIR 1.25%; the Black White Rare unpulled
      in 700 packs, community estimate 1 in 360-450 (1 in 400 here). Their
      Poke Ball and Master Ball reverses are not separate printings here.
+   - THE REST OF SCARLET & VIOLET (2026-10-13), each from TCGplayer's
+     Authentication Center as pullrates.com reports it (8,000+ packs a set;
+     1,500+ for Paldean Fates and Shrouded Fable), DR / IR / UR / SIR / HR:
+     sv01 Scarlet & Violet 1 in 7 / 13 / 15 / 32 / 54; sv02 Paldea Evolved
+     7 / 13 / 15 / 32 / 57; sv03 Obsidian Flames 7 / 13 / 15 / 32 / 52;
+     sv04 Paradox Rift 6 / 13 / 15 / 47 / 82. From Temporal Forces on an
+     ACE SPEC 1 in 20 beside them: sv05 Temporal Forces 6 / 13 / 15 / 86 /
+     188; sv06 Twilight Masquerade 6 / 13 / 15 / 86 / 146; sv06.5 Shrouded
+     Fable 6 / 12 / 15 / 67 / 144; sv07 Stellar Crown 6 / 13 / 15 / 90 / 137.
+   - sv04.5 Paldean Fates: Shiny rare 1 in 4 and Shiny Ultra Rare 1 in 13
+     (their own rolls, `shiny` and `shinyultra`, like the ACE SPEC's), DR 1
+     in 6, IR 14, UR 15, SIR 58, HR 62.
    - base1 Base Set 1st Edition (1999): one rare a pack, a holo one pack in
      three - the double roll, which lands on `holo`. Nothing else is printed:
      every other roll is 0. */
@@ -122,10 +138,24 @@ export const SET_RATES = {
   sv10: { double: 1 / 5, illustration: 1 / 12, ultra: 1 / 16, special: 1 / 94, mega: 1 / 149 },
   "sv10.5b": { double: 0.2111, illustration: 0.1639, ultra: 0.0583, special: 0.0125, mega: 1 / 400 },
   "sv10.5w": { double: 0.2111, illustration: 0.1639, ultra: 0.0583, special: 0.0125, mega: 1 / 400 },
+  sv01: { double: 1 / 7, illustration: 1 / 13, ultra: 1 / 15, special: 1 / 32, mega: 1 / 54 },
+  sv02: { double: 1 / 7, illustration: 1 / 13, ultra: 1 / 15, special: 1 / 32, mega: 1 / 57 },
+  sv03: { double: 1 / 7, illustration: 1 / 13, ultra: 1 / 15, special: 1 / 32, mega: 1 / 52 },
+  sv04: { double: 1 / 6, illustration: 1 / 13, ultra: 1 / 15, special: 1 / 47, mega: 1 / 82 },
+  "sv04.5": { double: 1 / 6, illustration: 1 / 14, shinyultra: 1 / 13, shiny: 1 / 4, ultra: 1 / 15, special: 1 / 58, mega: 1 / 62 },
+  sv05: { double: 1 / 6, illustration: 1 / 13, ace: 1 / 20, ultra: 1 / 15, special: 1 / 86, mega: 1 / 188 },
+  sv06: { double: 1 / 6, illustration: 1 / 13, ace: 1 / 20, ultra: 1 / 15, special: 1 / 86, mega: 1 / 146 },
+  "sv06.5": { double: 1 / 6, illustration: 1 / 12, ace: 1 / 20, ultra: 1 / 15, special: 1 / 67, mega: 1 / 144 },
+  sv07: { double: 1 / 6, illustration: 1 / 13, ace: 1 / 20, ultra: 1 / 15, special: 1 / 90, mega: 1 / 137 },
   base1: { double: 1 / 3, illustration: 0, ultra: 0, special: 0, mega: 0 },
 };
+/* THE SECOND REVERSE SLOT'S OWN ROLLS, after the Illustration rare, rarest
+   first: a key a set's row may name (Surging Sparks' ACE SPEC, Paldean
+   Fates' shiny vault), each landing on its own rung. */
+export const EXTRA_ROLLS = ["ace", "shinyultra", "shiny"];
 // A pack holding a hit (a Double rare or better), at a set's rates.
-export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration - (r.ace ?? 0)) * (1 - r.double - r.ultra);
+export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration
+  - EXTRA_ROLLS.reduce((t, k) => t + (r[k] ?? 0), 0)) * (1 - r.double - r.ultra);
 
 /* PITY IS A SAFETY NET, NOT A SCHEDULE (your call, 2026-10-06): real packs
    have none, so each set's is scaled to its own rates - the odds start to
@@ -154,7 +184,7 @@ export const GOD_PACK = 1 / 500;
 
 /* WHAT A SPARE COPY IS WORTH IN DUST (docs/cards.md): a foil copy of a common,
    uncommon or rare counts as `foil`. Crafting costs eight times this. */
-export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, pikachu: 40, holo: 60, double: 80, ace: 90, illustration: 100, ultra: 150, special: 300, futuristic: 400, blackwhite: 400, hyper: 400, mega: 400 };
+export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, pikachu: 40, holo: 60, shiny: 70, double: 80, ace: 90, illustration: 100, ultra: 150, shinyultra: 200, special: 300, futuristic: 400, blackwhite: 400, hyper: 400, mega: 400 };
 export const dustOf = (rarity, variant) =>
   (rungOf(rarity) <= rungOf("rare") && variant !== "n" ? DUST.foil : DUST[rarity]);
 /* A CRAFT COSTS SIXTEEN SPARES' WORTH. Measured over 40 seeded collectors
@@ -235,6 +265,16 @@ export const BOXES = {
   // Black Bolt and White Flare were never sold in booster boxes.
   "sv10.5b": { name: "Booster bundle", packs: 6, price: 21600 },
   "sv10.5w": { name: "Booster bundle", packs: 6, price: 21600 },
+  sv01: { name: "Booster box", packs: 36, price: 120000 },
+  sv02: { name: "Booster box", packs: 36, price: 120000 },
+  sv03: { name: "Booster box", packs: 36, price: 120000 },
+  sv04: { name: "Booster box", packs: 36, price: 120000 },
+  // Paldean Fates and Shrouded Fable were special sets, never sold in booster boxes.
+  "sv04.5": { name: "Booster bundle", packs: 6, price: 21600 },
+  sv05: { name: "Booster box", packs: 36, price: 120000 },
+  sv06: { name: "Booster box", packs: 36, price: 120000 },
+  "sv06.5": { name: "Booster bundle", packs: 6, price: 21600 },
+  sv07: { name: "Booster box", packs: 36, price: 120000 },
   base1: { name: "Booster box", packs: 36, price: 120000 },
 };
 // Every 7th day of a daily-quest streak pays a pack.
@@ -243,7 +283,9 @@ export const PACK_SIZE = 10;
 export const CARD_MAX = 99;
 // The level each set opens at (docs/cards.md, Economy).
 export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45, "sv03.5": 50, me05: 55, "sv08.5": 60, sv08: 65, "30th": 70,
-  sv09: 75, sv10: 80, "sv10.5b": 85, "sv10.5w": 85, base1: 90 };
+  sv09: 75, sv10: 80, "sv10.5b": 85, "sv10.5w": 85, base1: 90,
+  // The rest of Scarlet & Violet (2026-10-13), in release order into the gaps and beside the others.
+  sv01: 15, sv02: 20, sv03: 30, sv04: 40, "sv04.5": 50, sv05: 55, sv06: 60, "sv06.5": 65, sv07: 70 };
 
 export const setById = (id) => CARD_SETS.find((s) => s.id === id) ?? null;
 export const setOpen = (id, level) => !!setById(id) && level >= (SET_LEVEL[id] ?? Infinity);
@@ -316,9 +358,16 @@ export function openPack(cards, rng, pity = freshPity(), rules) {
   if (rng() < m) slot2 = of("mega", "h");
   else if (rng() < Math.min(1, s / (1 - m))) slot2 = of("special", "h");
   else if (rng() < Math.min(1, rates.illustration / Math.max(1e-9, 1 - m - s))) slot2 = of("illustration", "h");
-  // An ACE SPEC beside the Illustration rares (Surging Sparks): its own roll, after them.
-  else if (rates.ace && rng() < Math.min(1, rates.ace / Math.max(1e-9, 1 - m - s - rates.illustration))) slot2 = of("ace", "h");
-  else slot2 = reverse();
+  // An ACE SPEC or a shiny beside the Illustration rares: each its own roll, after them.
+  else {
+    let left = 1 - m - s - rates.illustration;
+    for (const k of EXTRA_ROLLS) {
+      if (!rates[k]) continue;
+      if (rng() < Math.min(1, rates[k] / Math.max(1e-9, left))) { slot2 = of(k, "h"); break; }
+      left -= rates[k];
+    }
+    slot2 ??= reverse();
+  }
   // The rare slot: an ultra, a double, or a holo rare - forced to a hit
   // on the `hit` pity's hard pack when nothing else in the pack is one.
   const r = rng();

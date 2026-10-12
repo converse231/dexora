@@ -49,12 +49,29 @@ WRAPPERS = {
              "SV10 Booster Giovanni Mewtwo.png", "SV10 Booster Ethan Ho-Oh.png"],
     "sv10.5b": ["SV10.5 BLK Booster EN.png"],
     "sv10.5w": ["SV10.5 WHT Booster EN.png"],
+    "sv01": ["SV1 Booster Koraidon.png", "SV1 Booster Miraidon.png", "SV1 Booster Gyarados.png"],
+    "sv02": ["SV2 Booster Meowscarada.png", "SV2 Booster Skeledirge.png", "SV2 Booster Quaquaval.png",
+             "SV2 Booster Ting-Lu.png", "SV2 Booster Chien-Pao.png"],
+    "sv03": ["SV3 Booster Charizard.png", "SV3 Booster Tyranitar.png", "SV3 Booster Dragonite.png",
+             "SV3 Booster Revavroom.png"],
+    "sv04": ["SV4 Booster Roaring Moon.png", "SV4 Booster Iron Valiant.png", "SV4 Booster Garchomp.png",
+             "SV4 Booster Armarouge.png"],
+    "sv04.5": ["Paldean Fates Booster Pikachu.png", "Paldean Fates Booster Ceruledge.png",
+               "Paldean Fates Booster Tinkaton.png", "Paldean Fates Booster Dondozo.png"],
+    "sv05": ["SV5 Booster Walking Wake.png", "SV5 Booster Iron Leaves.png", "SV5 Booster Raging Bolt.png",
+             "SV5 Booster Iron Crown.png"],
+    "sv06": ["SV6 Booster Ogerpon.png", "SV6 Booster Dragapult.png", "SV6 Booster Ursaluna.png",
+             "SV6 Booster Sinistcha.png"],
+    "sv06.5": ["Shrouded Fable Booster Pecharunt.png", "Shrouded Fable Booster Okidogi.png",
+               "Shrouded Fable Booster Munkidori.png", "Shrouded Fable Booster Fezandipiti.png"],
+    "sv07": ["SV7 Booster Terapagos.png", "SV7 Booster Lapras.png", "SV7 Booster Cinderace.png",
+             "SV7 Booster Galvantula.png"],
     # The 1999 wrappers (Bulbagarden's "Shadowless" scans: the first print run).
     "base1": ["Base Set Booster Charizard Shadowless.jpg", "Base Set Booster Blastoise Shadowless.jpg",
               "Base Set Booster Venusaur Shadowless.jpg"],
 }
 # A set TCGdex has no logo for gets one from here (fetch-cards leaves it out).
-LOGOS = {"30th": "30th Anniversary logo.png"}
+LOGOS = {"30th": "30th Anniversary logo.png", "sv05": "SV5 Logo EN.png"}
 LOGO_W = 400
 PACK_W = 300          # shown at most ~230px wide, twice that on a dense screen is wasted here
 BACK_W = 490

@@ -812,7 +812,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   (`landsOn`): one `RATES` table serves every era - the top roll is a Mega
   Hyper Rare or a Hyper rare (`isTop`, what the top pity resets on), and
   Prismatic's illustration roll an ACE SPEC (`ace` sits under
-  `illustration`). The Packs tab names each rate through it.
+  `illustration`). The Packs tab names each rate through it. A rarity with
+  its own odds beside the Illustration rare (the ACE SPEC, Paldean Fates'
+  `shiny` and `shinyultra`) is an `EXTRA_ROLLS` key a set's row may name.
   **Phase 4**: every printing of a set is its MASTER step (`MILESTONES.length
   + 1`, `MASTER_DUST`); titles are `titleIds` (titles.js) and the SQL's
   `card_titles` the same rule (tradedb holds them equal); the trainer card's
