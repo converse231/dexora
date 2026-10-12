@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import { evoCycleFrames, SCALE_MAX } from "../game/evocycle.js";
-import { spriteUrl, VariantFx, STRIP_TIERS } from "./Sprite.jsx";
+import { spriteUrl, VariantFx, STRIP_TIERS, drawsStrip } from "./Sprite.jsx";
 
 const FRAME = 1000 / 60; // the GBA's frame, which every number below counts in
 const CYCLE = evoCycleFrames();
@@ -43,7 +43,9 @@ const SPARKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
    `spriteUrl` is the one that knows, so the copy is gone. Still not <Sprite>,
    because the animation holds refs to these two elements. */
 export default function Evolve({ evo, onDone }) {
-  const art = (id) => spriteUrl(id, evo.variant);
+  /* Per id, not per scene: the parent has the strip and the evolution may not
+     (`drawsStrip` in Sprite.jsx), and then the new form is its plain picture. */
+  const art = (id) => spriteUrl(id, STRIP_TIERS.has(evo.variant) && !drawsStrip(id, evo.variant) ? null : evo.variant);
 
   /* A STRIP IN AN `<img>` IS EIGHT CREATURES IN A COLUMN.
 
@@ -64,7 +66,7 @@ export default function Evolve({ evo, onDone }) {
      The refs are untouched by the swap: they set `style.transform` and
      nothing else, which a span takes exactly as an image does. */
   const Mon = ({ innerRef, id, className }) =>
-    STRIP_TIERS.has(evo.variant) ? (
+    drawsStrip(id, evo.variant) ? (
       <span
         ref={innerRef}
         className={`sprite-strip sprite-${evo.variant} ${className}`}

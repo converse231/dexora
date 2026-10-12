@@ -5,6 +5,7 @@
    a roulette spin, offered straight away. */
 import { useEffect, useState } from "react";
 import Icon from "./Icon.jsx";
+import Confetti from "./Confetti.jsx";
 import { ItemIcon } from "./Sprite.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
 import { itemById } from "../game/items.js";
@@ -92,8 +93,13 @@ export default function CheckIn({ status, best, onCheckIn, onSpin, onClose }) {
 
       {party && (
         <div className="ci-party" role="dialog" aria-label={`${streak}-day streak`} onClick={(e) => { e.stopPropagation(); setParty(false); }}>
+          {/* THE CARD PULL'S POP (2026-10-13, asked for): its flash, its corner
+              cannons and its masked rays. The party had its own 18 bits on one
+              falling track, which read as a line drifting across the screen,
+              and full-screen hard rays. */}
+          <span className="cd-flash" aria-hidden="true" />
           <i className="ci-rays" aria-hidden="true" />
-          {Array.from({ length: 18 }, (_, k) => <i key={k} className="ci-bit" style={{ "--k": k }} aria-hidden="true" />)}
+          <Confetti />
           <div className="ci-medal">
             <Icon n="flame" size={54} />
             <b>{streak}</b>

@@ -27,21 +27,21 @@ const evolves = new Set(EVOLUTIONS.filter((e) => e.level < 100).map((e) => e.fro
    a 1-in-250 roll, and required it left 0 to 2 species finishable in a whole
    playthrough (measured) against 16 without it.
 
-   SLOT 0 COUNTS ORDINARY CATCHES ONLY - no tier, no alpha. It counted every
-   catch up to 20 before; old counters are kept, clamped to 10, since nearly
-   all of them were ordinary anyway. This is where the game asks you to catch
-   the same species more than once, and since 2026-10-09 it is the ONLY place
-   it does - see RESEARCH_LIFT below. */
-/* A LEGENDARY'S RESEARCH IS ONE CATCH AND WHAT YOU DO WITH IT: catch one
-   (`legend`), feed it a berry in that encounter, win a League battle with one
-   on your team (`league`), and raise one to Lv 100 (`hundred`). It asked for
-   the first ball too until 2026-09-29: with one meeting a playthrough, a
-   first-ball catch of a legendary was luck on top of luck (reported from
-   play), where a League win is something you can set out to do. Hunting on its home map, one specific
-   legendary is met about once a playthrough (1 in 3,333 encounters), so a
-   count of catches is out of reach - one catch was too easy, three was three
-   playthroughs. Its star cost one spare until 2026-10-09, which asked for a
-   second catch of a thing met once a playthrough; nothing is spent now.
+   SLOT 0 COUNTS EVERY CATCH - a rare form and an alpha too (your call,
+   2026-10-12; from 2026-10-0x to then it counted ordinary ones only, which
+   was the star's price showing through after the star stopped costing
+   anything). This is where the game asks you to catch the same species more
+   than once, and since 2026-10-09 it is the ONLY place it does - see
+   RESEARCH_LIFT below. Old counters stand as they were. */
+/* A LEGENDARY'S RESEARCH IS TWO CATCHES AND WHAT YOU DO WITH THEM: catch
+   two (`legend`, steps 1 and 2), feed one a berry in an encounter, and raise
+   one to Lv 100 (`hundred`). A League win with one on your team (`league`)
+   was the fourth task until 2026-10-12, replaced by the second catch (your
+   call); its slot stays, asked of nobody, because TASKS is append-only. It
+   asked for the first ball until 2026-09-29: luck on top of luck. Hunting on
+   its home map, one specific legendary is met about once a playthrough (1 in
+   3,333 encounters), so two is the most worth asking - three was three
+   playthroughs.
 
    XS AND XL ARE ONE TASK, either size: needing both was the tightest of the
    luck tasks, and folding them doubled what a playthrough finishes (12 to 26
@@ -59,7 +59,7 @@ const metOrLegend = (id) => isLegendary(id) || met(id);
 export const TASKS = [
   /* 1, 3, 5 - it was 1, 4, 10, reported from play as too many. These five
      ARE the duplicate incentive now that the star spends nothing. */
-  { id: "catch", label: "Catch ordinary ones", steps: [1, 3, 5], points: 10, when: plain },
+  { id: "catch", label: "Catch 5 of them", steps: [1, 3, 5], points: 10, when: plain },
   { id: "night", label: "Catch one at night", steps: [1], points: 10, when: met },
   { id: "xs", label: "Catch an XS or XL one", steps: [1], points: 10, when: plain },
   { id: "xl", label: "Catch an XL one", steps: [1], points: 10, when: () => false },
@@ -68,12 +68,12 @@ export const TASKS = [
   { id: "fed", label: "Feed one a berry", steps: [1], points: 10, when: metOrLegend },
   { id: "evolve", label: "Evolve one", steps: [1], points: 10, when: (id) => plain(id) && evolves.has(id) },
   { id: "alpha", label: "Catch an alpha", steps: [1], points: 20, when: canBeAlpha, bonus: true },
-  { id: "legend", label: "Catch one", steps: [1], points: 10, when: isLegendary },
+  { id: "legend", label: "Catch two", steps: [1, 2], points: 10, when: isLegendary },
   { id: "hundred", label: "Raise one to Lv 100", steps: [1], points: 10, when: isLegendary },
   // A bonus: trading is never required to finish anything (docs/trading.md).
   { id: "trade", label: "Get one in a trade", steps: [1], points: 10, bonus: true },
-  // A legendary's in place of the first ball (above); credited by `battleEnd` to every Pokemon that fought.
-  { id: "league", label: "Win a League battle with it", steps: [1], points: 20, when: isLegendary },
+  // Asked of nobody since 2026-10-12 (a legendary's second catch replaced it); the slot stays.
+  { id: "league", label: "Win a League battle with it", steps: [1], points: 20, when: () => false },
 ];
 export const HUNDRED = 100;
 const SLOT = Object.fromEntries(TASKS.map((t, i) => [t.id, i]));

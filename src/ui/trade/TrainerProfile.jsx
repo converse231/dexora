@@ -281,9 +281,9 @@ export default function TrainerProfile({
       {(card.card_show?.length > 0 || self) && (
         <section className="ev-card">
           <header className="ev-banner">
-            <h4>Cards</h4><span className="tp-count">{card.card_show?.length ?? 0}/{LIMITS.CARD_SHOW}</span>
+            <h4>Cards</h4>{edit("cards", card.card_show?.length ?? 0, LIMITS.CARD_SHOW)}
           </header>
-          <CardShow list={card.card_show ?? []} self={self} />
+          <CardShow list={card.card_show ?? []} self={self} onAdd={self ? () => onEdit("cards") : null} />
         </section>
       )}
 

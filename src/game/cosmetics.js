@@ -1,4 +1,5 @@
 import { SAME, NONE } from "../data/follow.js";
+import { researchLevel, RESEARCH_MAX } from "./research.js";
 
 /* COSMETICS (docs/cosmetics.md): a look, never a strength. No rule module
    reads this file.
@@ -10,6 +11,35 @@ const NO_FOLLOW = new Set(NONE);
 // How many can be in the walking party - switched on the map, one walking at a time.
 export const PARTY_MAX = 3;
 export const followSheet = (id) => (NO_FOLLOW.has(id) ? null : SAME[id] ?? id);
+
+/* A PARTNER IS EARNED, NOT HANDED OUT (your call, 2026-10-13). Any of 1,413
+   species could walk with you, and since 2026-10-07 the one walking lends a
+   field ability - so the party was picked for Pickup and Illuminate, and said
+   nothing about the species. Now its research must reach PARTNER_LEVEL: for
+   a common species about five catches, one at night and one with the first
+   ball, no luck asked; for a legendary its two catches.
+
+   - NEVER TAKEN AWAY: a Pokemon already in the party stays, which covers
+     saves from before this and a partner that evolved into a species not
+     researched yet (it is the same creature).
+   - THE FIRST IS FREE: while no species you hold has got there, one Pokemon
+     may walk alone, so a new game does not start without a companion.
+   - MASTERY IS ON TOP: a mastered species (RESEARCH_MAX) bonds MASTERED_BOND
+     times as fast - hearts, and the friend finds that come with them. Not its
+     rare form's palette: a follower sheet carries only the normal and shiny
+     rows, and a per-frame canvas filter is what this file already refused. */
+export const PARTNER_LEVEL = 5;
+export const MASTERED_BOND = 2;
+export const isMastered = (id, research) => researchLevel(id, research?.[id]) >= RESEARCH_MAX;
+// One reading of the rule for the engine and every screen that offers a partner.
+export function partnerRule({ box, party, research }) {
+  const level = (id) => researchLevel(id, research?.[id]);
+  return {
+    level,
+    starter: !box.some((m) => followSheet(m.species) != null && level(m.species) >= PARTNER_LEVEL),
+    can: (m) => !!m && (party.includes(m.uid) || level(m.species) >= PARTNER_LEVEL),
+  };
+}
 
 /* TRAINER SKINS: what you look like walking the map.
    A look, never a strength, and a money sink for the late game: a skin

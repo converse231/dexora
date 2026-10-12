@@ -298,6 +298,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   separation - every other sprite in the game is a frozen picture, so a Cadence
   one is too, until it starts breathing. Its `cad-breath` bloom is the only
   persistent tell a Dex tile gets, because a tile has no arrival.
+  **A strip is drawn only where the species has one** (`drawsStrip`, 2026-10-13):
+  a background cannot fall back the way an `<img>` does, and the tier travels
+  through evolution, so 164 evolutions (Megas, Gmax, Alolan forms) drew an
+  empty tile. Without its strip a creature wears its plain picture and the
+  tier's layer. Anything that builds its own strip span (Evolve.jsx) asks it too.
 - **A tier added since Glitched draws its motion through `VariantFx`**
   (`SCENE_FX` in the battle): a `.sprite-<tier>` filter for the bare `<img>`
   plus a few layers in the sprite's box, sized for forty Dex tiles at once.
@@ -586,15 +591,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   size, `throws`, `variant`) in `settle`, plus `useBerry` and `evolve` (credited
   to the species evolved FROM). EVERY TASK IS REQUIRED except a `bonus` one
   (the alpha: required, it left 0-2 species finishable a playthrough), and
-  the level is a share of the species' own total. Slot 0 counts ORDINARY
-  catches only, and evolving is asked only where a sub-Lv-100 row exists.
+  the level is a share of the species' own total. Slot 0 counts EVERY catch,
+  a rare form and an alpha too (your call, 2026-10-12), and evolving is asked
+  only where a sub-Lv-100 row exists.
   `owned()` credits a catch AND an evolution into a species (evolved forms
   are rarely met wild), and an evolved form (`grown`) is not asked night,
   first ball or a berry. A legendary (met about once a playthrough even
-  hunted) is `legend` - one catch, credited from the dex by `loadState` -
-  plus `fed`, `league` (a League win with it on the team, credited to every
-  Pokemon that fought in `battleEnd`) and `hundred` (Lv 100, by candy or
-  evolution); `first` is not asked of it (luck on luck, reported). Its
+  hunted) is `legend` - TWO catches (the first credited from the dex by
+  `loadState`) - plus `fed` and `hundred` (Lv 100, by candy or evolution);
+  `first` is not asked of it (luck on luck, reported), and `league` (a League
+  win with it) was replaced by the second catch on 2026-10-12 - its slot
+  stays, asked of nobody, and nothing credits it. Its
   star asked for a second catch until 2026-10-09; it is free now like every
   other. The catch task is 1, 3, 5 (10 was reported as too many), and those
   five ARE the duplicate incentive.
@@ -781,7 +788,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   all over; a card you do not own wears none. **Crafting ends at the Double rare**
   (`canCraft`, your call 2026-10-07): an Illustration rare and up - the ACE
   SPEC too - is packs only (`PACK_ONLY`, derived), and so is a set's own top rarity
-  (`canCraft(rarity, cards)`: Base Set's Holo rare, 2026-10-10). Dust's other use is a pack
+  (`canCraft(rarity, cards)`: Base Set's Holo rare, 2026-10-10). The Dust
+  tab's Missing list is PER PRINTING: owning a normal card hid its holo and
+  reverse holo from it (2026-10-12). Dust's other use is a pack
   of an open set (`DUST_PACK` 400, `dustPack`), held above what a pack of
   spares dusts to (check.mjs re-measures every set). Cards carry no catch indicator.
   The last card of every pack charges and flashes (white until the charge),

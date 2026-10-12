@@ -31,6 +31,7 @@ import Sprite, { TrainerArt } from "../Sprite.jsx";
 import Icon from "../Icon.jsx";
 import Mark from "../Marks.jsx";
 import TrainerProfile from "./TrainerProfile.jsx";
+import CardShowEdit from "../cards/CardShowEdit.jsx";
 
 const ADD_SAYS = {
   sent: "Request sent.",
@@ -64,6 +65,7 @@ const EDITS = {
   showcase: { title: "Showcase", note: `Pick up to ${LIMITS.SHOWCASE} to show off.` },
   seeking: { title: "Looking for", note: "Any species - even ones you have never seen." },
   shelf: { title: "Up for trade", note: "Strangers can only ask for these; friends can ask for any spare. You always keep the last of each species." },
+  cards: { title: "Cards" },
 };
 function SectionEdit({ kind, box, dexOf, card, shelf, busy, onSave, onCancel }) {
   const [pick, setPick] = useState(() => (kind === "showcase"
@@ -341,10 +343,19 @@ export default function TradeCenter({
      save, so the engine's local write lands and uploads first. */
   const saveSection = async (kind, value) => {
     setBusy(true); setNote(null);
+    /* THE CARDS ARE THE SAVE'S (`cardShowcase`): written through the engine
+       first, so the flush below carries them to the server that draws them. */
+    if (kind === "cards") {
+      for (const k of [...engine.state.cardShowcase]) engine.showCard(...k.split(":"), false);
+      for (const k of value) engine.showCard(...k.split(":"), true);
+    }
     await new Promise((r) => setTimeout(r, 500));
     await flushNow(push);
     let got;
-    if (kind === "shelf") {
+    if (kind === "cards") {
+      got = await myCard();
+      if (got.ok) setMe(got.data);
+    } else if (kind === "shelf") {
       got = await setShelf(value);
       if (got.ok) {
         engine.reconcileTrades({ assign: Object.fromEntries(got.data.filter((m) => m.uid).map((m) => [m.uid, m.mid])) });
@@ -463,6 +474,9 @@ export default function TradeCenter({
           onOffer={(want) => setComposing({ them: browsing.card, want, give: [] })} />
       </>
     );
+  } else if (editing === "cards" && me) {
+    body = <CardShowEdit owned={engine.state.cards} shown={engine.state.cardShowcase} busy={busy}
+      onSave={(v) => saveSection("cards", v)} onCancel={() => setEditing(null)} />;
   } else if (editing && me) {
     body = <SectionEdit kind={editing} box={box} dexOf={dexOf} card={me} shelf={myShelf} busy={busy}
       onSave={(v) => saveSection(editing, v)} onCancel={() => setEditing(null)} />;

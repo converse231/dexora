@@ -598,7 +598,13 @@ export default function DexSheet({
             </button>
           )}
           {/* The walking party: up to three, one at your heels (docs/cosmetics.md). */}
-          {walk && onWalk && (
+          {walk && onWalk && walk.locked != null && (
+            <button className="sheet-inbox" disabled
+              data-tip={`A partner joins once its research reaches Lv ${walk.need}`}>
+              RESEARCH LV {walk.locked}/{walk.need} TO WALK
+            </button>
+          )}
+          {walk && onWalk && walk.locked == null && (
             <button className={`sheet-inbox${walk.member != null ? " on" : ""}`} onClick={onWalk}
               data-tip={walk.member != null ? `Take ${label(sp)} out of your walking party`
                 : walk.full ? "Your walking party is full - choose who to swap out" : `${label(sp)} walks with you - switch on the map or with Q`}>

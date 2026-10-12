@@ -13,7 +13,8 @@ import {
   RARITY, CARD_RARITIES, landsOn, rulesOf, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
   copiesOf, chanceOf, freshPity, sparesOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit, DUST_PACK,
 } from "../../game/cards.js";
-import CardFace, { RarityMark } from "./Card.jsx";
+import CardFace, { RarityMark, VARIANT_NAME } from "./Card.jsx";
+import Confirm from "../Confirm.jsx";
 import Inspect from "./Inspect.jsx";
 import Opening, { OpenAll } from "./Opening.jsx";
 import { loadSet, logoUrl, packUrl } from "./load.js";
@@ -201,6 +202,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
           milestones={st?.milestones ?? {}} />}
         {tab === "dex" && <CardDex sets={sets} cards={cards} dex={dex} onLook={look} />}
         {tab === "dust" && <Dust sets={sets} cards={cards} dust={dust} onLook={look}
+          onCraftAll={(id, picks) => engine.craftCards(sets[id], picks)}
           onSweep={(id) => engine.dustSpares(sets[id])} level={level} onDustPack={(id) => engine.dustPack(id)} />}
         <p className="cd-credit">
           Card data and small images from TCGdex; pack and card-back art from Bulbagarden Archives; each card names
@@ -333,6 +335,11 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
 function Binder({ sets, cards, dex, log, onLook, milestones }) {
   const [setId, setSetId] = useState(CARD_SETS[0]?.id);
   const [pageNo, setPage] = useState(0);
+  /* FILTERS (2026-10-13, asked for): the Card Dex's, scoped to this set, and
+     the pages page through what is left. Every change goes back to page one,
+     or a filter that left two pages could strand you on page nine. */
+  const [f, setF] = useState(NO_FILTER);
+  const filter = (patch) => { setF((x) => ({ ...x, ...patch })); setPage(0); };
   const set = sets[setId];
   if (!set) return <p className="ev-quiet">Loading…</p>;
   const key = (c) => cardId(setId, c[0]);
@@ -343,14 +350,16 @@ function Binder({ sets, cards, dex, log, onLook, milestones }) {
   const done = (milestones[setId] ?? 0) >= MILESTONES.length;
   const masterDone = (milestones[setId] ?? 0) >= MASTER_STEP;
   const master = set.CARDS.reduce((a, c) => a + c[4].split("").filter((v) => cards[key(c)]?.[v]).length, 0);
-  const pages = Math.ceil(set.CARDS.length / POCKETS);
+  const shown = set.CARDS.filter((c) => cardMatches(c, cards[key(c)], f));
+  const filtering = !!(f.q || f.rarity || f.have);
+  const pages = Math.max(1, Math.ceil(shown.length / POCKETS));
   const at = Math.min(pageNo, pages - 1);
-  const rows = set.CARDS.slice(at * POCKETS, at * POCKETS + POCKETS);
+  const rows = shown.slice(at * POCKETS, at * POCKETS + POCKETS);
   const pulls = log.filter(([id]) => id.startsWith(`${setId}-`))
     .map(([id, v, when]) => ({ card: set.CARDS.find((c) => key(c) === id), v, when })).filter((p) => p.card);
   return (
     <div className="cd-binder">
-      <SetChips setId={setId} onSet={(id) => { setSetId(id); setPage(0); }} />
+      <SetChips setId={setId} onSet={(id) => { setSetId(id); setPage(0); setF((x) => ({ ...x, rarity: "" })); }} />
       {pulls.length > 0 && (
         <section className="cd-wall">
           <h5>Pulls wall <span>your hits, newest first</span></h5>
@@ -377,6 +386,15 @@ function Binder({ sets, cards, dex, log, onLook, milestones }) {
         <i style={{ "--p": ownedN / set.CARDS.length }} />
         <small>Master set: {master} of {variants} printings</small>
       </div>
+      <CardFilters f={f} onChange={filter}
+        rarities={CARD_RARITIES.filter((r) => set.CARDS.some((c) => c[3] === r))} />
+      {filtering && (
+        <p className="cd-sub">
+          {shown.length} of {set.CARDS.length} cards{" "}
+          <button type="button" className="tp-quiet" onClick={() => filter(NO_FILTER)}>Clear filters</button>
+        </p>
+      )}
+      {!shown.length && <p className="ev-quiet">No card in this set matches.</p>}
       <div className="cd-page-grid">
         {rows.map((c) => {
           const row = cards[key(c)];
@@ -422,25 +440,50 @@ function SetChips({ setId, onSet }) {
 /* THE CARD DEX: every card of every shipped set in one grid, filtered and
    sorted - the binder answers "what is on this page", this answers "where is
    the card I want". Missing cards show, dimmed: you can see what you chase. */
+/* ONE PREDICATE FOR BOTH LISTS. `printing` is the master-set chase: a card
+   you hold in some printing but not every one - the Binder's pockets show
+   only the best copy, so a missing reverse holo was invisible there. */
+const NO_FILTER = { q: "", rarity: "", have: "" };
+function cardMatches(c, row, { q, rarity, have }) {
+  const n = q.trim().toLowerCase();
+  if (n && !c[1].toLowerCase().includes(n) && !(c[6] ?? "").toLowerCase().includes(n) && c[0].toLowerCase() !== n) return false;
+  if (rarity && c[3] !== rarity) return false;
+  if (have === "owned" && !row) return false;
+  if (have === "missing" && row) return false;
+  if (have === "printing" && !(row && c[4].split("").some((v) => !row[v]))) return false;
+  if (have === "spare" && !c[4].split("").some((v) => sparesOf(row, v))) return false;
+  return true;
+}
+
+function CardFilters({ f, onChange, rarities = CARD_RARITIES, children }) {
+  return (
+    <div className="pk-bar">
+      <input className="tc-input pk-q" type="search" value={f.q} onChange={(e) => onChange({ q: e.target.value })}
+        placeholder="Search a card, number or illustrator" aria-label="Search cards" />
+      <select className="pk-sel" value={f.rarity} onChange={(e) => onChange({ rarity: e.target.value })} aria-label="Rarity">
+        <option value="">Every rarity</option>
+        {rarities.map((r) => <option key={r} value={r}>{RARITY[r].name}</option>)}
+      </select>
+      <select className="pk-sel" value={f.have} onChange={(e) => onChange({ have: e.target.value })} aria-label="Owned">
+        <option value="">Owned and missing</option>
+        <option value="owned">Owned</option>
+        <option value="missing">Missing</option>
+        <option value="printing">Missing a printing</option>
+        <option value="spare">With spares</option>
+      </select>
+      {children}
+    </div>
+  );
+}
+
 function CardDex({ sets, cards, dex, onLook }) {
-  const [q, setQ] = useState("");
-  const [rarity, setRarity] = useState("");
-  const [have, setHave] = useState("");
+  const [f, setF] = useState(NO_FILTER);
   const [sort, setSort] = useState("set");
   const all = useMemo(() => CARD_SETS.flatMap((s) => (sets[s.id]?.CARDS ?? []).map((c, i) => ({ s: s.id, c, i }))), [sets]);
-  const n = q.trim().toLowerCase();
-  const shown = all.filter(({ s, c }) => {
-    const row = cards[cardId(s, c[0])];
-    if (n && !c[1].toLowerCase().includes(n) && !(c[6] ?? "").toLowerCase().includes(n)) return false;
-    if (rarity && c[3] !== rarity) return false;
-    if (have === "owned" && !row) return false;
-    if (have === "missing" && row) return false;
-    if (have === "spare" && !c[4].split("").some((v) => sparesOf(row, v))) return false;
-    return true;
-  }).sort((a, b) => (sort === "rarity" ? rungOf(b.c[3]) - rungOf(a.c[3]) : 0)
+  const shown = all.filter(({ s, c }) => cardMatches(c, cards[cardId(s, c[0])], f)).sort((a, b) => (sort === "rarity" ? rungOf(b.c[3]) - rungOf(a.c[3]) : 0)
     || (sort === "dex" ? (a.c[5][0] ?? 1e9) - (b.c[5][0] ?? 1e9) : 0) || a.i - b.i);
   const [upTo, setUpTo] = useState(TILE_PAGE);
-  useEffect(() => setUpTo(TILE_PAGE), [q, rarity, have, sort]);
+  useEffect(() => setUpTo(TILE_PAGE), [f, sort]);
   const more = useRef(null);
   useEffect(() => {
     const el = more.current;
@@ -451,25 +494,13 @@ function CardDex({ sets, cards, dex, onLook }) {
   }, [upTo, shown.length]);
   return (
     <div className="cd-dex">
-      <div className="pk-bar">
-        <input className="tc-input pk-q" type="search" value={q} onChange={(e) => setQ(e.target.value)}
-          placeholder="Search a card or illustrator" aria-label="Search cards" />
-        <select className="pk-sel" value={rarity} onChange={(e) => setRarity(e.target.value)} aria-label="Rarity">
-          <option value="">Every rarity</option>
-          {CARD_RARITIES.map((r) => <option key={r} value={r}>{RARITY[r].name}</option>)}
-        </select>
-        <select className="pk-sel" value={have} onChange={(e) => setHave(e.target.value)} aria-label="Owned">
-          <option value="">Owned and missing</option>
-          <option value="owned">Owned</option>
-          <option value="missing">Missing</option>
-          <option value="spare">With spares</option>
-        </select>
+      <CardFilters f={f} onChange={(patch) => setF((x) => ({ ...x, ...patch }))}>
         <select className="pk-sel" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
           <option value="set">Set order</option>
           <option value="rarity">Rarest first</option>
           <option value="dex">Pokédex number</option>
         </select>
-      </div>
+      </CardFilters>
       <p className="cd-sub">{shown.length} card{shown.length === 1 ? "" : "s"}</p>
       <div className="cd-grid">
         {shown.slice(0, upTo).map(({ s, c }) => {
@@ -492,8 +523,11 @@ function CardDex({ sets, cards, dex, onLook }) {
 /* DUST: your spares and what they are worth, the one sweep, and what a
    missing card costs to craft. Every individual dust or craft happens in the
    card view, which asks first for anything rare. */
-function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack }) {
+function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack, onCraftAll }) {
   const [setId, setSetId] = useState(CARD_SETS[0]?.id);
+  // CRAFT ALL: every printing, or the normal ones only - a set completes on any printing.
+  const [scope, setScope] = useState("all");
+  const [asking, setAsking] = useState(false);
   const set = sets[setId];
   if (!set) return <p className="ev-quiet">Loading…</p>;
   const spares = set.CARDS.map((c) => {
@@ -503,7 +537,15 @@ function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack }) {
   }).filter((x) => x.per.length);
   const sweep = spares.filter(({ c }) => rungOf(c[3]) < rungOf("rare"))
     .reduce((a, { c, per }) => a + per.filter(([v]) => v === "n").reduce((b, [, k]) => b + k * dustOf(c[3], "n"), 0), 0);
-  const missing = set.CARDS.filter((c) => !cards[cardId(setId, c[0])]);
+  /* MISSING IS PER PRINTING (2026-10-12): a card counted as missing only
+     when no printing of it was held, so owning a normal Pikachu hid its
+     reverse holo and holo from this list - reported as holos and reverse
+     holos that could not be bought with dust. Each printing not held is its
+     own tile, at its own cost. */
+  const missing = set.CARDS.flatMap((c) => {
+    const row = cards[cardId(setId, c[0])];
+    return c[4].split("").filter((v) => !row?.[v]).map((v) => ({ c, v }));
+  });
   return (
     <div className="cd-dustpage">
       <SetChips setId={setId} onSet={setSetId} />
@@ -532,11 +574,57 @@ function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack }) {
         </div>
       ) : <p className="ev-quiet">No spares yet - every card you hold is your only copy.</p>}
       <h5 className="cd-h">Missing <span>{missing.length} to craft</span></h5>
+      {(() => {
+        /* What "Craft all" would buy: craftable, in scope, cheapest first, as
+           far as the dust goes - the engine's own order, so the button never
+           promises more than it makes. */
+        const want = missing.filter(({ c, v }) => canCraft(c[3], set.CARDS) && (scope === "all" || v === "n"))
+          .map(({ c, v }) => ({ c, v, cost: craftCost(c[3], v) })).sort((a, b) => a.cost - b.cost);
+        let left = dust;
+        const plan = [];
+        for (const x of want) { if (left < x.cost) break; left -= x.cost; plan.push(x); }
+        const spend = dust - left;
+        return (
+          <div className="cd-bulk">
+            <div className="you-seg" role="radiogroup" aria-label="Which printings to craft">
+              {[["all", "Every printing"], ["n", "Normal only"]].map(([k, name]) => (
+                <button key={k} type="button" role="radio" aria-checked={scope === k}
+                  className={scope === k ? "on" : ""} onClick={() => setScope(k)}>{name}</button>
+              ))}
+            </div>
+            <button type="button" className="lg-go" disabled={!plan.length} onClick={() => setAsking(true)}>
+              {plan.length ? `Craft ${plan.length} · ${spend.toLocaleString()} dust` : want.length ? "Not enough dust" : "Nothing to craft"}
+            </button>
+            {want.length > plan.length && plan.length > 0 && (
+              <small>{want.length - plan.length} more need more dust</small>
+            )}
+            {asking && (
+              <Confirm
+                title={`Craft ${plan.length} card${plan.length === 1 ? "" : "s"}?`}
+                lines={[
+                  ["Cards", plan.length],
+                  ["Dust spent", spend.toLocaleString()],
+                  ["Dust left", left.toLocaleString()],
+                  ...(want.length > plan.length ? [["Still missing", want.length - plan.length]] : []),
+                ]}
+                note="Cheapest first. Illustration rares and up, and a set's own top rarity, come from packs only."
+                confirmLabel={`CRAFT ${plan.length}`}
+                tone="buy"
+                onConfirm={() => { onCraftAll(setId, plan.map(({ c, v }) => [c[0], v])); setAsking(false); }}
+                onCancel={() => setAsking(false)}
+              />
+            )}
+          </div>
+        );
+      })()}
       <div className="cd-grid">
-        {missing.map((c) => (
-          <button key={c[0]} type="button" className="cd-tile" onClick={() => onLook(setId, c[0])}>
-            <CardFace setId={setId} card={c} variant={c[4][0]} still lazy />
-            <span className="cd-tile-cap"><RarityMark rarity={c[3]} />{canCraft(c[3], set.CARDS) ? craftCost(c[3], c[4][0]).toLocaleString() : "Packs only"}</span>
+        {missing.map(({ c, v }) => (
+          <button key={`${c[0]}${v}`} type="button" className="cd-tile" onClick={() => onLook(setId, c[0])}
+            aria-label={`${c[1]}, ${VARIANT_NAME[v]}`}>
+            <CardFace setId={setId} card={c} variant={v} still lazy />
+            <span className="cd-tile-cap"><RarityMark rarity={c[3]} />
+              {v !== "n" && <i className="cd-tile-v">{v === "h" ? "Holo" : "Rev."}</i>}
+              {canCraft(c[3], set.CARDS) ? craftCost(c[3], v).toLocaleString() : "Packs only"}</span>
           </button>
         ))}
       </div>

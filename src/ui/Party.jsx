@@ -12,7 +12,7 @@ import { variantOf } from "../game/items.js";
 import { PARTY_MAX } from "../game/cosmetics.js";
 import { perkName, fieldText, heartsOf, HEARTS } from "../game/abilities.js";
 
-function Party({ mons, buddy, onPick, onEdit }) {
+function Party({ mons, buddy, mastered, onPick, onEdit }) {
   const full = mons.length >= PARTY_MAX;
   return (
     <div className="party" role="group" aria-label="Walking party">
@@ -21,9 +21,11 @@ function Party({ mons, buddy, onPick, onEdit }) {
         const on = m.uid === buddy;
         // Its ability, what it does out here, and its friendship - the tooltip's second line.
         const what = fieldText(m);
-        const about = `${perkName(m)}${what ? ` (${what.toLowerCase()})` : ""} · friendship ${heartsOf(m.walked)}/${HEARTS.length}`;
+        const star = mastered?.has(m.species);
+        const about = `${perkName(m)}${what ? ` (${what.toLowerCase()})` : ""} · friendship ${heartsOf(m.walked)}/${HEARTS.length}`
+          + (star ? " · mastered, bonds twice as fast" : "");
         return (
-          <button key={m.uid} type="button" className={`party-mon${on ? " on" : ""}`} aria-pressed={on}
+          <button key={m.uid} type="button" className={`party-mon${on ? " on" : ""}${star ? " mastered" : ""}`} aria-pressed={on}
             aria-label={`${on ? `${name} is walking with you. Put it in its ball` : `Walk with ${name}`}`
               + (what ? `. ${what}` : "")}
             data-tip={on ? `${name} · ${about} · tap to rest, Q to switch` : `Walk with ${name} · ${about}`}
