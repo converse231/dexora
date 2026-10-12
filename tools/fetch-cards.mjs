@@ -35,8 +35,9 @@ const ROOT = new URL("../", import.meta.url);
 const CACHE = new URL(".assets-src/tcgdex/", ROOT);
 const API = "https://api.tcgdex.net/v2/en";
 // Shipped sets, in the order they open (docs/cards.md, Phases).
+// The rest of Scarlet & Violet arrived on 2026-10-13, before Base Set.
 const SETS = ["me01", "me02", "me02.5", "sv03.5", "sv08.5", "me03", "me04", "me05", "30th", "sv08",
-  "sv09", "sv10", "sv10.5b", "sv10.5w", "base1"];
+  "sv09", "sv10", "sv10.5b", "sv10.5w", "sv01", "sv02", "sv03", "sv04", "sv04.5", "sv05", "sv06", "sv06.5", "sv07", "base1"];
 /* A set shipped under the name its packs carried: TCGdex's Base Set is the
    1999 print, and the packs here are its 1st Edition (asked for, 2026-10-07). */
 const NAME = { base1: "Base Set 1st Edition" };
@@ -48,6 +49,7 @@ const RARITY = {
   "Hyper rare": "hyper", "ACE SPEC Rare": "ace",
   "Pikachu Rare": "pikachu", "Futuristic Rare": "futuristic",
   "Black White Rare": "blackwhite",
+  "Shiny rare": "shiny", "Shiny Ultra Rare": "shinyultra",
 };
 /* BASE SET PRINTS ITS HOLOS AS "Rare" with only a holo variant; they are the
    set's hit, one pack in three, so they are their own rung (`holo`). */

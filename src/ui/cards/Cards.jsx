@@ -262,7 +262,7 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
   const { rates, pity: net } = rules;
   const as = (r) => (set ? landsOn(set.CARDS, r) ?? r : r);
   // A roll the set does not have (rate 0: 30th Celebration's ultra) is not listed.
-  const odds = ["double", "illustration", "ace", "ultra", "special", "mega"].filter((r) => rates[r] > 0).map((r) => [as(r), rates[r]]);
+  const odds = ["double", "illustration", "shiny", "shinyultra", "ace", "ultra", "special", "mega"].filter((r) => rates[r] > 0).map((r) => [as(r), rates[r]]);
   // The rate a rarity is pulled at here: the roll that lands on it.
   const rateOf = (rarity) => rates[Object.keys(rates).find((k) => as(k) === rarity)] ?? 0;
   // A meter a set has a roll for: Base Set has only the hit.
