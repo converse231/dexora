@@ -790,7 +790,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   SPEC too - is packs only (`PACK_ONLY`, derived), and so is a set's own top rarity
   (`canCraft(rarity, cards)`: Base Set's Holo rare, 2026-10-10). The Dust
   tab's Missing list is PER PRINTING: owning a normal card hid its holo and
-  reverse holo from it (2026-10-12). Dust's other use is a pack
+  reverse holo from it (2026-10-12). The sweep is `sweepOf` (engine and
+  Dust tab both): normal commons and uncommons, or every printing up to a
+  Double rare, the room above earned stamps spent ONCE across printings. The
+  card view offers a held printing only its spares and a missing one only its
+  craft (2026-10-13); one set (`SetPicker`, grouped by series) is shared by
+  the Binder and Dust. Dust's other use is a pack
   of an open set (`DUST_PACK` 400, `dustPack`), held above what a pack of
   spares dusts to (check.mjs re-measures every set). Cards carry no catch indicator.
   The last card of every pack charges and flashes (white until the charge),

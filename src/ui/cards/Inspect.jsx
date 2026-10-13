@@ -3,14 +3,14 @@
    the motion sensors), what it is, who drew it, your copies, and the two
    things you can do with it: dust a spare, craft a missing copy. */
 import { useEffect, useRef, useState } from "react";
-import { RARITY, cardId, copiesOf, sparesOf, dustOf, craftCost, canCraft, showKey, CARD_SHOW } from "../../game/cards.js";
+import { RARITY, cardId, sparesOf, dustOf, craftCost, canCraft, showKey, CARD_SHOW } from "../../game/cards.js";
 import { useModalLock, useDismiss } from "../modal.js";
 import { RarityMark, VARIANT_NAME } from "./Card.jsx";
 import { cardUrl, hiUrl } from "./load.js";
 
 const CAT = { P: "Pokémon", T: "Trainer", E: "Energy" };
 
-export default function Inspect({ set, localId, cards, dust, dex, showcase = [], onShow, onDust, onCraft, onSpecies, onClose }) {
+export default function Inspect({ set, localId, cards, dust, dex, showcase = [], onShow, onDust, onCraft, onSpecies, onBulk, onClose }) {
   useModalLock();
   const dismiss = useDismiss(onClose);
   const card = set.CARDS.find((c) => c[0] === localId);
@@ -59,29 +59,43 @@ export default function Inspect({ set, localId, cards, dust, dex, showcase = [],
           <p className="cd-sub">Illustrated by {card[6] || "an unknown illustrator"} · data and image: TCGdex</p>
           {row?.earned && <p className="cd-sub">✦ {row.earned.length} earned cop{row.earned.length === 1 ? "y" : "ies"}</p>}
 
+          {/* ONE ROW A PRINTING, SAYING WHAT YOU HOLD (2026-10-13): "×10" beside
+              "Dust a spare" and a "Craft" for a printing already held read as
+              ten waiting to be bought. A held printing offers only its spares;
+              a missing one only its craft. */}
           <ul className="cd-copies">
             {card[4].split("").map((v) => {
-              const have = row?.[v] ?? 0, spare = sparesOf(row, v), cost = craftCost(card[3], v);
+              const have = row?.[v] ?? 0, spare = sparesOf(row, v), cost = craftCost(card[3], v), each = dustOf(card[3], v);
               return (
-                <li key={v}>
+                <li key={v} className={have ? "" : "none"}>
                   <button type="button" className={`cd-vname${v === shown ? " on" : ""}`} aria-pressed={v === shown}
                     onClick={() => setView(v)}>{VARIANT_NAME[v]}</button>
-                  <b>×{have}</b>
-                  {spare > 0 && (
-                    <button type="button" className="lg-go quiet" onClick={() => onDust(v)}>
-                      Dust a spare · +{dustOf(card[3], v)}
-                    </button>
-                  )}
-                  {canCraft(card[3], set.CARDS) ? (
-                    <button type="button" className={`lg-go${have ? " quiet" : ""}`} disabled={dust < cost} onClick={() => onCraft(v)}>
-                      Craft · {cost.toLocaleString()} dust
-                    </button>
-                  ) : <span className="cd-packonly">Packs only</span>}
+                  <span className="cd-have">
+                    {have ? <><b>×{have}</b>{spare > 0 && <small>{spare} spare</small>}</> : <small>Not owned</small>}
+                  </span>
+                  <span className="cd-do">
+                    {!have && (canCraft(card[3], set.CARDS) ? (
+                      <button type="button" className="lg-go" disabled={dust < cost} onClick={() => onCraft(v)}>
+                        Craft · {cost.toLocaleString()} dust
+                      </button>
+                    ) : <span className="cd-packonly">Packs only</span>)}
+                    {spare > 0 && (
+                      <button type="button" className="lg-go quiet" onClick={() => onDust(v, 1)}>Dust 1 · +{each}</button>
+                    )}
+                    {spare > 1 && (
+                      <button type="button" className="lg-go quiet" onClick={() => onDust(v, spare)}>
+                        Dust {spare} · +{(each * spare).toLocaleString()}
+                      </button>
+                    )}
+                  </span>
                 </li>
               );
             })}
           </ul>
-          <p className="cd-sub">You have {dust.toLocaleString()} Card Dust · {copiesOf(row)} cop{copiesOf(row) === 1 ? "y" : "ies"} of this card</p>
+          <p className="cd-sub">
+            You have {dust.toLocaleString()} Card Dust. A spare is a copy past your first of a printing
+            {row?.earned ? "; earned copies (✦) are always kept" : ""}.
+          </p>
           <div className="cd-actions">
             {/* YOUR TRAINER CARD shows up to CARD_SHOW cards, the printing shown here. */}
             {row?.[shown] && onShow && (showcase.includes(showKey(cardId(set.SET.id, localId), shown)) ? (
@@ -94,6 +108,8 @@ export default function Inspect({ set, localId, cards, dust, dex, showcase = [],
             {card[5].length > 0 && (
               <button type="button" className="lg-go quiet" onClick={() => onSpecies(card[5][0])}>Open in the Pokédex</button>
             )}
+            {/* Every spare and every missing printing of the set at once: the Dust tab, on this set. */}
+            {onBulk && <button type="button" className="lg-go quiet" onClick={onBulk}>Dust or craft the whole set</button>}
           </div>
         </div>
       </div>

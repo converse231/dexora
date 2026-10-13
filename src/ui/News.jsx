@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-13-binder",
+    icon: "📒",
+    date: "October 2026",
+    title: "Easier binder and dust",
+    items: [
+      ["Find a set fast", "One set picker, grouped by series, with your progress on every set."],
+      ["Clearer card view", "Each printing says how many you hold and how many are spare."],
+      ["Dust in bulk", "Dust every spare printing up to Double rare at once, from the Dust tab."],
+    ],
+  },
+  {
     id: "2026-10-13-scarlet-violet",
     icon: "🃏",
     date: "October 2026",

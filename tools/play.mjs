@@ -2350,6 +2350,25 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
   assert.deepEqual(sw.state.cards[key(common)], { n: 1, r: 3 }, "the sweep took a foil, or the last copy");
   assert.equal(sw.state.cards[key(rare)].h, 3, "the sweep took a rare");
   assert.equal(sw.state.dust, 3 * C.dustOf("common", "n"));
+  /* EVERY PRINTING (2026-10-13): foils and rares too, up to a Double rare -
+     one of each printing kept, an Illustration rare never, and the room above
+     the earned stamps spent once across printings, not once per printing. */
+  {
+    const ill = set.CARDS.find((c) => c[3] === "illustration");
+    const all = boot({ ...SAVE, cards: { [key(common)]: { n: 4, r: 3 }, [key(rare)]: { h: 3 }, [key(ill)]: { h: 2 } } }).e;
+    assert.equal(all.dustSpares(set, true), true);
+    assert.equal(all.state.ask?.kind, "sweep", "the every-printing sweep did not ask first");
+    all.answerAsk(true);
+    assert.deepEqual(all.state.cards[key(common)], { n: 1, r: 1 }, "the every-printing sweep left a foil spare, or took a last copy");
+    assert.equal(all.state.cards[key(rare)].h, 1, "the every-printing sweep left a rare spare");
+    assert.equal(all.state.cards[key(ill)].h, 2, "the every-printing sweep took an Illustration rare");
+    assert.equal(all.state.dust, 3 * C.dustOf("common", "n") + 2 * C.dustOf("common", "r") + 2 * C.dustOf("rare", "h"));
+    const held = boot({ ...SAVE, cards: { [key(common)]: { n: 3, r: 3, earned: ["a", "b", "c", "d"] } } }).e;
+    held.dustSpares(set, true);
+    held.answerAsk(true);
+    const left = held.state.cards[key(common)];
+    assert.equal(left.n + left.r, 4, "the sweep dusted an earned copy, spending the same room on two printings");
+  }
 
   /* THE CARD SHOP'S CHECKOUT: the whole cart or none of it - a cart past your
      money, with a shut set, or with a bad line buys nothing at all. */
