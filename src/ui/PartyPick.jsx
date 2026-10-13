@@ -7,13 +7,13 @@ import { useEffect, useMemo } from "react";
 import Picker, { keyOf } from "./trade/Picker.jsx";
 import Sprite from "./Sprite.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
-import { PARTY_MAX, PARTNER_LEVEL, MASTERED_BOND, followSheet, partnerRule, isMastered } from "../game/cosmetics.js";
+import { PARTY_MAX, MASTERED_BOND, followSheet, partnerRule, isMastered } from "../game/cosmetics.js";
 import { variantOf } from "../game/items.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import { perkName, fieldText, heartsOf, HEARTS } from "../game/abilities.js";
 
-export default function PartyPick({ engine, box, party, research, onClose }) {
+export default function PartyPick({ engine, box, party, research, stars, onClose }) {
   useModalLock();
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
@@ -22,8 +22,8 @@ export default function PartyPick({ engine, box, party, research, onClose }) {
   }, [onClose]);
   const all = useMemo(() => box.filter((m) => followSheet(m.species) != null).map((m) => ({ ...m, tier: variantOf(m) })), [box]);
   /* Only what may join is offered (the engine refuses the rest). `free` is the
-     lone first partner, open while nothing is researched to PARTNER_LEVEL. */
-  const rule = useMemo(() => partnerRule({ box, party, research }), [box, party, research]);
+     lone first partner, open while no species you hold is starred. */
+  const rule = useMemo(() => partnerRule({ box, party, research, stars }), [box, party, research, stars]);
   const free = rule.starter && party.length <= 1;
   const mons = useMemo(() => all.filter((m) => free || rule.can(m)), [all, free, rule]);
   const waiting = free ? 0 : new Set(all.filter((m) => !rule.can(m)).map((m) => m.species)).size;
@@ -43,8 +43,8 @@ export default function PartyPick({ engine, box, party, research, onClose }) {
         <div className="vr-body">
           {(free || waiting > 0) && (
             <p className="pp-note">
-              {free ? `Your first partner is free. The rest join at research Lv ${PARTNER_LEVEL}.`
-                : `${waiting} more of your species join at research Lv ${PARTNER_LEVEL}.`}
+              {free ? "Your first partner is free. The rest join once their research is starred."
+                : `${waiting} more of your species join once their research is starred.`}
             </p>
           )}
           <ol className="pp-slots">

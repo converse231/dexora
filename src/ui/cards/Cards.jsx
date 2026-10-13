@@ -180,6 +180,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
             {shop.v === "grid" && <ShopGrid order={order} level={level} held={packs} onSee={(id) => setShop({ v: "product", id })} />}
             {shown && (
               <Product key={shown.id} meta={shown} level={level} money={st?.money ?? 0} onAdd={addToCart}
+                dust={dust} onDustPack={(id) => engine.dustPack(id)} onMine={() => { setShop({ v: "grid" }); setTab("mine"); }}
                 onCart={() => setShop({ v: "cart" })} cartCount={cartCount}>
                 <PackCard meta={shown} set={sets[shown.id]} level={level} money={st?.money ?? 0}
                   pity={st?.cardPity?.[shown.id] ?? freshPity()} cards={cards} log={st?.cardLog ?? []}

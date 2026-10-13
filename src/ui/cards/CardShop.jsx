@@ -11,7 +11,7 @@ import Icon from "../Icon.jsx";
 import { CARD_SETS } from "../../data/cards/index.js";
 import { WRAPPERS } from "../../data/cards/art.js";
 import { packUrl, logoUrl } from "./load.js";
-import { PACK_PRICE, BOXES, SET_LEVEL, setOpen } from "../../game/cards.js";
+import { PACK_PRICE, BOXES, SET_LEVEL, DUST_PACK, setOpen } from "../../game/cards.js";
 
 const yen = (n) => `¥${n.toLocaleString("en-US")}`;
 const art = (id) => (WRAPPERS[id]?.[0] ? packUrl(id, WRAPPERS[id][0]) : logoUrl(id));
@@ -79,11 +79,12 @@ export function ShopGrid({ order, level, held, onSee }) {
 }
 
 // ONE PRODUCT: the packs, the variants, a quantity and Add to cart; the set's details below.
-export function Product({ meta, level, money, onAdd, onCart, cartCount, children }) {
+export function Product({ meta, level, money, dust = 0, onAdd, onCart, onDustPack, onMine, cartCount, children }) {
   const vs = variantsOf(meta.id);
   const [key, setKey] = useState("1");
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(null);
+  const [dusted, setDusted] = useState(0);
   const open = setOpen(meta.id, level);
   const v = vs.find((x) => x.key === key) ?? vs[0];
   useEffect(() => { if (!added) return undefined; const t = setTimeout(() => setAdded(null), 2600); return () => clearTimeout(t); }, [added]);
@@ -125,6 +126,30 @@ export function Product({ meta, level, money, onAdd, onCart, cartCount, children
                 </p>
               )}
               {money < v.price * qty && <p className="cs-short">You have {yen(money)} - add it now, check out when you can.</p>}
+              {/* THE SAME PACK FOR DUST (asked for, 2026-10-13: the button lived
+                  only on the Dust tab, where nobody goes to shop). Bought at
+                  once through `engine.dustPack`, never in the cart - the cart
+                  is a yen checkout, and one cart in two currencies is where
+                  "why can't I pay for this line" starts. */}
+              {onDustPack && (
+                <div className="cs-dust">
+                  <span>
+                    <b>Or pay with Card Dust</b>
+                    <small>1 pack for {DUST_PACK} dust · you have {dust.toLocaleString()}</small>
+                  </span>
+                  <button type="button" className="ci-go quiet" disabled={dust < DUST_PACK}
+                    onClick={() => { if (onDustPack(meta.id)) setDusted((n) => n + 1); }}>
+                    Buy 1 · {DUST_PACK} dust
+                  </button>
+                  {dust < DUST_PACK && <small className="cs-dust-why">Dust comes from spare cards, on the Dust tab.</small>}
+                </div>
+              )}
+              {dusted > 0 && (
+                <p className="cs-added" role="status">
+                  {dusted} pack{dusted === 1 ? "" : "s"} bought with dust, waiting in My Packs.{" "}
+                  <button type="button" onClick={onMine}>Go to My Packs</button>
+                </p>
+              )}
             </>
           ) : <p className="cd-lock">Opens at Lv {SET_LEVEL[meta.id]}</p>}
         </div>

@@ -600,8 +600,8 @@ export default function DexSheet({
           {/* The walking party: up to three, one at your heels (docs/cosmetics.md). */}
           {walk && onWalk && walk.locked != null && (
             <button className="sheet-inbox" disabled
-              data-tip={`A partner joins once its research reaches Lv ${walk.need}`}>
-              RESEARCH LV {walk.locked}/{walk.need} TO WALK
+              data-tip="A partner joins once its research is finished and starred">
+              {walk.locked >= walk.need ? "STAR ITS RESEARCH TO WALK" : `RESEARCH LV ${walk.locked}/${walk.need} · STAR TO WALK`}
             </button>
           )}
           {walk && onWalk && walk.locked == null && (

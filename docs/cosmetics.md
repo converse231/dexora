@@ -17,12 +17,14 @@ battle.
   the same tile. All three sheets are loaded with the party, so a switch
   never waits. A save from the one-follower days gets `party = [buddy]`.
 
-- **A partner is earned (2026-10-13).** Its species' research must reach
-  `PARTNER_LEVEL` (5) to join (`partnerRule` in cosmetics.js, read by
-  `setParty` and every screen that offers one). A Pokémon already in the party
-  is never refused, which covers older saves and a partner that evolved into
-  a species not yet researched. While no species you hold has reached Lv 5,
-  one Pokémon may walk alone (the free first partner). Mastery (research
+- **A partner is earned (2026-10-13).** Its species' research must be
+  STARRED - finished to Lv 10 and the star taken - to join (`partnerRule` in
+  cosmetics.js, read by `setParty` and every screen that offers one). It was
+  research Lv 5 for a day, and a picker full of half-researched species read
+  as no rule at all. A Pokémon already in the party is never refused, which
+  covers older saves and a partner that evolved into a species not yet
+  researched. While no species you hold is starred, one Pokémon may walk
+  alone (the free first partner). Mastery (research
   Lv 10) adds `MASTERED_BOND`: friendship counts twice. The picker lists only
   what may join and says how many wait; the Dex button shows the research
   level instead of a press the engine would refuse.

@@ -861,7 +861,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   lazy, the trade Picker); `state.buddy` the one walking, one of
   them, `setBuddy`/`cycleBuddy` from the strip on the map or Q) - a switch is
   `stepped()`, never `changed()`, and grows the next out of a flash
-  (`SWAP_MS`, which holds the redraw open). **The follower** takes the tile you just left
+  (`SWAP_MS`, which holds the redraw open). **A partner is earned**:
+  `partnerRule` (cosmetics.js) lets a species join only once its research is
+  STARRED (your call, 2026-10-13; research Lv 5 for a day read as no rule),
+  never takes a member away, and lets one walk free until a species is
+  starred. **The follower** takes the tile you just left
   (`trail` in `tryStep` and `surf`); its position is never saved, and every
   teleport (`goThrough`, a ladder, `travel`) stands it on you unseen
   (`snapBuddy`); afloat, on a rail or a bike road it is in its ball. Only its

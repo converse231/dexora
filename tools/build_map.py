@@ -2528,6 +2528,16 @@ MOON_MOUTH = (0, 18, 37)          # the way in from Route 4 - and so the spawn
 # cave ladder (reported 2026-10-07). Route 4 is outside both ends of the
 # cave, so it takes you out the way you came in: one way, onto the mouth.
 MOON_EXIT = (1, 45, 4)
+# A RIM IS A WALL ON ONE SIDE (reported 2026-10-13: B2F's cliff edges were
+# walked as floor). FireRed gives 27 B2F cells collision 0 and
+# MB_IMPASSABLE_NORTH: you cannot leave one northward or enter one southward,
+# so the raised ground behind them is reached by ladder only. Our grid has no
+# one-sided wall, and making the rim solid reaches exactly what the GBA's rule
+# does from every other walkable cell (measured: 857 of 857), so it is solid
+# here, keeping its art. Any other directional behaviour on a walkable cell
+# stops the build rather than being read as floor.
+MB_IMPASSABLE_NORTH = 0x32
+MB_DIRECTIONAL = range(0x30, 0x38)            # MB_IMPASSABLE_EAST .. _SOUTHWEST
 
 
 def mt_moon():
@@ -2565,13 +2575,17 @@ def mt_moon():
                     "rb").read(), dtype="<u2")[:fw * fh]
         ids = (raw & 0x3FF).reshape(fh, fw)
         col = ((raw >> 10) & 3).reshape(fh, fw)
+        behave = fr_layout(name, "cave", "general", 0, 0)["behave"]
         ox, oy = origin[i]
         for y in range(fh):
             for x in range(fw):
                 loc = int(ids[y][x]) - 640
                 assert loc >= 0, f"mt moon: {name} ({x},{y}) is not a cave metatile"
+                b = behave(int(ids[y][x]))
+                if int(col[y][x]) == 0 and b in MB_DIRECTIONAL:
+                    assert b == MB_IMPASSABLE_NORTH, f"mt moon: {name} ({x},{y}) is one-way ({b:#x}) - read it, do not walk it"
                 g[oy + y][ox + x] = ("l" if (i, x, y) in ladder_cells or (i, x, y) == MOON_EXIT
-                                     else "r" if int(col[y][x]) == 0 else "R")
+                                     else "r" if int(col[y][x]) == 0 and b != MB_IMPASSABLE_NORTH else "R")
                 tiles[oy + y][ox + x] = base + loc
 
     # --- open B1F up ------------------------------------------------------

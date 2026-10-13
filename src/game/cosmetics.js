@@ -15,29 +15,31 @@ export const followSheet = (id) => (NO_FOLLOW.has(id) ? null : SAME[id] ?? id);
 /* A PARTNER IS EARNED, NOT HANDED OUT (your call, 2026-10-13). Any of 1,413
    species could walk with you, and since 2026-10-07 the one walking lends a
    field ability - so the party was picked for Pickup and Illuminate, and said
-   nothing about the species. Now its research must reach PARTNER_LEVEL: for
-   a common species about five catches, one at night and one with the first
-   ball, no luck asked; for a legendary its two catches.
+   nothing about the species. Now its research must be STARRED - finished to
+   Lv 10 and the star taken (your call, 2026-10-13; it was research Lv 5 for
+   a day, and a picker full of half-researched species read as no rule at
+   all). The star is free, so this asks for the research and nothing else.
 
    - NEVER TAKEN AWAY: a Pokemon already in the party stays, which covers
      saves from before this and a partner that evolved into a species not
      researched yet (it is the same creature).
-   - THE FIRST IS FREE: while no species you hold has got there, one Pokemon
+   - THE FIRST IS FREE: while no species you hold is starred, one Pokemon
      may walk alone, so a new game does not start without a companion.
    - MASTERY IS ON TOP: a mastered species (RESEARCH_MAX) bonds MASTERED_BOND
      times as fast - hearts, and the friend finds that come with them. Not its
      rare form's palette: a follower sheet carries only the normal and shiny
      rows, and a per-frame canvas filter is what this file already refused. */
-export const PARTNER_LEVEL = 5;
 export const MASTERED_BOND = 2;
 export const isMastered = (id, research) => researchLevel(id, research?.[id]) >= RESEARCH_MAX;
 // One reading of the rule for the engine and every screen that offers a partner.
-export function partnerRule({ box, party, research }) {
+export function partnerRule({ box, party, research, stars }) {
   const level = (id) => researchLevel(id, research?.[id]);
+  const starred = (id) => !!stars?.includes(id);
   return {
     level,
-    starter: !box.some((m) => followSheet(m.species) != null && level(m.species) >= PARTNER_LEVEL),
-    can: (m) => !!m && (party.includes(m.uid) || level(m.species) >= PARTNER_LEVEL),
+    starred,
+    starter: !box.some((m) => followSheet(m.species) != null && starred(m.species)),
+    can: (m) => !!m && (party.includes(m.uid) || starred(m.species)),
   };
 }
 

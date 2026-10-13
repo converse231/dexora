@@ -38,14 +38,14 @@ export const NEWS = [
     ],
   },
   {
-    id: "2026-10-13-partners",
+    id: "2026-10-13-partners-star",
     icon: "🤝",
     date: "October 2026",
     title: "Partners are earned",
     items: [
-      ["Research Lv 5 to walk", "A Pokémon joins your walking party once its species' research reaches Lv 5."],
-      ["Nobody leaves", "Partners already walking with you stay, even ones not researched yet."],
-      ["Your first is free", "Until a species reaches Lv 5, any one Pokémon can walk with you."],
+      ["Star it to walk", "A Pokémon joins your walking party once its species' research is finished and starred."],
+      ["Nobody leaves", "Partners already walking with you stay, even ones not starred yet."],
+      ["Your first is free", "Until you star a species, any one Pokémon can walk with you."],
       ["Mastery bonds faster", "A mastered species (Lv 10) earns friendship twice as fast, marked with a star."],
     ],
   },
