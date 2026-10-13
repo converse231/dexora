@@ -444,9 +444,12 @@ function SetChips({ setId, onSet }) {
    you hold in some printing but not every one - the Binder's pockets show
    only the best copy, so a missing reverse holo was invisible there. */
 const NO_FILTER = { q: "", rarity: "", have: "" };
+// A card number as printed: "6" finds "006", the padding modern sets store.
+const unpad = (s) => s.replace(/^0+(?=\w)/, "");
 function cardMatches(c, row, { q, rarity, have }) {
   const n = q.trim().toLowerCase();
-  if (n && !c[1].toLowerCase().includes(n) && !(c[6] ?? "").toLowerCase().includes(n) && c[0].toLowerCase() !== n) return false;
+  if (n && !c[1].toLowerCase().includes(n) && !(c[6] ?? "").toLowerCase().includes(n)
+    && unpad(c[0].toLowerCase()) !== unpad(n)) return false;
   if (rarity && c[3] !== rarity) return false;
   if (have === "owned" && !row) return false;
   if (have === "missing" && row) return false;
