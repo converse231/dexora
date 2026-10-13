@@ -26,7 +26,8 @@ import Achievements from "./ui/Achievements.jsx";
 import { dueCount } from "./game/achievements.js";
 import Party from "./ui/Party.jsx";
 import CheckIn from "./ui/CheckIn.jsx";
-import { followSheet, PARTY_MAX, PARTNER_LEVEL, partnerRule, isMastered } from "./game/cosmetics.js";
+import { followSheet, PARTY_MAX, partnerRule, isMastered } from "./game/cosmetics.js";
+import { RESEARCH_MAX } from "./game/research.js";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
 import Bag from "./ui/Bag.jsx";
@@ -781,7 +782,7 @@ export default function App({
       )}
       {partyPick && engine && st && (
         <Suspense fallback={null}>
-          <PartyPick engine={engine} box={st.box} party={st.party} research={st.research} onClose={() => setPartyPick(false)} />
+          <PartyPick engine={engine} box={st.box} party={st.party} research={st.research} stars={st.stars} onClose={() => setPartyPick(false)} />
         </Suspense>
       )}
       {news && <News onClose={() => setNews(false)}
@@ -1364,9 +1365,9 @@ export default function App({
                offering a press the engine refuses. A lone first partner is free. */
             const rule = partnerRule(st);
             const lv = rule.level(entry);
-            const locked = member == null && !(rule.starter && !st.party.length) && lv < PARTNER_LEVEL;
+            const locked = member == null && !(rule.starter && !st.party.length) && !rule.starred(entry);
             return { member, full: member == null && st.party.length >= PARTY_MAX,
-              locked: locked ? lv : null, need: PARTNER_LEVEL };
+              locked: locked ? lv : null, need: RESEARCH_MAX };
           })()}
           onWalk={() => {
             const member = st.party.find((u) => st.box.find((m) => m.uid === u)?.species === entry);

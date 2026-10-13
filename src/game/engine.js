@@ -3035,7 +3035,7 @@ export function createEngine(canvas, onChange, mini = null) {
       return m && followSheet(m.species) != null;
     }).slice(0, PARTY_MAX);
     if (next.length !== new Set(uids).size) return false;
-    /* EARNED (cosmetics.js, `partnerRule`): research at PARTNER_LEVEL or
+    /* EARNED (cosmetics.js, `partnerRule`): its research starred, or
        already in the party; the one exception is a lone first partner. */
     const rule = partnerRule(state);
     const unearned = next.filter((u) => !rule.can(state.box.find((b) => b.uid === u)));

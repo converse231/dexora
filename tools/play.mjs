@@ -1929,37 +1929,27 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
   assert.equal(e.wearSkin(null), true);
   assert.equal(e.state.skin, null, "taking a skin off did not give your own trainer back");
 
-  /* A PARTNER IS EARNED (cosmetics.js): research at PARTNER_LEVEL, or already
-     walking; a lone first partner is free until a species gets there. Rows
-     are built from TASKS and checked against the level they claim, so a
-     retuned task list fails here rather than silently testing nothing. */
+  /* A PARTNER IS EARNED (cosmetics.js): its research starred, or already
+     walking; a lone first partner is free until a species is starred.
+     Finished research alone is not enough - the star is the rule. */
   const RS = await import("../src/game/research.js");
-  const row = (done) => RS.TASKS.map((t) => (done.includes(t.id) ? t.steps.at(-1) : 0));
-  const halfway = row(["catch", "night", "first"]);
   const mastered = RS.TASKS.map((t) => t.steps.at(-1));
-  for (const id of [25, 1, 4]) {
-    assert.ok(RS.researchLevel(id, halfway) >= C.PARTNER_LEVEL, `the test row no longer reaches Lv ${C.PARTNER_LEVEL} for #${id}`);
-  }
-  // A species met in the wild needs more than catches; an evolved one (Pikachu) has fewer tasks and does not.
-  for (const id of [1, 4]) {
-    assert.ok(RS.researchLevel(id, row(["catch"])) < C.PARTNER_LEVEL, `five catches alone already make #${id} a partner`);
-  }
   const boxOf4 = [1, 2, 3, 4].map((uid) => ({ uid, species: [25, 1, 4, 7][uid - 1], level: 5, at: 1 }));
   {
     const g = boot({ ...pika, box: boxOf4, nextUid: 5 }).e;
-    assert.equal(g.setParty([1, 2]), false, "two unresearched partners walked - only the first is free");
+    assert.equal(g.setParty([1, 2]), false, "two unstarred partners walked - only the first is free");
     assert.equal(g.setParty([2]), true, "a new game could not choose its free first partner");
-    const h = boot({ ...pika, box: boxOf4, nextUid: 5, research: { 25: halfway } }).e;
-    assert.equal(h.setParty([2]), false, "an unresearched partner walked after a species reached Lv 5");
-    assert.equal(h.setParty([1]), true, "a species at research Lv 5 could not walk");
-    const kept = boot({ ...pika, box: boxOf4, nextUid: 5, research: { 25: halfway }, party: [4], buddy: 4 }).e;
+    const h = boot({ ...pika, box: boxOf4, nextUid: 5, research: { 25: mastered, 1: mastered }, stars: [25] }).e;
+    assert.equal(h.setParty([2]), false, "finished but unstarred research walked after a species was starred");
+    assert.equal(h.setParty([1]), true, "a starred species could not walk");
+    const kept = boot({ ...pika, box: boxOf4, nextUid: 5, stars: [25], party: [4], buddy: 4 }).e;
     assert.deepEqual(kept.state.party, [4], "a partner from before the rule was taken away on load");
     assert.equal(kept.setParty([4, 1]), true, "a partner already walking was refused beside an earned one");
     assert.equal(kept.setParty([1, 2]), false, "an unresearched partner joined by swapping");
   }
 
   // THE WALKING PARTY: up to three, each once, from the Box; the one walking is one of them.
-  const four = { ...pika, box: boxOf4, nextUid: 5, research: { 25: halfway, 1: halfway, 4: halfway } };
+  const four = { ...pika, box: boxOf4, nextUid: 5, stars: [25, 1, 4] };
   const f = boot(four).e;
   assert.equal(f.setBuddy(1), false, "a Pokemon outside the party was sent walking");
   assert.equal(f.setParty([1, 99]), false, "a party with a uid not in the Box was taken");
@@ -2197,11 +2187,9 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
   globalThis.Image = class {
     set src(v) { this.url = v; this.width = 256; this.height = 64; queueMicrotask(() => this.onload?.()); }
   };
-  // Bulbasaur is researched to a partner (cosmetics.js, `partnerRule`), so the switch below can add it.
-  const { TASKS } = await import("../src/game/research.js");
-  const partnerRow = TASKS.map((t) => (["catch", "night", "first"].includes(t.id) ? t.steps.at(-1) : 0));
+  // Bulbasaur is starred, so a partner (cosmetics.js, `partnerRule`), and the switch below can add it.
   const e = boot({ ...SAVE, box: [{ uid: 1, species: 25, level: 5, shiny: 1, at: 1 }, { uid: 2, species: 1, level: 5, at: 1 }], nextUid: 3, buddy: 1,
-    research: { 1: partnerRow } }).e;
+    stars: [1] }).e;
   tick(16);                                        // the first frame asks for the sheet
   await new Promise((r) => setTimeout(r, 0));      // and it arrives
   // A still scene is not redrawn, so each look asks for one (a rev bump).
