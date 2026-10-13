@@ -201,7 +201,8 @@ export default function App({
     const to = dexRank(engine?.state.dex.filter((v) => v === 2).length ?? 0).step;
     setReplay({ from: to > 0 ? to - 1 : null, to });
   }, [engine]);
-  const onConvert = useCallback((uids) => engine?.convert(uids), [engine]);
+  // A rare form's spares go through their own engine call (`convertVariants`).
+  const onConvert = useCallback((uids, variants = false) => (variants ? engine?.convertVariants(uids) : engine?.convert(uids)), [engine]);
   const onLevelUp = useCallback((uid, n) => engine?.levelUp(uid, n), [engine]);
   const onEvolve = useCallback((uid, to) => engine?.evolve(uid, to), [engine]);
   // Stable like the rest: the Box is memo()'d, and a fresh arrow here rebuilt every row on every walk notice.

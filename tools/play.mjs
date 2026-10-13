@@ -2390,6 +2390,14 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
     assert.equal(dp.dustPack(open), false, "a pack was sold for dust the trainer did not have");
     const shut = boot({ ...SAVE, xp: 0, paid: 1, dust: 1e6 }).e;
     assert.equal(shut.dustPack(open), false, "a shut set sold a pack for dust");
+    // SEVERAL AT ONCE: all of them or none, at DUST_PACK each, never a part-payment.
+    const many = boot({ ...SAVE, dust: 5 * C.DUST_PACK + 7 }).e;
+    assert.equal(many.dustPack(open, 6), false, "six packs were sold for five packs' dust");
+    assert.equal(many.state.dust, 5 * C.DUST_PACK + 7, "a refused dust order spent dust");
+    assert.equal(many.state.packs[open] ?? 0, 0, "a refused dust order delivered packs");
+    assert.equal(many.dustPack(open, 0), false, "an order of no packs went through");
+    assert.equal(many.dustPack(open, 5), true);
+    assert.deepEqual([many.state.dust, many.state.packs[open]], [7, 5], "five dust packs did not cost five DUST_PACKs");
   }
   // CRAFT: exact cost, a variant it is printed in, refused when short.
   const cr = boot({ ...SAVE, dust: C.craftCost("common", "n") }).e;
@@ -3054,6 +3062,30 @@ console.log("stranded ok — a saved spot on rock or off the map loads at the ma
   assert.equal(e.evolve(1, 17), null, "a locked Pokemon evolved");
   assert.ok(e.state.box.some((m) => m.uid === 1), "a locked Pokemon left the box");
   assert.ok(!duplicateUids(e.state.box).includes(1), "the sweep offered a locked Pokemon");
+  /* A RARE FORM'S SPARES (2026-10-13): convertible from their row, never by
+     the plain convert or the sweep, and never the row's best, an alpha, a
+     trade lock or a member of the walking party. */
+  {
+    const { variantSpareUids } = await import("../src/game/spares.js");
+    const rare = [
+      { uid: 1, species: 25, level: 30, size: 100, at: 1, shiny: 1 },
+      { uid: 2, species: 25, level: 5, size: 100, at: 1, shiny: 1 },
+      { uid: 3, species: 25, level: 9, size: 100, at: 1, shiny: 1, mid: M(5), lock: "offer" },
+      { uid: 4, species: 25, level: 4, size: 100, at: 1, shiny: 1, alpha: 1 },
+      { uid: 5, species: 25, level: 3, size: 100, at: 1, holo: 1 },
+      { uid: 6, species: 25, level: 2, size: 100, at: 1, shiny: 1 },
+      { uid: 7, species: 25, level: 2, size: 100, at: 1, shiny: 1 },
+    ];
+    const v = boot({ ...SAVE, box: structuredClone(rare), nextUid: 8, candy: 0, party: [6], buddy: 6, dex: dexWith(25) }).e;
+    assert.equal(v.convert([2, 7]), 0, "the plain convert took a rare form");
+    assert.ok(!duplicateUids(v.state.box).some((u) => u !== 1 && rare.some((m) => m.uid === u)), "the sweep offered a rare form");
+    assert.deepEqual(variantSpareUids(v.state.box, v.state.party).sort(), [2, 7], "the wrong rare forms were spare");
+    const got = v.convertVariants([1, 2, 3, 4, 5, 6, 7]);
+    assert.deepEqual(v.state.box.map((m) => m.uid).sort(), [1, 3, 4, 5, 6],
+      "converting rare forms took a best, a lock, an alpha, a lone one or a partner - or left a spare");
+    assert.ok(got > 0 && v.state.candy === got, "converted rare forms paid no candy");
+    assert.equal(v.convertVariants([1]), 0, "the last of a rare form was converted");
+  }
   // And where the locked one is the LOWEST level - exactly the one a sweep sells first.
   assert.ok(!duplicateUids([{ uid: 10, species: 19, level: 30 }, { uid: 11, species: 19, level: 2, mid: M(3), lock: "offer" }]).includes(11),
     "the sweep offered a locked Pokemon it would otherwise sell first");
