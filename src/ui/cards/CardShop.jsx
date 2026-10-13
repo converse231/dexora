@@ -11,23 +11,22 @@ import Icon from "../Icon.jsx";
 import { CARD_SETS } from "../../data/cards/index.js";
 import { WRAPPERS } from "../../data/cards/art.js";
 import { packUrl, logoUrl } from "./load.js";
-import { PACK_PRICE, BOXES, SET_LEVEL, DUST_PACK, setOpen } from "../../game/cards.js";
-import Confirm from "../Confirm.jsx";
+import { PACK_PRICE, SET_LEVEL, DUST_PACK, setOpen, dealsOf } from "../../game/cards.js";
 
 const yen = (n) => `¥${n.toLocaleString("en-US")}`;
 const art = (id) => (WRAPPERS[id]?.[0] ? packUrl(id, WRAPPERS[id][0]) : logoUrl(id));
 const setName = (id) => CARD_SETS.find((s) => s.id === id)?.name ?? id;
 
-/* What a set sells: single packs in three sizes, and its box or bundle at
-   its own discount (BOXES). `key` names the variant in the cart. */
+/* What a set sells: single packs in three sizes, and its deals at their own
+   discount (`dealsOf`: a main set's bundle and box, a special set's bundle).
+   `key` names the variant in the cart. */
 export function variantsOf(id) {
-  const box = BOXES[id];
   return [
     { key: "1", n: 1, label: "1 pack", price: PACK_PRICE },
     { key: "5", n: 5, label: "5 packs", price: 5 * PACK_PRICE },
     { key: "10", n: 10, label: "10 packs", price: 10 * PACK_PRICE },
-    ...(box ? [{ key: "box", n: box.packs, box: true, label: `${box.name} · ${box.packs} packs`, price: box.price,
-      off: Math.round((1 - box.price / (box.packs * PACK_PRICE)) * 100) }] : []),
+    ...dealsOf(id).map((d) => ({ key: d.key, deal: d.key, n: d.packs, label: `${d.name} · ${d.packs} packs`, price: d.price,
+      off: Math.round((1 - d.price / (d.packs * PACK_PRICE)) * 100) })),
   ];
 }
 const variant = (line) => variantsOf(line.set).find((v) => v.key === line.key);
@@ -80,25 +79,14 @@ export function ShopGrid({ order, level, held, onSee }) {
 }
 
 // ONE PRODUCT: the packs, the variants, a quantity and Add to cart; the set's details below.
-export function Product({ meta, level, money, dust = 0, onAdd, onCart, onDustPack, onMine, cartCount, children }) {
+export function Product({ meta, level, money, onAdd, onCart, cartCount, children }) {
   const vs = variantsOf(meta.id);
   const [key, setKey] = useState("1");
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(null);
-  const [dusted, setDusted] = useState(0);
-  /* PAY WITH MONEY OR DUST, for every option (asked for, 2026-10-13). Money
-     goes through the cart; dust buys at once (`engine.dustPack`, all or
-     none) - one cart in two currencies is where "why can't I pay for this
-     line" starts. Dust has no bulk discount: every pack is DUST_PACK. */
-  const [pay, setPay] = useState("yen");
-  const [asking, setAsking] = useState(false);
-  const byDust = pay === "dust" && !!onDustPack;
-  const cost = (x) => (byDust ? x.n * DUST_PACK : x.price);
-  const fmt = (n) => (byDust ? `${n.toLocaleString()} dust` : yen(n));
   const open = setOpen(meta.id, level);
   const v = vs.find((x) => x.key === key) ?? vs[0];
-  const packsN = v.n * qty, total = cost(v) * qty;
-  const buyDust = () => { if (onDustPack(meta.id, packsN)) setDusted((n) => n + packsN); setAsking(false); };
+  const packsN = v.n * qty, total = v.price * qty;
   useEffect(() => { if (!added) return undefined; const t = setTimeout(() => setAdded(null), 2600); return () => clearTimeout(t); }, [added]);
   const wraps = WRAPPERS[meta.id] ?? [];
   return (
@@ -114,65 +102,28 @@ export function Product({ meta, level, money, dust = 0, onAdd, onCart, onDustPac
           <h2>{meta.name}</h2>
           {open ? (
             <>
-              {onDustPack && (
-                <div className="you-seg cs-pay" role="radiogroup" aria-label="Pay with">
-                  {[["yen", `Money · ${yen(money)}`], ["dust", `Card Dust · ${dust.toLocaleString()}`]].map(([k, name]) => (
-                    <button key={k} type="button" role="radio" aria-checked={pay === k}
-                      className={pay === k ? "on" : ""} onClick={() => setPay(k)}>{name}</button>
-                  ))}
-                </div>
-              )}
               <div className="cs-variants" role="radiogroup" aria-label="What to buy">
                 {vs.map((x) => (
                   <button key={x.key} type="button" role="radio" aria-checked={x.key === key} className={x.key === key ? "on" : ""}
                     onClick={() => setKey(x.key)}>
                     <b>{x.label}</b>
-                    <span>{fmt(cost(x))}{x.off && !byDust ? <em>−{x.off}%</em> : null}</span>
+                    <span>{yen(x.price)}{x.off ? <em>−{x.off}%</em> : null}</span>
                   </button>
                 ))}
               </div>
               <div className="cs-row">
                 <Stepper value={qty} onChange={setQty} />
-                <span className="cs-total">{fmt(total)}<small>{packsN} pack{packsN === 1 ? "" : "s"}</small></span>
+                <span className="cs-total">{yen(total)}<small>{packsN} pack{packsN === 1 ? "" : "s"}</small></span>
               </div>
               <div className="cs-row">
-                {byDust ? (
-                  <button type="button" className="ci-go" disabled={dust < total}
-                    onClick={() => (packsN > 1 ? setAsking(true) : buyDust())}>
-                    Buy now · {fmt(total)}
-                  </button>
-                ) : (
-                  <button type="button" className="ci-go" onClick={() => { onAdd({ set: meta.id, key: v.key, qty }); setAdded(`${qty} × ${v.label}`); }}>
-                    <Icon n="plus" size={18} /> Add to cart
-                  </button>
-                )}
+                <button type="button" className="ci-go" onClick={() => { onAdd({ set: meta.id, key: v.key, qty }); setAdded(`${qty} × ${v.label}`); }}>
+                  <Icon n="plus" size={18} /> Add to cart
+                </button>
               </div>
-              {added && !byDust && (
+              <p className="cs-paynote">Pay with money or Card Dust at checkout.</p>
+              {added && (
                 <p className="cs-added" role="status">
                   Added {added}. <button type="button" onClick={onCart}>View cart ({cartCount})</button>
-                </p>
-              )}
-              {byDust ? (
-                <p className="cs-short">
-                  {dust < total ? `You have ${dust.toLocaleString()} dust. ` : ""}Paid at once, not through the cart. Dust has no
-                  bulk price: every pack is {DUST_PACK}. Dust comes from spare cards, on the Dust tab.
-                </p>
-              ) : money < total && <p className="cs-short">You have {yen(money)} - add it now, check out when you can.</p>}
-              {asking && (
-                <Confirm
-                  title={`Buy ${packsN} ${meta.name} packs with dust?`}
-                  lines={[["Packs", packsN], ["Dust spent", total.toLocaleString()], ["Dust left", (dust - total).toLocaleString()]]}
-                  note="They arrive in My Packs straight away. Dust spent on packs does not come back."
-                  confirmLabel={`BUY ${packsN}`}
-                  tone="buy"
-                  onConfirm={buyDust}
-                  onCancel={() => setAsking(false)}
-                />
-              )}
-              {dusted > 0 && (
-                <p className="cs-added" role="status">
-                  {dusted} pack{dusted === 1 ? "" : "s"} bought with dust, waiting in My Packs.{" "}
-                  <button type="button" onClick={onMine}>Go to My Packs</button>
                 </p>
               )}
             </>
@@ -185,9 +136,18 @@ export function Product({ meta, level, money, dust = 0, onAdd, onCart, onDustPac
 }
 
 // THE CART: lines with quantities, the total against your money, and Checkout.
-export function Cart({ cart, money, level, onQty, onRemove, onCheckout, onShop }) {
-  const total = cart.reduce((a, l) => a + lineTotal(l), 0);
+/* PAY WITH MONEY OR CARD DUST, for the whole order (asked for, 2026-10-13):
+   one cart, one currency. In dust every pack is DUST_PACK - a bundle's or a
+   box's discount is money's alone, and the cart says so. */
+export function Cart({ cart, money, dust = 0, level, onQty, onRemove, onCheckout, onShop }) {
+  const [pay, setPay] = useState("money");
+  const byDust = pay === "dust";
+  const cost = (l) => (byDust ? linePacks(l) * DUST_PACK : lineTotal(l));
+  const fmt = (n) => (byDust ? `${n.toLocaleString()} dust` : yen(n));
+  const total = cart.reduce((a, l) => a + cost(l), 0);
   const packs = cart.reduce((a, l) => a + linePacks(l), 0);
+  const have = byDust ? dust : money;
+  const deals = cart.some((l) => variant(l)?.deal);
   const shut = cart.filter((l) => !setOpen(l.set, level));
   return (
     <div className="cs-cart">
@@ -200,19 +160,33 @@ export function Cart({ cart, money, level, onQty, onRemove, onCheckout, onShop }
                 <img src={art(l.set)} alt="" loading="lazy" />
                 <div><b>{setName(l.set)}</b><span>{variant(l)?.label}</span></div>
                 <Stepper value={l.qty} onChange={(q) => onQty(i, q)} />
-                <span className="cs-line-price">{yen(lineTotal(l))}</span>
+                <span className="cs-line-price">{fmt(cost(l))}</span>
                 <button type="button" className="cs-x" aria-label={`Remove ${setName(l.set)} ${variant(l)?.label}`} onClick={() => onRemove(i)}>✕</button>
               </li>
             ))}
           </ul>
+          <div className="cs-paywith">
+            <span>Pay with</span>
+            <div className="you-seg" role="radiogroup" aria-label="Pay with">
+              {[["money", `Money · ${yen(money)}`], ["dust", `Card Dust · ${dust.toLocaleString()}`]].map(([k, name]) => (
+                <button key={k} type="button" role="radio" aria-checked={pay === k}
+                  className={pay === k ? "on" : ""} onClick={() => setPay(k)}>{name}</button>
+              ))}
+            </div>
+          </div>
           <div className="cs-sum">
             <span>{packs} packs</span>
-            <b>{yen(total)}</b>
-            <small>You have {yen(money)}{money < total ? ` - ${yen(total - money)} short` : ""}</small>
+            <b>{fmt(total)}</b>
+            <small>You have {fmt(have)}{have < total ? ` - ${fmt(total - have)} short` : ""}</small>
           </div>
+          {byDust && (
+            <p className="cs-short">
+              In dust every pack is {DUST_PACK}{deals ? ", so bundles and boxes are full price" : ""}. Dust comes from spare cards, on the Dust tab.
+            </p>
+          )}
           {shut.length > 0 && <p className="cs-short">{setName(shut[0].set)} is not open to you yet - remove it to check out.</p>}
-          <button type="button" className="ci-go" disabled={money < total || shut.length > 0} onClick={onCheckout}>
-            Checkout · {yen(total)}
+          <button type="button" className="ci-go" disabled={have < total || shut.length > 0} onClick={() => onCheckout(pay)}>
+            Checkout · {fmt(total)}
           </button>
           <button type="button" className="ci-go quiet" onClick={onShop}>Continue shopping</button>
         </>
@@ -234,7 +208,7 @@ export function Done({ order, onOpen, onMine, onShop }) {
     <div className="cs-done" role="status">
       <span className="cs-tick"><Icon n="check" size={30} /></span>
       <h2>Order complete</h2>
-      <p>{n} pack{n === 1 ? "" : "s"} for {yen(order.total)}, waiting in My Packs.</p>
+      <p>{n} pack{n === 1 ? "" : "s"} for {order.pay === "dust" ? `${order.total.toLocaleString()} dust` : yen(order.total)}, waiting in My Packs.</p>
       <ul className="cs-got">
         {ids.map((id) => <li key={id}><img src={art(id)} alt="" /><b>{order.packs[id]}×</b><span>{setName(id)}</span></li>)}
       </ul>

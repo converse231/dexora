@@ -7555,12 +7555,14 @@ import { statSync } from "node:fs";
      a single pack is a mistake), and a bundle never cheaper a pack than a box. */
   const perPack = (b) => b.price / b.packs;
   for (const s of CD_SETS) {
-    const b = CD.BOXES[s.id];
-    assert.ok(b, `${s.id} has no box or bundle`);
-    const off = 1 - perPack(b) / CD.PACK_PRICE;
-    assert.ok(off > 0 && off <= 0.2, `${s.id}'s ${b.name} is ${Math.round(off * 100)}% off`);
+    assert.ok(CD.BOXES[s.id], `${s.id} has no box or bundle`);
+    for (const b of CD.dealsOf(s.id)) {
+      const off = 1 - perPack(b) / CD.PACK_PRICE;
+      assert.ok(off > 0 && off <= 0.2, `${s.id}'s ${b.name} is ${Math.round(off * 100)}% off`);
+    }
   }
-  const boxes = Object.values(CD.BOXES).filter((b) => b.packs >= 36), bundles = Object.values(CD.BOXES).filter((b) => b.packs < 36);
+  const deals = CD_SETS.flatMap((s) => CD.dealsOf(s.id));
+  const boxes = deals.filter((b) => b.packs >= 36), bundles = deals.filter((b) => b.packs < 36);
   for (const u of bundles) for (const x of boxes) assert.ok(perPack(u) >= perPack(x), "a bundle is cheaper a pack than a box");
   // Crafting ends at the Double rare: an Illustration rare and up (the ACE SPEC too) are packs only.
   assert.ok(CD.CARD_RARITIES.filter(CD.isTop).every((r) => !CD.canCraft(r)) && !CD.canCraft("special")

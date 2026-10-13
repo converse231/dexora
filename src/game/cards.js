@@ -327,6 +327,17 @@ export const BOXES = {
   sv07: { name: "Booster box", packs: 36, price: 120000 },
   base1: { name: "Booster box", packs: 36, price: 120000 },
 };
+/* EVERY SET'S DEALS (2026-10-13): its BOXES entry, and for a set sold in
+   36-pack boxes the 6-pack bundle too, as in shops - a special set's BOXES
+   entry already IS its bundle, so it has the one. A 10-pack is not a real
+   product, so it stays full price. The shop's variants and the engine's
+   checkout both read this. */
+export const BUNDLE = { name: "Booster bundle", packs: 6, price: 21600 };
+export function dealsOf(setId) {
+  const box = BOXES[setId];
+  if (!box) return [];
+  return box.packs > BUNDLE.packs ? [{ key: "bundle", ...BUNDLE }, { key: "box", ...box }] : [{ key: "box", ...box }];
+}
 // Every 7th day of a daily-quest streak pays a pack.
 export const STREAK_PACK = 7;
 export const PACK_SIZE = 10;

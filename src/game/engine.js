@@ -45,7 +45,7 @@ import {
 import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
 import {
   openPack as rollPack, rulesOf, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX, cleanBinders, BINDER_MAX, BINDER_POCKETS,
-  dustOf, craftCost, sparesOf, sweepOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, STREAK_PACK, DUST_PACK,
+  dustOf, craftCost, sparesOf, sweepOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, dealsOf, STREAK_PACK, DUST_PACK,
   MASTER_DUST, printingsOf, CARD_SHOW, showKey,
 } from "./cards.js";
 import { CARD_SETS } from "../data/cards/index.js";
@@ -3101,29 +3101,36 @@ export function createEngine(canvas, onChange, mini = null) {
      checked WHOLE before anything is spent: every set open to you, every
      count whole, the total within your money. Then one save. A cart is never
      half-bought. Answers `{ total, packs: { set: n } }`, or null. */
-  function checkout(lines) {
-    if (!Array.isArray(lines) || !lines.length || lines.length > 50) return null;
+  /* PAID IN MONEY OR IN DUST, chosen at checkout for the whole cart (asked
+     for, 2026-10-13: the choice sat on each product page). A line is a
+     number of packs or one of the set's deals (`dealsOf`; `box: true` is the
+     old cart's spelling of "box"). In dust every pack is DUST_PACK - a deal's
+     discount is money's alone, or a box would eat the margin DUST_PACK keeps
+     over what a pack of spares dusts to. */
+  function checkout(lines, pay = "money") {
+    if (!Array.isArray(lines) || !lines.length || lines.length > 50 || !["money", "dust"].includes(pay)) return null;
     const level = levelFromXp(state.xp);
     let total = 0;
     const add = {};
     for (const l of lines) {
       if (!l || !setOpen(l.set, level)) return null;
-      const box = l.box ? BOXES[l.set] : null;
+      const key = l.deal ?? (l.box ? "box" : null);
+      const deal = key ? dealsOf(l.set).find((d) => d.key === key) : null;
       const qty = whole(l.qty ?? 1);
-      if ((l.box && !box) || !qty) return null;
-      const n = box ? box.packs * qty : whole(l.n) * qty;
+      if ((key && !deal) || !qty) return null;
+      const n = deal ? deal.packs * qty : whole(l.n) * qty;
       if (!n) return null;
-      total += box ? box.price * qty : PACK_PRICE * n;
+      total += pay === "dust" ? n * DUST_PACK : deal ? deal.price * qty : PACK_PRICE * n;
       add[l.set] = (add[l.set] ?? 0) + n;
     }
-    if (state.money < total) return null;
-    state.money -= total;
+    if ((pay === "dust" ? state.dust : state.money) < total) return null;
+    if (pay === "dust") state.dust -= total; else state.money -= total;
     const packs = { ...state.packs };
     for (const [id, n] of Object.entries(add)) packs[id] = (packs[id] ?? 0) + n;
     state.packs = packs;
     save();
     changed();
-    return { total, packs: add };
+    return { total, packs: add, pay };
   }
 
   // A box or bundle: the set's discounted multi-pack.
