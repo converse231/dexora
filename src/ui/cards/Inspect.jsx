@@ -10,7 +10,9 @@ import { cardUrl, hiUrl } from "./load.js";
 
 const CAT = { P: "Pokémon", T: "Trainer", E: "Energy" };
 
-export default function Inspect({ set, localId, cards, dust, dex, showcase = [], onShow, onDust, onCraft, onSpecies, onBulk, onClose }) {
+export default function Inspect({ set, localId, cards, dust, dex, showcase = [], onShow, onDust, onCraft, onSpecies, onBulk,
+  binders = [], onAddToBinder, onClose }) {
+  const [added, setAdded] = useState(null);
   useModalLock();
   const dismiss = useDismiss(onClose);
   const card = set.CARDS.find((c) => c[0] === localId);
@@ -108,6 +110,16 @@ export default function Inspect({ set, localId, cards, dust, dex, showcase = [],
             {card[5].length > 0 && (
               <button type="button" className="lg-go quiet" onClick={() => onSpecies(card[5][0])}>Open in the Pokédex</button>
             )}
+            {/* INTO ONE OF YOUR BINDERS, the printing shown (Binders.jsx). */}
+            {row?.[shown] && onAddToBinder && (
+              <select className="pk-sel cd-tobinder" value="" aria-label="Add to a binder"
+                onChange={(e) => { const name = onAddToBinder(e.target.value, shown); setAdded(name ? `Added to ${name}` : "That binder is full"); }}>
+                <option value="">Add to a binder…</option>
+                {binders.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                <option value="new">New binder…</option>
+              </select>
+            )}
+            {added && <span className="cd-added" role="status">{added}</span>}
             {/* Every spare and every missing printing of the set at once: the Dust tab, on this set. */}
             {onBulk && <button type="button" className="lg-go quiet" onClick={onBulk}>Dust or craft the whole set</button>}
           </div>

@@ -2304,6 +2304,32 @@ await savedField("milestones", { me01: 2 }, "junk", {});
 await savedField("cardDay", "2026-10-02", 42, null);
 await savedField("boxVouchers", ["dex:1"], "junk", []);
 await savedField("cardShowcase", ["me01-187:h"], "junk", []);
+await savedField("binders", [{ id: "a1", name: "Faves", pockets: ["me01-001:n", null, "me01-187:h"] }], "junk", []);
+/* YOUR OWN BINDERS: a bad pocket becomes an empty one (the rest stay put), a
+   bad binder is dropped alone, a repeated id once; and the engine adds,
+   places, renames and deletes, refusing what would not fit. */
+{
+  const C = await import("../src/game/cards.js");
+  assert.deepEqual(C.cleanBinders([{ id: "a1", name: "  x  ", pockets: ["me01-001:n", "bad", "me01-002:q", "me01-003:r", null] },
+    { id: "a1", name: "dup" }, { id: "BAD!", name: "y" }, "junk", { id: "b2", pockets: 7 }]),
+  [{ id: "a1", name: "x", pockets: ["me01-001:n", null, null, "me01-003:r"] }, { id: "b2", name: "My binder", pockets: [] }],
+  "a binder's bad pocket moved its neighbours, or a bad binder took the rest with it");
+  const bb = boot({ ...SAVE }).e;
+  const id = bb.newBinder("Fire types");
+  assert.ok(id && bb.state.binders.length === 1, "a binder was not made");
+  assert.equal(bb.addToBinder(id, ["me01-001:n", "me01-002:n"]), true);
+  assert.equal(bb.addToBinder(id, ["me01-009:h"], 5), true);
+  assert.deepEqual(bb.state.binders[0].pockets, ["me01-001:n", "me01-002:n", null, null, null, "me01-009:h"]);
+  assert.equal(bb.addToBinder(id, ["me01-010:n"]), true);
+  assert.equal(bb.state.binders[0].pockets[2], "me01-010:n", "a new card did not fill the first empty pocket");
+  assert.equal(bb.addToBinder(id, ["x"], C.BINDER_POCKETS), false, "a card went past the binder's last pocket");
+  assert.equal(bb.setBinder(id, { name: "Flames" }), true);
+  assert.equal(bb.state.binders[0].name, "Flames");
+  for (let k = 1; k < C.BINDER_MAX; k++) bb.newBinder();
+  assert.equal(bb.newBinder(), null, "a binder past BINDER_MAX was made");
+  assert.equal(bb.deleteBinder(id), true);
+  assert.ok(!bb.state.binders.some((b) => b.id === id), "a deleted binder stayed");
+}
 assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h", "me01-1:q"] }).e.state.cardShowcase,
   ["me01-187:h"], "a bad showcase key or a repeat was kept");
 {
