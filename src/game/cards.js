@@ -222,6 +222,30 @@ export function sparesOf(row, variant) {
   return Math.max(0, Math.min(row[variant] - 1, room));
 }
 
+/* WHAT A SWEEP TAKES from one set's cards, as [card, variant, n]: every
+   spare normal common and uncommon, or with `every` every spare printing up
+   to a Double rare (asked for, 2026-10-13: ten reverse holos could only be
+   dusted one press at a time). The room a card has above its earned stamps
+   is SHARED by its printings, so each printing is taken from what the one
+   before it left - counted alone, a normal and a reverse holo could each
+   spend the same room and dust an earned copy. The engine's sweep and the
+   Dust tab's button both read this. */
+export function sweepOf(rows, setId, cards, every = false) {
+  const top = every ? rungOf("double") : rungOf("uncommon");
+  return cards.flatMap((c) => {
+    if (rungOf(c[3]) > top) return [];
+    let row = rows[cardId(setId, c[0])];
+    const out = [];
+    for (const v of every ? c[4].split("") : ["n"]) {
+      const n = sparesOf(row, v);
+      if (!n) continue;
+      out.push([c, v, n]);
+      row = { ...row, [v]: row[v] - n };
+    }
+    return out;
+  });
+}
+
 /* SET MILESTONES (docs/cards.md): a share of a set's cards owned pays dust
    once; the whole set is a title too. */
 export const MILESTONES = [[0.25, 200], [0.5, 500], [0.75, 1000], [1, 2000]];

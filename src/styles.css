@@ -9607,6 +9607,41 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   font: 600 14px var(--body);
 }
 .cse-add span { font-size: 20px; color: var(--accent); }
+/* THE SET PICKER (Cards.jsx `SetPicker`): the set you are on with steps
+   either side, and every set behind it grouped by series. */
+.cd-sp { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; margin: 0 0 14px; }
+.cd-sp-step { width: 40px; border: 1px solid var(--line-firm); border-radius: 12px; background: var(--surface);
+  color: var(--ink); font: 700 20px var(--body); cursor: pointer; }
+.cd-sp-now { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 8px 12px; border: 1px solid var(--line-firm);
+  border-radius: 14px; background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
+.cd-sp-now[aria-expanded="true"] { border-color: var(--accent); }
+.cd-sp-now img { flex: none; width: 76px; height: 34px; object-fit: contain; }
+.cd-sp-now span { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.cd-sp-now b { font: 700 15px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-sp-now small { font-size: 12px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-sp-now em { flex: none; font: 600 12px var(--pixel); font-style: normal; color: var(--accent); }
+.cd-sp-bar { display: block; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.cd-sp-bar::after { content: ""; display: block; height: 100%; width: calc(var(--p) * 100%); background: var(--accent); }
+.cd-sp-bar.done::after { background: var(--gold); }
+.cd-sp-list { grid-column: 1 / -1; display: grid; gap: 14px; padding: 12px; border: 1px solid var(--line-firm); border-radius: 14px; background: var(--surface); }
+.cd-sp-list h6 { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 8px; font: 700 13px var(--display); color: var(--ink); }
+.cd-sp-list h6 span { font: 600 11px var(--pixel); color: var(--ink-soft); }
+.cd-sp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.cd-sp-set { display: grid; gap: 4px; align-content: start; padding: 8px; border: 1px solid var(--line); border-radius: 12px;
+  background: none; color: var(--ink); text-align: left; cursor: pointer; }
+.cd-sp-set:hover { border-color: var(--line-firm); }
+.cd-sp-set.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.cd-sp-set img { width: 100%; height: 34px; object-fit: contain; object-position: left center; }
+.cd-sp-set b { font: 600 12.5px var(--body); line-height: 1.2; }
+.cd-sp-set small { font: 600 11px var(--pixel); color: var(--ink-soft); }
+/* A phone keeps the set's name: a smaller logo, and the button is its own label. */
+@media (max-width: 480px) {
+  .cd-sp-now { gap: 8px; padding: 8px; }
+  .cd-sp-now img { width: 46px; height: 28px; }
+  .cd-sp-now em { display: none; }
+}
+.cd-tobulk { justify-self: start; }
+.cd-sweep { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 /* CRAFT ALL, over the Missing list: which printings, and the one button. */
 .cd-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 2px 0 12px; }
 .cd-bulk small { font-size: 12px; color: var(--ink-faint); }
@@ -9618,17 +9653,29 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-dusthead small { font-weight: 400; font-size: 12.5px; color: var(--ink-soft); }
 
 /* ---- the card view */
-.cd-inspect-card { position: relative; width: min(760px, 100%); display: grid; gap: 18px; grid-template-columns: 1fr; }
+/* A card taller than a phone SCROLLS (2026-10-13: its last buttons were 75px
+   below a 390x844 screen and out of reach). Centred by its margin, not by
+   `place-items`, because a centred item taller than its box loses its top. */
+.sheet.cd-inspect { overflow-y: auto; align-items: start; }
+.cd-inspect-card { position: relative; width: min(760px, 100%); display: grid; gap: 18px; grid-template-columns: 1fr; margin-block: auto; }
 @media (min-width: 640px) { .cd-inspect-card { grid-template-columns: minmax(220px, 300px) 1fr; } }
 .cd-inspect-art { display: grid; place-items: center; }
 .cd-card.big { width: min(300px, 68vw); box-shadow: 0 14px 34px rgba(0, 0, 0, .45); touch-action: none; }
 .cd-inspect-body h3 { margin: 0 32px 2px 0; font: 800 22px var(--display); color: var(--ink); }
 .cd-kind { display: flex; align-items: center; gap: 6px; margin: 4px 0 6px; font-weight: 700; color: var(--ink); }
 .cd-copies { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
-.cd-copies li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cd-copies li { display: grid; grid-template-columns: auto minmax(64px, auto) 1fr; align-items: center; gap: 8px; }
+.cd-have { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.cd-have b { font: 700 13px var(--pixel); color: var(--ink); }
+.cd-have small { font: 600 11px var(--pixel); color: var(--ink-soft); }
+.cd-copies li.none .cd-have small { color: var(--ink-faint); }
+.cd-do { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+@media (max-width: 520px) {
+  .cd-copies li { grid-template-columns: auto 1fr; }
+  .cd-do { grid-column: 1 / -1; justify-content: flex-start; }
+}
 .cd-vname { min-width: 104px; min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--ink-soft); font: 600 13px var(--body); text-align: left; cursor: pointer; }
 .cd-vname.on { border-color: var(--accent); color: var(--ink); }
-.cd-copies li > b { min-width: 30px; font: 700 13px var(--pixel); color: var(--ink); }
 .cd-packonly { font: 600 12px var(--pixel); color: var(--gold); }
 /* A free box of your choice (a generation's Pokédex). */
 /* THE BINDER COVER: locked, foil once complete, gold for the master set. */

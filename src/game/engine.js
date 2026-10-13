@@ -45,7 +45,7 @@ import {
 import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
 import {
   openPack as rollPack, rulesOf, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX,
-  dustOf, craftCost, sparesOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, STREAK_PACK, DUST_PACK,
+  dustOf, craftCost, sparesOf, sweepOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, STREAK_PACK, DUST_PACK,
   MASTER_DUST, printingsOf, CARD_SHOW, showKey,
 } from "./cards.js";
 import { CARD_SETS } from "../data/cards/index.js";
@@ -3339,24 +3339,26 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
-  /* THE SWEEP: every spare of a common or uncommon, normal copies only - foils
-     and anything rare stay for you to decide. Asks first, saying how much. */
-  function dustSpares(set, confirmed = false) {
+  /* THE SWEEP: every spare of a common or uncommon, normal copies only - or
+     with `every`, every spare printing up to a Double rare (`sweepOf`).
+     Anything rarer stays for you to decide. Asks first, saying how much. */
+  function dustSpares(set, every = false, confirmed = false) {
     const meta = realSet(set);
     if (!meta) return false;
-    const take = set.CARDS.filter((c) => rungOf(c[3]) < rungOf("rare"))
-      .map((c) => [c, sparesOf(state.cards[cardId(meta.id, c[0])], "n")]).filter(([, n]) => n > 0);
+    const take = sweepOf(state.cards, meta.id, set.CARDS, every);
     if (!take.length) return false;
-    const gain = take.reduce((a, [c, n]) => a + n * dustOf(c[3], "n"), 0);
+    const gain = take.reduce((a, [c, v, n]) => a + n * dustOf(c[3], v), 0);
     if (!confirmed) {
-      ask("sweep", () => dustSpares(set, true), `Dust ${take.reduce((a, [, n]) => a + n, 0)} spares?`,
-        `Every spare common and uncommon in ${meta.name}, normal copies only. You keep one of each, and get ${gain} Card Dust.`);
+      ask("sweep", () => dustSpares(set, every, true), `Dust ${take.reduce((a, [, , n]) => a + n, 0)} spares?`,
+        every
+          ? `Every spare up to a Double rare in ${meta.name}, in every printing. You keep one of each printing and every earned copy, and get ${gain} Card Dust.`
+          : `Every spare common and uncommon in ${meta.name}, normal copies only. You keep one of each, and get ${gain} Card Dust.`);
       return true;
     }
     const cards = { ...state.cards };
-    for (const [c, n] of take) {
+    for (const [c, v, n] of take) {
       const key = cardId(meta.id, c[0]);
-      cards[key] = { ...cards[key], n: cards[key].n - n };
+      cards[key] = { ...cards[key], [v]: cards[key][v] - n };
     }
     state.cards = cards;
     state.dust += gain;

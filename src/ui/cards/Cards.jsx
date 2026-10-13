@@ -11,7 +11,7 @@ import { CARD_SETS } from "../../data/cards/index.js";
 import { WRAPPERS } from "../../data/cards/art.js";
 import {
   RARITY, CARD_RARITIES, landsOn, rulesOf, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
-  copiesOf, chanceOf, freshPity, sparesOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit, DUST_PACK,
+  copiesOf, chanceOf, freshPity, sparesOf, sweepOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit, DUST_PACK,
 } from "../../game/cards.js";
 import CardFace, { RarityMark, VARIANT_NAME } from "./Card.jsx";
 import Confirm from "../Confirm.jsx";
@@ -41,6 +41,13 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   const [sets, setSets] = useState({});            // id -> { SET, CARDS }, as each loads
   const [opening, setOpening] = useState(null);    // { set, result, wrapper, n }
   const [inspect, setInspect] = useState(null);    // { setId, localId }
+  /* ONE SET ACROSS THE BINDER AND DUST, starting on the set of your newest
+     pull: a card's "Dust or craft the whole set" lands on its own set. */
+  const [setId, setSetId] = useState(() => {
+    const last = st?.cardLog?.[0]?.[0];
+    const id = last && last.slice(0, last.lastIndexOf("-"));
+    return CARD_SETS.some((s) => s.id === id) ? id : CARD_SETS[0]?.id;
+  });
   const [note, setNote] = useState("");
   // The shop's view: the grid, a product, the cart, or the order just placed.
   const [shop, setShop] = useState({ v: "grid" });
@@ -199,11 +206,11 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
           </div>
         )}
         {tab === "binder" && <Binder sets={sets} cards={cards} dex={dex} log={st?.cardLog ?? []} onLook={look}
-          milestones={st?.milestones ?? {}} />}
+          milestones={st?.milestones ?? {}} setId={setId} onSet={setSetId} onDust={() => setTab("dust")} />}
         {tab === "dex" && <CardDex sets={sets} cards={cards} dex={dex} onLook={look} />}
-        {tab === "dust" && <Dust sets={sets} cards={cards} dust={dust} onLook={look}
+        {tab === "dust" && <Dust sets={sets} cards={cards} dust={dust} onLook={look} setId={setId} onSet={setSetId}
           onCraftAll={(id, picks) => engine.craftCards(sets[id], picks)}
-          onSweep={(id) => engine.dustSpares(sets[id])} level={level} onDustPack={(id) => engine.dustPack(id)} />}
+          onSweep={(id, every) => engine.dustSpares(sets[id], every)} level={level} onDustPack={(id) => engine.dustPack(id)} />}
         <p className="cd-credit">
           Card data and small images from TCGdex; pack and card-back art from Bulbagarden Archives; each card names
           its illustrator. Pokémon and the TCG are © Nintendo, Creatures and GAME FREAK. Cards change nothing in the wild.
@@ -229,7 +236,8 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
         <Inspect set={sets[inspect.setId]} localId={inspect.localId} cards={cards} dust={dust} dex={dex}
           showcase={st?.cardShowcase ?? []}
           onShow={(v, on) => engine.showCard(cardId(inspect.setId, inspect.localId), v, on)}
-          onDust={(v) => engine.dustCard(sets[inspect.setId], inspect.localId, v, 1)}
+          onDust={(v, n) => engine.dustCard(sets[inspect.setId], inspect.localId, v, n)}
+          onBulk={() => { setSetId(inspect.setId); setInspect(null); setTab("dust"); }}
           onCraft={(v) => engine.craftCard(sets[inspect.setId], inspect.localId, v)}
           onSpecies={(id) => { setInspect(null); onSpecies?.(id); }}
           onClose={() => setInspect(null)} />
@@ -332,8 +340,7 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
 /* THE BINDER: twelve pockets a page, four across, in set order. An empty
    pocket names the card faintly; a filled one holds the best copy, a count,
    the catch stamp and the earned mark. Above it, the Pulls wall. */
-function Binder({ sets, cards, dex, log, onLook, milestones }) {
-  const [setId, setSetId] = useState(CARD_SETS[0]?.id);
+function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDust }) {
   const [pageNo, setPage] = useState(0);
   /* FILTERS (2026-10-13, asked for): the Card Dex's, scoped to this set, and
      the pages page through what is left. Every change goes back to page one,
@@ -359,7 +366,7 @@ function Binder({ sets, cards, dex, log, onLook, milestones }) {
     .map(([id, v, when]) => ({ card: set.CARDS.find((c) => key(c) === id), v, when })).filter((p) => p.card);
   return (
     <div className="cd-binder">
-      <SetChips setId={setId} onSet={(id) => { setSetId(id); setPage(0); setF((x) => ({ ...x, rarity: "" })); }} />
+      <SetPicker setId={setId} cards={cards} onSet={(id) => { onSet(id); setPage(0); setF((x) => ({ ...x, rarity: "" })); }} />
       {pulls.length > 0 && (
         <section className="cd-wall">
           <h5>Pulls wall <span>your hits, newest first</span></h5>
@@ -385,6 +392,10 @@ function Binder({ sets, cards, dex, log, onLook, milestones }) {
         <b>{ownedN}<u>/{set.CARDS.length}</u></b>
         <i style={{ "--p": ownedN / set.CARDS.length }} />
         <small>Master set: {master} of {variants} printings</small>
+        {/* Bulk lives on the Dust tab; the binder is where you notice the gaps. */}
+        {master < variants && (
+          <button type="button" className="tp-quiet cd-tobulk" onClick={onDust}>Craft missing printings with dust ›</button>
+        )}
       </div>
       <CardFilters f={f} onChange={filter}
         rarities={CARD_RARITIES.filter((r) => set.CARDS.some((c) => c[3] === r))} />
@@ -424,15 +435,76 @@ function Binder({ sets, cards, dex, log, onLook, milestones }) {
   );
 }
 
-// One set at a time, for the Binder and Dust.
-function SetChips({ setId, onSet }) {
+/* ONE SET AT A TIME, for the Binder and Dust (redesigned 2026-10-13: 24 sets
+   as a wall of chips read as noise, with nothing saying which era a name was
+   or how far along you were). The set you are on - logo, series, progress -
+   with steps either side, and the rest behind it grouped by series, newest
+   first, each with its own progress. Progress counts card ids, so it needs no
+   set loaded. */
+const SERIES = [["me", "Mega Evolution"], ["sv", "Scarlet & Violet"], ["", "Classics and celebrations"]];
+const seriesOf = (id) => (id.startsWith("me") ? "me" : id.startsWith("sv") ? "sv" : "");
+const PICK_ORDER = SERIES.flatMap(([k]) => CARD_SETS.filter((s) => seriesOf(s.id) === k)
+  .sort((a, b) => b.released.localeCompare(a.released)));
+
+function SetPicker({ setId, cards, onSet }) {
+  const [open, setOpen] = useState(false);
+  const owned = useMemo(() => {
+    const n = {};
+    for (const k of Object.keys(cards)) { const id = k.slice(0, k.lastIndexOf("-")); n[id] = (n[id] ?? 0) + 1; }
+    return n;
+  }, [cards]);
+  useEffect(() => {
+    if (!open) return undefined;
+    // Escape folds the list rather than closing the whole Cards page.
+    const esc = (e) => { if (e.key === "Escape") { e.stopImmediatePropagation(); setOpen(false); } };
+    addEventListener("keydown", esc, true);
+    return () => removeEventListener("keydown", esc, true);
+  }, [open]);
   if (CARD_SETS.length < 2) return null;
+  const at = Math.max(0, PICK_ORDER.findIndex((s) => s.id === setId));
+  const now = PICK_ORDER[at];
+  const pick = (id) => { onSet(id); setOpen(false); };
+  const step = (d) => pick(PICK_ORDER[(at + d + PICK_ORDER.length) % PICK_ORDER.length].id);
+  const series = (id) => SERIES.find(([k]) => k === seriesOf(id))[1];
+  const bar = (s) => <i className={`cd-sp-bar${(owned[s.id] ?? 0) >= s.total ? " done" : ""}`} style={{ "--p": (owned[s.id] ?? 0) / s.total }} />;
   return (
-    <div className="pk-chips">
-      {CARD_SETS.map((s) => (
-        <button key={s.id} type="button" className={`tp-chip add${s.id === setId ? " have" : ""}`}
-          aria-pressed={s.id === setId} onClick={() => onSet(s.id)}>{s.name}</button>
-      ))}
+    <div className="cd-sp">
+      <button type="button" className="cd-sp-step" aria-label="Previous set" onClick={() => step(-1)}>‹</button>
+      <button type="button" className="cd-sp-now" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <img src={logoUrl(now.id)} alt="" />
+        <span>
+          <b>{now.name}</b>
+          <small>{series(now.id)} · {owned[now.id] ?? 0}/{now.total} cards</small>
+          {bar(now)}
+        </span>
+        <em>{open ? "Close" : "All sets"}</em>
+      </button>
+      <button type="button" className="cd-sp-step" aria-label="Next set" onClick={() => step(1)}>›</button>
+      {open && (
+        <div className="cd-sp-list">
+          {SERIES.map(([k, name]) => {
+            const list = PICK_ORDER.filter((s) => seriesOf(s.id) === k);
+            if (!list.length) return null;
+            const done = list.filter((s) => (owned[s.id] ?? 0) >= s.total).length;
+            return (
+              <section key={k}>
+                <h6>{name} <span>{done ? `${done} of ${list.length} complete` : `${list.length} sets`}</span></h6>
+                <div className="cd-sp-grid">
+                  {list.map((s) => (
+                    <button key={s.id} type="button" className={`cd-sp-set${s.id === setId ? " on" : ""}`}
+                      aria-pressed={s.id === setId} onClick={() => pick(s.id)}>
+                      <img src={logoUrl(s.id)} alt="" loading="lazy" />
+                      <b>{s.name}</b>
+                      <small>{owned[s.id] ?? 0}/{s.total}</small>
+                      {bar(s)}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -526,8 +598,9 @@ function CardDex({ sets, cards, dex, onLook }) {
 /* DUST: your spares and what they are worth, the one sweep, and what a
    missing card costs to craft. Every individual dust or craft happens in the
    card view, which asks first for anything rare. */
-function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack, onCraftAll }) {
-  const [setId, setSetId] = useState(CARD_SETS[0]?.id);
+function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack, onCraftAll, setId, onSet }) {
+  // THE SWEEP: normal commons and uncommons, or every printing up to a Double rare (`sweepOf`).
+  const [every, setEvery] = useState(false);
   // CRAFT ALL: every printing, or the normal ones only - a set completes on any printing.
   const [scope, setScope] = useState("all");
   const [asking, setAsking] = useState(false);
@@ -538,8 +611,9 @@ function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack, onCraftAl
     const per = c[4].split("").map((v) => [v, sparesOf(row, v)]).filter(([, k]) => k);
     return { c, per, worth: per.reduce((a, [v, k]) => a + k * dustOf(c[3], v), 0) };
   }).filter((x) => x.per.length);
-  const sweep = spares.filter(({ c }) => rungOf(c[3]) < rungOf("rare"))
-    .reduce((a, { c, per }) => a + per.filter(([v]) => v === "n").reduce((b, [, k]) => b + k * dustOf(c[3], "n"), 0), 0);
+  const take = sweepOf(cards, setId, set.CARDS, every);
+  const sweepN = take.reduce((a, [, , n]) => a + n, 0);
+  const sweep = take.reduce((a, [c, v, n]) => a + n * dustOf(c[3], v), 0);
   /* MISSING IS PER PRINTING (2026-10-12): a card counted as missing only
      when no printing of it was held, so owning a normal Pikachu hid its
      reverse holo and holo from this list - reported as holos and reverse
@@ -551,13 +625,21 @@ function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack, onCraftAl
   });
   return (
     <div className="cd-dustpage">
-      <SetChips setId={setId} onSet={setSetId} />
+      <SetPicker setId={setId} cards={cards} onSet={onSet} />
       <section className="ev-card cd-dusthead">
         <b>{dust.toLocaleString()}</b>
-        <span>Card Dust<small>Spares become dust. Dust buys packs, and crafts the cards you are missing up to a Double rare - Illustration rares and up, and a set's own top rarity, come from packs only. You always keep one of each.</small></span>
-        <button type="button" className="lg-go" disabled={!sweep} onClick={() => onSweep(setId)}>
-          Dust spare commons and uncommons · +{sweep}
-        </button>
+        <span>Card Dust<small>Spares become dust. Dust buys packs, and crafts the cards you are missing up to a Double rare - Illustration rares and up, and a set's own top rarity, come from packs only. You always keep one of each printing.</small></span>
+        <div className="cd-sweep">
+          <div className="you-seg" role="radiogroup" aria-label="Which spares to dust">
+            {[[false, "Normal commons and uncommons"], [true, "All spares up to Double rare"]].map(([k, name]) => (
+              <button key={name} type="button" role="radio" aria-checked={every === k}
+                className={every === k ? "on" : ""} onClick={() => setEvery(k)}>{name}</button>
+            ))}
+          </div>
+          <button type="button" className="lg-go" disabled={!sweepN} onClick={() => onSweep(setId, every)}>
+            {sweepN ? `Dust ${sweepN} spare${sweepN === 1 ? "" : "s"} · +${sweep.toLocaleString()}` : "No spares to dust"}
+          </button>
+        </div>
         {/* Dust's other use: a pack of this set, if it is open to you. */}
         <button type="button" className="lg-go quiet" disabled={dust < DUST_PACK || !setOpen(setId, level)} onClick={() => onDustPack(setId)}
           data-tip={setOpen(setId, level) ? "Added to your packs on the Packs tab" : `Opens at Lv ${SET_LEVEL[setId]}`}>
