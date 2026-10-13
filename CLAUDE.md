@@ -809,9 +809,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   to the body - `.tc-main` isolates, and a sheet inside it sat under the
   pinned header (2026-10-13). Dust's other use is a pack
   of an open set (`DUST_PACK` 400, `dustPack`), held above what a pack of
-  spares dusts to (check.mjs re-measures every set). The Card Shop takes it for
-  any option (`dustPack(set, n)`, all or none, outside the cart) at
-  `DUST_PACK` a pack: a box has no dust discount, which would eat that margin. Cards carry no catch indicator.
+  spares dusts to (check.mjs re-measures every set). The Card Shop takes it AT
+  CHECKOUT for the whole cart (`checkout(lines, "dust")`, all or none) at
+  `DUST_PACK` a pack: a deal has no dust discount, which would eat that
+  margin. A set's deals are `dealsOf` - its BOXES entry, plus the 6-pack
+  `BUNDLE` where that entry is a 36-pack box (2026-10-13). Cards carry no catch indicator.
   The last card of every pack charges and flashes (white until the charge),
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.

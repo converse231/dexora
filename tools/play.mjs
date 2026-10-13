@@ -2404,6 +2404,26 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
     assert.equal(shut.state.money, 1e7, "a cart with a shut set spent part of itself");
     assert.equal(ok.checkout([{ set: "me01", n: "lots" }]), null, "a garbage line was bought");
     assert.equal(ok.checkout([]), null, "an empty cart checked out");
+    /* A MAIN SET'S BUNDLE, and the whole cart in DUST: every pack DUST_PACK
+       there (no deal discount), all of it or none, never money. */
+    const bundle = C.dealsOf("me01").find((d) => d.key === "bundle");
+    assert.ok(bundle && bundle.packs < box.packs, "a main set has no bundle under its box");
+    assert.deepEqual(C.dealsOf("sv03.5").map((d) => d.key), ["box"], "a special set gained a second bundle");
+    const bm = boot({ ...SAVE, money: bundle.price }).e;
+    assert.ok(bm.checkout([{ set: "me01", deal: "bundle", qty: 1 }]), "a bundle could not be bought");
+    assert.equal(bm.state.money, 0, "a bundle did not cost its price");
+    const need = (bundle.packs + 1) * C.DUST_PACK;
+    const cart = [{ set: "me01", deal: "bundle", qty: 1 }, { set: "me01", n: 1, qty: 1 }];
+    const short = boot({ ...SAVE, dust: need - 1 }).e;
+    assert.equal(short.checkout(cart, "dust"), null, "a dust cart one short went through");
+    assert.equal(short.state.dust, need - 1, "a refused dust cart spent dust");
+    const dd = boot({ ...SAVE, dust: need }).e;
+    const before = { money: dd.state.money, packs: dd.state.packs.me01 ?? 0 };
+    const paid = dd.checkout(cart, "dust");
+    assert.ok(paid && paid.pay === "dust" && paid.total === need, "a dust cart was not charged a DUST_PACK a pack");
+    assert.deepEqual([dd.state.dust, dd.state.money, dd.state.packs.me01], [0, before.money, before.packs + bundle.packs + 1],
+      "a dust cart touched money, or its packs did not all arrive");
+    assert.equal(boot({ ...SAVE, money: 1e6 }).e.checkout([{ set: "me01", n: 1 }], "gems"), null, "an unknown currency paid");
   }
   // A PACK FOR DUST: exactly DUST_PACK, into the set's packs (bought, not earned); refused when short or the set is shut.
   {

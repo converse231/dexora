@@ -59,10 +59,10 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
     if (i < 0) return [...c, line];
     return c.map((l, k) => (k === i ? { ...l, qty: Math.min(20, l.qty + line.qty) } : l));
   });
-  const checkout = () => {
-    const lines = cart.map((l) => { const v = variantsOf(l.set).find((x) => x.key === l.key); return { set: l.set, n: v.n, box: Boolean(v.box), qty: l.qty }; });
-    const order = engine.checkout(lines);
-    if (!order) { setNote("That cart could not be bought - check your money and that every set is open to you."); return; }
+  const checkout = (pay) => {
+    const lines = cart.map((l) => { const v = variantsOf(l.set).find((x) => x.key === l.key); return { set: l.set, n: v.n, deal: v.deal ?? null, qty: l.qty }; });
+    const order = engine.checkout(lines, pay);
+    if (!order) { setNote(`That cart could not be bought - check your ${pay === "dust" ? "dust" : "money"} and that every set is open to you.`); return; }
     setNote("");
     setCart([]);
     setShop({ v: "done", order });
@@ -180,7 +180,6 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
             {shop.v === "grid" && <ShopGrid order={order} level={level} held={packs} onSee={(id) => setShop({ v: "product", id })} />}
             {shown && (
               <Product key={shown.id} meta={shown} level={level} money={st?.money ?? 0} onAdd={addToCart}
-                dust={dust} onDustPack={(id, n) => engine.dustPack(id, n)} onMine={() => { setShop({ v: "grid" }); setTab("mine"); }}
                 onCart={() => setShop({ v: "cart" })} cartCount={cartCount}>
                 <PackCard meta={shown} set={sets[shown.id]} level={level} money={st?.money ?? 0}
                   pity={st?.cardPity?.[shown.id] ?? freshPity()} cards={cards} log={st?.cardLog ?? []}
@@ -188,7 +187,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
               </Product>
             )}
             {shop.v === "cart" && (
-              <Cart cart={cart} money={st?.money ?? 0} level={level}
+              <Cart cart={cart} money={st?.money ?? 0} dust={dust} level={level}
                 onQty={(i, q) => setCart((c) => c.map((l, k) => (k === i ? { ...l, qty: q } : l)))}
                 onRemove={(i) => setCart((c) => c.filter((_, k) => k !== i))}
                 onCheckout={checkout} onShop={() => setShop({ v: "grid" })} />
