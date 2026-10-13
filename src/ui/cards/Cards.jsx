@@ -708,7 +708,8 @@ function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack, onCraftAl
             aria-label={`${c[1]}, ${VARIANT_NAME[v]}`}>
             <CardFace setId={setId} card={c} variant={v} still lazy />
             <span className="cd-tile-cap"><RarityMark rarity={c[3]} />
-              {v !== "n" && <i className="cd-tile-v">{v === "h" ? "Holo" : "Rev."}</i>}
+              {/* Which printing, only where the card has more than one (a holo-only hit needs no tag). */}
+              {c[4].length > 1 && v !== "n" && <i className="cd-tile-v">{v === "h" ? "Holo" : "Rev."}</i>}
               {canCraft(c[3], set.CARDS) ? craftCost(c[3], v).toLocaleString() : "Packs only"}</span>
           </button>
         ))}
