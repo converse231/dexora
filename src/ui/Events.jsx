@@ -21,7 +21,7 @@ import {
 } from "../game/research.js";
 import { badgesOf } from "../game/league.js";
 
-const NEAREST = 4;   // how many unfinished entries the Discovery card lists
+const NEAREST = 10;  // how many unfinished entries the Discovery card lists (4 until 2026-10-13, asked for)
 
 /* The research you are closest to finishing, and the next task on each - the
    question a player actually has ("what should I catch next?"). */

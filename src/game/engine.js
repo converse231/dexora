@@ -61,6 +61,7 @@ import {
   fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
   stepReward, keeper, alphaCandy, canBike, variantOf,
 } from "./items.js";
+import { variantSpareUids } from "./spares.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
    that froze every catch in the game. `createEngine` has its own
    `function advance(now)` driving the phase machine, declared INSIDE the
@@ -3370,10 +3371,15 @@ export function createEngine(canvas, onChange, mini = null) {
 
   /* A PACK FOR DUST (DUST_PACK) of a set you have open - bought, not earned,
      like a pack bought with money. */
-  function dustPack(setId) {
-    if (!setOpen(setId, levelFromXp(state.xp)) || state.dust < DUST_PACK) return false;
-    state.dust -= DUST_PACK;
-    state.packs = { ...state.packs, [setId]: (state.packs[setId] ?? 0) + 1 };
+  /* `n` packs at once (the Card Shop's pay-with-dust, 2026-10-13: any of its
+     options, a box included) - all of them or none, at DUST_PACK each. No
+     bulk discount in dust: DUST_PACK is held above what a pack of spares
+     dusts to, and a box price would eat that margin. */
+  function dustPack(setId, n = 1) {
+    n = whole(n);
+    if (!n || !setOpen(setId, levelFromXp(state.xp)) || state.dust < n * DUST_PACK) return false;
+    state.dust -= n * DUST_PACK;
+    state.packs = { ...state.packs, [setId]: (state.packs[setId] ?? 0) + n };
     save();
     changed();
     return true;
@@ -3572,6 +3578,28 @@ export function createEngine(canvas, onChange, mini = null) {
     let got = 0;
     state.box = state.box.filter((mon) => {
       if (!wanted.has(mon.uid) || keeper(mon) || mon.lock) return true;
+      got += candyValue(speciesById(mon.species));
+      return false;
+    });
+    got = candyAt(got, state.stats);
+    state.candy += got;
+    save();
+    changed();
+    return got;
+  }
+
+  /* A RARE FORM'S SPARES INTO CANDY (2026-10-13), at the candy an ordinary
+     one of its species pays: its bounty was paid on the catch, and a dearer
+     candy here would make duplicates of a rare form an income of their own.
+     Only what `variantSpareUids` allows - the row's best, an alpha, a trade
+     lock, the walking party and the League team are never taken. */
+  function convertVariants(uids) {
+    const ok = new Set(variantSpareUids(state.box, [...state.party, ...state.team]));
+    const wanted = new Set((Array.isArray(uids) ? uids : []).filter((u) => ok.has(u)));
+    if (!wanted.size) return 0;
+    let got = 0;
+    state.box = state.box.filter((mon) => {
+      if (!wanted.has(mon.uid)) return true;
       got += candyValue(speciesById(mon.species));
       return false;
     });
@@ -4056,6 +4084,7 @@ export function createEngine(canvas, onChange, mini = null) {
     star,
     reconcileTrades,
     convert,
+    convertVariants,
     levelUp,
     spend,
     fish,

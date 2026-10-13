@@ -12,6 +12,7 @@ import { CARD_SETS } from "../../data/cards/index.js";
 import { WRAPPERS } from "../../data/cards/art.js";
 import { packUrl, logoUrl } from "./load.js";
 import { PACK_PRICE, BOXES, SET_LEVEL, DUST_PACK, setOpen } from "../../game/cards.js";
+import Confirm from "../Confirm.jsx";
 
 const yen = (n) => `¥${n.toLocaleString("en-US")}`;
 const art = (id) => (WRAPPERS[id]?.[0] ? packUrl(id, WRAPPERS[id][0]) : logoUrl(id));
@@ -85,8 +86,19 @@ export function Product({ meta, level, money, dust = 0, onAdd, onCart, onDustPac
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(null);
   const [dusted, setDusted] = useState(0);
+  /* PAY WITH MONEY OR DUST, for every option (asked for, 2026-10-13). Money
+     goes through the cart; dust buys at once (`engine.dustPack`, all or
+     none) - one cart in two currencies is where "why can't I pay for this
+     line" starts. Dust has no bulk discount: every pack is DUST_PACK. */
+  const [pay, setPay] = useState("yen");
+  const [asking, setAsking] = useState(false);
+  const byDust = pay === "dust" && !!onDustPack;
+  const cost = (x) => (byDust ? x.n * DUST_PACK : x.price);
+  const fmt = (n) => (byDust ? `${n.toLocaleString()} dust` : yen(n));
   const open = setOpen(meta.id, level);
   const v = vs.find((x) => x.key === key) ?? vs[0];
+  const packsN = v.n * qty, total = cost(v) * qty;
+  const buyDust = () => { if (onDustPack(meta.id, packsN)) setDusted((n) => n + packsN); setAsking(false); };
   useEffect(() => { if (!added) return undefined; const t = setTimeout(() => setAdded(null), 2600); return () => clearTimeout(t); }, [added]);
   const wraps = WRAPPERS[meta.id] ?? [];
   return (
@@ -102,47 +114,60 @@ export function Product({ meta, level, money, dust = 0, onAdd, onCart, onDustPac
           <h2>{meta.name}</h2>
           {open ? (
             <>
+              {onDustPack && (
+                <div className="you-seg cs-pay" role="radiogroup" aria-label="Pay with">
+                  {[["yen", `Money · ${yen(money)}`], ["dust", `Card Dust · ${dust.toLocaleString()}`]].map(([k, name]) => (
+                    <button key={k} type="button" role="radio" aria-checked={pay === k}
+                      className={pay === k ? "on" : ""} onClick={() => setPay(k)}>{name}</button>
+                  ))}
+                </div>
+              )}
               <div className="cs-variants" role="radiogroup" aria-label="What to buy">
                 {vs.map((x) => (
                   <button key={x.key} type="button" role="radio" aria-checked={x.key === key} className={x.key === key ? "on" : ""}
                     onClick={() => setKey(x.key)}>
                     <b>{x.label}</b>
-                    <span>{yen(x.price)}{x.off ? <em>−{x.off}%</em> : null}</span>
+                    <span>{fmt(cost(x))}{x.off && !byDust ? <em>−{x.off}%</em> : null}</span>
                   </button>
                 ))}
               </div>
               <div className="cs-row">
                 <Stepper value={qty} onChange={setQty} />
-                <span className="cs-total">{yen(v.price * qty)}<small>{v.n * qty} pack{v.n * qty === 1 ? "" : "s"}</small></span>
+                <span className="cs-total">{fmt(total)}<small>{packsN} pack{packsN === 1 ? "" : "s"}</small></span>
               </div>
               <div className="cs-row">
-                <button type="button" className="ci-go" onClick={() => { onAdd({ set: meta.id, key: v.key, qty }); setAdded(`${qty} × ${v.label}`); }}>
-                  <Icon n="plus" size={18} /> Add to cart
-                </button>
+                {byDust ? (
+                  <button type="button" className="ci-go" disabled={dust < total}
+                    onClick={() => (packsN > 1 ? setAsking(true) : buyDust())}>
+                    Buy now · {fmt(total)}
+                  </button>
+                ) : (
+                  <button type="button" className="ci-go" onClick={() => { onAdd({ set: meta.id, key: v.key, qty }); setAdded(`${qty} × ${v.label}`); }}>
+                    <Icon n="plus" size={18} /> Add to cart
+                  </button>
+                )}
               </div>
-              {added && (
+              {added && !byDust && (
                 <p className="cs-added" role="status">
                   Added {added}. <button type="button" onClick={onCart}>View cart ({cartCount})</button>
                 </p>
               )}
-              {money < v.price * qty && <p className="cs-short">You have {yen(money)} - add it now, check out when you can.</p>}
-              {/* THE SAME PACK FOR DUST (asked for, 2026-10-13: the button lived
-                  only on the Dust tab, where nobody goes to shop). Bought at
-                  once through `engine.dustPack`, never in the cart - the cart
-                  is a yen checkout, and one cart in two currencies is where
-                  "why can't I pay for this line" starts. */}
-              {onDustPack && (
-                <div className="cs-dust">
-                  <span>
-                    <b>Or pay with Card Dust</b>
-                    <small>1 pack for {DUST_PACK} dust · you have {dust.toLocaleString()}</small>
-                  </span>
-                  <button type="button" className="ci-go quiet" disabled={dust < DUST_PACK}
-                    onClick={() => { if (onDustPack(meta.id)) setDusted((n) => n + 1); }}>
-                    Buy 1 · {DUST_PACK} dust
-                  </button>
-                  {dust < DUST_PACK && <small className="cs-dust-why">Dust comes from spare cards, on the Dust tab.</small>}
-                </div>
+              {byDust ? (
+                <p className="cs-short">
+                  {dust < total ? `You have ${dust.toLocaleString()} dust. ` : ""}Paid at once, not through the cart. Dust has no
+                  bulk price: every pack is {DUST_PACK}. Dust comes from spare cards, on the Dust tab.
+                </p>
+              ) : money < total && <p className="cs-short">You have {yen(money)} - add it now, check out when you can.</p>}
+              {asking && (
+                <Confirm
+                  title={`Buy ${packsN} ${meta.name} packs with dust?`}
+                  lines={[["Packs", packsN], ["Dust spent", total.toLocaleString()], ["Dust left", (dust - total).toLocaleString()]]}
+                  note="They arrive in My Packs straight away. Dust spent on packs does not come back."
+                  confirmLabel={`BUY ${packsN}`}
+                  tone="buy"
+                  onConfirm={buyDust}
+                  onCancel={() => setAsking(false)}
+                />
               )}
               {dusted > 0 && (
                 <p className="cs-added" role="status">

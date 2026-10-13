@@ -324,6 +324,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **`keeper()` protects variants in the engine**, on `sell` and `convert` both.
   Legendaries are not keepers: sweep dialogs list them unticked, and
   `run(picked)` never falls back to the full list.
+  **A rare form's duplicates convert from their own row only**
+  (`convertVariants`, `variantSpareUids` in `spares.js` - kept out of
+  items.js because the ranked referee bundles it whole): never the row's
+  best, an alpha, a trade lock, the walking party or the League team, at the
+  ordinary candy rate; never sold, never the sweep's (2026-10-13).
 - **An evolution can cost a tier** when the target has no such art; warn with
   `lockedTiers(target)`.
 - **The evolution cycle switches a tier's own animation off** until the
@@ -797,7 +802,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   craft (2026-10-13); one set (`SetPicker`, grouped by series) is shared by
   the Binder and Dust. Dust's other use is a pack
   of an open set (`DUST_PACK` 400, `dustPack`), held above what a pack of
-  spares dusts to (check.mjs re-measures every set). Cards carry no catch indicator.
+  spares dusts to (check.mjs re-measures every set). The Card Shop takes it for
+  any option (`dustPack(set, n)`, all or none, outside the cart) at
+  `DUST_PACK` a pack: a box has no dust discount, which would eat that margin. Cards carry no catch indicator.
   The last card of every pack charges and flashes (white until the charge),
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.

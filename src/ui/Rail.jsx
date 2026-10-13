@@ -166,6 +166,8 @@ export default function Rail({
           onLevelUp={onLevelUp}
           onEvolve={onEvolve}
           candy={state?.candy ?? 0}
+          party={state?.party}
+          team={state?.team}
         />
       ))}
       {pane("shop", (

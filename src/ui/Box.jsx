@@ -22,6 +22,7 @@ import {
   sellValue, candyValue, duplicateUids, evolutionsOf, evolveState, itemById,
   variantOf,
 } from "../game/items.js";
+import { variantSpareUids } from "../game/spares.js";
 import { label } from "../game/map.js";
 import Types from "./Types.jsx";
 import FilterBar from "./FilterBar.jsx";
@@ -58,7 +59,7 @@ const ACTIONABLE = (a, b) =>
    five handlers are `useCallback`ed over an engine that is set once. */
 function Box({
   box, bag, dex, candy, colRev, stats, busy, findSeed, onSeedUsed,
-  onSell, onConvert, onLevelUp, onEvolve, defense = null,
+  onSell, onConvert, onLevelUp, onEvolve, defense = null, party = [], team = [],
 }) {
   const [pending, setPending] = useState(null);
   const [flash, setFlash] = useState(null);
@@ -100,6 +101,9 @@ function Box({
 
   const { groups, spareUids, spareValue, spareCandy } = useMemo(() => {
     const spare = new Set(duplicateUids(box));
+    /* A rare form's spares are its row's alone - never the sweep's, which
+       reads `spare` - and converted from the row (`convertVariants`). */
+    const vspare = new Set(variantSpareUids(box, [...(party ?? []), ...(team ?? [])]));
     const byId = new Map();
 
     /* KEYED ON SPECIES **AND** VARIANT. One row used to stand for every
@@ -133,7 +137,7 @@ function Box({
       g.count += 1;
       g.best = Math.max(g.best, mon.level);
       g.mons.push(mon);
-      if (spare.has(mon.uid)) g.spares.push(mon.uid);
+      if (spare.has(mon.uid) || vspare.has(mon.uid)) g.spares.push(mon.uid);
       byId.set(key, g);
     }
 
@@ -199,7 +203,7 @@ function Box({
     };
     // `colRev` is what changes: the engine mutates box, bag and dex in
     // place, so their references alone would keep this memo stale forever.
-  }, [box, bag, dex, colRev, stats]);
+  }, [box, bag, dex, colRev, stats, party, team]);
 
   /* Distinct SPECIES, not rows. A row is one species-and-variant now, so
      `groups.length` counts a Holo Pidgey separately from the ordinary pile -
@@ -412,9 +416,14 @@ function Box({
       .sort((a, b) => a.level - b.level || a.uid - b.uid);
     const defends = defendNote(going, defense, (m) => `Lv ${m.level}`);
 
+    // A rare form's duplicates: candy only, and the dialog says what kind they are.
+    const tier = group.variant ? group.variant[0].toUpperCase() + group.variant.slice(1) : "";
+    const rare = group.variant
+      ? `These are ${tier} ${label(sp)}. You keep your best one, at Lv ${group.best}; the rest become Rare Candy at the ordinary rate. This cannot be undone.`
+      : null;
     setPending({
-      title: candyPayout ? `Convert spare ${label(sp)}?` : `Sell spare ${label(sp)}?`,
-      ...(defends && { tone: "warn", note: `${label(sp)} ${defends}` }),
+      title: candyPayout ? `Convert spare ${tier ? `${tier} ` : ""}${label(sp)}?` : `Sell spare ${label(sp)}?`,
+      ...((defends || rare) && { tone: "warn", note: [rare, defends && `${label(sp)} ${defends}`].filter(Boolean).join(" ") }),
       lines: [
         ["Taken", `${uids.length} × ${label(sp)}`],
         ["You receive", candyPayout ? `${gain} Rare Candy` : `¥${value.toLocaleString()}`],
@@ -431,7 +440,7 @@ function Box({
         : `SELL ${uids.length} · +¥${value.toLocaleString()}`,
       run: () => {
         if (candyPayout) {
-          onConvert(uids);
+          onConvert(uids, !!group.variant);
           setFlash(`+${gain} candy`);
         } else {
           onSell(uids);
@@ -757,9 +766,12 @@ function Box({
                 )}
                 {spare > 0 && (
                   <>
-                    <button onClick={() => confirmSellOne(group, false)}>
-                      SELL {spare}
-                    </button>
+                    {/* A rare form's spares convert only: they are never sold. */}
+                    {!group.variant && (
+                      <button onClick={() => confirmSellOne(group, false)}>
+                        SELL {spare}
+                      </button>
+                    )}
                     <button
                       className="candy"
                       onClick={() => confirmSellOne(group, true)}

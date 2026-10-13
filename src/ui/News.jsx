@@ -16,6 +16,16 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-13-rare-spares",
+    icon: "🍬",
+    date: "October 2026",
+    title: "Rare form duplicates",
+    items: [
+      ["Convert spare rare forms", "A rare form row with extras can turn them into Rare Candy."],
+      ["Your best stays", "The highest level one, partners and League team members are always kept."],
+    ],
+  },
+  {
     id: "2026-10-13-binder",
     icon: "📒",
     date: "October 2026",
