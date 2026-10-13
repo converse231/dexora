@@ -16,6 +16,7 @@ import {
 import CardFace, { RarityMark, VARIANT_NAME } from "./Card.jsx";
 import Confirm from "../Confirm.jsx";
 import Inspect from "./Inspect.jsx";
+import { BinderPages, MyBinders } from "./Binders.jsx";
 import Opening, { OpenAll } from "./Opening.jsx";
 import { loadSet, logoUrl, packUrl } from "./load.js";
 import Icon from "../Icon.jsx";
@@ -27,7 +28,6 @@ const yen = (n) => `¥${n.toLocaleString()}`;
 const oneIn = (p) => Math.round(1 / p);
 // The store, then what you hold (asked for, 2026-10-07: shop, cart, checkout, My Packs).
 const TABS = [["shop", "Card Shop", "shop"], ["mine", "My Packs", "cards"], ["binder", "Binder", "book"], ["dex", "Card Dex", "dex"], ["dust", "Dust", "forms"]];
-const POCKETS = 12;            // a page: four across, three down
 /* THE CARD DEX ADDS TILES A PAGE AT A TIME as its end scrolls near (the
    Picker's rule): 188 tiles at once was a 103ms task on a throttled phone. */
 const TILE_PAGE = 48;
@@ -207,7 +207,8 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
           </div>
         )}
         {tab === "binder" && <Binder sets={sets} cards={cards} dex={dex} log={st?.cardLog ?? []} onLook={look}
-          milestones={st?.milestones ?? {}} setId={setId} onSet={setSetId} onDust={() => setTab("dust")} />}
+          milestones={st?.milestones ?? {}} setId={setId} onSet={setSetId} onDust={() => setTab("dust")}
+          binders={st?.binders ?? []} engine={engine} />}
         {tab === "dex" && <CardDex sets={sets} cards={cards} dex={dex} onLook={look} />}
         {tab === "dust" && <Dust sets={sets} cards={cards} dust={dust} onLook={look} setId={setId} onSet={setSetId}
           onCraftAll={(id, picks) => engine.craftCards(sets[id], picks)}
@@ -239,6 +240,12 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
           onShow={(v, on) => engine.showCard(cardId(inspect.setId, inspect.localId), v, on)}
           onDust={(v, n) => engine.dustCard(sets[inspect.setId], inspect.localId, v, n)}
           onBulk={() => { setSetId(inspect.setId); setInspect(null); setTab("dust"); }}
+          binders={st?.binders ?? []}
+          onAddToBinder={(bid, v) => {
+            const id = bid === "new" ? engine.newBinder() : bid;
+            const ok = id && engine.addToBinder(id, [`${cardId(inspect.setId, inspect.localId)}:${v}`]);
+            return ok ? engine.state.binders.find((b) => b.id === id)?.name ?? null : null;
+          }}
           onCraft={(v) => engine.craftCard(sets[inspect.setId], inspect.localId, v)}
           onSpecies={(id) => { setInspect(null); onSpecies?.(id); }}
           onClose={() => setInspect(null)} />
@@ -338,18 +345,34 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
   );
 }
 
-/* THE BINDER: twelve pockets a page, four across, in set order. An empty
-   pocket names the card faintly; a filled one holds the best copy, a count,
-   the catch stamp and the earned mark. Above it, the Pulls wall. */
-function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDust }) {
+/* THE BINDER (redesigned 2026-10-13: the pages sat under the pulls wall, a
+   cover banner, the progress and the filters - two phone screens before a
+   card). Now: which binders (the set's, or your own), the set, ONE header
+   line for its progress and cover, the filters, then the pages themselves -
+   nine pockets each, a spread where there is room (`BinderPages`). The pulls
+   wall goes under them. An empty pocket names the card faintly; a filled one
+   holds the best copy, a count and the earned mark. */
+function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDust, binders = [], engine }) {
+  const [mode, setMode] = useState("set");
   const [pageNo, setPage] = useState(0);
   /* FILTERS (2026-10-13, asked for): the Card Dex's, scoped to this set, and
      the pages page through what is left. Every change goes back to page one,
      or a filter that left two pages could strand you on page nine. */
   const [f, setF] = useState(NO_FILTER);
   const filter = (patch) => { setF((x) => ({ ...x, ...patch })); setPage(0); };
+  const modes = (
+    <div className="you-seg bn-mode" role="radiogroup" aria-label="Binders">
+      {[["set", "Set binders"], ["mine", `My binders${binders.length ? ` · ${binders.length}` : ""}`]].map(([k, name]) => (
+        <button key={k} type="button" role="radio" aria-checked={mode === k} className={mode === k ? "on" : ""}
+          onClick={() => setMode(k)}>{name}</button>
+      ))}
+    </div>
+  );
+  if (mode === "mine") {
+    return <div className="cd-binder">{modes}<MyBinders binders={binders} sets={sets} cards={cards} engine={engine} onLook={onLook} /></div>;
+  }
   const set = sets[setId];
-  if (!set) return <p className="ev-quiet">Loading…</p>;
+  if (!set) return <div className="cd-binder">{modes}<p className="ev-quiet">Loading…</p></div>;
   const key = (c) => cardId(setId, c[0]);
   const ownedN = set.CARDS.filter((c) => cards[key(c)]).length;
   const variants = printingsOf(set.CARDS);
@@ -360,44 +383,25 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
   const master = set.CARDS.reduce((a, c) => a + c[4].split("").filter((v) => cards[key(c)]?.[v]).length, 0);
   const shown = set.CARDS.filter((c) => cardMatches(c, cards[key(c)], f));
   const filtering = !!(f.q || f.rarity || f.have);
-  const pages = Math.max(1, Math.ceil(shown.length / POCKETS));
-  const at = Math.min(pageNo, pages - 1);
-  const rows = shown.slice(at * POCKETS, at * POCKETS + POCKETS);
   const pulls = log.filter(([id]) => id.startsWith(`${setId}-`))
     .map(([id, v, when]) => ({ card: set.CARDS.find((c) => key(c) === id), v, when })).filter((p) => p.card);
   return (
     <div className="cd-binder">
+      {modes}
       <SetPicker setId={setId} cards={cards} onSet={(id) => { onSet(id); setPage(0); setF((x) => ({ ...x, rarity: "" })); }} />
-      {pulls.length > 0 && (
-        <section className="cd-wall">
-          <h5>Pulls wall <span>your hits, newest first</span></h5>
-          <div className="cd-chase-row">
-            {pulls.map((p, k) => (
-              <button key={k} type="button" className="cd-chase-card got" onClick={() => onLook(setId, p.card[0])}>
-                <CardFace setId={setId} card={p.card} variant={p.v} still lazy />
-                <span><RarityMark rarity={p.card[3]} /> {new Date(p.when).toLocaleDateString()}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-      <div className={`cd-cover${done ? " done" : ""}${masterDone ? " master" : ""}`}>
-        <img src={logoUrl(setId)} alt="" />
-        <span>
-          <b>{masterDone ? "Master set" : done ? "Complete" : "Binder cover"}</b>
-          <i>{masterDone ? `Every printing - ${titleName(`master:${setId}`)}` : done ? `${titleName(`set:${setId}`)} · the gold cover takes every printing`
-            : `Complete the set (${set.CARDS.length - ownedN} to go) for its cover`}</i>
+      <section className={`bn-head${done ? " done" : ""}${masterDone ? " master" : ""}`} aria-label="Set progress">
+        <div className="bn-count"><b>{ownedN}<u>/{set.CARDS.length}</u></b><small>cards</small></div>
+        <div className="bn-prog">
+          <i style={{ "--p": ownedN / set.CARDS.length }} />
+          <small>Master set {master} of {variants} printings</small>
+        </div>
+        <span className="bn-cover">
+          {masterDone ? `★ Master set · ${titleName(`master:${setId}`)}` : done ? `✓ Complete · ${titleName(`set:${setId}`)}`
+            : `${set.CARDS.length - ownedN} to go for the cover`}
         </span>
-      </div>
-      <div className="cd-progress">
-        <b>{ownedN}<u>/{set.CARDS.length}</u></b>
-        <i style={{ "--p": ownedN / set.CARDS.length }} />
-        <small>Master set: {master} of {variants} printings</small>
         {/* Bulk lives on the Dust tab; the binder is where you notice the gaps. */}
-        {master < variants && (
-          <button type="button" className="tp-quiet cd-tobulk" onClick={onDust}>Craft missing printings with dust ›</button>
-        )}
-      </div>
+        {master < variants && <button type="button" className="tp-quiet" onClick={onDust}>Craft missing ›</button>}
+      </section>
       <CardFilters f={f} onChange={filter}
         rarities={CARD_RARITIES.filter((r) => set.CARDS.some((c) => c[3] === r))} />
       {filtering && (
@@ -406,9 +410,8 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
           <button type="button" className="tp-quiet" onClick={() => filter(NO_FILTER)}>Clear filters</button>
         </p>
       )}
-      {!shown.length && <p className="ev-quiet">No card in this set matches.</p>}
-      <div className="cd-page-grid">
-        {rows.map((c) => {
+      {!shown.length ? <p className="ev-quiet">No card in this set matches.</p> : <BinderPages count={shown.length} page={pageNo} onPage={setPage} render={(i) => {
+          const c = shown[i];
           const row = cards[key(c)];
           const n = copiesOf(row);
           return (
@@ -425,13 +428,20 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
               )}
             </button>
           );
-        })}
-      </div>
-      <div className="cd-turn">
-        <button type="button" className="lg-go quiet" disabled={at === 0} onClick={() => setPage(at - 1)} aria-label="Previous page">‹</button>
-        <span>Page {at + 1} of {pages}</span>
-        <button type="button" className="lg-go quiet" disabled={at >= pages - 1} onClick={() => setPage(at + 1)} aria-label="Next page">›</button>
-      </div>
+        }} />}
+      {pulls.length > 0 && (
+        <section className="cd-wall">
+          <h5>Pulls wall <span>your hits, newest first</span></h5>
+          <div className="cd-chase-row">
+            {pulls.map((p, k) => (
+              <button key={k} type="button" className="cd-chase-card got" onClick={() => onLook(setId, p.card[0])}>
+                <CardFace setId={setId} card={p.card} variant={p.v} still lazy />
+                <span><RarityMark rarity={p.card[3]} /> {new Date(p.when).toLocaleDateString()}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

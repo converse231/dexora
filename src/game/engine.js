@@ -44,7 +44,7 @@ import {
 } from "./league.js";
 import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
 import {
-  openPack as rollPack, rulesOf, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX,
+  openPack as rollPack, rulesOf, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX, cleanBinders, BINDER_MAX, BINDER_POCKETS,
   dustOf, craftCost, sparesOf, sweepOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, STREAK_PACK, DUST_PACK,
   MASTER_DUST, printingsOf, CARD_SHOW, showKey,
 } from "./cards.js";
@@ -228,6 +228,7 @@ function freshState() {
     cardDay: null,        // the day the last pack opened - the daily first pack
     boxVouchers: [],      // free boxes of your choice, by where they came from ("dex:1")
     cardShowcase: [],     // cards on your trainer card, "me01-187:h" - the server checks each
+    binders: [],          // your own binders, `{ id, name, pockets }` - see `cleanBinders`
     rift: null,           // an open space-time rift, `{ areaId, left }` - see events.js
     sinceTravel: 0,       // steps since the map last changed, which is what opens a rift
     /* One quest a day. `key` is the local date it belongs to, so a new day is
@@ -666,6 +667,7 @@ function loadState() {
         .filter((v) => typeof v === "string" && v.length <= 64).slice(0, 50),
       cardShowcase: [...new Set(Array.isArray(s.cardShowcase) ? s.cardShowcase : [])]
         .filter((v) => typeof v === "string" && /^[\w.]+-\w+:[nhr]$/.test(v)).slice(0, CARD_SHOW),
+      binders: cleanBinders(s.binders),
       /* A save from before `paid` existed was paid for every level it had
          reached, and never past the old cap of 50 - so that is where it
          stands, and anything above is owed. Never above its own level, so no
@@ -3217,6 +3219,57 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
+  /* YOUR OWN BINDERS (cards.js `cleanBinders`). Each write goes through the
+     same cleaner a load does, so a binder in the state is always one a load
+     would keep. None of them checks you still hold a card: a pocket keeps
+     its card through a sale and the page draws it faded. */
+  function newBinder(name = "") {
+    if (state.binders.length >= BINDER_MAX) return null;
+    let id;
+    do id = Math.random().toString(36).slice(2, 10); while (state.binders.some((b) => b.id === id));
+    state.binders = cleanBinders([...state.binders, { id, name: name || `Binder ${state.binders.length + 1}`, pockets: [] }]);
+    save();
+    changed();
+    return id;
+  }
+  function setBinder(id, patch) {
+    const at = state.binders.findIndex((b) => b.id === id);
+    if (at < 0 || !patch || typeof patch !== "object") return false;
+    const next = [...state.binders];
+    next[at] = { ...next[at], ...(typeof patch.name === "string" && { name: patch.name }), ...(Array.isArray(patch.pockets) && { pockets: patch.pockets }) };
+    state.binders = cleanBinders(next);
+    save();
+    changed();
+    return true;
+  }
+  function deleteBinder(id) {
+    if (!state.binders.some((b) => b.id === id)) return false;
+    state.binders = state.binders.filter((b) => b.id !== id);
+    save();
+    changed();
+    return true;
+  }
+  /* Into a binder: `at` puts one card in that pocket; without it, each card
+     fills the first empty pocket and then goes on the end. Refused (nothing
+     written) when it would not all fit. */
+  function addToBinder(id, keys, at = null) {
+    const b = state.binders.find((x) => x.id === id);
+    if (!b || !Array.isArray(keys) || !keys.length) return false;
+    const pockets = [...b.pockets];
+    if (at != null) {
+      if (!Number.isInteger(at) || at < 0 || at >= BINDER_POCKETS) return false;
+      while (pockets.length <= at) pockets.push(null);
+      pockets[at] = keys[0];
+    } else {
+      for (const k of keys) {
+        const gap = pockets.indexOf(null);
+        if (gap >= 0) pockets[gap] = k; else pockets.push(k);
+      }
+      if (pockets.length > BINDER_POCKETS) return false;
+    }
+    return setBinder(id, { pockets });
+  }
+
   /* OPEN ONE, decided and SAVED before a frame of the scene plays: a reload
      mid-opening loses nothing. `set` is `{ SET, CARDS }` from the lazy page
      (the engine never imports card data); it must be the set it says it is.
@@ -4023,6 +4076,10 @@ export function createEngine(canvas, onChange, mini = null) {
     claimAchievements,
     dexClaims,
     showCard,
+    newBinder,
+    setBinder,
+    deleteBinder,
+    addToBinder,
     buyCandy,
     useField,
     useBerry,

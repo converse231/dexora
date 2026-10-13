@@ -800,7 +800,14 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   Double rare, the room above earned stamps spent ONCE across printings. The
   card view offers a held printing only its spares and a missing one only its
   craft (2026-10-13); one set (`SetPicker`, grouped by series) is shared by
-  the Binder and Dust. Dust's other use is a pack
+  the Binder and Dust. **The Binder draws pages through `BinderPages`**
+  (Binders.jsx: nine pockets, a two-page spread from 720px), and **My
+  Binders** are the save's `binders` (`cleanBinders` in cards.js; the engine's
+  `newBinder`, `setBinder`, `deleteBinder`, `addToBinder`): a pocket keeps a
+  card you no longer hold and draws it faded, so a sale never loses a layout.
+  Anything a binder opens over the page (the picker, its Confirm) is PORTALLED
+  to the body - `.tc-main` isolates, and a sheet inside it sat under the
+  pinned header (2026-10-13). Dust's other use is a pack
   of an open set (`DUST_PACK` 400, `dustPack`), held above what a pack of
   spares dusts to (check.mjs re-measures every set). The Card Shop takes it for
   any option (`dustPack(set, n)`, all or none, outside the cart) at

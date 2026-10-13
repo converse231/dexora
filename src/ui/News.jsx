@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-13-my-binders",
+    icon: "📖",
+    date: "October 2026",
+    title: "My Binders",
+    items: [
+      ["Your own binders", "Cards → Binder → My binders: fill a binder with cards from any set."],
+      ["Real binder pages", "Nine cards a page, with two pages side by side on a big screen."],
+      ["From any card", "Open a card and choose Add to a binder."],
+    ],
+  },
+  {
     id: "2026-10-13-rare-spares",
     icon: "🍬",
     date: "October 2026",

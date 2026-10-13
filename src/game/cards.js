@@ -254,6 +254,32 @@ export const MILESTONES = [[0.25, 200], [0.5, 500], [0.75, 1000], [1, 2000]];
    gold binder cover - paid once, as the step past MILESTONES. */
 export const MASTER_DUST = 5000;
 export const printingsOf = (cards) => cards.reduce((n, c) => n + c[4].length, 0);
+/* YOUR OWN BINDERS (asked for, 2026-10-13): cards from any set, in the order
+   you put them. A binder is `{ id, name, pockets }`, a pocket a printing key
+   ("me01-187:h") or null for an empty one. A card you later dust or trade
+   STAYS in its pocket and is drawn faded - the layout is yours and is never
+   lost to a sale. Nine pockets a page, like a real binder page. */
+export const PAGE_POCKETS = 9;
+export const BINDER_MAX = 20;
+export const BINDER_POCKETS = 40 * PAGE_POCKETS;
+export const BINDER_NAME = 24;
+const POCKET_KEY = /^[\w.]+-\w+:[nhr]$/;
+export function cleanBinders(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [], ids = new Set();
+  for (const b of raw) {
+    if (!b || typeof b !== "object" || typeof b.id !== "string" || !/^[a-z0-9]{1,16}$/.test(b.id) || ids.has(b.id)) continue;
+    const name = typeof b.name === "string" ? b.name.trim().slice(0, BINDER_NAME) : "";
+    const pockets = (Array.isArray(b.pockets) ? b.pockets : []).slice(0, BINDER_POCKETS)
+      .map((k) => (typeof k === "string" && POCKET_KEY.test(k) ? k : null));
+    while (pockets.length && pockets.at(-1) === null) pockets.pop();
+    ids.add(b.id);
+    out.push({ id: b.id, name: name || "My binder", pockets });
+    if (out.length >= BINDER_MAX) break;
+  }
+  return out;
+}
+
 // How many cards of a showcase a trainer card shows (trade_limit('CARD_SHOW')).
 export const CARD_SHOW = 6;
 export const showKey = (id, variant) => `${id}:${variant}`;
