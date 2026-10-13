@@ -38,15 +38,15 @@ export default function PartyPick({ engine, box, party, research, onClose }) {
         <div className="set-top">
           <h3>Walking party</h3>
           <span className="set-mail">Up to {PARTY_MAX}. The one walking lends its ability.</span>
+          <button type="button" className="set-x" aria-label="Close" onClick={onClose}>✕</button>
+        </div>
+        <div className="vr-body">
           {(free || waiting > 0) && (
             <p className="pp-note">
               {free ? `Your first partner is free. The rest join at research Lv ${PARTNER_LEVEL}.`
                 : `${waiting} more of your species join at research Lv ${PARTNER_LEVEL}.`}
             </p>
           )}
-          <button type="button" className="set-x" aria-label="Close" onClick={onClose}>✕</button>
-        </div>
-        <div className="vr-body">
           <ol className="pp-slots">
             {slots.map((m, i) => (
               <li key={m ? m.uid : `empty${i}`} className={m ? "" : "empty"}>
