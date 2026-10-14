@@ -791,10 +791,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   clock in it, and under it `.hud-tasks` - the quest, check-in, spin, reward),
   WHAT'S ACTING top right (`.hud-status`: events, item rings, the perk, the
   combo ring), THE DOCK bottom left (`.hud-dock`: minimap and party), the
-  balls bottom right. Upright on touch the tasks and the dock sit UNDER the
-  map (the viewport reserves `--dock-h`), held sideways the tasks take the
-  left column under Menu. A new HUD element joins a zone, never a corner of
-  its own. Audit at all nine sizes (desktop, laptop, both tablets, two phones,
+  balls bottom right. Upright on a phone all of it stays ON the map a size
+  down (30px chips, 34px rings: a bottom screen under the map read as outside
+  the game, 2026-10-14); held sideways the tasks take the left column under
+  Menu, on the Menu key's own offsets. A new HUD element joins a zone, never
+  a corner of its own. Audit at all nine sizes (desktop, laptop, both tablets, two phones,
   three sideways).
 - **Cards are designed in docs/cards.md** - change a decision there first, and
   build one phase at a time behind its QA gate. **A collection, never a

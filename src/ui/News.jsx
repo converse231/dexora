@@ -36,7 +36,7 @@ export const NEWS = [
       ["Catch Combo", "Catch the same Pokémon again and again. At 10, 20 and 30 in a row its rare forms get likelier."],
       ["Keep the chain", "Catch others as you like. If the chained one flees or you run, the chain breaks."],
       ["Cries", "Pokémon call out when you meet them. Turn it off on You."],
-      ["A tidier screen", "Your party and today's quest sit under the map on a phone."],
+      ["A tidier screen", "The map's buttons are smaller and grouped by corner, so the map stays clear."],
     ],
   },
   {
