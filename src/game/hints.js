@@ -1,5 +1,4 @@
 import { COMBO_STEPS } from "./combo.js";
-import { RUSTLE_LIFT, RUSTLE_STEPS } from "./rustle.js";
 
 /* THE TUTORIAL IS NOT A TUTORIAL. Nobody reads a five-step tour of a game they
    have not played yet, and this one has nothing to explain until you are
@@ -48,17 +47,17 @@ export const HINTS = [
     when: (e) => e.kind === "fled",
     text: "It ran. Berries make that less likely — a Nanab stops it outright.",
   },
+  /* WEEKLY BINGO, the first time a square fills (2026-10-14): the update's
+     one-time card, said at the moment the card means something. */
+  {
+    id: "bingo",
+    when: (e) => e.kind === "bingo",
+    text: "Weekly Bingo! You just filled a square on this week's card. Finish a line of five "
+      + "for a prize - the centre is free. See it on the Events page.",
+  },
   /* THE CATCH CHAIN, the first time one starts (2026-10-14): the update's
      one-time card on the map, at the moment it means something. Before
      `duplicate`, which a second catch of a species also reaches. */
-  /* A RUSTLING SPOT, the first time the grass shakes (2026-10-14): the
-     update's map card, said while the spot is there to be walked to. */
-  {
-    id: "spot",
-    when: (e) => e.kind === "spot",
-    text: `The grass is rustling! Walk into the shaking patch: something is there for sure, `
-      + `and rare forms are ${RUSTLE_LIFT}x as likely. It settles after ${RUSTLE_STEPS} steps.`,
-  },
   {
     id: "combo",
     when: (e) => e.kind === "caught" && e.chain === 2,

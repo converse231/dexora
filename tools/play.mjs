@@ -3064,104 +3064,6 @@ await savedField("combo", { species: 25, n: 12 }, "junk", null);
 }
 console.log("combo ok — a chain builds, resets, breaks on a flee or a run, survives a reload and lifts the roll");
 
-/* RUSTLING SPOTS (rustle.js, 2026-10-14). A spot is tall grass between NEAR
-   and FAR of you; every roll landing raises one through a real step (a max
-   repel keeps ordinary meetings off), that step meets nothing, and the first
-   one shows its card; it settles after RUSTLE_STEPS steps of yours; walked
-   into, it is a meeting for sure even under the repel; and one left on
-   another map is dropped. */
-{
-  const R = await import("../src/game/rustle.js");
-  const { AREAS } = await import("../src/game/mapdata.js");
-  const { HINT_IDS } = await import("../src/game/hints.js");
-  const dist = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-  const grass = (x, y) => (x * 7 + y * 3) % 4 === 0;
-  for (let i = 0; i < 300; i++) {
-    const c = R.pickSpot(20, 20, grass, () => true);
-    const d = Math.abs(c[0] - 20) + Math.abs(c[1] - 20);
-    assert.ok(grass(...c) && d >= R.RUSTLE_NEAR && d <= R.RUSTLE_FAR && Math.abs(c[1] - 20) <= R.RUSTLE_ROWS,
-      `a spot at ${c} is not grass in range`);
-  }
-  assert.equal(R.pickSpot(20, 20, () => false, () => true), null, "a spot rose where there is no grass");
-  assert.equal(R.pickSpot(20, 20, grass, () => false), null, "a spot rose outside the room you stand in");
-
-  const real = Math.random;
-  const quiet = { field: { repel: { id: "max-repel", steps: 9999 } }, hints: HINT_IDS.filter((h) => h !== "spot") };
-  const DIRS = [["right", 1, 0], ["down", 0, 1], ["left", -1, 0], ["up", 0, -1]];
-  const walk = (e, dir) => { e.press(dir); for (let i = 0; i < 14; i++) tick(16); e.clearHeld(); for (let i = 0; i < 20; i++) tick(16); };
-
-  /* The meadow's spawn has no tall grass near it: stand in a patch with
-     grass on every side and plenty more in range, found rather than named. */
-  const rows = AREAS.meadow.rows;
-  const G = (x, y) => rows[y]?.[x] === ",";
-  let home = null;
-  for (let y = 0; y < rows.length && !home; y++) {
-    for (let x = 0; x < rows[0].length && !home; x++) {
-      if (!G(x, y) || !DIRS.every(([, dx, dy]) => G(x + dx, y + dy))) continue;
-      let n = 0;
-      for (let v = -R.RUSTLE_FAR; v <= R.RUSTLE_FAR; v++) for (let u = -R.RUSTLE_FAR; u <= R.RUSTLE_FAR; u++) {
-        const k = Math.abs(u) + Math.abs(v);
-        if (k >= R.RUSTLE_NEAR && k <= R.RUSTLE_FAR && G(x + u, y + v)) n++;
-      }
-      if (n >= 10) home = { x, y, dir: "down" };
-    }
-  }
-  assert.ok(home, "the meadow has no patch of tall grass to test a spot in");
-  // No repel here: every roll landing would also meet something, but for the spot.
-  let { e } = boot({ ...SAVE, hints: quiet.hints, player: home });
-  Math.random = () => 0.001;
-  try {
-    for (let k = 0; k < 8 && !e.state.spot; k++) { e.state.hint = null; walk(e, DIRS[k % 4][0]); }
-  } finally { Math.random = real; }
-  const s = e.state.spot;
-  assert.ok(s, "every roll landing on a grassy map raised no rustling spot");
-  assert.equal(AREAS[s.areaId].rows[s.y][s.x], ",", "the spot is not on tall grass");
-  const d = dist(e.state.player, s);
-  assert.ok(d >= R.RUSTLE_NEAR && d <= R.RUSTLE_FAR, `the spot is ${d} steps away`);
-  assert.equal(s.left, R.RUSTLE_STEPS, "a new spot does not last RUSTLE_STEPS");
-  assert.ok(!e.state.encounter, "the step the grass started shaking also met something");
-  assert.ok(e.state.hints.includes("spot"), "the first spot showed no card");
-
-  // Back and forth beside where it rose: it settles on its last step.
-  Math.random = () => 0.99;
-  try {
-    const from = e.state.steps;
-    for (let k = 0; k < 400 && e.state.spot; k++) {
-      const [dir, dx, dy] = DIRS[k % 4];
-      if (e.state.player.x + dx === s.x && e.state.player.y + dy === s.y) continue;
-      walk(e, dir);
-      assert.ok(!e.state.encounter, "a quiet step met something");
-      if (e.state.spot) assert.ok(e.state.steps - from < R.RUSTLE_STEPS, "a spot outlived its steps");
-    }
-    assert.equal(e.state.spot, null, "a spot never settled");
-    assert.equal(e.state.steps - from, R.RUSTLE_STEPS, "a spot settled early");
-  } finally { Math.random = real; }
-
-  // Walked into: a meeting for sure, under a max repel, and the spot is spent.
-  ({ e } = boot({ ...SAVE, ...quiet }));
-  Math.random = () => 0.99;
-  try {
-    for (const [dir, dx, dy] of DIRS) {
-      const p = e.state.player, to = { x: p.x + dx, y: p.y + dy };
-      e.state.spot = { areaId: e.state.areaId, ...to, left: 9 };
-      walk(e, dir);
-      if (e.state.player.x === to.x && e.state.player.y === to.y) break;
-    }
-  } finally { Math.random = real; }
-  assert.equal(e.state.encounter?.source, "spot", "walking into the shaking grass met nothing");
-  assert.equal(e.state.spot, null, "a spot walked into stayed up");
-  until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
-  e.flee(true);
-  until(e, (st) => !st.encounter, "the encounter to close", 4000);
-
-  // One left behind on another map goes on the next step and is never met.
-  e.state.spot = { areaId: "pond", x: e.state.player.x + 1, y: e.state.player.y, left: 9 };
-  Math.random = () => 0.99;
-  try { walk(e, "left"); walk(e, "right"); } finally { Math.random = real; }
-  assert.equal(e.state.spot, null, "a spot on another map was kept");
-}
-console.log("rustle ok — grass in range, rises on a quiet step with its card, settles on time, met for sure when walked into");
-
 /* WHO'S THAT POKEMON (quiz.js, 2026-10-14). The day's four names are four
    species of one generation including the answer, and the days move both
    the answer and where it sits; one answer a day, a wrong one pays nothing,
@@ -3203,6 +3105,100 @@ await savedField("quiz", { day: "20261014", ok: true }, { day: 5, ok: "yes" }, n
   assert.equal(boot({ ...SAVE, quiz: e.state.quiz }).e.quiz().done?.ok, true, "today's answer did not survive a reload");
 }
 console.log("quiz ok — four names of one generation, one answer a day, a right one pays and is seen, never caught");
+
+/* WEEKLY BINGO (bingo.js, 2026-10-14). The week turns on Monday; a card is
+   24 different squares round a free centre, the same for the same week and
+   what you can do, with nothing you cannot (no rod, no shut region), and
+   weeks differ in what they ask. Through the engine: a step fills a walking
+   square and finishes its line with a banner and the card's tip once; a
+   claim pays each finished line once; a full card pays its pack; a catch
+   counts for catch, type and region squares; last week's card is replaced. */
+{
+  const B = await import("../src/game/bingo.js");
+  const { HINT_IDS } = await import("../src/game/hints.js");
+  const { genOf, speciesById } = await import("../src/game/biomes.js");
+  assert.equal(B.weekKey(new Date(2026, 9, 18)), "20261012", "a Sunday is not in the week its Monday began");
+  assert.equal(B.weekKey(new Date(2026, 9, 19)), "20261019", "a Monday did not start a new week");
+  const low = { level: 1, fish: false, packs: false, missing: 900 };
+  const high = { level: 60, fish: true, packs: true, missing: 0 };
+  const c1 = B.cardFor("20261012", low);
+  assert.equal(c1.length, 25, "a card is not five by five");
+  assert.equal(c1[B.FREE], null, "the centre is not free");
+  assert.equal(new Set(c1.filter(Boolean).map(String)).size, 24, "a card repeats a square");
+  assert.deepEqual(B.cardFor("20261012", low), c1, "the same week drew a different card");
+  const asked = new Set();
+  for (let w = 0; w < 12; w++) {
+    const key = B.weekKey(new Date(2026, 0, 5 + 7 * w));
+    const lo = B.cardFor(key, low).filter(Boolean);
+    assert.ok(lo.every(([k, , p]) => !["fish", "pack"].includes(k) && !(k === "gen" && p > 1)), `${key}: a square asks for what level 1 cannot do`);
+    assert.ok(B.cardFor(key, high).filter(Boolean).every(([k]) => k !== "new"), `${key}: a finished Pokédex is asked for a new entry`);
+    for (const c of B.cardFor(key, high)) if (c) asked.add(String(c));
+  }
+  assert.ok(asked.size > 28, `twelve weeks asked only ${asked.size} different things`);
+  assert.equal(B.LINES.length, 12, "rows, columns and diagonals are not 12 lines");
+  assert.ok(B.LINES.every((l) => l.length === 5 && new Set(l).size === 5), "a line is not five squares");
+
+  await savedField("bingo", B.fresh(B.weekKey(), low), { week: "soon", cells: [] }, null);
+
+  const real = Math.random;
+  const walk = (e, dir) => { e.press(dir); for (let i = 0; i < 14; i++) tick(16); e.clearHeld(); for (let i = 0; i < 20; i++) tick(16); };
+  const step = (e) => {
+    const from = e.state.steps;
+    Math.random = () => 0.99;
+    try { for (const d of ["right", "left", "down", "up"]) { walk(e, d); if (e.state.steps > from) break; } } finally { Math.random = real; }
+    assert.ok(e.state.steps > from, "the trainer could not take a step");
+  };
+  // A card whose top row is walking, one step each: the first step finishes it.
+  const cells = Array.from({ length: 25 }, (_, i) => (i === B.FREE ? null : ["catch", 99, null]));
+  for (const i of B.LINES[0]) cells[i] = ["walk", 1, null];
+  const card = { week: B.weekKey(), cells, n: Array(25).fill(0), lines: [], full: false };
+  let { e } = boot({ ...SAVE, bingo: card, hints: HINT_IDS.filter((h) => h !== "bingo") });
+  step(e);
+  assert.ok(B.LINES[0].every((i) => B.doneAt(e.state.bingo, i)), "a step did not fill the walking squares");
+  assert.ok(e.state.cheers.some((c) => c.kind === "bingo" && c.title === "BINGO!"), "a finished line raised no banner");
+  assert.ok(e.state.hints.includes("bingo"), "the first filled square showed no card");
+  const candy = e.state.candy, great = e.state.bag["great-ball"] ?? 0;
+  const got = e.claimBingo();
+  assert.equal(got?.lines, 1, "the finished line was not claimed");
+  assert.equal(e.state.candy, candy + B.BINGO_LINE.candy, "a line did not pay its candy");
+  assert.equal(e.state.bag["great-ball"], great + B.BINGO_LINE.items["great-ball"], "a line did not pay its balls");
+  assert.equal(e.claimBingo(), null, "a line was paid twice");
+  assert.deepEqual(e.state.bingo.lines, [0], "the paid line was not recorded");
+
+  // The whole card: every line and the card itself, the pack among it.
+  ({ e } = boot({ ...SAVE, bingo: { ...card, n: cells.map((c) => (c ? c[1] : 0)) } }));
+  const packs = Object.values(e.state.packs ?? {}).reduce((a, b) => a + b, 0);
+  const all = e.claimBingo();
+  assert.ok(all?.full && all.lines === B.LINES.length, "a full card did not pay every line and the card");
+  assert.equal(all.packs, B.BINGO_FULL.packs, "a full card paid no pack");
+  assert.equal(Object.values(e.state.packs).reduce((a, b) => a + b, 0), packs + B.BINGO_FULL.packs, "the full card's pack never reached the bag");
+  assert.equal(e.claimBingo(), null, "a full card was paid twice");
+
+  // A catch counts where it should: any catch, its type, its region.
+  const pika = 25;
+  const kinds = Array.from({ length: 25 }, (_, i) => (i === B.FREE ? null : ["walk", 9999, null]));
+  kinds[0] = ["catch", 5, null]; kinds[1] = ["type", 5, "electric"]; kinds[2] = ["type", 5, "water"]; kinds[3] = ["gen", 5, genOf(pika)];
+  ({ e } = boot({ ...SAVE, bingo: { ...card, cells: kinds } }));
+  const meet = () => {
+    const enc = e.state.encounter ?? walkToEncounter(e);
+    assert.ok(enc, "walked a whole map and met nothing");
+    until(e, (s) => s.encounter?.phase === "idle", "the encounter to settle");
+    Object.assign(e.state.encounter, { speciesId: pika, alpha: false, variant: null, types: speciesById(pika).types });
+  };
+  meet();
+  e.state.bag["master-ball"] = 1;
+  e.throwBall("master-ball");
+  e.answerAsk(true);
+  until(e, (s) => !s.encounter || s.encounter.phase === "caught", "the catch");
+  assert.deepEqual(e.state.bingo.n.slice(0, 4), [1, 1, 0, 1], "a catch of Pikachu did not count for catch, Electric and Kanto only");
+
+  // Last week's card goes on the next thing noted.
+  ({ e } = boot({ ...SAVE, bingo: { ...card, week: "20200106" } }));
+  step(e);
+  assert.equal(e.state.bingo.week, B.weekKey(), "last week's card was kept");
+  assert.notDeepEqual(e.state.bingo.cells, cells, "last week's squares were kept");
+}
+console.log("bingo ok — a card a week, gated and varied; a line pays once, a full card its pack; a catch counts where it should");
 
 /* LOOKS, THROUGH THE ENGINE (2026-10-01). Walking Tanoby meets Unown in more
    than one letter; Type: Null evolves into the Silvally the roll picks; a Blue

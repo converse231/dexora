@@ -20,6 +20,7 @@ import {
   tasksFor, progress, researchLevel, researchPoints, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../game/research.js";
 import { badgesOf } from "../game/league.js";
+import Bingo from "./Bingo.jsx";
 
 const NEAREST = 10;  // how many unfinished entries the Discovery card lists (4 until 2026-10-13, asked for)
 
@@ -74,7 +75,7 @@ function Pips({ total, spent, label: aria }) {
 /* THE EVENTS BOARD, as the Rotom panel's Events app (2026-10-01). It was a
    dialog off the ☰ menu and the HUD's cards; both now open this app beside
    the game, which is still being played - so it locks no keys. */
-export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onStar }) {
+export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onStar, bingo, onClaimBingo }) {
   const ob = world?.outbreak ?? null;
   const obSp = ob && speciesById(ob.speciesId);
   const obLive = ob && ob.left > 0;
@@ -99,6 +100,8 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
 
   const board = (
         <div className="hp-body">
+          {/* WEEKLY BINGO - the week's card, first: it is what every other card feeds. */}
+          <Bingo card={bingo} onClaim={onClaimBingo} />
           {/* OUTBREAK - the raid of the day. */}
           <section className={`ev-card ev-raid${obLive ? " live" : ""}`}>
             <header className="ev-banner">
