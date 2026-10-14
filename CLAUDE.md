@@ -908,7 +908,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `shiny` and `shinyultra`) is an `EXTRA_ROLLS` key a set's row may name.
   **Phase 4**: every printing of a set is its MASTER step (`MILESTONES.length
   + 1`, `MASTER_DUST`); titles are `titleIds` (titles.js) and the SQL's
-  `card_titles` the same rule (tradedb holds them equal); the trainer card's
+  `card_titles` the same rule (tradedb holds them equal) - a set's title DRAWS
+  as the set's logo (`titleLogo`, `TitleBadges`), a Master's with a gold tag,
+  and a Master hides its own Collector (`shownTitles`; your call 2026-10-15,
+  the names were sentences on a card); the trainer card's
   `card_show` comes off the STORED save through `card_showcase` (held
   printings only, `CARD_SHOW` = `trade_limit`), written by the trigger alone.
 - **A finished generation is a medal** (`gen:<g>` in medals.js, your call

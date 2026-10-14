@@ -31,6 +31,17 @@ export function titleIds(milestones = {}, medals = []) {
 const DRAWN = /^dex:[1-9]$/;
 export const titleBadge = (t) => (DRAWN.test(t) ? `titles/${t.replace(":", "-")}.png` : null);
 
+/* A CARD SET'S TITLE IS ITS LOGO (asked for, 2026-10-15: "Phantasmal Flames
+   Master Collector" as a pill was a sentence on a trainer card): the set's
+   own logo, which every set ships (public/cards/<id>/logo.webp, npm run
+   cards; check.mjs holds each to the disk), the name in its tooltip. */
+export const titleLogo = (t) => (/^(set|master):/.test(t) ? `cards/${t.split(":")[1]}/logo.webp` : null);
+
+/* What a trainer card shows: a set's Master Collector says its Collector
+   already, so the two are one badge. */
+export const shownTitles = (titles = []) =>
+  titles.filter((t) => !(t.startsWith("set:") && titles.includes(`master:${t.slice(4)}`)));
+
 const setName = (id) => CARD_SETS.find((s) => s.id === id)?.name ?? id;
 export function titleName(t) {
   const [kind, id] = t.split(":");
