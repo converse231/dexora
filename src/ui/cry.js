@@ -22,8 +22,9 @@ const plays = {
 };
 let last = null;
 
-export function playCry(id) {
-  if (!criesOn()) return;
+// `asked`: a press that asks for the cry (the quiz's hint) plays it even with cries off.
+export function playCry(id, asked = false) {
+  if (!criesOn() && !asked) return;
   const at = CRY_OF[id] ?? id;
   const kind = CRY_MP3.has(at) ? "mp3" : "ogg";
   if (!plays[kind]) return;

@@ -4676,6 +4676,32 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(COMBO_STEPS.at(-1)[1] <= DEX_CHARM,
         `a catch chain (x${COMBO_STEPS.at(-1)[1]}) outranks the Pokedex Charm (x${DEX_CHARM})`);
     }
+    /* A RUSTLING SPOT (rustle.js) is one extra meeting at a lift: never past
+       the Pokedex Charm, and asked of the one roll. Its rare forms, met at
+       every spot, add under 15% to what walking grass turns up - a spot is
+       a thing to walk to, not a second income. */
+    {
+      const R = await import("../src/game/rustle.js");
+      const { DEX_CHARM } = await import("../src/game/medals.js");
+      assert.ok(R.RUSTLE_LIFT > 1 && R.RUSTLE_LIFT <= DEX_CHARM, `a rustling spot lifts x${R.RUSTLE_LIFT}`);
+      const extra = R.RUSTLE_LIFT / (R.RUSTLE_EVERY * ENCOUNTER_RATE);
+      assert.ok(extra < 0.15, `rustling spots add ${(extra * 100).toFixed(1)}% to walking's rare forms`);
+      assert.ok(R.RUSTLE_NEAR >= 2 && R.RUSTLE_FAR >= R.RUSTLE_NEAR, "a spot can rise underfoot");
+      // In view on the smallest screen: VIEW_W x VIEW_H around you, less the tile at the edge.
+      const { VIEW_W, VIEW_H } = await import("../src/game/engine.js");
+      assert.ok(R.RUSTLE_ROWS <= (VIEW_H - 1) / 2 - 1 && R.RUSTLE_FAR <= (VIEW_W - 1) / 2 - 1,
+        "a rustling spot can rise outside the view");
+      assert.match(roller, /rollVariant\([\s\S]{0,500}?RUSTLE_LIFT/,
+        "the variant roll in engine.js does not ask RUSTLE_LIFT - a spot lifts nothing");
+    }
+    /* THE DAILY QUIZ pays no more than a check-in day's candy: a guess is a
+       daily nicety, not a candy stream. */
+    {
+      const { QUIZ_PAY } = await import("../src/game/quiz.js");
+      const { CHECKIN_REWARDS } = await import("../src/game/checkin.js");
+      const most = Math.max(...CHECKIN_REWARDS.map((r) => r.candy ?? 0));
+      assert.ok(QUIZ_PAY.candy > 0 && QUIZ_PAY.candy <= most, `the quiz pays ${QUIZ_PAY.candy} candy against a check-in day's ${most}`);
+    }
 
     /* AND IT IS NOT THE INCOME. A 3,500-encounter playthrough of every map,
        caught 60% of the time, every task given its fair chance: what research
