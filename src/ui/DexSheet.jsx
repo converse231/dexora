@@ -32,6 +32,7 @@ import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
 import DexCards from "./cards/DexCards.jsx";
 import { sageArt, SAGE_CREDIT } from "../game/biomes.js";
+import { hasLook } from "../game/gender.js";
 import {
   tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../game/research.js";
@@ -255,12 +256,16 @@ export default function DexSheet({
      Kindest first, which is what makes the row read as progress. */
   const forms = [
     [null, "Ordinary", "the sprite everyone meets"],
+    // HER LOOK (gender.js): beside the ordinary picture, not among the tiers.
+    ...(hasLook(id) ? [["female", "Female", "her own look"]] : []),
     ...[...tiersFor(id)].reverse().map((t) => [t, LABEL(t), BLURB[t] ?? ""]),
   ];
   /* THE ROSETTE IS ANY FOUR, and this label has to say the same thing the Dex
      tile does - two answers to "is this complete" is how one screen shows the
      badge and the other does not. */
-  const heldCount = forms.filter(([t]) => t !== null && got(t)).length;
+  const heldCount = forms.filter(([t]) => t !== null && t !== "female" && got(t)).length;
+  // The rare forms a species can wear: her look is a cell, not one of them.
+  const rareCount = forms.filter(([t]) => t !== null && t !== "female").length;
   const every = heldCount >= ROSETTE_NEED;
 
   /* WHICH FORM THE PORTRAIT IS SHOWING. It was fixed at the rarest one held,
@@ -291,7 +296,7 @@ export default function DexSheet({
      research, the line and where to look, one scroll. */
   const rLevel = researchLevel(id, research);
   const tabs = caught ? [
-    ["forms", "Forms", `${heldCount}/${forms.length - 1}`],
+    ["forms", "Forms", `${heldCount}/${rareCount}`],
     ["info", "Info", `Lv ${rLevel}`],
   ] : [];
   const [tab, setTab] = useState(() => lastTab);
@@ -341,10 +346,11 @@ export default function DexSheet({
           <span className={`sheet-portrait${caught ? "" : " locked"}`}>
             <Sprite
               id={id}
-              variant={caught ? shown : null}
+              variant={caught && shown !== "female" ? shown : null}
+              sex={caught && shown === "female" ? "f" : null}
               className={`sheet-art${caught ? "" : " locked"}`}
             />
-            {caught && <VariantFx key={`fx-${shown ?? "plain"}`} id={id} variant={shown} />}
+            {caught && shown !== "female" && <VariantFx key={`fx-${shown ?? "plain"}`} id={id} variant={shown} />}
           </span>
           <div className="sheet-id">
             <div className="sheet-no">#{String(id).padStart(3, "0")}</div>
@@ -367,7 +373,7 @@ export default function DexSheet({
                       data-tip={`Research Lv ${rLevel} of ${RESEARCH_MAX}`}>
                       <b>{rLevel}</b>
                     </span>
-                    <span><b>{heldCount}/{forms.length - 1}</b> forms</span>
+                    <span><b>{heldCount}/{rareCount}</b> forms</span>
                     <span><b>{owned}</b> owned</span>
                   </div>
                 )}
@@ -416,11 +422,11 @@ export default function DexSheet({
                     {every ? (
                       <span className="sf-all">
                         {/* "COMPLETE" read as every form held (reported). */}
-                        <Mark tier="complete" size={14} /> ROSETTE · {heldCount}/{forms.length - 1}
+                        <Mark tier="complete" size={14} /> ROSETTE · {heldCount}/{rareCount}
                       </span>
                     ) : (
                       <span className="sf-tally">
-                        <b>{heldCount}<i>/{forms.length - 1}</i></b>
+                        <b>{heldCount}<i>/{rareCount}</i></b>
                         <em>{ROSETTE_NEED} for the rosette</em>
                       </span>
                     )}
@@ -481,10 +487,11 @@ export default function DexSheet({
                               larger than its eight neighbours. */}
                           <Sprite
                             id={id}
-                            variant={STRIP_TIERS.has(t) && !got(t) ? null : t}
+                            variant={t === "female" ? null : STRIP_TIERS.has(t) && !got(t) ? null : t}
+                            sex={t === "female" ? "f" : null}
                             alt={`${name} ${label(sp)}`}
                           />
-                          <VariantFx id={id} variant={t} />
+                          {t !== "female" && <VariantFx id={id} variant={t} />}
                           {/* A MARK ONLY APPEARS ON A CELL YOU HAVE EARNED, and
                               before this it appeared on all nine, greyed out.
 

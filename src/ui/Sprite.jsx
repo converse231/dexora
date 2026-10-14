@@ -24,6 +24,7 @@
 
 import { artOf } from "../game/items.js";
 import { lockedTiers } from "../game/biomes.js";
+import { femaleArtFor } from "../game/gender.js";
 
 const FOLDER = { shiny: "shiny/", origin: "origin/", showdown: "showdown/", cadence: "cadence/" };
 /* THE TIERS THAT ARE A STRIP RATHER THAN A PICTURE. They share one class,
@@ -100,9 +101,15 @@ export const onSpriteError = (ev) => {
    two can never be paired again. `FRAMES` in tools/strip_frames.py; check.mjs
    holds the two equal. */
 export const STRIP_FRAMES = 16;
-export const spriteUrl = (id, variant = null) =>
-  new URL(`sprites/${FOLDER[variant] ?? ""}${id}.png${STRIP_TIERS.has(variant) ? `?f=${STRIP_FRAMES}` : ""}`,
+/* `sex`: a female of a species with a female look wears her own picture
+   (gender.js) - in the ordinary art and every tier drawn over it, and in a
+   shiny where she has one; Origin and the strips are their own art. */
+export const spriteUrl = (id, variant = null, sex = null) => {
+  const her = sex === "f" && femaleArtFor(id, variant);
+  const folder = her ? (variant === "shiny" ? "shiny/female/" : "female/") : FOLDER[variant] ?? "";
+  return new URL(`sprites/${folder}${id}.png${STRIP_TIERS.has(variant) ? `?f=${STRIP_FRAMES}` : ""}`,
     document.baseURI).href;
+};
 
 /* A POKEMON FROM BEHIND, for your side of a League battle - the one place a
    back path is derived (docs/battles.md, *Data model*). Shiny has back art of
@@ -363,13 +370,15 @@ export function TierReveal({ id, variant }) {
    Off by default, because the wrapper changes the DOM shape and every existing
    caller is laid out against a bare `<img>`. */
 export default function Sprite({
-  id, variant = null, className = "", alt = "", fx = false, eager = false,
+  id, variant = null, className = "", alt = "", fx = false, eager = false, sex = null,
 }) {
   /* Lazy is right for a Box of hundreds; the battle's one Pokemon is the
      point of the screen and must not wait for layout to be asked for. */
   const load = eager ? { loading: "eager", fetchpriority: "high" } : { loading: "lazy" };
   // A strip tier reaching the `<img>` paths below has no strip: draw the plain picture.
-  const src = spriteUrl(id, STRIP_TIERS.has(variant) ? null : variant);
+  const src = spriteUrl(id, STRIP_TIERS.has(variant) ? null : variant, sex);
+  // Her outline for a tier's layers, which are masked to the art they cover.
+  const art = sex === "f" ? src : null;
   /* THE TIERS THAT ARE NOT IMAGES. A strip in an `<img>` is eight creatures
      stacked in a column, so these have to be a box with a background - and it
      goes BEFORE the `fx` branch, because `VariantFx` returns null for a strip
@@ -411,7 +420,7 @@ export default function Sprite({
           data-plain={id}
           onError={onSpriteError}
         />
-        <VariantFx id={id} variant={variant} />
+        <VariantFx id={id} variant={variant} art={art} />
       </span>
     );
   }

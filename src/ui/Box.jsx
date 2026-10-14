@@ -34,6 +34,7 @@ import Sprite from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 import Preview from "./Preview.jsx";
 import { HUNDRED } from "../game/research.js";
+import { sexOf, looksFemale } from "../game/gender.js";
 
 // Rarest first: the order the Box, the Dex and the encounter all read in -
 // one array, in biomes.js, beside the odds that define it.
@@ -124,11 +125,15 @@ function Box({
          a guarantee nobody can see. It stacks on the tier, so an Alpha Shiny
          is a row of its own beside the plain Shiny. */
       const alpha = !!mon.alpha;
-      const key = `${mon.species}:${variant ?? ""}:${alpha ? "a" : ""}`;
+      /* HER LOOK IS A ROW TOO (gender.js): grouped with the males, the row's
+         one picture could never show the thing you caught her for. */
+      const look = looksFemale(mon.species, sexOf(mon));
+      const key = `${mon.species}:${variant ?? ""}:${alpha ? "a" : ""}${look ? "f" : ""}`;
       const g = byId.get(key) ?? {
         species: mon.species,
         variant,
         alpha,
+        look,
         count: 0,
         best: 0,
         mons: [],
@@ -666,10 +671,10 @@ function Box({
           const spare = group.spares.length;
           return (
             <div
-              key={`${group.species}:${group.variant ?? ""}:${group.alpha ? "a" : ""}`}
+              key={`${group.species}:${group.variant ?? ""}:${group.alpha ? "a" : ""}${group.look ? "f" : ""}`}
               className={`boxrow${group.ready ? " ready" : group.spares.length ? " spare" : ""}`}
             >
-              <Sprite id={group.species} variant={group.variant} fx />
+              <Sprite id={group.species} variant={group.variant} fx sex={group.look ? "f" : null} />
               {/* THE PICTURE OPENS A CLOSER LOOK. Laid over the sprite's own
                   grid cell rather than wrapped round it, so the sprite keeps
                   the `.boxrow > img` sizing every variant depends on. */}
@@ -701,6 +706,7 @@ function Box({
                       <Mark tier="alpha" size={11} />ALPHA
                     </span>
                   )}
+                  {group.look && <span className="bx-vtag bx-female" data-tip="Her own look">♀ FEMALE</span>}
                   {/* Held by a trade (docs/trading.md): it cannot be sold or
                       evolved until the trade closes, and this says why. */}
                   {group.mons.some((m) => m.lock) && (

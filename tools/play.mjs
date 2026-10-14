@@ -3200,6 +3200,44 @@ console.log("quiz ok — four names of one generation, one answer a day, a right
 }
 console.log("bingo ok — a card a week, gated and varied; a line pays once, a full card its pack; a catch counts where it should");
 
+/* GENDER (gender.js, 2026-10-15). A Mega answers for its base; the female
+   looks the Pokedex keeps are a saved list; through the engine, catching a
+   female of a species with a look records it with its banner, her Box entry
+   is female by the same rule the meeting used, and a boot records a look
+   the Box already holds (a trade, a save from before). */
+await savedField("females", [396], "junk", []);
+{
+  const G = await import("../src/game/gender.js");
+  const { FEMALE_ART } = await import("../src/data/genders.js");
+  for (let s = 75; s <= 125; s += 5) assert.equal(G.sexAt(10033, s), G.sexAt(3, s), "Mega Venusaur did not read its base's gender");
+  assert.equal(G.sexAt(81, 100), null, "Magnemite has a gender");
+  const look = [...FEMALE_ART][0];
+  const herSize = [...Array(51).keys()].map((k) => 75 + k).find((s) => G.sexAt(look, s) === "f");
+  const hisSize = [...Array(51).keys()].map((k) => 75 + k).find((s) => G.sexAt(look, s) === "m");
+  assert.ok(herSize && hisSize, `species ${look} has no female and male size`);
+
+  let { e } = boot({ ...SAVE, females: [] });
+  const enc = e.state.encounter ?? walkToEncounter(e);
+  assert.ok(enc, "walked a whole map and met nothing");
+  until(e, (s) => s.encounter?.phase === "idle", "the encounter to settle");
+  Object.assign(e.state.encounter, { speciesId: look, alpha: false, variant: null, size: herSize, sex: "f" });
+  e.state.bag["master-ball"] = 1;
+  e.throwBall("master-ball");
+  e.answerAsk(true);
+  until(e, (s) => !s.encounter || s.encounter.phase === "caught", "the catch");
+  assert.deepEqual(e.state.females, [look], "catching her did not put her look in the Pokédex");
+  assert.ok(e.state.cheers.some((c) => c.kind === "female"), "her look arrived with no banner");
+  assert.equal(G.sexOf(e.state.box.at(-1)), "f", "her Box entry is not female");
+
+  // A male of the same species records nothing.
+  ({ e } = boot({ ...SAVE, females: [], box: [...SAVE.box, { uid: 900, species: look, level: 5, size: hisSize, at: 1 }], nextUid: 901 }));
+  assert.deepEqual(e.state.females, [], "a male recorded a female look");
+  // A boot records a look the Box already holds.
+  ({ e } = boot({ ...SAVE, females: [], box: [...SAVE.box, { uid: 900, species: look, level: 5, size: herSize, at: 1 }], nextUid: 901 }));
+  assert.deepEqual(e.state.females, [look], "a boot did not record the look the Box holds");
+}
+console.log("gender ok — forms read their base, her look is caught and kept, a male records nothing, a boot catches up");
+
 /* LOOKS, THROUGH THE ENGINE (2026-10-01). Walking Tanoby meets Unown in more
    than one letter; Type: Null evolves into the Silvally the roll picks; a Blue
    Flabebe evolves into a Blue Floette, by its own row and with no roll. */

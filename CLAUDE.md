@@ -81,6 +81,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/data/abilities.js` | `npm run abilities` (PokeAPI, cached in .assets-src/abilities) |
 | `public/sprites/cadence/`, `src/data/cadence.js` | `npm run cadence` (Black and White's own idle, 16-frame strips at native pixels; `tools/strip_frames.py`, shared with Showdown's builder) |
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
+| `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
   National Dex alone, read by the fetchers).
@@ -665,6 +666,23 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   banners; the prize is CLAIMED on Events (`claimBingo`, each line once),
   never paid on the moment: `BINGO_LINE` / `BINGO_FULL`, no money or Master
   Ball, a week under the daily quest's candy at the streak cap (check.mjs).
+- **Gender is `gender.js`** (2026-10-15), DERIVED from species and size,
+  never stored: `size` already rides every save and trade (trading.sql's
+  column), so no new field and no server change. `sexAt` places the size in
+  `rollSize`'s own spread (its quantile, offset per species) - hashing the
+  raw size left a half-female species 24% female, sizes bunching in the
+  middle; check.mjs holds every species at its real ratio within one size's
+  step. A form reads its base (`of`). **38 species have a female LOOK**,
+  only where the female art comes from the ordinary sprite's own set (your
+  call: FireRed's 1-386 drew none, and HGSS's beside it was another pose) -
+  her picture in the ordinary art and every tier drawn over it, her shiny
+  where she has one, never Origin or a strip (`femaleArtFor`; `spriteUrl`
+  and `Sprite` take `sex`, tier layers mask to her `art`). `state.females`
+  (dex ids) is the Pokedex's record, set by `noteLook` on the catch, on an
+  evolution and at boot from the Box, so selling her keeps the mark. In the
+  Box she is a row of her own (as an alpha is); in the Dex she is a cell of
+  the Forms strip (`"female"`, outside the rosette's count) and `Mark` draws
+  her sign. A look, never a strength: nothing in a battle or a roll reads it.
 - **An alpha is a LAYER, not a tier**: `rollAlpha` (1 in `ALPHA_CHANCE`, never
   a legendary or costume, `canBeAlpha`) rolls BESIDE the tier, so an Alpha
   Shiny exists and is rarer than either. It was a tier for one pass and lost
@@ -794,8 +812,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   the end of styles.css, 2026-10-14): WHERE top left (the area card with the
   clock in it, and under it `.hud-tasks` - the quest, check-in, spin, reward),
   WHAT'S ACTING top right (`.hud-status`: events, item rings, the perk, the
-  combo ring), THE DOCK bottom left (`.hud-dock`: minimap and party), the
-  balls bottom right. Upright on a phone all of it stays ON the map a size
+  combo ring), THE DOCK bottom left (`.hud-dock`: the party STACKED ABOVE
+  the minimap - beside it, a Bag rail opened wide ran over it), the balls
+  bottom right. A desktop alert pill is two lines in 40px, tight (an 8px
+  gap put its words through the border); `pills.cjs`-style checks measure
+  each pill's words against its box. Upright on a phone all of it stays ON the map a size
   down (30px chips, 34px rings: a bottom screen under the map read as outside
   the game, 2026-10-14); held sideways the tasks take the left column under
   Menu, on the Menu key's own offsets. On touch the ALERTS (check-in, quiz,
@@ -1287,7 +1308,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   the Dex takes as many >= 76px columns as fit (`useRows` reads the count).
 - **Dialogs have a short-screen shape** (`max-height: 540px`, tighter at
   420px): picture left, the rest right, and the close or confirm button
-  always on screen. A sideways phone is 360-430px tall; audit there.
+  always on screen. A sideways phone is 360-430px tall; audit there. **The
+  Dex entry's** is a full-height left PANEL (the type's tint behind all of
+  it, the portrait as big as the height allows), the X in the card's own
+  corner, tabs and a scrolling body right with forms four across (blurbs in
+  the tooltip), and one compact action row - no CLOSE beside the X
+  (2026-10-15, THE DEX ENTRY, SIDEWAYS at the end of styles.css).
 - **An encounter's sprite is fetched before the encounter**: App warms the
   map's table through `preloadSprites` in idle time and KEEPS the Images
   (the host answers `no-cache`; a dropped one revalidated and drew late),

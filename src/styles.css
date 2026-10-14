@@ -10203,9 +10203,17 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 
 /* EVERY CHIP ONE HEIGHT: the quest, a check-in and the party strip line up. */
 .hud .ms-tab { height: 40px; min-height: 0; padding-block: 0; }
+/* An alert's two lines (its label over its words) inside that 40px: the
+   stack's own 8px gap and loose lines put "Bingo!" through the pill's
+   bottom edge (reported 2026-10-15). Touch draws alerts as icons instead. */
+.hud .dc-pill { justify-content: center; gap: 1px; line-height: 1; }
+.hud .dc-pill > b { line-height: 1.15; }
 
-/* A DESKTOP's dock keeps clear of the ball rail across the bottom right. */
-@media (hover: hover) { .hud-dock { margin-right: 300px; } }
+/* THE PARTY RIDES ABOVE THE MINIMAP, never beside it: the dock's right edge
+   was a typed 300px of clearance, and a Bag rail opened wide (balls and
+   running items, 560px) ran over the party anyway (reported 2026-10-15).
+   Stacked, the dock is the minimap's width, which no rail reaches. */
+.hud-dock { flex-direction: column-reverse; align-items: flex-start; }
 
 /* -------- A PHONE HELD UPRIGHT: on the map, a size down. The map is 267px
    tall on a 390x844 phone, so every chip is 30px (the quest keeps its word,
@@ -10348,4 +10356,70 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   .ev-bingo > .bg-grid { grid-column: 1; grid-row: 2 / span 6; }
   .ev-bingo > :not(.ev-banner):not(.bg-grid) { grid-column: 2; }
   .ev-bingo > .ev-meta { flex-direction: column; gap: 4px; }
+}
+
+/* ================================================================ GENDER
+   (gender.js, 2026-10-15.) A mark, never a word: blue and pink are the
+   games' own and tell the two apart at a glance. Her look's Box tag. */
+.sex-mark { font-weight: 700; line-height: 1; }
+.sex-mark.m { color: #4f9dff; }
+.sex-mark.f { color: #ff6fa5; }
+.nameplate .sex-mark { font-size: 1.1em; }
+.bx-vtag.bx-female { color: #ff6fa5; border-color: color-mix(in srgb, #ff6fa5 55%, transparent); }
+.mark-female { display: inline-grid; place-items: center; line-height: 1; }
+
+/* ================================================================ THE DEX ENTRY, SIDEWAYS
+   (2026-10-15, reported as "so ugly".) Below 540px tall the entry was the
+   phone card split in two: its tinted header bled past the card's corner and
+   stopped halfway down, the close button sat inside it, the portrait was a
+   96px box over empty space, three form cells filled the width two rows deep,
+   and a full-width CLOSE ran off the right edge beside the X.
+   Now: a PANEL down the left, the type's tint behind the whole of it and the
+   portrait as big as the height allows; the X in the card's own corner; the
+   tabs and a body that scrolls on the right, forms four across with their
+   blurbs in the tooltip, and the actions one compact row - CLOSE goes, the X
+   is the close. Last in the file: it overrides the short-screen rules above. */
+@media (max-height: 540px) {
+  .sheet-card, .sheet-card.tabbed {
+    --dex-left: clamp(196px, 30%, 250px);
+    position: relative; padding: 0; overflow: hidden;
+    grid-template-columns: var(--dex-left) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto; column-gap: 0;
+  }
+  /* The panel. Static, so the tint and the X measure from the card. */
+  .sheet-card > .sheet-top {
+    position: static; grid-column: 1; grid-row: 1 / -1; align-self: stretch;
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+    margin: 0; padding: 14px; border: 0; border-right: 1px solid var(--line);
+    background: var(--surface-2); overflow-y: auto;
+  }
+  .sheet-card .sheet-hero { inset: 0 auto 0 0; width: var(--dex-left); border-radius: 0; }
+  .sheet-card .sheet-portrait {
+    width: 100%; height: clamp(84px, 34vh, 150px); flex: none;
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+  }
+  .sheet-card .sheet-portrait .sheet-art { width: 100%; height: 100%; object-fit: contain; }
+  .sheet-card .sheet-id { padding-right: 0; }
+  .sheet-card .sheet-name { font-size: 22px; line-height: 1.1; }
+  .sheet-card .dx-stats { flex-wrap: wrap; row-gap: 6px; }
+  .sheet-card .sheet-x { position: absolute; top: 10px; right: 10px; z-index: 3; }
+
+  /* The right side: room on the tabs' row for the X. */
+  .sheet-card > .sheet-tabs { grid-column: 2; grid-row: 1; margin: 10px 52px 8px 12px; }
+  .sheet-card > .sheet-body { grid-column: 2; grid-row: 2; padding: 0 12px; }
+  .sheet-card > .sheet-actions {
+    grid-column: 2; grid-row: 3; margin: 8px 12px 10px; flex-wrap: wrap; gap: 6px;
+  }
+  .sheet-card > .sheet-actions .sheet-close { display: none; }
+  .sheet-card > .sheet-actions .sheet-inbox { flex: 1 1 auto; min-height: 34px; padding: 0 12px; font-size: 11px; }
+
+  /* Forms four across, a name each; the blurb is in the cell's tooltip. */
+  .sheet-card .sf-row { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+  .sheet-card .sf-one { padding: 6px 4px; gap: 2px; }
+  .sheet-card .sf-art { width: 52px; height: 52px; }
+  .sheet-card .sf-note { display: none; }
+}
+@media (max-height: 340px) {
+  .sheet-card .sheet-portrait { height: clamp(72px, 28vh, 110px); }
+  .sheet-card .sheet-genus { display: none; }
 }

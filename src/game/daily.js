@@ -36,6 +36,15 @@ export function hash(str) {
   return (h >>> 0);
 }
 
+/* FNV is weak on keys a character apart (a bingo card's squares barely
+   shuffled; sizes 99 and 100 sat in one bucket): mix before taking a
+   remainder or ordering by it. */
+export const mix = (h) => {
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return (h ^ (h >>> 16)) >>> 0;
+};
+
 /* THE TYPES THAT CAN ACTUALLY BE ASKED FOR, and getting this wrong makes a
    quest a wall rather than a task.
 

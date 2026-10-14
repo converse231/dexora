@@ -18,6 +18,7 @@ import Sprite, { spriteUrl, VariantFx, TierReveal, SCENE_FX } from "./Sprite.jsx
 import Mark from "./Marks.jsx";
 import { RESEARCH_LIFT } from "../game/research.js";
 import { sageArt, SAGE_CREDIT } from "../game/biomes.js";
+import { SEX_MARK, SEX_NAME } from "../game/gender.js";
 
   /* THE EVOLUTION CARD IS GONE, and "confusing" was the kind half of it.
 
@@ -167,6 +168,7 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           <Sprite
             id={enc.speciesId}
             variant={enc.variant}
+            sex={enc.sex}
             className={`mon${monCaptured ? " captured" : ""}${monGone ? " gone" : ""}`}
             alt={enc.name}
             eager
@@ -201,7 +203,7 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           {enc.holo && monHere && (
             <span
               className="holo-foil"
-              style={{ "--art": `url(${spriteUrl(enc.speciesId)})` }}
+              style={{ "--art": `url(${spriteUrl(enc.speciesId, null, enc.sex)})` }}
               aria-hidden="true"
             />
           )}
@@ -211,14 +213,14 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
               reason to be a fifth copy, and the four layers it needs are
               exactly the four the Box and the Dex already draw. */}
           {SCENE_FX.has(enc.variant) && monHere && (
-            <VariantFx id={enc.speciesId} variant={enc.variant} />
+            <VariantFx id={enc.speciesId} variant={enc.variant} art={spriteUrl(enc.speciesId, null, enc.sex)} />
           )}
 
           {/* The sky inside it, clipped to its own outline. */}
           {enc.astral && monHere && (
             <span
               className="astral-sky"
-              style={{ "--art": `url(${spriteUrl(enc.speciesId)})` }}
+              style={{ "--art": `url(${spriteUrl(enc.speciesId, null, enc.sex)})` }}
               aria-hidden="true"
             />
           )}
@@ -288,6 +290,8 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           <Mark tier="legendary" size={16} className="np-legend" />
         )}
         <span className="np-name">{enc.name}</span>
+        {/* HER GENDER (gender.js): a mark, never a word - it fits the one-row phone plate. */}
+        {enc.sex && <span className={`sex-mark ${enc.sex}`} role="img" aria-label={SEX_NAME[enc.sex]}>{SEX_MARK[enc.sex]}</span>}
         {/* AN ICON, NOT A TREATMENT, so it sits beside any tier's chip - an
             Alpha Shiny shows both - instead of two effects fighting over one
             sprite. The bigger slot says the rest. */}

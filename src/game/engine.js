@@ -64,6 +64,7 @@ import {
 import { variantSpareUids } from "./spares.js";
 import { comboLift, comboKey, nextCombo, cleanCombo, COMBO_STEPS } from "./combo.js";
 import { quizFor, cleanQuiz, QUIZ_PAY } from "./quiz.js";
+import { sexAt, sexOf, looksFemale, cleanFemales } from "./gender.js";
 import {
   weekKey, fresh as freshBingo, advanceBingo, dueLines, fullDue, cleanBingo, BINGO_LINE, BINGO_FULL,
 } from "./bingo.js";
@@ -212,6 +213,7 @@ function freshState() {
     research: {},         // per-species research counters, keyed by DEX ID - see research.js
     stars: [],            // dex ids whose finished research was starred - see `star`
     combo: null,          // the catch chain, `{ species, n }` - see combo.js
+    females: [],          // dex ids whose female look you have held - see gender.js
     quiz: null,           // today's quiz answered, `{ day, ok }` - see quiz.js
     bingo: null,          // this week's card and its progress - see bingo.js
     gifted: [],           // LEGACY: dex ids once held back from rewards as trades - paid and cleared at boot
@@ -633,6 +635,7 @@ function loadState() {
       combo: cleanCombo(s.combo, speciesById),
       quiz: cleanQuiz(s.quiz),
       bingo: cleanBingo(s.bingo),
+      females: cleanFemales(s.females),
       gifted: [...new Set(Array.isArray(s.gifted) ? s.gifted : [])]
         .filter((id) => Number.isInteger(id) && speciesById(id)),
       // Entry by entry, never the whole record: badges are years of play.
@@ -1907,8 +1910,10 @@ export function createEngine(canvas, onChange, mini = null) {
         : `A wild ${label(sp).toUpperCase()} appeared!`,
       until: 0,
     };
+    // Her gender, from the size frozen above (gender.js) - so the Box agrees.
+    state.encounter.sex = sexAt(sp.id, state.encounter.size);
     save();
-    teach({ kind: "encounter", variant });
+    teach({ kind: "encounter", variant, female: looksFemale(sp.id, state.encounter.sex) });
   }
 
   /* SURFING IS NOT A FLAG, IT IS WHERE YOU ARE STANDING.
@@ -2210,6 +2215,16 @@ export function createEngine(canvas, onChange, mini = null) {
 
   /* A SPECIES THAT ARRIVED - a trade or a hard-mode gift - registers like a
      catch: the Pokédex, what it finishes, and the dex bonus (a trade counts). */
+  /* A FEMALE LOOK HELD (gender.js) is the Pokedex's for good, as a tier row
+     is: recorded on the catch, on an evolution into a species with one, and
+     at boot from the Box (a trade, an old save). Selling her keeps the mark.
+     Answers whether it was new. */
+  function noteLook(mon) {
+    if (!looksFemale(mon.species, sexOf(mon)) || state.females.includes(mon.species)) return false;
+    state.females = [...state.females, mon.species];
+    return true;
+  }
+
   function registerGift(id) {
     const at = dexIndex(id);
     if (state.dex[at] === 2) return;
@@ -2382,6 +2397,10 @@ export function createEngine(canvas, onChange, mini = null) {
         ...(e.alpha ? { alpha: 1 } : {}),
         at: Date.now(),
       });
+      // Her look, new to the Pokedex: its own banner, behind a tier's.
+      if (noteLook(state.box[state.box.length - 1]) && !e.newVariant) {
+        cheer({ kind: "female", title: e.name, sub: "Her own look - added to your Pokédex." });
+      }
       if (e.newVariant) {
         /* The species is the headline, not the word SHINY - the kind label
            above it already names the tier, and saying it twice was the
@@ -2985,6 +3004,8 @@ export function createEngine(canvas, onChange, mini = null) {
   /* And anything a raised cap owes is paid now, with its banner - not on the
      next catch, which would read as one catch paying out nine levels. */
   if (!state.stale && payLevels()) save();
+  // Every female look the Box holds, recorded once (a trade, a save from before).
+  if (!state.stale && state.box.map(noteLook).some(Boolean)) save();
   /* SPECIES ONCE HELD BACK AS GIFTS COUNT NOW (a trade counts, 2026-10-03):
      what they finish is paid once, here - every medal holding one, and every
      milestone the count stepped over - and the legacy list is cleared. A
@@ -3701,6 +3722,7 @@ export function createEngine(canvas, onChange, mini = null) {
        is what a future trade or battle log would need to refer to. */
     mon.species = targetId;
     mon.at = Date.now();
+    noteLook(mon);
     study(row.from, ["evolve"]);
     study(targetId, owned(targetId, roll, mon.alpha, mon.size, mon.level));
 
