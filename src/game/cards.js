@@ -350,8 +350,16 @@ export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45,
 
 export const setById = (id) => CARD_SETS.find((s) => s.id === id) ?? null;
 export const setOpen = (id, level) => !!setById(id) && level >= (SET_LEVEL[id] ?? Infinity);
-// The newest set you have open - what a reward pack is.
+// The newest set you have open.
 export const newestOpen = (level) => [...CARD_SETS].reverse().find((s) => setOpen(s.id, level))?.id ?? null;
+/* WHAT A REWARD PACK IS: any set you have open, at random (2026-10-14). It
+   was the newest by list order - with two dozen sets that is an arbitrary
+   one, and every badge and Champion paid the same set (reported: "why are
+   card rewards always Surging Sparks?"). The Pokedex's claim already rolls. */
+export function randomOpen(level, random = Math.random) {
+  const open = CARD_SETS.filter((s) => setOpen(s.id, level));
+  return open.length ? open[Math.floor(random() * open.length)].id : null;
+}
 
 export const cardId = (setId, localId) => `${setId}-${localId}`;
 

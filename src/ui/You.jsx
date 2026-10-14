@@ -13,6 +13,7 @@ import { levelProgress } from "../game/biomes.js";
 import { dexRank } from "../game/medals.js";
 import { freePoints } from "../game/trainer.js";
 import { themeChoice, setTheme, THEMES } from "./theme.js";
+import { criesOn, setCries } from "./cry.js";
 import TitleBadges from "./TitleBadges.jsx";
 import { TIERS } from "../game/biomes.js";
 
@@ -24,6 +25,7 @@ export default function You({
 }) {
   useModalLock();
   const [theme, setThemeState] = useState(themeChoice);
+  const [cries, setCriesState] = useState(criesOn);
   const { level, into, need, frac } = levelProgress(xp);
   const r = dexRank(caught);
   const free = freePoints(stats, level);
@@ -79,6 +81,18 @@ export default function You({
                 <button key={t} type="button" role="radio" aria-checked={theme === t}
                   className={theme === t ? "on" : ""} onClick={() => { setTheme(t); setThemeState(t); }}>
                   {THEME_NAME[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="you-row">
+            <Icon n="sound" size={20} />
+            <span><b>Cries</b><small>A Pokémon calls out when you meet it</small></span>
+            <div className="you-seg" role="radiogroup" aria-label="Cries">
+              {[[true, "On"], [false, "Off"]].map(([on, name]) => (
+                <button key={name} type="button" role="radio" aria-checked={cries === on}
+                  className={cries === on ? "on" : ""} onClick={() => { setCries(on); setCriesState(on); }}>
+                  {name}
                 </button>
               ))}
             </div>
