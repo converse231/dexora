@@ -63,6 +63,8 @@ import {
 } from "./items.js";
 import { variantSpareUids } from "./spares.js";
 import { comboLift, comboKey, nextCombo, cleanCombo, COMBO_STEPS } from "./combo.js";
+import { pickSpot, RUSTLE_EVERY, RUSTLE_STEPS, RUSTLE_LIFT } from "./rustle.js";
+import { quizFor, cleanQuiz, QUIZ_PAY } from "./quiz.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
    that froze every catch in the game. `createEngine` has its own
    `function advance(now)` driving the phase machine, declared INSIDE the
@@ -208,6 +210,8 @@ function freshState() {
     research: {},         // per-species research counters, keyed by DEX ID - see research.js
     stars: [],            // dex ids whose finished research was starred - see `star`
     combo: null,          // the catch chain, `{ species, n }` - see combo.js
+    quiz: null,           // today's quiz answered, `{ day, ok }` - see quiz.js
+    spot: null,           // a rustling spot, `{ areaId, x, y, left }` - see rustle.js (volatile)
     gifted: [],           // LEGACY: dex ids once held back from rewards as trades - paid and cleared at boot
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
@@ -292,7 +296,7 @@ function freshState() {
 /* `battle` is a League battle in progress (docs/battles.md): never saved, so a
    reload mid-battle is a forfeit with nothing spent. */
 const VOLATILE = ["encounter", "evolution", "fishing", "running", "cheers",
-  "worn", "ask", "rev", "colRev", "stale", "hint", "battle", "defense"];
+  "worn", "ask", "rev", "colRev", "stale", "hint", "battle", "defense", "spot"];
 const persisted = (s) => {
   const out = { ...s };
   for (const k of VOLATILE) delete out[k];
@@ -625,6 +629,7 @@ function loadState() {
       stars: [...new Set(Array.isArray(s.stars) ? s.stars : [])]
         .filter((id) => Number.isInteger(id) && speciesById(id)),
       combo: cleanCombo(s.combo, speciesById),
+      quiz: cleanQuiz(s.quiz),
       gifted: [...new Set(Array.isArray(s.gifted) ? s.gifted : [])]
         .filter((id) => Number.isInteger(id) && speciesById(id)),
       // Entry by entry, never the whole record: badges are years of play.
@@ -1341,6 +1346,11 @@ export function createEngine(canvas, onChange, mini = null) {
      stand there. Drawing state only: never saved, and nothing reads it. */
   const GRASS = { ",": { seq: [1, 2, 3, 4, 0], ms: 110 } };
   let grassFx = [];
+  /* A RUSTLING SPOT shakes in the same frames: two quick parts, then still,
+     on a loop (`SHAKE`, one entry per `SHAKE_MS`). Drawn only on its map. */
+  const SHAKE = [1, 2, 1, 2, 0, 0, 0, 0];
+  const SHAKE_MS = 110;
+  const spotHere = () => (state.spot?.areaId === state.areaId ? state.spot : null);
 
   function tryStep(dir) {
     const p = state.player;
@@ -1605,7 +1615,32 @@ export function createEngine(canvas, onChange, mini = null) {
        repel is for: crossing a map you have already farmed. */
     const mate = walker();
     const rate = ENCOUNTER_RATE * (running("repel")?.rate ?? 1) * (fieldOf(mate)?.rate ?? 1);
-    if (biome && !state.evolution && !indoors() && Math.random() < rate) {
+    /* A RUSTLING SPOT (rustle.js): walked into, it is a meeting for sure (a
+       repel does not stop what you walked into on purpose). Otherwise it
+       runs down a step; with none up the grass may start, and that step
+       meets nothing else - the shaking is the event. */
+    const spot = state.spot?.areaId === state.areaId ? state.spot : null;
+    let rustled = false;
+    if (spot && spot.x === state.player.x && spot.y === state.player.y && biome && !state.evolution) {
+      state.spot = null;
+      startEncounter(tableFor(biome, levelFromXp(state.xp)), "spot");
+      return;
+    }
+    if (spot) {
+      if (--spot.left <= 0) state.spot = null;
+    } else if (state.spot) {
+      state.spot = null;                       // left behind on another map
+    } else if (biome && !ride && !state.evolution && !indoors() && Math.random() < 1 / RUSTLE_EVERY) {
+      const room = roomAt(state.player.x, state.player.y);
+      const cell = pickSpot(state.player.x, state.player.y, (x, y) => at(x, y) === ",",
+        (x, y) => roomAt(x, y) === room);
+      if (cell) {
+        state.spot = { areaId: state.areaId, x: cell[0], y: cell[1], left: RUSTLE_STEPS };
+        rustled = true;
+        teach({ kind: "spot" });
+      }
+    }
+    if (biome && !rustled && !state.evolution && !indoors() && Math.random() < rate) {
       /* The level is part of the table, not a modifier on the roll: past Lv 8
          a map starts turning up the evolved forms of what already lives there.
          `tableFor` caches, because this is asked on every step that spawns. */
@@ -1794,6 +1829,7 @@ export function createEngine(canvas, onChange, mini = null) {
         * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.stars) * charmOf(state.beaten)
         * dexCharm(sp.id, state.medals)
         * comboLift(state.combo, sp.id)
+        * (source === "spot" ? RUSTLE_LIFT : 1)
         * tierLift(state.stats),
       honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
@@ -2756,6 +2792,11 @@ export function createEngine(canvas, onChange, mini = null) {
         drawGrass(ctx, art.grass, Math.round(f.x * TILE - camX), Math.round(f.y * TILE - camY),
           i < f.g.seq.length ? f.g.seq[i] : 0);
       }
+      const s = spotHere();
+      if (s && (s.y < frontY) === behind) {
+        drawGrass(ctx, art.grass, Math.round(s.x * TILE - camX), Math.round(s.y * TILE - camY),
+          SHAKE[Math.floor(now / SHAKE_MS) % SHAKE.length]);
+      }
     };
     /* Over the trainer, under the tree tops. A finished rustle stays only on
        the tile you (or it) are standing on, as its rest frame; the rest drop
@@ -2929,8 +2970,12 @@ export function createEngine(canvas, onChange, mini = null) {
       /* The follower's and the skin's sheets arrive on their own clock, so
          each one's arrival is in the key. A rustle redraws while it PLAYS:
          a finished one kept as the rest frame is still. */
+      /* A rustling spot is the map's one clock-driven drawing: while one is
+         up here the key takes its frame, so it redraws at the shake's pace
+         and never at 60fps. */
       const key = `${state.rev}|${p.x},${p.y},${p.dir}|${viewW}|${!!art.atlas}${!!art.player}|${state.running}`
-        + `|${!!buddyArt()}${!!skinSheet.sheet}${!!blob}`;
+        + `|${!!buddyArt()}${!!skinSheet.sheet}${!!blob}`
+        + (spotHere() ? `|${Math.floor(now / SHAKE_MS) % SHAKE.length}` : "");
       if (key !== drawnKey || move.active || state.fishing || battleSince !== null || swap
         || grassFx.some((f) => now - f.start < f.g.seq.length * f.g.ms)) {
         render(now);
@@ -3078,6 +3123,28 @@ export function createEngine(canvas, onChange, mini = null) {
     save();
     changed();
     return true;
+  }
+
+  /* WHO'S THAT POKEMON (quiz.js): today's quiz, and whether and how it was
+     answered. One answer a day, judged, paid and SAVED here; a right one
+     also puts the species in the Pokedex as seen. */
+  function quiz() {
+    const q = quizFor(dayKey());
+    return { ...q, done: state.quiz?.day === q.key ? state.quiz : null };
+  }
+  function answerQuiz(id) {
+    if (state.stale) return null;
+    const q = quizFor(dayKey());
+    if (state.quiz?.day === q.key || !q.choices.includes(id)) return null;
+    const ok = id === q.answer;
+    const at = dexIndex(q.answer);
+    const seen = ok && state.dex[at] === 0;
+    if (seen) state.dex[at] = 1;
+    if (ok) state.candy += QUIZ_PAY.candy;
+    state.quiz = { day: q.key, ok };
+    save();
+    changed();
+    return { ok, answer: q.answer, seen };
   }
 
   /* THE DAILY CHECK-IN (checkin.js): the one press a day. Paid and SAVED
@@ -4004,6 +4071,8 @@ export function createEngine(canvas, onChange, mini = null) {
     checkIn,
     spinRoulette,
     checkinStatus: () => checkinStatus(state.checkin),
+    quiz,
+    answerQuiz,
     buySkin,
     wearSkin,
     setBuddy,

@@ -10237,3 +10237,45 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   @media (max-height: 340px) { .hud-tasks { top: 50px; } .hud .ms-tab { height: 32px; } }
 }
 
+/* ================================================================ WHO'S THAT POKEMON?
+   (quiz.js, 2026-10-14.) The check-in's card with a stage: a black
+   silhouette on a ray burst, which fills in with colour on the answer. */
+.qz-pill b { color: var(--accent); }
+.qz-title { margin: 0; font: 800 26px var(--display); color: var(--ink); }
+.qz-stage {
+  width: min(220px, 60vw); aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--accent) 22%, transparent) 0 10deg, transparent 10deg 20deg),
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, var(--surface-2)), var(--surface-2) 70%);
+}
+.qz-stage > .qz-mon, .qz-stage > .sprite-fx { width: 80%; height: 80%; object-fit: contain; image-rendering: pixelated; }
+.qz-mon { filter: brightness(0); transition: filter 500ms ease; }
+.qz-mon.shown { filter: none; animation: qz-pop 420ms cubic-bezier(.2, 1.5, .4, 1); }
+@keyframes qz-pop { from { transform: scale(.82); } }
+.qz-cry {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 16px; border-radius: 999px; cursor: pointer;
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line-firm); font: 600 14px var(--body);
+}
+.qz-choices { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.qz-choice {
+  min-height: 48px; padding: 6px 10px; border-radius: 14px; cursor: pointer; font: 700 15px var(--display);
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line-firm); overflow-wrap: anywhere;
+}
+.qz-choice:hover:not(:disabled) { border-color: var(--accent); }
+.qz-choice:disabled { cursor: default; }
+.qz-choice.right { background: color-mix(in srgb, #2fbf71 22%, var(--surface-2)); border-color: #2fbf71; }
+.qz-choice.wrong { background: color-mix(in srgb, var(--bad) 18%, var(--surface-2)); border-color: var(--bad); }
+.qz-choice.out { opacity: .5; }
+.ci-got > span.qz-miss { color: var(--bad); }
+.qz-seen { font-size: 12px; color: var(--ink-soft); }
+@media (prefers-reduced-motion: reduce) { .qz-mon.shown { animation: none; } .qz-mon { transition: none; } }
+/* A SHORT SCREEN (a sideways phone): the picture left, the names and the
+   answer right, so Continue is never under the fold. */
+@media (max-height: 540px) {
+  .qz-card { width: min(760px, 100%); gap: 8px 20px; padding-block: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; }
+  .qz-card > .ci-kicker, .qz-title, .qz-stage, .qz-cry { grid-column: 1; }
+  .qz-choices { grid-column: 2; grid-row: 1 / span 3; }
+  .qz-card > .ci-got, .qz-card > .ci-foot { grid-column: 2; grid-row: 4; }
+  .qz-stage { width: min(150px, 34vh); }
+  .qz-title { font-size: 20px; }
+  .qz-choice { min-height: 44px; }
+}

@@ -642,7 +642,25 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   the `combo` hint once - the update's map card.
 - **Cries are a device preference** (`ui/cry.js`, `dexora-cries`, on by
   default): App plays one per encounter object, never per phase; a format
-  the browser cannot play is silence, never an error.
+  the browser cannot play is silence, never an error. A press that ASKS for
+  a cry (the quiz's hint) plays it even with cries off.
+- **A rustling spot is `rustle.js`** (2026-10-14): `state.spot`, VOLATILE,
+  one at a time, on tall grass (`,`) only - six maps have it - in the room
+  you stand in, `RUSTLE_NEAR`-`RUSTLE_FAR` steps away and at most
+  `RUSTLE_ROWS` rows (a phone's view is 11 tall; check.mjs holds both inside
+  VIEW_W x VIEW_H). It rises at 1 in `RUSTLE_EVERY` a step and that step
+  meets nothing else; it runs down on YOUR steps; walked into, it is a
+  meeting for sure (source `"spot"`, past a repel) at `RUSTLE_LIFT` in the
+  one `rollVariant` call; it is gone on another map. Its shake is the map's
+  one clock-driven drawing: the redraw key takes its frame only while one is
+  up, never 60fps. check.mjs holds its rare forms under 15% of walking's.
+- **Who's that Pokemon is `quiz.js`** (2026-10-14): `quizFor(dayKey())`
+  hashes the day to a species (never a form) and three names of its
+  generation; `answerQuiz` takes ONE answer a day (`state.quiz`
+  `{ day, ok }`), pays `QUIZ_PAY` (at most a check-in day's candy) and makes
+  an unseen species SEEN, never caught. The silhouette carries no name - no
+  alt, no tip. A HUD task chip until answered; banners and tips wait while
+  it is open.
 - **An alpha is a LAYER, not a tier**: `rollAlpha` (1 in `ALPHA_CHANCE`, never
   a legendary or costume, `canBeAlpha`) rolls BESIDE the tier, so an Alpha
   Shiny exists and is rarer than either. It was a tier for one pass and lost

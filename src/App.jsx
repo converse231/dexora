@@ -26,6 +26,7 @@ import Achievements from "./ui/Achievements.jsx";
 import { dueCount } from "./game/achievements.js";
 import Party from "./ui/Party.jsx";
 import CheckIn from "./ui/CheckIn.jsx";
+import Quiz from "./ui/Quiz.jsx";
 import { followSheet, PARTY_MAX, partnerRule, isMastered } from "./game/cosmetics.js";
 import { RESEARCH_MAX } from "./game/research.js";
 import { COMBO_STEPS, comboLift, nextRung } from "./game/combo.js";
@@ -213,6 +214,7 @@ export default function App({
   /* THE DAILY CHECK-IN asks once a session, on the first visit of a day;
      dismissed, it waits as a pill on the map. The roulette opens from it. */
   const [checkinOpen, setCheckinOpen] = useState(false);
+  const [quizOpen, setQuizOpen] = useState(false);
   const [rouletteOpen, setRouletteOpen] = useState(false);
   const askedCheckin = useRef(false);
   const onEditParty = useCallback(() => setPartyPick(true), []);
@@ -501,8 +503,9 @@ export default function App({
      on the summary. */
   /* And while a Pokédex reward rolls (DexClaim): the "new packs" tip over the reel. */
   const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene || claimGen != null
-    || checkinOpen || rouletteOpen;
+    || checkinOpen || rouletteOpen || quizOpen;
   const checkin = engine?.checkinStatus?.() ?? null;
+  const quiz = engine?.quiz?.() ?? null;
   const spins = st?.checkin?.spins ?? 0;
   // Finished generations not yet claimed - derived, so it is a button until pressed.
   const claims = engine?.dexClaims?.() ?? [];
@@ -779,6 +782,9 @@ export default function App({
           onSpin={() => { setCheckinOpen(false); setRouletteOpen(true); }}
           onClose={() => setCheckinOpen(false)} />
       )}
+      {quizOpen && quiz && (
+        <Quiz quiz={quiz} onAnswer={(id) => engine.answerQuiz(id)} onClose={() => setQuizOpen(false)} />
+      )}
       {rouletteOpen && engine && (
         <Suspense fallback={null}>
           <Roulette spins={spins} onSpin={() => engine.spinRoulette()}
@@ -933,7 +939,7 @@ export default function App({
           and Hint.jsx for why it is a dialog rather than the bar it started as:
           a tip somebody scrolls past is a tip nobody read. */}
       {/* Tips wait for the check-in and the roulette too: a pack's first-time tip named the prize mid-spin. */}
-      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && (
+      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && !quizOpen && (
         <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 
@@ -1024,6 +1030,14 @@ export default function App({
                       data-tip="Check in for today's reward and keep your streak">
                       <i>DAY {checkin.day}</i>
                       <b>Check in<em className="ms-dot" aria-hidden="true">!</em></b>
+                    </button>
+                  )}
+                  {/* TODAY'S QUIZ (quiz.js) until it is answered. */}
+                  {quiz && !quiz.done && !quizOpen && (
+                    <button type="button" className="ms-tab ready dc-pill qz-pill" onClick={() => setQuizOpen(true)}
+                      data-tip="Today's silhouette - guess it for Rare Candy">
+                      <i>DAILY QUIZ</i>
+                      <b>Who's that?<em className="ms-dot" aria-hidden="true">!</em></b>
                     </button>
                   )}
                   {spins > 0 && !rouletteOpen && (

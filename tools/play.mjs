@@ -3064,6 +3064,146 @@ await savedField("combo", { species: 25, n: 12 }, "junk", null);
 }
 console.log("combo ok — a chain builds, resets, breaks on a flee or a run, survives a reload and lifts the roll");
 
+/* RUSTLING SPOTS (rustle.js, 2026-10-14). A spot is tall grass between NEAR
+   and FAR of you; every roll landing raises one through a real step (a max
+   repel keeps ordinary meetings off), that step meets nothing, and the first
+   one shows its card; it settles after RUSTLE_STEPS steps of yours; walked
+   into, it is a meeting for sure even under the repel; and one left on
+   another map is dropped. */
+{
+  const R = await import("../src/game/rustle.js");
+  const { AREAS } = await import("../src/game/mapdata.js");
+  const { HINT_IDS } = await import("../src/game/hints.js");
+  const dist = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+  const grass = (x, y) => (x * 7 + y * 3) % 4 === 0;
+  for (let i = 0; i < 300; i++) {
+    const c = R.pickSpot(20, 20, grass, () => true);
+    const d = Math.abs(c[0] - 20) + Math.abs(c[1] - 20);
+    assert.ok(grass(...c) && d >= R.RUSTLE_NEAR && d <= R.RUSTLE_FAR && Math.abs(c[1] - 20) <= R.RUSTLE_ROWS,
+      `a spot at ${c} is not grass in range`);
+  }
+  assert.equal(R.pickSpot(20, 20, () => false, () => true), null, "a spot rose where there is no grass");
+  assert.equal(R.pickSpot(20, 20, grass, () => false), null, "a spot rose outside the room you stand in");
+
+  const real = Math.random;
+  const quiet = { field: { repel: { id: "max-repel", steps: 9999 } }, hints: HINT_IDS.filter((h) => h !== "spot") };
+  const DIRS = [["right", 1, 0], ["down", 0, 1], ["left", -1, 0], ["up", 0, -1]];
+  const walk = (e, dir) => { e.press(dir); for (let i = 0; i < 14; i++) tick(16); e.clearHeld(); for (let i = 0; i < 20; i++) tick(16); };
+
+  /* The meadow's spawn has no tall grass near it: stand in a patch with
+     grass on every side and plenty more in range, found rather than named. */
+  const rows = AREAS.meadow.rows;
+  const G = (x, y) => rows[y]?.[x] === ",";
+  let home = null;
+  for (let y = 0; y < rows.length && !home; y++) {
+    for (let x = 0; x < rows[0].length && !home; x++) {
+      if (!G(x, y) || !DIRS.every(([, dx, dy]) => G(x + dx, y + dy))) continue;
+      let n = 0;
+      for (let v = -R.RUSTLE_FAR; v <= R.RUSTLE_FAR; v++) for (let u = -R.RUSTLE_FAR; u <= R.RUSTLE_FAR; u++) {
+        const k = Math.abs(u) + Math.abs(v);
+        if (k >= R.RUSTLE_NEAR && k <= R.RUSTLE_FAR && G(x + u, y + v)) n++;
+      }
+      if (n >= 10) home = { x, y, dir: "down" };
+    }
+  }
+  assert.ok(home, "the meadow has no patch of tall grass to test a spot in");
+  // No repel here: every roll landing would also meet something, but for the spot.
+  let { e } = boot({ ...SAVE, hints: quiet.hints, player: home });
+  Math.random = () => 0.001;
+  try {
+    for (let k = 0; k < 8 && !e.state.spot; k++) { e.state.hint = null; walk(e, DIRS[k % 4][0]); }
+  } finally { Math.random = real; }
+  const s = e.state.spot;
+  assert.ok(s, "every roll landing on a grassy map raised no rustling spot");
+  assert.equal(AREAS[s.areaId].rows[s.y][s.x], ",", "the spot is not on tall grass");
+  const d = dist(e.state.player, s);
+  assert.ok(d >= R.RUSTLE_NEAR && d <= R.RUSTLE_FAR, `the spot is ${d} steps away`);
+  assert.equal(s.left, R.RUSTLE_STEPS, "a new spot does not last RUSTLE_STEPS");
+  assert.ok(!e.state.encounter, "the step the grass started shaking also met something");
+  assert.ok(e.state.hints.includes("spot"), "the first spot showed no card");
+
+  // Back and forth beside where it rose: it settles on its last step.
+  Math.random = () => 0.99;
+  try {
+    const from = e.state.steps;
+    for (let k = 0; k < 400 && e.state.spot; k++) {
+      const [dir, dx, dy] = DIRS[k % 4];
+      if (e.state.player.x + dx === s.x && e.state.player.y + dy === s.y) continue;
+      walk(e, dir);
+      assert.ok(!e.state.encounter, "a quiet step met something");
+      if (e.state.spot) assert.ok(e.state.steps - from < R.RUSTLE_STEPS, "a spot outlived its steps");
+    }
+    assert.equal(e.state.spot, null, "a spot never settled");
+    assert.equal(e.state.steps - from, R.RUSTLE_STEPS, "a spot settled early");
+  } finally { Math.random = real; }
+
+  // Walked into: a meeting for sure, under a max repel, and the spot is spent.
+  ({ e } = boot({ ...SAVE, ...quiet }));
+  Math.random = () => 0.99;
+  try {
+    for (const [dir, dx, dy] of DIRS) {
+      const p = e.state.player, to = { x: p.x + dx, y: p.y + dy };
+      e.state.spot = { areaId: e.state.areaId, ...to, left: 9 };
+      walk(e, dir);
+      if (e.state.player.x === to.x && e.state.player.y === to.y) break;
+    }
+  } finally { Math.random = real; }
+  assert.equal(e.state.encounter?.source, "spot", "walking into the shaking grass met nothing");
+  assert.equal(e.state.spot, null, "a spot walked into stayed up");
+  until(e, (st) => st.encounter?.phase === "idle", "the encounter to settle");
+  e.flee(true);
+  until(e, (st) => !st.encounter, "the encounter to close", 4000);
+
+  // One left behind on another map goes on the next step and is never met.
+  e.state.spot = { areaId: "pond", x: e.state.player.x + 1, y: e.state.player.y, left: 9 };
+  Math.random = () => 0.99;
+  try { walk(e, "left"); walk(e, "right"); } finally { Math.random = real; }
+  assert.equal(e.state.spot, null, "a spot on another map was kept");
+}
+console.log("rustle ok — grass in range, rises on a quiet step with its card, settles on time, met for sure when walked into");
+
+/* WHO'S THAT POKEMON (quiz.js, 2026-10-14). The day's four names are four
+   species of one generation including the answer, and the days move both
+   the answer and where it sits; one answer a day, a wrong one pays nothing,
+   a right one pays and makes an unseen species seen (never caught); the
+   answer survives a reload. */
+await savedField("quiz", { day: "20261014", ok: true }, { day: 5, ok: "yes" }, null);
+{
+  const Q = await import("../src/game/quiz.js");
+  const { genOf, dexIndex, speciesById } = await import("../src/game/biomes.js");
+  const { dayKey } = await import("../src/game/daily.js");
+  const answers = new Set(), places = new Set();
+  for (let d = 1; d <= 60; d++) {
+    const key = String(20261000 + (d % 28) + 1 + Math.floor(d / 28) * 100);
+    const q = Q.quizFor(key);
+    assert.equal(new Set(q.choices).size, Q.QUIZ_CHOICES, `${key}: the names repeat`);
+    assert.ok(q.choices.includes(q.answer), `${key}: the answer is not offered`);
+    assert.ok(q.choices.every((id) => id < 10000 && speciesById(id) && genOf(id) === genOf(q.answer)), `${key}: a name from another generation, or a form`);
+    answers.add(q.answer); places.add(q.choices.indexOf(q.answer));
+  }
+  assert.ok(answers.size > 40 && places.size === Q.QUIZ_CHOICES, "the days do not move the answer or where it sits");
+
+  const q = Q.quizFor(dayKey());
+  const wrong = q.choices.find((id) => id !== q.answer);
+  let { e } = boot(SAVE);
+  const candy = e.state.candy;
+  assert.equal(e.answerQuiz(99999), null, "a name that was not offered was taken");
+  assert.equal(e.answerQuiz(wrong)?.ok, false, "a wrong answer was judged right");
+  assert.equal(e.state.candy, candy, "a wrong answer paid");
+  assert.equal(e.answerQuiz(q.answer), null, "a second answer the same day was taken");
+  assert.equal(e.quiz().done?.ok, false, "today's wrong answer was not kept");
+
+  const dex = [...SAVE.dex];
+  dex[dexIndex(q.answer)] = 0;
+  ({ e } = boot({ ...SAVE, dex }));
+  const r = e.answerQuiz(q.answer);
+  assert.ok(r?.ok && r.seen, "a right answer on an unseen species was not judged right and seen");
+  assert.equal(e.state.candy, candy + Q.QUIZ_PAY.candy, "a right answer did not pay");
+  assert.equal(e.state.dex[dexIndex(q.answer)], 1, "a guess registered more than seen");
+  assert.equal(boot({ ...SAVE, quiz: e.state.quiz }).e.quiz().done?.ok, true, "today's answer did not survive a reload");
+}
+console.log("quiz ok — four names of one generation, one answer a day, a right one pays and is seen, never caught");
+
 /* LOOKS, THROUGH THE ENGINE (2026-10-01). Walking Tanoby meets Unown in more
    than one letter; Type: Null evolves into the Silvally the roll picks; a Blue
    Flabebe evolves into a Blue Floette, by its own row and with no roll. */

@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-14-rustle-quiz",
+    icon: "🌾",
+    date: "October 2026",
+    title: "Rustling grass and Who's that Pokémon?",
+    items: [
+      ["Rustling grass", "Now and then a patch of tall grass shakes. Walk into it to meet a Pokémon for sure."],
+      ["Rare forms", "What hides in the shaking grass is twice as likely to be a rare form."],
+      ["Who's that Pokémon?", "A new silhouette every day, on the map. Guess right for 3 Rare Candy."],
+      ["A hint", "Stuck? Tap Hear its cry."],
+    ],
+  },
+  {
     id: "2026-10-14-combo-cries",
     icon: "🔗",
     date: "October 2026",
