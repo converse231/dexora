@@ -15,5 +15,10 @@ export const cardUrl = (setId, localId) => at(`cards/${setId}/${localId}.webp`);
 export const logoUrl = (setId) => at(`cards/${setId}/logo.webp`);
 export const packUrl = (setId, slug) => at(`cards/${setId}/pack-${slug}.webp`);
 export const backUrl = () => at("cards/back.webp");
+/* REAL-LIFE PRICES (docs/cards.md, Prices): one lazy chunk, asked for only
+   by a view that shows a price. */
+let prices;
+export const loadPrices = () => (prices ??= import("../../data/cards/prices.js"));
+
 // The large image is TCGdex's own, loaded only when a card is inspected.
 export const hiUrl = (set, localId) => `${set.SET.asset}${localId}/high.webp`;

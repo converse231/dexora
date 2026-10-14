@@ -13,7 +13,7 @@ import {
   RARITY, CARD_RARITIES, landsOn, rulesOf, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
   copiesOf, chanceOf, freshPity, sparesOf, sweepOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit, DUST_PACK,
 } from "../../game/cards.js";
-import CardFace, { RarityMark, VARIANT_NAME } from "./Card.jsx";
+import CardFace, { RarityMark, VARIANT_NAME, usePrices, worthOf, usd, PriceNote } from "./Card.jsx";
 import Confirm from "../Confirm.jsx";
 import Inspect from "./Inspect.jsx";
 import { BinderPages, MyBinders } from "./Binders.jsx";
@@ -359,6 +359,7 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
      the pages page through what is left. Every change goes back to page one,
      or a filter that left two pages could strand you on page nine. */
   const [f, setF] = useState(NO_FILTER);
+  const prices = usePrices();
   const filter = (patch) => { setF((x) => ({ ...x, ...patch })); setPage(0); };
   const modes = (
     <div className="you-seg bn-mode" role="radiogroup" aria-label="Binders">
@@ -383,6 +384,8 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
   const master = set.CARDS.reduce((a, c) => a + c[4].split("").filter((v) => cards[key(c)]?.[v]).length, 0);
   const shown = set.CARDS.filter((c) => cardMatches(c, cards[key(c)], f));
   const filtering = !!(f.q || f.rarity || f.have);
+  const worth = worthOf(prices, cards, [setId]), all = worthOf(prices, cards);
+  const topCard = worth.top && set.CARDS.find((c) => c[0] === worth.top.localId);
   const pulls = log.filter(([id]) => id.startsWith(`${setId}-`))
     .map(([id, v, when]) => ({ card: set.CARDS.find((c) => key(c) === id), v, when })).filter((p) => p.card);
   return (
@@ -401,6 +404,18 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
         </span>
         {/* Bulk lives on the Dust tab; the binder is where you notice the gaps. */}
         {master < variants && <button type="button" className="tp-quiet" onClick={onDust}>Craft missing ›</button>}
+        {/* REAL-LIFE VALUE (2026-10-15): this set's copies, the whole collection, the dearest card here. */}
+        {all.total > 0 && (
+          <p className="bn-worth">
+            <span>Worth <b>{usd(worth.total)}</b> · collection <b>{usd(all.total)}</b></span>
+            {topCard && (
+              <button type="button" className="tp-quiet" onClick={() => onLook(setId, topCard[0])}>
+                Top card: {topCard[1]} {usd(worth.top.cents)} ›
+              </button>
+            )}
+            <PriceNote prices={prices} />
+          </p>
+        )}
       </section>
       <CardFilters f={f} onChange={filter}
         rarities={CARD_RARITIES.filter((r) => set.CARDS.some((c) => c[3] === r))} />
@@ -452,8 +467,8 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
    with steps either side, and the rest behind it grouped by series, newest
    first, each with its own progress. Progress counts card ids, so it needs no
    set loaded. */
-const SERIES = [["me", "Mega Evolution"], ["sv", "Scarlet & Violet"], ["", "Classics and celebrations"]];
-const seriesOf = (id) => (id.startsWith("me") ? "me" : id.startsWith("sv") ? "sv" : "");
+const SERIES = [["me", "Mega Evolution"], ["sv", "Scarlet & Violet"], ["swsh", "Sword & Shield"], ["", "Classics and celebrations"]];
+const seriesOf = (id) => SERIES.find(([k]) => k && id.startsWith(k))?.[0] ?? "";
 const PICK_ORDER = SERIES.flatMap(([k]) => CARD_SETS.filter((s) => seriesOf(s.id) === k)
   .sort((a, b) => b.released.localeCompare(a.released)));
 

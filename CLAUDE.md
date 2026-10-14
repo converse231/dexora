@@ -81,6 +81,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/data/abilities.js` | `npm run abilities` (PokeAPI, cached in .assets-src/abilities) |
 | `public/sprites/cadence/`, `src/data/cadence.js` | `npm run cadence` (Black and White's own idle, 16-frame strips at native pixels; `tools/strip_frames.py`, shared with Showdown's builder) |
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
+| `src/data/cards/prices.js` | `npm run prices` (TCGplayer via TCGdex, a dated snapshot; display only) |
 | `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
@@ -884,6 +885,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `DUST_PACK` a pack: a deal has no dust discount, which would eat that
   margin. A set's deals are `dealsOf` - its BOXES entry, plus the 6-pack
   `BUNDLE` where that entry is a 36-pack box (2026-10-13). Cards carry no catch indicator.
+  **Real-life prices are display only** (`prices.js`, dated `PRICED_AT`,
+  printed beside every price; 2026-10-15): the card view and the Binder's
+  value line, one lazy chunk named by `load.js` alone, never a sale or dust.
   The last card of every pack charges and flashes (white until the charge),
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.

@@ -767,6 +767,27 @@ now and then when a step started an encounter.
 - A complete set now costs far more: a given Mega Hyper Rare is ~1 in 1,900
   Mega Evolution packs, and the chase is packs only.
 
+## Sword & Shield and real-life prices *(2026-10-15, your calls)*
+
+- **Five Sword & Shield sets** (`swsh7` Evolving Skies, `swsh9` Brilliant
+  Stars, `swsh11` Lost Origin, `swsh12` Silver Tempest, `swsh12.5` Crown
+  Zenith), at TCGplayer's measured rates (cited in `SET_RATES`). Its Holo
+  Rare is the `holo` rung, rolled in the rare slot (`rates.holo`); V, VMAX
+  and VSTAR are Double rares; Secret Rares the top roll. Two new rungs, both
+  packs only: `gallery` (a Trainer or Galarian Gallery card, merged into its
+  parent set by fetch-cards' `SUBSETS`, one roll whatever it prints) and
+  `radiant`. A published holo rate counts holo pulls, so check.mjs leaves a
+  Holo Rare's reverse holo out of the measure.
+- **Prices are real life, display only** (`npm run prices`,
+  `tools/fetch-prices.mjs` -> `src/data/cards/prices.js`): TCGplayer's market
+  price through TCGdex, cents per printing, dated `PRICED_AT`, printed beside
+  every price. Never a sale, dust or rule input (no rule module may import
+  card data); one lazy chunk named by `load.js` alone. The card view prices
+  each printing; the Binder's header adds up the set's copies (every copy,
+  spares included), the whole collection, and the dearest card held. Base
+  Set is unpriced: its packs are 1st Edition and TCGdex only has the
+  unlimited print's price. Re-run `npm run prices` to refresh the snapshot.
+
 ## Deferred on purpose *(each with the trigger that brings it back)*
 
 - **Trading cards** - needs server-minted card rows; trigger: players asking

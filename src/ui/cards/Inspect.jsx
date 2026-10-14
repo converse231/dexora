@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RARITY, cardId, sparesOf, dustOf, craftCost, canCraft, showKey, CARD_SHOW } from "../../game/cards.js";
 import { useModalLock, useDismiss } from "../modal.js";
-import { RarityMark, VARIANT_NAME } from "./Card.jsx";
+import { RarityMark, VARIANT_NAME, usePrices, priceOf, usd, PriceNote } from "./Card.jsx";
 import { cardUrl, hiUrl } from "./load.js";
 
 const CAT = { P: "Pokémon", T: "Trainer", E: "Energy" };
@@ -13,6 +13,7 @@ const CAT = { P: "Pokémon", T: "Trainer", E: "Energy" };
 export default function Inspect({ set, localId, cards, dust, dex, showcase = [], onShow, onDust, onCraft, onSpecies, onBulk,
   binders = [], onAddToBinder, onClose }) {
   const [added, setAdded] = useState(null);
+  const prices = usePrices();
   useModalLock();
   const dismiss = useDismiss(onClose);
   const card = set.CARDS.find((c) => c[0] === localId);
@@ -68,12 +69,14 @@ export default function Inspect({ set, localId, cards, dust, dex, showcase = [],
           <ul className="cd-copies">
             {card[4].split("").map((v) => {
               const have = row?.[v] ?? 0, spare = sparesOf(row, v), cost = craftCost(card[3], v), each = dustOf(card[3], v);
+              const price = priceOf(prices, set.SET.id, localId, v);
               return (
                 <li key={v} className={have ? "" : "none"}>
                   <button type="button" className={`cd-vname${v === shown ? " on" : ""}`} aria-pressed={v === shown}
                     onClick={() => setView(v)}>{VARIANT_NAME[v]}</button>
                   <span className="cd-have">
                     {have ? <><b>×{have}</b>{spare > 0 && <small>{spare} spare</small>}</> : <small>Not owned</small>}
+                    {price > 0 && <small className="cd-usd" data-tip="TCGplayer market price, one copy">{usd(price)}</small>}
                   </span>
                   <span className="cd-do">
                     {!have && (canCraft(card[3], set.CARDS) ? (
@@ -94,6 +97,7 @@ export default function Inspect({ set, localId, cards, dust, dex, showcase = [],
               );
             })}
           </ul>
+          <PriceNote prices={prices} />
           <p className="cd-sub">
             You have {dust.toLocaleString()} Card Dust. A spare is a copy past your first of a printing
             {row?.earned ? "; earned copies (✦) are always kept" : ""}.

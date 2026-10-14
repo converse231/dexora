@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-15-swsh",
+    icon: "💎",
+    date: "October 2026",
+    title: "Sword & Shield cards, with real prices",
+    items: [
+      ["Five new sets", "Evolving Skies, Brilliant Stars, Lost Origin, Silver Tempest and Crown Zenith."],
+      ["New rarities", "Trainer and Galarian Gallery cards, and Radiant Rares."],
+      ["What it's worth in real life", "Each card shows its TCGplayer price, and your binder adds up your collection."],
+    ],
+  },
+  {
     id: "2026-10-15-gender",
     icon: "🚻",
     date: "October 2026",

@@ -30,7 +30,8 @@
     "abilities": "node tools/fetch-abilities.mjs",
     "genders": "node tools/fetch-genders.mjs",
     "cadence": "python tools/build_cadence.py",
-    "cards": "node tools/fetch-cards.mjs && python tools/fetch_card_art.py"
+    "cards": "node tools/fetch-cards.mjs && python tools/fetch_card_art.py",
+    "prices": "node tools/fetch-prices.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

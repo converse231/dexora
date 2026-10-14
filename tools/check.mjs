@@ -7578,6 +7578,11 @@ import { statSync } from "node:fs";
   for (const f of walk("").map((f) => f.replace(/^\//, "")).filter((f) => /\.(js|jsx)$/.test(f))) {
     const t = src(f);
     if (/(from\s+|import\(|glob\()["'`][^"'`]*data\/cards\/sets/.test(t)) assert.equal(f, "ui/cards/load.js", `${f} names a card set file - only ui/cards/load.js may, lazily`);
+    // Prices are display only and a chunk of their own: named by load.js's import() alone.
+    if (/data\/cards\/prices/.test(t)) {
+      assert.equal(f, "ui/cards/load.js", `${f} names the card prices - only ui/cards/load.js may, lazily`);
+      assert.ok(/import\("\.\.\/\.\.\/data\/cards\/prices\.js"\)/.test(t) && !/from\s+["'][^"']*prices/.test(t), "load.js imports the prices statically");
+    }
     if (/ui\/cards\/Cards\.jsx/.test(t)) {
       assert.ok(/lazyPage\(\(\) => import\("\.\/ui\/cards\/Cards\.jsx"\)\)/.test(t), `${f} imports the Cards page outside lazyPage()`);
     }
@@ -7590,6 +7595,22 @@ import { statSync } from "node:fs";
     const bare = walk("").map((f) => f.replace(/^\//, "")).filter((f) => /\.(js|jsx)$/.test(f))
       .filter((f) => /[^a-zA-Z]lazy\(\(\) => import\(/.test(stripComments(src(f))));
     assert.deepEqual(bare, [], `${bare.join(", ")}: a lazy page outside lazyPage() blanks the game when its chunk is gone`);
+  }
+  /* REAL-LIFE PRICES (npm run prices): every priced set shipped and every
+     priced card in it, three whole cents a card, at least one price set,
+     and a snapshot date - the page prints it beside every price. */
+  {
+    const { PRICES, PRICED_AT } = await import("../src/data/cards/prices.js");
+    assert.match(PRICED_AT, /^\d{4}-\d\d-\d\d$/, "prices.js has no snapshot date");
+    for (const [sid, rows] of Object.entries(PRICES)) {
+      assert.ok(CD_SETS.some((m) => m.id === sid), `prices for ${sid}, which is not shipped`);
+      const { CARDS } = await import(`../src/data/cards/sets/${sid}.js`);
+      const ids = new Set(CARDS.map((c) => c[0]));
+      for (const [id, p] of Object.entries(rows)) {
+        assert.ok(ids.has(id), `${sid}-${id} is priced but not in the set`);
+        assert.ok(p.length === 3 && p.every((c) => Number.isInteger(c) && c >= 0) && p.some(Boolean), `${sid}-${id}: bad price ${p}`);
+      }
+    }
   }
   const idx = readFileSync(new URL("../src/data/cards/index.js", import.meta.url));
   assert.ok(cdGzip(idx).length < 1024, `the main bundle's card index is ${cdGzip(idx).length} bytes gzipped`);
@@ -7636,7 +7657,8 @@ import { statSync } from "node:fs";
         assert.equal(o.pulls.length, CD.PACK_SIZE);
         assert.equal(new Set(o.pulls.map((x) => x.localId)).size, CD.PACK_SIZE, "a card came twice in one pack");
         if (o.god) { god++; continue; }
-        for (const r of new Set(o.pulls.map((x) => x.rarity))) hits[r] = (hits[r] ?? 0) + 1;
+        // A reverse holo of a Holo Rare (Sword & Shield's) is not the holo pull a published rate counts.
+        for (const r of new Set(o.pulls.filter((x) => x.variant !== "r").map((x) => x.rarity))) hits[r] = (hits[r] ?? 0) + 1;
         for (const k of Object.keys(dry)) dry[k] = Math.max(dry[k], o.pity[k]);
         p = o.pity;
       }

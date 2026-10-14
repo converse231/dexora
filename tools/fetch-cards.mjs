@@ -37,7 +37,21 @@ const API = "https://api.tcgdex.net/v2/en";
 // Shipped sets, in the order they open (docs/cards.md, Phases).
 // The rest of Scarlet & Violet arrived on 2026-10-13, before Base Set.
 const SETS = ["me01", "me02", "me02.5", "sv03.5", "sv08.5", "me03", "me04", "me05", "30th", "sv08",
-  "sv09", "sv10", "sv10.5b", "sv10.5w", "sv01", "sv02", "sv03", "sv04", "sv04.5", "sv05", "sv06", "sv06.5", "sv07", "base1"];
+  "sv09", "sv10", "sv10.5b", "sv10.5w", "sv01", "sv02", "sv03", "sv04", "sv04.5", "sv05", "sv06", "sv06.5", "sv07", "base1",
+  // Sword & Shield's favourites (2026-10-15, asked for).
+  "swsh7", "swsh9", "swsh11", "swsh12", "swsh12.5"];
+/* A GALLERY IS PART OF ITS SET'S PACKS: TCGdex lists Brilliant Stars'
+   Trainer Gallery (and Lost Origin's, Silver Tempest's, Crown Zenith's
+   Galarian Gallery) as sets of their own, but a booster draws them in place
+   of a reverse holo. Merged into the parent set, every card on one rung
+   (`gallery`) whatever it prints - one roll, at the gallery's published
+   rate - and keeping its own localId (TG01, GG01). TCGdex gives a gallery
+   card no image, but hosts it under the PARENT set's folder (swsh9/TG01),
+   so the set's own image base serves both. */
+const SUBSETS = { swsh9: "swsh9tg", swsh11: "swsh11tg", swsh12: "swsh12tg", "swsh12.5": "swsh12.5gg" };
+/* RARES PRINTED WITHOUT A HOLO are plain cards in these sets (Base Set's, and
+   Sword & Shield's, whose holo rares are a rung of their own). */
+const PLAIN_RARES = new Set(["base1", "swsh7", "swsh9", "swsh11", "swsh12", "swsh12.5"]);
 /* A set shipped under the name its packs carried: TCGdex's Base Set is the
    1999 print, and the packs here are its 1st Edition (asked for, 2026-10-07). */
 const NAME = { base1: "Base Set 1st Edition" };
@@ -50,6 +64,12 @@ const RARITY = {
   "Pikachu Rare": "pikachu", "Futuristic Rare": "futuristic",
   "Black White Rare": "blackwhite",
   "Shiny rare": "shiny", "Shiny Ultra Rare": "shinyultra",
+  /* SWORD & SHIELD (2026-10-15): its Holo Rare is a rung of its own (Base
+     Set's), its V, VMAX and VSTAR its Double rares, its Secret Rares
+     (rainbows, golds, alternate-art VMAX) its top chase - where Scarlet &
+     Violet's Hyper rare sits - and a Radiant Rare a roll of its own. */
+  "Holo Rare": "holo", "Holo Rare V": "double", "Holo Rare VMAX": "double", "Holo Rare VSTAR": "double",
+  "Secret Rare": "hyper", "Radiant Rare": "radiant",
 };
 /* BASE SET PRINTS ITS HOLOS AS "Rare" with only a holo variant; they are the
    set's hit, one pack in three, so they are their own rung (`holo`). */
@@ -126,20 +146,28 @@ function variantsOf(card, rarity, set) {
   if (rarity === "common" || rarity === "uncommon") return "n" + (v.reverse ? "r" : "");
   // A rare printed without a holo (Base Set's) is a plain card.
   // Not 30th Celebration's, which TCGdex prints the same way: saves hold those as "h".
-  if (rarity === "rare") return (set === "base1" && v.holo === false && v.normal ? "n" : "h") + (v.reverse ? "r" : "");
+  if (rarity === "rare") return (PLAIN_RARES.has(set) && v.holo === false && v.normal ? "n" : "h") + (v.reverse ? "r" : "");
+  // A holo rare has its reverse holo too (Sword & Shield's; Base Set's has none).
+  if (rarity === "holo") return "h" + (v.reverse ? "r" : "");
   return "h";
 }
 
 const index = [];
 for (const id of SETS) {
   const set = await cached(`set-${id}`, `${API}/sets/${id}`);
-  const cards = await pool(set.cards, 4, (c) => cached(`card-${c.id}`, `${API}/cards/${c.id}`));
+  const own = await pool(set.cards, 4, (c) => cached(`card-${c.id}`, `${API}/cards/${c.id}`));
+  // Its gallery, merged in: every card a `gallery` holo (SUBSETS).
+  const sub = SUBSETS[id] && await cached(`set-${SUBSETS[id]}`, `${API}/sets/${SUBSETS[id]}`);
+  const gallery = sub ? await pool(sub.cards, 4, (c) => cached(`card-${c.id}`, `${API}/cards/${c.id}`)) : [];
+  const base = own[0].image.replace(/[^/]+$/, "");
+  const cards = [...own, ...gallery.map((c) => ({ ...c, image: c.image ?? `${base}${c.localId}` }))];
+  const inGallery = new Set(gallery.map((c) => c.id));
   const rows = cards.map((c) => {
-    const rarity = rarityOf(c, id);
+    const rarity = inGallery.has(c.id) ? "gallery" : rarityOf(c, id);
     if (!rarity) throw new Error(`${c.id}: unknown rarity "${c.rarity}" - add it to CARD_RARITIES first`);
     const cat = CATEGORY[c.category];
     if (!cat) throw new Error(`${c.id}: unknown category "${c.category}"`);
-    return [c.localId, c.name, cat, rarity, variantsOf(c, rarity, id), speciesOf(c), c.illustrator ?? ""];
+    return [c.localId, c.name, cat, rarity, inGallery.has(c.id) ? "h" : variantsOf(c, rarity, id), speciesOf(c), c.illustrator ?? ""];
   });
 
   const dir = new URL(`public/cards/${id}/`, ROOT);
@@ -160,13 +188,16 @@ for (const id of SETS) {
   if (set.logo && !existsSync(logo)) writeFileSync(logo, await get(`${set.logo}.webp`, true));
 
   const asset = cards[0].image.replace(/[^/]+$/, "");
+  // A gallery card's TCGdex id is its subset's (swsh9tg-TG01), which the price fetch asks by.
+  const subs = gallery.length ? { [gallery[0].localId.replace(/\d+$/, "")]: SUBSETS[id] } : null;
   const head = `/* GENERATED by tools/fetch-cards.mjs (npm run cards) from TCGdex - never hand-edit.\r\n`
     + `   Rows: [localId, name, category, rarity, variants, speciesIds, illustrator]. */\r\n`;
   mkdirSync(new URL("src/data/cards/sets/", ROOT), { recursive: true });
   writeFileSync(new URL(`src/data/cards/sets/${id}.js`, ROOT),
     head + `export const SET = ${JSON.stringify({
       id, name: NAME[id] ?? set.name, released: set.releaseDate, asset,
-      official: set.cardCount.official, total: set.cardCount.total,
+      official: set.cardCount.official, total: set.cardCount.total + gallery.length,
+      ...(subs ? { subs } : {}),
     })};\r\nexport const CARDS = [\r\n${rows.map((r) => JSON.stringify(r)).join(",\r\n")},\r\n];\r\n`);
   index.push({ id, name: NAME[id] ?? set.name, released: set.releaseDate, total: rows.length });
   console.log(`${id} ${set.name}: ${rows.length} cards, ${fetched} images fetched`);

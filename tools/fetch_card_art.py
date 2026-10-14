@@ -69,6 +69,16 @@ WRAPPERS = {
     # The 1999 wrappers (Bulbagarden's "Shadowless" scans: the first print run).
     "base1": ["Base Set Booster Charizard Shadowless.jpg", "Base Set Booster Blastoise Shadowless.jpg",
               "Base Set Booster Venusaur Shadowless.jpg"],
+    # Sword & Shield's favourites (2026-10-15): each set's own wrappers, checked live on Bulbagarden.
+    "swsh7": ["SWSH7 Booster Umbreon.jpg", "SWSH7 Booster Sylveon.jpg", "SWSH7 Booster Rayquaza.jpg",
+              "SWSH7 Booster Gigantamax Duraludon.jpg"],
+    "swsh9": ["SWSH9 Booster Charizard.jpg", "SWSH9 Booster Arceus.jpg", "SWSH9 Booster Shaymin.jpg",
+              "SWSH9 Booster Whimsicott.jpg"],
+    "swsh11": ["SWSH11 Booster Origin Forme Giratina.jpg", "SWSH11 Booster Hisuian Zoroark.jpg",
+               "SWSH11 Booster Radiant Gardevoir.jpg", "SWSH11 Booster Enamorus.jpg"],
+    "swsh12": ["SWSH12 Booster Lugia.jpg", "SWSH12 Booster Alolan Vulpix.jpg", "SWSH12 Booster Regieleki.jpg",
+               "SWSH12 Booster Regidrago.jpg"],
+    "swsh12.5": ["Crown Zenith Booster.jpg"],
 }
 # A set TCGdex has no logo for gets one from here (fetch-cards leaves it out).
 LOGOS = {"30th": "30th Anniversary logo.png", "sv05": "SV5 Logo EN.png"}
