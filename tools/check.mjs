@@ -2612,6 +2612,20 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(png.length < 24 * 1024, `${b} is ${png.length >> 10}KB - run npm run ranks`);
     }
     assert.equal(titleBadge("set:me01"), null, "a card set's title claims a badge that is not drawn");
+    /* A CARD SET'S TITLE IS ITS LOGO (2026-10-15): every set ships the one its
+       Collector and Master Collector titles draw, and a Master hides its
+       Collector (one badge, not two). */
+    {
+      const { titleLogo, shownTitles } = await import("../src/game/titles.js");
+      const { CARD_SETS } = await import("../src/data/cards/index.js");
+      for (const s of CARD_SETS) {
+        for (const kind of ["set", "master"]) {
+          const f = titleLogo(`${kind}:${s.id}`);
+          assert.ok(f && existsSync(new URL(`../public/${f}`, import.meta.url)), `${s.name}'s ${kind} title has no logo at public/${f} - npm run cards`);
+        }
+      }
+      assert.deepEqual(shownTitles(["master:me02", "set:me02", "set:sv01"]), ["master:me02", "set:sv01"], "a Master Collector title showed its Collector beside it");
+    }
   }
   /* A GENERATION'S MEDAL is every national number of it and nothing else (no
      form), so a region's Pokédex is what the games call one; its charm is

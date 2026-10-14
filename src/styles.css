@@ -9757,6 +9757,16 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .you-titles { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 4px; }
 /* A drawn title: the medal alone, its name in the tooltip (TitleBadges). */
 .title-badge { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
+/* A card set's title: its logo, sized by height (logos run 1.3:1 to 4.3:1);
+   a Master's carries a gold tag over its foot - gold is what says "master". */
+.title-set { position: relative; display: inline-grid; justify-items: center; flex: none; }
+.title-set > img { height: 36px; width: auto; max-width: 112px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .4)); }
+.title-set.master { padding-bottom: 7px; }
+.title-set.master > b {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  font: 700 9px var(--pixel); padding: 1px 6px; border-radius: 999px; white-space: nowrap;
+  color: #3a2600; background: linear-gradient(#ffe27a, #f0b83c); box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+}
 .you-titles i { font-style: normal; font: 700 11px var(--pixel); padding: 3px 8px; border-radius: 999px;
   color: #3a2600; background: linear-gradient(#ffe27a, #f0b83c); }
 .tp-cards .cd-chase-card { width: 92px; }

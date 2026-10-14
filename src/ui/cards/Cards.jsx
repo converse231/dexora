@@ -21,7 +21,7 @@ import Opening, { OpenAll } from "./Opening.jsx";
 import { loadSet, logoUrl, packUrl } from "./load.js";
 import Icon from "../Icon.jsx";
 import { ShopGrid, Product, Cart, Done, MyPacks, readCart, writeCart, variantsOf } from "./CardShop.jsx";
-import { titleIds, titleName, MASTER_STEP } from "../../game/titles.js";
+import { titleIds, titleName, shownTitles, MASTER_STEP } from "../../game/titles.js";
 import { showKey, CARD_SHOW, printingsOf } from "../../game/cards.js";
 
 const yen = (n) => `¥${n.toLocaleString()}`;
@@ -133,7 +133,8 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
     }, 30);
   };
   const look = (setId, localId) => setInspect({ setId, localId });
-  const titles = titleIds(st?.milestones, st?.medals).map(titleName);
+  // Counted here: the titles themselves are badges on your card (TitleBadges).
+  const titles = shownTitles(titleIds(st?.milestones, st?.medals));
 
   return (
     <div className={`tc-page evcard cd-page${opening ? " opening" : ""}`} role="dialog" aria-modal="true" aria-label="Cards" ref={page}>
@@ -146,7 +147,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
           <div className="tc-titles">
             <h3>Cards</h3>
             <span>{owned} cards collected · {unopened} pack{unopened === 1 ? "" : "s"} to open · {dust.toLocaleString()} dust
-              {titles.length ? ` · ${titles.join(", ")}` : ""}</span>
+              {titles.length ? ` · ${titles.length} title${titles.length === 1 ? "" : "s"}` : ""}</span>
           </div>
         </div>
         <nav className="lg-strip-wrap" aria-label="Cards">
