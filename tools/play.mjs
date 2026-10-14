@@ -2983,6 +2983,87 @@ console.log("alpha ok — never flees, caught pays candy and research, boxed, un
 }
 console.log("lustre ok — rank 20 turns a roll just past the odds into a rare form");
 
+/* THE CATCH CHAIN (combo.js, 2026-10-14). Saved and cleaned; a catch of the
+   chained species adds one and another species starts over; running from
+   another species is free, while the chained one fleeing or run from breaks
+   it; a rung and a lost chain are announced; and the lift reaches the
+   engine's tier roll (the Lustre test's fixed roll, at the top rung). */
+await savedField("combo", { species: 25, n: 12 }, "junk", null);
+{
+  const C = await import("../src/game/combo.js");
+  const { looksOf, speciesById } = await import("../src/game/biomes.js");
+  assert.equal(C.cleanCombo({ species: 25, n: 0 }, speciesById), null, "a chain of none was kept");
+  assert.equal(C.cleanCombo({ species: 25, n: 2.5 }, speciesById), null, "a fractional chain was kept");
+  const letters = looksOf(201);
+  assert.ok(letters.length > 2, "Unown has no looks to chain");
+  assert.equal(C.cleanCombo({ species: letters[1], n: 3 }, speciesById), null, "a chain keyed on a look, not its family, was kept");
+  assert.deepEqual(C.nextCombo({ species: 201, n: 3 }, letters[2], "caught"), { species: 201, n: 4 }, "another Unown letter broke the chain");
+
+  const { e } = boot({ ...SAVE, combo: { species: 25, n: 9 } });
+  const meet = (id) => {
+    const enc = e.state.encounter ?? walkToEncounter(e);
+    assert.ok(enc, "walked a whole map and met nothing");
+    until(e, (s) => s.encounter?.phase === "idle", "the encounter to settle");
+    Object.assign(e.state.encounter, { speciesId: id, alpha: false, variant: null });
+  };
+  const catchIt = () => {
+    e.state.bag["master-ball"] = 1;
+    e.throwBall("master-ball");
+    e.answerAsk(true);
+    until(e, (s) => !s.encounter || s.encounter.phase === "caught", "the catch");
+    until(e, (s) => !s.encounter, "the encounter to close", 4000);
+  };
+  const run = () => { e.flee(); until(e, (s) => !s.encounter, "the encounter to close", 4000); };
+  meet(25); catchIt();
+  assert.deepEqual(e.state.combo, { species: 25, n: 10 }, "catching the chained species did not add one");
+  assert.ok(e.state.cheers.some((c) => c.kind === "combo" && c.title.includes("×10")), "reaching a rung raised no banner");
+  meet(19); run();
+  assert.deepEqual(e.state.combo, { species: 25, n: 10 }, "running from ANOTHER species broke the chain");
+  meet(25); run();
+  assert.equal(e.state.combo, null, "running from the chained species kept the chain");
+  assert.ok(e.state.cheers.some((c) => c.kind === "combo" && c.title.includes("lost")), "losing a lifted chain was silent");
+  meet(19); catchIt();
+  assert.deepEqual(e.state.combo, { species: 19, n: 1 }, "a catch with no chain did not start one");
+  e.state.hints = e.state.hints.filter((h) => h !== "combo");
+  meet(16); catchIt();
+  assert.deepEqual(e.state.combo, { species: 16, n: 1 }, "another species' catch did not start over");
+  assert.ok(!e.state.hints.includes("combo"), "the combo card showed for a chain of one");
+  meet(16); e.state.hint = null; catchIt();
+  assert.ok(e.state.hints.includes("combo"), "the first chain of two showed no combo card");
+  e.state.combo = { species: 16, n: 1 };
+  assert.deepEqual(boot({ ...SAVE, combo: e.state.combo }).e.state.combo, { species: 16, n: 1 }, "the chain did not survive a reload");
+}
+{
+  const { dayKey } = await import("../src/game/daily.js");
+  const { outbreakPool, OUTBREAK_LIFT } = await import("../src/game/events.js");
+  const { BIOMES, TIER_ODDS, lockedTiers } = await import("../src/game/biomes.js");
+  const { COMBO_STEPS, comboKey } = await import("../src/game/combo.js");
+  const id = outbreakPool(BIOMES.find((b) => b.id === "meadow"), 50).find((x) => comboKey(x) === x);
+  const top = Math.max(...TIER_ODDS.filter(([t]) => !lockedTiers(id)?.has(t)).map(([, o]) => o));
+  const [n, lift] = COMBO_STEPS.at(-1);
+  const met = (combo) => {
+    const { e } = boot({ ...SAVE, combo, outbreak: { key: dayKey(), areaId: "meadow", speciesId: id, left: 5 } });
+    const real = Math.random;
+    try {
+      Math.random = () => top * OUTBREAK_LIFT * (1 + lift) / 2;
+      for (const dir of ["right", "down", "left", "up"]) {
+        e.press(dir);
+        for (let i = 0; i < 30 && !e.state.encounter; i++) tick(16);
+        e.clearHeld();
+        if (e.state.encounter) break;
+      }
+    } finally { Math.random = real; }
+    assert.equal(e.state.encounter?.speciesId, id, "the combo test met the wrong species");
+    return e.state.encounter;
+  };
+  assert.equal(met(null).variant, null, "the fixed roll made a rare form with no chain - the test proves nothing");
+  const enc = met({ species: id, n });
+  assert.ok(enc.variant, "a top-rung chain did not lift the engine's tier roll");
+  assert.equal(enc.chain, n, "the meeting did not carry its chain");
+  assert.equal(met({ species: id === 16 ? 19 : 16, n }).variant, null, "another species' chain lifted this one");
+}
+console.log("combo ok — a chain builds, resets, breaks on a flee or a run, survives a reload and lifts the roll");
+
 /* LOOKS, THROUGH THE ENGINE (2026-10-01). Walking Tanoby meets Unown in more
    than one letter; Type: Null evolves into the Silvally the roll picks; a Blue
    Flabebe evolves into a Blue Floette, by its own row and with no roll. */
@@ -4172,9 +4253,9 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     const region = LEAGUES[0];
     const champ = region.league.find((p) => GYMTUNE[p.id].kind === "champion");
     const e = at(allOf(everyone(region).filter((id) => id !== champ.id)));
-    const set = C.newestOpen(levelFromXp(e.state.xp));
     const r = win(e, champ.id);
-    assert.equal(r.pack, set, "a first Champion win paid no box");
+    const set = r.pack;
+    assert.ok(set && C.setOpen(set, levelFromXp(e.state.xp)), "a first Champion win paid no box, or a box of a shut set");
     assert.equal(r.packs, C.BOXES[set].packs, "the result card would name the wrong number of packs");
     assert.equal(e.state.packs[set], C.BOXES[set].packs, "the Champion's box is not the set's box");
     assert.deepEqual(e.state.earnedPacks[set], Array(C.BOXES[set].packs).fill(`champion:${champ.id}`),
@@ -4237,14 +4318,28 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     const was = e.state.beaten;
     /* A FIRST BADGE PAYS A CARD PACK (docs/cards.md): the newest set open,
        held as earned so its cards carry the badge's stamp. */
-    const { newestOpen } = await import("../src/game/cards.js");
+    const C2 = await import("../src/game/cards.js");
     const { levelFromXp: lvOf } = await import("../src/game/biomes.js");
-    const newest = newestOpen(lvOf(e.state.xp));      // the newest set this level has open
-    const packs0 = e.state.packs[newest] ?? 0;
+    const packs0 = { ...e.state.packs };
     const r = win(e, brock.id);
-    assert.deepEqual(r, { over: 0, pay: GYMTUNE[brock.id].prize, first: true, fee: 0, gift: null, master: false, charm: null, pack: newest, packs: 1 });
-    assert.equal(e.state.packs[newest], packs0 + 1, "a first badge did not add its pack");
-    assert.deepEqual(e.state.earnedPacks[newest].slice(-1), [`badge:${brock.id}`], "the badge pack is not marked earned");
+    const got = r.pack;                               // a random set this level has open
+    assert.ok(got && C2.setOpen(got, lvOf(e.state.xp)), "a first badge paid a pack of a shut set, or none");
+    assert.deepEqual(r, { over: 0, pay: GYMTUNE[brock.id].prize, first: true, fee: 0, gift: null, master: false, charm: null, pack: got, packs: 1 });
+    assert.equal(e.state.packs[got], (packs0[got] ?? 0) + 1, "a first badge did not add its pack");
+    assert.deepEqual(e.state.earnedPacks[got].slice(-1), [`badge:${brock.id}`], "the badge pack is not marked earned");
+    /* REWARD PACKS ROLL OVER EVERY OPEN SET, not the newest by list order
+       (every badge paid the same set): seeded, each open set comes up, and
+       never a shut one. */
+    {
+      let x = 7;
+      const rnd = () => { x = (x * 16807) % 2147483647; return x / 2147483647; };
+      const lv = 60;
+      const seen = new Set();
+      for (let k = 0; k < 2000; k++) seen.add(C2.randomOpen(lv, rnd));
+      const want = (await import("../src/data/cards/index.js")).CARD_SETS.filter((s) => C2.setOpen(s.id, lv)).map((s) => s.id);
+      assert.deepEqual([...seen].sort(), [...want].sort(), "reward packs do not roll over every open set, or rolled a shut one");
+      assert.equal(C2.randomOpen(0, rnd), null, "a level with no set open still named one");
+    }
     assert.notEqual(e.state.beaten, was, "a win was written into `beaten` in place - the League page's memo never sees it");
     assert.equal(e.state.money, money + GYMTUNE[brock.id].prize, "the first win did not pay its prize");
     assert.deepEqual(e.state.beaten[brock.id], { wins: 1, at: e.state.steps });

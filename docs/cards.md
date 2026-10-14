@@ -273,8 +273,8 @@ League rematch guard).
 
 | Source | Reward | Stamp |
 |---|---|---|
-| A gym badge (first win) | 1 pack of the newest set you have open | `earned` · the badge |
-| A region's Champion (first win) | a box (or Ascended Heroes' bundle) of the newest set you have open | `earned` · the League |
+| A gym badge (first win) | 1 pack of a random set you have open (`randomOpen`; the newest until 2026-10-14) | `earned` · the badge |
+| A region's Champion (first win) | a box (or bundle) of a random set you have open | `earned` · the League |
 | Daily quest, 7-day streak | 1 pack | `earned` · the streak |
 | Pokédex rank up | 1 pack per rank | `earned` · the rank |
 | A set completed | a title ("Mega Evolution Collector") and a binder cover; no pack | - |

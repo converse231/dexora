@@ -2330,7 +2330,10 @@ canvas {
 /* The picture is a button: laid over the sprite's cell, see-through, with a
    small VIEW tab so a tap target that looks like art says what it does. */
 .boxrow .bx-peek {
-  grid-area: img; align-self: stretch; justify-self: stretch; position: relative;
+  /* Over the sprite's whole cell: a rare form's `.sprite-fx > img` sits at
+     z-index 1 for its layers, and took the tap off the button (2026-10-14:
+     the picture opened nothing on every rare-form row). */
+  grid-area: img; align-self: stretch; justify-self: stretch; position: relative; z-index: 2;
   padding: 0; border: 0; background: transparent; cursor: zoom-in; min-height: 0;
 }
 .boxrow .bx-peek:hover { background: transparent; border: 0; }
@@ -3916,16 +3919,6 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 
 /* The clock, on the map rather than in the bar of counters. Under the effect
    readout in the same corner, so the two stack instead of competing. */
-/* THE TOP-RIGHT STACK. Everything pinned to this corner goes in it, so two
-   things can never print on top of each other again - which they did, because
-   the clock dodged the effect card with a typed `top: 40px` and the card grew
-   past it. A column with a gap needs no number and cannot go stale. */
-.hud-right {
-  position: absolute; right: 10px; top: 10px; z-index: 3;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 7px;
-  pointer-events: none;
-}
-
 .worldclock {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 10px 4px; border-radius: 10px;
@@ -5273,6 +5266,10 @@ button:disabled { transition: none; }
 .fx-ring.fx-repel { --rc: #7fc8ff; }
 .fx-ring.fx-rarity { --rc: #f0f4ff; }
 .fx-ring.fx-variant { --rc: var(--gold); }
+/* The catch chain: cyan while it builds, gold once it lifts. */
+.combo-ring { --rc: var(--accent); cursor: default; }
+.combo-ring.lit { --rc: var(--gold); }
+.combo-ring > img { position: relative; width: 34px; height: 34px; object-fit: contain; opacity: 1; }
 .fx-ring > img, .fx-ring > .item-fx { position: relative; width: 28px; height: 28px; opacity: 1; }
 .fx-ring > .item-fx > img { width: 100%; height: 100%; }
 .fx-ring b { box-shadow: 0 0 0 1.5px var(--rc) inset; }
@@ -8797,12 +8794,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 @media (max-width: 1240px) { .topbar .tb-extra { display: none; } }
 @media (max-width: 1020px) { .tb-logo { font-size: 0; gap: 0; } .topbar .tb-tab { padding: 0 12px; } }
 
-/* ---------- the map's corners */
-.hud-left {
-  position: absolute; top: 12px; left: 12px; z-index: 5; max-width: 62%;
-  display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
-}
-.hud-left .biome-tag { position: static; max-width: none; left: auto; top: auto; }
+/* ---------- the map's corners (placed by HUD ZONES, end of file) */
 .biome-tag, .worldclock {
   background: var(--glass); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
   color: var(--ink); box-shadow: 0 10px 24px var(--shadow-soft);
@@ -9427,16 +9419,6 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .pp-slots button:hover { color: var(--bad); border-color: var(--bad); }
 .partypick { width: min(560px, 100%); }
 @media (prefers-reduced-motion: reduce) { .party-mon.on > img { animation: none; } }
-/* ON A PHONE THE PARTY SITS BOTTOM-LEFT of the map (asked for, 2026-10-07):
-   up top it took a third row under the area and the quest. The corner is
-   free there - the minimap only shows on a wide layout. `.hud-left` runs the
-   map's height so the strip can sit at its foot; it lets touches through
-   everywhere but its own buttons. */
-@media (hover: none) and (pointer: coarse) {
-  .hud-left { bottom: 12px; align-content: flex-start; pointer-events: none; }
-  .hud-left > * { pointer-events: auto; }
-  .hud-left > .party { position: absolute; left: 0; bottom: 0; }
-}
 
 /* ================================================================ CARDS
    The fifth tab (docs/cards.md): Packs, Binder, Card Dex, Dust, the card view
@@ -10141,3 +10123,117 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   .rw-ok { grid-column: 2; grid-row: 5; justify-self: center; margin: 0; }
   .rw-rays { left: 25%; top: 46px; }
 }
+
+/* ================================================================ HUD ZONES
+   (2026-10-14, "the screen is getting crowded".) The map's HUD is four zones,
+   the way a handheld game lays one out, and the same four at every size:
+
+     WHERE (top left)        the area, its clock, its types; under it WHAT
+                             TODAY ASKS - the quest and anything waiting on a
+                             tap (check-in, a spin, a reward).
+     WHAT'S ACTING (top right)  events, running items, the partner's perk.
+     THE DOCK (bottom left)  the minimap and the walking party.
+     THE BALLS (bottom right)   the rail, which places itself.
+
+   `.hud` is a GRID over the map, so two zones cannot print over each other
+   (a typed offset between two pinned corners is how the clock once landed on
+   the effect card). It lets the map take every touch but its own buttons.
+
+   Upright on a touch screen the map is small and the space between it and the
+   pad was empty (260px on a 390x844 phone), so everything but WHERE moves
+   UNDER the map, a bottom screen: the party, the tasks, then what is acting
+   as a row of rings (six at once had wrapped over the area's name). Held
+   sideways the tasks take the left column under the Menu key, which was
+   empty down to the D-pad, and the map keeps where and what's acting. */
+.hud {
+  position: absolute; inset: 0; z-index: 5; padding: 10px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px; pointer-events: none;
+}
+.hud-tl { grid-area: 1 / 1; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.hud-status {
+  grid-area: 1 / 2 / 3 / 3; z-index: 1; min-height: 0;
+  /* A busy corner wraps into a second column inward, never past the map. */
+  display: flex; flex-direction: column; flex-wrap: wrap-reverse; align-content: flex-start;
+  align-items: flex-start; gap: 7px;
+}
+/* On touch the map is small: the rings a size down. */
+@media (hover: none) and (pointer: coarse) {
+  .hud .rift-ring { width: 40px; height: 40px; }
+  .hud .rift-ring > img, .hud .fx-ring > .item-fx { width: 24px; height: 24px; }
+  .hud .combo-ring > img { width: 30px; height: 30px; }
+  .hud { padding: 7px; }
+  .hud-status { gap: 5px; }
+}
+.hud-dock { grid-area: 3 / 1; display: flex; align-items: flex-end; gap: 8px; }
+.hud-tasks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hud-tasks > *, .hud-dock > .party { pointer-events: auto; }
+.hud .minimap { position: static; }
+.hud .dc-pill { margin-top: 0; }
+
+/* WHERE: one card, the name and the clock on one line, the types under. */
+.hud .biome-tag { position: static; max-width: 100%; pointer-events: auto; }
+.bt-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bt-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.biome-tag .worldclock {
+  flex: none; display: inline-flex; gap: 4px; padding: 2px 8px 1px; border: 0; box-shadow: none;
+  font: 600 12px var(--pixel); line-height: 1.4;
+}
+.biome-tag .worldclock b { font-size: 12px; }
+/* Past `.biome-tag i`, which is the small grey caption style. */
+.biome-tag .worldclock i { font-size: 12px; color: inherit; }
+
+/* The quest's card opens over the map from wherever the quest sits. */
+.hud .ms-pop { z-index: 70; }
+
+/* EVERY CHIP ONE HEIGHT: the quest, a check-in and the party strip line up. */
+.hud .ms-tab { height: 40px; min-height: 0; padding-block: 0; }
+
+/* A DESKTOP's dock keeps clear of the ball rail across the bottom right. */
+@media (hover: hover) { .hud-dock { margin-right: 300px; } }
+
+/* -------- TOUCH, UPRIGHT: the bottom screen. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  .app.tab-catch:not(.busy) .viewport { margin-bottom: var(--dock-h); }
+  .app.tab-catch { --dock-h: 166px; }
+  /* `grid-area: auto`: an absolute grid child with an area is placed IN that
+     area, and the status column is empty once its rings leave it. */
+  .hud-dock, .hud-tasks, .hud-status {
+    position: absolute; left: 0; right: 0; padding: 0; grid-area: auto;
+    pointer-events: none;
+  }
+  .hud-dock { top: calc(100% + 10px); justify-content: flex-start; align-items: center; }
+  .hud-tasks, .hud-status { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .hud-tasks { top: calc(100% + 64px); }
+  /* Room below for the counts on the rings' edges, which a scroller clips. */
+  .hud-status { top: calc(100% + 112px); flex-direction: row; align-items: center; gap: 6px; padding-bottom: 8px; }
+  .hud-tasks::-webkit-scrollbar, .hud-status::-webkit-scrollbar { display: none; }
+  .hud-tasks > *, .hud-status > * { flex: none; }
+  .hud .ms-tab { height: 40px; }
+  .hud .ms-tab i { display: inline; }
+  /* The quest's card opens over the map, FIXED: the tasks row scrolls
+     sideways, and a scroller clips an absolute child (the card opened
+     invisible). A fixed one escapes it - nothing above `.hud` transforms. */
+  .hud .ms-pop { position: fixed; top: calc(80px + env(safe-area-inset-top)); bottom: auto; left: 16px; right: 16px; min-width: 0; }
+  /* A tablet held upright: one row, the party left and the tasks right. */
+  @media (min-width: 600px) {
+    .app.tab-catch { --dock-h: 120px; }
+    .hud-tasks { top: calc(100% + 10px); left: auto; justify-content: flex-end; }
+    .hud-dock { right: auto; }
+    .hud-status { top: calc(100% + 66px); }
+  }
+}
+
+/* -------- TOUCH, SIDEWAYS: the tasks take the left column under Menu. */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .hud-tasks {
+    position: fixed; z-index: 57; top: 58px; left: calc(10px + env(safe-area-inset-left));
+    width: var(--col); flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px;
+  }
+  .hud .ms-tab { height: 36px; width: 100%; justify-content: center; padding-inline: 8px; }
+  .hud .missions { width: 100%; }
+  .hud .ms-tab i { display: inline; }
+  .hud .ms-pop { left: 0; right: auto; min-width: min(268px, 60vw); }
+  @media (max-height: 340px) { .hud-tasks { top: 50px; } .hud .ms-tab { height: 32px; } }
+}
+

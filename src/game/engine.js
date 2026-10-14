@@ -44,7 +44,7 @@ import {
 } from "./league.js";
 import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
 import {
-  openPack as rollPack, rulesOf, setById, setOpen, newestOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX, cleanBinders, BINDER_MAX, BINDER_POCKETS,
+  openPack as rollPack, rulesOf, setById, setOpen, randomOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX, cleanBinders, BINDER_MAX, BINDER_POCKETS,
   dustOf, craftCost, sparesOf, sweepOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, dealsOf, STREAK_PACK, DUST_PACK,
   MASTER_DUST, printingsOf, CARD_SHOW, showKey,
 } from "./cards.js";
@@ -62,6 +62,7 @@ import {
   stepReward, keeper, alphaCandy, canBike, variantOf,
 } from "./items.js";
 import { variantSpareUids } from "./spares.js";
+import { comboLift, comboKey, nextCombo, cleanCombo, COMBO_STEPS } from "./combo.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
    that froze every catch in the game. `createEngine` has its own
    `function advance(now)` driving the phase machine, declared INSIDE the
@@ -206,6 +207,7 @@ function freshState() {
     outbreak: null,       // today's mass outbreak, frozen at first sight - see events.js
     research: {},         // per-species research counters, keyed by DEX ID - see research.js
     stars: [],            // dex ids whose finished research was starred - see `star`
+    combo: null,          // the catch chain, `{ species, n }` - see combo.js
     gifted: [],           // LEGACY: dex ids once held back from rewards as trades - paid and cleared at boot
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
@@ -622,6 +624,7 @@ function loadState() {
       // Real species, once each; anything else is dropped, never the list.
       stars: [...new Set(Array.isArray(s.stars) ? s.stars : [])]
         .filter((id) => Number.isInteger(id) && speciesById(id)),
+      combo: cleanCombo(s.combo, speciesById),
       gifted: [...new Set(Array.isArray(s.gifted) ? s.gifted : [])]
         .filter((id) => Number.isInteger(id) && speciesById(id)),
       // Entry by entry, never the whole record: badges are years of play.
@@ -1790,6 +1793,7 @@ export function createEngine(canvas, onChange, mini = null) {
       pityBoost(state.dry) * (honey && !honey.tier ? honey.lift : 1)
         * (flood ? OUTBREAK_LIFT : 1) * researchLift(sp.id, state.stars) * charmOf(state.beaten)
         * dexCharm(sp.id, state.medals)
+        * comboLift(state.combo, sp.id)
         * tierLift(state.stats),
       honey?.tier ? { tier: honey.tier, mult: honey.lift } : null);
     state.dry = variant ? 0 : (state.dry ?? 0) + 1;
@@ -1831,6 +1835,8 @@ export function createEngine(canvas, onChange, mini = null) {
          `known` and for the same reason: everything the plate reads is fixed
          when the Pokemon appears. */
       starred: (state.stars ?? []).includes(sp.id),
+      // The chain this meeting is part of, if it is the chained species.
+      chain: state.combo?.species === comboKey(sp.id) ? state.combo.n : 0,
       variant,
       /* The same word as four booleans, so a panel can ask `enc.holo` without
          re-deriving anything. Spread from `TIERS` rather than typed out: the
@@ -2389,7 +2395,8 @@ export function createEngine(canvas, onChange, mini = null) {
          reach. Rounded, because XP is whole and a half-point that only ever
          appears with a berry in play is a rounding difference nobody can
          explain. */
-      teach({ kind: "caught", duplicate: dupe, caught: state.caught });
+      teach({ kind: "caught", duplicate: dupe, caught: state.caught,
+        chain: (state.combo?.species === comboKey(e.speciesId) ? state.combo.n : 0) + 1 });
       const gained = gainXp(Math.round(xpForCatch(sp, e.isNew) * berryXp(e.berries)));
 
       /* WHAT A CATCH PAYS, AND IT USED TO BE A FLAT ¥100 OR NOTHING.
@@ -2433,6 +2440,7 @@ export function createEngine(canvas, onChange, mini = null) {
         ? `  +¥${bounty + entry + learnt}`
         : entry ? `  +¥${entry} new entry` : "";
       e.msg = `Gotcha! ${e.name} was caught!${tail}`;
+      chainOn(e.speciesId, "caught");
       if (gained) {
         e.levelUp = gained.level;
         e.reward = gained.items;
@@ -2441,6 +2449,7 @@ export function createEngine(canvas, onChange, mini = null) {
     } else if (phase === "fled") {
       teach({ kind: "fled" });
       e.msg = `${e.name} fled!`;
+      chainOn(e.speciesId, "fled");
     } else {
       e.msg = "It broke free!";
     }
@@ -2492,6 +2501,23 @@ export function createEngine(canvas, onChange, mini = null) {
     stepped();           // a phase is animation - see `stepped`
   }
 
+  /* THE CATCH CHAIN moves when an encounter ends (combo.js). Reaching a rung
+     is announced, and so is losing a chain worth one, so a lift never starts
+     or stops in silence. */
+  function chainOn(id, outcome) {
+    const was = state.combo;
+    state.combo = nextCombo(was, id, outcome);
+    const rung = COMBO_STEPS.find(([n]) => n === state.combo?.n);
+    const name = () => label(speciesById(comboKey(id))).toUpperCase();
+    if (outcome === "caught" && rung) {
+      cheer({ kind: "combo", title: `${name()} ×${rung[0]}`,
+        sub: `Its rare forms are ${rung[1]}x as likely while the chain lasts.` });
+    } else if (!state.combo && was && comboLift(was, was.species) > 1) {
+      cheer({ kind: "combo", title: `${name()} chain lost`,
+        sub: `A chain of ${was.n} ended: the chained Pokémon fled, or you ran.` });
+    }
+  }
+
   function flee(confirmed = false) {
     const e = state.encounter;
     if (!e || e.phase !== "idle") return;
@@ -2513,6 +2539,7 @@ export function createEngine(canvas, onChange, mini = null) {
     }
     e.phase = "ran";
     e.msg = "Got away safely.";
+    chainOn(e.speciesId, "ran");
     e.until = performance.now() + 450;
     changed();
   }
@@ -3147,7 +3174,7 @@ export function createEngine(canvas, onChange, mini = null) {
   /* A REWARD IN PACKS, stamped with where it came from, for the newest set
      open (the first before any is): a badge, a Champion, a streak. */
   function grantPacks(n, stamp, to = null) {
-    const id = to ?? newestOpen(levelFromXp(state.xp)) ?? CARD_SETS[0]?.id;
+    const id = to ?? randomOpen(levelFromXp(state.xp)) ?? CARD_SETS[0]?.id;
     if (!id) return null;
     state.packs = { ...state.packs, [id]: (state.packs[id] ?? 0) + n };
     state.earnedPacks = { ...state.earnedPacks, [id]: [...(state.earnedPacks[id] ?? []), ...Array(n).fill(stamp)] };
@@ -4040,11 +4067,12 @@ export function createEngine(canvas, onChange, mini = null) {
            set open at your level, or the first set before any is - held, it
            opens whatever the level - stamped with the badge. */
         if (first && GYMTUNE[fight.id]?.kind === "leader") { pack = grantPacks(1, `badge:${fight.id}`); packs = 1; }
-        /* A REGION'S CHAMPION, first win: the newest open set's box or bundle. */
+        /* A REGION'S CHAMPION, first win: a random open set's box or bundle -
+           the set rolled once, so its count and its packs are the same set's. */
         if (first && GYMTUNE[fight.id]?.kind === "champion") {
-          const id = newestOpen(levelFromXp(state.xp)) ?? CARD_SETS[0]?.id;
+          const id = randomOpen(levelFromXp(state.xp)) ?? CARD_SETS[0]?.id;
           packs = BOXES[id]?.packs ?? 1;
-          if (id) pack = grantPacks(packs, `champion:${fight.id}`);
+          if (id) pack = grantPacks(packs, `champion:${fight.id}`, id);
         }
         const g = first ? giftOf(fight.id) : null;
         if (g) {

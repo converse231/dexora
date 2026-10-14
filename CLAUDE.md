@@ -81,6 +81,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/data/abilities.js` | `npm run abilities` (PokeAPI, cached in .assets-src/abilities) |
 | `public/sprites/cadence/`, `src/data/cadence.js` | `npm run cadence` (Black and White's own idle, 16-frame strips at native pixels; `tools/strip_frames.py`, shared with Showdown's builder) |
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
+| `public/cries/`, `src/data/cries.js` | `npm run cries` (PokeAPI's cries, cached in .assets-src/cries; each file under its REAL type - the source's .ogg is partly MP3) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
   National Dex alone, read by the fetchers).
@@ -631,6 +632,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   also outrank the Pokedex Charm (2x, a whole generation) and the Region Charm
   (1.5x, nine hard runs) - check.mjs refuses both.
   `loadState` drops a bad row, never the whole object.
+- **The catch chain is `combo.js`** (Catch Combo, 2026-10-14): `state.combo`
+  `{ species, n }`, keyed by `looksOf`'s base. A catch of it adds one, any
+  other catch starts over, running from or losing ANOTHER species is free,
+  and the chained one fleeing or run from breaks it (`chainOn` in the
+  engine, which banners a rung and a lifted chain lost). `comboLift` is a
+  tier lift on that species alone, in the one `rollVariant` call; its top
+  rung stays at most `DEX_CHARM` (check.mjs). Its first chain of two shows
+  the `combo` hint once - the update's map card.
+- **Cries are a device preference** (`ui/cry.js`, `dexora-cries`, on by
+  default): App plays one per encounter object, never per phase; a format
+  the browser cannot play is silence, never an error.
 - **An alpha is a LAYER, not a tier**: `rollAlpha` (1 in `ALPHA_CHANCE`, never
   a legendary or costume, `canBeAlpha`) rolls BESIDE the tier, so an Alpha
   Shiny exists and is rarer than either. It was a tier for one pass and lost
@@ -755,8 +767,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **The rail is the Rotom panel**: Dex, Box, Shop, Map and Events (the
   board that was a dialog), its app held in App (`railTab`) so the HUD's
   event cards and "See in Box" open the right one. On a phone it is a sheet
-  (`.rail.open`, the pad's ROTOM key) - hidden, never unmounted. The quest
-  is a pill on the map (`.hud-left`, beside the area's name).
+  (`.rail.open`, the pad's ROTOM key) - hidden, never unmounted.
+- **The map's HUD is four zones** (`.hud`, a grid over the map; HUD ZONES at
+  the end of styles.css, 2026-10-14): WHERE top left (the area card with the
+  clock in it, and under it `.hud-tasks` - the quest, check-in, spin, reward),
+  WHAT'S ACTING top right (`.hud-status`: events, item rings, the perk, the
+  combo ring), THE DOCK bottom left (`.hud-dock`: minimap and party), the
+  balls bottom right. Upright on touch the tasks and the dock sit UNDER the
+  map (the viewport reserves `--dock-h`), held sideways the tasks take the
+  left column under Menu. A new HUD element joins a zone, never a corner of
+  its own. Audit at all nine sizes (desktop, laptop, both tablets, two phones,
+  three sideways).
 - **Cards are designed in docs/cards.md** - change a decision there first, and
   build one phase at a time behind its QA gate. **A collection, never a
   strength**: no rule module (`catch`, `biomes`, `battle`, `league`, `trainer`,
@@ -773,7 +794,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `buyPacks` and `openCardPack(set)` are the only writers of `cards`,
   `packs`, `earnedPacks` and `cardPity`; a pack is decided and SAVED before
   the scene plays, an earned pack opens first and stamps its cards, and a
-  first badge pays one (`battleEnd`'s `pack`). **Pull rates are real life,
+  first badge pays one (`battleEnd`'s `pack`) - every reward pack is a
+  RANDOM open set (`randomOpen`; the newest by list order paid one set
+  forever). **Pull rates are real life,
   one row a set** (`SET_RATES`, TCGplayer's per-pack data; your call
   2026-10-06): `rulesOf(setId)` is a set's rates, hit rate and pity, and
   `openPack` takes it. A set with no row fails check.mjs, so a new

@@ -4663,6 +4663,19 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     const roller = stripComments(readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8"));
     assert.match(roller, /rollVariant\([\s\S]{0,400}?researchLift\(/,
       "the variant roll in engine.js does not ask researchLift - a finished entry lifts nothing");
+    /* THE CATCH CHAIN'S RUNGS (combo.js) climb in both length and lift, and
+       the top one never passes the Pokedex Charm: one species hunted for a
+       while must not outrank a whole finished region. */
+    {
+      const { COMBO_STEPS } = await import("../src/game/combo.js");
+      const { DEX_CHARM } = await import("../src/game/medals.js");
+      COMBO_STEPS.forEach(([n, x], i) => {
+        assert.ok(Number.isInteger(n) && n > 1 && x > 1, `combo rung ${i} is not a chain or not a lift`);
+        if (i) assert.ok(n > COMBO_STEPS[i - 1][0] && x > COMBO_STEPS[i - 1][1], `combo rung ${i} does not climb`);
+      });
+      assert.ok(COMBO_STEPS.at(-1)[1] <= DEX_CHARM,
+        `a catch chain (x${COMBO_STEPS.at(-1)[1]}) outranks the Pokedex Charm (x${DEX_CHARM})`);
+    }
 
     /* AND IT IS NOT THE INCOME. A 3,500-encounter playthrough of every map,
        caught 60% of the time, every task given its fair chance: what research
@@ -7410,6 +7423,26 @@ import * as COS from "../src/game/cosmetics.js";
   // Two species have no drawing upstream (Alcremie's); a big drop means the build lost some.
   assert.ok(walkers.length >= SPECIES.length - 5, `only ${walkers.length} of ${SPECIES.length} species can follow you`);
   console.log(`cosmetics ok — ${COS.SKINS.length} skins, each a walk set with a price; ${walkers.length} of ${SPECIES.length} species can follow you, from ${files.size} sheets; no rule module reads either`);
+}
+
+/* CRIES (ui/cry.js, `npm run cries`): every species plays a file that ships,
+   under its real type - the source's ".ogg" files are partly MP3, and Safari
+   will not play an MP3 served as audio/ogg - and a borrowed cry is never
+   itself borrowed (the client looks one step, not a chain). The folder is in
+   vercel.json's cached list, or every meeting re-checks its cry. */
+{
+  const { CRY_OF, CRY_MP3 } = await import("../src/data/cries.js");
+  const shipped = new Set(readdirSync(new URL("../public/cries/", import.meta.url)));
+  for (const sp of SPECIES) {
+    const at = CRY_OF[sp.id] ?? sp.id;
+    assert.ok(CRY_OF[at] == null, `${nameOf(sp)} borrows a cry that is itself borrowed`);
+    const f = `${at}.${CRY_MP3.has(at) ? "mp3" : "ogg"}`;
+    assert.ok(shipped.has(f), `${nameOf(sp)} plays cries/${f}, which does not ship - npm run cries`);
+    const magic = readFileSync(new URL(`../public/cries/${f}`, import.meta.url)).subarray(0, 4).toString("latin1");
+    assert.equal(magic === "OggS", f.endsWith(".ogg"), `cries/${f} is not the type its name says`);
+  }
+  assert.ok(/\|cries\)/.test(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")), "cries/ is not in vercel.json's cached folders");
+  console.log(`cries ok — all ${SPECIES.length} species play a shipped file of its real type, ${shipped.size} files`);
 }
 
 /* FIELD ABILITIES (abilities.js): every ability the table names is a real

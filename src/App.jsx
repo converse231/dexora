@@ -28,6 +28,8 @@ import Party from "./ui/Party.jsx";
 import CheckIn from "./ui/CheckIn.jsx";
 import { followSheet, PARTY_MAX, partnerRule, isMastered } from "./game/cosmetics.js";
 import { RESEARCH_MAX } from "./game/research.js";
+import { COMBO_STEPS, comboLift, nextRung } from "./game/combo.js";
+import { playCry } from "./ui/cry.js";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
 import Bag from "./ui/Bag.jsx";
@@ -648,6 +650,10 @@ export default function App({
     const b = biomeFor(areaId);
     return b ? preloadSprites(tableFor(b, level).map(([id]) => id)) : undefined;
   }, [areaId, level]);
+  /* A MEETING CALLS OUT (ui/cry.js), once, as it appears: the encounter is
+     one object for its whole life (mutated in place), so this runs per
+     meeting and never per phase. */
+  useEffect(() => { if (enc) playCry(enc.speciesId); }, [enc]);
 
   /* The claim says what it paid, in the one alert the game uses. Without it a
      claim is a button that greys itself out and three numbers that moved
@@ -976,41 +982,69 @@ export default function App({
                 overlay after it - an element rather than a canvas pass, so
                 the engine's draw loop does not grow a second colour rule. */}
             {engine?.riftHere() && <div className="rift-tint" aria-hidden="true" />}
-            {/* Where you are, at a glance. Hidden the moment anything takes
-                over the screen: during an encounter the question is which
-                ball, not which corner of the map, and a camera box tracking a
-                player who cannot move is noise.
-
-                HIDDEN, not unmounted. The engine is handed this canvas once,
-                at `createEngine`, and holds the element - so unmounting it
-                would hand the engine a detached canvas and every minimap
-                after the first encounter would be a dead grey box. A class is
-                the whole fix; the engine goes on drawing to it, which costs
-                one `drawImage` nobody sees. */}
-            {/* No caption. It carried the area name for one build, and the
-                area name is the string ALREADY on screen in the biome tag
-                eight tiles above it - identical for all eight areas, checked
-                rather than assumed. The tag says where you are; this says
-                where in it, and saying the first thing twice was the only
-                thing on it that was not information. */}
             {/* A RUNNING EFFECT IS SPENT IN STEPS, so it is counted down
                 where the steps happen rather than on the shelf that sold it.
                 Nothing is drawn when nothing is running - a readout that is
-                always there saying "no" is a readout nobody reads - and it
-                hides with the minimap for an encounter, because the count
-                cannot move while you are not walking. */}
-            {/* ONE STACK, NOT TWO THINGS PINNED TO THE SAME CORNER. Both of
-                these were `position: absolute; right: 10px; top: 10px`, and
-                what kept them apart was `.fieldbox ~ .worldclock { top: 40px }`
-                - a typed offset for a card that was 31px tall when it was
-                written. The card grew, the offset did not, and they printed on
-                top of each other. Reported from play.
-
-                A column with a gap cannot overlap whatever either one ends up
-                measuring, which is the whole reason to do it this way rather
-                than to measure the card again and type 48. */}
+                always there saying "no" is a readout nobody reads. */}
+            {/* THE HUD IS FOUR ZONES (2026-10-14, "the screen is getting
+                crowded"): WHERE (top left: the area, its clock, and under it
+                what today asks), WHAT'S ACTING (top right: events, running
+                items, the partner's perk, the combo), THE DOCK (bottom left:
+                minimap and party) and the balls (bottom right, the rail).
+                `.hud` is a grid over the map, so zones cannot print over each
+                other; CSS moves the tasks and the dock under the map on an
+                upright phone and the tasks into the left column held sideways.
+                Everything but the minimap goes for an encounter. */}
+            <div className="hud">
             {!enc && !evo && (
-              <div className="hud-right">
+              <div className="hud-tl">
+                {/* THE CLOCK IS PART OF WHERE YOU ARE: the time of day is a
+                    thing you see on this map, so it rides the area's card
+                    rather than a pill of its own in the other corner. */}
+                <div className="biome-tag">
+                  <div className="bt-row">
+                    {biome && <span>{biome.name}</span>}
+                    <span
+                      className={`worldclock ph-${phaseAt(st?.steps ?? 0).id}`}
+                      data-tip={`${phaseAt(st?.steps ?? 0).name} — the world's clock runs as you walk`}
+                    >
+                      <b aria-hidden="true">
+                        {["dusk", "night"].includes(phaseAt(st?.steps ?? 0).id) ? "☾" : "☀"}
+                      </b>
+                      <i>{timeLabel(st?.steps ?? 0)}</i>
+                    </span>
+                  </div>
+                  {biome && <Types of={biome.types} />}
+                </div>
+                {/* WHAT TODAY ASKS: the quest, then anything waiting on a tap. */}
+                <div className="hud-tasks">
+                  <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />
+                  {checkin?.due && !checkinOpen && (
+                    <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setCheckinOpen(true)}
+                      data-tip="Check in for today's reward and keep your streak">
+                      <i>DAY {checkin.day}</i>
+                      <b>Check in<em className="ms-dot" aria-hidden="true">!</em></b>
+                    </button>
+                  )}
+                  {spins > 0 && !rouletteOpen && (
+                    <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setRouletteOpen(true)}
+                      data-tip="A banked roulette spin">
+                      <i>ROULETTE</i>
+                      <b>Spin{spins > 1 ? ` ×${spins}` : ""}<em className="ms-dot" aria-hidden="true">!</em></b>
+                    </button>
+                  )}
+                  {claims.length > 0 && (
+                    <button type="button" className="ms-tab ready dc-pill" onClick={() => setClaimGen(claims[0])}
+                      data-tip="A finished Pokédex - claim its reward">
+                      <i>REWARD</i>
+                      <b>{REGION_NAME[claims[0]]} complete<em className="ms-dot" aria-hidden="true">!</em></b>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {!enc && !evo && (
+              <div className="hud-status">
             {/* IN THE STACK, ABOVE THE RUNNING ONES. It replaces the card it
                 is about - the effect it names has just left this column - so
                 putting it anywhere else would make the player look somewhere
@@ -1112,26 +1146,43 @@ export default function App({
               );
             })}
 
-            {/* THE CLOCK, OVER THE WORLD IT LIGHTS. It sat in the top bar
-                among the money and the step count, which is a row of things you
-                read; the time of day is a thing you SEE, and the sky it belongs
-                to is on this screen. Hidden with everything else for an
-                encounter - the phase is frozen on the encounter itself by then,
-                so a clock ticking over a paused world would be lying. */}
-              <div
-                className={`worldclock ph-${phaseAt(st?.steps ?? 0).id}`}
-                data-tip={`${phaseAt(st?.steps ?? 0).name} — the world's clock runs as you walk`}
-              >
-                <b aria-hidden="true">
-                  {["dusk", "night"].includes(phaseAt(st?.steps ?? 0).id) ? "☾" : "☀"}
-                </b>
-                <i>{timeLabel(st?.steps ?? 0)}</i>
-              </div>
+            {/* THE CATCH CHAIN (combo.js), a ring like a running item: the
+                chained species inside, the count on the edge, the rim filling
+                to the next rung - gold once the chain lifts its rare forms.
+                From two: one catch is not a chain. */}
+            {st?.combo?.n >= 2 && (() => {
+              const { species, n } = st.combo;
+              const up = nextRung(n);
+              const from = [...COMBO_STEPS].reverse().find(([at]) => n >= at)?.[0] ?? 0;
+              const lift = comboLift(st.combo, species);
+              const tip = `${label(speciesById(species))} chain of ${n}`
+                + (lift > 1 ? ` - its rare forms are ${lift}x as likely` : "")
+                + (up ? `. ${up[0] - n} more for ${up[1]}x.` : ". The top rung.")
+                + " It breaks if it flees or you run.";
+              return (
+                <span className={`rift-ring combo-ring${lift > 1 ? " lit" : ""}`} role="status"
+                  data-tip={tip} aria-label={tip} style={{ "--p": up ? (n - from) / (up[0] - from) : 1 }}>
+                  <Sprite id={species} alt="" eager />
+                  <b>×{n}</b>
+                </span>
+              );
+            })()}
+
               </div>
             )}
 
-            <div className={`minimap${enc || evo ? " gone" : ""}`}>
-              <canvas ref={miniRef} aria-hidden="true" />
+            {/* THE DOCK: the minimap and the walking party, bottom left on a
+                big screen. Under the map on an upright phone, where the space
+                between the map and the pad was empty. The minimap is HIDDEN,
+                not unmounted: the engine holds that canvas from `createEngine`,
+                and an unmounted one turned every later minimap into a dead
+                grey box. */}
+            <div className="hud-dock">
+              <div className={`minimap${enc || evo ? " gone" : ""}`}>
+                <canvas ref={miniRef} aria-hidden="true" />
+              </div>
+              {!enc && !evo && <Party mons={partyMons} buddy={st?.buddy ?? null} mastered={partyMastered} onPick={onPickBuddy} onEdit={onEditParty} />}
+            </div>
             </div>
 
             {/* Above the battle overlay, so it is the one control that never
@@ -1176,42 +1227,6 @@ export default function App({
               </div>
             )}
 
-            {/* WHERE YOU ARE AND WHAT TODAY ASKS, top left of the world: the
-                area's name and the quest pill (it was in the top bar; the
-                quest is about this walk, so it lives over it). */}
-            {!enc && !evo && (
-              <div className="hud-left">
-                {biome && (
-                  <div className="biome-tag">
-                    <span>{biome.name}</span>
-                    <Types of={biome.types} />
-                  </div>
-                )}
-                <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />
-                <Party mons={partyMons} buddy={st?.buddy ?? null} mastered={partyMastered} onPick={onPickBuddy} onEdit={onEditParty} />
-                {checkin?.due && !checkinOpen && (
-                  <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setCheckinOpen(true)}
-                    data-tip="Check in for today's reward and keep your streak">
-                    <i>DAY {checkin.day}</i>
-                    <b>Check in<em className="ms-dot" aria-hidden="true">!</em></b>
-                  </button>
-                )}
-                {spins > 0 && !rouletteOpen && (
-                  <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setRouletteOpen(true)}
-                    data-tip="A banked roulette spin">
-                    <i>ROULETTE</i>
-                    <b>Spin{spins > 1 ? ` ×${spins}` : ""}<em className="ms-dot" aria-hidden="true">!</em></b>
-                  </button>
-                )}
-                {claims.length > 0 && (
-                  <button type="button" className="ms-tab ready dc-pill" onClick={() => setClaimGen(claims[0])}
-                    data-tip="A finished Pokédex - claim its reward">
-                    <i>REWARD</i>
-                    <b>{REGION_NAME[claims[0]]} complete<em className="ms-dot" aria-hidden="true">!</em></b>
-                  </button>
-                )}
-              </div>
-            )}
 
             {evo && (
               <Evolve evo={evo} onDone={() => engine.closeEvolution()} />

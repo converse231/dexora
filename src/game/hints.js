@@ -1,3 +1,5 @@
+import { COMBO_STEPS } from "./combo.js";
+
 /* THE TUTORIAL IS NOT A TUTORIAL. Nobody reads a five-step tour of a game they
    have not played yet, and this one has nothing to explain until you are
    standing in front of the thing: "spares convert to Rare Candy" means nothing
@@ -44,6 +46,16 @@ export const HINTS = [
     id: "flee",
     when: (e) => e.kind === "fled",
     text: "It ran. Berries make that less likely — a Nanab stops it outright.",
+  },
+  /* THE CATCH CHAIN, the first time one starts (2026-10-14): the update's
+     one-time card on the map, at the moment it means something. Before
+     `duplicate`, which a second catch of a species also reaches. */
+  {
+    id: "combo",
+    when: (e) => e.kind === "caught" && e.chain === 2,
+    text: `Catch Combo! Catch the same Pokémon again and again: at ${COMBO_STEPS.map(([n]) => n).join(", ")} `
+      + "in a row its rare forms get likelier. Catch other Pokémon as you like, "
+      + "but if this one flees or you run, the chain breaks.",
   },
   {
     id: "duplicate",

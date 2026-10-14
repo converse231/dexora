@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-14-combo-cries",
+    icon: "🔗",
+    date: "October 2026",
+    title: "Catch Combo and cries",
+    items: [
+      ["Catch Combo", "Catch the same Pokémon again and again. At 10, 20 and 30 in a row its rare forms get likelier."],
+      ["Keep the chain", "Catch others as you like. If the chained one flees or you run, the chain breaks."],
+      ["Cries", "Pokémon call out when you meet them. Turn it off on You."],
+      ["A tidier screen", "Your party and today's quest sit under the map on a phone."],
+    ],
+  },
+  {
     id: "2026-10-13-my-binders",
     icon: "📖",
     date: "October 2026",
