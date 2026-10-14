@@ -16,26 +16,34 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
-    id: "2026-10-14-rustle-quiz",
-    icon: "🌾",
+    id: "2026-10-14-bingo",
+    icon: "🎯",
     date: "October 2026",
-    title: "Rustling grass and Who's that Pokémon?",
+    title: "Weekly Bingo",
     items: [
-      ["Rustling grass", "Now and then a patch of tall grass shakes. Walk into it to meet a Pokémon for sure."],
-      ["Rare forms", "What hides in the shaking grass is twice as likely to be a rare form."],
-      ["Who's that Pokémon?", "A new silhouette every day, on the map. Guess right for 3 Rare Candy."],
-      ["A hint", "Stuck? Tap Hear its cry."],
+      ["A new card every Monday", "25 squares on the Events page, the centre free. Each square is a goal."],
+      ["Fill a line of five", "Any row, column or diagonal pays 2 Rare Candy and 5 Great Balls."],
+      ["Fill the whole card", "Every square pays 10 Rare Candy and a card pack."],
     ],
   },
   {
-    id: "2026-10-14-combo-cries",
+    id: "2026-10-14-quiz",
+    icon: "🔍",
+    date: "October 2026",
+    title: "Who's that Pokémon?",
+    items: [
+      ["A daily silhouette", "A new one every day, on the map. Pick its name from four."],
+      ["Guess right", "Earn 3 Rare Candy, and the Pokémon is added to your Pokédex as seen."],
+    ],
+  },
+  {
+    id: "2026-10-14-combo",
     icon: "🔗",
     date: "October 2026",
-    title: "Catch Combo and cries",
+    title: "Catch Combo",
     items: [
       ["Catch Combo", "Catch the same Pokémon again and again. At 10, 20 and 30 in a row its rare forms get likelier."],
       ["Keep the chain", "Catch others as you like. If the chained one flees or you run, the chain breaks."],
-      ["Cries", "Pokémon call out when you meet them. Turn it off on You."],
       ["A tidier screen", "The map's buttons are smaller and grouped by corner, so the map stays clear."],
     ],
   },

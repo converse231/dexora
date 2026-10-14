@@ -27,10 +27,11 @@ import { dueCount } from "./game/achievements.js";
 import Party from "./ui/Party.jsx";
 import CheckIn from "./ui/CheckIn.jsx";
 import Quiz from "./ui/Quiz.jsx";
+import Icon from "./ui/Icon.jsx";
 import { followSheet, PARTY_MAX, partnerRule, isMastered } from "./game/cosmetics.js";
 import { RESEARCH_MAX } from "./game/research.js";
 import { COMBO_STEPS, comboLift, nextRung } from "./game/combo.js";
-import { playCry } from "./ui/cry.js";
+import { dueLines, fullDue } from "./game/bingo.js";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
 import Bag from "./ui/Bag.jsx";
@@ -506,6 +507,9 @@ export default function App({
     || checkinOpen || rouletteOpen || quizOpen;
   const checkin = engine?.checkinStatus?.() ?? null;
   const quiz = engine?.quiz?.() ?? null;
+  // A bingo prize waiting (bingo.js) - a chip on the map until it is claimed on Events.
+  const bingo = engine?.bingo?.() ?? null;
+  const bingoDue = !!bingo && (dueLines(bingo).length > 0 || fullDue(bingo));
   const spins = st?.checkin?.spins ?? 0;
   // Finished generations not yet claimed - derived, so it is a button until pressed.
   const claims = engine?.dexClaims?.() ?? [];
@@ -653,10 +657,6 @@ export default function App({
     const b = biomeFor(areaId);
     return b ? preloadSprites(tableFor(b, level).map(([id]) => id)) : undefined;
   }, [areaId, level]);
-  /* A MEETING CALLS OUT (ui/cry.js), once, as it appears: the encounter is
-     one object for its whole life (mutated in place), so this runs per
-     meeting and never per phase. */
-  useEffect(() => { if (enc) playCry(enc.speciesId); }, [enc]);
 
   /* The claim says what it paid, in the one alert the game uses. Without it a
      claim is a button that greys itself out and three numbers that moved
@@ -1028,6 +1028,7 @@ export default function App({
                   {checkin?.due && !checkinOpen && (
                     <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setCheckinOpen(true)}
                       data-tip="Check in for today's reward and keep your streak">
+                      <Icon n="flame" size={18} className="ms-ic" />
                       <i>DAY {checkin.day}</i>
                       <b>Check in<em className="ms-dot" aria-hidden="true">!</em></b>
                     </button>
@@ -1036,13 +1037,23 @@ export default function App({
                   {quiz && !quiz.done && !quizOpen && (
                     <button type="button" className="ms-tab ready dc-pill qz-pill" onClick={() => setQuizOpen(true)}
                       data-tip="Today's silhouette - guess it for Rare Candy">
+                      <Icon n="help" size={18} className="ms-ic" />
                       <i>DAILY QUIZ</i>
                       <b>Who's that?<em className="ms-dot" aria-hidden="true">!</em></b>
+                    </button>
+                  )}
+                  {bingoDue && (
+                    <button type="button" className="ms-tab ready dc-pill bg-pill" onClick={() => openRail("events")}
+                      data-tip="A bingo line is finished - claim its prize on Events">
+                      <Icon n="board" size={18} className="ms-ic" />
+                      <i>WEEKLY BINGO</i>
+                      <b>Bingo!<em className="ms-dot" aria-hidden="true">!</em></b>
                     </button>
                   )}
                   {spins > 0 && !rouletteOpen && (
                     <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setRouletteOpen(true)}
                       data-tip="A banked roulette spin">
+                      <Icon n="gift" size={18} className="ms-ic" />
                       <i>ROULETTE</i>
                       <b>Spin{spins > 1 ? ` ×${spins}` : ""}<em className="ms-dot" aria-hidden="true">!</em></b>
                     </button>
@@ -1050,6 +1061,7 @@ export default function App({
                   {claims.length > 0 && (
                     <button type="button" className="ms-tab ready dc-pill" onClick={() => setClaimGen(claims[0])}
                       data-tip="A finished Pokédex - claim its reward">
+                      <Icon n="trophy" size={18} className="ms-ic" />
                       <i>REWARD</i>
                       <b>{REGION_NAME[claims[0]]} complete<em className="ms-dot" aria-hidden="true">!</em></b>
                     </button>
@@ -1327,6 +1339,8 @@ export default function App({
               onSelect={(id) => setEntry(id)}
               onLeague={() => goTab("battles")}
               onStar={(id) => engine.star(id)}
+              bingo={bingo}
+              onClaimBingo={() => engine.claimBingo()}
             />
           )}
           state={st}

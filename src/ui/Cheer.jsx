@@ -37,6 +37,7 @@ const KIND = {
   rift: "SPACE-TIME RIFT",
   cards: "CARDS",
   combo: "CATCH COMBO",
+  bingo: "WEEKLY BINGO",
   ...Object.fromEntries(
     Object.entries(TIER_TELL).map(([t, tell]) => [t, tell.toUpperCase()]),
   ),

@@ -8038,6 +8038,7 @@ button:disabled { transition: none; }
 :root[data-theme="dark"] .ev-league .ev-banner { background: linear-gradient(90deg, #3d3018, #2a2416); border-color: #6a5224; }
 :root[data-theme="dark"] .ev-board .ev-banner { background: linear-gradient(90deg, #3d2c1c, #2a2118); border-color: #5e4428; }
 :root[data-theme="dark"] .ev-surprise .ev-banner { background: linear-gradient(90deg, #1b3340, #172630); border-color: #2d5163; }
+:root[data-theme="dark"] .ev-bingo .ev-banner { background: linear-gradient(90deg, #173a2c, #142a22); border-color: #2a5c46; }
 :root[data-theme="dark"] .dx-notes .ev-banner { background: linear-gradient(90deg, #1f3328, #1a2a21); border-color: #2f4a3a; }
 :root[data-theme="dark"] .ev-stamp.live { color: #ff7a66; }
 
@@ -10155,12 +10156,24 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   display: flex; flex-direction: column; flex-wrap: wrap-reverse; align-content: flex-start;
   align-items: flex-start; gap: 7px;
 }
-/* On touch the map is small: the rings a size down, and every pill ONE
-   line - a check-in's "DAY 1" over "Check in" sat cramped and off-centre in
-   a short pill. The quest keeps its word, beside its count. */
+/* An alert's icon: drawn on touch only, where the alerts are icon chips. */
+.ms-ic { display: none; }
+/* On touch the map is small: the rings a size down, and the ALERTS (check-in,
+   quiz, bingo, a spin, a reward) are ICON CHIPS with the dot on the corner -
+   four of them as pills took three rows of an upright phone's map and ran
+   into the D-pad held sideways (2026-10-14). The quest keeps its pill: it is
+   a count, not an alert. The words stay in the button for a screen reader. */
 @media (hover: none) and (pointer: coarse) {
   .hud .ms-tab { flex-direction: row; align-items: center; }
+  .hud .dc-pill { position: relative; width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 12px; }
   .hud .dc-pill > i { display: none; }
+  .hud .dc-pill > .ms-ic { display: block; flex: none; }
+  .hud .dc-pill > b { font-size: 0; }
+  .hud .dc-pill .ms-dot { position: absolute; top: -4px; right: -4px; margin: 0; font-size: 9px; }
+  .hud .ci-pill > .ms-ic { color: #ff7a38; }
+  .hud .qz-pill > .ms-ic { color: var(--accent); }
+  .hud .bg-pill > .ms-ic { color: #2fbf71; }
+  .hud .dc-pill:not(.ci-pill):not(.qz-pill):not(.bg-pill) > .ms-ic { color: var(--gold, #ffcf4a); }
   .hud .rift-ring { width: 40px; height: 40px; }
   .hud .rift-ring > img, .hud .fx-ring > .item-fx { width: 24px; height: 24px; }
   .hud .combo-ring > img { width: 30px; height: 30px; }
@@ -10210,6 +10223,10 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   .hud .ms-tab i { display: none; }
   .hud .missions .ms-tab i { display: inline; font-size: 9px; }
   .hud .ms-tab b { font-size: 13px; }
+  /* An alert chip a size down, restated past the pill rules above it (their
+     padding squeezed its icon to 5px, their font-size drew its words). */
+  .hud .dc-pill { width: 32px; height: 32px; padding: 0; border-radius: 10px; }
+  .hud .dc-pill > b { font-size: 0; }
   .hud .ms-dot { width: 14px; height: 14px; font-size: 9px; }
   .hud .rift-ring { width: 34px; height: 34px; }
   .hud .rift-ring > img, .hud .fx-ring > .item-fx { width: 20px; height: 20px; }
@@ -10233,13 +10250,13 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
      tasks once took the column's edge and sat 8px out of line with it. */
   .hud-tasks {
     position: fixed; z-index: 57; top: 64px; left: calc(10px + env(safe-area-inset-left) + var(--menu-x));
-    width: var(--col); flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px;
+    width: var(--col); flex-direction: row; flex-wrap: wrap; align-content: flex-start; gap: 6px;
   }
-  .hud .ms-tab { height: 40px; width: 100%; justify-content: center; padding-inline: 8px; }   /* the Menu key's height */
+  .hud .missions .ms-tab { height: 40px; width: 100%; justify-content: center; padding-inline: 8px; }   /* the Menu key's height */
   .hud .missions { width: 100%; }
   .hud .missions .ms-tab i { display: inline; }
   .hud .ms-pop { left: 0; right: auto; min-width: min(268px, 60vw); }
-  @media (max-height: 340px) { .hud-tasks { top: 56px; } .hud .ms-tab { height: 34px; } }
+  @media (max-height: 340px) { .hud-tasks { top: 56px; } .hud .missions .ms-tab { height: 34px; } .hud .dc-pill { width: 34px; height: 34px; } }
 }
 
 /* ================================================================ WHO'S THAT POKEMON?
@@ -10256,10 +10273,6 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .qz-mon { filter: brightness(0); transition: filter 500ms ease; }
 .qz-mon.shown { filter: none; animation: qz-pop 420ms cubic-bezier(.2, 1.5, .4, 1); }
 @keyframes qz-pop { from { transform: scale(.82); } }
-.qz-cry {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 16px; border-radius: 999px; cursor: pointer;
-  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line-firm); font: 600 14px var(--body);
-}
 .qz-choices { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .qz-choice {
   min-height: 48px; padding: 6px 10px; border-radius: 14px; cursor: pointer; font: 700 15px var(--display);
@@ -10277,10 +10290,62 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
    answer right, so Continue is never under the fold. */
 @media (max-height: 540px) {
   .qz-card { width: min(760px, 100%); gap: 8px 20px; padding-block: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; }
-  .qz-card > .ci-kicker, .qz-title, .qz-stage, .qz-cry { grid-column: 1; }
+  .qz-card > .ci-kicker, .qz-title, .qz-stage { grid-column: 1; }
   .qz-choices { grid-column: 2; grid-row: 1 / span 3; }
   .qz-card > .ci-got, .qz-card > .ci-foot { grid-column: 2; grid-row: 4; }
   .qz-stage { width: min(150px, 34vh); }
   .qz-title { font-size: 20px; }
   .qz-choice { min-height: 44px; }
+}
+
+/* ================================================================ WEEKLY BINGO
+   (bingo.js, 2026-10-14.) A card on the Events board: five by five, a goal a
+   square, the fill along a square's foot its progress, a finished square
+   stamped with the accent. The centre is free. Two short lines a square fit
+   a 60px square on a phone; the full sentence sits under the card. */
+.ev-bingo .ev-banner { background: linear-gradient(90deg, #dff3e9, #f1faf5); border-color: #b7e0c9; }
+.ev-bingo .ev-banner > .ic { color: #2f9e6c; flex: none; }
+.ev-bingo.live { border-color: #2fbf71; }
+/* Held to a card's width: on a sideways phone the board is the whole screen,
+   and stretched squares (134px) made a card taller than the screen. */
+.bg-grid {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
+  width: 100%; max-width: 360px; margin-inline: auto; container-type: inline-size;
+}
+.bg-sq {
+  position: relative; aspect-ratio: 1; min-width: 0; padding: 4px 3px; overflow: hidden;
+  display: grid; align-content: center; justify-items: center; gap: 2px; text-align: center;
+  border-radius: 10px; border: 1px solid var(--line-firm); background: var(--surface-2); color: var(--ink);
+  cursor: pointer; font: 600 11px/1.15 var(--body);
+}
+.bg-sq > span { overflow-wrap: break-word; }
+/* A narrow card (the desktop rail's 57px squares): a size down, so a word
+   like "outbreak" fits whole rather than breaking mid-word. */
+@container (max-width: 320px) { .bg-sq { font-size: 10px; } }
+.bg-sq > i { font: 600 9px var(--pixel); font-style: normal; color: var(--ink-faint); }
+/* Progress fills along the foot - drawn, as the rest of the board's is. */
+.bg-sq::after {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p, 0) * 100%);
+  background: var(--accent); pointer-events: none;
+}
+.bg-sq.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.bg-sq.done { background: color-mix(in srgb, #2fbf71 20%, var(--surface-2)); border-color: #2fbf71; }
+.bg-sq.done::after { display: none; }
+.bg-sq.done > .ic { color: #2fbf71; }
+.bg-sq.free { cursor: default; }
+.bg-sq.free > b { font: 700 11px var(--pixel); color: #2f9e6c; }
+.bg-say { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.bg-say > b { color: var(--ink); font-weight: 600; }
+.bg-say > span { flex: none; font: 600 11px var(--pixel); color: var(--ink-faint); }
+.ev-card p.bg-got { color: #2f9e6c; font-weight: 600; }
+.bg-pill b { color: #2fbf71; }
+/* A WIDE PANEL (the Rotom panel is the whole screen held sideways): the card
+   left, what a square asks, the claim and the prizes right - stacked, the
+   claim sat a scroll below a centred grid with dead space either side. */
+@container rail (min-width: 620px) {
+  .ev-bingo { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); column-gap: 18px; align-items: start; }
+  .ev-bingo > .ev-banner { grid-column: 1 / -1; }
+  .ev-bingo > .bg-grid { grid-column: 1; grid-row: 2 / span 6; }
+  .ev-bingo > :not(.ev-banner):not(.bg-grid) { grid-column: 2; }
+  .ev-bingo > .ev-meta { flex-direction: column; gap: 4px; }
 }

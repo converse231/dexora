@@ -1,5 +1,5 @@
-/* WHO'S THAT POKEMON? (quiz.js): today's silhouette, its cry on a press,
-   four names, one answer. The answer is judged, paid and SAVED by
+/* WHO'S THAT POKEMON? (quiz.js): today's silhouette, four names, one
+   answer. The answer is judged, paid and SAVED by
    `engine.answerQuiz` before the reveal plays; the picture then fills in
    and the right name lights. The silhouette carries no name anywhere - no
    alt, no tip - or the question would answer itself. */
@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import Icon from "./Icon.jsx";
 import Sprite from "./Sprite.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
-import { playCry } from "./cry.js";
 import { label } from "../game/map.js";
 import { speciesById } from "../game/biomes.js";
 import { QUIZ_PAY } from "../game/quiz.js";
@@ -41,11 +40,6 @@ export default function Quiz({ quiz, onAnswer, onClose }) {
         <div className="qz-stage">
           <Sprite id={quiz.answer} alt="" eager className={got ? "qz-mon shown" : "qz-mon"} />
         </div>
-        {!got && (
-          <button type="button" className="qz-cry" onClick={() => playCry(quiz.answer, true)}>
-            <Icon n="sound" size={18} /> Hear its cry
-          </button>
-        )}
         <div className="qz-choices">
           {quiz.choices.map((id) => (
             <button key={id} type="button" className={`qz-choice${cls(id)}`} disabled={!!got} onClick={() => answer(id)}>

@@ -4676,23 +4676,35 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(COMBO_STEPS.at(-1)[1] <= DEX_CHARM,
         `a catch chain (x${COMBO_STEPS.at(-1)[1]}) outranks the Pokedex Charm (x${DEX_CHARM})`);
     }
-    /* A RUSTLING SPOT (rustle.js) is one extra meeting at a lift: never past
-       the Pokedex Charm, and asked of the one roll. Its rare forms, met at
-       every spot, add under 15% to what walking grass turns up - a spot is
-       a thing to walk to, not a second income. */
+    /* WEEKLY BINGO (bingo.js): a whole week - every line and the full card -
+       pays no money, no Master Ball, and less candy than a week of daily
+       quests at the streak cap: a side card, not a second candy stream. And
+       every square is fed: each goal counts some event the engine sends
+       (`noteBingo` and the catch's facts), or it would be a square nobody
+       can fill. */
     {
-      const R = await import("../src/game/rustle.js");
-      const { DEX_CHARM } = await import("../src/game/medals.js");
-      assert.ok(R.RUSTLE_LIFT > 1 && R.RUSTLE_LIFT <= DEX_CHARM, `a rustling spot lifts x${R.RUSTLE_LIFT}`);
-      const extra = R.RUSTLE_LIFT / (R.RUSTLE_EVERY * ENCOUNTER_RATE);
-      assert.ok(extra < 0.15, `rustling spots add ${(extra * 100).toFixed(1)}% to walking's rare forms`);
-      assert.ok(R.RUSTLE_NEAR >= 2 && R.RUSTLE_FAR >= R.RUSTLE_NEAR, "a spot can rise underfoot");
-      // In view on the smallest screen: VIEW_W x VIEW_H around you, less the tile at the edge.
-      const { VIEW_W, VIEW_H } = await import("../src/game/engine.js");
-      assert.ok(R.RUSTLE_ROWS <= (VIEW_H - 1) / 2 - 1 && R.RUSTLE_FAR <= (VIEW_W - 1) / 2 - 1,
-        "a rustling spot can rise outside the view");
-      assert.match(roller, /rollVariant\([\s\S]{0,500}?RUSTLE_LIFT/,
-        "the variant roll in engine.js does not ask RUSTLE_LIFT - a spot lifts nothing");
+      const B = await import("../src/game/bingo.js");
+      const D = await import("../src/game/daily.js");
+      const { genOf } = await import("../src/game/biomes.js");
+      const week = B.LINES.length * B.BINGO_LINE.candy + B.BINGO_FULL.candy;
+      const quests = 7 * D.reward(null, D.STREAK_CAP).candy;
+      assert.ok(week <= quests, `a week of bingo pays ${week} candy against ${quests} for a week of quests`);
+      for (const r of [B.BINGO_LINE, B.BINGO_FULL]) {
+        assert.ok(!r.money && !r.items?.["master-ball"], "bingo pays money or a Master Ball");
+      }
+      const src = stripComments(readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8"));
+      // Keys a note opens with, and the catch note's own keys beside `caught` (its chain).
+      const plain = [...src.matchAll(/noteBingo\(\{\s*(\w+):/g), ...src.matchAll(/caught: \{[\s\S]*?\},\s*(\w+):/g)]
+        .map((m) => m[1]).filter((k) => k !== "caught");
+      const caught = src.match(/caught: \{([\s\S]*?)\},\s*combo:/)?.[1] ?? "";
+      const facts = [...caught.matchAll(/(\w+)(?=[:,\s])/g)].map((m) => m[1]);
+      for (const [kind, g] of Object.entries(B.GOALS)) {
+        const param = kind === "type" ? "normal" : kind === "gen" ? genOf(1) : null;
+        const cell = { kind, need: g.need, param };
+        const fed = plain.some((k) => g.count(cell, { [k]: g.need }) > 0)
+          || facts.some((k) => g.count(cell, { caught: { id: 1, types: ["normal"], [k]: true } }) > 0);
+        assert.ok(fed, `the bingo square "${kind}" counts nothing the engine sends`);
+      }
     }
     /* THE DAILY QUIZ pays no more than a check-in day's candy: a guess is a
        daily nicety, not a candy stream. */
@@ -6343,6 +6355,34 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       "document.baseURI in JS and pass it in as a custom property");
   }
 
+  /* EVERY BRACE CLOSES, AND NO RULE SITS INSIDE A RULE. This file writes no
+     nested CSS, and browsers now ACCEPT nesting - so a lost "}" turns every
+     rule after it into a nested one, silently: the build passes and whole
+     layouts vanish (2026-10-14: the sideways HUD fell back onto the map).
+     Comments and strings out first; an at-rule ("@media", "@container",
+     "@supports", "@keyframes" ...) may hold rules, a plain rule may not. */
+  {
+    const flat = css.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, "")).replace(/"[^"\n]*"|'[^'\n]*'/g, "\"\"");
+    const stack = [];
+    let start = 0, line = 1;
+    for (let i = 0; i < flat.length; i++) {
+      const ch = flat[i];
+      if (ch === "\n") line++;
+      else if (ch === "{") {
+        const head = flat.slice(start, i).trim().split(/[;}]/).pop().trim();
+        const atRule = head.startsWith("@");
+        assert.ok(atRule || stack.every((h) => h.at), `styles.css line ${line}: "${head.slice(0, 60)}" is a rule nested in a rule - a "}" is missing above it`);
+        stack.push({ at: atRule || /^(from|to|[\d.]+%)(\s*,\s*(from|to|[\d.]+%))*$/.test(head) });
+        start = i + 1;
+      } else if (ch === "}") {
+        assert.ok(stack.length, `styles.css line ${line}: a "}" closes nothing`);
+        stack.pop();
+        start = i + 1;
+      } else if (ch === ";") start = i + 1;
+    }
+    assert.equal(stack.length, 0, `styles.css ends with ${stack.length} rule(s) unclosed - a "}" is missing`);
+  }
+
   const artHead = css.indexOf(".gate-art {");
   assert.ok(artHead >= 0, ".gate-art has no rule");
   const artRule = css.slice(artHead, css.indexOf("}", artHead) + 1);
@@ -7449,26 +7489,6 @@ import * as COS from "../src/game/cosmetics.js";
   // Two species have no drawing upstream (Alcremie's); a big drop means the build lost some.
   assert.ok(walkers.length >= SPECIES.length - 5, `only ${walkers.length} of ${SPECIES.length} species can follow you`);
   console.log(`cosmetics ok — ${COS.SKINS.length} skins, each a walk set with a price; ${walkers.length} of ${SPECIES.length} species can follow you, from ${files.size} sheets; no rule module reads either`);
-}
-
-/* CRIES (ui/cry.js, `npm run cries`): every species plays a file that ships,
-   under its real type - the source's ".ogg" files are partly MP3, and Safari
-   will not play an MP3 served as audio/ogg - and a borrowed cry is never
-   itself borrowed (the client looks one step, not a chain). The folder is in
-   vercel.json's cached list, or every meeting re-checks its cry. */
-{
-  const { CRY_OF, CRY_MP3 } = await import("../src/data/cries.js");
-  const shipped = new Set(readdirSync(new URL("../public/cries/", import.meta.url)));
-  for (const sp of SPECIES) {
-    const at = CRY_OF[sp.id] ?? sp.id;
-    assert.ok(CRY_OF[at] == null, `${nameOf(sp)} borrows a cry that is itself borrowed`);
-    const f = `${at}.${CRY_MP3.has(at) ? "mp3" : "ogg"}`;
-    assert.ok(shipped.has(f), `${nameOf(sp)} plays cries/${f}, which does not ship - npm run cries`);
-    const magic = readFileSync(new URL(`../public/cries/${f}`, import.meta.url)).subarray(0, 4).toString("latin1");
-    assert.equal(magic === "OggS", f.endsWith(".ogg"), `cries/${f} is not the type its name says`);
-  }
-  assert.ok(/\|cries\)/.test(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")), "cries/ is not in vercel.json's cached folders");
-  console.log(`cries ok — all ${SPECIES.length} species play a shipped file of its real type, ${shipped.size} files`);
 }
 
 /* FIELD ABILITIES (abilities.js): every ability the table names is a real

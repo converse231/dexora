@@ -81,7 +81,6 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/data/abilities.js` | `npm run abilities` (PokeAPI, cached in .assets-src/abilities) |
 | `public/sprites/cadence/`, `src/data/cadence.js` | `npm run cadence` (Black and White's own idle, 16-frame strips at native pixels; `tools/strip_frames.py`, shared with Showdown's builder) |
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
-| `public/cries/`, `src/data/cries.js` | `npm run cries` (PokeAPI's cries, cached in .assets-src/cries; each file under its REAL type - the source's .ogg is partly MP3) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
   National Dex alone, read by the fetchers).
@@ -488,7 +487,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   later one win silently, and so does a class name reused for something new
   (grep before naming - a second `.dx-ring` resized the Dex sheet's); hold a sprite range with `steps(n, jump-none)`;
   percentage `background-position` aligns p% of image to p% of box; media
-  queries add no specificity (overrides go last); `<details open>` in React
+  queries add no specificity (overrides go last); a lost `}` is not an
+  error - browsers take what follows as NESTED rules, the build passes and
+  layouts vanish (check.mjs balances the braces and refuses a rule in a
+  rule); `<details open>` in React
   needs owned state; a flex item's `min-height` is `auto`; a percentage size is
   of the containing block.
 - **A LOOP NOBODY CAN SEE IS NOT FREE** (`ui/pause.js`, 2026-10-08): neither
@@ -640,20 +642,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   tier lift on that species alone, in the one `rollVariant` call; its top
   rung stays at most `DEX_CHARM` (check.mjs). Its first chain of two shows
   the `combo` hint once - the update's map card.
-- **Cries are a device preference** (`ui/cry.js`, `dexora-cries`, on by
-  default): App plays one per encounter object, never per phase; a format
-  the browser cannot play is silence, never an error. A press that ASKS for
-  a cry (the quiz's hint) plays it even with cries off.
-- **A rustling spot is `rustle.js`** (2026-10-14): `state.spot`, VOLATILE,
-  one at a time, on tall grass (`,`) only - six maps have it - in the room
-  you stand in, `RUSTLE_NEAR`-`RUSTLE_FAR` steps away and at most
-  `RUSTLE_ROWS` rows (a phone's view is 11 tall; check.mjs holds both inside
-  VIEW_W x VIEW_H). It rises at 1 in `RUSTLE_EVERY` a step and that step
-  meets nothing else; it runs down on YOUR steps; walked into, it is a
-  meeting for sure (source `"spot"`, past a repel) at `RUSTLE_LIFT` in the
-  one `rollVariant` call; it is gone on another map. Its shake is the map's
-  one clock-driven drawing: the redraw key takes its frame only while one is
-  up, never 60fps. check.mjs holds its rare forms under 15% of walking's.
+- **The game makes no sound** (your call, 2026-10-14): Pokemon cries and
+  rustling grass spots were built and taken out the same day. Ask before
+  adding audio or a clock-driven map effect back.
 - **Who's that Pokemon is `quiz.js`** (2026-10-14): `quizFor(dayKey())`
   hashes the day to a species (never a form) and three names of its
   generation; `answerQuiz` takes ONE answer a day (`state.quiz`
@@ -661,6 +652,19 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   an unseen species SEEN, never caught. The silhouette carries no name - no
   alt, no tip. A HUD task chip until answered; banners and tips wait while
   it is open.
+- **Weekly Bingo is `bingo.js`** (2026-10-14): `state.bingo`, a 5x5 card
+  a week (`weekKey`, Monday), the centre free, FROZEN at first sight by
+  `bingoNow` from the week's hash and what you can do (no rod, no shut
+  region, no new entry on a full Pokedex) - 24 squares DRAWN from every open
+  goal, so weeks differ in what they ask. Squares move only through
+  `noteBingo(event)` (the step, the catch's frozen facts and its chain, a
+  rift find, the quiz, a check-in, a claimed quest, an evolution, a berry,
+  a pack, spares sold or converted, a battle won); check.mjs fails a goal
+  nothing the engine sends can fill. Its tip is `teach(..., quiet)` - every
+  caller notifies after (Open all stays ONE changed()). A line or the card
+  banners; the prize is CLAIMED on Events (`claimBingo`, each line once),
+  never paid on the moment: `BINGO_LINE` / `BINGO_FULL`, no money or Master
+  Ball, a week under the daily quest's candy at the streak cap (check.mjs).
 - **An alpha is a LAYER, not a tier**: `rollAlpha` (1 in `ALPHA_CHANCE`, never
   a legendary or costume, `canBeAlpha`) rolls BESIDE the tier, so an Alpha
   Shiny exists and is rarer than either. It was a tier for one pass and lost
@@ -794,8 +798,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   balls bottom right. Upright on a phone all of it stays ON the map a size
   down (30px chips, 34px rings: a bottom screen under the map read as outside
   the game, 2026-10-14); held sideways the tasks take the left column under
-  Menu, on the Menu key's own offsets. A new HUD element joins a zone, never
-  a corner of its own. Audit at all nine sizes (desktop, laptop, both tablets, two phones,
+  Menu, on the Menu key's own offsets. On touch the ALERTS (check-in, quiz,
+  bingo, a spin, a reward: `.dc-pill`) are icon chips with the dot on the
+  corner - as pills, four took three rows of an upright map and ran into the
+  sideways D-pad; the quest keeps its pill. A new HUD element joins a zone,
+  never a corner of its own. Audit at all nine sizes (desktop, laptop, both tablets, two phones,
   three sideways).
 - **Cards are designed in docs/cards.md** - change a decision there first, and
   build one phase at a time behind its QA gate. **A collection, never a
