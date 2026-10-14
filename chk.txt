@@ -1,0 +1,91 @@
+
+> meadow-route@0.2.0 check
+> node tools/check.mjs && node tools/play.mjs
+
+catch rules ok — odds unchanged, shakes consistent
+phase machine ok — all paths terminate, shakes match the roll
+balls ok — 4 plain, 4 situational (net ×3.5 ¥150, repeat ×3.5 ¥170, dusk ×3.5 ¥190, timer ×4 ¥70); a rare costs ¥177/283/243/275/472/308/264/50000 at best, against ¥260 back
+master ball price ok — ¥50000 is 34x the cheapest route to a legendary (TIMER, ¥1488) and 10.5% of a playthrough's ¥475540 (¥415540 played, ¥60000 walked)
+master balls ok — 11 in a playthrough (7 from levels, 4 from walking)
+economy ok — common nets +7, rare costs -212, variant bounties 38% of a late encounter
+strips ok — 1879 Showdown and Cadence strips, 16 frames each, stepped and stacked to match
+evolution ok — 607 chains, 290 synthetic levels, candy 1/2/4/8 at ¥120
+evolution scene ok — 60 swaps over 406 frames (6.8s), 18f -> 2f
+trainer ok - 7 stats x 20, 99 points of 140, 3 rods
+casting ok — 4 phases, both outcomes terminate, 3 rods bite 50%/65%/80%
+tileset ok — 5 biomes, ground and solid disjoint; 102 water tiles match FireRed
+player ok — 320x256 strip, walk:3@16px run:3@16px fish:4@32px surf:2@32px jump:1@32px, run from level 15
+map ladder ok — 1, 3, 6, 9, 12, 15, 16, 18, 19, 20, 20, 20, 25, 30, 35, 40 (Lv 1 to 40), three screens through one gate
+names ok — 39 hyphenated slugs, every one named
+achievements ok — 25 ladders, 80 steps, ¥166,500 against the Pokedex's ¥753,750
+dex ranks ok — Field Intern 0, Researcher 43, Senior Researcher 142, Specialist 283, Professor 496, Expedition Leader 708, Grand Scholar 1062, Pokédex Master 1415
+medals ok — 285 (241 line, 18 type, 16 biome, 9 gen, 1 dex) + 11 milestones, ¥753,750 and 530 ultra over a full dex
+origin ok — ungated, 819 in 200000 rolls; the rosette wants any 4 of 16
+origin art ok — 511 species have an older drawing, 904 do not (Gen 3 art is Gen 3 on both sides); the rosette stays reachable for all
+variant rows ok — a level is a level, whatever tier wears it
+steps ok — a parcel every 250, a haul every 2500, a Master Ball every 12500 from Lv 15; 50,000 steps pays 220/460/40/4 poke/great/ultra/master (¥56,900 of the priced ones)
+minimap ok — 50 colours cover 38 map characters; unused: F c D ~ Z o u C S W Y n
+battle scene ok — 16 floors, 21 skies
+gen share ok — every one within 30% of fair in all 16 maps, worst is power gen 9 at Lv 45 (1.5% against a fair 1.1%); 927 map-levels where a generation came in short because the species cap held it
+headliners ok — Gen 1 holds at least 19.5% of every map at Lv 100 (rainwood lowest), against a floor of 20%
+generation band ok — late game, the closest to a ceiling is desert gen 1 31.8%; the thinnest region is ember gen 6 at 5.0%
+species cap ok — no non-Kanto species above 6.0% of any map at any level (numel in cinder at Lv 25), except 0 rows where the cast is at its 25% ceiling
+no invasion ok — from Lv 20 the most any one species holds is 25.0% (gastly in tower at Lv 23)
+arrival ok — no generation takes more than 6.7% of a map on the level it opens (gen 5 in tower at Lv 25)
+findable ok — every base form turns up within a 3500-encounter playthrough or on a rod; hardest walking find is eevee at 1 in 2879
+band budgets ok — every map holds its own rarity mix at every level
+pity ok — opens at 300, caps at 10x, ladder keeps its order
+daily ok — 3 kinds, 5 askable types, streak caps at 7 (×2.05)
+outbreak ok — 16 maps and 51 species over 60 days, 18.2% variants, ¥29632 a week against the Master Ball's ¥50000
+trade rules ok — 11 limits (SQL agrees), 6 presets, last-one rule, locks need a server id
+research ok — 13 tasks, every species finishable without an alpha, pays at most 5.8% of catch income (meadow), 410 finished over 16 playthroughs
+alphas ok — a layer at 1 in 249, size 140-160, catch ×0.6, never flee, 10x candy at capture, never swept
+rifts ok — open at a median of 1478 steps, certain by 3000, tilt 0.2 flattens every map, finds 13.8% of a cycle (shoal)
+pixel face ok — no letter-spacing, nothing under 9px, every cqw floored
+    a jar runs 42 encounters; the dearest costs 126% of what that grosses at the start and 68% at the richest
+field ok — 3 families on 3 levers, 21 items; the flute is 10.0 Fortune ranks on the same exponent, honeys favour 16 tiers
+berries ok — 3 on 3 systems; Razz ×1.5-×2.5, Nanab locks it, Pinap ×2-×4; the ball ladder survives all of them
+senses ok — bands 2-7 to 12-17 (0.5 per gate, worst free evolutions 9% in Rainwood Crossing); sizes 75-125, 8.8% wear an XS/XL tag
+catch floor ok — 3 ordinary species on it (beldum, metang, metagross), each banded one kinder
+spawn ladder ok — 104 species in the wild at Lv 1, 1188 at Lv 100; legendaries no easier anywhere; nothing born below its own evolution level
+clock ok — 4 phases over 1200 steps (night 38% of it); the Dusk Ball reaches its boost two different ways
+habitat ok — 147 legendaries, each likeliest where its primary type lives (home 0.5, haunt 0, stray 0)
+save migration ok — 4 layouts recorded; a 358-entry save remaps onto 1415 by id, Sinnoh intact and Hoenn empty
+confirm ok — all 4 dialogs pass a title Confirm actually reads
+generations ok — Gen 1 at 1, then every 5 from 10; 9 gates ending at Lv 45 under a cap of 100; Tall Grass commons 79.0% → 69.8%
+tier layers ok - 21 containers holding a tier wrapper size their image by child selector
+variant layers ok — the sheet portrait is sized to its art, so every tier's layer fits it by construction; no tier animates its own !important property; 16 tiers each have one shared sentence
+art table ok — every one of 1415 species has a base art generation, the catch-all covering Gen 9 only (to #19716)
+dex portrait ok — 1 keyed layer(s), all distinct, image unkeyed
+trainer art ok — red/leaf picked from one strip, the picker's offsets match player.json
+storage ok — 4 files go through store.js; nothing else names localStorage
+portable ok — 32 of 35 rule modules are browser-free; only engine.js, tileset.js, store.js need one
+account ok — the merge takes the longer walk; nothing but net/cloud.js needs a backend
+name rules ok — 6 accepted, 8 refused, 3-16 matching the SQL constraint
+age gate ok — 13 exactly, counted on the calendar, bounded in SQL
+typed confirm ok — the word gates the button AND the Enter key, in Settings.jsx
+fish ok — 63 of them, none on the 7 maps with no water in
+areas ok — 16 maps, 147 legendaries homed 0-66 per map, 23x17 … 123x95
+league data ok — 9 regions, 391 opponents in 162 portraits, 781 moves (90 keep only their damage, 198 never chosen), 77KB gzipped and imported by nothing in the main bundle
+move animations ok — 576/584 moves, 12040 events, 417 sheets, 45 backgrounds, 90KB gzipped in their own chunk
+battle rules ok — 115 opponents within 15 points of target or on a proved cliff (Bruno 68/23% for 50%, Blue 55/24% for 40%, Milo 100/100% for 85%, Gordie 90/91% for 67%, Kofu 94/94% for 74%), 276 gym trainers all over 85% (10 lowered to get there), AI 2 beats 1 82% and 3 beats 2 61%, longest battle 183 turns, first wins ¥120813 and a 10750-step rematch clock, a rematch outearns its healers everywhere (tightest Lance, 1.12x at 4.2 items) (62s)
+hard mode ok — 115 opponents replayed on the record, 21 short of 20% at the most training (Brock 46%, Roxanne 48%, Wattson 99%, Tate & Liza 63%, Roark 55%, Gardenia 65%, ...); prize ¥2448, fee ¥612; the full Region Charm ×1.5; 13 battle items; the Tutor's lists hold (20s)
+news ok — 60 entries, each its own id and emoji, 213 items each under two lines
+suggest ok — 4 styles and 19 lineups (10 famous, 9 Champions): each fills a team from the Box, one of each; attack out-hits defense and defense out-lasts attack; balanced spreads 11 types to stat totals' 8; a lineup takes a line and names who is missing
+perks ok — 16 forms and the alpha each have one, they stack, and a plain Pokemon (and ranked) fights exactly as before
+cosmetics ok — 49 skins, each a walk set with a price; 1413 of 1415 species can follow you, from 1253 sheets; no rule module reads either
+abilities ok — 14 field abilities, all real; every species has an ability; finds are items
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: swsh7: holo (holo) came 1 in 1.9, not 1 in 3.0
+    at file:///C:/Users/admin/Desktop/mini-games/pokemon-collect/tools/check.mjs:7656:14 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '=='
+}
+
+Node.js v20.20.0

@@ -29,7 +29,12 @@ import { CARD_SETS } from "../data/cards/index.js";
    lands on it. `shiny` and `shinyultra` are Paldean Fates' shiny vault
    (2026-10-13): a Shiny rare sits just under the Double rare, so its 120
    cards can be crafted, and a Shiny Ultra Rare beside the Ultra Rare. */
-export const CARD_RARITIES = ["common", "uncommon", "rare", "pikachu", "holo", "shiny", "double", "ace", "illustration", "ultra", "shinyultra", "special", "futuristic", "blackwhite", "hyper", "mega"];
+/* `gallery` and `radiant` are Sword & Shield's (2026-10-15): a Trainer or
+   Galarian Gallery card - whatever it prints, one rung, drawn in place of a
+   reverse holo - and a Radiant Rare, each its own roll; both just over the
+   Double rare, so packs only. Its Holo Rare is Base Set's `holo` rung, its
+   V, VMAX and VSTAR the Double rare, its Secret Rare the Hyper rare. */
+export const CARD_RARITIES = ["common", "uncommon", "rare", "pikachu", "holo", "shiny", "double", "gallery", "ace", "radiant", "illustration", "ultra", "shinyultra", "special", "futuristic", "blackwhite", "hyper", "mega"];
 export const RARITY = {
   common:       { name: "Common", icon: "●" },
   uncommon:     { name: "Uncommon", icon: "◆" },
@@ -38,7 +43,9 @@ export const RARITY = {
   holo:         { name: "Holo Rare", icon: "★" },
   shiny:        { name: "Shiny rare", icon: "★" },
   double:       { name: "Double rare", icon: "★★" },
+  gallery:      { name: "Gallery rare", icon: "★" },
   ace:          { name: "ACE SPEC Rare", icon: "◆" },
+  radiant:      { name: "Radiant Rare", icon: "✦" },
   illustration: { name: "Illustration rare", icon: "★" },
   ultra:        { name: "Ultra Rare", icon: "★★" },
   shinyultra:   { name: "Shiny Ultra Rare", icon: "★★" },
@@ -122,7 +129,23 @@ export function landsOn(cards, rarity) {
      in 6, IR 14, UR 15, SIR 58, HR 62.
    - base1 Base Set 1st Edition (1999): one rare a pack, a holo one pack in
      three - the double roll, which lands on `holo`. Nothing else is printed:
-     every other roll is 0. */
+     every other roll is 0.
+   - SWORD & SHIELD (2026-10-15), each from TCGplayer's Authentication Center
+     as pullrates.com reports it (8,000+ packs a set; 1,500+ for Crown
+     Zenith). Its rare slot has a Holo Rare roll of its own (`holo`), beside
+     the Double rare (V + VMAX + VSTAR) and Ultra Rare; the top roll is its
+     Secret Rares (Rainbow + Gold); a Radiant Rare and a gallery card (every
+     gallery tier together) are second-slot rolls. No Illustration or Special
+     illustration rares: those rolls are 0.
+     swsh7 Evolving Skies: Holo 1 in 3, V 9 + VMAX 18, UR 26, Rainbow 88 +
+     Gold 109. swsh9 Brilliant Stars: Holo 3, V 10 + VSTAR 30 + VMAX 200, UR
+     54, Rainbow 51 + Gold 92, Trainer Gallery 8 + TG V 18 + TG Gold 309.
+     swsh11 Lost Origin: Holo 3, V 9 + VSTAR 27 + VMAX 158, UR 26, Rainbow 78
+     + Gold 131, Radiant 20, TG 12 + TG V 32 + TG Gold 117. swsh12 Silver
+     Tempest: Holo 3, V 9 + VSTAR 31 + VMAX 189, UR 27, Rainbow 80 + Gold 106,
+     Radiant 22, TG 12 + TG V 32 + TG Gold 111. swsh12.5 Crown Zenith: Holo
+     13, V 8 + VMAX 19 + VSTAR 19, UR 35, Secret 133, Radiant 22, Galarian
+     Gallery 4 + GG V 8 + GG Gold 125. */
 export const SET_RATES = {
   me01: { double: 0.2091, illustration: 0.1089, ultra: 0.0823, special: 0.0099, mega: 0.0008 },
   me02: { double: 0.2077, illustration: 0.1097, ultra: 0.0806, special: 0.0125, mega: 0.0008 },
@@ -148,14 +171,24 @@ export const SET_RATES = {
   "sv06.5": { double: 1 / 6, illustration: 1 / 12, ace: 1 / 20, ultra: 1 / 15, special: 1 / 67, mega: 1 / 144 },
   sv07: { double: 1 / 6, illustration: 1 / 13, ace: 1 / 20, ultra: 1 / 15, special: 1 / 90, mega: 1 / 137 },
   base1: { double: 1 / 3, illustration: 0, ultra: 0, special: 0, mega: 0 },
+  swsh7: { holo: 1 / 3, double: 1 / 9 + 1 / 18, ultra: 1 / 26, illustration: 0, special: 0, mega: 1 / 88 + 1 / 109 },
+  swsh9: { holo: 1 / 3, double: 1 / 10 + 1 / 30 + 1 / 200, ultra: 1 / 54, illustration: 0, special: 0, mega: 1 / 51 + 1 / 92,
+    gallery: 1 / 8 + 1 / 18 + 1 / 309 },
+  swsh11: { holo: 1 / 3, double: 1 / 9 + 1 / 27 + 1 / 158, ultra: 1 / 26, illustration: 0, special: 0, mega: 1 / 78 + 1 / 131,
+    radiant: 1 / 20, gallery: 1 / 12 + 1 / 32 + 1 / 117 },
+  swsh12: { holo: 1 / 3, double: 1 / 9 + 1 / 31 + 1 / 189, ultra: 1 / 27, illustration: 0, special: 0, mega: 1 / 80 + 1 / 106,
+    radiant: 1 / 22, gallery: 1 / 12 + 1 / 32 + 1 / 111 },
+  "swsh12.5": { holo: 1 / 13, double: 1 / 8 + 1 / 19 + 1 / 19, ultra: 1 / 35, illustration: 0, special: 0, mega: 1 / 133,
+    radiant: 1 / 22, gallery: 1 / 4 + 1 / 8 + 1 / 125 },
 };
 /* THE SECOND REVERSE SLOT'S OWN ROLLS, after the Illustration rare, rarest
    first: a key a set's row may name (Surging Sparks' ACE SPEC, Paldean
    Fates' shiny vault), each landing on its own rung. */
-export const EXTRA_ROLLS = ["ace", "shinyultra", "shiny"];
-// A pack holding a hit (a Double rare or better), at a set's rates.
+export const EXTRA_ROLLS = ["ace", "radiant", "shinyultra", "shiny", "gallery"];
+/* A pack holding a hit (a Holo rare or better), at a set's rates - Sword &
+   Shield's rare slot rolls its Holo Rare (`holo`) beside its Double rares. */
 export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration
-  - EXTRA_ROLLS.reduce((t, k) => t + (r[k] ?? 0), 0)) * (1 - r.double - r.ultra);
+  - EXTRA_ROLLS.reduce((t, k) => t + (r[k] ?? 0), 0)) * (1 - r.double - r.ultra - (r.holo ?? 0));
 
 /* PITY IS A SAFETY NET, NOT A SCHEDULE (your call, 2026-10-06): real packs
    have none, so each set's is scaled to its own rates - the odds start to
@@ -184,7 +217,7 @@ export const GOD_PACK = 1 / 500;
 
 /* WHAT A SPARE COPY IS WORTH IN DUST (docs/cards.md): a foil copy of a common,
    uncommon or rare counts as `foil`. Crafting costs eight times this. */
-export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, pikachu: 40, holo: 60, shiny: 70, double: 80, ace: 90, illustration: 100, ultra: 150, shinyultra: 200, special: 300, futuristic: 400, blackwhite: 400, hyper: 400, mega: 400 };
+export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, pikachu: 40, holo: 60, shiny: 70, double: 80, gallery: 90, ace: 90, radiant: 100, illustration: 100, ultra: 150, shinyultra: 200, special: 300, futuristic: 400, blackwhite: 400, hyper: 400, mega: 400 };
 export const dustOf = (rarity, variant) =>
   (rungOf(rarity) <= rungOf("rare") && variant !== "n" ? DUST.foil : DUST[rarity]);
 /* A CRAFT COSTS SIXTEEN SPARES' WORTH. Measured over 40 seeded collectors
@@ -326,6 +359,12 @@ export const BOXES = {
   "sv06.5": { name: "Booster bundle", packs: 6, price: 21600 },
   sv07: { name: "Booster box", packs: 36, price: 120000 },
   base1: { name: "Booster box", packs: 36, price: 120000 },
+  swsh7: { name: "Booster box", packs: 36, price: 120000 },
+  swsh9: { name: "Booster box", packs: 36, price: 120000 },
+  swsh11: { name: "Booster box", packs: 36, price: 120000 },
+  swsh12: { name: "Booster box", packs: 36, price: 120000 },
+  // Crown Zenith was a special set, never sold in booster boxes.
+  "swsh12.5": { name: "Booster bundle", packs: 6, price: 21600 },
 };
 /* EVERY SET'S DEALS (2026-10-13): its BOXES entry, and for a set sold in
    36-pack boxes the 6-pack bundle too, as in shops - a special set's BOXES
@@ -346,7 +385,9 @@ export const CARD_MAX = 99;
 export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45, "sv03.5": 50, me05: 55, "sv08.5": 60, sv08: 65, "30th": 70,
   sv09: 75, sv10: 80, "sv10.5b": 85, "sv10.5w": 85, base1: 90,
   // The rest of Scarlet & Violet (2026-10-13), in release order into the gaps and beside the others.
-  sv01: 15, sv02: 20, sv03: 30, sv04: 40, "sv04.5": 50, sv05: 55, sv06: 60, "sv06.5": 65, sv07: 70 };
+  sv01: 15, sv02: 20, sv03: 30, sv04: 40, "sv04.5": 50, sv05: 55, sv06: 60, "sv06.5": 65, sv07: 70,
+  // Sword & Shield's favourites (2026-10-15), spread over the ladder; Evolving Skies early, its best-loved.
+  swsh7: 30, swsh9: 45, swsh11: 60, swsh12: 75, "swsh12.5": 90 };
 
 export const setById = (id) => CARD_SETS.find((s) => s.id === id) ?? null;
 export const setOpen = (id, level) => !!setById(id) && level >= (SET_LEVEL[id] ?? Infinity);
@@ -441,9 +482,11 @@ export function openPack(cards, rng, pity = freshPity(), rules) {
   // on the `hit` pity's hard pack when nothing else in the pack is one.
   const r = rng();
   const forced = pity.hit + 1 >= rules.pity.hit.hard && !isHit(slot2.rarity);
+  const holo = rates.holo ?? 0;    // Sword & Shield's Holo Rare: the rare slot's own roll
   const rareSlot = r < rates.ultra || (forced && r < rates.ultra / (rates.ultra + rates.double))
     ? of("ultra", "h")
-    : r < rates.ultra + rates.double || forced ? of("double", "h") : of("rare", "h");
+    : r < rates.ultra + rates.double || forced ? of("double", "h")
+      : r < rates.ultra + rates.double + holo ? of("holo", "h") : of("rare", "h");
 
   const pulls = [...base, ...sortTail([slot2, rareSlot])];
   const best = Math.max(...pulls.map((p) => rungOf(p.rarity)));
