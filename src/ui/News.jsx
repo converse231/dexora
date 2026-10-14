@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-15-gender",
+    icon: "🚻",
+    date: "October 2026",
+    title: "Male and female",
+    items: [
+      ["Every Pokémon has a gender", "Look for ♂ or ♀ on the nameplate and in the Box."],
+      ["Female looks", "38 species look different as females, from Gen 4 on. Catch her for her own sprite."],
+      ["In your Pokédex", "Her look joins the Forms tab, and a new achievement counts them."],
+    ],
+  },
+  {
     id: "2026-10-14-bingo",
     icon: "🎯",
     date: "October 2026",

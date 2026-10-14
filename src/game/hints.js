@@ -47,6 +47,14 @@ export const HINTS = [
     when: (e) => e.kind === "fled",
     text: "It ran. Berries make that less likely — a Nanab stops it outright.",
   },
+  /* A FEMALE LOOK, the first time one appears (2026-10-15): the update's
+     one-time card, while she is there to be caught. */
+  {
+    id: "female",
+    when: (e) => e.kind === "encounter" && e.female,
+    text: "She's female - and for some Pokémon that means a look of her own. "
+      + "Catch her and it goes in your Pokédex beside the usual one.",
+  },
   /* WEEKLY BINGO, the first time a square fills (2026-10-14): the update's
      one-time card, said at the moment the card means something. */
   {

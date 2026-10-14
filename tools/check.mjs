@@ -4706,6 +4706,35 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         assert.ok(fed, `the bingo square "${kind}" counts nothing the engine sends`);
       }
     }
+    /* GENDER (gender.js): every female look ships its picture (and the shiny
+       it is listed with) and nothing else does; none comes from 1-386, whose
+       FireRed art has no female drawing (your call, 2026-10-15); and over the
+       sizes `rollSize` really deals, every species is female at its own
+       ratio within one size's step - hashing the size itself once left a
+       half-female species 24% female. */
+    {
+      const G = await import("../src/game/gender.js");
+      const { FEMALE_EIGHTHS, FEMALE_ART, FEMALE_SHINY } = await import("../src/data/genders.js");
+      const { rollSize, SIZE_MIN, SIZE_MAX } = await import("../src/game/biomes.js");
+      const dir = (d) => new Set(readdirSync(new URL(`../public/sprites/${d}/`, import.meta.url)));
+      const her = dir("female"), herShiny = dir("shiny/female");
+      assert.deepEqual([...her].sort(), [...FEMALE_ART].map((id) => `${id}.png`).sort(), "public/sprites/female does not match FEMALE_ART - npm run genders");
+      assert.deepEqual([...herShiny].sort(), [...FEMALE_SHINY].map((id) => `${id}.png`).sort(), "public/sprites/shiny/female does not match FEMALE_SHINY - npm run genders");
+      assert.ok([...FEMALE_SHINY].every((id) => FEMALE_ART.has(id)), "a female shiny with no female look");
+      assert.ok([...FEMALE_ART].every((id) => id > 386), "a female look from FireRed's 1-386, which has no female art of its own");
+      assert.ok(Object.values(FEMALE_EIGHTHS).every((e) => Number.isInteger(e) && e >= -1 && e <= 8), "a gender rate outside -1..8");
+      let x = 7;
+      const rnd = () => { x = (x * 16807) % 2147483647; return x / 2147483647; };
+      const sizes = Array.from({ length: 6000 }, () => rollSize(rnd));
+      const step = 2 / (SIZE_MAX - SIZE_MIN);     // the heaviest size's share of the spread
+      for (const sp of SPECIES) {
+        if (sp.id >= 10000) continue;
+        const e = G.eighthsOf(sp.id);
+        const f = sizes.filter((s) => G.sexAt(sp.id, s) === "f").length / sizes.length;
+        if (e < 0) assert.equal(sizes.some((s) => G.sexAt(sp.id, s)), false, `${nameOf(sp)} is genderless but drew a gender`);
+        else assert.ok(Math.abs(f - e / 8) <= step + 0.01, `${nameOf(sp)} is ${(f * 100).toFixed(1)}% female against ${e}/8`);
+      }
+    }
     /* THE DAILY QUIZ pays no more than a check-in day's candy: a guess is a
        daily nicety, not a candy stream. */
     {

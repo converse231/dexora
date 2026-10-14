@@ -32,6 +32,7 @@ import { followSheet, PARTY_MAX, partnerRule, isMastered } from "./game/cosmetic
 import { RESEARCH_MAX } from "./game/research.js";
 import { COMBO_STEPS, comboLift, nextRung } from "./game/combo.js";
 import { dueLines, fullDue } from "./game/bingo.js";
+import { sexOf } from "./game/gender.js";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
 import Bag from "./ui/Bag.jsx";
@@ -1148,7 +1149,7 @@ export default function App({
                 data-tip={walkerFx.tip} aria-label={walkerFx.tip} aria-expanded={perkOpen}
                 onClick={() => setPerkOpen((o) => !o)}>
                 <span>
-                  <Sprite id={walkerFx.mon.species} variant={variantOf(walkerFx.mon)} alt="" eager />
+                  <Sprite id={walkerFx.mon.species} variant={variantOf(walkerFx.mon)} alt="" eager sex={sexOf(walkerFx.mon)} />
                   <u><b>{walkerFx.what}</b><i>{walkerFx.name}</i></u>
                 </span>
               </button>
@@ -1386,8 +1387,8 @@ export default function App({
              index missed this one, so a Johto or Sinnoh entry read its variant
              marks out of whichever species happens to sit at that POSITION -
              Arceus' row answering for Chikorita. */
-          held={Object.fromEntries(
-            TIERS.map((t) => [t, !!st?.[t]?.[dexIndex(entry)]]))}
+          held={{ ...Object.fromEntries(TIERS.map((t) => [t, !!st?.[t]?.[dexIndex(entry)]])),
+            female: !!st?.females?.includes(entry) }}
           research={st?.research?.[entry] ?? null}
           starred={!!st?.stars?.includes(entry)}
           // What a star could spend: ordinary ones, never a keeper.

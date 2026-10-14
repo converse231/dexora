@@ -22,6 +22,7 @@
    NO ART: a step is marked done, never drawn (your call, 2026-10-10). Pure
    and browser-free, so check.mjs and tools/play read it in Node. */
 
+import { FEMALE_ART } from "../data/genders.js";
 import { SPECIES } from "../data/dex.js";
 import { CARD_SETS } from "../data/cards/index.js";
 import { TIERS, levelFromXp, isLegendary, dexIndex, REGION_NAME } from "./biomes.js";
@@ -68,6 +69,9 @@ export const ACHIEVEMENTS = [
     of: (s) => TIERS.filter((t) => sum(s[t]) > 0).length },
   { id: "shiny", group: "rare", name: "Shiny hunter", sub: "Different species you have registered as a Shiny", steps: [1, 10, 50], of: (s) => sum(s.shiny) },
   { id: "gold", group: "rare", name: "The chase", sub: "Register a Gold Pokémon, the rarest kind of all", steps: [1], of: (s) => sum(s.gold) },
+  // Female looks (gender.js): the Pokedex's list, so one sold still counts.
+  { id: "looks", group: "rare", name: "Her own look", sub: `Female looks in your Pokédex - ${FEMALE_ART.size} species have one`,
+    steps: upTo(FEMALE_ART.size, 1, 10), of: (s) => (s.females ?? []).length },
 
   { id: "research", group: "research", name: "Professor", sub: "Different species with research at Lv 10 - Events shows what each still needs", steps: [1, 10, 50, 200],
     of: (s) => Object.entries(s.research ?? {}).filter(([id, r]) => researchLevel(Number(id), r) >= RESEARCH_MAX).length },

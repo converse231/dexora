@@ -38,6 +38,7 @@ const KIND = {
   cards: "CARDS",
   combo: "CATCH COMBO",
   bingo: "WEEKLY BINGO",
+  female: "FEMALE LOOK",
   ...Object.fromEntries(
     Object.entries(TIER_TELL).map(([t, tell]) => [t, tell.toUpperCase()]),
   ),

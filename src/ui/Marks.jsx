@@ -50,6 +50,14 @@ const TIER_ART = {
 };
 
 export default function Mark({ tier, size = 12, className = "", title }) {
+  /* A FEMALE LOOK (gender.js) is not a tier and has no drawn mark: the
+     games' own sign, in her pink, wherever a held form shows its mark. */
+  if (tier === "female") {
+    return (
+      <span className={`mark mark-female sex-mark f ${className}`.trim()} style={{ fontSize: size }}
+        role="img" aria-label="Female look" data-tip={title ?? "Female look"}>♀</span>
+    );
+  }
   const art = TIER_ART[tier];
   if (!art) return null;
   return (

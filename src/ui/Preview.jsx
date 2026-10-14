@@ -11,6 +11,7 @@ import Types from "./Types.jsx";
 import Mark from "./Marks.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
 import { perksOf } from "../game/perks.js";
+import { sexOf, SEX_MARK, SEX_NAME } from "../game/gender.js";
 
 const STATS = ["HP", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed"];
 // The highest base stat any Pokemon has, so a bar is comparable across species.
@@ -38,7 +39,7 @@ export default function Preview({ group, onClose }) {
         onClick={(e) => e.stopPropagation()}>
         <div className="pv-art">
           <span className={`pv-tint t-${sp.types[0]}`} aria-hidden="true" />
-          <Sprite id={group.species} variant={group.variant} fx alt={label(sp)} />
+          <Sprite id={group.species} variant={group.variant} fx alt={label(sp)} sex={group.look ? "f" : null} />
         </div>
         <div className="pv-head">
           {sp.id < 10000 && <span className="pv-no">#{String(sp.id).padStart(3, "0")}</span>}
@@ -51,6 +52,11 @@ export default function Preview({ group, onClose }) {
               </span>
             )}
             {group.alpha && <span className="bx-vtag bx-alpha"><Mark tier="alpha" size={11} />ALPHA</span>}
+            {sexOf(group.hero) && (
+              <span className={`sex-mark ${sexOf(group.hero)}`} role="img" aria-label={SEX_NAME[sexOf(group.hero)]}>
+                {SEX_MARK[sexOf(group.hero)]}
+              </span>
+            )}
             <span>Lv {group.hero.level}</span>
             {size && <span>{size}</span>}
             <span>&times;{group.count} owned</span>

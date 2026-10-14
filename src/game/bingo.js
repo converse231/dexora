@@ -11,7 +11,7 @@
    Ball: check.mjs holds a whole week under the daily quest's candy.
 
    Browser-free, so check.mjs can bound it. */
-import { QUEST_TYPES, hash, dayKey } from "./daily.js";
+import { QUEST_TYPES, hash, mix, dayKey } from "./daily.js";
 import { genOf, GEN_UNLOCK, REGION_NAME } from "./biomes.js";
 
 export const BINGO_SIZE = 5;
@@ -84,12 +84,6 @@ export const sayOf = (cell) => GOALS[cell[0]].say(cellOf(cell));
    squares DRAWN from every goal open to you - the fixed ones, the starting
    map's types, your open regions - so weeks differ in what they ask, not
    only where. Short of 24 (a new player), bigger catch counts fill in. */
-// The day hash is FNV, weak on keys a character apart: mixed before ordering.
-const mix = (h) => {
-  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  return (h ^ (h >>> 16)) >>> 0;
-};
 export function cardFor(week, ctx) {
   const shut = { fish: !ctx.fish, pack: !ctx.packs, new: !(ctx.missing > 0) };
   const open = [

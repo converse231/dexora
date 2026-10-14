@@ -5,6 +5,7 @@
    engine plays the release on the canvas, so this is buttons only. */
 import { memo } from "react";
 import Sprite from "./Sprite.jsx";
+import { sexOf } from "../game/gender.js";
 import Icon from "./Icon.jsx";
 import { label } from "../game/map.js";
 import { speciesById } from "../game/biomes.js";
@@ -30,7 +31,7 @@ function Party({ mons, buddy, mastered, onPick, onEdit }) {
               + (what ? `. ${what}` : "")}
             data-tip={on ? `${name} · ${about} · tap to rest, Q to switch` : `Walk with ${name} · ${about}`}
             onClick={() => onPick(on ? null : m.uid)}>
-            <Sprite id={m.species} variant={variantOf(m)} alt="" eager />
+            <Sprite id={m.species} variant={variantOf(m)} alt="" eager sex={sexOf(m)} />
           </button>
         );
       })}
