@@ -16,6 +16,16 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-15-invite",
+    icon: "🎁",
+    date: "October 2026",
+    title: "Invite friends",
+    items: [
+      ["Share your link", "You › Invite friends. When a friend gets going, you both get rewards."],
+      ["Big rewards", "Ultra Balls, Rare Candy and card packs - and a box or Master Ball at 3, 5 and 10 friends."],
+    ],
+  },
+  {
     id: "2026-10-15-meet",
     icon: "👋",
     date: "October 2026",

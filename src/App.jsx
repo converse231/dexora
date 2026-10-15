@@ -7,8 +7,10 @@ import { freePoints } from "./game/trainer.js";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
-import { RAIL_KEY, ORDER_KEY, read, write, flushNow } from "./game/store.js";
-import { tradeInbox, push, myDefense } from "./net/cloud.js";
+import { RAIL_KEY, ORDER_KEY, REF_KEY, read, write, drop, flushNow } from "./game/store.js";
+import { tradeInbox, push, myDefense, setReferrer, myReferrals } from "./net/cloud.js";
+import Invite from "./ui/Invite.jsx";
+import { referralDue } from "./game/referral.js";
 import { inboxToReconcile, freshTrades } from "./game/trade.js";
 import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
@@ -265,6 +267,34 @@ export default function App({
     return got;
   }, [account, engine]);
   const tradeOpen = Boolean(trade);
+  /* INVITES, ONCE SIGNED IN: a link this device was opened with (main.jsx
+     keeps it) is followed - the server decides whether it may be - and
+     forgotten on any answer; a call that failed tries again next session.
+     Then how your invites stand, again every ten minutes while in view. */
+  const loadRefs = useCallback(async () => {
+    if (!account) return;
+    const got = await myReferrals();
+    if (got.ok && got.data) setRefInfo(got.data);
+  }, [account]);
+  /* The answer is never dropped for a re-run: the account object changes on
+     its first token refresh, right after a sign-in, and a guard on the old
+     run threw away "linked" - the link already forgotten, the welcome never
+     shown (caught on a phone). */
+  useEffect(() => {
+    if (!account) { setRefInfo(null); return undefined; }
+    (async () => {
+      const ref = read(REF_KEY);
+      drop(REF_KEY);
+      if (ref) {
+        const got = await setReferrer(ref);
+        if (!got.ok) write(REF_KEY, ref);
+        else if (got.data === "linked") setInvite({ welcome: true });
+      }
+      loadRefs();
+    })();
+    const timer = setInterval(() => { if (document.visibilityState === "visible") loadRefs(); }, 600000);
+    return () => clearInterval(timer);
+  }, [account, loadRefs]);
   // Who defends in ranked, so the Box and the Trade Center warn before one goes (Ranked refreshes it on every edit).
   useEffect(() => {
     if (!account || !engine) return;
@@ -350,6 +380,11 @@ export default function App({
   const [bagView, setBagView] = useState(null);
   const [waterAsk, setWaterAsk] = useState(false);   // "Surf or fish?" (WaterAsk)
   const [claimGen, setClaimGen] = useState(null);     // a finished generation's reward, being claimed (DexClaim)
+  /* INVITE FRIENDS (referral.js): how your invites stand, as the server
+     answered (`my_referrals`), and the dialog - `welcome` when it opened
+     because this account just followed someone's link. */
+  const [refInfo, setRefInfo] = useState(null);
+  const [invite, setInvite] = useState(null);         // null, or { welcome }
   /* "See in Box" crosses two components that do not know each other: the sheet
      lives here and the tab lives in the Rail. A species id parked here is the
      smallest thing that can travel between them, and the Rail clears it once it
@@ -483,6 +518,8 @@ export default function App({
   }, []);
 
   const st = engine?.state;
+  // Invite rewards the server says are owed and this save has not been paid.
+  const refDue = referralDue(refInfo, st?.referralsPaid ?? []).length;
   const enc = st?.encounter ?? null;
   const evo = st?.evolution ?? null;
   /* A NEWER BUILD IS LIVE (ui/update.js): take it the moment nothing would be
@@ -812,6 +849,7 @@ export default function App({
             dexOf={(x) => st?.dex[dexIndex(x)] ?? 0}
             openName={trade.name}
             openBoard={trade.board ?? null}
+            onInvite={() => setInvite({ welcome: false })}
             profile={Boolean(trade.profile)}
             offers={offerAlert}
             inbox={inbox}
@@ -894,6 +932,8 @@ export default function App({
           }}
           onProfile={account ? () => setTrade({ name: null, profile: true }) : null}
           requests={inbox?.friend_requests ?? 0}
+          invites={refDue}
+          onInvite={account ? () => setInvite({ welcome: false }) : null}
           onNews={() => setNews(true)}
           onHelp={() => setHelp(true)}
           onForms={() => setForms(true)}
@@ -902,6 +942,13 @@ export default function App({
           onLogOut={onLogOut ? () => setLeaving(true) : null}
           onReset={onLogOut ? null : () => engine?.reset()}
         />
+      )}
+
+      {invite && (
+        <Invite name={trainerName} info={refInfo} signedIn={Boolean(account)} paidIds={st?.referralsPaid ?? []}
+          welcome={invite.welcome} onRefresh={loadRefs}
+          onClaim={() => engine?.claimReferrals(refInfo)}
+          onClose={() => setInvite(null)} />
       )}
 
       {scenes.length > 0 && (
@@ -970,7 +1017,7 @@ export default function App({
         tradeAlert={offerAlert}
         cardAlert={Object.values(st?.packs ?? {}).reduce((a, b) => a + b, 0)}
         // Friend requests live on your card now (You › Your trainer card), so they light You.
-        youAlert={unread || freePoints(st?.stats, level) > 0 || (inbox?.friend_requests ?? 0) > 0 || due > 0}
+        youAlert={unread || freePoints(st?.stats, level) > 0 || (inbox?.friend_requests ?? 0) > 0 || due > 0 || refDue > 0}
         onNews={() => setNews(true)}
         unread={unread}
         trainerName={trainerName}

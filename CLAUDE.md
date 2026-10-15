@@ -323,6 +323,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   and its old `normalise` shrank 2,062 of them. Showdown needs a real strip
   (`hasShowdown` reads the files).
 - **Pity is a capped multiplier on the whole ladder**; `dry` resets on the roll.
+- **The Dex filtered to a tier shows its gaps** (2026-10-15, asked for): every
+  species that can wear it (`tiersFor`), the held ones in its art and the
+  rest as dashed `.lack` tiles, with Both / Held / Missing to narrow it.
 - **`keeper()` protects variants in the engine**, on `sell` and `convert` both.
   Legendaries are not keepers: sweep dialogs list them unticked, and
   `run(picked)` never falls back to the full list.
@@ -1190,7 +1193,14 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   your friends and **Trainers to meet** (2026-10-15, asked for:
   `suggest_trainers`, eight shuffled strangers - recently played first,
   never a friend or request, never across a block, never a flagged account;
-  a page answers nothing, never `closed`, until the server has it).
+  a page answers nothing, never `closed`, until the server has it).  a page answers nothing, never `closed`, until the server has it).
+  **Invites are docs/trading.md's Referrals** (2026-10-15): `?ref=<name>`
+  links, `db/referrals.sql` (after trading.sql) decides EVERYTHING - a new
+  account, once, to an older one, progress counted from the save it had when
+  linked, over separate server days, no flag, the first `cap` paid - and
+  `referral_rule()` equals `REF_RULE`; the engine's `claimReferrals` pays
+  each id once (`referralsPaid`). A followed link's answer is never dropped
+  for an effect re-run (the account object changes right after sign-in).
   **A block works both ways and ends the friendship**, and friending refuses
   across one, so friends implies no block and the friends-only modes need no
   check of their own; every other read (search, card, shelf, offer, request)

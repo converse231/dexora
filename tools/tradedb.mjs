@@ -65,6 +65,8 @@ if (!(await q("select to_regclass('public.saves') as t"))[0].t) {
 await db.query(readFileSync(new URL("../db/trading.sql", import.meta.url), "utf8"));
 // Ranked reads trading's functions, so it goes on after, as on the live project.
 await db.query(readFileSync(new URL("../db/ranked.sql", import.meta.url), "utf8"));
+// Referrals read trading's profiles, saves and befriend - after it too.
+await db.query(readFileSync(new URL("../db/referrals.sql", import.meta.url), "utf8"));
 
 // ---- two trainers -------------------------------------------------------------
 /* NO REALTIME HERE, and Node 20 has no WebSocket for supabase-js to find at
@@ -912,6 +914,79 @@ await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
   await q("delete from public.saves where user_id = $1", [C.id]);
   await q("update public.profiles set flagged_at = null, flag_reason = null where user_id = $1", [C.id]);
   console.log("tradedb pace ok — an honest save passes, an impossible one is stored and flags its account, whose Pokemon leave trading and which registers nothing");
+}
+
+// ---- REFERRALS (db/referrals.sql) ------------------------------------------------
+/* A new account links to an older one through a link, once; its progress is
+   read off its STORED saves from where it stood when linked, over separate
+   days, and only then are both owed their rewards - never a flagged one, and
+   never a table a client can read. */
+{
+  const { REF_RULE } = await import("../src/game/referral.js");
+  for (const [k, name] of [["steps", "STEPS"], ["caught", "CAUGHT"], ["days", "DAYS"], ["cap", "CAP"], ["linkHours", "LINK_HOURS"]]) {
+    assert.equal((await q("select public.referral_rule($1) as v", [name]))[0].v, REF_RULE[k], `referral_rule('${name}') is not REF_RULE.${k}`);
+  }
+  const N = await trainer("newbie");
+  await q("delete from public.referrals where referee = any($1) or referrer = any($1)", [[N.id, A.id, B.id]]);
+  await q("delete from public.friends where a = $1 or b = $1", [N.id]);
+  await q("delete from public.saves where user_id = $1", [N.id]);
+  await q("update public.profiles set flagged_at = null, flag_reason = null where user_id = any($1)", [[N.id, A.id]]);
+  await q("update auth.users set created_at = now() - interval '1 hour', email_confirmed_at = now() where id = $1", [N.id]);
+  await q("update auth.users set created_at = least(created_at, now() - interval '30 days') where id = any($1)", [both]);
+  const nsave = (steps, caught) => rpc(N, "save_game", { payload: { dex: [0], box: [], nextUid: 1, steps, caught }, sess: "s-newbie" });
+  // A guest game brought in: progress counts from here, never from zero.
+  await nsave(5000, 40);
+  assert.equal(await rpc(N, "set_referrer", { name: "TesterNEWBIE" }), "self", "an account invited itself");
+  assert.equal(await rpc(N, "set_referrer", { name: "nobody-at-all" }), "unknown", "a link to nobody was taken");
+  assert.equal(await rpc(A, "set_referrer", { name: "TesterB" }), "late", "an old account was linked to an invite");
+  assert.equal(await rpc(N, "set_referrer", { name: "testera" }), "linked", "a new account could not follow an invite");
+  assert.equal(await rpc(N, "set_referrer", { name: "TesterB" }), "already", "an account was linked twice");
+  assert.equal(await rpc(A, "set_referrer", { name: "TesterNEWBIE" }), "late", "an invite ran backwards, older to newer");
+  assert.ok((await rpc(N, "my_friends", {})).some((f) => f.card.username === "TesterA"), "following an invite sent no friend request");
+  const mine = async () => (await rpc(A, "my_referrals", {})).invited.find((x) => x.id === N.id);
+  let row = await mine();
+  assert.deepEqual([row.steps, row.caught, row.qualified, row.paid], [0, 0, false, false], "a brought-in game counted as progress");
+  // Everything in one day is not enough: the days are the guard a single upload cannot buy.
+  await nsave(5000 + REF_RULE.steps + 100, 40 + REF_RULE.caught + 5);
+  row = await mine();
+  assert.deepEqual([row.days, row.qualified], [1, false], `one day of play qualified (${JSON.stringify(row)})`);
+  await q("update public.referrals set days = array[current_date - 2, current_date - 1] where referee = $1", [N.id]);
+  await nsave(5000 + REF_RULE.steps + 200, 40 + REF_RULE.caught + 5);
+  row = await mine();
+  assert.deepEqual([row.days, row.qualified, row.paid], [REF_RULE.days, true, true], `three days of real progress did not qualify (${JSON.stringify(row)})`);
+  const me = (await rpc(N, "my_referrals", {})).me;
+  assert.deepEqual([me.referrer, me.qualified], ["TesterA", true], "the newcomer is not owed a welcome");
+  // A flagged newcomer earns nobody anything.
+  await q("update public.profiles set flagged_at = now(), flag_reason = 'test' where user_id = $1", [N.id]);
+  assert.equal((await mine()).paid, false, "a flagged newcomer still paid the inviter");
+  assert.equal((await rpc(N, "my_referrals", {})).me.qualified, false, "a flagged newcomer is still owed a welcome");
+  await q("update public.profiles set flagged_at = null, flag_reason = null where user_id = $1", [N.id]);
+  // An unconfirmed email never qualifies.
+  await q("update public.referrals set qualified_at = null where referee = $1", [N.id]);
+  await q("update auth.users set email_confirmed_at = null where id = $1", [N.id]);
+  await nsave(5000 + REF_RULE.steps + 300, 40 + REF_RULE.caught + 5);
+  assert.equal((await mine()).qualified, false, "an unconfirmed email qualified");
+  await q("update auth.users set email_confirmed_at = now() where id = $1", [N.id]);
+  // The cap: past your first CAP friends, a friend still qualifies but pays you nothing.
+  const fake = [];
+  for (let k = 0; k < REF_RULE.cap; k++) {
+    const t = await trainer(`cap${k}`);
+    fake.push(t.id);
+  }
+  await q("delete from public.referrals where referee = any($1)", [fake]);
+  await q("insert into public.referrals (referee, referrer, qualified_at, days) select x, $2, now() - interval '1 day', '{}' from unnest($1::uuid[]) x",
+    [fake, A.id]);
+  await nsave(5000 + REF_RULE.steps + 400, 40 + REF_RULE.caught + 5);
+  const all = (await rpc(A, "my_referrals", {})).invited;
+  assert.equal(all.filter((x) => x.paid).length, REF_RULE.cap, "more than CAP friends paid the inviter");
+  assert.ok(all.find((x) => x.id === N.id).qualified && !all.find((x) => x.id === N.id).paid, "the friend past the cap was paid");
+  // Nobody reads or writes the table but these functions.
+  assert.deepEqual((await A.c.from("referrals").select("*")).data ?? [], [], "a client read the referrals table");
+  const { error: wrote } = await N.c.from("referrals").insert({ referee: N.id, referrer: B.id });
+  assert.ok(wrote, "a client wrote a referral directly");
+  await q("delete from public.referrals where referee = any($1) or referrer = $2", [[N.id, ...fake], A.id]);
+  console.log("tradedb referrals ok — a new account links once to an older one, never itself, a brought-in game counts nothing, " +
+    "qualifying takes the rule over separate days and a confirmed email, a flagged account earns nothing, the cap holds, the table is the functions' alone");
 }
 
 await db.end();
