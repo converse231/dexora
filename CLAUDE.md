@@ -332,7 +332,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Pity is a capped multiplier on the whole ladder**; `dry` resets on the roll.
 - **The Dex filtered to a tier shows its gaps** (2026-10-15, asked for): every
   species that can wear it (`tiersFor`), the held ones in its art and the
-  rest as dashed `.lack` tiles, with Both / Held / Missing to narrow it.
+  rest as dashed `.lack` tiles - always both (the Held / Missing tabs went,
+  2026-10-16, your call).
 - **`keeper()` protects variants in the engine**, on `sell` and `convert` both.
   Legendaries are not keepers: sweep dialogs list them unticked, and
   `run(picked)` never falls back to the full list.

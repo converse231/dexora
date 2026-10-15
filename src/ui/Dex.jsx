@@ -199,9 +199,9 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
   const [find, setFind] = useState("");
   /* WHAT A TIER IS MISSING (asked for, 2026-10-15: "I don't know which
      Pokemon I'm missing for Gold"): filtered to a tier, the grid shows every
-     species that CAN wear it - the ones held in its art, the rest as gaps -
-     and this narrows it to either. */
-  const [hold, setHold] = useState("both");
+     species that CAN wear it - the ones held in its art, the rest as gaps.
+     Both, always: the Held / Missing tabs went (2026-10-16, your call) - the
+     grid already shows the two apart, and the tabs drew broken. */
 
   const at = (id) => dex?.[dexIndex(id)] ?? 0;
   const rank = dexRank(caught);
@@ -271,8 +271,6 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
        the list whether `only` names a tier does not touch the data at all. */
     if (TIERS.includes(only)) {
       if (!tiersFor(sp.id).includes(only)) return false;
-      if (hold === "held" && !has(only, sp.id)) return false;
-      if (hold === "missing" && has(only, sp.id)) return false;
     }
 
     if (type === "legendary" && !LEGEND.has(sp.id)) return false;
@@ -305,7 +303,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
         placeholder="Find a name, type or number…"
         onReset={() => {
           setOnly("all"); setType("any"); setSort("number"); setFind("");
-          setRegion("all"); setHold("both");
+          setRegion("all");
         }}
         selects={[
           {
@@ -428,15 +426,6 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
         <b style={{ width: `${(scope.seen / Math.max(1, scope.total)) * 100}%` }} />
         <i style={{ width: `${(scope.caught / Math.max(1, scope.total)) * 100}%` }} />
       </div>
-
-      {tier && (
-        <div className="you-seg dx-hold" role="radiogroup" aria-label={`${tier} Pokémon to show`}>
-          {[["both", "Both", scope.total], ["held", "Held", scope.caught], ["missing", "Missing", scope.total - scope.caught]].map(([k, name, n]) => (
-            <button key={k} type="button" role="radio" aria-checked={hold === k} className={hold === k ? "on" : ""}
-              onClick={() => setHold(k)}>{name} {n}</button>
-          ))}
-        </div>
-      )}
 
       {!shown.length && <p className="empty">Nothing matches that.</p>}
 
