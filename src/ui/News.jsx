@@ -23,7 +23,6 @@ export const NEWS = [
     items: [
       ["A pocket for every Pokémon", "Cards › Binder › My binders › New Pokédex binder: #001 to #1025, in order."],
       ["See what's missing", "Empty pockets show the Pokémon that goes there. Tap one to pick from your cards of it."],
-      ["Fill it in one tap", "Fill from my cards files your rarest card of each Pokémon in its pocket."],
     ],
   },
   {

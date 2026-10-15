@@ -240,8 +240,13 @@ export function VariantFx({ id, variant, art = null }) {
         </>
       );
     }
-    // Diamond's prism split is in the filter; these are the glints.
-    return <span className="dia-fire" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>;
+    // Diamond: the prism halo turning behind it, and the glints.
+    return (
+      <>
+        <span className="dia-halo" aria-hidden="true"><i /></span>
+        <span className="dia-fire" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
+      </>
+    );
   }
   if (variant === "gold" || variant === "chaotic" || variant === "projection" || variant === "shadow") {
     const url = `url(${art ?? spriteUrl(id)})`;

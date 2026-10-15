@@ -3391,7 +3391,8 @@ export function createEngine(canvas, onChange, mini = null) {
   /* `dex` makes a Pokedex binder (cards.js, DEX_POCKETS): its pockets are the
      National Dex, so the page places each card by its species. */
   function newBinder(name = "", dex = false) {
-    if (state.binders.length >= BINDER_MAX) return null;
+    // A Pokedex binder is the game's, one a player (your call, 2026-10-16).
+    if (state.binders.length >= BINDER_MAX || (dex && state.binders.some((b) => b.dex === 1))) return null;
     let id;
     do id = Math.random().toString(36).slice(2, 10); while (state.binders.some((b) => b.id === id));
     state.binders = cleanBinders([...state.binders, {
@@ -3450,7 +3451,8 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
   function deleteBinder(id) {
-    if (!state.binders.some((b) => b.id === id)) return false;
+    // The Pokedex binder is reset (emptied), never deleted.
+    if (!state.binders.some((b) => b.id === id && b.dex !== 1)) return false;
     state.binders = state.binders.filter((b) => b.id !== id);
     save();
     changed();

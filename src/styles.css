@@ -3019,6 +3019,10 @@ canvas {
 
 /* THE LEAGUE: badges as a trophy count, gold where the alphas are red. */
 .ev-league .ev-banner { background: linear-gradient(90deg, #f6e6bf, #fdf6e4); border-color: #e2c27a; }
+/* Invite friends (Events.jsx): the gift's orange, the one card that is about other people. */
+.ev-invite .ev-banner { background: linear-gradient(90deg, #ffe1cc, #fff3ea); border-color: #f6bf98; }
+.ev-invite .ev-banner > .ic { color: #ff7a35; flex: none; }
+.ev-invite.live { border-color: #ff7a35; }
 .ev-league .ev-banner img { image-rendering: pixelated; }
 .ev-league .ev-trophy > b { background: linear-gradient(160deg, #d8a13a, #7a4a08); box-shadow: 0 3px 0 #553305; }
 
@@ -8095,6 +8099,7 @@ button:disabled { transition: none; }
 :root[data-theme="dark"] .ev-board .ev-banner { background: linear-gradient(90deg, #3d2c1c, #2a2118); border-color: #5e4428; }
 :root[data-theme="dark"] .ev-surprise .ev-banner { background: linear-gradient(90deg, #1b3340, #172630); border-color: #2d5163; }
 :root[data-theme="dark"] .ev-bingo .ev-banner { background: linear-gradient(90deg, #173a2c, #142a22); border-color: #2a5c46; }
+:root[data-theme="dark"] .ev-invite .ev-banner { background: linear-gradient(90deg, #40261a, #2b1d16); border-color: #6e3f26; }
 :root[data-theme="dark"] .dx-notes .ev-banner { background: linear-gradient(90deg, #1f3328, #1a2a21); border-color: #2f4a3a; }
 :root[data-theme="dark"] .ev-stamp.live { color: #ff7a66; }
 
@@ -8386,10 +8391,15 @@ button:disabled { transition: none; }
    them and is still clearly above Platinum, which is the only thing it has to
    stay clear of. Lower was tried: at 1.1 / 1.26 the two stop being tellable
    apart at a glance, and the prism fringe is left doing all the work. */
+/* PRISM HALO (your call, 2026-10-16, from the Treasure Tier Lab: Diamond,
+   Platinum and Noir were three greys at a Box row). The body is white ice -
+   the 2px prism fringe vanished at 52px - and the colour moved OUT of it: a
+   rainbow of light turning behind the creature (`.dia-halo`). Noir has no
+   light at all, Platinum's is a sweep across the body, Emerald's radiance is
+   green and still; this one is every colour and turning. */
 .sprite-diamond {
-  filter: grayscale(1) brightness(1.34) contrast(1.55)
-          drop-shadow(2px 0 0 rgba(0, 225, 255, .7)) drop-shadow(-2px 0 0 rgba(255, 80, 215, .62))
-          drop-shadow(0 0 7px rgba(255, 255, 255, .6)) !important;
+  filter: grayscale(1) brightness(1.28) contrast(1.4) drop-shadow(0 0 1px rgba(28, 38, 78, .85))
+          drop-shadow(0 0 3px rgba(255, 255, 255, .7)) !important;
 }
 .sprite-emerald {
   filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(3.8) brightness(.98) contrast(1.32)
@@ -8428,11 +8438,22 @@ button:disabled { transition: none; }
 
 .gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
 .chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .cad-breath,
-.plat-sweep, .dia-fire, .em-depth, .em-rad, .em-glint {
+.plat-sweep, .dia-fire, .dia-halo, .em-depth, .em-rad, .em-glint {
   position: absolute; inset: 0; pointer-events: none;
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */
-.shadow-aura, .chaos-aura, .proj-beam, .proj-base, .em-rad { z-index: 0; }
+.shadow-aura, .chaos-aura, .proj-beam, .proj-base, .em-rad, .dia-halo { z-index: 0; }
+/* Diamond's halo: a blurred rainbow disc behind the creature, turning - a
+   transform, so it costs the compositor and nothing else. Unmasked: the light
+   leaves the stone. */
+/* A RING, not a disc (a disc behind a white body washed it out on a Dex tile): the
+   centre is masked away, and a thin dark outline on the body (the filter) keeps it read. */
+.dia-halo { inset: 4%; border-radius: 50%; overflow: hidden; filter: blur(7px); opacity: .7;
+  -webkit-mask: radial-gradient(closest-side, transparent 52%, #000 78%); mask: radial-gradient(closest-side, transparent 52%, #000 78%); }
+.dia-halo i { position: absolute; inset: 0;
+  background: conic-gradient(#ff5d8f, #ffd25d, #7dff8a, #5de2ff, #8a7dff, #ff5df0, #ff5d8f);
+  animation: dia-halo 5s linear infinite; }
+@keyframes dia-halo { to { transform: rotate(360deg); } }
 .gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines,
 .plat-sweep, .dia-fire, .em-depth, .em-glint { z-index: 3; }
 /* Masked to the creature's own outline, or they are rectangles over the grass. */
@@ -10090,9 +10111,9 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   color: #3a2600; background: linear-gradient(#ffe27a, #f0b83c); }
 .tp-cards .cd-chase-card { width: 92px; }
 /* A shown card opens into a closer look (CardShow's Zoom). */
-.cs-open { padding: 0; border: 0; background: none; cursor: zoom-in; transition: transform .15s ease; }
-.cs-open:hover { transform: translateY(-3px); }
-.cs-open:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.csz-open { padding: 0; border: 0; background: none; cursor: zoom-in; transition: transform .15s ease; }
+.csz-open:hover { transform: translateY(-3px); }
+.csz-open:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .cd-x { position: absolute; right: 10px; top: 10px; z-index: 2; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
 
 /* ================================================================ THE OPENING */
