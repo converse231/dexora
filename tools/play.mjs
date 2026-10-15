@@ -2344,6 +2344,20 @@ await savedField("referralsPaid", ["ref:welcome", "ref:m3"], "junk", []);
   { color: "navy", patches: [{ id: "set:me01", x: 100, y: 0 }, ...Array.from({ length: C.PATCH_MAX - 1 }, (_, k) => ({ id: `set:s${k}`, x: 5, y: 5 }))] },
   "a cover's patches were not cleaned one by one, clamped and capped");
   assert.ok(C.COVER_COLORS.includes(C.coverOf({ id: "zz9" }).color), "a binder with no cover has no colour");
+  /* A POKEDEX BINDER keeps its flag and a pocket per species - past an
+     ordinary binder's cap - and a card can be placed at its own number. */
+  const { SPECIES } = await import("../src/data/dex.js");
+  assert.equal(C.DEX_POCKETS, SPECIES.filter((sp) => sp.id < 10000).length, "DEX_POCKETS is not the dex's species count");
+  const far = Array(C.DEX_POCKETS).fill(null); far[C.DEX_POCKETS - 1] = "me01-001:n";
+  const [kept] = C.cleanBinders([{ id: "dx1", name: "Dex", dex: 1, pockets: far }]);
+  assert.equal(kept.dex, 1, "a Pokedex binder lost its flag");
+  assert.equal(kept.pockets.length, C.DEX_POCKETS, "a Pokedex binder was cut to an ordinary binder's pockets");
+  assert.equal(C.cleanBinders([{ id: "o1", pockets: far }])[0].pockets.length, 0, "an ordinary binder kept pockets past its cap");
+  const db = boot({ ...SAVE }).e;
+  const did = db.newBinder("", true);
+  assert.deepEqual([db.state.binders[0].dex, db.state.binders[0].name], [1, "Pokédex"]);
+  assert.equal(db.addToBinder(did, ["me01-001:n"], C.DEX_POCKETS - 1), true, "a card could not go in the last Pokedex pocket");
+  assert.equal(db.addToBinder(did, ["me01-001:n"], C.DEX_POCKETS), false, "a card went past the last Pokedex pocket");
   const pb = boot({ ...SAVE, dust: C.PATCH_DUST * 2 - 1, xp: 1e9, beaten: { "kanto-brock": { wins: 1, at: 1 } } }).e;
   assert.equal(pb.buyPatch("nope"), false, "a patch of a set that does not exist was sold");
   assert.equal(pb.buyPatch("me01"), true, "a set's patch did not sell");

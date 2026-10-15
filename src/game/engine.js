@@ -46,7 +46,7 @@ import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
 import {
   openPack as rollPack, rulesOf, setById, setOpen, randomOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX, cleanBinders, BINDER_MAX, BINDER_POCKETS,
   dustOf, craftCost, sparesOf, sweepOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, dealsOf, STREAK_PACK, DUST_PACK,
-  MASTER_DUST, printingsOf, CARD_SHOW, showKey, cleanPatches, PATCH_DUST, coverOf,
+  MASTER_DUST, printingsOf, CARD_SHOW, showKey, cleanPatches, PATCH_DUST, coverOf, pocketCap,
 } from "./cards.js";
 import { CARD_SETS } from "../data/cards/index.js";
 import { defenders, defendNote } from "./ranked.js";
@@ -3388,11 +3388,15 @@ export function createEngine(canvas, onChange, mini = null) {
      same cleaner a load does, so a binder in the state is always one a load
      would keep. None of them checks you still hold a card: a pocket keeps
      its card through a sale and the page draws it faded. */
-  function newBinder(name = "") {
+  /* `dex` makes a Pokedex binder (cards.js, DEX_POCKETS): its pockets are the
+     National Dex, so the page places each card by its species. */
+  function newBinder(name = "", dex = false) {
     if (state.binders.length >= BINDER_MAX) return null;
     let id;
     do id = Math.random().toString(36).slice(2, 10); while (state.binders.some((b) => b.id === id));
-    state.binders = cleanBinders([...state.binders, { id, name: name || `Binder ${state.binders.length + 1}`, pockets: [] }]);
+    state.binders = cleanBinders([...state.binders, {
+      id, name: name || (dex ? "Pokédex" : `Binder ${state.binders.length + 1}`), pockets: [], ...(dex && { dex: 1 }),
+    }]);
     save();
     changed();
     return id;
@@ -3460,7 +3464,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!b || !Array.isArray(keys) || !keys.length) return false;
     const pockets = [...b.pockets];
     if (at != null) {
-      if (!Number.isInteger(at) || at < 0 || at >= BINDER_POCKETS) return false;
+      if (!Number.isInteger(at) || at < 0 || at >= pocketCap(b)) return false;
       while (pockets.length <= at) pockets.push(null);
       pockets[at] = keys[0];
     } else {
@@ -3468,7 +3472,7 @@ export function createEngine(canvas, onChange, mini = null) {
         const gap = pockets.indexOf(null);
         if (gap >= 0) pockets[gap] = k; else pockets.push(k);
       }
-      if (pockets.length > BINDER_POCKETS) return false;
+      if (pockets.length > pocketCap(b)) return false;
     }
     return setBinder(id, { pockets });
   }

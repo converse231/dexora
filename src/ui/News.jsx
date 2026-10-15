@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-16-dexbinder",
+    icon: "📖",
+    date: "October 2026",
+    title: "The Pokédex binder",
+    items: [
+      ["A pocket for every Pokémon", "Cards › Binder › My binders › New Pokédex binder: #001 to #1025, in order."],
+      ["See what's missing", "Empty pockets show the Pokémon that goes there. Tap one to pick from your cards of it."],
+      ["Fill it in one tap", "Fill from my cards files your rarest card of each Pokémon in its pocket."],
+    ],
+  },
+  {
     id: "2026-10-15-invite",
     icon: "🎁",
     date: "October 2026",
