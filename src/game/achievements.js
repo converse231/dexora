@@ -68,7 +68,7 @@ export const ACHIEVEMENTS = [
   { id: "kinds", group: "rare", name: "Every kind", sub: `How many of the ${TIERS.length} kinds of rare form you have at least one of`, steps: upTo(TIERS.length, 1, 8),
     of: (s) => TIERS.filter((t) => sum(s[t]) > 0).length },
   { id: "shiny", group: "rare", name: "Shiny hunter", sub: "Different species you have registered as a Shiny", steps: [1, 10, 50], of: (s) => sum(s.shiny) },
-  { id: "gold", group: "rare", name: "The chase", sub: "Register a Gold Pokémon, the rarest kind of all", steps: [1], of: (s) => sum(s.gold) },
+  { id: "gold", group: "rare", name: "Struck gold", sub: "Register a Gold Pokémon", steps: [1], of: (s) => sum(s.gold) },
   // Female looks (gender.js): the Pokedex's list, so one sold still counts.
   { id: "looks", group: "rare", name: "Her own look", sub: `Female looks in your Pokédex - ${FEMALE_ART.size} species have one`,
     steps: upTo(FEMALE_ART.size, 1, 10), of: (s) => (s.females ?? []).length },

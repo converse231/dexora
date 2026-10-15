@@ -38,7 +38,7 @@ import { OUTBREAK_LIFT } from "../game/events.js";
 import { HONEY_STEPS } from "../game/items.js";
 import { RESEARCH_LIFT } from "../game/research.js";
 import { PERKS, ALPHA_PERK } from "../game/perks.js";
-import { SAGE_CREDIT } from "../game/biomes.js";
+import { SAGE_CREDIT, tierName } from "../game/biomes.js";
 
 /* FIVE CREATURES EVERYBODY KNOWS. The point of a preview is recognition - you
    are here to learn what a treatment looks like, and you can only see that on
@@ -51,7 +51,7 @@ import { SAGE_CREDIT } from "../game/biomes.js";
    the whole ladder is a poor advertisement for it. */
 const CAST = [25, 143, 94, 6, 130];
 
-const LABEL = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const LABEL = tierName;
 
 /* "1 in 105". `TIER_ODDS` is a probability per encounter, and a reciprocal is
    the only form of it anybody thinks in. */

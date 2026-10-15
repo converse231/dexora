@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-16-versions",
+    icon: "💎",
+    date: "October 2026",
+    title: "Ruby, Sapphire, Fire Red and Leaf Green",
+    items: [
+      ["Four new rare forms", "Two shining stones, embers off a campfire, and falling leaves. Twenty tiers now."],
+      ["Showdown is the rarest", "Then Cadence, then Gold. A rare form overall is exactly as common as before."],
+      ["Sharper Showdown", "Small Showdown sprites are redrawn at twice the detail - no more blur."],
+      ["Honeys and badges too", "A honey for each new form, and a Pokédex badge for each region in it."],
+    ],
+  },
+  {
     id: "2026-10-16-dexbinder",
     icon: "📖",
     date: "October 2026",
@@ -24,6 +36,7 @@ export const NEWS = [
       ["A pocket for every Pokémon", "Cards › Binder › My binders › New Pokédex binder: #001 to #1025, in order."],
       ["See what's missing", "Empty pockets show the Pokémon that goes there. Tap one to pick from your cards of it."],
       ["Or fill it in one tap", "Fill from my cards files your rarest card of each Pokémon in its empty pocket."],
+      ["Choose the rarities", "Tick which rarities Fill may use - only Illustration rares, say. It remembers."],
     ],
   },
   {

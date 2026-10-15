@@ -978,6 +978,31 @@ canvas {
               box-shadow: 0 0 0 1.5px #ff2a2a inset, 0 0 8px rgba(255, 40, 40, .45); }
 .np-projection { color: #062f36; background: linear-gradient(160deg, #d6fcff, #5fe6f5);
                  box-shadow: 0 0 0 1.5px #1c9fb3 inset, 0 0 8px rgba(90, 240, 255, .45); }
+/* The rest had none and drew a bare word (found 2026-10-16 adding the versions). */
+.np-showdown { color: #04263a; background: linear-gradient(160deg, #d8f4ff, #7fd9ff);
+               box-shadow: 0 0 0 1.5px #1c6fa0 inset, 0 0 8px rgba(127, 217, 255, .5); }
+.np-cadence { color: #04291d; background: linear-gradient(160deg, #d6ffef, #5be8b5);
+              box-shadow: 0 0 0 1.5px #1f8f6d inset; }
+.np-glitched { color: #fff; background: linear-gradient(160deg, #ff2f6a, #8a0030);
+               box-shadow: 0 0 0 1.5px #00d6e6 inset; }
+.np-noir { color: #f4f4f8; background: linear-gradient(160deg, #55555f, #16161c);
+           box-shadow: 0 0 0 1.5px #9a9aa6 inset; }
+.np-vivid { color: #3a0a22; background: linear-gradient(112deg, #ffd24f, #ff4fa3);
+            box-shadow: 0 0 0 1.5px #b0236a inset; }
+.np-diamond { color: #1a2244; background: linear-gradient(160deg, #ffffff, #cfe0ff 50%, #e3d6ff);
+              box-shadow: 0 0 0 1.5px #6d7fc4 inset, 0 0 8px rgba(190, 200, 255, .55); }
+.np-platinum { color: #1e2834; background: linear-gradient(160deg, #f4f8fc, #b9c7d6);
+               box-shadow: 0 0 0 1.5px #6b7d93 inset; }
+.np-emerald { color: #042d1a; background: linear-gradient(160deg, #b6ffd8, #2fd486);
+              box-shadow: 0 0 0 1.5px #0f7a4a inset, 0 0 8px rgba(60, 255, 150, .45); }
+.np-ruby { color: #fff1f4; background: linear-gradient(160deg, #ff5d7e, #9e0c2c);
+           box-shadow: 0 0 0 1.5px #ff9db1 inset, 0 0 8px rgba(255, 40, 80, .5); }
+.np-sapphire { color: #eef5ff; background: linear-gradient(160deg, #5aa8ff, #1440a0);
+               box-shadow: 0 0 0 1.5px #a8d0ff inset, 0 0 8px rgba(40, 120, 255, .5); }
+.np-firered { color: #3a1300; background: linear-gradient(160deg, #ffd166, #ff7a1f);
+              box-shadow: 0 0 0 1.5px #c2400c inset, 0 0 8px rgba(255, 120, 40, .5); }
+.np-leafgreen { color: #0f2e0b; background: linear-gradient(160deg, #d8f9b0, #7fcf5a);
+                box-shadow: 0 0 0 1.5px #3d9a3a inset; }
 @keyframes shiny-pulse { 50% { filter: brightness(1.22); } }
 @keyframes holo-pulse { 50% { filter: saturate(1.45) brightness(1.12); } }
 @keyframes astral-pulse {
@@ -1409,6 +1434,17 @@ canvas {
 .bx-vtag.chaotic { background: #b3121f; color: #ffe36a; }
 .bx-vtag.projection { background: #1c8fa3; }
 .bx-vtag.cadence { background: #1f8f6d; }
+.bx-vtag.showdown { background: #1c6fa0; }
+.bx-vtag.glitched { background: #c4123f; }
+.bx-vtag.noir { background: #3a3a44; }
+.bx-vtag.vivid { background: #d63a8c; }
+.bx-vtag.diamond { background: #5d6fb8; }
+.bx-vtag.platinum { background: #6b7d93; }
+.bx-vtag.emerald { background: #0f7a4a; }
+.bx-vtag.ruby { background: #b5122f; }
+.bx-vtag.sapphire { background: #1a4fc2; }
+.bx-vtag.firered { background: #d4520f; }
+.bx-vtag.leafgreen { background: #2f7f2a; }
 /* One badge, used everywhere a type is named. It was sized in cqw, which only
    resolves inside the battle overlay, so it could not be reused in the rail -
    which is why the map tag and the travel list printed types as prose. Plain px
@@ -4328,6 +4364,13 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .tv-shadow   { --tv: #b98cff; --tv2: #3a0f80; }
 .tv-chaotic  { --tv: #ff2a2a; --tv2: #ffd400; }
 .tv-projection { --tv: #8ff8ff; --tv2: #1c9fb3; }
+.tv-diamond  { --tv: #f4fbff; --tv2: #b9a8ff; }
+.tv-platinum { --tv: #eef4fa; --tv2: #9fb2c8; }
+.tv-emerald  { --tv: #6dffb0; --tv2: #12a35e; }
+.tv-ruby     { --tv: #ff6b8a; --tv2: #c4103a; }
+.tv-sapphire { --tv: #7cc0ff; --tv2: #1f56d6; }
+.tv-firered  { --tv: #ffd166; --tv2: #ff6a1a; }
+.tv-leafgreen { --tv: #c9f59a; --tv2: #3d9a3a; }
 /* No `.tv-cadence`: `TierReveal` emits `tv-<tier>` only for a tier with a
    REVEAL motion, and Cadence has none on purpose - its entrance is the wake. */
 
@@ -5044,6 +5087,18 @@ button:disabled { transition: none; }
 .cheer-chaotic .cheer-kind { color: #d0141f; }
 .cheer-projection .cheer-kind { color: #168ea3; }
 .cheer-steps .cheer-kind { color: var(--canopy); }
+.cheer-showdown .cheer-kind { color: #1c7fb0; }
+.cheer-cadence .cheer-kind { color: #1f8f6d; }
+.cheer-glitched .cheer-kind { color: #c4123f; }
+.cheer-noir .cheer-kind { color: #4a4a55; }
+.cheer-vivid .cheer-kind { color: #d63a8c; }
+.cheer-diamond .cheer-kind { color: #5d6fb8; }
+.cheer-platinum .cheer-kind { color: #5f7086; }
+.cheer-emerald .cheer-kind { color: #0f8a52; }
+.cheer-ruby .cheer-kind { color: #c4103a; }
+.cheer-sapphire .cheer-kind { color: #1f56d6; }
+.cheer-firered .cheer-kind { color: #d4520f; }
+.cheer-leafgreen .cheer-kind { color: #2f8a2c; }
 /* The larger half of a medal, so it reads before the row of ball icons. */
 .cheer-cash {
   font-family: var(--pixel); font-size: 15px; color: var(--canopy);
@@ -6232,6 +6287,13 @@ button:disabled { transition: none; }
 .tp-slot.has-shadow { border-color: #7b3dff; }
 .tp-slot.has-chaotic { border-color: #e0252f; }
 .tp-slot.has-projection { border-color: #3fd6ea; }
+.tp-slot.has-diamond { border-color: #a8c4ff; }
+.tp-slot.has-platinum { border-color: #9fb2c8; }
+.tp-slot.has-emerald { border-color: #1fbf74; }
+.tp-slot.has-ruby { border-color: #e0244c; }
+.tp-slot.has-sapphire { border-color: #2f74e8; }
+.tp-slot.has-firered { border-color: #f2701c; }
+.tp-slot.has-leafgreen { border-color: #4fae3e; }
 .tp-tier { position: absolute; top: 5px; left: 5px; }
 .tp-alpha {
   position: absolute; top: 4px; right: 4px; display: grid; place-items: center; padding: 2px;
@@ -6366,6 +6428,13 @@ button:disabled { transition: none; }
 .of-big.has-shadow { border-color: #7b3dff; }
 .of-big.has-chaotic { border-color: #e0252f; }
 .of-big.has-projection { border-color: #3fd6ea; }
+.of-big.has-diamond { border-color: #a8c4ff; }
+.of-big.has-platinum { border-color: #9fb2c8; }
+.of-big.has-emerald { border-color: #1fbf74; }
+.of-big.has-ruby { border-color: #e0244c; }
+.of-big.has-sapphire { border-color: #2f74e8; }
+.of-big.has-firered { border-color: #f2701c; }
+.of-big.has-leafgreen { border-color: #4fae3e; }
 /* One row: the answer wide, the other two beside it, all one height. */
 .of-acts { flex-wrap: nowrap; }
 .of-acts .ev-go { flex: 2 1 0; width: auto; min-width: 0; margin: 0; }
@@ -8113,6 +8182,18 @@ button:disabled { transition: none; }
 :root[data-theme="dark"] .cheer-shadow .cheer-kind { color: #b08cff; }
 :root[data-theme="dark"] .cheer-chaotic .cheer-kind { color: #ff5a5a; }
 :root[data-theme="dark"] .cheer-projection .cheer-kind { color: #6fe9f7; }
+:root[data-theme="dark"] .cheer-showdown .cheer-kind { color: #7fd9ff; }
+:root[data-theme="dark"] .cheer-cadence .cheer-kind { color: #5be8b5; }
+:root[data-theme="dark"] .cheer-glitched .cheer-kind { color: #ff5a86; }
+:root[data-theme="dark"] .cheer-noir .cheer-kind { color: #d6d6de; }
+:root[data-theme="dark"] .cheer-vivid .cheer-kind { color: #ff7dbc; }
+:root[data-theme="dark"] .cheer-diamond .cheer-kind { color: #c4d2ff; }
+:root[data-theme="dark"] .cheer-platinum .cheer-kind { color: #c9d5e2; }
+:root[data-theme="dark"] .cheer-emerald .cheer-kind { color: #5ee8a2; }
+:root[data-theme="dark"] .cheer-ruby .cheer-kind { color: #ff6b8a; }
+:root[data-theme="dark"] .cheer-sapphire .cheer-kind { color: #7cb6ff; }
+:root[data-theme="dark"] .cheer-firered .cheer-kind { color: #ff9a4a; }
+:root[data-theme="dark"] .cheer-leafgreen .cheer-kind { color: #9be86a; }
 :root[data-theme="dark"] .evo-bg { background: linear-gradient(#17262e 0%, #182a22 60%, #15221a 100%); }
 
 /* ================================================================ TOUCH LAYOUTS
@@ -8405,6 +8486,23 @@ button:disabled { transition: none; }
   filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(3.8) brightness(.98) contrast(1.32)
           drop-shadow(0 0 3px rgba(60, 255, 150, .8)) !important;
 }
+/* THE VERSIONS (2026-10-16): the Tier Lab's filters as signed off. */
+.sprite-ruby {
+  filter: grayscale(1) sepia(1) hue-rotate(-48deg) saturate(5) brightness(.95) contrast(1.38)
+          drop-shadow(0 0 3px rgba(255, 40, 80, .85)) !important;
+}
+.sprite-sapphire {
+  filter: grayscale(1) sepia(1) hue-rotate(182deg) saturate(4.6) brightness(.9) contrast(1.4)
+          drop-shadow(0 0 3px rgba(40, 120, 255, .9)) !important;
+}
+.sprite-firered {
+  filter: grayscale(1) sepia(1) hue-rotate(-22deg) saturate(4.2) brightness(1.05) contrast(1.28)
+          drop-shadow(0 0 3px rgba(255, 120, 40, .9)) !important;
+}
+.sprite-leafgreen {
+  filter: grayscale(1) sepia(1) hue-rotate(48deg) saturate(2.6) brightness(1.04) contrast(1.15)
+          drop-shadow(0 0 2px rgba(120, 220, 90, .8)) !important;
+}
 .sprite-shadow {
   filter: brightness(.55) sepia(.6) hue-rotate(222deg) saturate(1.7)
           drop-shadow(0 0 3px rgba(150, 70, 255, .9)) drop-shadow(0 0 8px rgba(110, 40, 230, .55)) !important;
@@ -8438,11 +8536,12 @@ button:disabled { transition: none; }
 
 .gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
 .chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .cad-breath,
-.plat-sweep, .dia-fire, .dia-halo, .em-depth, .em-rad, .em-glint {
+.plat-sweep, .dia-fire, .dia-halo, .em-depth, .em-rad, .em-glint,
+.gem-depth, .gem-shine, .gem-glint, .ember-glow, .ember-spark, .leaf-fall {
   position: absolute; inset: 0; pointer-events: none;
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */
-.shadow-aura, .chaos-aura, .proj-beam, .proj-base, .em-rad, .dia-halo { z-index: 0; }
+.shadow-aura, .chaos-aura, .proj-beam, .proj-base, .em-rad, .dia-halo, .ember-glow { z-index: 0; }
 /* Diamond's halo is an AURA IN THE CREATURE'S OWN SHAPE (reported 2026-10-16:
    a disc, then a ring, read as a circle behind it, not an aura). The rainbow
    is cut to the sprite's silhouette (`--art`), grown a little and blurred by
@@ -8456,9 +8555,10 @@ button:disabled { transition: none; }
   animation: dia-halo 5s linear infinite; }
 @keyframes dia-halo { to { transform: rotate(360deg); } }
 .gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines,
-.plat-sweep, .dia-fire, .em-depth, .em-glint { z-index: 3; }
+.plat-sweep, .dia-fire, .em-depth, .em-glint,
+.gem-depth, .gem-shine, .gem-glint, .ember-spark, .leaf-fall { z-index: 3; }
 /* Masked to the creature's own outline, or they are rectangles over the grass. */
-.gold-shine, .chaos-neg, .proj-lines, .plat-sweep, .em-depth {
+.gold-shine, .chaos-neg, .proj-lines, .plat-sweep, .em-depth, .gem-depth, .gem-shine {
   overflow: hidden;
   -webkit-mask: var(--art) center / contain no-repeat;
           mask: var(--art) center / contain no-repeat;
@@ -8750,10 +8850,72 @@ button:disabled { transition: none; }
   40% { transform: scale(0) rotate(34deg); opacity: 0; }
 }
 
+/* ---- THE VERSIONS (2026-10-16), the Tier Lab's own rules, renamed only so no
+   class is shared (`gem-*`, `ember-*`, `leaf-fall`). Every loop moves
+   transform or opacity alone, so forty on a Dex sheet stay the compositor's.
+
+   RUBY and SAPPHIRE are one shining stone in two colours, Gold's and
+   Emerald's family: light pooled deep inside it, a sheen crossing it, and
+   glints flashing at its edges. */
+.gem-ruby { --d1: rgba(255, 160, 178, .85); --d2: rgba(255, 60, 95, .7); --sh: rgba(255, 228, 235, .95); --gl: #ff4f70; }
+.gem-sapphire { --d1: rgba(160, 215, 255, .85); --d2: rgba(60, 130, 255, .7); --sh: rgba(228, 242, 255, .95); --gl: #5aa8ff; }
+.gem-depth { mix-blend-mode: screen; opacity: .8; }
+.gem-depth i { position: absolute; inset: -12%;
+  background: radial-gradient(58% 44% at 30% 34%, var(--d1), transparent 70%), radial-gradient(44% 58% at 72% 66%, var(--d2), transparent 72%);
+  animation: gem-depth 8s ease-in-out infinite; }
+@keyframes gem-depth { 0%, 100% { transform: translate(-5%, -3%); } 50% { transform: translate(6%, 4%); } }
+.gem-shine { mix-blend-mode: screen; }
+.gem-shine i { position: absolute; top: -20%; bottom: -20%; left: -40%; width: 24%;
+  background: linear-gradient(90deg, transparent, var(--sh), transparent);
+  transform: skewX(-20deg); animation: gem-sweep 3.6s cubic-bezier(.5, 0, .3, 1) infinite; }
+@keyframes gem-sweep { 0%, 45% { transform: skewX(-20deg) translateX(0); } 80%, 100% { transform: skewX(-20deg) translateX(620%); } }
+.gem-glint i { position: absolute; width: 22%; aspect-ratio: 1; transform: scale(0); animation: gem-glint 2.4s ease-out infinite;
+  clip-path: polygon(50% 0, 56% 44%, 100% 50%, 56% 56%, 50% 100%, 44% 56%, 0 50%, 44% 44%);
+  background: radial-gradient(circle, #fff 0 18%, var(--gl) 45%, transparent 72%); }
+.gem-glint i:nth-child(1) { top: 6%; left: 10%; }
+.gem-glint i:nth-child(2) { top: 30%; right: 2%; width: 17%; animation-delay: -.8s; }
+.gem-glint i:nth-child(3) { bottom: 8%; left: 30%; width: 19%; animation-delay: -1.6s; }
+@keyframes gem-glint { 0%, 100% { transform: scale(0) rotate(0); opacity: 0; } 12% { transform: scale(1.1) rotate(30deg); opacity: 1; } 30% { transform: scale(0) rotate(60deg); opacity: 0; } }
+
+/* FIRE RED - by the campfire: a glow flickering at its feet, and embers
+   sparking up off its SIDES and drifting outward - over the orange body a
+   spark is lost. */
+.ember-glow i { position: absolute; left: 10%; right: 10%; bottom: 0; height: 34%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 130, 40, .55), transparent); filter: blur(4px);
+  animation: ember-hearth 1.4s ease-in-out infinite alternate; }
+@keyframes ember-hearth { from { opacity: .55; transform: scale(.95); } to { opacity: 1; transform: scale(1.05); } }
+.ember-spark i { position: absolute; bottom: 20%; width: 10%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, #fffbe6 0 34%, #ffe066 52%, #ff8a1f 70%, transparent 76%);
+  box-shadow: 0 0 6px 2px rgba(255, 170, 40, .95); opacity: 0; animation: ember-spark 2.6s ease-out infinite; }
+.ember-spark i:nth-child(1) { left: 2%; --dx: -60%; }
+.ember-spark i:nth-child(2) { left: 86%; --dx: 80%; width: 8%; animation-delay: -.45s; }
+.ember-spark i:nth-child(3) { left: 12%; --dx: -120%; width: 7%; animation-delay: -.9s; }
+.ember-spark i:nth-child(4) { left: 78%; --dx: 140%; width: 9%; animation-delay: -1.35s; }
+.ember-spark i:nth-child(5) { left: 30%; --dx: -40%; width: 7%; animation-delay: -1.8s; bottom: 70%; }
+.ember-spark i:nth-child(6) { left: 62%; --dx: 60%; width: 6.5%; animation-delay: -2.2s; bottom: 70%; }
+@keyframes ember-spark {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  10% { opacity: 1; }
+  55% { transform: translate(calc(var(--dx) * .5), -330%) scale(.85); opacity: .95; }
+  100% { transform: translate(var(--dx), -600%) scale(.35); opacity: 0; }
+}
+
+/* LEAF GREEN - a meadow creature, leaves tumbling past it. */
+.leaf-fall i { position: absolute; top: -10%; width: 13%; aspect-ratio: 1; border-radius: 0 100% 0 100%;
+  background: linear-gradient(135deg, #b8f27a, #3d9a3a); box-shadow: inset -1px -1px 0 rgba(0, 60, 0, .35);
+  opacity: 0; animation: leaf-fall 4.2s linear infinite; }
+.leaf-fall i:nth-child(1) { left: 6%; }
+.leaf-fall i:nth-child(2) { left: 70%; width: 11%; animation-delay: -1.4s; }
+.leaf-fall i:nth-child(3) { left: 40%; width: 9%; animation-delay: -2.8s; }
+.leaf-fall i:nth-child(4) { left: 86%; width: 10%; animation-delay: -.7s; }
+@keyframes leaf-fall { 0% { transform: translate(0, 0) rotate(0); opacity: 0; } 10% { opacity: 1; } 50% { transform: translate(-30%, 520%) rotate(160deg); }
+  90% { opacity: 1; } 100% { transform: translate(20%, 980%) rotate(320deg); opacity: 0; } }
+
 /* In a Dex tile the sprite is 84% of the cell and centred (see `.cell .holo-foil`),
    so the layers that register to it come in by the same 8%. */
 .cell .gold-shine, .cell .gold-glint, .cell .chaos-neg, .cell .chaos-cut, .cell .proj-lines { inset: 8%; }
 .cell .plat-sweep, .cell .dia-fire, .cell .dia-halo, .cell .em-depth, .cell .em-glint { inset: 8%; }
+.cell .gem-depth, .cell .gem-shine, .cell .gem-glint, .cell .ember-glow, .cell .ember-spark, .cell .leaf-fall { inset: 8%; }
 /* THE TILE'S SPRITE OVER ITS BEHIND-LAYERS: a bare `<img>` is not positioned, so
    every positioned layer painted over it whatever its z-index - Diamond's aura
    (and Emerald's radiance) tinted the creature instead of glowing behind it
@@ -8769,6 +8931,7 @@ button:disabled { transition: none; }
   .gold-shine i, .gold-glint i, .shadow-aura i, .chaos-aura::before, .chaos-aura i,
   .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i,
   .plat-sweep i, .dia-fire i, .dia-halo b, .em-depth i, .em-rad i, .em-glint i,
+  .gem-depth i, .gem-shine i, .gem-glint i, .ember-glow i, .ember-spark i, .leaf-fall i,
   .sprite-projection:not(.mon) { animation: none; }
   .sprite-projection.mon { animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both; }
 }

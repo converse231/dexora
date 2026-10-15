@@ -24,6 +24,11 @@ export const PERKS = {
   diamond:    { says: "Defense and Sp. Def +10%", st: [1, 1, 1.1, 1, 1.1, 1] },
   platinum:   { says: "Half of all status moves fail", shrug: 0.5 },
   emerald:    { says: "Attack +15%", st: [1, 1.15, 1, 1, 1, 1] },
+  // The versions (2026-10-16): the other two stones, the campfire and the leaf.
+  ruby:       { says: "Sp. Atk +15%", st: [1, 1, 1, 1.15, 1, 1] },
+  sapphire:   { says: "Sp. Def +15%", st: [1, 1, 1, 1, 1.15, 1] },
+  firered:    { says: "Attack +8% and Speed +5%", st: [1, 1.08, 1, 1, 1, 1.05] },
+  leafgreen:  { says: "Max HP +6% and Defense +6%", st: [1.06, 1, 1.06, 1, 1, 1] },
   showdown:   { says: "Speed +10%", st: [1, 1, 1, 1, 1, 1.1] },
   cadence:    { says: "Max HP +6% and Speed +6%", st: [1.06, 1, 1, 1, 1, 1.06] },
   shiny:      { says: "25% chance to shrug off a status", shrug: 0.25 },

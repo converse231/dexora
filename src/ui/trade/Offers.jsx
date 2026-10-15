@@ -8,7 +8,7 @@
    several open offers; the first accepted takes it. */
 import { useEffect, useMemo, useState } from "react";
 import { SPECIES } from "../../data/dex.js";
-import { speciesById, isLegendary } from "../../game/biomes.js";
+import { speciesById, isLegendary, tierName } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { LIMITS, PRESETS, tradeable } from "../../game/trade.js";
 import { keeper } from "../../game/items.js";
@@ -39,7 +39,7 @@ function Half({ title, mons, get }) {
           const name = label(speciesById(m.species));
           return (
             <figure key={m.mid ?? i} className={`of-big${m.tier ? ` has-${m.tier}` : ""}`}
-              data-tip={`${name}${m.tier ? ` · ${m.tier}` : ""}${m.alpha ? " · alpha" : ""} · Lv ${m.level}`}>
+              data-tip={`${name}${m.tier ? ` · ${tierName(m.tier)}` : ""}${m.alpha ? " · alpha" : ""} · Lv ${m.level}`}>
               <Sprite id={m.species} variant={m.tier} fx alt={name} />
               {m.tier && <span className="tp-tier"><Mark tier={m.tier} size={10} /></span>}
               {m.alpha && <span className="tp-alpha"><Mark tier="alpha" size={9} /></span>}

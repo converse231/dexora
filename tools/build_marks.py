@@ -49,7 +49,7 @@ SHEET_ORDER = ["origin", "shiny", "astral", "complete"]
 # Everything the game asks for. `src/ui/Marks.jsx` names the same set.
 ICONS = ["origin", "shiny", "holo", "astral", "glitched", "vivid", "noir",
          "showdown", "gold", "shadow", "chaotic", "projection", "cadence",
-         "diamond", "platinum", "emerald",
+         "diamond", "platinum", "emerald", "ruby", "sapphire", "firered", "leafgreen",
          "complete", "legendary", "research", "alpha"]
 
 # THE SHAPE HAS TO CARRY IT, NOT THE COLOUR. Eight of these sit in a row on a
@@ -76,6 +76,16 @@ STAND_IN = {
     "emerald":  ((80, 230, 150), [(26, 10), (74, 10), (92, 28), (92, 72),
                                   (74, 90), (26, 90), (8, 72), (8, 28)]),
     "showdown": ((120, 210, 255), [(24, 12), (88, 50), (24, 88)]),
+    # THE VERSIONS (2026-10-16), stand-ins until drawn: a pear cut (Ruby), a
+    # lozenge (Sapphire), a campfire's flame over its logs (Fire Red) and a
+    # leaf (Leaf Green) - outlines none of the other sixteen has.
+    "ruby":      ((255, 70, 100), [(50, 4), (70, 34), (82, 58), (78, 78), (64, 92), (50, 96),
+                                   (36, 92), (22, 78), (18, 58), (30, 34)]),
+    "sapphire":  ((70, 140, 255), [(50, 4), (84, 50), (50, 96), (16, 50)]),
+    "firered":   ((255, 130, 40), [(50, 6), (64, 34), (74, 52), (70, 66), (92, 80), (88, 92),
+                                   (50, 82), (12, 92), (8, 80), (30, 66), (26, 52), (36, 34)]),
+    "leafgreen": ((130, 220, 90), [(6, 94), (14, 64), (32, 34), (60, 14), (94, 6), (86, 40),
+                                   (66, 68), (36, 86)]),
     # The four that joined together, and again none shares an outline with
     # the rest: a crown, a flame, a cross of shards and a beam over its base.
     "gold":       ((242, 188, 52), [(8, 80), (8, 26), (30, 50), (50, 12), (70, 50),

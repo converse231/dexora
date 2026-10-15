@@ -272,13 +272,20 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   tiers (FORMS strip, catch banner, `Variants.jsx`) takes its order from `TIERS`
   and its prose from `TIER_TELL`, which never quotes a number. `Variants.jsx`
   computes odds from `TIER_ODDS`.
-- **The sixteen tiers are kinds, not strengths.** Keep the spread narrow; move
+- **The twenty tiers are kinds, not strengths.** Keep the spread narrow; move
   the ratio, never the base. Vivid stays rarer than 1 in 100. A new tier keeps
   the any-variant RATE (every rung moves up to make room, held for a species
-  without Origin); Gold alone sits above the 2.0x spread, as the chase.
+  without Origin), and the spread stays 2.30x. **Showdown is the chase and
+  Cadence is a rung under it** (your call, 2026-10-16: the two drawn from real
+  animation), then Gold. Holding the rate moves the kindest rung up with the
+  rest, so `variantPay` (relative to it) keeps variant income flat - four
+  tiers cost the League nothing (biomes.js).
+- **A tier's name is `tierName`** (biomes.js): Fire Red and Leaf Green are two
+  words, and eleven screens capitalised the id themselves. Never `t[0]
+  .toUpperCase()` a tier.
 - **The treasure set is Gold's** (2026-10-08, your call): Diamond, Platinum and
-  Emerald sit directly under it, so the four rarest tiers are one material
-  each. Each is ONE filter and ONE idea of motion, and the three ideas are
+  Emerald sit directly under it, then Ruby and Sapphire (2026-10-16: the same
+  stone in two colours, `gem-<tier>`), so the stones are one material each. Each is ONE filter and ONE idea of motion, and the three ideas are
   disjoint on purpose - a sweep, a flash, a drift - because the filters alone
   are three bright metals and do not separate on a 56px Box row. Platinum takes
   the sweep so Gold keeps the sparkle; Diamond's points are round where Shiny's
@@ -353,7 +360,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   its creatures at 77% of 77%, top-left, every effect off to the side).
   Asserted in check.mjs.
 - **Showdown is a 16-frame strip on a span, not an `<img>`**, stepped with
-  `steps(16, jump-none)`. Both strips keep the source GIF's own pixels on a
+  `steps(16, jump-none)`. **Its small sources are Scale2x'd at build time**
+  (`up` in strip_frames.py, `UP` 200 in build_showdown.py; 2026-10-16,
+  reported blurry): 16-colour pixel art as small as 45px drawn at ~150px
+  smeared wherever a browser smooths a background image. ~1.6x the bytes. Both strips keep the source GIF's own pixels on a
   square canvas (`CAP` 192) with the full 256 colours - a 64px, 64-colour canvas
   was the blur (2026-10-10) - and their frames are picked by time; check.mjs
   holds `FRAMES` to the CSS and to every PNG's height. It is sized to 77% of its box (a Showdown frame fills
@@ -908,7 +918,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   empty pocket shows that Pokemon's sprite, number and name, the picker
   offers only its cards (a form files under its base, `of`), pockets never
   drag, Fill from my cards files your rarest printing of each into its EMPTY
-  pocket (taken out and restored 2026-10-16, your call both times), and it
+  pocket (taken out and restored 2026-10-16, your call both times) among the
+  rarities ticked in its dialog (`Confirm`'s pick rows; the device remembers
+  the unticked ones, `dexora-dexfill`, only for rarities it was shown), and it
   is RESET, never deleted - one a player, the game's (engine refuses both).
   Diamond is the PRISM HALO (2026-10-16): white ice, a thin dark outline,
   and a rainbow AURA in the creature's own shape turning behind it

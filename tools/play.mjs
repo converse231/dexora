@@ -270,20 +270,25 @@ function until(e, what, label, max = 2000) {
   assert.equal(paid.ordinary, 0, "an ordinary catch paid a variant bounty");
   assert.ok(paid.showdown > 0, "the rarest tier in the game paid nothing");
   assert.ok(paid.cadence > 0, "the second strip tier paid nothing");
-  /* AND CADENCE OUTPAYS SHOWDOWN ON THE SAME SPECIES, because it is rarer.
-     ON THE SAME SPECIES is the whole assertion: `catchBounty` is the species'
+  /* AND THE RARER STRIP OUTPAYS THE OTHER ON THE SAME SPECIES. Named by the
+     ladder, not typed: Cadence was the rarer until Showdown became the chase
+     (2026-10-16), and a typed "Cadence outpays Showdown" failed for the one
+     reason that is not a bug. ON THE SAME SPECIES is the whole assertion: `catchBounty` is the species'
      SELL band times the tier's pay, and the loop above meets a different
      creature each time - so comparing what those two throws actually paid
      compares sell bands, not tiers, and said Cadence was the cheaper tier. */
+  const { TIERS: LADDER } = await import("../src/game/biomes.js");
+  const [rarer, kinder] = LADDER.indexOf("cadence") < LADDER.indexOf("showdown")
+    ? ["cadence", "showdown"] : ["showdown", "cadence"];
   {
     const one = speciesById(6);
-    assert.ok(catchBounty(one, "cadence") > catchBounty(one, "showdown"),
-      `on one species Cadence pays ¥${catchBounty(one, "cadence")} and Showdown ` +
-      `¥${catchBounty(one, "showdown")} - Cadence is rarer and the bounty does not know it`);
+    assert.ok(catchBounty(one, rarer) > catchBounty(one, kinder),
+      `on one species ${rarer} pays ¥${catchBounty(one, rarer)} and ${kinder} ` +
+      `¥${catchBounty(one, kinder)} - ${rarer} is rarer and the bounty does not know it`);
   }
   console.log(`bounty ok — an ordinary catch pays ¥0, a showdown ¥${paid.showdown} ` +
-    `and a cadence ¥${paid.cadence}, all through a real throw, and Cadence outpays ` +
-    "Showdown on one species");
+    `and a cadence ¥${paid.cadence}, all through a real throw, and ${rarer} outpays ` +
+    `${kinder} on one species`);
 }
 
 /* TWO PRESSES THAT CANNOT BE TAKEN BACK HAVE TO ASK, AND ONLY THE ENGINE CAN

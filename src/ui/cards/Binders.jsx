@@ -48,6 +48,14 @@ const REGION_STARTS = Object.keys(REGION_NAME).map(Number)
 import CardFace, { RarityMark, VARIANT_NAME, priceOf, usd, Money, PriceInfo } from "./Card.jsx";
 import { logoUrl } from "./load.js";
 import Confirm from "../Confirm.jsx";
+import { read, write } from "../../game/store.js";
+
+/* THE RARITIES FILL LEAVES OUT (2026-10-16, asked for): a device's choice,
+   never the save's - which rarities Fill from my cards may file. */
+const FILL_KEY = "dexora-dexfill";
+const fillSkips = () => {
+  try { const v = JSON.parse(read(FILL_KEY) ?? "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
+};
 import { useDismiss, useModalLock } from "../modal.js";
 
 // "me01-187:h" -> its set, card number and printing.
@@ -249,6 +257,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
   const [sel, setSel] = useState(null);
   const [picker, setPicker] = useState(null);       // { at } fills one pocket, { many: true } adds several
   const [asking, setAsking] = useState(false);
+  const [filling, setFilling] = useState(false);
   const [editing, setEditing] = useState(false);
   const [drag, setDrag] = useState(null);           // { from, over, x, y, w }
   const [note, setNote] = useState("");
@@ -306,11 +315,11 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
     : Math.min(BINDER_POCKETS, Math.max(2 * PAGE_POCKETS, Math.ceil((b.pockets.length + 1) / PAGE_POCKETS) * PAGE_POCKETS));
   const put = (pockets) => engine.setBinder(b.id, { pockets });
   /* FILL FROM YOUR CARDS (a Pokedex binder): each EMPTY pocket takes your
-     rarest held printing of its Pokemon - a card filed by its first Pokemon,
-     a form under its base - from the sets loaded. A filled pocket is never
-     touched: what you placed stays. */
-  const fill = () => {
-    const best = new Map();
+     rarest held printing of its Pokemon among the rarities ticked - a card
+     filed by its first Pokemon, a form under its base - from the sets loaded.
+     A filled pocket is never touched: what you placed stays. */
+  const fillable = () => {
+    const out = [];
     for (const s of CARD_SETS) {
       for (const c of sets[s.id]?.CARDS ?? []) {
         const row = cards[`${s.id}-${c[0]}`];
@@ -318,15 +327,34 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
         if (!v || !c[5].length) continue;
         const sp = Math.min(...c[5].map(baseNo));
         if (sp > DEX_POCKETS || b.pockets[sp - 1]) continue;
-        const r = rungOf(c[3]);
-        if (!best.has(sp) || r > best.get(sp).r) best.set(sp, { key: `${s.id}-${c[0]}:${v}`, r });
+        out.push({ sp, rar: c[3], key: `${s.id}-${c[0]}:${v}` });
       }
     }
-    if (!best.size) { setNote("Nothing new to file - every Pokémon you hold a card of is in."); return; }
+    return out;
+  };
+  const bestOf = (list, allowed) => {
+    const best = new Map();
+    for (const x of list) {
+      if (!allowed.includes(x.rar)) continue;
+      if (!best.has(x.sp) || rungOf(x.rar) > rungOf(best.get(x.sp).rar)) best.set(x.sp, x);
+    }
+    return best;
+  };
+  // Remembers only what was SHOWN: a rarity you hold no card of yet keeps its old answer.
+  const fill = (allowed, shown) => {
+    write(FILL_KEY, JSON.stringify([...fillSkips().filter((r) => !shown.includes(r)),
+      ...shown.filter((r) => !allowed.includes(r))]));
+    const best = bestOf(fillable(), allowed);
+    setFilling(false);
+    if (!best.size) { setNote("Nothing new to file in those rarities."); return; }
     const p = Array.from({ length: DEX_POCKETS }, (_, i) => b.pockets[i] ?? null);
     for (const [sp, x] of best) p[sp - 1] = x.key;
     put(p);
     setNote(`Filed ${best.size} card${best.size === 1 ? "" : "s"} in their pockets.`);
+  };
+  const openFill = () => {
+    if (!fillable().length) { setNote("Nothing new to file - every Pokémon you hold a card of is in."); return; }
+    setNote(""); setFilling(true);
   };
   const swap = (from, to) => {
     if (to < 0 || to >= count || to === from) return;
@@ -453,7 +481,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
           <button type="button" className="tp-quiet" onClick={() => setEditing(true)}>Cover</button>
           <button type="button" className="tp-quiet" disabled={isDex && !filled} onClick={() => setAsking(true)}>{isDex ? "Reset" : "Delete"}</button>
           {isDex
-            ? <button type="button" className="lg-go" onClick={fill}>Fill from my cards</button>
+            ? <button type="button" className="lg-go" onClick={openFill}>Fill from my cards</button>
             : <button type="button" className="lg-go" onClick={() => setPicker({ many: true })}>Add cards</button>}
         </span>
       </div>
@@ -555,6 +583,30 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
         <CoverEditor binder={b} engine={engine} dust={dust} level={level} beaten={beaten} onClose={() => setEditing(false)} />,
         document.body,
       )}
+      {filling && (() => {
+        const list = fillable();
+        const skip = fillSkips();
+        const rars = [...CARD_RARITIES].reverse().filter((r) => list.some((x) => x.rar === r));
+        const pokemon = (r) => new Set(list.filter((x) => x.rar === r).map((x) => x.sp)).size;
+        return (
+          <Confirm
+            title="Fill from my cards"
+            note="Each empty pocket gets your rarest card of that Pokémon from the rarities ticked. Filled pockets stay as they are."
+            manifest={rars.map((r) => ({
+              key: r, uids: [r], off: skip.includes(r),
+              label: <><RarityMark rarity={r} /> {RARITY[r].name}</>,
+              sub: `${pokemon(r)} Pokémon`,
+            }))}
+            recount={(allowed) => {
+              const n = bestOf(list, allowed).size;
+              return { lines: [["Pockets to fill", n]], confirmLabel: n ? `FILE ${n}` : "NOTHING TO FILE" };
+            }}
+            confirmLabel="FILE"
+            onConfirm={(allowed) => fill(allowed, rars)}
+            onCancel={() => setFilling(false)}
+          />
+        );
+      })()}
       {asking && createPortal(
         isDex ? (
           <Confirm

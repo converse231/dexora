@@ -17,7 +17,7 @@ import { label } from "../game/map.js";
 import {
   LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor, isLegendary,
   ROSETTE_NEED,
-  GEN_UNLOCK, REGION_NAME,
+  GEN_UNLOCK, REGION_NAME, tierName,
 } from "../game/biomes.js";
 import FilterBar from "./FilterBar.jsx";
 import Sprite, { VariantFx } from "./Sprite.jsx";
@@ -322,7 +322,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
               ["missing", "Missing", SPECIES.length - caught],
               /* One row per tier, kindest first, so the menu reads in the
                  same direction the marks on a tile do. */
-              ...MARKS.map((t) => [t, t[0].toUpperCase() + t.slice(1), count(t)]),
+              ...MARKS.map((t) => [t, tierName(t), count(t)]),
               ["complete", "Rosette", completed],
             ],
           },
@@ -410,7 +410,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
         </p>
       )}
       <div className={`count${tier ? ` tiered t-${tier}` : ""}`}>
-        {tier && <span className="dx-tier"><Mark tier={tier} size={13} />{tier[0].toUpperCase() + tier.slice(1)}{region !== "all" ? ` · ${REGION_NAME[region]}` : ""}</span>}
+        {tier && <span className="dx-tier"><Mark tier={tier} size={13} />{tierName(tier)}{region !== "all" ? ` · ${REGION_NAME[region]}` : ""}</span>}
         <b>{scope.caught}</b> <span>/ {scope.total.toLocaleString()}</span>
         <em>{Math.round((scope.caught / Math.max(1, scope.total)) * 100)}%</em>
       </div>

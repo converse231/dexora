@@ -3034,6 +3034,31 @@ animated one moves, which no other tier does. Both need the same reframing
 actually felt - a fifth tier changes the completion rosette for every species,
 and the ladder's SPREAD is the thing that took two attempts to get right.
 
+### Twenty tiers: the versions, and Showdown is the chase
+
+Ruby, Sapphire, Fire Red and Leaf Green joined (2026-10-16), each a version
+of the games made into a look, and each a filter plus a few moving layers:
+
+| | the tell | odds |
+|---|---|---|
+| **Ruby** | **cut from ruby**: crimson stone, light pooled inside, a sheen and glints | 1/462 |
+| **Sapphire** | **cut from sapphire**: the same stone in deep blue | 1/441 |
+| **Fire Red** | **lit by embers**: ember-orange, sparks rising off its sides | 1/402 |
+| **Leaf Green** | **in falling leaves**: a soft green, leaves tumbling past | 1/384 |
+
+**Showdown is the rarest tier again (1/610), Cadence under it (1/582),
+then Gold (1/556)** - the two drawn from real animation are the chase.
+Nineteen rungs, the spread still exactly 2.30x, and any variant at all still
+1 in 20.5 for a species without Origin (20.4 before). Every single tier is
+a little rarer (Vivid 1/209 -> 1/265), because there are more of them sharing one rate.
+
+**What it moves elsewhere: nothing a player has to relearn.** Variant
+bounty is priced relative to the kindest tier, which moved with the rest, so
+variant income is flat (1.292 -> 1.291 a variant encounter) and the League
+needed no re-solve. Four new honeys join the shelf at their rank. The
+Pokedex badges, titles, achievements and the trading server all read the
+tier list, so each new tier has them from the start.
+
 ### Twelve tiers, and a variant is no more common
 
 Gold, Shadow, Chaotic and Projection joined the ladder together. Each one is a

@@ -4,7 +4,7 @@
    walking party is joined from the Dex.) */
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { speciesById, sizeTag } from "../game/biomes.js";
+import { speciesById, sizeTag, tierName } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import Sprite from "./Sprite.jsx";
 import Types from "./Types.jsx";
@@ -48,7 +48,7 @@ export default function Preview({ group, onClose }) {
           <div className="pv-chips">
             {group.variant && (
               <span className={`bx-vtag ${group.variant}`}>
-                <Mark tier={group.variant} size={11} />{group.variant.toUpperCase()}
+                <Mark tier={group.variant} size={11} />{tierName(group.variant).toUpperCase()}
               </span>
             )}
             {group.alpha && <span className="bx-vtag bx-alpha"><Mark tier="alpha" size={11} />ALPHA</span>}
