@@ -10525,73 +10525,49 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ev-bingo .ev-banner { background: linear-gradient(90deg, #dff3e9, #f1faf5); border-color: #b7e0c9; }
 .ev-bingo .ev-banner > .ic { color: #2f9e6c; flex: none; }
 .ev-bingo.live { border-color: #2fbf71; }
-/* THE CARD (2026-10-15): printed paper - art, so the same in both themes -
-   B-I-N-G-O balls over the columns, thin printed rules, and the week's card
-   number at the foot. Held to a card's width: on a sideways phone the board
-   is the whole screen, and stretched squares (134px) made a card taller than
-   the screen. */
+/* THE CARD (2026-10-15): the app's own glass - tokens, so it follows the
+   theme - a ball sprite over each B-I-N-G-O column, a caught square tinted
+   with the accent and stamped with a Poke Ball, a finished line's squares
+   rimmed gold. Held to a card's width: on a sideways phone the board is the
+   whole screen, and stretched squares (134px) made a card taller than it. */
 .bg-card {
-  width: 100%; max-width: 360px; margin-inline: auto; padding: 8px 8px 6px; border-radius: 12px;
-  background: linear-gradient(180deg, #fffdf6, #f6efdc); color: #2b2b38;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 0 0 1px #e3d8bd, 0 8px 18px rgba(0, 0, 0, .22);
+  width: 100%; max-width: 360px; margin-inline: auto; padding: 8px; border-radius: 14px;
+  border: 1px solid var(--line-firm); background: var(--surface);
 }
-.bg-head { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); justify-items: center; padding-bottom: 6px; }
-.bg-ball {
-  display: grid; place-items: center; width: min(34px, 82%); aspect-ratio: 1; border-radius: 50%;
-  font: 800 16px / 1 var(--display); color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, .35);
-  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .55), transparent 42%), var(--ball);
-  box-shadow: inset 0 -3px 5px rgba(0, 0, 0, .25), 0 2px 4px rgba(0, 0, 0, .25);
-}
-.bg-ball.b0 { --ball: #2d6fd8; }
-.bg-ball.b1 { --ball: #e04545; }
-.bg-ball.b2 { --ball: #2f9e6c; }
-.bg-ball.b3 { --ball: #e8961c; }
-.bg-ball.b4 { --ball: #8a4fd8; }
-.bg-grid {
-  position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
-  container-type: inline-size; border: 2px solid #2b2b38; border-radius: 4px; overflow: hidden; background: #fffdf6;
-}
+.bg-head { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 2px 0 6px; }
+.bg-ball { display: flex; align-items: center; justify-content: center; gap: 3px; font: 800 17px / 1 var(--display); color: var(--ink); }
+.bg-ball img { width: 22px; height: 22px; image-rendering: pixelated; }
+.bg-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; container-type: inline-size; }
 .bg-sq {
   position: relative; aspect-ratio: 1; min-width: 0; padding: 4px 3px; overflow: hidden;
   display: grid; align-content: center; justify-items: center; gap: 2px; text-align: center;
-  border: 0; border-right: 1px solid #d9cfb8; border-bottom: 1px solid #d9cfb8; border-radius: 0;
-  background: none; color: #2b2b38; cursor: pointer; font: 600 11px/1.15 var(--body);
+  border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  cursor: pointer; font: 600 11px/1.15 var(--body);
 }
-.bg-sq:nth-child(5n) { border-right: 0; }
-.bg-sq:nth-child(n + 21) { border-bottom: 0; }
-.bg-sq > span { position: relative; z-index: 1; overflow-wrap: break-word; }
+.bg-sq > span { overflow-wrap: break-word; }
 /* A narrow card (the desktop rail's 57px squares): a size down, so a word
    like "outbreak" fits whole rather than breaking mid-word. */
 @container (max-width: 320px) { .bg-sq { font-size: 10px; } }
-.bg-sq > i { position: relative; z-index: 1; font: 600 9px var(--pixel); font-style: normal; color: #8a8270; }
+.bg-sq > i { font: 600 9px var(--pixel); font-style: normal; color: var(--ink-faint); }
 /* Progress fills along the foot - drawn, as the rest of the board's is. */
 .bg-sq::after {
   content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p, 0) * 100%);
-  background: #2d6fd8; opacity: .55; pointer-events: none;
+  background: var(--accent); pointer-events: none;
 }
-.bg-sq.sel { outline: 2px dashed #2d6fd8; outline-offset: -4px; }
+.bg-sq.sel { outline: 2px dashed var(--accent); outline-offset: -3px; }
+/* CAUGHT: the accent's tint and a Poke Ball stamped in the corner - the words stay. */
+.bg-sq.done { background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .bg-sq.done::after { display: none; }
-/* THE DAUBER: translucent ink over the printed words, never quite centred. */
-.bg-daub {
-  position: absolute; inset: 12%; z-index: 2; border-radius: 50%; pointer-events: none; mix-blend-mode: multiply;
-  background: radial-gradient(circle at 42% 38%, rgba(226, 52, 98, .5), rgba(206, 28, 80, .62) 62%, rgba(206, 28, 80, .4) 70%, transparent 72%);
-  transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--r, 0deg));
-  animation: bg-dab .35s ease-out both;
-}
-@keyframes bg-dab { from { opacity: 0; transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--r, 0deg)) scale(1.35); } }
-.bg-sq.free { cursor: default; }
-.bg-sq.free > b { position: relative; z-index: 1; font: 800 13px var(--display); color: #2b2b38; }
-.bg-sq.free .bg-daub { background: radial-gradient(circle at 42% 38%, rgba(240, 180, 40, .55), rgba(226, 150, 20, .65) 62%, rgba(226, 150, 20, .4) 70%, transparent 72%); }
-/* A FINISHED LINE is struck through in marker, drawn once as it appears. */
-.bg-lines { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; overflow: visible; }
-.bg-lines line {
-  /* In the grid's own units (it is square), so the dash that draws it is the line's length. */
-  stroke: #e04545; stroke-width: .13; stroke-linecap: round; opacity: .72;
-  stroke-dasharray: 1; stroke-dashoffset: 0; animation: bg-strike .6s ease-out both;
-}
-@keyframes bg-strike { from { stroke-dashoffset: 1; } }
-.bg-foot { display: flex; justify-content: space-between; padding: 5px 2px 0; font: 600 10px var(--pixel); color: #8a8270; }
-@media (prefers-reduced-motion: reduce) { .bg-daub, .bg-lines line { animation: none; } }
+.bg-caught { position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; image-rendering: pixelated;
+  animation: bg-catch .4s cubic-bezier(.3, 1.6, .5, 1) both; }
+@keyframes bg-catch { from { transform: scale(0) rotate(-90deg); } }
+/* A FINISHED LINE: its squares rimmed and lit gold. */
+.bg-sq.won { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold), 0 0 10px color-mix(in srgb, var(--gold) 35%, transparent); }
+.bg-sq.free { cursor: default; gap: 0; }
+.bg-sq.free > img { width: 28px; height: 28px; image-rendering: pixelated; }
+.bg-sq.free > b { font: 700 10px var(--pixel); color: var(--ink-soft); }
+.bg-foot { display: flex; justify-content: space-between; padding: 6px 2px 0; font: 600 10px var(--pixel); color: var(--ink-faint); }
+@media (prefers-reduced-motion: reduce) { .bg-caught { animation: none; } }
 .bg-say { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .bg-say > b { color: var(--ink); font-weight: 600; }
 .bg-say > span { flex: none; font: 600 11px var(--pixel); color: var(--ink-faint); }
