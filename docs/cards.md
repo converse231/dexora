@@ -825,10 +825,11 @@ now and then when a step started an encounter.
   for a Pokemon not yet met) - so you know which card to look for; tapping it
   opens the picker on that Pokemon's cards only (a form, a Mega, under its
   base species).
-- Pockets never move (no drag, no Move). It is filled BY HAND, a card at a
-  time (an automatic fill was built and taken out the same day: completing
-  it is the effort). It is the game's binder, one a player: **Reset** empties
-  it, and it is never deleted.
+- Pockets never move (no drag, no Move). **Fill from my cards** files your
+  rarest held printing of each Pokemon into its EMPTY pocket and never
+  touches a filled one (taken out and brought back the same day, both your
+  call). It is the game's binder, one a player: **Reset** empties it, and it
+  is never deleted.
 
 ## Deferred on purpose *(each with the trigger that brings it back)*
 

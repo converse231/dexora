@@ -907,11 +907,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   is National Dex #i+1 (`DEX_POCKETS`, held to the dex's species count): an
   empty pocket shows that Pokemon's sprite, number and name, the picker
   offers only its cards (a form files under its base, `of`), pockets never
-  drag, and it is filled BY HAND (no auto-fill: the effort is the point) and
-  RESET, never deleted - one a player, the game's (engine refuses both).
+  drag, Fill from my cards files your rarest printing of each into its EMPTY
+  pocket (taken out and restored 2026-10-16, your call both times), and it
+  is RESET, never deleted - one a player, the game's (engine refuses both).
   Diamond is the PRISM HALO (2026-10-16): white ice, a thin dark outline,
-  and a rainbow ring turning behind it (`.dia-halo`, masked to a ring - a
-  disc washed the body out on a Dex tile).
+  and a rainbow AURA in the creature's own shape turning behind it
+  (`.dia-halo`: the rainbow cut to `--art`, grown and blurred - a disc and
+  then a ring read as a circle, not an aura).
   The last card of every pack charges and flashes (white until the charge),
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.
