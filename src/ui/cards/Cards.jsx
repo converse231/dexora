@@ -13,10 +13,10 @@ import {
   RARITY, CARD_RARITIES, landsOn, rulesOf, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
   copiesOf, chanceOf, freshPity, sparesOf, sweepOf, dustOf, craftCost, rungOf, titleOf, canCraft, isHit, DUST_PACK,
 } from "../../game/cards.js";
-import CardFace, { RarityMark, VARIANT_NAME, usePrices, worthOf, usd, PriceNote } from "./Card.jsx";
+import CardFace, { RarityMark, VARIANT_NAME, usePrices, worthOf, PriceInfo, Money } from "./Card.jsx";
 import Confirm from "../Confirm.jsx";
 import Inspect from "./Inspect.jsx";
-import { BinderPages, MyBinders } from "./Binders.jsx";
+import { BinderPages, MyBinders, Cover, leatherOf } from "./Binders.jsx";
 import Opening, { OpenAll } from "./Opening.jsx";
 import { loadSet, logoUrl, packUrl } from "./load.js";
 import Icon from "../Icon.jsx";
@@ -208,7 +208,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
         )}
         {tab === "binder" && <Binder sets={sets} cards={cards} dex={dex} log={st?.cardLog ?? []} onLook={look}
           milestones={st?.milestones ?? {}} setId={setId} onSet={setSetId} onDust={() => setTab("dust")}
-          binders={st?.binders ?? []} engine={engine} />}
+          binders={st?.binders ?? []} engine={engine} dust={dust} level={level} beaten={st?.beaten} />}
         {tab === "dex" && <CardDex sets={sets} cards={cards} dex={dex} onLook={look} />}
         {tab === "dust" && <Dust sets={sets} cards={cards} dust={dust} onLook={look} setId={setId} onSet={setSetId}
           onCraftAll={(id, picks) => engine.craftCards(sets[id], picks)}
@@ -352,7 +352,7 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
    nine pockets each, a spread where there is room (`BinderPages`). The pulls
    wall goes under them. An empty pocket names the card faintly; a filled one
    holds the best copy, a count and the earned mark. */
-function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDust, binders = [], engine }) {
+function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDust, binders = [], engine, dust, level, beaten }) {
   const [mode, setMode] = useState("set");
   const [pageNo, setPage] = useState(0);
   /* FILTERS (2026-10-13, asked for): the Card Dex's, scoped to this set, and
@@ -370,7 +370,12 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
     </div>
   );
   if (mode === "mine") {
-    return <div className="cd-binder">{modes}<MyBinders binders={binders} sets={sets} cards={cards} engine={engine} onLook={onLook} /></div>;
+    return (
+      <div className="cd-binder">
+        {modes}
+        <MyBinders binders={binders} sets={sets} cards={cards} engine={engine} onLook={onLook} prices={prices} dust={dust} level={level} beaten={beaten} />
+      </div>
+    );
   }
   const set = sets[setId];
   if (!set) return <div className="cd-binder">{modes}<p className="ev-quiet">Loading…</p></div>;
@@ -392,29 +397,39 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
     <div className="cd-binder">
       {modes}
       <SetPicker setId={setId} cards={cards} onSet={(id) => { onSet(id); setPage(0); setF((x) => ({ ...x, rarity: "" })); }} />
-      <section className={`bn-head${done ? " done" : ""}${masterDone ? " master" : ""}`} aria-label="Set progress">
-        <div className="bn-count"><b>{ownedN}<u>/{set.CARDS.length}</u></b><small>cards</small></div>
-        <div className="bn-prog">
-          <i style={{ "--p": ownedN / set.CARDS.length }} />
-          <small>Master set {master} of {variants} printings</small>
+      {/* THE SET'S BINDER, CLOSED: its series' leather with the logo
+          debossed, the logo lifted out in colour once the set is complete,
+          gold leather for the master set - the cover is the reward. */}
+      <section className="bn-head" aria-label="Set progress">
+        <Cover color={masterDone ? "gold" : leatherOf(setId)} logo={setId} state={done ? "done" : ""} className="bn-art" />
+        <div className="bn-stats">
+          <div className="bn-count"><b>{ownedN}<u>/{set.CARDS.length}</u></b><small>cards</small></div>
+          <div className="bn-prog">
+            <i style={{ "--p": ownedN / set.CARDS.length }} />
+            <small>Master set {master} of {variants} printings</small>
+          </div>
+          <span className="bn-cover">
+            {masterDone ? `★ Master set · ${titleName(`master:${setId}`)}` : done ? `✓ Complete · ${titleName(`set:${setId}`)}`
+              : `${set.CARDS.length - ownedN} to go for the cover`}
+            {/* Bulk lives on the Dust tab; the binder is where you notice the gaps. */}
+            {master < variants && <button type="button" className="tp-quiet" onClick={onDust}>Craft missing ›</button>}
+          </span>
         </div>
-        <span className="bn-cover">
-          {masterDone ? `★ Master set · ${titleName(`master:${setId}`)}` : done ? `✓ Complete · ${titleName(`set:${setId}`)}`
-            : `${set.CARDS.length - ownedN} to go for the cover`}
-        </span>
-        {/* Bulk lives on the Dust tab; the binder is where you notice the gaps. */}
-        {master < variants && <button type="button" className="tp-quiet" onClick={onDust}>Craft missing ›</button>}
-        {/* REAL-LIFE VALUE (2026-10-15): this set's copies, the whole collection, the dearest card here. */}
+        {/* REAL-LIFE VALUE (2026-10-15): this set's copies, raw, counting up;
+            the whole collection; the dearest card here, one tap from its view. */}
         {all.total > 0 && (
-          <p className="bn-worth">
-            <span>Worth <b>{usd(worth.total)}</b> · collection <b>{usd(all.total)}</b></span>
+          <div className="bn-worth">
+            <span className="bn-worth-k">This set is worth <PriceInfo prices={prices} /></span>
+            <Money cents={worth.total} className="bn-worth-big" />
+            <span className="bn-worth-all">Collection <Money cents={all.total} /></span>
             {topCard && (
-              <button type="button" className="tp-quiet" onClick={() => onLook(setId, topCard[0])}>
-                Top card: {topCard[1]} {usd(worth.top.cents)} ›
+              <button type="button" className="bn-top" onClick={() => onLook(setId, topCard[0])}>
+                <CardFace setId={setId} card={topCard} variant={worth.top.v} still />
+                <span className="bn-top-t"><small>Top card</small><b>{topCard[1]}</b></span>
+                <Money cents={worth.top.cents} />
               </button>
             )}
-            <PriceNote prices={prices} />
-          </p>
+          </div>
         )}
       </section>
       <CardFilters f={f} onChange={filter}
@@ -425,7 +440,8 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
           <button type="button" className="tp-quiet" onClick={() => filter(NO_FILTER)}>Clear filters</button>
         </p>
       )}
-      {!shown.length ? <p className="ev-quiet">No card in this set matches.</p> : <BinderPages count={shown.length} page={pageNo} onPage={setPage} render={(i) => {
+      {!shown.length ? <p className="ev-quiet">No card in this set matches.</p> : <BinderPages count={shown.length} page={pageNo} onPage={setPage} leather={masterDone ? "gold" : leatherOf(setId)}
+        bookKey={`${setId}|${f.q}|${f.rarity}|${f.have}`} render={(i) => {
           const c = shown[i];
           const row = cards[key(c)];
           const n = copiesOf(row);

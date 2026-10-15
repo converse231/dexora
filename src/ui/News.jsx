@@ -16,6 +16,19 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-15-binders",
+    icon: "📒",
+    date: "October 2026",
+    title: "Binders you can hold",
+    items: [
+      ["Leather binders", "Pick a colour and sew on patches - set logos for dust, gym badges for free."],
+      ["Turn the pages", "Pages flip in 3D. Swipe, use the arrows, or drag a card to the edge."],
+      ["Drag and drop", "Move cards between pockets. On a phone, hold a card first."],
+      ["Real prices, bigger", "Every card shows its raw TCGplayer price, and your binder adds it up."],
+      ["A real Bingo card", "Weekly Bingo is now a printed card, daubed and lined as you play."],
+    ],
+  },
+  {
     id: "2026-10-15-swsh",
     icon: "💎",
     date: "October 2026",

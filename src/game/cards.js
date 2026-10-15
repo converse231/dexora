@@ -297,6 +297,32 @@ export const BINDER_MAX = 20;
 export const BINDER_POCKETS = 40 * PAGE_POCKETS;
 export const BINDER_NAME = 24;
 const POCKET_KEY = /^[\w.]+-\w+:[nhr]$/;
+/* A BINDER'S COVER (2026-10-15, asked for): a leather colour and up to
+   PATCH_MAX sewn-on patches, each where you put it (x, y in % of the cover).
+   A look, never a strength. A patch is a set's logo bought for dust
+   (`patches`, the engine's `buyPatch`) or a League badge you have won -
+   derived from `beaten`, never stored. A binder saved without a cover wears
+   the colour its id hashes to, so an old shelf is not one colour. */
+export const COVER_COLORS = ["oxblood", "saddle", "tan", "forest", "teal", "navy", "plum", "charcoal"];
+export const PATCH_MAX = 6;
+export const PATCH_DUST = 500;
+const PATCH_ID = /^(set|badge):[\w.-]{1,40}$/;
+export const coverOf = (b) => b.cover ?? {
+  color: COVER_COLORS[[...b.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % COVER_COLORS.length],
+  patches: [],
+};
+const spot = (n) => Math.round(Math.min(100, Math.max(0, Number(n))) * 10) / 10;
+function cleanCover(c) {
+  if (!c || typeof c !== "object" || !COVER_COLORS.includes(c.color)) return null;
+  const seen = new Set();
+  const patches = (Array.isArray(c.patches) ? c.patches : []).filter((p) => p && typeof p.id === "string"
+    && PATCH_ID.test(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y) && !seen.has(p.id) && seen.add(p.id))
+    .slice(0, PATCH_MAX).map((p) => ({ id: p.id, x: spot(p.x), y: spot(p.y) }));
+  return { color: c.color, patches };
+}
+// The set patches bought: set ids, once each (an unknown one is kept, as a skin is).
+export const cleanPatches = (raw) => (Array.isArray(raw)
+  ? [...new Set(raw.filter((s) => typeof s === "string" && /^[\w.-]{1,40}$/.test(s)))].slice(0, 200) : []);
 export function cleanBinders(raw) {
   if (!Array.isArray(raw)) return [];
   const out = [], ids = new Set();
@@ -307,7 +333,8 @@ export function cleanBinders(raw) {
       .map((k) => (typeof k === "string" && POCKET_KEY.test(k) ? k : null));
     while (pockets.length && pockets.at(-1) === null) pockets.pop();
     ids.add(b.id);
-    out.push({ id: b.id, name: name || "My binder", pockets });
+    const cover = cleanCover(b.cover);
+    out.push({ id: b.id, name: name || "My binder", pockets, ...(cover && { cover }) });
     if (out.length >= BINDER_MAX) break;
   }
   return out;

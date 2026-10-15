@@ -9625,10 +9625,61 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   .cd-sp-now em { display: none; }
 }
 .cd-sweep { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-/* THE BINDER'S HEADER: the set's progress and its cover in one line. */
+/* ---- LEATHER (Binders.jsx, 2026-10-15): a colour, its grain (`--grain`,
+   two SVG noises built in JS - no url() here may name a path), a sheen and
+   a vignette. Art, so the same in both themes. */
+.leather {
+  /* No default --lc on .leather itself: the inside of a binder's cover
+     inherits the binder's colour (it drew oxblood in a teal binder). */
+  background:
+    radial-gradient(120% 80% at 22% 10%, rgba(255, 255, 255, .17), transparent 55%),
+    radial-gradient(140% 110% at 85% 108%, rgba(0, 0, 0, .55), transparent 62%),
+    var(--grain, none),
+    var(--lc, #611b1a);
+}
+.lc-oxblood { --lc: #611b1a; }
+.lc-saddle { --lc: #7c4421; }
+.lc-tan { --lc: #a7733d; }
+.lc-forest { --lc: #1e4731; }
+.lc-teal { --lc: #155b5f; }
+.lc-navy { --lc: #1b2b4e; }
+.lc-plum { --lc: #4b2347; }
+.lc-charcoal { --lc: #2b2b31; }
+.lc-gold { --lc: #b3862a; }
+/* A COVER: leather on board, a crease at the spine, stitching, the name in foil. */
+.lc { position: relative; display: block; width: 100%; aspect-ratio: 5 / 7; container-type: inline-size; overflow: hidden;
+  border-radius: 5px 12px 12px 5px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .14), 0 10px 22px rgba(0, 0, 0, .35); }
+.lc::before { content: ""; position: absolute; top: 0; bottom: 0; left: 9cqw; width: 3px; pointer-events: none;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .5), rgba(255, 255, 255, .14)); box-shadow: -9cqw 0 8cqw rgba(0, 0, 0, .3); }
+.lc-stitch { position: absolute; inset: 5cqw 5cqw 5cqw 13cqw; pointer-events: none; border: 1.5px dashed rgba(255, 236, 205, .45);
+  border-radius: 3px 9px 9px 3px; box-shadow: 0 1px 0 rgba(0, 0, 0, .35); }
+.lc-title { position: absolute; left: 15cqw; right: 9cqw; bottom: 10cqw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: center; font: 800 clamp(11px, 10cqw, 30px) / 1.15 var(--display); color: #e2b24a;
+  background: linear-gradient(180deg, #fff4c8, #e2b24a 42%, #9a6614 58%, #f3d27e); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .55)); }
+/* A set binder's logo, debossed until the set is complete, then lifted out in colour with a sheen. */
+.lc-logo { position: absolute; left: 17cqw; width: 72cqw; top: 26%; height: 32%; object-fit: contain; pointer-events: none;
+  filter: brightness(0) drop-shadow(0 1px 0 rgba(255, 255, 255, .3)); opacity: .4; }
+.lc.done .lc-logo { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .55)); opacity: 1; }
+.lc.done::after { content: ""; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+  background: linear-gradient(125deg, transparent 30%, rgba(255, 255, 255, .22) 45%, rgba(160, 220, 255, .18) 52%, transparent 66%); }
+/* A PATCH: twill, an embroidered rim, its art - a set's logo or a pixel badge. */
+.lc-patch { position: absolute; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none;
+  background: repeating-linear-gradient(45deg, #24232c 0 2px, #1b1a22 2px 4px); border: 2px solid #efe6d2;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), 0 3px 5px rgba(0, 0, 0, .5); }
+.lc-patch::after { content: ""; position: absolute; inset: 2px; border: 1px dashed rgba(239, 230, 210, .55); border-radius: inherit; pointer-events: none; }
+.lc-patch.set { width: 40cqw; aspect-ratio: 2 / 1; border-radius: 8px; padding: 3cqw 4cqw; }
+.lc-patch.badge { width: 22cqw; aspect-ratio: 1; border-radius: 50%; padding: 3.5cqw; }
+.lc-patch img { width: 100%; height: 100%; object-fit: contain; }
+.lc-patch.badge img { image-rendering: pixelated; }
+
+/* THE SET BINDER'S HEADER: its closed cover, the progress, and what it is worth. */
 .bn-mode { justify-self: start; }
-.bn-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px 16px;
-  padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.bn-head { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 12px 20px;
+  padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.bn-art { width: 84px; }
+.bn-stats { display: grid; gap: 8px; min-width: 0; }
 .bn-count b { font: 800 24px var(--display); color: var(--ink); }
 .bn-count u { text-decoration: none; font-size: 14px; color: var(--ink-faint); }
 .bn-count small { display: block; font-size: 11px; color: var(--ink-faint); }
@@ -9636,58 +9687,213 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .bn-prog i { display: block; height: 6px; border-radius: 3px; background: var(--line); position: relative; overflow: hidden; }
 .bn-prog i::after { content: ""; position: absolute; inset: 0; background: var(--accent); transform-origin: left; transform: scaleX(var(--p)); }
 .bn-prog small { font-size: 12px; color: var(--ink-faint); }
-.bn-cover { font: 600 12.5px var(--body); color: var(--ink-soft); }
-@media (max-width: 560px) {
-  .bn-head { grid-template-columns: auto minmax(0, 1fr); }
-  .bn-cover, .bn-head > button { grid-column: 1 / -1; justify-self: start; }
+.bn-cover { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font: 600 12.5px var(--body); color: var(--ink-soft); }
+/* REAL-LIFE VALUE (Card.jsx): big and counting up, the note behind a yellow (i). */
+.money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.money i { font-style: normal; }
+.money small { font-size: .62em; }
+.bn-worth { display: grid; justify-items: end; gap: 2px; min-width: 0; text-align: right; }
+.bn-worth-k { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--body); color: var(--ink-soft); }
+.bn-worth-big { font: 800 36px / 1.05 var(--display); color: var(--ink); }
+.bn-worth-big i, .cd-price-big i { font-size: .55em; vertical-align: .62em; margin-right: 2px; color: var(--ink-soft); }
+.bn-worth-big small, .cd-price-big small { font-size: .5em; vertical-align: .8em; margin-left: 1px; }
+.bn-worth-all { font: 600 12.5px var(--body); color: var(--ink-soft); }
+.bn-worth-all .money { font-weight: 700; color: var(--ink); }
+.bn-top { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 9px; width: 100%; max-width: 300px;
+  margin-top: 6px; padding: 5px 10px 5px 5px; border: 1px solid var(--line-firm); border-radius: 10px; background: var(--surface-2);
+  color: var(--ink); text-align: left; cursor: pointer; }
+.bn-top:hover { border-color: var(--accent); }
+.bn-top .cd-card { width: 30px; border-radius: 3px; }
+.bn-top-t { display: grid; min-width: 0; }
+.bn-top small { font-size: 10.5px; color: var(--ink-faint); }
+.bn-top b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 13px var(--display); }
+.bn-top .money { font: 800 14px var(--display); }
+@media (max-width: 640px) {
+  .bn-head { grid-template-columns: 64px minmax(0, 1fr); }
+  .bn-art { width: 64px; }
+  .bn-worth { grid-column: 1 / -1; justify-items: start; text-align: left; padding-top: 10px; border-top: 1px solid var(--line); }
+  .bn-top { max-width: none; }
 }
-/* REAL-LIFE VALUE (Card.jsx usePrices): a line under the header, never a colour of its own. */
-.bn-worth { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0;
-  font: 600 12.5px var(--body); color: var(--ink-soft); }
-.bn-worth b { font: 700 13px var(--pixel); color: var(--ink); }
-.bn-head.done .bn-worth, .bn-head.done .bn-worth b, .bn-head.done .bn-worth button { color: #fff; }
-.cd-price-note { font-size: 11px; color: var(--ink-faint); }
-.cd-inspect-body .cd-price-note { display: block; margin-top: 6px; }
+.pr-info { position: relative; display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; padding: 0; border: 0;
+  border-radius: 50%; background: #f2c230; color: #3a2a00; font: italic 800 11.5px / 1 var(--display); cursor: help; }
+.pr-info::before { content: ""; position: absolute; inset: -9px; }      /* a 36px target round an 18px dot */
+.pr-info:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The card view's price: the printing shown, raw, big. */
+.cd-price { display: grid; justify-items: start; gap: 2px; margin: 8px 0 10px; padding: 12px 14px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--surface-2); }
+.cd-price-top { display: flex; align-items: center; gap: 8px; font: 600 12px var(--body); color: var(--ink-soft); }
+.cd-price-top b { padding: 2px 8px; border-radius: 999px; background: var(--ink); color: var(--surface); font: 800 10.5px var(--body); text-transform: uppercase; }
+.cd-price-big { font: 800 40px / 1.05 var(--display); color: var(--ink); }
+.cd-price-none { padding: 6px 0 2px; font: 600 14px var(--body); color: var(--ink-faint); }
+.cd-price > small { font-size: 12.5px; color: var(--ink-soft); }
 .cd-have .cd-usd { color: var(--ink); }
-/* BINDER PAGES (Binders.jsx): nine pockets a page, a spread where there is
-   room - two pages meeting at a spine - and big turns either side. */
-.bp { display: grid; gap: 10px; }
-.bp-book { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
-.bp-turn { width: 40px; height: 72px; border-radius: 12px; border: 1px solid var(--line-firm); background: var(--surface);
-  color: var(--ink); font: 700 24px var(--body); cursor: pointer; }
-.bp-turn:disabled { opacity: .3; cursor: default; }
-.bp-spread { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; max-width: 520px; justify-self: center; }
-.bp-spread.two { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 1040px; }
-.bp-page { display: grid; gap: 6px; align-content: start; padding: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
-.bp-spread.two .bp-page:first-child { border-radius: 14px 0 0 14px; border-right: 0; box-shadow: inset -12px 0 14px -12px var(--shadow); }
-.bp-spread.two .bp-page:last-child { border-radius: 0 14px 14px 0; box-shadow: inset 12px 0 14px -12px var(--shadow); }
+
+/* ---- THE BOOK (BinderPages): leather boards round sleeved pages, the rings
+   between them, and a leaf that turns in 3D. --flip-ms and --open-ms are
+   FLIP_MS and OPEN_MS in Binders.jsx. */
+.bp { display: grid; gap: 10px; --flip-ms: 650ms; --open-ms: 900ms; }
+.bp-book { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.bp-turn { display: grid; place-items: center; width: 44px; height: 44px; padding: 0 0 3px; border-radius: 50%; border: 1px solid var(--line-firm);
+  background: var(--surface); color: var(--ink); font: 700 24px / 1 var(--body); cursor: pointer;
+  box-shadow: 0 4px 10px var(--shadow-soft); transition: transform .15s ease, border-color .15s ease; }
+.bp-turn:not(:disabled):hover { transform: scale(1.08); border-color: var(--accent); }
+.bp-turn:disabled { opacity: .3; cursor: default; box-shadow: none; }
+.bk { --spine: 26px; position: relative; justify-self: center; width: 100%; max-width: 540px; padding: 12px; border-radius: 10px 16px 16px 10px;
+  perspective: 2400px; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; outline: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .12), 0 18px 34px rgba(0, 0, 0, .35); }
+.bk:not(.two) { overflow: hidden; }
+.bk.two { max-width: 1100px; border-radius: 16px; }
+.bk:focus-visible { box-shadow: 0 0 0 3px var(--accent), 0 18px 34px rgba(0, 0, 0, .35); }
+.bk-in { position: relative; display: grid; grid-template-columns: var(--spine) minmax(0, 1fr); }
+.bk.two .bk-in { grid-template-columns: minmax(0, 1fr) var(--spine) minmax(0, 1fr); }
+.bk-in > * { grid-row: 1; min-width: 0; }
+.bk-page { position: relative; display: grid; gap: 6px; align-content: start; padding: 12px; border-radius: 3px 8px 8px 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(0, 0, 0, .05)), var(--surface-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .35), inset 14px 0 16px -14px rgba(0, 0, 0, .5); }
+.bk-page.r { grid-column: 2; }
+.bk.two .bk-page.l { grid-column: 1; border-radius: 8px 3px 3px 8px; box-shadow: 0 1px 2px rgba(0, 0, 0, .35), inset -16px 0 18px -14px rgba(0, 0, 0, .5); }
+.bk.two .bk-page.r { grid-column: 3; }
+.bk-spine { grid-column: 1; position: relative; z-index: 2; pointer-events: none; }
+.bk.two .bk-spine { grid-column: 2; background: linear-gradient(90deg, rgba(0, 0, 0, .35), rgba(0, 0, 0, .08) 50%, rgba(0, 0, 0, .35)); }
+.bk-ring { position: absolute; left: 50%; width: calc(var(--spine) + 22px); height: 10px; border-radius: 6px; transform: translate(-50%, -50%);
+  background: linear-gradient(180deg, #f6f8fb, #b8c0c9 40%, #6a717a 60%, #d4d9e0);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(0, 0, 0, .25); }
+.bk-ring:nth-child(1) { top: 14%; }
+.bk-ring:nth-child(2) { top: 50%; }
+.bk-ring:nth-child(3) { top: 86%; }
+.bk:not(.two) .bk-ring { left: calc(50% + 5px); width: calc(var(--spine) + 10px); }
 .bp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .bp-void { aspect-ratio: 63 / 88; }
-.bp-no { justify-self: center; font: 600 11px var(--pixel); color: var(--ink-faint); }
+.bp-no { justify-self: center; min-height: 14px; font: 600 11px var(--pixel); color: var(--ink-faint); }
+/* SLEEVES: a pocket is clear plastic - a sheen across it, a rim of light;
+   a held card lifts under the pointer. */
+.bk .cd-pocket { border: 1px solid rgba(255, 255, 255, .07); border-radius: 5px; background: rgba(0, 0, 0, .16); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .35); }
+.bk .cd-pocket.got { border: 0; background: none; box-shadow: 0 3px 8px rgba(0, 0, 0, .35); }
+.bk .cd-pocket::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(118deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 28%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, .06));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
+@media (hover: hover) {
+  .bk .cd-pocket.got { transition: transform .18s ease, box-shadow .18s ease; }
+  .bk .cd-pocket.got:hover { transform: translateY(-3px); box-shadow: 0 10px 18px rgba(0, 0, 0, .4); }
+}
+/* THE TURN: a leaf over the page it leaves, hinged at the middle of the rings
+   (so it lands exactly on the other page), the next page on its back, and a
+   shade that deepens as it lifts. */
+.bk-leaf { position: relative; z-index: 4; transform-style: preserve-3d; pointer-events: none; will-change: transform;
+  animation: var(--flip-ms) cubic-bezier(.45, .05, .25, 1) both; }
+.bk-leaf.r, .bk-leaf.one-next, .bk-leaf.one-prev { transform-origin: calc(var(--spine) / -2) 50%; }
+.bk-leaf.r { grid-column: 3; animation-name: bk-to-left; }
+.bk-leaf.l { grid-column: 1; transform-origin: calc(100% + var(--spine) / 2) 50%; animation-name: bk-to-right; }
+.bk-leaf.one-next { grid-column: 2; animation-name: bk-to-left; }
+.bk-leaf.one-prev { grid-column: 2; animation-name: bk-from-left; }
+@keyframes bk-to-left { from { transform: rotateY(0deg); } to { transform: rotateY(-180deg); } }
+@keyframes bk-to-right { from { transform: rotateY(0deg); } to { transform: rotateY(180deg); } }
+@keyframes bk-from-left { from { transform: rotateY(-180deg); } to { transform: rotateY(0deg); } }
+.bk-face { position: absolute; inset: 0; display: grid; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.bk-face.back { transform: rotateY(180deg); }
+.bk-face > .bk-page { height: 100%; }
+.bk-leaf:not(.bk-flap) .bk-face::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; }
+.bk-leaf:not(.bk-flap) .front::after { background: linear-gradient(90deg, rgba(0, 0, 0, .42), rgba(0, 0, 0, .05)); animation: bk-shade var(--flip-ms) ease-in both; }
+.bk-leaf:not(.bk-flap) .back::after { background: linear-gradient(270deg, rgba(0, 0, 0, .42), rgba(0, 0, 0, .05)); animation: bk-unshade var(--flip-ms) ease-out both; }
+@keyframes bk-shade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bk-unshade { from { opacity: 1; } to { opacity: 0; } }
+/* OPENING AND CLOSING: the front cover swings on the rings; while it is
+   shut the left page and the rings are not there yet. */
+.bk-flap { z-index: 5; pointer-events: auto; animation-duration: var(--open-ms); animation-delay: 80ms; }
+.bk.opening .bk-flap { animation-name: bk-to-left; }
+.bk.closing .bk-flap { animation-name: bk-from-left; animation-delay: 0ms; }
+.bk-flap .lc { height: 100%; aspect-ratio: auto; border-radius: 3px 10px 10px 3px; }
+.bk-inside { border-radius: 10px 3px 3px 10px; filter: brightness(.75); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .4); }
+.bk.opening .bk-inside { animation: bk-gone var(--open-ms) linear both; }
+.bk.closing .bk-inside { animation: bk-come var(--open-ms) linear both; }
+.bk.opening .bk-page.l, .bk.opening .bk-spine { animation: bk-reveal var(--open-ms) linear both; }
+.bk.closing .bk-page.l, .bk.closing .bk-spine { animation: bk-hide var(--open-ms) linear both; }
+@keyframes bk-gone { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes bk-come { 0% { opacity: 0; } 25%, 100% { opacity: 1; } }
+@keyframes bk-reveal { 0%, 45% { opacity: 0; } 60%, 100% { opacity: 1; } }
+@keyframes bk-hide { 0%, 40% { opacity: 1; } 55%, 100% { opacity: 0; } }
 .bp-nav { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .bp-nav input { width: min(320px, 55%); accent-color: var(--accent); }
 .bp-nav span { font: 600 12px var(--pixel); color: var(--ink-soft); }
 @media (max-width: 480px) {
-  .bp-turn { width: 30px; height: 56px; font-size: 20px; }
-  .bp-page { padding: 8px; }
+  .bp-book { gap: 4px; }
+  .bp-turn { width: 28px; height: 56px; border-radius: 10px; font-size: 20px; }
+  .bk { --spine: 18px; padding: 8px; }
+  .bk-page { padding: 8px; }
   .bp-grid { gap: 6px; }
 }
-/* YOUR OWN BINDERS (Binders.jsx). */
-.mb-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
-.mb-tile { display: grid; gap: 6px; justify-items: start; align-content: start; padding: 10px; border: 1px solid var(--line); border-radius: 14px;
-  background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
-.mb-tile:hover { border-color: var(--line-firm); }
-.mb-cover { position: relative; width: 100%; aspect-ratio: 63 / 88; border-radius: 8px; overflow: hidden; background: var(--surface-2);
-  display: grid; place-items: center; color: var(--ink-faint); font: 600 13px var(--body); }
-.mb-cover i { font-style: normal; }
-.mb-cover .cd-card { position: absolute; inset: 0; height: 100%; }
-.mb-new .mb-cover { border: 1.5px dashed var(--line-firm); background: none; font: 600 34px var(--body); color: var(--accent); }
-.mb-tile b { font: 700 14px var(--display); }
-.mb-tile small { font-size: 12px; color: var(--ink-faint); }
-.mb-open { display: grid; gap: 12px; }
-.mb-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
-.mb-name { flex: 1 1 180px; min-width: 0; font: 700 16px var(--display); }
+/* YOUR OWN BINDERS (Binders.jsx): a shelf of covers that tilt open under
+   the pointer, then the open binder. */
+.mb-shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 22px 18px; padding: 4px 2px 12px; }
+.mb-book { display: grid; gap: 8px; align-content: start; padding: 0; border: 0; background: none; color: var(--ink); text-align: left;
+  cursor: pointer; perspective: 900px; }
+.mb-book .lc { transform-origin: left center; transition: transform .25s ease, box-shadow .25s ease; }
+@media (hover: hover) {
+  .mb-book:hover .lc { transform: rotateY(-14deg) translateY(-4px);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .14), 12px 18px 28px rgba(0, 0, 0, .42); }
+}
+.mb-book:focus-visible { outline: none; }
+.mb-book:focus-visible .lc { outline: 3px solid var(--accent); outline-offset: 3px; }
+.mb-meta { display: flex; justify-content: space-between; gap: 8px; font: 600 12.5px var(--body); color: var(--ink-soft); }
+.mb-meta b { font: 700 12.5px var(--display); color: var(--ink); font-variant-numeric: tabular-nums; }
+.mb-blank { display: grid; place-content: center; justify-items: center; gap: 4px; border: 2px dashed var(--line-firm); background: none;
+  box-shadow: none; color: var(--ink-soft); font: 600 13px var(--body); }
+.mb-blank::before { display: none; }
+.mb-blank b { font: 300 40px / 1 var(--body); color: var(--accent); }
+.mb-open { display: grid; gap: 10px; }
+.mb-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.mb-name { flex: 1 1 160px; min-width: 0; font: 700 16px var(--display); }
+.mb-value { display: inline-flex; align-items: center; gap: 6px; font: 800 20px var(--display); color: var(--ink); }
 .mb-count { font-size: 13px; color: var(--ink-faint); }
+.mb-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.mb-hint { margin: 0; font-size: 12.5px; color: var(--ink-faint); }
+.cd-pocket.lifting { opacity: .3; }
+.cd-pocket.drop-here { outline: 3px solid var(--accent); outline-offset: 2px; }
+.mb-ghost { position: fixed; left: 0; top: 0; z-index: 90; pointer-events: none; aspect-ratio: 63 / 88; border-radius: 6px;
+  box-shadow: 0 18px 30px rgba(0, 0, 0, .5); }
+.mb-ghost .cd-card { position: absolute; inset: 0; height: 100%; }
+/* THE COVER EDITOR: the cover to drag patches on, leather swatches, and
+   the patches - yours, and a shop of set patches for dust. */
+.ce { position: relative; width: min(820px, 100%); max-height: calc(100dvh - 32px); display: grid;
+  grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: start; }
+.ce-art { position: relative; width: min(280px, calc((100dvh - 80px) * 5 / 7)); align-self: center; container-type: inline-size;
+  touch-action: none; -webkit-user-select: none; user-select: none; }
+.ce-patch { pointer-events: auto; cursor: grab; touch-action: none; }
+.ce-patch.moving { z-index: 2; cursor: grabbing; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .5)); }
+.ce-body { display: grid; gap: 10px; min-height: 0; max-height: calc(100dvh - 72px); grid-template-rows: repeat(6, auto) minmax(0, 1fr) auto; }
+.ce-body h3 { margin: 0 40px 0 0; font: 800 20px var(--display); color: var(--ink); }
+.ce-k { margin: 4px 0 0; font: 700 13px var(--display); color: var(--ink); }
+.ce-k small { display: block; font: 500 12px var(--body); color: var(--ink-faint); }
+.ce-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.ce-swatch { width: 34px; height: 34px; padding: 0; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35), 0 2px 5px rgba(0, 0, 0, .3); }
+.ce-swatch[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--surface), 0 2px 5px rgba(0, 0, 0, .3); }
+.ce-tabs { justify-self: start; }
+.ce-scroll { display: grid; gap: 10px; align-content: start; min-height: 120px; overflow-y: auto; }
+.ce-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.ce-tile { display: grid; justify-items: center; align-content: start; gap: 6px; padding: 10px 8px; container-type: inline-size;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); color: var(--ink); text-align: center; cursor: pointer; }
+.ce-tile.on { border-color: var(--accent); }
+.ce-tile .lc-patch { position: relative; transform: none; }
+.ce-tile .lc-patch.set { width: 84cqw; }
+.ce-tile .lc-patch.badge { width: 46cqw; }
+.ce-tile small { font: 600 11.5px / 1.25 var(--body); color: var(--ink-soft); }
+.ce-tile em { font: 700 11px var(--body); font-style: normal; color: var(--accent); }
+.ce-tile.buy { cursor: default; }
+.ce-tile .ce-lock { color: var(--ink-faint); }
+.ce-note { margin: 0; font-size: 12.5px; color: var(--gold); }
+.ce-foot { margin: 0; font-size: 12px; color: var(--ink-faint); }
+.ce-done { justify-self: end; }
+@media (max-width: 640px) {
+  .ce { grid-template-columns: 1fr; overflow-y: auto; }
+  .ce-art { width: min(220px, 60vw); justify-self: center; }
+  .ce-body { max-height: none; }
+  .ce-scroll { overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-leaf, .bk-flap, .bk-face::after, .bk-inside, .bk-page, .bk-spine { animation: none !important; }
+  .mb-book .lc, .bp-turn { transition: none; }
+}
 .mb-slot { display: grid; place-items: center; color: var(--ink-faint); font: 600 24px var(--body); }
 .mb-slot:hover { color: var(--accent); border-color: var(--accent); }
 .cd-pocket.sel { outline: 3px solid var(--accent); outline-offset: 2px; }
@@ -9748,19 +9954,6 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-vname.on { border-color: var(--accent); color: var(--ink); }
 .cd-packonly { font: 600 12px var(--pixel); color: var(--gold); }
 /* A free box of your choice (a generation's Pokédex). */
-/* THE COVER, ON THE BINDER'S HEADER (it was its own banner until
-   2026-10-13): foil once the set is complete, gold for the master set, with
-   the sweep. Art, so it is the same in both themes. */
-.bn-head.done { position: relative; overflow: hidden; border: 0; background: linear-gradient(125deg, #2a1d5c, #6b2fa8 40%, #1aa4b8); }
-.bn-head.done .bn-count b, .bn-head.done .bn-count u, .bn-head.done small, .bn-head.done .bn-cover, .bn-head.done > button { color: #fff; }
-.bn-head.done .bn-prog i { background: rgba(255, 255, 255, .25); }
-.bn-head.done .bn-prog i::after { background: #fff; }
-.bn-head.master { background: linear-gradient(125deg, #7a5200, #f3c64c 40%, #fff1b8 55%, #c58b10); }
-.bn-head.master .bn-count b, .bn-head.master .bn-count u, .bn-head.master small, .bn-head.master .bn-cover, .bn-head.master > button { color: #3a2600; }
-.bn-head.master .bn-prog i::after { background: #3a2600; }
-.bn-head.done::after { content: ""; position: absolute; top: -20%; bottom: -20%; left: -40%; width: 30%; pointer-events: none;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .45), transparent); animation: cd-sweep 3.4s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .bn-head.done::after { animation: none; display: none; } }
 /* Earned titles: on You and on a trainer card. */
 .you-titles { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 4px; }
 /* A drawn title: the medal alone, its name in the tooltip (TitleBadges). */
@@ -10332,34 +10525,73 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ev-bingo .ev-banner { background: linear-gradient(90deg, #dff3e9, #f1faf5); border-color: #b7e0c9; }
 .ev-bingo .ev-banner > .ic { color: #2f9e6c; flex: none; }
 .ev-bingo.live { border-color: #2fbf71; }
-/* Held to a card's width: on a sideways phone the board is the whole screen,
-   and stretched squares (134px) made a card taller than the screen. */
+/* THE CARD (2026-10-15): printed paper - art, so the same in both themes -
+   B-I-N-G-O balls over the columns, thin printed rules, and the week's card
+   number at the foot. Held to a card's width: on a sideways phone the board
+   is the whole screen, and stretched squares (134px) made a card taller than
+   the screen. */
+.bg-card {
+  width: 100%; max-width: 360px; margin-inline: auto; padding: 8px 8px 6px; border-radius: 12px;
+  background: linear-gradient(180deg, #fffdf6, #f6efdc); color: #2b2b38;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 0 0 1px #e3d8bd, 0 8px 18px rgba(0, 0, 0, .22);
+}
+.bg-head { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); justify-items: center; padding-bottom: 6px; }
+.bg-ball {
+  display: grid; place-items: center; width: min(34px, 82%); aspect-ratio: 1; border-radius: 50%;
+  font: 800 16px / 1 var(--display); color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, .35);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .55), transparent 42%), var(--ball);
+  box-shadow: inset 0 -3px 5px rgba(0, 0, 0, .25), 0 2px 4px rgba(0, 0, 0, .25);
+}
+.bg-ball.b0 { --ball: #2d6fd8; }
+.bg-ball.b1 { --ball: #e04545; }
+.bg-ball.b2 { --ball: #2f9e6c; }
+.bg-ball.b3 { --ball: #e8961c; }
+.bg-ball.b4 { --ball: #8a4fd8; }
 .bg-grid {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
-  width: 100%; max-width: 360px; margin-inline: auto; container-type: inline-size;
+  position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  container-type: inline-size; border: 2px solid #2b2b38; border-radius: 4px; overflow: hidden; background: #fffdf6;
 }
 .bg-sq {
   position: relative; aspect-ratio: 1; min-width: 0; padding: 4px 3px; overflow: hidden;
   display: grid; align-content: center; justify-items: center; gap: 2px; text-align: center;
-  border-radius: 10px; border: 1px solid var(--line-firm); background: var(--surface-2); color: var(--ink);
-  cursor: pointer; font: 600 11px/1.15 var(--body);
+  border: 0; border-right: 1px solid #d9cfb8; border-bottom: 1px solid #d9cfb8; border-radius: 0;
+  background: none; color: #2b2b38; cursor: pointer; font: 600 11px/1.15 var(--body);
 }
-.bg-sq > span { overflow-wrap: break-word; }
+.bg-sq:nth-child(5n) { border-right: 0; }
+.bg-sq:nth-child(n + 21) { border-bottom: 0; }
+.bg-sq > span { position: relative; z-index: 1; overflow-wrap: break-word; }
 /* A narrow card (the desktop rail's 57px squares): a size down, so a word
    like "outbreak" fits whole rather than breaking mid-word. */
 @container (max-width: 320px) { .bg-sq { font-size: 10px; } }
-.bg-sq > i { font: 600 9px var(--pixel); font-style: normal; color: var(--ink-faint); }
+.bg-sq > i { position: relative; z-index: 1; font: 600 9px var(--pixel); font-style: normal; color: #8a8270; }
 /* Progress fills along the foot - drawn, as the rest of the board's is. */
 .bg-sq::after {
   content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p, 0) * 100%);
-  background: var(--accent); pointer-events: none;
+  background: #2d6fd8; opacity: .55; pointer-events: none;
 }
-.bg-sq.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.bg-sq.done { background: color-mix(in srgb, #2fbf71 20%, var(--surface-2)); border-color: #2fbf71; }
+.bg-sq.sel { outline: 2px dashed #2d6fd8; outline-offset: -4px; }
 .bg-sq.done::after { display: none; }
-.bg-sq.done > .ic { color: #2fbf71; }
+/* THE DAUBER: translucent ink over the printed words, never quite centred. */
+.bg-daub {
+  position: absolute; inset: 12%; z-index: 2; border-radius: 50%; pointer-events: none; mix-blend-mode: multiply;
+  background: radial-gradient(circle at 42% 38%, rgba(226, 52, 98, .5), rgba(206, 28, 80, .62) 62%, rgba(206, 28, 80, .4) 70%, transparent 72%);
+  transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--r, 0deg));
+  animation: bg-dab .35s ease-out both;
+}
+@keyframes bg-dab { from { opacity: 0; transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--r, 0deg)) scale(1.35); } }
 .bg-sq.free { cursor: default; }
-.bg-sq.free > b { font: 700 11px var(--pixel); color: #2f9e6c; }
+.bg-sq.free > b { position: relative; z-index: 1; font: 800 13px var(--display); color: #2b2b38; }
+.bg-sq.free .bg-daub { background: radial-gradient(circle at 42% 38%, rgba(240, 180, 40, .55), rgba(226, 150, 20, .65) 62%, rgba(226, 150, 20, .4) 70%, transparent 72%); }
+/* A FINISHED LINE is struck through in marker, drawn once as it appears. */
+.bg-lines { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; overflow: visible; }
+.bg-lines line {
+  /* In the grid's own units (it is square), so the dash that draws it is the line's length. */
+  stroke: #e04545; stroke-width: .13; stroke-linecap: round; opacity: .72;
+  stroke-dasharray: 1; stroke-dashoffset: 0; animation: bg-strike .6s ease-out both;
+}
+@keyframes bg-strike { from { stroke-dashoffset: 1; } }
+.bg-foot { display: flex; justify-content: space-between; padding: 5px 2px 0; font: 600 10px var(--pixel); color: #8a8270; }
+@media (prefers-reduced-motion: reduce) { .bg-daub, .bg-lines line { animation: none; } }
 .bg-say { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .bg-say > b { color: var(--ink); font-weight: 600; }
 .bg-say > span { flex: none; font: 600 11px var(--pixel); color: var(--ink-faint); }
@@ -10371,8 +10603,8 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 @container rail (min-width: 620px) {
   .ev-bingo { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); column-gap: 18px; align-items: start; }
   .ev-bingo > .ev-banner { grid-column: 1 / -1; }
-  .ev-bingo > .bg-grid { grid-column: 1; grid-row: 2 / span 6; }
-  .ev-bingo > :not(.ev-banner):not(.bg-grid) { grid-column: 2; }
+  .ev-bingo > .bg-card { grid-column: 1; grid-row: 2 / span 6; }
+  .ev-bingo > :not(.ev-banner):not(.bg-card) { grid-column: 2; }
   .ev-bingo > .ev-meta { flex-direction: column; gap: 4px; }
 }
 
