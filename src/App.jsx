@@ -1391,6 +1391,8 @@ export default function App({
               onStar={(id) => engine.star(id)}
               bingo={bingo}
               onClaimBingo={() => engine.claimBingo()}
+              invite={{ due: refDue, counted: (refInfo?.invited ?? []).filter((x) => x.paid).length }}
+              onInvite={account ? () => setInvite({ welcome: false }) : null}
             />
           )}
           state={st}

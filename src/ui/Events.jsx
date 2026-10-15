@@ -21,6 +21,9 @@ import {
 } from "../game/research.js";
 import { badgesOf } from "../game/league.js";
 import Bingo from "./Bingo.jsx";
+import Icon from "./Icon.jsx";
+import { REF_EACH, REF_WELCOME, REF_RULE, rewardWords } from "../game/referral.js";
+import { itemById } from "../game/items.js";
 
 const NEAREST = 10;  // how many unfinished entries the Discovery card lists (4 until 2026-10-13, asked for)
 
@@ -75,7 +78,7 @@ function Pips({ total, spent, label: aria }) {
 /* THE EVENTS BOARD, as the Rotom panel's Events app (2026-10-01). It was a
    dialog off the ☰ menu and the HUD's cards; both now open this app beside
    the game, which is still being played - so it locks no keys. */
-export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onStar, bingo, onClaimBingo }) {
+export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onStar, bingo, onClaimBingo, invite = null, onInvite = null }) {
   const ob = world?.outbreak ?? null;
   const obSp = ob && speciesById(ob.speciesId);
   const obLive = ob && ob.left > 0;
@@ -102,6 +105,30 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
         <div className="hp-body">
           {/* WEEKLY BINGO - the week's card, first: it is what every other card feeds. */}
           <Bingo card={bingo} onClaim={onClaimBingo} />
+          {/* INVITE FRIENDS, second on the board (asked for, 2026-10-16: on Events
+              so it is seen) - what you both get, how many have counted, and the
+              dialog (Invite.jsx) one press away. Signed out, it says how to start. */}
+          <section className={`ev-card ev-invite${invite?.due ? " live" : ""}`}>
+            <header className="ev-banner">
+              <Icon n="gift" size={22} />
+              <h4>Invite friends</h4>
+              <span className={`ev-stamp${invite?.due ? " live" : ""}`}>
+                {invite?.due ? "REWARD!" : `${invite?.counted ?? 0} / ${REF_RULE.cap}`}
+              </span>
+            </header>
+            <p>Share your link. When a friend gets going, you both get big rewards.</p>
+            <div className="ev-meta">
+              <span>You, per friend: {rewardWords(REF_EACH, (id) => itemById(id)?.name ?? id)}</span>
+              <span>Your friend: {rewardWords(REF_WELCOME, (id) => itemById(id)?.name ?? id)}</span>
+            </div>
+            {onInvite
+              ? (
+                <button type="button" className="ev-go" onClick={onInvite}>
+                  {invite?.due ? `Claim ${invite.due} reward${invite.due === 1 ? "" : "s"}` : "Invite friends ›"}
+                </button>
+              )
+              : <p className="ev-quiet">Sign in to get your own invite link.</p>}
+          </section>
           {/* OUTBREAK - the raid of the day. */}
           <section className={`ev-card ev-raid${obLive ? " live" : ""}`}>
             <header className="ev-banner">

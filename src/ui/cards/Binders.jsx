@@ -30,8 +30,10 @@ import Sprite from "../Sprite.jsx";
 /* THE POKEDEX BINDER (asked for, 2026-10-16): pocket i is National Dex #i+1.
    An empty one shows who belongs there - the sprite, the number, the name -
    so you know which card to look for; tapping it offers only that
-   Pokemon's cards. Its pockets never move (no drag), and it fills itself
-   from your collection on request. */
+   Pokemon's cards. Its pockets never move (no drag). It is FILLED BY HAND,
+   card by card (your call, 2026-10-16: an automatic fill took the effort out
+   of completing it), and it is the game's, not yours: one per player, reset
+   rather than deleted. */
 const baseNo = (id) => speciesById(id)?.of ?? id;
 // Where each region starts in the National Dex, for the jump.
 const REGION_STARTS = Object.keys(REGION_NAME).map(Number)
@@ -243,7 +245,6 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
   const [asking, setAsking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [drag, setDrag] = useState(null);           // { from, over, x, y, w }
-  const [note, setNote] = useState("");
   const b = binders.find((x) => x.id === openId) ?? null;
   const [draft, setDraft] = useState("");
   useEffect(() => { setDraft(b?.name ?? ""); }, [b?.id, b?.name]);
@@ -257,7 +258,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
     const t = setTimeout(() => { if (phase === "closing") setOpenId(null); setPhase("open"); }, OPEN_MS);
     return () => clearTimeout(t);
   }, [phase]);
-  const open = (id) => { setOpenId(id); setPage(0); setSel(null); setNote(""); setPhase(reduced() ? "open" : "opening"); };
+  const open = (id) => { setOpenId(id); setPage(0); setSel(null); setPhase(reduced() ? "open" : "opening"); };
   const close = () => { setSel(null); if (reduced()) setOpenId(null); else setPhase("closing"); };
 
   if (!b) {
@@ -279,7 +280,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
             <span className="mb-meta">Cards from any set</span>
           </button>
         )}
-        {binders.length < BINDER_MAX && (
+        {binders.length < BINDER_MAX && !binders.some((x) => x.dex === 1) && (
           <button type="button" className="mb-book mb-new" onClick={() => { const id = engine.newBinder("", true); if (id) open(id); }}>
             <span className="lc mb-blank" aria-hidden="true"><b>#</b>New Pokédex binder</span>
             <span className="mb-meta">A pocket for every Pokémon, in order</span>
@@ -296,33 +297,6 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
   const isDex = b.dex === 1;
   const count = isDex ? DEX_POCKETS
     : Math.min(BINDER_POCKETS, Math.max(2 * PAGE_POCKETS, Math.ceil((b.pockets.length + 1) / PAGE_POCKETS) * PAGE_POCKETS));
-  /* FILL FROM YOUR CARDS (a Pokedex binder): each empty pocket takes your
-     rarest held printing of its Pokemon - a card filed by its first Pokemon,
-     a form under its base - from the sets loaded. Filled pockets stay. */
-  const fillable = () => {
-    if (!isDex) return [];
-    const best = new Map();
-    for (const s of CARD_SETS) {
-      for (const c of sets[s.id]?.CARDS ?? []) {
-        const row = cards[`${s.id}-${c[0]}`];
-        const v = row && ["h", "r", "n"].find((x) => row[x] && c[4].includes(x));
-        if (!v || !c[5].length) continue;
-        const sp = Math.min(...c[5].map(baseNo));
-        if (sp > DEX_POCKETS || b.pockets[sp - 1]) continue;
-        const r = rungOf(c[3]);
-        if (!best.has(sp) || r > best.get(sp).r) best.set(sp, { key: `${s.id}-${c[0]}:${v}`, r });
-      }
-    }
-    return [...best].map(([sp, x]) => [sp - 1, x.key]);
-  };
-  const fill = () => {
-    const add = fillable();
-    if (!add.length) { setNote("Nothing new to file - every Pokémon you hold a card of is in."); return; }
-    const p = Array.from({ length: DEX_POCKETS }, (_, i) => b.pockets[i] ?? null);
-    for (const [i, k] of add) p[i] = k;
-    engine.setBinder(b.id, { pockets: p });
-    setNote(`Filed ${add.length} card${add.length === 1 ? "" : "s"} in their pockets.`);
-  };
   const put = (pockets) => engine.setBinder(b.id, { pockets });
   const swap = (from, to) => {
     if (to < 0 || to >= count || to === from) return;
@@ -447,10 +421,8 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
         <span className="mb-count">{filled} card{filled === 1 ? "" : "s"}</span>
         <span className="mb-actions">
           <button type="button" className="tp-quiet" onClick={() => setEditing(true)}>Cover</button>
-          <button type="button" className="tp-quiet" onClick={() => setAsking(true)}>Delete</button>
-          {isDex
-            ? <button type="button" className="lg-go" onClick={fill}>Fill from my cards</button>
-            : <button type="button" className="lg-go" onClick={() => setPicker({ many: true })}>Add cards</button>}
+          <button type="button" className="tp-quiet" disabled={isDex && !filled} onClick={() => setAsking(true)}>{isDex ? "Reset" : "Delete"}</button>
+          {!isDex && <button type="button" className="lg-go" onClick={() => setPicker({ many: true })}>Add cards</button>}
         </span>
       </div>
       {isDex && (
@@ -463,9 +435,8 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
           <span className="mb-count">{filled} of {DEX_POCKETS} Pokémon</span>
         </div>
       )}
-      {note && <p className="mb-hint" role="status">{note}</p>}
       <p className="mb-hint">
-        {isDex ? "Every pocket is one Pokémon, in Pokédex order. Tap an empty pocket to pick from your cards of it."
+        {isDex ? "Every pocket is one Pokémon, in Pokédex order. Tap an empty pocket to choose one of your cards of it."
           : !filled ? "An empty binder. Tap a pocket, or Add cards, to fill it from any set you collect."
             : "Drag a card onto another pocket to swap them - hold it over ‹ or › to turn the page. On a phone, hold the card first."}
       </p>
@@ -534,15 +505,27 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
         document.body,
       )}
       {asking && createPortal(
-        <Confirm
-          title={`Delete "${b.name}"?`}
-          lines={[["Cards in it", filled]]}
-          note="Only the binder goes. Every card stays in your collection."
-          confirmLabel="DELETE"
-          tone="warn"
-          onConfirm={() => { engine.deleteBinder(b.id); setAsking(false); setOpenId(null); }}
-          onCancel={() => setAsking(false)}
-        />,
+        isDex ? (
+          <Confirm
+            title="Reset your Pokédex binder?"
+            lines={[["Cards in it", filled]]}
+            note="Every pocket is emptied and you start again. Every card stays in your collection."
+            confirmLabel="RESET"
+            tone="warn"
+            onConfirm={() => { engine.setBinder(b.id, { pockets: [] }); setAsking(false); setSel(null); }}
+            onCancel={() => setAsking(false)}
+          />
+        ) : (
+          <Confirm
+            title={`Delete "${b.name}"?`}
+            lines={[["Cards in it", filled]]}
+            note="Only the binder goes. Every card stays in your collection."
+            confirmLabel="DELETE"
+            tone="warn"
+            onConfirm={() => { engine.deleteBinder(b.id); setAsking(false); setOpenId(null); }}
+            onCancel={() => setAsking(false)}
+          />
+        ),
         document.body,
       )}
     </div>

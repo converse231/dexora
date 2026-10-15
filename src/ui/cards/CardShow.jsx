@@ -91,7 +91,7 @@ export default function CardShow({ list, self, onAdd = null }) {
         const s = sets[setOf(c.id)];
         const row = s?.CARDS.find((r) => `${s.SET.id}-${r[0]}` === c.id);
         return row ? (
-          <button key={`${c.id}:${c.v}`} type="button" className="cd-chase-card got cs-open" onClick={() => setOpen({ s, row, v: c.v })}
+          <button key={`${c.id}:${c.v}`} type="button" className="cd-chase-card got csz-open" onClick={() => setOpen({ s, row, v: c.v })}
             aria-label={`${row[1]}, ${RARITY[row[3]].name}, ${VARIANT_NAME[c.v]} - look closer`}>
             <CardFace setId={s.SET.id} card={row} variant={c.v} still lazy />
           </button>

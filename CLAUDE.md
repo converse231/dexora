@@ -907,7 +907,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   is National Dex #i+1 (`DEX_POCKETS`, held to the dex's species count): an
   empty pocket shows that Pokemon's sprite, number and name, the picker
   offers only its cards (a form files under its base, `of`), pockets never
-  drag, and Fill files your rarest printing of each into its empty pocket.
+  drag, and it is filled BY HAND (no auto-fill: the effort is the point) and
+  RESET, never deleted - one a player, the game's (engine refuses both).
+  Diamond is the PRISM HALO (2026-10-16): white ice, a thin dark outline,
+  and a rainbow ring turning behind it (`.dia-halo`, masked to a ring - a
+  disc washed the body out on a Dex tile).
   The last card of every pack charges and flashes (white until the charge),
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.
@@ -1206,6 +1210,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `referral_rule()` equals `REF_RULE`; the engine's `claimReferrals` pays
   each id once (`referralsPaid`). A followed link's answer is never dropped
   for an effect re-run (the account object changes right after sign-in).
+  The way in is You › Invite friends, Trading's Your friends banner, and an
+  Invite card second on the Events board (after Bingo, 2026-10-16).
   **A block works both ways and ends the friendship**, and friending refuses
   across one, so friends implies no block and the friends-only modes need no
   check of their own; every other read (search, card, shelf, offer, request)
