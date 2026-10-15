@@ -16,7 +16,7 @@ import { LIMITS, tradeable } from "../../game/trade.js";
 import { variantOf, keeper } from "../../game/items.js";
 import { flushNow } from "../../game/store.js";
 import {
-  myCard, cardByName, searchTrainers, updateCard, myFriends,
+  myCard, cardByName, searchTrainers, suggestTrainers, updateCard, myFriends,
   addFriend, requestFriend, answerFriend, removeFriend, push,
   blockUser, unblockUser, myBlocks, reportUser,
   surpriseDeposit, surpriseWithdraw, trainerShelf, setShelf,
@@ -240,6 +240,16 @@ export default function TradeCenter({
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState("");
   const [found, setFound] = useState(null);
+  /* TRAINERS TO MEET (asked for, 2026-10-15): a shuffled handful of other
+     trainers, recently played first (`suggest_trainers`). Null until it
+     answers; a server without the function yet answers nothing, and the
+     section stays hidden rather than closing the Trade Center. */
+  const [meet, setMeet] = useState(null);
+  const [asked, setAsked] = useState([]);          // asked from here this visit
+  const shuffle = useCallback(async () => {
+    const got = await suggestTrainers();
+    setMeet(got.ok && Array.isArray(got.data) ? got.data : []);
+  }, []);
   const [code, setCode] = useState("");
 
   const answer = useCallback((got) => {
@@ -266,6 +276,8 @@ export default function TradeCenter({
       else if (got.ok) setNote(`No trainer called “${openName}”.`);
     });
   }, [signedIn, openName, load, answer]);
+
+  useEffect(() => { if (signedIn && tab === "trainers" && meet === null) shuffle(); }, [signedIn, tab, meet, shuffle]);
 
   // Escape and Back peel one view off at a time, then close.
   const back = useCallback(() => {
@@ -534,8 +546,52 @@ export default function TradeCenter({
           {found && (found.length
             ? <ul className="tc-rows">{found.map((c) => <Row key={c.user_id} card={c} onOpen={setViewing} />)}</ul>
             : <p className="ev-quiet">No trainer by that name.</p>)}
-          <p className="ev-quiet">Your friends, requests and friend code are on your trainer card: You › Your trainer card.</p>
         </section>
+
+        {/* Your friends, one tap from their card or their Pokemon; requests,
+            your code and blocks stay on your own card. */}
+        <section className="ev-card">
+          <header className="ev-banner"><h4>Your friends</h4><span className="tp-count">{accepted.length}</span></header>
+          {friends === null
+            ? <p className="ev-quiet">{fail ? "" : "Loading…"}</p>
+            : accepted.length
+              ? (
+                <ul className="tc-rows">
+                  {accepted.map((f) => (
+                    <Row key={f.card.user_id} card={f.card} onOpen={setViewing}>
+                      <button type="button" className="tp-quiet tc-browse" aria-label={`Browse ${f.card.username}'s Pokémon`}
+                        onClick={() => setBrowsing({ card: f.card, query: "" })}>Pokémon</button>
+                    </Row>
+                  ))}
+                </ul>
+              )
+              : <p className="ev-quiet">No friends yet - add someone from Trainers to meet below.</p>}
+          <p className="ev-quiet">Requests, your friend code and blocks are on your trainer card: You › Your trainer card.</p>
+        </section>
+
+        {meet?.length > 0 && (
+          <section className="ev-card">
+            <header className="ev-banner">
+              <h4>Trainers to meet</h4>
+              <button type="button" className="tp-quiet tc-shuffle" onClick={() => setMeet(null)}>Shuffle</button>
+            </header>
+            <ul className="tc-rows">
+              {meet.map((c) => (
+                <Row key={c.user_id} card={c} onOpen={setViewing}>
+                  {asked.includes(c.user_id)
+                    ? <span className="tc-asked">Requested</span>
+                    : (
+                      <button type="button" className="tp-quiet tc-browse" disabled={busy} aria-label={`Add ${c.username} as a friend`}
+                        onClick={() => act(() => requestFriend(c.user_id), (r) => {
+                          if (r === "sent" || r === "friends" || r === "already") setAsked((a) => [...a, c.user_id]);
+                          return r === "unknown" ? "That trainer can't be added." : ADD_SAYS[r];
+                        })}>Add</button>
+                    )}
+                </Row>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     );
   }

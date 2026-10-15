@@ -752,7 +752,9 @@ returns jsonb language sql immutable set search_path = '' as $$
 $$;
 
 -- TITLES, as src/game/titles.js derives them: a set's milestones paid
--- (4 = the whole set, 5 = the master set) and a generation's Pokédex medal.
+-- (4 = the whole set, 5 = the master set), a generation's Pokédex medal, and
+-- a generation's Pokédex in one rare tier ('tier:<tier>:<gen>', a tier the
+-- server knows - tier_list()), which is its own medal id.
 create or replace function public.card_titles(data jsonb)
 returns text[] language sql immutable set search_path = '' as $$
   select coalesce(array_agg(t order by t), '{}') from (
@@ -766,7 +768,11 @@ returns text[] language sql immutable set search_path = '' as $$
     union all
     select 'dex:' || substr(g, 5)
       from jsonb_array_elements_text(case when jsonb_typeof(data->'medals') = 'array' then data->'medals' else '[]' end) g
-     where g ~ '^gen:[1-9]$') x
+     where g ~ '^gen:[1-9]$'
+    union all
+    select g
+      from jsonb_array_elements_text(case when jsonb_typeof(data->'medals') = 'array' then data->'medals' else '[]' end) g
+     where g ~ '^tier:[a-z]+:[1-9]$' and split_part(g, ':', 2) = any(public.tier_list())) x
 $$;
 
 -- A box entry as a card shows it - fields read off the stored save only.
@@ -1595,3 +1601,25 @@ revoke all on function public.refuse_flagged_mons() from public, anon, authentic
 drop trigger if exists mons_refuse_flagged on public.mons;
 create trigger mons_refuse_flagged before insert on public.mons
   for each row execute function public.refuse_flagged_mons();
+
+-- =================================================================== TRAINERS TO MEET
+-- (2026-10-15, asked for) A handful of other trainers to open and befriend on
+-- the Trainers tab: never you, never a friend or a request either way, never
+-- across a block, never a flagged account (above, so it is defined first);
+-- trainers who played in the last 30 days first, shuffled within each.
+-- Volatile on purpose: each call is a new shuffle.
+-- ponytail: random() over every card - fine for thousands; a sampled pool if it grows past that.
+create or replace function public.suggest_trainers()
+returns jsonb language sql security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(public.public_card(c)), '[]') from (
+    select t.* from public.trainer_cards t
+     where auth.uid() is not null and t.user_id <> auth.uid()
+       and not exists (select 1 from public.friends f
+                        where (f.a = auth.uid() and f.b = t.user_id) or (f.a = t.user_id and f.b = auth.uid()))
+       and not public.blocked_between(auth.uid(), t.user_id)
+       and not exists (select 1 from public.profiles p where p.user_id = t.user_id and p.flagged_at is not null)
+     order by coalesce(t.played_at > now() - interval '30 days', false) desc, random()
+     limit 8) c
+$$;
+revoke all on function public.suggest_trainers() from public, anon;
+grant execute on function public.suggest_trainers() to authenticated;

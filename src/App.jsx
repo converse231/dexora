@@ -52,7 +52,7 @@ import DexSheet from "./ui/DexSheet.jsx";
 import { modalOpen } from "./ui/modal.js";
 import Cheer from "./ui/Cheer.jsx";
 import RankUp from "./ui/RankUp.jsx";
-import { DEX_RANKS, dexRank, rankLine } from "./game/medals.js";
+import { DEX_RANKS, dexRank, rankLine, tierName } from "./game/medals.js";
 import Types from "./ui/Types.jsx";
 import Evolve from "./ui/Evolve.jsx";
 /* ON DEMAND: the Trade Center is its own chunk, fetched the first time it
@@ -1064,7 +1064,9 @@ export default function App({
                       data-tip="A finished Pokédex - claim its reward">
                       <Icon n="trophy" size={18} className="ms-ic" />
                       <i>REWARD</i>
-                      <b>{REGION_NAME[claims[0]]} complete<em className="ms-dot" aria-hidden="true">!</em></b>
+                      <b>{typeof claims[0] === "string"
+                        ? `${REGION_NAME[claims[0].split(":")[2]]} ${tierName(claims[0].split(":")[1])}`
+                        : REGION_NAME[claims[0]]} complete<em className="ms-dot" aria-hidden="true">!</em></b>
                     </button>
                   )}
                 </div>

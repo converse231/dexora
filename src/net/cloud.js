@@ -561,6 +561,7 @@ async function tradeCall(fn, args = {}) {
 export const myCard = () => tradeCall("my_card");
 export const cardByName = (name) => tradeCall("card_by_name", { name: String(name ?? "").trim() });
 export const searchTrainers = (q) => tradeCall("find_trainers", { q });
+export const suggestTrainers = () => tradeCall("suggest_trainers");
 export const updateCard = (showcase, seeking) => tradeCall("update_card", { showcase, seeking });
 export const myFriends = () => tradeCall("my_friends");
 export const addFriend = (code) => tradeCall("add_friend", { code });

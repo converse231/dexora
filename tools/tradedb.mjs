@@ -310,7 +310,7 @@ assert.equal(ca.showcase.find((m) => m.uid === 1).species, 18, "the showcase did
     cardShowcase: ["me01-187:h", "me01-001:r", "me01-001:r", "me01-999:h", "me01-003:n", "bad key", "me01-001:n",
       "me01-003:h", "x1-1:n", "x2-2:n", "x3-3:n", "x4-4:n"],
     milestones: { me01: 5, me02: 4, me025: 2 },
-    medals: ["gen:1", "gen:9", "dex", "gen:10"],
+    medals: ["gen:1", "gen:9", "dex", "gen:10", "tier:gold:1", "tier:bogus:1", "tier:gold:10"],
   };
   await rpc(A, "save_game", { payload: cardsPayload, sess: "s-a" });
   const cc = await card(A);
@@ -318,7 +318,7 @@ assert.equal(ca.showcase.find((m) => m.uid === 1).species, 18, "the showcase did
     `card showcase ${JSON.stringify(cc.card_show)} - an unheld printing, a repeat or a bad key got through`);
   assert.deepEqual(cc.titles, titleIds(cardsPayload.milestones, cardsPayload.medals),
     `titles ${cc.titles} are not the game's ${titleIds(cardsPayload.milestones, cardsPayload.medals)}`);
-  assert.deepEqual(cc.titles, ["dex:1", "dex:9", "master:me01", "set:me01", "set:me02"]);
+  assert.deepEqual(cc.titles, ["dex:1", "dex:9", "master:me01", "set:me01", "set:me02", "tier:gold:1"]);
   // Sold off: a card that leaves the save leaves the card.
   await rpc(A, "save_game", { payload: { ...cardsPayload, cards: { "me01-001": { n: 2 } } }, sess: "s-a" });
   assert.deepEqual((await card(A)).card_show, [{ id: "me01-001", v: "n" }], "a card no longer held stayed on the trainer card");
@@ -565,12 +565,23 @@ assert.equal((await rpc(B, "card_by_name", { name: " testera " }))?.username, "T
 assert.ok(!("friend_code" in (await rpc(B, "card_by_name", { name: "TesterA" }))), "a card by name handed out a friend code");
 assert.equal((await rpc(A, "my_card", {})).friend_code, code5, "your own card does not show your code");
 
+// ---- 32b. TRAINERS TO MEET: never yourself, never a code, at most eight; a friend and a
+// block (below) take a trainer out. Shuffled, so only what must hold every call is asserted.
+const meet = async (who, n = 5) => (await Promise.all(Array.from({ length: n }, () => rpc(who, "suggest_trainers", {})))).flat();
+{
+  const got = await meet(A);
+  assert.ok(got.length > 0, "nobody was suggested though TesterB is a stranger");
+  assert.ok(got.every((c) => c.user_id !== A.id && !("friend_code" in c)), "a suggestion was yourself or handed out a code");
+  assert.ok((await rpc(A, "suggest_trainers", {})).length <= 8, "more than eight trainers were suggested");
+}
+
 // ---- 33. a friend request by trainer (a profile's button), and the inbox counts it ------------
 assert.equal(await rpc(A, "request_friend", { other: B.id }), "sent", "a request by trainer failed");
 assert.equal((await rpc(B, "trade_inbox", {})).friend_requests, 1, "the inbox did not count a friend request");
 assert.equal((await rpc(A, "trade_inbox", {})).friend_requests, 0, "the inbox counted the asker's own request");
 assert.ok(!(await rpc(B, "my_friends", {})).some((f) => "friend_code" in f.card), "the friends list handed out a friend code");
 assert.equal(await rpc(B, "request_friend", { other: A.id }), "friends", "asking back by trainer did not accept");
+assert.ok(!(await meet(A)).some((c) => c.user_id === B.id), "a friend was suggested as a trainer to meet");
 assert.equal(await rpc(A, "request_friend", { other: A.id }), "self", "a trainer befriended themselves by trainer");
 assert.equal(await rpc(A, "request_friend", { other: "00000000-0000-0000-0000-000000000000" }), "unknown",
   "a request to nobody did not say so");
@@ -586,6 +597,8 @@ assert.equal((await rpc(A, "trade_inbox", {})).locks[a5[90]], "held", "a block l
 assert.equal((await q("select count(*)::int n from public.trades where status = 'open' and (a = any($1) or b = any($1))", [both]))[0].n, 0,
   "a block left an offer open");
 assert.deepEqual(await rpc(A, "my_friends", {}), [], "a block left the friendship");
+assert.ok(!(await meet(A)).some((c) => c.user_id === B.id) && !(await meet(B)).some((c) => c.user_id === A.id),
+  "a trainer was suggested across a block");
 for (const [x, y, name, other] of [[A, B, "testerb", "TesterB"], [B, A, "testera", "TesterA"]]) {
   const way = `${x.tag} -> ${y.tag}`;
   assert.deepEqual(await rpc(x, "find_trainers", { q: name }), [], `search found across a block (${way})`);
@@ -890,6 +903,7 @@ await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
   assert.equal(await rpc(C, "save_game", { payload: { ...base, steps: 1001321, caught: 1431, xp: 100000544 }, sess: "s-pace" }), true,
     "an impossible save was refused - it must be stored, and flagged");
   assert.ok((await flag()).flagged_at && /steps/.test((await flag()).flag_reason), "a million steps in a second did not flag the account");
+  assert.ok(!(await meet(A, 8)).some((c) => c.user_id === C.id), "a flagged account was suggested as a trainer to meet");
   assert.equal((await q("select count(*)::int n from public.mons where owner = $1", [C.id]))[0].n, 0, "a flagged account kept Pokemon in trading");
   await refuses(rpc(C, "register_mons", { snaps: [{ uid: 2, species: 19, level: 6 }] }), "a flagged account registered a Pokemon");
   await q("insert into public.mons (owner, local_uid, species, level) values ($1, 2, 19, 6)", [C.id]);

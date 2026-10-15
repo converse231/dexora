@@ -940,7 +940,15 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `boxVouchers` entry is claimed the same way, rolled). The medal gives the
   title and the Pokedex Charm (`dexCharm`, `DEX_CHARM` 2x on that
   generation's tier roll, a Mega through `genOf`; between `RESEARCH_LIFT`
-  and `OUTBREAK_LIFT`, your call 2026-10-03).
+  and `OUTBREAK_LIFT`, your call 2026-10-03). **A region in one rare tier**
+  is its own medal (`tier:<tier>:<gen>`, `TIER_MEDALS`, your call
+  2026-10-15): every species of the region's medal held in that tier ROW (own
+  play; a trade sets none), less a species whose art cannot wear it
+  (`tiersFor`). Claimed last through `claimDex` - a random set's box and the
+  title "<Region> <Tier> Dex Master" only, no money, Master Ball or charm.
+  Its badge is the region's with the tier's mark tagged at its foot, and a
+  region shows ONE, its rarest (`shownTitles`; 144 would bury a card). The
+  SQL's `card_titles` derives the same ids (re-apply trading.sql).
 - **Achievements are DERIVED, never counted** (`achievements.js`, a page
   off You, 2026-10-10): each is a ladder of steps over a number the save
   already holds (`caught`, `steps`, tier rows, `beaten`, research rows -
@@ -1178,7 +1186,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `trade_board` and `fulfil_listing`); `fits` in trade.js mirrors
   `fulfil_listing`'s rule for the button. **Friends live on your trainer
   card** (the profile's Friends panel: requests, the list, add by code,
-  blocked; their count lights You, not Trade); the Trainers tab is search.
+  blocked; their count lights You, not Trade); the Trainers tab is search,
+  your friends and **Trainers to meet** (2026-10-15, asked for:
+  `suggest_trainers`, eight shuffled strangers - recently played first,
+  never a friend or request, never across a block, never a flagged account;
+  a page answers nothing, never `closed`, until the server has it).
   **A block works both ways and ends the friendship**, and friending refuses
   across one, so friends implies no block and the friends-only modes need no
   check of their own; every other read (search, card, shelf, offer, request)

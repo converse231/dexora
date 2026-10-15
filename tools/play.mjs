@@ -2591,7 +2591,7 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
   {
     const T = await import("../src/game/titles.js");
     const M = await import("../src/game/medals.js");
-    const { dexIndex: di, speciesById: byId } = await import("../src/game/biomes.js");
+    const { dexIndex: di, speciesById: byId, tiersFor: tiersOf } = await import("../src/game/biomes.js");
     const { SPECIES } = await import("../src/data/dex.js");
     const { CARD_SETS } = await import("../src/data/cards/index.js");
     const kanto = M.MEDALS.find((m) => m.id === "gen:1");
@@ -2645,6 +2645,33 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
     assert.equal(M.dexCharm(152, g.state.medals), 1, "Johto took Kanto's charm");
     assert.deepEqual(T.titleIds({}, g.state.medals), ["dex:1"]);
     assert.equal(T.titleName("dex:1"), "Kanto Dex Master");
+
+    /* A REGION IN ONE RARE TIER (asked for, 2026-10-15): every Kanto species
+       in Gold, by your own play, is a claim - one short is not - and it pays
+       a box and its title, never money or a Master Ball. A species whose art
+       cannot wear a tier is not asked for in it. */
+    const goldKanto = M.TIER_MEDALS.find((m) => m.id === "tier:gold:1");
+    const row = Array(SAVE.dex.length).fill(0);
+    for (const id of goldKanto.need) row[di(id)] = 1;
+    row[di(goldKanto.need[0])] = 0;
+    assert.deepEqual(boot({ ...old, box: [], medals: ["gen:1"], gold: row }).e.dexClaims(), [], "a Gold Kanto one short is a claim");
+    row[di(goldKanto.need[0])] = 1;
+    const tk = boot({ ...old, box: [], medals: ["gen:1"], gold: row }).e;
+    assert.deepEqual(tk.dexClaims(), ["tier:gold:1"], "a Gold Kanto is not a claim");
+    const tw = tk.claimDex(() => 0);
+    assert.deepEqual([tw.tier, tw.gen, tw.money, tk.state.money, tk.state.bag["master-ball"] ?? 0], ["gold", 1, 0, old.money, 0],
+      "a tier Pokédex paid money or a Master Ball");
+    assert.equal(tk.state.earnedPacks[CARD_SETS[0].id].filter((x) => x === "tier:gold:1").length, C.BOXES[CARD_SETS[0].id].packs,
+      "a tier Pokédex's box is not earned and stamped");
+    assert.deepEqual(tk.dexClaims(), [], "a claimed tier Pokédex is still a claim");
+    assert.ok(T.titleIds({}, tk.state.medals).includes("tier:gold:1"), "a tier Pokédex gave no title");
+    assert.deepEqual(T.titleIds({}, ["tier:bogus:1", "tier:gold:10"]), [], "a tier the game does not know became a title");
+    assert.equal(T.titleName("tier:gold:1"), "Kanto Gold Dex Master");
+    assert.deepEqual(T.shownTitles(["tier:gold:1", "tier:vivid:1", "tier:vivid:2"]), ["tier:gold:1", "tier:vivid:2"],
+      "a region's tier Pokédexes are not one badge, its rarest");
+    assert.ok(M.TIER_MEDALS.every((m) => m.need.every((id) => byId(id) && tiersOf(id).includes(m.tier))), "a tier Pokédex asks for a species that cannot wear it");
+    assert.ok(M.TIER_MEDALS.some((m) => m.need.length < M.MEDALS.find((x) => x.id === `gen:${m.gen}`).need.length),
+      "no species is ever left out of a tier it cannot wear - the art gates are not read");
 
     // The showcase: held printings only, the cap, off again.
     const sh = boot({ ...SAVE, cards: { "me01-001": { n: 1 }, "me01-003": { h: 1 } } }).e;

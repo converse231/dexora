@@ -52,7 +52,7 @@ import { CARD_SETS } from "../data/cards/index.js";
 import { defenders, defendNote } from "./ranked.js";
 import { nextStep, settlePhase, nextCast } from "./phases.js";
 import { isNight, phaseAt } from "./clock.js";
-import { medalsFor, milestoneAt, dexRank, rankLine, dexCharm, genMedalsDue } from "./medals.js";
+import { medalsFor, milestoneAt, dexRank, rankLine, dexCharm, genMedalsDue, tierMedalsDue } from "./medals.js";
 import { ACHIEVEMENTS, standing, payOf, cleanAchieved } from "./achievements.js";
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE, TUTOR_PRICE,
@@ -3328,14 +3328,28 @@ export function createEngine(canvas, onChange, mini = null) {
      plays: the medal (its title and Pokédex Charm), its money and Master
      Ball, and the box of a RANDOM set, every pack earned and stamped. A box
      of choice from before (`boxVouchers`) is claimed the same way, rolled.
-     Answers what was won, for the reel, or null. */
+     A region finished in one rare tier (`tier:<tier>:<gen>`, medals.js) is
+     claimed last, the same way: its title and a box, nothing else. A claim
+     is a generation's number, or a tier medal's id. Answers what was won,
+     for the reel, or null. */
+  const tierRows = () => Object.fromEntries(TIERS.map((t) => [t, state[t]]));
   const dexClaims = () => [
     ...genMedalsDue(state.dex, state.medals).map((m) => m.gen),
     ...state.boxVouchers.map((s) => Number(s.slice(4))),
+    ...tierMedalsDue(tierRows(), state.medals).map((m) => m.id),
   ];
   function claimDex(random = Math.random) {
     if (state.stale) return null;
     const medal = genMedalsDue(state.dex, state.medals)[0];
+    const tier = !medal && !state.boxVouchers.length ? tierMedalsDue(tierRows(), state.medals)[0] : null;
+    if (tier) {
+      state.medals.push(tier.id);
+      const set = CARD_SETS[Math.floor(random() * CARD_SETS.length)].id;
+      grantPacks(BOXES[set].packs, tier.id, set);
+      save();
+      changed();
+      return { gen: tier.gen, tier: tier.tier, set, packs: BOXES[set].packs, money: 0, items: {}, medal: true };
+    }
     const stamp = medal ? `dex:${medal.gen}` : state.boxVouchers[0];
     if (!stamp) return null;
     if (medal) {

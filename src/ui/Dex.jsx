@@ -53,11 +53,11 @@ const SORTS = {
    the per-phase rebuilds were gone. Every prop is a primitive or a stable
    reference (`sp` from SPECIES, `onSelect` a state setter; marks joined to a
    string), so `memo` compares for real and an untouched tile is skipped. */
-const Cell = memo(function Cell({ sp, state, variant, marks, full, studied, onSelect }) {
+const Cell = memo(function Cell({ sp, state, variant, marks, full, studied, lack, onSelect }) {
   const list = marks ? marks.split(",") : [];
   return (
     <button
-      className={`cell ${STATE[state]}${full ? " full" : ""}`}
+      className={`cell ${STATE[state]}${full ? " full" : ""}${lack ? " lack" : ""}`}
       onClick={() => onSelect(sp.id)}
       /* The tile is one button, so its label has to carry everything
          inside it - and the marks are images with their own alt text,
@@ -69,7 +69,7 @@ const Cell = memo(function Cell({ sp, state, variant, marks, full, studied, onSe
           ? `${label(sp)}, entry ${sp.id}${
               list.length ? `, ${list.join(" and ")}` : ""
             }${full ? ", every variant caught" : ""}${
-              studied ? ", research complete" : ""}`
+              studied ? ", research complete" : ""}${lack ? `, not yet in ${lack}` : ""}`
           : `Unknown Pokémon ${sp.id}`
       }
     >
@@ -197,6 +197,11 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
      way to start. */
   const [region, setRegion] = useState("all");
   const [find, setFind] = useState("");
+  /* WHAT A TIER IS MISSING (asked for, 2026-10-15: "I don't know which
+     Pokemon I'm missing for Gold"): filtered to a tier, the grid shows every
+     species that CAN wear it - the ones held in its art, the rest as gaps -
+     and this narrows it to either. */
+  const [hold, setHold] = useState("both");
 
   const at = (id) => dex?.[dexIndex(id)] ?? 0;
   const rank = dexRank(caught);
@@ -264,7 +269,11 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
        and is not now it is the engine state - `state` is null for the first
        render, and `null["all"]` threw before a single cell was drawn. Asking
        the list whether `only` names a tier does not touch the data at all. */
-    if (TIERS.includes(only) && !has(only, sp.id)) return false;
+    if (TIERS.includes(only)) {
+      if (!tiersFor(sp.id).includes(only)) return false;
+      if (hold === "held" && !has(only, sp.id)) return false;
+      if (hold === "missing" && has(only, sp.id)) return false;
+    }
 
     if (type === "legendary" && !LEGEND.has(sp.id)) return false;
     if (type !== "any" && type !== "legendary" && !sp.types.includes(type)) return false;
@@ -296,7 +305,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
         placeholder="Find a name, type or number…"
         onReset={() => {
           setOnly("all"); setType("any"); setSort("number"); setFind("");
-          setRegion("all");
+          setRegion("all"); setHold("both");
         }}
         selects={[
           {
@@ -420,6 +429,15 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
         <i style={{ width: `${(scope.caught / Math.max(1, scope.total)) * 100}%` }} />
       </div>
 
+      {tier && (
+        <div className="you-seg dx-hold" role="radiogroup" aria-label={`${tier} Pokémon to show`}>
+          {[["both", "Both", scope.total], ["held", "Held", scope.caught], ["missing", "Missing", scope.total - scope.caught]].map(([k, name, n]) => (
+            <button key={k} type="button" role="radio" aria-checked={hold === k} className={hold === k ? "on" : ""}
+              onClick={() => setHold(k)}>{name} {n}</button>
+          ))}
+        </div>
+      )}
+
       {!shown.length && <p className="empty">Nothing matches that.</p>}
 
       <div className="dexgrid" ref={grid}>
@@ -427,13 +445,15 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
           style={{ paddingTop: first * win.pitch, paddingBottom: (rows - last) * win.pitch }}>
         {shown.slice(first * win.cols, last * win.cols).map((sp) => {
           const state = at(sp.id);
+          const lack = tier && !has(tier, sp.id) ? tier : null;
           return (
             <Cell
               key={sp.id} sp={sp} state={state} onSelect={onSelect}
               /* Filtered to a tier, every tile wears THAT tier (asked for,
                  2026-10-06): the filter only lists species holding it, and
                  the rarest one held showed a Gold under "Shiny". */
-              variant={state > 0 ? (TIERS.includes(only) ? only : rarest(sp.id)) : null}
+              variant={state > 0 && !lack ? (tier ?? rarest(sp.id)) : null}
+              lack={lack}
               marks={MARKS.filter((t) => has(t, sp.id)).join(",")}
               full={complete(sp.id)}
               studied={researchLevel(sp.id, tiers?.research?.[sp.id]) >= RESEARCH_MAX}

@@ -10,7 +10,7 @@ import Reel, { CELLS, WIN_AT } from "./Reel.jsx";
 import { CARD_SETS } from "../data/cards/index.js";
 import { WRAPPERS } from "../data/cards/art.js";
 import { REGION_NAME } from "../game/biomes.js";
-import { DEX_CHARM } from "../game/medals.js";
+import { DEX_CHARM, tierName } from "../game/medals.js";
 import { packUrl, logoUrl } from "./cards/load.js";
 
 // Every prize here is a box of a set, so every cell is one - the roulette's
@@ -18,12 +18,17 @@ import { packUrl, logoUrl } from "./cards/load.js";
 const art = (set) => (WRAPPERS[set]?.[0] ? packUrl(set, WRAPPERS[set][0]) : logoUrl(set));
 const filler = () => CARD_SETS[Math.floor(Math.random() * CARD_SETS.length)].id;
 
-export default function DexClaim({ gen, onClaim, onCards, onClose }) {
+/* `gen` is a generation's number, or a region finished in one rare tier
+   (`tier:<tier>:<gen>`): the same reel, a box and its title only. */
+export default function DexClaim({ gen: key, onClaim, onCards, onClose }) {
   useModalLock();
+  const tier = typeof key === "string" ? tierName(key.split(":")[1]) : null;
+  const gen = tier ? Number(key.split(":")[2]) : key;
   const [won, setWon] = useState(null);     // what claimDex answered
   const [cells, setCells] = useState(null); // the strip, once there is a prize
   const [done, setDone] = useState(false);
   const region = REGION_NAME[gen] ?? "";
+  const title = `${region}${tier ? ` ${tier}` : ""} Dex Master`;
 
   const claim = () => {
     const r = onClaim();
@@ -47,16 +52,16 @@ export default function DexClaim({ gen, onClaim, onCards, onClose }) {
     <div className="sheet" {...useDismiss(() => { if (!won || done) onClose(); })}>
       <div className={`confirm dx-claim${won ? " rolling" : ""}${done ? " done" : ""}`} role="dialog" aria-modal="true"
         aria-label={`${region} Pokédex reward`} onClick={(e) => e.stopPropagation()}>
-        <span className="dc-kicker">Pokédex complete</span>
-        <h3 className="cf-title">{region.toUpperCase()} COMPLETE</h3>
+        <span className="dc-kicker">{tier ? `${tier} Pokédex complete` : "Pokédex complete"}</span>
+        <h3 className="cf-title">{region.toUpperCase()}{tier ? ` ${tier.toUpperCase()}` : ""} COMPLETE</h3>
         {!won ? (
           <>
-            <p className="dc-lede">Every {region} Pokémon, caught by you. Claim your reward:</p>
+            <p className="dc-lede">Every {region} Pokémon{tier ? ` in ${tier}` : ""}, caught by you. Claim your reward:</p>
             <ul className="dc-list">
               <li><b>A booster box</b> of a random set - roll for it</li>
-              <li><b>¥20,000</b> and a <b>Master Ball</b></li>
-              <li>The title <b>{region} Dex Master</b></li>
-              <li><b>Pokédex Charm</b>: {region}&rsquo;s rare forms {DEX_CHARM}&times; as likely</li>
+              {!tier && <li><b>¥20,000</b> and a <b>Master Ball</b></li>}
+              <li>The title <b>{title}</b>{tier ? " and its badge" : ""}</li>
+              {!tier && <li><b>Pokédex Charm</b>: {region}&rsquo;s rare forms {DEX_CHARM}&times; as likely</li>}
             </ul>
             <div className="cf-actions">
               <button type="button" className="cf-yes buy" autoFocus onClick={claim}>Claim and roll</button>
@@ -76,9 +81,9 @@ export default function DexClaim({ gen, onClaim, onCards, onClose }) {
               <>
                 <p className="dc-won"><b>{prize?.name}</b> · {won.packs} packs</p>
                 <ul className="dc-list">
-                  {won.medal && <li><b>¥{won.money.toLocaleString("en-US")}</b> and a <b>Master Ball</b></li>}
-                  {won.medal && <li>Title: <b>{region} Dex Master</b></li>}
-                  {won.medal && <li>{region}&rsquo;s rare forms now <b>{DEX_CHARM}&times;</b> as likely</li>}
+                  {won.medal && !tier && <li><b>¥{won.money.toLocaleString("en-US")}</b> and a <b>Master Ball</b></li>}
+                  {won.medal && <li>Title: <b>{title}</b></li>}
+                  {won.medal && !tier && <li>{region}&rsquo;s rare forms now <b>{DEX_CHARM}&times;</b> as likely</li>}
                 </ul>
                 <div className="cf-actions">
                   <button type="button" className="cf-yes buy" autoFocus onClick={onCards}>Open the packs</button>
