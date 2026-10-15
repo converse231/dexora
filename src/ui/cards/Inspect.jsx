@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RARITY, cardId, sparesOf, dustOf, craftCost, canCraft, showKey, CARD_SHOW } from "../../game/cards.js";
 import { useModalLock, useDismiss } from "../modal.js";
-import { RarityMark, VARIANT_NAME, usePrices, priceOf, usd, PriceNote } from "./Card.jsx";
+import { RarityMark, VARIANT_NAME, usePrices, priceOf, usd, PriceInfo, Money } from "./Card.jsx";
 import { cardUrl, hiUrl } from "./load.js";
 
 const CAT = { P: "Pokémon", T: "Trainer", E: "Energy" };
@@ -59,6 +59,18 @@ export default function Inspect({ set, localId, cards, dust, dex, showcase = [],
           <h3>{card[1]}</h3>
           <p className="cd-sub">{set.SET.name} · {localId}/{set.SET.official} · {CAT[card[2]]}</p>
           <p className="cd-kind"><RarityMark rarity={card[3]} /> {RARITY[card[3]].name}</p>
+          {/* WHAT IT IS WORTH IN REAL LIFE, the printing shown, big (2026-10-15).
+              Raw only: graded prices have no free source. */}
+          {prices && (() => {
+            const price = priceOf(prices, set.SET.id, localId, shown), held = row?.[shown] ?? 0;
+            return (
+              <section className="cd-price" aria-label="Real-life price">
+                <span className="cd-price-top"><b>Raw</b>{VARIANT_NAME[shown]}<PriceInfo prices={prices} /></span>
+                {price ? <Money cents={price} className="cd-price-big" /> : <span className="cd-price-none">No market price for this printing yet</span>}
+                {price > 0 && held > 1 && <small>Your {held} copies: {usd(price * held)}</small>}
+              </section>
+            );
+          })()}
           <p className="cd-sub">Illustrated by {card[6] || "an unknown illustrator"} · data and image: TCGdex</p>
           {row?.earned && <p className="cd-sub">✦ {row.earned.length} earned cop{row.earned.length === 1 ? "y" : "ies"}</p>}
 
@@ -97,7 +109,6 @@ export default function Inspect({ set, localId, cards, dust, dex, showcase = [],
               );
             })}
           </ul>
-          <PriceNote prices={prices} />
           <p className="cd-sub">
             You have {dust.toLocaleString()} Card Dust. A spare is a copy past your first of a printing
             {row?.earned ? "; earned copies (✦) are always kept" : ""}.

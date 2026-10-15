@@ -2304,7 +2304,37 @@ await savedField("milestones", { me01: 2 }, "junk", {});
 await savedField("cardDay", "2026-10-02", 42, null);
 await savedField("boxVouchers", ["dex:1"], "junk", []);
 await savedField("cardShowcase", ["me01-187:h"], "junk", []);
-await savedField("binders", [{ id: "a1", name: "Faves", pockets: ["me01-001:n", null, "me01-187:h"] }], "junk", []);
+await savedField("binders", [{ id: "a1", name: "Faves", pockets: ["me01-001:n", null, "me01-187:h"],
+  cover: { color: "teal", patches: [{ id: "set:me01", x: 30, y: 40.5 }] } }], "junk", []);
+await savedField("patches", ["me01", "sv01"], "junk", []);
+/* A BINDER'S COVER: a bad colour drops the cover alone (the binder keeps its
+   pockets), bad patches go one by one, a repeat once, and positions clamp.
+   The engine sews on only patches you have, and sells a set's patch once,
+   for dust, from a set open at your level. */
+{
+  const C = await import("../src/game/cards.js");
+  assert.deepEqual(C.cleanBinders([{ id: "a1", pockets: [], cover: { color: "lime" } }]), [{ id: "a1", name: "My binder", pockets: [] }],
+    "a cover in an unknown colour was kept");
+  assert.deepEqual(C.cleanBinders([{ id: "a1", pockets: [], cover: { color: "navy", patches: [
+    { id: "set:me01", x: 150, y: -4 }, { id: "set:me01", x: 1, y: 1 }, { id: "bad id", x: 1, y: 1 }, { id: "badge:kanto-brock", x: "1", y: 2 },
+    ...Array.from({ length: 9 }, (_, k) => ({ id: `set:s${k}`, x: 5, y: 5 }))] } }])[0].cover,
+  { color: "navy", patches: [{ id: "set:me01", x: 100, y: 0 }, ...Array.from({ length: C.PATCH_MAX - 1 }, (_, k) => ({ id: `set:s${k}`, x: 5, y: 5 }))] },
+  "a cover's patches were not cleaned one by one, clamped and capped");
+  assert.ok(C.COVER_COLORS.includes(C.coverOf({ id: "zz9" }).color), "a binder with no cover has no colour");
+  const pb = boot({ ...SAVE, dust: C.PATCH_DUST * 2 - 1, xp: 1e9, beaten: { "kanto-brock": { wins: 1, at: 1 } } }).e;
+  assert.equal(pb.buyPatch("nope"), false, "a patch of a set that does not exist was sold");
+  assert.equal(pb.buyPatch("me01"), true, "a set's patch did not sell");
+  assert.equal(pb.state.dust, C.PATCH_DUST - 1, "a patch did not cost PATCH_DUST");
+  assert.equal(pb.buyPatch("me01"), false, "a patch sold twice");
+  assert.equal(pb.buyPatch("sv01"), false, "a patch sold without the dust for it");
+  const bid = pb.newBinder("Show");
+  pb.setBinder(bid, { cover: { color: "plum", patches: [{ id: "set:me01", x: 20, y: 20 }, { id: "set:sv01", x: 1, y: 1 },
+    { id: "badge:kanto-brock", x: 50, y: 50 }, { id: "badge:kanto-misty", x: 1, y: 1 }] } });
+  assert.deepEqual(pb.state.binders[0].cover, { color: "plum", patches: [{ id: "set:me01", x: 20, y: 20 }, { id: "badge:kanto-brock", x: 50, y: 50 }] },
+    "a cover wore a patch not bought or a badge not won");
+  pb.setBinder(bid, { cover: { color: "tan" } });
+  assert.equal(pb.state.binders[0].cover.patches.length, 2, "changing the colour took the patches off");
+}
 /* YOUR OWN BINDERS: a bad pocket becomes an empty one (the rest stay put), a
    bad binder is dropped alone, a repeated id once; and the engine adds,
    places, renames and deletes, refusing what would not fit. */

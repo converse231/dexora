@@ -3,7 +3,7 @@
    reverse holo shines everywhere but the art window, a holo rare only inside
    it, and a hit across the whole card (`.cd-foil`, styles.css; the window was
    measured off the card faces: 6.6% in, 9.6% down, 84.5% x 38%). */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RARITY, cardId } from "../../game/cards.js";
 import { cardUrl, loadPrices } from "./load.js";
 
@@ -42,8 +42,41 @@ export function worthOf(prices, cards, setIds = Object.keys(prices?.PRICES ?? {}
   }
   return { total, top };
 }
-export function PriceNote({ prices }) {
-  return prices && <small className="cd-price-note">TCGplayer market price, {prices.PRICED_AT} · real life, not in the game</small>;
+/* THE ONE NOTE A PRICE CARRIES, behind a yellow (i) (2026-10-15, asked for:
+   the line under every price read as clutter). `data-tap` lets a touch open
+   it (Tip.jsx), since a phone has no hover. */
+export function PriceInfo({ prices }) {
+  if (!prices) return null;
+  const text = `Raw (ungraded) TCGplayer market price, as of ${prices.PRICED_AT}. Real-life value - never spent in the game.`;
+  return <button type="button" className="pr-info" data-tip={text} data-tap aria-label={text}>i</button>;
+}
+
+/* A NUMBER THAT COUNTS UP to where it lands: from 0 the first time, then
+   from wherever it was (a new set counts from the old one's value). Reduced
+   motion lands at once. */
+const still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+export function useCountUp(target, ms = 900) {
+  const [v, setV] = useState(() => (still() ? target : 0));
+  const at = useRef(0);
+  useEffect(() => {
+    if (still()) { at.current = target; setV(target); return undefined; }
+    const from = at.current, start = performance.now();
+    let raf = requestAnimationFrame(function tick(t) {
+      const k = Math.min(1, (t - start) / ms);
+      at.current = Math.round(from + (target - from) * (1 - (1 - k) ** 3));
+      setV(at.current);
+      if (k < 1) raf = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return v;
+}
+
+// Dollars big, cents small - the way a price tag reads.
+export function Money({ cents, className = "" }) {
+  const shown = useCountUp(cents);
+  const [d, c] = (shown / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(".");
+  return <span className={`money ${className}`} aria-label={usd(cents)}><i>$</i>{d}<small>.{c}</small></span>;
 }
 
 /* `card` is a set row; `variant` the copy shown (a holo rare and a reverse

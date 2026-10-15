@@ -662,7 +662,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `noteBingo(event)` (the step, the catch's frozen facts and its chain, a
   rift find, the quiz, a check-in, a claimed quest, an evolution, a berry,
   a pack, spares sold or converted, a battle won); check.mjs fails a goal
-  nothing the engine sends can fill. Its tip is `teach(..., quiet)` - every
+  nothing the engine sends can fill. It is DRAWN as a printed bingo card
+  (2026-10-15): paper, B-I-N-G-O balls, a dauber on each finished square
+  and a marker stroke through each finished line. Its tip is `teach(..., quiet)` - every
   caller notifies after (Open all stays ONE changed()). A line or the card
   banners; the prize is CLAIMED on Events (`claimBingo`, each line once),
   never paid on the moment: `BINGO_LINE` / `BINGO_FULL`, no money or Master
@@ -885,9 +887,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `DUST_PACK` a pack: a deal has no dust discount, which would eat that
   margin. A set's deals are `dealsOf` - its BOXES entry, plus the 6-pack
   `BUNDLE` where that entry is a 36-pack box (2026-10-13). Cards carry no catch indicator.
-  **Real-life prices are display only** (`prices.js`, dated `PRICED_AT`,
-  printed beside every price; 2026-10-15): the card view and the Binder's
-  value line, one lazy chunk named by `load.js` alone, never a sale or dust.
+  **Real-life prices are display only** (`prices.js`, dated `PRICED_AT`;
+  2026-10-15): raw only (graded prices have no free source), the date in
+  one yellow (i) (`PriceInfo`, `data-tap` so a touch opens it), counting up
+  (`Money`); the card view and the Binder's value, one lazy chunk named by
+  `load.js` alone, never a sale or dust. **The binder is a real binder**
+  (docs/cards.md): leather covers (`Cover`, `GRAIN` built in JS), a 3D page
+  turn that follows the PAGE, not the control (`bookKey` lands a new set at
+  once), My Binders a shelf that opens and closes, drag and drop by window
+  pointer events (a touch must HOLD first, so a swipe is never a drag; near
+  the edge it scrolls), and covers you colour and patch (`cover` on a binder,
+  `patches` bought by `buyPatch` for dust, gym badges won free - derived).
   The last card of every pack charges and flashes (white until the charge),
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.

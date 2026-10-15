@@ -63,6 +63,21 @@ export default function Tip() {
     /* `pointerover` rather than `mouseover` so a touch that lands on a tile
        shows the same thing, and `focusin` so the keyboard gets it too — which
        is most of what the native title was quietly doing for us. */
+    /* A TAP SHOWS IT where the element asks (`data-tap`: the price's (i)) -
+       a touch's own pointerdown drops the bubble before it could appear. */
+    const tap = (ev) => {
+      const el = ev.target?.closest?.("[data-tip][data-tap]");
+      if (!el) return;
+      clearTimeout(timer);
+      const r = el.getBoundingClientRect();
+      setTip({
+        text: el.getAttribute("data-tip"),
+        x: Math.min(Math.max(r.left + r.width / 2, HALF + EDGE), innerWidth - HALF - EDGE),
+        above: r.top > 64,
+        y: r.top > 64 ? r.top - 8 : r.bottom + 8,
+      });
+    };
+    addEventListener("click", tap);
     addEventListener("pointerover", show);
     addEventListener("focusin", show);
     addEventListener("pointerdown", drop);
@@ -75,6 +90,7 @@ export default function Tip() {
 
     return () => {
       clearTimeout(timer);
+      removeEventListener("click", tap);
       removeEventListener("pointerover", show);
       removeEventListener("focusin", show);
       removeEventListener("pointerdown", drop);

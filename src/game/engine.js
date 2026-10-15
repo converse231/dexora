@@ -40,13 +40,13 @@ import {
 import { cleanTradeFields } from "./trade.js";
 import {
   isOpen, refusal, payFor, teamSize, rematchesReady, cleanBeaten, TEAM_MAX,
-  feeFor, giftOf, hardCleared, charmOf, cleanTaught, taughtOk,
+  feeFor, giftOf, hardCleared, charmOf, cleanTaught, taughtOk, badgesWon,
 } from "./league.js";
 import { HARDTUNE, GYMTUNE } from "../data/gymtune.js";
 import {
   openPack as rollPack, rulesOf, setById, setOpen, randomOpen, cardId, cleanCard, freshPity, PACK_PRICE, CARD_MAX, cleanBinders, BINDER_MAX, BINDER_POCKETS,
   dustOf, craftCost, sparesOf, sweepOf, isHit, rungOf, MILESTONES, LOG_MAX, titleOf, RARITY, canCraft, BOXES, dealsOf, STREAK_PACK, DUST_PACK,
-  MASTER_DUST, printingsOf, CARD_SHOW, showKey,
+  MASTER_DUST, printingsOf, CARD_SHOW, showKey, cleanPatches, PATCH_DUST, coverOf,
 } from "./cards.js";
 import { CARD_SETS } from "../data/cards/index.js";
 import { defenders, defendNote } from "./ranked.js";
@@ -238,7 +238,8 @@ function freshState() {
     cardDay: null,        // the day the last pack opened - the daily first pack
     boxVouchers: [],      // free boxes of your choice, by where they came from ("dex:1")
     cardShowcase: [],     // cards on your trainer card, "me01-187:h" - the server checks each
-    binders: [],          // your own binders, `{ id, name, pockets }` - see `cleanBinders`
+    binders: [],          // your own binders, `{ id, name, pockets, cover? }` - see `cleanBinders`
+    patches: [],          // set patches bought for binder covers, by set id - see `buyPatch`
     rift: null,           // an open space-time rift, `{ areaId, left }` - see events.js
     sinceTravel: 0,       // steps since the map last changed, which is what opens a rift
     /* One quest a day. `key` is the local date it belongs to, so a new day is
@@ -682,6 +683,7 @@ function loadState() {
       cardShowcase: [...new Set(Array.isArray(s.cardShowcase) ? s.cardShowcase : [])]
         .filter((v) => typeof v === "string" && /^[\w.]+-\w+:[nhr]$/.test(v)).slice(0, CARD_SHOW),
       binders: cleanBinders(s.binders),
+      patches: cleanPatches(s.patches),
       /* A save from before `paid` existed was paid for every level it had
          reached, and never past the old cap of 50 - so that is where it
          stands, and anything above is owed. Never above its own level, so no
@@ -3382,7 +3384,28 @@ export function createEngine(canvas, onChange, mini = null) {
     if (at < 0 || !patch || typeof patch !== "object") return false;
     const next = [...state.binders];
     next[at] = { ...next[at], ...(typeof patch.name === "string" && { name: patch.name }), ...(Array.isArray(patch.pockets) && { pockets: patch.pockets }) };
+    // A cover wears only patches you have (cards.js: bought, or a badge won).
+    if (patch.cover && typeof patch.cover === "object") {
+      const was = coverOf(next[at]);
+      const patches = Array.isArray(patch.cover.patches) ? patch.cover.patches.filter((p) => hasPatch(p?.id)) : was.patches;
+      next[at] = { ...next[at], cover: { color: patch.cover.color ?? was.color, patches } };
+    }
     state.binders = cleanBinders(next);
+    save();
+    changed();
+    return true;
+  }
+  function hasPatch(id) {
+    if (typeof id !== "string") return false;
+    const [kind, of] = [id.slice(0, id.indexOf(":")), id.slice(id.indexOf(":") + 1)];
+    return kind === "set" ? state.patches.includes(of) : kind === "badge" && badgesWon(state.beaten).includes(of);
+  }
+  /* A SET'S PATCH, for a binder cover: once each, for Card Dust, from a set
+     open at your level. A dust sink that buys a look and nothing else. */
+  function buyPatch(setId) {
+    if (state.patches.includes(setId) || !setOpen(setId, levelFromXp(state.xp)) || state.dust < PATCH_DUST) return false;
+    state.dust -= PATCH_DUST;
+    state.patches = [...state.patches, setId];
     save();
     changed();
     return true;
@@ -4241,6 +4264,8 @@ export function createEngine(canvas, onChange, mini = null) {
     newBinder,
     setBinder,
     deleteBinder,
+    buyPatch,
+    hasPatch,
     addToBinder,
     buyCandy,
     useField,

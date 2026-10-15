@@ -787,6 +787,35 @@ now and then when a step started an encounter.
   spares included), the whole collection, and the dearest card held. Base
   Set is unpriced: its packs are 1st Edition and TCGdex only has the
   unlimited print's price. Re-run `npm run prices` to refresh the snapshot.
+- **Raw only.** Graded (PSA 10) prices have no free source: PriceCharting
+  has them, behind a paid API token. The price panel says "Raw" so a grade
+  can join it later; its note is a yellow (i) (`PriceInfo`, a tap opens it
+  on touch through Tip.jsx's `data-tap`), never a line under every price.
+  Values count up (`useCountUp`, `Money`).
+
+## The binder as a real binder *(2026-10-15, asked for)*
+
+- **Leather, built not drawn**: two SVG noises (`GRAIN`, made in JS - no
+  url() in styles.css may name a path) over a colour, a spine crease,
+  stitching and the name in foil. A set binder's cover is its series'
+  leather with the logo debossed, lifted out in colour when the set is
+  complete, gold leather for the master set - the cover IS the reward.
+- **The book** (`BinderPages`): boards round sleeved pages, three rings,
+  and a 3D turn - a leaf hinged at the rings' centre, so it lands exactly on
+  the other page, the next page on its back. The animation follows the page,
+  not the control: buttons, swipe, arrow keys, slider and a dragged card all
+  turn it. A new set or filter (`bookKey`) and reduced motion land at once.
+- **My Binders** is a shelf of covers that open and close (the cover swings
+  on the rings), with DRAG AND DROP between pockets: a mouse picks a card up
+  once it moves, a touch once it is HELD (300ms), so a swipe or a scroll is
+  never a drag. Held over a turn button the page turns; near the screen's
+  edge the page scrolls (a phone held sideways is shorter than the book).
+- **Covers are yours**: eight leathers (`COVER_COLORS`) and up to
+  `PATCH_MAX` patches, dragged where you want them. A set's logo patch costs
+  `PATCH_DUST` once (`buyPatch`, a set open at your level); every gym badge
+  you win is a patch for free (derived from `beaten`, never stored). A look,
+  never a strength. A binder saved without a cover wears the colour its id
+  hashes to.
 
 ## Deferred on purpose *(each with the trigger that brings it back)*
 

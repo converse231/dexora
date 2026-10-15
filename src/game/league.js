@@ -193,7 +193,9 @@ export function cleanTaught(m) {
   return rest;
 }
 
-export const badgesOf = (beaten) => IDS.filter((id) => GYMTUNE[id].kind === "leader" && won(beaten, id)).length;
+// The leaders beaten, in League order: a badge each (and a binder cover's patch).
+export const badgesWon = (beaten) => IDS.filter((id) => GYMTUNE[id].kind === "leader" && won(beaten, id));
+export const badgesOf = (beaten) => badgesWon(beaten).length;
 
 /* A SAVED `beaten`, cleaned entry by entry: a win count of one or more and a
    step count; anything else is dropped, never the whole record. An id this
