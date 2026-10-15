@@ -16,6 +16,26 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-15-meet",
+    icon: "👋",
+    date: "October 2026",
+    title: "Meet other trainers",
+    items: [
+      ["Trainers to meet", "The Trainers tab suggests players to add or visit. Shuffle for more."],
+      ["Your friends, up front", "Your friends now sit on the Trainers tab, one tap from their card."],
+    ],
+  },
+  {
+    id: "2026-10-15-tierdex",
+    icon: "🏅",
+    date: "October 2026",
+    title: "Rare-form Pokédex badges",
+    items: [
+      ["Complete a region in one tier", "Catch every Kanto Pokémon in Gold - or any of the 16 tiers - for a new badge."],
+      ["Claim a booster box", "Each one pays a random set's box and a title like Kanto Gold Dex Master."],
+    ],
+  },
+  {
     id: "2026-10-15-binders",
     icon: "📒",
     date: "October 2026",

@@ -27,7 +27,7 @@
 
 import { SPECIES } from "../data/dex.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
-import { BIOMES, speciesById, dexIndex, genOf, REGION_NAME, looksOf } from "./biomes.js";
+import { BIOMES, speciesById, dexIndex, genOf, REGION_NAME, looksOf, TIERS, tiersFor } from "./biomes.js";
 import { isForm } from "../data/dex.js";
 import { label } from "./map.js";
 
@@ -163,6 +163,30 @@ export function genReward(gen, dex = [], earned = []) {
   const left = m.need.filter((id) => !owns(dex, id)).length;
   return { claimed: false, ready: !left, left };
 }
+
+/* A REGION'S POKEDEX IN ONE RARE TIER (asked for, 2026-10-15: "a Kanto
+   Gold Dex"): every species of the generation's own medal, registered in that
+   tier by your own play (a tier row; a trade never sets one) - except a
+   species whose art cannot wear the tier (`tiersFor`), which no luck could
+   finish. Claimed like a region's medal (`claimDex`): a booster box of a
+   random set and its title, `tier:<tier>:<gen>` - no money, no Master Ball,
+   no charm, so the economy does not move. A family of looks is held by any
+   drawing, as for the region (`owns`). */
+export const tierName = (t) => t[0].toUpperCase() + t.slice(1);
+export const TIER_MEDALS = TIERS.flatMap((tier) => MEDALS.filter((m) => m.kind === "gen").map((m) => ({
+  id: `tier:${tier}:${m.gen}`, kind: "tier", tier, gen: m.gen,
+  need: m.need.filter((id) => tiersFor(id).includes(tier)),
+}))).filter((m) => m.need.length);
+const wears = (row, id) => row?.[dexIndex(id)] === 1
+  || (speciesById(id)?.form !== "look" && looksOf(id).some((x) => row?.[dexIndex(x)] === 1));
+// `rows` is the save's tier rows by tier ({ gold: [...], ... }).
+export const tierMedalsDue = (rows, earned = []) => TIER_MEDALS.filter((m) => !earned.includes(m.id)
+  && m.need.every((id) => wears(rows?.[m.tier], id)));
+// How far one stands: its species held in the tier, of how many.
+export const tierProgress = (rows, tier, gen) => {
+  const m = TIER_MEDALS.find((x) => x.tier === tier && x.gen === gen);
+  return m && { have: m.need.filter((id) => wears(rows?.[tier], id)).length, of: m.need.length };
+};
 
 // Generation medals a dex has finished and the save has not claimed yet.
 export const genMedalsDue = (dex, earned = []) => MEDALS.filter((m) => m.kind === "gen" && !earned.includes(m.id)

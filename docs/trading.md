@@ -258,3 +258,14 @@ They may live in `.env` beside the live keys (it is gitignored, and only
 
 The live project gets the SQL only after a phase passes on the test one, as a
 new numbered section of SUPABASE.md, run once - the §3c pattern.
+
+## Trainers to meet *(2026-10-15, asked for)*
+
+- The Trainers tab shows search, **your friends** (one tap to their card or
+  Pokemon) and **Trainers to meet**: `suggest_trainers()` - eight other
+  trainers, those who played in the last 30 days first, shuffled; never you,
+  a friend or a pending request either way, anyone across a block, or a
+  flagged account. Shuffle asks again; Add is `request_friend`.
+- Requests, your friend code and blocks stay on your own card.
+- The page treats a missing function as no suggestions (the section hides),
+  never as trading being closed, so the client can ship before the SQL.

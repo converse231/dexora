@@ -6144,6 +6144,9 @@ button:disabled { transition: none; }
 }
 .tp-ring i { font-style: normal; font-size: 9px; }
 .tp-count { font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
+/* Trainers to meet: the shuffle on the banner's right, a request sent where its Add was. */
+.tc-shuffle { margin-left: auto; padding: 4px 12px; }
+.tc-asked { flex: none; margin-left: auto; padding: 0 8px; font: 600 12px var(--body); color: var(--ink-faint); }
 .tp-badges { display: flex; flex-wrap: wrap; gap: 4px; }
 .tp-badges img { width: 32px; height: 32px; image-rendering: pixelated; }  /* the art's own size */
 .tp-show { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -9258,6 +9261,12 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 18%, transparent), var(--surface-2) 72%);
 }
 .cell.caught .cell-no { color: var(--ink-faint); }
+/* A GAP IN A TIER (Dex SHOW = a tier): a species that can wear it and does not
+   yet - dashed and dimmed, its plain picture if caught, a silhouette if seen. */
+.cell.lack { border-style: dashed; border-color: var(--line-firm); background: none; }
+.cell.lack img { opacity: .4; filter: grayscale(.7); }
+.cell.lack.seen img { filter: brightness(0); opacity: .25; }
+.dx-hold { justify-self: start; margin: 2px 0 6px; }
 .cell.caught.full { border-color: color-mix(in srgb, var(--gold) 60%, transparent); }
 /* WHITE ON A COLOURED FILL. These took the page's own token for their text
    (`--surface`/`--paper`), which was white by day and is navy at night - navy
@@ -9906,6 +9915,12 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .mb-picker { position: relative; width: min(860px, 100%); max-height: calc(100dvh - 32px); display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 10px; }
 .mb-picker h3 { margin: 0 44px 0 0; font: 700 18px var(--display); color: var(--ink); }
+/* The picker's bar: search, set, rarity and sort - the three selects share a row on a phone. */
+.mb-picker .pk-bar { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+@media (max-width: 640px) {
+  .mb-picker .pk-bar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mb-picker .pk-q { grid-column: 1 / -1; }
+}
 .mb-pick-scroll { overflow-y: auto; min-height: 0; display: grid; gap: 10px; align-content: start; }
 .mb-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
 .mb-pick { position: relative; padding: 0; border: 2px solid transparent; border-radius: 8px; background: none; cursor: pointer; }
@@ -9968,6 +9983,11 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   font: 700 9px var(--pixel); padding: 1px 6px; border-radius: 999px; white-space: nowrap;
   color: #3a2600; background: linear-gradient(#ffe27a, #f0b83c); box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
 }
+/* A region's Pokedex in one rare tier: its badge, the tier's mark tagged at its foot. */
+.title-tier { position: relative; display: inline-grid; justify-items: center; flex: none; padding-bottom: 6px; }
+.title-tier > img:first-child { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
+.title-tier > .title-mark { position: absolute; bottom: 0; left: 50%; width: 18px; height: 18px; transform: translateX(-50%);
+  padding: 1px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .45); }
 .you-titles i { font-style: normal; font: 700 11px var(--pixel); padding: 3px 8px; border-radius: 999px;
   color: #3a2600; background: linear-gradient(#ffe27a, #f0b83c); }
 .tp-cards .cd-chase-card { width: 92px; }

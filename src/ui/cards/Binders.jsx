@@ -20,7 +20,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CARD_SETS } from "../../data/cards/index.js";
 import {
-  PAGE_POCKETS, BINDER_MAX, BINDER_NAME, BINDER_POCKETS, RARITY, rungOf, coverOf, COVER_COLORS, PATCH_MAX, PATCH_DUST, setOpen, SET_LEVEL,
+  CARD_RARITIES, PAGE_POCKETS, BINDER_MAX, BINDER_NAME, BINDER_POCKETS, RARITY, rungOf, coverOf, COVER_COLORS, PATCH_MAX, PATCH_DUST, setOpen, SET_LEVEL,
 } from "../../game/cards.js";
 import { badgesWon } from "../../game/league.js";
 import CardFace, { RarityMark, VARIANT_NAME, priceOf, usd, Money, PriceInfo } from "./Card.jsx";
@@ -605,6 +605,7 @@ function CardPicker({ sets, cards, many, onPick, onClose }) {
   const [q, setQ] = useState("");
   const [setF, setSetF] = useState("");
   const [sort, setSort] = useState("set");
+  const [rarF, setRarF] = useState("");
   const [chosen, setChosen] = useState([]);
   const [upTo, setUpTo] = useState(PICK_PAGE);
   useEffect(() => {
@@ -612,15 +613,17 @@ function CardPicker({ sets, cards, many, onPick, onClose }) {
     addEventListener("keydown", esc, true);
     return () => removeEventListener("keydown", esc, true);
   }, [onClose]);
-  useEffect(() => setUpTo(PICK_PAGE), [q, setF, sort]);
+  useEffect(() => setUpTo(PICK_PAGE), [q, setF, rarF, sort]);
 
   const all = useMemo(() => CARD_SETS.flatMap((s) => (sets[s.id]?.CARDS ?? []).flatMap((c, i) => {
     const row = cards[`${s.id}-${c[0]}`];
     return ["h", "r", "n"].filter((v) => row?.[v] && c[4].includes(v)).map((v) => ({ key: `${s.id}-${c[0]}:${v}`, s: s.id, c, v, i }));
   })), [sets, cards]);
   const held = useMemo(() => new Set(all.map((x) => x.s)), [all]);
+  // The rarities you hold, in the set picked - a rung you have none of is never offered.
+  const rarities = useMemo(() => CARD_RARITIES.filter((r) => all.some((x) => x.c[3] === r && (!setF || x.s === setF))), [all, setF]);
   const n = q.trim().toLowerCase();
-  const shown = all.filter((x) => (!setF || x.s === setF)
+  const shown = all.filter((x) => (!setF || x.s === setF) && (!rarF || x.c[3] === rarF)
     && (!n || x.c[1].toLowerCase().includes(n) || (x.c[6] ?? "").toLowerCase().includes(n) || unpad(x.c[0].toLowerCase()) === unpad(n)))
     .sort((a, b) => (sort === "rare" ? rungOf(b.c[3]) - rungOf(a.c[3]) : 0));
   const toggle = (k) => setChosen((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
@@ -634,9 +637,13 @@ function CardPicker({ sets, cards, many, onPick, onClose }) {
         <div className="pk-bar">
           <input className="tc-input pk-q" type="search" value={q} onChange={(e) => setQ(e.target.value)}
             placeholder="Search a card, number or illustrator" aria-label="Search your cards" />
-          <select className="pk-sel" value={setF} onChange={(e) => setSetF(e.target.value)} aria-label="Set">
+          <select className="pk-sel" value={setF} onChange={(e) => { setSetF(e.target.value); setRarF(""); }} aria-label="Set">
             <option value="">Every set</option>
             {CARD_SETS.filter((s) => held.has(s.id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select className="pk-sel" value={rarF} onChange={(e) => setRarF(e.target.value)} aria-label="Rarity">
+            <option value="">Every rarity</option>
+            {rarities.map((r) => <option key={r} value={r}>{RARITY[r].name}</option>)}
           </select>
           <select className="pk-sel" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
             <option value="set">Set order</option>
