@@ -303,12 +303,18 @@ const POCKET_KEY = /^[\w.]+-\w+:[nhr]$/;
    (`patches`, the engine's `buyPatch`) or a League badge you have won -
    derived from `beaten`, never stored. A binder saved without a cover wears
    the colour its id hashes to, so an old shelf is not one colour. */
-export const COVER_COLORS = ["oxblood", "saddle", "tan", "forest", "teal", "navy", "plum", "charcoal"];
+export const COVER_CLASSIC = ["oxblood", "saddle", "tan", "forest", "teal", "navy", "plum", "charcoal"];
+/* SMOOTH LEATHER (2026-10-15, asked for: the pebbled ones "a bit too dirty"):
+   bright, clean colours with a fine grain and a gloss. Appended - a saved
+   colour is its id. */
+export const COVER_SMOOTH = ["scarlet", "cobalt", "jade", "sunflower", "blush", "violet", "pearl", "onyx"];
+export const COVER_COLORS = [...COVER_CLASSIC, ...COVER_SMOOTH];
 export const PATCH_MAX = 6;
 export const PATCH_DUST = 500;
 const PATCH_ID = /^(set|badge):[\w.-]{1,40}$/;
 export const coverOf = (b) => b.cover ?? {
-  color: COVER_COLORS[[...b.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % COVER_COLORS.length],
+  // Hashed over the classic eight only, so a cover never saved keeps the colour it always had.
+  color: COVER_CLASSIC[[...b.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % COVER_CLASSIC.length],
   patches: [],
 };
 const spot = (n) => Math.round(Math.min(100, Math.max(0, Number(n))) * 10) / 10;

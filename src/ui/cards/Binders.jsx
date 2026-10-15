@@ -20,7 +20,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CARD_SETS } from "../../data/cards/index.js";
 import {
-  CARD_RARITIES, PAGE_POCKETS, BINDER_MAX, BINDER_NAME, BINDER_POCKETS, RARITY, rungOf, coverOf, COVER_COLORS, PATCH_MAX, PATCH_DUST, setOpen, SET_LEVEL,
+  CARD_RARITIES, PAGE_POCKETS, BINDER_MAX, BINDER_NAME, BINDER_POCKETS, RARITY, rungOf, coverOf, COVER_CLASSIC, COVER_SMOOTH, PATCH_MAX, PATCH_DUST, setOpen, SET_LEVEL,
 } from "../../game/cards.js";
 import { badgesWon } from "../../game/league.js";
 import CardFace, { RarityMark, VARIANT_NAME, priceOf, usd, Money, PriceInfo } from "./Card.jsx";
@@ -45,8 +45,13 @@ const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-r
 const noise = (f, o, m) => `url("data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='${f}' numOctaves='${o}' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${m}'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>`,
 )}")`;
-export const GRAIN = `${noise(0.85, 3, "1.5 0 0 0 -.55")}, ${noise(0.06, 2, ".9 0 0 0 -.3")}`;
+// The mottle is kept faint: stronger, it read as dirt (2026-10-15).
+export const GRAIN = `${noise(0.85, 3, "1.2 0 0 0 -.5")}, ${noise(0.06, 2, ".5 0 0 0 -.2")}`;
 const GRAIN_STYLE = { "--grain": GRAIN };
+// Smooth leather: a fine grain only, no mottle.
+const SMOOTH_STYLE = { "--grain": noise(0.9, 2, ".5 0 0 0 -.25") };
+const isSmooth = (color) => COVER_SMOOTH.includes(color);
+const leatherStyle = (color) => (isSmooth(color) ? SMOOTH_STYLE : GRAIN_STYLE);
 
 // A set binder's leather is its series'; a finished master set's is gold.
 export const leatherOf = (setId) => (setId.startsWith("me") ? "navy" : setId.startsWith("sv") ? "plum" : setId.startsWith("swsh") ? "teal" : "oxblood");
@@ -74,7 +79,7 @@ export function Patch({ id, x, y, className = "", ...rest }) {
    binder's); `state` "done" lifts it out in colour. */
 export function Cover({ color, patches = [], title, logo, state = "", className = "", children }) {
   return (
-    <span className={`lc leather lc-${color}${state ? ` ${state}` : ""} ${className}`} style={GRAIN_STYLE}>
+    <span className={`lc leather lc-${color}${isSmooth(color) ? " smooth" : ""}${state ? ` ${state}` : ""} ${className}`} style={leatherStyle(color)}>
       <span className="lc-stitch" aria-hidden="true" />
       {logo && <img className="lc-logo" src={logoUrl(logo)} alt="" draggable="false" />}
       {patches.map((p) => <Patch key={p.id} id={p.id} x={p.x} y={p.y} />)}
@@ -165,7 +170,7 @@ export function BinderPages({ count, page, onPage, render, bookKey = "", leather
     <div className="bp" ref={ref}>
       <div className="bp-book">
         <button type="button" className="bp-turn" data-turn="prev" disabled={left === 0 || !!flap} onClick={() => turn(left - show)} aria-label="Previous page">‹</button>
-        <div className={`bk leather lc-${leather}${two ? " two" : ""}${phase}`} style={GRAIN_STYLE} tabIndex={0}
+        <div className={`bk leather lc-${leather}${isSmooth(leather) ? " smooth" : ""}${two ? " two" : ""}${phase}`} style={leatherStyle(leather)} tabIndex={0}
           aria-label={`Binder, page ${left + 1} of ${pages}. Arrow keys turn the page.`} onPointerDown={onPointerDown} onKeyDown={onKeyDown}>
           <div className="bk-in">
             {two && sheet(L, "l")}
@@ -539,14 +544,18 @@ function CoverEditor({ binder, engine, dust, level, beaten, onClose }) {
         </div>
         <div className="ce-body">
           <h3>Cover</h3>
-          <p className="ce-k">Leather</p>
-          <div className="ce-swatches" role="radiogroup" aria-label="Leather colour">
-            {COVER_COLORS.map((c) => (
-              <button key={c} type="button" role="radio" aria-checked={cover.color === c} aria-label={c} data-tip={c[0].toUpperCase() + c.slice(1)}
-                className={`ce-swatch leather lc-${c}`} style={GRAIN_STYLE}
-                onClick={() => engine.setBinder(binder.id, { cover: { color: c, patches: cover.patches } })} />
-            ))}
-          </div>
+          {[["Classic leather", COVER_CLASSIC], ["Smooth leather", COVER_SMOOTH]].map(([title, list]) => (
+            <div key={title} className="ce-leather">
+              <p className="ce-k">{title}</p>
+              <div className="ce-swatches" role="radiogroup" aria-label={title}>
+                {list.map((c) => (
+                  <button key={c} type="button" role="radio" aria-checked={cover.color === c} aria-label={c} data-tip={c[0].toUpperCase() + c.slice(1)}
+                    className={`ce-swatch leather lc-${c}${isSmooth(c) ? " smooth" : ""}`} style={leatherStyle(c)}
+                    onClick={() => engine.setBinder(binder.id, { cover: { color: c, patches: cover.patches } })} />
+                ))}
+              </div>
+            </div>
+          ))}
           <p className="ce-k">Patches <small>{cover.patches.length} of {PATCH_MAX} sewn on · drag one on the cover to move it</small></p>
           <div className="you-seg ce-tabs" role="radiogroup" aria-label="Patches">
             {[["yours", `Yours · ${owned.length}`], ["shop", "Shop"]].map(([k, name]) => (

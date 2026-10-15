@@ -9543,7 +9543,9 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 @keyframes cd-sweep { 0% { opacity: 1; transform: translateX(0); } 55%, 100% { opacity: 1; transform: translateX(400%); } }
 /* Under the pointer (the card view): the band and a glare follow it, the card tilts. */
 .cd-card.live { transition: transform .12s ease-out; transform: perspective(900px) rotateY(calc((var(--mx, .5) - .5) * 18deg)) rotateX(calc((.5 - var(--my, .5)) * 18deg)); }
-.cd-card.live .cd-foil::after { opacity: .9; transform: translateX(calc(var(--mx, .5) * 280%)); }
+/* A NARROW BAND under the pointer (2026-10-15: at 60% of the card it washed
+   the art out): a soft sixth of the card, carried right across it. */
+.cd-card.live .cd-foil::after { left: -20%; width: 15%; opacity: .5; filter: blur(6px); transform: translateX(calc(var(--mx, .5) * 800%)); }
 .cd-glare { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .2s;
   background: radial-gradient(circle at calc(var(--mx, .5) * 100%) calc(var(--my, .5) * 100%), rgba(255, 255, 255, .38), transparent 46%); }
 .cd-card.live.held .cd-glare { opacity: 1; }
@@ -9708,6 +9710,23 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .lc-plum { --lc: #4b2347; }
 .lc-charcoal { --lc: #2b2b31; }
 .lc-gold { --lc: #b3862a; }
+.lc-scarlet { --lc: #b3202a; }
+.lc-cobalt { --lc: #1f4fa8; }
+.lc-jade { --lc: #12805e; }
+.lc-sunflower { --lc: #d39a17; }
+.lc-blush { --lc: #c4688b; }
+.lc-violet { --lc: #6a3fb0; }
+.lc-pearl { --lc: #e2d9c8; }
+.lc-onyx { --lc: #18181d; }
+/* SMOOTH LEATHER: a fine grain under a gloss - a clean, bright cover. */
+.leather.smooth {
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, .26), rgba(255, 255, 255, .04) 38%, transparent 55%),
+    radial-gradient(140% 110% at 85% 108%, rgba(0, 0, 0, .32), transparent 62%),
+    var(--grain, none),
+    var(--lc, #611b1a);
+}
+.lc-pearl .lc-stitch { border-color: rgba(90, 70, 40, .4); }
 /* A COVER: leather on board, a crease at the spine, stitching, the name in foil. */
 .lc { position: relative; display: block; width: 100%; aspect-ratio: 5 / 7; container-type: inline-size; overflow: hidden;
   border-radius: 5px 12px 12px 5px;
@@ -9916,13 +9935,20 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .mb-ghost .cd-card { position: absolute; inset: 0; height: 100%; }
 /* THE COVER EDITOR: the cover to drag patches on, leather swatches, and
    the patches - yours, and a shop of set patches for dust. */
-.ce { position: relative; width: min(820px, 100%); max-height: calc(100dvh - 32px); display: grid;
+.ce { position: relative; width: min(820px, 100%); max-height: calc(100dvh - 32px); display: grid; overflow: hidden;
   grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: start; }
 .ce-art { position: relative; width: min(280px, calc((100dvh - 80px) * 5 / 7)); align-self: center; container-type: inline-size;
   touch-action: none; -webkit-user-select: none; user-select: none; }
 .ce-patch { pointer-events: auto; cursor: grab; touch-action: none; }
 .ce-patch.moving { z-index: 2; cursor: grabbing; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .5)); }
-.ce-body { display: grid; gap: 10px; min-height: 0; max-height: calc(100dvh - 72px); grid-template-rows: repeat(6, auto) minmax(0, 1fr) auto; }
+/* The body is held to the dialog's own height (its padding, 28px, off the
+   32px the dialog keeps from the screen): taller, Done fell out of the
+   dialog's foot (2026-10-15) - a grid of row counts put the list in an
+   `auto` row whenever the note was absent. A column: only the list shrinks. */
+.ce-body { display: flex; flex-direction: column; gap: 10px; min-height: 0; max-height: calc(100dvh - 32px - 28px); }
+.ce-body > * { flex: none; }
+.ce-body > .ce-scroll { flex: 0 1 auto; }
+.ce-leather { display: grid; gap: 6px; }
 .ce-body h3 { margin: 0 40px 0 0; font: 800 20px var(--display); color: var(--ink); }
 .ce-k { margin: 4px 0 0; font: 700 13px var(--display); color: var(--ink); }
 .ce-k small { display: block; font: 500 12px var(--body); color: var(--ink-faint); }
@@ -9930,7 +9956,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .ce-swatch { width: 34px; height: 34px; padding: 0; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35), 0 2px 5px rgba(0, 0, 0, .3); }
 .ce-swatch[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--surface), 0 2px 5px rgba(0, 0, 0, .3); }
-.ce-tabs { justify-self: start; }
+.ce-tabs { align-self: flex-start; }
 .ce-scroll { display: grid; gap: 10px; align-content: start; min-height: 120px; overflow-y: auto; }
 .ce-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
 .ce-tile { display: grid; justify-items: center; align-content: start; gap: 6px; padding: 10px 8px; container-type: inline-size;
@@ -9945,7 +9971,15 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .ce-tile .ce-lock { color: var(--ink-faint); }
 .ce-note { margin: 0; font-size: 12.5px; color: var(--gold); }
 .ce-foot { margin: 0; font-size: 12px; color: var(--ink-faint); }
-.ce-done { justify-self: end; }
+.ce-done { align-self: flex-end; position: sticky; bottom: 0; z-index: 1; box-shadow: 0 -6px 14px var(--surface); }
+/* A SHORT SCREEN (a phone held sideways): the dialog scrolls as one, and Done
+   stays pinned at its foot - the held list could not shrink enough, and Done
+   was clipped below the dialog. */
+@media (max-height: 540px) {
+  .ce { overflow-y: auto; }
+  .ce-body { max-height: none; }
+  .ce-scroll { overflow: visible; min-height: 0; }
+}
 @media (max-width: 640px) {
   .ce { grid-template-columns: 1fr; overflow-y: auto; }
   .ce-art { width: min(220px, 60vw); justify-self: center; }
@@ -10044,6 +10078,10 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .you-titles i { font-style: normal; font: 700 11px var(--pixel); padding: 3px 8px; border-radius: 999px;
   color: #3a2600; background: linear-gradient(#ffe27a, #f0b83c); }
 .tp-cards .cd-chase-card { width: 92px; }
+/* A shown card opens into a closer look (CardShow's Zoom). */
+.cs-open { padding: 0; border: 0; background: none; cursor: zoom-in; transition: transform .15s ease; }
+.cs-open:hover { transform: translateY(-3px); }
+.cs-open:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .cd-x { position: absolute; right: 10px; top: 10px; z-index: 2; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
 
 /* ================================================================ THE OPENING */
@@ -10721,4 +10759,17 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 @media (max-height: 340px) {
   .sheet-card .sheet-portrait { height: clamp(72px, 28vh, 110px); }
   .sheet-card .sheet-genus { display: none; }
+}
+
+/* THIN SCROLLBARS ON A DESKTOP (asked for, 2026-10-15): every scroller, the
+   page included, gets the thin bar in the theme's own line colour. Gated on a
+   mouse, never width (touch scrollbars are the system's overlay). A `*` rule
+   loses to any class, so the strips that hide their bar (`.lg-strip`,
+   `.pk-chips`, `.rd-maps`) still hide it. */
+@media (hover: hover) and (pointer: fine) {
+  * { scrollbar-width: thin; scrollbar-color: var(--line-firm) transparent; }
+  /* Safari before 18.2 reads only these (Chrome ignores them once the above is set). */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { border-radius: 8px; background: var(--line-firm); }
 }
