@@ -662,9 +662,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `noteBingo(event)` (the step, the catch's frozen facts and its chain, a
   rift find, the quiz, a check-in, a claimed quest, an evolution, a berry,
   a pack, spares sold or converted, a battle won); check.mjs fails a goal
-  nothing the engine sends can fill. It is DRAWN as a printed bingo card
-  (2026-10-15): paper, B-I-N-G-O balls, a dauber on each finished square
-  and a marker stroke through each finished line. Its tip is `teach(..., quiet)` - every
+  nothing the engine sends can fill. It is DRAWN as a Pokemon bingo card in
+  the app's glass (2026-10-15): a ball sprite over each B-I-N-G-O column, a
+  finished square CAUGHT (tinted, a Poke Ball stamp, its words kept) and a
+  finished line rimmed gold - a paper card's ink daubs and marker strokes
+  buried every word at eight lines. Its tip is `teach(..., quiet)` - every
   caller notifies after (Open all stays ONE changed()). A line or the card
   banners; the prize is CLAIMED on Events (`claimBingo`, each line once),
   never paid on the moment: `BINGO_LINE` / `BINGO_FULL`, no money or Master

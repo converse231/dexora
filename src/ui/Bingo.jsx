@@ -3,10 +3,11 @@
    in full under the card - a 60px square on a phone has room for two short
    lines, not a sentence. Finished lines are CLAIMED here, together.
 
-   IT IS A BINGO CARD (2026-10-15, asked for): printed paper, B-I-N-G-O
-   balls over the columns, the week's card number at its foot, a dauber's
-   ink on every finished square (each at its own tilt, as a hand lands it),
-   and a marker stroke through every finished line. */
+   A POKEMON BINGO CARD in the app's own glass (2026-10-15, asked for): a
+   ball sprite over each B-I-N-G-O column, a finished square CAUGHT - tinted
+   and stamped with a Poke Ball, its words still readable - and a finished
+   line lit gold. A paper card with ink daubs and marker strokes was tried
+   the same day: at eight lines the strokes buried every word. */
 import { useState } from "react";
 import Icon from "./Icon.jsx";
 import {
@@ -20,16 +21,8 @@ const says = (r) => [r.candy && `${r.candy} Rare Candy`,
   ...Object.entries(r.items ?? {}).map(([id, n]) => `${n} ${itemById(id)?.name ?? id}${n > 1 ? "s" : ""}`),
   r.packs && `${r.packs === 1 ? "a card pack" : `${r.packs} card packs`}`].filter(Boolean).join(" + ");
 
-const BALLS = ["B", "I", "N", "G", "O"];
-// A dauber never lands the same way twice: a square's tilt and offset come from its index.
-const daub = (i) => ({ "--r": `${((i * 47) % 50) - 25}deg`, "--dx": `${((i * 13) % 9) - 4}%`, "--dy": `${((i * 29) % 9) - 4}%` });
-// A finished line's stroke, from square centre to square centre, in a 5x5 box.
-const strokeOf = (line) => {
-  const at = (i) => [(i % 5) + 0.5, Math.floor(i / 5) + 0.5];
-  const [a, b] = [at(line[0]), at(line[line.length - 1])];
-  const dx = Math.sign(b[0] - a[0]) * 0.3, dy = Math.sign(b[1] - a[1]) * 0.3;
-  return { x1: a[0] - dx, y1: a[1] - dy, x2: b[0] + dx, y2: b[1] + dy };
-};
+// The columns are balls, rarest last; a caught square wears a Poke Ball.
+const BALLS = [["B", "poke-ball"], ["I", "great-ball"], ["N", "ultra-ball"], ["G", "net-ball"], ["O", "master-ball"]];
 
 // Days until Monday's new card.
 function daysLeft() {
@@ -47,6 +40,7 @@ export default function Bingo({ card, onClaim }) {
   const lines = LINES.filter((l) => l.every((i) => doneAt(card, i))).length;
   const pick = sel ?? card.cells.findIndex((c, i) => c && !doneAt(card, i));
   const cell = card.cells[pick];
+  const won = new Set(LINES.filter((l) => l.every((i) => doneAt(card, i))).flat());
 
   return (
     <section className={`ev-card ev-bingo${due || full ? " live" : ""}`}>
@@ -57,26 +51,23 @@ export default function Bingo({ card, onClaim }) {
       </header>
       <div className="bg-card">
         <div className="bg-head" aria-hidden="true">
-          {BALLS.map((l, k) => <span key={l} className={`bg-ball b${k}`}>{l}</span>)}
+          {BALLS.map(([l, ball]) => <span key={l} className="bg-ball"><img src={`items/${ball}.png`} alt="" />{l}</span>)}
         </div>
         <div className="bg-grid" role="group" aria-label="This week's bingo card">
           {card.cells.map((c, i) => {
             const done = doneAt(card, i);
             if (i === FREE) {
-              return <span key={i} className="bg-sq free done" style={daub(i)} aria-label="Free square"><b>FREE</b><em className="bg-daub" /></span>;
+              return <span key={i} className={`bg-sq free done${won.has(i) ? " won" : ""}`} aria-label="Free square"><img src="items/poke-ball.png" alt="" /><b>FREE</b></span>;
             }
             return (
-              <button key={i} type="button" className={`bg-sq${done ? " done" : ""}${i === pick ? " sel" : ""}`}
+              <button key={i} type="button" className={`bg-sq${done ? " done" : ""}${won.has(i) ? " won" : ""}${i === pick ? " sel" : ""}`}
                 aria-pressed={i === pick} aria-label={`${sayOf(c)}: ${done ? "done" : `${card.n[i]} of ${c[1]}`}`}
-                onClick={() => setSel(i)} style={{ ...daub(i), "--p": Math.min(1, card.n[i] / c[1]) }}>
+                onClick={() => setSel(i)} style={{ "--p": Math.min(1, card.n[i] / c[1]) }}>
                 <span>{shortOf(c)}</span>
-                {done ? <em className="bg-daub" aria-hidden="true" /> : <i>{fmt(card.n[i])}/{fmt(c[1])}</i>}
+                {done ? <img className="bg-caught" src="items/poke-ball.png" alt="" /> : <i>{fmt(card.n[i])}/{fmt(c[1])}</i>}
               </button>
             );
           })}
-          <svg className="bg-lines" viewBox="0 0 5 5" preserveAspectRatio="none" aria-hidden="true">
-            {LINES.map((l, k) => l.every((i) => doneAt(card, i)) && <line key={k} {...strokeOf(l)} pathLength="1" />)}
-          </svg>
         </div>
         <div className="bg-foot" aria-hidden="true"><span>Card No. {card.week.slice(2)}</span><span>Free centre</span></div>
       </div>

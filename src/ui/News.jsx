@@ -25,7 +25,7 @@ export const NEWS = [
       ["Turn the pages", "Pages flip in 3D. Swipe, use the arrows, or drag a card to the edge."],
       ["Drag and drop", "Move cards between pockets. On a phone, hold a card first."],
       ["Real prices, bigger", "Every card shows its raw TCGplayer price, and your binder adds it up."],
-      ["A real Bingo card", "Weekly Bingo is now a printed card, daubed and lined as you play."],
+      ["A Pokémon Bingo card", "Ball columns, a Poké Ball on every square you clear, and gold lines."],
     ],
   },
   {
