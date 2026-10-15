@@ -827,7 +827,8 @@ now and then when a step started an encounter.
   base species).
 - Pockets never move (no drag, no Move). **Fill from my cards** files your
   rarest held printing of each Pokemon into its EMPTY pocket and never
-  touches a filled one (taken out and brought back the same day, both your
+  touches a filled one; its dialog ticks which rarities may go in (asked
+  for, 2026-10-16 - all by default, the device remembers what you untick) (taken out and brought back the same day, both your
   call). It is the game's binder, one a player: **Reset** empties it, and it
   is never deleted.
 

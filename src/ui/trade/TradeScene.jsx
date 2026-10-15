@@ -17,7 +17,7 @@
 
    `trade` is one entry of the inbox's `recent`: {kind, partner, gave, got}. */
 import { useEffect, useState } from "react";
-import { speciesById } from "../../game/biomes.js";
+import { speciesById, tierName } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { useModalLock } from "../modal.js";
 import Sprite from "../Sprite.jsx";
@@ -101,7 +101,7 @@ export default function TradeScene({ trade, onDone }) {
           </div>
         )}
         <p className="ts-caption">
-          {got.length === 1 && lead.tier && <span className="ts-tier"><Mark tier={lead.tier} size={14} />{lead.tier.toUpperCase()}</span>}
+          {got.length === 1 && lead.tier && <span className="ts-tier"><Mark tier={lead.tier} size={14} />{tierName(lead.tier).toUpperCase()}</span>}
           {got.length === 1 && lead.alpha && <span className="ts-tier alpha"><Mark tier="alpha" size={14} />ALPHA</span>}
           <b>{and(got)}</b> arrived from {trade.partner}!
           {gave.length > 0 && <i>You sent {and(gave)}.</i>}

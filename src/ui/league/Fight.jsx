@@ -15,7 +15,7 @@ import { MOVES } from "../../data/moves.js";
 import { TYPES } from "../../data/types.js";
 import { step, newBattle, effectiveness, mulberry32, canUse, itemOn, STRUGGLE } from "../../game/battle.js";
 import { HEALS } from "../../game/items.js";
-import { speciesById } from "../../game/biomes.js";
+import { speciesById, tierName } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { useModalLock } from "../modal.js";
 import Sprite, { backUrl, VariantFx, ItemIcon } from "../Sprite.jsx";
@@ -573,7 +573,7 @@ export default function Fight({ opponent, foeTeam, myTeam, myMons, foeMons = nul
                 {over === "won" && paid?.gift && (
                   <li className="gift">
                     <Sprite id={paid.gift.species} variant={paid.gift.tier} alt="" />
-                    <span><i>JOINS YOUR BOX · LV {paid.gift.level}</i><b>{nameOf(paid.gift.species)}{paid.gift.tier ? `, ${paid.gift.tier[0].toUpperCase()}${paid.gift.tier.slice(1)}` : ""}</b></span>
+                    <span><i>JOINS YOUR BOX · LV {paid.gift.level}</i><b>{nameOf(paid.gift.species)}{paid.gift.tier ? `, ${tierName(paid.gift.tier)}` : ""}</b></span>
                   </li>
                 )}
                 {/* CARD PACKS (a first badge, a Champion's box): they go to the Cards tab, so say so here. */}

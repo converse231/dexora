@@ -51,6 +51,7 @@ CDN = ("https://raw.githubusercontent.com/PokeAPI/sprites/master/"
        "sprites/pokemon/other/showdown/")
 CACHE = os.path.join(ROOT, ".assets-src", "showdown")
 OUT = os.path.join(ROOT, "public", "sprites", "showdown")
+UP = 200    # Scale2x a small source while it stays at most this (strip_frames.py); 16 x 200 is a 3,200px strip
 
 
 
@@ -102,7 +103,7 @@ def main():
         if not src:
             missing.append(i)
             continue
-        sheet = strip(src)
+        sheet = strip(src, up=UP)
         if sheet is None:
             missing.append(i)
             continue

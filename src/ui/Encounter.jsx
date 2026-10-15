@@ -17,7 +17,7 @@ import Gen from "./Gen.jsx";
 import Sprite, { spriteUrl, VariantFx, TierReveal, SCENE_FX } from "./Sprite.jsx";
 import Mark from "./Marks.jsx";
 import { RESEARCH_LIFT } from "../game/research.js";
-import { sageArt, SAGE_CREDIT } from "../game/biomes.js";
+import { sageArt, SAGE_CREDIT, tierName } from "../game/biomes.js";
 import { SEX_MARK, SEX_NAME } from "../game/gender.js";
 
   /* THE EVOLUTION CARD IS GONE, and "confusing" was the kind half of it.
@@ -318,9 +318,9 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
         {/* The drawn badge carries the tier now - the word beside it was saying
             the same thing twice, and at a glance the icon is the faster read. */}
         {enc.variant && (
-          <span className={`np-tier np-${enc.variant}`} data-tip={enc.variant.toUpperCase()}>
+          <span className={`np-tier np-${enc.variant}`} data-tip={tierName(enc.variant).toUpperCase()}>
             <Mark tier={enc.variant} size={16} />
-            <span className="np-word">{enc.variant.toUpperCase()}</span>
+            <span className="np-word">{tierName(enc.variant).toUpperCase()}</span>
           </span>
         )}
         {/* Just the ball. The word was redundant the moment the icon was there
@@ -346,7 +346,7 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
           <span
             className="np-caught"
             data-tip={(enc.variant
-              ? `This ${enc.variant} is already in the Pokédex`
+              ? `This ${tierName(enc.variant)} is already in the Pokédex`
               : "Already in the Pokédex") + (enc.ownedForm > 0 ? ` - you hold ${enc.ownedForm}` : "")}
           >
             <img src="items/poke-ball.png" alt="Already caught" />

@@ -305,7 +305,7 @@ export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower",
    handful of shinies in a whole playthrough - rare enough that each one is a
    story, common enough that they are not a rumour. Do not tune this one alone:
    it is one rung of the ladder below, and they move together. */
-export const SHINY_ODDS = 1 / 336;
+export const SHINY_ODDS = 1 / 421;
 
 /* Four rarities above ordinary, and they are not variations on one idea -
    each is a different KIND of rare, which is what lets all four stand together
@@ -356,9 +356,9 @@ export const SHINY_ODDS = 1 / 336;
    trade this is deliberately making - a FULLY complete 151-species dex is not
    reachable at any odds that leave a rare feeling rare, and no number here
    pretends otherwise. */
-export const ASTRAL_ODDS = 1 / 298;
-export const ORIGIN_ODDS = 1 / 235;
-export const HOLO_ODDS = 1 / 235;
+export const ASTRAL_ODDS = 1 / 350;
+export const ORIGIN_ODDS = 1 / 291;
+export const HOLO_ODDS = 1 / 291;
 
 /* FOUR MORE, AND THE LADDER GOT KINDER RATHER THAN LONGER.
 
@@ -465,19 +465,39 @@ export const HOLO_ODDS = 1 / 235;
 
    And three more tiers cost the League what the thirteenth did, three times
    over - see the income note above. The fix is the healer anchor, never the
-   ladder. */
-export const VIVID_ODDS = 1 / 209;
-export const NOIR_ODDS = 1 / 221;
-export const PROJECTION_ODDS = 1 / 249;
-export const GLITCH_ODDS = 1 / 265;
-export const CHAOTIC_ODDS = 1 / 281;
-export const SHADOW_ODDS = 1 / 317;
-export const SHOWDOWN_ODDS = 1 / 357;
-export const CADENCE_ODDS = 1 / 378;
-export const EMERALD_ODDS = 1 / 402;
-export const PLATINUM_ODDS = 1 / 426;
-export const DIAMOND_ODDS = 1 / 453;
-export const GOLD_ODDS = 1 / 480;
+   ladder.
+
+   THE VERSIONS joined (2026-10-16, your call): Ruby and Sapphire, two more
+   stones under Emerald, and Fire Red and Leaf Green, a campfire and a falling
+   leaf, either side of Shiny. And SHOWDOWN IS THE CHASE again, Cadence a rung
+   under it, both above Gold: the two tiers drawn from real animation are the
+   rarest things in the game. Nineteen rungs (Holo and Origin still share one),
+   the spread still exactly 2.30x, the rate held as always - 1 in 20.4 before,
+   1 in 20.5 after, for a species without Origin by the sum.
+
+   AND THIS TIME THE LEAGUE PAYS NOTHING. Four tiers add four rungs' worth of
+   bounty (the income note above), but the kindest rung moved up with them,
+   and `variantPay` is relative to it: 15 x 18/209 = 1.2919 a variant
+   encounter before, 19 x 18/265 = 1.2906 after. The kindest rung is 265 and
+   not the 264 an even ladder gives FOR THAT: at 264 income rose 0.3% and the
+   League's prize unit, whose quotient sits at 6.99 (the income note), floored
+   to 7 instead of 6 - a re-solve of every opponent for a rounding. */
+export const VIVID_ODDS = 1 / 265;
+export const NOIR_ODDS = 1 / 278;
+export const PROJECTION_ODDS = 1 / 304;
+export const GLITCH_ODDS = 1 / 319;
+export const CHAOTIC_ODDS = 1 / 334;
+export const SHADOW_ODDS = 1 / 366;
+export const LEAFGREEN_ODDS = 1 / 384;
+export const FIRERED_ODDS = 1 / 402;
+export const SAPPHIRE_ODDS = 1 / 441;
+export const RUBY_ODDS = 1 / 462;
+export const EMERALD_ODDS = 1 / 484;
+export const PLATINUM_ODDS = 1 / 507;
+export const DIAMOND_ODDS = 1 / 531;
+export const GOLD_ODDS = 1 / 556;
+export const CADENCE_ODDS = 1 / 582;
+export const SHOWDOWN_ODDS = 1 / 610;
 
 /* THE LADDER, rarest first - and the single source for it.
 
@@ -488,13 +508,17 @@ export const GOLD_ODDS = 1 / 480;
    fourth tier ends up protected from the sell sweep and not from the feed.
    Adding a fifth means adding a row here and drawing an icon. */
 export const TIER_ODDS = [
+  ["showdown", SHOWDOWN_ODDS],
+  ["cadence", CADENCE_ODDS],
   ["gold", GOLD_ODDS],
   ["diamond", DIAMOND_ODDS],
   ["platinum", PLATINUM_ODDS],
   ["emerald", EMERALD_ODDS],
-  ["cadence", CADENCE_ODDS],
-  ["showdown", SHOWDOWN_ODDS],
+  ["ruby", RUBY_ODDS],
+  ["sapphire", SAPPHIRE_ODDS],
   ["shiny", SHINY_ODDS],
+  ["firered", FIRERED_ODDS],
+  ["leafgreen", LEAFGREEN_ODDS],
   ["shadow", SHADOW_ODDS],
   ["astral", ASTRAL_ODDS],
   ["chaotic", CHAOTIC_ODDS],
@@ -522,6 +546,12 @@ export const ROSETTE_NEED = 4;
 /* Just the names, rarest first. Kindest-first is `[...TIERS].reverse()`, which
    is what a row of marks reads in - progress towards the rarest. */
 export const TIERS = TIER_ODDS.map(([tier]) => tier);
+
+/* A TIER'S NAME, the one way it is written to a player. Every screen used to
+   capitalise the id itself, which is right until an id is two words: Fire Red
+   and Leaf Green (2026-10-16) would have read "Firered" in eleven places. */
+const TIER_NAME = { firered: "Fire Red", leafgreen: "Leaf Green" };
+export const tierName = (t) => TIER_NAME[t] ?? t[0].toUpperCase() + t.slice(1);
 
 /* WHAT EACH TIER IS, IN A PHRASE - the TELL, never the odds. Beside `TIERS`
    because it is the same list and there is no second place a tier's name and
@@ -558,6 +588,11 @@ export const TIER_TELL = {
   diamond: "cut and polished",
   platinum: "struck in platinum",
   emerald: "cut from emerald",
+  // THE VERSIONS (2026-10-16): two more stones, and two that are a place.
+  ruby: "cut from ruby",
+  sapphire: "cut from sapphire",
+  firered: "lit by embers",
+  leafgreen: "in falling leaves",
   shadow: "sealed in darkness",
   chaotic: "unstable energy",
   projection: "a projection of light",

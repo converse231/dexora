@@ -39,7 +39,7 @@ import { sexOf, looksFemale } from "../game/gender.js";
 // Rarest first: the order the Box, the Dex and the encounter all read in -
 // one array, in biomes.js, beside the odds that define it.
 import {
-  TIERS as RARE, speciesById, isLegendary, lockedTiers,
+  TIERS as RARE, speciesById, isLegendary, lockedTiers, tierName,
 } from "../game/biomes.js";
 
 /* The order rows of one species sit in: the ordinary pile, then its variants
@@ -422,7 +422,7 @@ function Box({
     const defends = defendNote(going, defense, (m) => `Lv ${m.level}`);
 
     // A rare form's duplicates: candy only, and the dialog says what kind they are.
-    const tier = group.variant ? group.variant[0].toUpperCase() + group.variant.slice(1) : "";
+    const tier = group.variant ? tierName(group.variant) : "";
     const rare = group.variant
       ? `These are ${tier} ${label(sp)}. You keep your best one, at Lv ${group.best}; the rest become Rare Candy at the ordinary rate. This cannot be undone.`
       : null;
@@ -437,7 +437,7 @@ function Box({
       manifest: going.map((m) => ({
         key: m.uid,
         icon: { id: group.species, variant: group.variant ?? null },
-        label: `${label(sp)}${group.variant ? ` · ${group.variant.toUpperCase()}` : ""}`,
+        label: `${label(sp)}${group.variant ? ` · ${tierName(group.variant).toUpperCase()}` : ""}`,
         sub: `Lv ${m.level}${defense?.[m.uid] ? ` · defends, ${defense[m.uid]}` : ""}`,
       })),
       confirmLabel: candyPayout
@@ -498,11 +498,11 @@ function Box({
          Dex's FORMS strip about which column exists. Asked of the TARGET,
          because that is the one whose art has to exist. */
       note: (lost
-        ? `${label(target)} has no ${group.variant} artwork — Game Freak never ` +
-          `drew one. Your ${group.variant} mark is kept, but it will be drawn ` +
+        ? `${label(target)} has no ${tierName(group.variant)} artwork — Game Freak never ` +
+          `drew one. Your ${tierName(group.variant)} mark is kept, but it will be drawn ` +
           `as an ordinary ${label(target)}. This cannot be undone.`
         : group.variant
-          ? `Your ${group.variant} evolves, and stays ${group.variant}. No duplicates are spent.`
+          ? `Your ${tierName(group.variant)} evolves, and stays ${tierName(group.variant)}. No duplicates are spent.`
           : "No duplicates are spent — only the level you have already paid for.")
         + (defends ? ` It defends in ranked (${defends}) and will defend as ${label(target)} from now on.` : ""),
       confirmLabel: lost ? "EVOLVE ANYWAY" : "EVOLVE",
@@ -595,7 +595,7 @@ function Box({
                 ["all", "Any", groups.length],
                 ...VARIANT_ORDER.map((v) => [
                   v ?? "plain",
-                  v ? v[0].toUpperCase() + v.slice(1) : "Ordinary",
+                  v ? tierName(v) : "Ordinary",
                   groups.filter((g) => (g.variant ?? null) === v).length,
                 ]),
                 ["alpha", "Alpha", groups.filter((g) => g.alpha).length],
@@ -698,7 +698,7 @@ function Box({
                   {label(sp)}
                   {group.variant && (
                     <span className={`bx-vtag ${group.variant}`}>
-                      {group.variant.toUpperCase()}
+                      {tierName(group.variant).toUpperCase()}
                     </span>
                   )}
                   {group.alpha && (

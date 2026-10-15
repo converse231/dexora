@@ -31,7 +31,7 @@ import { evoLevel, itemById } from "../game/items.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
 import DexCards from "./cards/DexCards.jsx";
-import { sageArt, SAGE_CREDIT } from "../game/biomes.js";
+import { sageArt, SAGE_CREDIT, tierName } from "../game/biomes.js";
 import { hasLook } from "../game/gender.js";
 import {
   tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT,
@@ -49,7 +49,7 @@ import {
    A tier with no line here still renders; it just has no blurb. That is the
    right failure - a missing sentence beats a missing column. */
 const BLURB = TIER_TELL;
-const LABEL = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const LABEL = tierName;
 
 /* Where this one turns up, in a sentence a player can act on.
 

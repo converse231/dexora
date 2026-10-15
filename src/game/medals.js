@@ -172,7 +172,7 @@ export function genReward(gen, dex = [], earned = []) {
    random set and its title, `tier:<tier>:<gen>` - no money, no Master Ball,
    no charm, so the economy does not move. A family of looks is held by any
    drawing, as for the region (`owns`). */
-export const tierName = (t) => t[0].toUpperCase() + t.slice(1);
+export { tierName } from "./biomes.js";
 export const TIER_MEDALS = TIERS.flatMap((tier) => MEDALS.filter((m) => m.kind === "gen").map((m) => ({
   id: `tier:${tier}:${m.gen}`, kind: "tier", tier, gen: m.gen,
   need: m.need.filter((id) => tiersFor(id).includes(tier)),

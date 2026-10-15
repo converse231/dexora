@@ -248,6 +248,33 @@ export function VariantFx({ id, variant, art = null }) {
       </>
     );
   }
+  /* THE VERSIONS (2026-10-16), ported from the Tier Lab as they were signed
+     off. Ruby and Sapphire are one stone in two colours (`gem-<tier>` holds
+     the colours): light pooled deep inside it, a sheen crossing it, glints at
+     its edges - Gold's and Emerald's family. Fire Red is a campfire: a glow
+     at its feet and embers sparking up off its sides (over the orange body a
+     spark was lost). Leaf Green is leaves tumbling past. */
+  if (variant === "ruby" || variant === "sapphire") {
+    const url = `url(${art ?? spriteUrl(id)})`;
+    return (
+      <>
+        <span className={`gem-depth gem-${variant}`} style={{ "--art": url }} aria-hidden="true"><i /></span>
+        <span className={`gem-shine gem-${variant}`} style={{ "--art": url }} aria-hidden="true"><i /></span>
+        <span className={`gem-glint gem-${variant}`} aria-hidden="true"><i /><i /><i /></span>
+      </>
+    );
+  }
+  if (variant === "firered") {
+    return (
+      <>
+        <span className="ember-glow" aria-hidden="true"><i /></span>
+        <span className="ember-spark" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
+      </>
+    );
+  }
+  if (variant === "leafgreen") {
+    return <span className="leaf-fall" aria-hidden="true"><i /><i /><i /><i /></span>;
+  }
   if (variant === "gold" || variant === "chaotic" || variant === "projection" || variant === "shadow") {
     const url = `url(${art ?? spriteUrl(id)})`;
     if (variant === "gold") {
@@ -346,6 +373,11 @@ const REVEAL = {
      and a reveal firing over that would step on the one beat that sells it. */
   glitched: "tear",
   gold: "burst", shadow: "implode", chaotic: "tear", projection: "scan",
+  /* The treasure set had none - a Diamond arrived exactly like an ordinary
+     sprite - and the versions join them: a stone or a fire flares out, a
+     depth or a colour draws in, a sheen or a falling leaf passes over. */
+  diamond: "burst", platinum: "scan", emerald: "implode",
+  ruby: "burst", sapphire: "implode", firered: "burst", leafgreen: "scan",
 };
 
 /* THE TIERS THE BATTLE DRAWS THROUGH `VariantFx`. The older four (Shiny,
@@ -353,7 +385,7 @@ const REVEAL = {
    component; everything since goes through it, so a battle and a Box row can
    never draw one tier two ways. */
 export const SCENE_FX = new Set(["glitched", "gold", "shadow", "chaotic", "projection", "cadence",
-  "platinum", "diamond", "emerald"]);
+  "platinum", "diamond", "emerald", "ruby", "sapphire", "firered", "leafgreen"]);
 
 export function TierReveal({ id, variant }) {
   const motion = REVEAL[variant];

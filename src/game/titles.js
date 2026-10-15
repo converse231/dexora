@@ -10,7 +10,7 @@
 
    Pure and browser-free; the order is the server's (sorted). */
 import { CARD_SETS } from "../data/cards/index.js";
-import { REGION_NAME, TIERS } from "./biomes.js";
+import { REGION_NAME, TIERS, tierName } from "./biomes.js";
 import { MILESTONES } from "./cards.js";
 
 // `milestones` counts MILESTONES paid per set, one past them for a master set.
@@ -63,7 +63,7 @@ export function titleName(t) {
   if (kind === "dex") return `${REGION_NAME[id] ?? `Gen ${id}`} Dex Master`;
   if (titleTier(t)) {
     const g = t.split(":")[2];
-    return `${REGION_NAME[g] ?? `Gen ${g}`} ${id[0].toUpperCase()}${id.slice(1)} Dex Master`;
+    return `${REGION_NAME[g] ?? `Gen ${g}`} ${tierName(id)} Dex Master`;
   }
   return t;
 }

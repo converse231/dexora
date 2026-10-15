@@ -16,7 +16,16 @@ lengths, and every-Nth-frame over-sampled the quick ones. Sixteen, from
 eight, for a smoother loop.
 
 THE CANVAS IS RESIZED, NEVER THE CREATURE: the whole source canvas maps onto
-the square, so the creature keeps its relative size, feet on the floor."""
+the square, so the creature keeps its relative size, feet on the floor.
+
+SCALE2X FOR SHOWDOWN (`up`, 2026-10-16, reported as "a little blurry"): its
+sources are 16-colour pixel art as small as 45px, drawn at ~150px. Chrome
+keeps a background's pixels hard; a browser that smooths a background image
+(`image-rendering` is a hint) smeared every one of them. Doubled by Scale2x -
+the emulators' edge rule, exact on a 16-colour palette - while the side stays
+under `up`, a strip is near the size it is drawn at, so either way it is
+crisp, and its diagonals are smooth instead of stair-stepped. ~1.5x the bytes."""
+import numpy as np
 from PIL import Image, ImageSequence
 
 FRAMES = 16         # styles.css steps the strip by this (`steps(16)`, `1600%`); check.mjs holds both
@@ -24,7 +33,24 @@ CAP = 192           # a frame's side at most: 16 of them is 3,072px, under a pho
 COLORS = 256
 
 
-def strip(path):
+def scale2x(fr):
+    """One RGBA frame doubled by Scale2x (AdvMAME2x): each pixel becomes four,
+    and a corner takes its neighbour's colour where two edges meet there."""
+    a = np.asarray(fr, dtype=np.uint8).copy()
+    a[a[..., 3] == 0] = 0                       # one transparent colour, not many
+    c = a.view(np.uint32)[..., 0]
+    p = np.pad(c, 1, mode="edge")
+    B, D, E, F, H = p[:-2, 1:-1], p[1:-1, :-2], p[1:-1, 1:-1], p[1:-1, 2:], p[2:, 1:-1]
+    k = (B != H) & (D != F)
+    out = np.empty((c.shape[0] * 2, c.shape[1] * 2), np.uint32)
+    out[0::2, 0::2] = np.where(k & (D == B), D, E)
+    out[0::2, 1::2] = np.where(k & (B == F), F, E)
+    out[1::2, 0::2] = np.where(k & (D == H), D, E)
+    out[1::2, 1::2] = np.where(k & (H == F), F, E)
+    return Image.fromarray(out.view(np.uint8).reshape(out.shape + (4,)), "RGBA")
+
+
+def strip(path, up=0):
     im = Image.open(path)
     w, h = im.size
     frames, starts, t = [], [], 0
@@ -39,8 +65,11 @@ def strip(path):
         at = t * k / FRAMES
         i = max(j for j, s in enumerate(starts) if s <= at)
         picked.append(frames[i])
+    while up and max(w, h) * 2 <= up:
+        picked = [scale2x(fr) for fr in picked]
+        w, h = w * 2, h * 2
     side = max(w, h)
-    size = min(side, CAP)
+    size = min(side, max(CAP, up))     # a doubled frame is never resampled back down
     scale = size / side
     out = Image.new("RGBA", (size, size * FRAMES), (0, 0, 0, 0))
     for k, fr in enumerate(picked):

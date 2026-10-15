@@ -2777,34 +2777,42 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-    for (let i = 0; i < 400000; i++) {
+    /* TWO MILLION, AND ONLY RUNGS FAR ENOUGH APART TO MEASURE (2026-10-16).
+       At twenty tiers the rungs are 4.7% apart, and 400k rolls put ~700 in
+       each of the rarest with a standard deviation near 38 between two of
+       them: Cadence "beat" Showdown by noise. A pair is compared only where
+       its odds differ by `APART` (1.12x), which at 2M rolls is five standard
+       deviations - an order this can read, not a coin it can lose. 0.4s. */
+    const ROLLS = 2000000, APART = 1.12;
+    for (let i = 0; i < ROLLS; i++) {
       const v = rollVariant(rng);
       if (v === null) plain++;
       else seen[v]++;
       assert.ok(v === null || TIERS.includes(v), `rollVariant said ${v}`);
     }
-    assert.equal(TIERS.reduce((n, t) => n + seen[t], 0) + plain, 400000,
+    assert.equal(TIERS.reduce((n, t) => n + seen[t], 0) + plain, ROLLS,
       "every roll has exactly one answer");
     /* Measured, not just declared: a strictly rarer tier must actually come up
        less. Only where the odds differ - Origin and Holo share theirs, and
        which of two equal tiers wins a 400k sample is noise, so asserting an
        order between them would be a test that fails on a new seed. */
-    for (let i = 1; i < TIER_ODDS.length; i++) {
-      const [rarer, rOdds] = TIER_ODDS[i - 1];
-      const [kinder, kOdds] = TIER_ODDS[i];
-      if (kOdds === rOdds) continue;
+    for (let i = 0; i < TIER_ODDS.length; i++) {
+      const [rarer, rOdds] = TIER_ODDS[i];
+      const far = TIER_ODDS.slice(i + 1).find(([, o]) => o >= rOdds * APART);
+      if (!far) continue;
+      const [kinder] = far;
       assert.ok(seen[kinder] > seen[rarer],
-        `over 400k rolls: ${JSON.stringify(seen)} - ${kinder} is not commoner ` +
+        `over ${ROLLS} rolls: ${JSON.stringify(seen)} - ${kinder} is not commoner ` +
         `than ${rarer}, and its odds say it should be`);
     }
     for (const tier of TIERS)
-      assert.ok(seen[tier] > 0, `${tier} never appeared in 400k rolls`);
+      assert.ok(seen[tier] > 0, `${tier} never appeared in ${ROLLS} rolls`);
     /* Every tier reachable is not the same as every tier reachable AT ITS OWN
        RATE: a loop that returned early would still hit them all. Each count
        has to sit near what its odds predict, and the band is wide because a
        1/4096 tier only lands about 98 times in 400k. */
     for (const [tier, odds] of TIER_ODDS) {
-      const want = 400000 * odds;
+      const want = ROLLS * odds;
       assert.ok(seen[tier] > want * 0.6 && seen[tier] < want * 1.4,
         `${tier} came up ${seen[tier]} times, expected about ${Math.round(want)}`);
     }

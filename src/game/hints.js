@@ -1,4 +1,5 @@
 import { COMBO_STEPS } from "./combo.js";
+import { tierName } from "./biomes.js";
 
 /* THE TUTORIAL IS NOT A TUTORIAL. Nobody reads a five-step tour of a game they
    have not played yet, and this one has nothing to explain until you are
@@ -39,7 +40,7 @@ export const HINTS = [
   {
     id: "variant",
     when: (e) => e.kind === "encounter" && !!e.variant,
-    text: (e) => `That one is ${e.variant.toUpperCase()} — a rare form. They are `
+    text: (e) => `That one is ${tierName(e.variant).toUpperCase()} — a rare form. They are `
       + "worth spending a better ball on.",
   },
   {

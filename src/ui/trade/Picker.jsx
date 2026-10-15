@@ -15,7 +15,7 @@
    traded - the caller passes only what may. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SPECIES } from "../../data/dex.js";
-import { speciesById, isLegendary, TIERS } from "../../game/biomes.js";
+import { speciesById, isLegendary, TIERS, tierName } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { variantOf } from "../../game/items.js";
 import { keepLast } from "../../game/trade.js";
@@ -168,7 +168,7 @@ export default function Picker({
             return (
               <button key={g.key} type="button" className={`tc-mon${took ? " on" : ""}`}
                 aria-pressed={took > 0}
-                aria-label={`${label(sp)}${g.tier ? `, ${g.tier}` : ""}${g.alpha ? ", alpha" : ""}, ${g.members.length} owned${took ? `, ${took} picked` : ""}`}
+                aria-label={`${label(sp)}${g.tier ? `, ${tierName(g.tier)}` : ""}${g.alpha ? ", alpha" : ""}, ${g.members.length} owned${took ? `, ${took} picked` : ""}`}
                 disabled={!took && !room ? true : full && !single}
                 onClick={() => tap(g)}>
                 <Sprite id={g.species} variant={g.tier} fx />

@@ -7,7 +7,7 @@
    FIND is the other half: pick any species and see who has one - listings,
    friends with a spare (browse their box), and anybody's shelf. */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { speciesById, TIERS } from "../../game/biomes.js";
+import { speciesById, TIERS, tierName } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { LIMITS, tradeable, fits } from "../../game/trade.js";
 import { variantOf, keeper } from "../../game/items.js";
@@ -24,7 +24,7 @@ const Want = ({ species, tier }) => {
   return (
     <span className="bd-want">
       <Sprite id={species} variant={tier} fx alt="" />
-      <span>{tier ? <><Mark tier={tier} size={10} /> {tier}</> : "any"} {sp ? label(sp) : "?"}</span>
+      <span>{tier ? <><Mark tier={tier} size={10} /> {tierName(tier)}</> : "any"} {sp ? label(sp) : "?"}</span>
     </span>
   );
 };
@@ -82,7 +82,7 @@ function Post({ box, dexOf, engine, onPosted, onCancel }) {
             onClick={() => setTier(null)}>Any form</button>
           {TIERS.map((t) => (
             <button key={t} type="button" className={`tp-chip add${tier === t ? " have" : ""}`} aria-pressed={tier === t}
-              onClick={() => setTier(t)}><Mark tier={t} size={12} />{t}</button>
+              onClick={() => setTier(t)}><Mark tier={t} size={12} />{tierName(t)}</button>
           ))}
         </div>
       </section>

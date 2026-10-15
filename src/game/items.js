@@ -2,7 +2,7 @@ import { SPECIES } from "../data/dex.js";
 import { EVOLUTIONS as EVO_ROWS } from "../data/evolutions.js";
 import { GUARANTEED, PLAIN_MULT } from "../catch.js";
 import {
-  TIERS, TIER_ODDS, ENCLOSED, ENCOUNTER_RATE, speciesById,
+  TIERS, TIER_ODDS, ENCLOSED, ENCOUNTER_RATE, speciesById, tierName,
 } from "./biomes.js";
 
 /* The economy and evolution, free of DOM so tools/check.mjs can test them.
@@ -337,7 +337,7 @@ export const honeyLift = (odds) =>
    `TIER_ODDS` is rarest-first, hence the reverse. */
 const TIER_HONEY = [...TIER_ODDS].reverse().map(([tier, odds], rank) => {
   const lift = honeyLift(odds);
-  const name = tier.charAt(0).toUpperCase() + tier.slice(1);
+  const name = tierName(tier);
   /* PRICE AND LEVEL COME FROM THE RANK, NOT FROM THE LIFT, and the suite is
      what said so. The lift is an integer ceiling, so Vivid at 1/105 and Noir
      at 1/118 both round to x4 and priced identically - and a shelf where two
