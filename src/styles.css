@@ -8394,7 +8394,7 @@ button:disabled { transition: none; }
 /* PRISM HALO (your call, 2026-10-16, from the Treasure Tier Lab: Diamond,
    Platinum and Noir were three greys at a Box row). The body is white ice -
    the 2px prism fringe vanished at 52px - and the colour moved OUT of it: a
-   rainbow of light turning behind the creature (`.dia-halo`). Noir has no
+   rainbow aura in its own shape, turning behind the creature (`.dia-halo`). Noir has no
    light at all, Platinum's is a sweep across the body, Emerald's radiance is
    green and still; this one is every colour and turning. */
 .sprite-diamond {
@@ -8443,14 +8443,15 @@ button:disabled { transition: none; }
 }
 /* Behind the sprite (it is z-index 1 in `.sprite-fx` and the battle slot). */
 .shadow-aura, .chaos-aura, .proj-beam, .proj-base, .em-rad, .dia-halo { z-index: 0; }
-/* Diamond's halo: a blurred rainbow disc behind the creature, turning - a
-   transform, so it costs the compositor and nothing else. Unmasked: the light
-   leaves the stone. */
-/* A RING, not a disc (a disc behind a white body washed it out on a Dex tile): the
-   centre is masked away, and a thin dark outline on the body (the filter) keeps it read. */
-.dia-halo { inset: 4%; border-radius: 50%; overflow: hidden; filter: blur(7px); opacity: .7;
-  -webkit-mask: radial-gradient(closest-side, transparent 52%, #000 78%); mask: radial-gradient(closest-side, transparent 52%, #000 78%); }
-.dia-halo i { position: absolute; inset: 0;
+/* Diamond's halo is an AURA IN THE CREATURE'S OWN SHAPE (reported 2026-10-16:
+   a disc, then a ring, read as a circle behind it, not an aura). The rainbow
+   is cut to the sprite's silhouette (`--art`), grown a little and blurred by
+   the parent - so the light hugs the body and spills just past its outline.
+   The rainbow turns inside it: a transform, the compositor's alone. */
+.dia-halo { filter: blur(4px); opacity: 1; }
+.dia-halo i { position: absolute; inset: 0; overflow: hidden; transform: scale(1.2);
+  -webkit-mask: var(--art) center / contain no-repeat; mask: var(--art) center / contain no-repeat; }
+.dia-halo b { position: absolute; inset: -50%;
   background: conic-gradient(#ff5d8f, #ffd25d, #7dff8a, #5de2ff, #8a7dff, #ff5df0, #ff5d8f);
   animation: dia-halo 5s linear infinite; }
 @keyframes dia-halo { to { transform: rotate(360deg); } }
@@ -8752,7 +8753,12 @@ button:disabled { transition: none; }
 /* In a Dex tile the sprite is 84% of the cell and centred (see `.cell .holo-foil`),
    so the layers that register to it come in by the same 8%. */
 .cell .gold-shine, .cell .gold-glint, .cell .chaos-neg, .cell .chaos-cut, .cell .proj-lines { inset: 8%; }
-.cell .plat-sweep, .cell .dia-fire, .cell .em-depth, .cell .em-glint { inset: 8%; }
+.cell .plat-sweep, .cell .dia-fire, .cell .dia-halo, .cell .em-depth, .cell .em-glint { inset: 8%; }
+/* THE TILE'S SPRITE OVER ITS BEHIND-LAYERS: a bare `<img>` is not positioned, so
+   every positioned layer painted over it whatever its z-index - Diamond's aura
+   (and Emerald's radiance) tinted the creature instead of glowing behind it
+   (2026-10-16). `.sprite-fx > img` does the same everywhere else. */
+.cell > img:not(.mark) { position: relative; z-index: 1; }
 .cell .em-rad { inset: 2%; }
 .cell .shadow-aura { inset: 0 4% 6%; }
 .cell .chaos-aura { inset: 8%; }
@@ -8762,7 +8768,7 @@ button:disabled { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .gold-shine i, .gold-glint i, .shadow-aura i, .chaos-aura::before, .chaos-aura i,
   .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i,
-  .plat-sweep i, .dia-fire i, .em-depth i, .em-rad i, .em-glint i,
+  .plat-sweep i, .dia-fire i, .dia-halo b, .em-depth i, .em-rad i, .em-glint i,
   .sprite-projection:not(.mon) { animation: none; }
   .sprite-projection.mon { animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both; }
 }
@@ -9961,6 +9967,16 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .mb-dextag { position: absolute; top: 9cqw; left: 50%; transform: translateX(-50%); padding: 2px 8px; border-radius: 999px;
   font: 800 clamp(8px, 6cqw, 12px) / 1.2 var(--display); font-style: normal; color: #3a2600; background: linear-gradient(#ffe27a, #f0b83c); }
 .cd-pocket.lifting { opacity: .3; }
+/* HOVER ACTIONS on a filled pocket (a mouse only - Binders.jsx FINE): View and
+   Remove rise over the card's foot; keyboard focus shows them too. */
+.cd-pocket.hoverable { cursor: pointer; }
+.bk-acts { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; justify-content: center; gap: 8px;
+  padding: 18px 6px 8px; background: linear-gradient(transparent, rgba(6, 10, 22, .78)); opacity: 0; transition: opacity .15s ease; }
+.cd-pocket.hoverable:hover .bk-acts, .cd-pocket.hoverable:focus-within .bk-acts { opacity: 1; }
+.bk-acts button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .35); background: rgba(14, 20, 40, .88); color: #fff; transition: background .12s, border-color .12s; }
+.bk-acts button:hover, .bk-acts button:focus-visible { background: var(--accent); border-color: var(--accent); color: #04121c; outline: none; }
+.bk-acts button.rm:hover, .bk-acts button.rm:focus-visible { background: #d0453c; border-color: #d0453c; color: #fff; }
 .cd-pocket.drop-here { outline: 3px solid var(--accent); outline-offset: 2px; }
 .mb-ghost { position: fixed; left: 0; top: 0; z-index: 90; pointer-events: none; aspect-ratio: 63 / 88; border-radius: 6px;
   box-shadow: 0 18px 30px rgba(0, 0, 0, .5); }

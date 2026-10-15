@@ -26,14 +26,20 @@ import { badgesWon } from "../../game/league.js";
 import { speciesById, genOf, REGION_NAME, dexIndex } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import Sprite from "../Sprite.jsx";
+import Icon from "../Icon.jsx";
+
+/* A MOUSE GETS HOVER ACTIONS (asked for, 2026-10-16): View and Remove float
+   over a filled pocket, and a click on the card opens it. Touch keeps the tap
+   and its toolbar - a phone has no hover. Gated on the pointer, never width. */
+const FINE = typeof matchMedia === "function" && matchMedia("(hover: hover) and (pointer: fine)").matches;
 
 /* THE POKEDEX BINDER (asked for, 2026-10-16): pocket i is National Dex #i+1.
    An empty one shows who belongs there - the sprite, the number, the name -
    so you know which card to look for; tapping it offers only that
-   Pokemon's cards. Its pockets never move (no drag). It is FILLED BY HAND,
-   card by card (your call, 2026-10-16: an automatic fill took the effort out
-   of completing it), and it is the game's, not yours: one per player, reset
-   rather than deleted. */
+   Pokemon's cards. Its pockets never move (no drag). Fill from my cards
+   files your rarest card of each into its empty pocket (taken out and brought
+   back the same day, 2026-10-16 - your call both times). It is the game's,
+   not yours: one per player, reset rather than deleted. */
 const baseNo = (id) => speciesById(id)?.of ?? id;
 // Where each region starts in the National Dex, for the jump.
 const REGION_STARTS = Object.keys(REGION_NAME).map(Number)
@@ -245,6 +251,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
   const [asking, setAsking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [drag, setDrag] = useState(null);           // { from, over, x, y, w }
+  const [note, setNote] = useState("");
   const b = binders.find((x) => x.id === openId) ?? null;
   const [draft, setDraft] = useState("");
   useEffect(() => { setDraft(b?.name ?? ""); }, [b?.id, b?.name]);
@@ -258,7 +265,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
     const t = setTimeout(() => { if (phase === "closing") setOpenId(null); setPhase("open"); }, OPEN_MS);
     return () => clearTimeout(t);
   }, [phase]);
-  const open = (id) => { setOpenId(id); setPage(0); setSel(null); setPhase(reduced() ? "open" : "opening"); };
+  const open = (id) => { setOpenId(id); setPage(0); setSel(null); setNote(""); setPhase(reduced() ? "open" : "opening"); };
   const close = () => { setSel(null); if (reduced()) setOpenId(null); else setPhase("closing"); };
 
   if (!b) {
@@ -298,6 +305,29 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
   const count = isDex ? DEX_POCKETS
     : Math.min(BINDER_POCKETS, Math.max(2 * PAGE_POCKETS, Math.ceil((b.pockets.length + 1) / PAGE_POCKETS) * PAGE_POCKETS));
   const put = (pockets) => engine.setBinder(b.id, { pockets });
+  /* FILL FROM YOUR CARDS (a Pokedex binder): each EMPTY pocket takes your
+     rarest held printing of its Pokemon - a card filed by its first Pokemon,
+     a form under its base - from the sets loaded. A filled pocket is never
+     touched: what you placed stays. */
+  const fill = () => {
+    const best = new Map();
+    for (const s of CARD_SETS) {
+      for (const c of sets[s.id]?.CARDS ?? []) {
+        const row = cards[`${s.id}-${c[0]}`];
+        const v = row && ["h", "r", "n"].find((x) => row[x] && c[4].includes(x));
+        if (!v || !c[5].length) continue;
+        const sp = Math.min(...c[5].map(baseNo));
+        if (sp > DEX_POCKETS || b.pockets[sp - 1]) continue;
+        const r = rungOf(c[3]);
+        if (!best.has(sp) || r > best.get(sp).r) best.set(sp, { key: `${s.id}-${c[0]}:${v}`, r });
+      }
+    }
+    if (!best.size) { setNote("Nothing new to file - every Pokémon you hold a card of is in."); return; }
+    const p = Array.from({ length: DEX_POCKETS }, (_, i) => b.pockets[i] ?? null);
+    for (const [sp, x] of best) p[sp - 1] = x.key;
+    put(p);
+    setNote(`Filed ${best.size} card${best.size === 1 ? "" : "s"} in their pockets.`);
+  };
   const swap = (from, to) => {
     if (to < 0 || to >= count || to === from) return;
     const p = [...b.pockets];
@@ -422,7 +452,9 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
         <span className="mb-actions">
           <button type="button" className="tp-quiet" onClick={() => setEditing(true)}>Cover</button>
           <button type="button" className="tp-quiet" disabled={isDex && !filled} onClick={() => setAsking(true)}>{isDex ? "Reset" : "Delete"}</button>
-          {!isDex && <button type="button" className="lg-go" onClick={() => setPicker({ many: true })}>Add cards</button>}
+          {isDex
+            ? <button type="button" className="lg-go" onClick={fill}>Fill from my cards</button>
+            : <button type="button" className="lg-go" onClick={() => setPicker({ many: true })}>Add cards</button>}
         </span>
       </div>
       {isDex && (
@@ -435,6 +467,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
           <span className="mb-count">{filled} of {DEX_POCKETS} Pokémon</span>
         </div>
       )}
+      {note && <p className="mb-hint" role="status">{note}</p>}
       <p className="mb-hint">
         {isDex ? "Every pocket is one Pokémon, in Pokédex order. Tap an empty pocket to choose one of your cards of it."
           : !filled ? "An empty binder. Tap a pocket, or Add cards, to fill it from any set you collect."
@@ -463,8 +496,26 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
               </button>
             );
           }
-          const { id, v } = parseKey(k);
+          const { id, v, setId, localId } = parseKey(k);
           const held = !!cards[id]?.[v];
+          if (FINE) {
+            const look = () => onLook(setId, localId);
+            const off = () => { const p = [...b.pockets]; p[i] = null; put(p); };
+            const inActs = (e) => e.target.closest(".bk-acts");
+            return (
+              <div className={`cd-pocket got hoverable${held ? "" : " ghost"}${cls}`} role="group"
+                data-pocket={isDex ? undefined : i} aria-label={`Pocket ${i + 1}${held ? "" : ", no longer held"}`}
+                onPointerDown={isDex ? undefined : (e) => { if (!inActs(e)) press(e, i); }}
+                onClick={(e) => { if (!inActs(e)) look(); }}>
+                <Face sets={sets} cards={cards} k={k} />
+                {!held && <span className="mb-gone">Not held</span>}
+                <span className="bk-acts">
+                  <button type="button" onClick={look} aria-label="View this card" data-tip="View"><Icon n="eye" size={17} /></button>
+                  <button type="button" className="rm" onClick={off} aria-label="Remove it from this pocket" data-tip="Remove"><Icon n="trash" size={17} /></button>
+                </span>
+              </div>
+            );
+          }
           return (
             <button type="button" className={`cd-pocket got${held ? "" : " ghost"}${sel === i ? " sel" : ""}${cls}`} aria-pressed={sel === i}
               data-pocket={isDex ? undefined : i} onPointerDown={isDex ? undefined : (e) => press(e, i)} onContextMenu={(e) => e.preventDefault()}

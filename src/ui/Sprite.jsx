@@ -243,7 +243,7 @@ export function VariantFx({ id, variant, art = null }) {
     // Diamond: the prism halo turning behind it, and the glints.
     return (
       <>
-        <span className="dia-halo" aria-hidden="true"><i /></span>
+        <span className="dia-halo" style={{ "--art": url }} aria-hidden="true"><i><b /></i></span>
         <span className="dia-fire" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
       </>
     );
