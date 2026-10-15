@@ -373,7 +373,8 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
     return (
       <div className="cd-binder">
         {modes}
-        <MyBinders binders={binders} sets={sets} cards={cards} engine={engine} onLook={onLook} prices={prices} dust={dust} level={level} beaten={beaten} />
+        <MyBinders binders={binders} sets={sets} cards={cards} engine={engine} onLook={onLook} prices={prices} dust={dust} level={level} beaten={beaten}
+          dexSeen={dex ?? []} />
       </div>
     );
   }

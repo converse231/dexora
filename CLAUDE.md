@@ -903,6 +903,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   pointer events (a touch must HOLD first, so a swipe is never a drag; near
   the edge it scrolls), and covers you colour and patch (`cover` on a binder,
   `patches` bought by `buyPatch` for dust, gym badges won free - derived).
+  **A Pokédex binder** (`dex: 1`, 2026-10-16) is a My Binder whose pocket i
+  is National Dex #i+1 (`DEX_POCKETS`, held to the dex's species count): an
+  empty pocket shows that Pokemon's sprite, number and name, the picker
+  offers only its cards (a form files under its base, `of`), pockets never
+  drag, and Fill files your rarest printing of each into its empty pocket.
   The last card of every pack charges and flashes (white until the charge),
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.

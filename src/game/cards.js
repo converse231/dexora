@@ -296,6 +296,11 @@ export const PAGE_POCKETS = 9;
 export const BINDER_MAX = 20;
 export const BINDER_POCKETS = 40 * PAGE_POCKETS;
 export const BINDER_NAME = 24;
+/* A POKEDEX BINDER (asked for, 2026-10-16): `dex: 1`, and pocket i is National
+   Dex #i+1 - one pocket a species, every species, in order. The game's dex runs
+   to 1025 before its forms (dex.js); check.mjs holds the two equal. */
+export const DEX_POCKETS = 1025;
+export const pocketCap = (b) => (b?.dex === 1 ? DEX_POCKETS : BINDER_POCKETS);
 const POCKET_KEY = /^[\w.]+-\w+:[nhr]$/;
 /* A BINDER'S COVER (2026-10-15, asked for): a leather colour and up to
    PATCH_MAX sewn-on patches, each where you put it (x, y in % of the cover).
@@ -335,12 +340,12 @@ export function cleanBinders(raw) {
   for (const b of raw) {
     if (!b || typeof b !== "object" || typeof b.id !== "string" || !/^[a-z0-9]{1,16}$/.test(b.id) || ids.has(b.id)) continue;
     const name = typeof b.name === "string" ? b.name.trim().slice(0, BINDER_NAME) : "";
-    const pockets = (Array.isArray(b.pockets) ? b.pockets : []).slice(0, BINDER_POCKETS)
+    const pockets = (Array.isArray(b.pockets) ? b.pockets : []).slice(0, pocketCap(b))
       .map((k) => (typeof k === "string" && POCKET_KEY.test(k) ? k : null));
     while (pockets.length && pockets.at(-1) === null) pockets.pop();
     ids.add(b.id);
     const cover = cleanCover(b.cover);
-    out.push({ id: b.id, name: name || "My binder", pockets, ...(cover && { cover }) });
+    out.push({ id: b.id, name: name || "My binder", pockets, ...(b.dex === 1 && { dex: 1 }), ...(cover && { cover }) });
     if (out.length >= BINDER_MAX) break;
   }
   return out;

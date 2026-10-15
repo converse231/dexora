@@ -20,9 +20,23 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CARD_SETS } from "../../data/cards/index.js";
 import {
-  CARD_RARITIES, PAGE_POCKETS, BINDER_MAX, BINDER_NAME, BINDER_POCKETS, RARITY, rungOf, coverOf, COVER_CLASSIC, COVER_SMOOTH, PATCH_MAX, PATCH_DUST, setOpen, SET_LEVEL,
+  CARD_RARITIES, PAGE_POCKETS, BINDER_MAX, BINDER_NAME, BINDER_POCKETS, DEX_POCKETS, RARITY, rungOf, coverOf, COVER_CLASSIC, COVER_SMOOTH, PATCH_MAX, PATCH_DUST, setOpen, SET_LEVEL,
 } from "../../game/cards.js";
 import { badgesWon } from "../../game/league.js";
+import { speciesById, genOf, REGION_NAME, dexIndex } from "../../game/biomes.js";
+import { label } from "../../game/map.js";
+import Sprite from "../Sprite.jsx";
+
+/* THE POKEDEX BINDER (asked for, 2026-10-16): pocket i is National Dex #i+1.
+   An empty one shows who belongs there - the sprite, the number, the name -
+   so you know which card to look for; tapping it offers only that
+   Pokemon's cards. Its pockets never move (no drag), and it fills itself
+   from your collection on request. */
+const baseNo = (id) => speciesById(id)?.of ?? id;
+// Where each region starts in the National Dex, for the jump.
+const REGION_STARTS = Object.keys(REGION_NAME).map(Number)
+  .map((g) => [g, Array.from({ length: DEX_POCKETS }, (_, i) => i + 1).find((id) => genOf(id) === g)])
+  .filter(([, id]) => id);
 import CardFace, { RarityMark, VARIANT_NAME, priceOf, usd, Money, PriceInfo } from "./Card.jsx";
 import { logoUrl } from "./load.js";
 import Confirm from "../Confirm.jsx";
@@ -220,7 +234,7 @@ const binderValue = (b, cards, prices) => b.pockets.reduce((t, k) => {
 const HOLD_MS = 300;       // a touch held this long picks the card up
 const EDGE_MS = 600;       // a card held over ‹ or › this long turns the page
 
-export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust = 0, level = 1, beaten }) {
+export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust = 0, level = 1, beaten, dexSeen = [] }) {
   const [openId, setOpenId] = useState(null);
   const [phase, setPhase] = useState("open");      // "opening" | "open" | "closing"
   const [page, setPage] = useState(0);
@@ -229,6 +243,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
   const [asking, setAsking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [drag, setDrag] = useState(null);           // { from, over, x, y, w }
+  const [note, setNote] = useState("");
   const b = binders.find((x) => x.id === openId) ?? null;
   const [draft, setDraft] = useState("");
   useEffect(() => { setDraft(b?.name ?? ""); }, [b?.id, b?.name]);
@@ -242,7 +257,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
     const t = setTimeout(() => { if (phase === "closing") setOpenId(null); setPhase("open"); }, OPEN_MS);
     return () => clearTimeout(t);
   }, [phase]);
-  const open = (id) => { setOpenId(id); setPage(0); setSel(null); setPhase(reduced() ? "open" : "opening"); };
+  const open = (id) => { setOpenId(id); setPage(0); setSel(null); setNote(""); setPhase(reduced() ? "open" : "opening"); };
   const close = () => { setSel(null); if (reduced()) setOpenId(null); else setPhase("closing"); };
 
   if (!b) {
@@ -253,8 +268,8 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
           const c = coverOf(x);
           return (
             <button key={x.id} type="button" className="mb-book" onClick={() => open(x.id)} aria-label={`Open ${x.name}, ${n} card${n === 1 ? "" : "s"}`}>
-              <Cover color={c.color} patches={c.patches} title={x.name} />
-              <span className="mb-meta">{n} card{n === 1 ? "" : "s"}{value > 0 && <b>{usd(value)}</b>}</span>
+              <Cover color={c.color} patches={c.patches} title={x.name}>{x.dex === 1 && <i className="mb-dextag">POKÉDEX</i>}</Cover>
+              <span className="mb-meta">{x.dex === 1 ? `${n} / ${DEX_POCKETS}` : `${n} card${n === 1 ? "" : "s"}`}{value > 0 && <b>{usd(value)}</b>}</span>
             </button>
           );
         })}
@@ -262,6 +277,12 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
           <button type="button" className="mb-book mb-new" onClick={() => { const id = engine.newBinder(); if (id) open(id); }}>
             <span className="lc mb-blank" aria-hidden="true"><b>+</b>New binder</span>
             <span className="mb-meta">Cards from any set</span>
+          </button>
+        )}
+        {binders.length < BINDER_MAX && (
+          <button type="button" className="mb-book mb-new" onClick={() => { const id = engine.newBinder("", true); if (id) open(id); }}>
+            <span className="lc mb-blank" aria-hidden="true"><b>#</b>New Pokédex binder</span>
+            <span className="mb-meta">A pocket for every Pokémon, in order</span>
           </button>
         )}
       </div>
@@ -272,7 +293,36 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
   const filled = b.pockets.filter(Boolean).length;
   // Always one empty pocket after the last card, whole pages, and at least a
   // full spread - a new binder opened on a blank right-hand page.
-  const count = Math.min(BINDER_POCKETS, Math.max(2 * PAGE_POCKETS, Math.ceil((b.pockets.length + 1) / PAGE_POCKETS) * PAGE_POCKETS));
+  const isDex = b.dex === 1;
+  const count = isDex ? DEX_POCKETS
+    : Math.min(BINDER_POCKETS, Math.max(2 * PAGE_POCKETS, Math.ceil((b.pockets.length + 1) / PAGE_POCKETS) * PAGE_POCKETS));
+  /* FILL FROM YOUR CARDS (a Pokedex binder): each empty pocket takes your
+     rarest held printing of its Pokemon - a card filed by its first Pokemon,
+     a form under its base - from the sets loaded. Filled pockets stay. */
+  const fillable = () => {
+    if (!isDex) return [];
+    const best = new Map();
+    for (const s of CARD_SETS) {
+      for (const c of sets[s.id]?.CARDS ?? []) {
+        const row = cards[`${s.id}-${c[0]}`];
+        const v = row && ["h", "r", "n"].find((x) => row[x] && c[4].includes(x));
+        if (!v || !c[5].length) continue;
+        const sp = Math.min(...c[5].map(baseNo));
+        if (sp > DEX_POCKETS || b.pockets[sp - 1]) continue;
+        const r = rungOf(c[3]);
+        if (!best.has(sp) || r > best.get(sp).r) best.set(sp, { key: `${s.id}-${c[0]}:${v}`, r });
+      }
+    }
+    return [...best].map(([sp, x]) => [sp - 1, x.key]);
+  };
+  const fill = () => {
+    const add = fillable();
+    if (!add.length) { setNote("Nothing new to file - every Pokémon you hold a card of is in."); return; }
+    const p = Array.from({ length: DEX_POCKETS }, (_, i) => b.pockets[i] ?? null);
+    for (const [i, k] of add) p[i] = k;
+    engine.setBinder(b.id, { pockets: p });
+    setNote(`Filed ${add.length} card${add.length === 1 ? "" : "s"} in their pockets.`);
+  };
   const put = (pockets) => engine.setBinder(b.id, { pockets });
   const swap = (from, to) => {
     if (to < 0 || to >= count || to === from) return;
@@ -398,18 +448,42 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
         <span className="mb-actions">
           <button type="button" className="tp-quiet" onClick={() => setEditing(true)}>Cover</button>
           <button type="button" className="tp-quiet" onClick={() => setAsking(true)}>Delete</button>
-          <button type="button" className="lg-go" onClick={() => setPicker({ many: true })}>Add cards</button>
+          {isDex
+            ? <button type="button" className="lg-go" onClick={fill}>Fill from my cards</button>
+            : <button type="button" className="lg-go" onClick={() => setPicker({ many: true })}>Add cards</button>}
         </span>
       </div>
+      {isDex && (
+        <div className="mb-dexbar">
+          <select className="pk-sel" value="" aria-label="Jump to a region"
+            onChange={(e) => { if (e.target.value) setPage(Math.floor((Number(e.target.value) - 1) / PAGE_POCKETS)); }}>
+            <option value="">Jump to a region…</option>
+            {REGION_STARTS.map(([g, id]) => <option key={g} value={id}>{REGION_NAME[g]} · #{id}</option>)}
+          </select>
+          <span className="mb-count">{filled} of {DEX_POCKETS} Pokémon</span>
+        </div>
+      )}
+      {note && <p className="mb-hint" role="status">{note}</p>}
       <p className="mb-hint">
-        {!filled ? "An empty binder. Tap a pocket, or Add cards, to fill it from any set you collect."
-          : "Drag a card onto another pocket to swap them - hold it over ‹ or › to turn the page. On a phone, hold the card first."}
+        {isDex ? "Every pocket is one Pokémon, in Pokédex order. Tap an empty pocket to pick from your cards of it."
+          : !filled ? "An empty binder. Tap a pocket, or Add cards, to fill it from any set you collect."
+            : "Drag a card onto another pocket to swap them - hold it over ‹ or › to turn the page. On a phone, hold the card first."}
       </p>
       <BinderPages count={count} page={page} leather={cover.color} bookKey={b.id} flap={flap || null}
         dragging={() => Boolean(dragRef.current?.on) || performance.now() - droppedAt.current < 250}
         onPage={(p) => { setPage(p); setSel(null); }} render={(i) => {
           const k = b.pockets[i];
           const cls = `${drag?.from === i ? " lifting" : ""}${drag && drag.over === i && drag.from !== i ? " drop-here" : ""}`;
+          if (!k && isDex) {
+            const sp = speciesById(i + 1);
+            return (
+              <button type="button" className={`cd-pocket mb-slot dx-slot${dexSeen[dexIndex(i + 1)] ? "" : " unmet"}`} onClick={() => setPicker({ at: i, species: i + 1 })}
+                aria-label={`#${i + 1} ${sp ? label(sp) : ""}, empty - add a card`}>
+                {sp && <Sprite id={i + 1} />}
+                <small><b>#{String(i + 1).padStart(3, "0")}</b>{sp ? label(sp) : ""}</small>
+              </button>
+            );
+          }
           if (!k) {
             return (
               <button type="button" className={`cd-pocket mb-slot${cls}`} data-pocket={i} onClick={() => setPicker({ at: i })}
@@ -422,7 +496,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
           const held = !!cards[id]?.[v];
           return (
             <button type="button" className={`cd-pocket got${held ? "" : " ghost"}${sel === i ? " sel" : ""}${cls}`} aria-pressed={sel === i}
-              data-pocket={i} onPointerDown={(e) => press(e, i)} onContextMenu={(e) => e.preventDefault()}
+              data-pocket={isDex ? undefined : i} onPointerDown={isDex ? undefined : (e) => press(e, i)} onContextMenu={(e) => e.preventDefault()}
               onClick={() => setSel(sel === i ? null : i)} aria-label={`Pocket ${i + 1}${held ? "" : ", no longer held"}`}>
               <Face sets={sets} cards={cards} k={k} />
               {!held && <span className="mb-gone">Not held</span>}
@@ -433,8 +507,8 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
         <div className="mb-tools" role="toolbar" aria-label="Selected card">
           <span><RarityMark rarity={selCard.c[3]} /> {selCard.c[1]} · {VARIANT_NAME[selCard.v]}</span>
           <button type="button" className="tp-quiet" onClick={() => onLook(selCard.setId, selCard.localId)}>View</button>
-          <button type="button" className="tp-quiet" disabled={sel === 0} onClick={() => move(sel, sel - 1)} aria-label="Move one pocket back">‹ Move</button>
-          <button type="button" className="tp-quiet" disabled={sel >= count - 1} onClick={() => move(sel, sel + 1)} aria-label="Move one pocket on">Move ›</button>
+          {!isDex && <button type="button" className="tp-quiet" disabled={sel === 0} onClick={() => move(sel, sel - 1)} aria-label="Move one pocket back">‹ Move</button>}
+          {!isDex && <button type="button" className="tp-quiet" disabled={sel >= count - 1} onClick={() => move(sel, sel + 1)} aria-label="Move one pocket on">Move ›</button>}
           <button type="button" className="tp-quiet" onClick={() => { const p = [...b.pockets]; p[sel] = null; put(p); setSel(null); }}>Remove</button>
         </div>
       )}
@@ -448,7 +522,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
       {/* PORTALLED: the Cards page's main area isolates, so a dialog drawn
           inside it sat under the page's pinned header and tabs. */}
       {picker && createPortal(
-        <CardPicker sets={sets} cards={cards} many={!!picker.many} onClose={() => setPicker(null)}
+        <CardPicker sets={sets} cards={cards} many={!!picker.many} species={picker.species ?? null} onClose={() => setPicker(null)}
           onPick={(keys) => {
             engine.addToBinder(b.id, keys, picker.many ? null : picker.at);
             setPicker(null);
@@ -607,8 +681,12 @@ function CoverEditor({ binder, engine, dust, level, beaten, onClose }) {
    to add at once. A page of tiles at a time, so a big collection opens fast. */
 const PICK_PAGE = 60;
 const unpad = (s) => s.replace(/^0+(?=\w)/, "");
+/* A card's place in the Pokedex: its first Pokemon, a form read through to
+   its base (a Mega Charizard X card files under #6); a Trainer or an Energy
+   last. Ties keep set order - the sort is stable. */
+const dexNo = (c) => (c[5].length ? Math.min(...c[5].map((id) => speciesById(id)?.of ?? id)) : 1e9);
 
-function CardPicker({ sets, cards, many, onPick, onClose }) {
+function CardPicker({ sets, cards, many, species = null, onPick, onClose }) {
   useModalLock();
   const dismiss = useDismiss(onClose);
   const [q, setQ] = useState("");
@@ -624,17 +702,19 @@ function CardPicker({ sets, cards, many, onPick, onClose }) {
   }, [onClose]);
   useEffect(() => setUpTo(PICK_PAGE), [q, setF, rarF, sort]);
 
+  // A Pokedex pocket asks for one Pokemon: only cards that show it (a form counts as its base).
   const all = useMemo(() => CARD_SETS.flatMap((s) => (sets[s.id]?.CARDS ?? []).flatMap((c, i) => {
+    if (species && !c[5].some((id) => baseNo(id) === species)) return [];
     const row = cards[`${s.id}-${c[0]}`];
     return ["h", "r", "n"].filter((v) => row?.[v] && c[4].includes(v)).map((v) => ({ key: `${s.id}-${c[0]}:${v}`, s: s.id, c, v, i }));
-  })), [sets, cards]);
+  })), [sets, cards, species]);
   const held = useMemo(() => new Set(all.map((x) => x.s)), [all]);
   // The rarities you hold, in the set picked - a rung you have none of is never offered.
   const rarities = useMemo(() => CARD_RARITIES.filter((r) => all.some((x) => x.c[3] === r && (!setF || x.s === setF))), [all, setF]);
   const n = q.trim().toLowerCase();
   const shown = all.filter((x) => (!setF || x.s === setF) && (!rarF || x.c[3] === rarF)
     && (!n || x.c[1].toLowerCase().includes(n) || (x.c[6] ?? "").toLowerCase().includes(n) || unpad(x.c[0].toLowerCase()) === unpad(n)))
-    .sort((a, b) => (sort === "rare" ? rungOf(b.c[3]) - rungOf(a.c[3]) : 0));
+    .sort((a, b) => (sort === "rare" ? rungOf(b.c[3]) - rungOf(a.c[3]) : sort === "dex" ? dexNo(a.c) - dexNo(b.c) : 0));
   const toggle = (k) => setChosen((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
 
   return (
@@ -642,7 +722,7 @@ function CardPicker({ sets, cards, many, onPick, onClose }) {
       <div className="confirm mb-picker" role="dialog" aria-modal="true" aria-label={many ? "Add cards to the binder" : "Choose a card"}
         onClick={(e) => e.stopPropagation()}>
         <button type="button" className="cd-x" onClick={onClose} aria-label="Close">✕</button>
-        <h3>{many ? "Add cards" : "Choose a card"}</h3>
+        <h3>{many ? "Add cards" : species ? `A card for #${String(species).padStart(3, "0")} ${label(speciesById(species))}` : "Choose a card"}</h3>
         <div className="pk-bar">
           <input className="tc-input pk-q" type="search" value={q} onChange={(e) => setQ(e.target.value)}
             placeholder="Search a card, number or illustrator" aria-label="Search your cards" />
@@ -657,10 +737,11 @@ function CardPicker({ sets, cards, many, onPick, onClose }) {
           <select className="pk-sel" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
             <option value="set">Set order</option>
             <option value="rare">Rarest first</option>
+            <option value="dex">Pokédex number</option>
           </select>
         </div>
         <div className="mb-pick-scroll">
-          {!all.length ? <p className="ev-quiet">No cards yet - open a pack in Cards.</p>
+          {!all.length ? <p className="ev-quiet">{species ? "You hold no card of this Pokémon yet - look for it in packs, or craft one on Dust." : "No cards yet - open a pack in Cards."}</p>
             : !shown.length ? <p className="ev-quiet">No card of yours matches.</p> : (
               <div className="mb-pick-grid">
                 {shown.slice(0, upTo).map((x) => {

@@ -817,6 +817,18 @@ now and then when a step started an encounter.
   never a strength. A binder saved without a cover wears the colour its id
   hashes to.
 
+## The Pokédex binder *(2026-10-16, asked for)*
+
+- A My Binder with `dex: 1`: pocket i is National Dex #i+1, all 1,025 of
+  them (`DEX_POCKETS`, `pocketCap`), 114 pages with a region jump.
+- An empty pocket shows who belongs there - sprite, number, name (greyed
+  for a Pokemon not yet met) - so you know which card to look for; tapping it
+  opens the picker on that Pokemon's cards only (a form, a Mega, under its
+  base species).
+- Pockets never move (no drag, no Move); **Fill from my cards** files your
+  rarest held printing of each Pokemon into its empty pocket, by the card's
+  first Pokemon, and never touches a filled one.
+
 ## Deferred on purpose *(each with the trigger that brings it back)*
 
 - **Trading cards** - needs server-minted card rows; trigger: players asking
