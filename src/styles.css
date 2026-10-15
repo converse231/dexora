@@ -6144,6 +6144,59 @@ button:disabled { transition: none; }
 }
 .tp-ring i { font-style: normal; font-size: 9px; }
 .tp-count { font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
+/* INVITE FRIENDS (Invite.jsx): the link, what you both get, the rule, your invites. */
+.iv { position: relative; width: min(620px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; display: grid; gap: 12px; }
+.iv-hero { display: flex; align-items: center; gap: 14px; padding-right: 40px; }
+.iv-gift { flex: none; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px;
+  background: rgba(255, 122, 53, .16); color: #ff7a35; }
+.iv-hero h3 { margin: 0; font: 800 21px var(--display); color: var(--ink); }
+.iv-hero p { margin: 2px 0 0; font-size: 13.5px; color: var(--ink-soft); }
+.iv-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.iv-card h4 { margin: 0; font: 700 14px var(--display); color: var(--ink); }
+.iv-card h4 small { font: 500 12px var(--body); color: var(--ink-faint); margin-left: 6px; }
+.iv-me { border-color: rgba(255, 122, 53, .55); }
+.iv-me.done { border-color: var(--gold); }
+.iv-link { display: flex; gap: 8px; }
+.iv-link input { flex: 1; min-width: 0; font-size: 13px; }
+.iv-note { margin: 0; font-size: 12.5px; color: var(--accent); overflow-wrap: anywhere; }
+.iv-rows { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; align-items: center; }
+.iv-k { font: 600 12.5px var(--body); color: var(--ink-soft); }
+.iv-prize { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font: 700 13px var(--pixel); color: var(--ink); }
+.iv-prize > span { display: inline-flex; align-items: center; gap: 2px; }
+.iv-prize img { width: 24px; height: 24px; image-rendering: pixelated; }
+.iv-prize .ic { color: #ff7a35; }
+.iv-ladder { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.iv-ladder li { display: grid; justify-items: center; gap: 2px; padding: 8px 6px; border: 1px dashed var(--line-firm); border-radius: 12px; text-align: center; }
+.iv-ladder li.done { border: 1px solid var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); }
+.iv-ladder b { font: 800 20px / 1 var(--display); color: var(--ink); }
+.iv-ladder small { font-size: 11px; color: var(--ink-faint); }
+.iv-ladder .iv-prize { justify-content: center; }
+.iv-steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; color: var(--ink-soft); }
+.iv-steps b { color: var(--ink); }
+.iv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.iv-list li { display: grid; grid-template-columns: 36px minmax(70px, auto) minmax(0, 1fr); align-items: center; gap: 10px; }
+.iv-list .tc-art { width: 36px; height: 36px; }
+.iv-list b { font: 700 13.5px var(--display); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iv-meters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.iv-meters > span { display: grid; gap: 3px; }
+.iv-meters i { display: block; height: 5px; border-radius: 3px; background: var(--line); position: relative; overflow: hidden; }
+.iv-meters i::after { content: ""; position: absolute; inset: 0; background: var(--accent); transform-origin: left; transform: scaleX(var(--p)); }
+.iv-meters .done i::after { background: var(--gold); }
+.iv-meters small { font: 600 10px var(--pixel); color: var(--ink-faint); white-space: nowrap; }
+.iv-ok { font: 700 13px var(--body); color: var(--gold); }
+.iv-cap { font-size: 12px; color: var(--ink-faint); }
+.iv-claim { justify-self: stretch; }
+.iv-got { list-style: none; margin: 0; padding: 10px 12px; display: grid; gap: 6px; border-radius: 12px; background: color-mix(in srgb, var(--gold) 12%, var(--surface-2)); }
+.iv-got li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: 13px; color: var(--ink); }
+.iv-fine { margin: 0; font-size: 11.5px; color: var(--ink-faint); }
+@media (max-width: 520px) {
+  .iv-list li { grid-template-columns: 36px minmax(0, 1fr); }
+  .iv-list li > :last-child { grid-column: 1 / -1; }
+  .iv-rows { grid-template-columns: 1fr; gap: 4px; }
+  .iv-link { flex-wrap: wrap; }
+  .iv-link input { flex-basis: 100%; }
+  .iv-link button { flex: 1; }
+}
 /* Trainers to meet: the shuffle on the banner's right, a request sent where its Add was. */
 .tc-shuffle { margin-left: auto; padding: 4px 12px; }
 .tc-asked { flex: none; margin-left: auto; padding: 0 8px; font: 600 12px var(--body); color: var(--ink-faint); }

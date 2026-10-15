@@ -19,8 +19,8 @@ import { TIERS } from "../game/biomes.js";
 const THEME_NAME = { auto: "Auto", dark: "Night", light: "Day" };
 
 export default function You({
-  trainerName, caught, xp, stats, bag, save, account, unread, titles = [], requests = 0, due = 0,
-  onProfile, onAchievements, onNews, onHelp, onForms, onWardrobe, onSettings, onLogOut, onReset, onSpend,
+  trainerName, caught, xp, stats, bag, save, account, unread, titles = [], requests = 0, due = 0, invites = 0,
+  onProfile, onInvite, onAchievements, onNews, onHelp, onForms, onWardrobe, onSettings, onLogOut, onReset, onSpend,
 }) {
   useModalLock();
   const [theme, setThemeState] = useState(themeChoice);
@@ -31,6 +31,8 @@ export default function You({
   const items = [
     onProfile && ["card", "Your trainer card",
       requests ? `${requests} friend request${requests === 1 ? "" : "s"}` : "Your card and your friends", onProfile, requests > 0],
+    onInvite && ["gift", "Invite friends",
+      invites ? `${invites} reward${invites === 1 ? "" : "s"} to claim` : "Big rewards for you and a friend", onInvite, invites > 0],
     onAchievements && ["trophy", "Achievements",
       due ? `${due} step${due === 1 ? "" : "s"} to claim` : "Catching, battles, cards, trading", onAchievements, due > 0],
     ["news", "What's new", unread ? "New since you last looked" : "Updates to the game", onNews, unread],

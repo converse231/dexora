@@ -522,6 +522,26 @@ docs/ranked.md, *Entry* and *Versioning*. Tested on the TEST project
    deployed, the new game and the old function refuse each other.
 3. **Check it took**: `select public.ranked_limit('LEVEL');` is 100.
 
+## 3i. Invites, trainer suggestions and tier titles — **run this once, after 3h** (added 2026-10-15)
+
+Do it on the TEST project first (`npm run tradedb` applies and tests both
+files there), then live:
+
+1. **`db/trading.sql` again** - paste the whole file and run it. It adds
+   `suggest_trainers()` (Trading's "Trainers to meet") and the
+   `tier:<tier>:<gen>` titles in `card_titles`. Re-runnable.
+2. **`db/referrals.sql`** - paste the whole file and run it, AFTER
+   trading.sql. It adds the `referrals` table (no client may read or write
+   it), the progress trigger on `saves`, and `set_referrer`, `my_referrals`
+   and `referral_rule`. Re-runnable.
+
+Until both are run the game still works: the Trainers to meet section stays
+hidden, the Invite dialog shows no invites, and a followed link is kept on the
+device and tried again next session (an account can only follow one within
+3 days of signing up). With email confirmation off (step 4) the referral
+rule's "confirmed email" check passes for everyone; the days, the progress
+since linking, the pace flag and the cap still hold.
+
 ## 4. Turn off email confirmation — **you have to do this one**
 
 It is the only step that cannot be done from here: the setting lives in GoTrue's

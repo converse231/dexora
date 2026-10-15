@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { nameProblem, NAME_MAX, ageProblem, MIN_AGE } from "../game/name.js";
 import { TrainerArt } from "./Sprite.jsx";
+import { read, REF_KEY } from "../game/store.js";
 
 /* Both trainers, in the order `build_player` stacks them into player.png. The
    tile draws the real down-facing walk frame out of that same strip, so what is
@@ -42,8 +43,13 @@ function Shell({ step, title, blurb, children, foot }) {
 
 /* --------------------------------------------------------------- the account */
 
+/* Who invited this device (an invite link, main.jsx): the form opens on
+   sign-up and says so - an invite only counts for a NEW account. */
+const invitedBy = () => read(REF_KEY);
+
 export function Account({ onSignUp, onSignIn, onForgot = null, offline, notice = "" }) {
-  const [mode, setMode] = useState("in");        // "in" | "up" | "lost"
+  const [invited] = useState(invitedBy);
+  const [mode, setMode] = useState(() => (invited ? "up" : "in"));        // "in" | "up" | "lost"
   const [addr, setAddr] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -174,9 +180,11 @@ export function Account({ onSignUp, onSignIn, onForgot = null, offline, notice =
     <Shell
       step="STEP 1 OF 2"
       title={up ? "Make an account" : "Welcome back"}
-      blurb={up
-        ? "Your Pokédex lives on the account, so it follows you to any device."
-        : "Log in and your Pokédex comes with you."}
+      blurb={up && invited
+        ? `${invited} invited you! Make an account and get going - you both get a gift.`
+        : up
+          ? "Your Pokédex lives on the account, so it follows you to any device."
+          : "Log in and your Pokédex comes with you."}
       foot={
         <>
           <button

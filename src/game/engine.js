@@ -64,6 +64,7 @@ import {
 import { variantSpareUids } from "./spares.js";
 import { comboLift, comboKey, nextCombo, cleanCombo, COMBO_STEPS } from "./combo.js";
 import { quizFor, cleanQuiz, QUIZ_PAY } from "./quiz.js";
+import { referralDue, cleanRefPaid } from "./referral.js";
 import { sexAt, sexOf, looksFemale, cleanFemales } from "./gender.js";
 import {
   weekKey, fresh as freshBingo, advanceBingo, dueLines, fullDue, cleanBingo, BINGO_LINE, BINGO_FULL,
@@ -107,7 +108,8 @@ const RUN_SCALE = 0.7;        // Running Shoes: quicker than walking
    bag at large - only key items, which are earned by levelling and never
    spent. */
 function grantKeys(bag, level) {
-  let out = bag;
+  // A save with no bag (one written by the server tests) loads an empty one, never none.
+  let out = bag && typeof bag === "object" ? bag : {};
   for (const k of KEY_ITEMS) {
     if (level >= k.level && !holding(out, k.id)) out = { ...out, [k.id]: 1 };
   }
@@ -240,6 +242,7 @@ function freshState() {
     cardShowcase: [],     // cards on your trainer card, "me01-187:h" - the server checks each
     binders: [],          // your own binders, `{ id, name, pockets, cover? }` - see `cleanBinders`
     patches: [],          // set patches bought for binder covers, by set id - see `buyPatch`
+    referralsPaid: [],    // invite rewards already paid, by id - see referral.js
     rift: null,           // an open space-time rift, `{ areaId, left }` - see events.js
     sinceTravel: 0,       // steps since the map last changed, which is what opens a rift
     /* One quest a day. `key` is the local date it belongs to, so a new day is
@@ -684,6 +687,7 @@ function loadState() {
         .filter((v) => typeof v === "string" && /^[\w.]+-\w+:[nhr]$/.test(v)).slice(0, CARD_SHOW),
       binders: cleanBinders(s.binders),
       patches: cleanPatches(s.patches),
+      referralsPaid: cleanRefPaid(s.referralsPaid),
       /* A save from before `paid` existed was paid for every level it had
          reached, and never past the old cap of 50 - so that is where it
          stands, and anything above is owed. Never above its own level, so no
@@ -3409,6 +3413,23 @@ export function createEngine(canvas, onChange, mini = null) {
     changed();
     return true;
   }
+  /* INVITE REWARDS (referral.js): what the server's `my_referrals` answer
+     owes and the save has not been paid - each id once, in one save. The
+     server decided who qualified; this only pays it. Answers what was paid. */
+  function claimReferrals(info) {
+    if (state.stale) return null;
+    const due = referralDue(info, state.referralsPaid);
+    if (!due.length) return null;
+    for (const r of due) {
+      give(r.items);
+      state.candy += r.candy ?? 0;
+      if (r.packs) grantPacks(r.packs, r.id);
+    }
+    state.referralsPaid = [...state.referralsPaid, ...due.map((r) => r.id)];
+    save();
+    changed();
+    return due;
+  }
   function hasPatch(id) {
     if (typeof id !== "string") return false;
     const [kind, of] = [id.slice(0, id.indexOf(":")), id.slice(id.indexOf(":") + 1)];
@@ -4272,6 +4293,7 @@ export function createEngine(canvas, onChange, mini = null) {
     craftCard,
     craftCards,
     claimDex,
+    claimReferrals,
     claimAchievements,
     dexClaims,
     showCard,

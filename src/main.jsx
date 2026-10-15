@@ -5,6 +5,20 @@ import Boot from "./Boot.jsx";
 import { Boundary } from "./ui/crash.jsx";
 import { applyTheme } from "./ui/theme.js";
 import "./styles.css";
+import { write, REF_KEY } from "./game/store.js";
+
+/* AN INVITE LINK (`?ref=<username>`, referral.js): kept on the device until a
+   signed-in NEW account can follow it (App, `set_referrer`), and taken off
+   the address so a reload or a shared screenshot does not carry it on. */
+{
+  const q = new URLSearchParams(location.search);
+  const ref = q.get("ref");
+  if (ref) {
+    write(REF_KEY, ref.slice(0, 32));      // storage refused: the link is simply not followed
+    q.delete("ref");
+    history.replaceState(null, "", location.pathname + (q.size ? `?${q}` : "") + location.hash);
+  }
+}
 
 applyTheme();
 

@@ -562,6 +562,9 @@ export const myCard = () => tradeCall("my_card");
 export const cardByName = (name) => tradeCall("card_by_name", { name: String(name ?? "").trim() });
 export const searchTrainers = (q) => tradeCall("find_trainers", { q });
 export const suggestTrainers = () => tradeCall("suggest_trainers");
+// Invite a friend (db/referrals.sql): follow a link once, and read how your invites stand.
+export const setReferrer = (name) => tradeCall("set_referrer", { name: String(name ?? "").trim() });
+export const myReferrals = () => tradeCall("my_referrals");
 export const updateCard = (showcase, seeking) => tradeCall("update_card", { showcase, seeking });
 export const myFriends = () => tradeCall("my_friends");
 export const addFriend = (code) => tradeCall("add_friend", { code });

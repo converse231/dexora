@@ -2307,6 +2307,29 @@ await savedField("cardShowcase", ["me01-187:h"], "junk", []);
 await savedField("binders", [{ id: "a1", name: "Faves", pockets: ["me01-001:n", null, "me01-187:h"],
   cover: { color: "teal", patches: [{ id: "set:me01", x: 30, y: 40.5 }] } }], "junk", []);
 await savedField("patches", ["me01", "sv01"], "junk", []);
+await savedField("referralsPaid", ["ref:welcome", "ref:m3"], "junk", []);
+/* INVITE REWARDS: what the server says is owed is paid once - the welcome,
+   one per paid friend, each milestone - and a second answer pays nothing;
+   a flagged account is owed nothing at all. */
+{
+  const R = await import("../src/game/referral.js");
+  const friends = (n, paid = true) => Array.from({ length: n }, (_, k) => ({ id: `u${k}`, username: `F${k}`, paid }));
+  const info = { me: { referrer: "Ash", qualified: true }, invited: [...friends(3), { id: "late", username: "L", paid: false }] };
+  assert.deepEqual(R.referralDue(info).map((r) => r.id), ["ref:welcome", "ref:u0", "ref:u1", "ref:u2", "ref:m3"]);
+  assert.deepEqual(R.referralDue({ ...info, flagged: true }), [], "a flagged account was owed invite rewards");
+  const g = boot({ ...SAVE, candy: 0, bag: { ...SAVE.bag, "ultra-ball": 0 }, packs: {} }).e;
+  const paid = g.claimReferrals(info);
+  assert.equal(paid.length, 5, "the invite rewards were not all paid");
+  assert.equal(g.state.candy, R.REF_WELCOME.candy + 3 * R.REF_EACH.candy, "invite candy was not paid");
+  assert.equal(g.state.bag["ultra-ball"], R.REF_WELCOME.items["ultra-ball"] + 3 * R.REF_EACH.items["ultra-ball"], "invite balls were not paid");
+  const packs = Object.values(g.state.packs).reduce((a, n) => a + n, 0);
+  assert.equal(packs, R.REF_WELCOME.packs + 3 * R.REF_EACH.packs + R.REF_MILESTONES[0][1].packs, "invite packs were not paid");
+  assert.equal(g.claimReferrals(info), null, "invite rewards paid twice");
+  assert.deepEqual(R.cleanRefPaid(["ref:a", "ref:a", "bad", 7]), ["ref:a"]);
+  // A save with no bag at all still takes a reward (the bag was undefined, and the claim threw).
+  const nb = boot({ dex: [2], box: [], nextUid: 1, xp: 0 }).e;
+  assert.ok(nb.claimReferrals(info)?.length && nb.state.bag["ultra-ball"] > 0, "a save with no bag could not be paid");
+}
 /* A BINDER'S COVER: a bad colour drops the cover alone (the binder keeps its
    pockets), bad patches go one by one, a repeat once, and positions clamp.
    The engine sews on only patches you have, and sells a set's patch once,

@@ -269,3 +269,31 @@ new numbered section of SUPABASE.md, run once - the §3c pattern.
 - Requests, your friend code and blocks stay on your own card.
 - The page treats a missing function as no suggestions (the section hides),
   never as trading being closed, so the client can ship before the SQL.
+
+## Referrals - invite a friend *(2026-10-15, asked for)*
+
+`src/game/referral.js` (the words and rewards), `db/referrals.sql` (every
+decision), `ui/Invite.jsx` (the dialog: You › Invite friends, and Trading's
+"Your friends" banner).
+
+- **The link** is `?ref=<username>`. main.jsx keeps it on the device and takes
+  it off the address; the sign-up form opens on "Make an account" and says
+  who invited you; once signed in, App calls `set_referrer` and forgets the
+  link on any answer (a failed call keeps it for next session). "linked" opens
+  the dialog as a welcome and sends the inviter a friend request.
+- **Rewards are big on purpose.** Each friend who gets going: 15 Ultra Balls,
+  10 Rare Candy, 6 card packs to the inviter; 10 Ultra Balls, 5 Rare Candy, 3
+  packs to the friend. At 3, 5 and 10 friends: a booster box, a Master Ball,
+  both. The Master Balls sit outside `MASTER_EVERY`'s per-game count on
+  purpose - a social one-off, capped.
+- **Abuse is an alt farm, so every guard is the server's**: only an account
+  under 72 hours old links, once, to an OLDER account, never itself, never
+  across a block, never to a flagged one; progress counts from the save it had
+  when linked (a brought-in game or a forged first save starts at zero); it
+  qualifies at 3,000 steps and 25 catches past that, arriving on 3 different
+  server days (a single upload cannot buy days), with a confirmed email (off on
+  live - SUPABASE.md §3i) and no pace flag on either side; the inviter is paid
+  for the first 10 only. `referral_rule()` holds the numbers, equal to
+  `REF_RULE` (tradedb).
+- **Paid once, by the game**: `my_referrals` says who is owed; the engine's
+  `claimReferrals` pays each reward id once (`referralsPaid` in the save).

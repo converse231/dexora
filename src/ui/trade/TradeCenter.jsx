@@ -215,7 +215,7 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
 }
 
 export default function TradeCenter({
-  signedIn, engine, sync, onTraded, box = [], dexOf = () => 0, openName = null, openBoard = null,
+  signedIn, engine, sync, onTraded, box = [], dexOf = () => 0, openName = null, openBoard = null, onInvite = null,
   offers = 0, inbox = null, onClose, profile = false,
 }) {
   useModalLock();
@@ -551,7 +551,10 @@ export default function TradeCenter({
         {/* Your friends, one tap from their card or their Pokemon; requests,
             your code and blocks stay on your own card. */}
         <section className="ev-card">
-          <header className="ev-banner"><h4>Your friends</h4><span className="tp-count">{accepted.length}</span></header>
+          <header className="ev-banner">
+            <h4>Your friends</h4><span className="tp-count">{accepted.length}</span>
+            {onInvite && <button type="button" className="tp-quiet tc-shuffle" onClick={onInvite}>Invite friends</button>}
+          </header>
           {friends === null
             ? <p className="ev-quiet">{fail ? "" : "Loading…"}</p>
             : accepted.length

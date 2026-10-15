@@ -119,6 +119,9 @@ export const scoped = (key, owner) => (owner ? `${key}:${owner}` : key);
    and the last load was the owner's. After that the bare keys belong to local
    mode alone, and nothing moves again. */
 export const SCOPED_KEY = `${SAVE_KEY}:scoped`;
+/* AN INVITE LINK this device was opened with (`?ref=<username>`, referral.js),
+   kept until a signed-in new account follows it. The device's, never a save's. */
+export const REF_KEY = "dexora-ref";
 
 /* Reading never throws. A private window, cleared site data, or a browser that
    has revoked storage all arrive here as "no save", which is the same thing a
