@@ -4521,7 +4521,8 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     const { genOf: rGen, isLegendary: rLeg } = await import("../src/game/biomes.js");
     for (let g = 1; g <= 9; g++) {
       const all = RD.roadOf(g);
-      assert.equal(all.length, RD.ROAD_PER_REGION, `region ${g} has ${all.length} road trainers`);
+      assert.ok(all.length === RD.rosterSize(g) && all.length >= 12, `region ${g} fields ${all.length} road trainers`);
+      assert.ok(["Rookie", "Ace", "Veteran"].every((k) => all.some((x) => x.rung === k)), `region ${g} lacks a rung`);
       assert.ok(all.every((x) => x.party.every(([sp]) => sp < 10000 && rGen(sp) === g && !rLeg(sp))),
         `a region ${g} road trainer fielded a form, a legendary or another region's Pokemon`);
     }

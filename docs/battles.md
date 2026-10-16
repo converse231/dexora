@@ -517,19 +517,21 @@ Battles that are not the League: trainers met on the maps, fought for money.
 
 - **Where they are: by REGION** (2026-10-16, asked for, as DelugeRPG files
   its trainers - by map, nobody could tell a generation's were all there).
-  Every region your level has opened (`GEN_UNLOCK`) has `ROAD_PER_REGION` (6)
-  trainers, new each day. Each trainer is a hash of the day, the region and
+  Every region your level has opened (`GEN_UNLOCK`) fields its whole roster -
+  every trainer class its games have, one trainer each (`ROSTER` in road.js:
+  that region's gym trainer classes from leagues.js plus its route classes,
+  14 to 25 a region), with new teams each day. Each trainer is a hash of the day, the region and
   its slot (`road.js`), so every copy of the game agrees and a reload cannot
   reroll one. The Battles page's **Trainers** tab lists them by region,
   opening on the newest. An old save's map-filed ids name nobody.
-- **Who they are.** Six slots a region:
+- **Who they are.** Each class fights at its rung:
 
-  | Rung | Slots | Team | Level | Opponent AI |
+  | Rung | Classes | Team | Level | Opponent AI |
   |---|---|---|---|---|
-  | Rookie | 1 | 2 | the region's arrival level +3 | 1 (random) |
-  | Regular | 2 | 3 | the region's arrival level +10 | 1 |
-  | Ace | 2 | 4 | the region's arrival level +25 | 2 |
-  | Veteran | 1 | 6 | 60 to 100 | 2 |
+  | Rookie | Youngster, Lass, Tuber, School Kid... | 2 | the region's arrival level +3 | 1 (random) |
+  | Regular | Hiker, Sailor, Fisherman, Beauty... | 3 | the region's arrival level +10 | 1 |
+  | Ace | Ace Trainer, Black Belt, Psychic... | 4 | the region's arrival level +25 | 2 |
+  | Veteran | Veteran | 6 | 60 to 100 | 2 |
 
   Their classes are the games' own (Youngster, Lass, Bug Catcher, Hiker, Ace
   Trainer, Veteran...), drawn with the portraits the League already ships.
@@ -541,8 +543,8 @@ Battles that are not the League: trainers met on the maps, fought for money.
   level × `ROAD_YEN` × (1 + team / 3)). Never EXP, never a badge, never
   `beaten`: the League's ladder, its solved levels and its rematch clock are
   untouched, so `npm run gyms` is not owed. At the top of the game every map's
-  trainers come to roughly ¥85,000 a day, if every one is fought
-  (`ROAD_YEN` 7 -> 15 on 2026-10-16, raised with the League's prizes).
+  175 trainers come to roughly ¥300,000 a day, if every one is fought - a
+  battle averages ¥1,700 (`ROAD_YEN` 7 -> 15 -> 20 on 2026-10-16, raised with the League's prizes).
 - **The engine judges it like a League battle:** `battleBegin` refuses a road
   trainer that is not today's, is on a map not yet open, or was already beaten
   today. `battleEnd` pays and records the win in `state.road` (`{ day, won }`,

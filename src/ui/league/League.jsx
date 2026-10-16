@@ -27,7 +27,7 @@ import { speciesById } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { variantOf } from "../../game/items.js";
 import { hash, dayKey } from "../../game/daily.js";
-import { roadOf, roadRegions, ROAD_PER_REGION } from "../../game/road.js";
+import { roadOf, roadRegions, rosterSize } from "../../game/road.js";
 import { REGION_NAME } from "../../game/biomes.js";
 import { useModalLock } from "../modal.js";
 import Sprite from "../Sprite.jsx";
@@ -602,7 +602,7 @@ function RoadView({ level, road, onBattle }) {
       <section className="lg-hero rd-hero">
         <span className="lg-kicker">Trainers by region</span>
         <h2>Road trainers</h2>
-        <p>{ROAD_PER_REGION} in every region you have opened, using that region's Pokémon, new each day. Beat them for money - {beat} of {regions.length * ROAD_PER_REGION} today.</p>
+        <p>Every trainer class of each region you have opened, using that region's Pokémon, with new teams each day. Beat them for money - {beat} of {regions.reduce((n, g) => n + rosterSize(g), 0)} today.</p>
       </section>
       <div className="rd-maps" role="tablist" aria-label="Region">
         {regions.map((g) => {
