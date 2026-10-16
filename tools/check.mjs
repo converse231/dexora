@@ -2116,9 +2116,12 @@ for (const b of BIOMES) {
   assert.ok(seen.size >= 0.9 * spawnable,
     `${b.id}: only ${seen.size} of ${spawnable} walkable tiles are reachable`);
 
-  /* An `only` map is one species' home (Tanoby: Unown, 28 letters rolled by
-     `rollLook`) - its roll is the look, not the row. Everywhere else, eight. */
-  assert.ok(b.table.length >= 8 || (b.only && b.table.length === 1 && looksOf(b.table[0][0]).length >= 8),
+  /* An `only` map is one family's home - Tanoby: Unown, 28 letters rolled by
+     `rollLook`; the Weather Institute: Castform and its three weathers
+     (2026-10-17) - so what it offers is DRAWINGS, a row's looks or the row
+     itself, and four is the least that is still a hunt. Everywhere else, eight. */
+  const drawings = b.table.reduce((n, [id]) => n + Math.max(1, looksOf(id).length), 0);
+  assert.ok(b.table.length >= 8 || (b.only && drawings >= 4),
     `${b.id} needs a table worth rolling on`);
 
   /* Types are ids now, not a display string, because every one of them is
@@ -2504,6 +2507,11 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     lilycove: () => route.safari.general,
     lavender: () => route.lavender.general,
     fourisland: () => route.fourisland.general,
+    // 2026-10-17: the Institute on Emerald's General (Building and Lab rebased
+    // through `inside`), Cinnabar and Route 10 on FireRed's.
+    institute: () => route.inside.general,
+    cinnabar: () => route.cinnabar.general,
+    route10: () => route.lavender.general,
   };
   /* The ceiling is the highest id the atlas actually hands out, read off the
      manifest rather than named. It used to be `forest.fringeTop` because that

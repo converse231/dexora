@@ -242,13 +242,16 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   map decides legendary homes, so widening it is never flavour; `legends`
   (`legendTypes`) adds a type for legendary homes alone - the Mansion's psychic,
   where `types` measured 49% psychic residents. Every legendary must keep a home.
-- **An `only` map is one species' home** (Tanoby: Unown, asked for), and
-  NO OTHER map homes its species (`KEPT`: the Gen 2 filler put Unown in
-  Meteor Falls; check.mjs holds every map, surf and rod clear). No
-  `types`, so nothing homes there and no legendary lives there; surfing it
-  meets the same table (`surfTable`); check.mjs's mix suites (`MIXED`), the
-  eight-row table rule and the rift-finds bound skip it, and nothing else
-  does. Its roll is the look, not the row.
+- **An `only` map is one family's home** (Tanoby: Unown, asked for; the
+  Weather Institute: Castform and its three weathers, 2026-10-17), and NO
+  OTHER map homes its species (`KEPT`, honoured by `derivedHomes` and the Gen
+  2 filler: the filler put Unown in Meteor Falls, and Castform's wild weather
+  forms were homed on fire, water and ice maps; check.mjs holds every map,
+  surf and rod clear). No `types`, so nothing homes there and no legendary
+  lives there; surfing it meets the same table (`surfTable`); check.mjs's mix
+  suites (`MIXED`) and the rift-finds bound skip it, and its table rule counts
+  DRAWINGS (a row's looks, or the row) - at least four - where every other
+  map needs eight rows.
 - **Costumes live where a Pikachu lives**: appended like legendaries at
   `LEGEND_EACH` and homed by the same `legendTier`, so all thirteen (pure
   Electric) are Power Plant only. They were flat on every map once and read
@@ -1341,8 +1344,15 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `exitNear`; the Map tab's world map draws from the doors themselves, its
   places in Travel.jsx's `AT`. tools/play rides every door and road cell both
   ways. Levels are never reordered to fit geography. A room with a floor
-  above it is `UPSTAIRS` in build_map (the Weather Institute): attach_inside
-  shelves both and pairs the stairs. Cinderpeak is four floors (Mt Chimney,
+  above it is `UPSTAIRS` in build_map (empty since the Weather Institute
+  became its own map): attach_inside shelves both and pairs the stairs.
+  **A building's door is on the map it really stands on** (2026-10-17,
+  reported: the Mansion was a plain house on Monsoon Trail and the Power
+  Plant a cave hatch on Seaside Road): the Mansion's on Cinnabar Island,
+  the Power Plant's on Route 10 (Lavender's road north; its north half, the
+  river to the Plant, is the ferry's), both FireRed towns; the Weather
+  Institute is a map of its own (`em_rooms` with `pad` 1 - a front door on
+  a room's bottom row is otherwise walled up by the ring). Cinderpeak is four floors (Mt Chimney,
   Route 112, Jagged Pass, the Fiery Path), its spawn held to Route 112.
   **A TOWN is an area with no biome** (`town: true` in build_map's spec and
   mapdata): streets and doors, never an encounter, a rod or a rift (its rift

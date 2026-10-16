@@ -1369,6 +1369,22 @@ const RESIDENTS = [
     ],
   },
   {
+    id: "institute",
+    level: 15,  // Gen 3's arrival: Castform is Hoenn's
+    name: "Weather Institute",
+    /* CASTFORM'S OWN MAP (2026-10-17, asked for: the Institute met nothing as
+       rooms on Monsoon Trail). Emerald's Weather Institute studies Castform and
+       gives you one, so it is an `only` map like Tanoby: Castform and its three
+       weather forms, and NO OTHER map meets them (`KEPT`, which `derivedHomes`
+       honours too - the forms are `wild` and homed on fire, water and ice
+       otherwise). The plain form is the common one; the weathers are rarer. */
+    only: true,
+    types: [],
+    table: [
+      [351, 10], [10013, 4], [10014, 4], [10015, 4],
+    ],
+  },
+  {
     id: "cinder",
     level: 16,  // between the volcano and the ice, a rung of its own
     name: "Cinderpeak",
@@ -1859,9 +1875,11 @@ const derivedHomes = () => {
      every Furfrou trim and Flabebe colour as a resident of its own and
      Tall Grass lost Eevee and Miltank under them. A look is met through its
      family's one row (`rollLook`). */
+  // AND NEVER A KEPT ONE: an `only` map's species live there alone (Castform's
+  // weather forms, wild, were homed on fire, water and ice maps besides).
   const wild = SPECIES.filter((sp) =>
     (!evolvesInto.has(sp.id) || sp.wild) && !LEGENDARY.includes(sp.id)
-    && !COSTUMES.includes(sp.id) && sp.form !== "look");
+    && !COSTUMES.includes(sp.id) && sp.form !== "look" && !KEPT.has(sp.id));
 
   /* A HOME IS THE PRIMARY TYPE, AND THE OTHER 453 SPECIES WERE NOT GETTING
      THE RULE THE LEGENDARIES HAVE HAD FOR A YEAR.

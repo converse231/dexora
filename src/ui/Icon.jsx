@@ -61,6 +61,7 @@ Object.assign(P, {
   safari: "M7 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM4 14l2-8h3l1 6M20 14l-2-8h-3l-1 6M10 15h4",
   lock: "M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3",
   boat: "M2 15h20l-3.5 5h-13zM5 15v-5h14v5M12 10V4l5 6",
+  weather: "M7 19h9a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.4 1.5A3.3 3.3 0 0 0 7 19zM17 2v2M21.5 6.5H20M20.2 3.3l-1.2 1.2",
 });
 // The raw path, for a glyph drawn inside another SVG (the world map).
 export const glyph = (n) => P[n];

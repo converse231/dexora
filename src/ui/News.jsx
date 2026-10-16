@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-17-buildings",
+    icon: "🏛️",
+    date: "October 2026",
+    title: "The right buildings",
+    items: [
+      ["Weather Institute", "Castform and its Sunny, Rainy and Snowy forms live here now - and only here."],
+      ["Cinnabar Island", "The Pokémon Mansion stands in its real home - take the ferry."],
+      ["Route 10", "The Power Plant's real building, north of Lavender Town and by ferry."],
+    ],
+  },
+  {
     id: "2026-10-17-ferry",
     icon: "⛴️",
     date: "October 2026",
