@@ -11,10 +11,14 @@ import { BIOMES, areaOpen } from "../game/biomes.js";
 const levelOf = (id) => BIOMES.find((b) => b.id === id)?.level;
 // What a town stop is the doorstep of: the maps behind its doors (not its roads).
 const behindIds = (id) => [...new Set((AREAS[id].doors ?? []).filter((d) => d[5] !== 1).map((d) => d[2]))];
-/* The mainland's port first (a stop with a road on), then Kanto in the order
-   it opens - a town at the level of the map behind its door. */
+/* The mainland first (a stop with a road on: Lilycove, Route 123's Mt. Pyre
+   side), each part in the order it opens - a town at the level of the map
+   behind its door, a town with nothing behind one (Lilycove, the port) first. */
 const mainland = (id) => (AREAS[id].doors ?? []).some((d) => d[5] === 1);
-const opensAt = (id) => levelOf(id) ?? Math.min(...behindIds(id).map(levelOf));
+const opensAt = (id) => {
+  const behind = behindIds(id).map(levelOf).filter(Boolean);
+  return levelOf(id) ?? (behind.length ? Math.min(...behind) : 0);
+};
 const STOPS = [...FERRY_STOPS].sort((a, b) => mainland(b) - mainland(a) || opensAt(a) - opensAt(b));
 
 export default function Ferry({ areaId, level, onSail, onClose }) {

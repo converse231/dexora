@@ -2086,7 +2086,12 @@ for (const b of BIOMES) {
     assert.ok(area.elev.length === rows.length && area.elev.every((r) => r.length === W && /^[0-9a-f]+$/.test(r)),
       `${b.id}: elev is not one hex digit a cell`);
   }
-  const seen = fillFrom(area, [[area.spawn.x, area.spawn.y]]);
+  /* From every way IN, not the spawn alone: Route 123's east half is entered
+     only off the ferry at the top of its path (2026-10-17) - and a road or
+     door into a map lands where its pair says. */
+  const ins = [[area.spawn.x, area.spawn.y], ...(area.dock ? [[area.dock.x, area.dock.y]] : [])];
+  for (const other of Object.values(AREAS)) for (const [, , to, ax, ay] of other.doors ?? []) if (to === b.id) ins.push([ax, ay]);
+  const seen = fillFrom(area, ins);
   /* Ledges are one-way, so they are the one thing on a map that can strand you.
      The generator checks the map it draws; this checks the map that shipped. */
   for (let y = 0; y < rows.length; y++) {
@@ -2178,6 +2183,20 @@ assert.equal(biomeFor("nowhere"), null, "an unknown area has no biome");
   assert.deepEqual(lost, [], `cut off from Mauville City (one way or both): ${lost.join(", ")}`);
   // Every map is in it now: Kanto's by the ferry (the fifth phase).
   assert.deepEqual(ids.filter((id) => !joined.includes(id)), [], "a map with no door, road or ferry");
+  /* EVERY MAP IS ON THE MAP TAB (2026-10-17): a place in Travel.jsx's `AT`
+     and a logo in its `KIND` - a map left out of either is simply not drawn
+     there, with nothing to say so. Read off the file: it is JSX. */
+  {
+    const src = readFileSync(new URL("../src/ui/Travel.jsx", import.meta.url), "utf8");
+    const keysOf = (name) => {
+      const body = src.match(new RegExp(String.raw`export const ${name} = \{([\s\S]*?)\n\};`))?.[1] ?? "";
+      return new Set([...body.matchAll(/([a-z0-9]+):/g)].map((m) => m[1]));
+    };
+    const at = keysOf("AT"), kind = keysOf("KIND");
+    assert.ok(at.size && kind.size, "Travel.jsx's AT or KIND could not be read");
+    const missing = ids.filter((id) => !at.has(id) || !kind.has(id));
+    assert.deepEqual(missing, [], `not on the Map tab (Travel.jsx's AT or KIND): ${missing.join(", ")}`);
+  }
   console.log(`world ok — ${joined.length} maps joined by doors, roads and the ferry (${stops.length} stops), every one walkable to and from Mauville City`);
 }
 

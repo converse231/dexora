@@ -24,6 +24,8 @@ export const NEWS = [
       ["The ferry", "Sail from Lilycove City to Kanto - walk into a harbor or a cave mouth to board."],
       ["Three new towns", "Lilycove City, Lavender Town at the Haunted Tower's door, and Four Island at Icefall Cave's."],
       ["Every map joined", "Mt. Moon, Frost Hollow, Tanoby Ruins and Tall Grass are ferry stops."],
+      ["All of Route 123", "Its far side is a ferry stop now - land by Mt. Pyre and walk the whole route."],
+      ["A clearer Map tab", "Every place has its own logo, and a tap shows where it leads."],
       ["Prices", "A Master Ball costs ¥100,000 now, and road trainers pay a little less."],
     ],
   },

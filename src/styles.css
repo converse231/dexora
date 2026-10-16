@@ -2471,60 +2471,100 @@ canvas {
 .tier-A { background: var(--path); }
 .tier-S { background: var(--gold); }
 
-/* ---------- travel ---------- */
-.arealist { display: grid; gap: 6px; max-height: 430px; overflow-y: auto; padding-right: 4px; }
-.arearow {
-  /* Explicit placement: the button auto-placed into column 1 and stretched. */
-  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto;
-  gap: 3px 12px; align-items: center; text-align: left;
-  padding: 10px 12px; border-radius: 14px;
-  background: var(--surface); border: 1px solid var(--line);
-  cursor: pointer; font: inherit;
-}
-.arearow:hover:not(:disabled) { border-color: var(--path); transform: translateY(-1px); }
-/* A locked row is legible, not hidden: the name and the types are the reason
-   to look ahead at all. Only the action reads as unavailable. */
-.arearow.locked { opacity: .55; cursor: default; }
-.arearow.locked em { color: var(--ink-faint); }
-
-.arearow.here { background: var(--path-soft); border-color: var(--path); cursor: default; }
-.arearow:disabled { cursor: default; }
-.ar-name { grid-column: 1; grid-row: 1; font-size: 16px; font-weight: 700; }
-/* Today's outbreak: the event card's own icon, beside the map it is on. */
-.ar-event { width: 18px; height: 18px; margin-left: 6px; vertical-align: -3px; }
-.ar-types { grid-column: 1; grid-row: 2; }
-.arearow em {
-  grid-column: 2; grid-row: 1 / span 2; justify-self: end; font-style: normal;
-  font-family: var(--pixel); font-size: 10px; color: var(--ink-faint);
-  padding: 7px 9px 6px; border: 1px solid var(--line-firm); border-radius: 10px;
-}
-.arearow.here em { color: var(--path); border-color: var(--path); }
-.arearow { grid-template-rows: auto auto auto; }
-.arearow em { grid-row: 1 / -1; }
-/* WHERE IT LEADS (the world plan, 2026-10-16): its roads and doors, a line. */
-.ar-ways { grid-column: 1; grid-row: 3; font-size: 12px; color: var(--ink-soft); }
-
-/* THE WORLD MAP: a place per map, its roads solid and its doors dashed, the
-   one you stand on ringed. Tokens throughout, so night redraws it. */
-.worldmap { display: block; width: 100%; height: auto; aspect-ratio: 100 / 160; flex: none; margin: 0 0 10px;
+/* ---------- travel: THE MAP TAB (redrawn 2026-10-17, Travel.jsx) ----------
+   ONE scroller for the pane (`.wx-scroll`): the map took its full height and
+   the list was squeezed into a scroller of its own, two rows tall, with the
+   note spilling out of the panel. Tokens throughout, so night redraws it. */
+.wx-scroll { display: grid; gap: 10px; align-content: start; overflow-y: auto; padding-right: 4px; max-height: 70dvh; }
+.wx-scroll > * { min-width: 0; }
+.wx-mapbox { width: 100%; max-width: 460px; justify-self: center; }
+.wx-map { display: block; width: 100%; height: auto; aspect-ratio: 100 / 168;
   border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
-.wm-road { stroke: var(--path); stroke-width: 1; stroke-linecap: round; }
-.wm-door { stroke: var(--path); stroke-width: .7; stroke-dasharray: 1.2 1.2; }
-.wm-place circle { fill: var(--path); stroke: var(--surface); stroke-width: .5; }
-.wm-place text { font: 600 3.6px var(--body); fill: var(--ink); text-anchor: middle;
+.wx-region { font: 700 2.7px var(--body); fill: var(--ink-faint); }
+.wx-shore { stroke: var(--line-firm); stroke-width: .4; stroke-dasharray: 2 1.5; }
+.wx-road { stroke: var(--path); stroke-width: 1; stroke-linecap: round; }
+.wx-door { stroke: var(--path); stroke-width: .7; stroke-dasharray: 1.2 1.2; }
+.wx-ferry { stroke: var(--accent); stroke-width: .6; stroke-dasharray: 1 1.2; }
+.wx-dock { fill: none; stroke: var(--accent); stroke-width: .45; stroke-dasharray: .9 .9; }
+.wx-boat circle { fill: var(--accent); }
+/* A logo is the place's glyph in white on its main type's colour (`--tc`, the
+   `.t-<type>` class); a town is a slate square, a place not open yet grey. */
+.wx-boat path, .wx-logo path { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.wx-logo circle { fill: var(--tc, var(--path)); stroke: var(--surface); stroke-width: .5; }
+.wx-logo.town rect { fill: var(--ink-soft); stroke: var(--surface); stroke-width: .5; }
+.wx-logo.town path { stroke: var(--surface); }
+.wx-logo.shut circle, .wx-logo.shut rect { fill: var(--line-firm); }
+.wx-logo.shut path { stroke: var(--ink-soft); }
+.wx-place { cursor: pointer; outline: none; }
+.wx-hit { fill: transparent; }
+.wx-ring { fill: none; stroke: var(--accent); stroke-width: .7; }
+.wx-place.sel:not(.here) .wx-ring { stroke-dasharray: 1.4 1; }
+.wx-place text { font: 600 3.4px var(--body); fill: var(--ink); text-anchor: middle;
   paint-order: stroke; stroke: var(--surface-2); stroke-width: 1.4px; stroke-linejoin: round; }
-.wm-place.shut circle { fill: var(--line-firm); }
-.wm-place.town rect { fill: var(--ink-soft); stroke: var(--surface); stroke-width: .5; }
-.wm-place.town.here rect { fill: var(--accent); }
-.wm-place.shut text { fill: var(--ink-faint); }
-.wm-place:not(.shut):not(.here) { cursor: pointer; }
-.wm-place.here circle:not(.wm-ring) { fill: var(--accent); }
-.wm-ring { fill: none !important; stroke: var(--accent) !important; stroke-width: .6 !important; }
-.wm-sea { font: 600 3.2px var(--body); fill: var(--ink-faint); text-anchor: middle; }
-.wm-shore { stroke: var(--line-firm); stroke-width: .4; stroke-dasharray: 2 1.5; }
-/* THE FERRY: a dashed lane from Lilycove to the shore, a dashed rim on every stop. */
-.wm-ferry { stroke: var(--accent); stroke-width: .6; stroke-dasharray: 1 1.2; }
-.wm-dock { fill: none; stroke: var(--accent); stroke-width: .45; stroke-dasharray: .9 .9; }
+.wx-place.shut text { fill: var(--ink-faint); }
+.wx-place.here text { fill: var(--accent); font-weight: 800; }
+.wx-place .wx-logo .wx-lv { font: 800 3px var(--body); fill: var(--ink-soft); text-anchor: middle; stroke: none; }
+/* The key: what a line, a rim and a colour mean. */
+.wx-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; font-size: 12px; color: var(--ink-soft); }
+.wx-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.wx-legend svg { width: 18px; height: 7px; }
+.wx-key { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: #fff; background: var(--accent); }
+.wx-key.town { border-radius: 5px; background: var(--ink-soft); color: var(--surface); }
+.wx-key.shut { background: var(--line-firm); color: var(--ink-soft); font: 800 9px var(--body); }
+.wx-tint { font-style: italic; }
+/* The logo in HTML, for the card and the list. */
+.wx-disc { flex: none; display: grid; place-items: center; width: var(--d); height: var(--d); border-radius: 50%;
+  background: var(--tc, var(--path)); color: #fff; }
+.wx-disc.town { border-radius: 28%; background: var(--ink-soft); color: var(--surface); }
+.wx-disc.shut { background: var(--line-firm); color: var(--ink-soft); }
+/* THE PLACE CARD: what you tapped - its kind, types, ways out and the trip. */
+.wx-card { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line-firm); border-radius: 16px; background: var(--surface); }
+.wx-card header { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wx-card header > div { min-width: 0; }
+.wx-card h4 { margin: 0; font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--ink); }
+.wx-kind { font-size: 12px; color: var(--ink-soft); }
+.wx-event { width: 18px; height: 18px; margin-left: 6px; vertical-align: -3px; }
+.wx-ways { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 13px; color: var(--ink-soft); }
+.wx-ways .ic { vertical-align: -2px; color: var(--accent); }
+.wx-way { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--path); vertical-align: middle; margin-right: 6px; }
+.wx-way.door { border-top-style: dashed; }
+.wx-to { font: inherit; font-weight: 700; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer;
+  text-decoration: underline; text-decoration-color: var(--line-firm); text-underline-offset: 2px; }
+.wx-to:hover { text-decoration-color: var(--accent); }
+.wx-ways em { font-style: normal; color: var(--ink-faint); }
+.wx-note { margin: 0; font-size: 12px; color: var(--ink-soft); }
+.wx-go { font: 600 14px var(--body); padding: 10px; border-radius: 12px; border: 1px solid transparent; background: var(--cta); color: #fff; cursor: pointer; }
+.wx-go:disabled { background: var(--surface-2); color: var(--ink-faint); border-color: var(--line-firm); cursor: default; }
+.wx-go.here:disabled { color: var(--accent); border-color: var(--accent); }
+/* THE LIST, by region: tap a row to see it on the map, GO to go. */
+.wx-group h4 { margin: 4px 2px 6px; font: 600 11px var(--pixel); color: var(--ink-faint); }
+.wx-rows { display: grid; gap: 6px; }
+.wx-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px 6px 6px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.wx-row.here { border-color: var(--path); background: var(--path-soft); }
+.wx-pick { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto;
+  column-gap: 10px; row-gap: 2px; align-items: center; text-align: left; background: none; border: 0; padding: 0;
+  font: inherit; color: var(--ink); cursor: pointer; }
+.wx-pick .wx-disc { grid-row: 1 / span 2; }
+.wx-row-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wx-row-types { grid-column: 2; }
+.wx-row.shut .wx-row-name { color: var(--ink-soft); }
+.wx-row-go { flex: none; display: inline-flex; align-items: center; gap: 4px; font: 600 10px var(--pixel);
+  padding: 7px 9px 6px; border: 1px solid var(--line-firm); border-radius: 10px; background: var(--surface-2);
+  color: var(--ink-soft); cursor: pointer; }
+.wx-row-go:not(:disabled):hover { border-color: var(--path); color: var(--path); }
+.wx-row.here .wx-row-go { color: var(--path); border-color: var(--path); }
+.wx-row-go:disabled { cursor: default; }
+/* A WIDE RAIL (a sideways phone, a tablet): the map left, its key and card
+   right, and the list below across both in columns. */
+@container rail (min-width: 620px) {
+  .wx-scroll { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 14px; }
+  .wx-mapbox { grid-column: 1; grid-row: 1 / span 3; }
+  .wx-legend { grid-column: 2; grid-row: 1; justify-content: flex-start; }
+  .wx-card { grid-column: 2; grid-row: 2; align-self: start; }
+  .wx-group, .wx-scroll > .shop-note { grid-column: 1 / -1; }
+  .wx-rows { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+}
 
 /* THE SIGNPOST on the area card: near a road or a door, where it goes. */
 .biome-tag .bt-exit { font-family: var(--body); font-size: 11px; color: var(--path); }
@@ -2533,7 +2573,7 @@ canvas {
 
 /* ---------- shop ---------- */
 .shoplist { display: grid; gap: 7px; }
-/* One scroller for the whole shop, matching .boxlist and .arealist. Without it
+/* One scroller for the whole shop, matching .boxlist and .wx-scroll. Without it
    the shop was the one tab that could grow past the screen. */
 .shopscroll {
   max-height: 430px; overflow-y: auto; padding-right: 4px;
@@ -6017,7 +6057,7 @@ button:disabled { transition: none; }
     height: 0; min-height: 100%;
   }
   .rail > .panel, .rail-pane > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .dexgrid, .boxlist, .arealist, .shopscroll, .trscroll {
+  .dexgrid, .boxlist, .wx-scroll, .shopscroll, .trscroll {
     max-height: none; flex: 1 1 auto; min-height: 120px;
     /* These are grids that now fill the column, so their rows would stretch to
        share the leftover height - which turned every square dex cell into a
@@ -8328,7 +8368,7 @@ button:disabled { transition: none; }
   /* The rail is below the play card now, full width: back to a list that
      scrolls inside itself (the desktop column let it grow to fill). */
   .rail { height: auto; min-height: 0; }
-  .dexgrid, .boxlist, .arealist, .shopscroll, .trscroll { max-height: 70dvh; flex: none; }
+  .dexgrid, .boxlist, .wx-scroll, .shopscroll, .trscroll { max-height: 70dvh; flex: none; }
 }
 
 /* ================================================================ WIDE RAIL
@@ -8339,7 +8379,7 @@ button:disabled { transition: none; }
    end and its buttons at the other. From 620px they are cards in columns. */
 .rail { container: rail / inline-size; }
 @container rail (min-width: 620px) {
-  .boxlist, .arealist, .shoplist, .trlist {
+  .boxlist, .shoplist, .trlist {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
     align-content: start;
   }
@@ -8349,7 +8389,6 @@ button:disabled { transition: none; }
      the buttons, which sit on the card's floor like their neighbour's. */
   .boxrow { grid-template-rows: auto auto 1fr; }
   .boxrow > .bx-acts { align-self: end; }
-  .arearow { align-content: center; }
   /* An open shop row is a form, twice a row's height: it takes the whole
      width rather than stretching the item beside it. */
   .shoprow.open { grid-column: 1 / -1; }
@@ -9440,7 +9479,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   .rail.open > .tabs { padding-right: 40px; }
   .rail .tab-glyph { width: 44px; height: 44px; border-radius: 14px; }
   .rail.open .rail-pane > .panel, .rail.open > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .rail.open .dexgrid, .rail.open .boxlist, .rail.open .arealist, .rail.open .shopscroll, .rail.open .trscroll {
+  .rail.open .dexgrid, .rail.open .boxlist, .rail.open .wx-scroll, .rail.open .shopscroll, .rail.open .trscroll {
     max-height: none; flex: 1 1 auto; min-height: 120px; align-content: start;
   }
   .pad-rotom { color: var(--accent); }
@@ -9467,7 +9506,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   .rail.open .fb-find { flex: 1 1 34%; min-width: 0; }
   .rail.open .fb-row { flex: 1 1 66%; min-width: 0; flex-wrap: nowrap; }
   .rail.open .dx-rank { display: none; }
-  .rail.open .dexgrid, .rail.open .boxlist, .rail.open .arealist, .rail.open .shopscroll, .rail.open .trscroll { min-height: 0; }
+  .rail.open .dexgrid, .rail.open .boxlist, .rail.open .wx-scroll, .rail.open .shopscroll, .rail.open .trscroll { min-height: 0; }
 }
 .tb-menu, .tb-scrim { display: none; }
 /* HELD SIDEWAYS the tabs are a menu behind one corner button (see TopBar's

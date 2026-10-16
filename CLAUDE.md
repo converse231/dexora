@@ -1367,8 +1367,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   VOLATILE; App's `Ferry.jsx`); `sail(id)` lands on that stop's `dock`
   facing in, refused while the level has not opened it, and `leaveFerry`
   steps back. Stops are read off mapdata (`FERRY_STOPS`): a town's harbor
-  (`em_route`'s `ferry` warp - Lilycove, Four Island) or road out (Lavender's,
-  opened after the per-map check as a road is), else the map's own way in
+  (`em_route`'s `ferry` warp - Lilycove, Four Island) or an edge
+  (`edge_ferry`: Lavender's road out, Route 123's path down from Mt. Pyre -
+  its only way into its east half; opened after the per-map check as a road
+  is), else the map's own way in
   (`FERRY_SPAWN`, `spawn_ferry`: a cave mouth, or the foot of Tall Grass's
   path - a ferry cell in the open boards you for stepping on it). check.mjs's
   world check walks through it; tools/play boards and sails every stop.

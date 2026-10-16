@@ -43,6 +43,28 @@ const P = {
   steps: "M13 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM6 20l3-6 3 2v5M9 14l1-5 4 2 3-1M10 9l-3 2",
 };
 
+/* PLACES (the world map, 2026-10-17): what kind of place a map is, drawn in
+   its main type's colour on the Map tab - Travel.jsx's `KIND`. Plus the
+   ferry, a lock for a place not open yet. */
+Object.assign(P, {
+  town: "M3 21V11l5-4 5 4v10M13 21V7l4-3 4 3v14M2 21h20M6 15h4M16 10h2M16 14h2",
+  grass: "M3 20c1-4 2-6 3-8 1 2 2 4 3 8M9 20c1-6 2-9 3-12 1 3 2 6 3 12M15 20c1-4 2-6 3-8 1 2 2 4 3 8",
+  forest: "M12 2l6 9h-3.5l4.5 7H5l4.5-7H6zM12 18v4",
+  coast: "M2 10c2.5-2.5 5-2.5 7.5 0s5 2.5 7.5 0 3.5-1.5 5 0M2 16c2.5-2.5 5-2.5 7.5 0s5 2.5 7.5 0 3.5-1.5 5 0",
+  cave: "M2 20L9 7l3 4 2-3 8 12zM9 20v-3a3 3 0 0 1 6 0v3",
+  mountain: "M2 20l7-11h6l7 11zM9 9L7.5 5M15 9l1.5-4M12 9V3",
+  ice: "M12 2v20M3.4 7l17.2 10M3.4 17L20.6 7M9 3.5l3 2 3-2M9 20.5l3-2 3 2",
+  desert: "M12 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 18v2M3 11h2M19 11h2M5.6 4.6L7 6M17 16l1.4 1.4M5.6 17.4L7 16M17 6l1.4-1.4M2 22h20",
+  building: "M3 21V9l6-3v15M9 21V4l12 5v12M2 21h20M13 12h4M13 16h4",
+  tower: "M8 21V8l4-5 4 5v13M6 21h12M10 11h4M10 15h4",
+  ruins: "M3 21h18M5 21V9M9.5 21V9M14.5 21V9M19 21v-9M3 9h13l-2-4H5z",
+  safari: "M7 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM4 14l2-8h3l1 6M20 14l-2-8h-3l-1 6M10 15h4",
+  lock: "M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3",
+  boat: "M2 15h20l-3.5 5h-13zM5 15v-5h14v5M12 10V4l5 6",
+});
+// The raw path, for a glyph drawn inside another SVG (the world map).
+export const glyph = (n) => P[n];
+
 export default function Icon({ n, size = 20, className = "" }) {
   return (
     <svg className={`ic ${className}`} width={size} height={size} viewBox="0 0 24 24" fill="none"

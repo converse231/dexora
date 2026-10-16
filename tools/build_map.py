@@ -3591,13 +3591,24 @@ def lavender_town():
     # west, Route 8's, is the way to the ferry: every cell of the left edge
     # walkable in FireRed is reopened as a ferry cell - after the per-map
     # check, where the roads open, since the ring is solid till then.
-    out = em_route("LavenderTown", "lavender_town", "lavender", "lavender", ["left"], door=0, fr=True)
+    return edge_ferry(em_route("LavenderTown", "lavender_town", "lavender", "lavender", ["left"], door=0, fr=True), "left")
+
+
+def edge_ferry(out, side):
+    """THE FERRY ON A MAP'S EDGE: every cell of `side` the real map walks off
+    is a ferry cell (reopened after the per-map check, where the roads open,
+    since the ring is solid till then), docking on the floor just inside the
+    middle one. Lavender's road west; Route 123's path down from Mt. Pyre."""
     rows, extra = out[0], out[5]
-    cells = [(0, y) for y in range(len(rows))
-             if extra["edge"][(0, y)][0] not in SOLID and rows[y][1] not in SOLID]
-    assert cells, "Lavender Town: no road west to reopen"
+    W, H = len(rows[0]), len(rows)
+    dx, dy = INWARD[side]
+    line = ([(0 if side == "left" else W - 1, y) for y in range(H)] if side in ("left", "right")
+            else [(x, 0 if side == "top" else H - 1) for x in range(W)])
+    cells = [(x, y) for x, y in line
+             if extra["edge"][(x, y)][0] not in SOLID and rows[y + dy][x + dx] not in SOLID]
+    assert cells, f"no way off the {side} edge to make a ferry of"
     mid = cells[len(cells) // 2]
-    extra["ferry"] = {"cells": cells, "dock": (mid[0] + 1, mid[1]), "edge": True}
+    extra["ferry"] = {"cells": cells, "dock": (mid[0] + dx, mid[1] + dy), "edge": True}
     return out
 
 
@@ -3627,11 +3638,13 @@ def route114():
 
 
 def route123():
-    # East of Route 118; the Berry Master's House is a room. Route 122 above it
-    # is open sea (18 cells of land) and is not a map, so Route 123 is reached
-    # from Route 118 alone, and its east half - down ledges from Mt. Pyre's
-    # side on the GBA - is culled, art kept.
-    return em_route("Route123", "lilycove", "safari", "lilycove", ["left"])
+    # East of Route 118; the Berry Master's House is a room. On the GBA its
+    # east half is entered from the north, down a path from Route 122's sand
+    # bar by Mt. Pyre, and left west down one-way ledges to Route 118. Route
+    # 122 is open sea (18 cells of land), so it is not a map: the path's top
+    # is a FERRY STOP instead (2026-10-17, reported - from 118 alone half the
+    # route was walled off), and every cell it reaches is kept.
+    return edge_ferry(em_route("Route123", "lilycove", "safari", "lilycove", ["left", "top"]), "top")
 
 
 def route115():
