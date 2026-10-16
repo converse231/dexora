@@ -27,8 +27,8 @@ import { speciesById } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { variantOf } from "../../game/items.js";
 import { hash, dayKey } from "../../game/daily.js";
-import { roadOf, roadMaps, ROAD_PER_MAP } from "../../game/road.js";
-import { AREAS } from "../../game/mapdata.js";
+import { roadOf, roadRegions, ROAD_PER_REGION } from "../../game/road.js";
+import { REGION_NAME } from "../../game/biomes.js";
 import { useModalLock } from "../modal.js";
 import Sprite from "../Sprite.jsx";
 import Icon from "../Icon.jsx";
@@ -586,29 +586,30 @@ function MyTeam({ engine, box, team }) {
   );
 }
 
-/* ROAD TRAINERS (docs/battles.md): today's four on each map you have opened,
-   the map you stand on first. A win pays once a trainer a day; tomorrow
-   brings new ones. The engine judges it (`battleBegin`), this only shows. */
-function RoadView({ level, road, here, onBattle }) {
-  const maps = roadMaps(level);
-  const [at, setAt] = useState(() => (maps.includes(here) ? here : maps[0]));
+/* ROAD TRAINERS (docs/battles.md): today's six in each region you have
+   opened, filed by generation as DelugeRPG files them - the newest region
+   first. A win pays once a trainer a day; tomorrow brings new ones. The
+   engine judges it (`battleBegin`), this only shows. */
+function RoadView({ level, road, onBattle }) {
+  const regions = roadRegions(level);
+  const [at, setAt] = useState(() => regions.at(-1));
   const day = dayKey();
   const list = useMemo(() => (at ? roadOf(at, day) : []), [at, day]);
   const done = (id) => road?.day === day && road.won?.includes(id);
-  const beat = maps.reduce((n, m) => n + roadOf(m, day).filter((t) => done(t.id)).length, 0);
+  const beat = regions.reduce((n, g) => n + roadOf(g, day).filter((t) => done(t.id)).length, 0);
   return (
     <div className="rd-page">
       <section className="lg-hero rd-hero">
-        <span className="lg-kicker">Trainers on the maps</span>
+        <span className="lg-kicker">Trainers by region</span>
         <h2>Road trainers</h2>
-        <p>Four on every map you have opened, new each day. Beat them for money - {beat} of {maps.length * ROAD_PER_MAP} today.</p>
+        <p>{ROAD_PER_REGION} in every region you have opened, using that region's Pokémon, new each day. Beat them for money - {beat} of {regions.length * ROAD_PER_REGION} today.</p>
       </section>
-      <div className="rd-maps" role="tablist" aria-label="Map">
-        {maps.map((m) => {
-          const left = roadOf(m, day).filter((t) => !done(t.id)).length;
+      <div className="rd-maps" role="tablist" aria-label="Region">
+        {regions.map((g) => {
+          const left = roadOf(g, day).filter((t) => !done(t.id)).length;
           return (
-            <button key={m} type="button" role="tab" aria-selected={m === at} className={m === at ? "on" : ""} onClick={() => setAt(m)}>
-              {AREAS[m]?.name ?? m}{m === here ? " · here" : ""}<em>{left ? `${left} left` : "done"}</em>
+            <button key={g} type="button" role="tab" aria-selected={g === at} className={g === at ? "on" : ""} onClick={() => setAt(g)}>
+              {REGION_NAME[g]}<em>{left ? `${left} left` : "done"}</em>
             </button>
           );
         })}
@@ -664,7 +665,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
       <section className="lg-foe">
         <img className="lg-foe-pic" src={asset(`trainers/${o.pic}.png`)} alt="" />
         <div className="lg-foe-who">
-          <span className="lg-kicker">{kind === "road" ? `${o.rung} · ${o.map}` : kind === "trainer" ? o.cls : kind === "hard" ? "Hard mode · Lv 100" : kind === "champion" ? "Champion" : kind === "league" ? "Elite Four" : "Leader"}</span>
+          <span className="lg-kicker">{kind === "road" ? `${o.rung} · ${o.region}` : kind === "trainer" ? o.cls : kind === "hard" ? "Hard mode · Lv 100" : kind === "champion" ? "Champion" : kind === "league" ? "Elite Four" : "Leader"}</span>
           <h4>{kind === "road" ? trainerName(o) : o.name}</h4>
           <Party team={theirs} small />
         </div>
@@ -707,7 +708,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
 
 export default function League({
   engine, box = [], beaten = {}, steps = 0, team = [], signedIn = false, onClose,
-  money = 0, bag = {}, level = 1, stats = null, candy = 0, road = null, areaId = null,
+  money = 0, bag = {}, level = 1, stats = null, candy = 0, road = null,
 }) {
   useModalLock();
   const page = useRef(null);
@@ -895,7 +896,7 @@ export default function League({
         {pick ? (
           <TeamPick o={pick.o} kind={pick.kind} box={box} last={team} beaten={beaten} steps={steps} onFight={startFight} />
         ) : roadTab ? (
-          <RoadView level={level} road={road} here={areaId} onBattle={(o) => setPick({ o, kind: "road" })} />
+          <RoadView level={level} road={road} onBattle={(o) => setPick({ o, kind: "road" })} />
         ) : mine ? (
           <MyTeam engine={engine} box={box} team={team} />
         ) : shop ? (

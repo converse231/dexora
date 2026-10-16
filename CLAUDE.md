@@ -427,7 +427,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `trainer.js`, `effect()` strings included. **Lustre** (tier roll) stays at
   most a research star's lift; **Coach** pays on converting duplicates only.
 - **League prices are measured on a Lv 75 game** (`PRICE_LEVEL` in
-  league-sim): 76-100 is post-game, and pricing against it would have doubled
+  league-sim), first wins at `PRIZE_CEIL` 15% of it and rematches at
+  `REMATCH_CEIL` 30% of income per step (both 1.5x on 2026-10-16, asked for): 76-100 is post-game, and pricing against it would have doubled
   every prize without the ladder moving.
 - **`state.paid` is the highest level whose reward was paid.** `payLevels()`
   pays from there, on every gain and once at boot. Old saves count as paid to
@@ -1027,8 +1028,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   every map is already its types, so one did nothing (2026-10-10).
   Steps together count on the box entry (`walked`) IN PLACE: a heart or a find
   is the one `changed()`, or a big Box rebuilds every step.
-- **Road trainers are designed in docs/battles.md** (`road.js`): four a
-  map a day, a hash of day, map and slot; parties from the map's own table;
+- **Road trainers are designed in docs/battles.md** (`road.js`): filed BY
+  REGION, as DelugeRPG files them (2026-10-16, asked for) - six a region a
+  day (`ROAD_PER_REGION`), every region `GEN_UNLOCK` has opened, a hash of
+  day, region and slot; parties from the region's own species (no forms or
+  legendaries), staged by `opponent()`; an old save's map-filed id names nobody;
   `battleBegin` judges them by `roadOpen`, `battleEnd` pays once a day into
   `state.road` - never `beaten`, so the League's solved ladder is untouched.
   A road trainer carries `road: true`, which `tuneOf` reads.
@@ -1217,7 +1221,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   your friends and **Trainers to meet** (2026-10-15, asked for:
   `suggest_trainers`, eight shuffled strangers - recently played first,
   never a friend or request, never across a block, never a flagged account;
-  a page answers nothing, never `closed`, until the server has it).  a page answers nothing, never `closed`, until the server has it).
+  a page answers nothing, never `closed`, until the server has it).
   **Invites are docs/trading.md's Referrals** (2026-10-15): `?ref=<name>`
   links, `db/referrals.sql` (after trading.sql) decides EVERYTHING - a new
   account, once, to an older one, progress counted from the save it had when

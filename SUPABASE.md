@@ -542,6 +542,19 @@ device and tried again next session (an account can only follow one within
 rule's "confirmed email" check passes for everyone; the days, the progress
 since linking, the pace flag and the cap still hold.
 
+## 3j. Ruby, Sapphire, Fire Red and Leaf Green — **run this once** (added 2026-10-16)
+
+1. **`db/trading.sql` again** - paste the whole file and run it. `tier_list()`
+   now names twenty tiers, Showdown first, and the tier CHECKs on `mons` and
+   `listings` are re-added from it. Re-runnable.
+2. **Optionally redeploy `ranked-step`** (§3f). Its bundle was rebuilt, but
+   only tier odds it never reads changed, so `RULES_VERSION` is unchanged and
+   the deployed function plays exactly the same.
+
+Until step 1 is run, a Pokemon in one of the four new tiers cannot enter
+trading (its tier fails the CHECK), and a region's new-tier titles do not reach
+the trainer card. Everything else works.
+
 ## 4. Turn off email confirmation — **you have to do this one**
 
 It is the only step that cannot be done from here: the setting lives in GoTrue's

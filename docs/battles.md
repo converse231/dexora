@@ -515,31 +515,34 @@ and Cynthia's Roserade had nothing that hits.
 
 Battles that are not the League: trainers met on the maps, fought for money.
 
-- **Where they are.** Every map you have opened (`areaOpen`) has
-  `ROAD_PER_MAP` (4) trainers, new each day. Each trainer is a hash of the day,
-  the map and its slot (`road.js`), so every copy of the game agrees and a
-  reload cannot reroll one. The Battles page's **Trainers** tab lists them by
-  map, opening on the map you stand on.
-- **Who they are.** Four rungs a map:
+- **Where they are: by REGION** (2026-10-16, asked for, as DelugeRPG files
+  its trainers - by map, nobody could tell a generation's were all there).
+  Every region your level has opened (`GEN_UNLOCK`) has `ROAD_PER_REGION` (6)
+  trainers, new each day. Each trainer is a hash of the day, the region and
+  its slot (`road.js`), so every copy of the game agrees and a reload cannot
+  reroll one. The Battles page's **Trainers** tab lists them by region,
+  opening on the newest. An old save's map-filed ids name nobody.
+- **Who they are.** Six slots a region:
 
-  | Rung | Team | Level | Opponent AI |
-  |---|---|---|---|
-  | Rookie | 2 | the map's level +3 | 1 (random) |
-  | Regular | 3 | the map's level +10 | 1 |
-  | Ace | 4 | the map's level +25 | 2 |
-  | Veteran | 6 | 60 to 100 | 2 |
+  | Rung | Slots | Team | Level | Opponent AI |
+  |---|---|---|---|---|
+  | Rookie | 1 | 2 | the region's arrival level +3 | 1 (random) |
+  | Regular | 2 | 3 | the region's arrival level +10 | 1 |
+  | Ace | 2 | 4 | the region's arrival level +25 | 2 |
+  | Veteran | 1 | 6 | 60 to 100 | 2 |
 
   Their classes are the games' own (Youngster, Lass, Bug Catcher, Hiker, Ace
   Trainer, Veteran...), drawn with the portraits the League already ships.
-- **Their Pokémon** are the map's own wild table (`tableFor`, no legendaries
-  and no costumes), at the stage their level reaches (`opponent()`, the one
-  builder, the same as a gym's). A Veteran at Lv 100 fields fully evolved
-  Pokémon from that map.
+- **Their Pokémon** are the region's own species (no forms, no legendaries or
+  mythicals), drawn evenly, at the stage their level reaches (`opponent()`,
+  the one builder, the same as a gym's). A Veteran at Lv 100 fields fully
+  evolved Pokémon of that region.
 - **What a win pays:** money only, once per trainer per day (`roadPay`: the ace
   level × `ROAD_YEN` × (1 + team / 3)). Never EXP, never a badge, never
   `beaten`: the League's ladder, its solved levels and its rematch clock are
   untouched, so `npm run gyms` is not owed. At the top of the game every map's
-  four come to roughly ¥55,000 a day, if every one is fought.
+  trainers come to roughly ¥85,000 a day, if every one is fought
+  (`ROAD_YEN` 7 -> 15 on 2026-10-16, raised with the League's prizes).
 - **The engine judges it like a League battle:** `battleBegin` refuses a road
   trainer that is not today's, is on a map not yet open, or was already beaten
   today. `battleEnd` pays and records the win in `state.road` (`{ day, won }`,

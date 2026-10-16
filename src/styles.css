@@ -9699,7 +9699,8 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-foil { position: absolute; inset: 0; display: none; pointer-events: none; overflow: hidden; mix-blend-mode: color-dodge; }
 .cd-card.v-r .cd-foil, .cd-card.r-rare.v-h .cd-foil, .cd-card.r-double .cd-foil, .cd-card.r-ace .cd-foil, .cd-card.r-ultra .cd-foil,
 .cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil, .cd-card.r-hyper .cd-foil, .cd-card.r-mega .cd-foil,
-.cd-card.r-holo .cd-foil, .cd-card.r-futuristic .cd-foil, .cd-card.r-blackwhite .cd-foil { display: block; }
+.cd-card.r-holo .cd-foil, .cd-card.r-futuristic .cd-foil, .cd-card.r-blackwhite .cd-foil,
+.cd-card.r-gallery .cd-foil, .cd-card.r-radiant .cd-foil, .cd-card.r-shiny .cd-foil, .cd-card.r-shinyultra .cd-foil { display: block; }
 /* At rest a foil is a faint rainbow; the band sweeps over it when shown. */
 .cd-foil {
   background: linear-gradient(125deg, rgba(255, 110, 190, .16), rgba(110, 220, 255, .2) 35%, rgba(255, 236, 130, .16) 65%, rgba(170, 120, 255, .18));
@@ -9719,7 +9720,8 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .cd-card.r-ultra .cd-foil { background: repeating-linear-gradient(115deg, rgba(230, 240, 255, .14) 0 2px, transparent 2px 6px), linear-gradient(125deg, rgba(220, 235, 255, .2), rgba(255, 255, 255, .06)); }
 /* No dot texture (asked for, 2026-10-07): a 6px grid of dots over the art
    read as blur. The sheen alone. */
-.cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil, .cd-card.r-pikachu .cd-foil {
+.cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil, .cd-card.r-pikachu .cd-foil,
+.cd-card.r-gallery .cd-foil, .cd-card.r-radiant .cd-foil, .cd-card.r-shiny .cd-foil, .cd-card.r-shinyultra .cd-foil {
   background: linear-gradient(125deg, rgba(255, 110, 190, .14), rgba(110, 220, 255, .16) 50%, rgba(255, 236, 130, .14));
 }
 /* A Mega Hyper Rare is printed in gold already: a light hand, or its etching washes out. */
@@ -9745,7 +9747,8 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 /* A card you do not own has no finish yet: a sparkle over a greyed card read as noise. */
 .cd-card.missing .cd-foil, .cd-chase-card:not(.got) .cd-foil, .cd-tile:not(.got) .cd-foil { display: none; }
 .cd-rar { font-style: normal; font-size: 12px; min-width: 20px; text-align: center; color: var(--ink-faint); }
-.cd-rar.r-double, .cd-rar.r-ace, .cd-rar.r-ultra { color: var(--ink); }
+.cd-rar.r-double, .cd-rar.r-ace, .cd-rar.r-ultra, .cd-rar.r-holo, .cd-rar.r-shiny, .cd-rar.r-gallery, .cd-rar.r-radiant { color: var(--ink); }
+.cd-rar.r-shinyultra, .cd-rar.r-futuristic { color: var(--gold); }
 .cd-rar.r-illustration, .cd-rar.r-special, .cd-rar.r-hyper, .cd-rar.r-mega, .cd-rar.r-blackwhite { color: var(--gold); }
 .cd-stamp {
   position: absolute; left: 5px; bottom: 5px; width: 15px; height: 15px; border-radius: 50%; z-index: 2;
@@ -10317,6 +10320,16 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .cd-open.tone-special { --rc: #ff4fbf; }
 .cd-open.tone-mega, .cd-open.tone-hyper { --rc: #ffd24a; }
 .cd-open.tone-ace { --rc: #ff6fae; }
+/* The rungs added since (Base Set's holo, 30th Celebration, Paldean Fates,
+   Sword & Shield) had none: their banner drew in the scene's default blue and
+   their pips never lit (2026-10-16). check.mjs now asks every hit for both. */
+.cd-open.tone-holo { --rc: #9fe6ff; }
+.cd-open.tone-shiny { --rc: #ff9ad5; }
+.cd-open.tone-gallery { --rc: #b49bff; }
+.cd-open.tone-radiant { --rc: #ffe08a; }
+.cd-open.tone-shinyultra { --rc: #d6a8ff; }
+.cd-open.tone-futuristic { --rc: #7af0ff; }
+.cd-open.tone-blackwhite { --rc: #f4f4f8; }
 .cd-room { position: fixed; inset: 0; pointer-events: none; opacity: .45; transition: opacity .6s;
   background: radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--rc) 42%, transparent), transparent 62%); }
 .cd-open[class*="tone-"] .cd-room { opacity: 1; }
@@ -10462,6 +10475,9 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .cd-pips i.r-double { --pc: #ffcb3d; } .cd-pips i.r-ultra { --pc: #cfe0ff; } .cd-pips i.r-illustration { --pc: #33e0c4; }
 .cd-pips i.r-special { --pc: #ff4fbf; } .cd-pips i.r-mega, .cd-pips i.r-hyper, .cd-pips i.r-blackwhite { --pc: #ffd24a; }
 .cd-pips i.r-ace { --pc: #ff6fae; }
+.cd-pips i.r-holo { --pc: #9fe6ff; } .cd-pips i.r-shiny { --pc: #ff9ad5; } .cd-pips i.r-gallery { --pc: #b49bff; }
+.cd-pips i.r-radiant { --pc: #ffe08a; } .cd-pips i.r-shinyultra { --pc: #d6a8ff; } .cd-pips i.r-futuristic { --pc: #7af0ff; }
+.cd-pips i.r-blackwhite { --pc: #f4f4f8; }
 .cd-pips i.seen[class*="r-"]:not(.r-common):not(.r-uncommon):not(.r-rare) { background: var(--pc); box-shadow: 0 0 8px var(--pc); }
 .cd-pips i.tell { border-color: var(--pc); box-shadow: 0 0 10px var(--pc); animation: cd-glow 1s ease-in-out infinite; }
 .cd-pips i.cur { scale: 1.35; }

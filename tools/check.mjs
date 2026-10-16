@@ -7624,6 +7624,7 @@ import { statSync } from "node:fs";
   assert.ok(cdGzip(idx).length < 1024, `the main bundle's card index is ${cdGzip(idx).length} bytes gzipped`);
 
   let n = 0;
+  const CARD_CSS = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
   for (const meta of CD_SETS) {
     const { SET, CARDS } = await import(`../src/data/cards/sets/${meta.id}.js`);
     assert.equal(CARDS.length, meta.total, `${meta.id}: the index and the set disagree on its size`);
@@ -7681,6 +7682,10 @@ import { statSync } from "node:fs";
       if (!rate) continue;               // a roll the set does not have (30th Celebration's ultra)
       const as = CD.landsOn(CARDS, r);
       assert.ok(CD.isHit(as), `${meta.id}: the ${r} roll lands on ${as}, not a hit`);
+      /* AND IT IS DRAWN AS ONE (2026-10-16): a hit with no tone opened in the
+         scene's default blue, and with no pip colour its dot never lit. */
+      assert.ok(new RegExp(`\.cd-open\.tone-${as}[ ,{]`).test(CARD_CSS) && new RegExp(`\.cd-pips i\.r-${as}[ ,{]`).test(CARD_CSS),
+        `${meta.id}: the ${as} hit has no .cd-open.tone-${as} or .cd-pips i.r-${as} colour`);
       const got = (flat.hits[as] ?? 0) / N;
       const room = Math.max(0.15 * rate, 4 * Math.sqrt(rate * (1 - rate) / N));
       assert.ok(Math.abs(got - rate) <= room, `${meta.id}: ${r} (${as}) came 1 in ${(1 / got).toFixed(1)}, not 1 in ${(1 / rate).toFixed(1)}`);
