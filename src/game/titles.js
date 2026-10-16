@@ -46,7 +46,7 @@ export const titleLogo = (t) => (/^(set|master):/.test(t) ? `cards/${t.split(":"
 /* What a trainer card shows: a set's Master Collector says its Collector
    already, so the two are one badge.
    And a region's tier Pokédexes are ONE badge, its rarest (TIERS runs
-   rarest first): sixteen tiers by nine regions is 144 badges on a card.
+   rarest first): twenty tiers by nine regions is 180 badges on a card.
    The badge's tooltip names every tier finished (`regionTiers`). */
 const tierRank = (t) => TIERS.indexOf(titleTier(t));
 export const regionTiers = (titles, gen) => titles.filter((t) => titleTier(t) && t.endsWith(`:${gen}`))

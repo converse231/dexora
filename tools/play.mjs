@@ -4500,7 +4500,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
       opponent(RD.roadTrainer(id).party, RD.roadTrainer(id).top, (k) => k + 1),
     ], [null, 1]);
     const e = at();
-    const [t] = RD.roadOf("meadow");
+    const [t] = RD.roadOf(1);
     const money = e.state.money;
     assert.equal(e.battleBegin(roadBattle(e, t.id, [4]), { id: t.id, uids: [4] }), null, "today's road trainer was refused");
     e.battleStep({ ...e.state.battle, over: 0 });
@@ -4510,15 +4510,23 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
     assert.deepEqual(e.state.road, { day: dayKey(), won: [t.id] }, "the road win was not noted");
     assert.equal(e.state.beaten[t.id], undefined, "a road win touched the League's beaten");
     assert.equal(e.battleBegin(roadBattle(e, t.id, [4]), { id: t.id, uids: [4] }), "shut", "a road trainer was fought twice in a day");
-    const old = RD.roadId("20200101", "meadow", 0);
-    assert.equal(e.battleBegin(roadBattle(e, RD.roadOf("meadow")[1].id, [4]), { id: old, uids: [4] }), "shut", "another day's road trainer was fought");
-    const far = RD.roadOf("falls")[0];
+    const old = RD.roadId("20200101", 1, 0);
+    assert.equal(e.battleBegin(roadBattle(e, RD.roadOf(1)[1].id, [4]), { id: old, uids: [4] }), "shut", "another day's road trainer was fought");
+    const far = RD.roadOf(9)[0];
     const low = boot({ ...SAVE, box, nextUid: 7, xp: 0, paid: 1 }).e;
-    assert.equal(low.battleBegin(roadBattle(low, far.id, [4]), { id: far.id, uids: [4] }), "shut", "a road trainer on a shut map was fought");
-    assert.equal(RD.roadOf("tanoby").length, 0, "Tanoby (one species) has road trainers");
-    assert.ok(RD.roadOf("meadow").every((x) => x.party.every(([sp]) => sp < 10000)), "a road trainer fielded a form");
+    assert.equal(low.battleBegin(roadBattle(low, far.id, [4]), { id: far.id, uids: [4] }), "shut", "a road trainer in a shut region was fought");
+    // An old save's map-filed id names nobody now - never a crash, never a fight.
+    assert.equal(RD.roadTrainer(`road:${dayKey()}:meadow:0`), null, "an old map-filed road id still names a trainer");
+    // BY REGION, ALL OF THEM: every region has its full roster, each Pokemon from that region.
+    const { genOf: rGen, isLegendary: rLeg } = await import("../src/game/biomes.js");
+    for (let g = 1; g <= 9; g++) {
+      const all = RD.roadOf(g);
+      assert.equal(all.length, RD.ROAD_PER_REGION, `region ${g} has ${all.length} road trainers`);
+      assert.ok(all.every((x) => x.party.every(([sp]) => sp < 10000 && rGen(sp) === g && !rLeg(sp))),
+        `a region ${g} road trainer fielded a form, a legendary or another region's Pokemon`);
+    }
     await savedField("road", { day: dayKey(), won: [t.id] }, "junk", { day: null, won: [] });
-    console.log(`road ok — today's trainer fights and pays ¥${t.pay} once, noted in road and never beaten; another day, a shut map and a second try are refused`);
+    console.log(`road ok — today's trainer fights and pays ¥${t.pay} once, noted in road and never beaten; another day, a shut region and a second try are refused`);
   }
 
   /* A REGION'S CHAMPION PAYS A BOX of the newest open set (docs/cards.md,

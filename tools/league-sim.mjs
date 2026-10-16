@@ -346,7 +346,8 @@ export { mulberry32 };   // battle.js's - one seeded roll everywhere
    100: the smallest that brings the reference player down to HARD_TARGET,
    or the most there is, where even that leaves it above. */
 export const HARD_TARGET = 0.2;          // brutal: your call, over 40% and 60%
-export const HARD_PRIZE_CEIL = 0.2;      // every first hard win, of a whole Lv 75 game's income
+// 1.5x on 2026-10-16 with PRIZE_CEIL and REMATCH_CEIL (asked for: bigger battle cash).
+export const HARD_PRIZE_CEIL = 0.3;      // every first hard win, of a whole Lv 75 game's income
 export const HARD_FEE_SHARE = 0.25;      // an attempt's fee, of its prize; given back with the win
 export const HARD_RECORD = { n: 120, seed: 17 };
 export function hardRungs() {
@@ -406,8 +407,10 @@ export function incomePerStep() {
   return { catchPerStep: perEnc * ENCOUNTER_RATE, wagePerStep: wages / 50000, perEnc, wages };
 }
 
-export const PRIZE_CEIL = 0.1;         // every first win in the game, of a whole Lv 75 game's income
-export const REMATCH_CEIL = 0.2;       // rematching everything as fast as possible, of income per step
+/* 0.1 and 0.2 until 2026-10-16: raised 1.5x together (asked for: bigger battle
+   cash), so a rematch pays more rather than only coming round slower. */
+export const PRIZE_CEIL = 0.15;        // every first win in the game, of a whole Lv 75 game's income
+export const REMATCH_CEIL = 0.3;       // rematching everything as fast as possible, of income per step
 export { REMATCH_SHARE, TRAINER_SHARE };   // league.js's - the shares the engine pays are the ones priced
 
 /* PRIZES AND THE REMATCH CLOCK, SOLVED FROM THEIR BOUNDS. A capped opponent

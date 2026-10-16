@@ -16,6 +16,16 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-16-battlecash",
+    icon: "💰",
+    date: "October 2026",
+    title: "Bigger battle prizes",
+    items: [
+      ["Trainers by region", "Battles › Trainers now lists six trainers for every region, each with its own Pokémon."],
+      ["About twice the pay", "Road trainers pay roughly double, and League prizes and rematches 50% more."],
+    ],
+  },
+  {
     id: "2026-10-16-versions",
     icon: "💎",
     date: "October 2026",
