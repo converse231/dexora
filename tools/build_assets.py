@@ -123,7 +123,9 @@ SECONDARY = [("mt_ember", "general"), ("seafoam_islands", "general"),
              ("sevii_islands_67", "general"), ("tanoby_ruins", "building"),
              # The ferry's Kanto stops (the world plan's fifth phase,
              # 2026-10-16): Lavender Town, and Four Island on the Sevii 4-5 set.
-             ("lavender_town", "general"), ("sevii_islands_45", "general")]
+             ("lavender_town", "general"), ("sevii_islands_45", "general"),
+             # Cinnabar Island, where the Pokemon Mansion stands (2026-10-17).
+             ("cinnabar_island", "general")]
 
 # FireRed PRIMARIES we bake WHOLE, for the same reason `EM_PRIMARY` exists one
 # decomp over: ids 0-639 in this atlas are `gTileset_General`, and a map drawn
@@ -1042,6 +1044,7 @@ def build_tileset():
         # town's own set.
         "lavender": {"general": 0, "lavender": sets["lavender_town"], "split": 640},
         "fourisland": {"general": 0, "sevii45": sets["sevii_islands_45"], "split": 640},
+        "cinnabar": {"general": 0, "cinnabar": sets["cinnabar_island"], "split": 640},
         "tanoby": {"general": 0, "sevii": sets["sevii_islands_67"],
                    "building": sets["fr_building"], "ruins": sets["tanoby_ruins"],
                    "split": 640, "floor": sets["tanoby_ruins"] + 60},
@@ -1331,6 +1334,8 @@ def build_ground():
         "route113": meta["fallarbor"]["floor"],
         "route123": meta["safari"]["floor"],
         "route115": meta["route110"]["floor"],
+        # The Weather Institute's battles stand on the Mansion's parquet - a lab floor.
+        "institute": meta["mansion"]["floor"],
     }
     # The fallback an area with no tile of its own lands on, and what the CSS
     # default points at.

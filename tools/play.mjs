@@ -3699,16 +3699,17 @@ console.log("purchases ok — whole numbers only, NaN refused");
   assert.ok(walk(e, back), "a trainer could not step off a rail");
   e.state.bag["acro-bike"] = 1;
 
-  // The door, both ways: Monsoon Trail -> Mansion -> back, landing on the pairs.
-  const [dx, dy, to, ax, ay] = AREAS.woods.doors[0];
-  const home = AREAS.mansion.doors[0];
-  assert.equal(to, "mansion", "Monsoon Trail's door does not lead to the Mansion");
+  // The door, both ways: Monsoon Trail -> the Weather Institute (its own map
+  // since 2026-10-17, Castform's) -> back, landing on the pairs.
+  const [dx, dy, to, ax, ay] = AREAS.woods.doors.find((d) => d[5] !== 1);
+  const home = AREAS.institute.doors[0];
+  assert.equal(to, "institute", "Monsoon Trail's door does not lead to the Weather Institute");
   place([dx, dy + 1]);
   assert.ok(walk(e, "up"), "walking into the Weather Institute went nowhere");
-  assert.equal(e.state.areaId, "mansion", "the Weather Institute door did not reach the Mansion");
-  assert.deepEqual([e.state.player.x, e.state.player.y], [ax, ay], "the Mansion arrival is not its paired tile");
-  assert.ok(walk(e, "down"), "walking out of the Mansion went nowhere");
-  assert.equal(e.state.areaId, "woods", "the Mansion's front door did not lead back to Monsoon Trail");
+  assert.equal(e.state.areaId, "institute", "the Weather Institute door did not reach the Institute");
+  assert.deepEqual([e.state.player.x, e.state.player.y], [ax, ay], "the Institute arrival is not its paired tile");
+  assert.ok(walk(e, "down"), "walking out of the Institute went nowhere");
+  assert.equal(e.state.areaId, "woods", "the Institute's front door did not lead back to Monsoon Trail");
   assert.deepEqual([e.state.player.x, e.state.player.y], [home[3], home[4]], "the way back is not the paired tile");
 
   /* MT MOON'S EXIT LADDER CLIMBS OUT AT THE MOUTH, and the Power Plant's

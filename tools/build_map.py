@@ -58,7 +58,7 @@ AREAS = [
     # COPIED: Emerald's Route 119, as Monsoon Trail - see monsoon_trail(). The
     # id is the slot's historical handle (this was Deep Woods); renaming it
     # would move every save standing here.
-    dict(id="woods", name="Monsoon Trail", drawn="monsoon_trail", inside="Route119"),
+    dict(id="woods", name="Monsoon Trail", drawn="monsoon_trail"),
     # Several lakes, not one: water is solid and only the bank spawns, so a
     # single pond leaves a whole map with a 17-tile shoreline to pace.
     # COPIED: Emerald's Route 110 and the Seaside Cycling Road, in the slot the
@@ -131,6 +131,14 @@ AREAS = [
     dict(id="lilycove", name="Lilycove City", drawn="lilycove_city", town=True),
     dict(id="lavender", name="Lavender Town", drawn="lavender_town", town=True),
     dict(id="fourisland", name="Four Island", drawn="four_island", town=True),
+    # THE RIGHT BUILDINGS (2026-10-17, reported: the Mansion was a plain house
+    # on Monsoon Trail, the Power Plant a cave hatch on Seaside Road, and the
+    # Weather Institute met nothing). The Institute is a map of its own -
+    # Castform's - behind Monsoon Trail's door; the Mansion stands in FireRed's
+    # Cinnabar Island and the Power Plant on FireRed's Route 10, Kanto stops.
+    dict(id="institute", name="Weather Institute", drawn="weather_institute"),
+    dict(id="cinnabar", name="Cinnabar Island", drawn="cinnabar_island", town=True),
+    dict(id="route10", name="Route 10", drawn="route10", town=True),
 ]
 
 SOLID = set("TwRMIPHLFCWXBEVkKdtYGAZJQ")
@@ -2934,8 +2942,8 @@ def safari_zone():
 
 # ----------------------------------------------------------- Monsoon Trail
 
-MONSOON_DOOR = (6, 32)      # the Weather Institute - a room on the shelf (INSIDE, both floors)
-MONSOON_HOUSE = (33, 109)   # the house: the door to the Pokemon Mansion (DOOR_PAIRS)
+MONSOON_DOOR = (6, 32)      # the Weather Institute - its own map (DOOR_PAIRS)
+MONSOON_HOUSE = (33, 109)   # the house: shut (the Mansion's door was here until 2026-10-17)
 
 
 def monsoon_trail():
@@ -3001,14 +3009,15 @@ def monsoon_trail():
             g[y][x] = em_cell(behave(i), int(col[y][x]))
             tiles[y][x] = rebase(i)
 
-    # THE MANSION MOVED NEXT DOOR (2026-10-16): the Weather Institute's door
-    # opens on the real institute now (attach_inside), and the house's door
-    # is the Mansion's - it stays a Monsoon Trail door, as asked.
-    dx, dy = MONSOON_HOUSE
-    assert g[dy + 1][dx] not in SOLID, "monsoon: nothing to stand on below the house door"
+    # THE INSTITUTE IS A MAP OF ITS OWN (2026-10-17): its door joins the
+    # Weather Institute (DOOR_PAIRS), Castform's home; the house beside it is
+    # an ordinary house again and stays shut - the Mansion stands on Cinnabar
+    # Island now, its real building (reported: a plain house read as wrong).
+    hx, hy = MONSOON_HOUSE
+    g[hy][hx] = "T"
+    dx, dy = MONSOON_DOOR
+    assert g[dy + 1][dx] not in SOLID, "monsoon: nothing to stand on below the Institute's door"
     g[dy][dx] = "l"                        # the door - see DOOR_PAIRS
-    wx, wy = MONSOON_DOOR
-    g[wy][wx] = "T"                        # attach_inside opens it onto the institute
 
     # The ring as the real map has it, for ROADS (Route 118 below, Fortree right).
     edge = {(x, y): (g[y][x], tiles[y][x]) for y in range(H) for x in range(W)
@@ -3064,11 +3073,11 @@ def monsoon_trail():
                     cut += 1
         if not cut and not land_ledges(g, "T"):
             break
-    assert g[dy][dx] == "l", "monsoon: the house door to the Mansion is cut off"
+    assert g[dy][dx] == "l", "monsoon: the Weather Institute's door is cut off"
 
     rows = ["".join(r) for r in g]
     return (rows, spawn, [i for row in tiles for i in row], GB, None,
-            {"door": MONSOON_HOUSE, "arrive": (dx, dy + 1), "edge": edge,
+            {"door": MONSOON_DOOR, "arrive": (dx, dy + 1), "edge": edge,
              "elev": elev_rows([[int(e) for e in r] for r in elev])})
 
 
@@ -3083,8 +3092,10 @@ def monsoon_trail():
 # door to the Power Plant (2026-10-16, the world plan's first phase): it IS
 # Emerald's power plant, and ours stood alone behind a doormat.
 R110_WARPS = (((15, 16), (18, 16)), ((16, 88), (19, 88)))
-R110_SHUT = ((11, 66),)
-R110_NEW_MAUVILLE = (35, 24)
+# NEW MAUVILLE (35,24) IS SHUT AGAIN (2026-10-17, reported): a cave hatch
+# opening on FireRed's Power Plant read as a mistake. The Power Plant's door
+# is Route 10's now, its real building.
+R110_SHUT = ((11, 66), (35, 24))
 
 
 def route110():
@@ -3199,8 +3210,7 @@ def route110():
     # from it). Nothing else is lost - every other cell here is reached on foot
     # or by Surf without it, checked when this went in.
     return (rows, spawn, [i for row in tiles for i in row], GB, warps,
-            {"elev": elev_rows(elev), "cycling": True, "edge": edge,
-             "door": R110_NEW_MAUVILLE, "arrive": (R110_NEW_MAUVILLE[0], R110_NEW_MAUVILLE[1] + 1)})
+            {"elev": elev_rows(elev), "cycling": True, "edge": edge})
 
 
 # ------------------------------------------------------------ Mirage Desert
@@ -3336,7 +3346,7 @@ def route111():
 
 # -------------------------------------------------------------- Emerald layouts
 
-def em_layout(layout, secondary, general, sec_base):
+def em_layout(layout, secondary, general, sec_base, primary="general"):
     """One Emerald layout, read as every copied Emerald route reads it: the
     metatile ids, collision and elevation out of its map.bin, each cell's
     behaviour out of the right tileset's attributes, its 2x2 border block and
@@ -3356,8 +3366,8 @@ def em_layout(layout, secondary, general, sec_base):
         dtype="<u2")[:W * H]
     attr = {
         False: np.frombuffer(io.open(BA.fetch(
-            "data/tilesets/primary/general/metatile_attributes.bin",
-            "em/general/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
+            f"data/tilesets/primary/{primary}/metatile_attributes.bin",
+            f"em/{primary}/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
         True: np.frombuffer(io.open(BA.fetch(
             f"data/tilesets/secondary/{secondary}/metatile_attributes.bin",
             f"em/{secondary}/attr.bin", root=BA.EMERALD), "rb").read(), dtype="<u2"),
@@ -3591,7 +3601,7 @@ def lavender_town():
     # west, Route 8's, is the way to the ferry: every cell of the left edge
     # walkable in FireRed is reopened as a ferry cell - after the per-map
     # check, where the roads open, since the ring is solid till then.
-    return edge_ferry(em_route("LavenderTown", "lavender_town", "lavender", "lavender", ["left"], door=0, fr=True), "left")
+    return edge_ferry(em_route("LavenderTown", "lavender_town", "lavender", "lavender", ["left", "top"], door=0, fr=True), "left")
 
 
 def edge_ferry(out, side):
@@ -3610,6 +3620,37 @@ def edge_ferry(out, side):
     mid = cells[len(cells) // 2]
     extra["ferry"] = {"cells": cells, "dock": (mid[0] + dx, mid[1] + dy), "edge": True}
     return out
+
+
+def weather_institute():
+    """THE WEATHER INSTITUTE, a map of its own (2026-10-17, asked for: it
+    met nothing as rooms on Monsoon Trail). Emerald's two floors on one shelf
+    through `em_rooms`, the stairs their own warp pair, read against Emerald's
+    Building plus Lab - both baked since it was a room, so no new art. Its
+    way in is the front door (`door_at_spawn`), Monsoon Trail's door. Not
+    INDOORS: Castform lives here (biomes.js, an `only` map)."""
+    M = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"), encoding="utf-8"))["inside"]
+    load = lambda lay: em_layout(lay, "lab", M["prim"]["building"], M["sec"]["lab"], primary="building")
+    return door_at_spawn(em_rooms("institute", "Route119_WeatherInstitute", ("1F", "2F"), None, M, None,
+                                  ((0, 1),), "MAP_ROUTE119", None,
+                                  lambda b, ch: {".": "r", "T": "R"}.get(ch, ch), load=load, pad=1))
+
+
+def cinnabar_island():
+    # FireRed's Cinnabar Island: the Pokemon Mansion's own building (warp 0)
+    # is its door, and the beach path off its north edge - Route 21, sea - the
+    # ferry. The Gym, the Lab and the rest stay shut.
+    return edge_ferry(em_route("CinnabarIsland", "cinnabar_island", "cinnabar", "cinnabar", ["top"],
+                               door=0, fr=True), "top")
+
+
+def route10():
+    # FireRed's Route 10, the Power Plant's doorstep (warp 2, its front door).
+    # Rock Tunnel splits it: the south part is Lavender Town's road north, and
+    # the north part - Route 9's side, the ferry - reaches the Power Plant by
+    # surfing down the river, as on the GBA. Lavender's set, already baked.
+    return edge_ferry(em_route("Route10", "lavender_town", "lavender", "lavender", ["bottom", "left"],
+                               door=2, fr=True), "left")
 
 
 def four_island():
@@ -3664,7 +3705,7 @@ FALLS_GUT = 2
 FALLS_IN = "MAP_ROUTE114"          # the Fallarbor side: the way in
 
 
-def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mouths, remap, load=None, exits=()):
+def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mouths, remap, load=None, exits=(), pad=0):
     """Emerald rooms, cell for cell, on shelves on one grid, joined by their
     real warps - read out of each room's map.json and kept only where they
     answer each other, as Ember Caldera's are. `way_in` is the map the entrance
@@ -3673,7 +3714,10 @@ def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mou
     outdoor characters into the cave's own, so the minimap draws rock, not
     grass. Shared by Meteor Falls and Icefall Cave; `load` reads a layout
     another way (FireRed's, through `fr_layout`). `exits` are other ways out
-    left open (Meteor Falls' Route 115 mouth), reported in `exits` by map."""
+    left open (Meteor Falls' Route 115 mouth), reported in `exits` by map.
+    `pad` sets the rooms that many cells in from the solid ring - a building's
+    front door is on its room's bottom row (the Weather Institute's), which
+    the ring would wall up; 0 for the caves, whose saves hold their cells."""
     rooms = []
     for name in names:
         L = (load or (lambda lay: em_layout(lay, secondary, meta["general"], sec_base)))(f"{prefix}_{name}")
@@ -3699,15 +3743,15 @@ def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mou
     assert sorted(i for s_ in shelves for i in s_) == list(range(len(rooms))), \
         f"{tag}: every room must sit on exactly one shelf"
 
-    origin, y = {}, 0
+    origin, y = {}, pad
     for shelf in shelves:
-        x = 0
+        x = pad
         for i in shelf:
             origin[i] = (x, y)
             x += rooms[i]["W"] + FALLS_GUT
         y += max(rooms[i]["H"] for i in shelf) + FALLS_GUT
-    W = max(origin[i][0] + rooms[i]["W"] for i in origin)
-    H = max(origin[i][1] + rooms[i]["H"] for i in origin)
+    W = max(origin[i][0] + rooms[i]["W"] for i in origin) + pad
+    H = max(origin[i][1] + rooms[i]["H"] for i in origin) + pad
 
     B = rooms[0]["border"]
     g = [["M"] * W for _ in range(H)]
@@ -4487,7 +4531,6 @@ INSIDE = {
     "MAP_MIRAGE_TOWER_1F": "MirageTower_1F",
     # THE WEATHER INSTITUTE (2026-10-16, the world plan's second phase), both
     # floors. Its door led to the Mansion, which moved to the house's door.
-    "MAP_ROUTE119_WEATHER_INSTITUTE_1F": "Route119_WeatherInstitute_1F",
     # The new routes' houses (2026-10-16): the Day Care, the Glass Workshop,
     # the Fossil Maniac's (its tunnel stays shut) and Lanette's.
     "MAP_ROUTE117_POKEMON_DAY_CARE": "Route117_PokemonDayCare",
@@ -4654,9 +4697,11 @@ def attach_inside(folder, rows, spawn, tiles, base, warps, extra):
 
 
 # A room's floor above it, put on the shelf beside it and joined by its stairs.
-UPSTAIRS = {"Route119_WeatherInstitute_1F": "Route119_WeatherInstitute_2F"}
+# A room's floor above it, shelved and joined by its stairs. Empty since the
+# Weather Institute became a map of its own (2026-10-17); kept for the next.
+UPSTAIRS = {}
 
-DOOR_PAIRS = [("woods", "mansion"), ("pond", "power"), ("cinder", "ember"),
+DOOR_PAIRS = [("woods", "institute"), ("cinnabar", "mansion"), ("route10", "power"), ("cinder", "ember"),
               ("route114", "falls"), ("route121", "safari"), ("route115", "falls"),
               ("lavender", "tower"), ("fourisland", "shoal")]
 
@@ -4721,6 +4766,8 @@ ROADS = [
     (("route118", 79, 0, "right"), ("route123", 0, 0, "left"), 20),
     # The fifth: Lilycove City at Route 121's right, 10 rows down.
     (("route121", 79, 0, "right"), ("lilycove", 0, 10, "left"), 20),
+    # Route 10 has Lavender Town below it (2026-10-17).
+    (("lavender", 0, 0, "top"), ("route10", 0, 79, "bottom"), 24),
 ]
 
 INWARD = {"left": (1, 0), "right": (-1, 0), "top": (0, 1), "bottom": (0, -1)}

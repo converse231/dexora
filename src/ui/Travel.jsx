@@ -30,24 +30,27 @@ import { eventIcon } from "./Sprite.jsx";
    at the rail's width. Mauville in the middle with the desert above it,
    Seaside Road below, 117 and 118 either side, Route 123 off 118; Route 113
    and Fallarbor over the desert toward Meteor Falls, Route 115 beyond it;
-   Route 118 up to Monsoon Trail, Fortree, Rainwood, Route 121 and Lilycove -
-   then the shore, and Kanto's ferry stops with what lies behind their doors. */
+   Route 118 up to Monsoon Trail (the Weather Institute off it), Fortree,
+   Rainwood, Route 121 and Lilycove - then the shore, and Kanto: each ferry
+   stop in the right-hand column beside what lies behind its door (Route 10's
+   Power Plant, Lavender's Tower, Cinnabar's Mansion, Four Island's cave). */
 export const AT = {
   falls: [18, 14], route114: [50, 14], fallarbor: [82, 14],
   route115: [18, 26], route113: [82, 26],
   ember: [18, 38], cinder: [50, 38], desert: [82, 38],
   route117: [18, 50], mauville: [50, 50], route118: [82, 50], route123: [64, 56],
   pond: [50, 62], woods: [82, 62],
-  power: [18, 74], mansion: [50, 74], fortree: [82, 74],
+  institute: [50, 74], fortree: [82, 74],
   rainwood: [82, 86],
   safari: [50, 98], route121: [82, 98],
   lilycove: [82, 110],
-  meadow: [18, 132], ridge: [50, 132], lavender: [82, 132],
-  frost: [18, 146], fourisland: [50, 146], tower: [82, 146],
-  tanoby: [18, 160], shoal: [50, 160],
+  meadow: [18, 132], power: [50, 132], route10: [82, 132],
+  ridge: [18, 146], tower: [50, 146], lavender: [82, 146],
+  frost: [18, 160], mansion: [50, 160], cinnabar: [82, 160],
+  tanoby: [18, 174], shoal: [50, 174], fourisland: [82, 174],
 };
 const SHORE = 119;
-const H = 168;
+const H = 182;
 
 /* WHAT KIND OF PLACE each map is - its logo's glyph (Icon.jsx) and its word.
    Ours, like `AT`: the maps carry no such field. check.mjs holds every map to
@@ -57,13 +60,14 @@ export const KIND = {
   route123: "grass", route113: "desert", route121: "grass", route114: "grass", route115: "coast",
   rainwood: "forest", safari: "safari", desert: "desert",
   ridge: "cave", falls: "cave", ember: "cave", cinder: "mountain", frost: "ice", shoal: "ice",
-  power: "building", mansion: "building", tower: "tower", tanoby: "ruins",
+  power: "building", mansion: "building", tower: "tower", tanoby: "ruins", institute: "weather",
   mauville: "town", fortree: "town", fallarbor: "town", lilycove: "town", lavender: "town", fourisland: "town",
+  cinnabar: "town", route10: "town",
 };
 const KIND_NAME = {
   grass: "Route", forest: "Forest route", coast: "Coast", desert: "Desert", safari: "Safari Zone",
   cave: "Cave", mountain: "Mountain", ice: "Ice cave", building: "Building", tower: "Tower",
-  ruins: "Ruins", town: "Town",
+  ruins: "Ruins", town: "Town", weather: "Research lab",
 };
 
 const biomeOf = (id) => BIOMES.find((b) => b.id === id) ?? null;
@@ -246,8 +250,19 @@ function Row({ b, areaId, level, busy, outbreakArea, onTravel, onSelect }) {
   );
 }
 
+/* THE MAP FOLDS (2026-10-17, asked for): its header shows or hides the map
+   and its key, leaving the card and the list. Remembered on this device -
+   a view preference, never the save. */
+const FOLD_KEY = "dexora-worldmap";
+const foldedAtStart = () => { try { return localStorage.getItem(FOLD_KEY) === "folded"; } catch { return false; } };
+
 export default function Travel({ areaId, level = 1, onTravel, busy, outbreakArea }) {
   const [sel, setSel] = useState(areaId);
+  const [folded, setFolded] = useState(foldedAtStart);
+  const fold = () => setFolded((was) => {
+    try { localStorage.setItem(FOLD_KEY, was ? "open" : "folded"); } catch { /* nothing to remember with */ }
+    return !was;
+  });
   // A new map (walked, sailed or travelled) is what the card shows next.
   useEffect(() => { setSel(areaId); }, [areaId]);
   const cardRef = useRef(null);
@@ -265,8 +280,19 @@ export default function Travel({ areaId, level = 1, onTravel, busy, outbreakArea
         <span>{AREAS[areaId]?.name}</span>
       </div>
       <div className="wx-scroll">
-        <WorldMap areaId={areaId} level={level} sel={sel} onSelect={pick} />
-        <Legend />
+        <button type="button" className={`wx-fold${folded ? " folded" : ""}`} onClick={fold}
+          aria-expanded={!folded} aria-controls="wx-world">
+          <Icon n="map" size={16} />
+          <span>World map</span>
+          <em>{folded ? "Show" : "Hide"}</em>
+          <Icon n="chev" size={16} className="wx-chev" />
+        </button>
+        {!folded && (
+          <div className="wx-world" id="wx-world">
+            <WorldMap areaId={areaId} level={level} sel={sel} onSelect={pick} />
+            <Legend />
+          </div>
+        )}
         {AREAS[sel] && (
           <PlaceCard id={sel} areaId={areaId} level={level} busy={busy} outbreakArea={outbreakArea}
             onTravel={onTravel} onSelect={pick} cardRef={cardRef} />
