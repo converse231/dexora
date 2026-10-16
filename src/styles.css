@@ -8548,8 +8548,14 @@ button:disabled { transition: none; }
    the parent - so the light hugs the body and spills just past its outline.
    The rainbow turns inside it: a transform, the compositor's alone. */
 .dia-halo { filter: blur(4px); opacity: 1; }
-.dia-halo i { position: absolute; inset: 0; overflow: hidden; transform: scale(1.2);
-  -webkit-mask: var(--art) center / contain no-repeat; mask: var(--art) center / contain no-repeat; }
+/* GROWN EVENLY, NOT SCALED (2026-10-16, reported off in battle): a scale grew
+   the outline away from the box's centre, so the aura leaked under the feet
+   and past the tail and hugged nothing. The silhouette stamped eight times,
+   `--dil` out in each direction, is the outline DILATED - the same margin all
+   the way round - and the blur softens its edge. */
+.dia-halo { --dil: 2px; }
+.dia-halo i { position: absolute; inset: 0; overflow: hidden;
+  -webkit-mask: var(--art) calc(50% + var(--dil)) 50% / contain no-repeat, var(--art) calc(50% - var(--dil)) 50% / contain no-repeat, var(--art) 50% calc(50% + var(--dil)) / contain no-repeat, var(--art) 50% calc(50% - var(--dil)) / contain no-repeat, var(--art) calc(50% + var(--dil)) calc(50% + var(--dil)) / contain no-repeat, var(--art) calc(50% - var(--dil)) calc(50% + var(--dil)) / contain no-repeat, var(--art) calc(50% + var(--dil)) calc(50% - var(--dil)) / contain no-repeat, var(--art) calc(50% - var(--dil)) calc(50% - var(--dil)) / contain no-repeat; mask: var(--art) calc(50% + var(--dil)) 50% / contain no-repeat, var(--art) calc(50% - var(--dil)) 50% / contain no-repeat, var(--art) 50% calc(50% + var(--dil)) / contain no-repeat, var(--art) 50% calc(50% - var(--dil)) / contain no-repeat, var(--art) calc(50% + var(--dil)) calc(50% + var(--dil)) / contain no-repeat, var(--art) calc(50% - var(--dil)) calc(50% + var(--dil)) / contain no-repeat, var(--art) calc(50% + var(--dil)) calc(50% - var(--dil)) / contain no-repeat, var(--art) calc(50% - var(--dil)) calc(50% - var(--dil)) / contain no-repeat; }
 .dia-halo b { position: absolute; inset: -50%;
   background: conic-gradient(#ff5d8f, #ffd25d, #7dff8a, #5de2ff, #8a7dff, #ff5df0, #ff5d8f);
   animation: dia-halo 5s linear infinite; }
@@ -8913,6 +8919,27 @@ button:disabled { transition: none; }
 @keyframes leaf-fall { 0% { transform: translate(0, 0) rotate(0); opacity: 0; } 10% { opacity: 1; } 50% { transform: translate(-30%, 520%) rotate(160deg); }
   90% { opacity: 1; } 100% { transform: translate(20%, 980%) rotate(320deg); opacity: 0; } }
 
+/* IN BATTLE THE LAYERS RIDE WITH THE CREATURE (2026-10-16, reported: the
+   Diamond aura sat off the Pokemon). `.mon` lands with a squash and then
+   bobs 3% of its height; its layers stood still, so an aura drifted 7px
+   off the body and a masked sheen slid off its outline. They mount with the
+   sprite (both gated on `monHere`), so the same keyframes on the same clock
+   keep them on it - transform and opacity only, never `mon-appear`'s filter,
+   which would erase a halo's blur. Only spans with no animation of their own. */
+@keyframes fx-follow {
+  0%   { transform: translateY(-40%) scale(.2); opacity: 0; }
+  30%  { opacity: 1; }
+  68%  { transform: translateY(0) scale(1.1); }
+  84%  { transform: translateY(0) scale(.95); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.mon-slot > :is(.dia-halo, .dia-fire, .gold-shine, .gold-glint, .shadow-aura, .chaos-aura, .proj-base,
+  .plat-sweep, .em-depth, .em-rad, .em-glint, .gem-depth, .gem-shine, .gem-glint, .ember-glow, .ember-spark, .leaf-fall) {
+  animation: fx-follow 620ms cubic-bezier(.2, 1.5, .45, 1) both, mon-idle 2.6s ease-in-out 700ms infinite;
+}
+/* And the halo spills a little wider at battle size, evenly round the outline. */
+.mon-slot > .dia-halo { --dil: 7px; filter: blur(6px); }
+
 /* In a Dex tile the sprite is 84% of the cell and centred (see `.cell .holo-foil`),
    so the layers that register to it come in by the same 8%. */
 .cell .gold-shine, .cell .gold-glint, .cell .chaos-neg, .cell .chaos-cut, .cell .proj-lines { inset: 8%; }
@@ -8935,6 +8962,10 @@ button:disabled { transition: none; }
   .plat-sweep i, .dia-fire i, .dia-halo b, .em-depth i, .em-rad i, .em-glint i,
   .gem-depth i, .gem-shine i, .gem-glint i, .ember-glow i, .ember-spark i, .leaf-fall i,
   .sprite-projection:not(.mon) { animation: none; }
+  .mon-slot > :is(.dia-halo, .dia-fire, .gold-shine, .gold-glint, .shadow-aura, .chaos-aura, .proj-base,
+    .plat-sweep, .em-depth, .em-rad, .em-glint, .gem-depth, .gem-shine, .gem-glint, .ember-glow, .ember-spark, .leaf-fall) {
+    animation: none;   /* the sprite holds still too (.mon, "motion" above) */
+  }
   .sprite-projection.mon { animation: mon-appear 620ms cubic-bezier(.2, 1.5, .45, 1) both; }
 }
 

@@ -21,8 +21,8 @@ export const NEWS = [
     date: "October 2026",
     title: "Bigger battle prizes",
     items: [
-      ["Trainers by region", "Battles › Trainers now lists six trainers for every region, each with its own Pokémon."],
-      ["About twice the pay", "Road trainers pay roughly double, and League prizes and rematches 50% more."],
+      ["Trainers by region", "Battles › Trainers lists every trainer class of each region - 175 a day, each with its own Pokémon."],
+      ["Almost three times the pay", "Road trainers pay nearly 3x what they did, and League prizes and rematches 50% more."],
     ],
   },
   {

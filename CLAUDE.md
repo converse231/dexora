@@ -926,8 +926,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   is RESET, never deleted - one a player, the game's (engine refuses both).
   Diamond is the PRISM HALO (2026-10-16): white ice, a thin dark outline,
   and a rainbow AURA in the creature's own shape turning behind it
-  (`.dia-halo`: the rainbow cut to `--art`, grown and blurred - a disc and
-  then a ring read as a circle, not an aura).
+  (`.dia-halo`: the rainbow cut to `--art` DILATED - the silhouette stamped
+  eight times `--dil` out, never scaled from the box's centre, which leaked
+  past the feet - and blurred; a disc and then a ring read as a circle, not
+  an aura). **In battle every free layer span rides with the creature**
+  (`fx-follow` + `mon-idle`, same clock as `.mon`; 2026-10-16, the aura
+  drifted 7px off the bobbing body).
   The last card of every pack charges and flashes (white until the charge),
   and a revealed card runs NO animation or transition (`.boom`): leaving the
   charge restarted the entrance animation and faded it in after the flash.
@@ -1029,8 +1033,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   Steps together count on the box entry (`walked`) IN PLACE: a heart or a find
   is the one `changed()`, or a big Box rebuilds every step.
 - **Road trainers are designed in docs/battles.md** (`road.js`): filed BY
-  REGION, as DelugeRPG files them (2026-10-16, asked for) - six a region a
-  day (`ROAD_PER_REGION`), every region `GEN_UNLOCK` has opened, a hash of
+  REGION, as DelugeRPG files them (2026-10-16, asked for) - every class a
+  region's games field, one trainer each (`ROSTER`, append-only: a slot is an
+  index), every region `GEN_UNLOCK` has opened, new teams daily from a hash of
   day, region and slot; parties from the region's own species (no forms or
   legendaries), staged by `opponent()`; an old save's map-filed id names nobody;
   `battleBegin` judges them by `roadOpen`, `battleEnd` pays once a day into
