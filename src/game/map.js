@@ -143,6 +143,43 @@ export const walkable = (rows, x, y) =>
   y >= 0 && y < rows.length && x >= 0 && x < rows[0].length &&
   !SOLID.includes(rows[y][x]);
 
+/* WHERE A MAP LEADS (the world plan, 2026-10-16): its doors to other maps
+   grouped by where they go, each a DOOR or a ROAD - a road is a door with a
+   sixth element, 1, the cells build_map's ROADS opened (a map with rooms on
+   a shelf has its real edge inside the grid, so the grid's edge cannot say).
+   Read off the doors themselves, never typed: the signpost and the world map
+   cannot disagree with where you arrive. */
+export function exitsOf(areaId) {
+  const a = AREAS[areaId];
+  if (!a) return [];
+  const by = new Map();
+  for (const [x, y, to, , , isRoad] of a.doors ?? []) {
+    const road = isRoad === 1;
+    const k = `${to}:${road}`;
+    if (!by.has(k)) by.set(k, { to, road, cells: [] });
+    by.get(k).cells.push([x, y]);
+  }
+  // The ferry is an exit too (`ferry` in mapdata): it goes to every stop.
+  if (a.ferry) by.set("ferry", { to: "ferry", road: false, ferry: true, cells: a.ferry });
+  return [...by.values()];
+}
+
+/* THE FERRY'S STOPS (the world plan's fifth phase): every map with a `dock`,
+   where the ferry lands you - read off mapdata, never typed. */
+export const FERRY_STOPS = AREA_IDS.filter((id) => AREAS[id].dock);
+
+/* THE SIGNPOST: the exit nearest (x, y) within `reach` steps, or null. */
+export function exitNear(areaId, x, y, reach = 4) {
+  let best = null, far = reach + 1;
+  for (const ex of exitsOf(areaId)) {
+    for (const [cx, cy] of ex.cells) {
+      const d = Math.abs(cx - x) + Math.abs(cy - y);
+      if (d < far) { far = d; best = ex; }
+    }
+  }
+  return best;
+}
+
 /* EVERY SPECIES WHOSE SLUG HAS A HYPHEN IS NAMED HERE, or is one of the three
    whose real name is a hyphen and a lower-case letter (Jangmo-o's line).
    Capitalising the slug alone gave "Ho-oh", "Mime-jr", "Type-null",

@@ -1983,7 +1983,11 @@ import {
 } from "../src/game/biomes.js";
 import { EVOLUTIONS } from "../src/data/evolutions.js";
 
-assert.equal(BIOMES.length, AREA_IDS.length, "every area needs a biome");
+/* EVERY AREA IS A BIOME OR A TOWN (the world plan, 2026-10-16): a town is
+   streets and doors - no encounters and no biome (`town: true` in mapdata) -
+   and everything else needs one, or nothing would ever jump out there. */
+assert.deepEqual(AREA_IDS.filter((id) => !AREAS[id].town), BIOMES.map((b) => b.id).sort((x, y) => AREA_IDS.indexOf(x) - AREA_IDS.indexOf(y)),
+  "every area that is not a town needs a biome, and no town has one");
 
 /* Every type any species has, and nothing else. It used to admit "rare" as
    well, for the Flower Clearing, whose type list read Rare - a pseudo-type that
@@ -1991,29 +1995,13 @@ assert.equal(BIOMES.length, AREA_IDS.length, "every area needs a biome");
    and so is the exemption, which is what makes a typo here fail again. */
 const KNOWN_TYPES = new Set(SPECIES.flatMap((s) => s.types));
 
-for (const b of BIOMES) {
-  const area = AREAS[b.id];
-  assert.ok(area, `${b.id} has no generated map`);
-
+/* WHAT WALKING REACHES ON ONE MAP from `starts` - every step, ladder, hop and
+   surf the engine allows, elevation and all. One function, so the per-map
+   check below and the world's connectivity (the world plan, 2026-10-16) walk
+   by the same rules. */
+function fillFrom(area, starts) {
   const rows = area.rows;
   const W = rows[0].length;
-  assert.ok(rows.every((r) => r.length === W), `${b.id}: ragged map`);
-  assert.ok(walkable(rows, area.spawn.x, area.spawn.y), `${b.id}: spawn is inside a wall`);
-
-  assert.ok(!("spawnOn" in b), `${b.id}: spawnOn is gone — every tile spawns now`);
-
-  let spawnable = 0;
-  for (let y = 0; y < rows.length; y++)
-    for (let x = 0; x < W; x++) if (walkable(rows, x, y)) spawnable++;
-  assert.ok(spawnable >= 200,
-    `${b.id} has only ${spawnable} walkable tiles — too small to hunt`);
-
-  // Walkable is not reachable: a walled-off pocket is map you can never stand on.
-  /* AND A LADDER IS A WAY THROUGH. Mt Moon is three floors sharing one grid,
-     sealed from each other in rock and joined only by the real cave's own
-     warps - so a fill that only walks reports 1,157 of its 2,391 tiles cut
-     off, which is true about walking and false about the map. Both ends of
-     every pair, because the engine walks them both ways. */
   const hop = new Map();
   for (const [ax, ay, bx, by, oneWay] of area.warps ?? []) {
     hop.set(`${ax},${ay}`, [bx, by]);
@@ -2024,14 +2012,9 @@ for (const b of BIOMES) {
      elevation), since one cell can be reached at one and not another. Water,
      a hop and a ladder are exempt and only settle the elevation. */
   const E = (x, y) => (area.elev ? parseInt(area.elev[y]?.[x] ?? "0", 16) || 0 : 0);
-  if (area.elev) {
-    assert.ok(area.elev.length === rows.length && area.elev.every((r) => r.length === W && /^[0-9a-f]+$/.test(r)),
-      `${b.id}: elev is not one hex digit a cell`);
-  }
   const seen = new Set();
   const states = new Set();
-  const start = E(area.spawn.x, area.spawn.y);
-  const stack = [[area.spawn.x, area.spawn.y, start === 15 ? 0 : start]];
+  const stack = starts.map(([sx, sy]) => [sx, sy, E(sx, sy) === 15 ? 0 : E(sx, sy)]);
   while (stack.length) {
     const [x, y, cur] = stack.pop();
     const c = rows[y]?.[x];
@@ -2073,6 +2056,37 @@ for (const b of BIOMES) {
       stack.push([nx, ny, next(nx, ny)]);
     }
   }
+  return seen;
+}
+
+for (const b of BIOMES) {
+  const area = AREAS[b.id];
+  assert.ok(area, `${b.id} has no generated map`);
+
+  const rows = area.rows;
+  const W = rows[0].length;
+  assert.ok(rows.every((r) => r.length === W), `${b.id}: ragged map`);
+  assert.ok(walkable(rows, area.spawn.x, area.spawn.y), `${b.id}: spawn is inside a wall`);
+
+  assert.ok(!("spawnOn" in b), `${b.id}: spawnOn is gone — every tile spawns now`);
+
+  let spawnable = 0;
+  for (let y = 0; y < rows.length; y++)
+    for (let x = 0; x < W; x++) if (walkable(rows, x, y)) spawnable++;
+  assert.ok(spawnable >= 200,
+    `${b.id} has only ${spawnable} walkable tiles — too small to hunt`);
+
+  // Walkable is not reachable: a walled-off pocket is map you can never stand on.
+  /* AND A LADDER IS A WAY THROUGH. Mt Moon is three floors sharing one grid,
+     sealed from each other in rock and joined only by the real cave's own
+     warps - so a fill that only walks reports 1,157 of its 2,391 tiles cut
+     off, which is true about walking and false about the map. Both ends of
+     every pair, because the engine walks them both ways. */
+  if (area.elev) {
+    assert.ok(area.elev.length === rows.length && area.elev.every((r) => r.length === W && /^[0-9a-f]+$/.test(r)),
+      `${b.id}: elev is not one hex digit a cell`);
+  }
+  const seen = fillFrom(area, [[area.spawn.x, area.spawn.y]]);
   /* Ledges are one-way, so they are the one thing on a map that can strand you.
      The generator checks the map it draws; this checks the map that shipped. */
   for (let y = 0; y < rows.length; y++) {
@@ -2118,6 +2132,54 @@ for (const b of BIOMES) {
 }
 
 assert.equal(biomeFor("nowhere"), null, "an unknown area has no biome");
+
+/* NOBODY IS STRANDED AND EVERY MAP CAN BE WALKED TO (the world plan,
+   2026-10-16). Each map is filled from every place you can arrive on it - its
+   spawn and the far side of every door or road into it - and a door you can
+   then reach is an edge to the map it leads to. The maps that roads and doors
+   join must be ONE strongly connected world: from any of them you can walk to
+   any other and back, so no ledge, no one-way drop and no missing cell of a
+   road leaves somebody walking into a dead end. Levels are not walls here -
+   they open with time - and Travel goes anywhere opened anyway. */
+{
+  const ids = Object.keys(AREAS);
+  const into = new Map(ids.map((id) => [id, [[AREAS[id].spawn.x, AREAS[id].spawn.y]]]));
+  for (const id of ids) for (const [, , to, ax, ay] of AREAS[id].doors ?? []) into.get(to)?.push([ax, ay]);
+  /* THE FERRY (the fifth phase) is an edge from every stop whose ferry you
+     can walk to, to every other stop, arriving on its dock. */
+  const stops = ids.filter((id) => AREAS[id].dock);
+  for (const id of stops) into.get(id).push([AREAS[id].dock.x, AREAS[id].dock.y]);
+  const next = new Map();
+  for (const id of ids) {
+    const area = AREAS[id];
+    const seen = fillFrom(area, into.get(id));
+    const out = new Set();
+    for (const [x, y, to] of area.doors ?? []) if (seen.has(`${x},${y}`)) out.add(to);
+    for (const [x, y] of area.ferry ?? []) {
+      assert.ok(seen.has(`${x},${y}`), `${id}: the ferry at (${x},${y}) cannot be walked to from anywhere you arrive`);
+      for (const s of stops) if (s !== id) out.add(s);
+    }
+    for (const [x, y, to] of area.doors ?? []) {
+      assert.ok(seen.has(`${x},${y}`), `${id}: the door or road at (${x},${y}) to ${to} cannot be walked to from anywhere you arrive`);
+    }
+    next.set(id, out);
+  }
+  const from = (start, edges) => {
+    const got = new Set([start]), stack = [start];
+    while (stack.length) for (const n of edges.get(stack.pop()) ?? []) if (!got.has(n)) { got.add(n); stack.push(n); }
+    return got;
+  };
+  const back = new Map(ids.map((id) => [id, new Set()]));
+  for (const [id, outs] of next) for (const to of outs) back.get(to).add(id);
+  const joined = ids.filter((id) => (AREAS[id].doors ?? []).length || AREAS[id].ferry);
+  const hub = "mauville";
+  const fwd = from(hub, next), rev = from(hub, back);
+  const lost = joined.filter((id) => !fwd.has(id) || !rev.has(id));
+  assert.deepEqual(lost, [], `cut off from Mauville City (one way or both): ${lost.join(", ")}`);
+  // Every map is in it now: Kanto's by the ferry (the fifth phase).
+  assert.deepEqual(ids.filter((id) => !joined.includes(id)), [], "a map with no door, road or ferry");
+  console.log(`world ok — ${joined.length} maps joined by doors, roads and the ferry (${stops.length} stops), every one walkable to and from Mauville City`);
+}
 
 /* Legendaries are appended to every table by rule, not listed in any of them.
    The rule is the whole point - it is what replaced a map built to hold the two
@@ -2407,6 +2469,22 @@ assert.ok(xpForCatch({ tier: "C" }, true) > xpForCatch({ tier: "C" }, false),
     // Pokemon Tower is the same pairing - `building` plus its own secondary -
     // so its ids rebase against the one block the Mansion already bakes.
     tower: () => route.mansion.building,
+    // The mainland (2026-10-16): each on Emerald's General, by its secondary's key.
+    mauville: () => route.route110.general,
+    route117: () => route.route110.general,
+    route118: () => route.route110.general,
+    fortree: () => route.monsoon.general,
+    route121: () => route.safari.general,
+    route113: () => route.fallarbor.general,
+    fallarbor: () => route.fallarbor.general,
+    route114: () => route.fallarbor.general,
+    route123: () => route.safari.general,
+    route115: () => route.fallarbor.general,
+    // The ferry's (the fifth phase): Lilycove on Emerald's General, the Kanto
+    // towns on FireRed's.
+    lilycove: () => route.safari.general,
+    lavender: () => route.lavender.general,
+    fourisland: () => route.fourisland.general,
   };
   /* The ceiling is the highest id the atlas actually hands out, read off the
      manifest rather than named. It used to be `forest.fringeTop` because that
@@ -3539,7 +3617,8 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
    the only thing that says the two agree with the list of maps. */
 {
   const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
-  for (const id of Object.keys(AREAS)) {
+  // Not a town: nothing is ever met in one, so it has no battle to draw.
+  for (const id of Object.keys(AREAS).filter((id) => !AREAS[id].town)) {
     assert.ok(existsSync(new URL(`../public/battle/${id}.png`, import.meta.url)),
       `no public/battle/${id}.png - run npm run art after adding a map`);
     assert.ok(css.includes(`.battle[data-area="${id}"]`) || id === "meadow",
@@ -7681,10 +7760,18 @@ import { statSync } from "node:fs";
     for (const [r, rate] of Object.entries(CD.SET_RATES[meta.id])) {
       if (!rate) continue;               // a roll the set does not have (30th Celebration's ultra)
       const as = CD.landsOn(CARDS, r);
-      assert.ok(CD.isHit(as), `${meta.id}: the ${r} roll lands on ${as}, not a hit`);
-      /* AND IT IS DRAWN AS ONE (2026-10-16): a hit with no tone opened in the
+      /* EVERY ROLL IS A HIT BUT SWORD & SHIELD'S HOLO RARE (your call,
+         2026-10-17): the rare slot's own `holo` roll, one pack in three,
+         lands on `holorare`, under the line - while Base Set's 1999 holo, a
+         Double rare roll there, is its hit. */
+      if (r === "holo") {
+        assert.ok(as === "holorare" && !CD.isHit(as), `${meta.id}: its Holo Rare (${as}) counts as a hit`);
+      } else {
+        assert.ok(CD.isHit(as), `${meta.id}: the ${r} roll lands on ${as}, not a hit`);
+      }
+      /* AND A HIT IS DRAWN AS ONE (2026-10-16): a hit with no tone opened in the
          scene's default blue, and with no pip colour its dot never lit. */
-      assert.ok(new RegExp(`\.cd-open\.tone-${as}[ ,{]`).test(CARD_CSS) && new RegExp(`\.cd-pips i\.r-${as}[ ,{]`).test(CARD_CSS),
+      if (CD.isHit(as)) assert.ok(new RegExp(`\.cd-open\.tone-${as}[ ,{]`).test(CARD_CSS) && new RegExp(`\.cd-pips i\.r-${as}[ ,{]`).test(CARD_CSS),
         `${meta.id}: the ${as} hit has no .cd-open.tone-${as} or .cd-pips i.r-${as} colour`);
       const got = (flat.hits[as] ?? 0) / N;
       const room = Math.max(0.15 * rate, 4 * Math.sqrt(rate * (1 - rate) / N));

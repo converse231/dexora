@@ -16,8 +16,9 @@ import { dayKey, hash } from "./daily.js";
 
 // What a win pays: the ace level x ROAD_YEN x (1 + team / 3), once a trainer a
 // day. 7, then 15 (2026-10-16, with the League's prizes), then 20 the same
-// day (asked for: "bump up the price a bit too").
-export const ROAD_YEN = 20;
+// day (asked for: "bump up the price a bit too"), then 16 (2026-10-17, your
+// call, with the Master Ball doubled: 175 trainers a day paid ~¥300,000).
+export const ROAD_YEN = 16;
 
 /* The rungs: team size, level over the region's own (its arrival level), and
    the AI. */

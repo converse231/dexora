@@ -772,7 +772,11 @@ now and then when a step started an encounter.
 - **Five Sword & Shield sets** (`swsh7` Evolving Skies, `swsh9` Brilliant
   Stars, `swsh11` Lost Origin, `swsh12` Silver Tempest, `swsh12.5` Crown
   Zenith), at TCGplayer's measured rates (cited in `SET_RATES`). Its Holo
-  Rare is the `holo` rung, rolled in the rare slot (`rates.holo`); V, VMAX
+  Rare is its own rung, `holorare`, just under Base Set's `holo` and NOT A
+  HIT (your call, 2026-10-17: one pack in three lit the hit pips for a card
+  worth a rare; Base Set's holo stays its set's hit). It is rolled in the
+  rare slot (`rates.holo`, landing on `holorare`) and left out of the hit
+  rate the pity is scaled to; V, VMAX
   and VSTAR are Double rares; Secret Rares the top roll. Two new rungs, both
   packs only: `gallery` (a Trainer or Galarian Gallery card, merged into its
   parent set by fetch-cards' `SUBSETS`, one roll whatever it prints) and

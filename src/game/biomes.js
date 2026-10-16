@@ -1174,7 +1174,7 @@ const RESIDENTS = [
     water: true,
     level: 1,  // where you start, so it cannot be anything else
     name: "Tall Grass",
-    types: ["normal", "flying", "bug", "fairy"],
+    types: ["normal", "flying", "bug"],
     // [dexId, weight] — Eevee and Chansey near 0.5%, so a find means something.
     // The Flower Clearing's Normal-types came here when it was removed. They
     // arrive at 2, not at the 10-12 they had there: that map had no commons to
@@ -1235,6 +1235,20 @@ const RESIDENTS = [
     ],
   },
   {
+    id: "route117",
+    water: true,               // its ponds
+    level: 7,
+    name: "Route 117",
+    /* THE MAINLAND (2026-10-16, docs/world.md): Emerald's Route 117, west of
+       Mauville, and FAIRY'S SECOND HOME - Fairy had only Tall Grass. Grass and
+       Bug for its flower beds. THE CAST IS THIS GAME'S, as every map's is:
+       Kanto rows that set the rarity mix; every generation arrives by type. */
+    types: ["fairy", "grass", "bug"],
+    table: [
+      [43, 14], [35, 8], [10, 12], [46, 10], [69, 10], [39, 6], [123, 3],
+    ],
+  },
+  {
     id: "ridge",
     level: 9,
     name: "Mt. Moon",
@@ -1252,6 +1266,22 @@ const RESIDENTS = [
       [74, 20], [41, 16], [50, 10], [66, 10], [27, 9], [95, 7], [104, 6],
       [111, 6], [75, 4], [67, 4], [35, 4], [106, 2], [107, 2],
       [115, 1], [138, 1], [140, 1], [142, 1],
+    ],
+  },
+  {
+    id: "route118",
+    water: true,               // the sea it crosses
+    level: 10,
+    name: "Route 118",
+    /* EMERALD'S ROUTE 118, east of Mauville: the sea and the gulls, Water
+       and Flying by type. NOT ELECTRIC'S SECOND HOME, though it was meant to
+       be - as a home it split Electric's table with the Power Plant and the
+       Rotom forms fell to 1 in 28,000 encounters (check.mjs's findability).
+       Its electric Kanto residents stay in the cast. No Kanto water rows:
+       written, they make its surfing Kanto's. */
+    types: ["water", "flying"],
+    table: [
+      [21, 14], [16, 12], [100, 10], [81, 8], [84, 8], [83, 3], [25, 8], [125, 2], [143, 1],
     ],
   },
   {
@@ -1289,6 +1319,19 @@ const RESIDENTS = [
     table: [
       [81, 20], [100, 18], [25, 16], [82, 9], [101, 9], [88, 7], [125, 5],
       [26, 3], [135, 2], [179, 1],
+    ],
+  },
+  {
+    id: "route123",
+    water: true,               // its pond
+    level: 14,
+    name: "Route 123",
+    /* THE WORLD PLAN'S FOURTH PHASE (2026-10-16): Emerald's Route 123, east
+       of Route 118, and POISON'S and FIGHTING'S third home - both had two.
+       Grass for its long grass and berry fields. THE CAST IS THIS GAME'S. */
+    types: ["poison", "fighting", "grass"],
+    table: [
+      [23, 12], [56, 10], [66, 10], [43, 10], [88, 6], [106, 2], [123, 2],
     ],
   },
   {
@@ -1557,6 +1600,17 @@ const RESIDENTS = [
     ],
   },
   {
+    id: "route113",
+    level: 22,
+    name: "Route 113",
+    /* EMERALD'S ROUTE 113, the ash route north of the desert, and STEEL'S
+       SECOND HOME after Mt. Moon. Normal and Ground for its ashen fields. */
+    types: ["steel", "normal", "ground"],
+    table: [
+      [27, 14], [52, 10], [21, 10], [81, 8], [50, 8], [115, 3],
+    ],
+  },
+  {
     id: "rainwood",
     water: true,               // its ponds, fished and surfed
     level: 25,  // the ladder goes on past Surf: the first of three later maps
@@ -1578,6 +1632,31 @@ const RESIDENTS = [
     ],
   },
   {
+    id: "route121",
+    water: true,               // its lake
+    level: 27,
+    name: "Route 121",
+    /* EMERALD'S ROUTE 121, east of Rainwood and the Safari Zone's door, and
+       GHOST'S SECOND HOME - Ghost had only the Haunted Tower. Grass for its
+       long grass. */
+    types: ["ghost", "grass"],
+    table: [
+      [92, 12], [43, 10], [69, 10], [16, 8], [102, 3],
+    ],
+  },
+  {
+    id: "route114",
+    water: true,               // its lake and falls
+    level: 28,
+    name: "Route 114",
+    /* EMERALD'S ROUTE 114, past Fallarbor, and Meteor Falls' door. ROCK'S
+       SECOND HOME (Rock had only Mt. Moon) and DRAGON'S (only Meteor Falls). */
+    types: ["rock", "dragon"],
+    table: [
+      [74, 16], [111, 8], [95, 4], [147, 2],
+    ],
+  },
+  {
     id: "falls",
     water: true,               // its pools and falls, fished and surfed
     level: 30,
@@ -1593,6 +1672,18 @@ const RESIDENTS = [
     types: ["dragon", "psychic"],
     table: [
       [63, 14], [96, 14], [122, 4], [147, 6],
+    ],
+  },
+  {
+    id: "route115",
+    water: true,               // its beach and pond
+    level: 32,
+    name: "Route 115",
+    /* EMERALD'S ROUTE 115, west of Route 114, and FIGHTING'S fourth and
+       FLYING'S fourth home: its beach, cliffs and grass. */
+    types: ["fighting", "flying", "normal"],
+    table: [
+      [56, 12], [21, 12], [66, 10], [19, 8], [83, 3], [128, 2],
     ],
   },
   {

@@ -132,9 +132,11 @@ export const BALLS = [
      a rate-3 legendary the hard way measures at ~1,500 in balls (Timer Balls,
      at its best case, over about five encounters with it). Anything near that
      and the Master Ball becomes the CHEAP way to catch a legendary, which
-     inverts the ball ladder the whole shelf is built on. At 50,000 it is
-     thirty-three times the cheapest route: never the efficient choice, only the
-     certain one. That is the thing it should be bought for - the legendary you
+     inverts the ball ladder the whole shelf is built on. At 100,000 it is
+     some sixty-seven times the cheapest route: never the efficient choice,
+     only the certain one. (50,000 until 2026-10-17, doubled with the road
+     trainers' pay - your call: every class a region fields put ~¥240,000 a
+     day of wins within reach, five Master Balls a day at the old price.) That is the thing it should be bought for - the legendary you
      have already watched run away, where the alternative is losing it again.
 
      And it is priced against income, not against the other balls. The best map
@@ -148,7 +150,7 @@ export const BALLS = [
      about the ball rail, not the shelf. */
   {
     id: "master-ball", name: "Master Ball", short: "MASTER", mult: GUARANTEED,
-    price: 50000, level: 30, hideWhenEmpty: true, hint: "never fails",
+    price: 100000, level: 30, hideWhenEmpty: true, hint: "never fails",
   },
 ];
 
@@ -864,8 +866,8 @@ const plain = (n, level) => Math.max(1, Math.round(n * plainShare(level)));
    remembered on the day a ball's price moves; this cannot be.
 
    The Master Ball is excluded by the same predicate `defaultBall` uses, and
-   for a sharper reason here: at 50,000 it is not a ball, it is the thing you
-   are saving FOR, and pricing a wage against it would pay ¥200,000 a parcel
+   for a sharper reason here: at 100,000 it is not a ball, it is the thing you
+   are saving FOR, and pricing a wage against it would pay ¥400,000 a parcel
    the moment you passed Lv 30. */
 /* Halved from 2 (your call, 2026-10-04): with trades, the League's prizes and
    the dex bonus all paying, walking made money too easy. */

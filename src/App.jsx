@@ -16,6 +16,7 @@ import Pad from "./ui/Pad.jsx";
 import Hint from "./ui/Hint.jsx";
 import Confirm from "./ui/Confirm.jsx";
 import WaterAsk from "./ui/WaterAsk.jsx";
+import Ferry from "./ui/Ferry.jsx";
 import DexClaim from "./ui/DexClaim.jsx";
 import { lazyPage } from "./ui/crash.jsx";
 import { useNewVersion } from "./ui/update.js";
@@ -47,9 +48,9 @@ import Sprite, { ItemIcon, eventIcon, preloadSprites } from "./ui/Sprite.jsx";
 import { perkName, fieldText, heartsOf, HEARTS } from "./game/abilities.js";
 import { EVENT_NAME } from "./game/events.js";
 import {
-  biomeFor, levelFromXp, TIERS, dexIndex, tableFor, REGION_NAME, speciesById,
+  biomeFor, levelFromXp, TIERS, dexIndex, tableFor, REGION_NAME, speciesById, BIOMES, areaOpen,
 } from "./game/biomes.js";
-import { label } from "./game/map.js";
+import { label, AREAS, exitNear } from "./game/map.js";
 import DexSheet from "./ui/DexSheet.jsx";
 import { modalOpen } from "./ui/modal.js";
 import Cheer from "./ui/Cheer.jsx";
@@ -1056,7 +1057,8 @@ export default function App({
                     rather than a pill of its own in the other corner. */}
                 <div className="biome-tag">
                   <div className="bt-row">
-                    {biome && <span>{biome.name}</span>}
+                    {/* A town has no biome (nothing is met there), so its name is the map's. */}
+                    {(biome?.name ?? AREAS[st?.areaId]?.name) && <span>{biome?.name ?? AREAS[st.areaId].name}</span>}
                     <span
                       className={`worldclock ph-${phaseAt(st?.steps ?? 0).id}`}
                       data-tip={`${phaseAt(st?.steps ?? 0).name} — the world's clock runs as you walk`}
@@ -1068,6 +1070,22 @@ export default function App({
                     </span>
                   </div>
                   {biome && <Types of={biome.types} />}
+                  {/* THE SIGNPOST (the world plan, 2026-10-16): near a road or a
+                      door to another map, where it goes - and, if your level
+                      has not opened it, when it will. */}
+                  {(() => {
+                    const ex = st?.player && exitNear(st.areaId, st.player.x, st.player.y);
+                    if (!ex) return null;
+                    if (ex.ferry) return <span className="bt-exit">To the <b>ferry</b></span>;
+                    const to = BIOMES.find((b) => b.id === ex.to);
+                    const open = areaOpen(ex.to, level);
+                    return (
+                      <span className={`bt-exit${open ? "" : " shut"}`}>
+                        {ex.road ? "Road to" : "Door to"} <b>{AREAS[ex.to]?.name ?? ex.to}</b>
+                        {!open && to && <> · opens at Lv {to.level}</>}
+                      </span>
+                    );
+                  })()}
                 </div>
                 {/* WHAT TODAY ASKS: the quest, then anything waiting on a tap. */}
                 <div className="hud-tasks">
@@ -1509,6 +1527,11 @@ export default function App({
           onSurf={() => { setWaterAsk(false); engine.surf(); }}
           onFish={() => { setWaterAsk(false); engine.fish(); }}
           onClose={() => setWaterAsk(false)} />
+      )}
+      {st?.boarding && (
+        <Ferry areaId={st.areaId} level={level}
+          onSail={(id) => engine.sail(id)}
+          onClose={() => engine.leaveFerry()} />
       )}
       {st?.ask && (st?.encounter || ["rift", "dust", "sweep", "field"].includes(st.ask.kind)) && (
         <Confirm

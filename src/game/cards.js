@@ -32,14 +32,19 @@ import { CARD_SETS } from "../data/cards/index.js";
 /* `gallery` and `radiant` are Sword & Shield's (2026-10-15): a Trainer or
    Galarian Gallery card - whatever it prints, one rung, drawn in place of a
    reverse holo - and a Radiant Rare, each its own roll; both just over the
-   Double rare, so packs only. Its Holo Rare is Base Set's `holo` rung, its
-   V, VMAX and VSTAR the Double rare, its Secret Rare the Hyper rare. */
-export const CARD_RARITIES = ["common", "uncommon", "rare", "pikachu", "holo", "shiny", "double", "gallery", "ace", "radiant", "illustration", "ultra", "shinyultra", "special", "futuristic", "blackwhite", "hyper", "mega"];
+   Double rare, so packs only. Its V, VMAX and VSTAR are the Double rare, its
+   Secret Rare the Hyper rare. ITS HOLO RARE IS `holorare`, NOT A HIT (your
+   call, 2026-10-17): one in every third Sword & Shield pack, it lit the hit
+   pips for a card worth a rare. Base Set's `holo` stays a hit - it is that
+   set's chase. The rung sits just under `holo`, so the rare slot's `holo`
+   roll lands on it in a set that prints no 1999 holo (`of`, `landsOn`). */
+export const CARD_RARITIES = ["common", "uncommon", "rare", "pikachu", "holorare", "holo", "shiny", "double", "gallery", "ace", "radiant", "illustration", "ultra", "shinyultra", "special", "futuristic", "blackwhite", "hyper", "mega"];
 export const RARITY = {
   common:       { name: "Common", icon: "●" },
   uncommon:     { name: "Uncommon", icon: "◆" },
   rare:         { name: "Rare", icon: "★" },
   pikachu:      { name: "Pikachu Rare", icon: "★" },
+  holorare:     { name: "Holo Rare", icon: "★" },
   holo:         { name: "Holo Rare", icon: "★" },
   shiny:        { name: "Shiny rare", icon: "★" },
   double:       { name: "Double rare", icon: "★★" },
@@ -56,7 +61,8 @@ export const RARITY = {
   mega:         { name: "Mega Hyper Rare", icon: "✦" },
 };
 export const rungOf = (rarity) => CARD_RARITIES.indexOf(rarity);
-// A HIT is a Holo Rare (Base Set's) or a Double rare or better - what the `hit` pity counts.
+// A HIT is Base Set's Holo Rare or a Double rare or better - what the `hit` pity counts.
+// Sword & Shield's Holo Rare (`holorare`) is under the line.
 export const isHit = (rarity) => rungOf(rarity) >= rungOf("holo");
 // The chase: a Special illustration rare and the top rung (a Futuristic, Hyper or Mega Hyper Rare).
 export const isTop = (rarity) => rungOf(rarity) >= rungOf("futuristic");
@@ -188,7 +194,7 @@ export const EXTRA_ROLLS = ["ace", "radiant", "shinyultra", "shiny", "gallery"];
 /* A pack holding a hit (a Holo rare or better), at a set's rates - Sword &
    Shield's rare slot rolls its Holo Rare (`holo`) beside its Double rares. */
 export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration
-  - EXTRA_ROLLS.reduce((t, k) => t + (r[k] ?? 0), 0)) * (1 - r.double - r.ultra - (r.holo ?? 0));
+  - EXTRA_ROLLS.reduce((t, k) => t + (r[k] ?? 0), 0)) * (1 - r.double - r.ultra);
 
 /* PITY IS A SAFETY NET, NOT A SCHEDULE (your call, 2026-10-06): real packs
    have none, so each set's is scaled to its own rates - the odds start to
@@ -217,7 +223,7 @@ export const GOD_PACK = 1 / 500;
 
 /* WHAT A SPARE COPY IS WORTH IN DUST (docs/cards.md): a foil copy of a common,
    uncommon or rare counts as `foil`. Crafting costs eight times this. */
-export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, pikachu: 40, holo: 60, shiny: 70, double: 80, gallery: 90, ace: 90, radiant: 100, illustration: 100, ultra: 150, shinyultra: 200, special: 300, futuristic: 400, blackwhite: 400, hyper: 400, mega: 400 };
+export const DUST = { common: 5, uncommon: 10, rare: 25, foil: 50, pikachu: 40, holorare: 60, holo: 60, shiny: 70, double: 80, gallery: 90, ace: 90, radiant: 100, illustration: 100, ultra: 150, shinyultra: 200, special: 300, futuristic: 400, blackwhite: 400, hyper: 400, mega: 400 };
 export const dustOf = (rarity, variant) =>
   (rungOf(rarity) <= rungOf("rare") && variant !== "n" ? DUST.foil : DUST[rarity]);
 /* A CRAFT COSTS SIXTEEN SPARES' WORTH. Measured over 40 seeded collectors

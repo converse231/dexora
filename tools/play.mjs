@@ -3715,7 +3715,7 @@ console.log("purchases ok — whole numbers only, NaN refused");
      front door is a doormat: the two were a pair, and walking out of the
      Power Plant came out on a cave ladder (reported 2026-10-07). */
   {
-    assert.ok(!AREAS.power.doors && !AREAS.ridge.doors, "the Power Plant and Mt Moon are a door pair again");
+    assert.ok(!AREAS.ridge.doors && !AREAS.power.doors?.some((d) => d[2] === "ridge"), "the Power Plant and Mt Moon are a door pair again");
     const out = AREAS.ridge.warps.find((w) => w[4] === 1);
     assert.ok(out, "Mt Moon's exit ladder leads nowhere");
     assert.deepEqual([out[2], out[3]], [AREAS.ridge.spawn.x, AREAS.ridge.spawn.y], "Mt Moon's exit ladder does not come out at the mouth");
@@ -3755,6 +3755,132 @@ console.log("purchases ok — whole numbers only, NaN refused");
   walk(low, "up");
   assert.equal(low.state.areaId, "woods", "a door opened onto a map the level has not reached");
   assert.ok(low.state.worn.some((w) => w.id === "door"), "a shut door said nothing");
+
+  /* A SHUT ROAD SAYS SO ONCE (release QA, 2026-10-17): Lilycove's road to
+     Route 121 (Lv 27) is a door per edge cell. Walked along at Lv 1, every
+     cell banners nothing new; a step off the road and back says it again. */
+  {
+    const road = AREAS.lilycove.doors.filter((d) => d[5] === 1 && d[2] === "route121").sort((a, c) => a[1] - c[1]);
+    assert.ok(road.length >= 2, "Lilycove's road to Route 121 has under two cells");
+    const [x, y] = road[0];
+    const e = boot({ ...SAVE, areaId: "lilycove", xp: 0, paid: 1, player: { x: x + 1, y, dir: "left" } }).e;
+    const told = () => e.state.worn.filter((w) => w.id === "door").length;
+    walk(e, "left");
+    assert.equal(e.state.areaId, "lilycove", "a road opened onto a map the level has not reached");
+    assert.equal(told(), 1, "the shut road said nothing");
+    walk(e, "down");
+    assert.ok(e.state.player.y > y && road.some((d) => d[0] === e.state.player.x && d[1] === e.state.player.y),
+      "the walk along the road did not stay on it");
+    assert.equal(told(), 1, "every cell of a shut road bannered again");
+    walk(e, "right");
+    const off = [e.state.player.x, e.state.player.y];
+    walk(e, "left");
+    tick(16, 20);                              // the last step lands
+    assert.equal(told(), 2, `stepping off a shut road (to ${off}) and back (to ${e.state.player.x},${e.state.player.y}) said nothing`);
+  }
+
+  /* A TOWN NEVER TEARS: its rift ring says so rather than counting toward a
+     rift that cannot open there (release QA, 2026-10-17). */
+  {
+    const e = boot({ ...SAVE, areaId: "mauville", xp: LEVEL_XP[59], paid: 60 }).e;
+    const r = e.events().find((ev) => ev.id === "rift");
+    assert.ok(r && !r.open && r.ring === 0 && /town/i.test(r.tip), `a town's rift ring reads ${JSON.stringify(r)}`);
+  }
+
+  /* EVERY DOOR AND EVERY ROAD, BOTH WAYS (the world plan, 2026-10-16): from
+     the floor beside it, walk through - you land on its paired tile in the
+     other map - then turn round and walk back, landing where you started. A
+     road is a door per edge cell (build_map's ROADS), so this rides every
+     cell of Cinderpeak's road into Mirage Desert as well as each door. */
+  {
+    const BACK = { left: "right", right: "left", up: "down", down: "up" };
+    const STEP = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
+    let rode = 0, roads = 0;
+    for (const [id, area] of Object.entries(AREAS)) {
+      const enter = new Set((area.enter ?? []).map(([x, y]) => `${x},${y}`));
+      const isDoor = new Set((area.doors ?? []).map(([x, y]) => `${x},${y}`));
+      for (const [x, y, to, ax, ay, isRoad] of area.doors ?? []) {
+        // The way in: floor beside it, walking at it, and for a walk-in door
+        // nothing but wall past it (the engine's `intoIt`).
+        const way = Object.entries(STEP).find(([, [sx, sy]]) => {
+          const fx = x - sx, fy = y - sy;
+          return walkable(area.rows, fx, fy) && !isDoor.has(`${fx},${fy}`)
+            && (!enter.has(`${x},${y}`) || !walkable(area.rows, x + sx, y + sy));
+        });
+        assert.ok(way, `${id}: the door at (${x},${y}) to ${to} has no floor to walk at it from`);
+        const [dir, [sx, sy]] = way;
+        const from = [x - sx, y - sy];
+        const e = boot({ ...SAVE, areaId: id, xp: LEVEL_XP[59], paid: 60, player: { x: from[0], y: from[1], dir } }).e;
+        assert.ok(walk(e, dir), `${id}: walking into the door at (${x},${y}) went nowhere`);
+        assert.equal(e.state.areaId, to, `${id}: the door at (${x},${y}) did not lead to ${to}`);
+        assert.deepEqual([e.state.player.x, e.state.player.y], [ax, ay], `${id} -> ${to}: not on the paired tile`);
+        // Back the way that faces the door home from where you landed - which
+        // is the reverse of the way in for a road, not always for a door taken
+        // from its side (the Safari Zone's mat).
+        const home = new Map((AREAS[to].doors ?? []).filter((d) => d[2] === id).map((d) => [`${d[0]},${d[1]}`, d]));
+        const [backDir, [sx2, sy2]] = Object.entries(STEP).find(([, [qx, qy]]) => home.has(`${ax + qx},${ay + qy}`)) ?? [BACK[dir], STEP[BACK[dir]]];
+        walk(e, backDir);
+        assert.equal(e.state.areaId, id, `${to}: the way back from (${ax},${ay}) did not lead to ${id}`);
+        // On the return door's own landing - for a road, exactly where you started.
+        const ret = home.get(`${ax + sx2},${ay + sy2}`);
+        assert.deepEqual([e.state.player.x, e.state.player.y], ret ? [ret[3], ret[4]] : from, `${to} -> ${id}: the way back did not land on its paired tile`);
+        if (isRoad === 1) assert.deepEqual(from, [ret[3], ret[4]], `${id}/${to}: a road does not come back to where you left`);
+        rode++;
+        if (isRoad === 1) roads++;
+      }
+    }
+    // Every road ROADS names opens at least one cell each way: 12 roads, so 24 at the least.
+    assert.ok(roads >= 24, `only ${roads} road cells - a road between two maps is missing`);
+    console.log(`doors ok — ${rode} doors and road cells ridden both ways, ${roads} of them roads off a map's edge`);
+  }
+
+  /* THE FERRY (the world plan's fifth phase): at every stop, walk into its
+     ferry from the floor beside it - the stops are offered and nothing has
+     moved - step back ashore, board again and sail on to the next stop,
+     landing on its dock facing in, where one step forward does NOT board
+     again. A stop your level has not opened stays shut. */
+  {
+    const STEP = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
+    const stops = Object.keys(AREAS).filter((id) => AREAS[id].dock);
+    assert.ok(stops.length >= 7, `only ${stops.length} ferry stops`);
+    const boardAt = (id, xp, paid) => {
+      const area = AREAS[id];
+      const enter = new Set((area.enter ?? []).map(([x, y]) => `${x},${y}`));
+      for (const [x, y] of area.ferry) {
+        const way = Object.entries(STEP).find(([, [sx, sy]]) => walkable(area.rows, x - sx, y - sy)
+          && !area.ferry.some(([fx, fy]) => fx === x - sx && fy === y - sy)
+          && (!enter.has(`${x},${y}`) || !walkable(area.rows, x + sx, y + sy)));
+        if (!way) continue;
+        const [dir, [sx, sy]] = way;
+        const e = boot({ ...SAVE, areaId: id, xp, paid, player: { x: x - sx, y: y - sy, dir } }).e;
+        walk(e, dir);
+        return e;
+      }
+      assert.fail(`${id}: no floor to walk into its ferry from`);
+    };
+    stops.forEach((id, k) => {
+      const to = stops[(k + 1) % stops.length];
+      const e = boardAt(id, LEVEL_XP[59], 60);
+      assert.ok(e.state.boarding, `${id}: walking into the ferry offered nothing`);
+      assert.equal(e.state.areaId, id, `${id}: boarding the ferry moved you`);
+      e.leaveFerry();
+      assert.ok(!e.state.boarding, `${id}: stepping back ashore left the ferry open`);
+      assert.ok(!e.sail(to), `${id}: sailed without boarding`);
+      const b = boardAt(id, LEVEL_XP[59], 60);
+      assert.ok(b.sail(to), `${id}: the ferry would not sail to ${to}`);
+      assert.equal(b.state.areaId, to, `${id}: the ferry did not land at ${to}`);
+      assert.deepEqual([b.state.player.x, b.state.player.y], [AREAS[to].dock.x, AREAS[to].dock.y], `${to}: not on its dock`);
+      assert.ok(!b.state.boarding, `${to}: still on the ferry after landing`);
+      walk(b, b.state.player.dir);
+      assert.ok(!b.state.boarding && b.state.areaId === to, `${to}: the first step off the dock boarded again`);
+    });
+    // Tanoby Ruins opens at Lv 40: a Lv 1 trainer in Tall Grass is refused it.
+    const low = boardAt("meadow", 0, 1);
+    assert.ok(low.state.boarding, "Tall Grass's ferry offered nothing");
+    assert.ok(!low.sail("tanoby"), "the ferry sailed to a stop the level has not opened");
+    assert.equal(low.state.areaId, "meadow", "a refused stop moved you");
+    console.log(`ferry ok — ${stops.length} stops, each boarded, stepped off and sailed on to the next`);
+  }
 
   /* A BRIDGE IS WALKED OVER FROM A BANK AND SURFED UNDER FROM THE RIVER - the
      planks drew over a trainer standing on them. Found, not named: a plank
@@ -4091,7 +4217,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
       if (kinds.has(areaId + L.ch)) continue;      // one of each per map is the rule
       kinds.add(areaId + L.ch);
       const [into, back] = DIR[`${L.dx},${L.dy}`];
-      const mapLevel = (await import("../src/game/biomes.js")).biomeFor(areaId).level;
+      const mapLevel = (await import("../src/game/biomes.js")).biomeFor(areaId)?.level ?? 1;   // a town has no biome: open from the start
       assert.ok(into, `no direction for a ledge facing ${L.dx},${L.dy}`);
       const at = (x, y) => ({
         // At least the map's own level: one opening past Lv 25 sends a

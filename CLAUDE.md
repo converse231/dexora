@@ -1333,10 +1333,45 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   map.json. It was Victory Road re-skinned in our volcano autotile, which
   could not draw a real cave's thin walls or rungs. Lava (Lavaridge 189/307)
   is `V`, as Cinderpeak's crater; `elev` as Monsoon Trail.
+- **The world is designed in docs/world.md** (2026-10-16) - change a decision
+  there first. **A road is doors on the edge**: `ROADS` in build_map.py opens
+  the stretch two maps share (the games' own `connections`) and `open_roads`
+  pairs each cell as a door, landing on the first cell inside the other map;
+  a door on the outer ring is a road (`exitsOf`). The area card's signpost is
+  `exitNear`; the Map tab's world map draws from the doors themselves, its
+  places in Travel.jsx's `AT`. tools/play rides every door and road cell both
+  ways. Levels are never reordered to fit geography. A room with a floor
+  above it is `UPSTAIRS` in build_map (the Weather Institute): attach_inside
+  shelves both and pairs the stairs. Cinderpeak is four floors (Mt Chimney,
+  Route 112, Jagged Pass, the Fiery Path), its spawn held to Route 112.
+  **A TOWN is an area with no biome** (`town: true` in build_map's spec and
+  mapdata): streets and doors, never an encounter, a rod or a rift (its rift
+  ring says so, `TOWN`), always open, not a Travel stop; check.mjs holds every
+  other area to a biome. A shut road banners ONCE (`shutTold`), not per cell. A
+  road door carries a sixth element, 1 (`exitsOf` reads it - a map with a
+  shelf has its real edge inside the grid). New Emerald towns and routes go
+  through `em_route(layout, secondary, meta, sec, sides, door)`: nothing a
+  road on `sides` can reach is culled, and the spawn is the most-reaching
+  cell of `sides[0]`. **check.mjs's world check**: every map joined by doors
+  and roads is walkable to and from Mauville City (`fillFrom`, the per-map
+  fill, run from every arrival).
 - **Doors join maps** (`DOOR_PAIRS` in build_map.py): each builder reports its
   door and arrival tile, `mapdata` carries `doors: [x, y, area, ax, ay]`, and
   the engine takes one late in `onArrive` (the step counts, no encounter). A
-  door to a map your level has not opened stays shut and says so.
+  door to a map your level has not opened stays shut and says so. A map with a
+  second door names it by where it leads (`doors`: Meteor Falls' Route 115
+  mouth, kept open by `em_rooms`' `exits`). A road is never laid over open
+  sea: Route 122 (18 cells of land) is not a map.
+- **Kanto is islands by THE FERRY** (docs/world.md, phase 5): a map's `ferry`
+  cells are walked into like a door and offer every stop (`boarding`,
+  VOLATILE; App's `Ferry.jsx`); `sail(id)` lands on that stop's `dock`
+  facing in, refused while the level has not opened it, and `leaveFerry`
+  steps back. Stops are read off mapdata (`FERRY_STOPS`): a town's harbor
+  (`em_route`'s `ferry` warp - Lilycove, Four Island) or road out (Lavender's,
+  opened after the per-map check as a road is), else the map's own way in
+  (`FERRY_SPAWN`, `spawn_ferry`: a cave mouth, or the foot of Tall Grass's
+  path - a ferry cell in the open boards you for stepping on it). check.mjs's
+  world check walks through it; tools/play boards and sails every stop.
 - **A route's houses and small caves are ROOMS on its own grid**
   (`attach_inside`, `INSIDE` in build_map.py; asked for, 2026-10-07): the
   real Emerald layout each door's `warp_events` names, on a shelf under the
