@@ -369,6 +369,35 @@ canvas {
   --ground-lip: rgba(20, 56, 32, .3);
   --ground-glow: rgba(226, 255, 196, .22);
 }
+/* THE MAINLAND'S ROUTES (2026-10-16). Route 117: flowers in the sun, a warm
+   clear sky. Route 118: the sea under it. Route 113: ash falling, grey-gold.
+   Route 121: the overcast east, Rainwood's weather. Route 114: a bright lake. */
+.battle[data-area="route117"] {
+  --sky: linear-gradient(#a6dcf2 0%, #cdeef0 55%, #f2f0d2 100%);
+}
+.battle[data-area="route118"] {
+  --sky: linear-gradient(#8fd2f2 0%, #bfe8f4 55%, #dcf2ea 100%);
+}
+.battle[data-area="route113"] {
+  --sky: linear-gradient(#a8a294 0%, #c8c0ac 55%, #ded6c2 100%);
+  --ground-tint: linear-gradient(rgba(240, 232, 210, .10), rgba(60, 54, 40, .30));
+  --ground-lip: rgba(56, 50, 38, .28);
+}
+.battle[data-area="route121"] {
+  --sky: linear-gradient(#9aa8b8 0%, #b8c4d0 55%, #d2dbe2 100%);
+  --ground-tint: linear-gradient(rgba(180, 206, 220, .08), rgba(24, 44, 56, .28));
+  --ground-lip: rgba(26, 50, 60, .26);
+}
+.battle[data-area="route114"] {
+  --sky: linear-gradient(#98d4ee 0%, #c2eaf0 55%, #e2f2dc 100%);
+}
+/* Route 123: berry fields under a warm afternoon. Route 115: the beach sky. */
+.battle[data-area="route123"] {
+  --sky: linear-gradient(#a2d6ee 0%, #cdeaea 55%, #eef0d0 100%);
+}
+.battle[data-area="route115"] {
+  --sky: linear-gradient(#8ccff0 0%, #bde6f2 55%, #f0ead0 100%);
+}
 /* Pond & Shore: more sky, and it is over water. */
 .battle[data-area="pond"] {
   --sky: linear-gradient(#9fd8f0 0%, #c6ecf3 55%, #dff2e6 100%);
@@ -2470,6 +2499,37 @@ canvas {
   padding: 7px 9px 6px; border: 1px solid var(--line-firm); border-radius: 10px;
 }
 .arearow.here em { color: var(--path); border-color: var(--path); }
+.arearow { grid-template-rows: auto auto auto; }
+.arearow em { grid-row: 1 / -1; }
+/* WHERE IT LEADS (the world plan, 2026-10-16): its roads and doors, a line. */
+.ar-ways { grid-column: 1; grid-row: 3; font-size: 12px; color: var(--ink-soft); }
+
+/* THE WORLD MAP: a place per map, its roads solid and its doors dashed, the
+   one you stand on ringed. Tokens throughout, so night redraws it. */
+.worldmap { display: block; width: 100%; height: auto; aspect-ratio: 100 / 160; flex: none; margin: 0 0 10px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.wm-road { stroke: var(--path); stroke-width: 1; stroke-linecap: round; }
+.wm-door { stroke: var(--path); stroke-width: .7; stroke-dasharray: 1.2 1.2; }
+.wm-place circle { fill: var(--path); stroke: var(--surface); stroke-width: .5; }
+.wm-place text { font: 600 3.6px var(--body); fill: var(--ink); text-anchor: middle;
+  paint-order: stroke; stroke: var(--surface-2); stroke-width: 1.4px; stroke-linejoin: round; }
+.wm-place.shut circle { fill: var(--line-firm); }
+.wm-place.town rect { fill: var(--ink-soft); stroke: var(--surface); stroke-width: .5; }
+.wm-place.town.here rect { fill: var(--accent); }
+.wm-place.shut text { fill: var(--ink-faint); }
+.wm-place:not(.shut):not(.here) { cursor: pointer; }
+.wm-place.here circle:not(.wm-ring) { fill: var(--accent); }
+.wm-ring { fill: none !important; stroke: var(--accent) !important; stroke-width: .6 !important; }
+.wm-sea { font: 600 3.2px var(--body); fill: var(--ink-faint); text-anchor: middle; }
+.wm-shore { stroke: var(--line-firm); stroke-width: .4; stroke-dasharray: 2 1.5; }
+/* THE FERRY: a dashed lane from Lilycove to the shore, a dashed rim on every stop. */
+.wm-ferry { stroke: var(--accent); stroke-width: .6; stroke-dasharray: 1 1.2; }
+.wm-dock { fill: none; stroke: var(--accent); stroke-width: .45; stroke-dasharray: .9 .9; }
+
+/* THE SIGNPOST on the area card: near a road or a door, where it goes. */
+.biome-tag .bt-exit { font-family: var(--body); font-size: 11px; color: var(--path); }
+.biome-tag .bt-exit b { font-weight: 700; }
+.biome-tag .bt-exit.shut { color: var(--ink-faint); }
 
 /* ---------- shop ---------- */
 .shoplist { display: grid; gap: 7px; }
@@ -3490,6 +3550,19 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 .water-ask .cf-actions button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .water-ask img { width: 22px; height: 22px; image-rendering: pixelated; }
 .water-ask kbd { font: 600 10px var(--pixel); opacity: .75; }
+/* THE FERRY (Ferry.jsx): one row a stop, what lies behind a town under its
+   name, a shut stop greyed with the level it opens at. */
+.ferry-stops { display: grid; gap: 6px; margin: 0 0 10px; max-height: min(52vh, 360px); overflow-y: auto; }
+.ferry-stop {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 10px; text-align: left;
+  padding: 9px 12px; border: 1px solid var(--line-firm); border-radius: 12px;
+  background: var(--surface-2); color: var(--ink); cursor: pointer; font: inherit;
+}
+.ferry-stop b { font-family: var(--display); font-weight: 600; font-size: 15px; }
+.ferry-stop span { grid-column: 1; font-size: 12px; color: var(--ink-soft); }
+.ferry-stop em { grid-column: 2; grid-row: 1 / span 2; font: 600 10px var(--pixel); font-style: normal; color: var(--ink-faint); }
+.ferry-stop:not(:disabled):hover { border-color: var(--accent); }
+.ferry-stop:disabled { opacity: .55; cursor: default; }
 .cf-actions button {
   flex: 1; font-family: var(--pixel); font-size: 11px; padding: 11px 8px 9px;
   border: 1px solid var(--line-firm); border-radius: 14px;
@@ -9728,7 +9801,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 }
 .cd-card > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .cd-foil { position: absolute; inset: 0; display: none; pointer-events: none; overflow: hidden; mix-blend-mode: color-dodge; }
-.cd-card.v-r .cd-foil, .cd-card.r-rare.v-h .cd-foil, .cd-card.r-double .cd-foil, .cd-card.r-ace .cd-foil, .cd-card.r-ultra .cd-foil,
+.cd-card.v-r .cd-foil, .cd-card.r-rare.v-h .cd-foil, .cd-card.r-holorare.v-h .cd-foil, .cd-card.r-double .cd-foil, .cd-card.r-ace .cd-foil, .cd-card.r-ultra .cd-foil,
 .cd-card.r-illustration .cd-foil, .cd-card.r-special .cd-foil, .cd-card.r-hyper .cd-foil, .cd-card.r-mega .cd-foil,
 .cd-card.r-holo .cd-foil, .cd-card.r-futuristic .cd-foil, .cd-card.r-blackwhite .cd-foil,
 .cd-card.r-gallery .cd-foil, .cd-card.r-radiant .cd-foil, .cd-card.r-shiny .cd-foil, .cd-card.r-shinyultra .cd-foil { display: block; }
@@ -9745,7 +9818,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) 0 0 / 100% 100% no-repeat exclude, linear-gradient(#000 0 0) 42.6% 15.5% / 84.5% 38% no-repeat;
 }
-.cd-card.r-rare.v-h .cd-foil { inset: 9.6% 8.9% 52.4% 6.6%; }
+.cd-card.r-rare.v-h .cd-foil, .cd-card.r-holorare.v-h .cd-foil { inset: 9.6% 8.9% 52.4% 6.6%; }
 /* A 1999 holo shines in its art window, which sits a little lower and narrower on the old frame. */
 .cd-card.r-holo .cd-foil { inset: 11% 10% 50% 10%; }
 .cd-card.r-ultra .cd-foil { background: repeating-linear-gradient(115deg, rgba(230, 240, 255, .14) 0 2px, transparent 2px 6px), linear-gradient(125deg, rgba(220, 235, 255, .2), rgba(255, 255, 255, .06)); }
@@ -9778,7 +9851,7 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 /* A card you do not own has no finish yet: a sparkle over a greyed card read as noise. */
 .cd-card.missing .cd-foil, .cd-chase-card:not(.got) .cd-foil, .cd-tile:not(.got) .cd-foil { display: none; }
 .cd-rar { font-style: normal; font-size: 12px; min-width: 20px; text-align: center; color: var(--ink-faint); }
-.cd-rar.r-double, .cd-rar.r-ace, .cd-rar.r-ultra, .cd-rar.r-holo, .cd-rar.r-shiny, .cd-rar.r-gallery, .cd-rar.r-radiant { color: var(--ink); }
+.cd-rar.r-holorare, .cd-rar.r-double, .cd-rar.r-ace, .cd-rar.r-ultra, .cd-rar.r-holo, .cd-rar.r-shiny, .cd-rar.r-gallery, .cd-rar.r-radiant { color: var(--ink); }
 .cd-rar.r-shinyultra, .cd-rar.r-futuristic { color: var(--gold); }
 .cd-rar.r-illustration, .cd-rar.r-special, .cd-rar.r-hyper, .cd-rar.r-mega, .cd-rar.r-blackwhite { color: var(--gold); }
 .cd-stamp {

@@ -177,6 +177,8 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
             <p>
               {rift
                 ? `Open over ${here}: rarer Pokémon, and things lying on the ground. Leaving closes it.`
+                : AREAS[state?.areaId]?.town
+                  ? "No rift opens in a town - they tear on routes and in caves."
                 : since < RIFT_FROM
                   ? `Stay on one map and it tears. ${RIFT_FROM - since} more steps here first.`
                   : `The air is thin here. Any step could open one, and one is certain by ${RIFT_SURE}.`}

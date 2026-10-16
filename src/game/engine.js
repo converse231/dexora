@@ -303,8 +303,10 @@ function freshState() {
    One list, read by both, and `loadState` resets every one of them. */
 /* `battle` is a League battle in progress (docs/battles.md): never saved, so a
    reload mid-battle is a forfeit with nothing spent. */
+/* `boarding` is true while the ferry's stops are offered (docs/world.md):
+   walked into a ferry cell, not yet sailed or stepped back ashore. */
 const VOLATILE = ["encounter", "evolution", "fishing", "running", "cheers",
-  "worn", "ask", "rev", "colRev", "stale", "hint", "battle", "defense"];
+  "worn", "ask", "rev", "colRev", "stale", "hint", "battle", "defense", "boarding"];
 const persisted = (s) => {
   const out = { ...s };
   for (const k of VOLATILE) delete out[k];
@@ -844,6 +846,10 @@ export function createEngine(canvas, onChange, mini = null) {
   const doorMap = (area) =>
     new Map((area.doors ?? []).map(([x, y, to, ax, ay]) => [`${x},${y}`, [to, ax, ay]]));
   let doors = doorMap(areaOf(state.areaId));
+  /* THE FERRY'S CELLS on this map (the world plan's fifth phase): walked into
+     like a door, they offer the stops (`boarding`) instead of taking you. */
+  const ferryMap = (area) => new Set((area.ferry ?? []).map(([x, y]) => `${x},${y}`));
+  let ferry = ferryMap(areaOf(state.areaId));
   /* WALKED INTO, NOT STEPPED ON: the warp and door tiles that are not ladders
      (`enter` in mapdata, from the GBA's own behaviours). Reported from play as
      doors that took you for brushing past them - a ladder is taken when you
@@ -885,6 +891,10 @@ export function createEngine(canvas, onChange, mini = null) {
       enterDoor(door);
       save();
       changed();
+      return true;
+    }
+    if (ferry.has(key)) {
+      board();
       return true;
     }
     return false;
@@ -1595,11 +1605,18 @@ export function createEngine(canvas, onChange, mini = null) {
        encounter roll, because nothing jumps out on a doormat. */
     const door = intoIt(state.player.x, state.player.y, state.player.dir)
       ? doors.get(`${state.player.x},${state.player.y}`) : null;
+    if (doors.get(`${state.player.x},${state.player.y}`)?.[0] !== shutTold) shutTold = null;
     if (door) {
       held.clear();
       enterDoor(door);
       save();
       changed();
+      return;
+    }
+    // The ferry, the same way: walked into, and nothing jumps out on a dock.
+    if (ferry.has(`${state.player.x},${state.player.y}`)
+        && intoIt(state.player.x, state.player.y, state.player.dir)) {
+      board();
       return;
     }
     const biome = biomeFor(state.areaId);
@@ -1648,6 +1665,8 @@ export function createEngine(canvas, onChange, mini = null) {
      Returns whether the bag moved, so the step bumps `colRev` when it did. */
   function riftHere() { return !!state.rift && state.rift.areaId === state.areaId; }
   function stepRift() {
+    // Nothing is met in a town, so no rift opens there and its clock waits.
+    if (!biomeFor(state.areaId)) return false;
     if (state.rift) {
       if (!riftHere() || --state.rift.left <= 0) { closeRift(); return false; }
       const find = riftFind(Math.random, levelFromXp(state.xp));
@@ -1707,10 +1726,51 @@ export function createEngine(canvas, onChange, mini = null) {
 
   /* Through a door, or told why not: a door to a map your level has not
      opened stays shut, and says so rather than being a tile that does nothing. */
+  /* ONCE PER WAY: a road is a door per edge cell, so walking along a shut
+     road to Route 121 banners every step (release QA, 2026-10-17). It says so
+     again only after a step onto a cell that is not that map's door. */
+  let shutTold = null;
   function enterDoor([to, x, y]) {
     if (travel(to, { x, y })) return;       // true when it moved, or asked first
+    if (shutTold === to) return;
+    shutTold = to;
     state.worn.push({ id: "door", event: true, title: AREAS[to]?.name ?? "Locked",
       sub: `Opens at Lv ${BIOMES.find((b) => b.id === to)?.level ?? "?"}`, n: ++wornSeq });
+  }
+
+  /* ONTO THE FERRY: the stops are offered (App's Ferry dialog); `sail` takes
+     you, `leaveFerry` steps back. Held keys drop, so a held step is not a second
+     boarding the moment the dialog closes. */
+  function board() {
+    held.clear();
+    state.boarding = true;
+    changed();
+  }
+
+  /* SAILING lands you on the stop's `dock`, facing in off the ferry: away
+     from the ferry cell beside it, or from the wall a mouth is walked into.
+     A stop your level has not opened stays shut, as a door does. */
+  function sail(areaId) {
+    const a = AREAS[areaId];
+    if (!state.boarding || !a?.dock || areaId === state.areaId) return false;
+    const { x, y } = a.dock;
+    const toward = Object.entries(DIRS);
+    const cell = a.ferry.find(([fx, fy]) => Math.abs(fx - x) + Math.abs(fy - y) === 1);
+    const dir = cell
+      ? toward.find(([, [dx, dy]]) => dx === x - cell[0] && dy === y - cell[1])[0]
+      : toward.find(([, [dx, dy]]) => walkable(a.rows, x - dx, y - dy) === false)?.[0] ?? "down";
+    // The facing rides on the arrival, so a rift's "Leave?" answered no
+    // leaves you as you were (release QA, 2026-10-17).
+    if (!travel(areaId, { x, y, dir })) return false;
+    state.boarding = false;
+    changed();
+    return true;
+  }
+
+  function leaveFerry() {
+    if (!state.boarding) return;
+    state.boarding = false;
+    changed();
   }
 
   function travel(areaId, arrive = null, confirmed = false) {
@@ -1734,6 +1794,7 @@ export function createEngine(canvas, onChange, mini = null) {
     fixed = areaOf(areaId).tiles ?? null;
     warps = warpMap(areaOf(areaId));
     doors = doorMap(areaOf(areaId));
+    ferry = ferryMap(areaOf(areaId));
     enter = enterSet(areaOf(areaId));
     elev = areaOf(areaId).elev ?? null;
     rooms = areaOf(areaId).rooms ?? null;
@@ -1745,7 +1806,7 @@ export function createEngine(canvas, onChange, mini = null) {
     bakeMini();
     // Through a door you arrive on its far side, still facing the way you walked.
     const spawn = arrive ?? areaOf(areaId).spawn;
-    state.player = { ...spawn, dir: arrive ? state.player.dir : "down" };
+    state.player = { ...spawn, dir: arrive?.dir ?? (arrive ? state.player.dir : "down") };
     rise();
     move.active = false;
     move.fromX = spawn.x;
@@ -1957,6 +2018,8 @@ export function createEngine(canvas, onChange, mini = null) {
 
   function castable() {
     if (state.encounter || state.evolution || state.fishing || move.active) return null;
+    // A TOWN is streets and doors (docs/world.md): nothing bites in its fountains.
+    if (!biomeFor(state.areaId)) return null;
     /* Every kind of water takes a line: `w` outdoors, `W` the Rock Ridge
        spring, `k` the pools in Frost Hollow.
 
@@ -4287,6 +4350,8 @@ export function createEngine(canvas, onChange, mini = null) {
       return { over, pay, first, fee, gift, master, charm, pack: pack && packs ? pack : null, packs };
     },
     travel,
+    sail,
+    leaveFerry,
     buy,
     buyPacks,
     buyBox,
@@ -4334,6 +4399,13 @@ export function createEngine(canvas, onChange, mini = null) {
          this map toward the one that makes a rift certain; open, the steps it
          has left. `open` says which. */
       const since = state.sinceTravel ?? 0;
+      /* A TOWN NEVER TEARS (`stepRift` returns early there): the ring said
+         "keep walking" for a rift that could not open (release QA, 2026-10-17). */
+      if (!riftHere() && AREAS[state.areaId]?.town) {
+        out.push({ id: "rift", open: false, count: null, label: "TOWN", ring: 0,
+          tip: "No rift opens in a town - they tear on routes and in caves." });
+        return out;
+      }
       out.push(riftHere()
         ? { id: "rift", open: true, count: state.rift.left, label: "RIFT", ring: state.rift.left / RIFT_STEPS,
           tip: `A space-time rift: rarer Pokémon come out and things turn up underfoot. ${state.rift.left} steps left - `

@@ -120,7 +120,10 @@ SECONDARY = [("mt_ember", "general"), ("seafoam_islands", "general"),
              ("pokemon_mansion", "building"),
              # Tanoby Ruins: the sea route on the Sevii set, its seven
              # chambers on their own against Building.
-             ("sevii_islands_67", "general"), ("tanoby_ruins", "building")]
+             ("sevii_islands_67", "general"), ("tanoby_ruins", "building"),
+             # The ferry's Kanto stops (the world plan's fifth phase,
+             # 2026-10-16): Lavender Town, and Four Island on the Sevii 4-5 set.
+             ("lavender_town", "general"), ("sevii_islands_45", "general")]
 
 # FireRed PRIMARIES we bake WHOLE, for the same reason `EM_PRIMARY` exists one
 # decomp over: ids 0-639 in this atlas are `gTileset_General`, and a map drawn
@@ -144,19 +147,26 @@ EMERALD = "https://raw.githubusercontent.com/pret/pokeemerald/master"
 # regi chambers Emerald's Cave, Mirage Tower its own set.
 EM_SECONDARY = [("lavaridge", "general"), ("lilycove", "general"), ("fortree", "general"),
                 ("mauville", "general"), ("meteor_falls", "general"),
-                ("generic_building", "building"), ("cave", "general"), ("mirage_tower", "general")]
+                ("generic_building", "building"), ("cave", "general"), ("mirage_tower", "general"),
+                # The Weather Institute's (2026-10-16): Lab on Emerald's Building.
+                ("lab", "building"),
+                # The mainland (2026-10-16): Fallarbor, Route 113 and Route 114's
+                # ash and grass, and the Day Care on Route 117.
+                ("fallarbor", "general"), ("pokemon_day_care", "building")]
 # BAKED ONLY UP TO THE LAST METATILE AN INTERIOR USES: a few rooms reach the
 # first 296, 274 and 171 of sets 512, 414 and 414 long, and the atlas is every
 # player's download. Truncating the tail keeps every id below it where it was;
 # build_map asserts each interior inside its count (route.json `inside.n`).
-EM_UPTO = {"generic_building": 296, "cave": 274, "mirage_tower": 171}
+EM_UPTO = {"generic_building": 296, "cave": 274, "mirage_tower": 171, "lab": 154, "pokemon_day_care": 68}
 
 # pokeemerald PRIMARIES we bake WHOLE, because a map drawn against one
 # references its metatiles directly and ours are somebody else's. Ids 0-639
 # here are FIRERED's General; Emerald ships a tileset with the same name, the
 # same job and entirely different art, so it needs its own block. The Safari
 # Zone is 140 of its 189 metatiles, which is why this exists.
-EM_PRIMARY = ["general"]
+# Building is Emerald's interiors' primary, all 8 metatiles of it (2026-10-16:
+# the Weather Institute's floor uses four).
+EM_PRIMARY = ["general", "building"]
 
 # Emerald's own constants, and neither matches FireRed's. Get the tile split
 # wrong and every secondary metatile picks tiles 128 slots off; get the palette
@@ -1028,6 +1038,10 @@ def build_tileset():
         # TANOBY RUINS, FireRed's: the sea route is General (base 0) plus the
         # Sevii set, the chambers Building plus their own. The floor is the
         # chambers' stone, tanoby_ruins local 60 (361 of their cells).
+        # THE FERRY'S KANTO STOPS: FireRed's General (base 0) plus each
+        # town's own set.
+        "lavender": {"general": 0, "lavender": sets["lavender_town"], "split": 640},
+        "fourisland": {"general": 0, "sevii45": sets["sevii_islands_45"], "split": 640},
         "tanoby": {"general": 0, "sevii": sets["sevii_islands_67"],
                    "building": sets["fr_building"], "ruins": sets["tanoby_ruins"],
                    "split": 640, "floor": sets["tanoby_ruins"] + 60},
@@ -1038,9 +1052,14 @@ def build_tileset():
         # 449 of the route's 690 deep-sand cells.
         "route111": {"general": sets["em_general"], "mauville": sets["mauville"],
                      "split": 512, "floor": sets["mauville"] + 81},
+        # FALLARBOR, Routes 113 and 114: Emerald's General plus Fallarbor. Its
+        # floor is Route 113's volcanic ash, Fallarbor local 10.
+        "fallarbor": {"general": sets["em_general"], "fallarbor": sets["fallarbor"],
+                      "split": 512, "floor": sets["fallarbor"] + 10},
         # THE INTERIORS behind the Emerald routes' doors - see EM_UPTO, and
         # build_map's `INSIDE`. Keyed by the decomp's secondary name.
         "inside": {"general": sets["em_general"], "split": 512,
+                   "prim": {"general": sets["em_general"], "building": sets["em_building"]},
                    "sec": {n: sets["em_cave" if n == "cave" else n] for n in EM_UPTO},
                    "n": {n: counts["em_cave" if n == "cave" else n] for n in EM_UPTO}},
     }
@@ -1304,6 +1323,14 @@ def build_ground():
         # The mansion's own parquet, which is also what its switch script
         # lays down wherever it opens a barrier.
         "mansion": meta["mansion"]["floor"],
+        # THE MAINLAND'S ROUTES (2026-10-16): Emerald's grass, and Route 113's ash.
+        "route117": meta["route110"]["floor"],
+        "route118": meta["route110"]["floor"],
+        "route121": meta["safari"]["floor"],
+        "route114": meta["route110"]["floor"],
+        "route113": meta["fallarbor"]["floor"],
+        "route123": meta["safari"]["floor"],
+        "route115": meta["route110"]["floor"],
     }
     # The fallback an area with no tile of its own lands on, and what the CSS
     # default points at.

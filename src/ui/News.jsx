@@ -16,6 +16,63 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-17-ferry",
+    icon: "⛴️",
+    date: "October 2026",
+    title: "All aboard the ferry",
+    items: [
+      ["The ferry", "Sail from Lilycove City to Kanto - walk into a harbor or a cave mouth to board."],
+      ["Three new towns", "Lilycove City, Lavender Town at the Haunted Tower's door, and Four Island at Icefall Cave's."],
+      ["Every map joined", "Mt. Moon, Frost Hollow, Tanoby Ruins and Tall Grass are ferry stops."],
+      ["Prices", "A Master Ball costs ¥100,000 now, and road trainers pay a little less."],
+    ],
+  },
+  {
+    id: "2026-10-16-routes",
+    icon: "🗺️",
+    date: "October 2026",
+    title: "Two more routes",
+    items: [
+      ["Route 123", "East off Route 118 - Poison, Fighting and Grass Pokémon, and the Berry Master's House."],
+      ["Route 115", "Through Meteor Falls and out of its far mouth - Fighting, Flying and Normal Pokémon."],
+      ["Tall Grass is less crowded", "Fairy Pokémon live on Route 117 now."],
+      ["Sword & Shield Holo Rares", "No longer count as hits in a pack - Base Set's holos still do."],
+    ],
+  },
+  {
+    id: "2026-10-16-mainland",
+    icon: "🏙️",
+    date: "October 2026",
+    title: "The mainland is joined up",
+    items: [
+      ["Three towns", "Mauville City, Fortree City and Fallarbor Town - walk through them between routes."],
+      ["Five new routes", "Routes 113, 114, 117, 118 and 121, each with its own Pokémon to find."],
+      ["One connected world", "Walk from Seaside Road to Meteor Falls or the Safari Zone without the Travel menu."],
+      ["New homes", "Fairy, Ghost, Rock, Steel and Dragon Pokémon have more places to live."],
+    ],
+  },
+  {
+    id: "2026-10-16-inside",
+    icon: "🏔️",
+    date: "October 2026",
+    title: "Caves and buildings to explore",
+    items: [
+      ["Jagged Pass and the Fiery Path", "Cinderpeak's two caves are real now - and Jagged Pass hides the way into Ember Caldera."],
+      ["The Weather Institute", "Monsoon Trail's big building is the real institute, two floors. The Mansion is next door."],
+    ],
+  },
+  {
+    id: "2026-10-16-roads",
+    icon: "🗺️",
+    date: "October 2026",
+    title: "Roads between maps",
+    items: [
+      ["Walk to the next map", "Head east out of Cinderpeak and you walk straight into Mirage Desert."],
+      ["A new way in", "Seaside Road's big building is the door to the Power Plant."],
+      ["Signposts and a world map", "The map card names the road you are near. Rotom › Map shows every road."],
+    ],
+  },
+  {
     id: "2026-10-16-battlecash",
     icon: "💰",
     date: "October 2026",

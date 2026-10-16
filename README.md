@@ -301,7 +301,7 @@ price in a way that breaks it and the tests fail rather than the play session:
 |---|---|
 | Poké / Great / Ultra Ball | ¥25 / ¥90 / ¥250 — ×1.0 / ×1.8 / ×3.0 odds |
 | Net / Repeat / Dusk / Timer Ball | ¥150 / ¥170 / ¥190 / ¥70 — ×1.0 until their condition holds |
-| Master Ball | **¥50,000**, Lv 30 — never fails, so only the price balances it |
+| Master Ball | **¥100,000**, Lv 30 — never fails, so only the price balances it (¥50,000 until 2026-10-17) |
 | Duplicate sells for | ¥40 C · ¥90 B · ¥220 A · ¥600 S |
 | New dex entry | ¥100, once per species |
 | A common, caught and sold | **nets about +¥14** |
@@ -3272,7 +3272,7 @@ Six guards. Each is one rule, and each is aimed at something specific:
   one that can. Without this rule, trading deletes it.
 - **POKÉMON ONLY, NEVER ITEMS.** Balls, candy and money are fungible, so
   trading them is a currency, and a currency between untrusted clients is the
-  duplication problem wearing a hat. A Master Ball costs ¥50,000 for reasons
+  duplication problem wearing a hat. A Master Ball costs ¥100,000 for reasons
   measured in check.mjs; none of that survives a gift economy.
 - **A RATE, TIED TO SOMETHING ALREADY EARNED.** A handful of trades a day, on
   the `daily.js` cadence — which is pure, keyed on the day, and already

@@ -68,7 +68,7 @@ const RARITY = {
      Set's), its V, VMAX and VSTAR its Double rares, its Secret Rares
      (rainbows, golds, alternate-art VMAX) its top chase - where Scarlet &
      Violet's Hyper rare sits - and a Radiant Rare a roll of its own. */
-  "Holo Rare": "holo", "Holo Rare V": "double", "Holo Rare VMAX": "double", "Holo Rare VSTAR": "double",
+  "Holo Rare": "holorare", "Holo Rare V": "double", "Holo Rare VMAX": "double", "Holo Rare VSTAR": "double",
   "Secret Rare": "hyper", "Radiant Rare": "radiant",
 };
 /* BASE SET PRINTS ITS HOLOS AS "Rare" with only a holo variant; they are the
@@ -148,7 +148,7 @@ function variantsOf(card, rarity, set) {
   // Not 30th Celebration's, which TCGdex prints the same way: saves hold those as "h".
   if (rarity === "rare") return (PLAIN_RARES.has(set) && v.holo === false && v.normal ? "n" : "h") + (v.reverse ? "r" : "");
   // A holo rare has its reverse holo too (Sword & Shield's; Base Set's has none).
-  if (rarity === "holo") return "h" + (v.reverse ? "r" : "");
+  if (rarity === "holorare" || rarity === "holo") return "h" + (v.reverse ? "r" : "");
   return "h";
 }
 

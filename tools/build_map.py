@@ -110,6 +110,27 @@ AREAS = [
     # COPIED: one of FireRed's Tanoby Ruins chambers - see tanoby().
     # Unown's own map, and nobody else's.
     dict(id="tanoby", name="Tanoby Ruins", drawn="tanoby"),
+    # THE MAINLAND (2026-10-16, the world plan's third phase): Emerald's towns
+    # and routes between the maps above, all through em_route(). A TOWN is
+    # streets and doors - no encounters, no biome, always open.
+    dict(id="mauville", name="Mauville City", drawn="mauville_city", town=True),
+    dict(id="route117", name="Route 117", drawn="route117", inside="Route117"),
+    dict(id="route118", name="Route 118", drawn="route118"),
+    dict(id="fortree", name="Fortree City", drawn="fortree_city", town=True),
+    dict(id="route121", name="Route 121", drawn="route121"),
+    dict(id="route113", name="Route 113", drawn="route113", inside="Route113"),
+    dict(id="fallarbor", name="Fallarbor Town", drawn="fallarbor_town", town=True),
+    dict(id="route114", name="Route 114", drawn="route114", inside="Route114"),
+    # THE WORLD PLAN'S FOURTH PHASE (2026-10-16): three more routes for the
+    # thin types, every one on art already baked and joined to the rest.
+    dict(id="route123", name="Route 123", drawn="route123", inside="Route123"),
+    dict(id="route115", name="Route 115", drawn="route115"),
+    # THE FERRY (the world plan's fifth phase, 2026-10-16): Lilycove's harbor
+    # on the mainland, and Kanto's island stops - Lavender Town at the Pokemon
+    # Tower's door, Four Island at Icefall Cave's. Towns, as the mainland's are.
+    dict(id="lilycove", name="Lilycove City", drawn="lilycove_city", town=True),
+    dict(id="lavender", name="Lavender Town", drawn="lavender_town", town=True),
+    dict(id="fourisland", name="Four Island", drawn="four_island", town=True),
 ]
 
 SOLID = set("TwRMIPHLFCWXBEVkKdtYGAZJQ")
@@ -1124,7 +1145,10 @@ def check(area, rows, spawn, tiles=None, warps=None):
     # held. Water is crossed, never counted - `got` is still only land. And
     # ELEVATION decides what walking reaches, where the map carries it.
     elev = [[int(c, 16) for c in r] for r in area["elev"]] if area.get("elev") else None
-    seen = reach(rows, [spawn], elev, hop, surf=True)
+    # From every way in a road or door gives (em_route's `starts`), not just
+    # the spawn: a ledge facing away from the main way in can still be walked
+    # from another road - the world check in check.mjs proves the ends join up.
+    seen = reach(rows, [spawn] + [tuple(s) for s in (area.get("door") or {}).get("starts", [])], elev, hop, surf=True)
 
     # Every walkable tile spawns now, so the thing to check is that the ground
     # is one connected place: a walled-off pocket is map you can see and never
@@ -1144,7 +1168,8 @@ def check(area, rows, spawn, tiles=None, warps=None):
              if rows[y][x] not in SOLID]
     assert not edge,         f"{aid}: {len(edge)} walkable tiles on the boundary, e.g. {edge[:4]}"
 
-    assert len(got) >= 200, f"{aid}: only {len(got)} walkable tiles"
+    # A town is a few streets (Fallarbor is 20x20); a route is a place to walk.
+    assert len(got) >= (100 if area.get("town") else 200), f"{aid}: only {len(got)} walkable tiles"
     assert len(got) >= 0.9 * len(tiles),         f"{aid}: {len(tiles) - len(got)} of {len(tiles)} walkable tiles are cut off"
     return len(got), len(tiles)
 
@@ -1852,9 +1877,13 @@ def magma_hideout():
         if not cut_ and not land_ledges(g, "M"):
             break
 
+    # THE WAY IN IS A DOOR NOW (2026-10-16): Jagged Pass's hideout entrance,
+    # on Cinderpeak (DOOR_PAIRS). You arrive just inside it.
+    assert g[spawn[1] - 1][spawn[0]] not in SOLID, "ember: nothing to stand on inside the way in"
     return (["".join(r) for r in g], spawn, [i for row in tiles for i in row], GB, warps,
             {"elev": elev_rows(elev),
-             "rooms": [[*origin[i], rooms[i]["w"], rooms[i]["h"]] for i in sorted(origin)]})
+             "rooms": [[*origin[i], rooms[i]["w"], rooms[i]["h"]] for i in sorted(origin)],
+             "door": spawn, "arrive": (spawn[0], spawn[1] - 1)})
 
 
 # THE POKEMON TOWER, ALL SEVEN FLOORS, TRANSCRIBED.
@@ -2003,9 +2032,10 @@ def haunted_tower():
     print("   tower  %d walkable reached, %d unreachable culled to wall, %d graves"
           % (len(seen), culled, sum(1 for r in g for c in r if c in "GA")))
 
-    return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], PB, warps,
-            {"rooms": [[ox, oy, TOWER_FW, TOWER_FH] for ox, oy in origin]})
+    # Its front door is Lavender Town's (DOOR_PAIRS, the world plan's fifth phase).
+    return door_at_spawn((["".join(r) for r in g], spawn,
+                          [i for row in tiles for i in row], PB, warps,
+                          {"rooms": [[ox, oy, TOWER_FW, TOWER_FH] for ox, oy in origin]}))
 
 
 def seafoam_floor(floor="B3F", rungs=()):
@@ -2383,6 +2413,9 @@ PP_CONSOLE = frozenset((57, 58,             # the lit console set into a bank
                         144, 152))          # screens
 
 
+PP_DOOR = (5, 38)                  # FireRed's own front-door warp (PowerPlant map.json)
+
+
 def power_plant():
     """Power Plant: 49x40, transcribed tile for tile from its own map.bin.
 
@@ -2468,11 +2501,15 @@ def power_plant():
             if g[y][x] not in SOLID and (x, y) not in seen:
                 g[y][x] = "P"                   # solid, and still its own tile
 
-    # The front door leads to Route 10, which we do not have: a doormat. It
-    # was paired with Mt Moon's exit ladder for a while, and walking out of
-    # the Power Plant into a cave read as a bug (reported 2026-10-07).
+    # The front door is the mat at (5,38), FireRed's own warp, and it leads
+    # out to Seaside Road's New Mauville door (DOOR_PAIRS, 2026-10-16). It
+    # was paired with Mt Moon's exit ladder once, and walking out of the
+    # Power Plant into a cave read as a bug (reported 2026-10-07).
+    assert g[PP_DOOR[1]][PP_DOOR[0]] not in SOLID and g[PP_DOOR[1] - 1][PP_DOOR[0]] not in SOLID, \
+        "power plant: the front mat or the floor inside it is not floor"
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], base)
+            [i for row in tiles for i in row], base, None,
+            {"door": PP_DOOR, "arrive": (PP_DOOR[0], PP_DOOR[1] - 1)})
 
 
 # ------------------------------------------------------------------- Mt Moon
@@ -2888,14 +2925,17 @@ def safari_zone():
                 g[y][x] = "T"
 
     return (["".join(r) for r in g], spawn,
-            [i for row in tiles for i in row], GB, None, {"elev": elev_rows(elev)})
+             [i for row in tiles for i in row], GB, None,
+             # Its way in is Route 121's door now (2026-10-16, DOOR_PAIRS): the
+             # spawn, at the south; you arrive on the floor just above it.
+             {"elev": elev_rows(elev), "door": spawn, "arrive": (spawn[0], spawn[1] - 1)})
 
 
 
 # ----------------------------------------------------------- Monsoon Trail
 
-MONSOON_DOOR = (6, 32)      # the Weather Institute - the first door to another map
-MONSOON_HOUSE = (33, 109)   # a house with nothing behind it: sealed, art kept
+MONSOON_DOOR = (6, 32)      # the Weather Institute - a room on the shelf (INSIDE, both floors)
+MONSOON_HOUSE = (33, 109)   # the house: the door to the Pokemon Mansion (DOOR_PAIRS)
 
 
 def monsoon_trail():
@@ -2961,13 +3001,18 @@ def monsoon_trail():
             g[y][x] = em_cell(behave(i), int(col[y][x]))
             tiles[y][x] = rebase(i)
 
-    dx, dy = MONSOON_DOOR
-    assert g[dy][dx] not in SOLID and g[dy + 1][dx] not in SOLID, \
-        "monsoon: the Weather Institute door or the tile below it is not walkable"
+    # THE MANSION MOVED NEXT DOOR (2026-10-16): the Weather Institute's door
+    # opens on the real institute now (attach_inside), and the house's door
+    # is the Mansion's - it stays a Monsoon Trail door, as asked.
+    dx, dy = MONSOON_HOUSE
+    assert g[dy + 1][dx] not in SOLID, "monsoon: nothing to stand on below the house door"
     g[dy][dx] = "l"                        # the door - see DOOR_PAIRS
-    hx, hy = MONSOON_HOUSE
-    g[hy][hx] = "T"                        # nothing behind it; keeps its art
+    wx, wy = MONSOON_DOOR
+    g[wy][wx] = "T"                        # attach_inside opens it onto the institute
 
+    # The ring as the real map has it, for ROADS (Route 118 below, Fortree right).
+    edge = {(x, y): (g[y][x], tiles[y][x]) for y in range(H) for x in range(W)
+            if x in (0, W - 1) or y in (0, H - 1)}
     for x in range(W):
         for y in (0, H - 1):
             g[y][x] = "T"
@@ -3019,11 +3064,11 @@ def monsoon_trail():
                     cut += 1
         if not cut and not land_ledges(g, "T"):
             break
-    assert g[dy][dx] == "l", "monsoon: the Weather Institute door is cut off"
+    assert g[dy][dx] == "l", "monsoon: the house door to the Mansion is cut off"
 
     rows = ["".join(r) for r in g]
     return (rows, spawn, [i for row in tiles for i in row], GB, None,
-            {"door": MONSOON_DOOR, "arrive": (dx, dy + 1),
+            {"door": MONSOON_HOUSE, "arrive": (dx, dy + 1), "edge": edge,
              "elev": elev_rows([[int(e) for e in r] for r in elev])})
 
 
@@ -3034,9 +3079,12 @@ def monsoon_trail():
 # the gatehouse interior's warp table (warps 0/1 lead back to Route 110 warp 2,
 # 12/13 to warp 3; the south one to 4 and 5). Walking into one door comes out
 # of the other, the Cinderpeak cable car's simplification. The Trick House
-# (11,66) and New Mauville (35,24) lead to maps we do not have: solid, art kept.
+# (11,66) is a room on the shelf (attach_inside). New Mauville (35,24) is the
+# door to the Power Plant (2026-10-16, the world plan's first phase): it IS
+# Emerald's power plant, and ours stood alone behind a doormat.
 R110_WARPS = (((15, 16), (18, 16)), ((16, 88), (19, 88)))
-R110_SHUT = ((11, 66), (35, 24))
+R110_SHUT = ((11, 66),)
+R110_NEW_MAUVILLE = (35, 24)
 
 
 def route110():
@@ -3103,6 +3151,9 @@ def route110():
         warps.append([ax, ay, bx, by])
     for x, y in R110_SHUT:
         g[y][x] = "T"
+    # The ring as the real map has it, for ROADS (Mauville above).
+    edge = {(x, y): (g[y][x], tiles[y][x]) for y in range(H) for x in range(W)
+            if x in (0, W - 1) or y in (0, H - 1)}
 
     for x in range(W):
         for y in (0, H - 1):
@@ -3148,7 +3199,8 @@ def route110():
     # from it). Nothing else is lost - every other cell here is reached on foot
     # or by Surf without it, checked when this went in.
     return (rows, spawn, [i for row in tiles for i in row], GB, warps,
-            {"elev": elev_rows(elev), "cycling": True})
+            {"elev": elev_rows(elev), "cycling": True, "edge": edge,
+             "door": R110_NEW_MAUVILLE, "arrive": (R110_NEW_MAUVILLE[0], R110_NEW_MAUVILLE[1] + 1)})
 
 
 # ------------------------------------------------------------ Mirage Desert
@@ -3240,6 +3292,10 @@ def route111():
                 slopes += 1
     assert slopes == 2, f"route111: {slopes} muddy slopes, the real map has two"
 
+    # The ring as the real map has it, before it is sealed - a ROAD may open
+    # some of it again (ROADS: the edge Route 112 joins, 2026-10-16).
+    edge = {(x, y): (g[y][x], tiles[y][x]) for y in range(H) for x in range(W)
+            if x in (0, W - 1) or y in (0, H - 1)}
     for x in range(W):
         for y in (0, H - 1):
             g[y][x] = "T"
@@ -3275,7 +3331,7 @@ def route111():
 
     rows = ["".join(r) for r in g]
     return (rows, spawn, [i for row in tiles for i in row], GB, None,
-            {"elev": elev_rows(elev)})
+            {"elev": elev_rows(elev), "edge": edge})
 
 
 # -------------------------------------------------------------- Emerald layouts
@@ -3359,6 +3415,9 @@ def route120():
         g[y][x] = "T"
 
     border = L["border"]
+    # The ring as the real map has it, for ROADS (Fortree left, Route 121 right).
+    edge = {(x, y): (g[y][x], tiles[y][x]) for y in range(H) for x in range(W)
+            if x in (0, W - 1) or y in (0, H - 1)}
     for x in range(W):
         for y in (0, H - 1):
             g[y][x] = "T"
@@ -3389,7 +3448,197 @@ def route120():
 
     rows = ["".join(r) for r in g]
     return (rows, spawn, [i for row in tiles for i in row], meta["general"], None,
-            {"elev": elev_rows(elev)})
+            {"elev": elev_rows(elev), "edge": edge})
+
+
+# ------------------------------------------------------------ the mainland's
+# THE MAINLAND'S TOWNS AND ROUTES (2026-10-16, the world plan's third phase):
+# every one an Emerald map cell for cell, read by one builder because they ask
+# one thing - be the real map, its ring sealed except where ROADS opens it.
+
+def em_route(layout, secondary, meta_key, sec_key, sides, door=None, ferry=None, fr=False):
+    """An Emerald town or route, cell for cell. Long grass is laid as tall
+    grass (as Monsoon Trail's). Its warps are shut - attach_inside reopens the
+    INSIDE ones, and `door` (a warp index) is the one DOOR_PAIRS pairs. The
+    ring is the layout's own border block, kept as it was in `edge` for
+    ROADS. Nothing is culled that the roads on `sides` can reach: every inner
+    cell along those edges is a start, so a ledge facing away from the way in
+    cannot wall a road off. `ferry` (a warp index) is the harbor door the ferry
+    leaves from, reported as `ferry`; `fr` reads a FireRed layout (Lavender
+    Town, Four Island) through `fr_layout`."""
+    meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
+                             encoding="utf-8"))[meta_key]
+    L = (fr_layout(layout, secondary, "general", meta["general"], meta[sec_key]) if fr
+         else em_layout(layout, secondary, meta["general"], meta[sec_key]))
+    W, H, ids, col, elev, behave, rebase = (L[k] for k in ("W", "H", "ids", "col", "elev", "behave", "rebase"))
+
+    g = [[None] * W for _ in range(H)]
+    tiles = [[-1] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            i = int(ids[y][x])
+            if behave(i) in MB_LONG_GRASS:
+                i = EM_TALL_GRASS
+            g[y][x] = em_cell(behave(i), int(col[y][x]))
+            tiles[y][x] = rebase(i)
+
+    out, dock = None, None
+    for k, w in enumerate(L["events"]["warp_events"]):
+        if k == door:
+            assert g[w["y"] + 1][w["x"]] not in SOLID, f"{layout}: nothing to stand on below its door"
+            g[w["y"]][w["x"]] = "l"
+            out = {"door": (w["x"], w["y"]), "arrive": (w["x"], w["y"] + 1)}
+        elif k == ferry:
+            # Landed on the floor beside it - below it in Lilycove, above it on
+            # Four Island, whose harbor is walked into off the end of the dock.
+            near = [(w["x"] + dx, w["y"] + dy) for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0))
+                    if g[w["y"] + dy][w["x"] + dx] not in SOLID]
+            assert near, f"{layout}: nothing to stand on beside its harbor"
+            g[w["y"]][w["x"]] = "l"
+            dock = {"cells": [(w["x"], w["y"])], "dock": near[0]}
+        else:
+            g[w["y"]][w["x"]] = "T"            # attach_inside opens the rooms; the rest stay shut
+
+    edge = {(x, y): (g[y][x], tiles[y][x]) for y in range(H) for x in range(W)
+            if x in (0, W - 1) or y in (0, H - 1)}
+    border = L["border"]
+    for (x, y) in edge:
+        g[y][x] = "T"
+        tiles[y][x] = rebase(border[(y % 2) * 2 + (x % 2)])
+    seal_hidden(g, tiles, "T", elev)
+
+    # The starts: the floor just inside every edge a road meets.
+    inward = {"left": (1, 0), "right": (-1, 0), "top": (0, 1), "bottom": (0, -1)}
+    starts, first = [], None
+    for side in sides:
+        dx, dy = inward[side]
+        line = ([(0 if side == "left" else W - 1, y) for y in range(H)] if side in ("left", "right")
+                else [(x, 0 if side == "top" else H - 1) for x in range(W)])
+        starts += [(x + dx, y + dy) for x, y in line
+                   if edge[(x, y)][0] not in SOLID and g[y + dy][x + dx] not in SOLID]
+        if first is None and starts:
+            first = list(starts)               # the main way in, `sides[0]`
+    if out:
+        starts.append(out["arrive"])
+    if dock:
+        starts.append(dock["dock"])
+    assert starts, f"{layout}: no way in from {sides}"
+    # THE SPAWN is the cell of the main way in that reaches the most ground:
+    # the middle of an edge can be a pocket (Mauville's top is a strip of
+    # pavement walled off from the streets below it).
+    spawn = max(first or starts, key=lambda c: len(reach(g, [c], elev, surf=True)))
+
+    while True:
+        seen = reach(g, starts, elev, surf=True)
+        cut = 0
+        for y in range(H):
+            for x in range(W):
+                if g[y][x] not in SOLID and (x, y) not in seen:
+                    g[y][x] = "T"
+                    cut += 1
+        if not cut and not land_ledges(g, "T"):
+            break
+    assert g[spawn[1]][spawn[0]] not in SOLID, f"{layout}: its way in is walled up"
+
+    rows = ["".join(r) for r in g]
+    return (rows, spawn, [i for row in tiles for i in row], meta["general"], None,
+            dict({"elev": elev_rows(elev), "edge": edge, "starts": starts},
+                 **(out or {}), **({"ferry": dock} if dock else {})))
+
+
+# Each one's tilesets (route.json key, its secondary's key) and the edges its roads use.
+def mauville_city():
+    return em_route("MauvilleCity", "mauville", "route110", "mauville", ["top", "bottom", "left", "right"])
+
+
+def route117():
+    return em_route("Route117", "mauville", "route110", "mauville", ["right"])
+
+
+def route118():
+    return em_route("Route118", "mauville", "route110", "mauville", ["left", "top", "right"])
+
+
+def fortree_city():
+    return em_route("FortreeCity", "fortree", "monsoon", "fortree", ["left", "right"])
+
+
+def route121():
+    # Its one warp is the Safari Zone's entrance: a door to the Safari Zone,
+    # the lobby collapsed as the cable car's is (its Shop art is not baked).
+    return em_route("Route121", "lilycove", "safari", "lilycove", ["left"], door=0)
+
+
+def route113():
+    return em_route("Route113", "fallarbor", "fallarbor", "fallarbor", ["right", "left", "bottom"])
+
+
+def fallarbor_town():
+    return em_route("FallarborTown", "fallarbor", "fallarbor", "fallarbor", ["left", "right"])
+
+
+def lilycove_city():
+    # The ferry's mainland port, as in Emerald (the S.S. Tidal): its harbor
+    # door (warp 12) is the ferry. Route 121 is at its left; Route 124 (sea)
+    # at its right is not a map. Every other door - the Department Store, the
+    # Contest Hall, Team Aqua's hideout - stays shut.
+    return em_route("LilycoveCity", "lilycove", "safari", "lilycove", ["left"], ferry=12)
+
+
+def lavender_town():
+    # FireRed's Lavender Town, at the Pokemon Tower's door (warp 0). It has no
+    # harbor - Kanto is islands by ferry here (docs/world.md) - so the road
+    # west, Route 8's, is the way to the ferry: every cell of the left edge
+    # walkable in FireRed is reopened as a ferry cell - after the per-map
+    # check, where the roads open, since the ring is solid till then.
+    out = em_route("LavenderTown", "lavender_town", "lavender", "lavender", ["left"], door=0, fr=True)
+    rows, extra = out[0], out[5]
+    cells = [(0, y) for y in range(len(rows))
+             if extra["edge"][(0, y)][0] not in SOLID and rows[y][1] not in SOLID]
+    assert cells, "Lavender Town: no road west to reopen"
+    mid = cells[len(cells) // 2]
+    extra["ferry"] = {"cells": cells, "dock": (mid[0] + 1, mid[1]), "edge": True}
+    return out
+
+
+def four_island():
+    # FireRed's Four Island: Icefall Cave's mouth (warp 3) is its door and its
+    # harbor (warp 6) the ferry; the Day Care, Lorelei's house and the rest
+    # stay shut.
+    return em_route("FourIsland", "sevii_islands_45", "fourisland", "sevii45", [], door=3, ferry=6, fr=True)
+
+
+def door_at_spawn(out):
+    """A dungeon whose way in is its spawn (the Pokemon Tower's front door,
+    Icefall Cave's mouth) reports it as its DOOR, arriving on the floor just
+    inside, so DOOR_PAIRS can join it to the town outside."""
+    rows = out[0]
+    sx, sy = out[1]
+    inside = next((x, y) for x, y in ((sx, sy - 1), (sx, sy + 1), (sx - 1, sy), (sx + 1, sy))
+                  if rows[y][x] not in SOLID)
+    extra = dict(out[5] or {}) if len(out) > 5 else {}
+    extra.update(door=(sx, sy), arrive=inside)
+    return tuple(out[:5]) + (extra,)
+
+
+def route114():
+    # Warp 0 is Meteor Falls' Route 114 mouth: the door to Meteor Falls.
+    return em_route("Route114", "fallarbor", "fallarbor", "fallarbor", ["right"], door=0)
+
+
+def route123():
+    # East of Route 118; the Berry Master's House is a room. Route 122 above it
+    # is open sea (18 cells of land) and is not a map, so Route 123 is reached
+    # from Route 118 alone, and its east half - down ledges from Mt. Pyre's
+    # side on the GBA - is culled, art kept.
+    return em_route("Route123", "lilycove", "safari", "lilycove", ["left"])
+
+
+def route115():
+    # Meteor Falls' far side: its south mouth is the door (warp 0), and the way
+    # in. Route 114 is beside it only along a cliff, and Rustboro (below) is
+    # not a map here; Terra Cave stays shut - a legend's lair.
+    return em_route("Route115", "fallarbor", "fallarbor", "fallarbor", [], door=0)
 
 
 # -------------------------------------------------------------- Meteor Falls
@@ -3402,7 +3651,7 @@ FALLS_GUT = 2
 FALLS_IN = "MAP_ROUTE114"          # the Fallarbor side: the way in
 
 
-def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mouths, remap, load=None):
+def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mouths, remap, load=None, exits=()):
     """Emerald rooms, cell for cell, on shelves on one grid, joined by their
     real warps - read out of each room's map.json and kept only where they
     answer each other, as Ember Caldera's are. `way_in` is the map the entrance
@@ -3410,7 +3659,8 @@ def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mou
     leads to a map we do not have and is sealed. `remap` turns `em_cell`'s
     outdoor characters into the cave's own, so the minimap draws rock, not
     grass. Shared by Meteor Falls and Icefall Cave; `load` reads a layout
-    another way (FireRed's, through `fr_layout`)."""
+    another way (FireRed's, through `fr_layout`). `exits` are other ways out
+    left open (Meteor Falls' Route 115 mouth), reported in `exits` by map."""
     rooms = []
     for name in names:
         L = (load or (lambda lay: em_layout(lay, secondary, meta["general"], sec_base)))(f"{prefix}_{name}")
@@ -3471,11 +3721,13 @@ def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mou
                 tiles[oy + yy][ox + xx] = rebase(mid)
                 elev[oy + yy][ox + xx] = r["elev"][yy][xx]
 
-    spawn = None
+    spawn, found = None, {}
     for i, mx, my, dest in out:
         at = (origin[i][0] + mx, origin[i][1] + my)
         if dest == way_in:
             spawn = at
+        elif dest in exits:
+            found[dest] = at
         else:
             g[at[1]][at[0]] = "M"               # to a map we do not have: sealed
     assert spawn and g[spawn[1]][spawn[0]] not in SOLID, f"{tag}: the way in is walled up"
@@ -3521,19 +3773,23 @@ def em_rooms(tag, prefix, names, secondary, meta, sec_base, shelves, way_in, mou
 
     return (["".join(r) for r in g], spawn, [i for row in tiles for i in row], meta["general"], warps,
             {"elev": elev_rows(elev),
-             "rooms": [[*origin[i], rooms[i]["W"], rooms[i]["H"]] for i in sorted(origin)]})
+             "rooms": [[*origin[i], rooms[i]["W"], rooms[i]["H"]] for i in sorted(origin)],
+             "exits": found})
 
 
 def meteor_falls():
     """Meteor Falls: Emerald's cave of waterfalls, every room cell for cell,
-    on shelves - see `em_rooms`. The way in is the Route 114 mouth; the Route
-    115 one is sealed. Cave floor and wall are Ember Caldera's characters
+    on shelves - see `em_rooms`. The way in is the Route 114 mouth, and the
+    Route 115 one is a second door (the world plan's fourth phase: Route 115
+    meets Route 114 only along a cliff, so the cave is the one way between
+    them, as on the GBA). Cave floor and wall are Ember Caldera's characters
     (`m`, `M`). A waterfall is surfed up, as Monsoon Trail's are - Waterfall is
     not a move this game has, and without it the upper rooms are walled off."""
     meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
                              encoding="utf-8"))["meteor"]
     out = em_rooms("falls", "MeteorFalls", FALLS_ROOMS, "meteor_falls", meta, meta["meteor_falls"],
-                   FALLS_SHELVES, FALLS_IN, 2, lambda b, ch: {".": "m", "T": "M"}.get(ch, ch))
+                   FALLS_SHELVES, FALLS_IN, 2, lambda b, ch: {".": "m", "T": "M"}.get(ch, ch),
+                   exits=("MAP_ROUTE115",))
     # AN INVISIBLE DOOR, DRAWN (reported 2026-10-07): the warp at FALLS_BARE is
     # a walk-in door laid on plain wall - the room's own metatiles have no mouth
     # there - so it read as rock you could walk into. The 3x2 cave mouth from a
@@ -3544,6 +3800,14 @@ def meteor_falls():
     for oy in (-1, 0):
         for ox in (-1, 0, 1):
             tiles[(dy + oy) * W + dx + ox] = tiles[(my + oy) * W + mx + ox]
+    # THE WAY IN IS ROUTE 114's DOOR NOW (2026-10-16, DOOR_PAIRS): you arrive
+    # on the floor just inside the mouth.
+    inside = lambda sx, sy: next((x, y) for x, y in ((sx, sy - 1), (sx, sy + 1), (sx - 1, sy), (sx + 1, sy))
+                                 if rows[y][x] not in SOLID)
+    m115 = out[5].pop("exits")["MAP_ROUTE115"]
+    assert rows[m115[1]][m115[0]] not in SOLID, "falls: the Route 115 mouth was culled"
+    out[5].update(door=out[1], arrive=inside(*out[1]),
+                  doors={"route115": {"door": m115, "arrive": inside(*m115)}})
     return out
 
 
@@ -3580,10 +3844,11 @@ def icefall_cave():
     meta = json.load(io.open(os.path.join(ROOT, "public", "tilesets", "route.json"),
                              encoding="utf-8"))["icefall"]
     load = lambda lay: fr_layout(lay, "seafoam_islands", "general", meta["general"], meta["seafoam"])
-    return em_rooms("icefall", "FourIsland_IcefallCave", ICEFALL_ROOMS, None, meta, None,
+    # Its mouth is Four Island's door (DOOR_PAIRS, the world plan's fifth phase).
+    return door_at_spawn(em_rooms("icefall", "FourIsland_IcefallCave", ICEFALL_ROOMS, None, meta, None,
                     ICEFALL_SHELVES, ICEFALL_IN, None,
                     lambda b, ch: "i" if b in FR_ICE and ch == "." else {".": "m", "T": "M"}.get(ch, ch),
-                    load=load)
+                    load=load))
 
 
 # FireRed's ice behaviours (pokefirered's numbering, not Emerald's 0x20):
@@ -3737,7 +4002,10 @@ touching. Measured against the atlas rather than listed, because a list of ids
 is a list that falls behind.
 """
 
-CINDER_FLOORS = (("MtChimney", 40, 47), ("Route112", 40, 60))
+# JAGGED PASS AND THE FIERY PATH ARE FLOORS NOW (2026-10-16, the world plan's
+# second phase), stacked under Route 112: both were collapsed into warp pairs
+# that skipped them, and Jagged Pass is where the Magma Hideout's door is.
+CINDER_FLOORS = (("MtChimney", 40, 47), ("Route112", 40, 60), ("JaggedPass", 30, 46), ("FieryPath", 35, 38))
 CINDER_GUT = 2
 # Both layouts' border block is the same single metatile, so the frame is one
 # tile everywhere rather than a 2x2 to phase.
@@ -3766,9 +4034,15 @@ CINDER_SPLIT = 512                 # NUM_METATILES_IN_PRIMARY, Emerald's
 # north-east quarter reachable at all.
 CINDER_WARPS = (((1, 28, 27), (0, 17, 36)),        # cable car
                 ((1, 29, 27), (0, 18, 36)),
-                ((1, 6, 46), (0, 20, 41)),         # Jagged Pass
-                ((1, 7, 46), (0, 21, 41)),
-                ((1, 11, 36), (1, 22, 10)))        # the Fiery Path, through
+                ((1, 6, 46), (2, 14, 40)),         # Route 112 <-> Jagged Pass's foot
+                ((1, 7, 46), (2, 15, 40)),
+                ((2, 13, 5), (0, 20, 41)),         # Jagged Pass's top <-> Mt Chimney
+                ((2, 14, 5), (0, 21, 41)),
+                ((1, 11, 36), (3, 26, 36)),        # Route 112 <-> the Fiery Path
+                ((1, 22, 10), (3, 26, 4)))
+# Jagged Pass's own warp 4: the Magma Hideout's door, paired with Ember
+# Caldera's way in (DOOR_PAIRS). The GBA opens it with a script; here it is open.
+CINDER_HIDEOUT = (2, 16, 18)
 MB_TALL_GRASS = 0x02
 # Emerald's own ledge behaviours, mapped onto our characters. The corner
 # (0x3E, south-east) caps an east run on Route 112 and hops with it.
@@ -3818,12 +4092,15 @@ def cinderpeak():
     behave = lambda i: int((ga[i] if i < CINDER_SPLIT else la[i - CINDER_SPLIT]) & 0x1FF)
 
     W = CINDER_FLOORS[0][1]
-    origin = [(0, 0), (0, CINDER_FLOORS[0][2] + CINDER_GUT)]
-    H = origin[1][1] + CINDER_FLOORS[1][2]
+    origin, top = [], 0
+    for _name, _fw, fh in CINDER_FLOORS:
+        origin.append((0, top))
+        top += fh + CINDER_GUT
+    H = top - CINDER_GUT
 
     g = [["M"] * W for _ in range(H)]
     tiles = [[rebase(CINDER_FRAME)] * W for _ in range(H)]
-    doors = {(f, x, y) for pair in CINDER_WARPS for (f, x, y) in pair}
+    doors = {(f, x, y) for pair in CINDER_WARPS for (f, x, y) in pair} | {CINDER_HIDEOUT}
 
     for i, (name, fw, fh) in enumerate(CINDER_FLOORS):
         lay = next(q for q in layouts if q["name"] == name + "_Layout")
@@ -3862,16 +4139,21 @@ def cinderpeak():
                 tiles[oy + y][ox + x] = rebase(mid)
 
     # --- the frame -------------------------------------------------------
-    # Both maps open onto neighbours we do not have - Route 111, Lavaridge,
-    # Jagged Pass, the Fiery Path - and the composed rectangle's edge opens
-    # onto nothing. It closes with the layouts' OWN border block, which is one
-    # metatile on both, so there is no 2x2 to phase and nothing to invent.
-    for x in range(W):
-        for y in (0, H - 1):
-            g[y][x] = "M"
-    for y in range(H):
-        for x in (0, W - 1):
-            g[y][x] = "M"
+    # Both maps open onto neighbours we do not have - Lavaridge, Jagged Pass,
+    # the Fiery Path - and the composed rectangle's edge opens onto nothing.
+    # It closes with the layouts' OWN border block, which is one metatile on
+    # both, so there is no 2x2 to phase and nothing to invent. Route 111 is
+    # the exception now: its edge is kept as it was (`edge`), and ROADS opens
+    # the stretch the two real maps share (2026-10-16).
+    # EACH FLOOR'S OWN EDGE, now that they are stacked: a floor's perimeter
+    # is where its real map meets neighbours we do not have.
+    ring = set()
+    for (fx, fy), (_n, fw, fh) in zip(origin, CINDER_FLOORS):
+        ring |= {(fx + x, fy + y) for y in range(fh) for x in range(fw)
+                 if x in (0, fw - 1) or y in (0, fh - 1)}
+    edge = {(x, y): (g[y][x], tiles[y][x]) for x, y in ring}
+    for x, y in ring:
+        g[y][x] = "M"
 
     seal_hidden(g, tiles, "M")
 
@@ -3926,8 +4208,10 @@ def cinderpeak():
     # invalidates the cull - and both only ever turn ground into rock, so the
     # pair shrinks and terminates.
     while True:
-        scored = [(len(reach((x, y))), x, y) for y in range(H) for x in range(W)
-                  if g[y][x] not in SOLID]
+        # ON ROUTE 112: the floors under it would otherwise be "lowest".
+        r_top = origin[1][1]
+        scored = [(len(reach((x, y))), x, y) for y in range(r_top, r_top + CINDER_FLOORS[1][2])
+                  for x in range(W) if g[y][x] not in SOLID]
         assert scored, "cinderpeak: nowhere to stand"
         most = max(n for n, _x, _y in scored)
         low = max(y for n, _x, y in scored if n == most)
@@ -3945,7 +4229,10 @@ def cinderpeak():
 
     return (["".join(r) for r in g], spawn,
             [i for row in tiles for i in row], GB, warps,
-            {"rooms": [[*origin[i], W, CINDER_FLOORS[i][2]] for i in range(len(CINDER_FLOORS))]})
+            {"rooms": [[*origin[i], CINDER_FLOORS[i][1], CINDER_FLOORS[i][2]] for i in range(len(CINDER_FLOORS))],
+             "edge": edge,
+             "door": (origin[CINDER_HIDEOUT[0]][0] + CINDER_HIDEOUT[1], origin[CINDER_HIDEOUT[0]][1] + CINDER_HIDEOUT[2]),
+             "arrive": (origin[CINDER_HIDEOUT[0]][0] + CINDER_HIDEOUT[1], origin[CINDER_HIDEOUT[0]][1] + CINDER_HIDEOUT[2] + 1)})
 
 
 # --- the Pokemon Mansion ----------------------------------------------------
@@ -4185,7 +4472,16 @@ INSIDE = {
     "MAP_ROUTE111_OLD_LADYS_REST_STOP": "Route111_OldLadysRestStop",
     "MAP_DESERT_RUINS": "DesertRuins",
     "MAP_MIRAGE_TOWER_1F": "MirageTower_1F",
-    "MAP_ROUTE119_HOUSE": "Route119_House",
+    # THE WEATHER INSTITUTE (2026-10-16, the world plan's second phase), both
+    # floors. Its door led to the Mansion, which moved to the house's door.
+    "MAP_ROUTE119_WEATHER_INSTITUTE_1F": "Route119_WeatherInstitute_1F",
+    # The new routes' houses (2026-10-16): the Day Care, the Glass Workshop,
+    # the Fossil Maniac's (its tunnel stays shut) and Lanette's.
+    "MAP_ROUTE117_POKEMON_DAY_CARE": "Route117_PokemonDayCare",
+    "MAP_ROUTE113_GLASS_WORKSHOP": "Route113_GlassWorkshop",
+    "MAP_ROUTE114_FOSSIL_MANIACS_HOUSE": "Route114_FossilManiacsHouse",
+    "MAP_ROUTE114_LANETTES_HOUSE": "Route114_LanettesHouse",
+    "MAP_ROUTE123_BERRY_MASTERS_HOUSE": "Route123_BerryMastersHouse",
     "MAP_ANCIENT_TOMB": "AncientTomb",
 }
 
@@ -4193,7 +4489,9 @@ INSIDE = {
 def attach_inside(folder, rows, spawn, tiles, base, warps, extra):
     """A built route plus the INSIDE rooms its doors lead to - the same tuple
     a builder returns, grown downwards (and sideways when the shelf is wider).
-    `folder` is the route's decomp folder, whose `warp_events` name the doors."""
+    `folder` is the route's decomp folder, whose `warp_events` name the doors.
+    A room with an UPSTAIRS (`UPSTAIRS`: the Weather Institute's 2F) puts that
+    floor on the shelf too, its stairs a warp pair with the room below."""
     import numpy as np
     import build_assets as BA
     em = lambda rel, dest: BA.fetch(rel, dest, root=BA.EMERALD)
@@ -4213,11 +4511,9 @@ def attach_inside(folder, rows, spawn, tiles, base, warps, extra):
     rooms = [list(r) for r in (extra.get("rooms") or [[0, 0, W, H]])]
     warps = list(warps or [])
     filler = t[0][0]            # the ring's own art: copied, and never drawn (outside every room)
-    x0 = 1
-    for k, w in enumerate(route["warp_events"]):
-        name = INSIDE.get(w["dest_map"])
-        if not name:
-            continue
+
+    def load(name):
+        """One interior's grid, art and elevation, and its map.json."""
         m = json.load(io.open(em(f"data/maps/{name}/map.json", f"em/{name}_map.json"), encoding="utf-8"))
         lay = layouts[m["layout"]]
         prim = snake(lay["primary_tileset"][len("gTileset_"):])
@@ -4236,45 +4532,36 @@ def attach_inside(folder, rows, spawn, tiles, base, warps, extra):
             for x in range(iw):
                 i = int(ids[y][x])
                 if i < 512:
-                    # Only Emerald's General is baked whole; the Building primary is not.
-                    assert prim == "general", f"{name}: primary metatile {i} on {prim}"
-                    it[y][x] = M["general"] + i
+                    # Emerald's General is baked whole, and its Building (all 8).
+                    assert prim in M["prim"], f"{name}: primary metatile {i} on {prim}, which is not baked"
+                    it[y][x] = M["prim"][prim] + i
                 else:
                     assert i - 512 < M["n"][sec], f"{name}: {sec} local {i - 512} is past the baked {M['n'][sec]}"
                     it[y][x] = M["sec"][sec] + i - 512
                 c = em_cell(behave(i), int((raw[y * iw + x] >> 10) & 3))
                 ig[y][x] = floor if c in ".,#" else wall if c == "T" else c
+        return m, iw, ih, ig, it, ie, wall
 
-        # Its own warps: the mats back out, pairs inside it, and the rest shut.
-        mats, hop, inner = [], {}, []
-        for j, v in enumerate(m["warp_events"]):
-            if v["dest_map"] == "MAP_" + snake(folder).upper() and int(v["dest_warp_id"]) == k:
-                mats.append((v["x"], v["y"]))
-            elif v["dest_map"] == w["dest_map"]:
-                back = m["warp_events"][int(v["dest_warp_id"])]
-                hop[(v["x"], v["y"])] = (back["x"], back["y"])
-                if j < int(v["dest_warp_id"]):
-                    inner.append((v["x"], v["y"], back["x"], back["y"]))
-            else:
-                ig[v["y"]][v["x"]] = wall
-        assert mats, f"{name}: no mat leads back to {folder} warp {k}"
-        for x, y in mats:
-            ig[y][x] = "l"
-        for ax, ay, bx, by in inner:
-            ig[ay][ax] = ig[by][bx] = "l"
+    def finish(name, ig, it, ie, wall, starts, hop):
+        """Hidden cells sealed, and what nothing reaches made wall."""
         seal_hidden(ig, it, wall, ie)
-        seen = reach(ig, [mats[0]], ie, hop=hop, surf=True)
-        for y in range(ih):
-            for x in range(iw):
+        seen = reach(ig, starts, ie, hop=hop, surf=True)
+        for y in range(len(ig)):
+            for x in range(len(ig[0])):
                 if ig[y][x] not in SOLID and (x, y) not in seen:
                     ig[y][x] = wall
         if extra.get("cycling"):
             # Elevation 4 is bike ground on a cycling map; no room may carry it.
-            assert not any(ie[y][x] == 4 for y in range(ih) for x in range(iw) if ig[y][x] not in SOLID), \
+            assert not any(ie[y][x] == 4 for y in range(len(ig)) for x in range(len(ig[0])) if ig[y][x] not in SOLID), \
                 f"{name}: elevation 4 indoors would be bike ground"
 
-        # Onto the shelf: one solid column between rooms, a solid row under
-        # them, so every mat on a room's bottom edge is walked into.
+    shelf = [1]                 # the next free column on the shelf
+
+    def shelve(ig, it, ie):
+        """Onto the shelf: one solid column between rooms, a solid row under
+        them, so every mat on a room's bottom edge is walked into. Answers the
+        room's top-left on the grid."""
+        x0, ih, iw = shelf[0], len(ig), len(ig[0])
         need_w, need_h = x0 + iw + 1, H + ih + 1
         for r, fill in ((g, "T"), (t, filler), (el, 0)):
             for row in r:
@@ -4284,16 +4571,65 @@ def attach_inside(folder, rows, spawn, tiles, base, warps, extra):
         for y in range(ih):
             for x in range(iw):
                 g[H + y][x0 + x], t[H + y][x0 + x], el[H + y][x0 + x] = ig[y][x], it[y][x], ie[y][x]
+        rooms.append([x0, H, iw, ih, 1])
+        shelf[0] += iw + 1
+        return x0, H
+
+    for k, w in enumerate(route["warp_events"]):
+        name = INSIDE.get(w["dest_map"])
+        if not name:
+            continue
+        m, iw, ih, ig, it, ie, wall = load(name)
+        up = UPSTAIRS.get(name)
+        up_id = json.load(io.open(em(f"data/maps/{up}/map.json", f"em/{up}_map.json"), encoding="utf-8"))["id"] if up else None
+
+        # Its own warps: the mats back out, pairs inside it, its stairs up,
+        # and the rest shut.
+        mats, hop, inner, stairs = [], {}, [], {}
+        for j, v in enumerate(m["warp_events"]):
+            if v["dest_map"] == "MAP_" + snake(folder).upper() and int(v["dest_warp_id"]) == k:
+                mats.append((v["x"], v["y"]))
+            elif v["dest_map"] == w["dest_map"]:
+                back = m["warp_events"][int(v["dest_warp_id"])]
+                hop[(v["x"], v["y"])] = (back["x"], back["y"])
+                if j < int(v["dest_warp_id"]):
+                    inner.append((v["x"], v["y"], back["x"], back["y"]))
+            elif up_id and v["dest_map"] == up_id:
+                stairs[j] = (v["x"], v["y"])
+            else:
+                ig[v["y"]][v["x"]] = wall
+        assert mats, f"{name}: no mat leads back to {folder} warp {k}"
+        for x, y in mats + list(stairs.values()):
+            ig[y][x] = "l"
+        for ax, ay, bx, by in inner:
+            ig[ay][ax] = ig[by][bx] = "l"
+        finish(name, ig, it, ie, wall, [mats[0]], hop)
+        x0, y0 = shelve(ig, it, ie)
+
         dx, dy = w["x"], w["y"]
         assert g[dy + 1][dx] not in SOLID, f"{folder}: nothing to stand on below the door to {name}"
         g[dy][dx] = "l"
         (mx, my), *more = mats
-        warps.append([dx, dy, x0 + mx, H + my])
+        warps.append([dx, dy, x0 + mx, y0 + my])
         # A second mat cell walks out of the same door: one-way, onto it.
-        warps += [[x0 + x, H + y, dx, dy, 1] for x, y in more]
-        warps += [[x0 + ax, H + ay, x0 + bx, H + by] for ax, ay, bx, by in inner]
-        rooms.append([x0, H, iw, ih, 1])
-        x0 += iw + 1
+        warps += [[x0 + x, y0 + y, dx, dy, 1] for x, y in more]
+        warps += [[x0 + ax, y0 + ay, x0 + bx, y0 + by] for ax, ay, bx, by in inner]
+
+        if up:
+            # THE FLOOR ABOVE: its stairs answer the ones below by warp id.
+            um, uw, uh, ug, ut, ue, uwall = load(up)
+            ends = []
+            for v in um["warp_events"]:
+                j = int(v["dest_warp_id"])
+                if v["dest_map"] == m["id"] and j in stairs:
+                    ug[v["y"]][v["x"]] = "l"
+                    ends.append(((v["x"], v["y"]), stairs[j]))
+                else:
+                    ug[v["y"]][v["x"]] = uwall
+            assert ends, f"{up}: no stairs lead back down to {name}"
+            finish(up, ug, ut, ue, uwall, [ends[0][0]], {})
+            ux, uy = shelve(ug, ut, ue)
+            warps += [[x0 + lx, y0 + ly, ux + sx, uy + sy] for (sx, sy), (lx, ly) in ends]
 
     # The rows grown for one room are filler wherever a shorter one stands.
     Wn = max(len(r) for r in g)
@@ -4304,7 +4640,113 @@ def attach_inside(folder, rows, spawn, tiles, base, warps, extra):
     return (["".join(r) for r in g], spawn, [i for row in t for i in row], base, warps, extra)
 
 
-DOOR_PAIRS = [("woods", "mansion")]
+# A room's floor above it, put on the shelf beside it and joined by its stairs.
+UPSTAIRS = {"Route119_WeatherInstitute_1F": "Route119_WeatherInstitute_2F"}
+
+DOOR_PAIRS = [("woods", "mansion"), ("pond", "power"), ("cinder", "ember"),
+              ("route114", "falls"), ("route121", "safari"), ("route115", "falls"),
+              ("lavender", "tower"), ("fourisland", "shoal")]
+
+# THE FERRY (the world plan's fifth phase, 2026-10-16; docs/world.md): Kanto
+# is islands. A ferry cell is walked into like a door and offers every stop;
+# each stop's `dock` is where the ferry lands you. A town's ferry is its
+# harbor (Lilycove's, Four Island's) or its road out (Lavender's); a map with
+# no town at its door is a stop itself, docked at its way in - its spawn.
+FERRY_SPAWN = ("meadow", "ridge", "frost", "tanoby")
+
+
+def spawn_ferry(rows, spawn):
+    """A stop docked at its way in: the spawn, when it is walked into a wall
+    (a cave mouth). Tall Grass's spawn stands in the open, where a ferry cell
+    would board you for stepping on it, so its dock is the foot of the path
+    it stands on - the row under it against the map's edge, walked into."""
+    x, y = spawn
+    if any(rows[y + dy][x + dx] in SOLID for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0))):
+        return {"cells": [spawn], "dock": spawn}
+    while rows[y + 1][x] not in SOLID:
+        y += 1
+    ch, run = rows[y][x], [x]
+    for step in (-1, 1):
+        k = x + step
+        while rows[y][k] == ch:
+            run.append(k)
+            k += step
+    return {"cells": [(k, y) for k in sorted(run)], "dock": spawn}
+
+# ROADS BETWEEN MAPS (the world plan, 2026-10-16): where two of our maps are
+# neighbours in the real game, the stretch of edge they share is opened again
+# and each of its cells is a door to the matching cell on the other side -
+# walk off one map and you are walking onto the next. Each end is (map, x, y,
+# side): the first cell of the stretch on that map's edge, and which edge it
+# is (the inside is the other way). `n` cells run DOWN a left/right edge and
+# ALONG a top/bottom one. The offsets are the games' own `connections`.
+# Desert, Monsoon Trail and Seaside Road keep rooms on a shelf below them, so
+# their real bottom edge is a row inside the grid: hence the side, not the
+# grid's edge, says where a road is.
+ROADS = [
+    # Route 112 (Cinderpeak's floor 2, from row 49) has Route 111 at its right, 20 up.
+    (("cinder", 39, 49, "right"), ("desert", 0, 20, "left"), 60),
+    # Mauville: Route 111 above, Route 110 below, 117 left, 118 right.
+    (("mauville", 0, 0, "top"), ("desert", 0, 139, "bottom"), 40),
+    (("mauville", 0, 19, "bottom"), ("pond", 0, 0, "top"), 40),
+    (("mauville", 0, 0, "left"), ("route117", 59, 0, "right"), 20),
+    (("mauville", 39, 0, "right"), ("route118", 0, 0, "left"), 20),
+    # Route 118 has Route 119 above it, from x 40.
+    (("route118", 40, 0, "top"), ("woods", 0, 139, "bottom"), 40),
+    # Fortree: Route 119 left, Route 120 right; Route 121 at 120's right, 80 down.
+    (("fortree", 0, 0, "left"), ("woods", 39, 0, "right"), 20),
+    (("fortree", 39, 0, "right"), ("rainwood", 0, 0, "left"), 20),
+    (("rainwood", 39, 80, "right"), ("route121", 0, 0, "left"), 20),
+    # Route 113: Route 111 right, Fallarbor left. (Emerald also lists Route 112
+    # below it, but both edges are mountain there - no cell opens - so no road.)
+    (("route113", 99, 0, "right"), ("desert", 0, 0, "left"), 20),
+    (("route113", 0, 0, "left"), ("fallarbor", 19, 0, "right"), 20),
+    # Fallarbor has Route 114 at its left.
+    (("fallarbor", 0, 0, "left"), ("route114", 39, 0, "right"), 20),
+    # The fourth phase: Route 123 at Route 118's right. Route 115 is a door
+    # off Meteor Falls (DOOR_PAIRS).
+    (("route118", 79, 0, "right"), ("route123", 0, 0, "left"), 20),
+    # The fifth: Lilycove City at Route 121's right, 10 rows down.
+    (("route121", 79, 0, "right"), ("lilycove", 0, 10, "left"), 20),
+]
+
+INWARD = {"left": (1, 0), "right": (-1, 0), "top": (0, 1), "bottom": (0, -1)}
+
+
+def open_roads(out, doors):
+    """Open each ROADS stretch where the real map's edge was walkable on BOTH
+    sides and the cell just inside each is floor, and pair the cells as doors
+    (a sixth element, 1: a ROAD): stepping onto one map's edge puts you on the
+    other's first cell inside its own edge, still facing the way you walked.
+    Its `enter` rule then takes it only when you walk OFF the map, never when
+    you walk along it."""
+    by = {spec["id"]: i for i, (spec, *_r) in enumerate(out)}
+    for (a, ax, ay, sa), (b, bx, by0, sb), n in ROADS:
+        A, B = out[by[a]], out[by[b]]
+        ra, rb = [list(r) for r in A[1]], [list(r) for r in B[1]]
+        ea, eb = A[0]["door"]["edge"], B[0]["door"]["edge"]
+        Wa, Wb = A[0]["w"], B[0]["w"]
+        (iax, iay), (ibx, iby) = INWARD[sa], INWARD[sb]
+        step_a = (0, 1) if sa in ("left", "right") else (1, 0)
+        step_b = (0, 1) if sb in ("left", "right") else (1, 0)
+        opened = 0
+        for k in range(n):
+            pa = (ax + step_a[0] * k, ay + step_a[1] * k)
+            pb = (bx + step_b[0] * k, by0 + step_b[1] * k)
+            qa, qb = (pa[0] + iax, pa[1] + iay), (pb[0] + ibx, pb[1] + iby)
+            if (pa not in ea or pb not in eb or ea[pa][0] in SOLID or eb[pb][0] in SOLID
+                    or ra[qa[1]][qa[0]] in SOLID or rb[qb[1]][qb[0]] in SOLID):
+                continue
+            for rows, tiles, w, (x, y), (ch, tile) in ((ra, A[3], Wa, pa, ea[pa]), (rb, B[3], Wb, pb, eb[pb])):
+                rows[y][x] = ch
+                tiles[y * w + x] = tile
+            doors.setdefault(a, []).append([*pa, b, *qb, 1])
+            doors.setdefault(b, []).append([*pb, a, *qa, 1])
+            opened += 1
+        assert opened, f"road {a}/{b}: no cell of the shared edge is open on both sides"
+        A[1][:] = ["".join(r) for r in ra]
+        B[1][:] = ["".join(r) for r in rb]
+        print("   road    %s <-> %s  %d cells" % (a, b, opened))
 
 if __name__ == "__main__":
     out = []
@@ -4320,6 +4762,8 @@ if __name__ == "__main__":
         spec["elev"] = (spec["door"] or {}).get("elev")
         spec["cycling"] = (spec["door"] or {}).get("cycling")
         spec["rooms"] = (spec["door"] or {}).get("rooms")
+        spec["ferry"] = ((spec["door"] or {}).get("ferry")
+                         or (spawn_ferry(rows, spawn) if spec["id"] in FERRY_SPAWN else None))
         spec["w"], spec["h"] = len(rows[0]), len(rows)
         got, total = check(spec, rows, spawn, tiles, warps)
         out.append((spec, rows, spawn, tiles, base, warps))
@@ -4329,11 +4773,22 @@ if __name__ == "__main__":
     doors = {}
     by = {spec["id"]: spec for spec, *_rest in out}
     for a, b in DOOR_PAIRS:
-        da, db = by[a]["door"], by[b]["door"]
+        # A map with more than one door names the others by where they lead.
+        da = (by[a]["door"] or {}).get("doors", {}).get(b) or by[a]["door"]
+        db = (by[b]["door"] or {}).get("doors", {}).get(a) or by[b]["door"]
         assert da and db, f"door pair {a}/{b}: a map reports no door"
         doors.setdefault(a, []).append([*da["door"], b, *db["arrive"]])
         doors.setdefault(b, []).append([*db["door"], a, *da["arrive"]])
         print("   door    %s %s <-> %s %s" % (a, da["door"], b, db["door"]))
+    open_roads(out, doors)
+    # A ferry on the edge (Lavender's road west) opens now, as a road does.
+    for spec, rows, *_rest in out:
+        f = spec["ferry"]
+        if f and f.get("edge"):
+            g, tiles = [list(r) for r in rows], _rest[1]
+            for x, y in f["cells"]:
+                g[y][x], tiles[y * spec["w"] + x] = spec["door"]["edge"][(x, y)]
+            rows[:] = ["".join(r) for r in g]
 
     # WALKED INTO, NOT STEPPED ON. On the GBA a ladder is taken the moment you
     # arrive on it, but a door, a cave mouth or a stairway is taken only when
@@ -4349,6 +4804,7 @@ if __name__ == "__main__":
         # A one-way warp's landing is ordinary floor: nothing to walk into.
         pts = [(w[0], w[1]) for w in (warps or [])] + [(w[2], w[3]) for w in (warps or []) if len(w) < 5]
         pts += [(d[0], d[1]) for d in doors.get(spec["id"], [])]
+        pts += [tuple(c) for c in (spec["ferry"] or {}).get("cells", [])]
         W, H = spec["w"], spec["h"]
         solid = lambda x, y: not (0 <= x < W and 0 <= y < H) or rows[y][x] in SOLID
         # Only where some approach FACES a wall: a doorway in a corridor (walls
@@ -4408,15 +4864,22 @@ if __name__ == "__main__":
         if spec.get("cycling"):
             # Its raised road is bike ground - see route110().
             body.append("    cycling: true,")
+        if spec.get("town"):
+            # A TOWN: streets and doors - no biome, no encounters, always open.
+            body.append("    town: true,")
         if spec["id"] in enter:
             # WARPS AND DOORS YOU WALK INTO rather than step on - see `enter`.
             body.append("    enter: [%s]," % ", ".join("[%d, %d]" % q for q in enter[spec["id"]]))
         if spec["id"] in doors:
             # DOORS TO ANOTHER MAP: [x, y, area, arriveX, arriveY].
             body.append("    doors: [")
-            body += ["      [%d, %d, %s, %d, %d]," % (d[0], d[1], json.dumps(d[2]), d[3], d[4])
-                     for d in doors[spec["id"]]]
+            body += ["      [%s]," % ", ".join(json.dumps(v) for v in d) for d in doors[spec["id"]]]
             body.append("    ],")
+        if spec["ferry"]:
+            # THE FERRY: the cells that board it (walked into, like a door),
+            # and where it lands you - see FERRY_SPAWN.
+            body.append("    ferry: [%s]," % ", ".join("[%d, %d]" % tuple(c) for c in spec["ferry"]["cells"]))
+            body.append("    dock: { x: %d, y: %d }," % tuple(spec["ferry"]["dock"]))
         body.append("  },")
     body.append("};\n")
     body.append("export const AREA_IDS = %s;\n"
