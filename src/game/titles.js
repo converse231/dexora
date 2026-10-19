@@ -7,11 +7,13 @@
      master:<id>  every printing of a set    "Mega Evolution Master Collector"
      dex:<g>      a generation's Pokédex     "Kanto Dex Master"
      tier:<t>:<g> that Pokédex in one tier   "Kanto Gold Dex Master"
+     event:<id>   every look of a dated event "Hallowed Hunter"
 
    Pure and browser-free; the order is the server's (sorted). */
 import { CARD_SETS } from "../data/cards/index.js";
 import { REGION_NAME, TIERS, tierName } from "./biomes.js";
 import { MILESTONES } from "./cards.js";
+import { EVENTS } from "../data/eventforms.js";
 
 // `milestones` counts MILESTONES paid per set, one past them for a master set.
 export const MASTER_STEP = MILESTONES.length + 1;
@@ -24,6 +26,7 @@ export function titleIds(milestones = {}, medals = []) {
   }
   for (const m of medals ?? []) if (/^gen:[1-9]$/.test(m)) out.push(`dex:${m.slice(4)}`);
   for (const m of medals ?? []) if (/^tier:[a-z]+:[1-9]$/.test(m) && TIERS.includes(m.split(":")[1])) out.push(m);
+  for (const m of medals ?? []) if (/^event:[a-z]+$/.test(m)) out.push(m);
   return out.sort();
 }
 
@@ -61,6 +64,8 @@ export function titleName(t) {
   if (kind === "set") return `${setName(id)} Collector`;
   if (kind === "master") return `${setName(id)} Master Collector`;
   if (kind === "dex") return `${REGION_NAME[id] ?? `Gen ${id}`} Dex Master`;
+  if (kind === "event") return EVENTS.find((ev) => ev.id === id)?.title
+    ?? EVENTS.find((ev) => ev.hunt?.medal === id)?.hunt.name ?? "Event Hunter";
   if (titleTier(t)) {
     const g = t.split(":")[2];
     return `${REGION_NAME[g] ?? `Gen ${g}`} ${tierName(id)} Dex Master`;

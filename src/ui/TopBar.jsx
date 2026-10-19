@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { levelProgress } from "../game/biomes.js";
 import Daily from "./Daily.jsx";
-import { SPECIES } from "../data/dex.js";
+import { DEX_TOTAL } from "../data/dex.js";
 import Icon from "./Icon.jsx";
 import { dexRank } from "../game/medals.js";
 import { RankMedal } from "./RankBadge.jsx";
@@ -188,7 +188,7 @@ export default function TopBar({
             they had finished at 151 of 358. */}
         <span className="tb-stat dex" data-tip="Pokédex">
           <Icon n="dex" size={15} />
-          <b>{caught}<u>/{SPECIES.length}</u></b>
+          <b>{caught}<u>/{DEX_TOTAL}</u></b>
         </span>
         <span className="tb-stat tb-extra" data-tip="Caught">
           <Icon n="ball" size={15} />

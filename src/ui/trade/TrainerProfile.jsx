@@ -6,7 +6,7 @@
    the save - so a showcase here is what that trainer really holds, never what
    their client claimed. */
 import { useEffect, useState } from "react";
-import { SPECIES } from "../../data/dex.js";
+import { DEX_TOTAL } from "../../data/dex.js";
 import { speciesById, levelFromXp } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
 import { LIMITS, REPORT_REASONS } from "../../game/trade.js";
@@ -55,10 +55,10 @@ const joined = (at) => (at
    League wins (db/trading.sql `card_stats`); a server that has not run that
    SQL yet sends none, which reads as 0. */
 function Stats({ card }) {
-  const pct = card.dex_count / SPECIES.length;
+  const pct = card.dex_count / DEX_TOTAL;
   return (
     <div className="tp-stats">
-      <span className="tp-ring" style={{ "--p": pct }} data-tip={`${card.dex_count} of ${SPECIES.length} species`}>
+      <span className="tp-ring" style={{ "--p": pct }} data-tip={`${card.dex_count} of ${DEX_TOTAL} species`}>
         <b>{Math.round(pct * 100)}<i>%</i></b>
       </span>
       <span><b>{card.dex_count}</b>Pokédex</span>

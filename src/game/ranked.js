@@ -9,6 +9,7 @@
    Ranked reads the level, the IVs and the moves off the format, so a save
    can claim a species - never a stronger one. */
 import { speciesById } from "./biomes.js";
+import { isEvent } from "../data/dex.js";
 import { TEAM_MAX } from "./league.js";
 
 // The server refuses a client on another version of these rules (6b). 2: the Kanto
@@ -110,11 +111,13 @@ export function defendNote(mons, defense, name) {
 }
 
 /* What is wrong with a team of species ids, or null: `empty`, `size` (over
-   six), `unknown` (not a species), `clause` (two of one species). */
+   six), `unknown` (not a species), `event` (an event look, which never
+   battles - league.js `refusal`), `clause` (two of one species). */
 export function teamProblem(species) {
   if (!species.length) return "empty";
   if (species.length > TEAM_MAX) return "size";
   if (species.some((id) => !speciesById(id))) return "unknown";
+  if (species.some(isEvent)) return "event";
   if (new Set(species.map(baseOf)).size !== species.length) return "clause";
   return null;
 }

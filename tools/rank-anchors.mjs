@@ -15,7 +15,7 @@ import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEAGUES } from "../src/data/leagues.js";
-import { SPECIES } from "../src/data/dex.js";
+import { SPECIES, isEvent } from "../src/data/dex.js";
 import { rankedFighter, simulate, mulberry32 } from "../src/game/battle.js";
 import { teamProblem, baseOf } from "../src/game/ranked.js";
 
@@ -25,8 +25,9 @@ export const ANCHOR_RECORD = { n: 200, seed: 17 };
 export const ANCHOR_SPREAD = 600;
 const TEAM = 6;
 
-// The field: every species a player could own (the whole dex, forms included).
-const FIELD = SPECIES.filter((sp) => sp.stats.reduce((a, b) => a + b, 0) >= 180).map((sp) => sp.id);
+// The field: every species a player could battle with (the whole dex, forms
+// included; an event look never battles).
+const FIELD = SPECIES.filter((sp) => !isEvent(sp.id) && sp.stats.reduce((a, b) => a + b, 0) >= 180).map((sp) => sp.id);
 
 // One of each species, in party order, as the format allows.
 function formatTeam(party) {

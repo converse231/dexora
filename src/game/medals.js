@@ -28,7 +28,7 @@
 import { SPECIES } from "../data/dex.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import { BIOMES, speciesById, dexIndex, genOf, REGION_NAME, looksOf, TIERS, tiersFor } from "./biomes.js";
-import { isForm } from "../data/dex.js";
+import { isForm, isEvent, DEX_TOTAL } from "../data/dex.js";
 import { label } from "./map.js";
 
 /* Evolution families, by union-find over the evolution edges. A family is the
@@ -37,10 +37,12 @@ import { label } from "./map.js";
 function families() {
   const parent = SPECIES.map((sp) => sp.id);
   const find = (a) => (parent[a - 1] === a ? a : (parent[a - 1] = find(parent[a - 1])));
-  for (const row of EVOLUTIONS) parent[find(row.from) - 1] = find(row.to);
+  // An event look's line is the event's, not a medal of the Pokedex's (dex.js).
+  for (const row of EVOLUTIONS) if (!isEvent(row.from)) parent[find(row.from) - 1] = find(row.to);
 
   const groups = new Map();
   for (const sp of SPECIES) {
+    if (isEvent(sp.id)) continue;
     const root = find(sp.id);
     if (!groups.has(root)) groups.set(root, []);
     groups.get(root).push(sp.id);
@@ -85,7 +87,7 @@ const biomeMedal = (b) => ({
 function build() {
   const byType = new Map();
   for (const sp of SPECIES)
-    for (const t of sp.types) {
+    for (const t of isEvent(sp.id) ? [] : sp.types) {
       if (!byType.has(t)) byType.set(t, []);
       byType.get(t).push(sp.id);
     }
@@ -115,8 +117,8 @@ function build() {
       id: "dex",
       kind: "dex",
       name: "POKÉDEX COMPLETE",
-      sub: `All ${SPECIES.length}. There is nothing left to find.`,
-      need: SPECIES.map((sp) => sp.id),
+      sub: `All ${DEX_TOTAL}. There is nothing left to find.`,
+      need: SPECIES.filter((sp) => !isEvent(sp.id)).map((sp) => sp.id),
       money: 25000,
       items: { "master-ball": 1 },
     },
@@ -230,7 +232,7 @@ export const MILESTONES = [
      added, and a milestone nobody can reach is the one kind of reward that
      costs nothing to leave broken. */
   {
-    at: SPECIES.length,
+    at: DEX_TOTAL,
     money: 60000,
     items: { "ultra-ball": 60, "master-ball": 2 },
   },
@@ -255,7 +257,7 @@ export const DEX_RANKS = [
   ["expedition-leader", "Expedition Leader", 0.5, "#7a4bc4"],
   ["grand-scholar", "Grand Scholar", 0.75, "#e4b53c"],
   ["pokedex-master", "Pokédex Master", 1, "#f3d56b"],
-].map(([id, name, share, color], step) => ({ id, name, step, color, at: Math.ceil(share * SPECIES.length) }));
+].map(([id, name, share, color], step) => ({ id, name, step, color, at: Math.ceil(share * DEX_TOTAL) }));
 
 // Your rank for a caught count, the next one and how many species away it is.
 export function dexRank(caught) {

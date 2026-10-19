@@ -12,8 +12,9 @@
 
 import { useState } from "react";
 import {
-  SHOP_BALLS, STONES, CANDY_PRICE, FIELD, BERRIES, onShelf, speciesNeedingStone,
+  SHOP_BALLS, STONES, CANDY_PRICE, SHOP_FIELD, BERRIES, onShelf, speciesNeedingStone, eventShelf,
 } from "../game/items.js";
+import { eventOn, eventDaysLeft } from "../game/events.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import { pricedAt } from "../game/trainer.js";
@@ -193,6 +194,8 @@ export function ShopShelf({ items, money, bag, level, stats, onBuy, first = null
 export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCandy }) {
   // Through the same discount as everything else, or Haggle has two rules.
   const candyPrice = pricedAt(CANDY_PRICE, stats);
+  // The event running today, whose shelf leads the shop (items.js `eventShelf`).
+  const ev = eventOn();
   const shelf = (items, first = null) => (
     <ShopShelf items={items} money={money} bag={bag} level={level} stats={stats} onBuy={onBuy} first={first} />
   );
@@ -207,6 +210,17 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
       {/* One scroller for the whole shop, like every other tab has. Two lists
           each scrolling on their own would be worse than one long page. */}
       <div className="shopscroll">
+        {ev && (
+          <>
+            <div className="sh-head sh-event">
+              <span>{ev.name.toUpperCase()}</span>
+              <span>{eventDaysLeft(ev) === 1 ? "LAST DAY" : `${eventDaysLeft(ev)} DAYS LEFT`}</span>
+            </div>
+            {shelf(eventShelf(ev.id))}
+            <p className="shop-note">Sold only during the event.</p>
+          </>
+        )}
+
         {/* RARE CANDY, and it is priced to lose. ¥120 against the ¥40 a common
             duplicate sells for means three sold to buy one candy, where
             converting that same duplicate gives one outright - so buying is
@@ -285,7 +299,7 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
           <span>WHILE YOU WALK</span>
         </div>
 
-        {shelf(FIELD)}
+        {shelf(SHOP_FIELD)}
 
         <p className="shop-note">
           One of each kind runs at a time, and they are spent in steps.

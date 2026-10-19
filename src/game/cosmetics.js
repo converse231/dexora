@@ -1,16 +1,21 @@
 import { SAME, NONE } from "../data/follow.js";
 import { researchLevel, RESEARCH_MAX } from "./research.js";
+import { isEvent } from "../data/dex.js";
+import { speciesById } from "./biomes.js";
 
 /* COSMETICS (docs/cosmetics.md): a look, never a strength. No rule module
    reads this file.
 
    THE FOLLOWER. Which sheet a species walks with behind you:
    public/follow/<id>.png (`npm run follow`), a form without its own drawing
-   walking as its species, null for the two with none. */
+   walking as its species, null for the two with none. An event look walks
+   as its species too: the overworld sheets are the games', and nobody drew
+   a hat on them. */
 const NO_FOLLOW = new Set(NONE);
 // How many can be in the walking party - switched on the map, one walking at a time.
 export const PARTY_MAX = 3;
-export const followSheet = (id) => (NO_FOLLOW.has(id) ? null : SAME[id] ?? id);
+export const followSheet = (id) => (isEvent(id) ? followSheet(speciesById(id).of)
+  : NO_FOLLOW.has(id) ? null : SAME[id] ?? id);
 
 /* A PARTNER IS EARNED, NOT HANDED OUT (your call, 2026-10-13). Any of 1,413
    species could walk with you, and since 2026-10-07 the one walking lends a

@@ -12,6 +12,7 @@
    about a practice battle is saved, paid or rated. */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { speciesById } from "../../game/biomes.js";
+import { isEvent } from "../../data/dex.js";
 import { label } from "../../game/map.js";
 import { variantOf } from "../../game/items.js";
 import { flushNow } from "../../game/store.js";
@@ -29,8 +30,9 @@ import Suggest from "./Suggest.jsx";
 
 const asset = (path) => new URL(path, document.baseURI).href;
 /* WHO MAY PLAY: a member still in the Box and at Lv 100 (docs/ranked.md,
-   Entry) - the server leaves anyone else out the same way. */
-const ready = (m) => !m.missing && (m.level ?? 0) >= RANKED_LEVEL;
+   Entry) - the server leaves anyone else out the same way. Never an event
+   look: a costume never battles (`teamProblem`). */
+const ready = (m) => !m.missing && (m.level ?? 0) >= RANKED_LEVEL && !isEvent(m.species);
 const present = (team) => (team ?? []).filter(ready);
 // The server's refusals, in the game's words (db/ranked.sql).
 const say = (error) => (/not in your saved box/.test(error ?? "")
@@ -45,6 +47,7 @@ const RANKED_SAYS = {
   twice: "A Pokémon is in that team twice.",
   level: `Only Lv ${RANKED_LEVEL} Pokémon may battle in ranked - raise them in Battles › Train.`,
   clause: "That team has two of one species - a form counts as its species.",
+  event: "Event Pokémon are for collecting - they never battle.",
   size: "A team is one to six Pokémon.",
   version: "A new version of Dexora is out - reload the page to battle.",
   closed: "Ranked battles aren't open yet.",

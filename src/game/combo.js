@@ -13,13 +13,15 @@
      base is the key, so a letter never breaks an Unown chain.
 
    Browser-free, so check.mjs can bound it. */
-import { looksOf } from "./biomes.js";
+import { looksOf, speciesById } from "./biomes.js";
+import { isEvent } from "../data/dex.js";
 
 /* [chain length, lift]: rungs, longest last. The top rung stays at most the
    Pokedex Charm's (check.mjs), so a chain never outranks a finished region. */
 export const COMBO_STEPS = [[10, 1.25], [20, 1.5], [30, 2]];
 
-export const comboKey = (id) => looksOf(id)[0];
+// A costume chains with its own species (a witch Gastly is a Gastly caught).
+export const comboKey = (id) => (isEvent(id) ? speciesById(id).of : looksOf(id)[0]);
 
 /* What the chain is worth on a meeting with `id`: its rung if `id` is the
    chained species, else nothing. */

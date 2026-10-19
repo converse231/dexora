@@ -240,10 +240,14 @@ export function VariantFx({ id, variant, art = null }) {
         </>
       );
     }
-    // Diamond: the prism halo turning behind it, and the glints.
+    /* Diamond: the prism halo turning behind it, its FIRE turning inside it
+       (`.dia-prism`, 2026-10-19, asked for: "shimmer a bit, not just on the
+       outside") - colour flashes cut to the body, the other way round - and
+       the glints. Turning is Diamond's one idea of motion. */
     return (
       <>
         <span className="dia-halo" style={{ "--art": url }} aria-hidden="true"><i><b /></i></span>
+        <span className="dia-prism" style={{ "--art": url }} aria-hidden="true"><i /></span>
         <span className="dia-fire" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
       </>
     );
@@ -524,6 +528,18 @@ export const eventIcon = (id) => new URL(`events/${id}.png`, document.baseURI).h
 
 export function ItemIcon({ item, className = "" }) {
   const url = new URL(`items/${artOf(item)}.png`, document.baseURI).href;
+  /* AN EVENT'S JAR (`fx` on the item): the honey jar under the event's own
+     filter, with a glow and a wisp of its own - `.item-fx`, so every place
+     that sizes a coloured honey sizes this one. */
+  if (item?.fx) {
+    return (
+      <span className={`sprite-fx item-fx item-${item.fx} ${className}`.trim()}>
+        <img src={url} alt="" />
+        <i className="ifx-glow" aria-hidden="true" />
+        <i className="ifx-wisp" aria-hidden="true" />
+      </span>
+    );
+  }
   if (!item?.tier) {
     return <img className={className} src={url} alt="" />;
   }

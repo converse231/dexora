@@ -1881,6 +1881,7 @@ async function savedField(name, good, bad, empty, base = SAVE) {
     `a garbage "${name}" was trusted instead of dropped to empty`);
 }
 await savedField("dry", 123, "lots", 0);
+await savedField("dreams", { halloween: 3 }, { halloween: 99, nowhere: 2 }, {});
 /* CARDS (docs/cards.md): each field loads empty from an old save, survives a
    reload, and drops garbage - row by row for the collection. */
 await savedField("cards", { "me01-001": { n: 2, r: 1, earned: ["badge:kanto-brock"] } }, "junk", {});
@@ -2044,15 +2045,16 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
     assert.ok(e.state.worn.some((w) => w.id === "find"), "Pickup found nothing on a sure roll");
     assert.notEqual(JSON.stringify(e.state.bag), before, "the find did not reach the bag");
   }
-  // A FORAGER: an ability with nothing to do here still finds, by its first type (Bulbasaur: berries).
+  // A FORAGER: an ability with nothing to do here still finds, by its first
+  // type (Bulbasaur: berries, and since 2026-10-19 its type's Leaf Stone).
   {
     assert.ok(AB.fieldOf({ uid: 5, species: 1 })?.forage, "this Bulbasaur does not forage - pick another uid");
     const e = walking(1, 5);
-    const berries = () => ["razz-berry", "pinap-berry", "nanab-berry"].reduce((n, b) => n + (e.state.bag[b] ?? 0), 0);
+    const berries = () => ["razz-berry", "pinap-berry", "nanab-berry", "leaf-stone"].reduce((n, b) => n + (e.state.bag[b] ?? 0), 0);
     const before = berries();
     let calls = 0;
     assert.ok(stepWith(e, () => (++calls <= 2 ? 0.0001 : 0.999)));
-    assert.equal(berries(), before + 1, "a Grass forager did not find a berry on a sure roll");
+    assert.equal(berries(), before + 1, "a Grass forager did not find a berry or a Leaf Stone on a sure roll");
   }
   // Stench halves the encounter rate: a roll between the halved and the full rate meets nothing.
   {
@@ -2800,6 +2802,141 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
 }
 console.log("saved fields ok — dry, outbreak: missing loads empty, a value survives a reload, garbage is dropped");
 console.log("outbreak ok — spawns on its map, counts down, ends with a notice");
+
+/* A DATED EVENT (eventforms.js, events.js): its costumes are met only on its
+   days, in place of their own species, through a real step; its shop and its
+   honey work only then; a costume never battles, moves no count of the
+   Pokedex, and the board pays its claim once. The calendar is faked, because
+   the event is a date. */
+{
+  const { dayKey } = await import("../src/game/daily.js");
+  const { eventLook, eventChance, EVENT_CAP } = await import("../src/game/events.js");
+  const { EVENTS } = await import("../src/data/eventforms.js");
+  const { speciesById, dexIndex } = await import("../src/game/biomes.js");
+  const { dexCaught } = await import("../src/data/dex.js");
+  const { refusal } = await import("../src/game/league.js");
+  const { liveMult, ballById } = await import("../src/game/items.js");
+  const ev = EVENTS[0];
+  const look = ev.looks[0];
+  const RealDate = Date;
+  const on = (k) => {
+    globalThis.Date = class extends RealDate {
+      constructor(...a) { if (a.length) super(...a); else super(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8), 12); }
+      static now() { return new globalThis.Date().getTime(); }
+    };
+  };
+  const off = () => { globalThis.Date = RealDate; };
+  try {
+    // Pure: the costume only on its days, and no roll drawn outside them.
+    let drawn = 0;
+    const rng = () => { drawn++; return 0; };
+    assert.equal(eventLook(speciesById(look.of), rng, { day: ev.start }).id, look.id, "the event's first day met no costume");
+    assert.equal(eventLook(speciesById(look.of), rng, { day: "20261023" }).id, look.of, "a costume came out before its event");
+    assert.equal(eventLook(speciesById(1), rng, { day: ev.start }).id, 1, "a species the event did not dress came in costume");
+    assert.equal(drawn, 1, "an event drew a roll it did not need - every seeded record would move");
+    assert.ok(eventChance({ night: true }) > eventChance(), "night is not likelier");
+    assert.equal(eventChance({ night: true, lure: 99 }), EVENT_CAP, "the lure ran past its cap");
+
+    // The engine: a forced Gastly step meets the costume, frozen as an event's.
+    on(ev.start);
+    const ob = { key: dayKey(), areaId: "tower", speciesId: look.of, left: 5 };
+    const e = boot({ ...SAVE, areaId: "tower", outbreak: ob }).e;
+    assert.equal(e.state.outbreak?.speciesId, look.of, "the test could not force its species");
+    const real = Math.random;
+    Math.random = () => 0.01;
+    try {
+      for (const dir of ["right", "down", "left", "up"]) {
+        e.press(dir);
+        for (let i = 0; i < 30 && !e.state.encounter; i++) tick(16);
+        e.clearHeld();
+        if (e.state.encounter) break;
+      }
+    } finally { Math.random = real; }
+    const enc = e.state.encounter;
+    assert.equal(enc?.speciesId, look.id, "an event-day step with every roll landing met no costume");
+    assert.equal(enc.event, ev.id, "the encounter does not say which event its costume is");
+    assert.ok(liveMult(ballById("hallow-ball"), enc) > liveMult(ballById("poke-ball"), enc), "the Hallow Ball is no better on a costume");
+    assert.ok(e.buy("hallow-ball", 1) && e.buy("spooky-honey", 1), "the event's shelf did not sell on its day");
+    const before = dexCaught(e.state.dex);
+    // Caught - a Bad Dream toward the hunt, and no step of the Pokedex's count.
+    until(e, (s) => s.encounter?.phase === "idle", "the costume to settle");
+    e.throwBall("master-ball");
+    e.answerAsk(true);
+    until(e, (s) => !s.encounter || s.encounter.phase === "caught", "the master ball to land");
+    assert.equal(e.state.dreams[ev.id], 1, "a costume caught was no Bad Dream");
+    assert.equal(dexCaught(e.state.dex), before, "an event look moved the Pokedex's count");
+    e.destroy();
+
+    /* THE NIGHTMARE: dreams full, the Tower after dark, the next wild meeting
+       is the hunted one - it asks before you run, and running from it waxes
+       the moon back to `keep`. */
+    const { isNight } = await import("../src/game/clock.js");
+    let night = SAVE.steps;
+    while (!isNight(night)) night++;
+    const moon = { [ev.id]: ev.hunt.dreams };
+    const dark = boot({ ...SAVE, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
+    Math.random = () => 0.01;
+    try {
+      for (const dir of ["right", "down", "left", "up"]) {
+        dark.press(dir);
+        for (let i = 0; i < 30 && !dark.state.encounter; i++) tick(16);
+        dark.clearHeld();
+        if (dark.state.encounter) break;
+      }
+    } finally { Math.random = real; }
+    const nm = dark.state.encounter;
+    assert.equal(nm?.speciesId, ev.hunt.id, "a full moon in the Tower after dark met no Nightmare");
+    assert.ok(nm.hunt && !nm.alpha, "the Nightmare is not marked the hunt's, or rolled an alpha");
+    until(dark, (s) => s.encounter?.phase === "idle", "the Nightmare to settle");
+    dark.flee();
+    assert.equal(dark.state.ask?.kind, "flee", "running from the Nightmare did not ask");
+    dark.answerAsk(true);
+    until(dark, (s) => !s.encounter, "the Nightmare to fade", 4000);
+    assert.equal(dark.state.dreams[ev.id], ev.hunt.keep, "a Nightmare run from did not wax the moon back");
+    dark.destroy();
+    // By day, or anywhere else, a full moon meets nothing new.
+    const day = boot({ ...SAVE, areaId: "meadow", dreams: moon }).e;
+    assert.equal(day.state.dreams[ev.id], ev.hunt.dreams, "a full moon did not survive a load");
+    day.destroy();
+
+    off();
+    on("20261201");
+    const after = boot({ ...SAVE, bag: { ...SAVE.bag, "spooky-honey": 1 } }).e;
+    assert.ok(!after.buy("hallow-ball", 1), "the event's ball was sold after the event");
+    assert.ok(!after.useField("spooky-honey"), "a Spooky Honey was spent after its event, luring nothing");
+    assert.equal(after.state.bag["spooky-honey"], 1, "the honey left the bag");
+
+    // Never a fighter.
+    assert.equal(refusal({ species: look.id }), "event", "an event look may enter a battle");
+
+    // Its check-in day pays its own on top - on that weekday, and only then.
+    off();
+    on("20261030");                          // a Friday inside the event
+    const fri = boot({ ...SAVE, bag: { ...SAVE.bag, "hallow-ball": 0 } }).e;
+    const paid = fri.checkIn();
+    assert.equal(paid?.bonus?.items["hallow-ball"], ev.checkin.items["hallow-ball"], "Friday's check-in named no bonus");
+    assert.equal(fri.state.bag["hallow-ball"], ev.checkin.items["hallow-ball"], "Friday's Hallow Balls never reached the bag");
+    fri.destroy();
+    off();
+    on("20261031");                          // the Saturday
+    const sat = boot({ ...SAVE, bag: { ...SAVE.bag, "hallow-ball": 0 } }).e;
+    assert.equal(sat.checkIn()?.bonus, null, "a Saturday check-in paid the Friday bonus");
+    assert.equal(sat.state.bag["hallow-ball"], 0, "a Saturday check-in gave Hallow Balls");
+    sat.destroy();
+
+    // The claim: every look held, paid once, and its title.
+    const dex = Array(358).fill(0);
+    const full = boot({ ...SAVE, dex }).e;
+    assert.equal(full.claimEvent(ev.id), null, "an event was claimed with nothing caught");
+    for (const l of ev.looks) full.state.dex[dexIndex(l.id)] = 2;
+    const got = full.claimEvent(ev.id);
+    assert.ok(got?.packs >= 1, "a finished event paid no pack");
+    assert.ok(full.state.medals.includes(`event:${ev.id}`), "a finished event left no medal");
+    assert.equal(full.claimEvent(ev.id), null, "an event was claimed twice");
+  } finally { off(); }
+  console.log("event ok — costumes on its days alone, through a real step, its shelf and honey only then, " +
+    "never a fighter or a Pokedex count, its claim paid once");
+}
 
 /* RESEARCH COUNTS REAL PLAY. The save half first, then a catch through a real
    step and a real throw: the tasks read facts frozen on the encounter, and

@@ -14,8 +14,9 @@
    falls, and it cannot be burned by leaving the game open. Once they are met
    it is over until tomorrow. */
 import { SPECIES } from "../data/dex.js";
-import { BIOMES, areaOpen, encounterTable, isLegendary } from "./biomes.js";
-import { hash } from "./daily.js";
+import { EVENTS } from "../data/eventforms.js";
+import { BIOMES, areaOpen, dexIndex, encounterTable, isLegendary, speciesById } from "./biomes.js";
+import { dayKey, hash } from "./daily.js";
 import { STONES } from "./items.js";
 
 export const OUTBREAK_SHARE = 0.3;
@@ -94,3 +95,91 @@ export function riftFind(random, level) {
 
 // What the "it is over" card calls each event.
 export const EVENT_NAME = { outbreak: "Outbreak", rift: "Rift" };
+
+/* A DATED EVENT (eventforms.js): for its fortnight, a species it dressed is
+   sometimes met in its costume instead - `EVENT_SHARE` of the meetings with
+   that species, wherever and however it is met (grass, water, a rod, an
+   outbreak), and never where the species is not. A substitution and not a
+   table row, so no spawn table, no League level and no rod moves for it: the
+   event is over the day it ends and the world is exactly the world.
+
+   1 in 16 is a hunt, not a gift. Measured on the tables at Lv 50: a witch
+   Gastly is about one Pokemon Tower meeting in 115, a Pumpkin Mimikyu about
+   one in 1,100 there, a Vampire Zubat one in 400 in Mt. Moon - and the
+   evolved costumes are rarer still wild (a Gengar is 0.3% of the Tower), so
+   the line is mostly raised. Night doubles it (`EVENT_NIGHT`: the dead walk
+   at night, and night is already frozen on every encounter), and a Spooky
+   Honey multiplies it by its `lure`, never past `EVENT_CAP`. */
+export const EVENT_SHARE = 1 / 16;
+export const EVENT_NIGHT = 2;
+export const EVENT_CAP = 0.5;
+
+// The event running on a local day (dayKey), or null.
+export const eventOn = (day = dayKey()) =>
+  EVENTS.find((ev) => day >= ev.start && day <= ev.end) ?? null;
+
+// Every event look, by the species it dresses, for the event running.
+export const eventLooks = (day) => eventOn(day)?.looks ?? [];
+
+export const eventChance = ({ night = false, lure = 1 } = {}) =>
+  Math.min(EVENT_CAP, EVENT_SHARE * (night ? EVENT_NIGHT : 1) * lure);
+
+/* The species met: `sp`, or its costume. Draws from `random` ONLY when the
+   running event dressed this species, so every other roll in the game - and
+   every seeded record check.mjs replays - is untouched by an event. */
+export function eventLook(sp, random, { day, night, lure } = {}) {
+  const look = eventLooks(day).find((l) => l.of === sp.id);
+  if (!look || random() >= eventChance({ night, lure })) return sp;
+  return speciesById(look.id);
+}
+
+/* EVERY LOOK OF AN EVENT IN THE POKEDEX is its medal (`event:<id>`) and its
+   title, claimed on the Events board (`claimEvent`) - never paid on the
+   catch, like a generation. A trade counts, as it does for the Pokedex; a
+   look evolved into counts, which is how most of each line is held. */
+export const EVENT_PACKS = 1;
+export const eventHeld = (ev, dex) => ev.looks.filter((l) => dex?.[dexIndex(l.id)] === 2).length;
+export const eventDue = (dex, medals = []) =>
+  EVENTS.filter((ev) => eventHeld(ev, dex) === ev.looks.length && !medals.includes(`event:${ev.id}`));
+
+/* THE NIGHTMARE (an event's `hunt`, eventforms.js): `state.dreams` holds
+   each event's Bad Dreams, one a costume caught on its days. Full, the hunt
+   is DUE until its medal is won: the next wild meeting in its area after
+   dark is it. A save's count is held to the hunt's own range. */
+export function huntDue(dreams, medals = [], day) {
+  const ev = eventOn(day);
+  const h = ev?.hunt;
+  if (!h || medals.includes(`event:${h.medal}`)) return null;
+  return (dreams?.[ev.id] ?? 0) >= h.dreams ? h : null;
+}
+export const cleanDreams = (d) => Object.fromEntries(EVENTS.filter((ev) => ev.hunt).flatMap((ev) => {
+  const n = d?.[ev.id];
+  return Number.isInteger(n) && n >= 0 && n <= ev.hunt.dreams ? [[ev.id, n]] : [];
+}));
+
+/* THE CLOCK ON AN EVENT, for its countdowns: it opens at local midnight on
+   its first day and closes at local midnight after its last - the same days
+   `eventOn` keys on, as instants. Announced `TEASE_DAYS` before it opens. */
+export const TEASE_DAYS = 7;
+const midnight = (k, plus = 0) => new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8) + plus).getTime();
+export const eventOpens = (ev) => midnight(ev.start);
+export const eventCloses = (ev) => midnight(ev.end, 1);
+// The event about to open (within TEASE_DAYS), or null - never one running.
+export function eventSoon(now = Date.now()) {
+  if (eventOn(dayKey(new Date(now)))) return null;
+  return EVENTS.find((ev) => eventOpens(ev) > now && eventOpens(ev) - now <= TEASE_DAYS * 86400000) ?? null;
+}
+
+/* AN EVENT'S CHECK-IN DAY (its `checkin`): what a check-in on that weekday
+   pays besides its own reward, or null. */
+export function eventCheckin(day = dayKey()) {
+  const ev = eventOn(day);
+  const d = new Date(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8));
+  return ev?.checkin && d.getDay() === ev.checkin.weekday ? { event: ev, items: ev.checkin.items } : null;
+}
+
+// Days left in an event, today included (the dialog's and the board's count).
+export function eventDaysLeft(ev, day = dayKey()) {
+  const at = (k) => Date.UTC(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8));
+  return Math.max(0, Math.round((at(ev.end) - at(day)) / 86400000) + 1);
+}

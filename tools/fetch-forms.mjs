@@ -333,7 +333,11 @@ try {
   const { FORMS: was } = await import("../src/data/forms.js");
   prior = new Map(was.map((f) => [f.name, f.wave ?? (f.wild ? 1 : 0)]));
 } catch { /* first ever run - everything is new */ }
-const NEXT_WAVE = prior.size ? Math.max(...prior.values()) + 1 : 2;
+/* The event looks (eventforms.js) sit one wave past the forms in dex.js, so a
+   form fetched after them must take a wave past THEIRS or it would sort in
+   front of them - an insert. */
+const { EVENT_WAVE } = await import("../src/data/eventforms.js");
+const NEXT_WAVE = Math.max(prior.size ? Math.max(...prior.values()) + 1 : 2, EVENT_WAVE + 1);
 const waveOf = (name) => prior.get(name) ?? NEXT_WAVE;
 
 const byName = new Map(SPECIES.map((sp) => [sp.name, sp]));
@@ -662,6 +666,10 @@ const LOOK_VARIETIES = [
   const ids = out.map((f) => f.id);
   if (new Set(ids).size !== ids.length) throw new Error("two forms share an id");
   if (ids.some((id) => id < 10000 || id > 20000)) throw new Error("a form id left 10000-20000");
+  // The event looks hold hand-picked ids in the same range (eventforms.js).
+  const { EVENTS } = await import("../src/data/eventforms.js");
+  const taken = new Set(EVENTS.flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])].map((l) => l.id)));
+  if (ids.some((id) => taken.has(id))) throw new Error("a form id is an event look's - give the look another");
 }
 
 /* MADE FIRST, MET SECOND - AND THAT ORDER IS A SAVE MIGRATION AVOIDED.

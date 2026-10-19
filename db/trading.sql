@@ -700,6 +700,16 @@ returns text[] language sql immutable set search_path = '' as $$
   ]
 $$;
 
+-- THE EVENT LOOKS' PLACES in a save's dex array (1-based): a costume from a
+-- dated event (src/data/eventforms.js) is no Pokedex entry, so `dex_count`
+-- skips them - a player who missed an event can still finish the Pokedex,
+-- and the card's rank is the game's own (`dexCaught`, dex.js). check.mjs holds
+-- this list equal to the game's `EVENT_SLOTS`.
+create or replace function public.event_slots()
+returns int[] language sql immutable set search_path = '' as $$
+  select array[1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423]
+$$;
+
 -- A card's numbers, and its showcase kept honest, from a save document.
 create or replace function public.card_stats(data jsonb, card public.trainer_cards)
 returns public.trainer_cards language plpgsql stable set search_path = '' as $$
@@ -708,7 +718,8 @@ declare
 begin
   card.xp := case when coalesce(data->>'xp', '') ~ '^\d{1,9}$' then (data->>'xp')::int else card.xp end;
   card.dex_count := case when jsonb_typeof(data->'dex') = 'array'
-    then (select count(*) from jsonb_array_elements_text(data->'dex') d where d = '2') else card.dex_count end;
+    then (select count(*) from jsonb_array_elements_text(data->'dex') with ordinality d(v, n)
+           where d.v = '2' and not d.n = any(public.event_slots())) else card.dex_count end;
   card.variants := (select count(*)
     from unnest(public.tier_list()) t,
          jsonb_array_elements_text(case when jsonb_typeof(data->t) = 'array' then data->t else '[]' end) v
@@ -772,7 +783,11 @@ returns text[] language sql immutable set search_path = '' as $$
     union all
     select g
       from jsonb_array_elements_text(case when jsonb_typeof(data->'medals') = 'array' then data->'medals' else '[]' end) g
-     where g ~ '^tier:[a-z]+:[1-9]$' and split_part(g, ':', 2) = any(public.tier_list())) x
+     where g ~ '^tier:[a-z]+:[1-9]$' and split_part(g, ':', 2) = any(public.tier_list())
+    union all
+    select g
+      from jsonb_array_elements_text(case when jsonb_typeof(data->'medals') = 'array' then data->'medals' else '[]' end) g
+     where g ~ '^event:[a-z]+$') x
 $$;
 
 -- A box entry as a card shows it - fields read off the stored save only.

@@ -1090,11 +1090,16 @@ canvas {
    Written as `30cqw` twice rather than as a shared token because that is what
    `.evo-mon` says four lines up; if that moves, this has to move with it, and
    a grep for `30cqw` finds both. */
+/* NO STACKING CONTEXT OF ITS OWN (2026-10-19): with `z-index: 2` and a
+   centring `transform` it was one layer over the creature, so a behind-layer
+   (Diamond's aura, Emerald's radiance) covered the reveal. Centred by
+   margins, its layers stack with `.evo-mon` (z 1): behind at 0, over at 3. */
 .evo-fx {
-  position: absolute; left: 50%; top: 50%; z-index: 2;
-  width: 30cqw; height: 30cqw; transform: translate(-50%, -50%);
+  position: absolute; left: 50%; top: 50%;
+  width: 30cqw; height: 30cqw; margin: -15cqw 0 0 -15cqw;
   pointer-events: none;
 }
+.evo-mon { position: relative; z-index: 1; }
 
 /* 13px, up from 9. At 9 the stars read as specks of dust against a 64px
    sprite blown up to fill a battle scene - the tell of the tier was the one
@@ -8013,6 +8018,14 @@ button:disabled { transition: none; }
 .ci-go:disabled { opacity: .5; cursor: default; }
 .ci-go.quiet { background: var(--surface-2); color: var(--ink); box-shadow: none; border: 1px solid var(--line-firm); }
 .ci-foot { margin: 0; font-size: 12px; color: var(--ink-faint); }
+/* A DATED EVENT'S CHECK-IN DAY (events.js `eventCheckin`): its extra, in the event's orange. */
+.ci-bonus {
+  width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; border-radius: 14px;
+  background: color-mix(in srgb, #ff8a2a 14%, var(--surface-2)); border: 1px solid color-mix(in srgb, #ff8a2a 55%, transparent);
+}
+.ci-bonus .ci-ic { width: 30px; height: 30px; flex: none; image-rendering: pixelated; }
+.ci-bonus > span { display: grid; gap: 1px; font-size: 12.5px; color: var(--ink-soft); }
+.ci-bonus b { font: 700 14px var(--display); color: #e8650f; }
 .ci-pill b { color: #ff7a38; }
 /* The milestone: the whole screen, a turning burst, confetti, the number. */
 .ci-party { position: fixed; inset: 0; z-index: 90; display: grid; place-content: center; justify-items: center; gap: 10px; overflow: hidden;
@@ -8663,7 +8676,7 @@ button:disabled { transition: none; }
 
 .gold-shine, .gold-glint, .shadow-aura, .chaos-aura,
 .chaos-neg, .chaos-cut, .proj-beam, .proj-base, .proj-lines, .cad-breath,
-.plat-sweep, .dia-fire, .dia-halo, .em-depth, .em-rad, .em-glint,
+.plat-sweep, .dia-fire, .dia-halo, .dia-prism, .em-depth, .em-rad, .em-glint,
 .gem-depth, .gem-shine, .gem-glint, .ember-glow, .ember-spark, .leaf-fall {
   position: absolute; inset: 0; pointer-events: none;
 }
@@ -8687,11 +8700,24 @@ button:disabled { transition: none; }
   background: conic-gradient(#ff5d8f, #ffd25d, #7dff8a, #5de2ff, #8a7dff, #ff5df0, #ff5d8f);
   animation: dia-halo 5s linear infinite; }
 @keyframes dia-halo { to { transform: rotate(360deg); } }
+/* DIAMOND'S FIRE, INSIDE IT (2026-10-19, asked for): the halo is the light
+   leaving the stone; this is the light caught in it. A cone of thin colour
+   flashes with clear gaps between, cut to the body and turning the OTHER
+   way from the halo, slower - so a flash crosses the white ice now and then
+   rather than tinting it. Turning, never sweeping (Platinum) or drifting
+   (Emerald); transform only, so a Box row can run it. */
+.dia-prism i { position: absolute; inset: -50%;
+  background: conic-gradient(from 0deg,
+    transparent 0 6%, rgba(255, 93, 143, .55) 9%, transparent 13% 30%,
+    rgba(93, 226, 255, .6) 34%, transparent 38% 52%, rgba(255, 210, 93, .55) 56%, transparent 60% 74%,
+    rgba(138, 125, 255, .6) 78%, transparent 82% 100%);
+  mix-blend-mode: screen; animation: dia-prism 9s linear infinite reverse; }
+@keyframes dia-prism { to { transform: rotate(360deg); } }
 .gold-shine, .gold-glint, .shadow-aura.front, .chaos-neg, .chaos-cut, .proj-lines,
-.plat-sweep, .dia-fire, .em-depth, .em-glint,
+.plat-sweep, .dia-fire, .dia-prism, .em-depth, .em-glint,
 .gem-depth, .gem-shine, .gem-glint, .ember-spark, .leaf-fall { z-index: 3; }
 /* Masked to the creature's own outline, or they are rectangles over the grass. */
-.gold-shine, .chaos-neg, .proj-lines, .plat-sweep, .em-depth, .gem-depth, .gem-shine {
+.gold-shine, .chaos-neg, .proj-lines, .plat-sweep, .dia-prism, .em-depth, .gem-depth, .gem-shine {
   overflow: hidden;
   -webkit-mask: var(--art) center / contain no-repeat;
           mask: var(--art) center / contain no-repeat;
@@ -9060,7 +9086,7 @@ button:disabled { transition: none; }
   84%  { transform: translateY(0) scale(.95); }
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
-.mon-slot > :is(.dia-halo, .dia-fire, .gold-shine, .gold-glint, .shadow-aura, .chaos-aura, .proj-base,
+.mon-slot > :is(.dia-halo, .dia-prism, .dia-fire, .gold-shine, .gold-glint, .shadow-aura, .chaos-aura, .proj-base,
   .plat-sweep, .em-depth, .em-rad, .em-glint, .gem-depth, .gem-shine, .gem-glint, .ember-glow, .ember-spark, .leaf-fall) {
   animation: fx-follow 620ms cubic-bezier(.2, 1.5, .45, 1) both, mon-idle 2.6s ease-in-out 700ms infinite;
 }
@@ -9077,6 +9103,11 @@ button:disabled { transition: none; }
    (and Emerald's radiance) tinted the creature instead of glowing behind it
    (2026-10-16). `.sprite-fx > img` does the same everywhere else. */
 .cell > img:not(.mark) { position: relative; z-index: 1; }
+/* AND THE DEX ENTRY'S OWN PICTURES (2026-10-19, reported: Diamond's aura over
+   the whole creature in the portrait): the portrait and the Forms strip are
+   bare `<img>`s beside their layers too. */
+.sheet-portrait > img, .sf-art > img:not(.mark) { position: relative; z-index: 1; }
+.cell .dia-prism { inset: 8%; }
 .cell .em-rad { inset: 2%; }
 .cell .shadow-aura { inset: 0 4% 6%; }
 .cell .chaos-aura { inset: 8%; }
@@ -9086,10 +9117,10 @@ button:disabled { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .gold-shine i, .gold-glint i, .shadow-aura i, .chaos-aura::before, .chaos-aura i,
   .chaos-neg, .chaos-neg::before, .chaos-cut, .proj-beam, .proj-lines, .proj-lines i,
-  .plat-sweep i, .dia-fire i, .dia-halo b, .em-depth i, .em-rad i, .em-glint i,
+  .plat-sweep i, .dia-fire i, .dia-halo b, .dia-prism i, .em-depth i, .em-rad i, .em-glint i,
   .gem-depth i, .gem-shine i, .gem-glint i, .ember-glow i, .ember-spark i, .leaf-fall i,
   .sprite-projection:not(.mon) { animation: none; }
-  .mon-slot > :is(.dia-halo, .dia-fire, .gold-shine, .gold-glint, .shadow-aura, .chaos-aura, .proj-base,
+  .mon-slot > :is(.dia-halo, .dia-prism, .dia-fire, .gold-shine, .gold-glint, .shadow-aura, .chaos-aura, .proj-base,
     .plat-sweep, .em-depth, .em-rad, .em-glint, .gem-depth, .gem-shine, .gem-glint, .ember-glow, .ember-spark, .leaf-fall) {
     animation: none;   /* the sprite holds still too (.mon, "motion" above) */
   }
@@ -11159,3 +11190,217 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { border-radius: 8px; background: var(--line-firm); }
 }
+
+/* ===== A DATED EVENT (Season.jsx, eventforms.js) =========================
+   Art, like the battle skies: the event's own night whatever the theme, so
+   its colours are literals here and change for no `data-theme`. Hallowed
+   Night's are a moonlit violet and a jack-o'-lantern orange. */
+.sn-sheet { padding: 12px; }
+.sn-card {
+  --sn-glow: #ff8a2a; --sn-ink: #f6ecff; --sn-soft: #cbb8e6; --sn-night: #160c2a;
+  position: relative; isolation: isolate; overflow: hidden auto;
+  width: min(620px, 100%); max-height: calc(100dvh - 24px);
+  display: grid; gap: 14px; justify-items: center; text-align: center; padding: 30px 22px 20px;
+  color: var(--sn-ink); border-radius: 24px; border: 1px solid rgba(255, 138, 42, .45);
+  background: radial-gradient(120% 70% at 50% 0%, #3a1f63 0%, #22123f 45%, var(--sn-night) 100%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .6), inset 0 0 60px rgba(255, 138, 42, .08);
+  animation: ci-in 420ms cubic-bezier(.2, 1.3, .4, 1);
+}
+.sn-sky { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.sn-moon {
+  position: absolute; top: 18px; right: 34px; width: 74px; height: 74px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 36%, #fff8dc 0 40%, #ffe7a0 62%, #f3c66a 100%);
+  box-shadow: 0 0 40px 10px rgba(255, 220, 140, .35), 0 0 120px 40px rgba(255, 180, 90, .15);
+}
+.sn-fog {
+  position: absolute; left: -40%; width: 180%; height: 110px; bottom: 0; opacity: .5;
+  background: radial-gradient(40% 60% at 25% 60%, rgba(200, 180, 255, .22), transparent 70%),
+    radial-gradient(35% 55% at 70% 50%, rgba(200, 180, 255, .18), transparent 70%);
+  animation: sn-drift 18s linear infinite alternate;
+}
+.sn-fog.b { bottom: 40px; opacity: .3; animation-duration: 26s; animation-direction: alternate-reverse; }
+@keyframes sn-drift { to { transform: translateX(18%); } }
+/* A bat: one clip-path silhouette, its wings beating between two shapes. */
+.sn-bat {
+  position: absolute; width: 26px; height: 12px; background: #0b0614;
+  clip-path: polygon(0 20%, 18% 0, 30% 35%, 42% 15%, 50% 30%, 58% 15%, 70% 35%, 82% 0, 100% 20%, 82% 70%, 62% 55%, 50% 100%, 38% 55%, 18% 70%);
+  animation: sn-flap .32s ease-in-out infinite alternate, sn-fly 9s ease-in-out infinite;
+}
+.sn-bat.b0 { top: 34px; left: 12%; }
+.sn-bat.b1 { top: 70px; left: 74%; scale: .7; animation-delay: .1s, -3s; }
+.sn-bat.b2 { top: 22px; left: 46%; scale: .55; animation-delay: .2s, -5s; }
+.sn-bat.b3 { top: 96px; left: 6%; scale: .6; animation-delay: .05s, -7s; }
+.sn-bat.b4 { top: 58px; left: 88%; scale: .45; animation-delay: .15s, -1s; }
+@keyframes sn-flap { to { clip-path: polygon(0 60%, 18% 40%, 30% 45%, 42% 25%, 50% 30%, 58% 25%, 70% 45%, 82% 40%, 100% 60%, 82% 80%, 62% 60%, 50% 100%, 38% 60%, 18% 80%); } }
+@keyframes sn-fly { 50% { translate: 24px -10px; } }
+/* STICKY, not absolute: the card scrolls on a phone, and the X must not
+   scroll away with it. It takes no room (the negative margin). */
+.sn-x {
+  position: sticky; top: 0; justify-self: end; z-index: 2; margin: -18px -10px -30px 0;
+  grid-area: auto;               /* .set-x names an area this card has not got */
+  color: var(--sn-ink); background: rgba(0, 0, 0, .45);
+}
+.sn-kicker { font: 600 10px var(--pixel); text-transform: uppercase; color: var(--sn-glow); }
+.sn-title {
+  margin: -4px 0 0; font: 900 clamp(30px, 8vw, 46px)/1 var(--display); color: #ffb35c;
+  text-shadow: 0 0 18px rgba(255, 138, 42, .75), 0 3px 0 #6b2a00;
+  animation: sn-flicker 3.2s steps(1, end) infinite;
+}
+@keyframes sn-flicker { 0%, 47%, 50%, 77%, 100% { opacity: 1; } 48% { opacity: .55; } 76% { opacity: .8; } }
+.sn-lede { margin: 0; max-width: 46ch; font-size: 14px; line-height: 1.5; color: var(--sn-soft); }
+.sn-lineup { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.sn-line {
+  display: grid; gap: 4px; justify-items: center; align-content: start; padding: 10px 8px 12px;
+  border-radius: 16px; background: rgba(0, 0, 0, .28); border: 1px solid rgba(203, 184, 230, .18);
+}
+.sn-line > b { font: 700 14px var(--display); color: var(--sn-ink); }
+.sn-line > small { font-size: 11.5px; line-height: 1.35; color: var(--sn-soft); }
+.sn-mons { display: flex; justify-content: center; align-items: flex-end; min-height: 64px; }
+.sn-mon { position: relative; width: 60px; height: 60px; margin: 0 -6px; animation: sn-bob 2.4s ease-in-out infinite; animation-delay: calc(var(--k) * -.6s); }
+.sn-mon > img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .55)); }
+@keyframes sn-bob { 50% { transform: translateY(-5px); } }
+.sn-mon.solo { width: 96px; height: 96px; margin: -16px 0 -16px; }
+.sn-got {
+  position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  font: 700 11px var(--body); font-style: normal; color: #fff; background: #2fbf71; box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
+}
+.sn-how { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; text-align: left; }
+.sn-how li { display: flex; gap: 10px; align-items: center; padding: 9px 11px; border-radius: 12px; background: rgba(255, 255, 255, .05); }
+.sn-how em { font-style: normal; font-size: 20px; flex: none; }
+.sn-how span { display: grid; gap: 1px; font-size: 12px; line-height: 1.35; color: var(--sn-soft); }
+.sn-how b { font: 700 13.5px var(--display); color: var(--sn-ink); }
+/* THE BUTTON STAYS ON SCREEN (the short-screen rule): the foot is pinned to
+   the card's floor while the rest scrolls under it. */
+.sn-foot {
+  position: sticky; bottom: -20px; z-index: 2; margin: 0 -22px -20px; padding: 14px 22px 16px;
+  width: calc(100% + 44px); display: grid; gap: 6px; justify-items: center;
+  background: linear-gradient(to top, var(--sn-night) 70%, rgba(22, 12, 42, 0));
+}
+.sn-held { font: 600 10px var(--pixel); text-transform: uppercase; color: var(--sn-soft); }
+.sn-go { background: linear-gradient(180deg, #ff9d3d, #e8650f); box-shadow: 0 10px 28px rgba(255, 120, 30, .45); }
+.sn-board {
+  border: 0; background: none; cursor: pointer; padding: 6px 10px;
+  font: 700 13px var(--display); color: var(--sn-glow);
+}
+/* A phone's card is narrow: the moon sets behind the corner, off the title. */
+@media (max-width: 520px) {
+  .sn-moon { top: -16px; right: -16px; width: 64px; height: 64px; }
+  .sn-lineup { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+  .sn-mon { width: 44px; height: 44px; }
+  .sn-mon.solo { width: 72px; height: 72px; margin: -12px 0; }
+}
+@media (max-height: 540px) {
+  .sn-card { gap: 10px; padding: 20px 16px 14px; }
+  /* Sideways the foot is ONE ROW - count, button, board link - so the card
+     a phone holds sideways (360px) keeps most of its height for the event. */
+  .sn-foot {
+    bottom: -14px; margin: 0 -16px -14px; padding: 8px 16px 8px; width: calc(100% + 32px);
+    grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  }
+  .sn-foot .sn-go { min-height: 42px; font-size: 15px; }
+  .sn-title { font-size: 30px; }
+  .sn-lede { font-size: 12.5px; }
+  .sn-moon { width: 48px; height: 48px; }
+  .sn-mon { width: 48px; height: 48px; }
+  .sn-mon.solo { width: 72px; height: 72px; margin: -12px 0; }
+  .sn-mons { min-height: 50px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sn-fog, .sn-bat, .sn-title, .sn-mon { animation: none; }
+}
+/* The event's chip on a nameplate, in the event's colours rather than a
+   generation's gold: a costume met in the grass says so where you look. */
+.gen.gen-event { color: #fff; background: #3a1f63; box-shadow: inset 0 0 0 1.5px #ff8a2a; }
+/* Its shelf heads the shop while it runs. */
+.sh-head.sh-event span:first-child { color: #e8650f; }
+/* ITS BOARD CARD: the looks in a row, each drawn when held and a shadow until. */
+.sn-board-card .ev-banner { background: linear-gradient(90deg, #2a1648, #3a1f63); }
+.evcard .sn-board-card .ev-banner h4 { color: #ffb35c; }
+.sn-emblem { font-size: 20px; line-height: 1; }
+.sn-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+.sn-slot {
+  aspect-ratio: 1; padding: 2px; border-radius: 10px; cursor: pointer;
+  border: 1px dashed var(--line-firm); background: var(--surface-2);
+}
+.sn-slot > img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; filter: brightness(0) opacity(.3); }
+.sn-slot.got { border-style: solid; border-color: #ff8a2a; }
+.sn-slot.got > img { filter: none; }
+/* THE COUNTDOWN: four tiles, the seconds' one ticking. On the event's night
+   in the dialog, in the theme's own surface on the board's card. */
+.sn-count { display: grid; gap: 6px; justify-items: center; }
+.sn-count-says { font: 600 10px var(--pixel); text-transform: uppercase; color: var(--sn-glow, #e8650f); }
+.sn-count-tiles { display: flex; gap: 6px; }
+.sn-tile {
+  display: grid; justify-items: center; min-width: 52px; padding: 7px 6px 5px; border-radius: 12px;
+  background: rgba(0, 0, 0, .4); border: 1px solid rgba(255, 138, 42, .4);
+  box-shadow: inset 0 -3px 0 rgba(255, 138, 42, .15);
+}
+.sn-tile b { font: 800 24px/1 var(--display); color: #ffb35c; font-variant-numeric: tabular-nums; }
+.sn-tile.tick b { animation: sn-tick 1s ease-out; }
+@keyframes sn-tick { from { transform: translateY(-4px); opacity: .4; } }
+.sn-tile i { font: 600 9px var(--pixel); font-style: normal; text-transform: uppercase; color: var(--sn-soft, #cbb8e6); }
+.sn-board-card .sn-tile { background: var(--surface-2); border-color: color-mix(in srgb, #ff8a2a 45%, transparent); min-width: 0; flex: 1; }
+.sn-board-card .sn-tile b { color: #e8650f; font-size: 20px; }
+.sn-board-card .sn-tile i { color: var(--ink-faint); }
+.sn-board-card .sn-count-tiles { width: 100%; }
+@media (max-height: 540px) { .sn-tile { min-width: 44px; padding: 5px 4px 4px; } .sn-tile b { font-size: 19px; } }
+@media (prefers-reduced-motion: reduce) { .sn-tile.tick b { animation: none; } }
+/* THE MAP'S CHIP: the event's colours; on a touch screen an icon chip like
+   every alert, its dot carrying the biggest unit left ("3d"). */
+.sn-pill { border-color: #ff8a2a; }
+.sn-pill b { color: #e8650f; }
+.sn-pill-ic { font-size: 16px; line-height: 1; }
+.sn-pill .ms-dot { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  .hud .sn-pill .ms-dot { display: grid; width: auto; min-width: 14px; padding: 0 3px; border-radius: 7px; background: #ff8a2a; color: #2a1000; }
+}
+/* THE NIGHTMARE: its slot, what it waits on, and the moon waning to new. */
+.sn-hunt-row {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 8px; border-radius: 12px; background: var(--surface-2);
+}
+.sn-hunt-row.due { box-shadow: inset 0 0 0 1px #8a5cff, 0 0 18px rgba(138, 92, 255, .35); }
+/* Not the moons' span: they are a row of their own (a grid stacked them). */
+.sn-hunt-row > span:not(.sn-moons) { display: grid; gap: 1px; min-width: 0; }
+.sn-hunt-row b { font: 700 13.5px var(--display); color: var(--ink); }
+.sn-hunt-row small { font-size: 11.5px; color: var(--ink-soft); }
+.sn-moons { display: flex; gap: 3px; }
+.sn-moons i {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 36%, #fff8dc, #f3c66a); box-shadow: 0 0 4px rgba(255, 220, 140, .5);
+}
+.sn-moons i.dark { background: #1b1030; box-shadow: inset 0 0 0 1px #6a4fa0; }
+.sn-hunt {
+  width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; text-align: left;
+  padding: 10px 14px; border-radius: 16px; background: rgba(0, 0, 0, .35); border: 1px solid rgba(138, 92, 255, .4);
+}
+.sn-hunt > span { display: grid; gap: 2px; font-size: 12.5px; line-height: 1.4; color: var(--sn-soft); }
+.sn-hunt b { font: 800 16px var(--display); color: #c9b2ff; }
+/* Only a shape until it is caught - with the light of its one eye. */
+.sn-shade > img { filter: brightness(0) drop-shadow(0 0 10px rgba(138, 92, 255, .9)) !important; }
+/* THE NIGHTMARE NEAR: the map closes in to a ring round the trainer. */
+.nm-veil {
+  position: absolute; inset: 0; pointer-events: none; border-radius: 9px;
+  background: radial-gradient(circle at 50% 50%, transparent 18%, rgba(8, 2, 20, .55) 42%, rgba(4, 0, 12, .9) 75%);
+  animation: nm-close 4s ease-in-out infinite;
+}
+@keyframes nm-close { 50% { opacity: .82; } }
+@media (prefers-reduced-motion: reduce) { .nm-veil { animation: none; } }
+/* THE SPOOKY HONEY (items.js `fx`): the one honey jar turned violet, a
+   pumpkin glow breathing in its belly and a wisp curling off the lid. Two
+   small layers, opacity and transform only, so a Bag of them costs nothing. */
+.item-spooky { position: relative; }
+.item-spooky > img { filter: sepia(1) hue-rotate(225deg) saturate(3) brightness(.75) contrast(1.2) !important; }
+.item-spooky > .ifx-glow {
+  position: absolute; left: 22%; top: 40%; width: 56%; height: 46%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 170, 60, 1) 0 22%, rgba(255, 120, 20, .7) 45%, rgba(255, 110, 20, 0) 72%);
+  mix-blend-mode: screen; animation: ifx-breathe 2.2s ease-in-out infinite;
+}
+.item-spooky > .ifx-wisp {
+  position: absolute; left: 44%; top: -4%; width: 14%; height: 30%; border-radius: 50% 50% 40% 40%; pointer-events: none;
+  background: linear-gradient(to top, rgba(200, 170, 255, .8), rgba(200, 170, 255, 0));
+  animation: ifx-wisp 2.8s ease-out infinite;
+}
+@keyframes ifx-breathe { 50% { opacity: .45; transform: scale(.85); } }
+@keyframes ifx-wisp { 0% { opacity: 0; transform: translateY(20%) scaleX(.6); } 30% { opacity: .9; } 100% { opacity: 0; transform: translate(30%, -60%) scaleX(1.2); } }
+@media (prefers-reduced-motion: reduce) { .item-spooky > i { animation: none; } }

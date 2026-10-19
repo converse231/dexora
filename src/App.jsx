@@ -5,7 +5,7 @@ import TopBar, { Missions } from "./ui/TopBar.jsx";
 import You from "./ui/You.jsx";
 import { freePoints } from "./game/trainer.js";
 import Tip from "./ui/Tip.jsx";
-import { phaseAt, timeLabel } from "./game/clock.js";
+import { phaseAt, timeLabel, isNight } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
 import { RAIL_KEY, ORDER_KEY, REF_KEY, read, write, drop, flushNow } from "./game/store.js";
 import { tradeInbox, push, myDefense, setReferrer, myReferrals } from "./net/cloud.js";
@@ -30,6 +30,8 @@ import { dueCount } from "./game/achievements.js";
 import Party from "./ui/Party.jsx";
 import CheckIn from "./ui/CheckIn.jsx";
 import Quiz from "./ui/Quiz.jsx";
+import { SeasonIntro, SeasonChip, seasonUnseen } from "./ui/Season.jsx";
+import { eventOn, eventSoon, huntDue } from "./game/events.js";
 import Icon from "./ui/Icon.jsx";
 import { followSheet, PARTY_MAX, partnerRule, isMastered } from "./game/cosmetics.js";
 import { RESEARCH_MAX } from "./game/research.js";
@@ -56,6 +58,7 @@ import { modalOpen } from "./ui/modal.js";
 import Cheer from "./ui/Cheer.jsx";
 import RankUp from "./ui/RankUp.jsx";
 import { DEX_RANKS, dexRank, rankLine, tierName } from "./game/medals.js";
+import { dexCaught } from "./data/dex.js";
 import Types from "./ui/Types.jsx";
 import Evolve from "./ui/Evolve.jsx";
 /* ON DEMAND: the Trade Center is its own chunk, fetched the first time it
@@ -206,7 +209,7 @@ export default function App({
      dependency is honest rather than a lie told to the linter. */
   const onSell = useCallback((uids) => engine?.sell(uids), [engine]);
   const onRank = useCallback(() => {
-    const to = dexRank(engine?.state.dex.filter((v) => v === 2).length ?? 0).step;
+    const to = dexRank(dexCaught(engine?.state.dex)).step;
     setReplay({ from: to > 0 ? to - 1 : null, to });
   }, [engine]);
   // A rare form's spares go through their own engine call (`convertVariants`).
@@ -222,6 +225,9 @@ export default function App({
   const [quizOpen, setQuizOpen] = useState(false);
   const [rouletteOpen, setRouletteOpen] = useState(false);
   const askedCheckin = useRef(false);
+  /* A DATED EVENT'S ANNOUNCEMENT (Season.jsx): opens by itself once per event
+     on each device, after the check-in, and again from its board card. */
+  const [seasonOpen, setSeasonOpen] = useState(false);
   const onEditParty = useCallback(() => setPartyPick(true), []);
   const onJumped = useCallback(() => setBoxJump(null), []);
   /* THE ROTOM PANEL'S APP (Dex, Box, Shop, Map, Events), held here so the
@@ -543,7 +549,7 @@ export default function App({
      on the summary. */
   /* And while a Pokédex reward rolls (DexClaim): the "new packs" tip over the reel. */
   const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene || claimGen != null
-    || checkinOpen || rouletteOpen || quizOpen;
+    || checkinOpen || rouletteOpen || quizOpen || seasonOpen;
   const checkin = engine?.checkinStatus?.() ?? null;
   const quiz = engine?.quiz?.() ?? null;
   // A bingo prize waiting (bingo.js) - a chip on the map until it is claimed on Events.
@@ -559,6 +565,18 @@ export default function App({
     askedCheckin.current = true;
     setCheckinOpen(true);
   }, [engine, checkin?.due, enc, st?.char]);
+  // The event announces itself once, never over an encounter or the check-in.
+  // The event running, or the one about to open (its teaser and countdown).
+  const season = eventOn() ?? eventSoon();
+  const nightmare = st ? huntDue(st.dreams, st.medals) : null;
+  const nightmareNear = !!nightmare && st.areaId === nightmare.area && isNight(st.steps);
+  useEffect(() => {
+    /* AFTER the day's check-in, never beside it: both decide in one render,
+       and on a Friday of the event the two opened stacked (found in QA). */
+    if (!engine || !season || !seasonUnseen(season) || enc || !st?.char || checkinOpen || rouletteOpen
+      || checkin?.due) return;
+    setSeasonOpen(true);
+  }, [engine, season, enc, st?.char, checkinOpen, rouletteOpen, checkin?.due]);
 
   // The walking party's Box entries, for the strip on the map: rebuilt only when the party or the Box moves.
   /* WHAT THE ONE WALKING IS DOING OUT HERE, or null. Derived, never stored -
@@ -684,7 +702,8 @@ export default function App({
   }, [steps]);
   useEffect(() => () => clearTimeout(parcelTimer.current), []);
 
-  const caught = st ? st.dex.filter((v) => v === 2).length : 0;
+  // The Pokedex's count: an event look is no entry of it (dex.js).
+  const caught = st ? dexCaught(st.dex) : 0;
   const level = levelFromXp(st?.xp ?? 0);
   /* Steps due, for the You dot. On the collection's rev and the thousand
      steps (every walking step is a multiple of 1,000): not on every step. */
@@ -823,6 +842,10 @@ export default function App({
       )}
       {quizOpen && quiz && (
         <Quiz quiz={quiz} onAnswer={(id) => engine.answerQuiz(id)} onClose={() => setQuizOpen(false)} />
+      )}
+      {seasonOpen && season && (
+        <SeasonIntro ev={season} dex={st?.dex} onClose={() => setSeasonOpen(false)}
+          onBoard={() => { setSeasonOpen(false); goTab("catch"); openRail("events"); }} />
       )}
       {rouletteOpen && engine && (
         <Suspense fallback={null}>
@@ -987,7 +1010,7 @@ export default function App({
           and Hint.jsx for why it is a dialog rather than the bar it started as:
           a tip somebody scrolls past is a tip nobody read. */}
       {/* Tips wait for the check-in and the roulette too: a pack's first-time tip named the prize mid-spin. */}
-      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && !quizOpen && (
+      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && !quizOpen && !seasonOpen && (
         <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 
@@ -1036,6 +1059,9 @@ export default function App({
                 overlay after it - an element rather than a canvas pass, so
                 the engine's draw loop does not grow a second colour rule. */}
             {engine?.riftHere() && <div className="rift-tint" aria-hidden="true" />}
+            {/* THE NIGHTMARE IS NEAR (events.js `huntDue`): its area after dark
+                closes in round the trainer, so the place says so before it does. */}
+            {nightmareNear && <div className="nm-veil" aria-hidden="true" />}
             {/* A RUNNING EFFECT IS SPENT IN STEPS, so it is counted down
                 where the steps happen rather than on the shelf that sold it.
                 Nothing is drawn when nothing is running - a readout that is
@@ -1098,6 +1124,8 @@ export default function App({
                       <b>Check in<em className="ms-dot" aria-hidden="true">!</em></b>
                     </button>
                   )}
+                  {/* A DATED EVENT'S COUNTDOWN (Season.jsx): to its opening, then its close. */}
+                  {season && !seasonOpen && <SeasonChip ev={season} onOpen={() => setSeasonOpen(true)} />}
                   {/* TODAY'S QUIZ (quiz.js) until it is answered. */}
                   {quiz && !quiz.done && !quizOpen && (
                     <button type="button" className="ms-tab ready dc-pill qz-pill" onClick={() => setQuizOpen(true)}
@@ -1408,6 +1436,8 @@ export default function App({
               onStar={(id) => engine.star(id)}
               bingo={bingo}
               onClaimBingo={() => engine.claimBingo()}
+              onClaimEvent={(id) => engine.claimEvent(id)}
+              onEventIntro={() => setSeasonOpen(true)}
               invite={{ due: refDue, counted: (refInfo?.invited ?? []).filter((x) => x.paid).length }}
               onInvite={account ? () => setInvite({ welcome: false }) : null}
             />

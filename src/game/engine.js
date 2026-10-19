@@ -3,7 +3,7 @@
    re-renders per frame — the engine calls onChange() only when something the
    UI actually shows has changed (a step, a dex entry, an encounter phase). */
 
-import { SPECIES } from "../data/dex.js";
+import { SPECIES, DEX_TOTAL, dexCaught, isEvent } from "../data/dex.js";
 import {
   AREAS, AREA_IDS, areaOf, walkable, rideable, SURFABLE, label, LEDGE, RAIL, MINI, MINI_UNKNOWN,
   HIGH_ELEV,
@@ -32,6 +32,7 @@ import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
+  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, cleanDreams, eventCheckin,
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
@@ -269,6 +270,8 @@ function freshState() {
     ...Object.fromEntries(TIERS.map((t) => [t, new Array(SPECIES.length).fill(0)])),
     // Medal ids already banked, so none can ever pay twice.
     medals: [],
+    // Each event's Bad Dreams, toward its hunt (events.js `huntDue`).
+    dreams: {},
     achieved: {},              // achievement id -> steps claimed - see achievements.js
     // Where the levels go. Ranks are spent, never refunded.
     stats: emptyStats(),
@@ -595,6 +598,7 @@ function loadState() {
       origin: normalise(s.origin ?? s.astral, SPECIES.length),
       astral: normalise(s.origin ? s.astral : null, SPECIES.length),
       medals: Array.isArray(s.medals) ? s.medals.filter((m) => typeof m === "string") : [],
+      dreams: cleanDreams(s.dreams),
       achieved: cleanAchieved(s.achieved),
       // A save from before stats existed has none, and a hand-edited one could
       // hold anything; the trainer module clamps each rank as it reads it.
@@ -1590,7 +1594,7 @@ export function createEngine(canvas, onChange, mini = null) {
           state.worn.push({ id: "friend", title: `${name} is happy`, sub: h >= HEARTS.length ? "BEST FRIENDS" : `${h} OF ${HEARTS.length} HEARTS`, n: ++wornSeq });
         }
         const kind = fieldOf(mate)?.find;
-        const item = (kind && rollFind(kind, Math.random))
+        const item = (kind && rollFind(kind, Math.random, levelFromXp(state.xp)))
           || (heartsOf(mate.walked) >= FRIEND_FINDS ? rollFind("friend", Math.random) : null);
         if (item) {
           bonded = true;
@@ -1841,7 +1845,18 @@ export function createEngine(canvas, onChange, mini = null) {
     const flood = !!ob && ob.areaId === state.areaId && Math.random() < OUTBREAK_SHARE;
     if (flood && --ob.left === 0) state.worn.push({ id: "outbreak", event: true, n: ++wornSeq });
     // Which of a family's drawings you meet (Unown's letter) - see `rollLook`.
-    const sp = rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(table));
+    /* And whether it came in costume (events.js): only while an event runs,
+       only a species it dressed, at night twice as often, more under a
+       Spooky Honey. Night is read here as the encounter below freezes it. */
+    const lure = running("event");
+    /* THE NIGHTMARE FALLS (events.js `huntDue`): its Bad Dreams full, the
+       first wild meeting in its area after dark IS the hunted one - and is
+       never a swap or a roll anywhere else. */
+    const hunt = source === "wild" ? huntDue(state.dreams, state.medals) : null;
+    const nightmare = !!hunt && state.areaId === hunt.area && isNight(state.steps);
+    const sp = nightmare ? speciesById(hunt.id)
+      : eventLook(rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(table)), Math.random,
+        { night: isNight(state.steps), lure: lure?.lure ?? 1 });
     /* Whether the dex already has this one, read BEFORE the throw can register
        it. It rides on the encounter rather than being looked up while drawing,
        because the panel would then read live state: settling a catch sets the
@@ -1901,7 +1916,7 @@ export function createEngine(canvas, onChange, mini = null) {
     /* Its own roll beside the tier's - see `rollAlpha` - so an alpha can be a
        Shiny too. A BOOLEAN, never 1/0: panels write `enc.alpha && <x/>`, and a
        0 there renders the digit "0" in the battle. The box entry stores 1. */
-    const alpha = rollAlpha(Math.random, sp.id);
+    const alpha = !nightmare && rollAlpha(Math.random, sp.id);
 
     state.encounter = {
       speciesId: sp.id,
@@ -1916,6 +1931,9 @@ export function createEngine(canvas, onChange, mini = null) {
          `known` and for the same reason: everything the plate reads is fixed
          when the Pokemon appears. */
       starred: (state.stars ?? []).includes(sp.id),
+      /* THE EVENT A COSTUME BELONGS TO, or null - what the Hallow Ball asks,
+         and the nameplate's event tag. */
+      event: isEvent(sp.id) ? sp.event : null,
       // The chain this meeting is part of, if it is the chained species.
       chain: state.combo?.species === comboKey(sp.id) ? state.combo.n : 0,
       variant,
@@ -1972,7 +1990,10 @@ export function createEngine(canvas, onChange, mini = null) {
       ball: "poke-ball",
       isNew: false,
       source,
-      msg: source === "fishing"
+      // The hunted one, which asks before you run and ends its hunt (`huntOn`).
+      hunt: nightmare,
+      msg: nightmare ? `The Nightmare falls... ${label(sp).toUpperCase()} is here!`
+        : source === "fishing"
         ? `Something bit! A wild ${label(sp).toUpperCase()}!`
         : `A wild ${label(sp).toUpperCase()} appeared!`,
       until: 0,
@@ -2264,7 +2285,7 @@ export function createEngine(canvas, onChange, mini = null) {
      the dex bonus. It was held back as a "gift" until then, and a Johto
      reading 137/137 paid nothing because its only Crobat was Koga's. Rare-form
      marks are still your own catches (`repairDex` skips traded entries). */
-  const caughtSpecies = () => state.dex.reduce((n, v) => n + (v === 2 ? 1 : 0), 0);
+  const caughtSpecies = () => dexCaught(state.dex);
 
   /* A SPECIES REGISTERS HERE, every way one can (a catch, an evolution, a
      trade), so the Pokédex rank is announced whichever way the count moved.
@@ -2272,9 +2293,9 @@ export function createEngine(canvas, onChange, mini = null) {
      card counts it - since it is a title and pays nothing. */
   function register(at) {
     if (state.dex[at] === 2) return;
-    const before = dexRank(state.dex.reduce((n, v) => n + (v === 2 ? 1 : 0), 0));
+    const before = dexRank(dexCaught(state.dex));
     state.dex[at] = 2;
-    const now = dexRank(state.dex.reduce((n, v) => n + (v === 2 ? 1 : 0), 0));
+    const now = dexRank(dexCaught(state.dex));
     if (now.step > before.step) {
       // Played as the rank-up ceremony (RankUp.jsx), never the banner.
       cheer({ kind: "rank", title: now.name.toUpperCase(), rank: now.id, step: now.step, from: before.step,
@@ -2299,10 +2320,14 @@ export function createEngine(canvas, onChange, mini = null) {
     if (state.dex[at] === 2) return;
     register(at);
     checkDexRewards(id);
-    state.money += dexBonus(caughtSpecies(), SPECIES.length);
+    if (!isEvent(id)) state.money += dexBonus(caughtSpecies(), DEX_TOTAL);
   }
 
   function checkDexRewards(speciesId) {
+    /* An event look moves no count (dex.js): no medal, and no milestone - the
+       count it would read is the one already paid. Its own prize is the
+       event's, claimed on the board (`claimEvent`). */
+    if (isEvent(speciesId)) return;
     for (const medal of medalsFor(speciesId, state.dex, state.medals)) {
       /* A GENERATION IS CLAIMED, not paid here (`claimDex`): the banner only
          says so, and the map's claim button stays until it is. */
@@ -2325,9 +2350,9 @@ export function createEngine(canvas, onChange, mini = null) {
         /* Completing the dex is the moment Origins start appearing in the
            wild, and a reward nobody is told about is not a reward. This is
            the only place that can say so at the moment it becomes true. */
-        sub: caught === SPECIES.length
+        sub: caught === DEX_TOTAL
           ? "Complete. Origin Pokémon now appear in the wild."
-          : `${SPECIES.length - caught} left to find.`,
+          : `${DEX_TOTAL - caught} left to find.`,
       });
     }
   }
@@ -2509,7 +2534,7 @@ export function createEngine(canvas, onChange, mini = null) {
          money on it too would have left the stream one-off exactly like the
          dex bonus it is there to replace. */
       const bounty = catchBounty(sp, e.variant);
-      const entry = e.isNew ? dexBonus(caughtSpecies(), SPECIES.length) : 0;
+      const entry = e.isNew && !isEvent(e.speciesId) ? dexBonus(caughtSpecies(), DEX_TOTAL) : 0;
       state.money += bounty + entry;
       // Every fact a research task reads is already frozen on the encounter.
       const learnt = study(e.speciesId, [...owned(e.speciesId, e.variant, e.alpha, e.size),
@@ -2542,6 +2567,7 @@ export function createEngine(canvas, onChange, mini = null) {
         : entry ? `  +¥${entry} new entry` : "";
       e.msg = `Gotcha! ${e.name} was caught!${tail}`;
       chainOn(e.speciesId, "caught");
+      huntOn(e, "caught");
       noteBingo({
         caught: {
           id: e.speciesId, types: sp.types, night: !!e.night, first: e.throws === 1, sized: !!sizeTag(e.size),
@@ -2559,6 +2585,7 @@ export function createEngine(canvas, onChange, mini = null) {
       teach({ kind: "fled" });
       e.msg = `${e.name} fled!`;
       chainOn(e.speciesId, "fled");
+      huntOn(e, "fled");
     } else {
       e.msg = "It broke free!";
     }
@@ -2574,7 +2601,8 @@ export function createEngine(canvas, onChange, mini = null) {
       if (cast) {
         if (cast.roll) {
           // One roll, here, so the machine itself stays pure and testable.
-          const hooked = Math.random() < rodBite(f.rod);
+          // Suction Cups or Sticky Hold walking with you: a likelier bite.
+          const hooked = Math.random() < Math.min(1, rodBite(f.rod) * (fieldOf(walker())?.bite ?? 1));
           Object.assign(f, hooked
             ? { phase: "bite", until: now + F.bite }
             : { phase: "miss", until: now + F.miss });
@@ -2613,6 +2641,36 @@ export function createEngine(canvas, onChange, mini = null) {
   /* THE CATCH CHAIN moves when an encounter ends (combo.js). Reaching a rung
      is announced, and so is losing a chain worth one, so a lift never starts
      or stops in silence. */
+  /* THE HUNT'S END, and the dreams that feed it (events.js). A costume
+     caught on its event's days is a Bad Dream; the last one says the
+     Nightmare is due. The hunted one caught is its medal - its title -
+     at once; lost, the moon waxes back to `keep`. */
+  function huntOn(e, outcome) {
+    const ev = eventOn();
+    const h = ev?.hunt;
+    if (!h) return;
+    if (e.hunt) {
+      if (outcome === "caught") {
+        state.medals.push(`event:${h.medal}`);
+        cheer({ kind: "medal", title: h.name.toUpperCase(), sub: `${h.title} is yours. A new title for your trainer card.` });
+      } else {
+        state.dreams = { ...state.dreams, [ev.id]: Math.min(state.dreams[ev.id] ?? 0, h.keep) };
+        cheer({ kind: "medal", title: "THE NIGHTMARE FADES",
+          sub: `Catch ${h.dreams - h.keep} more costumes and the new moon will bring it back.` });
+      }
+      return;
+    }
+    if (outcome !== "caught" || speciesById(e.speciesId)?.event !== ev.id
+      || state.medals.includes(`event:${h.medal}`)) return;
+    const was = state.dreams[ev.id] ?? 0;
+    if (was >= h.dreams) return;
+    state.dreams = { ...state.dreams, [ev.id]: was + 1 };
+    if (was + 1 === h.dreams) {
+      cheer({ kind: "medal", title: "THE NEW MOON RISES",
+        sub: `Something waits in ${AREAS[h.area]?.name ?? "the dark"} after nightfall...` });
+    }
+  }
+
   function chainOn(id, outcome) {
     const was = state.combo;
     state.combo = nextCombo(was, id, outcome);
@@ -2638,10 +2696,11 @@ export function createEngine(canvas, onChange, mini = null) {
        the derivation is pure and its input is already frozen. */
     /* AN ALPHA ASKS TOO: it never runs from you, so running is the only way
        to lose one - about one Pokemon in 250, gone on one press. */
-    if (!confirmed && (isLegendary(e.speciesId) || e.alpha)) {
+    if (!confirmed && (isLegendary(e.speciesId) || e.alpha || e.hunt)) {
       ask("flee", () => flee(true),
         `Run from ${e.alpha ? "the alpha " : ""}${e.name}?`,
-        isLegendary(e.speciesId)
+        e.hunt ? "The Nightmare fades if you run - three more costumes bring it back."
+          : isLegendary(e.speciesId)
           ? "A legendary. There is no telling when you will meet another."
           : "An alpha never runs from you, but it will be gone if you run from it.");
       return;
@@ -2649,6 +2708,7 @@ export function createEngine(canvas, onChange, mini = null) {
     e.phase = "ran";
     e.msg = "Got away safely.";
     chainOn(e.speciesId, "ran");
+    huntOn(e, "ran");
     e.until = performance.now() + 450;
     changed();
   }
@@ -3083,7 +3143,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const now = caughtSpecies();
     for (let n = now - state.gifted.length + 1; n <= now; n++) {
       const stone = milestoneAt(n);
-      if (stone) pay(stone.money, stone.items, { kind: "dex", title: `${n} SPECIES`, sub: `${SPECIES.length - now} left to find.` });
+      if (stone) pay(stone.money, stone.items, { kind: "dex", title: `${n} SPECIES`, sub: `${DEX_TOTAL - now} left to find.` });
     }
     for (const id of state.gifted) {
       for (const medal of medalsFor(id, state.dex, state.medals)) {
@@ -3203,7 +3263,7 @@ export function createEngine(canvas, onChange, mini = null) {
       state.bingo = freshBingo(week, {
         // a fixed roll: whether a set is open must not spend a random draw
         level, fish: !!bestRod(state.bag), packs: randomOpen(level, () => 0) != null,
-        missing: state.dex.filter((v) => v !== 2).length,
+        missing: DEX_TOTAL - dexCaught(state.dex),
       });
     }
     return state.bingo;
@@ -3271,6 +3331,9 @@ export function createEngine(canvas, onChange, mini = null) {
     if (reward.money) state.money += reward.money;
     if (reward.candy) state.candy += reward.candy;
     if (reward.items) give(reward.items);
+    // An event's check-in day pays its own on top (events.js `eventCheckin`).
+    const bonus = eventCheckin();
+    if (bonus) give(bonus.items);
     state.checkin = {
       last: dayKey(), streak: st.streak, best: Math.max(state.checkin.best, st.streak),
       spins: state.checkin.spins + (reward.spin ?? 0),
@@ -3278,7 +3341,7 @@ export function createEngine(canvas, onChange, mini = null) {
     noteBingo({ checkin: 1 });
     save();
     changed();
-    return { ...st, reward, milestone: STREAK_MILESTONES.includes(st.streak) };
+    return { ...st, reward, bonus, milestone: STREAK_MILESTONES.includes(st.streak) };
   }
   /* THE ROULETTE: one banked spin, decided and SAVED before the reel moves -
      a card set's packs, earned and stamped, or a Gold Pokemon that counts as
@@ -3430,6 +3493,21 @@ export function createEngine(canvas, onChange, mini = null) {
     changed();
     return { gen: Number(stamp.slice(4)), set, packs: BOXES[set].packs,
       money: medal?.money ?? 0, items: medal?.items ?? {}, medal: !!medal };
+  }
+
+  /* AN EVENT FINISHED, CLAIMED on the Events board (events.js `eventDue`):
+     its medal - which is its title - and a card pack of a random open set,
+     in one save. Answers what was won, or null. */
+  function claimEvent(id) {
+    if (state.stale) return null;
+    const ev = eventDue(state.dex, state.medals).find((e) => e.id === id);
+    if (!ev) return null;
+    state.medals.push(`event:${ev.id}`);
+    const set = grantPacks(EVENT_PACKS, `event:${ev.id}`);
+    cheer({ kind: "medal", title: ev.title.toUpperCase(), sub: `Every ${ev.name} look caught. A new title, and a card pack.` });
+    save();
+    changed();
+    return { id: ev.id, set, packs: set ? EVENT_PACKS : 0 };
   }
 
   /* YOUR CARD SHOWCASE: a card you hold, in a printing you hold, on or off
@@ -3768,6 +3846,8 @@ export function createEngine(canvas, onChange, mini = null) {
     // Key items and the Master Ball have no price; without this they would be
     // free, since the cost of qty x 0 is 0.
     if (!item || !forSale(item) || !qty) return false;
+    // An event's items are on the shelf only while it runs (items.js).
+    if (item.event && eventOn()?.id !== item.event) return false;
     const cost = priceOf(item) * qty;
     if (state.money < cost) return false;
     state.money -= cost;
@@ -3853,9 +3933,9 @@ export function createEngine(canvas, onChange, mini = null) {
     study(row.from, ["evolve"]);
     study(targetId, owned(targetId, roll, mon.alpha, mon.size, mon.level));
 
-    if (isNew) {
+    if (isNew && !isEvent(targetId)) {
       checkDexRewards(targetId);
-      state.money += dexBonus(caughtSpecies(), SPECIES.length);
+      state.money += dexBonus(caughtSpecies(), DEX_TOTAL);
     }
     const gained = gainXp(xpForCatch(target, isNew));
 
@@ -4004,6 +4084,8 @@ export function createEngine(canvas, onChange, mini = null) {
   function useField(id, confirmed = false) {
     const item = fieldById(id);
     if (!item || (state.bag[item.id] ?? 0) <= 0) return false;
+    // A Spooky Honey after its event would lure nothing - kept, never spent.
+    if (item.event && eventOn()?.id !== item.event) return false;
     /* AND IT ASKS BEFORE IT THROWS STEPS AWAY (your call, 2026-10-09). The
        swap below is not reversible and the jar is already spent, so this is
        the same press `star` and `travel`-out-of-a-rift are: gated HERE rather
@@ -4366,6 +4448,7 @@ export function createEngine(canvas, onChange, mini = null) {
     claimDex,
     claimReferrals,
     claimAchievements,
+    claimEvent,
     dexClaims,
     showCard,
     newBinder,

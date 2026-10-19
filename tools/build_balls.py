@@ -41,6 +41,7 @@ during a shake - that was the old animation's job and the two compound into a
 lurch.
 """
 
+import colorsys
 import os
 
 from PIL import Image
@@ -58,6 +59,35 @@ COLUMN = {
     "poke-ball": 0, "great-ball": 1, "ultra-ball": 2, "master-ball": 3,
     "net-ball": 8, "repeat-ball": 10, "timer-ball": 11, "dusk-ball": 14,
 }
+
+# A BALL NOBODY DREW is a ball someone did, recoloured: the Hallow Ball
+# (Hallowed Night, src/data/eventforms.js) is the Poke Ball's every frame -
+# and its bag icon, public/items/<id>.png - in a violet shell over a
+# pumpkin-orange half. One recolour for both, so the bag and the throw agree.
+VIOLET, PUMPKIN = 0.76, 0.075
+
+
+def hallow(im):
+    im = im.convert("RGBA")
+    px = im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = px[x, y]
+            if not a:
+                continue
+            h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+            if s > 0.3 and (h < 0.1 or h > 0.9):            # the red shell, and its red glows
+                h, l, s = VIOLET, l * 0.82, s * 0.9
+            elif (s < 0.25 or 0.6 < h < 0.8) and 0.5 < l < 0.93:   # the white half - never its shine
+                h, l, s = PUMPKIN, l * 0.72, 0.95
+            else:
+                continue
+            nr, ng, nb = colorsys.hls_to_rgb(h, l, s)
+            px[x, y] = (round(nr * 255), round(ng * 255), round(nb * 255), a)
+    return im
+
+
+RECOLOURED = {"hallow-ball": ("poke-ball", hallow)}
 # Every ball draws its closed, resting self here: 14x14, centred. Asserted,
 # because it is the number `.ball`'s width is derived from - the art fills
 # 21.9% of its cell, so the cell has to be drawn about five times the size the
@@ -100,8 +130,14 @@ def main():
         print("  %-12s col %2d  %dx%d  %5.1f KB" % (
             name, col, strip.width, strip.height, size / 1024))
 
+    for name, (base, paint) in RECOLOURED.items():
+        paint(Image.open(os.path.join(OUT, "%s.png" % base))).save(os.path.join(OUT, "%s.png" % name), optimize=True)
+        icon = os.path.join(os.path.dirname(OUT), "%s.png" % base)
+        paint(Image.open(icon)).save(os.path.join(os.path.dirname(OUT), "%s.png" % name), optimize=True)
+        print("  %-12s the %s, recoloured (strip and icon)" % (name, base))
+
     print("wrote %d strips to %s (%.0f KB total, from a %.0f KB sheet)" % (
-        len(COLUMN), OUT, total / 1024, os.path.getsize(SRC) / 1024))
+        len(COLUMN) + len(RECOLOURED), OUT, total / 1024, os.path.getsize(SRC) / 1024))
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ import { ItemIcon } from "./Sprite.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
 import { itemById } from "../game/items.js";
 import { CHECKIN_REWARDS, WEEK, STREAK_MILESTONES } from "../game/checkin.js";
+import { eventCheckin } from "../game/events.js";
 
 const yen = (n) => `¥${n.toLocaleString()}`;
 // A reward's icon and its words.
@@ -52,6 +53,8 @@ export default function CheckIn({ status, best, onCheckIn, onSpin, onClose }) {
     return () => removeEventListener("keydown", onKey);
   });
   const next = STREAK_MILESTONES.find((m) => m > streak);
+  // An event's check-in day: its extra, named before the press and after.
+  const bonus = got ? got.bonus : status.due ? eventCheckin() : null;
 
   return (
     <div className="sheet" {...useDismiss(() => { if (party) setParty(false); else onClose(); })}>
@@ -77,10 +80,19 @@ export default function CheckIn({ status, best, onCheckIn, onSpin, onClose }) {
             );
           })}
         </ol>
+        {bonus && (
+          <div className="ci-bonus">
+            {Object.entries(bonus.items).map(([id, n]) => <ItemIcon key={id} item={itemById(id)} className="ci-ic" />)}
+            <span>
+              <b>{bonus.event.name} bonus</b>
+              {got ? "Added to your bag: " : "Check in today for "}{says({ items: bonus.items })}
+            </span>
+          </div>
+        )}
         {got ? (
           <div className="ci-got" role="status">
             <span>Checked in</span>
-            <b>{says(got.reward)}</b>
+            <b>{says(got.reward)}{got.bonus ? ` + ${says({ items: got.bonus.items })}` : ""}</b>
             {got.reward.spin
               ? <button type="button" className="ci-go" autoFocus onClick={onSpin}><Icon n="gift" size={18} /> Spin the roulette</button>
               : <button type="button" className="ci-go quiet" autoFocus onClick={onClose}>Continue</button>}

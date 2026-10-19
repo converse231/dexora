@@ -20,8 +20,10 @@
 
 import { useEffect, useState } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
-import { SPECIES } from "../data/dex.js";
-import { label } from "../game/map.js";
+import { SPECIES, isEvent } from "../data/dex.js";
+import { EVENTS } from "../data/eventforms.js";
+import { eventOn, eventDaysLeft, EVENT_SHARE } from "../game/events.js";
+import { label, AREAS } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx, STRIP_TIERS } from "./Sprite.jsx";
 import {
   foundIn, howOften, speciesById, areaOpen, BIOMES, tiersFor, ROSETTE_NEED,
@@ -62,6 +64,32 @@ const LABEL = tierName;
    the old sheet said nothing whatsoever, on exactly the entries a player is
    most likely to open wondering where it is. */
 function whereToFind(id) {
+  /* AN EVENT LOOK is its species met in costume, only while its event runs:
+     the species' own places, at one meeting in 1/EVENT_SHARE, then the
+     event's own evolutions (eventforms.js). */
+  if (isEvent(id)) {
+    const sp = speciesById(id);
+    const ev = EVENTS.find((e) => e.id === sp.event);
+    const live = eventOn()?.id === ev.id;
+    // The hunted one is met by its hunt alone, never in its species' places.
+    if (sp.hunt) {
+      return [
+        { key: "event", where: ev.name, how: live ? `${eventDaysLeft(ev)} days left` : "the event is over" },
+        { key: "hunt", where: AREAS[ev.hunt.area]?.name ?? "", how: `after dark, at ${ev.hunt.dreams} Bad Dreams` },
+      ];
+    }
+    const wild = live ? whereToFind(sp.of).filter((r) => !r.key.startsWith("evo-")).map((r) => ({
+      ...r, how: `1 in ${Math.round(1 / EVENT_SHARE)} ${label(speciesById(sp.of))} · ${r.how}`,
+    })) : [];
+    return [
+      { key: "event", where: ev.name, how: live ? `${eventDaysLeft(ev)} days left` : "the event is over" },
+      ...wild,
+      ...EVOLUTIONS.filter((r) => r.to === id).map((r) => ({
+        key: `evo-${r.from}`, where: `Evolve ${label(speciesById(r.from))}`,
+        how: r.kind === "level" ? `at Lv ${r.level}` : `at Lv ${evoLevel(r)}`,
+      })),
+    ];
+  }
   const { legendary, areas, rods } = foundIn(id);
 
   /* `from` is the level an evolved form starts turning up at. Printed, because
@@ -543,7 +571,7 @@ export default function DexSheet({
                       <div><dt>Height</dt><dd>{(sp.height / 10).toFixed(1)} m</dd></div>
                       <div><dt>Weight</dt><dd>{(sp.weight / 10).toFixed(1)} kg</dd></div>
                       <div><dt>Catch rate</dt><dd>{sp.rate}</dd></div>
-                      <div><dt>Gen</dt><dd>{genOf(id)}</dd></div>
+                      <div><dt>Gen</dt><dd>{isEvent(id) ? "Event" : genOf(id)}</dd></div>
                     </dl>
                   </section>
                   <section className={`ev-card dx-research${rLevel >= RESEARCH_MAX ? " live" : ""}`}>
