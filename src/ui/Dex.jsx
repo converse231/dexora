@@ -12,7 +12,13 @@
 
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useOffscreenPause } from "./pause.js";
-import { SPECIES } from "../data/dex.js";
+import { SPECIES, DEX_TOTAL, isEvent } from "../data/dex.js";
+import { EVENTS } from "../data/eventforms.js";
+
+/* WHICH ENTRIES A REGION IS: a generation's, never its event looks - they
+   are the Event region's alone, and "All" counts none of them (dex.js). */
+const inRegion = (sp, region) => (region === "event" ? isEvent(sp.id)
+  : region === "all" || (!isEvent(sp.id) && genOf(sp.id) === Number(region)));
 import { label } from "../game/map.js";
 import {
   LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor, isLegendary,
@@ -225,7 +231,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
     && tiersFor(id).filter((t) => has(t, id)).length >= ROSETTE_NEED;
   const completed = SPECIES.filter((sp) => complete(sp.id)).length;
 
-  const seen = SPECIES.filter((sp) => at(sp.id) >= 1).length;
+  const seen = SPECIES.filter((sp) => !isEvent(sp.id) && at(sp.id) >= 1).length;
 
   /* What the progress bar is measuring: the chosen region, or the whole dex.
      One object so the three readings - total, seen, caught - cannot come from
@@ -238,9 +244,8 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
      never reads as Pokemon lost; the rank above stays the whole dex's. */
   const tier = TIERS.includes(only) ? only : null;
   const scope = useMemo(() => {
-    let mine = region === "all"
-      ? SPECIES
-      : SPECIES.filter((sp) => genOf(sp.id) === Number(region));
+    // "All" measures the Pokedex, which no event look is part of.
+    let mine = SPECIES.filter((sp) => (region === "all" ? !isEvent(sp.id) : inRegion(sp, region)));
     if (tier) {
       mine = mine.filter((sp) => tiersFor(sp.id).includes(tier));
       const got = mine.filter((sp) => has(tier, sp.id)).length;
@@ -253,15 +258,16 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
     };
   }, [region, dex, tiers, tier]);
   // A region's Pokédex reward: claimed, ready, or what it waits on (`genReward`).
-  const reward = useMemo(() => (region === "all" ? null
+  const reward = useMemo(() => (region === "all" || region === "event" ? null
     : genReward(Number(region), dex ?? [], tiers?.medals ?? [])), [region, dex, tiers]);
   const needle = find.trim().toLowerCase();
 
   const shown = SPECIES.filter((sp) => {
     const state = at(sp.id);
-    if (region !== "all" && genOf(sp.id) !== Number(region)) return false;
+    if (!inRegion(sp, region)) return false;
     if (only === "caught" && state !== 2) return false;
-    if (only === "missing" && state === 2) return false;
+    // A look whose fortnight you missed is not "missing" from the Pokedex.
+    if (only === "missing" && (state === 2 || (isEvent(sp.id) && region !== "event"))) return false;
     if (only === "seen" && state !== 1) return false;
     if (only === "complete" && !complete(sp.id)) return false;
     /* `TIERS.includes`, not `tiers[only]`. The old line indexed the tier map
@@ -314,10 +320,10 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
                out as "Seen, not cau". Every one of these is the noun plus its
                count and nothing else. */
             options: [
-              ["all", "All", SPECIES.length],
+              ["all", "All", DEX_TOTAL],
               ["caught", "Caught", caught],
               ["seen", "Seen only", seen - caught],
-              ["missing", "Missing", SPECIES.length - caught],
+              ["missing", "Missing", DEX_TOTAL - caught],
               /* One row per tier, kindest first, so the menu reads in the
                  same direction the marks on a tile do. */
               ...MARKS.map((t) => [t, tierName(t), count(t)]),
@@ -355,6 +361,8 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
                 return [String(g.gen),
                   level >= at ? g.name : `${g.name} — from Lv ${at}`, null];
               }),
+              // Costumes from dated events (eventforms.js), outside every region.
+              ...(EVENTS.length ? [["event", "Event Pokémon", null]] : []),
             ],
           },
           {

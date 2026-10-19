@@ -82,6 +82,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/sprites/cadence/`, `src/data/cadence.js` | `npm run cadence` (Black and White's own idle, 16-frame strips at native pixels; `tools/strip_frames.py`, shared with Showdown's builder) |
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
 | `src/data/cards/prices.js` | `npm run prices` (TCGplayer via TCGdex, a dated snapshot; display only) |
+| `public/sprites/<event look id>.png` and its shiny | `npm run eventart` from the drawn originals in `art/events/<event>/<base id>.jpg` (keyed, shrunk to the base's canvas, the shiny by the species' own recolour) |
 | `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
@@ -175,6 +176,40 @@ anything done. The run prints each suite; the count is not typed anywhere.
   shown as slugs ("Iron-bundle", "Chi-yu", "Type-null") until 2026-09-29.
 - **`genOf` has its own Map** because it runs at module init, before
   `speciesById` exists.
+- **An event look is a costume from a dated event** (`src/data/eventforms.js`,
+  hand-written; Hallowed Night, 2026-10-24 to 11-07, asked for 2026-10-19):
+  `form: "event"`, ids 19901+ (under trading.sql's 20000), built from its
+  species in dex.js and appended by `wave` (fetch-forms takes a wave past
+  it). It is met ONLY as a substitution (`eventLook` in events.js, after
+  `rollLook`): `EVENT_SHARE` of its species' meetings on the event's days,
+  `EVENT_NIGHT` at night, a Spooky Honey's `lure`, never past `EVENT_CAP` -
+  so no table, rod or League level moves, and no roll is drawn outside the
+  event (seeded records replay). It evolves only into its event's look of
+  the next stage (`event` rows, fetch-evolutions). **It is no entry of the
+  Pokedex**: `DEX_TOTAL`/`dexCaught` (dex.js) and trading.sql's
+  `event_slots()` (held equal) skip it - no medal, milestone, rank, dex
+  bonus or "left to find" - and the Dex files it under the Event region.
+  Front art only, so it never battles (`refusal`, `teamProblem`, the anchors'
+  field) and walks as its species. Every look of an event in the Pokedex is
+  `event:<id>`, claimed on the Events board (`claimEvent`): the title and a
+  pack. Its items (`event` on an item) are sold and used only on its days,
+  on their own shelf; a ball nobody drew is a recolour in build_balls.py
+  (`RECOLOURED`: the Hallow Ball is the Poke Ball's every frame and icon), a
+  jar nobody drew is the honey jar in CSS (`fx`, ItemIcon). `SeasonIntro`
+  announces it once per device - and once more as a teaser in the
+  `TEASE_DAYS` before it opens (2026-10-20, asked for), after the day's
+  check-in, never beside it. Its countdowns (dialog, board card, the HUD's
+  `SeasonChip`) each tick on their own clock (`useNow`), never App's. Its
+  `checkin` weekday pays its items on top of the day's reward
+  (`eventCheckin`: Friday, five Hallow Balls). **An event's `hunt` is its legendary**
+  (Scarecrow Darkrai, 2026-10-20): never a swap or a table row. Each costume
+  caught on its days is a Bad Dream (`state.dreams`, `huntOn`); at `dreams`
+  the next wild meeting in its `area` after dark IS it (`huntDue`, no alpha,
+  it asks before you run); lost, the count falls to `keep`; caught, it is
+  `event:<medal>`, a title of its own. Event art is keyed by
+  build_event_sprites.py: the border flood, enclosed pockets that fit a
+  checker at its own square size (Gemini paints a pocket on a grid of its
+  own), specks, and accent colours one at a time.
 - **A look is one of a family's drawings** (`form: "look"`: Unown's letters,
   Furfrou's trims, Flabebe's colours, Silvally's types - `LOOK_FAMILIES` in
   fetch-forms, ids `PLATE_BASE` + form id like the plates). It is a species
@@ -1034,7 +1069,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   riding), each effect one lever - encounter `rate` or a `find` - never the
   tier roll. An entry's ability is its species' regular one by uid, an
   alpha's its hidden one. EVERY ONE HAS A PERK: an ability with nothing to do
-  here FORAGES by its first type (`forageOf`). There are no type pulls -
+  here FORAGES by its first type (`forageOf`): berries or balls, and its
+  type's STONE (`TYPE_STONE`, 2026-10-19), never one below the level its shop
+  sells it (`rollFind`'s level) and never a find worth a Honey (check.mjs). A
+  rod's bite is a third lever (`bite`: Suction Cups, Sticky Hold); Cute Charm
+  stays out - gender is a look nothing rolls on. There are no type pulls -
   every map is already its types, so one did nothing (2026-10-10).
   Steps together count on the box entry (`walked`) IN PLACE: a heart or a find
   is the one `changed()`, or a big Box rebuilds every step.

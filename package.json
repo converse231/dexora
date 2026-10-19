@@ -12,6 +12,7 @@
     "tradedb": "node tools/tradedb.mjs",
     "assets": "node tools/fetch-species.mjs && node tools/fetch-items.mjs && node tools/fetch-evolutions.mjs && python tools/build_origin.py",
     "forms": "node tools/fetch-forms.mjs && node tools/fetch-evolutions.mjs",
+    "eventart": "python tools/build_event_sprites.py",
     "art": "python tools/build_assets.py",
     "map": "python tools/build_map.py",
     "layout": "python tools/study_layout.py",

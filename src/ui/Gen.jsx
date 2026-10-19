@@ -11,9 +11,22 @@
    nameplate already carries one or two of those and a third chip in the same
    palette would read as a third type. */
 
-import { genOf } from "../game/biomes.js";
+import { genOf, speciesById } from "../game/biomes.js";
+import { isEvent } from "../data/dex.js";
+import { EVENTS } from "../data/eventforms.js";
 
 export default function Gen({ id, className = "" }) {
+  /* AN EVENT LOOK belongs to no generation (eventforms.js): its chip names
+     the event, in the event's own colours, so a costume met in the grass is
+     announced on the nameplate itself. */
+  if (isEvent(id)) {
+    const ev = EVENTS.find((e) => e.id === speciesById(id).event);
+    return (
+      <span className={`gen gen-event ev-${ev.id} ${className}`.trim()} data-tip={`${ev.name} event Pokémon`}>
+        EVENT
+      </span>
+    );
+  }
   const gen = genOf(id);
   return (
     <span className={`gen ${className}`.trim()} data-tip={`Generation ${gen}`}>

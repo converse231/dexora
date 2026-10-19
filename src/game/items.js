@@ -118,6 +118,18 @@ export const BALLS = [
        than an exploit to close. */
     bonus: (enc) => Math.min(4, PLAIN_MULT + 0.6 * (enc.throws ?? 0)),
   },
+  /* AN EVENT'S BALL (eventforms.js): strong on that event's costumes and a
+     plain Poke Ball on everything else, so it is never the better buy outside
+     the hunt. `enc.event` is the event look's event id, frozen on the
+     encounter like `night`. Sold only while the event runs (`event`, read by
+     the Shop and `buy`); one bought keeps working on a costume met later -
+     there are none to meet, so it is a keepsake. 4 is the Timer Ball's cap:
+     the rarest catch in the game for a fortnight should feel like one. */
+  {
+    id: "hallow-ball", hideWhenEmpty: true, boost: 4, name: "Hallow Ball", short: "HALLOW", mult: PLAIN_MULT,
+    price: 200, level: 1, event: "halloween", hint: "on costumed ones",
+    bonus: (enc) => (enc.event === "halloween" ? 4 : PLAIN_MULT),
+  },
   /* NEVER FAILS, AND NOW IT HAS A PRICE - which reverses what this comment
      used to say, so here is the old argument and what changed.
 
@@ -422,6 +434,18 @@ export const FIELD = [
     steps: HONEY_STEPS, lift: 3, blurb: "Every rare tier, ×3 likely",
   },
   ...TIER_HONEY,
+
+  /* --- event: WHETHER IT WEARS THE COSTUME -----------------------------
+     Its own family and its own lever (`lure`, multiplying `eventChance` in
+     events.js), so it runs beside a honey and a flute and moves neither. Sold
+     and used only while its event runs: outside it there is nothing to lure,
+     and a jar that silently did nothing was the coloured honeys' old bug. */
+  {
+    /* The one jar, as every honey is (`art`), wearing its event's look in
+       CSS (`fx`, ItemIcon) - nobody draws a jar per event. */
+    id: "spooky-honey", art: "honey", fx: "spooky", family: "event", name: "Spooky Honey", price: 1200, level: 3,
+    event: "halloween", steps: HONEY_STEPS, lure: 3, blurb: "Costumed ones ×3 likely",
+  },
 ];
 
 /* WHICH BALL EACH NUMBER KEY THROWS, AND IT IS THE PLAYER'S TO ARRANGE.
@@ -699,7 +723,11 @@ export const bestRod = (bag) =>
 /* What the shop will actually sell. A price of zero means it is not for sale at
    any level - the Master Ball's whole design, and the key items' too. */
 export const forSale = (item) => item.price > 0 && item.level !== null;
-export const SHOP_BALLS = BALLS.filter(forSale);
+/* An event's items are its own shelf, at the top of the shop while it runs
+   (Shop.jsx) and nowhere when it does not - never in the climbing ball shelf. */
+export const SHOP_BALLS = BALLS.filter((b) => forSale(b) && !b.event);
+export const SHOP_FIELD = FIELD.filter((f) => !f.event);
+export const eventShelf = (id) => [...BALLS, ...FIELD].filter((i) => i.event === id);
 
 // Everything the game can name, whether or not it is for sale.
 export const ALL_ITEMS = [...BALLS, ...STONES, ...KEY_ITEMS, ...FIELD, ...BERRIES, ...HEALS];

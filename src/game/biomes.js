@@ -1890,7 +1890,10 @@ const derivedHomes = () => {
   // weather forms, wild, were homed on fire, water and ice maps besides).
   const wild = SPECIES.filter((sp) =>
     (!evolvesInto.has(sp.id) || sp.wild) && !LEGENDARY.includes(sp.id)
-    && !COSTUMES.includes(sp.id) && sp.form !== "look" && !KEPT.has(sp.id));
+    && !COSTUMES.includes(sp.id) && sp.form !== "look" && !KEPT.has(sp.id)
+    // NOR AN EVENT LOOK: nothing evolves into the first of a line, so the pool
+    // would home witch Gastly for good; it is met only in costume (events.js).
+    && sp.form !== "event");
 
   /* A HOME IS THE PRIMARY TYPE, AND THE OTHER 453 SPECIES WERE NOT GETTING
      THE RULE THE LEGENDARIES HAVE HAD FOR A YEAR.

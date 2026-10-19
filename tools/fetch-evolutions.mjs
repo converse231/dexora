@@ -145,6 +145,7 @@ for (const url of chainUrls) walk((await get(url)).chain);
    Box's existing branch UI already handles because Slowpoke taught it to. */
 const FORM_LEVEL = 100;
 const { FORMS } = await import("../src/data/forms.js");
+const { EVENTS } = await import("../src/data/eventforms.js");
 for (const f of FORMS) {
   /* A WILD FORM GETS NO ROW, AND THAT ABSENCE IS THE WHOLE MECHANISM.
 
@@ -218,6 +219,21 @@ for (const f of FORMS) {
   for (const r of baseRows.filter((e) => e.from === f.of && e.to < 10000)) {
     const kin = named.get(nameOf.get(r.to) + tail);
     rows.push({ ...r, from: f.id, to: kin ? kin.id : r.to, look: true });
+  }
+}
+
+/* AN EVENT LOOK EVOLVES INTO ITS EVENT'S LOOK of the next stage (Witch Hat
+   Gastly -> Witch Hat Haunter -> Witch Hat Gengar), by a copy of the species'
+   own row - method, level, item - marked `event`. Never into the plain next
+   stage (the costume is the point) and never the other way: an ordinary Gastly
+   evolves into an ordinary Haunter. A stage its event did not draw is where
+   the line stops. */
+for (const ev of EVENTS) {
+  for (const l of ev.looks) {
+    for (const r of baseRows.filter((e) => e.from === l.of && e.to < 10000)) {
+      const kin = ev.looks.find((k) => k.of === r.to);
+      if (kin) rows.push({ ...r, from: l.id, to: kin.id, event: true });
+    }
   }
 }
 

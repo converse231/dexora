@@ -21,6 +21,7 @@
 import { ABILITIES, ABILITY_NAMES } from "../data/abilities.js";
 import { SPECIES } from "../data/dex.js";
 import { speciesById } from "./biomes.js";
+import { STONES } from "./items.js";
 
 export const FIELD = {
   // More encounters (the games: Illuminate, Arena Trap, No Guard, Swarm).
@@ -33,6 +34,14 @@ export const FIELD = {
   pickup: { find: "pickup" }, "honey-gather": { find: "honey" },
   // The games: more wild Pokemon holding items. Here, a slower trickle of the same finds.
   "compound-eyes": { find: "luck" }, "super-luck": { find: "luck" },
+  /* 2026-10-19 (asked for: "mostly just forager"): the rest of the games'
+     overworld abilities that have something to act on here. Sand Veil and
+     Snow Cloak turn wild Pokemon away in a storm; with no weather, a few
+     fewer. Suction Cups and Sticky Hold make a fish bite: `bite` scales the
+     rod's bite chance (rodBite), capped at a sure bite. Cute Charm (the other
+     gender) is NOT here: gender is a look that nothing rolls on. */
+  "sand-veil": { rate: 0.75 }, "snow-cloak": { rate: 0.75 },
+  "suction-cups": { bite: 1.5 }, "sticky-hold": { bite: 1.5 },
 };
 
 /* FINDS: a chance a step and a weighted pool. Pickup is a trickle of balls
@@ -47,6 +56,30 @@ export const FINDS = {
   balls: { every: 300, pool: [["poke-ball", 55], ["great-ball", 35], ["ultra-ball", 10]] },
   friend: { every: 400, pool: [["poke-ball", 40], ["great-ball", 35], ["pinap-berry", 25]] },
 };
+
+/* A FORAGER FINDS ITS TYPE'S STONE now and then (2026-10-19, asked for), so a
+   Charmander turns up Fire Stones and a Gastly Dusk Stones, beside the berries
+   or balls its type found before. Measured in shop value a find: berries
+   ~¥323 and balls ~¥70 before; a stone is ¥1,200-1,400, so it is 4 finds in
+   100 on the berry side (~¥360) and 8 on the ball side (~¥165) - the ball
+   side was the poorer and gains more, and neither passes a Honey. A stone
+   your level's shop does not sell yet is never found (`rollFind`'s level):
+   a Dusk Stone at Lv 10 would be an evolution the game has not opened. */
+const TYPE_STONE = {
+  fire: "fire-stone", water: "water-stone", ice: "water-stone", electric: "thunder-stone",
+  grass: "leaf-stone", fairy: "moon-stone", rock: "moon-stone", psychic: "moon-stone",
+  ground: "sun-stone", fighting: "sun-stone", dragon: "sun-stone",
+  steel: "shiny-stone", ghost: "dusk-stone", dark: "dusk-stone",
+};
+const STONE_SHARE = { berries: 4, balls: 8 };
+for (const stone of new Set(Object.values(TYPE_STONE))) {
+  for (const base of ["berries", "balls"]) {
+    const rest = 100 - STONE_SHARE[base];
+    FINDS[`${base}+${stone}`] = { every: FINDS[base].every,
+      pool: [...FINDS[base].pool.map(([id, w]) => [id, (w * rest) / 100]), [stone, STONE_SHARE[base]]] };
+  }
+}
+const STONE_LEVEL = new Map(STONES.map((s) => [s.id, s.level]));
 
 // Steps walked together for each heart; the fifth is a best friend.
 export const HEARTS = [200, 800, 2000, 4000, 8000];
@@ -68,9 +101,13 @@ export function abilityOf(mon) {
 }
 
 /* What a forager turns up, by its first type: the living things find
-   berries, everything else what trainers drop. */
+   berries, everything else what trainers drop - and its type's stone. */
 const BERRY_TYPES = new Set(["grass", "bug", "fairy", "poison", "normal", "water", "flying"]);
-export const forageOf = (sp) => (BERRY_TYPES.has(sp?.types?.[0]) ? "berries" : "balls");
+export const forageOf = (sp) => {
+  const base = BERRY_TYPES.has(sp?.types?.[0]) ? "berries" : "balls";
+  const stone = TYPE_STONE[sp?.types?.[0]];
+  return stone ? `${base}+${stone}` : base;
+};
 
 export function fieldOf(mon) {
   const f = FIELD[abilityOf(mon)];
@@ -90,18 +127,23 @@ export function fieldText(mon) {
   const f = fieldOf(mon);
   if (!f) return null;
   if (f.rate) return f.rate > 1 ? "More wild Pokémon" : f.rate <= 0.5 ? "Far fewer wild Pokémon" : "Fewer wild Pokémon";
+  if (f.bite) return "Fish bite more often";
   if (f.find === "honey") return "Finds Honey";
-  if (f.find === "berries") return "Forages berries";
-  if (f.find === "balls") return "Turns up Poké Balls";
+  const [base, stone] = f.find.split("+");
+  const also = stone ? ` and ${STONES.find((s) => s.id === stone).name}s` : "";
+  if (base === "berries") return `Forages berries${also}`;
+  if (base === "balls") return `Turns up Poké Balls${also}`;
   return "Picks up items";
 }
 
 /* One step's find, or null: `rng` is the engine's Math.random. */
-export function rollFind(kind, rng) {
+export function rollFind(kind, rng, level = Infinity) {
   const f = FINDS[kind];
   if (!f || rng() >= 1 / f.every) return null;
-  const total = f.pool.reduce((n, [, w]) => n + w, 0);
+  // A stone the shop does not sell at your level yet is not found either.
+  const pool = f.pool.filter(([id]) => (STONE_LEVEL.get(id) ?? 0) <= level);
+  const total = pool.reduce((n, [, w]) => n + w, 0);
   let r = rng() * total;
-  for (const [id, w] of f.pool) if ((r -= w) < 0) return id;
-  return f.pool[0][0];
+  for (const [id, w] of pool) if ((r -= w) < 0) return id;
+  return pool[0][0];
 }

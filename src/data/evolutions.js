@@ -674,4 +674,8 @@ export const EVOLUTIONS = [
   {"from":19110,"to":19114,"kind":"stone","item":"shiny-stone","look":true},
   {"from":19344,"to":19345,"kind":"bond","look":true},
   {"from":19552,"to":19553,"kind":"level","level":40,"look":true},
+  {"from":19901,"to":19902,"kind":"level","level":25,"event":true},
+  {"from":19902,"to":19903,"kind":"trade","event":true},
+  {"from":19905,"to":19906,"kind":"level","level":22,"event":true},
+  {"from":19906,"to":19907,"kind":"bond","event":true},
 ];

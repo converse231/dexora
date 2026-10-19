@@ -16,6 +16,20 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-19-hallowed",
+    icon: "🎃",
+    date: "October 2026",
+    title: "Hallowed Night",
+    items: [
+      ["24 Oct - 7 Nov", "Witch Hat Gastlys, Vampire Zubats and a Pumpkin Mimikyu, in costume where they live."],
+      ["Night hunts", "Costumes come out twice as often after dark."],
+      ["Event shop", "A Spooky Honey to lure them and a Hallow Ball to catch them."],
+      ["Friday check-ins", "Check in on a Friday during the event for 5 Hallow Balls."],
+      ["Catch all seven", "The Hallowed Hunter title and a card pack, on the Events board."],
+      ["The Nightmare", "Every costume is a Bad Dream. At seven, something waits in the Haunted Tower after dark..."],
+    ],
+  },
+  {
     id: "2026-10-17-buildings",
     icon: "🏛️",
     date: "October 2026",
@@ -25,6 +39,7 @@ export const NEWS = [
       ["Cinnabar Island", "The Pokémon Mansion stands in its real home - take the ferry."],
       ["Route 10", "The Power Plant's real building, north of Lavender Town and by ferry."],
       ["Minior", "Lives in Mt. Moon now, where the meteors fell - much easier to find."],
+      ["Walking perks", "Foragers turn up their type's evolution stone, and four more abilities have a perk."],
     ],
   },
   {

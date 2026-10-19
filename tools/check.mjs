@@ -1,7 +1,8 @@
 // node tools/check.mjs
 import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { SPECIES, isForm } from "../src/data/dex.js";
+import { SPECIES, isForm, isEvent, EVENT_SLOTS, DEX_TOTAL, dexCaught } from "../src/data/dex.js";
+import { EVENTS } from "../src/data/eventforms.js";
 import { SAGE_IDS } from "../src/data/sage.js";
 import { evoCycleFrames, EVO_SWAPS, SCALE_MAX } from "../src/game/evocycle.js";
 import {
@@ -358,7 +359,9 @@ for (let i = 1; i < SHOP_BALLS.length; i++)
     for (const types of [["water"], ["bug"], ["fire"], ["normal", "flying"]])
       for (const known of [true, false])
         for (const throws of [0, 1, 3, 5, 12])
-          encs.push({ areaId, types, known, throws, level: 4 });
+          // An event look met, or not (the Hallow Ball's condition).
+          for (const event of [null, "halloween"])
+            encs.push({ areaId, types, known, throws, level: 4, event });
 
   for (const ball of situational) {
     assert.ok(ball.hint, `${ball.id} has no hint, so nothing says when to use it`);
@@ -432,7 +435,7 @@ for (let i = 1; i < SHOP_BALLS.length; i++)
      first version's bug and the printed cost is what gave it away - the Dusk
      Ball came out at 1,077 a head because it was being priced in the meadow,
      where it does nothing. A best-case check has to be run on the best case. */
-  const best = { areaId: [...ENCLOSED][0], types: ["water"], known: true, level: 4 };
+  const best = { areaId: [...ENCLOSED][0], types: ["water"], known: true, level: 4, event: "halloween" };
   assert.ok(BALLS.filter((b) => b.bonus).every((b) => liveMult(b, { ...best, throws: 9 }) === b.boost),
     "the best-case encounter does not actually boost every situational ball");
 
@@ -831,7 +834,15 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
     for (const id of [...reach]) {
       for (const row of evolutionsOf(id)) reach.add(row.to);
       for (const look of looksOf(id)) reach.add(look);
+      /* AN EVENT LOOK IS REACHED WHERE ITS SPECIES IS, while its event runs
+         (events.js `eventLook` swaps it for a meeting with the species). */
+      for (const l of EVENTS.flatMap((ev) => ev.looks)) if (l.of === id) reach.add(l.id);
     }
+  /* AN EVENT'S HUNTED ONE is reached by its hunt: its Bad Dreams are its
+     costumes caught, so it is reachable when they are and its area is a map. */
+  for (const ev of EVENTS)
+    if (ev.hunt && BIOMES.some((b) => b.id === ev.hunt.area) && ev.looks.some((l) => reach.has(l.id)))
+      reach.add(ev.hunt.id);
 
   const missing = SPECIES.filter((s) => !reach.has(s.id)).map((s) => s.name);
   assert.equal(missing.length, 0,
@@ -850,9 +861,11 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
       /* A LOOK'S row copies its species' row too (Blue Flabebe -> Blue
          Floette), so both ends read through to their base species. */
       const baseOf_ = (s) => (isForm(s.id) ? speciesById(s.of) : s);
-      const real = row.look
+      /* AN EVENT LOOK'S row copies its species' too (Witch Hat Gastly -> Witch
+         Hat Haunter), the same way. */
+      const real = row.look || row.event
         ? baseOf_(speciesById(row.to)).from === baseOf_(sp).name
-          && EVOLUTIONS.some((r) => !r.look && r.from === baseOf_(sp).id
+          && EVOLUTIONS.some((r) => !r.look && !r.event && r.from === baseOf_(sp).id
             && r.to === baseOf_(speciesById(row.to)).id && r.kind === row.kind
             && r.level === row.level && r.item === row.item)
         : row.regional
@@ -1165,7 +1178,8 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
          broken image. tools/build_battle_art.py reads a form's from its own
          PokeAPI record; the battle also falls back to the front, flipped. */
       {
-        const noBack = SPECIES.filter((sp) => !["", "shiny/"].every((k) =>
+        // An event look never battles (eventforms.js): it has a front alone.
+        const noBack = SPECIES.filter((sp) => !isEvent(sp.id) && !["", "shiny/"].every((k) =>
           existsSync(new URL(`../public/sprites/back/${k}${sp.id}.png`, import.meta.url))));
         assert.deepEqual(noBack.slice(0, 5).map((sp) => sp.name), [],
           `${noBack.length} species have no back or shiny back sprite - python tools/build_battle_art.py`);
@@ -2673,7 +2687,42 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      boundary is where `dexRank` changes its answer. The art is looked up by
      id, so ids are unique. */
   assert.equal(DEX_RANKS[0].at, 0, "the first Pokédex rank is not where everybody starts");
-  assert.equal(DEX_RANKS.at(-1).at, SPECIES.length, "the last Pokédex rank is not the whole dex");
+  assert.equal(DEX_RANKS.at(-1).at, DEX_TOTAL, "the last Pokédex rank is not the whole dex");
+  /* AN EVENT LOOK IS NO ENTRY OF THE POKEDEX (dex.js): the whole dex is every
+     species but them, a dex holding only them counts nothing, and the trading
+     server's card count skips the same places (trading.sql `event_slots()`). */
+  {
+    const looks = EVENTS.flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])]);
+    for (const ev of EVENTS.filter((e) => e.hunt)) {
+      assert.ok(ev.hunt.keep < ev.hunt.dreams && ev.hunt.keep >= 0, `${ev.id}'s hunt keeps more dreams than it needs`);
+      assert.ok(BIOMES.some((b) => b.id === ev.hunt.area), `${ev.id}'s hunt waits in no map`);
+      assert.ok(/^[a-z]+$/.test(ev.hunt.medal) && !EVENTS.some((e) => e.id === ev.hunt.medal),
+        `${ev.id}'s hunt medal is not an event: id the server's titles can take`);
+    }
+    assert.equal(DEX_TOTAL, SPECIES.length - looks.length, "DEX_TOTAL counts an event look");
+    const only = SPECIES.map((sp) => (isEvent(sp.id) ? 2 : 0));
+    assert.equal(dexCaught(only), 0, "a dex of event looks alone counted something");
+    assert.equal(dexCaught(SPECIES.map(() => 2)), DEX_TOTAL, "a full dex is not DEX_TOTAL");
+    const sql = readFileSync(new URL("../db/trading.sql", import.meta.url), "utf8");
+    const slots = sql.match(/function public\.event_slots\(\)[\s\S]*?array\[([\d,\s]*)\]/)?.[1]
+      .split(",").map(Number);
+    assert.deepEqual(slots, EVENT_SLOTS.map((i) => i + 1),
+      "db/trading.sql's event_slots() is not where the event looks sit in SPECIES (1-based) - re-type it and re-apply trading.sql");
+    // Its milestone and its medal, the same whole.
+    assert.equal(MILESTONES.at(-1).at, DEX_TOTAL, "the last milestone counts the event looks");
+    assert.ok(!MEDALS.some((m) => m.need.some(isEvent)), "a medal asks for an event look");
+    // Each look is its species in a costume - the same strength and worth.
+    for (const l of looks) {
+      const sp = speciesById(l.id), base = speciesById(l.of);
+      assert.deepEqual([sp.stats, sp.rate, sp.tier, sp.types], [base.stats, base.rate, base.tier, base.types],
+        `${sp.name} is not its species' strength`);
+      assert.ok(existsSync(new URL(`../public/sprites/${l.id}.png`, import.meta.url))
+        && existsSync(new URL(`../public/sprites/shiny/${l.id}.png`, import.meta.url)),
+        `${sp.name} has no sprite or shiny - npm run eventart`);
+      assert.ok(l.id < 20000, `${sp.name}'s id is past the 20000 the trading server takes`);
+    }
+    console.log(`event looks ok — ${looks.length} in ${EVENTS.length} event(s), outside every count of the dex`);
+  }
   assert.equal(new Set(DEX_RANKS.map((r) => r.id)).size, DEX_RANKS.length, "two Pokédex ranks share an id");
   for (const [i, r] of DEX_RANKS.entries()) {
     if (i) assert.ok(r.at > DEX_RANKS[i - 1].at, `${r.name} is not further than ${DEX_RANKS[i - 1].name}`);
@@ -3889,6 +3938,19 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         continue;
       }
 
+      /* AN EVENT LOOK is met in costume (events.js) or evolved into from its
+         event's look of the stage below - never a spawn row, never from its
+         plain species, never the Lv 100 a made form costs, and never a home
+         of its own (derivedHomes). */
+      if (sp.form === "event") {
+        assert.ok(!sp.wild && !wild.has(sp.id), `${sp.name} is an event look in a spawn table`);
+        assert.ok(rows.every((e) => e.event && speciesById(e.from).event === sp.event),
+          `${sp.name} is evolved into from outside its event`);
+        assert.ok(!EVOLUTIONS.some((e) => e.from === sp.id && speciesById(e.to).event !== sp.event),
+          `${sp.name} evolves out of its costume`);
+        continue;
+      }
+
       if (sp.wild) {
         /* BOTH IS ALLOWED NOW, AND `evo` IS WHAT MAKES IT DELIBERATE.
 
@@ -5097,7 +5159,8 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      assertions are mostly about that separation holding. */
   {
     const maxed = { ...emptyStats(), fortune: MAX_RANK };
-    const LEVERS = ["rate", "tilt", "lift"];
+    // `lure` is an event's: whether a met species wears its costume (events.js).
+    const LEVERS = ["rate", "tilt", "lift", "lure"];
 
     /* ONE FAMILY, ONE LEVER, and no two families sharing one. Two families on
        the same lever would be one family with two names, and the whole point
@@ -6967,6 +7030,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
      at a level a Pokémon can have, and the rows are in level order (the four
      most recent is read by walking them). */
   for (const sp of SPECIES) {
+    if (isEvent(sp.id)) continue;           // an event look never battles (league.js `refusal`)
     const rows = L_LEARN[sp.id];
     assert.ok(rows?.length, `${sp.name} has no learnset`);
     let last = 0;
@@ -7661,9 +7725,24 @@ import * as COS from "../src/game/cosmetics.js";
   assert.equal(none.length, 0, `${none.length} species have no ability (${none.slice(0, 5).map((s) => s.name)}) - npm run abilities`);
   for (const [kind, f] of Object.entries(AB.FINDS)) for (const [id] of f.pool) assert.ok(itemById(id), `the ${kind} find gives "${id}", which is no item`);
   // EVERY ONE HAS A PERK, and it is one the engine acts on: a rate or a known find.
-  const idle = SPECIES.filter((sp) => { const f = AB.fieldOf({ uid: 1, species: sp.id }); return !f || !(f.rate || AB.FINDS[f.find]); });
+  const idle = SPECIES.filter((sp) => { const f = AB.fieldOf({ uid: 1, species: sp.id }); return !f || !(f.rate || f.bite || AB.FINDS[f.find]); });
   assert.equal(idle.length, 0, `${idle.length} species walk with no perk (${idle.slice(0, 5).map((s) => s.name)})`);
-  assert.ok(Object.values(AB.FIELD).every((f) => f.rate || AB.FINDS[f.find]), "a field ability names an effect the engine has none of");
+  assert.ok(Object.values(AB.FIELD).every((f) => f.rate || f.bite || AB.FINDS[f.find]), "a field ability names an effect the engine has none of");
+  /* A FORAGER'S FIND STAYS A BONUS (2026-10-19, stones added): in shop value
+     a find, none passes a Honey - the dearest single find (Honey Gather's) -
+     and a stone is never found below the level its shop sells it. */
+  const { STONES } = await import("../src/game/items.js");
+  const worth = (pool) => pool.reduce((n, [id, w]) => n + w * (itemById(id).price ?? 0), 0) / pool.reduce((n, [, w]) => n + w, 0);
+  for (const [kind, f] of Object.entries(AB.FINDS)) {
+    if (kind.includes("+")) assert.ok(worth(f.pool) < itemById("honey").price, `the ${kind} find is worth ¥${Math.round(worth(f.pool))} a find`);
+  }
+  for (const s of STONES) {
+    const kind = Object.keys(AB.FINDS).find((k) => k.endsWith("+" + s.id));
+    if (!kind) continue;
+    let early = 0;
+    for (let i = 0; i < 4000; i++) { let k = 0; const rng = () => (k++ ? (i % 997) / 997 : 0); if (AB.rollFind(kind, rng, s.level - 1) === s.id) early++; }
+    assert.equal(early, 0, `${s.name} is found below Lv ${s.level}, where its shop opens`);
+  }
   assert.deepEqual([...AB.HEARTS].sort((a, b) => a - b), AB.HEARTS, "friendship hearts are out of order");
   console.log(`abilities ok — ${Object.keys(AB.FIELD).length} field abilities, all real; every species has an ability; finds are items`);
 }

@@ -312,7 +312,7 @@ assert.equal(ca.showcase.find((m) => m.uid === 1).species, 18, "the showcase did
     cardShowcase: ["me01-187:h", "me01-001:r", "me01-001:r", "me01-999:h", "me01-003:n", "bad key", "me01-001:n",
       "me01-003:h", "x1-1:n", "x2-2:n", "x3-3:n", "x4-4:n"],
     milestones: { me01: 5, me02: 4, me025: 2 },
-    medals: ["gen:1", "gen:9", "dex", "gen:10", "tier:gold:1", "tier:bogus:1", "tier:gold:10"],
+    medals: ["gen:1", "gen:9", "dex", "gen:10", "tier:gold:1", "tier:bogus:1", "tier:gold:10", "event:halloween", "event:Bad1"],
   };
   await rpc(A, "save_game", { payload: cardsPayload, sess: "s-a" });
   const cc = await card(A);

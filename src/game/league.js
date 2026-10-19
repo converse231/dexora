@@ -12,6 +12,7 @@
    count at the last win (the rematch clock). */
 import { GYMTUNE, TRAINERTUNE, REMATCH_STEPS, HARDTUNE, HARD_PRIZE, HARD_FEE } from "../data/gymtune.js";
 import { TIERS, tiersFor } from "./biomes.js";
+import { isEvent } from "../data/dex.js";
 
 // ------------------------------------------------------------------ refusal
 
@@ -20,8 +21,10 @@ export const TEAM_MAX = 6;
 /* WHO MAY ENTER: anyone not locked in a trade. There is NO level cap and no
    legendaries' limit by strength any more (your call, 2026-10-03): bring any
    team to any battle. `capOf` survives only as the rematch's scale on the
-   opponent's level. `null` is yes; otherwise the reason, for the picker. */
-export const refusal = (mon) => (mon.lock ? "locked" : null);
+   opponent's level. `null` is yes; otherwise the reason, for the picker.
+   AND NEVER AN EVENT LOOK (eventforms.js): a costume is a collection, drawn
+   from the front alone, and never a fighter. */
+export const refusal = (mon) => (mon.lock ? "locked" : isEvent(mon.species) ? "event" : null);
 
 // ------------------------------------------------------------------ the order
 
