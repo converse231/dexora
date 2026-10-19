@@ -225,7 +225,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   findable. Evolutions carry their parent's band (slot 3) and generation
   (slot 4).
 - **`derivedHomes` homes on primary type** (primary 2, secondary 1). A home must
-  already hold the species' band. The `GEN_HOME_MIN` filler must share a type
+  already hold the species' band - read off the HAND-WRITTEN cast, so a
+  species whose type's map lacks the band in its cast lands on a secondary
+  type's map; where that reads wrong, `HOME_AT` names the home (Minior: Mt.
+  Moon, 2026-10-19 - it was one of ~230 on Tall Grass). The `GEN_HOME_MIN` filler must share a type
   with the map and never brings a new band.
 - **A fish (`shape: fish`) only spawns on maps with water.** `b.water` is
   declared and asserted against the map's water tiles. Legendaries are exempt.
