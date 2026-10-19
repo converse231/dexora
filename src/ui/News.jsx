@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-20-touches",
+    icon: "🌦️",
+    date: "October 2026",
+    title: "Legends, weather and binders",
+    items: [
+      ["Weather Institute", "Castform has company: Wingull, Lotad, Swablu, Torkoal, Snover, Rotom and more weather Pokémon."],
+      ["Binder", "A Replace button on every pocket - swap a card without emptying the pocket first."],
+      ["Legendaries", "Twice as easy to find - and a White Flute doubles it again."],
+      ["Diamond", "Its sparkles now glint on the Pokémon itself."],
+    ],
+  },
+  {
     id: "2026-10-19-hallowed",
     icon: "🎃",
     date: "October 2026",

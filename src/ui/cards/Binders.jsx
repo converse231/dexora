@@ -529,6 +529,10 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
           if (FINE) {
             const look = () => onLook(setId, localId);
             const off = () => { const p = [...b.pockets]; p[i] = null; put(p); };
+            /* REPLACE (asked for, 2026-10-20): the pocket's picker, straight
+               over the card in it - not remove, then tap the empty pocket.
+               A Pokedex pocket offers only its own Pokemon's cards. */
+            const swap = () => setPicker({ at: i, species: isDex ? i + 1 : null });
             const inActs = (e) => e.target.closest(".bk-acts");
             return (
               <div className={`cd-pocket got hoverable${held ? "" : " ghost"}${cls}`} role="group"
@@ -539,6 +543,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
                 {!held && <span className="mb-gone">Not held</span>}
                 <span className="bk-acts">
                   <button type="button" onClick={look} aria-label="View this card" data-tip="View"><Icon n="eye" size={17} /></button>
+                  <button type="button" onClick={swap} aria-label="Replace this card" data-tip="Replace"><Icon n="swap" size={17} /></button>
                   <button type="button" className="rm" onClick={off} aria-label="Remove it from this pocket" data-tip="Remove"><Icon n="trash" size={17} /></button>
                 </span>
               </div>
@@ -559,6 +564,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
           <button type="button" className="tp-quiet" onClick={() => onLook(selCard.setId, selCard.localId)}>View</button>
           {!isDex && <button type="button" className="tp-quiet" disabled={sel === 0} onClick={() => move(sel, sel - 1)} aria-label="Move one pocket back">‹ Move</button>}
           {!isDex && <button type="button" className="tp-quiet" disabled={sel >= count - 1} onClick={() => move(sel, sel + 1)} aria-label="Move one pocket on">Move ›</button>}
+          <button type="button" className="tp-quiet" onClick={() => { setPicker({ at: sel, species: isDex ? sel + 1 : null }); setSel(null); }}>Replace</button>
           <button type="button" className="tp-quiet" onClick={() => { const p = [...b.pockets]; p[sel] = null; put(p); setSel(null); }}>Remove</button>
         </div>
       )}

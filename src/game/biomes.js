@@ -953,7 +953,11 @@ export const tiersFor = (id) => {
    encounter in 37 is legendary has no legendaries in it. Under the ceiling,
    hunting is preserved exactly; over it, everything scales down together and
    the RATIO still holds. */
-export const LEGEND_EACH = 0.0003;   // ~1% across today's 34, and it stays put
+/* 1 IN 1,600, TWICE AS KIND (2026-10-20, asked for: a named legendary was
+   1 in 3,333 - about 22 hours' hunting at ~150 encounters an hour). The
+   White Flute takes it to about 1 in 800, which makes the flute the hunting
+   tool; any legendary on a typical map is about 1 in 115. */
+export const LEGEND_EACH = 0.000625;
 /* 1.2%, down from 2.5%. With homes on the primary type only, the ceiling
    binds on exactly one map - the Safari Zone, home to 60 - and it is what
    stops the broadest map being the one where legendaries are commonplace:
@@ -963,7 +967,10 @@ export const LEGEND_EACH = 0.0003;   // ~1% across today's 34, and it stays put
    they were 1 in 4,167, past a 3,500-encounter playthrough. It binds on the
    Safari alone again (66 heads, 1 in 4,400 each, 1 in 67 for any), and every
    legendary there has another home at the full rate. */
-export const LEGEND_CEIL = 0.015;    // the world must not fill with them
+/* 3.2% with the per-head share doubled, so the Mansion's 50 are each still
+   worth `LEGEND_EACH` (3.1%); it binds on the Safari alone again (66 heads,
+   1 in ~2,100 each, every one with another home at the full rate). */
+export const LEGEND_CEIL = 0.032;    // the world must not fill with them
 export const LEGEND_SHARE = 0.01;    // what it comes to today; read, never set
 export const LEGEND_MATCHED = 0.5;
 /* A STRAY IS MEANT TO BE A STORY, and at 0.08 it was merely uncommon.
@@ -1377,11 +1384,22 @@ const RESIDENTS = [
        gives you one, so it is an `only` map like Tanoby: Castform and its three
        weather forms, and NO OTHER map meets them (`KEPT`, which `derivedHomes`
        honours too - the forms are `wild` and homed on fire, water and ice
-       otherwise). The plain form is the common one; the weathers are rarer. */
+       otherwise). The plain form is the common one; the weathers are rarer.
+
+       AND THE WEATHER'S OTHER POKEMON BESIDE IT (2026-10-20, asked for: "why
+       don't we put more fitting Pokemon in there?") - GUESTS, which live on
+       their own maps too; only `kept` is the Institute's alone. Each makes or
+       follows a weather: rain (Wingull's Pelipper brings it, Lotad swims in
+       it), sun (Torkoal's Drought, Cherubi's Cherrim blooming in it), sand
+       (Hippopotas), snow (Snover), wind and cloud (Swablu, Hoppip, Drifloon),
+       and the instruments' (Magnemite, Voltorb, Rotom). */
     only: true,
+    kept: [351, 10013, 10014, 10015],
     types: [],
     table: [
       [351, 10], [10013, 4], [10014, 4], [10015, 4],
+      [278, 6], [270, 5], [333, 5], [324, 4], [187, 4], [81, 4], [100, 4],
+      [425, 3], [420, 3], [459, 3], [449, 2], [479, 2],
     ],
   },
   {
@@ -1853,7 +1871,11 @@ const WATERY = new Set(RESIDENTS.filter((b) => b.water).map((b) => b.id));
 const isFish = (id) => speciesById(id)?.shape === "fish";
 
 // Species an `only` map keeps to itself (Tanoby's Unown): no other map may home them.
-const KEPT = new Set(RESIDENTS.filter((b) => b.only).flatMap((b) => b.table.map(([id]) => id)));
+/* What an `only` map keeps to itself: its `kept`, or its whole table. A
+   guest in an `only` table (the Institute's weather Pokemon) still lives on
+   its own maps. */
+export const keptOf = (b) => (b.only ? b.kept ?? b.table.map(([id]) => id) : []);
+const KEPT = new Set(RESIDENTS.flatMap(keptOf));
 
 /* A HOME BY NAME, where the rules below send a species somewhere that reads
    wrong and no rule fixes it without moving others (2026-10-19, reported:
@@ -2803,6 +2825,10 @@ function residents(biome, level) {
   /* Residents, then the evolved overlay, and the legendaries LAST - scaled to
      whatever the first two came to, so their share of the roll is the same on
      every map at every level whatever else has been added. */
+  /* AN `only` MAP IS ITS OWN WRITTEN WEIGHTS: a hand-picked roster has no
+     generation mix or Kanto cast to fit (the fit made Rotom 27% of the
+     Weather Institute and its Castform 6%). */
+  if (biome.only) return extra.length ? [...open, ...extra] : open;
   return capLines(fitShares(extra.length ? [...open, ...extra] : open,
                             BAND_SHAPE.get(biome.id) ?? {}, level), level);
 }

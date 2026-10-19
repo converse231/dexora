@@ -285,7 +285,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   OTHER map homes its species (`KEPT`, honoured by `derivedHomes` and the Gen
   2 filler: the filler put Unown in Meteor Falls, and Castform's wild weather
   forms were homed on fire, water and ice maps; check.mjs holds every map,
-  surf and rod clear). No `types`, so nothing homes there and no legendary
+  surf and rod clear). An `only` map may also hold GUESTS (`kept` names its
+  own family; the rest live on their maps too - the Institute's weather
+  Pokemon, 2026-10-20), and its written weights are its table: no fit (the
+  generation fit made Rotom 27% of the Institute). No `types`, so nothing homes there and no legendary
   lives there; surfing it meets the same table (`surfTable`); check.mjs's mix
   suites (`MIXED`) and the rift-finds bound skip it, and its table rule counts
   DRAWINGS (a row's looks, or the row) - at least four - where every other
