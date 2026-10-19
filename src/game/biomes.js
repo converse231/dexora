@@ -1855,6 +1855,17 @@ const isFish = (id) => speciesById(id)?.shape === "fish";
 // Species an `only` map keeps to itself (Tanoby's Unown): no other map may home them.
 const KEPT = new Set(RESIDENTS.filter((b) => b.only).flatMap((b) => b.table.map(([id]) => id)));
 
+/* A HOME BY NAME, where the rules below send a species somewhere that reads
+   wrong and no rule fixes it without moving others (2026-10-19, reported:
+   Minior "so hard to find"). Minior is Rock/Flying and S band; the band filter
+   below only reads a map's HAND-WRITTEN cast, so Mt. Moon (rock, no S in its
+   cast) was skipped and Tall Grass (Ditto's S, and Flying) took it - one of
+   ~230 species on the starting map, 1 in ~550 encounters at Lv 50. Mt. Moon is
+   where meteors fell, and Beldum's line already brings it the S band, so its
+   mix does not move. Counting homed bands in the filter was tried and moved 28
+   other species, some to worse homes (Roaring Moon into the Haunted Tower). */
+const HOME_AT = new Map([[774, "ridge"]]);
+
 const derivedHomes = () => {
   const placed = new Set(RESIDENTS.flatMap((b) => b.table.map(([id]) => id)));
   const evolvesInto = new Set(EVOLUTIONS.map((e) => e.to));
@@ -1976,7 +1987,8 @@ const derivedHomes = () => {
       }
       return high > 0 ? top : null;
     };
-    const best = pick(open.filter((b) => bands.get(b.id).has(myBand)))
+    const best = RESIDENTS.find((b) => b.id === HOME_AT.get(sp.id))
+      ?? pick(open.filter((b) => bands.get(b.id).has(myBand)))
       ?? pick(open) ?? open[0];
     homes.get(best.id).push([sp.id, DERIVED_WEIGHT[bandFor(sp.id)] ?? 4]);
   }

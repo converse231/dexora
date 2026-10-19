@@ -24,6 +24,7 @@ export const NEWS = [
       ["Weather Institute", "Castform and its Sunny, Rainy and Snowy forms live here now - and only here."],
       ["Cinnabar Island", "The Pokémon Mansion stands in its real home - take the ferry."],
       ["Route 10", "The Power Plant's real building, north of Lavender Town and by ferry."],
+      ["Minior", "Lives in Mt. Moon now, where the meteors fell - much easier to find."],
     ],
   },
   {
