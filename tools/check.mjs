@@ -1456,7 +1456,7 @@ import { forestId, waterId } from "../src/game/tileset.js";
    keyboard captured would look exactly like the game freezing. */
 import { nextCast, CAST_PHASES } from "../src/game/phases.js";
 // RODS and rodTable are imported by the biome suite below; imports hoist.
-import { rodBite } from "../src/game/biomes.js";
+import { rodBite, keptOf } from "../src/game/biomes.js";
 import { F } from "../src/game/engine.js";
 
 {
@@ -4139,7 +4139,11 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     const MIXED = BIOMES.filter((b) => !b.only);
     /* AN `only` MAP'S SPECIES LIVE NOWHERE ELSE - walking, surfing or on a
        rod. The Gen 2 filler put Unown in Meteor Falls (reported 2026-10-04). */
-    const kept = new Set(BIOMES.filter((b) => b.only).flatMap((b) => b.table.map(([id]) => id)));
+    const kept = new Set(BIOMES.flatMap(keptOf));
+    // Every kept species is in its own map's table, and a guest is no kept one.
+    for (const b of BIOMES.filter((x) => x.kept)) {
+      assert.ok(b.kept.every((id) => b.table.some(([t]) => t === id)), `${b.id} keeps a species it does not hold`);
+    }
     for (const b of MIXED) for (const lv of [b.level, MAX_LEVEL]) {
       const stray = [...tableFor(b, lv), ...surfTable(b, lv, "super-rod")].find(([id]) => kept.has(id));
       assert.ok(!stray, `${speciesById(stray?.[0])?.name} lives in ${b.id} at Lv ${lv} - it is kept to its own map`);
@@ -4389,7 +4393,9 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   {
     const bandOf = (id) =>
       (LEGENDARY.includes(id) ? "L" : speciesById(id).tier);
-    for (const b of BIOMES) {
+    // An `only` map is its written roster, unfitted: guests arriving with their
+    // generation ARE its mix growing (the Weather Institute's Gen 4 at Lv 20).
+    for (const b of BIOMES.filter((x) => !x.only)) {
       /* RESIDENTS ONLY, by their OWN tier. Two halves of that matter.
 
          Own tier, because `balance` bands a derived evolution with its PARENT

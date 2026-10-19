@@ -240,14 +240,15 @@ export function VariantFx({ id, variant, art = null }) {
         </>
       );
     }
-    /* Diamond: the prism halo turning behind it, its FIRE turning inside it
-       (`.dia-prism`, 2026-10-19, asked for: "shimmer a bit, not just on the
-       outside") - colour flashes cut to the body, the other way round - and
-       the glints. Turning is Diamond's one idea of motion. */
+    /* Diamond: the prism halo turning behind it, SPARKLES IN ITS BODY
+       (`.dia-prism`, cut to the creature's outline: 2026-10-19 asked for a
+       shimmer "not just on the outside"; 2026-10-20, the turning colour wheel
+       that was was not liked - "the sparkles in the sprite itself"), and the
+       glints round it. */
     return (
       <>
         <span className="dia-halo" style={{ "--art": url }} aria-hidden="true"><i><b /></i></span>
-        <span className="dia-prism" style={{ "--art": url }} aria-hidden="true"><i /></span>
+        <span className="dia-prism" style={{ "--art": url }} aria-hidden="true"><i /><i /><i /><i /><i /></span>
         <span className="dia-fire" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
       </>
     );
