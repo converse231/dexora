@@ -6770,6 +6770,33 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     `${offenders.join(", ")} imports the Supabase client directly - it goes ` +
     "through net/cloud.js, or the game stops working without an account");
 
+  /* THE DASHBOARD IS NOT THE GAME (docs/admin.md). Nothing in src/ reaches
+     into admin/, so no admin code ships to players; the dashboard reads only
+     the game's browser-free rule and data modules, never map.js or mapdata.js
+     (900KB of map rows for one name); and every `admin_*` function it calls is
+     one db/admin.sql defines. */
+  {
+    const toAdmin = walk(dir).filter((u) => /\.(jsx?|css)$/.test(u.pathname))
+      .filter((u) => /["'][./]*admin\//.test(readFileSync(u, "utf8"))).map((u) => u.pathname.split("/src/")[1]);
+    assert.deepEqual(toAdmin, [], `${toAdmin.join(", ")} imports from admin/ - the dashboard's code would ship to players`);
+    const adminDir = new URL("../admin/src/", import.meta.url);
+    const adminFiles = walk(adminDir).filter((u) => /\.jsx?$/.test(u.pathname));
+    const reads = adminFiles.flatMap((u) => [...readFileSync(u, "utf8").matchAll(/["'](?:\.\.\/)+src\/([^"']+)["']/g)]
+      .map((m) => [u.pathname.split("/admin/src/")[1], m[1]]));
+    assert.ok(reads.length > 0, "the dashboard reads none of the game's modules - the guard below would prove nothing");
+    for (const [file, mod] of reads) {
+      assert.ok(/^(game|data)\//.test(mod), `admin/src/${file} imports src/${mod} - only src/game and src/data are browser-free`);
+      assert.ok(!/(^|\/)(map|mapdata)\.js$/.test(mod), `admin/src/${file} imports src/${mod} - 900KB of map rows; read names off BIOMES`);
+    }
+    const sql = readFileSync(new URL("../db/admin.sql", import.meta.url), "utf8");
+    const called = new Set(adminFiles.flatMap((u) => [...readFileSync(u, "utf8").matchAll(/["'](admin_[a-z_]+)["']/g)].map((m) => m[1])));
+    for (const fn of called) {
+      assert.ok(sql.includes(`function public.${fn}(`), `the dashboard calls ${fn}, which db/admin.sql does not define`);
+    }
+    console.log(`admin ok — src/ never imports the dashboard, which reads ${new Set(reads.map(([, m]) => m)).size} of the game's ` +
+      `browser-free modules and calls ${called.size} admin functions, each defined in db/admin.sql`);
+  }
+
   const cloud = readFileSync(new URL("net/cloud.js", dir), "utf8");
   assert.ok(/export const CLOUD/.test(cloud), "cloud.js does not say whether it is configured");
   for (const fn of ["signUp", "signIn", "signOut", "pull", "push", "restore"]) {

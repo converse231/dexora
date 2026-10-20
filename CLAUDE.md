@@ -152,6 +152,18 @@ anything done. The run prints each suite; the count is not typed anywhere.
   personal is collected. Password reset uses the implicit flow with
   `detectSessionInUrl`.
   Log out replaced reset; it waits for the upload before dropping the cache.
+- **The admin dashboard is designed in docs/admin.md** (2026-10-20): its own
+  app in `admin/` and its own Vercel project, never imported by src/, reading
+  only src/game and src/data (check.mjs's `admin ok`). **The database is the
+  guard**: every `admin_*` function calls `admin.guard()` first - a listed
+  admin (`admin.admins`, inserted by hand), at `aal2` only while
+  `admin.mfa_required()` is true (two-factor is PARKED off, your call
+  2026-10-20) - and tradedb calls each as anon, a player and, switched on,
+  an admin without two-factor.
+  `db/admin.sql` goes on after trading, ranked and referrals and redefines
+  none of their functions; its `saves` trigger swallows its own errors (a
+  statistic never costs an upload); it never writes a save, and a flagged
+  account is out of every count and board.
 
 ## Dex, forms and ids
 
