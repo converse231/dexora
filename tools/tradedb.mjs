@@ -11,6 +11,7 @@
    IT REFUSES TO RUN AGAINST THE LIVE PROJECT: the test URL and the database
    URL are both checked against VITE_SUPABASE_URL's project ref. */
 import { readFileSync, existsSync } from "node:fs";
+import { createHmac } from "node:crypto";
 import assert from "node:assert/strict";
 import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
@@ -67,6 +68,8 @@ await db.query(readFileSync(new URL("../db/trading.sql", import.meta.url), "utf8
 await db.query(readFileSync(new URL("../db/ranked.sql", import.meta.url), "utf8"));
 // Referrals read trading's profiles, saves and befriend - after it too.
 await db.query(readFileSync(new URL("../db/referrals.sql", import.meta.url), "utf8"));
+// The dashboard reads all three, so it goes on last (docs/admin.md).
+await db.query(readFileSync(new URL("../db/admin.sql", import.meta.url), "utf8"));
 
 // ---- two trainers -------------------------------------------------------------
 /* NO REALTIME HERE, and Node 20 has no WebSocket for supabase-js to find at
@@ -320,7 +323,7 @@ assert.equal(ca.showcase.find((m) => m.uid === 1).species, 18, "the showcase did
     `card showcase ${JSON.stringify(cc.card_show)} - an unheld printing, a repeat or a bad key got through`);
   assert.deepEqual(cc.titles, titleIds(cardsPayload.milestones, cardsPayload.medals),
     `titles ${cc.titles} are not the game's ${titleIds(cardsPayload.milestones, cardsPayload.medals)}`);
-  assert.deepEqual(cc.titles, ["dex:1", "dex:9", "master:me01", "set:me01", "set:me02", "tier:gold:1"]);
+  assert.deepEqual(cc.titles, ["dex:1", "dex:9", "event:halloween", "master:me01", "set:me01", "set:me02", "tier:gold:1"]);
   // Sold off: a card that leaves the save leaves the card.
   await rpc(A, "save_game", { payload: { ...cardsPayload, cards: { "me01-001": { n: 2 } } }, sess: "s-a" });
   assert.deepEqual((await card(A)).card_show, [{ id: "me01-001", v: "n" }], "a card no longer held stayed on the trainer card");
@@ -987,6 +990,174 @@ await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
   await q("delete from public.referrals where referee = any($1) or referrer = $2", [[N.id, ...fake], A.id]);
   console.log("tradedb referrals ok — a new account links once to an older one, never itself, a brought-in game counts nothing, " +
     "qualifying takes the rule over separate days and a confirmed email, a flagged account earns nothing, the cap holds, the table is the functions' alone");
+}
+
+// ---- THE ADMIN DASHBOARD (db/admin.sql, docs/admin.md) ---------------------------
+{
+  /* A TOTP code from a base32 secret (RFC 6238), so the test signs in the way
+     the dashboard does - password, then the authenticator. */
+  const totp = (secret) => {
+    const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    const bits = [...secret.replace(/=+$/, "").toUpperCase()].map((c) => B32.indexOf(c).toString(2).padStart(5, "0")).join("");
+    const key = Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)));
+    const ctr = Buffer.alloc(8); ctr.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+    const h = createHmac("sha1", key).update(ctr).digest();
+    const o = h[19] & 15;
+    return String((h.readUInt32BE(o) & 0x7fffffff) % 1e6).padStart(6, "0");
+  };
+  const C = await trainer("z");
+  await q("delete from auth.mfa_factors where user_id = $1", [C.id]);
+  await q("delete from admin.admins where user_id = any($1)", [[A.id, B.id, C.id]]);
+  await q("insert into admin.admins (user_id) values ($1)", [C.id]);
+  // A fresh sign-in: aal1 until the authenticator answers.
+  const C1 = createClient(env.TEST_SUPABASE_URL, env.TEST_SUPABASE_ANON_KEY, OPTS);
+  { const { error } = await C1.auth.signInWithPassword({ email: "trade-z@dexora.test", password: PASS }); if (error) throw error; }
+  const C2 = createClient(env.TEST_SUPABASE_URL, env.TEST_SUPABASE_ANON_KEY, OPTS);
+  { const { error } = await C2.auth.signInWithPassword({ email: "trade-z@dexora.test", password: PASS }); if (error) throw error; }
+  const { data: f, error: fe } = await C2.auth.mfa.enroll({ factorType: "totp", friendlyName: `tradedb-${Date.now()}` });
+  if (fe) throw fe;
+  { const { error } = await C2.auth.mfa.challengeAndVerify({ factorId: f.id, code: totp(f.totp.secret) }); if (error) throw error; }
+  const anon = createClient(env.TEST_SUPABASE_URL, env.TEST_SUPABASE_ANON_KEY, OPTS);
+
+  /* EVERY admin_% FUNCTION, read off the database - one written without its
+     arguments here fails, so a new function cannot skip this test. */
+  const ARGS = {
+    admin_overview: { days: 7 }, admin_players: {}, admin_leaders: { board: "dex" }, admin_find: { name: "Tester" },
+    admin_trainer: { who: A.id }, admin_social: { days: 7 }, admin_ranked: {}, admin_daily: { days: 7 },
+    admin_snapshot: {}, admin_moderation: {}, admin_health: {},
+    admin_flag: { who: B.id, why: "tradedb" }, admin_unflag: { who: B.id, why: "tradedb" },
+    admin_void: { who: B.id, why: "tradedb" }, admin_dismiss: { ids: [0], why: "tradedb" },
+  };
+  const fns = (await q("select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace " +
+    "where n.nspname = 'public' and p.proname like 'admin\\_%'")).map((r) => r.proname);
+  for (const fn of fns) assert.ok(ARGS[fn], `${fn} has no arguments in tradedb's admin test - add it`);
+  for (const fn of Object.keys(ARGS)) assert.ok(fns.includes(fn), `${fn} is gone from db/admin.sql`);
+  const refused = async (client, fn, who) => {
+    const { error } = await client.rpc(fn, ARGS[fn]);
+    // Anon has no grant at all; a signed-in caller reaches the guard.
+    const why = who === "anon" ? /not an admin|permission denied/ : /not an admin/;
+    assert.ok(error && why.test(error.message), `${fn} answered ${who}: ${error?.message ?? "no error"}`);
+  };
+  // The writes are tried last as the admin; as anyone else they must refuse first.
+  for (const fn of fns) {
+    await refused(anon, fn, "anon");
+    await refused(A.c, fn, "a player");
+  }
+  assert.equal((await rpc(A, "is_admin")), false, "a player is an admin");
+  /* TWO-FACTOR IS A SWITCH (`admin.mfa_required()`, parked off). Off, a
+     listed admin with a password is in; on, the same session is refused by
+     every function until it passes two-factor - tested on, then put back. */
+  const mfaShipped = (await q("select admin.mfa_required() m"))[0].m;
+  assert.equal((await C1.rpc("dashboard_mfa")).data, mfaShipped, "dashboard_mfa does not say what the guard asks");
+  const mfaSwitch = (on) => q(`create or replace function admin.mfa_required() returns boolean language sql stable set search_path = '' as $$ select ${on} $$`);
+  try {
+    await mfaSwitch(true);
+    for (const fn of fns) await refused(C1, fn, "an admin without two-factor, with two-factor on");
+    assert.equal((await C1.rpc("is_admin")).data, false, "an admin without two-factor is an admin with two-factor on");
+    assert.equal((await C2.rpc("is_admin")).data, true, "the admin with two-factor is not");
+    await mfaSwitch(false);
+    assert.equal((await C1.rpc("is_admin")).data, true, "a listed admin is refused with two-factor off");
+    assert.equal((await A.c.rpc("is_admin")).data, false, "two-factor off let a player in");
+  } finally {
+    await mfaSwitch(mfaShipped);
+  }
+  const as = async (fn, args = ARGS[fn]) => {
+    const { data, error } = await C2.rpc(fn, args);
+    if (error) throw new Error(`${fn}: ${error.message}`);
+    return data;
+  };
+
+  // ACTIVITY: one row a trainer a day and an hour, however many uploads.
+  await q("delete from admin.active_days where user_id = $1", [A.id]);
+  await q("delete from admin.active_hours where user_id = $1", [A.id]);
+  await save(A, [P(901, 16, 5)]);
+  await save(A, [P(901, 16, 6)]);
+  const days = await q("select count(*)::int n from admin.active_days where user_id = $1", [A.id]);
+  const hours = await q("select count(*)::int n from admin.active_hours where user_id = $1", [A.id]);
+  assert.equal(days[0].n, 1, "two uploads made other than one active day");
+  assert.equal(hours[0].n, 1, "two uploads made other than one active hour");
+  // ...and a statistic that cannot be written never costs the upload.
+  await q("alter table admin.active_days rename to active_days_gone");
+  try {
+    await save(A, [P(901, 16, 7)]);
+    assert.equal((await stored(A)).box.find((x) => x.uid === 901)?.level, 7, "a failing activity trigger lost the upload");
+  } finally {
+    await q("alter table admin.active_days_gone rename to active_days");
+  }
+
+  // READS: each answers, and none carries an email or a birthdate.
+  const seen = [];
+  for (const fn of ["admin_overview", "admin_players", "admin_leaders", "admin_find", "admin_trainer",
+    "admin_social", "admin_ranked", "admin_moderation", "admin_health"]) seen.push(JSON.stringify(await as(fn)));
+  const ov = await as("admin_overview");
+  assert.equal(ov.series.length, 14, "overview's series is not 2N days");
+  assert.ok(ov.series.at(-1).dau >= 1, "today's actives miss the trainer who just saved");
+  assert.ok((await as("admin_find")).some((t) => t.id === A.id), "find misses a trainer by name");
+  assert.equal((await as("admin_trainer")).name, "TesterA", "a trainer's page names someone else");
+  for (const board of ["dex", "level", "steps", "caught", "variants", "stars", "trades", "badges", "ranked"])
+    seen.push(JSON.stringify(await as("admin_leaders", { board })));
+  {
+    const { error } = await C2.rpc("admin_leaders", { board: "email" });
+    assert.ok(error, "a board not on the list was answered");
+  }
+
+  // THE SNAPSHOT: twice in a day is one row, and every save field it reads is there.
+  const real = (await stored(A));
+  await rpc(A, "save_game", { payload: { ...real, money: 1234, candy: 5, caught: 3, areaId: "pond",
+    medals: ["gen:1"], beaten: { "kanto-brock": { wins: 1, at: 1 } }, dreams: { halloween: 2 },
+    cards: { "base1-4": { n: 1 } }, research: { 16: [1] }, checkin: { last: null, streak: 1, best: 7, spins: 0 },
+    shiny: [0, 1, 1] }, sess: "s-a" });
+  await as("admin_snapshot"); const m = await as("admin_snapshot");
+  assert.equal((await q("select count(*)::int n from admin.daily where day = (now() at time zone 'utc')::date"))[0].n, 1,
+    "two snapshots in a day made two rows");
+  assert.ok(m.players >= 1 && m.money.p50 != null && m.candy.p50 != null && m.box.p50 != null, "the snapshot misses money, candy or the box");
+  assert.ok(m.tiers.shiny?.held >= 2, "the snapshot misses a tier row's registrations");
+  assert.deepEqual(Object.keys(m.tiers).sort(), (await q("select unnest(public.tier_list()) t")).map((r) => r.t).sort(),
+    "the snapshot's tiers are not tier_list()'s");
+  assert.ok(m.beaten["kanto-brock"] >= 1 && m.areas.pond >= 1 && m.medals["gen:1"] >= 1, "the snapshot misses beaten, areas or medals");
+  assert.ok(m.dreams.halloween?.players >= 1 && m.cards.players >= 1 && m.research.p50 != null && m.streak.week >= 1,
+    "the snapshot misses dreams, cards, research or the check-in streak");
+  assert.ok(Object.keys(m.events).length === (await q("select cardinality(public.event_slots()) n"))[0].n,
+    "the snapshot does not count every event slot");
+  // A save that is not what it should be (past `save_shape`, which asks only
+  // for an object with a `dex` array) never fails the night's pass.
+  await rpc(B, "save_game", { payload: { dex: ["x", {}], box: {}, beaten: [], medals: {}, dreams: 3, cards: [], research: "no", money: "lots", shiny: "no", checkin: 4 }, sess: "s-b" });
+  await as("admin_snapshot");
+  seen.push(JSON.stringify(await as("admin_daily")));
+  for (const text of seen) {
+    assert.ok(!/@dexora\.test/.test(text), "an admin read returned an email");
+    assert.ok(!/birthdate/.test(text), "an admin read returned a birthdate");
+  }
+
+  // MODERATION: each write says why, is audited, and refuses without a reason.
+  const audits = async () => (await q("select count(*)::int n from admin.audit where actor = $1", [C.id]))[0].n;
+  const before = await audits();
+  { const { error } = await C2.rpc("admin_flag", { who: B.id, why: " " }); assert.ok(error, "a flag without a reason was taken"); }
+  await as("admin_flag");
+  assert.ok((await q("select flagged_at from public.profiles where user_id = $1", [B.id]))[0].flagged_at, "the flag did not land");
+  assert.ok(!(await as("admin_leaders", { board: "dex" })).some((t) => t.id === B.id), "a flagged trainer is on a board");
+  await as("admin_unflag");
+  assert.equal((await q("select flagged_at from public.profiles where user_id = $1", [B.id]))[0].flagged_at, null, "the unflag did not land");
+  await as("admin_void");
+  await rpc(A, "report_user", { other: B.id, reason: 0 }).catch(() => {});
+  const rep = (await q("select id from public.reports where reporter = $1 and reported = $2 order by id desc limit 1", [A.id, B.id]))[0];
+  assert.ok(rep, "no report to dismiss");
+  assert.equal(await as("admin_dismiss", { ids: [rep.id], why: "tradedb" }), 1, "the dismiss took other than one report");
+  assert.ok(!(await as("admin_moderation")).reports.some((r) => r.items.some((x) => x.id === rep.id)), "a dismissed report is still open");
+  assert.equal(await audits(), before + 4, "moderation writes are not one audit row each");
+  // The admin's own tables are nobody else's.
+  for (const t of ["admins", "audit", "active_days", "active_hours", "daily", "dismissed"]) {
+    const { error } = await A.c.schema("admin").from(t).select("*").limit(1);
+    assert.ok(error, `a player read admin.${t}`);
+  }
+  await q("delete from admin.admins where user_id = $1", [C.id]);
+  await q("delete from auth.mfa_factors where user_id = $1", [C.id]);
+  await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
+  console.log(`tradedb admin ok — all ${fns.length} admin functions refuse anon and a player, and with two-factor switched on ` +
+    `an admin without it (off, the shipped default, a listed admin is in); ` +
+    "activity is one row a day and an hour and never costs an upload; the snapshot is idempotent, reads every field " +
+    "and survives a malformed save; no read carries an email; each moderation write says why and is audited; " +
+    "the admin schema is unreadable to players");
 }
 
 await db.end();

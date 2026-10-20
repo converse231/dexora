@@ -555,6 +555,36 @@ Until step 1 is run, a Pokemon in one of the four new tiers cannot enter
 trading (its tier fails the CHECK), and a region's new-tier titles do not reach
 the trainer card. Everything else works.
 
+## 3k. The admin dashboard — **run this once, after 3j** (added 2026-10-20)
+
+docs/admin.md is the design. The dashboard is its own Vercel project; the
+database is what guards it.
+
+1. **`db/trading.sql` again if you have not since 2026-10-19** (the Halloween
+   event's `event_slots()`), then **`db/admin.sql`** - paste the whole file
+   and run it. Re-runnable. It adds the `admin` schema, the activity trigger
+   on `saves`, the indexes, the `admin_*` functions, and the nightly snapshot
+   under pg_cron (04:00 UTC).
+2. **Make yourself the admin** - in the SQL editor:
+   ```
+   insert into admin.admins (user_id)
+     select id from auth.users where email = 'YOUR GAME ACCOUNT EMAIL';
+   ```
+3. **Check the nightly job**: `select jobname, schedule from cron.job;` shows
+   `dexora-admin-snapshot`. If pg_cron is missing, enable it under Database →
+   Extensions and run `db/admin.sql` again.
+4. **The Vercel project**: Add New → Project → this repository, **Root
+   Directory `admin`**, framework Vite, and the environment variables
+   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` - the game's own two
+   public values. Leave "Include files outside the root directory" on: the
+   dashboard reads the game's rule modules from `../src`. Deploy.
+5. **Sign in** with your game account's email and password. Health → **Run
+   now** takes the first snapshot.
+
+Activity (daily actives, retention, busy hours) is recorded from step 1 on;
+sign-ups show their whole history at once. Two-factor is built but parked
+(docs/admin.md, Security 5): `admin.mfa_required()` returning `true` turns it on.
+
 ## 4. Turn off email confirmation — **you have to do this one**
 
 It is the only step that cannot be done from here: the setting lives in GoTrue's
