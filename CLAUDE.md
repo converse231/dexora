@@ -235,6 +235,13 @@ anything done. The run prints each suite; the count is not typed anywhere.
   decides. A look changes no spawn table: every table and rod hashed
   identical before and after the 95 arrived. Vivillon and Alcremie (19 and
   62 looks) were left out on purpose - README's Deferred list.
+  **A new look first** (2026-10-20, asked for: Minior took ~22 meetings for
+  eight drawings): while a family has drawings you have not CAUGHT, `rollLook`
+  gives you one of those (`owned`), so N looks take N catches; still one draw.
+  **Silvally is its own appended family**, out of `LEGENDARY`: `SILVALLY_SHARE`
+  (1 in 250) of every map with types, the drawing narrowed to the map's types
+  (`types`), so a Fire Silvally lives on fire maps; Type: Null stays a
+  legendary and evolves into a Silvally you lack. check.mjs's `looks ok`.
 
 ## Spawn tables
 

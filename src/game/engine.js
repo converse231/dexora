@@ -1854,8 +1854,10 @@ export function createEngine(canvas, onChange, mini = null) {
        never a swap or a roll anywhere else. */
     const hunt = source === "wild" ? huntDue(state.dreams, state.medals) : null;
     const nightmare = !!hunt && state.areaId === hunt.area && isNight(state.steps);
+    const owned = (id) => state.dex[dexIndex(id)] === 2;
     const sp = nightmare ? speciesById(hunt.id)
-      : eventLook(rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(table)), Math.random,
+      : eventLook(rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(table), Math.random,
+        { owned, types: biomeFor(state.areaId)?.types }), Math.random,
         { night: isNight(state.steps), lure: lure?.lure ?? 1 });
     /* Whether the dex already has this one, read BEFORE the throw can register
        it. It rides on the encounter rather than being looked up while drawing,
@@ -3908,7 +3910,10 @@ export function createEngine(canvas, onChange, mini = null) {
        becomes some Silvally, Litleo some Pyroar. A parent with looks of its
        own carries them through its rows (Blue Flabebe -> Blue Floette), so it
        is never rolled. */
-    if (looksOf(mon.species).length < 2) targetId = rollLook(speciesById(targetId)).id;
+    if (looksOf(mon.species).length < 2) {
+      targetId = rollLook(speciesById(targetId), Math.random,
+        { owned: (id) => state.dex[dexIndex(id)] === 2 }).id;
+    }
     const target = speciesById(targetId);
     const at = dexIndex(targetId);
     /* Evolving registers the new species, a traded one's too (a trade counts);

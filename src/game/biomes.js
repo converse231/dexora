@@ -240,8 +240,17 @@ export const GENERATIONS = (() => {
    It moves the roster 94 -> 97, which changes no odds: `LEGEND_EACH x 97` is
    2.91% against a `LEGEND_CEIL` of 2.5%, so the pool was already saturated and
    stays there. */
+/* SILVALLY IS NOT IN THE LEGENDARY POOL (2026-10-20, asked for): eighteen
+   drawings at 1 in 1,600 on the Normal maps put one particular type at 1 in
+   28,800 encounters. It is its own appended family instead - on every map
+   with types, at `SILVALLY_SHARE`, and the drawing met is one of the MAP's
+   types (`rollLook`): a Fire Silvally on a fire map. Type: Null stays a
+   legendary on the Normal maps, and evolves into a Silvally you lack. */
+export const SILVALLY = 773;
+export const SILVALLY_SHARE = 0.004;   // 1 in 250 encounters, on any map with types
+
 export const LEGENDARY = SPECIES
-  .filter((sp) => sp.legendary && (!isForm(sp.id) || sp.wild))
+  .filter((sp) => sp.legendary && (!isForm(sp.id) || sp.wild) && sp.id !== SILVALLY)
   .map((sp) => sp.id);
 
 /* THE COSTUME PIKACHU ARE APPENDED LIKE LEGENDARIES, AND THAT IS THE WHOLE
@@ -1088,9 +1097,20 @@ export const looksOf = (id) => {
   const sp = speciesById(id);
   return LOOKS.get(sp?.form === "look" ? sp.of : id) ?? [id];
 };
-export const rollLook = (sp, random = Math.random) => {
-  const family = looksOf(sp.id);
-  return family.length < 2 ? sp : speciesById(family[Math.floor(random() * family.length)]);
+/* A NEW LOOK FIRST (2026-10-20, asked for: Minior's eight drawings, met at
+   random, took ~22 Minior to complete - more than two playthroughs of Mt.
+   Moon). While a family has drawings you have not CAUGHT (`owned`), the one
+   you meet is one of those, so a family of N takes N catches and only a
+   finished one is random again. `types` first narrows the family to drawings
+   of the map's own types, where any are (Silvally: a Fire one on a fire map).
+   Always exactly ONE draw, whatever narrowed it, so a seeded record replays. */
+export const rollLook = (sp, random = Math.random, { owned, types } = {}) => {
+  let family = looksOf(sp.id);
+  if (family.length < 2) return sp;
+  const narrow = (keep) => { const some = family.filter(keep); if (some.length) family = some; };
+  if (types) narrow((id) => types.includes(speciesById(id)?.types[0]));
+  if (owned) narrow((id) => !owned(id));
+  return speciesById(family[Math.floor(random() * family.length)]);
 };
 
 /* Scaled so the legendaries together come to `LEGEND_SHARE` of the FINAL table
@@ -2771,11 +2791,14 @@ export function encounterTable(biome, level = 1) {
   /* Both are appended to the RESIDENT total, and both are scaled against the
      share the two of them take together - so each is exactly its own share of
      the finished table and neither moves when the other's roster grows. */
+  // Silvally: any map with types once Alola has arrived (an `only` map has none).
+  const silvally = biome.types?.length && alive(SILVALLY) ? SILVALLY_SHARE : 0;
   const taken = rareShare(LEGENDARY, alive, legendTypes(biome))
-              + rareShare(COSTUMES, alive, biome.types);
+              + rareShare(COSTUMES, alive, biome.types) + silvally;
   return [...rolled,
           ...rareFor(LEGENDARY, legendTypes(biome), total, alive, taken),
-          ...rareFor(COSTUMES, biome.types, total, alive, taken)];
+          ...rareFor(COSTUMES, biome.types, total, alive, taken),
+          ...(silvally && total > 0 ? [[SILVALLY, (total * silvally) / (1 - taken)]] : [])];
 }
 
 /* The residents and their evolved overlay, fitted - everything but the two

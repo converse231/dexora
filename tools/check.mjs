@@ -211,7 +211,7 @@ import {
   GEN_FIRST, GEN_STEP,
   wildBand, WILD_SPAN, WILD_STEP, rollSize, sizeOf, sizeTag, measured,
   SIZE_MIN, SIZE_MAX, ENCOUNTER_RATE, HEADLINE, genTargets, rowGen,
-  SPECIES_CAP, CAST_CEIL, RODS as RODS_ALL, isLegendary, looksOf, rollLook,
+  SPECIES_CAP, CAST_CEIL, RODS as RODS_ALL, isLegendary, looksOf, rollLook, SILVALLY, SILVALLY_SHARE,
   GEN_LOW, GEN_HIGH, CAST_TOP,
 } from "../src/game/biomes.js";
 import {
@@ -4008,6 +4008,50 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   const late = wildAt(MAX_LEVEL);
   assert.ok(late.size > early.size, "levelling adds no species at all");
   formCheck();
+
+  /* A NEW LOOK FIRST, AND SILVALLY'S HOMES (2026-10-20, asked for: Minior's
+     eight drawings took ~22 Minior, one Silvally type 1 in 28,800). A family
+     of N completes in N catches, and a finished one is random over all of
+     it again; a roll is ONE draw, whatever narrowed it. Silvally is out of the
+     legendary pool, exactly SILVALLY_SHARE of every map with types, met in a
+     drawing of that map's types, and every one of its drawings has a map. */
+  {
+    for (const id of [774, 201, 773, 669]) {
+      const family = looksOf(id), own = new Set();
+      let n = 0;
+      while (own.size < family.length && n < family.length * 3) {
+        n++;
+        own.add(rollLook(speciesById(id), Math.random, { owned: (x) => own.has(x) }).id);
+      }
+      assert.equal(n, family.length, `${speciesById(id).name}'s ${family.length} looks took ${n} catches - a caught look came again`);
+      let draws = 0;
+      rollLook(speciesById(id), () => { draws++; return 0.5; }, { owned: (x) => x === family[0], types: ["fire"] });
+      assert.equal(draws, 1, `a look roll drew ${draws} numbers - a seeded record would not replay`);
+      const seen = new Set();
+      for (let i = 0; i < 400; i++) seen.add(rollLook(speciesById(id), Math.random, { owned: () => true }).id);
+      assert.equal(seen.size, family.length, `${speciesById(id).name} with every look caught is not random over all of them`);
+    }
+    assert.ok(!LEGENDARY.includes(SILVALLY), "Silvally is back in the legendary pool - one type at 1 in 28,800");
+    const reached = new Set();
+    for (const b of BIOMES) {
+      const t = encounterTable(b, MAX_LEVEL);
+      const total = t.reduce((n, e) => n + e[1], 0);
+      const share = t.filter((e) => e[0] === SILVALLY).reduce((n, e) => n + e[1], 0) / total;
+      const expect = b.types?.length ? SILVALLY_SHARE : 0;
+      assert.ok(Math.abs(share - expect) < 1e-9, `${b.id}: Silvally is ${(share * 100).toFixed(3)}% of the table, not ${expect * 100}%`);
+      if (!expect) continue;
+      for (let i = 0; i < 60; i++) {
+        const look = rollLook(speciesById(SILVALLY), Math.random, { types: b.types });
+        const fits = looksOf(SILVALLY).some((x) => b.types.includes(speciesById(x).types[0]));
+        assert.ok(!fits || b.types.includes(look.types[0]), `${b.id} met a ${look.types[0]} Silvally - not one of its types`);
+        reached.add(look.id);
+      }
+    }
+    const lost = looksOf(SILVALLY).filter((x) => !reached.has(x)).map((x) => speciesById(x).types[0]);
+    assert.deepEqual(lost, [], `no map meets a ${lost.join(", ")} Silvally`);
+    console.log(`looks ok — a family of N completes in N catches and is random again once done, one draw a roll; ` +
+      `Silvally is ${SILVALLY_SHARE * 100}% of every map with types, met in that map's types, all ${looksOf(SILVALLY).length} reachable`);
+  }
   for (const sp of SPECIES) {
     /* A FORM THAT IS MADE IS REACHED, NEVER MET. Mega, Primal and Gigantamax
        are deliberately excluded from every wild table - being able to CATCH a
@@ -4412,7 +4456,8 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
          5.1% -> 15.4%, and that was neither. */
       const mix = (lv) => {
         const t = encounterTable(b, lv)
-          .filter((e) => !e[2] && !LEGENDARY.includes(e[0]));
+          // Appended families are not residents: the legendaries, and Silvally.
+          .filter((e) => !e[2] && !LEGENDARY.includes(e[0]) && e[0] !== SILVALLY);
         const total = t.reduce((n, e) => n + e[1], 0);
         const acc = {};
         for (const [id, w] of t) acc[bandOf(id)] = (acc[bandOf(id)] ?? 0) + w / total;

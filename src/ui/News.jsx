@@ -16,6 +16,16 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-20-looks",
+    icon: "🧩",
+    date: "October 2026",
+    title: "Every look, sooner",
+    items: [
+      ["New looks first", "Minior, Unown, Flabébé and friends: the one you meet is a look you haven't caught yet."],
+      ["Silvally", "No longer legendary-rare: about 1 in 250 on most maps, in that map's own type."],
+    ],
+  },
+  {
     id: "2026-10-20-touches",
     icon: "🌦️",
     date: "October 2026",
