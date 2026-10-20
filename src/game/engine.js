@@ -1253,8 +1253,8 @@ export function createEngine(canvas, onChange, mini = null) {
      every variant catch, and profiled it was this: each phase called
      `changed()`, so the Dex grid, the Box list and the rail's evolve count
      rebuilt seven times per throw - the banner only landed on top of it. A
-     phase moves nothing in the collection; `settle` (the catch itself) and
-     the encounter closing still call `changed()`, once each. */
+     phase moves nothing in the collection; `settle` (the catch itself) still
+     calls `changed()`, once - running and the close do not (2026-10-20). */
   const stepped = () => {
     state.rev++;
     notify();
@@ -2631,7 +2631,10 @@ export function createEngine(canvas, onChange, mini = null) {
     if (step.close) {
       state.encounter = null;
       state.ask = null;          // a question about an encounter dies with it
-      changed();
+      /* `stepped()`: the catch (`settle`) already said the collection moved,
+         and running moves none of it - a `changed()` here rebuilt a big Box
+         after every encounter (2026-10-20). */
+      stepped();
       return;
     }
     Object.assign(e, step);
@@ -2710,7 +2713,7 @@ export function createEngine(canvas, onChange, mini = null) {
     chainOn(e.speciesId, "ran");
     huntOn(e, "ran");
     e.until = performance.now() + 450;
-    changed();
+    stepped();          // the chain and the dreams are read off state, not colRev
   }
 
   // Skip straight to the result. In a game with hundreds of throws, waiting out

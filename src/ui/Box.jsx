@@ -15,7 +15,7 @@
    past the best of each species and never a variant, and both payouts itemise
    what they are about to take before they take it. */
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePauseOffscreenRows } from "./pause.js";
 import { SPECIES } from "../data/dex.js";
 import {
@@ -130,6 +130,7 @@ function Box({
       const look = looksFemale(mon.species, sexOf(mon));
       const key = `${mon.species}:${variant ?? ""}:${alpha ? "a" : ""}${look ? "f" : ""}`;
       const g = byId.get(key) ?? {
+        key,
         species: mon.species,
         variant,
         alpha,
@@ -183,6 +184,11 @@ function Box({
       }
       // Only a stone stands between you and it: a different sentence entirely.
       g.stoneOnly = g.paths.some((x) => x.need === 0 && !x.hasStone);
+      /* EVERYTHING `BoxRow` DRAWS from the group, so a row whose words did not
+         move is not rebuilt (a new field drawn there joins this list). */
+      g.sig = [g.count, g.best, g.hero.level, g.at, g.need, g.ready, g.stoneOnly,
+        g.spares.length, g.mons.some((m) => m.lock),
+        ...g.paths.map((p) => `${p.row.to}:${p.ready}:${p.hasStone}:${p.need}:${p.at}:${p.stone}`)].join("|");
     }
 
     /* Anything you can evolve right now floats to the top. A box of eighty
@@ -540,25 +546,25 @@ function Box({
     });
   };
 
-  /* What is stopping this branch. Every button carried a second line, and for
-     the common case it repeated the progress bar directly above it - "2 more to
-     catch" under "2 / 4 to evolve" - which is what made the buttons twice as
-     tall as they needed to be. Only a reason the bar cannot show gets a line;
-     the rest is on the button's title. */
-  const blockedBy = (group, path) => {
-    if (busy) return "finish what is on screen";
-    if (path.ready) return null;
-    if (!path.hasStone && path.need === 0) return `needs a ${itemById(path.stone)?.name}`;
-    return null;
-  };
-
-  // The full reason, for the tooltip, which has room for it.
-  const blockedWhy = (group, path) => {
-    if (busy) return "Finish what is on screen first";
-    if (path.ready) return `Evolve at Lv ${path.at}`;
-    if (path.need > 0) return `${path.need} more candy to reach Lv ${path.at}`;
-    return `Needs a ${itemById(path.stone)?.name}`;
-  };
+  /* THE ROWS' ONE HANDLER, stable for the life of the Box, so a memoised
+     row never re-renders for a fresh closure. It finds the group by key at
+     the press, so a row skipped by `BoxRow`'s memo still acts on today's
+     group. An encounter or an evolution on screen stops every action but
+     the preview (the engine refuses an evolution then too) - said at the
+     press, never drawn: a `busy` class on the list restyled all 800 rows
+     twice an encounter, ~100ms each on a slowed CPU (2026-10-20). */
+  const live = useRef(null);
+  live.current = { groups, busy, setPeek, setFlash, confirmEvolve, confirmRaise, confirmSellOne };
+  const act = useCallback((kind, key, arg) => {
+    const { groups, busy, ...on } = live.current;
+    const group = groups.find((g) => g.key === key);
+    if (!group) return;
+    if (kind === "peek") return on.setPeek(group);
+    if (busy) return on.setFlash("Finish what is on screen first.");
+    if (kind === "evolve") on.confirmEvolve(group, group.paths.find((p) => p.row.to === arg));
+    else if (kind === "raise") on.confirmRaise(group);
+    else on.confirmSellOne(group, arg);
+  }, []);
 
   return (
     <div className="panel">
@@ -666,132 +672,9 @@ function Box({
       )}
 
       <div className="boxlist" ref={list}>
-        {shown.map((group) => {
-          const sp = speciesById(group.species);
-          const spare = group.spares.length;
-          return (
-            <div
-              key={`${group.species}:${group.variant ?? ""}:${group.alpha ? "a" : ""}${group.look ? "f" : ""}`}
-              className={`boxrow${group.ready ? " ready" : group.spares.length ? " spare" : ""}`}
-            >
-              <Sprite id={group.species} variant={group.variant} fx sex={group.look ? "f" : null} />
-              {/* THE PICTURE OPENS A CLOSER LOOK. Laid over the sprite's own
-                  grid cell rather than wrapped round it, so the sprite keeps
-                  the `.boxrow > img` sizing every variant depends on. */}
-              <button type="button" className="bx-peek" onClick={() => setPeek(group)}
-                aria-label={`Preview ${label(sp)}`} data-tip="Preview">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              </button>
-              {/* The drawn mark, not a star glyph: the same icon the Dex tile
-                  and the encounter badge use, so one tier looks like itself
-                  everywhere. */}
-              {group.variant && (
-                <span className={`bx-rare ${group.variant}`}>
-                  <Mark tier={group.variant} size={13} />
-                </span>
-              )}
-              <div className="bx-main">
-                <span className="bx-name">
-                  {label(sp)}
-                  {group.variant && (
-                    <span className={`bx-vtag ${group.variant}`}>
-                      {tierName(group.variant).toUpperCase()}
-                    </span>
-                  )}
-                  {group.alpha && (
-                    <span className="bx-vtag bx-alpha">
-                      <Mark tier="alpha" size={11} />ALPHA
-                    </span>
-                  )}
-                  {group.look && <span className="bx-vtag bx-female" data-tip="Her own look">♀ FEMALE</span>}
-                  {/* Held by a trade (docs/trading.md): it cannot be sold or
-                      evolved until the trade closes, and this says why. */}
-                  {group.mons.some((m) => m.lock) && (
-                    <span className="bx-vtag bx-trade" data-tip="In a trade - it cannot be sold or evolved until the trade closes">IN TRADE</span>
-                  )}
-                  <span className={`tier tier-${sp.tier}`}>{sp.tier}</span>
-                </span>
-                <Types of={sp.types} className="bx-types" />
-                <span className="bx-meta">
-                  Lv {group.best} best · ¥{worth(sp)} / {candyOf(sp)} candy
-                </span>
-              </div>
-
-              <span className="bx-count">&times;{group.count}</span>
-
-              {/* ONE POKEMON'S PROGRESS, not the pile's. The bar used to read
-                  "9 / 16 caught" and moved when you caught a ninth; it reads
-                  "Lv 9 / 16" and moves when you spend candy. Same shape, and
-                  it is now about the individual sitting at the top of this
-                  row - which is also the one that will evolve. */}
-              {group.paths.length > 0 && (
-                <span className={`bx-evo${group.ready ? " on" : ""}`}>
-                  <i
-                    className="bx-bar"
-                    style={{ "--f": Math.min(1, group.hero.level / group.at) }}
-                  />
-                  {group.ready
-                    ? "ready to evolve"
-                    : group.stoneOnly
-                      ? `Lv ${group.hero.level} — needs a stone`
-                      : `Lv ${group.hero.level} / ${group.at}`}
-                </span>
-              )}
-
-              <div className="bx-acts">
-                {group.paths.map((path) => {
-                  const blocked = blockedBy(group, path);
-                  return (
-                    <button
-                      key={path.row.to}
-                      className="evobtn"
-                      disabled={!path.ready || busy}
-                      onClick={() => confirmEvolve(group, path)}
-                      data-tip={blockedWhy(group, path)}
-                    >
-                      {path.stone && (
-                        <img src={`items/${path.stone}.png`} alt="" />
-                      )}
-                      ▲ {label(speciesById(path.row.to))}
-                      {blocked && <em>{blocked}</em>}
-                    </button>
-                  );
-                })}
-                {/* RAISE only shows where candy would actually do something:
-                    there is a next step, it is not already reached, and a stone
-                    is not the only thing missing. Hidden rather than disabled
-                    when there is no candy, because a permanently dead button on
-                    every row of a long list is noise. */}
-                {group.need > 0 && candy > 0 && !busy && (
-                  <button className="raisebtn" onClick={() => confirmRaise(group)}>
-                    ▲ Lv +{Math.min(group.need, candy)}
-                  </button>
-                )}
-                {spare > 0 && (
-                  <>
-                    {/* A rare form's spares convert only: they are never sold. */}
-                    {!group.variant && (
-                      <button onClick={() => confirmSellOne(group, false)}>
-                        SELL {spare}
-                      </button>
-                    )}
-                    <button
-                      className="candy"
-                      onClick={() => confirmSellOne(group, true)}
-                      data-tip={`${candyOf(sp, spare)} Rare Candy`}
-                    >
-                      <img src="items/rare-candy.png" alt="" />
-                      {candyOf(sp, spare)}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {shown.map((group) => (
+          <BoxRow key={group.key} group={group} sig={group.sig} candy={candy} stats={stats} act={act} />
+        ))}
       </div>
 
       {peek && <Preview group={peek} onClose={() => setPeek(null)} />}
@@ -815,5 +698,157 @@ function Box({
     </div>
   );
 }
+
+/* What is stopping this branch. Every button carried a second line, and for
+   the common case it repeated the progress bar directly above it - "2 more to
+   catch" under "2 / 4 to evolve" - which is what made the buttons twice as
+   tall as they needed to be. Only a reason the bar cannot show gets a line;
+   the rest is on the button's title. */
+const blockedBy = (path) => {
+  if (path.ready) return null;
+  if (!path.hasStone && path.need === 0) return `needs a ${itemById(path.stone)?.name}`;
+  return null;
+};
+
+// The full reason, for the tooltip, which has room for it.
+const blockedWhy = (path) => {
+  if (path.ready) return `Evolve at Lv ${path.at}`;
+  if (path.need > 0) return `${path.need} more candy to reach Lv ${path.at}`;
+  return `Needs a ${itemById(path.stone)?.name}`;
+};
+
+/* ONE ROW, MEMOISED ON WHAT IT DRAWS (2026-10-20, reported as the map
+   lagging on every encounter with the Box open): an encounter's start and end
+   re-rendered the Box, and with it all 800 rows of a big one - 150ms a time on
+   a slowed CPU, several times an encounter. `sig` is the group's words; the
+   handlers come through the Box's one stable `act`. */
+const BoxRow = memo(function BoxRow({ group, candy, stats, act }) {
+  // Haggle and Coach, quoted as paid - the Box's `worth` and `candyOf`.
+  const worth = (x) => valuedAt(sellValue(x), stats);
+  const candyOf = (x, n = 1) => candyAt(n * candyValue(x), stats);
+  const sp = speciesById(group.species);
+  const spare = group.spares.length;
+  return (
+    <div
+      className={`boxrow${group.ready ? " ready" : group.spares.length ? " spare" : ""}`}
+    >
+      <Sprite id={group.species} variant={group.variant} fx sex={group.look ? "f" : null} />
+      {/* THE PICTURE OPENS A CLOSER LOOK. Laid over the sprite's own
+          grid cell rather than wrapped round it, so the sprite keeps
+          the `.boxrow > img` sizing every variant depends on. */}
+      <button type="button" className="bx-peek" onClick={() => act("peek", group.key)}
+        aria-label={`Preview ${label(sp)}`} data-tip="Preview">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      {/* The drawn mark, not a star glyph: the same icon the Dex tile
+          and the encounter badge use, so one tier looks like itself
+          everywhere. */}
+      {group.variant && (
+        <span className={`bx-rare ${group.variant}`}>
+          <Mark tier={group.variant} size={13} />
+        </span>
+      )}
+      <div className="bx-main">
+        <span className="bx-name">
+          {label(sp)}
+          {group.variant && (
+            <span className={`bx-vtag ${group.variant}`}>
+              {tierName(group.variant).toUpperCase()}
+            </span>
+          )}
+          {group.alpha && (
+            <span className="bx-vtag bx-alpha">
+              <Mark tier="alpha" size={11} />ALPHA
+            </span>
+          )}
+          {group.look && <span className="bx-vtag bx-female" data-tip="Her own look">♀ FEMALE</span>}
+          {/* Held by a trade (docs/trading.md): it cannot be sold or
+              evolved until the trade closes, and this says why. */}
+          {group.mons.some((m) => m.lock) && (
+            <span className="bx-vtag bx-trade" data-tip="In a trade - it cannot be sold or evolved until the trade closes">IN TRADE</span>
+          )}
+          <span className={`tier tier-${sp.tier}`}>{sp.tier}</span>
+        </span>
+        <Types of={sp.types} className="bx-types" />
+        <span className="bx-meta">
+          Lv {group.best} best · ¥{worth(sp)} / {candyOf(sp)} candy
+        </span>
+      </div>
+
+      <span className="bx-count">&times;{group.count}</span>
+
+      {/* ONE POKEMON'S PROGRESS, not the pile's. The bar used to read
+          "9 / 16 caught" and moved when you caught a ninth; it reads
+          "Lv 9 / 16" and moves when you spend candy. Same shape, and
+          it is now about the individual sitting at the top of this
+          row - which is also the one that will evolve. */}
+      {group.paths.length > 0 && (
+        <span className={`bx-evo${group.ready ? " on" : ""}`}>
+          <i
+            className="bx-bar"
+            style={{ "--f": Math.min(1, group.hero.level / group.at) }}
+          />
+          {group.ready
+            ? "ready to evolve"
+            : group.stoneOnly
+              ? `Lv ${group.hero.level} — needs a stone`
+              : `Lv ${group.hero.level} / ${group.at}`}
+        </span>
+      )}
+
+      <div className="bx-acts">
+        {group.paths.map((path) => {
+          const blocked = blockedBy(path);
+          return (
+            <button
+              key={path.row.to}
+              className="evobtn"
+              disabled={!path.ready}
+              onClick={() => act("evolve", group.key, path.row.to)}
+              data-tip={blockedWhy(path)}
+            >
+              {path.stone && (
+                <img src={`items/${path.stone}.png`} alt="" />
+              )}
+              ▲ {label(speciesById(path.row.to))}
+              {blocked && <em>{blocked}</em>}
+            </button>
+          );
+        })}
+        {/* RAISE only shows where candy would actually do something:
+            there is a next step, it is not already reached, and a stone
+            is not the only thing missing. Hidden rather than disabled
+            when there is no candy, because a permanently dead button on
+            every row of a long list is noise. */}
+        {group.need > 0 && candy > 0 && (
+          <button className="raisebtn" onClick={() => act("raise", group.key)}>
+            ▲ Lv +{Math.min(group.need, candy)}
+          </button>
+        )}
+        {spare > 0 && (
+          <>
+            {/* A rare form's spares convert only: they are never sold. */}
+            {!group.variant && (
+              <button onClick={() => act("sell", group.key, false)}>
+                SELL {spare}
+              </button>
+            )}
+            <button
+              className="candy"
+              onClick={() => act("sell", group.key, true)}
+              data-tip={`${candyOf(sp, spare)} Rare Candy`}
+            >
+              <img src="items/rare-candy.png" alt="" />
+              {candyOf(sp, spare)}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}, (a, b) => a.sig === b.sig && a.candy === b.candy && a.stats === b.stats && a.act === b.act);
 
 export default memo(Box);
