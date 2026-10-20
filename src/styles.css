@@ -10436,6 +10436,9 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .mb-more { justify-self: center; }
 .mb-picker footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .mb-picker footer span { font-size: 13px; color: var(--ink-soft); }
+/* The fill's receipt (FillDone): the count by rarity, then the cards. */
+.mb-filled-sum { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--ink-soft); }
+.mb-filled-sum > span { display: inline-flex; align-items: center; gap: 5px; }
 .cd-tobinder { max-width: 100%; }
 .cd-added { font-size: 13px; color: var(--accent); }
 /* CRAFT ALL, over the Missing list: which printings, and the one button. */

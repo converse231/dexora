@@ -59,6 +59,8 @@ import Cheer from "./ui/Cheer.jsx";
 import RankUp from "./ui/RankUp.jsx";
 import { DEX_RANKS, dexRank, rankLine, tierName } from "./game/medals.js";
 import { dexCaught } from "./data/dex.js";
+// How many of a map's Pokemon have their sprite fetched before they are met (its likeliest).
+const WARM = 30;
 import Types from "./ui/Types.jsx";
 import Evolve from "./ui/Evolve.jsx";
 /* ON DEMAND: the Trade Center is its own chunk, fetched the first time it
@@ -713,7 +715,10 @@ export default function App({
   const areaId = st?.areaId;
   useEffect(() => {
     const b = biomeFor(areaId);
-    return b ? preloadSprites(tableFor(b, level).map(([id]) => id)) : undefined;
+    /* THE MOST LIKELY ONLY (2026-10-20, the CDN's requests at 93%): every
+       row was ~110 sprites a map, 226 on Tall Grass. The top WARM by weight
+       are most of the meetings; a rarer one loads as it is met. */
+    return b ? preloadSprites([...tableFor(b, level)].sort((x, y) => y[1] - x[1]).slice(0, WARM).map(([id]) => id)) : undefined;
   }, [areaId, level]);
 
   /* The claim says what it paid, in the one alert the game uses. Without it a

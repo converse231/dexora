@@ -22,6 +22,7 @@ export const NEWS = [
     title: "Legends, weather and binders",
     items: [
       ["Weather Institute", "Castform has company: Wingull, Lotad, Swablu, Torkoal, Snover, Rotom and more weather Pokémon."],
+      ["Five new card sets", "Darkness Ablaze, Chilling Reign, Fusion Strike, Astral Radiance and Pokémon GO."],
       ["Binder", "A Replace button on every pocket - swap a card without emptying the pocket first."],
       ["Legendaries", "Twice as easy to find - and a White Flute doubles it again."],
       ["Diamond", "Its sparkles now glint on the Pokémon itself."],

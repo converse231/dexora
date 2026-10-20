@@ -79,6 +79,18 @@ WRAPPERS = {
     "swsh12": ["SWSH12 Booster Lugia.jpg", "SWSH12 Booster Alolan Vulpix.jpg", "SWSH12 Booster Regieleki.jpg",
                "SWSH12 Booster Regidrago.jpg"],
     "swsh12.5": ["Crown Zenith Booster.jpg"],
+    # Five more (2026-10-20), each set's own wrappers, listed live on Bulbagarden.
+    "swsh3": ["SWSH3 Booster Gigantamax Charizard.jpg", "SWSH3 Booster Eternamax Eternatus.jpg",
+              "SWSH3 Booster Gigantamax Grimmsnarl.jpg", "SWSH3 Booster Gigantamax Centiskorch.jpg"],
+    "swsh6": ["SWSH6 Booster Ice Rider Calyrex copy.jpg", "SWSH6 Booster Shadow Rider Calyrex copy.jpg",
+              "SWSH6 Booster Galarian Articuno copy.jpg", "SWSH6 Booster Galarian Moltres copy.jpg",
+              "SWSH6 Booster Galarian Zapdos copy.jpg"],
+    "swsh8": ["SWSH8 Booster Gigantamax Gengar.jpg", "SWSH8 Booster Mew.jpg", "SWSH8 Booster Genesect.jpg",
+              "SWSH8 Booster Boltund.jpg"],
+    "swsh10": ["SWSH10 Booster Origin Dialga.jpg", "SWSH10 Booster Origin Palkia.jpg",
+               "SWSH10 Booster Hisuian Decidueye.jpg", "SWSH10 Booster Hisuian Samurott.jpg",
+               "SWSH10 Booster Hisuian Typhlosion.jpg"],
+    "swsh10.5": ["Pok\u00e9mon GO Booster.jpg"],
 }
 # A set TCGdex has no logo for gets one from here (fetch-cards leaves it out).
 LOGOS = {"30th": "30th Anniversary logo.png", "sv05": "SV5 Logo EN.png"}

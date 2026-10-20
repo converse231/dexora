@@ -232,6 +232,44 @@ export function BinderPages({ count, page, onPage, render, bookKey = "", leather
   );
 }
 
+/* THE FILL'S RECEIPT: how many, by rarity, and every card with the pocket
+   it went into. */
+function FillDone({ sets, cards, filed, onClose, onGo }) {
+  useModalLock();
+  const dismiss = useDismiss(onClose);
+  const byRar = [...CARD_RARITIES].reverse().map((r) => [r, filed.filter((x) => x.rar === r).length]).filter(([, n]) => n);
+  return (
+    <div className="sheet" {...dismiss}>
+      <div className="confirm mb-picker mb-filled" role="dialog" aria-modal="true" aria-label="Cards filed"
+        onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="cd-x" onClick={onClose} aria-label="Close">✕</button>
+        <h3>Filed {filed.length} card{filed.length === 1 ? "" : "s"}</h3>
+        <p className="mb-filled-sum">
+          {byRar.map(([r, n]) => <span key={r}><RarityMark rarity={r} /> {n} {RARITY[r].name}</span>)}
+        </p>
+        <div className="mb-pick-scroll">
+          <div className="mb-pick-grid">
+            {filed.map((x) => {
+              const sp = speciesById(x.sp);
+              return (
+                <button key={x.sp} type="button" className="mb-pick" onClick={() => onGo(x.sp)}
+                  aria-label={`#${x.sp} ${sp ? label(sp) : ""} - go to its pocket`}>
+                  <Face sets={sets} cards={cards} k={x.key} lazy />
+                  <small>#{String(x.sp).padStart(3, "0")} {sp ? label(sp) : ""}</small>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <footer>
+          <span>Tap a card to turn to its page.</span>
+          <button type="button" className="lg-go" autoFocus onClick={onClose}>Done</button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 // One card face from a key, faded when it is no longer held.
 function Face({ sets, cards, k, lazy = false }) {
   const { id, v, setId, localId } = parseKey(k);
@@ -261,6 +299,8 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
   const [editing, setEditing] = useState(false);
   const [drag, setDrag] = useState(null);           // { from, over, x, y, w }
   const [note, setNote] = useState("");
+  // What the last Fill filed, shown in its dialog (FillDone) until closed.
+  const [filed, setFiled] = useState(null);
   const b = binders.find((x) => x.id === openId) ?? null;
   const [draft, setDraft] = useState("");
   useEffect(() => { setDraft(b?.name ?? ""); }, [b?.id, b?.name]);
@@ -350,7 +390,7 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
     const p = Array.from({ length: DEX_POCKETS }, (_, i) => b.pockets[i] ?? null);
     for (const [sp, x] of best) p[sp - 1] = x.key;
     put(p);
-    setNote(`Filed ${best.size} card${best.size === 1 ? "" : "s"} in their pockets.`);
+    setFiled([...best.values()].sort((x, y) => x.sp - y.sp));
   };
   const openFill = () => {
     if (!fillable().length) { setNote("Nothing new to file - every Pokémon you hold a card of is in."); return; }
@@ -613,6 +653,14 @@ export function MyBinders({ binders, sets, cards, engine, onLook, prices, dust =
           />
         );
       })()}
+      {/* WHAT WAS FILED (2026-10-20, asked for): every card the fill put in,
+          by Pokedex number; a tap turns to its page. Portalled like the
+          picker - `.tc-main` isolates. */}
+      {filed && createPortal(
+        <FillDone sets={sets} cards={cards} filed={filed} onClose={() => setFiled(null)}
+          onGo={(sp) => { setPage(Math.floor((sp - 1) / PAGE_POCKETS)); setFiled(null); }} />,
+        document.body,
+      )}
       {asking && createPortal(
         isDex ? (
           <Confirm
