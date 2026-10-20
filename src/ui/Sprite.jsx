@@ -71,7 +71,7 @@ export const onSpriteError = (ev) => {
   const img = ev.currentTarget;
   if (img.dataset.fellBack) return;      // never loop on a second failure
   img.dataset.fellBack = "1";
-  img.src = new URL(`sprites/${img.dataset.plain}.png`, document.baseURI).href;
+  img.src = new URL(`sprites/${img.dataset.plain}.png?v=${ART_REV}`, document.baseURI).href;
 };
 
 /* The same path as a bare string, for the one thing that needs it: an effect
@@ -104,10 +104,13 @@ export const STRIP_FRAMES = 16;
 /* `sex`: a female of a species with a female look wears her own picture
    (gender.js) - in the ordinary art and every tier drawn over it, and in a
    shiny where she has one; Origin and the strips are their own art. */
+/* THE ART'S STAMP (vite.config's `artRev`): the browser keeps sprites and
+   cards a month (vercel.json), so a redrawn file must change its url. */
+export const ART_REV = typeof __ART_REV__ === "undefined" ? "" : __ART_REV__;
 export const spriteUrl = (id, variant = null, sex = null) => {
   const her = sex === "f" && femaleArtFor(id, variant);
   const folder = her ? (variant === "shiny" ? "shiny/female/" : "female/") : FOLDER[variant] ?? "";
-  return new URL(`sprites/${folder}${id}.png${STRIP_TIERS.has(variant) ? `?f=${STRIP_FRAMES}` : ""}`,
+  return new URL(`sprites/${folder}${id}.png?v=${ART_REV}${STRIP_TIERS.has(variant) ? `&f=${STRIP_FRAMES}` : ""}`,
     document.baseURI).href;
 };
 
@@ -118,7 +121,7 @@ export const spriteUrl = (id, variant = null, sex = null) => {
    back, so this answers null and the caller draws the front, flipped. */
 const NO_BACK = new Set(["origin", "showdown", "cadence"]);
 export const backUrl = (id, variant = null) => (NO_BACK.has(variant) ? null
-  : new URL(`sprites/back/${variant === "shiny" ? "shiny/" : ""}${id}.png`, document.baseURI).href);
+  : new URL(`sprites/back/${variant === "shiny" ? "shiny/" : ""}${id}.png?v=${ART_REV}`, document.baseURI).href);
 
 /* WARM THE CACHE WITH WHAT THIS MAP CAN THROW AT YOU. An encounter's sprite
    was fetched only when the battle mounted it - on a phone, the Pokemon's

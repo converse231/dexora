@@ -39,7 +39,9 @@ const API = "https://api.tcgdex.net/v2/en";
 const SETS = ["me01", "me02", "me02.5", "sv03.5", "sv08.5", "me03", "me04", "me05", "30th", "sv08",
   "sv09", "sv10", "sv10.5b", "sv10.5w", "sv01", "sv02", "sv03", "sv04", "sv04.5", "sv05", "sv06", "sv06.5", "sv07", "base1",
   // Sword & Shield's favourites (2026-10-15, asked for).
-  "swsh7", "swsh9", "swsh11", "swsh12", "swsh12.5"];
+  "swsh7", "swsh9", "swsh11", "swsh12", "swsh12.5",
+  // Five more of its best-loved (2026-10-20, asked for: "you pick").
+  "swsh3", "swsh6", "swsh8", "swsh10", "swsh10.5"];
 /* A GALLERY IS PART OF ITS SET'S PACKS: TCGdex lists Brilliant Stars'
    Trainer Gallery (and Lost Origin's, Silver Tempest's, Crown Zenith's
    Galarian Gallery) as sets of their own, but a booster draws them in place
@@ -48,10 +50,10 @@ const SETS = ["me01", "me02", "me02.5", "sv03.5", "sv08.5", "me03", "me04", "me0
    rate - and keeping its own localId (TG01, GG01). TCGdex gives a gallery
    card no image, but hosts it under the PARENT set's folder (swsh9/TG01),
    so the set's own image base serves both. */
-const SUBSETS = { swsh9: "swsh9tg", swsh11: "swsh11tg", swsh12: "swsh12tg", "swsh12.5": "swsh12.5gg" };
+const SUBSETS = { swsh9: "swsh9tg", swsh10: "swsh10tg", swsh11: "swsh11tg", swsh12: "swsh12tg", "swsh12.5": "swsh12.5gg" };
 /* RARES PRINTED WITHOUT A HOLO are plain cards in these sets (Base Set's, and
    Sword & Shield's, whose holo rares are a rung of their own). */
-const PLAIN_RARES = new Set(["base1", "swsh7", "swsh9", "swsh11", "swsh12", "swsh12.5"]);
+const PLAIN_RARES = new Set(["base1", "swsh3", "swsh6", "swsh7", "swsh8", "swsh9", "swsh10", "swsh10.5", "swsh11", "swsh12", "swsh12.5"]);
 /* A set shipped under the name its packs carried: TCGdex's Base Set is the
    1999 print, and the packs here are its 1st Edition (asked for, 2026-10-07). */
 const NAME = { base1: "Base Set 1st Edition" };

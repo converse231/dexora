@@ -10,7 +10,9 @@ export const loadSet = (id) => {
   return cache.get(id);
 };
 
-const at = (path) => new URL(path, document.baseURI).href;
+// Stamped: the browser keeps card art a month (vercel.json, Sprite.jsx's ART_REV).
+const REV = typeof __ART_REV__ === "undefined" ? "" : __ART_REV__;
+const at = (path) => new URL(`${path}?v=${REV}`, document.baseURI).href;
 export const cardUrl = (setId, localId) => at(`cards/${setId}/${localId}.webp`);
 export const logoUrl = (setId) => at(`cards/${setId}/logo.webp`);
 export const packUrl = (setId, slug) => at(`cards/${setId}/pack-${slug}.webp`);

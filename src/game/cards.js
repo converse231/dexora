@@ -151,7 +151,21 @@ export function landsOn(cards, rarity) {
      Tempest: Holo 3, V 9 + VSTAR 31 + VMAX 189, UR 27, Rainbow 80 + Gold 106,
      Radiant 22, TG 12 + TG V 32 + TG Gold 111. swsh12.5 Crown Zenith: Holo
      13, V 8 + VMAX 19 + VSTAR 19, UR 35, Secret 133, Radiant 22, Galarian
-     Gallery 4 + GG V 8 + GG Gold 125. */
+     Gallery 4 + GG V 8 + GG Gold 125.
+   - FIVE MORE SWORD & SHIELD SETS (2026-10-20), the best source each has:
+     swsh8 Fusion Strike and swsh10 Astral Radiance are TCGplayer's
+     Authentication Center as pullrates.com reports it (8,000+ packs):
+     Fusion Strike Holo 3, V 9 + VMAX 30, UR 24, Rainbow 127 + Secret 120;
+     Astral Radiance Holo 3, V 8 + VSTAR 37 + VMAX 130, UR 25, Rainbow 78 +
+     Secret 130, Radiant 20, Trainer Gallery 12 + TG V 24. swsh3 Darkness
+     Ablaze and swsh6 Chilling Reign are pullrates.com's figures (no sample
+     stated) with the Secret rate it leaves out from Card Codex: Darkness
+     Ablaze Holo 3, V 9 + VMAX 20, UR 24, Rainbow 77 + Secret 115; Chilling
+     Reign Holo 3, V 9 + VMAX 18, UR 24, Rainbow 77 + Secret 100.
+     swsh10.5 Pokemon GO is Card Codex's table (pullrates.com had 371
+     packs): V 6 + VSTAR 40 + VMAX 53, UR 19.4, Rainbow 38.7 + Secret 63,
+     Radiant 17 - and every pack holds a holo or better, so its Holo is
+     what the rare slot's other rolls leave (Card Codex: 1 in 1.4). */
 export const SET_RATES = {
   me01: { double: 0.2091, illustration: 0.1089, ultra: 0.0823, special: 0.0099, mega: 0.0008 },
   me02: { double: 0.2077, illustration: 0.1097, ultra: 0.0806, special: 0.0125, mega: 0.0008 },
@@ -186,6 +200,13 @@ export const SET_RATES = {
     radiant: 1 / 22, gallery: 1 / 12 + 1 / 32 + 1 / 111 },
   "swsh12.5": { holo: 1 / 13, double: 1 / 8 + 1 / 19 + 1 / 19, ultra: 1 / 35, illustration: 0, special: 0, mega: 1 / 133,
     radiant: 1 / 22, gallery: 1 / 4 + 1 / 8 + 1 / 125 },
+  swsh3: { holo: 1 / 3, double: 1 / 9 + 1 / 20, ultra: 1 / 24, illustration: 0, special: 0, mega: 1 / 77 + 1 / 115 },
+  swsh6: { holo: 1 / 3, double: 1 / 9 + 1 / 18, ultra: 1 / 24, illustration: 0, special: 0, mega: 1 / 77 + 1 / 100 },
+  swsh8: { holo: 1 / 3, double: 1 / 9 + 1 / 30, ultra: 1 / 24, illustration: 0, special: 0, mega: 1 / 127 + 1 / 120 },
+  swsh10: { holo: 1 / 3, double: 1 / 8 + 1 / 37 + 1 / 130, ultra: 1 / 25, illustration: 0, special: 0, mega: 1 / 78 + 1 / 130,
+    radiant: 1 / 20, gallery: 1 / 12 + 1 / 24 },
+  "swsh10.5": { holo: 1 - (1 / 6 + 1 / 40 + 1 / 53) - 1 / 19.4 - (1 / 38.7 + 1 / 63), double: 1 / 6 + 1 / 40 + 1 / 53,
+    ultra: 1 / 19.4, illustration: 0, special: 0, mega: 1 / 38.7 + 1 / 63, radiant: 1 / 17 },
 };
 /* THE SECOND REVERSE SLOT'S OWN ROLLS, after the Illustration rare, rarest
    first: a key a set's row may name (Surging Sparks' ACE SPEC, Paldean
@@ -409,6 +430,12 @@ export const BOXES = {
   swsh12: { name: "Booster box", packs: 36, price: 120000 },
   // Crown Zenith was a special set, never sold in booster boxes.
   "swsh12.5": { name: "Booster bundle", packs: 6, price: 21600 },
+  swsh3: { name: "Booster box", packs: 36, price: 120000 },
+  swsh6: { name: "Booster box", packs: 36, price: 120000 },
+  swsh8: { name: "Booster box", packs: 36, price: 120000 },
+  swsh10: { name: "Booster box", packs: 36, price: 120000 },
+  // Pokemon GO was a special set, never sold in booster boxes.
+  "swsh10.5": { name: "Booster bundle", packs: 6, price: 21600 },
 };
 /* EVERY SET'S DEALS (2026-10-13): its BOXES entry, and for a set sold in
    36-pack boxes the 6-pack bundle too, as in shops - a special set's BOXES
@@ -431,7 +458,9 @@ export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45,
   // The rest of Scarlet & Violet (2026-10-13), in release order into the gaps and beside the others.
   sv01: 15, sv02: 20, sv03: 30, sv04: 40, "sv04.5": 50, sv05: 55, sv06: 60, "sv06.5": 65, sv07: 70,
   // Sword & Shield's favourites (2026-10-15), spread over the ladder; Evolving Skies early, its best-loved.
-  swsh7: 30, swsh9: 45, swsh11: 60, swsh12: 75, "swsh12.5": 90 };
+  swsh7: 30, swsh9: 45, swsh11: 60, swsh12: 75, "swsh12.5": 90,
+  // Five more (2026-10-20), into the gaps, Darkness Ablaze's Charizard early.
+  swsh3: 25, swsh6: 40, swsh8: 50, swsh10: 65, "swsh10.5": 80 };
 
 export const setById = (id) => CARD_SETS.find((s) => s.id === id) ?? null;
 export const setOpen = (id, level) => !!setById(id) && level >= (SET_LEVEL[id] ?? Infinity);

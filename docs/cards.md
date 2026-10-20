@@ -782,6 +782,7 @@ now and then when a step started an encounter.
   parent set by fetch-cards' `SUBSETS`, one roll whatever it prints) and
   `radiant`. A published holo rate counts holo pulls, so check.mjs leaves a
   Holo Rare's reverse holo out of the measure.
+- **Five more Sword & Shield sets** (2026-10-20, picked for you): `swsh3` Darkness Ablaze, `swsh6` Chilling Reign, `swsh8` Fusion Strike, `swsh10` Astral Radiance (its Trainer Gallery merged, `SUBSETS`) and `swsh10.5` Pokemon GO, every rarity one the game already knew. Rates cited in `SET_RATES` - TCGplayer's where measured, Card Codex where pullrates.com left a gap.
 - **Prices are real life, display only** (`npm run prices`,
   `tools/fetch-prices.mjs` -> `src/data/cards/prices.js`): TCGplayer's market
   price through TCGdex, cents per printing, dated `PRICED_AT`, printed beside
