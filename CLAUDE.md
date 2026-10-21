@@ -949,8 +949,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   (`canCraft(rarity, cards)`: Base Set's Holo rare, 2026-10-10). The Dust
   tab's Missing list is PER PRINTING: owning a normal card hid its holo and
   reverse holo from it (2026-10-12). The sweep is `sweepOf` (engine and
-  Dust tab both): normal commons and uncommons, or every printing up to a
-  Double rare, the room above earned stamps spent ONCE across printings. The
+  Dust tab both): normal commons and uncommons, every printing up to a
+  Double rare, or every spare at all (`"all"`, 2026-10-21: a hit's spare had
+  no use but dust), the room above earned stamps spent ONCE across printings. The
   card view offers a held printing only its spares and a missing one only its
   craft (2026-10-13); one set (`SetPicker`, grouped by series) is shared by
   the Binder and Dust. **The Binder draws pages through `BinderPages`**

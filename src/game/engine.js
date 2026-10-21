@@ -3761,7 +3761,9 @@ export function createEngine(canvas, onChange, mini = null) {
     const gain = take.reduce((a, [c, v, n]) => a + n * dustOf(c[3], v), 0);
     if (!confirmed) {
       ask("sweep", () => dustSpares(set, every, true), `Dust ${take.reduce((a, [, , n]) => a + n, 0)} spares?`,
-        every
+        every === "all"
+          ? `Every spare in ${meta.name}, Illustration rares and up included. You keep one of each printing and every earned copy, and get ${gain} Card Dust.`
+          : every
           ? `Every spare up to a Double rare in ${meta.name}, in every printing. You keep one of each printing and every earned copy, and get ${gain} Card Dust.`
           : `Every spare common and uncommon in ${meta.name}, normal copies only. You keep one of each, and get ${gain} Card Dust.`);
       return true;
