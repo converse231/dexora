@@ -642,7 +642,7 @@ function CardDex({ sets, cards, dex, onLook }) {
    missing card costs to craft. Every individual dust or craft happens in the
    card view, which asks first for anything rare. */
 function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack, onCraftAll, setId, onSet }) {
-  // THE SWEEP: normal commons and uncommons, or every printing up to a Double rare (`sweepOf`).
+  // THE SWEEP: normal commons and uncommons, every printing up to a Double rare, or every spare (`sweepOf`).
   const [every, setEvery] = useState(false);
   // CRAFT ALL: every printing, or the normal ones only - a set completes on any printing.
   const [scope, setScope] = useState("all");
@@ -674,7 +674,7 @@ function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack, onCraftAl
         <span>Card Dust<small>Spares become dust. Dust buys packs, and crafts the cards you are missing up to a Double rare - Illustration rares and up, and a set's own top rarity, come from packs only. You always keep one of each printing.</small></span>
         <div className="cd-sweep">
           <div className="you-seg" role="radiogroup" aria-label="Which spares to dust">
-            {[[false, "Normal commons and uncommons"], [true, "All spares up to Double rare"]].map(([k, name]) => (
+            {[[false, "Commons & uncommons"], [true, "Up to Double rare"], ["all", "Every spare"]].map(([k, name]) => (
               <button key={name} type="button" role="radio" aria-checked={every === k}
                 className={every === k ? "on" : ""} onClick={() => setEvery(k)}>{name}</button>
             ))}

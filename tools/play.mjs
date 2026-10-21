@@ -2459,6 +2459,15 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
     held.answerAsk(true);
     const left = held.state.cards[key(common)];
     assert.equal(left.n + left.r, 4, "the sweep dusted an earned copy, spending the same room on two printings");
+    /* EVERY SPARE (2026-10-21): the third sweep takes an Illustration rare's
+       spare too, and still keeps its last copy and an earned one. */
+    const hits = boot({ ...SAVE, cards: { [key(common)]: { n: 2 }, [key(ill)]: { h: 3, earned: ["x"] } } }).e;
+    assert.equal(hits.dustSpares(set, "all"), true);
+    assert.equal(hits.state.ask?.kind, "sweep", "the every-spare sweep did not ask first");
+    hits.answerAsk(true);
+    assert.equal(hits.state.cards[key(ill)].h, 1, "the every-spare sweep left an Illustration rare spare, or took its last copy");
+    assert.equal(hits.state.cards[key(common)].n, 1);
+    assert.equal(hits.state.dust, C.dustOf("common", "n") + 2 * C.dustOf("illustration", "h"));
   }
 
   /* THE CARD SHOP'S CHECKOUT: the whole cart or none of it - a cart past your

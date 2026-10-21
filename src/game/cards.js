@@ -290,8 +290,12 @@ export function sparesOf(row, variant) {
    before it left - counted alone, a normal and a reverse holo could each
    spend the same room and dust an earned copy. The engine's sweep and the
    Dust tab's button both read this. */
+/* `every`: false is normal commons and uncommons, true every printing up to
+   a Double rare, and "all" every spare at all - an Illustration rare and up
+   too (2026-10-21, asked for: a hit's spare had no use but dust, one tap at a
+   time). Each kind of sweep keeps one of each printing and every earned copy. */
 export function sweepOf(rows, setId, cards, every = false) {
-  const top = every ? rungOf("double") : rungOf("uncommon");
+  const top = every === "all" ? Infinity : every ? rungOf("double") : rungOf("uncommon");
   return cards.flatMap((c) => {
     if (rungOf(c[3]) > top) return [];
     let row = rows[cardId(setId, c[0])];
