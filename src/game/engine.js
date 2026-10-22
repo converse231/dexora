@@ -28,7 +28,7 @@ import { followSheet, skinById, skinPrice, PARTY_MAX, partnerRule, isMastered, M
 import { fieldOf, rollFind, heartsOf, FRIEND_FINDS, HEARTS } from "./abilities.js";
 import { CHECKIN_REWARDS, checkinStatus, rollRoulette, isMilestone, streakPacks, lotSets, LOT, ROULETTE_LEVEL } from "./checkin.js";
 import { isRoad, roadOpen, roadTrainer, ARENA_LEVELS, arenaPay } from "./road.js";
-import { masterOf, ladderOpen, ladderPay, cleanLadder } from "./ladder.js";
+import { masterOf, ladderOpen, ladderPay, cleanLadder, ARENA_TEAM } from "./ladder.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
@@ -224,6 +224,7 @@ function freshState() {
     gifted: [],           // LEGACY: dex ids once held back from rewards as trades - paid and cleared at boot
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
+    arenaTeam: [],        // the Arena's three, box uids; empty is the League team's first three
     party: [],            // up to PARTY_MAX box uids you can walk with - see `setParty`
     checkin: { last: null, streak: 0, best: 0, spins: 0 },   // the daily check-in - see checkin.js
     road: { day: null, won: [] },   // road trainers beaten today - see road.js
@@ -664,6 +665,7 @@ function loadState() {
       // Entry by entry, never the whole record: badges are years of play.
       beaten: cleanBeaten(s.beaten),
       team: [...new Set(Array.isArray(s.team) ? s.team : [])].filter(Number.isInteger).slice(0, TEAM_MAX),
+      arenaTeam: [...new Set(Array.isArray(s.arenaTeam) ? s.arenaTeam : [])].filter(Number.isInteger).slice(0, ARENA_TEAM),
       party: [...new Set(Array.isArray(s.party) ? s.party : [])].filter(Number.isInteger).slice(0, PARTY_MAX),
       /* The check-in, field by field: a bad count is 0, a bad day forgets the
          last stamp (today asks again) - never the rest. */
@@ -4430,6 +4432,15 @@ export function createEngine(canvas, onChange, mini = null) {
       state.team = [...new Set(uids)].filter((u) => state.box.some((m) => m.uid === u)).slice(0, TEAM_MAX);
       save();
       stepped();
+    },
+    /* THE ARENA'S OWN THREE (asked for, 2026-10-22: "how can I edit my
+       team?"), apart from the League's six, so picking for one never
+       reorders the other. Box uids, in fighting order. */
+    setArenaTeam(uids) {
+      if (!Array.isArray(uids)) return;
+      state.arenaTeam = [...new Set(uids)].filter((u) => state.box.some((m) => m.uid === u)).slice(0, ARENA_TEAM);
+      save();
+      changed();
     },
     tutor,
     /* A TURN, and the one place a Battle-shelf item is spent: each the turn

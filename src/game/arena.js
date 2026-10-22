@@ -78,7 +78,8 @@ const R = 0.45;                                 // a body's radius
 const X0 = INSET + R, X1 = W - INSET - R, Y0 = INSET + R, Y1 = H - INSET - R;
 export const DODGE_CD = sec(1.6);
 const DODGE = sec(0.3), DODGE_INV = sec(0.22), DODGE_DIST = 2.2;
-const SWAP = sec(0.6), SWAP_CD = sec(4), SWAP_INV = sec(0.5), KO_WAIT = sec(1);
+export const SWAP_CD = sec(4);
+const SWAP = sec(0.6), SWAP_INV = sec(0.5), KO_WAIT = sec(1);
 const STUN = sec(0.12), KB = sec(0.15), FLINCH = sec(0.25);
 export const SHOT_SPEED = 10 / TPS;
 const SHOT_RANGE = 9, SHOT_R = 0.35;
@@ -99,8 +100,11 @@ const HEAT_BURN = sec(1), SWIFT = sec(10);
 /* WHAT ONE HIT IS WORTH, against the plan's 30-45 s a Pokemon. Measured
    2026-10-22 over 40 Hard-vs-Hard CPU matches at Lv 50: 0.32 was 54 s a
    Pokemon and nearly every match ran out the clock; 0.75 was 27 s; 0.6 is
-   33 s. Re-measured with phase 1's shapes and statuses (check.mjs). */
-export const DAMAGE = 0.6;
+   33 s. Re-measured with phase 1's shapes and statuses (check.mjs). The
+   basic attack (2026-10-22) took a third of the damage and the CPU in to
+   its reach: a Hard-vs-Hard 3v3 fell from 83 s to 45 s at 0.6, so 0.4 -
+   76 s, Normal over Easy 31 of 40, as it was. */
+export const DAMAGE = 0.4;
 /* THE OPENING: the count before a fight, in which nobody moves. It is
    ticks of the match - both ends of an online fight count the same ones -
    off the match clock, and 0 for every test that drives a match. */
@@ -120,11 +124,31 @@ const SURGE_DMG = 1.25, SURGE_PUSH = 2.6;
    inside two minutes and then ran out the clock: both Pokemon out of PP,
    their benches full of moves, nobody able to land anything. */
 export const STRUGGLE_K = 4;
-export const spent = (f) => f.kit.every((m) => m.pp <= 0 || !moveOf(m.i).p);
+export const spent = (f) => f.kit.every((m) => m.pp <= 0 || !arenaMove(m.i).p);
 /* A move by its act's index: the kit's, or Struggle (`STRUGGLE_K`), which is
    kept apart on the fighter - pushed onto a kit of fewer than four moves it
    landed at the wrong index and the spent Pokemon froze. */
-export const moveAt = (f, k) => (k === STRUGGLE_K ? f.struggle : f.kit[k]);
+export const moveAt = (f, k) => (k === STRUGGLE_K ? f.struggle : k === BASIC_K ? f.basic : f.kit[k]);
+
+/* THE BASIC ATTACK (asked for, 2026-10-22: "a normal attack that users can
+   spam while waiting for the skills"): always there, no PP, HELD to repeat.
+   A fighter whose Attack is the higher jabs - a blow in reach - and one
+   whose Sp. Atk is throws a short bolt; typeless, so no STAB and nothing
+   resists it. Every third in a row (each within BASIC_CHAIN of the last)
+   lands harder: the rhythm a held button wants. A filler between moves,
+   never a strategy - check.mjs holds what it deals to a sliver of a kit's. */
+export const BASIC_K = 5;
+export const BASIC_P = -2, BASIC_S = -3;
+const BASIC = {
+  [BASIC_P]: { n: "basic-attack", t: null, c: 0, p: 15, pp: 1 },
+  [BASIC_S]: { n: "basic-shot", t: null, c: 1, p: 15, pp: 1 },
+};
+export const arenaMove = (i) => BASIC[i] ?? moveOf(i);
+export const BASIC_CD = sec(0.42);
+const BASIC_WIND = sec(0.1), BASIC_REC = sec(0.08), BASIC_RANGE = 4.5, BASIC_CHAIN = sec(1.2), BASIC_BOOST = 1.6;
+export const basicShape = (f) => (f.basic.i === BASIC_P ? "melee" : "shot");
+// Which a fighter has: the jab for the higher Attack, the bolt for the higher Sp. Atk.
+export const basicOf = (f) => (f.st[1] >= f.st[3] ? BASIC_P : BASIC_S);
 /* THE FINAL MINUTE: the clock's last FINAL_T hits harder and fills Surge
    twice as fast, announced on screen - a long fight ends on a swing, not a
    tally of HP. */
@@ -193,9 +217,9 @@ const multiCount = (m) => (m.hits ? Math.round((m.hits[0] + m.hits[1]) / 2) : 1)
 /* A FIGHTER'S KIT: its four League moves (`movesOf`/the Move Tutor) that the
    Arena can play. A kit that would not hit at all keeps Struggle beside them. */
 export function kitOf(f) {
-  const kit = f.moves.filter((m) => m.i !== STRUGGLE && shapeOf(moveOf(m.i))).slice(0, 4)
-    .map((m) => ({ i: m.i, pp: ppOf(moveOf(m.i)), cd: 0 }));
-  if (!kit.some((m) => moveOf(m.i).p > 0)) {
+  const kit = f.moves.filter((m) => m.i !== STRUGGLE && shapeOf(arenaMove(m.i))).slice(0, 4)
+    .map((m) => ({ i: m.i, pp: ppOf(arenaMove(m.i)), cd: 0 }));
+  if (!kit.some((m) => arenaMove(m.i).p > 0)) {
     if (kit.length === 4) kit.pop();
     kit.push({ i: STRUGGLE, pp: 99, cd: 0 });
   }
@@ -222,6 +246,7 @@ function body(f, side, slot) {
     act: null, dodge: 0, dx: 0, dy: 0, dodgeCd: 0, inv: 0, shield: 0, stun: 0, kbx: 0, kby: 0, kbt: 0, flash: 0,
     status: -1, statusT: 0, statusN: 0, badly: false, sleptAt: 0,
     vx: 0, vy: 0, heat: 0, swift: 0, hidden: false, surge: 0, struggle: null,
+    basic: { i: basicOf(f), pp: Infinity, cd: 0 }, basicN: 0, basicT: -BASIC_CHAIN,
   };
 }
 
@@ -254,7 +279,7 @@ const alive = (sd) => sd.team.filter((f) => f.hp > 0);
 export const PAR = 0, BRN = 1, PSN = 2, SLP = 3, FRZ = 4;
 const held = (f) => f.stun > 0 || f.status === SLP || f.status === FRZ;
 
-export const NO_INPUT = Object.freeze({ mx: 0, my: 0, ax: 0, ay: 0, fire: -1, dodge: false, swap: -1, surge: false });
+export const NO_INPUT = Object.freeze({ mx: 0, my: 0, ax: 0, ay: 0, fire: -1, basic: false, dodge: false, swap: -1, surge: false });
 
 export function tick(s, inputs) {
   if (s.over) return s;
@@ -294,7 +319,7 @@ function stepSide(s, side, inp) {
   }
   if (sd.koT > 0) return;
   const f = sd.team[sd.active];
-  for (const m of f.struggle ? [...f.kit, f.struggle] : f.kit) if (m.cd > 0) m.cd = Math.max(0, m.cd - (f.surge > 0 ? 2 : 1));
+  for (const m of f.struggle ? [...f.kit, f.struggle, f.basic] : [...f.kit, f.basic]) if (m.cd > 0) m.cd = Math.max(0, m.cd - (f.surge > 0 ? 2 : 1));
   if (f.surge > 0) f.surge--;
   if (f.dodgeCd > 0) f.dodgeCd--;
   if (f.inv > 0) f.inv--;
@@ -329,6 +354,8 @@ function stepSide(s, side, inp) {
       f.dodgeCd = Math.round(DODGE_CD * (1 - 0.15 * clamp(f.stages[7], -2, 2)));
       s.ev.push({ k: "dodge", side });
     }
+    // A move pressed during a basic attack's recovery cuts it short: the basic never holds a move back.
+    if (inp.fire >= 0 && f.act?.basic && f.act.ph === "rec") f.act = null;
     if (inp.fire >= 0 && !f.act && !f.dodge) {
       let k = inp.fire, m = f.kit[k];
       if (m && m.pp <= 0 && spent(f)) {
@@ -336,13 +363,20 @@ function stepSide(s, side, inp) {
         k = STRUGGLE_K; m = f.struggle;
       }
       if (m && m.cd === 0 && m.pp > 0) {
-        const data = moveOf(m.i);
+        const data = arenaMove(m.i);
         const [dx, dy] = ax || ay ? [ax, ay] : [f.fx, f.fy];
         f.fx = dx; f.fy = dy;
         const w = windOf(data);
         f.act = { k, ph: "wind", t: w, t0: w, dx, dy, id: s.nextId++, shape: shapeOf(data), aimX: inp.ax, aimY: inp.ay };
         s.ev.push({ k: "wind", side, move: m.i, shape: f.act.shape });
       }
+    }
+    // Held, the basic attack goes whenever nothing else is: it never waits on a move.
+    if (inp.basic && !f.act && !f.dodge && f.basic.cd === 0) {
+      const [dx, dy] = ax || ay ? [ax, ay] : [f.fx, f.fy];
+      f.fx = dx; f.fy = dy;
+      f.act = { k: BASIC_K, ph: "wind", t: BASIC_WIND, t0: BASIC_WIND, dx, dy, id: s.nextId++, shape: basicShape(f), aimX: inp.ax, aimY: inp.ay, basic: true };
+      s.ev.push({ k: "wind", side, move: f.basic.i, shape: f.act.shape, basic: true });
     }
   }
 
@@ -380,21 +414,26 @@ const speedOf = (f) => Math.min(6, Math.max(3, 3 + 2.5 * (f.st[5] * STAGE(f.stag
 
 function stepAct(s, side, f) {
   const a = f.act;
-  const m = moveAt(f, a.k), data = moveOf(m.i);
+  const m = moveAt(f, a.k), data = arenaMove(m.i);
   if (--a.t > 0) {
     if (a.ph === "act" && (a.shape === "melee" || a.shape === "dash") && !a.hit) contact(s, side, f);
     if (a.ph === "act" && a.shape === "multi" && a.t % 4 === 0 && a.left > 0) burst(s, side, f, a, data);
     return;
   }
   if (a.ph === "wind") {
-    m.cd = cooldownOf(data); m.pp--;
-    s.ev.push({ k: "fire", side, move: m.i, shape: a.shape, x: f.x, y: f.y, dx: a.dx, dy: a.dy });
+    if (a.basic) {
+      m.cd = BASIC_CD;
+      f.basicN = s.t - f.basicT <= BASIC_CHAIN ? f.basicN + 1 : 1;
+      f.basicT = s.t;
+      a.boost = f.basicN % 3 === 0;
+    } else { m.cd = cooldownOf(data); m.pp--; }
+    s.ev.push({ k: "fire", side, move: m.i, shape: a.shape, x: f.x, y: f.y, dx: a.dx, dy: a.dy, basic: Boolean(a.basic), boost: Boolean(a.boost) });
     // A move that changes its user's own stages does so as it fires (Close Combat, Overheat).
     if (data.p && data.sgu && data.sg && rnd(s) * 100 < (data.sgc ?? 100)) stages(s, f, data.sg);
-    const rec = Math.max(1, Math.round(windOf(data) / 2));
+    const rec = a.basic ? BASIC_REC : Math.max(1, Math.round(windOf(data) / 2));
     switch (a.shape) {
       case "shot":
-        shoot(s, side, f, a.dx, a.dy, m.i);
+        shoot(s, side, f, a.dx, a.dy, m.i, a.basic ? BASIC_RANGE : SHOT_RANGE, a.boost);
         a.ph = "rec"; a.t = rec; break;
       case "multi":
         a.left = multiCount(data);
@@ -419,14 +458,14 @@ function stepAct(s, side, f) {
         a.ph = "rec"; a.t = rec; break;
     }
   } else if (a.ph === "act") {
-    a.ph = "rec"; a.t = Math.max(1, Math.round(windOf(data) / 2));
+    a.ph = "rec"; a.t = a.basic ? BASIC_REC : Math.max(1, Math.round(windOf(data) / 2));
   } else {
     f.act = null;
   }
 }
 
-function shoot(s, side, f, dx, dy, move) {
-  s.shots.push({ id: s.nextId++, side, move, x: f.x + dx * (R + SHOT_R), y: f.y + dy * (R + SHOT_R), dx, dy, left: SHOT_RANGE, from: f.slot });
+function shoot(s, side, f, dx, dy, move, range = SHOT_RANGE, boost = false) {
+  s.shots.push({ id: s.nextId++, side, move, x: f.x + dx * (R + SHOT_R), y: f.y + dy * (R + SHOT_R), dx, dy, left: range, from: f.slot, boost });
 }
 // A burst: one shot of a multi-hit move, the spread fanning a little each time.
 function burst(s, side, f, a, data) {
@@ -457,7 +496,7 @@ function contact(s, side, f) {
     if (dist > 0 && (ex * f.act.dx + ey * f.act.dy) / dist < MELEE_COS) return;
   }
   f.act.hit = true;
-  hit(s, f, d, moveAt(f, f.act.k).i, f.act.dx, f.act.dy, true);
+  hit(s, f, d, moveAt(f, f.act.k).i, f.act.dx, f.act.dy, true, d.x, d.y, f.act.boost ? BASIC_BOOST : 1);
   if (f.act.shape === "dash") { f.act.ph = "rec"; f.act.t = sec(0.25); }
 }
 
@@ -502,7 +541,7 @@ export function blocked(s, ax, ay, bx, by) {
 /* A blow on cover: its power, twice for a type its material is weak to,
    half for one it resists. At nothing it breaks, and stays broken. */
 function chip(s, c, move, x, y) {
-  const m = moveOf(move), g = GROUND[s.arena];
+  const m = arenaMove(move), g = GROUND[s.arena];
   if (!m.p) { s.ev.push({ k: "fizzle", x, y, move }); return; }
   const k = g.weak?.includes(m.t) ? 2 : g.resist?.includes(m.t) ? 0.5 : 1;
   c.hp = Math.max(0, c.hp - Math.round(m.p * k * 0.5));
@@ -548,7 +587,7 @@ function place(s, side, f, a, move) {
   const dx = ux || a.dx, dy = uy || a.dy;
   const mine = s.hazards.filter((z) => z.side === side);
   if (mine.length >= HAZARD_MAX) s.hazards = s.hazards.filter((z) => z !== mine[0]);
-  const z = { id: s.nextId++, side, move, kind: moveOf(move).n, t: HAZARD_T,
+  const z = { id: s.nextId++, side, move, kind: arenaMove(move).n, t: HAZARD_T,
     x: clamp(f.x + dx * reach, X0, X1), y: clamp(f.y + dy * reach, Y0, Y1), last: -HAZARD_CD };
   s.hazards.push(z);
   s.ev.push({ k: "field", side, move, x: z.x, y: z.y });
@@ -635,8 +674,8 @@ function stepGround(s) {
 function reward(s, f, kind) {
   if (!f) return;
   if (kind === "pp") {
-    const m = [...f.kit].sort((a, b) => a.pp / ppOf(moveOf(a.i)) - b.pp / ppOf(moveOf(b.i)))[0];
-    if (m && m.pp < ppOf(moveOf(m.i))) m.pp++;
+    const m = [...f.kit].sort((a, b) => a.pp / ppOf(arenaMove(a.i)) - b.pp / ppOf(arenaMove(b.i)))[0];
+    if (m && m.pp < ppOf(arenaMove(m.i))) m.pp++;
   } else if (kind === "dodge") f.dodgeCd = 0;
   else if (kind === "cure") { if (f.status === BRN || f.status === PSN) { f.status = -1; f.badly = false; s.ev.push({ k: "cured", side: f.side }); } }
   else if (kind === "cool") for (const m of f.kit) m.cd = Math.max(0, m.cd - sec(2));
@@ -719,7 +758,7 @@ function stepShots(s) {
     const ex = d.x - p.x, ey = d.y - p.y;
     if (ex * ex + ey * ey > (R + SHOT_R) * (R + SHOT_R)) return true;
     const a = s.sides[p.side].team[p.from];
-    hit(s, a, d, p.move, p.dx, p.dy, false, p.x, p.y);
+    hit(s, a, d, p.move, p.dx, p.dy, false, p.x, p.y, p.boost ? BASIC_BOOST : 1);
     return false;
   });
 }
@@ -746,7 +785,7 @@ function gain(s, side, n) {
   if (was < SURGE_MAX && sd.meter >= SURGE_MAX) s.ev.push({ k: "ready", side });
 }
 
-function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y) {
+function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
   if (d.inv > 0) {
     // Rolled THROUGH it: a perfect dodge, paid in Surge.
     const perfect = !d.shield && d.dodge > 0;
@@ -754,7 +793,7 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y) {
     s.ev.push({ k: d.shield ? "blocked" : "evade", side: d.side, x: d.x, y: d.y, perfect });
     return;
   }
-  const m = moveOf(move);
+  const m = arenaMove(move);
   const eff = effectiveness(m.t, d.types);
   if (eff === 0) { s.ev.push({ k: "immune", side: d.side, x: d.x, y: d.y }); return; }
   let dmg = 0;
@@ -763,7 +802,7 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y) {
     const roll = 0.85 + rnd(s) * (a.perk?.roll ?? 0.15);
     // A multi-shot's every shot is one of its hits; a pulse or a blow carries the average.
     const hits = shapeOf(m) === "multi" || !m.hits ? 1 : (m.hits[0] + m.hits[1]) / 2;
-    dmg = Math.max(1, Math.floor(rawDamage(a, d, m, crit) * (crit ? 1.5 : 1) * roll * hits * DAMAGE * (a.surge > 0 ? SURGE_DMG : 1)
+    dmg = Math.max(1, Math.floor(rawDamage(a, d, m, crit) * (crit ? 1.5 : 1) * roll * hits * DAMAGE * boost * (a.surge > 0 ? SURGE_DMG : 1)
       * (finalMinute(s) ? FINAL_DMG : 1)));
     d.hp = Math.max(0, d.hp - dmg);
     const st = s.sides[a.side].stats;
@@ -781,7 +820,7 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y) {
     if (m.dr > 0) heal(s, a, Math.floor(dmg * m.dr / 100));
     if (m.dr < 0) hurt(s, a, Math.max(1, Math.floor(dmg * -m.dr / 100)));
     // Where it came from and how hard, for the picture alone (events are not in the replay hash).
-    s.ev.push({ k: "hit", side: d.side, x: hx, y: hy, dmg, crit, eff, move, heavy: (m.p ?? 0) >= 90 || crit || a.surge > 0, dx, dy, frac: dmg / d.max, ko: d.hp <= 0, surge: a.surge > 0 });
+    s.ev.push({ k: "hit", side: d.side, x: hx, y: hy, dmg, crit, eff, move, heavy: (m.p ?? 0) >= 90 || crit || a.surge > 0 || boost > 1, dx, dy, frac: dmg / d.max, ko: d.hp <= 0, surge: a.surge > 0, basic: Boolean(BASIC[move]), boost: boost > 1 });
   } else {
     s.ev.push({ k: "touch", side: d.side, x: hx, y: hy, move });
   }
@@ -846,10 +885,10 @@ const reachOf = (shape) => ({ shot: SHOT_RANGE * 0.75, multi: SHOT_RANGE * 0.6, 
    a status shot when the foe has none; a buff when it has none running; a
    heal when it is low; a hazard early; a shield never (it is reactive). */
 function worth(me, foe, m) {
-  const data = moveOf(m.i);
+  const data = arenaMove(m.i);
   const shape = shapeOf(data);
   if (data.p) return expected(me, foe, m.i);
-  const base = Math.max(1, ...me.kit.filter((k) => moveOf(k.i).p).map((k) => expected(me, foe, k.i))) * 0.7;
+  const base = Math.max(1, ...me.kit.filter((k) => arenaMove(k.i).p).map((k) => expected(me, foe, k.i))) * 0.7;
   if (SHIELDS.has(data.n)) return 0;
   if (data.n === "rest") return me.hp / me.max < 0.3 ? base * 1.5 : 0;
   if (shape === "self") {
@@ -895,7 +934,7 @@ function cpuInput(s, side) {
         return { ...NO_INPUT, mx: -uy * way - ux * away, my: ux * way - uy * away, dodge: true };
       }
       if (L.shield && !me.act) {
-        const k = me.kit.findIndex((m) => SHIELDS.has(moveOf(m.i).n) && !m.cd && m.pp > 0);
+        const k = me.kit.findIndex((m) => SHIELDS.has(arenaMove(m.i).n) && !m.cd && m.pp > 0);
         if (k >= 0) return { ...NO_INPUT, fire: k };
       }
     }
@@ -925,9 +964,11 @@ function cpuInput(s, side) {
     if (next >= 0 && sd.swapCd === 0) return { ...NO_INPUT, swap: next };
     if (next < 0 && !(me.struggle?.cd > 0)) pick = 0;
   }
-  const shapeAt = (k) => shapeOf(moveOf(me.kit[k].pp <= 0 && spent(me) ? STRUGGLE : me.kit[k].i));
+  const shapeAt = (k) => shapeOf(arenaMove(me.kit[k].pp <= 0 && spent(me) ? STRUGGLE : me.kit[k].i));
   const reach = pick >= 0 ? reachOf(shapeAt(pick)) : 4;
-  const want = pick < 0 ? 4 : Math.min(reach - 0.4, ["shot", "beam", "multi"].includes(shapeAt(pick)) ? 4.5 : reach - 0.4);
+  // Nothing ready: in to the basic attack's reach, a jab's or a bolt's.
+  const basicReach = basicShape(me) === "melee" ? MELEE_RANGE + R * 0.5 : BASIC_RANGE * 0.8;
+  const want = pick < 0 ? basicReach - 0.4 : Math.min(reach - 0.4, ["shot", "beam", "multi"].includes(shapeAt(pick)) ? 4.5 : reach - 0.4);
   if (s.t % (TPS * 2) === 0) c.strafe = rnd(s) < 0.5 ? 1 : -1;
   const toward = dist > want + 0.4 ? 1 : dist < want - 0.8 ? -1 : 0;
   let mx = ux * toward - uy * c.strafe * 0.6, my = uy * toward + ux * c.strafe * 0.6;
@@ -951,6 +992,11 @@ function cpuInput(s, side) {
       if (v > nowV) { nowV = v; now = k; }
     });
     pick = now;
+  }
+  if (pick < 0 && !me.act && me.basic.cd === 0 && dist <= basicReach + 0.3
+    && (basicShape(me) === "melee" || !blocked(s, me.x, me.y, foe.x, foe.y))) {
+    const off = (rnd(s) * 2 - 1) * L.err;
+    return { ...NO_INPUT, mx, my, ax: ux - uy * off, ay: uy + ux * off, basic: true };
   }
   if (pick < 0 || me.act) return { ...NO_INPUT, mx, my, ax: ex, ay: ey };
   // A shot or a beam into cover is a shot at the cover: step round it instead.
@@ -1014,7 +1060,7 @@ const q64 = (v, lim) => (Number.isFinite(v) ? Math.round(clamp(v, -lim, lim) * 6
 const pick = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : -1);
 export const cleanInput = (i) => ({
   mx: q64(i?.mx, 1), my: q64(i?.my, 1), ax: q64(i?.ax, 40), ay: q64(i?.ay, 40),
-  fire: pick(i?.fire, 0, 3), dodge: Boolean(i?.dodge), swap: pick(i?.swap, 0, 5), surge: Boolean(i?.surge),
+  fire: pick(i?.fire, 0, 3), basic: Boolean(i?.basic), dodge: Boolean(i?.dodge), swap: pick(i?.swap, 0, 5), surge: Boolean(i?.surge),
 });
 export function lockstep(link, me, round = 0) {
   const mine = new Map(), theirs = new Map(), myHash = new Map(), theirHash = new Map();
@@ -1072,6 +1118,6 @@ export function rulesPrint() {
 
 // What a replay compares: where everyone is and how they are, each tick's end.
 export const stateHash = (s) => hash(JSON.stringify([s.t, s.intro, s.rs, s.winner,
-  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.pp)])]),
+  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.pp), f.basic.cd, f.basicN])]),
   s.shots.map((p) => [p.x, p.y]), s.hazards.map((z) => [z.x, z.y, z.t]),
   s.cover.map((c) => c.hp), [s.zone.open, s.zone.t, s.zone.claimed], s.drops.map((r) => [r.x, r.y, r.t])]));

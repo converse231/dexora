@@ -39,10 +39,9 @@ import Suggest from "./Suggest.jsx";
 import { TYPES } from "../../data/types.js";
 import { standing, tuneOf, trainerName } from "./progress.js";
 import Ranked from "./Ranked.jsx";
-import Arena from "./arena/Arena.jsx";
 import { CHAR_PIC } from "../../game/ranked.js";
 import { rankedStep } from "../../net/cloud.js";
-import { LEAGUE_TAB_KEY, ARENA_NEWS_KEY, write } from "../../game/store.js";
+import { LEAGUE_TAB_KEY } from "../../game/store.js";
 
 /* The Ranked tab sits first in the region strip under its own id, which is
    not a region's; the strip remembers it like one. */
@@ -51,8 +50,6 @@ const RANKED = "ranked";
 const SHOP = "shop", TRAIN = "train", TEAM = "team";
 // Road trainers (road.js): battles off the League, on the maps.
 const ROAD = "road";
-// The Arena (game/arena.js): real-time battles beside the turn-based League.
-const ARENA = "arena";
 // One slot moved to another, the rest closing up: the team's order.
 const moved = (list, from, to) => { const n = [...list]; n.splice(to, 0, ...n.splice(from, 1)); return n; };
 
@@ -711,7 +708,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
 
 export default function League({
   engine, box = [], beaten = {}, steps = 0, team = [], signedIn = false, onClose,
-  money = 0, bag = {}, level = 1, stats = null, candy = 0, road = null, arena = null, ladder = [],
+  money = 0, bag = {}, level = 1, stats = null, candy = 0, road = null,
 }) {
   useModalLock();
   const page = useRef(null);
@@ -719,7 +716,7 @@ export default function League({
   const st = useMemo(() => standing(beaten), [beaten]);
   const firstOpen = () => {
     const saved = readRegion();
-    if ([RANKED, SHOP, TRAIN, TEAM, ROAD, ARENA].includes(saved)) return saved;
+    if ([RANKED, SHOP, TRAIN, TEAM, ROAD].includes(saved)) return saved;
     if (saved && st[LEAGUES.findIndex((r) => r.id === saved)]?.open) return saved;
     const k = st.findIndex((s) => s.open && !s.cleared);
     return LEAGUES[k >= 0 ? k : 0].id;
@@ -730,18 +727,14 @@ export default function League({
   /* A FIGHT OWNS THE WHOLE SCREEN: the app bar and the tab bar step aside
      (`body.fighting` in styles.css' ROTOM SHELL) - a tab pressed mid-turn
      would leave a battle half-played under another page. */
-  // An Arena match owns the screen the same way.
-  const [arenaLive, setArenaLive] = useState(false);
   useEffect(() => {
-    document.body.classList.toggle("fighting", Boolean(fight) || arenaLive);
+    document.body.classList.toggle("fighting", Boolean(fight));
     return () => document.body.classList.remove("fighting");
-  }, [fight, arenaLive]);
+  }, [fight]);
   const [editing, setEditing] = useState(null);   // the defense team slot being edited
   const [nonce, setNonce] = useState(0);          // a ranked battle closed: the Ranked tab reloads its standing
   const ranked = regionId === RANKED, shop = regionId === SHOP, train = regionId === TRAIN, mine = regionId === TEAM;
-  const roadTab = regionId === ROAD, arenaTab = regionId === ARENA;
-  // The Arena found: the map's announcement chip stands down (ArenaIntro.jsx).
-  useEffect(() => { if (arenaTab) write(ARENA_NEWS_KEY, "done"); }, [arenaTab]);
+  const roadTab = regionId === ROAD;
   // Normal or hard: one switch for every region, remembered while the page is open.
   const [hard, setHard] = useState(false);
   const ri = LEAGUES.findIndex((r) => r.id === regionId);
@@ -755,16 +748,16 @@ export default function League({
   }, [engine]);
 
   const back = useCallback(() => {
-    if (fight || arenaLive) return;     // the fight has its own Escape (forfeit), a match its pause
+    if (fight) return;                  // the fight has its own Escape (forfeit)
     if (pick) setPick(null);
     else if (ranked && editing) setEditing(null);
     else onClose();
-  }, [fight, arenaLive, pick, ranked, editing, onClose]);
+  }, [fight, pick, ranked, editing, onClose]);
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape" && !fight && !arenaLive) { e.preventDefault(); back(); } };
+    const onKey = (e) => { if (e.key === "Escape" && !fight) { e.preventDefault(); back(); } };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [back, fight, arenaLive]);
+  }, [back, fight]);
 
   // The browser's Back leaves the page (App watches the hash).
   useEffect(() => {
@@ -860,12 +853,6 @@ export default function League({
                 <b>Ranked</b>
                 <em>Teams</em>
               </button>
-              <button type="button" role="tab" aria-selected={arenaTab}
-                className={`rk-tab${arenaTab ? " on" : ""}`} onClick={() => choose(ARENA)}>
-                <Icon n="flame" className="side-ic" />
-                <b>Arena</b>
-                <em>Real time</em>
-              </button>
               <button type="button" role="tab" aria-selected={roadTab}
                 className={`rk-tab${roadTab ? " on" : ""}`} onClick={() => choose(ROAD)}>
                 <Icon n="users" className="side-ic" />
@@ -908,8 +895,6 @@ export default function League({
       <main className="hp-body tc-main lg-main">
         {pick ? (
           <TeamPick o={pick.o} kind={pick.kind} box={box} last={team} beaten={beaten} steps={steps} onFight={startFight} />
-        ) : arenaTab ? (
-          <Arena engine={engine} box={box} team={team} record={arena} ladder={ladder} onLive={setArenaLive} />
         ) : roadTab ? (
           <RoadView level={level} road={road} onBattle={(o) => setPick({ o, kind: "road" })} />
         ) : mine ? (

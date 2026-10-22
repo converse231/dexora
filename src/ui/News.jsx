@@ -16,6 +16,19 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-22-arena-tab",
+    icon: "🎮",
+    date: "October 2026",
+    title: "The Arena gets its own tab",
+    items: [
+      ["A basic attack", "Hold to attack between your moves - every third hit lands harder."],
+      ["Your Arena team", "Pick three just for the Arena with Edit, apart from your League team."],
+      ["Easier switching", "Press 1, 2 or 3 to send out that Pokémon. Moves are right click, Q, E and R."],
+      ["Phone controls", "A joystick and attack buttons like a mobile battle game. Drag a move to aim it."],
+      ["Bigger moves", "Moves charge up, call their name and hit harder on screen."],
+    ],
+  },
+  {
     id: "2026-10-22-streak",
     icon: "🔥",
     date: "October 2026",
@@ -32,7 +45,7 @@ export const NEWS = [
     date: "October 2026",
     title: "The Arena: live battles",
     items: [
-      ["Real-time fights", "Battles, then Arena: move, aim, dodge and switch as it happens, with your team."],
+      ["Real-time fights", "The Arena tab: move, aim, dodge and switch as it happens, with your team."],
       ["Surge", "Land hits and dodge at the last moment to fill your meter, then press F to power up."],
       ["Arena Ladder", "Ten masters on six arenas, each with its own ground. Beat them in order."],
       ["Battle a friend", "Challenge a friend from the Arena for a live match, on even terms."],
