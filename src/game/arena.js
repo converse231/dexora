@@ -83,8 +83,85 @@ const SWAP = sec(0.6), SWAP_INV = sec(0.5), KO_WAIT = sec(1);
 const STUN = sec(0.12), KB = sec(0.15), FLINCH = sec(0.25);
 export const SHOT_SPEED = 10 / TPS;
 const SHOT_RANGE = 9, SHOT_R = 0.35;
-const MELEE_RANGE = 1.5, MELEE_COS = 0.64;      // an arc of about 100 degrees
-const BEAM_LEN = 10, BEAM_W = 0.32;
+const MELEE_RANGE = 1.75, MELEE_COS = 0.6;      // an arc of about 105 degrees (1.5 read as too small, 2026-10-23)
+const BEAM_LEN = 10, BEAM_W = 0.5;               // 0.32 was hard to land (2026-10-23)
+/* A BEAM FOLLOWS ITS AIM while it charges (asked for, 2026-10-23: "it
+   should follow as it is channelling"): each tick of the wind-up its line
+   turns BEAM_TRACK of the way to where the player aims now - a sweep, never
+   a snap, and nothing after it fires. */
+const BEAM_TRACK = 0.12;
+/* DOUBLE TEAM MAKES COPIES THAT STAND THERE (asked for twice, 2026-10-23:
+   "multiply the sprites, like Naruto's shadow clones; an illusion is gone
+   when hit"): two copies at CLONE_OFF either side of the user, moving with
+   it, for CLONE_T. A shot, blow, beam or blast that reaches a copy first
+   pops it and is spent; a CPU may chase a copy. */
+const CLONE_T = sec(8), CLONE_OFF = 1.7;
+/* WIND-UPS, SHORTER (asked for, 2026-10-23: "it's hard to make it hit both
+   on desktop and mobile"): every move charges WIND_K of what its power
+   alone would make it. */
+const WIND_K = 0.7;
+/* WEATHER, one a match (asked for, 2026-10-23), drawn from the seed - the
+   same odds on every floor: a floor that leaned to its own (rain on the
+   Boardwalk) would hand a type its home, which phase 2 rules out. Rain:
+   Water 1.5x, Fire 0.5x and Fire types slower, everyone soaked. Sun: the
+   other way round. Sand and snow: all but their own types lose a
+   WEATHER_HURT-th every WEATHER_CHIP. */
+export const WEATHERS = ["clear", "rain", "sun", "sand", "snow"];
+const WEATHER_ODDS = [8, 3, 3, 3, 3];
+const WEATHER_CHIP = sec(6), WEATHER_HURT = 40, RAIN_SLOW = 0.88;
+const SAND_SAFE = ["rock", "ground", "steel"], SNOW_SAFE = ["ice"];
+/* TYPE COMBOS (asked for, 2026-10-23): a Water hit on a burned Pokemon
+   puts the burn out in a STEAM cloud (STEAM_T) that hides whoever stands in
+   it; a Water hit soaks for WET_T, and an Electric hit on a soaked Pokemon
+   lands SHOCK times as hard. */
+const STEAM_T = sec(3.5), STEAM_R = 1.7, WET_T = sec(5), SHOCK = 1.5;
+/* THE MATCH'S EVENTS (asked for, 2026-10-23), planned from the seed: a
+   legendary flies over between FLY_FIRST and FLY_FIRST + FLY_SPAN and drops
+   a Full Restore at the centre - as far from either start - FLY_DROP later;
+   and, DARK_ODDS of the time, the lights go out for DARK_T, when only what
+   glows is seen (the CPU loses a foe past DARK_SEE, as a player does). */
+const FLY_FIRST = sec(25), FLY_SPAN = sec(30), FLY_DROP = sec(1.6), RARE_LIFE = sec(20);
+const DARK_ODDS = 0.45, DARK_FIRST = sec(35), DARK_SPAN = sec(40), DARK_T = sec(14), DARK_SEE = 5;
+/* ULTIS (asked for, 2026-10-23: "Pikachu's ULTI calls Thunder down on the
+   whole court"): a full meter still throws the foe off and powers its user
+   up, and now also looses a SIGNATURE in its first type: a STORM (strikes
+   on the foe and around the court), a NOVA (a blast round its user), a
+   CANNON (a huge beam at the foe) or a BARRAGE (a fan of shots). Famous
+   Pokemon have their own by name. Every strike shows on the ground for
+   ULT_WARN and stops following its target ULT_LOCK before it lands, so it
+   can be dodged. Its hits are the League's formula on a 90-power move of
+   that type, scaled by the part (`k`). */
+const ULT_BASE = -100, ULT_P = 90, ULT_WARN = sec(0.75), ULT_LOCK = sec(0.45);
+export const ULT_KIND = { electric: "storm", flying: "storm", fire: "nova", ground: "nova", fighting: "nova", normal: "nova", rock: "nova",
+  water: "cannon", ice: "cannon", dragon: "cannon", psychic: "cannon", steel: "cannon",
+  grass: "barrage", bug: "barrage", poison: "barrage", ghost: "barrage", dark: "barrage", fairy: "barrage" };
+export const ULT_TYPE_NAME = { electric: "Thunderstorm", fire: "Inferno", water: "Tidal Cannon", grass: "Leaf Storm", ice: "Absolute Zero",
+  fighting: "Final Fist", poison: "Venom Rain", ground: "Fissure", flying: "Hurricane", psychic: "Mind Crush", bug: "Swarm",
+  rock: "Rockfall", ghost: "Phantom Barrage", dragon: "Draco Cannon", dark: "Nightfall", steel: "Steel Cannon", fairy: "Starfall", normal: "Hyper Impact" };
+// Famous ones, by dex id: [name, kind].
+export const ULT_NAMES = { 25: ["Thunder", "storm"], 26: ["Thunder", "storm"], 145: ["Thunder", "storm"], 135: ["Thunder", "storm"],
+  6: ["Blast Burn", "nova"], 9: ["Hydro Cannon", "cannon"], 3: ["Frenzy Plant", "barrage"], 150: ["Psystrike", "cannon"],
+  94: ["Shadow Storm", "barrage"], 448: ["Aura Sphere", "barrage"], 130: ["Hyper Beam", "cannon"], 149: ["Outrage", "nova"],
+  143: ["Giga Impact", "nova"], 384: ["Dragon Ascent", "cannon"], 248: ["Stone Edge", "nova"], 445: ["Dragon Rush", "nova"],
+  658: ["Water Shuriken", "barrage"], 282: ["Moonblast", "barrage"], 257: ["Blaze Kick", "nova"] };
+const ULT_PART = { storm: 0.4, nova: 0.7, cannon: 0.8, barrage: 0.28 };
+/* MOVES THAT LEAVE THE COURT (asked for, 2026-10-23: "Fly takes the Pokemon
+   out of the map, then dives into the enemy; Dig appears exactly under
+   it"): its user is gone - up, under, beneath the water, into the shadows -
+   for VANISH_T, where nothing can touch it, and comes back down ON the foe,
+   its landing marked on the ground and following the foe until ULT_LOCK
+   before it lands (an ULTI's strike), so a roll still beats it. */
+export const VANISH = { fly: "air", bounce: "air", dig: "ground", dive: "water", "phantom-force": "shadow", "shadow-force": "shadow" };
+const VANISH_T = sec(1.3), VANISH_R = 1.1;
+/* MOVES THAT FILL THE COURT (asked for, 2026-10-23): Heat Wave, Blizzard and
+   Petal Blizzard reach the foe anywhere, at WIDE_K of a hit - unless cover
+   stands between, or it rolls through. */
+export const WIDE = new Set(["heat-wave", "blizzard", "petal-blizzard"]);
+const WIDE_K = 0.7;
+/* SUDDEN DEATH (asked for, 2026-10-23): the clock out with as many Pokemon
+   standing on each side, every one of them drops to 1 HP and the fight
+   runs SUDDEN_T longer - the next blow wins it. Past that, HP decides. */
+export const SUDDEN_T = sec(30);
 const DASH = sec(0.2), DASH_DIST = 3.2;
 const PULSE_R = 2.6;
 const HAZARD_R = 1.1, HAZARD_T = sec(15), HAZARD_CD = sec(2), HAZARD_MAX = 3, PLACE = 5;
@@ -97,14 +174,36 @@ const ZONE_R = 1.3, ZONE_HOLD = sec(1), ZONE_FIRST = sec(20), ZONE_OPEN = sec(12
 const ZONE_AT = [[W / 2, INSET + 2.1], [W / 2, H - INSET - 2.1]];
 const ROCKS_EVERY = sec(25), ROCKS_FIRST = sec(15), ROCK_WARN = sec(1.2), ROCK_R = 1;
 const HEAT_BURN = sec(1), SWIFT = sec(10);
+
+/* POWER-UPS ON THE FLOOR (asked for, 2026-10-23: "power ups on the maps,
+   usable objects"). Every PICK_EVERY a MIRRORED PAIR of one kind appears -
+   one on each half, point for point - so no side is nearer one by the
+   draw. Touched, a Potion, a Full Heal or a Shiny Stone works at once; an X
+   item is HELD (one a side, `sd.held`) until its player USES it - the
+   decision is when. Uncollected, a pair fades after PICK_LIFE. */
+export const PICKUPS = {
+  potion: { held: false, name: "Potion", says: "Heals 20% HP" },
+  "full-heal": { held: false, name: "Full Heal", says: "Cures a status and any lowered stat" },
+  "shiny-stone": { held: false, name: "Shiny Stone", says: "+40% Surge" },
+  "x-attack": { held: true, name: "X Attack", says: "Use it: hits 30% harder for 8 s" },
+  "x-speed": { held: true, name: "X Speed", says: "Use it: faster, and cooldowns run quicker, for 8 s" },
+  "x-defense": { held: true, name: "X Defense", says: "Use it: a shield for 1.5 s" },
+  // The flyover's drop alone (`stepEvents`), never one of a pair.
+  "full-restore": { held: false, rare: true, name: "Full Restore", says: "Heals half, cures any status, +50% ULTI" },
+};
+const PICK_KINDS = Object.keys(PICKUPS).filter((k) => !PICKUPS[k].rare);
+const PICK_FIRST = sec(10), PICK_EVERY = sec(16), PICK_LIFE = sec(14), PICK_R = 0.5;
+const X_TIME = sec(8), X_ATTACK = 1.3, X_GUARD = sec(1.5);
 /* WHAT ONE HIT IS WORTH, against the plan's 30-45 s a Pokemon. Measured
    2026-10-22 over 40 Hard-vs-Hard CPU matches at Lv 50: 0.32 was 54 s a
    Pokemon and nearly every match ran out the clock; 0.75 was 27 s; 0.6 is
    33 s. Re-measured with phase 1's shapes and statuses (check.mjs). The
    basic attack (2026-10-22) took a third of the damage and the CPU in to
    its reach: a Hard-vs-Hard 3v3 fell from 83 s to 45 s at 0.6, so 0.4 -
-   76 s, Normal over Easy 31 of 40, as it was. */
-export const DAMAGE = 0.4;
+   76 s, Normal over Easy 31 of 40, as it was. Wind-ups 30% shorter and
+   the ULTIs' signatures (2026-10-23) brought it to 38 s; 0.3 with the ULTI
+   parts below is 76 s again, an ULTI ~14% of the damage dealt. */
+export const DAMAGE = 0.3;
 /* THE OPENING: the count before a fight, in which nobody moves. It is
    ticks of the match - both ends of an online fight count the same ones -
    off the match clock, and 0 for every test that drives a match. */
@@ -143,7 +242,14 @@ const BASIC = {
   [BASIC_P]: { n: "basic-attack", t: null, c: 0, p: 15, pp: 1 },
   [BASIC_S]: { n: "basic-shot", t: null, c: 1, p: 15, pp: 1 },
 };
-export const arenaMove = (i) => BASIC[i] ?? moveOf(i);
+export const arenaMove = (i) => BASIC[i] ?? (i <= ULT_BASE ? ultMove(i) : moveOf(i));
+// An ULTI's hit: a 90-power move of its user's first type, physical or special by the higher attack.
+const ULTS = new Map();
+function ultMove(i) {
+  if (!ULTS.has(i)) { const k = ULT_BASE - i; ULTS.set(i, { n: "ulti", t: TYPES[k >> 1] ?? "normal", c: k & 1, p: ULT_P, pp: 1 }); }
+  return ULTS.get(i);
+}
+export const isUlt = (i) => i <= ULT_BASE;
 export const BASIC_CD = sec(0.42);
 const BASIC_WIND = sec(0.1), BASIC_REC = sec(0.08), BASIC_RANGE = 4.5, BASIC_CHAIN = sec(1.2), BASIC_BOOST = 1.6;
 export const basicShape = (f) => (f.basic.i === BASIC_P ? "melee" : "shot");
@@ -201,9 +307,9 @@ export const SHAPES = ["shot", "beam", "melee", "dash", "pulse", "field", "self"
 
 // A move's timing, from its own data: big hits are slow and readable.
 export const windOf = (m) => {
-  const base = Math.max(sec(0.1), sec(0.18 + 0.004 * (m.p ?? 0)) - sec(0.12) * (m.pr ?? 0));
+  const base = Math.max(sec(0.08), Math.round((sec(0.18 + 0.004 * (m.p ?? 0)) - sec(0.12) * (m.pr ?? 0)) * WIND_K));
   const s = shapeOf(m);
-  return s === "beam" ? Math.round(base * 1.35) : s === "self" || s === "field" ? sec(0.3) : base;
+  return s === "beam" ? Math.round(base * 1.35) : s === "self" || s === "field" ? sec(0.22) : base;
 };
 export const cooldownOf = (m) => {
   if (m.c === 2) return SHIELDS.has(m.n) ? sec(7) : m.n === "rest" ? sec(20) : m.st === 3 ? sec(15) : sec(9);
@@ -245,7 +351,7 @@ function body(f, side, slot) {
     x: side ? X1 - 2.5 : X0 + 2.5, y: H / 2, px: 0, py: 0, fx: side ? -1 : 1, fy: 0, moving: false,
     act: null, dodge: 0, dx: 0, dy: 0, dodgeCd: 0, inv: 0, shield: 0, stun: 0, kbx: 0, kby: 0, kbt: 0, flash: 0,
     status: -1, statusT: 0, statusN: 0, badly: false, sleptAt: 0,
-    vx: 0, vy: 0, heat: 0, swift: 0, hidden: false, surge: 0, struggle: null,
+    vx: 0, vy: 0, heat: 0, swift: 0, hidden: false, surge: 0, struggle: null, power: 0, haste: 0, clones: [], cloneT: 0, wet: 0, rained: false, away: null,
     basic: { i: basicOf(f), pp: Infinity, cd: 0 }, basicN: 0, basicT: -BASIC_CHAIN,
   };
 }
@@ -253,22 +359,36 @@ function body(f, side, slot) {
 /* A MATCH. `teams`: two lists of League fighters (`playerFighter` for yours,
    `fighter` for the CPU's). `cpu`: per side, null for a person or a CPU's
    level (`LEVELS`, or "dummy"). `arena`: a GROUND id, its cover and zones. */
-export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "indigo", intro = 0 }) {
+export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "indigo", intro = 0, weather = null, events = true }) {
   const g = GROUND[arena] ? arena : "indigo";
   const s = {
     t: 0, intro, rs: seed | 0, over: false, winner: -1, why: "", ev: [], shots: [], hazards: [], nextId: 1,
-    arena: g, drops: [],
+    arena: g, drops: [], items: [], strikes: [], clouds: [], dark: 0,
     cover: COVER_AT.map(([x, y], i) => ({ id: i, x, y, hp: COVER_HP, max: COVER_HP })),
     zone: { open: false, t: ZONE_FIRST, claimed: [false, false], hold: [[0, 0], [0, 0]] },
     sides: teams.map((team, side) => ({
-      team: team.map((f, slot) => body(f, side, slot)), active: 0, swapT: 0, next: -1, swapCd: 0, koT: 0, meter: 0,
+      team: team.map((f, slot) => body(f, side, slot)), active: 0, swapT: 0, next: -1, swapCd: 0, koT: 0, meter: 0, held: null,
       // What the result screen tells (never read by the rules): damage dealt, hits, the best run of hits unanswered, perfect dodges, surges.
       stats: { dealt: 0, hits: 0, chain: 0, best: 0, perfect: 0, surges: 0 },
       cpu: cpu[side] ? { level: cpu[side], seen: 0, seenId: 0, strafe: 1, dodged: 0, lx: W / 2, ly: H / 2 } : null,
     })),
   };
   for (const side of s.sides) for (const f of side.team) { f.px = f.x; f.py = f.y; }
+  // The weather and the match's two events, drawn now so a seed replays them.
+  const roll = rnd(s) * WEATHER_ODDS.reduce((n, x) => n + x, 0);
+  let acc = 0;
+  s.weather = weather ?? WEATHERS.find((w, k) => (acc += WEATHER_ODDS[k]) > roll) ?? "clear";
+  const fly = FLY_FIRST + Math.floor(rnd(s) * FLY_SPAN), dir = rnd(s) < 0.5 ? 1 : -1;
+  const dark = rnd(s) < DARK_ODDS ? DARK_FIRST + Math.floor(rnd(s) * DARK_SPAN) : -1;
+  s.plan = events ? { fly, dir, dark } : { fly: -1, dir, dark: -1 };
   return s;
+}
+// Where Double Team's copies stand: beside their user, inside the court.
+export const clonesOf = (f) => f.clones.map(([ox, oy]) => [clamp(f.x + ox, X0, X1), clamp(f.y + oy, Y0, Y1)]);
+function popClone(s, f, k) {
+  const [x, y] = clonesOf(f)[k];
+  f.clones.splice(k, 1);
+  s.ev.push({ k: "decoy", side: f.side, x, y });
 }
 
 export const activeOf = (s, side) => {
@@ -277,9 +397,9 @@ export const activeOf = (s, side) => {
 };
 const alive = (sd) => sd.team.filter((f) => f.hp > 0);
 export const PAR = 0, BRN = 1, PSN = 2, SLP = 3, FRZ = 4;
-const held = (f) => f.stun > 0 || f.status === SLP || f.status === FRZ;
+const held = (f) => f.stun > 0 || f.status === SLP || f.status === FRZ || Boolean(f.away);
 
-export const NO_INPUT = Object.freeze({ mx: 0, my: 0, ax: 0, ay: 0, fire: -1, basic: false, dodge: false, swap: -1, surge: false });
+export const NO_INPUT = Object.freeze({ mx: 0, my: 0, ax: 0, ay: 0, fire: -1, basic: false, dodge: false, swap: -1, surge: false, use: false });
 
 export function tick(s, inputs) {
   if (s.over) return s;
@@ -295,12 +415,18 @@ export function tick(s, inputs) {
     stepSide(s, side, inp);
   }
   stepShots(s);
+  stepStrikes(s);
   stepHazards(s);
   stepGround(s);
+  stepEvents(s);
   for (let side = 0; side < 2; side++) settleKO(s, side);
   s.t++;
   if (s.t === LIMIT - FINAL_T) s.ev.push({ k: "final" });
-  if (!s.over && s.t >= LIMIT) timeUp(s);
+  if (!s.over && s.t >= LIMIT && !s.sudden) {
+    if (alive(s.sides[0]).length === alive(s.sides[1]).length) suddenDeath(s);
+    else timeUp(s);
+  }
+  if (!s.over && s.sudden && s.t >= LIMIT + SUDDEN_T) timeUp(s);
   return s;
 }
 
@@ -319,7 +445,7 @@ function stepSide(s, side, inp) {
   }
   if (sd.koT > 0) return;
   const f = sd.team[sd.active];
-  for (const m of f.struggle ? [...f.kit, f.struggle, f.basic] : [...f.kit, f.basic]) if (m.cd > 0) m.cd = Math.max(0, m.cd - (f.surge > 0 ? 2 : 1));
+  for (const m of f.struggle ? [...f.kit, f.struggle, f.basic] : [...f.kit, f.basic]) if (m.cd > 0) m.cd = Math.max(0, m.cd - (f.surge > 0 || f.haste > 0 ? 2 : 1));
   if (f.surge > 0) f.surge--;
   if (f.dodgeCd > 0) f.dodgeCd--;
   if (f.inv > 0) f.inv--;
@@ -334,13 +460,15 @@ function stepSide(s, side, inp) {
   f.moving = Boolean(mx || my);
 
   // A surge breaks a stagger (never sleep or freeze): the fighting game's burst.
-  if (inp.surge && sd.meter >= SURGE_MAX && !f.act && !f.dodge && f.status !== SLP && f.status !== FRZ) surge(s, side, f);
+  if (inp.surge && sd.meter >= SURGE_MAX && !f.act && !f.dodge && !f.away && f.status !== SLP && f.status !== FRZ) surge(s, side, f);
+  if (f.away) f.inv = Math.max(f.inv, 2);
   if (held(f)) { if (f.stun > 0) f.stun--; }
   else {
+    if (inp.use && sd.held) { useItem(s, f, sd.held); s.ev.push({ k: "use", side, item: sd.held, x: f.x, y: f.y }); sd.held = null; }
     if (inp.swap >= 0 && sd.swapCd === 0 && !f.act && !f.dodge) {
       const next = inp.swap < sd.team.length ? inp.swap : -1;
       if (next >= 0 && next !== sd.active && sd.team[next].hp > 0) {
-        sd.next = next; sd.swapT = SWAP; sd.swapCd = SWAP_CD; f.surge = 0;
+        sd.next = next; sd.swapT = SWAP; sd.swapCd = SWAP_CD; f.surge = 0; f.clones = [];
         s.ev.push({ k: "out", side, slot: sd.active });
         return;
       }
@@ -405,12 +533,16 @@ function stepSide(s, side, inp) {
   f.x = clamp(f.x, X0, X1); f.y = clamp(f.y, Y0, Y1);
   pushOut(s, f);
 
+  if (f.act?.shape === "beam" && f.act.ph === "wind" && (ax || ay)) {
+    const [nx, ny] = norm(f.act.dx + (ax - f.act.dx) * BEAM_TRACK, f.act.dy + (ay - f.act.dy) * BEAM_TRACK);
+    if (nx || ny) { f.act.dx = nx; f.act.dy = ny; f.fx = nx; f.fy = ny; }
+  }
   if (f.act) stepAct(s, side, f);
 }
 
 // Speed from the Speed stat and its stage; paralysis halves it, a swift zone lifts it.
 const speedOf = (f) => Math.min(6, Math.max(3, 3 + 2.5 * (f.st[5] * STAGE(f.stages[5]) / 200)))
-  / TPS * (f.status === PAR ? 0.5 : 1) * (f.swift > 0 ? 1.15 : 1) * (f.wading ? 0.5 : 1);
+  / TPS * (f.status === PAR ? 0.5 : 1) * (f.swift > 0 ? 1.15 : 1) * (f.wading ? 0.5 : 1) * (f.rained ? RAIN_SLOW : 1);
 
 function stepAct(s, side, f) {
   const a = f.act;
@@ -431,6 +563,7 @@ function stepAct(s, side, f) {
     // A move that changes its user's own stages does so as it fires (Close Combat, Overheat).
     if (data.p && data.sgu && data.sg && rnd(s) * 100 < (data.sgc ?? 100)) stages(s, f, data.sg);
     const rec = a.basic ? BASIC_REC : Math.max(1, Math.round(windOf(data) / 2));
+    if (!a.basic && VANISH[data.n]) { vanish(s, side, f, m.i, VANISH[data.n]); return; }
     switch (a.shape) {
       case "shot":
         shoot(s, side, f, a.dx, a.dy, m.i, a.basic ? BASIC_RANGE : SHOT_RANGE, a.boost);
@@ -464,8 +597,8 @@ function stepAct(s, side, f) {
   }
 }
 
-function shoot(s, side, f, dx, dy, move, range = SHOT_RANGE, boost = false) {
-  s.shots.push({ id: s.nextId++, side, move, x: f.x + dx * (R + SHOT_R), y: f.y + dy * (R + SHOT_R), dx, dy, left: range, from: f.slot, boost });
+function shoot(s, side, f, dx, dy, move, range = SHOT_RANGE, boost = false, k = 1) {
+  s.shots.push({ id: s.nextId++, side, move, x: f.x + dx * (R + SHOT_R), y: f.y + dy * (R + SHOT_R), dx, dy, left: range, from: f.slot, boost, k });
 }
 // A burst: one shot of a multi-hit move, the spread fanning a little each time.
 function burst(s, side, f, a, data) {
@@ -488,13 +621,21 @@ function contact(s, side, f) {
   }
   const d = activeOf(s, 1 - side);
   if (!d || d.hp <= 0) return;
-  const ex = d.x - f.x, ey = d.y - f.y, dist = Math.sqrt(ex * ex + ey * ey);
-  if (f.act.shape === "dash") {
-    if (dist > 2 * R + 0.15) return;
-  } else {
-    if (dist > MELEE_RANGE + R) return;
-    if (dist > 0 && (ex * f.act.dx + ey * f.act.dy) / dist < MELEE_COS) return;
+  const reaches = (tx, ty) => {
+    const ex = tx - f.x, ey = ty - f.y, dist = Math.sqrt(ex * ex + ey * ey);
+    if (f.act.shape === "dash") return dist <= 2 * R + 0.15 ? dist : -1;
+    if (dist > MELEE_RANGE + R) return -1;
+    return dist > 0 && (ex * f.act.dx + ey * f.act.dy) / dist < MELEE_COS ? -1 : dist;
+  };
+  // A copy nearer than its user takes the blow and is gone.
+  const real = reaches(d.x, d.y);
+  const copies = clonesOf(d).map(([cx, cy], k) => [reaches(cx, cy), k]).filter(([r]) => r >= 0).sort((a, b) => a[0] - b[0]);
+  if (copies.length && (real < 0 || copies[0][0] < real)) {
+    f.act.hit = true; popClone(s, d, copies[0][1]);
+    if (f.act.shape === "dash") { f.act.ph = "rec"; f.act.t = sec(0.25); }
+    return;
   }
+  if (real < 0) return;
   f.act.hit = true;
   hit(s, f, d, moveAt(f, f.act.k).i, f.act.dx, f.act.dy, true, d.x, d.y, f.act.boost ? BASIC_BOOST : 1);
   if (f.act.shape === "dash") { f.act.ph = "rec"; f.act.t = sec(0.25); }
@@ -502,20 +643,29 @@ function contact(s, side, f) {
 
 // A beam: a line drawn during the wind-up, hitting all along it at once - up to the first cover.
 function beam(s, side, f, a, move) {
-  let len = BEAM_LEN, block = null;
+  beamAt(s, side, f, f.x, f.y, a.dx, a.dy, move, BEAM_W, BEAM_LEN, 1);
+}
+/* A beam from (x, y): up to the first cover; the first of the foe and its
+   copies along it is struck - a copy pops and the beam is spent on it. */
+function beamAt(s, side, a, x, y, dx, dy, move, width, length, k, big = false) {
+  let len = length, block = null;
   for (const c of s.cover) {
     if (c.hp <= 0) continue;
-    const t = rayBox(f.x, f.y, a.dx, a.dy, c, BEAM_W);
+    const t = rayBox(x, y, dx, dy, c, width);
     if (t != null && t < len) { len = t; block = c; }
   }
-  s.ev.push({ k: "beam", side, move, x: f.x, y: f.y, dx: a.dx, dy: a.dy, len });
-  if (block) chip(s, block, move, f.x + a.dx * len, f.y + a.dy * len);
+  s.ev.push({ k: "beam", side, move, x, y, dx, dy, len, big });
+  if (block) chip(s, block, move, x + dx * len, y + dy * len);
   const d = activeOf(s, 1 - side);
   if (!d || d.hp <= 0) return;
-  const ex = d.x - f.x, ey = d.y - f.y;
-  const along = ex * a.dx + ey * a.dy;
-  const off = Math.abs(ex * a.dy - ey * a.dx);
-  if (along > 0 && along < len + R && off < R + BEAM_W) hit(s, f, d, move, a.dx, a.dy, false);
+  const along = (tx, ty) => {
+    const ex = tx - x, ey = ty - y, l = ex * dx + ey * dy;
+    return l > 0 && l < len + R && Math.abs(ex * dy - ey * dx) < R + width ? l : -1;
+  };
+  const real = along(d.x, d.y);
+  const copies = clonesOf(d).map(([cx, cy], n) => [along(cx, cy), n]).filter(([l]) => l >= 0).sort((p, q) => p[0] - q[0]);
+  if (copies.length && (real < 0 || copies[0][0] < real)) { popClone(s, d, copies[0][1]); return; }
+  if (real >= 0) hit(s, a, d, move, dx, dy, false, d.x, d.y, k);
 }
 
 /* Where a ray from (x, y) along (dx, dy) first enters a block (its half
@@ -566,18 +716,43 @@ function pushOut(s, f) {
 
 // A pulse: a ring around the user (Earthquake, Surf, Growl). It shakes the cover in it too.
 function pulse(s, side, f, move) {
+  if (WIDE.has(arenaMove(move).n)) {
+    // The whole court: every cover takes it, and the foe unless cover stands between.
+    s.ev.push({ k: "pulse", side, move, x: f.x, y: f.y, r: W, wide: true });
+    for (const c of s.cover) if (c.hp > 0) chip(s, c, move, c.x, c.y);
+    const d = activeOf(s, 1 - side);
+    if (d && d.hp > 0 && !blocked(s, f.x, f.y, d.x, d.y)) { const [dx, dy] = norm(d.x - f.x, d.y - f.y); hit(s, f, d, move, dx || 1, dy, false, d.x, d.y, WIDE_K); }
+    else if (d && d.hp > 0) s.ev.push({ k: "sheltered", side: d.side, x: d.x, y: d.y });
+    return;
+  }
   s.ev.push({ k: "pulse", side, move, x: f.x, y: f.y, r: PULSE_R });
   for (const c of s.cover) {
     if (c.hp <= 0) continue;
     const ex = c.x - f.x, ey = c.y - f.y;
     if (ex * ex + ey * ey < (PULSE_R + COVER_HALF) * (PULSE_R + COVER_HALF)) chip(s, c, move, c.x, c.y);
   }
+  blast(s, f, f.x, f.y, PULSE_R, move, 1);
+}
+// Off the court: the user is gone, and its landing is a strike on the foe.
+function vanish(s, side, f, move, kind) {
   const d = activeOf(s, 1 - side);
+  f.away = kind; f.act = null; f.clones = []; f.inv = Math.max(f.inv, 2);
+  s.strikes.push({ id: s.nextId++, side, from: f.slot, move, k: 1, t: VANISH_T, t0: VANISH_T, type: arenaMove(move).t, r: VANISH_R,
+    x: d ? d.x : f.x, y: d ? d.y : f.y, follow: true, vanish: kind });
+  s.ev.push({ k: "vanish", side, kind, move, x: f.x, y: f.y });
+}
+// A blast round (x, y): every copy in it pops, and the foe in it is struck.
+function blast(s, a, x, y, r, move, k) {
+  const d = activeOf(s, 1 - a.side);
   if (!d || d.hp <= 0) return;
-  const ex = d.x - f.x, ey = d.y - f.y;
-  if (ex * ex + ey * ey > (PULSE_R + R) * (PULSE_R + R)) return;
+  for (let n = clonesOf(d).length - 1; n >= 0; n--) {
+    const [cx, cy] = clonesOf(d)[n];
+    if ((cx - x) * (cx - x) + (cy - y) * (cy - y) <= (r + R) * (r + R)) popClone(s, d, n);
+  }
+  const ex = d.x - x, ey = d.y - y;
+  if (ex * ex + ey * ey > (r + R) * (r + R)) return;
   const [dx, dy] = norm(ex, ey);
-  hit(s, f, d, move, dx, dy, false);
+  hit(s, a, d, move, dx || 1, dy, false, d.x, d.y, k);
 }
 
 // A hazard: laid where you aim, up to PLACE tiles away, for HAZARD_T.
@@ -654,13 +829,24 @@ function stepGround(s) {
       return false;
     });
   }
+  stepItems(s, bodies);
+  s.clouds = s.clouds.filter((c) => --c.t > 0);
   for (const f of bodies) {
     if (!f || f.hp <= 0) continue;
     if (f.swift > 0) f.swift--;
+    if (f.power > 0) f.power--;
+    if (f.cloneT > 0 && --f.cloneT === 0 && f.clones.length) { s.ev.push({ k: "poof", side: f.side, at: clonesOf(f) }); f.clones = []; }
+    if (f.wet > 0) f.wet--;
+    if (s.weather === "rain") f.wet = Math.max(f.wet, 2);
+    f.rained = s.weather === "rain" && f.types.includes(T("fire"));
+    if ((s.weather === "sand" || s.weather === "snow") && s.t > 0 && s.t % WEATHER_CHIP === 0
+      && !(s.weather === "sand" ? SAND_SAFE : SNOW_SAFE).some((t) => f.types.includes(T(t)))) hurt(s, f, Math.max(1, Math.floor(f.max / WEATHER_HURT)), null);
+    if (f.haste > 0) f.haste--;
     // WATER (the Boardwalk): only a Water or Flying type moves freely in it.
     f.wading = inRects(g.water, f.x, f.y) && !f.types.includes(T("water")) && !f.types.includes(T("flying"));
     // TALL GRASS (the Grove): it hides you while you are not attacking.
-    f.hidden = inRects(g.grass, f.x, f.y) && !f.act && !f.dodge;
+    f.hidden = Boolean(f.away) || (inRects(g.grass, f.x, f.y) && !f.act && !f.dodge)
+      || s.clouds.some((c) => (c.x - f.x) * (c.x - f.x) + (c.y - f.y) * (c.y - f.y) < STEAM_R * STEAM_R);
     // THE HOT EDGE (the Caldera): a second against the wall burns a non-Fire type.
     if (g.heat && (f.x < X0 + g.heat || f.x > X1 - g.heat || f.y < Y0 + g.heat || f.y > Y1 - g.heat)) {
       if (++f.heat >= HEAT_BURN) { f.heat = 0; afflict(s, f, BRN); }
@@ -668,6 +854,50 @@ function stepGround(s) {
   }
   // BASALT ERODES (the Caldera): the cover thins out over the match.
   if (g.erode && s.t % sec(0.5) === 0) for (const c of s.cover) if (c.hp > 0 && --c.hp === 0) s.ev.push({ k: "break", id: c.id, x: c.x, y: c.y, move: STRUGGLE });
+}
+
+/* The floor's power-ups: a mirrored pair every PICK_EVERY, kept clear of
+   cover; touched, worked at once or held (one a side - a held one leaves a
+   second where it lies); gone after PICK_LIFE. */
+function stepItems(s, bodies) {
+  if (s.t >= PICK_FIRST && (s.t - PICK_FIRST) % PICK_EVERY === 0) {
+    const kind = PICK_KINDS[Math.floor(rnd(s) * PICK_KINDS.length)];
+    let x = 0, y = 0;
+    for (let n = 0; n < 6; n++) {
+      x = X0 + 2 + rnd(s) * (W / 2 - X0 - 3); y = Y0 + 1.2 + rnd(s) * (Y1 - Y0 - 2.4);
+      if (!s.cover.some((c) => c.hp > 0 && Math.abs(c.x - x) < COVER_HALF + 0.9 && Math.abs(c.y - y) < COVER_HALF + 0.9)) break;
+    }
+    for (const [px, py] of [[x, y], [W - x, H - y]]) s.items.push({ id: s.nextId++, kind, x: px, y: py, t: PICK_LIFE });
+    s.ev.push({ k: "items", kind });
+  }
+  s.items = s.items.filter((it) => {
+    if (--it.t <= 0) return false;
+    for (const f of bodies) {
+      if (!f || f.hp <= 0) continue;
+      if ((f.x - it.x) * (f.x - it.x) + (f.y - it.y) * (f.y - it.y) > (R + PICK_R) * (R + PICK_R)) continue;
+      const sd = s.sides[f.side];
+      if (PICKUPS[it.kind].held) { if (sd.held) continue; sd.held = it.kind; }
+      else useItem(s, f, it.kind);
+      s.ev.push({ k: "pick", side: f.side, item: it.kind, x: it.x, y: it.y, held: PICKUPS[it.kind].held });
+      return false;
+    }
+    return true;
+  });
+}
+function useItem(s, f, kind) {
+  if (kind === "potion") heal(s, f, Math.floor(f.max * 0.2));
+  else if (kind === "full-heal") {
+    if (f.status >= 0) { f.status = -1; f.badly = false; s.ev.push({ k: "cured", side: f.side }); }
+    for (let k = 1; k < 8; k++) if (f.stages[k] < 0) { f.stages[k] = 0; f.stageT[k] = 0; }
+  } else if (kind === "shiny-stone") gain(s, f.side, 40);
+  else if (kind === "full-restore") {
+    heal(s, f, Math.floor(f.max * 0.5));
+    if (f.status >= 0) { f.status = -1; f.badly = false; s.ev.push({ k: "cured", side: f.side }); }
+    gain(s, f.side, 50);
+  }
+  else if (kind === "x-attack") f.power = X_TIME;
+  else if (kind === "x-speed") { f.swift = Math.max(f.swift, X_TIME); f.haste = X_TIME; }
+  else if (kind === "x-defense") { f.shield = X_GUARD; f.inv = Math.max(f.inv, X_GUARD); s.ev.push({ k: "shield", side: f.side, x: f.x, y: f.y }); }
 }
 
 // What holding a zone pays, by the arena's kind.
@@ -693,6 +923,12 @@ function self(s, f, m) {
   }
   if (m.h) heal(s, f, Math.floor(f.max * m.h / 100));
   if (m.sg) stages(s, f, m.sg);
+  if (m.n === "double-team") {
+    // Either side of the way it faces.
+    f.clones = [[-f.fy * CLONE_OFF, f.fx * CLONE_OFF], [f.fy * CLONE_OFF, -f.fx * CLONE_OFF]];
+    f.cloneT = CLONE_T;
+    s.ev.push({ k: "clones", side: f.side, x: f.x, y: f.y });
+  }
 }
 
 function heal(s, f, n) {
@@ -754,11 +990,14 @@ function stepShots(s) {
     const c = s.cover.find((b) => b.hp > 0 && Math.abs(p.x - b.x) < COVER_HALF + SHOT_R && Math.abs(p.y - b.y) < COVER_HALF + SHOT_R);
     if (c) { chip(s, c, p.move, p.x, p.y); return false; }
     const d = activeOf(s, 1 - p.side);
-    if (!d || d.hp <= 0) return true;
+    if (!d || d.hp <= 0 || d.away) return true;
+    // A copy in the way takes the shot and is gone.
+    const cn = clonesOf(d).findIndex(([cx, cy]) => (cx - p.x) * (cx - p.x) + (cy - p.y) * (cy - p.y) <= (R + SHOT_R) * (R + SHOT_R));
+    if (cn >= 0) { popClone(s, d, cn); return false; }
     const ex = d.x - p.x, ey = d.y - p.y;
     if (ex * ex + ey * ey > (R + SHOT_R) * (R + SHOT_R)) return true;
     const a = s.sides[p.side].team[p.from];
-    hit(s, a, d, p.move, p.dx, p.dy, false, p.x, p.y, p.boost ? BASIC_BOOST : 1);
+    hit(s, a, d, p.move, p.dx, p.dy, false, p.x, p.y, (p.boost ? BASIC_BOOST : 1) * (p.k ?? 1));
     return false;
   });
 }
@@ -778,6 +1017,66 @@ function surge(s, side, f) {
     }
   }
   s.ev.push({ k: "surge", side, x: f.x, y: f.y });
+  ultimate(s, side, f);
+}
+// What a Pokemon's ULTI looses: its name and kind, by species, else by its first type.
+export function ultOf(f) {
+  const type = TYPES[f.types[0]] ?? "normal";
+  const [name, kind] = ULT_NAMES[f.id] ?? [ULT_TYPE_NAME[type] ?? "Ultimate", ULT_KIND[type] ?? "nova"];
+  return { name, kind, type };
+}
+function ultimate(s, side, f) {
+  const { name, kind, type } = ultOf(f);
+  const move = ULT_BASE - TYPES.indexOf(type) * 2 - (f.st[1] >= f.st[3] ? 0 : 1);
+  const d = activeOf(s, 1 - side);
+  const tx = d ? d.x : W - f.x, ty = d ? d.y : f.y;
+  const k = ULT_PART[kind];
+  s.ev.push({ k: "ult", side, name, kind, type, id: f.id, x: f.x, y: f.y });
+  const strike = (z) => s.strikes.push({ id: s.nextId++, side, from: f.slot, move, k, t0: z.t, type, ...z });
+  if (kind === "storm") {
+    for (let n = 0; n < 3; n++) strike({ x: tx, y: ty, t: ULT_WARN + n * sec(0.45), r: 1.2, follow: true });
+    for (let n = 0; n < 4; n++) strike({ x: X0 + 1 + rnd(s) * (X1 - X0 - 2), y: Y0 + 1 + rnd(s) * (Y1 - Y0 - 2), t: ULT_WARN + sec(0.2) + n * sec(0.3), r: 1.4 });
+  } else if (kind === "nova") strike({ x: f.x, y: f.y, t: ULT_WARN, r: 4.2, nova: true });
+  else if (kind === "cannon") { const [dx, dy] = norm(tx - f.x, ty - f.y); strike({ x: f.x, y: f.y, dx: dx || 1, dy, t: ULT_WARN, beam: true, follow: true }); }
+  else {
+    const [dx, dy] = norm(tx - f.x, ty - f.y);
+    for (const sp of [-0.32, -0.16, 0, 0.16, 0.32]) { const [ax, ay] = turn(dx || 1, dy, sp); shoot(s, side, f, ax, ay, move, SHOT_RANGE * 1.2, false, k); }
+  }
+}
+/* An ULTI's strikes: each shows where it will land, follows its target
+   until ULT_LOCK before it does, then lands - a blast, or a cannon's beam. */
+function stepStrikes(s) {
+  s.strikes = s.strikes.filter((z) => {
+    const a = s.sides[z.side].team[z.from], d = activeOf(s, 1 - z.side);
+    if (z.follow && z.t > ULT_LOCK && d && d.hp > 0) {
+      if (z.beam) { const at = activeOf(s, z.side); if (at) { z.x = at.x; z.y = at.y; } [z.dx, z.dy] = norm(d.x - z.x, d.y - z.y); if (!z.dx && !z.dy) z.dx = 1; }
+      else { z.x = d.x; z.y = d.y; }
+    }
+    if (--z.t > 0) return true;
+    if (z.vanish) {
+      // Back on the court, on the spot it marked - unless it fell while it was gone.
+      a.away = null;
+      if (a.hp <= 0) return false;
+      a.x = a.px = clamp(z.x, X0, X1); a.y = a.py = clamp(z.y, Y0, Y1);
+      a.inv = 0;
+      pushOut(s, a);
+    }
+    if (z.beam) beamAt(s, z.side, a, z.x, z.y, z.dx, z.dy, z.move, BEAM_W * 2.6, BEAM_LEN * 1.7, z.k, true);
+    else { s.ev.push({ k: "strike", side: z.side, x: z.x, y: z.y, r: z.r, nova: Boolean(z.nova), move: z.move, vanish: z.vanish ?? null }); blast(s, a, z.x, z.y, z.r, z.move, z.k); }
+    return false;
+  });
+}
+const weatherK = (s, t) => (s.weather === "rain" ? (t === "water" ? 1.5 : t === "fire" ? 0.5 : 1)
+  : s.weather === "sun" ? (t === "fire" ? 1.5 : t === "water" ? 0.5 : 1) : 1);
+/* The match's planned events: the flyover and its drop, the lights. */
+function stepEvents(s) {
+  if (s.t === s.plan.fly) s.ev.push({ k: "flyover", dir: s.plan.dir });
+  if (s.plan.fly >= 0 && s.t === s.plan.fly + FLY_DROP) {
+    s.items.push({ id: s.nextId++, kind: "full-restore", x: W / 2, y: H / 2, t: RARE_LIFE });
+    s.ev.push({ k: "drop", x: W / 2, y: H / 2 });
+  }
+  if (s.t === s.plan.dark) { s.dark = DARK_T; s.ev.push({ k: "dark" }); }
+  else if (s.dark > 0 && --s.dark === 0) s.ev.push({ k: "light" });
 }
 function gain(s, side, n) {
   const sd = s.sides[side], was = sd.meter;
@@ -786,6 +1085,9 @@ function gain(s, side, n) {
 }
 
 function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
+  if (d.away) return;
+  // Struck in its wind-up: a COUNTER (the picture calls it; the rules already cancel the move).
+  const counter = d.act?.ph === "wind" && d.act.k !== BASIC_K;
   if (d.inv > 0) {
     // Rolled THROUGH it: a perfect dodge, paid in Surge.
     const perfect = !d.shield && d.dodge > 0;
@@ -802,8 +1104,9 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     const roll = 0.85 + rnd(s) * (a.perk?.roll ?? 0.15);
     // A multi-shot's every shot is one of its hits; a pulse or a blow carries the average.
     const hits = shapeOf(m) === "multi" || !m.hits ? 1 : (m.hits[0] + m.hits[1]) / 2;
-    dmg = Math.max(1, Math.floor(rawDamage(a, d, m, crit) * (crit ? 1.5 : 1) * roll * hits * DAMAGE * boost * (a.surge > 0 ? SURGE_DMG : 1)
-      * (finalMinute(s) ? FINAL_DMG : 1)));
+    const shock = m.t === "electric" && d.wet > 0;
+    dmg = Math.max(1, Math.floor(rawDamage(a, d, m, crit) * (crit ? 1.5 : 1) * roll * hits * DAMAGE * boost * (a.surge > 0 ? SURGE_DMG : 1) * (a.power > 0 ? X_ATTACK : 1)
+      * (finalMinute(s) ? FINAL_DMG : 1) * weatherK(s, m.t) * (shock ? SHOCK : 1)));
     d.hp = Math.max(0, d.hp - dmg);
     const st = s.sides[a.side].stats;
     st.dealt += dmg; st.hits++; st.chain++; st.best = Math.max(st.best, st.chain);
@@ -817,10 +1120,20 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     if (d.status === SLP && s.t - d.sleptAt > sec(1)) { d.status = -1; s.ev.push({ k: "cured", side: d.side }); }
     if (d.status === FRZ && m.t === "fire") { d.status = -1; s.ev.push({ k: "cured", side: d.side }); }
     if (m.fl && rnd(s) * 100 < m.fl) { d.stun = Math.max(d.stun, FLINCH); }
+    // Water on a burn: the burn goes out in steam that hides whoever stands in it. Water soaks; a shock dries.
+    if (m.t === "water") {
+      if (d.status === BRN) {
+        d.status = -1; s.ev.push({ k: "cured", side: d.side });
+        s.clouds.push({ id: s.nextId++, x: d.x, y: d.y, t: STEAM_T });
+        s.ev.push({ k: "steam", side: d.side, x: d.x, y: d.y });
+      }
+      d.wet = Math.max(d.wet, WET_T);
+    }
+    if (shock && s.weather !== "rain") d.wet = 0;
     if (m.dr > 0) heal(s, a, Math.floor(dmg * m.dr / 100));
     if (m.dr < 0) hurt(s, a, Math.max(1, Math.floor(dmg * -m.dr / 100)));
     // Where it came from and how hard, for the picture alone (events are not in the replay hash).
-    s.ev.push({ k: "hit", side: d.side, x: hx, y: hy, dmg, crit, eff, move, heavy: (m.p ?? 0) >= 90 || crit || a.surge > 0 || boost > 1, dx, dy, frac: dmg / d.max, ko: d.hp <= 0, surge: a.surge > 0, basic: Boolean(BASIC[move]), boost: boost > 1 });
+    s.ev.push({ k: "hit", side: d.side, x: hx, y: hy, dmg, crit, eff, move, heavy: (m.p ?? 0) >= 90 || crit || a.surge > 0 || boost > 1, dx, dy, frac: dmg / d.max, ko: d.hp <= 0, surge: a.surge > 0, basic: Boolean(BASIC[move]), boost: boost > 1, counter, shock, ult: move <= ULT_BASE });
   } else {
     s.ev.push({ k: "touch", side: d.side, x: hx, y: hy, move });
   }
@@ -852,6 +1165,12 @@ function settleKO(s, side) {
   sd.koT = KO_WAIT;
 }
 
+function suddenDeath(s) {
+  s.sudden = true;
+  for (const sd of s.sides) for (const f of sd.team) if (f.hp > 0) { f.hp = 1; f.status = -1; f.badly = false; }
+  s.ev.push({ k: "sudden" });
+}
+
 // The clock: more Pokemon left wins, then more of their HP.
 function timeUp(s) {
   const score = (sd) => [alive(sd).length, sd.team.reduce((n, f) => n + f.hp / f.max, 0)];
@@ -870,11 +1189,12 @@ export const LEVELS = {
   /* `surge`: how close the foe must be before it spends a full meter. Easy
      never does, and misses more: with Surge (a comeback for whoever is being
      hit) Normal beat the old Easy 64% of 40 matches; this Easy, 78%. */
-  easy: { react: sec(0.5), err: 0.45, dodge: 0.08 },
-  normal: { react: sec(0.3), err: 0.18, dodge: 0.4, swap: 0.25, surge: 3 },
-  hard: { react: sec(0.18), err: 0.07, dodge: 0.7, swap: 0.35, lead: true, shield: true, zones: true, surge: 3.5 },
+  // `jab`: how often it takes a basic attack it could (1 when unsaid). Easy swings at half its chances.
+  easy: { react: sec(0.5), err: 0.45, dodge: 0.08, jab: 0.5 },
+  normal: { react: sec(0.3), err: 0.18, dodge: 0.4, swap: 0.25, surge: 3, items: true },
+  hard: { react: sec(0.18), err: 0.07, dodge: 0.7, swap: 0.35, lead: true, shield: true, zones: true, surge: 3.5, items: true },
   // The Arena Ladder's top masters (ladder.js): faster, surer, and it takes the zones.
-  champion: { react: sec(0.14), err: 0.03, dodge: 0.8, swap: 0.35, lead: true, shield: true, zones: true, surge: 3.5 },
+  champion: { react: sec(0.14), err: 0.03, dodge: 0.8, swap: 0.35, lead: true, shield: true, zones: true, surge: 3.5, items: true },
 };
 
 // How far each shape reaches, for choosing where to stand and when to throw.
@@ -904,7 +1224,7 @@ function worth(me, foe, m) {
 function cpuInput(s, side) {
   const c = s.sides[side].cpu, L = LEVELS[c.level] ?? LEVELS.normal;
   const me = activeOf(s, side), foe = activeOf(s, 1 - side);
-  if (!me) return NO_INPUT;
+  if (!me || me.away) return NO_INPUT;
   if (c.level === "dummy") {
     // Wanders a slow square and never attacks: something to hit.
     const k = (s.t % (TPS * 8)) / (TPS * 8);
@@ -913,12 +1233,31 @@ function cpuInput(s, side) {
   if (!foe) return { ...NO_INPUT, mx: (W / 2 - me.x) > 0 ? 1 : -1 };
   /* A foe in tall grass is where it was last seen: the CPU goes there and
      holds its fire. */
-  if (!foe.hidden || Math.abs(foe.x - me.x) + Math.abs(foe.y - me.y) < 2) { c.lx = foe.x; c.ly = foe.y; }
-  if (foe.hidden && Math.abs(foe.x - me.x) + Math.abs(foe.y - me.y) >= 2) {
+  const gap = Math.abs(foe.x - me.x) + Math.abs(foe.y - me.y);
+  const unseen = (foe.hidden && gap >= 2) || (s.dark > 0 && gap > DARK_SEE);
+  if (!unseen) { c.lx = foe.x; c.ly = foe.y; }
+  if (unseen) {
     const gx = c.lx - me.x, gy = c.ly - me.y;
     return { ...NO_INPUT, mx: gx, my: gy, ax: gx, ay: gy };
   }
-  const ex = foe.x - me.x, ey = foe.y - me.y, dist = Math.sqrt(ex * ex + ey * ey) || 1;
+  /* Double Team's copies: the CPU takes one of the three for the real one,
+     and thinks again every second or so. */
+  let aimX = foe.x, aimY = foe.y;
+  if (foe.clones.length) {
+    if (c.decoy == null || c.decoy >= foe.clones.length || s.t % sec(1.2) === 0) c.decoy = Math.floor(rnd(s) * (foe.clones.length + 1)) - 1;
+    if (c.decoy >= 0) [aimX, aimY] = clonesOf(foe)[c.decoy];
+  } else c.decoy = -1;
+  // An ULTI's strike about to land on it: rolled out of, at its odds.
+  const threat = s.strikes.find((z) => z.side !== side && !z.beam && z.t <= L.react + sec(0.2) && c.rolled !== z.id
+    && (z.x - me.x) * (z.x - me.x) + (z.y - me.y) * (z.y - me.y) < (z.r + R + 0.4) * (z.r + R + 0.4));
+  if (threat) {
+    c.rolled = threat.id;
+    if (me.dodgeCd === 0 && rnd(s) < L.dodge) {
+      const [ox, oy] = norm(me.x - threat.x || 1, me.y - threat.y);
+      return { ...NO_INPUT, mx: ox, my: oy, dodge: true };
+    }
+  }
+  const ex = aimX - me.x, ey = aimY - me.y, dist = Math.sqrt(ex * ex + ey * ey) || 1;
   const ux = ex / dist, uy = ey / dist;
   if (L.surge && s.sides[side].meter >= SURGE_MAX && !me.act && dist < L.surge) return { ...NO_INPUT, surge: true, ax: ex, ay: ey };
 
@@ -972,6 +1311,16 @@ function cpuInput(s, side) {
   if (s.t % (TPS * 2) === 0) c.strafe = rnd(s) < 0.5 ? 1 : -1;
   const toward = dist > want + 0.4 ? 1 : dist < want - 0.8 ? -1 : 0;
   let mx = ux * toward - uy * c.strafe * 0.6, my = uy * toward + ux * c.strafe * 0.6;
+  // A held X item: X Attack in reach of the foe, X Speed at once, X Defense against a wind-up aimed at it.
+  const hi = s.sides[side].held;
+  if (hi && L.items && !me.act && (hi === "x-speed" || (hi === "x-attack" && dist < 4)
+    || (hi === "x-defense" && fa?.ph === "wind" && (fa.dx * -ux + fa.dy * -uy) > 0.85))) return { ...NO_INPUT, use: true };
+  // Nothing ready, and a power-up nearer than the foe: the CPU goes for it.
+  if (L.items && pick < 0 && !me.act) {
+    const near = s.items.filter((it) => !(PICKUPS[it.kind].held && hi))
+      .map((it) => [(it.x - me.x) * (it.x - me.x) + (it.y - me.y) * (it.y - me.y), it]).sort((a, b) => a[0] - b[0])[0];
+    if (near && near[0] < 25 && near[0] < dist * dist) { mx = near[1].x - me.x; my = near[1].y - me.y; }
+  }
   // An open zone it has not claimed this cycle: the CPU goes and takes it.
   const z = s.zone;
   if (L.zones && z.open && !z.claimed[side]) {
@@ -993,12 +1342,14 @@ function cpuInput(s, side) {
     });
     pick = now;
   }
-  if (pick < 0 && !me.act && me.basic.cd === 0 && dist <= basicReach + 0.3
+  if (pick < 0 && !me.act && me.basic.cd === 0 && dist <= basicReach + 0.3 && rnd(s) < (L.jab ?? 1)
     && (basicShape(me) === "melee" || !blocked(s, me.x, me.y, foe.x, foe.y))) {
     const off = (rnd(s) * 2 - 1) * L.err;
     return { ...NO_INPUT, mx, my, ax: ux - uy * off, ay: uy + ux * off, basic: true };
   }
-  if (pick < 0 || me.act) return { ...NO_INPUT, mx, my, ax: ex, ay: ey };
+  // Only a CPU that leads its shots steers a charging beam after its target.
+  if (me.act) return { ...NO_INPUT, mx, my, ax: L.lead || me.act.shape !== "beam" ? ex : 0, ay: L.lead || me.act.shape !== "beam" ? ey : 0 };
+  if (pick < 0) return { ...NO_INPUT, mx, my, ax: ex, ay: ey };
   // A shot or a beam into cover is a shot at the cover: step round it instead.
   if (["shot", "beam", "multi"].includes(shapeAt(pick)) && blocked(s, me.x, me.y, foe.x, foe.y)) {
     return { ...NO_INPUT, mx: -uy * c.strafe + ux * 0.3, my: ux * c.strafe + uy * 0.3, ax: ex, ay: ey };
@@ -1060,7 +1411,7 @@ const q64 = (v, lim) => (Number.isFinite(v) ? Math.round(clamp(v, -lim, lim) * 6
 const pick = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : -1);
 export const cleanInput = (i) => ({
   mx: q64(i?.mx, 1), my: q64(i?.my, 1), ax: q64(i?.ax, 40), ay: q64(i?.ay, 40),
-  fire: pick(i?.fire, 0, 3), basic: Boolean(i?.basic), dodge: Boolean(i?.dodge), swap: pick(i?.swap, 0, 5), surge: Boolean(i?.surge),
+  fire: pick(i?.fire, 0, 3), basic: Boolean(i?.basic), dodge: Boolean(i?.dodge), swap: pick(i?.swap, 0, 5), surge: Boolean(i?.surge), use: Boolean(i?.use),
 });
 export function lockstep(link, me, round = 0) {
   const mine = new Map(), theirs = new Map(), myHash = new Map(), theirHash = new Map();
@@ -1118,6 +1469,8 @@ export function rulesPrint() {
 
 // What a replay compares: where everyone is and how they are, each tick's end.
 export const stateHash = (s) => hash(JSON.stringify([s.t, s.intro, s.rs, s.winner,
-  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.pp), f.basic.cd, f.basicN])]),
+  s.items.map((it) => [it.kind, it.x, it.y, it.t]), s.weather, s.dark, s.strikes.map((z) => [z.x, z.y, z.t]), s.clouds.map((c) => [c.x, c.y, c.t]),
+  s.sudden ? 1 : 0,
+  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.pp), f.basic.cd, f.basicN, f.clones.length, f.wet, f.away])]),
   s.shots.map((p) => [p.x, p.y]), s.hazards.map((z) => [z.x, z.y, z.t]),
   s.cover.map((c) => c.hp), [s.zone.open, s.zone.t, s.zone.claimed], s.drops.map((r) => [r.x, r.y, r.t])]));

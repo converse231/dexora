@@ -93,7 +93,7 @@ export function Missions({ daily, onClaim, note }) {
    desktop, a tab bar along the bottom of a phone, a menu behind a corner
    button on a sideways one (see ROTOM SHELL at the end of styles.css). */
 export const TABS = [["catch", "Catch", "ball"], ["trade", "Trade", "swap"], ["battles", "Battles", "trophy"],
-  ["arena", "Arena", "arena"], ["cards", "Cards", "cards"]];
+  ["cards", "Cards", "cards"]];
 
 /* HELD SIDEWAYS, THE TABS ARE A MENU (2026-10-02). A rail down the left took
    68px of a 360px-tall phone's width from the game, reported as the screen

@@ -16,6 +16,36 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-23-arena-ultis",
+    icon: "💥",
+    date: "October 2026",
+    title: "Signature ULTIs, weather and more",
+    items: [
+      ["Signature ULTIs", "Pikachu calls down Thunder, Charizard Blast Burn - every Pokémon has its own. Roll out of the strikes."],
+      ["Weather", "Rain, harsh sun, sandstorms and snow change every match."],
+      ["Type combos", "Water on a burn makes blinding steam; Electric on a soaked foe hits harder."],
+      ["Fly and Dig", "Vanish from the court and land right on the foe."],
+      ["Heat Wave and Blizzard", "They hit the whole court - hide behind cover."],
+      ["Shadow clones", "Double Team makes copies that stand beside you. A hit on a copy is a miss."],
+      ["Mid-match events", "A legendary may drop a Full Restore, or the lights may go out."],
+      ["Battles", "The Arena is back inside Battles - switch between Arena and Classic at the top."],
+    ],
+  },
+  {
+    id: "2026-10-23-arena-floor",
+    icon: "⚡",
+    date: "October 2026",
+    title: "Power-ups and clutch moments",
+    items: [
+      ["Power-ups", "Potions, Full Heals and Shiny Stones drop on the Arena floor - grab them first."],
+      ["X items", "Pick up an X Attack, X Speed or X Defense and press G when it counts."],
+      ["Clutch", "Both Pokémon nearly down and one winding up? Time slows. Make it count."],
+      ["Great to Legendary", "Long combos, counters and perfect dodges get called out - win untouched for a PERFECT."],
+      ["Sudden death", "Out of time and level on Pokémon? Everyone drops to 1 HP. Next hit wins."],
+      ["ULTI and more", "Surge is now your ULTI, and beams follow your aim while they charge."],
+    ],
+  },
+  {
     id: "2026-10-22-arena-tab",
     icon: "🎮",
     date: "October 2026",

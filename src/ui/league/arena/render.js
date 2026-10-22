@@ -37,9 +37,19 @@
    count; a surge cuts in on a band of its colour; the last knockout is an
    impact frame, slow motion and K.O., then the camera finds the winner.
    Reduced motion keeps every word and number and drops the shake, the zoom
-   and the weather. */
-import { W, H, TPS, INSET, INTRO, LIMIT, FINAL_T, moveAt, activeOf, PAR, BRN, PSN, SLP, FRZ, GROUND, ZONE_SAYS,
-  arenaMove as moveOf, BASIC_P, BASIC_S, BASIC_K } from "../../../game/arena.js";
+   and the weather.
+
+   AN ULTI LANDS AS A MANGA PANEL (asked for, 2026-10-23: "One Piece-like
+   impact frames"): the frame goes negative, then black ink - its type's own
+   pattern bursting from the hit, the Pokemon's silhouette huge on its side,
+   the ULTI's name - then the colour floods back. A famous Pokemon's panel is
+   its own: printed on its colour, the silhouette in ink, the name across it.
+   Drawn art (`ult-<id>`, `ult-<pattern>` in fx.js) takes the pattern's place
+   where it exists. The match's weather and its lights going out are the
+   picture's too: rain, sun, sand and snow in the air and the light, and in
+   the dark only what glows - and what stands near you - is seen. */
+import { W, H, TPS, INSET, INTRO, LIMIT, FINAL_T, moveAt, activeOf, PAR, BRN, PSN, SLP, FRZ, GROUND, ZONE_SAYS, PICKUPS,
+  arenaMove as moveOf, BASIC_P, BASIC_S, BASIC_K, clonesOf, ULT_NAMES, WIDE, VANISH } from "../../../game/arena.js";
 import { arenaArt, loadAnims } from "../moveAnim.js";
 import { followSheet } from "../../../game/cosmetics.js";
 import { MOVES } from "../../../data/moves.js";
@@ -52,6 +62,7 @@ import { FX, FX_REV } from "../../../data/fx.js";
 const asset = (p) => new URL(p, document.baseURI).href;
 // The basic attack (arena.js) is no League move: no slug, no sprite - it is drawn in its user's colour.
 const slugOf = (i) => (i === STRUGGLE ? "struggle" : MOVES[i]?.n ?? null);
+const artKey = (i) => { const key = `moves/${slugOf(i)}`; return FX[key] ? key : null; };
 const isBasic = (i) => i === BASIC_P || i === BASIC_S;
 // A move's name as the callout says it ("Thunder Punch").
 const callName = (i) => (i === STRUGGLE ? "Struggle" : MOVES[i].n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "));
@@ -68,10 +79,22 @@ const STATUS = {
 const STAT = ["", "ATK", "DEF", "SP.A", "SP.D", "SPE", "ACC", "EVA"];
 const FACE = `"Rubik", "Chakra Petch", sans-serif`;
 const MINE = "#45d4ff", THEIRS = "#ff7a4d";
+// The match's weather, said under FIGHT! and drawn in the light.
+const WEATHER_SAYS = { rain: "Rain: Water x1.5, Fire x0.5", sun: "Harsh sun: Fire x1.5, Water x0.5", sand: "Sandstorm: chips all but Rock, Ground, Steel", snow: "Snow: chips all but Ice" };
+const WEATHER_LIGHT = { rain: "rgba(20,40,90,0.16)", sun: "rgba(255,150,40,0.07)", sand: "rgba(170,120,60,0.17)", snow: "rgba(190,225,255,0.09)" };
+// Who flies over each floor (the match's flyover drops a Full Restore).
+const FLYER = { indigo: 145, moon: 792, seaside: 249, caldera: 146, grove: 384, rink: 144 };
+// A type's ULTI panel: its ink pattern.
+const INK = { electric: "bolts", fire: "flames", water: "waves", grass: "vines", bug: "vines", psychic: "psychic", fairy: "stars",
+  ghost: "shadow", dark: "shadow", poison: "shadow", fighting: "fists", normal: "fists", dragon: "dragon", ice: "frost",
+  rock: "rocks", ground: "rocks", steel: "speed", flying: "wind" };
+// A seeded random for a panel's pattern, so it holds still from frame to frame.
+const seeded = (n) => () => { n = (n + 0x6d2b79f5) | 0; let t = Math.imul(n ^ (n >>> 15), 1 | n); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 
 /* THE OPENING'S BEATS, in seconds of INTRO (the sim's own ticks). */
 const VS_IN = 0.12, VS_SLAM = 0.5, VS_OUT = 1.1, THROW = 1.15, LAND = 1.6, COUNT = [1.75, 2.2, 2.65];
 /* THE ENDING'S, in real milliseconds once the match is over. */
+const FLASH_GAP = 350;
 const KO_SLOW = 1100, RESULT_AT = 1150, DONE_AT = 2400;
 // How close the upright camera may come (the court fills the width at 1).
 const UPRIGHT_ZOOM = 2.4;
@@ -126,6 +149,13 @@ function tinted(im, colour) {
   return c;
 }
 const fxPath = (name) => `arena/fx/${name}.png?v=${FX_REV}`;
+/* A MOVE'S OWN ART (npm run fx, art/arena/fx/moves): its sheet's key, or
+   null. Most play where the move does - a projectile loops along its path,
+   a stream lies down a beam or trails a shot, a blow plays at its reach, a
+   dash trails its user, a blast plays round it - and these two where they
+   land instead: Psychic is a shot, Rock Slide a blast, and neither looks
+   right flying or round its user. */
+const LANDS = new Set(["psychic", "rock-slide"]);
 const flats = new WeakMap();
 function flat(im, colour = "#fff") {
   let per = flats.get(im);
@@ -403,7 +433,7 @@ const frameOf = (f, t) => {
 /* `sides`: each team's looks ({id, shiny}). `names`: per side, who fights
    ("You", a master's name, "CPU - Hard") for the VS card. `me`: which side
    is the player's (the low-HP pulse and the combo's corner). */
-export function createRenderer(canvas, sides, arena = "indigo", { names = [["You"], ["CPU"]], me = 0 } = {}) {
+export function createRenderer(canvas, sides, arena = "indigo", { names = [["You"], ["CPU"]], me = 0, moves = [] } = {}) {
   const ground = GROUND[arena] ?? GROUND.indigo;
   const coverPath = `arena/cover/${ground.cover}.webp`;
   const ctx = canvas.getContext("2d");
@@ -413,6 +443,132 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   // A side's Pokemon's first type: what its typeless basic attack wears.
   const typeAt = (s, side) => { const sd = s.sides[side]; return TYPES[sd.team[sd.active]?.types[0]] ?? "normal"; };
   const tintOf = (i, s, side) => (isBasic(i) ? colours[typeAt(s, side)] ?? "#e8e8f0" : colourOf(i));
+  /* A SHOT LOOKS LIKE ITS TYPE (asked for, 2026-10-23: "Razor Leaf will
+     have leaves, Hydro Pump water... unique effects"): under the move's own
+     Emerald sprite, a body drawn for its type - a bubble, a flame, a
+     crackling ball, leaves spinning round, a crystal, a shadow orb - turned
+     along its path. `r` in screen px. */
+  function shotStyle(type, x, y, ang, r, colour, n = "") {
+    const t = clock;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.globalCompositeOperation = "lighter";
+    const leaf = (lx, ly, rot, c) => {
+      ctx.save(); ctx.translate(lx, ly); ctx.rotate(rot); ctx.fillStyle = c;
+      ctx.beginPath(); ctx.ellipse(0, 0, r * 0.55, r * 0.22, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.fillRect(-r * 0.45, -r * 0.02, r * 0.9, r * 0.04); ctx.restore();
+    };
+    switch (type) {
+      case "water":
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "rgba(90,180,255,0.55)"; ctx.strokeStyle = "#d8f6ff"; ctx.lineWidth = Math.max(2, r * 0.12);
+        ctx.beginPath(); ctx.arc(0, 0, r * 0.75, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(-r * 0.25, -r * 0.3, r * 0.18, 0, TAU); ctx.fill();
+        break;
+      case "fire":
+        for (const [c, k] of [["#ff4a1a", 1], ["#ff9b2a", 0.72], ["#fff2a8", 0.42]]) {
+          const fl = 1 + 0.15 * Math.sin(t / 45 + k * 5);
+          ctx.fillStyle = c; ctx.beginPath();
+          ctx.moveTo(r * 0.8 * k, 0); ctx.quadraticCurveTo(0, -r * 0.75 * k, -r * 1.9 * k * fl, 0); ctx.quadraticCurveTo(0, r * 0.75 * k, r * 0.8 * k, 0); ctx.fill();
+        }
+        break;
+      case "electric":
+        ctx.fillStyle = "#fff59a"; ctx.beginPath(); ctx.arc(0, 0, r * 0.5, 0, TAU); ctx.fill();
+        ctx.strokeStyle = "#ffe74a"; ctx.lineWidth = Math.max(2, r * 0.1);
+        for (let i = 0; i < 4; i++) {
+          let a = rand() * TAU, px0 = Math.cos(a) * r * 0.4, py0 = Math.sin(a) * r * 0.4;
+          ctx.beginPath(); ctx.moveTo(px0, py0);
+          for (let j = 0; j < 3; j++) { a += (rand() - 0.5) * 1.2; px0 += Math.cos(a) * r * 0.35; py0 += Math.sin(a) * r * 0.35; ctx.lineTo(px0, py0); }
+          ctx.stroke();
+        }
+        break;
+      case "grass": case "bug": {
+        // Leaves turning round the centre: Razor Leaf's volley, a seed's spin.
+        const many = n.includes("leaf") || n.includes("petal") ? 4 : 3;
+        for (let i = 0; i < many; i++) { const a = t / 90 + i * TAU / many; leaf(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, a * 2, i % 2 ? "#5fd35a" : "#a6e86b"); }
+        break;
+      }
+      case "ice":
+        ctx.rotate(t / 160);
+        ctx.fillStyle = "rgba(190,240,255,0.85)"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1, r * 0.08);
+        ctx.beginPath(); ctx.moveTo(0, -r * 0.85); ctx.lineTo(r * 0.45, 0); ctx.lineTo(0, r * 0.85); ctx.lineTo(-r * 0.45, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      case "ghost": case "dark":
+        ctx.globalCompositeOperation = "source-over";
+        for (let i = 0; i < 6; i++) { const a = t / 120 + i; ctx.fillStyle = type === "ghost" ? "rgba(110,70,190,0.55)" : "rgba(40,30,60,0.6)"; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.25, Math.sin(a) * r * 0.25, r * 0.6, 0, TAU); ctx.fill(); }
+        ctx.fillStyle = type === "ghost" ? "#d6b8ff" : "#c08aff"; ctx.beginPath(); ctx.arc(r * 0.1, -r * 0.05, r * 0.18, 0, TAU); ctx.fill();
+        break;
+      case "psychic": case "fairy":
+        ctx.strokeStyle = colour; ctx.lineWidth = Math.max(2, r * 0.12);
+        for (let i = 0; i < 2; i++) { const k = ((t / 400 + i / 2) % 1); ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.arc(0, 0, r * (0.3 + k * 0.8), 0, TAU); ctx.stroke(); }
+        break;
+      case "rock": case "ground": case "steel":
+        ctx.globalCompositeOperation = "source-over"; ctx.rotate(t / 110);
+        ctx.fillStyle = type === "steel" ? "#c8d0dc" : type === "rock" ? "#9b8466" : "#b58b52"; ctx.strokeStyle = "rgba(0,0,0,0.4)"; ctx.lineWidth = Math.max(1, r * 0.08);
+        ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * TAU, rr = r * (0.55 + (i % 2) * 0.15); ctx[i ? "lineTo" : "moveTo"](Math.cos(a) * rr, Math.sin(a) * rr); } ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      case "poison":
+        ctx.fillStyle = "rgba(190,110,255,0.75)"; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc((i - 1) * r * 0.3, Math.sin(t / 80 + i) * r * 0.2, r * 0.45, 0, TAU); ctx.fill(); }
+        break;
+      case "dragon":
+        for (let i = 0; i < 3; i++) { const a = t / 70 + i * TAU / 3; ctx.fillStyle = i % 2 ? "#9b7bff" : "#5fb8ff"; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.35, Math.sin(a) * r * 0.35, r * 0.4, 0, TAU); ctx.fill(); }
+        break;
+      default: {
+        ctx.fillStyle = "#ffffff"; ctx.beginPath();
+        for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + t / 200, rr = i % 2 ? r * 0.3 : r * 0.8; ctx[i ? "lineTo" : "moveTo"](Math.cos(a) * rr, Math.sin(a) * rr); }
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  /* A BEAM LOOKS LIKE ITS TYPE, drawn in the beam's own turned frame (0..len
+     along it): lightning that jumps, a water stream that ripples, a flame
+     stream, crystals, Solar Beam's light, psychic rings. */
+  function beamStyle(type, len, wide, kk, colour) {
+    const a = 1 - kk;
+    if (type === "electric") {
+      ctx.strokeStyle = "#fff8b0"; ctx.globalAlpha = a; ctx.lineWidth = Math.max(2, wide * 0.25);
+      for (let k2 = 0; k2 < 3; k2++) {
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        for (let d = px * 0.5; d < len; d += px * 0.5) ctx.lineTo(d, (rand() - 0.5) * wide * 1.6);
+        ctx.stroke();
+      }
+    } else if (type === "water") {
+      ctx.fillStyle = "rgba(220,248,255,0.9)"; ctx.globalAlpha = a;
+      for (let d = 0; d < len; d += px * 0.3) {
+        const wv = Math.sin(d / px * 2 - clock / 40) * wide * 0.5;
+        ctx.beginPath(); ctx.arc(d, wv, Math.max(1, wide * 0.18), 0, TAU); ctx.fill();
+      }
+    } else if (type === "fire") {
+      ctx.globalAlpha = a * 0.8;
+      for (let d = 0; d < len; d += px * 0.45) {
+        ctx.fillStyle = rand() < 0.5 ? "#ffd27a" : "#ff5a1f";
+        ctx.beginPath(); ctx.arc(d, (rand() - 0.5) * wide, wide * (0.4 + rand() * 0.5), 0, TAU); ctx.fill();
+      }
+    } else if (type === "ice") {
+      ctx.fillStyle = "#e8fbff"; ctx.globalAlpha = a;
+      for (let d = px * 0.6; d < len; d += px * 0.9) {
+        ctx.save(); ctx.translate(d, 0); ctx.rotate(Math.PI / 4);
+        ctx.fillRect(-wide * 0.35, -wide * 0.35, wide * 0.7, wide * 0.7); ctx.restore();
+      }
+    } else if (type === "grass") {
+      ctx.fillStyle = "#fff8c0"; ctx.globalAlpha = a * 0.8;
+      for (let d = 0; d < len; d += px * 0.4) { ctx.beginPath(); ctx.arc(d, (rand() - 0.5) * wide * 1.4, Math.max(1, wide * 0.12), 0, TAU); ctx.fill(); }
+    } else if (type === "psychic" || type === "fairy") {
+      ctx.strokeStyle = colour; ctx.lineWidth = Math.max(2, wide * 0.15); ctx.globalAlpha = a;
+      for (let d = (clock / 4) % (px * 1.2); d < len; d += px * 1.2) { ctx.beginPath(); ctx.ellipse(d, 0, wide * 0.3, wide * 1.1, 0, 0, TAU); ctx.stroke(); }
+    } else if (type === "ghost" || type === "dark") {
+      ctx.fillStyle = type === "ghost" ? "rgba(140,90,220,0.5)" : "rgba(60,40,90,0.6)"; ctx.globalAlpha = a; ctx.globalCompositeOperation = "source-over";
+      for (let d = 0; d < len; d += px * 0.5) { ctx.beginPath(); ctx.arc(d, Math.sin(d / px + clock / 60) * wide * 0.4, wide * 0.7, 0, TAU); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // A bolt from above onto the struck (Thunderbolt, Thunder, Zap Cannon...).
+  function strike(x, y) {
+    if (still) return;
+    fx.push({ k: "strike", x, y, t: 0, life: 12, seed: rand() });
+    shake(0.35); impactFrame(sx(x), sy(y));
+  }
+
   /* WHAT A TYPE LEAVES IN THE AIR behind a shot: its own matter, a little
      at a time - embers, droplets, sparks, frost, leaves - so a Flamethrower
      and a Water Gun read apart at a glance, before either lands. */
@@ -440,8 +596,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   const poses = new Map();
   const covShake = new Map();
   const combo = [{ n: 0, at: -1e9, pop: 0 }, { n: 0, at: -1e9, pop: 0 }];
+  let lastCounter = -1e9, lastClutch = -1e9;
+  // The match's start, for a PERFECT win: whoever wins having lost no HP at all.
+  const hurtAt = [false, false];
   const lastHit = [[1, 0], [-1, 0]];
-  const cam = { x: W / 2, y: H / 2, z: 1, trauma: 0, kx: 0, ky: 0, rot: 0 };
+  const cam = { x: W / 2, y: H / 2, z: 1, trauma: 0, kx: 0, ky: 0, rot: 0, tilt: 0 };
+  // An ULTI cast waits for its first landing to play its panel (`ultAt`).
+  const ultAt = [null, null];
+  let darkAt = 0, liveMatch = false, darkCv = null;
   const punch = { z: 0, x: W / 2, y: H / 2 };
   let stopMs = 0, slowMs = 0, slowK = 1, scale = 1;
   let clock = 0, lastNow = 0, ghostAcc = 0;
@@ -458,9 +620,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     if (id != null) img(`follow/${id}.png`);
     atlasOf(m.id, m.shiny);
   }
-  for (const name of Object.keys(FX)) img(fxPath(name));
+  // The shared sheets, and only the moves this match's two teams know (the moves' art is a megabyte in all).
+  for (const name of Object.keys(FX)) if (!name.startsWith("moves/") && !name.startsWith("ult-")) img(fxPath(name));
+  for (const i of moves) { const key = artKey(i); if (key) img(fxPath(key)); }
+  for (const kind of Object.keys(PICKUPS)) img(`items/${kind}.png`);
   const leads = sides.map((team) => team[0] && spriteUrl(team[0].id, team[0].shiny ? "shiny" : null));
-  for (const u of leads) if (u) img(u);
+  // Every fighter's front art: the VS card's leads, and any of them an ULTI's panel draws.
+  for (const team of sides) for (const m of team) if (m) img(spriteUrl(m.id, m.shiny ? "shiny" : null));
+  img(spriteUrl(FLYER[arena] ?? 145));
 
   function resize() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -479,6 +646,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   const shake = (n) => { if (!still) cam.trauma = Math.min(1, cam.trauma + n); };
   const kick = (dx, dy, n) => { if (!still) { cam.kx += dx * n; cam.ky += dy * n; } };
   const zoomAt = (x, y, n) => { if (!still && n > punch.z) { punch.z = n; punch.x = x; punch.y = y; } };
+  // A dutch angle that rights itself: an ULTI's cast and its landing.
+  const tilt = (n) => { if (!still) cam.tilt = n; };
   const stop = (ms) => { stopMs = Math.max(stopMs, ms); };
   const slow = (ms, k) => { slowMs = Math.max(slowMs, ms); slowK = Math.min(slowK, k); };
   const poseOf = (side, slot) => {
@@ -624,16 +793,22 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   }
 
   // The floor's own air, a few each frame.
-  function weather(k) {
+  function weather(k, w) {
     if (still) return;
     const spawn = (rate, make) => { let n = rate * k; while (n > 0) { if (n >= 1 || rand() < n) air.push(make()); n -= 1; } };
+    // The match's own weather, over the floor's.
+    if (w === "rain") spawn(1.6, () => ({ k: "rain", x: rand() * (W + 3), y: rand() * H, t: 0, life: 9 + rand() * 5 }));
+    else if (w === "snow") spawn(0.55, () => ({ k: "snow", x: -2 + rand() * (W + 2), y: -0.5, vx: 0.02 + rand() * 0.015, vy: 0.025 + rand() * 0.02, t: 0, life: 900, size: 0.05 + rand() * 0.07, ph: rand() * TAU }));
+    else if (w === "sand") spawn(1.2, () => ({ k: "sand", x: -1, y: rand() * H, vx: 0.14 + rand() * 0.1, vy: 0.01 + rand() * 0.01, t: 0, life: 260, size: 0.2 + rand() * 0.5 }));
+    else if (w === "sun") spawn(0.08, () => ({ k: "mote", x: rand() * W, y: rand() * H, vx: 0.003, vy: -0.004, t: 0, life: 160, size: 0.04 + rand() * 0.05, glint: true }));
+    if (w === "rain" && arena === "grove" || w === "snow" && arena === "rink") { if (air.length > 220) air.splice(0, air.length - 220); return; }
     if (arena === "caldera") spawn(0.35, () => ({ k: "ember", x: INSET + rand() * (W - 2 * INSET), y: H - INSET - rand() * 3, vx: (rand() - 0.5) * 0.01, vy: -0.015 - rand() * 0.015, t: 0, life: 90 + rand() * 60, size: 0.05 + rand() * 0.06 }));
     else if (arena === "rink") spawn(0.3, () => ({ k: "snow", x: -2 + rand() * (W + 2), y: -0.5, vx: 0.01 + rand() * 0.01, vy: 0.02 + rand() * 0.02, t: 0, life: 900, size: 0.05 + rand() * 0.06, ph: rand() * TAU }));
     else if (arena === "grove") spawn(1.1, () => ({ k: "rain", x: rand() * (W + 3), y: rand() * H, t: 0, life: 10 + rand() * 6 }));
     else if (arena === "seaside") spawn(0.12, () => ({ k: "mote", x: -0.5, y: rand() * H, vx: 0.02 + rand() * 0.02, vy: (rand() - 0.5) * 0.004, t: 0, life: 1500, size: 0.04 + rand() * 0.05 }));
     else if (arena === "moon") spawn(0.1, () => ({ k: "mote", x: rand() * W, y: rand() * H, vx: (rand() - 0.5) * 0.004, vy: 0.002 + rand() * 0.003, t: 0, life: 200, size: 0.03 + rand() * 0.04, glint: rand() < 0.15 }));
     else if (arena === "indigo" && rand() < 0.04 * k) air.push(flashBulb());
-    if (air.length > 180) air.splice(0, air.length - 180);
+    if (air.length > 220) air.splice(0, air.length - 220);
   }
 
   const word = (x, y, text, colour, life = 50, big = false) => fx.push({ k: "word", x, y, text, colour, t: 0, life, big });
@@ -641,7 +816,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     for (let i = 0; i < n; i++) { const [vx, vy] = around(v); part({ k: "dot", x, y, vx, vy, colour, life: 22, size: 0.14, drag: 0.9 }); }
   };
   const stamp = (text, colour, life, sub = null) => overlays.push({ k: "stamp", text, colour, t: 0, life, sub });
-  const impactFrame = (x, y, dark = false) => { if (!still) overlays.push({ k: "frame", x, y, t: 0, life: dark ? 10 : 6, dark }); };
+  /* A full-screen flash at most every FLASH_GAP ms (a KO's dark one always): Thunder's seven strikes were
+     seven white screens in two seconds - a strobe. */
+  let flashAt = -1e9;
+  const impactFrame = (x, y, dark = false) => {
+    if (still || (!dark && clock - flashAt < FLASH_GAP)) return;
+    flashAt = clock;
+    overlays.push({ k: "frame", x, y, t: 0, life: dark ? 10 : 6, dark });
+  };
 
   // ------------------------------------------------------------- events
 
@@ -658,6 +840,20 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         fx.push({ k: "burst", x: e.x, y: e.y, art: art?.burst ?? art?.shot, colour, t: 0, life: bas && !e.boost ? 16 : 30 });
         impact(type, e.x, e.y, e.dx, e.dy, heavy);
         sheet("impact", e.x, e.y - 0.25, bas ? (e.boost ? 2.1 : 1.3) : heavy ? 3.4 : 2.5, colour, bas && !e.boost ? 14 : 22, (rand() - 0.5) * 0.6);
+        const lk = !bas && LANDS.has(slugOf(e.move)) && artKey(e.move);
+        if (lk) fx.push({ k: "mv", key: lk, x: e.x, y: e.y - 0.3, size: 3.4, ang: 0, t: 0, life: 30 });
+        // An ULTI's hit: its panel, once a cast, and twice the matter.
+        if (e.ult) { panel(1 - e.side, e.x, e.y); impact(type, e.x, e.y, e.dx, e.dy, true); }
+        // Electric on a soaked Pokemon: the water carries it.
+        if (e.shock) {
+          word(e.x, e.y - 1.75, "SHOCKED!", "#fff59a", 55, true);
+          strike(e.x, e.y);
+          for (let i = 0; i < 10; i++) part({ k: "bolt", x: e.x + (rand() - 0.5) * 1.2, y: e.y - 0.3 + (rand() - 0.5) * 0.8, ang: rand() * TAU, len: 0.5 + rand() * 0.6, colour: "#bff3ff", life: 8 + rand() * 6 });
+        }
+        const mn = bas ? "" : moveOf(e.move).n ?? "";
+        if (/thunder|zap|volt|bolt-strike|wild-charge/.test(mn)) strike(e.x, e.y);
+        if (/leaf|petal|blossom/.test(mn)) for (let i = 0; i < 14; i++) { const [vx, vy] = around(0.09); part({ k: "leaf", x: e.x, y: e.y, vx, vy, vz: 0.05, g: 0.002, colour: i % 2 ? "#5fd35a" : "#ffb3d9", life: 60, size: 0.2, vr: 0.3, drag: 0.95 }); }
+        if (/hydro|surf|water-spout|aqua|waterfall|scald/.test(mn)) { sheet("shockwave", e.x, e.y + 0.35, 2.6, "#7fd4ff", 22); for (let i = 0; i < 16; i++) { const [vx, vy] = around(0.08); part({ k: "dot", x: e.x, y: e.y, vx, vy, vz: 0.1 + rand() * 0.08, g: 0.008, colour: "#d8f6ff", life: 40, size: 0.12, splash: true }); } }
         if (heavy && !bas) sheet("shockwave", e.x, e.y + 0.35, 3.2, colour, 24);
         if (e.boost) {
           word(e.x + 0.5, e.y - 1.1, "x3!", "#ffd23f", 36, true);
@@ -684,16 +880,32 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         // A plain basic attack barely holds the frame: twenty a second of full hit-stops would be a slideshow.
         const hold = bas && !e.boost ? 14 : (e.ko ? 0 : 40) + (heavy ? 45 : 0) + (e.crit ? 25 : 0) + (e.eff > 1 ? 15 : 0) + (e.surge ? 20 : 0);
         stop(hold); p.jit = hold;
-        shake(0.18 + 0.4 * power * (heavy ? 1 : 0.6));
-        kick(e.dx, e.dy, px * 0.12 * power);
-        if (heavy) { zoomAt(e.x, e.y, e.crit ? 0.07 : 0.05); impactFrame(sx(e.x), sy(e.y)); crowd(3); }
+        shake((0.18 + 0.4 * power * (heavy ? 1 : 0.6)) * (bas ? 1 : 1.3));
+        kick(e.dx, e.dy, px * (bas ? 0.12 : 0.18) * power);
+        if (heavy) {
+          zoomAt(e.x, e.y, e.crit ? 0.1 : 0.07); impactFrame(sx(e.x), sy(e.y)); crowd(3);
+          // Debris thrown off a heavy blow, along it.
+          for (let i = 0; i < 8; i++) { const [vx, vy] = spray(e.dx || 1, e.dy, 1.6, 0.12); part({ k: "streak", x: e.x, y: e.y - 0.2, vx, vy, colour: i % 2 ? colour : "#ffffff", life: 12, size: 0.5, drag: 0.88 }); }
+        }
         if (MARK_OF[type] && (heavy || type !== "fighting" && type !== "steel" && rand() < 0.55)) mark(MARK_OF[type], e.x + (rand() - 0.5) * 0.3, e.y + 0.3, heavy ? 1.6 : 1.1, colour);
         else if (heavy) mark("ring", e.x, e.y + 0.3, 1.4, colour);
         // The striker's combo; the struck one's is broken.
         const by = 1 - e.side, cb = combo[by];
         cb.n = clock - cb.at < 1500 ? cb.n + 1 : 1; cb.at = clock; cb.pop = 1;
         combo[e.side].n = 0;
+        hurtAt[e.side] = true;
+        /* THE FIGHTING GAME'S JUDGEMENTS, under the striker's combo: a run
+           of hits earns its word, and a blow that breaks a move's wind-up is
+           a COUNTER - rationed, since in a real fight one lands most seconds. */
+        const praise = { 5: ["GREAT!", "#5fe08a"], 10: ["EXCELLENT!", "#45d4ff"], 15: ["AMAZING!", "#ff7ad9"], 25: ["LEGENDARY!", "#ffd23f"] }[cb.n];
+        if (praise) { overlays.push({ k: "judge", side: by, text: praise[0], colour: praise[1], t: 0, life: 60 }); crowd(4); }
+        else if (e.counter && !bas && e.frac >= 0.06 && clock - lastCounter > 2500) {
+          lastCounter = clock;
+          overlays.push({ k: "judge", side: by, text: "COUNTER!", colour: "#ff9d52", t: 0, life: 50 });
+          stop(60);
+        }
       } else if (e.k === "tick") {
+        hurtAt[e.side] = true;
         fx.push({ k: "num", x: e.x + 0.3, y: e.y - 0.5, text: String(e.dmg), size: 0.46, colour: STATUS[e.st]?.colour ?? "#d8d8e8", t: 0, life: 40 });
         const p = poseOf(e.side, s.sides[e.side].active); p.sx = 1.12; p.sy = 0.9; p.tint = STATUS[e.st]?.colour; p.tintT = 8;
       } else if (e.k === "heal") {
@@ -712,6 +924,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else if (e.k === "evade") {
         if (e.perfect) {
           word(e.x, e.y - 1.1, "PERFECT!", "#45d4ff", 48, true);
+          overlays.push({ k: "judge", side: e.side, text: "PERFECT!", colour: "#45d4ff", t: 0, life: 50 });
           part({ k: "ring", x: e.x, y: e.y, colour: "#9fe9ff", life: 20, size: 0.3, grow: 0.11 });
           slow(260, 0.3);
         } else word(e.x, e.y - 1, "Dodged", "#45d4ff", 40);
@@ -740,6 +953,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           else if (pow) shake(0.08 + pow / 600);
         }
         if (e.shape === "melee" || e.shape === "dash") { p.ox += e.dx * 0.4; p.oy += e.dy * 0.4; p.sx = 0.86; p.sy = 1.16; if (e.shape === "dash") dust(body.x, body.y, 5); }
+        // A blow's own art, at its reach.
+        const mk = e.shape === "melee" && !isBasic(e.move) && !LANDS.has(slugOf(e.move)) && !VANISH[slugOf(e.move)] && artKey(e.move);
+        if (mk) fx.push({ k: "mv", key: mk, x: body.x + e.dx * 1.2, y: body.y - 0.2 + e.dy * 1.2, size: 3.2, ang: Math.atan2(e.dy, e.dx), t: 0, life: 24 });
         else if (e.shape === "shot" || e.shape === "multi" || e.shape === "beam") {
           p.ox -= e.dx * 0.14; p.oy -= e.dy * 0.14; p.sx = 1.12; p.sy = 0.9;
           part({ k: "glow", x: body.x + e.dx * 0.6, y: body.y - 0.2 + e.dy * 0.6, colour, life: 8, size: 0.7 });
@@ -747,8 +963,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         } else if (e.shape === "pulse") { p.sx = 1.3; p.sy = 0.72; dust(body.x, body.y, 6); }
         else { p.oy -= 0.3; p.sy = 1.15; p.sx = 0.9; }
       } else if (e.k === "beam") {
-        fx.push({ k: "beam", x: e.x, y: e.y, dx: e.dx, dy: e.dy, len: e.len, colour: colourOf(e.move), art: arenaArt(slugOf(e.move))?.shot, t: 0, life: 24 });
-        shake(0.4); kick(-e.dx, -e.dy, px * 0.14);
+        fx.push({ k: "beam", x: e.x, y: e.y, dx: e.dx, dy: e.dy, len: e.len, colour: colourOf(e.move), art: arenaArt(slugOf(e.move))?.shot, type: typeOf(e.move), t: 0, life: e.big ? 44 : 26, big: e.big,
+          key: artKey(e.move) && FX[artKey(e.move)].n === 1 ? artKey(e.move) : null });
+        shake(e.big ? 0.9 : 0.45); kick(-e.dx, -e.dy, px * (e.big ? 0.3 : 0.16));
+        if (e.big) { zoomAt(e.x + e.dx * e.len / 2, e.y + e.dy * e.len / 2, 0.12); tilt(e.dx > 0 ? -0.03 : 0.03); }
         // Sparks thrown off all along it, and a burst where it ends.
         for (let d = 0.5; d < e.len; d += 0.6) {
           const side = rand() < 0.5 ? 1 : -1;
@@ -756,9 +974,29 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         }
         impact(typeOf(e.move), e.x + e.dx * e.len, e.y + e.dy * e.len, e.dx, e.dy, true);
         const type = typeOf(e.move);
-        if (moveOf(e.move).p) mark(type === "water" ? "wet" : type === "ice" ? "frost" : "scorch", e.x + e.dx * e.len / 2, e.y + 0.25 + e.dy * e.len / 2, 0.9, null, e.len, Math.atan2(e.dy, e.dx));
+        // Only a beam of matter marks the floor: a Psybeam left a dark scorch across the court.
+        const bm = { fire: "scorch", water: "wet", ice: "frost", electric: "char" }[type];
+        if (moveOf(e.move).p && bm) mark(bm, e.x + e.dx * e.len / 2, e.y + 0.25 + e.dy * e.len / 2, 0.9, null, e.len, Math.atan2(e.dy, e.dx));
       } else if (e.k === "pulse") {
-        const type = typeOf(e.move), colour = colourOf(e.move);
+        const type = typeOf(e.move), colour = colourOf(e.move), pk = !LANDS.has(slugOf(e.move)) && artKey(e.move);
+        if (pk) fx.push({ k: "mv", key: pk, x: e.x, y: e.y + 0.1, size: e.wide ? 6.5 : e.r * 2.4, ang: 0, t: 0, life: 32 });
+        if (e.wide) {
+          /* THE WHOLE COURT: the move's colour floods the screen and its matter
+             blows across every tile (its own art stamped over the court where
+             it has one) - a Heat Wave, a Blizzard, a Petal Blizzard. */
+          overlays.push({ k: "tint", colour, t: 0, life: 30 });
+          const foe = activeOf(s, 1 - e.side), dir = foe && foe.x < e.x ? -1 : 1;
+          if (pk) for (let i = 0; i < 7; i++) fx.push({ k: "mv", key: pk, x: INSET + 1.5 + rand() * (W - 2 * INSET - 3), y: INSET + 1.5 + rand() * (H - 2 * INSET - 3), size: 4 + rand() * 2, ang: 0, t: -i * 3, life: 30 });
+          const name = moveOf(e.move).n;
+          for (let i = 0; i < (still ? 0 : 90); i++) {
+            const x = INSET + rand() * (W - 2 * INSET), y = INSET + rand() * (H - 2 * INSET), vx = dir * (0.08 + rand() * 0.1), vy = (rand() - 0.5) * 0.02;
+            if (name === "blizzard") part({ k: "shard", x, y, vx, vy, colour: rand() < 0.5 ? "#ffffff" : "#bff3ff", life: 40 + rand() * 20, size: 0.14, vr: 0.3, t: -rand() * 20 });
+            else if (name === "petal-blizzard") part({ k: "leaf", x, y, vx, vy, colour: rand() < 0.6 ? "#ffb3d9" : "#ffe0f0", life: 50 + rand() * 20, size: 0.16, vr: 0.3, t: -rand() * 20 });
+            else part({ k: "glow", x, y, vx: vx * 0.4, vy: -0.02 - rand() * 0.02, colour: rand() < 0.5 ? "#ffd27a" : "#ff5a1f", life: 40 + rand() * 20, size: 0.14, t: -rand() * 20 });
+          }
+          shake(0.7); crowd(6);
+          continue;
+        }
         fx.push({ k: "wave", x: e.x, y: e.y, r: e.r, colour, art: arenaArt(slugOf(e.move))?.burst, t: 0, life: 24 });
         sheet("shockwave", e.x, e.y + 0.3, e.r * 2.3, colour, 26);
         if (!moveOf(e.move).p) continue;
@@ -794,6 +1032,96 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         for (let i = 0; i < 12; i++) fx.push({ k: "rise", x: e.x + (rand() - 0.5) * 2, y: e.y + 0.4, colour: mine ? "#7dffa8" : "#ffb37a", t: -i * 2, life: 34 });
       } else if (e.k === "zones") {
         for (const z of [[W / 2, INSET + 2.1], [W / 2, H - INSET - 2.1]]) { word(z[0], z[1] - 1.5, "Zone open!", "#45d4ff", 60); fx.push({ k: "ring", x: z[0], y: z[1], colour: "#45d4ff", t: 0, life: 30, big: true }); }
+      } else if (e.k === "clones") {
+        // A puff of smoke where each copy appears, as a shadow clone does.
+        if (body) for (const [cx, cy] of clonesOf(body)) poof(cx, cy, 1);
+      } else if (e.k === "poof") {
+        for (const [cx, cy] of e.at) poof(cx, cy, 0.8);
+      } else if (e.k === "decoy") {
+        word(e.x, e.y - 1, "Miss!", "#b9c2e4", 45, true);
+        poof(e.x, e.y, 1.3);
+        shake(0.15);
+      } else if (e.k === "ult") {
+        // The ULTI's name rides its cut-in; its panel waits for the first landing.
+        const cut = overlays.findLast((o) => o.k === "cut" && o.side === e.side);
+        if (cut) cut.name = e.name;
+        const colour = colours[e.type] ?? "#ffd23f";
+        ultAt[e.side] = { at: clock, id: e.id, name: e.name, type: e.type, colour, shiny: body ? shiny[e.side]?.[body.slot] : false, famous: Boolean(ULT_NAMES[e.id]) };
+        zoomAt(e.x, e.y, 0.16); tilt(e.side === me ? 0.035 : -0.035); shake(0.5);
+        if (e.kind === "storm") overlays.push({ k: "shade", colour: "rgba(6,8,30,", t: 0, life: 70 });
+        if (e.kind === "nova") for (let i = 0; i < 18; i++) { const a = (i / 18) * TAU; part({ k: "glow", x: e.x + Math.cos(a) * 3.6, y: e.y + Math.sin(a) * 3.6, vx: -Math.cos(a) * 0.06, vy: -Math.sin(a) * 0.06, colour, life: 40, size: 0.18, drag: 1 }); }
+      } else if (e.k === "strike") {
+        // An ULTI's strike lands: a blast the size of its ring, its type's matter, a bolt from the sky for a storm.
+        const colour = colourOf(e.move), type = typeOf(e.move);
+        if (e.vanish) {
+          // Back down on the foe: from above (a dive), from below (bursting out), out of the water or the dark.
+          const f = activeOf(s, e.side), p = f && poseOf(e.side, f.slot);
+          if (p) { if (e.vanish === "air") { p.oy = -4; p.sx = 0.7; p.sy = 1.5; } else { p.oy = 0.6; p.sx = 1.3; p.sy = 0.4; } }
+          // Its own art plays where it lands, never where it left.
+          const vk = artKey(e.move);
+          if (vk) fx.push({ k: "mv", key: vk, x: e.x, y: e.y - 0.2, size: 3.6, ang: 0, t: 0, life: 30 });
+          if (e.vanish === "air") for (let i = 0; i < 8; i++) part({ k: "streak", x: e.x + (rand() - 0.5) * 0.8, y: e.y - 3, vx: 0, vy: 0.35, colour: "#ffffff", life: 8, size: 0.9, drag: 0.9 });
+          else if (e.vanish === "ground") { for (let i = 0; i < 18; i++) { const [vx, vy] = around(0.07); part({ k: "chunk", x: e.x, y: e.y, vx, vy, vz: 0.12 + rand() * 0.1, g: 0.01, colour: rand() < 0.5 ? "#8a6a3e" : "#b58b52", life: 50, size: 0.16 + rand() * 0.12, vr: 0.3, bounce: 2, drag: 0.96 }); } mark("crack", e.x, e.y + 0.3, 2.4); }
+          else if (e.vanish === "water") impact("water", e.x, e.y, 0, -1, true);
+          else poof(e.x, e.y, 1.6);
+        } else if (type === "electric" || !e.nova && e.r < 1.5) strike(e.x, e.y);
+        impact(type, e.x, e.y, 0, 0, true);
+        sheet("shockwave", e.x, e.y + 0.3, e.r * 2.6, colour, 30);
+        sheet("impact", e.x, e.y - 0.3, e.r * (e.nova ? 1.6 : 2.2), colour, 24);
+        for (let i = 0; i < (e.nova ? 3 : 2); i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? colour : "#ffffff", life: 24, size: 0.3, grow: (e.nova ? 0.26 : 0.12) - i * 0.03, t: -i * 3 });
+        mark(MARK_OF[type] ?? "crack", e.x, e.y + 0.3, e.r * 1.8, colour);
+        if (e.nova) { for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU; impactRing(e.x + Math.cos(a) * e.r * 0.9, e.y + Math.sin(a) * e.r * 0.9); } shake(0.9); zoomAt(e.x, e.y, 0.14); }
+        else shake(0.55);
+        crowd(4);
+        panel(e.side, e.x, e.y);
+      } else if (e.k === "sheltered") {
+        word(e.x, e.y - 1.2, "Sheltered!", "#9fe3ff", 50, true);
+      } else if (e.k === "vanish") {
+        /* GONE: up into the sky, down into the ground, under the water, into
+           the shadows - its landing is marked on the ground from here. */
+        const f = s.sides[e.side].team[s.sides[e.side].active];
+        if (e.kind === "air") { fx.push({ k: "launch", id: f.id, side: e.side, slot: f.slot, x: e.x, y: e.y, t: 0, life: 20 }); dust(e.x, e.y, 8); part({ k: "ring", x: e.x, y: e.y + 0.3, colour: "#ffffff", life: 18, size: 0.3, grow: 0.12 }); }
+        else if (e.kind === "ground") { impact("ground", e.x, e.y + 0.2, 0, -1, true); mark("crack", e.x, e.y + 0.3, 1.6); dust(e.x, e.y, 10); }
+        else if (e.kind === "water") { impact("water", e.x, e.y + 0.2, 0, -1, true); part({ k: "ring", x: e.x, y: e.y + 0.3, colour: "#bff3ff", life: 24, size: 0.3, grow: 0.1 }); }
+        else poof(e.x, e.y, 1.4);
+        shake(0.25);
+      } else if (e.k === "steam") {
+        word(e.x, e.y - 1.5, "Steam!", "#e8f4ff", 55, true);
+        poof(e.x, e.y, 2);
+      } else if (e.k === "flyover") {
+        fx.push({ k: "fly", id: FLYER[arena] ?? 145, dir: e.dir, t: 0, life: 150 });
+        word(W / 2, INSET + 1.4, "A legendary flies over!", "#ffd23f", 100, true);
+        shake(0.3); crowd(12);
+      } else if (e.k === "drop") {
+        word(e.x, e.y - 1.4, "Full Restore!", "#7dffa8", 80, true);
+        sheet("shockwave", e.x, e.y + 0.3, 4, "#ffd23f", 30);
+        for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? "#7dffa8" : "#ffffff", life: 26, size: 0.3, grow: 0.16 - i * 0.03, t: -i * 4 });
+        sparks(e.x, e.y, "#fff6c8", 18, 0.1); shake(0.35);
+      } else if (e.k === "dark") {
+        darkAt = s.t;
+        stamp("LIGHTS OUT", "#b9c2e4", 70, "Only what glows can be seen");
+        crowd(6);
+      } else if (e.k === "light") {
+        overlays.push({ k: "tint", colour: "#ffffff", t: 0, life: 18 });
+        word(W / 2, H / 2 - 2, "Lights on!", "#ffffff", 50, true);
+      } else if (e.k === "sudden") {
+        stamp("SUDDEN DEATH", "#ff4d5e", 100, "Everyone at 1 HP - the next hit wins");
+        shake(0.6); crowd(12);
+      } else if (e.k === "items") {
+        // A pair of power-ups drops in: a spark where each lands.
+        for (const it of s.items.slice(-2)) { fx.push({ k: "ring", x: it.x, y: it.y, colour: "#ffd23f", t: 0, life: 22, big: true }); sparks(it.x, it.y, "#fff6c8", 10, 0.07); }
+      } else if (e.k === "pick") {
+        const p0 = PICKUPS[e.item];
+        word(e.x, e.y - 1.1, p0.held ? `${p0.name} - press to use` : p0.name, "#ffd23f", 55, true);
+        for (let i = 0; i < 2; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? "#ffd23f" : "#ffffff", life: 18, size: 0.2, grow: 0.1, t: -i * 3 });
+        sparks(e.x, e.y, "#fff6c8", 14, 0.09);
+        sheet("impact", e.x, e.y - 0.2, 1.8, "#ffd23f", 16);
+      } else if (e.k === "use") {
+        const colour = { "x-attack": "#ff6a4d", "x-speed": "#45d4ff", "x-defense": "#9fe3ff" }[e.item] ?? "#ffd23f";
+        word(e.x, e.y - 1.3, PICKUPS[e.item].name, colour, 50, true);
+        sheet("shockwave", e.x, e.y + 0.35, 3.2, colour, 24);
+        for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y, colour, life: 22, size: 0.3, grow: 0.12, t: -i * 3 });
+        shake(0.2);
       } else if (e.k === "rumble") {
         shake(0.35);
       } else if (e.k === "rock") {
@@ -804,7 +1132,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         shake(0.6);
       } else if (e.k === "ready") {
         const f = s.sides[e.side].team[s.sides[e.side].active];
-        if (e.side === me) word(f.x, f.y - 1.6, "SURGE READY", "#ffd23f", 60, true);
+        if (e.side === me) word(f.x, f.y - 1.6, "ULTI READY", "#ffd23f", 60, true);
         part({ k: "ring", x: f.x, y: f.y, colour: "#ffd23f", life: 24, size: 0.3, grow: 0.1 });
       } else if (e.k === "surge") {
         const f = activeOf(s, e.side);
@@ -824,16 +1152,16 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         impactFrame(sx(e.x), sy(e.y), true);
         fx.push({ k: "ring", x: e.x, y: e.y, colour: "#ffffff", t: 0, life: 40, big: true });
         sheet("shockwave", e.x, e.y + 0.35, 4.6, "#ffffff", 32);
-        stop(160); shake(0.85); zoomAt(e.x, e.y, 0.1); crowd(10);
+        stop(160); shake(1); zoomAt(e.x, e.y, 0.14); tilt(e.side === me ? -0.03 : 0.03); crowd(10);
         if (last) slow(KO_SLOW, 0.3); else { slow(520, 0.35); word(e.x, e.y - 1.6, "KNOCKED OUT", "#ffffff", 60, true); }
       } else if (e.k === "dodge" && body) {
         dust(body.x, body.y, 4);
         if (ground.water && body.wading) part({ k: "ring", x: body.x, y: body.y + 0.35, colour: "#bff3ff", life: 18, size: 0.3, grow: 0.06 });
       } else if (e.k === "go") {
-        stamp("FIGHT!", "#ffd23f", 46);
+        stamp("FIGHT!", "#ffd23f", s.weather !== "clear" ? 80 : 46, WEATHER_SAYS[s.weather] ?? null);
         shake(0.45); impactFrame(canvas.width / 2, canvas.height / 2);
       } else if (e.k === "final") {
-        stamp("FINAL MINUTE", "#ff5a4d", 80, "Hits land harder · Surge fills twice as fast");
+        stamp("FINAL MINUTE", "#ff5a4d", 80, "Hits land harder · ULTI fills twice as fast");
         shake(0.35); crowd(8);
       } else if (e.k === "in" || e.k === "out") {
         const f = activeOf(s, e.side) ?? s.sides[e.side].team[e.slot];
@@ -841,6 +1169,23 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         if (e.k === "in") { const p = poseOf(e.side, e.slot); p.sx = 0.15; p.sy = 0.15; sparks(f.x, f.y - 0.3, "#ffffff", 10, 0.08); dust(f.x, f.y, 3); }
       }
     }
+  }
+  // A shadow clone's puff: smoke thrown out in a ring, and a white pop.
+  function poof(x, y, n) {
+    for (let i = 0; i < 10 * n; i++) { const [vx, vy] = around(0.035); part({ k: "smoke", x: x + vx * 6, y: y - 0.2 + vy * 4, vx, vy: vy - 0.006, colour: "rgba(240,240,248,", life: 34 + rand() * 16, size: 0.35 + rand() * 0.25 * n, drag: 0.93 }); }
+    part({ k: "ring", x, y: y - 0.2, colour: "#ffffff", life: 14, size: 0.2, grow: 0.08 * n });
+  }
+  /* AN ULTI'S PANEL, at its first landing (a strike, a hit) within three
+     seconds of the cast: the manga frame, and the match held under it. */
+  function panel(side, x, y) {
+    const u0 = ultAt[side];
+    if (!u0 || clock - u0.at > 3000) return;
+    ultAt[side] = null;
+    if (still) return;
+    const life = liveMatch ? 22 : u0.famous ? 48 : 36;
+    const [qx, qy] = worldToScreen(x, y);
+    overlays.push({ k: "manga", ...u0, side, x: qx, y: qy, t: 0, life, seed: (rand() * 1e9) | 0 });
+    stop(liveMatch ? 0 : life * 14); shake(1); zoomAt(x, y, 0.2); tilt(side === me ? -0.05 : 0.05);
   }
   const impactRing = (x, y) => part({ k: "chunk", x, y, vx: 0, vy: 0, vz: 0.05 + rand() * 0.06, g: 0.008, colour: "#8a7a68", life: 40, size: 0.12 + rand() * 0.1, vr: 0.2, bounce: 1 });
 
@@ -861,10 +1206,28 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     for (let side = 0; side < 2; side++) {
       const f = activeOf(s, side);
       // A fallen body is its knockout's to draw: the last KO ends the match in its own tick, still "active", and stood beside its own fall.
-      if (f && f.hp > 0 && !(intro != null && intro < LAND)) bodies.push(f);
+      if (f && f.hp > 0 && !f.away && !(intro != null && intro < LAND)) bodies.push(f);
     }
     const lerp = (f) => [f.px + (f.x - f.px) * alpha, f.py + (f.y - f.py) * alpha];
 
+    /* THE CLUTCH (asked for, 2026-10-23: "like Tekken when two low-HP
+       characters are about to hit each other"): both Pokemon under a fifth
+       of their HP, within reach, and one of them winding up - time slows,
+       the camera closes on the two, bars close in from above and below. Once
+       in a while: a moment, not a mode. The picture only; online, the rules
+       never slow (`rate`), so both ends still agree. */
+    if (bodies.length === 2 && intro == null && !s.over && !still && clock - lastClutch > 9000) {
+      const [a, b] = bodies;
+      const low = (f) => f.hp > 0 && f.hp / f.max <= 0.2;
+      const near = Math.hypot(a.x - b.x, a.y - b.y) < 5.5;
+      if (low(a) && low(b) && near && (a.act?.ph === "wind" || b.act?.ph === "wind")) {
+        lastClutch = clock;
+        slow(1300, 0.22);
+        zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, 0.14);
+        overlays.push({ k: "clutch", t: 0, life: 80 });
+        crowd(8);
+      }
+    }
     // The camera: where it looks, how close, how hard it shakes.
     let tz = 1, tx = W / 2, ty = H / 2;
     if (intro != null) { const u = ease(clamp(intro / 1.3, 0, 1)); tz = 1.45 - 0.45 * u; }
@@ -904,8 +1267,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     fxw = lx[0] <= lx[1] ? clamp(fxw, lx[0], lx[1]) : W / 2;
     fyw = ly[0] <= ly[1] ? clamp(fyw, ly[0], ly[1]) : H / 2;
     const sh = cam.trauma * cam.trauma;
-    const jx = (rand() * 2 - 1) * sh * px * 0.55 + cam.kx, jy = (rand() * 2 - 1) * sh * px * 0.55 + cam.ky;
-    const rot = (rand() * 2 - 1) * sh * 0.012;
+    const jx = (rand() * 2 - 1) * sh * px * 0.7 + cam.kx, jy = (rand() * 2 - 1) * sh * px * 0.7 + cam.ky;
+    const rot = (rand() * 2 - 1) * sh * 0.016 + cam.tilt;
+    cam.tilt *= 0.9 ** (rdt / 16.7);
     cam.trauma = Math.max(0, cam.trauma - 0.022 * (rdt / 16.7));
     cam.kx *= 0.8 ** (rdt / 16.7); cam.ky *= 0.8 ** (rdt / 16.7);
     view.z = z; view.x = fxw; view.y = fyw;
@@ -978,12 +1342,33 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.restore();
     }
 
+    // 0a. Power-ups: the item, bobbing over a turning gold ring; it blinks out its last three seconds.
+    for (const it of s.items) {
+      if (it.t < 3 * TPS && Math.floor(clock / 120) % 2) continue;
+      const bob = still ? 0 : Math.sin(clock / 260 + it.id) * 0.12;
+      ctx.save();
+      ctx.globalAlpha = 0.85; ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = Math.max(2, px / 10);
+      ctx.translate(sx(it.x), sy(it.y + 0.3)); ctx.scale(1, 0.45); ctx.rotate(clock / 500);
+      ctx.setLineDash([px * 0.3, px * 0.2]); ctx.beginPath(); ctx.arc(0, 0, px * 0.6, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      ctx.restore();
+      glow(sx(it.x), sy(it.y - 0.1 + bob), px * 0.9, "#ffd23f", 0.35);
+      const icon = img(`items/${it.kind}.png`);
+      if (icon) {
+        const d = px * 1.25;
+        ctx.save(); ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(icon, sx(it.x) - d / 2, sy(it.y - 0.15 + bob) - d / 2, d, d);
+        ctx.restore();
+      }
+    }
+
     // 0. Hazards on the ground: spikes, rocks, toxic spikes, a web.
     for (const zz of s.hazards) {
       const colour = colourOf(zz.move), fade = Math.min(1, zz.t / 60);
       ctx.save(); ctx.globalAlpha = 0.85 * fade;
       ctx.translate(sx(zz.x), sy(zz.y));
-      if (zz.kind === "sticky-web") {
+      const hk = artKey(zz.move);
+      if (hk && img(fxPath(hk))) sheetFx(hk, 0, 0, 0, px * 2.6, 0, null, 0.9 * fade);
+      else if (zz.kind === "sticky-web") {
         ctx.strokeStyle = "rgba(240,240,255,0.8)"; ctx.lineWidth = Math.max(1, px / 14);
         for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * px * 1.1, Math.sin(a) * px * 1.1); ctx.stroke(); }
         for (const r of [0.4, 0.75, 1.05]) { ctx.beginPath(); ctx.arc(0, 0, r * px, 0, TAU); ctx.stroke(); }
@@ -1018,7 +1403,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.translate(sx(x), sy(y));
       if (a.shape === "shot" || a.shape === "multi" || a.shape === "beam" || a.shape === "dash") {
         const len = (a.shape === "beam" ? 10 : a.shape === "dash" ? 3.6 : 9) * px;
-        const wd = (a.shape === "beam" ? 1.1 : a.shape === "dash" ? 1 : 0.7) * px;
+        const wd = (a.shape === "beam" ? 1.5 : a.shape === "dash" ? 1 : 0.7) * px;
         ctx.rotate(ang);
         ctx.fillRect(0, -wd / 2, len, wd);
         ctx.globalAlpha = 0.85;
@@ -1029,10 +1414,15 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           ctx.beginPath(); ctx.moveTo(d, -wd * 0.3); ctx.lineTo(d + px * 0.3, 0); ctx.lineTo(d, wd * 0.3); ctx.lineTo(d + px * 0.12, 0); ctx.fill();
         }
       } else if (a.shape === "melee") {
-        const r = 1.95 * px;
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, ang - 0.88, ang + 0.88); ctx.closePath(); ctx.fill();
+        const r = 2.2 * px;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, ang - 0.93, ang + 0.93); ctx.closePath(); ctx.fill();
         ctx.globalAlpha = 0.9; ctx.lineWidth = Math.max(2, px / 7);
         ctx.beginPath(); ctx.arc(0, 0, r * kk, ang - 0.88, ang + 0.88); ctx.stroke();
+      } else if (a.shape === "pulse" && WIDE.has(m.n ?? moveOf(m.i).n)) {
+        ctx.globalAlpha = 0.06 + 0.16 * kk;
+        ctx.fillRect(sx(INSET) - sx(x), sy(INSET) - sy(y), (W - 2 * INSET) * px, (H - 2 * INSET) * px);
+        ctx.globalAlpha = 0.5 + 0.4 * kk; ctx.lineWidth = Math.max(3, px / 5);
+        ctx.strokeRect(sx(INSET) - sx(x), sy(INSET) - sy(y), (W - 2 * INSET) * px, (H - 2 * INSET) * px);
       } else if (a.shape === "pulse") {
         ctx.beginPath(); ctx.arc(0, 0, 3.05 * px, 0, TAU); ctx.fill();
         ctx.globalAlpha = 0.9; ctx.lineWidth = Math.max(2, px / 7);
@@ -1077,8 +1467,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.beginPath(); ctx.ellipse(sx(x), sy(y + 0.42), px * 0.6, px * 0.22, 0, 0, TAU); ctx.fill();
       ctx.restore();
       const lunging = f.act?.shape === "dash" && f.act.ph === "act";
-      if ((f.dodge > 0 || lunging || (f.surge > 0 && f.moving)) && ghostAcc >= 2) {
-        const tint = lunging ? colourOf(moveAt(f, f.act.k).i) : f.surge > 0 ? colours[TYPES[f.types[0]]] : f.dodge > 0 ? "#9fe9ff" : null;
+      if ((f.dodge > 0 || lunging || ((f.surge > 0 || f.haste > 0) && f.moving)) && ghostAcc >= 2) {
+        const tint = lunging ? colourOf(moveAt(f, f.act.k).i) : f.surge > 0 ? colours[TYPES[f.types[0]]] : f.haste > 0 ? "#45d4ff" : f.dodge > 0 ? "#9fe9ff" : null;
         ghosts.push({ x, y, f: poseOf(f.side, f.slot).fr ?? { frame: frameOf(f, t) }, id: f.id, side: f.side, slot: f.slot, life: lunging ? 10 : 14, t: 0, tint });
       }
       if (lunging && rand() < k) { const [vx, vy] = [-f.act.dx * 0.12, -f.act.dy * 0.12]; part({ k: "streak", x: x + (rand() - 0.5) * 0.6, y: y - 0.3 + (rand() - 0.5) * 0.6, vx, vy, colour: "#ffffff", life: 9, size: 0.7, drag: 0.9 }); }
@@ -1089,7 +1479,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       if ((g.t += k) > g.life) { ghosts.splice(i, 1); continue; }
       sprite(g.id, g.side, g.slot, g.x, g.y, g.f, 0.4 * (1 - g.t / g.life), g.tint);
     }
-    for (const f of bodies) {
+    /* BODIES AND COVER BY DEPTH (reported 2026-10-23: a pillar drew over a
+       Pokemon standing in front of it): whichever stands lower on the floor
+       is drawn last. */
+    const drawBody = (f) => {
       const [x, y] = lerp(f);
       const p = poseOf(f.side, f.slot);
       settle(p, k);
@@ -1111,6 +1504,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       }
       if (f.heat > 0) glow(sx(x), sy(y), px * 1.1, "#ff5a2a", 0.25 + 0.4 * (f.heat / TPS));
       if (f.swift > 0) glow(sx(x), sy(y), px * 0.9, "#7dffd8", 0.25);
+      if (f.power > 0) glow(sx(x), sy(y - 0.3), px * 1.2, "#ff5a3d", 0.3 + 0.12 * Math.sin(clock / 90));
       if (ground.ice && f.moving && rand() < k / 4) part({ k: "dot", x, y: y + 0.35, vx: 0, vy: 0, colour: "#e8fbff", life: 18, size: 0.12 });
       if (!ground.ice && f.moving && !f.wading && rand() < k / 14) dust(x, y, 1);
       // In tall grass: yours shows faint (you know where you are), the foe's barely.
@@ -1124,6 +1518,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         glow(sx(at.x), sy(at.y - 0.3), px * 1.3, tcol, 0.3 + 0.15 * Math.sin(clock / 60));
         aura(f, at, fr, tcol, hid);
         if (rand() < 0.8 * k) part({ k: "glow", x: at.x + (rand() - 0.5) * 0.8, y: at.y + 0.1, vx: 0, vy: -0.03 - rand() * 0.02, colour: tcol, life: 24, size: 0.12, drag: 0.98 });
+      }
+      /* Double Team's copies, standing either side of it and moving with it:
+         the foe's as solid as the real one (that is the trick), yours a
+         little see-through so you know which you are. */
+      for (const [cx, cy] of clonesOf({ clones: f.clones, x, y })) {
+        ctx.save(); ctx.globalAlpha = 0.3 * hid; ctx.fillStyle = "#000";
+        ctx.beginPath(); ctx.ellipse(sx(cx), sy(cy + 0.42), px * 0.6, px * 0.22, 0, 0, TAU); ctx.fill(); ctx.restore();
+        sprite(f.id, f.side, f.slot, cx, cy, fr, (f.side === me ? 0.5 : 1) * hid, null, { ...at, x: cx, y: cy, sx: 1, sy: 1, tilt: 0 });
       }
       sprite(f.id, f.side, f.slot, at.x, at.y, fr, (blink ? 0.45 : 1) * hid, f.flash > 0 ? "#ffffff" : null, at);
       if (p.tintT > 0 && p.tint && f.flash <= 0) sprite(f.id, f.side, f.slot, at.x, at.y, fr, 0.55 * (p.tintT / 12) * hid, p.tint, at);
@@ -1140,17 +1542,34 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.fillStyle = "rgba(160,230,255,0.15)";
         ctx.beginPath(); ctx.arc(sx(x), sy(y - 0.3), px * 1.25, 0, TAU); ctx.fill(); ctx.stroke(); ctx.restore();
       }
-    }
+    };
 
-    // 2b. Cover, over the bodies' feet: its material, cracking as it weakens, wobbling when struck.
+    // 2b. Cover: its material, cracking as it weakens, wobbling when struck.
     const pic = img(coverPath);
-    for (const c of s.cover) {
-      if (c.hp <= 0) continue;
+    const drawCov = (c) => {
       const w = covShake.get(c.id) ?? 0;
       const wob = w > 0 ? Math.sin(clock / 22) * w * px * 0.08 : 0;
       if (w > 0) covShake.set(c.id, Math.max(0, w - 0.06 * k));
       drawCover(ctx, ground.cover, sx(c.x) + wob, sy(c.y), 1.2 * px, c.hp / c.max, t, pic);
+    };
+    const depth = [...bodies.map((f) => [lerp(f)[1] + 0.2, () => drawBody(f)]), ...s.cover.filter((c) => c.hp > 0).map((c) => [c.y, () => drawCov(c)])];
+    depth.sort((a, b) => a[0] - b[0]);
+    for (const [, d] of depth) d();
+
+    // 2c. Steam: a cloud over whoever stands in it, thinning as it goes.
+    for (const c of s.clouds) {
+      const a = Math.min(1, c.t / 40);
+      for (let i = 0; i < 7; i++) {
+        const ang = i * 0.9 + clock / 1400, r = 0.9 + 0.35 * Math.sin(i * 2.1 + clock / 500);
+        const qx = c.x + Math.cos(ang) * r * 0.75, qy = c.y - 0.2 + Math.sin(ang) * r * 0.45;
+        ctx.save(); ctx.globalAlpha = 0.5 * a; ctx.fillStyle = i % 2 ? "#eef4fb" : "#d4dde8";
+        ctx.beginPath(); ctx.arc(sx(qx), sy(qy), px * (0.85 + 0.15 * Math.sin(clock / 300 + i)), 0, TAU); ctx.fill(); ctx.restore();
+      }
     }
+    // 2d. The lights out: everything under it dark but what glows and what stands near you.
+    if (s.dark > 0) darkness(s, bodies, lerp);
+    // 2e. An ULTI's strikes, marked on the ground over the dark - they glow, and they must be dodgeable.
+    for (const z of s.strikes) strikeMark(z);
 
     // 3. Shots: glow, trail, the move's own sprite turned along its path.
     const live = new Set();
@@ -1165,8 +1584,12 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       glow(sx(x), sy(y), px * (bas ? 0.6 : 1.15), colour, 0.65);
       if (!bas) glow(sx(x), sy(y), px * 0.4, "#ffffff", 0.55);
       if (rand() < (bas ? 0.35 : 1.1) * k) trailBit(bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, colour);
-      const art = arenaArt(slugOf(p.move))?.shot;
-      if (!drawArt(art, sx(x), sy(y), Math.max(1, px / 12), Math.atan2(p.dy, p.dx), clock / 16.7)
+      const art = arenaArt(slugOf(p.move))?.shot, key = !bas && !LANDS.has(slugOf(p.move)) && artKey(p.move), ang0 = Math.atan2(p.dy, p.dx);
+      // Its own art: a projectile looping along its path, or a stream trailing behind its head.
+      if (key && (FX[key].n > 1 ? moveFx(key, clock / 70 % FX[key].n, sx(x), sy(y), px * 2.4, ang0, 1)
+        : moveFx(key, 0, sx(x - p.dx * 1.7), sy(y - p.dy * 1.7), px * 4.2, ang0, 1))) continue;
+      if (!bas) shotStyle(typeOf(p.move), sx(x), sy(y), Math.atan2(p.dy, p.dx), px * 0.75, colour, moveOf(p.move).n ?? "");
+      if (!drawArt(art, sx(x), sy(y), Math.max(1, px / 10), Math.atan2(p.dy, p.dx), clock / 16.7)
         && !sheetFx("bolt", clock / 70 % 4, sx(x), sy(y), px * (bas ? (p.boost ? 2.2 : 1.6) : 2.2), Math.atan2(p.dy, p.dx), colour)) {
         // No sprite and the bolt not loaded yet: a comet - a bright head and a tapered tail along its path.
         const r = px * (bas ? (p.boost ? 0.3 : 0.2) : 0.32), ang = Math.atan2(p.dy, p.dx);
@@ -1180,17 +1603,25 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     }
     for (const id of trails.keys()) if (!live.has(id)) trails.delete(id);
 
-    // 4. Melee swings: a bright smear that sweeps across the blow's reach.
+    // 4. A dash's own art, trailing its user (a cloud, as Play Rough's, round it).
+    for (const f of bodies) {
+      const a = f.act, key = a?.shape === "dash" && a.ph === "act" && artKey(moveAt(f, a.k).i);
+      if (!key) continue;
+      const [x, y] = lerp(f), m = FX[key], ang = Math.atan2(a.dy, a.dx), wide = m.w / m.h > 1.3;
+      moveFx(key, clock / 60 % m.n, sx(x - (wide ? a.dx * 0.6 : 0)), sy(y - 0.25 - (wide ? a.dy * 0.6 : 0)), px * (wide ? 3 : 3.4), ang, 1);
+    }
+    // 4b. Melee swings: a bright smear that sweeps across the blow's reach (a move with its own art plays that at the fire).
     for (const f of bodies) {
       const a = f.act;
+      if (a && a.k !== BASIC_K && artKey(moveAt(f, a.k).i)) continue;
       if (!a || a.shape !== "melee" || (a.ph !== "act" && !(a.ph === "rec" && a.t > 2))) continue;
       const [x, y] = lerp(f);
       const bas = a.k === BASIC_K;
       const colour = tintOf(moveAt(f, a.k).i, s, f.side);
       const ang = Math.atan2(a.dy, a.dx), r = (bas ? 1.25 : 1.7) * px;
       const sweep = Math.min(1, a.ph === "act" ? 1 - a.t / 6 : 1);
-      const reach = bas ? 0.75 : 1;
-      if (sheetFx("slash", 0, sx(x + Math.cos(ang) * reach), sy(y - 0.2 + Math.sin(ang) * reach), px * (bas ? 2.3 : 3.6) * (0.7 + 0.3 * sweep),
+      const reach = bas ? 0.9 : 1.25;
+      if (sheetFx("slash", 0, sx(x + Math.cos(ang) * reach), sy(y - 0.2 + Math.sin(ang) * reach), px * (bas ? 2.9 : 5) * (0.7 + 0.3 * sweep),
         ang - Math.PI / 2, colour, a.ph === "act" ? 1 : 0.55, 1, a.id % 2 === 1)) continue;
       ctx.save();
       ctx.translate(sx(x), sy(y - 0.2));
@@ -1221,7 +1652,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       drawFx(e);
     }
     // 6. The air over the floor.
-    weather(k);
+    weather(k, s.weather);
     for (let i = air.length - 1; i >= 0; i--) {
       const a = air[i];
       if ((a.t += k) > a.life) { air.splice(i, 1); continue; }
@@ -1231,6 +1662,80 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     // ------------------------------------------------ screen space
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     screen(s, k, intro, outro);
+  }
+
+  /* THE DARK: a sheet the size of the screen laid over the floor and the
+     bodies, with holes where light is - round your Pokemon, round the foe
+     only near it (as near as the CPU sees in the dark), a charging move's
+     glow, a power-up's. Shots, beams and effects are drawn after it. */
+  function darkness(s, bodies, lerp) {
+    const cw = canvas.width, ch = canvas.height;
+    const a = clamp(Math.min((s.t - darkAt) / 30, s.dark / 30), 0, 1);
+    if (!darkCv) darkCv = document.createElement("canvas");
+    if (darkCv.width !== cw || darkCv.height !== ch) { darkCv.width = cw; darkCv.height = ch; }
+    const d = darkCv.getContext("2d");
+    d.setTransform(1, 0, 0, 1, 0, 0);
+    d.globalCompositeOperation = "source-over"; d.globalAlpha = 1;
+    d.clearRect(0, 0, cw, ch);
+    d.fillStyle = `rgba(3,4,12,${(0.9 * a).toFixed(3)})`; d.fillRect(0, 0, cw, ch);
+    d.setTransform(ctx.getTransform());
+    d.globalCompositeOperation = "destination-out";
+    const hole = (x, y, r, n) => { d.globalAlpha = n; d.drawImage(glowOf("#ffffff"), sx(x) - r * px, sy(y) - r * px, r * px * 2, r * px * 2); };
+    const mine = bodies.find((f) => f.side === me);
+    const [mx, my] = mine ? lerp(mine) : [-99, -99];
+    for (const f of bodies) {
+      const [x, y] = lerp(f);
+      if (f.side === me) { hole(x, y - 0.2, 3.4, 1); hole(x, y - 0.2, 2, 1); }
+      else if (Math.abs(x - mx) + Math.abs(y - my) <= 5) hole(x, y - 0.2, 1.8, 0.85);
+      else hole(x, y - 0.3, 0.9, 0.22);
+      if (f.act?.ph === "wind") hole(x, y - 0.3, 1.6, 0.7);
+    }
+    for (const it of s.items) hole(it.x, it.y, 1, 0.7);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(darkCv, 0, 0); ctx.restore();
+  }
+  // An ULTI's strike before it lands: its ring filling, or a cannon's lane, in its type's colour.
+  function strikeMark(z) {
+    const colour = colours[z.type] ?? "#ffd23f", kk = clamp(1 - z.t / Math.max(1, z.t0), 0, 1);
+    if (z.vanish) {
+      ctx.save(); ctx.translate(sx(z.x), sy(z.y + 0.35));
+      if (z.vanish === "air" || z.vanish === "shadow") {
+        ctx.globalAlpha = 0.25 + 0.45 * kk; ctx.fillStyle = z.vanish === "air" ? "#000" : "#2a1240";
+        ctx.beginPath(); ctx.ellipse(0, 0, px * (0.4 + 0.9 * kk), px * (0.16 + 0.36 * kk), 0, 0, TAU); ctx.fill();
+      } else if (z.vanish === "ground") {
+        ctx.strokeStyle = "#5a4430"; ctx.lineWidth = Math.max(2, px / 9); ctx.globalAlpha = 0.5 + 0.4 * kk;
+        for (let i = 0; i < 5; i++) { const a = i * 1.3 + z.id; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * px * (0.5 + kk), Math.sin(a) * px * (0.25 + kk * 0.4)); ctx.stroke(); }
+        if (!still && rand() < 0.5) part({ k: "chunk", x: z.x + (rand() - 0.5) * 0.8, y: z.y + 0.3, vx: 0, vy: 0, vz: 0.04 + rand() * 0.04, g: 0.008, colour: "#8a6a3e", life: 24, size: 0.1, bounce: 1 });
+      } else {
+        ctx.strokeStyle = "#bff3ff"; ctx.lineWidth = Math.max(1, px / 12);
+        for (let i = 0; i < 3; i++) { const q = ((clock / 600 + i / 3) % 1); ctx.globalAlpha = (1 - q) * 0.8; ctx.beginPath(); ctx.ellipse(0, 0, px * (0.3 + q * 1.2), px * (0.12 + q * 0.5), 0, 0, TAU); ctx.stroke(); }
+      }
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.translate(sx(z.x), sy(z.y));
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = colour; ctx.strokeStyle = colour;
+    if (z.beam) {
+      const len = 17 * px, wd = (1.3 + 0.45) * 2 * px;
+      ctx.rotate(Math.atan2(z.dy, z.dx));
+      ctx.globalAlpha = 0.16 + 0.24 * kk; ctx.fillRect(0, -wd / 2, len, wd);
+      ctx.globalAlpha = 0.7; ctx.fillRect(0, -wd / 2, len * kk, wd * 0.08); ctx.fillRect(0, wd / 2 - wd * 0.08, len * kk, wd * 0.08);
+    } else {
+      const r = (z.r + 0.45) * px;
+      ctx.scale(1, 0.62);
+      ctx.globalAlpha = 0.14 + 0.26 * kk; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 0.9; ctx.lineWidth = Math.max(2, px / 7);
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r * kk, 0, TAU); ctx.stroke();
+      // A warning flash as it locks on.
+      if (z.t < 27 && Math.floor(clock / 70) % 2) { ctx.globalAlpha = 0.25; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill(); }
+    }
+    ctx.restore();
+    // A storm's strike: the bolt's path flickers in the sky first.
+    if (!z.beam && !z.nova && z.type === "electric" && !still && rand() < 0.3) {
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.25 + 0.4 * kk; ctx.strokeStyle = "#fff59a"; ctx.lineWidth = Math.max(1, px / 14);
+      ctx.beginPath(); ctx.moveTo(sx(z.x) + (rand() - 0.5) * px, sy(z.y) - px * 9); ctx.lineTo(sx(z.x), sy(z.y)); ctx.stroke(); ctx.restore();
+    }
   }
 
   function stepPart(p, k) {
@@ -1358,6 +1863,11 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.globalAlpha = 0.28; ctx.strokeStyle = "#cfe8ff"; ctx.lineWidth = Math.max(1, px / 28);
       ctx.beginPath(); ctx.moveTo(x - fall * px * 0.5, y + fall * px); ctx.lineTo(x - (fall + 0.25) * px * 0.5, y + (fall + 0.5) * px); ctx.stroke();
       if (a.t + k > a.life) { ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.ellipse(x - 0.7 * px * 0.5, y + 1.4 * px, px * 0.12, px * 0.05, 0, 0, TAU); ctx.stroke(); }
+    } else if (a.k === "sand") {
+      a.x += a.vx * k; a.y += a.vy * k + Math.sin(a.t / 12) * 0.004 * k;
+      if (a.x > W + 1) a.t = a.life;
+      ctx.globalAlpha = 0.35; ctx.strokeStyle = "#e0b878"; ctx.lineWidth = Math.max(1, px / 20);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - a.size * px, y - a.size * px * 0.08); ctx.stroke();
     } else if (a.k === "mote") {
       a.x += a.vx * k; a.y += a.vy * k;
       if (a.x > W + 0.5) a.t = a.life;
@@ -1378,14 +1888,61 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       drawArt(e.art, sx(e.x), sy(e.y), Math.max(1, px / 11) * (1 + 0.4 * kk), 0, e.t, 1 - kk * kk);
     } else if (e.k === "beam") {
       // A beam: a wide glow, a white core, and the move's sprite laid down it.
-      const ang = Math.atan2(e.dy, e.dx), len = e.len * px, wide = px * (1 - kk) * (still ? 1 : 0.85 + rand() * 0.35);
+      const ang = Math.atan2(e.dy, e.dx), len = e.len * px, wide = px * (e.big ? 3.2 : 1.3) * (1 - kk) * (still ? 1 : 0.85 + rand() * 0.35);
       ctx.save(); ctx.translate(sx(e.x), sy(e.y)); ctx.rotate(ang);
       ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = 0.55 * (1 - kk); ctx.fillStyle = e.colour; ctx.fillRect(0, -wide, len, wide * 2);
-      ctx.globalAlpha = 0.95 * (1 - kk); ctx.fillStyle = "#fff"; ctx.fillRect(0, -wide * 0.3, len, wide * 0.6);
+      const stream = e.key && img(fxPath(e.key));
+      if (stream) {
+        // Its own stream, stretched down the beam over a glow of its colour, thinning as it fades.
+        ctx.globalAlpha = 0.35 * (1 - kk); ctx.fillStyle = e.colour; ctx.fillRect(0, -wide, len, wide * 2);
+        const h = px * (e.big ? 3.8 : 1.8) * (1 - 0.5 * kk);
+        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1 - kk * kk; ctx.imageSmoothingEnabled = false;
+        if (Math.cos(ang) < 0) ctx.scale(1, -1);
+        ctx.drawImage(stream, 0, -h / 2, len, h);
+      } else {
+        beamStyle(e.type, len, wide, kk, e.colour);
+        ctx.globalAlpha = 0.55 * (1 - kk); ctx.fillStyle = e.colour; ctx.fillRect(0, -wide, len, wide * 2);
+        ctx.globalAlpha = 0.95 * (1 - kk); ctx.fillStyle = "#fff"; ctx.fillRect(0, -wide * 0.3, len, wide * 0.6);
+      }
       ctx.restore();
-      if (e.art) for (let d = 0.6; d < e.len; d += 0.8) drawArt(e.art, sx(e.x + e.dx * d), sy(e.y + e.dy * d), Math.max(1, px / 14), ang, e.t + d * 7, 1 - kk);
+      if (e.art && !e.key) for (let d = 0.6; d < e.len; d += 0.8) drawArt(e.art, sx(e.x + e.dx * d), sy(e.y + e.dy * d), Math.max(1, px / 14), ang, e.t + d * 7, 1 - kk);
       glow(sx(e.x + e.dx * e.len), sy(e.y + e.dy * e.len), px * 1.2, e.colour, 0.6 * (1 - kk));
+    } else if (e.k === "mv") {
+      const m = FX[e.key];
+      moveFx(e.key, kk * m.n, sx(e.x), sy(e.y), px * e.size, e.ang, kk > 0.85 ? (1 - kk) / 0.15 : 1);
+    } else if (e.k === "launch") {
+      // Fly or Bounce: the body leaps up and off the screen, a streak under it.
+      sprite(e.id, e.side, e.slot, e.x, e.y - kk * kk * 10, { anim: "Hop", at: e.t * 16.7, frame: 0, row: 4 }, 1 - kk * 0.5, null, { x: e.x, y: e.y, sx: 1 - kk * 0.3, sy: 1 + kk * 0.6, tilt: 0 });
+    } else if (e.k === "fly") {
+      /* THE FLYOVER: a legendary crosses the court high up, its shadow
+         sweeping the floor under it; it is gone before the drop lands. */
+      const im = img(spriteUrl(e.id));
+      const along = -3 + (W + 6) * kk, x = e.dir > 0 ? along : W - along, y = H * 0.45 + Math.sin(kk * Math.PI) * -1.5;
+      ctx.save(); ctx.globalAlpha = 0.28 * Math.sin(kk * Math.PI); ctx.fillStyle = "#000";
+      ctx.beginPath(); ctx.ellipse(sx(x), sy(y + 3.5), px * 3.4, px * 1.1, 0, 0, TAU); ctx.fill(); ctx.restore();
+      if (im) {
+        const d = px * 6.5, bob = Math.sin(e.t / 6) * px * 0.2;
+        ctx.save(); ctx.imageSmoothingEnabled = false;
+        ctx.translate(sx(x), sy(y - 2) + bob); if (e.dir > 0) ctx.scale(-1, 1);
+        ctx.globalAlpha = 0.35;
+        for (let i = 1; i <= 3; i++) ctx.drawImage(flat(im, "#ffffff"), -d / 2 - i * px * 0.6, -d / 2, d, d);
+        ctx.globalAlpha = 1; ctx.drawImage(im, -d / 2, -d / 2, d, d);
+        ctx.restore();
+        if (rand() < 0.6) part({ k: "streak", x: x - e.dir * 2, y: y - 2 + (rand() - 0.5) * 2, vx: -e.dir * 0.2, vy: 0, colour: "#ffffff", life: 10, size: 0.8, drag: 0.92 });
+      }
+    } else if (e.k === "strike") {
+      // A jagged bolt from above the screen down onto the struck, fading.
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 1 - kk;
+      ctx.lineJoin = "round";
+      for (const [w2, c] of [[px * 0.5, "#ffe74a"], [px * 0.18, "#ffffff"]]) {
+        ctx.strokeStyle = c; ctx.lineWidth = w2; ctx.beginPath();
+        let bx = sx(e.x) + (e.seed - 0.5) * px * 2, by = sy(e.y) - px * 9;
+        ctx.moveTo(bx, by);
+        for (let i = 1; i <= 8; i++) { bx += (((e.seed * 97 + i * 37) % 1) - 0.5) * px * 1.4; by += px * 9 / 8; ctx.lineTo(i === 8 ? sx(e.x) : bx, by); }
+        ctx.stroke();
+      }
+      ctx.restore();
+      glow(sx(e.x), sy(e.y), px * 2, "#fff59a", 0.6 * (1 - kk));
     } else if (e.k === "sheet") {
       const n = FX[e.name]?.n ?? 1;
       sheetFx(e.name, kk * n, sx(e.x), sy(e.y), px * e.size, e.rot, e.colour, n > 1 ? (kk > 0.85 ? (1 - kk) / 0.15 : 1) : 1 - kk);
@@ -1476,6 +2033,13 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     }
     // The final minute: a slow red breath at the edges.
     if (!s.over && intro == null && LIMIT - s.t <= FINAL_T) vignette("rgba(255,60,50,", still ? 0.1 : 0.08 + 0.06 * Math.sin(clock / 400));
+    if (!s.over && s.sudden) vignette("rgba(255,20,40,", still ? 0.2 : 0.2 + 0.1 * Math.sin(clock / 160));
+    // The weather's light over everything.
+    if (WEATHER_LIGHT[s.weather] && !s.over) {
+      ctx.save(); ctx.globalCompositeOperation = s.weather === "sun" || s.weather === "snow" ? "lighter" : "source-over";
+      ctx.fillStyle = WEATHER_LIGHT[s.weather]; ctx.fillRect(0, 0, cw, ch); ctx.restore();
+      if (s.weather === "sun" && !still) glowAt(cw * 0.08, ch * 0.05, u * 0.7, "#ffcf6a", 0.22 + 0.04 * Math.sin(clock / 900));
+    }
     const surger = s.sides.findIndex((sd) => sd.team[sd.active]?.surge > 0);
     if (surger >= 0 && !s.over) vignette(surger === me ? "rgba(255,200,60," : "rgba(255,90,60,", 0.12);
     // The last five seconds, counted in the middle of the floor.
@@ -1511,7 +2075,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     // Impact frames, cut-ins, stamps.
     for (let i = overlays.length - 1; i >= 0; i--) {
       const o = overlays[i];
-      o.t += o.k === "stamp" || o.k === "cut" ? rdtFrames : k;
+      // A stamp, a cut-in and a panel run on the screen's own clock: the hit-stop under them never holds them.
+      o.t += o.k === "stamp" || o.k === "cut" || o.k === "manga" ? rdtFrames : k;
       if (o.t > o.life) { overlays.splice(i, 1); continue; }
       const kk = o.t / o.life;
       if (o.k === "frame") {
@@ -1526,6 +2091,36 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           speedLines(o.x, o.y, "rgba(10,8,20,0.5)", 1 - kk);
         }
         ctx.restore();
+      } else if (o.k === "judge") {
+        // Under the striker's combo, slanted, popped in, gold-edged.
+        const ours = o.side === me, pop = o.t < 6 ? back(o.t / 6) : 1, fade = kk > 0.75 ? (1 - kk) / 0.25 : 1;
+        const size = Math.min(cw, ch) * 0.06;
+        ctx.save(); ctx.globalAlpha = fade;
+        ctx.translate(ours ? cw * 0.05 : cw * 0.95, ch * 0.32 + size * 2.2); ctx.scale(pop, pop); ctx.transform(1, 0, -0.18, 1, 0, 0);
+        ctx.textAlign = ours ? "left" : "right"; ctx.textBaseline = "middle";
+        ctx.font = `italic 900 ${Math.round(size)}px ${FACE}`;
+        ctx.lineJoin = "round"; ctx.lineWidth = size / 5; ctx.strokeStyle = "rgba(8,10,24,0.92)"; ctx.strokeText(o.text, 0, 0);
+        const g = ctx.createLinearGradient(0, -size / 2, 0, size / 2);
+        g.addColorStop(0, "#ffffff"); g.addColorStop(0.6, o.colour); g.addColorStop(1, o.colour);
+        ctx.fillStyle = g; ctx.fillText(o.text, 0, 0);
+        ctx.restore();
+      } else if (o.k === "clutch") {
+        // Letterbox bars close in and the word pulses between them; the edges go dark.
+        const inK = ease(Math.min(1, kk * 5)), outK = kk > 0.8 ? (kk - 0.8) / 0.2 : 0, bar = ch * 0.11 * inK * (1 - outK);
+        ctx.save();
+        vignette("rgba(0,0,0,", 0.45 * inK * (1 - outK));
+        ctx.fillStyle = "#05060e"; ctx.fillRect(0, 0, cw, bar); ctx.fillRect(0, ch - bar, cw, bar);
+        if (kk > 0.08 && kk < 0.85) {
+          const size = Math.min(cw, ch) * 0.075 * (1 + 0.06 * Math.sin(clock / 70));
+          ctx.globalAlpha = 1 - outK;
+          ctx.translate(cw / 2, bar / 2 + size * 0.1); ctx.transform(1, 0, -0.18, 1, 0, 0);
+          ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `italic 900 ${Math.round(size)}px ${FACE}`;
+          ctx.fillStyle = "#ff4d5e"; ctx.fillText("CLUTCH", 0, 0);
+        }
+        ctx.restore();
+      } else if (o.k === "manga") manga(o);
+      else if (o.k === "shade") {
+        ctx.save(); ctx.fillStyle = `${o.colour}${(0.45 * Math.sin(Math.min(1, kk * 1.5) * Math.PI)).toFixed(3)})`; ctx.fillRect(0, 0, cw, ch); ctx.restore();
       } else if (o.k === "tint") {
         ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.3 * (1 - kk); ctx.fillStyle = o.colour; ctx.fillRect(0, 0, cw, ch); ctx.restore();
       } else if (o.k === "cut") cutIn(o, kk);
@@ -1541,7 +2136,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else {
         const t = (outro - RESULT_AT) / 16.7;
         const won = res.winner === me, draw = res.winner < 0;
-        stampAt(draw ? "DRAW" : won ? "VICTORY" : "DEFEAT", draw ? "#d8deff" : won ? "#ffd23f" : "#9aa5c8", t, Infinity);
+        // A win without losing a point of HP is a PERFECT, as a fighting game's is.
+        const perfect = !draw && !hurtAt[res.winner];
+        stampAt(draw ? "DRAW" : perfect ? "PERFECT" : won ? "VICTORY" : "DEFEAT", draw ? "#d8deff" : perfect ? "#45d4ff" : won ? "#ffd23f" : "#9aa5c8", t, Infinity,
+          perfect ? (won ? "Not a scratch" : "Not one hit landed") : null);
         if (won && !still) confetti(k, t);
       }
     }
@@ -1672,10 +2270,189 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     ctx.translate(off + (dir > 0 ? cw * 0.62 : cw * 0.38), y);
     ctx.transform(1, 0, -0.2, 1, 0, 0);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    // ULTI over the move's name, the name fitted to the band.
+    const name = (o.name ?? "ULTIIIII!").toUpperCase();
     ctx.font = `900 ${Math.round(u * 0.16)}px ${FACE}`;
-    ctx.lineJoin = "round"; ctx.lineWidth = u * 0.018; ctx.strokeStyle = "rgba(8,10,24,0.95)";
-    ctx.strokeText("SURGE!", 0, 0);
-    ctx.fillStyle = "#ffffff"; ctx.fillText("SURGE!", 0, 0);
+    const fit = Math.min(1, (cw * 0.5) / Math.max(1, ctx.measureText(name).width));
+    const size = Math.round(u * 0.16 * fit);
+    ctx.font = `900 ${size}px ${FACE}`;
+    ctx.lineJoin = "round"; ctx.lineWidth = Math.max(4, size * 0.11); ctx.strokeStyle = "rgba(8,10,24,0.95)";
+    ctx.strokeText(name, 0, size * 0.18);
+    ctx.fillStyle = "#ffffff"; ctx.fillText(name, 0, size * 0.18);
+    if (o.name) {
+      ctx.font = `italic 900 ${Math.round(u * 0.06)}px ${FACE}`; ctx.lineWidth = u * 0.01;
+      ctx.strokeText("ULTI!", 0, -size * 0.55 - u * 0.02); ctx.fillStyle = "#ffd23f"; ctx.fillText("ULTI!", 0, -size * 0.55 - u * 0.02);
+    }
+    ctx.restore();
+  }
+  function glowAt(x, y, r, colour, a) {
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a;
+    ctx.drawImage(glowOf(colour), x - r, y - r, r * 2, r * 2); ctx.restore();
+  }
+  /* THE ULTI'S PANEL (One Piece's impact frame): NEGATIVE for a few frames,
+     then INK - a black page (a famous Pokemon's: its colour), the type's
+     pattern bursting from the hit, the silhouette huge on its side, the
+     name - then the colour floods back in. Never a strobe: two cuts, then a
+     fade, on the screen's own clock. */
+  function manga(o) {
+    const cw = canvas.width, ch = canvas.height, u = Math.min(cw, ch);
+    const neg = 4, ink = o.life - 12, f = o.t;
+    ctx.save();
+    if (f < neg) {
+      ctx.globalCompositeOperation = "saturation"; ctx.fillStyle = "#808080"; ctx.fillRect(0, 0, cw, ch);
+      ctx.globalCompositeOperation = "difference"; ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cw, ch);
+      ctx.globalCompositeOperation = "source-over";
+      speedLines(o.x, o.y, "rgba(0,0,0,0.9)", 1);
+      ctx.restore();
+      return;
+    }
+    if (f >= ink) {
+      // The colour back: a wash of the type, the lines thinning out.
+      const a = 1 - (f - ink) / (o.life - ink);
+      ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.4 * a; ctx.fillStyle = o.colour; ctx.fillRect(0, 0, cw, ch);
+      ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+      speedLines(o.x, o.y, o.colour, a * 0.8);
+      ctx.restore();
+      return;
+    }
+    const page = o.famous ? o.colour : "#050507", ink0 = o.famous ? "#08080c" : "#ffffff";
+    const pop = Math.min(1, (f - neg) / 5);
+    ctx.fillStyle = page; ctx.fillRect(0, 0, cw, ch);
+    // A famous Pokemon's page is cut in two panels on the slant, the pattern in the far one.
+    const drawn = FX[`ult-${o.id}`] ?? FX[`ult-${INK[o.type] ?? "speed"}`];
+    const key = FX[`ult-${o.id}`] ? `ult-${o.id}` : `ult-${INK[o.type] ?? "speed"}`;
+    const art = drawn && img(fxPath(key));
+    if (art) {
+      ctx.save(); ctx.globalAlpha = 0.95; ctx.imageSmoothingEnabled = true;
+      // A famous panel is drawn with its Pokemon on the left: the foe's is mirrored, its name on the free side.
+      if (FX[`ult-${o.id}`] && o.side !== me) { ctx.translate(cw, 0); ctx.scale(-1, 1); }
+      const sc = Math.max(cw / art.naturalWidth, ch / art.naturalHeight) * (1.04 + 0.04 * pop);
+      const dw = art.naturalWidth * sc, dh = art.naturalHeight * sc;
+      ctx.drawImage(o.famous ? tinted(art, ink0) : art, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+      ctx.restore();
+    } else inkPattern(INK[o.type] ?? "speed", o.x, o.y, ink0, seeded(o.seed), u, pop);
+    speedLines(o.x, o.y, o.famous ? "rgba(8,8,12,0.75)" : "rgba(255,255,255,0.8)", 1);
+    // The silhouette, huge, on its side of the page and facing the middle - unless its own panel drew it.
+    const lead = !(art && FX[`ult-${o.id}`]) && img(spriteUrl(o.id, o.shiny ? "shiny" : null));
+    if (lead) {
+      const ours = o.side === me, d = ch * (0.95 + 0.08 * pop);
+      ctx.save(); ctx.imageSmoothingEnabled = false;
+      ctx.translate(ours ? cw * 0.27 : cw * 0.73, ch * 0.52);
+      if (ours) ctx.scale(-1, 1);
+      const rim = o.famous ? "#ffffff" : "#000000", body = o.famous ? "#08080c" : "#ffffff";
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(flat(lead, rim), -d / 2 + dx * u * 0.012, -d / 2 + dy * u * 0.012, d, d);
+      ctx.drawImage(flat(lead, body), -d / 2, -d / 2, d, d);
+      ctx.restore();
+    }
+    // The name, slammed across the far side.
+    const name = o.name.toUpperCase(), ours = o.side === me;
+    ctx.save();
+    ctx.translate(ours ? cw * 0.68 : cw * 0.32, ch * 0.5); ctx.rotate(ours ? -0.08 : 0.08); ctx.transform(1, 0, -0.2, 1, 0, 0);
+    ctx.font = `900 ${Math.round(u * 0.2)}px ${FACE}`;
+    const size = Math.round(u * 0.2 * Math.min(1, (cw * 0.55) / Math.max(1, ctx.measureText(name).width)) * (1.25 - 0.25 * pop));
+    ctx.font = `900 ${size}px ${FACE}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    ctx.lineWidth = size * 0.16; ctx.strokeStyle = o.famous ? "#08080c" : "#000000"; ctx.strokeText(name, 0, 0);
+    ctx.fillStyle = o.famous ? "#ffffff" : o.colour; ctx.fillText(name, 0, 0);
+    ctx.restore();
+    // A thin frame round the page, as a panel's.
+    ctx.strokeStyle = o.famous ? "#08080c" : "#ffffff"; ctx.lineWidth = Math.max(3, u * 0.012);
+    ctx.strokeRect(u * 0.02, u * 0.02, cw - u * 0.04, ch - u * 0.04);
+    ctx.restore();
+  }
+  /* A type's ink, drawn: bolts, flames, waves, vines, a psychic spiral,
+     shadow, a fist's focus burst, dragon scales, frost shards, cracks,
+     stars, wind - out from the hit. */
+  function inkPattern(kind, x, y, ink, r, u, pop) {
+    const cw = canvas.width, ch = canvas.height, far = Math.hypot(cw, ch);
+    ctx.save();
+    ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    const radial = (n, fn) => { for (let i = 0; i < n; i++) fn((i / n) * TAU + r() * 0.3, i); };
+    if (kind === "bolts") {
+      radial(9, (a) => {
+        ctx.lineWidth = u * (0.008 + r() * 0.012); ctx.beginPath();
+        let d = u * 0.12, bx = x + Math.cos(a) * d, by = y + Math.sin(a) * d; ctx.moveTo(bx, by);
+        while (d < far) { d += u * (0.05 + r() * 0.07); const w = (r() - 0.5) * 0.5; bx = x + Math.cos(a + w * 0.3) * d; by = y + Math.sin(a + w * 0.3) * d; ctx.lineTo(bx, by); }
+        ctx.stroke();
+      });
+    } else if (kind === "flames") {
+      radial(26, (a) => {
+        const r0 = u * (0.14 + r() * 0.1), r1 = r0 + u * (0.25 + r() * 0.45) * pop, w = 0.06 + r() * 0.07;
+        ctx.beginPath(); ctx.moveTo(x + Math.cos(a - w) * r0, y + Math.sin(a - w) * r0);
+        ctx.quadraticCurveTo(x + Math.cos(a - w * 1.6) * (r0 + r1) / 2, y + Math.sin(a - w * 1.6) * (r0 + r1) / 2, x + Math.cos(a + w * 0.4) * r1, y + Math.sin(a + w * 0.4) * r1);
+        ctx.quadraticCurveTo(x + Math.cos(a + w * 0.8) * (r0 + r1) / 2, y + Math.sin(a + w * 0.8) * (r0 + r1) / 2, x + Math.cos(a + w) * r0, y + Math.sin(a + w) * r0);
+        ctx.fill();
+      });
+    } else if (kind === "waves") {
+      for (let ring = 1; ring <= 7; ring++) {
+        const rr = u * (0.1 + ring * 0.11) * (0.8 + 0.2 * pop);
+        ctx.lineWidth = u * (0.012 - ring * 0.001); ctx.beginPath();
+        for (let i = 0; i <= 90; i++) { const a = (i / 90) * TAU, q = rr + Math.sin(a * 9 + ring) * u * 0.018; i ? ctx.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q) : ctx.moveTo(x + Math.cos(a) * q, y + Math.sin(a) * q); }
+        ctx.stroke();
+      }
+    } else if (kind === "vines") {
+      radial(10, (a) => {
+        const bend = (r() - 0.5) * 1.2, len = u * (0.5 + r() * 0.5);
+        ctx.lineWidth = u * 0.012; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * u * 0.1, y + Math.sin(a) * u * 0.1);
+        const cx2 = x + Math.cos(a + bend) * len * 0.6, cy2 = y + Math.sin(a + bend) * len * 0.6, ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len;
+        ctx.quadraticCurveTo(cx2, cy2, ex, ey); ctx.stroke();
+        for (let k = 1; k <= 3; k++) {
+          const tq = k / 4, lx = (1 - tq) * (1 - tq) * x + 2 * (1 - tq) * tq * cx2 + tq * tq * ex, ly = (1 - tq) * (1 - tq) * y + 2 * (1 - tq) * tq * cy2 + tq * tq * ey;
+          ctx.save(); ctx.translate(lx, ly); ctx.rotate(a + (k % 2 ? 0.8 : -0.8)); ctx.beginPath(); ctx.ellipse(u * 0.03, 0, u * 0.035, u * 0.014, 0, 0, TAU); ctx.fill(); ctx.restore();
+        }
+      });
+    } else if (kind === "psychic") {
+      ctx.lineWidth = u * 0.01;
+      for (let arm = 0; arm < 3; arm++) {
+        ctx.beginPath();
+        for (let i = 0; i < 120; i++) { const tq = i / 120, a = arm * TAU / 3 + tq * 9 * pop, q = u * 0.05 + tq * far * 0.6; i ? ctx.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q) : ctx.moveTo(x + Math.cos(a) * q, y + Math.sin(a) * q); }
+        ctx.stroke();
+      }
+      for (let ring = 1; ring <= 4; ring++) { ctx.lineWidth = u * 0.004; ctx.beginPath(); ctx.arc(x, y, u * 0.16 * ring, 0, TAU); ctx.stroke(); }
+    } else if (kind === "shadow") {
+      for (let i = 0; i < 16; i++) {
+        const ex = r() < 0.5 ? (r() < 0.5 ? 0 : cw) : r() * cw, ey = ex === 0 || ex === cw ? r() * ch : (r() < 0.5 ? 0 : ch);
+        ctx.beginPath(); ctx.arc(ex, ey, u * (0.12 + r() * 0.22) * (0.7 + 0.3 * pop), 0, TAU); ctx.fill();
+      }
+      radial(14, (a) => { ctx.lineWidth = u * (0.006 + r() * 0.01); ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * u * 0.2, y + Math.sin(a) * u * 0.2); ctx.quadraticCurveTo(x + Math.cos(a + 0.4) * u * 0.5, y + Math.sin(a + 0.4) * u * 0.5, x + Math.cos(a) * far, y + Math.sin(a) * far); ctx.stroke(); });
+    } else if (kind === "fists" || kind === "speed") {
+      const spikes = 22, r0 = u * 0.18 * (0.7 + 0.3 * pop), r1 = u * 0.36 * (0.7 + 0.3 * pop);
+      ctx.lineWidth = u * 0.012; ctx.beginPath();
+      for (let i = 0; i <= spikes * 2; i++) { const a = (i / (spikes * 2)) * TAU, q = i % 2 ? r0 : r1 * (0.8 + r() * 0.4); i ? ctx.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q) : ctx.moveTo(x + Math.cos(a) * q, y + Math.sin(a) * q); }
+      ctx.stroke();
+      if (kind === "speed") for (let i = 0; i < 40; i++) { const yy = r() * ch; ctx.fillRect(0, yy, cw, Math.max(1, u * 0.004 * r())); }
+    } else if (kind === "dragon") {
+      for (let ring = 1; ring <= 5; ring++) {
+        const rr = u * 0.12 * ring, n = 10 + ring * 4;
+        ctx.lineWidth = u * 0.008; ctx.beginPath();
+        for (let i = 0; i <= n; i++) { const a = (i / n) * TAU, q = i % 2 ? rr : rr + u * 0.05; i ? ctx.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q) : ctx.moveTo(x + Math.cos(a) * q, y + Math.sin(a) * q); }
+        ctx.stroke();
+      }
+    } else if (kind === "frost") {
+      radial(14, (a) => {
+        const r0 = u * 0.1, r1 = u * (0.4 + r() * 0.5) * (0.6 + 0.4 * pop), w = 0.025 + r() * 0.03;
+        ctx.beginPath(); ctx.moveTo(x + Math.cos(a - w) * r0, y + Math.sin(a - w) * r0); ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); ctx.lineTo(x + Math.cos(a + w) * r0, y + Math.sin(a + w) * r0); ctx.fill();
+      });
+    } else if (kind === "rocks") {
+      radial(11, (a) => {
+        ctx.lineWidth = u * (0.006 + r() * 0.01); ctx.beginPath();
+        let d = u * 0.08; ctx.moveTo(x + Math.cos(a) * d, y + Math.sin(a) * d);
+        while (d < far * 0.7) { d += u * (0.04 + r() * 0.06); const w = (r() - 0.5) * 0.35; ctx.lineTo(x + Math.cos(a + w) * d, y + Math.sin(a + w) * d); }
+        ctx.stroke();
+      });
+      for (let i = 0; i < 12; i++) { const a = r() * TAU, q = u * (0.3 + r() * 0.5), s2 = u * (0.02 + r() * 0.04); ctx.save(); ctx.translate(x + Math.cos(a) * q, y + Math.sin(a) * q); ctx.rotate(r() * TAU); ctx.fillRect(-s2, -s2 * 0.7, s2 * 2, s2 * 1.4); ctx.restore(); }
+    } else if (kind === "stars") {
+      for (let i = 0; i < 24; i++) {
+        const sx2 = r() * cw, sy2 = r() * ch, s2 = u * (0.01 + r() * 0.04) * (0.6 + 0.4 * pop);
+        ctx.beginPath(); ctx.moveTo(sx2, sy2 - s2 * 2); ctx.lineTo(sx2 + s2 * 0.4, sy2 - s2 * 0.4); ctx.lineTo(sx2 + s2 * 2, sy2); ctx.lineTo(sx2 + s2 * 0.4, sy2 + s2 * 0.4);
+        ctx.lineTo(sx2, sy2 + s2 * 2); ctx.lineTo(sx2 - s2 * 0.4, sy2 + s2 * 0.4); ctx.lineTo(sx2 - s2 * 2, sy2); ctx.lineTo(sx2 - s2 * 0.4, sy2 - s2 * 0.4); ctx.fill();
+      }
+    } else if (kind === "wind") {
+      for (let i = 0; i < 12; i++) {
+        const rr = u * (0.15 + r() * 0.6), a0 = r() * TAU;
+        ctx.lineWidth = u * (0.006 + r() * 0.01); ctx.beginPath(); ctx.arc(x, y, rr, a0, a0 + 1.2 + r() * 1.5 * pop); ctx.stroke();
+      }
+    }
     ctx.restore();
   }
   // THE OPENING: the VS card, two balls thrown in, the count.
@@ -1840,12 +2617,21 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     ctx.translate(x, y); ctx.scale(1, squash); if (rot) ctx.rotate(rot); if (flip) ctx.scale(-1, 1);
     ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = Math.min(1, alpha);
-    ctx.drawImage(tinted(im, colour), f * meta.w, 0, meta.w, meta.h, -w / 2, -h / 2, w, h);
-    ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = Math.min(1, alpha) * 0.45;
-    ctx.drawImage(im, f * meta.w, 0, meta.w, meta.h, -w / 2, -h / 2, w, h);
+    // A move's own art is drawn in its own colours; the shared sheets are white, coloured here.
+    ctx.drawImage(meta.c ? im : tinted(im, colour), f * meta.w, 0, meta.w, meta.h, -w / 2, -h / 2, w, h);
+    if (!meta.c) {
+      ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = Math.min(1, alpha) * 0.45;
+      ctx.drawImage(im, f * meta.w, 0, meta.w, meta.h, -w / 2, -h / 2, w, h);
+    }
     ctx.restore();
     return true;
   }
+  /* A move's art along `ang`: drawn facing right, so facing left it is
+     mirrored top to bottom rather than turned upside down. */
+  const moveFx = (key, frame, x, y, w, ang, alpha) => {
+    const left = Math.cos(ang) < 0;
+    return sheetFx(key, frame, x, y, w, left ? ang + Math.PI : ang, null, alpha, 1, left);
+  };
   // A drawn effect played out on the floor: its frames across its life, `size` in tiles.
   const sheet = (name, x, y, size, colour, life, rot = 0) => { if (!still) fx.push({ k: "sheet", name, x, y, size, colour, life, rot, t: 0 }); };
 
@@ -1981,6 +2767,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
        online match does not: both ends must step together). */
     rate(dt, live = false) {
       rdtFrames = dt / (1000 / 60);
+      liveMatch = live;
       /* Online the match never holds, so neither may the bodies' animation:
          a surge's hold slid a running body 420 ms in one frozen frame. */
       if (live) { stopMs = slowMs = 0; slowK = 1; scale = 1; return 1; }

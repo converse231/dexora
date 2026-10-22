@@ -138,6 +138,8 @@ export const ARENA_NEWS_KEY = "dexora-arena-news";
 /* The League page's last tab, a device preference - here, not in League.jsx,
    so the announcement's Fight now can open the page on its Arena tab. */
 export const LEAGUE_TAB_KEY = "dexora-league-region";
+/* Which half of Battles the tab opens on, "arena" or "league" (App's goTab). */
+export const BATTLES_KEY = "dexora-battles";
 
 /* Reading never throws. A private window, cleared site data, or a browser that
    has revoked storage all arrive here as "no save", which is the same thing a

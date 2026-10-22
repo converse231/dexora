@@ -7209,7 +7209,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     let wins = 0, ended = 0;
     for (let k = 1; k <= 12; k++) {
       const s = play(k * 31, "normal", "easy");
-      assert.ok(s.over && s.t <= A.LIMIT, "an Arena match did not end by its clock");
+      assert.ok(s.over && s.t <= A.LIMIT + A.SUDDEN_T, "an Arena match did not end by its clock and its sudden death");
       if (s.winner === 0) wins++;
       if (s.why === "knockout") ended++;
     }
@@ -7503,6 +7503,237 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       // A bound: measured 30-34% (2026-10-22). Past 45% the moves are the filler.
       assert.ok(basicShare <= 45, `the basic attack dealt ${basicShare}% of the damage - the moves no longer carry a fight`);
     }
+    /* POWER-UPS (2026-10-23). They drop as a mirrored pair - point for point,
+       so neither half is nearer; touched, a Potion heals at once; an X item
+       is held, one a side, and works only when used; a held slot leaves a
+       second where it lies; the CPU picks them up. */
+    let picked = 0;
+    {
+      const run = (kind) => {
+        const s = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 6 });
+        while (!s.items.length) A.tick(s, [A.NO_INPUT, null]);
+        const [a, b] = s.items;
+        assert.ok(Math.abs(a.x + b.x - A.W) < 1e-9 && Math.abs(a.y + b.y - A.H) < 1e-9 && a.kind === b.kind, "a pair of power-ups is not mirrored - one side is nearer");
+        for (const it of s.items) it.kind = kind;
+        return s;
+      };
+      const walkTo = (s, it) => { const f = s.sides[0].team[0]; Object.assign(f, { x: it.x, y: it.y, px: it.x, py: it.y }); A.tick(s, [A.NO_INPUT, null]); return f; };
+      const potion = run("potion");
+      const f = potion.sides[0].team[0];
+      f.hp = Math.floor(f.max / 2);
+      const was = f.hp;
+      walkTo(potion, potion.items[0]);
+      assert.ok(f.hp > was && potion.items.length === 1, "a Potion touched did not heal at once");
+      const x = run("x-attack");
+      const g = walkTo(x, x.items[0]);
+      assert.equal(x.sides[0].held, "x-attack", "an X Attack touched was not held");
+      assert.equal(g.power, 0, "a held X Attack worked before it was used");
+      walkTo(x, x.items[0]);
+      assert.equal(x.items.length, 1, "a second X item was taken into a full slot");
+      A.tick(x, [{ ...A.NO_INPUT, use: true }, null]);
+      // Standing on the second, the freed slot takes it at once.
+      assert.ok(g.power > 0 && x.items.length === 0 && x.sides[0].held === "x-attack", "using a held X Attack did nothing, or the freed slot left the second lying");
+      for (let k = 1; k <= 6; k++) {
+        const m = A.newMatch({ teams: [A.cpuTeam(k * 59, 50), A.cpuTeam(k * 59 + 7, 50)], cpu: ["hard", "hard"], seed: k });
+        while (!m.over) { A.tick(m, [null, null]); picked += m.ev.filter((e) => e.k === "pick").length; }
+      }
+      assert.ok(picked > 0, "the CPU never picked up a power-up in 6 Hard matches");
+    }
+    /* A BEAM FOLLOWS ITS AIM while it charges, and not after; SUDDEN DEATH puts
+       everyone standing at 1 HP when the clock runs out level, and the
+       clock decides as before when it does not (2026-10-23). */
+    {
+      const beamer = A.newMatch({ teams: [[bFighter(150, 50, 1, [idx("hyper-beam")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 2 });
+      A.tick(beamer, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]);
+      const act = beamer.sides[0].team[0].act;
+      assert.ok(act?.shape === "beam", "Hyper Beam did not wind up as a beam");
+      for (let t = 0; t < 8; t++) A.tick(beamer, [{ ...A.NO_INPUT, ax: 0, ay: 1 }, null]);
+      assert.ok(act.dy > 0.3 && act.dx < 0.97, `a charging beam did not turn toward the aim (${act.dx.toFixed(2)}, ${act.dy.toFixed(2)})`);
+      assert.ok(act.dy < 0.99, "a charging beam snapped to the aim instead of sweeping");
+
+      /* DOUBLE TEAM's copies stand either side of their user and move with it;
+         a blow or a shot that reaches one first pops it ("Miss!") and the
+         real one takes nothing (2026-10-23, asked for: "Naruto's clones"). */
+      const dt = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(25, 50, 2, [idx("double-team")])]], cpu: [null, null], seed: 4, weather: "clear", events: false });
+      const foe = dt.sides[1].team[0], me = dt.sides[0].team[0];
+      for (let t = 0; t < 40 && !foe.clones.length; t++) A.tick(dt, [A.NO_INPUT, { ...A.NO_INPUT, fire: 0 }]);
+      assert.equal(foe.clones.length, 2, "Double Team made no copies");
+      const was = A.clonesOf(foe);
+      foe.x += 1;
+      assert.ok(A.clonesOf(foe).every(([x], k) => Math.abs(x - was[k][0] - 1) < 1e-9), "Double Team's copies did not move with their user");
+      foe.x -= 1;
+      assert.ok(A.clonesOf(foe).every(([x, y]) => Math.hypot(x - foe.x, y - foe.y) > 1), "a copy stands on its user");
+      const [cx, cy] = A.clonesOf(foe)[0], whole = foe.hp;
+      Object.assign(me, { x: cx - 1.3, y: cy, px: cx - 1.3, py: cy });
+      let popped = 0;
+      for (let t = 0; t < 2 * A.TPS && !popped; t++) {
+        A.tick(dt, [{ ...A.NO_INPUT, ax: 1, ay: 0, basic: true }, null]);
+        popped += dt.ev.filter((e) => e.k === "decoy").length;
+      }
+      assert.ok(popped === 1 && foe.clones.length === 1, "a blow at a copy did not pop it");
+      assert.equal(foe.hp, whole, "a blow at a copy hurt the real one");
+      // A jab (Machop's basic attack is a blow) at the other copy pops it too.
+      const jabber = A.newMatch({ teams: [[bFighter(66, 50, 1, [idx("karate-chop")])], [bFighter(25, 50, 2, [idx("double-team")])]], cpu: [null, null], seed: 4, weather: "clear", events: false });
+      const [jm, jf] = [jabber.sides[0].team[0], jabber.sides[1].team[0]];
+      for (let t = 0; t < 40 && !jf.clones.length; t++) A.tick(jabber, [A.NO_INPUT, { ...A.NO_INPUT, fire: 0 }]);
+      assert.equal(A.basicShape(jm), "melee", "Machop's basic attack is not a blow");
+      const [jx, jy] = A.clonesOf(jf)[1], jhp = jf.hp;
+      Object.assign(jm, { x: jx - 1.1, y: jy, px: jx - 1.1, py: jy });
+      let jabbed = 0;
+      for (let t = 0; t < 2 * A.TPS && !jabbed; t++) { A.tick(jabber, [{ ...A.NO_INPUT, ax: 1, ay: 0, basic: true }, null]); jabbed += jabber.ev.filter((e) => e.k === "decoy").length; }
+      assert.ok(jabbed === 1 && jf.hp === jhp, "a blow at a copy did not pop it, or hurt the real one");
+
+      /* WEATHER, TYPE COMBOS, ULTIS AND THE MATCH'S EVENTS (2026-10-23). */
+      const duel = (atk, move, def, opts = {}) => {
+        const s = A.newMatch({ teams: [[bFighter(atk, 50, 1, [idx(move)])], [bFighter(def, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 5, events: false, ...opts });
+        const [a, d] = [s.sides[0].team[0], s.sides[1].team[0]];
+        Object.assign(a, { x: 8, y: 8, px: 8, py: 8 }); Object.assign(d, { x: 10, y: 8, px: 10, py: 8 });
+        return [s, a, d];
+      };
+      // The first hit of `move` thrown point-blank, after `prep`.
+      const firstHit = (atk, move, def, weather, prep = () => {}) => {
+        const [s, , d] = duel(atk, move, def, { weather });
+        prep(d);
+        for (let t = 0; t < 2 * A.TPS; t++) {
+          A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]);
+          const h = s.ev.find((e) => e.k === "hit");
+          if (h) return [h, s, d];
+        }
+        assert.fail(`${move} never hit`);
+      };
+      const near = (x, want, what) => assert.ok(Math.abs(x - want) <= 0.06, `${what}: x${x.toFixed(2)}, not x${want}`);
+      near(firstHit(6, "flamethrower", 143, "rain")[0].dmg / firstHit(6, "flamethrower", 143, "clear")[0].dmg, 0.5, "Fire in the rain");
+      near(firstHit(6, "flamethrower", 143, "sun")[0].dmg / firstHit(6, "flamethrower", 143, "clear")[0].dmg, 1.5, "Fire in harsh sun");
+      near(firstHit(9, "hydro-pump", 4, "rain")[0].dmg / firstHit(9, "hydro-pump", 4, "clear")[0].dmg, 1.5, "Water in the rain");
+      // Electric on a soaked Pokemon; Water on a burned one is steam that hides it.
+      const [zap] = firstHit(25, "thunderbolt", 130, "clear", (d) => { d.wet = A.TPS; });
+      assert.ok(zap.shock, "Electric on a soaked Pokemon was not a shock");
+      near(zap.dmg / firstHit(25, "thunderbolt", 130, "clear")[0].dmg, 1.5, "a shock");
+      const [, st, burned] = firstHit(9, "hydro-pump", 143, "clear", (d) => Object.assign(d, { status: A.BRN, statusT: 10 * A.TPS }));
+      assert.ok(burned.status === -1 && st.clouds.length === 1 && st.ev.some((e) => e.k === "steam"), "Water on a burn made no steam");
+      A.tick(st, [null, null]);
+      assert.ok(burned.hidden, "a Pokemon in steam was not hidden");
+      // Sand chips all but Rock, Ground and Steel; rain slows a Fire type.
+      {
+        const [s, a, d] = duel(25, "tackle", 74, { weather: "sand" });
+        for (let t = 0; t < 10 * A.TPS; t++) { A.tick(s, [null, null]); Object.assign(a, { x: 8, y: 8 }); }
+        assert.ok(a.hp < a.max && d.hp === d.max, `a sandstorm chipped the wrong Pokemon (Pikachu ${a.hp}/${a.max}, Geodude ${d.hp}/${d.max})`);
+        const walk = (weather) => { const [w, f] = duel(4, "tackle", 1, { weather }); for (let t = 0; t < 30; t++) A.tick(w, [{ ...A.NO_INPUT, mx: 1 }, null]); return f.x - 8; };
+        assert.ok(walk("rain") < walk("clear") * 0.95, "rain did not slow a Fire type");
+      }
+      // Every type has an ULTI, and a famous one its own.
+      assert.ok((await import("../src/data/types.js")).TYPES.every((t) => A.ULT_KIND[t] && A.ULT_TYPE_NAME[t]), "a type has no ULTI");
+      assert.ok(Object.values(A.ULT_NAMES).every(([n, k]) => n && Object.values(A.ULT_KIND).includes(k)), "a famous ULTI has no kind");
+      {
+        // Pikachu's ULTI is Thunder: strikes shown on the ground, then landing on a foe that stands there.
+        const [s, a, d] = duel(25, "tackle", 143, { weather: "clear" });
+        s.sides[0].meter = A.SURGE_MAX;
+        A.tick(s, [{ ...A.NO_INPUT, surge: true }, null]);
+        const ult = s.ev.find((e) => e.k === "ult");
+        assert.ok(ult?.name === "Thunder" && ult.kind === "storm", "Pikachu's ULTI is not Thunder");
+        assert.ok(s.strikes.length >= 3 && s.strikes.every((z) => z.t > 0), "Thunder's strikes landed without warning");
+        let hits = 0, first = -1;
+        for (let t = 1; t < 3 * A.TPS; t++) {
+          A.tick(s, [null, null]); Object.assign(d, { x: 10, y: 8 });
+          const n = s.ev.filter((e) => e.k === "hit" && e.ult).length;
+          if (n && first < 0) first = t;
+          hits += n;
+        }
+        assert.ok(hits >= 2 && d.hp < d.max, `Thunder struck a standing foe ${hits} times`);
+        // A bound: half a second is a human's reaction and a roll - a strike sooner cannot be dodged.
+        assert.ok(first >= A.TPS / 2, `Thunder's first strike landed ${first} ticks after the cast - too soon to dodge`);
+        // ...and a foe that rolls away as it lands is not struck.
+        const [s2, , d2] = duel(25, "tackle", 143, { weather: "clear" });
+        s2.sides[0].meter = A.SURGE_MAX;
+        A.tick(s2, [{ ...A.NO_INPUT, surge: true }, null]);
+        let dodged = 0;
+        for (let t = 0; t < 3 * A.TPS; t++) {
+          const soon = s2.strikes.some((z) => z.t < 8 && Math.hypot(z.x - d2.x, z.y - d2.y) < z.r + 0.5);
+          A.tick(s2, [null, soon && !d2.dodge ? { ...A.NO_INPUT, mx: 0, my: d2.y > 8 ? -1 : 1, dodge: true } : { ...A.NO_INPUT, my: 1 }]);
+          dodged += s2.ev.filter((e) => e.k === "hit" && e.ult).length;
+        }
+        assert.ok(dodged < hits, "an ULTI's strike could not be dodged");
+      }
+      {
+        /* The flyover drops a Full Restore in the middle of the court - as
+           far from either side's start - and the lights go out, then on. */
+        let s = null;
+        for (let seed = 1; seed < 40 && !s; seed++) { const m = A.newMatch({ teams: [A.cpuTeam(seed, 50), A.cpuTeam(seed + 7, 50)], cpu: ["dummy", "dummy"], seed, weather: "clear" }); if (m.plan.dark > 0) s = m; }
+        assert.ok(s, "no seed in 40 put the lights out");
+        const a = s.sides[0].team[0], b = s.sides[1].team[0];
+        assert.ok(Math.abs((A.W - b.x) - a.x) < 1e-9, "the two sides do not start mirrored");
+        let restore = null, dark = 0, lit = 0;
+        while (!s.over && s.t < Math.max(s.plan.fly, s.plan.dark) + 20 * A.TPS) {
+          A.tick(s, [null, null]);
+          restore ??= s.items.find((it) => it.kind === "full-restore");
+          if (s.dark > 0) dark++;
+          if (s.ev.some((e) => e.k === "light")) lit++;
+        }
+        assert.ok(restore && restore.x === A.W / 2 && restore.y === A.H / 2, "the flyover dropped nothing in the middle of the court");
+        assert.ok(dark > 0 && lit === 1 && s.dark === 0, "the lights went out and never came back");
+        const none = A.newMatch({ teams: [A.cpuTeam(3, 50), A.cpuTeam(4, 50)], cpu: ["dummy", "dummy"], seed: 3, events: false });
+        let happened = 0;
+        for (let t = 0; t < 3 * A.TPS; t++) { A.tick(none, [null, null]); happened += none.ev.filter((e) => ["flyover", "drop", "dark"].includes(e.k)).length; }
+        assert.ok(none.plan.fly < 0 && none.plan.dark < 0 && !happened, "a match without events had one");
+        // A Full Restore heals half, cures, and fills the ULTI.
+        const [h, f] = duel(4, "tackle", 1, { weather: "clear" });
+        Object.assign(f, { hp: 1, status: A.BRN, statusT: 10 * A.TPS });
+        h.items.push({ id: 999, kind: "full-restore", x: f.x, y: f.y, t: 99 });
+        A.tick(h, [null, null]);
+        assert.ok(f.hp >= Math.floor(f.max / 2) && f.status === -1 && h.sides[0].meter >= 50, "a Full Restore did not heal, cure and fill the ULTI");
+      }
+      {
+        /* FLY AND DIG LEAVE THE COURT (2026-10-23, asked for): gone, nothing
+           touches the user; it comes back down exactly on a foe that stood
+           still, and the foe is struck. */
+        for (const [id, move] of [[6, "fly"], [28, "dig"]]) {
+          const [s, a, d] = duel(id, move, 143, { weather: "clear" });
+          Object.assign(d, { x: 9.2, y: 8, px: 9.2, py: 8 });
+          let gone = 0, hurtGone = false, landed = null;
+          for (let t = 0; t < 3 * A.TPS; t++) {
+            const hp = a.hp;
+            A.tick(s, [t < 30 ? { ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 } : null, { ...A.NO_INPUT, ax: -1, ay: 0, basic: true }]);
+            Object.assign(d, { x: 9.2, y: 8 });
+            if (a.away) { gone++; if (a.hp < hp) hurtGone = true; } else if (gone && !landed) landed = [a.x, a.y];
+          }
+          assert.ok(gone > A.TPS / 2, `${move} never took its user off the court`);
+          assert.ok(!hurtGone, `${move}'s user was struck while it was gone`);
+          assert.ok(landed && Math.hypot(landed[0] - 9.2, landed[1] - 8) < 0.01, `${move} did not come back down on the foe (${landed})`);
+          assert.ok(d.hp < d.max, `${move} landed and the foe took nothing`);
+        }
+        /* HEAT WAVE FILLS THE COURT: the foe is struck across it, but not
+           behind cover. */
+        const wide = (place) => {
+          const [s, a, d] = duel(6, "heat-wave", 143, { weather: "clear" });
+          place(s, a, d);
+          for (let t = 0; t < A.TPS; t++) { A.tick(s, [t < 20 ? { ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 } : null, null]); if (s.ev.some((e) => e.k === "pulse")) break; }
+          return d.hp < d.max;
+        };
+        assert.ok(wide((s, a, d) => {
+          // Across the court, in the open.
+          for (let y = 4; y <= A.H - 4; y += 0.5) if (!A.blocked(s, a.x, a.y, A.W - 4, y)) { Object.assign(d, { x: A.W - 4, y, px: A.W - 4, py: y }); return; }
+          assert.fail("no open spot across the court");
+        }), "Heat Wave did not reach a foe across the court");
+        assert.ok(!wide((s, a, d) => {
+          const c = s.cover[0];
+          Object.assign(a, { x: c.x - 3, y: c.y, px: c.x - 3, py: c.y }); Object.assign(d, { x: c.x + 2, y: c.y, px: c.x + 2, py: c.y });
+        }), "Heat Wave struck a foe sheltering behind cover");
+      }
+
+      const late = (sizes) => {
+        const s = A.newMatch({ teams: sizes.map((n, k) => A.cpuTeam(31 + k, 50, n)), cpu: [null, null], seed: 3 });
+        s.t = A.LIMIT - 1;
+        A.tick(s, [null, null]);
+        return s;
+      };
+      const level = late([2, 2]);
+      assert.ok(level.sudden && !level.over, "the clock ran out level and there was no sudden death");
+      assert.ok(level.sides.every((sd) => sd.team.every((f) => f.hp === 1)), "sudden death did not put everyone standing at 1 HP");
+      const ahead = late([3, 2]);
+      assert.ok(ahead.over && !ahead.sudden && ahead.winner === 0, "a side with more Pokemon standing went to sudden death instead of winning on the clock");
+      for (let t = 0; t <= A.SUDDEN_T && !level.over; t++) A.tick(level, [null, null]);
+      assert.ok(level.over, "sudden death never ended");
+    }
     /* PLAYING ONLINE (phase 3). Two lockstep ends over a link that holds each
        message 1-9 frames (in order, as a reliable data channel is), each end
        playing its own scripted inputs: the same match tick for tick, to the
@@ -7522,7 +7753,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       const sample = (me) => () => {
         const r = roll(me);
         return { mx: roll(me) * 2 - 1, my: roll(me) * 2 - 1, ax: (roll(me) * 2 - 1) * 9.37, ay: (roll(me) * 2 - 1) * 5.11,
-          fire: r < 0.3 ? Math.floor(roll(me) * 4) : -1, basic: r > 0.4 && r < 0.8, dodge: r > 0.95, swap: r > 0.993 ? Math.floor(roll(me) * 3) : -1, surge: r > 0.9 };
+          fire: r < 0.3 ? Math.floor(roll(me) * 4) : -1, basic: r > 0.4 && r < 0.8, use: r > 0.85 && r < 0.87, dodge: r > 0.95, swap: r > 0.993 ? Math.floor(roll(me) * 3) : -1, surge: r > 0.9 };
       };
       while (!(ends[0].s.over && ends[1].s.over) && frame < 40000) {
         for (const e of ends) {
@@ -7563,6 +7794,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       `the opening holds everyone off the clock, a Surge throws the foe and doubles cooldowns until a switch, ${surges} in 8 Hard matches; ` +
       `a spent Pokemon Struggles and the CPU benches it, the final minute hits harder, ${timeouts}/24 Hard matches to the clock; ` +
       `a held basic attack repeats without PP, every third harder, a move cuts its recovery, ${basicShare}% of a real fight's damage; ` +
+      `power-ups drop mirrored, a Potion heals on touch, an X item waits to be used, ${picked} picked up by the CPU in 6 Hard matches; ` +
       `online, two lockstep ends over a laggy link finish one match (${fair[0].s.t} ticks, ${fair[0].s.why}) and a nudged state is caught at tick ${caught}`);
     console.log(`arena ok — a seed replays one match exactly and another seed differs, no browser-dependent maths, ` +
       `Normal beats Easy ${wins}/12 with ${ended}/12 by knockout, every match ends by its clock, every Pokemon has a kit; ` +

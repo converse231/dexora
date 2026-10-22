@@ -42,6 +42,7 @@ import Ranked from "./Ranked.jsx";
 import { CHAR_PIC } from "../../game/ranked.js";
 import { rankedStep } from "../../net/cloud.js";
 import { LEAGUE_TAB_KEY } from "../../game/store.js";
+import BattleSwitch from "./BattleSwitch.jsx";
 
 /* The Ranked tab sits first in the region strip under its own id, which is
    not a region's; the strip remembers it like one. */
@@ -707,7 +708,7 @@ function TeamPick({ o, kind, box, last, beaten, steps, onFight }) {
 }
 
 export default function League({
-  engine, box = [], beaten = {}, steps = 0, team = [], signedIn = false, onClose,
+  engine, box = [], beaten = {}, steps = 0, team = [], signedIn = false, onClose, onMode,
   money = 0, bag = {}, level = 1, stats = null, candy = 0, road = null,
 }) {
   useModalLock();
@@ -843,6 +844,7 @@ export default function League({
             <h3>Pokémon League</h3>
             <span>{totalBadges} badge{totalBadges === 1 ? "" : "s"} · {st.filter((s) => s.cleared).length} of {LEAGUES.length} regions cleared</span>
           </div>
+          {!sub && onMode && <BattleSwitch on="league" onPick={onMode} />}
         </div>
         {!sub && (
           <nav className="lg-strip-wrap" aria-label="Regions">

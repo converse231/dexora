@@ -43,17 +43,17 @@ export default function ArenaIntro({ onFight, onClose }) {
 
       <div className="ai-copy">
         <h2 id="ai-title">Live<br />battles</h2>
-        <p>Your team, in real time. Move, aim, dodge - and when the moment comes, Surge.</p>
+        <p>Your team, in real time. Move, aim, dodge - and when the moment comes, ULTI.</p>
       </div>
 
       <div className="ai-side">
         <div className="ai-how">
           <ol>
             <li><b>1</b>Move and aim every attack yourself</li>
-            <li><b>2</b>Dodge at the last moment to fill Surge</li>
+            <li><b>2</b>Dodge at the last moment to fill your ULTI</li>
             <li><b>3</b>Unleash it and turn the fight around</li>
           </ol>
-          <div className="ai-surge" aria-hidden="true"><span>Surge</span><i><u /></i></div>
+          <div className="ai-surge" aria-hidden="true"><span>ULTI</span><i><u /></i></div>
         </div>
         <div className="ai-go">
           <button type="button" ref={go} className="ci-go" onClick={onFight}>Fight now</button>
