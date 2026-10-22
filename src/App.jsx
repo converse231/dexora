@@ -7,7 +7,7 @@ import { freePoints } from "./game/trainer.js";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel, isNight } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
-import { RAIL_KEY, ORDER_KEY, REF_KEY, ARENA_NEWS_KEY, LEAGUE_TAB_KEY, read, write, drop, flushNow } from "./game/store.js";
+import { RAIL_KEY, ORDER_KEY, REF_KEY, ARENA_NEWS_KEY, read, write, drop, flushNow } from "./game/store.js";
 import { tradeInbox, push, myDefense, setReferrer, myReferrals } from "./net/cloud.js";
 import Invite from "./ui/Invite.jsx";
 import { referralDue } from "./game/referral.js";
@@ -75,6 +75,8 @@ const TradeScene = lazyPage(() => import("./ui/trade/TradeScene.jsx"));
 /* THE LEAGUE, the same way: the battle rules, rosters and moves are the
    heaviest data in the game, and only this chunk carries them (asserted). */
 const League = lazyPage(() => import("./ui/league/League.jsx"));
+// The Arena, its own tab since 2026-10-22: real-time battles, the League's data in its own chunk.
+const ArenaPage = lazyPage(() => import("./ui/league/arena/Arena.jsx"));
 // The walking party's editor: the trade picker, kept out of the main bundle.
 const PartyPick = lazyPage(() => import("./ui/PartyPick.jsx"));
 // The weekly roulette: only a spin loads it.
@@ -351,6 +353,7 @@ export default function App({
       if (name) setTrade({ name });
       else if (!h.startsWith("#/trade")) setTrade(null);   // Back, off the Trade Center page
       if (!h.startsWith("#/league")) setLeague(false);      // Back, off the League
+      if (!h.startsWith("#/arena")) setArenaPage(false);    // Back, off the Arena
       if (!h.startsWith("#/cards")) setCards(false);        // Back, off Cards
       setYou(h.startsWith("#/you"));                        // Back, onto or off You
     };
@@ -358,6 +361,7 @@ export default function App({
     return () => removeEventListener("hashchange", onHash);
   }, []);
   const [league, setLeague] = useState(false);
+  const [arenaPage, setArenaPage] = useState(false);
   const [cards, setCards] = useState(false);
   const [cardScene, setCardScene] = useState(false);
   const [you, setYou] = useState(() => location.hash.startsWith("#/you"));
@@ -367,11 +371,12 @@ export default function App({
      always means "back to the game" in one press, and pushes when you leave
      the map - each page reads its own hash and pushes nothing of its own. The
      `tc`/`lg` keys are what the pages' own closers already look for. */
-  const tab = league ? "battles" : cards ? "cards" : trade && !trade.profile ? "trade" : you || trade?.profile ? "you" : "catch";
+  const tab = arenaPage ? "arena" : league ? "battles" : cards ? "cards" : trade && !trade.profile ? "trade" : you || trade?.profile ? "you" : "catch";
   const goTab = useCallback((t) => {
-    const onPage = /^#\/(trade|trainer\/|league|cards|you)/.test(location.hash);
+    const onPage = /^#\/(trade|trainer\/|league|arena|cards|you)/.test(location.hash);
     setTrade(t === "trade" ? { name: null } : null);
     setLeague(t === "battles");
+    setArenaPage(t === "arena");
     setCards(t === "cards");
     setYou(t === "you");
     setRotom(false);
@@ -382,8 +387,8 @@ export default function App({
       return;
     }
     const st = { page: 1, tc: t === "trade" ? 1 : undefined, lg: t === "battles" ? 1 : undefined,
-      cd: t === "cards" ? 1 : undefined };
-    const hash = { trade: "#/trade", battles: "#/league", cards: "#/cards", you: "#/you" }[t];
+      ar: t === "arena" ? 1 : undefined, cd: t === "cards" ? 1 : undefined };
+    const hash = { trade: "#/trade", battles: "#/league", arena: "#/arena", cards: "#/cards", you: "#/you" }[t];
     if (onPage) history.replaceState(st, "", hash);
     else history.pushState(st, "", hash);
   }, []);
@@ -624,8 +629,8 @@ export default function App({
     setArenaIntro(true);
   }, [arenaNews, arenaPlayed, engine, st?.char, enc, tab, checkinOpen, rouletteOpen, streakLots, seasonOpen, checkin?.due, pathAt]);
   // Back from the League page, which marks the Arena found.
-  useEffect(() => { if (!league) setArenaNews(read(ARENA_NEWS_KEY)); }, [league]);
-  const toArena = () => { arenaNewsTo("done"); write(LEAGUE_TAB_KEY, "arena"); setArenaIntro(false); goTab("battles"); };
+  useEffect(() => { if (!arenaPage) setArenaNews(read(ARENA_NEWS_KEY)); }, [arenaPage]);
+  const toArena = () => { arenaNewsTo("done"); setArenaIntro(false); goTab("arena"); };
 
   // The walking party's Box entries, for the strip on the map: rebuilt only when the party or the Box moves.
   /* WHAT THE ONE WALKING IS DOING OUT HERE, or null. Derived, never stored -
@@ -967,12 +972,28 @@ export default function App({
             stats={st?.stats ?? null}
             candy={st?.candy ?? 0}
             road={st?.road ?? null}
-            arena={st?.arena ?? null}
-            ladder={st?.ladder ?? []}
             signedIn={Boolean(account)}
             onClose={() => {
               setLeague(false);
               if (history.state?.lg) history.back();
+              else if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+            }}
+          />
+        </Suspense>
+      )}
+
+      {arenaPage && (
+        <Suspense fallback={null}>
+          <ArenaPage
+            engine={engine}
+            box={st?.box ?? []}
+            team={st?.team ?? []}
+            arenaTeam={st?.arenaTeam ?? []}
+            record={st?.arena ?? null}
+            ladder={st?.ladder ?? []}
+            onClose={() => {
+              setArenaPage(false);
+              if (history.state?.ar) history.back();
               else if (location.hash) history.replaceState(null, "", location.pathname + location.search);
             }}
           />

@@ -43,9 +43,9 @@ export const PATH = [
     pay: { items: { "ultra-ball": 5 } }, where: "battles" },
   { id: "pack", name: "Open a card pack", tip: "Your first badge paid one - open it in Cards", need: 1, of: (s) => Object.keys(s.cards ?? {}).length > 0 ? 1 : 0,
     pay: { money: 2000 }, where: "cards" },
-  { id: "arena", name: "Win a live Arena battle", tip: "Battles › Arena - move, aim and dodge in real time", need: 1,
+  { id: "arena", name: "Win a live Arena battle", tip: "The Arena tab - move, aim and dodge in real time", need: 1,
     of: (s) => ((s.ladder ?? []).length || (s.arena?.won ?? []).length) ? 1 : 0,
-    pay: { money: 3000, items: { "ultra-ball": 10 } }, where: "battles" },
+    pay: { money: 3000, items: { "ultra-ball": 10 } }, where: "arena" },
 ];
 
 /* Where the path stands: the goal showing, its progress, and whether it can

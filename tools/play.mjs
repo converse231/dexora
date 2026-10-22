@@ -5256,6 +5256,7 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   // The saved fields: each on its three counts, then each entry cleaned on its own.
   await savedField("beaten", { [brock.id]: { wins: 2, at: 40 } }, "junk", {});
   await savedField("team", [1, 3], "junk", [], { ...SAVE, box, nextUid: 7 });
+  await savedField("arenaTeam", [3, 1], "junk", [], { ...SAVE, box, nextUid: 7 });
   {
     const e = boot({ ...SAVE, box, nextUid: 7, team: [3, 99, 1],
       beaten: { [brock.id]: { wins: 1, at: 5 }, [misty.id]: { wins: "x", at: 1 }, "from-a-newer-build": { wins: 1, at: 0 } } }).e;

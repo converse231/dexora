@@ -3822,7 +3822,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(light.size >= 20, `only ${light.size} colour tokens found - the parse is wrong`);
     }
 
-    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon", ".ts-got", ".ts-gave", ".tc-send", ".of-mon", ".bd-want", ".tc-who.still", ".ts-one", ".pk-took"]) {
+    for (const box of [".cell", ".sf-art", ".vr-art", ".boxrow", ".pv-art", ".tp-slot", ".tc-mon", ".ts-got", ".ts-gave", ".tc-send", ".of-mon", ".bd-want", ".tc-who.still", ".ts-one", ".pk-took", ".ag-mon"]) {
       assert.ok(new RegExp(`\\${box}[^{}]*\\.sprite-strip`).test(css),
         `${box} draws a Pokemon and never sizes .sprite-strip - a tier that ` +
         "is a span will render zero wide there, silently");
@@ -7440,6 +7440,52 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       // Measured 2026-10-22: 13 of 40 before, 2 of 40 after. A third again is a stalemate back.
       assert.ok(timeouts <= 5, `${timeouts} of 24 Hard-vs-Hard matches ran out the clock - a stalemate is back`);
     }
+    /* THE BASIC ATTACK (2026-10-22). Held, it lands again and again and
+       spends no PP; every third in a row hits harder; a move pressed in its
+       recovery goes at once; Attack jabs and Sp. Atk throws a bolt; the CPU
+       uses it - and over real fights it stays a filler, not the fight. */
+    let basicShare = 0;
+    {
+      const held = (id, foeX) => {
+        const s = A.newMatch({ teams: [[bFighter(id, 50, 1, [idx("ember")])], [bFighter(143, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 12 });
+        const f = s.sides[0].team[0], d = s.sides[1].team[0];
+        Object.assign(f, { x: 8, y: 8, px: 8, py: 8 }); Object.assign(d, { x: foeX, y: 8, px: foeX, py: 8 });
+        const dmg = [];
+        for (let t = 0; t < 3 * A.TPS; t++) {
+          A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, basic: true }, null]);
+          for (const e of s.ev) if (e.k === "hit" && e.side === 1) dmg.push([e.dmg, e.boost]);
+          Object.assign(d, { x: foeX, y: 8 });      // the target holds its ground
+        }
+        return { s, f, dmg };
+      };
+      const jab = held(68, 9.2), bolt = held(65, 11);  // Machamp hits harder with Attack, Alakazam with Sp. Atk
+      assert.equal(A.basicShape(jab.f), "melee", "a physical attacker's basic attack is not a jab");
+      assert.equal(A.basicShape(bolt.f), "shot", "a special attacker's basic attack is not a bolt");
+      for (const r of [jab, bolt]) {
+        assert.ok(r.dmg.length >= 5, `a held basic attack landed ${r.dmg.length} times in 3 s - it does not repeat`);
+        assert.equal(r.f.kit[0].pp, A.kitOf(r.f)[0].pp, "a basic attack spent a move's PP");
+        const plain = r.dmg.filter(([, b]) => !b).map(([n]) => n), big = r.dmg.filter(([, b]) => b).map(([n]) => n);
+        const avg = (l) => l.reduce((n, x) => n + x, 0) / l.length;
+        assert.ok(big.length >= 1 && avg(big) > avg(plain) * 1.3, `every third basic attack is not the harder one (${big} against ${plain})`);
+        assert.ok(r.dmg.every(([, b], k) => b === ((k + 1) % 3 === 0)), "the boosted basic attack is not every third in a row");
+      }
+      // A move pressed while a basic attack recovers goes now, not after it.
+      const s = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 3 });
+      let t = 0;
+      while (!(s.sides[0].team[0].act?.basic && s.sides[0].team[0].act.ph === "rec") && t++ < 60) A.tick(s, [{ ...A.NO_INPUT, ax: 1, basic: true }, null]);
+      A.tick(s, [{ ...A.NO_INPUT, ax: 1, fire: 0 }, null]);
+      assert.ok(s.sides[0].team[0].act && !s.sides[0].team[0].act.basic, "a move pressed during a basic attack's recovery waited");
+      // Over real fights: the CPU throws it, and it stays the smaller share of the damage.
+      let bd = 0, all = 0, fired = 0;
+      for (let k = 1; k <= 8; k++) {
+        const m = A.newMatch({ teams: [A.cpuTeam(k * 41, 50), A.cpuTeam(k * 41 + 7, 50)], cpu: ["hard", "normal"], seed: k });
+        while (!m.over) { A.tick(m, [null, null]); for (const e of m.ev) { if (e.k === "fire" && e.basic) fired++; if (e.k === "hit") { all += e.dmg; if (e.basic) bd += e.dmg; } } }
+      }
+      basicShare = Math.round(bd / all * 100);
+      assert.ok(fired > 0, "the CPU never used its basic attack");
+      // A bound: measured 30-34% (2026-10-22). Past 45% the moves are the filler.
+      assert.ok(basicShare <= 45, `the basic attack dealt ${basicShare}% of the damage - the moves no longer carry a fight`);
+    }
     /* PLAYING ONLINE (phase 3). Two lockstep ends over a link that holds each
        message 1-9 frames (in order, as a reliable data channel is), each end
        playing its own scripted inputs: the same match tick for tick, to the
@@ -7459,7 +7505,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       const sample = (me) => () => {
         const r = roll(me);
         return { mx: roll(me) * 2 - 1, my: roll(me) * 2 - 1, ax: (roll(me) * 2 - 1) * 9.37, ay: (roll(me) * 2 - 1) * 5.11,
-          fire: r < 0.3 ? Math.floor(roll(me) * 4) : -1, dodge: r > 0.95, swap: r > 0.993 ? Math.floor(roll(me) * 3) : -1, surge: r > 0.9 };
+          fire: r < 0.3 ? Math.floor(roll(me) * 4) : -1, basic: r > 0.4 && r < 0.8, dodge: r > 0.95, swap: r > 0.993 ? Math.floor(roll(me) * 3) : -1, surge: r > 0.9 };
       };
       while (!(ends[0].s.over && ends[1].s.over) && frame < 40000) {
         for (const e of ends) {
@@ -7499,6 +7545,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       `grass hides, water slows, cover stops a shot; ${LD.LADDER.length} masters pay ¥${ladderTotal} once; ` +
       `the opening holds everyone off the clock, a Surge throws the foe and doubles cooldowns until a switch, ${surges} in 8 Hard matches; ` +
       `a spent Pokemon Struggles and the CPU benches it, the final minute hits harder, ${timeouts}/24 Hard matches to the clock; ` +
+      `a held basic attack repeats without PP, every third harder, a move cuts its recovery, ${basicShare}% of a real fight's damage; ` +
       `online, two lockstep ends over a laggy link finish one match (${fair[0].s.t} ticks, ${fair[0].s.why}) and a nudged state is caught at tick ${caught}`);
     console.log(`arena ok — a seed replays one match exactly and another seed differs, no browser-dependent maths, ` +
       `Normal beats Easy ${wins}/12 with ${ended}/12 by knockout, every match ends by its clock, every Pokemon has a kit; ` +

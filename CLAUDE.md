@@ -1171,8 +1171,26 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   sprites and flashes over them and under the boxes. The bare `canvas` rule
   is the map's - a new canvas resets it. Port a callback from its C; a
   guessed motion is where the bad frames were.
-- **The Arena is real-time battles** (2026-10-22, the Arena plan's phase 0;
-  its own tab of the League page). `game/arena.js` is its rulebook: a
+- **The Arena is real-time battles** (2026-10-22, the Arena plan's phase 0)
+  and, since the same day, **its own app tab** (`#/arena`, `goTab("arena")`;
+  App lazy-loads `ui/league/arena/Arena.jsx`, whose default export is the
+  page: a game's lobby - team, four mode tiles, the Ladder's rungs, floors,
+  one pinned Battle - always dark, its sheets the app's own). The League page
+  no longer carries it. **The basic attack** (`BASIC_K`, `BASIC_P` jab /
+  `BASIC_S` bolt by the higher attack stat, `arenaMove` knows both): held,
+  no PP, typeless, every third in a row `BASIC_BOOST`; a move pressed in its
+  recovery cuts it; the CPU fills its cooldowns with it. It took a third of
+  the damage, so `DAMAGE` went 0.6 -> 0.4 (a 3v3 back to ~76 s); check.mjs
+  holds it under 45% of a fight's damage. **The Arena's three are
+  `arenaTeam`** (`setArenaTeam`, `ARENA_TEAM` in ladder.js; empty is the
+  League team's first three). Keys: LMB held basic, RMB/Q/E/R moves, 1-3
+  switch, Space dodge, F surge. **Touch is a MOBA's**: a resting stick, the
+  attack button with the moves on an arc (tap auto-aims at a visible foe,
+  drag aims with an arrow and a Cancel), fullscreen and landscape where the
+  browser allows (`immerse`), a "turn your phone" card otherwise, the match
+  sized to `100dvh` and re-fitted on `visualViewport` resize (URL bars).
+  The renderer calls a move by name, turns a rune under its charge, trails
+  each type's matter behind a shot and flashes a super-effective hit. `game/arena.js` is its rulebook: a
   FIXED-STEP simulation (`TPS` 60) that `tick(s, inputs)` moves in place from
   the match's own seed (`s.rs`) and the inputs alone, so a seed and its inputs
   replay one match exactly. Nothing in it may differ between browsers: no

@@ -14,6 +14,8 @@
    held under a quarter of one day's road trainers by check.mjs - and the
    Champion adds a card pack. */
 export const LADDER_YEN = 80;
+// How many fight a side in the Arena: the save's `arenaTeam` holds at most this many.
+export const ARENA_TEAM = 3;
 
 export const LADDER = [
   { id: "court", name: "Court Master", arena: "indigo", level: 20, cpu: "normal", type: "normal",

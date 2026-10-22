@@ -38,17 +38,22 @@
    impact frame, slow motion and K.O., then the camera finds the winner.
    Reduced motion keeps every word and number and drops the shake, the zoom
    and the weather. */
-import { W, H, TPS, INSET, INTRO, LIMIT, FINAL_T, moveAt, activeOf, PAR, BRN, PSN, SLP, FRZ, GROUND, ZONE_SAYS } from "../../../game/arena.js";
+import { W, H, TPS, INSET, INTRO, LIMIT, FINAL_T, moveAt, activeOf, PAR, BRN, PSN, SLP, FRZ, GROUND, ZONE_SAYS,
+  arenaMove as moveOf, BASIC_P, BASIC_S, BASIC_K } from "../../../game/arena.js";
 import { arenaArt, loadAnims } from "../moveAnim.js";
 import { followSheet } from "../../../game/cosmetics.js";
 import { MOVES } from "../../../data/moves.js";
 import { TYPES } from "../../../data/types.js";
-import { STRUGGLE, moveOf } from "../../../game/battle.js";
+import { STRUGGLE } from "../../../game/battle.js";
 import { spriteUrl } from "../../Sprite.jsx";
 import { PMD_IDS, PMD_REV } from "../../../data/pmd.js";
 
 const asset = (p) => new URL(p, document.baseURI).href;
-const slugOf = (i) => (i === STRUGGLE ? "struggle" : MOVES[i].n);
+// The basic attack (arena.js) is no League move: no slug, no sprite - it is drawn in its user's colour.
+const slugOf = (i) => (i === STRUGGLE ? "struggle" : MOVES[i]?.n ?? null);
+const isBasic = (i) => i === BASIC_P || i === BASIC_S;
+// A move's name as the callout says it ("Thunder Punch").
+const callName = (i) => (i === STRUGGLE ? "Struggle" : MOVES[i].n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "));
 const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const rand = Math.random;
 const TAU = Math.PI * 2;
@@ -69,6 +74,10 @@ const VS_IN = 0.12, VS_SLAM = 0.5, VS_OUT = 1.1, THROW = 1.15, LAND = 1.6, COUNT
 const KO_SLOW = 1100, RESULT_AT = 1150, DONE_AT = 2400;
 // How close the upright camera may come (the court fills the width at 1).
 const UPRIGHT_ZOOM = 2.4;
+/* ...and how far it may stand back: at 1 the court was a strip across the
+   middle of a tall phone with empty bands above and below the fight. Past
+   it the camera favours your own Pokemon, the one you steer. */
+const UPRIGHT_MIN = 1.3;
 
 /* A type's colour is `--tc` on its `.t-<type>` class (the rulebook: read it,
    never copy a hex), read once off a hidden probe. */
@@ -382,6 +391,25 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   const colours = typeColours();
   const colourOf = (i) => colours[moveOf(i).t] ?? "#e8e8f0";
   const typeOf = (i) => moveOf(i).t ?? "normal";
+  // A side's Pokemon's first type: what its typeless basic attack wears.
+  const typeAt = (s, side) => { const sd = s.sides[side]; return TYPES[sd.team[sd.active]?.types[0]] ?? "normal"; };
+  const tintOf = (i, s, side) => (isBasic(i) ? colours[typeAt(s, side)] ?? "#e8e8f0" : colourOf(i));
+  /* WHAT A TYPE LEAVES IN THE AIR behind a shot: its own matter, a little
+     at a time - embers, droplets, sparks, frost, leaves - so a Flamethrower
+     and a Water Gun read apart at a glance, before either lands. */
+  function trailBit(type, x, y, dx, dy, colour) {
+    const [vx, vy] = [-dx * 0.02 + (rand() - 0.5) * 0.03, -dy * 0.02 + (rand() - 0.5) * 0.03];
+    switch (type) {
+      case "fire": part({ k: "glow", x, y, vx, vy, lift: 0.002, colour: rand() < 0.5 ? "#ffd27a" : "#ff5a1f", life: 18 + rand() * 10, size: 0.1 + rand() * 0.08 }); break;
+      case "water": part({ k: "dot", x, y, vx, vy, vz: 0.02, g: 0.004, colour: rand() < 0.5 ? "#7fd4ff" : "#d8f6ff", life: 22, size: 0.09 }); break;
+      case "electric": if (rand() < 0.5) part({ k: "bolt", x, y, ang: rand() * TAU, len: 0.4 + rand() * 0.5, colour: "#fff59a", life: 5 }); break;
+      case "ice": part({ k: "shard", x, y, vx, vy, colour: rand() < 0.5 ? "#bff3ff" : "#ffffff", life: 20, size: 0.12, vr: 0.3 }); break;
+      case "grass": case "bug": part({ k: "leaf", x, y, vx, vy, colour: rand() < 0.5 ? "#5fd35a" : "#a6e86b", life: 26, size: 0.12, vr: 0.2 }); break;
+      case "psychic": case "fairy": part({ k: "star", x, y, vx, vy, colour: rand() < 0.5 ? colour : "#ffffff", life: 18, size: 0.12 }); break;
+      case "rock": case "ground": part({ k: "chunk", x, y, vx, vy, colour: "#9b8466", life: 18, size: 0.09 }); break;
+      default: part({ k: "glow", x, y, vx, vy, wob: type === "ghost" ? 1 : 0, colour, life: 16, size: 0.1 });
+    }
+  }
   let px = 16, floor = null, ox = 0, oy = 0, dpr = 1;
   const fx = [];          // live effects: bursts, numbers, words, rings, beams, corpses
   const parts = [];       // matter: embers, droplets, shards, chunks...
@@ -602,11 +630,23 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     for (const e of ev) {
       const body = e.side != null ? activeOf(s, e.side) : null;
       if (e.k === "hit") {
-        const colour = colourOf(e.move), type = typeOf(e.move);
+        // A basic attack hits in its user's colour and type, lighter - its third, boosted, does not.
+        const bas = isBasic(e.move);
+        const colour = tintOf(e.move, s, 1 - e.side), type = bas ? typeAt(s, 1 - e.side) : typeOf(e.move);
         const art = arenaArt(slugOf(e.move));
         const heavy = e.heavy || e.ko || e.frac > 0.25;
-        fx.push({ k: "burst", x: e.x, y: e.y, art: art?.burst ?? art?.shot, colour, t: 0, life: 30 });
+        fx.push({ k: "burst", x: e.x, y: e.y, art: art?.burst ?? art?.shot, colour, t: 0, life: bas && !e.boost ? 16 : 30 });
         impact(type, e.x, e.y, e.dx, e.dy, heavy);
+        if (e.boost) {
+          word(e.x + 0.5, e.y - 1.1, "x3!", "#ffd23f", 36, true);
+          for (let i = 0; i < 2; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? colour : "#ffffff", life: 16, size: 0.25, grow: 0.12 - i * 0.03, t: -i * 2 });
+        }
+        /* SUPER EFFECTIVE IS FELT: the screen flashes the move's colour and a
+           ring of it goes out from the hit. */
+        if (e.eff > 1 && !bas) {
+          overlays.push({ k: "tint", colour, t: 0, life: 14 });
+          fx.push({ k: "ring", x: e.x, y: e.y, colour, t: 0, life: 24, big: true });
+        }
         const bounce = e.dx > 0 ? 1 : -1;
         fx.push({ k: "num", x: e.x, y: e.y - 0.6, vx: bounce * (0.012 + rand() * 0.01), text: String(e.dmg), crit: e.crit, eff: e.eff, t: 0, life: 52, size: e.crit ? 0.82 : heavy ? 0.7 : 0.6 });
         const w = e.crit ? "Critical!" : e.eff > 1 ? "Super effective!" : e.eff < 1 ? "Not very effective" : null;
@@ -619,7 +659,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         p.vt += (e.dx >= 0 ? 1 : -1) * 0.12 * power;
         p.tint = colour; p.tintT = 12; p.hurt = 16;
         lastHit[e.side] = [e.dx || 0, e.dy || 0];
-        const hold = (e.ko ? 0 : 40) + (heavy ? 45 : 0) + (e.crit ? 25 : 0) + (e.eff > 1 ? 15 : 0) + (e.surge ? 20 : 0);
+        // A plain basic attack barely holds the frame: twenty a second of full hit-stops would be a slideshow.
+        const hold = bas && !e.boost ? 14 : (e.ko ? 0 : 40) + (heavy ? 45 : 0) + (e.crit ? 25 : 0) + (e.eff > 1 ? 15 : 0) + (e.surge ? 20 : 0);
         stop(hold); p.jit = hold;
         shake(0.18 + 0.4 * power * (heavy ? 1 : 0.6));
         kick(e.dx, e.dy, px * 0.12 * power);
@@ -662,10 +703,20 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else if (e.k === "fizzle") {
         fx.push({ k: "ring", x: e.x, y: e.y, colour: colourOf(e.move), t: 0, life: 16 });
       } else if (e.k === "wind" && body) {
-        part({ k: "ring", x: body.x, y: body.y + 0.35, colour: colourOf(e.move), life: 14, size: 1.2, grow: -0.06 });
+        if (!isBasic(e.move)) part({ k: "ring", x: body.x, y: body.y + 0.35, colour: colourOf(e.move), life: 14, size: 1.2, grow: -0.06 });
       } else if (e.k === "fire" && body) {
         // The release: a lunge into a blow, a kick back off a shot, a stamp for a pulse.
-        const p = poseOf(e.side, s.sides[e.side].active), colour = colourOf(e.move);
+        const p = poseOf(e.side, s.sides[e.side].active), colour = tintOf(e.move, s, e.side);
+        /* A MOVE IS CALLED, as the games call it: its name over its user, a
+           shockwave in its colour, and the camera answering its power. The
+           basic attack is never called - it is the rhythm under the moves. */
+        if (!isBasic(e.move)) {
+          const pow = moveOf(e.move).p ?? 0;
+          fx.push({ k: "call", x: body.x, y: body.y, text: callName(e.move), colour, mine: e.side === me, t: 0, life: 50 });
+          part({ k: "ring", x: body.x, y: body.y + 0.3, colour, life: 16, size: 0.4, grow: 0.12 });
+          if (pow >= 90) { shake(0.32); zoomAt(body.x, body.y, 0.045); impactFrame(sx(body.x), sy(body.y)); }
+          else if (pow) shake(0.08 + pow / 600);
+        }
         if (e.shape === "melee" || e.shape === "dash") { p.ox += e.dx * 0.4; p.oy += e.dy * 0.4; p.sx = 0.86; p.sy = 1.16; if (e.shape === "dash") dust(body.x, body.y, 5); }
         else if (e.shape === "shot" || e.shape === "multi" || e.shape === "beam") {
           p.ox -= e.dx * 0.14; p.oy -= e.dy * 0.14; p.sx = 1.12; p.sy = 0.9;
@@ -674,8 +725,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         } else if (e.shape === "pulse") { p.sx = 1.3; p.sy = 0.72; dust(body.x, body.y, 6); }
         else { p.oy -= 0.3; p.sy = 1.15; p.sx = 0.9; }
       } else if (e.k === "beam") {
-        fx.push({ k: "beam", x: e.x, y: e.y, dx: e.dx, dy: e.dy, len: e.len, colour: colourOf(e.move), art: arenaArt(slugOf(e.move))?.shot, t: 0, life: 20 });
-        shake(0.3); kick(-e.dx, -e.dy, px * 0.1);
+        fx.push({ k: "beam", x: e.x, y: e.y, dx: e.dx, dy: e.dy, len: e.len, colour: colourOf(e.move), art: arenaArt(slugOf(e.move))?.shot, t: 0, life: 24 });
+        shake(0.4); kick(-e.dx, -e.dy, px * 0.14);
+        // Sparks thrown off all along it, and a burst where it ends.
+        for (let d = 0.5; d < e.len; d += 0.6) {
+          const side = rand() < 0.5 ? 1 : -1;
+          part({ k: "glow", x: e.x + e.dx * d, y: e.y + e.dy * d, vx: -e.dy * side * (0.03 + rand() * 0.04), vy: e.dx * side * (0.03 + rand() * 0.04), colour: rand() < 0.4 ? "#ffffff" : colourOf(e.move), life: 18 + rand() * 12, size: 0.1 + rand() * 0.08 });
+        }
+        impact(typeOf(e.move), e.x + e.dx * e.len, e.y + e.dy * e.len, e.dx, e.dy, true);
         const type = typeOf(e.move);
         if (moveOf(e.move).p) mark(type === "water" ? "wet" : type === "ice" ? "frost" : "scorch", e.x + e.dx * e.len / 2, e.y + 0.25 + e.dy * e.len / 2, 0.9, null, e.len, Math.atan2(e.dy, e.dx));
       } else if (e.k === "pulse") {
@@ -797,8 +854,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
            frames the two fighters instead, as a fighting game does - closer
            while they are close, the whole court once they are apart. */
         const fit = Math.min(cw / ((Math.abs(ax - bx) + 7) * px), ch / ((Math.abs(ay - by) + 5) * px));
-        tz = clamp(fit, 1, UPRIGHT_ZOOM);
-        tx = (ax + bx) / 2; ty = (ay + by) / 2;
+        tz = clamp(fit, UPRIGHT_MIN, UPRIGHT_ZOOM);
+        const k = fit < UPRIGHT_MIN ? (bodies[0].side === me ? 0.7 : 0.3) : 0.5;
+        tx = ax * k + bx * (1 - k); ty = ay * k + by * (1 - k);
       } else {
         // A little closer while they are close: the fight fills the screen.
         const d = Math.hypot(ax - bx, ay - by);
@@ -922,7 +980,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     // 1. Telegraphs on the ground, under everything.
     for (const f of bodies) {
       const a = f.act;
-      if (!a || a.ph !== "wind") continue;
+      if (!a || a.ph !== "wind" || a.k === BASIC_K) continue;
       const [x, y] = lerp(f);
       const m = moveAt(f, a.k), colour = colourOf(m.i);
       const kk = 1 - a.t / Math.max(1, a.t0);
@@ -958,12 +1016,29 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.beginPath(); ctx.arc(0, 0, px * (1.2 - 0.6 * kk), 0, TAU); ctx.stroke();
       }
       ctx.restore();
-      // The body gathers its colour: motes drawn in, a glow that swells.
-      if (rand() < 0.7 * k * (0.4 + kk)) {
-        const a2 = rand() * TAU, r = 1.1 + rand() * 0.5;
-        part({ k: "glow", x: x + Math.cos(a2) * r, y: y - 0.3 + Math.sin(a2) * r, vx: -Math.cos(a2) * r / 14, vy: -Math.sin(a2) * r / 14, colour, life: 14, size: 0.1, drag: 1 });
+      /* THE CHARGE: a rune turning at its feet - two rings, opposite ways, and
+         six marks between - that brightens to the release. */
+      if (!still) {
+        ctx.save();
+        ctx.translate(sx(x), sy(y + 0.38)); ctx.scale(1, 0.42);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.strokeStyle = colour; ctx.fillStyle = colour;
+        ctx.globalAlpha = 0.3 + 0.55 * kk; ctx.lineWidth = Math.max(2, px / 9);
+        ctx.rotate(clock / 260);
+        ctx.setLineDash([px * 0.42, px * 0.18]); ctx.beginPath(); ctx.arc(0, 0, px * 1.3, 0, TAU); ctx.stroke();
+        ctx.rotate(-clock / 130);
+        ctx.setLineDash([px * 0.14, px * 0.26]); ctx.beginPath(); ctx.arc(0, 0, px * 0.9, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+        for (let i = 0; i < 6; i++) { const r2 = (i / 6) * TAU; ctx.fillRect(Math.cos(r2) * px * 1.1 - px * 0.06, Math.sin(r2) * px * 1.1 - px * 0.06, px * 0.12, px * 0.12); }
+        ctx.restore();
       }
-      glow(sx(x), sy(y - 0.3), px * (0.5 + 0.6 * kk), colour, 0.18 + 0.3 * kk);
+      // The body gathers its colour: motes drawn in, a glow that swells, a flare just before.
+      if (rand() < 1.4 * k * (0.4 + kk)) {
+        const a2 = rand() * TAU, r = 1.1 + rand() * 0.7;
+        part({ k: "glow", x: x + Math.cos(a2) * r, y: y - 0.3 + Math.sin(a2) * r, vx: -Math.cos(a2) * r / 12, vy: -Math.sin(a2) * r / 12, colour: rand() < 0.25 ? "#ffffff" : colour, life: 12, size: 0.13, drag: 1 });
+      }
+      glow(sx(x), sy(y - 0.3), px * (0.55 + 0.8 * kk), colour, 0.2 + 0.4 * kk);
+      if (kk > 0.82) glow(sx(x), sy(y - 0.3), px * 0.5, "#ffffff", 0.5 * (kk - 0.82) / 0.18);
     }
 
     // 2. Bodies: shadow, afterimages, the walking sprite, its status and flash.
@@ -1055,17 +1130,24 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     for (const p of s.shots) {
       live.add(p.id);
       const x = p.x - p.dx * (10 / TPS) * (1 - alpha), y = p.y - p.dy * (10 / TPS) * (1 - alpha);
-      const colour = colourOf(p.move);
+      const bas = isBasic(p.move), colour = tintOf(p.move, s, p.side);
       const tr = trails.get(p.id) ?? [];
-      tr.push([x, y]); if (tr.length > 10) tr.shift();
+      tr.push([x, y]); if (tr.length > (bas ? 6 : 12)) tr.shift();
       trails.set(p.id, tr);
-      tr.forEach(([qx, qy], n) => glow(sx(qx), sy(qy), px * (0.15 + 0.06 * n), colour, 0.06 + 0.05 * n));
-      glow(sx(x), sy(y), px * 0.95, colour, 0.6);
-      if (rand() < 0.5 * k) part({ k: "glow", x, y, vx: -p.dx * 0.01 + (rand() - 0.5) * 0.02, vy: -p.dy * 0.01 + (rand() - 0.5) * 0.02, colour, life: 14, size: 0.08 });
+      tr.forEach(([qx, qy], n) => glow(sx(qx), sy(qy), px * (bas ? 0.1 + 0.04 * n : 0.18 + 0.07 * n), colour, 0.07 + 0.05 * n));
+      glow(sx(x), sy(y), px * (bas ? 0.6 : 1.15), colour, 0.65);
+      if (!bas) glow(sx(x), sy(y), px * 0.4, "#ffffff", 0.55);
+      if (rand() < (bas ? 0.35 : 1.1) * k) trailBit(bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, colour);
       const art = arenaArt(slugOf(p.move))?.shot;
       if (!drawArt(art, sx(x), sy(y), Math.max(1, px / 12), Math.atan2(p.dy, p.dx), clock / 16.7)) {
-        ctx.save(); ctx.fillStyle = colour; ctx.beginPath(); ctx.arc(sx(x), sy(y), px * 0.32, 0, TAU); ctx.fill();
-        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(sx(x), sy(y), px * 0.13, 0, TAU); ctx.fill(); ctx.restore();
+        // No sprite (a basic bolt): a comet - a bright head and a tapered tail along its path.
+        const r = px * (bas ? (p.boost ? 0.3 : 0.2) : 0.32), ang = Math.atan2(p.dy, p.dx);
+        ctx.save(); ctx.translate(sx(x), sy(y)); ctx.rotate(ang);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = colour; ctx.globalAlpha = 0.8;
+        ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r * 4, -r * 0.6); ctx.lineTo(-r * 4, r * 0.6); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, TAU); ctx.fill(); ctx.restore();
       }
     }
     for (const id of trails.keys()) if (!live.has(id)) trails.delete(id);
@@ -1075,14 +1157,15 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       const a = f.act;
       if (!a || a.shape !== "melee" || (a.ph !== "act" && !(a.ph === "rec" && a.t > 2))) continue;
       const [x, y] = lerp(f);
-      const colour = colourOf(moveAt(f, a.k).i);
-      const ang = Math.atan2(a.dy, a.dx), r = 1.7 * px;
+      const bas = a.k === BASIC_K;
+      const colour = tintOf(moveAt(f, a.k).i, s, f.side);
+      const ang = Math.atan2(a.dy, a.dx), r = (bas ? 1.25 : 1.7) * px;
       const sweep = Math.min(1, a.ph === "act" ? 1 - a.t / 6 : 1);
       ctx.save();
       ctx.translate(sx(x), sy(y - 0.2));
       ctx.globalCompositeOperation = "lighter";
       ctx.lineCap = "round";
-      for (const [w, c, al] of [[0.7, colour, 0.35], [0.42, colour, 0.8], [0.13, "#fff", 0.95]]) {
+      for (const [w, c, al] of bas ? [[0.36, colour, 0.5], [0.1, "#fff", 0.95]] : [[0.9, colour, 0.3], [0.5, colour, 0.8], [0.16, "#fff", 0.95]]) {
         ctx.strokeStyle = c; ctx.globalAlpha = al; ctx.lineWidth = px * w;
         ctx.beginPath(); ctx.arc(0, 0, r, ang - 0.95, ang - 0.95 + 1.9 * sweep); ctx.stroke();
       }
@@ -1264,7 +1347,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       drawArt(e.art, sx(e.x), sy(e.y), Math.max(1, px / 11) * (1 + 0.4 * kk), 0, e.t, 1 - kk * kk);
     } else if (e.k === "beam") {
       // A beam: a wide glow, a white core, and the move's sprite laid down it.
-      const ang = Math.atan2(e.dy, e.dx), len = e.len * px, wide = px * (1 - kk) * 0.95;
+      const ang = Math.atan2(e.dy, e.dx), len = e.len * px, wide = px * (1 - kk) * (still ? 1 : 0.85 + rand() * 0.35);
       ctx.save(); ctx.translate(sx(e.x), sy(e.y)); ctx.rotate(ang);
       ctx.globalCompositeOperation = "lighter";
       ctx.globalAlpha = 0.55 * (1 - kk); ctx.fillStyle = e.colour; ctx.fillRect(0, -wide, len, wide * 2);
@@ -1272,6 +1355,20 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.restore();
       if (e.art) for (let d = 0.6; d < e.len; d += 0.8) drawArt(e.art, sx(e.x + e.dx * d), sy(e.y + e.dy * d), Math.max(1, px / 14), ang, e.t + d * 7, 1 - kk);
       glow(sx(e.x + e.dx * e.len), sy(e.y + e.dy * e.len), px * 1.2, e.colour, 0.6 * (1 - kk));
+    } else if (e.k === "call") {
+      // The move's name: punched in over its user, slanted, then lifting away.
+      const pop = e.t < 6 ? back(e.t / 6) : 1, fade = kk > 0.72 ? (1 - kk) / 0.28 : 1;
+      const size = Math.max(11, Math.round(px * 0.48));
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.translate(sx(e.x), sy(e.y - 1.7 - kk * 0.35)); ctx.scale(pop, pop); ctx.transform(1, 0, -0.18, 1, 0, 0);
+      ctx.font = `italic 900 ${size}px ${FACE}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const w = ctx.measureText(e.text).width + size * 1.1;
+      ctx.fillStyle = "rgba(8,10,24,0.88)"; ctx.fillRect(-w / 2, -size * 0.72, w, size * 1.44);
+      ctx.fillStyle = e.colour; ctx.fillRect(-w / 2, size * 0.56, w, size * 0.16);
+      ctx.fillRect(e.mine ? -w / 2 : w / 2 - size * 0.16, -size * 0.72, size * 0.16, size * 1.44);
+      ctx.fillStyle = "#ffffff"; ctx.fillText(e.text, 0, 0);
+      ctx.restore();
     } else if (e.k === "wave") {
       const r = e.r * px * (0.25 + 0.75 * Math.min(1, kk * 1.6));
       ctx.save(); ctx.globalAlpha = 0.7 * (1 - kk); ctx.strokeStyle = e.colour; ctx.lineWidth = px * 0.35 * (1 - kk * 0.6);
@@ -1395,6 +1492,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           speedLines(o.x, o.y, "rgba(10,8,20,0.5)", 1 - kk);
         }
         ctx.restore();
+      } else if (o.k === "tint") {
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.3 * (1 - kk); ctx.fillStyle = o.colour; ctx.fillRect(0, 0, cw, ch); ctx.restore();
       } else if (o.k === "cut") cutIn(o, kk);
       else if (o.k === "stamp") stampAt(o.text, o.colour, o.t, o.life, o.sub);
     }

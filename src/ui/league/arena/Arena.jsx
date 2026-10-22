@@ -1,6 +1,9 @@
-/* THE ARENA (the Arena plan, phases 0 and 1): real-time battles, a tab of
-   the League page. game/arena.js is the rules; render.js draws them; this is
-   the lobby, the controls and the HUD.
+/* THE ARENA (the Arena plan): real-time battles, its OWN TAB since
+   2026-10-22 ("Battles would be League, then Arena a separate tab with a
+   totally different UI/UX, like a complete game"). game/arena.js is the
+   rules; render.js draws them; this is the page - a game's lobby (your team,
+   the modes, the floors, one big Battle) - and a match's controls and HUD.
+   Reached only by `lazy()` from App, like the League it borrows its data from.
 
    THE LOOP LIVES OUTSIDE REACT, like the map's: requestAnimationFrame steps
    the match in whole ticks (`TPS`) from accumulated time and draws between
@@ -10,7 +13,8 @@
    A match never touches your Pokemon. A win against a CPU pays once a level a
    day (`engine.arenaWin`, priced like a road trainer in road.js); a master of
    the Arena Ladder (ladder.js) pays its first win once (`engine.arenaMaster`,
-   which also judges the order).
+   which also judges the order). The Arena's three are the save's own
+   `arenaTeam`, apart from the League's six (empty: the League's first three).
 
    ONLINE (phase 3): a FRIEND is challenged from the lobby (db/arena.sql), the
    two browsers link up (net.js) and play one match in lockstep (arena.js) in
@@ -19,12 +23,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL,
-  FINAL_T, spent,
+  FINAL_T, spent, BASIC_CD, SWAP_CD, basicShape, basicOf, BASIC_P,
   cooldownOf, DODGE_CD, ARENAS, shapeOf, GROUND, ZONE_SAYS } from "../../../game/arena.js";
 import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, arenaCancel } from "../../../net/cloud.js";
 import { isEvent } from "../../../data/dex.js";
 import { connect } from "./net.js";
-import { LADDER, masterOf, ladderOpen, ladderPay } from "../../../game/ladder.js";
+import { LADDER, masterOf, ladderOpen, ladderPay, ARENA_TEAM } from "../../../game/ladder.js";
 import { playerFighter, moveOf, STRUGGLE, refusal } from "../../../game/battle.js";
 import { MOVES } from "../../../data/moves.js";
 import { speciesById } from "../../../game/biomes.js";
@@ -32,24 +36,50 @@ import { variantOf } from "../../../game/items.js";
 import { label } from "../../../game/map.js";
 import { ARENA_LEVELS, arenaPay } from "../../../game/road.js";
 import { dayKey, hash } from "../../../game/daily.js";
+import { ARENA_NEWS_KEY, write } from "../../../game/store.js";
 import { createRenderer } from "./render.js";
 import { loadAnims } from "../moveAnim.js";
 import Sprite from "../../Sprite.jsx";
+import Icon from "../../Icon.jsx";
+import Types from "../../Types.jsx";
+import Picker, { keyOf } from "../../trade/Picker.jsx";
 import { useModalLock, useDismiss } from "../../modal.js";
 import { PMD_REV } from "../../../data/pmd.js";
 
-const TEAM = 3;
 const nameOf = (id) => label(speciesById(id));
 const moveName = (i) => (i === STRUGGLE ? "Struggle" : MOVES[i].n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "));
 const touchDevice = () => matchMedia("(hover: none) and (pointer: coarse)").matches;
 const clock = (ticks) => { const s = Math.max(0, Math.ceil(ticks / TPS)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const asset = (p) => new URL(p, document.baseURI).href;
-const ARENA_KEY = "dexora-arena-floor";
-const readFloor = () => { try { return localStorage.getItem(ARENA_KEY) || "random"; } catch { return "random"; } };
-const keepFloor = (id) => { try { localStorage.setItem(ARENA_KEY, id); } catch { /* a preference */ } };
+// Device preferences, never the save.
+const pref = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
+const keep = (k, v) => { try { localStorage.setItem(k, v); } catch { /* a preference */ } };
+const FLOOR_KEY = "dexora-arena-floor", MODE_KEY = "dexora-arena-mode", LEVEL_KEY = "dexora-arena-cpu";
 const STATUS_TAG = ["PAR", "BRN", "PSN", "SLP", "FRZ"];
 const STAT = ["", "Atk", "Def", "SpA", "SpD", "Spe", "Acc", "Eva"];
 const SHAPE_WORD = { shot: "Shot", beam: "Beam", melee: "Blow", dash: "Dash", pulse: "Pulse", field: "Trap", self: "Self", multi: "Burst" };
+// The keys a match reads, in one place: the HUD's keycaps and How to play both say them.
+const SKILL_KEYS = ["RMB", "Q", "E", "R"];
+const PRESS = 14;          // ticks a press waits for its move: a basic attack's swing is shorter
+/* A PHONE PLAYS FULLSCREEN AND SIDEWAYS where the browser lets a page ask
+   (Android's Chrome: it also takes the URL bar away, which otherwise came
+   and went over the controls). Asked on the Battle press - it must be a
+   gesture - and let go when the match is over. Elsewhere (iOS) it quietly
+   does nothing and the match asks to be turned instead. */
+const immerse = () => {
+  if (!touchDevice() || document.fullscreenElement) return;
+  try {
+    document.documentElement.requestFullscreen?.({ navigationUI: "hide" })
+      ?.then(() => screen.orientation?.lock?.("landscape")?.catch?.(() => {}))?.catch?.(() => {});
+  } catch { /* not this browser */ }
+};
+const unimmerse = () => {
+  try { screen.orientation?.unlock?.(); } catch { /* not this browser */ }
+  if (document.fullscreenElement) document.exitFullscreen?.()?.catch?.(() => {});
+};
+const UPRIGHT_KEY = "dexora-arena-upright";
+// A dragged move reaches this far: a thumb's pull of AIM_PX aims AIM_TILES away (a hazard lands there).
+const AIM_PX = 72, AIM_TILES = 6, AIM_DEAD = 14;
 
 /* What each floor's ground does, in the player's words (GROUND is the rule). */
 const GROUND_SAYS = {
@@ -62,105 +92,329 @@ const GROUND_SAYS = {
 };
 const floorName = (id) => ARENAS.find((a) => a.id === id)?.name ?? id;
 
-const MODES = [
-  { id: "dummy", name: "Training", says: "A dummy that never hits back. Learn your four moves.", cpu: "dummy" },
-  { id: "easy", name: "Quick battle · Easy", says: "A CPU team at your team's level. Slow to react.", cpu: "easy" },
-  { id: "normal", name: "Quick battle · Normal", says: "Dodges about half of what it sees, switches when low.", cpu: "normal" },
-  { id: "hard", name: "Quick battle · Hard", says: "Fast hands, sharp aim, leads its shots, raises a shield.", cpu: "hard" },
-];
+const LEVEL_SAYS = {
+  easy: "Slow to react, loose aim. Good for learning the ropes.",
+  normal: "Dodges about half of what it sees and switches out when low.",
+  hard: "Fast hands, sharp aim. Leads its shots, raises a shield, takes the zones.",
+};
+const MODE_NAME = { ladder: "Arena Ladder", quick: "Quick battle", training: "Training", friends: "Battle a friend" };
 
-export default function Arena({ engine, box, team, record, ladder = [], onLive }) {
-  const mons = useMemo(() => team.map((uid) => box.find((m) => m.uid === uid)).filter((m) => m && !refusal(m)).slice(0, TEAM), [box, team]);
-  const [match, setMatch] = useState(null);     // { mode, seed, floor }
+/* THE ARENA PAGE: a tab of its own. The game underneath pauses while it is
+   open, it takes the modal lock, and a match owns the whole screen through
+   `body.fighting` (the bars step aside). Opening it is what the map's
+   announcement waits for (ARENA_NEWS_KEY). */
+export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], onClose }) {
+  useModalLock();
+  useEffect(() => {
+    engine?.pause(true);
+    return () => engine?.pause(false);
+  }, [engine]);
+  useEffect(() => { write(ARENA_NEWS_KEY, "done"); }, []);
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    document.body.classList.toggle("fighting", live);
+    if (!live) unimmerse();
+    return () => document.body.classList.remove("fighting");
+  }, [live]);
+  useEffect(() => unimmerse, []);
+
+  const ids = arenaTeam.length ? arenaTeam : team;
+  const mons = useMemo(() => ids.map((uid) => box.find((m) => m.uid === uid)).filter((m) => m && !refusal(m)).slice(0, ARENA_TEAM), [box, ids]);
+  const [match, setMatch] = useState(null);     // { mode, seed, floor, master }
   const [online, setOnline] = useState(null);   // { role, invite, friend }
-  const [floor, setFloor] = useState(readFloor);
-  useEffect(() => { onLive?.(Boolean(match || online)); }, [match, online, onLive]);
-  useEffect(() => () => onLive?.(false), [onLive]);
+  const [editing, setEditing] = useState(false);
+  const [howto, setHowto] = useState(false);
+  useEffect(() => { setLive(Boolean(match || online)); }, [match, online]);
   useEffect(() => { loadAnims(); }, []);
-  const level = mons.length ? Math.round(mons.reduce((n, m) => n + m.level, 0) / mons.length) : 5;
-  const paid = record?.day === dayKey() ? record.won : [];
+  // Escape leaves the page - unless a match, the editor or How to play has it.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape" && !match && !online && !editing && !howto) { e.preventDefault(); onClose(); } };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [match, online, editing, howto, onClose]);
 
-  const pickFloor = (seed) => (floor === "random" ? ARENAS[Math.abs(seed) % ARENAS.length].id : floor);
+  const level = mons.length ? Math.round(mons.reduce((n, m) => n + m.level, 0) / mons.length) : 5;
   if (match) {
     return <Match key={match.seed} mons={mons} mode={match.mode} master={match.master} level={level} seed={match.seed} floor={match.floor}
       onWin={(cpu) => (match.master ? engine?.arenaMaster(match.master.id) : engine?.arenaWin(cpu, level)) ?? 0}
-      onAgain={() => { const seed = (match.seed * 1103515245 + 12345) | 0; setMatch({ ...match, seed, floor: match.master ? match.floor : pickFloor(seed) }); }}
+      onAgain={() => { const seed = (match.seed * 1103515245 + 12345) | 0; setMatch({ ...match, seed, floor: match.master || match.fixed ? match.floor : pickFloor(match.pick, seed) }); }}
       onExit={() => setMatch(null)} />;
   }
   if (online) return <Online start={online} mons={mons} onExit={() => setOnline(null)} />;
-  const start = (mode) => { const seed = (Date.now() & 0x7fffffff) | 1; setMatch({ mode, seed, floor: pickFloor(seed) }); };
-  const challenge = (m) => setMatch({ mode: m.cpu, master: m, seed: (Date.now() & 0x7fffffff) | 1, floor: m.arena });
-  const shown = floor === "random" ? null : floor;
-  const choose = (id) => { setFloor(id); keepFloor(id); };
   return (
-    <div className="ar-lobby">
-      <section className="lg-hero ar-hero">
-        <span className="lg-kicker">Real-time battles</span>
-        <h2>The Arena</h2>
-        <p>Move, aim, dodge and switch as it happens. Your first three Team Pokémon fight with their League moves; a hit is the League's own damage. Nothing here changes your Pokémon.</p>
-      </section>
-      <h3 className="lg-section">Your team</h3>
-      {mons.length ? (
-        <div className="ar-team">
-          {mons.map((m) => (
-            <div key={m.uid} className="ar-mon">
-              <Sprite id={m.species} variant={variantOf(m)} />
-              <b>{nameOf(m.species)}</b>
-              <span>Lv {m.level}</span>
-              <ul>{playerFighter(m).moves.map((mv) => {
-                const shape = shapeOf(moveOf(mv.i));
-                return <li key={mv.i} className={shape ? "" : "off"} data-tip={shape ? SHAPE_WORD[shape] : "Not played in the Arena"}>{moveName(mv.i)}</li>;
-              })}</ul>
+    <>
+      <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0}
+        onStart={(m) => { immerse(); setMatch(m); }} onOnline={(o) => { immerse(); setOnline(o); }} onEdit={() => setEditing(true)} onHowto={() => setHowto(true)} />
+      {editing && <TeamEdit box={box} picked={mons} custom={arenaTeam.length > 0}
+        onSave={(uids) => { engine?.setArenaTeam(uids); setEditing(false); }} onClose={() => setEditing(false)} />}
+      {howto && <HowTo onClose={() => setHowto(false)} />}
+    </>
+  );
+}
+
+const pickFloor = (floor, seed) => (floor === "random" ? ARENAS[Math.abs(seed) % ARENAS.length].id : floor);
+
+/* THE LOBBY: your three on the left, the four ways to fight on the right,
+   the floors under them, and one big Battle along the foot. Each mode is a
+   tile; the chosen one opens its own panel (the Ladder's ten masters, a
+   CPU's difficulty, your friends). */
+function Lobby({ mons, level, record, ladder, custom, onStart, onOnline, onEdit, onHowto }) {
+  const [mode, setMode0] = useState(() => { const m = pref(MODE_KEY, "ladder"); return MODE_NAME[m] && (m !== "friends" || CLOUD) ? m : "ladder"; });
+  const [cpu, setCpu0] = useState(() => pref(LEVEL_KEY, "normal"));
+  const [floor, setFloor0] = useState(() => pref(FLOOR_KEY, "random"));
+  const setMode = (v) => { setMode0(v); keep(MODE_KEY, v); };
+  const setCpu = (v) => { setCpu0(v); keep(LEVEL_KEY, v); };
+  const setFloor = (v) => { setFloor0(v); keep(FLOOR_KEY, v); };
+  const next = LADDER.find((m) => !ladder.includes(m.id)) ?? LADDER.at(-1);
+  const [master, setMaster] = useState(next.id);
+  const chosen = masterOf(master) ?? next;
+  const paid = record?.day === dayKey() ? record.won : [];
+  const best = useMemo(() => {
+    let mem = {};
+    try { mem = JSON.parse(localStorage.getItem(RECORD_KEY) || "{}") || {}; } catch { /* a convenience */ }
+    const grades = Object.entries(mem).filter(([k]) => k !== "streak").map(([, g]) => g).filter((g) => GRADES.includes(g));
+    return { grade: grades.sort((a, b) => GRADES.indexOf(a) - GRADES.indexOf(b))[0] ?? null, streak: mem.streak ?? 0 };
+  }, []);
+  const seed = () => (Date.now() & 0x7fffffff) | 1;
+  const ready = mons.length > 0;
+  const go = () => {
+    if (!ready) { onEdit(); return; }
+    if (mode === "ladder") onStart({ mode: chosen.cpu, master: chosen, seed: seed(), floor: chosen.arena });
+    else if (mode === "quick" || mode === "training") {
+      const s = seed();
+      onStart({ mode: mode === "training" ? "dummy" : cpu, seed: s, floor: pickFloor(floor, s), pick: floor });
+    }
+  };
+  const bg = mode === "ladder" ? chosen.arena : floor === "random" ? "indigo" : floor;
+  const summary = mode === "ladder" ? `${chosen.name} · Lv ${chosen.level} · ${floorName(chosen.arena)}`
+    : mode === "training" ? `A dummy that never hits back · ${floor === "random" ? "Any arena" : floorName(floor)}`
+      : mode === "quick" ? `${cpu[0].toUpperCase()}${cpu.slice(1)} CPU · ${floor === "random" ? "Any arena" : floorName(floor)}` : "";
+  const prize = mode === "ladder"
+    ? (ladder.includes(chosen.id) ? "Practice - its prize is won" : `First win ¥${ladderPay(chosen).toLocaleString()}${chosen.id === "champion" ? " + a card pack" : ""}`)
+    : mode === "quick" ? (paid.includes(cpu) ? "Today's prize is won" : `First win today ¥${arenaPay(cpu, level).toLocaleString()}`) : "";
+
+  return (
+    <div className="tc-page ag-page" role="dialog" aria-modal="true" aria-label="The Arena" style={{ "--ag-bg": `url(${asset(`arena/${bg}.webp`)})` }}>
+      <i className="ag-bg" aria-hidden="true" />
+      <div className="ag-wrap">
+        <header className="ag-head">
+          <div className="ag-brand">
+            <span className="ag-mark" aria-hidden="true"><Icon n="arena" size={24} /></span>
+            <div>
+              <h2>Arena</h2>
+              <span>Real-time Pokémon battles</span>
             </div>
-          ))}
+          </div>
+          <div className="ag-stats">
+            <span className="ag-stat"><b>{ladder.length}<u>/{LADDER.length}</u></b><i>Ladder</i></span>
+            <span className="ag-stat"><b className={best.grade ? `g-${best.grade}` : ""}>{best.grade ?? "-"}</b><i>Best grade</i></span>
+            <span className="ag-stat"><b>{best.streak}</b><i>Win streak</i></span>
+            <button type="button" className="ag-help" onClick={onHowto}><Icon n="help" size={18} /><span>How to play</span></button>
+          </div>
+        </header>
+
+        <div className="ag-grid">
+          <section className="ag-team" aria-label="Your team">
+            <div className="ag-sec">
+              <h3>Your team</h3>
+              <button type="button" className="ag-edit" onClick={onEdit}><Icon n="edit" size={16} />Edit</button>
+            </div>
+            <ol className="ag-mons">
+              {Array.from({ length: ARENA_TEAM }, (_, k) => {
+                const m = mons[k];
+                if (!m) {
+                  return (
+                    <li key={k} className="ag-mon empty">
+                      <button type="button" onClick={onEdit}><Icon n="plus" size={22} /><span>Add a Pokémon</span></button>
+                    </li>
+                  );
+                }
+                const f = playerFighter(m);
+                const sp = speciesById(m.species);
+                return (
+                  <li key={m.uid} className="ag-mon">
+                    <span className="ag-slot" aria-label={`Slot ${k + 1}`}>{k + 1}</span>
+                    <Sprite id={m.species} variant={variantOf(m)} />
+                    <div className="ag-mon-text">
+                      <b>{nameOf(m.species)}</b>
+                      <span>Lv {m.level} · {basicOf(f) === BASIC_P ? "Jab" : "Bolt"} attack</span>
+                      <Types of={sp.types} />
+                      <ul className="ag-moves">
+                        {f.moves.map((mv) => {
+                          const data = moveOf(mv.i), shape = shapeOf(data);
+                          return <li key={mv.i} className={`t-${data.t ?? "normal"}${shape ? "" : " off"}`} data-tip={shape ? SHAPE_WORD[shape] : "Not played in the Arena"}>{moveName(mv.i)}</li>;
+                        })}
+                      </ul>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="ag-note">{custom ? "Your Arena team - apart from your League team." : "Your League team's first three. Edit to pick an Arena team of its own."}</p>
+          </section>
+
+          <section className="ag-play" aria-label="Choose how to fight">
+            <div className="ag-modes" role="radiogroup" aria-label="Mode">
+              <ModeTile id="ladder" mode={mode} onPick={setMode} floor={next.arena}
+                title="Arena Ladder" says={`${ladder.length >= LADDER.length ? "Every master beaten" : `Next: ${next.name}`}`}>
+                <Sprite id={next.team.at(-1)[0]} />
+                <span className="ag-pips" aria-label={`${ladder.length} of ${LADDER.length} beaten`}>
+                  {LADDER.map((m) => <i key={m.id} className={ladder.includes(m.id) ? "on" : m.id === next.id ? "next" : ""} />)}
+                </span>
+              </ModeTile>
+              <ModeTile id="quick" mode={mode} onPick={setMode} floor="caldera" title="Quick battle" says="A CPU team at your level">
+                <span className="ag-vs" aria-hidden="true">VS</span>
+              </ModeTile>
+              <ModeTile id="training" mode={mode} onPick={setMode} floor="grove" title="Training" says="Practise on a dummy">
+                <Icon n="board" size={34} />
+              </ModeTile>
+              {CLOUD && (
+                <ModeTile id="friends" mode={mode} onPick={setMode} floor="seaside" title="Battle a friend" says="Live, online">
+                  <Icon n="users" size={34} />
+                </ModeTile>
+              )}
+            </div>
+
+            <div className="ag-panel">
+              {mode === "ladder" && <LadderBoard ladder={ladder} chosen={chosen.id} onPick={setMaster} />}
+              {mode === "quick" && (
+                <div className="ag-levels" role="radiogroup" aria-label="Difficulty">
+                  {ARENA_LEVELS.map((c) => (
+                    <button key={c} type="button" role="radio" aria-checked={cpu === c} className={`ag-level${cpu === c ? " on" : ""}`} onClick={() => setCpu(c)}>
+                      <b>{c[0].toUpperCase() + c.slice(1)}</b>
+                      <span>{LEVEL_SAYS[c]}</span>
+                      <em className={paid.includes(c) ? "done" : ""}>{paid.includes(c) ? "Today's prize won" : `First win today ¥${arenaPay(c, level).toLocaleString()}`}</em>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {mode === "training" && (
+                <p className="ag-say">A dummy walks a slow square and never hits back. Try every move, the basic attack's rhythm, rolling through and Surge - nothing is at stake.</p>
+              )}
+              {mode === "friends" && <FriendBattles mons={mons} floor={floor} onStart={onOnline} />}
+            </div>
+
+            {mode !== "ladder" && (
+              <div className="ag-floors-wrap">
+                <h3 className="ag-h">Arena</h3>
+                <div className="ag-floors" role="radiogroup" aria-label="Arena">
+                  {[{ id: "random", name: "Any arena" }, ...ARENAS].map((a) => (
+                    <button key={a.id} type="button" role="radio" aria-checked={floor === a.id} className={`ag-floor${floor === a.id ? " on" : ""}`} onClick={() => setFloor(a.id)}>
+                      {a.id === "random" ? <span className="ag-any">?</span> : <img src={asset(`arena/${a.id}.webp`)} alt="" loading="lazy" />}
+                      <b>{a.name}</b>
+                    </button>
+                  ))}
+                </div>
+                <p className="ag-say">{floor === "random" ? "Each arena has its own ground, cover in its own material, and two zones that open every 30 s."
+                  : <><b>{floorName(floor)}</b> {GROUND_SAYS[floor]} Its zones: {ZONE_SAYS[GROUND[floor].zone].toLowerCase()}.</>}</p>
+              </div>
+            )}
+          </section>
         </div>
-      ) : (
-        <p className="ev-quiet">Pick a team on the Team tab first - the Arena takes its first three.</p>
-      )}
-      <h3 className="lg-section">Arena</h3>
-      <div className="ar-floors" role="radiogroup" aria-label="Arena">
-        {[{ id: "random", name: "Any arena" }, ...ARENAS].map((a) => (
-          <button key={a.id} type="button" role="radio" aria-checked={floor === a.id} className={`ar-floor${floor === a.id ? " on" : ""}`} onClick={() => choose(a.id)}>
-            {a.id === "random" ? <span className="ar-floor-any">?</span> : <img src={asset(`arena/${a.id}.webp`)} alt="" loading="lazy" />}
-            <b>{a.name}</b>
-          </button>
-        ))}
       </div>
-      <p className="ar-ground">{shown ? <><b>{floorName(shown)}</b> {GROUND_SAYS[shown]} Its zones: {ZONE_SAYS[GROUND[shown].zone].toLowerCase()}.</>
-        : "Each arena has its own ground, cover in its own material, and two zones that open every 30 s."}</p>
-      <h3 className="lg-section">Arena Ladder</h3>
-      <ol className="ar-ladder">
-        {LADDER.map((m, k) => {
-          const beat = ladder.includes(m.id), open = ladderOpen(m.id, ladder);
+
+      {mode !== "friends" && (
+        <div className="ag-go">
+          <div className="ag-go-text">
+            <b>{ready ? MODE_NAME[mode] : "Pick your team first"}</b>
+            <span>{ready ? summary : "Three Pokémon from your Box fight in the Arena."}</span>
+            {ready && prize && <em>{prize}</em>}
+          </div>
+          <button type="button" className="ag-battle" onClick={go}>
+            <Icon n="arena" size={22} />{ready ? "Battle" : "Pick team"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModeTile({ id, mode, onPick, floor, title, says, children }) {
+  return (
+    <button type="button" role="radio" aria-checked={mode === id} className={`ag-tile${mode === id ? " on" : ""}`} onClick={() => onPick(id)}
+      style={{ "--tile": `url(${asset(`arena/${floor}.webp`)})` }}>
+      <span className="ag-tile-art" aria-hidden="true">{children}</span>
+      <b>{title}</b>
+      <span>{says}</span>
+    </button>
+  );
+}
+
+/* THE LADDER, drawn as ten rungs: each master on its own floor with its
+   ace, beaten ones ticked, the next lit; a tap chooses whom Battle fights
+   (any already beaten, for practice, or the next). */
+function LadderBoard({ ladder, chosen, onPick }) {
+  const m = masterOf(chosen);
+  return (
+    <div className="ag-ladder">
+      <ol className="ag-rungs">
+        {LADDER.map((r, k) => {
+          const beat = ladder.includes(r.id), open = ladderOpen(r.id, ladder);
           return (
-            <li key={m.id} className={beat ? "won" : open ? "next" : "shut"}>
-              <button type="button" disabled={!open || !mons.length} onClick={() => challenge(m)}>
-                <span className="ar-rung">{k + 1}</span>
-                <span className="ar-who"><b>{m.name}</b><em>{floorName(m.arena)} · Lv {m.level}</em></span>
-                <span className={`ar-type t-${m.type}`}>{m.type}</span>
-                <span className="ar-pay">{beat ? "Beaten" : open ? `¥${ladderPay(m).toLocaleString()}${m.id === "champion" ? " + a pack" : ""}` : "Locked"}</span>
+            <li key={r.id}>
+              <button type="button" disabled={!open} aria-pressed={chosen === r.id}
+                className={`ag-rung${beat ? " won" : open ? " open" : " shut"}${chosen === r.id ? " on" : ""}${r.id === "champion" ? " champ" : ""}`}
+                style={{ "--tile": `url(${asset(`arena/${r.arena}.webp`)})` }} onClick={() => onPick(r.id)}
+                aria-label={`${r.name}, level ${r.level}${beat ? ", beaten" : open ? "" : ", locked"}`}>
+                <span className="ag-rung-n">{k + 1}</span>
+                <Sprite id={r.team.at(-1)[0]} />
+                <span className="ag-rung-lv">Lv {r.level}</span>
+                {beat && <span className="ag-tick" aria-hidden="true"><Icon n="check" size={12} /></span>}
+                {!open && <span className="ag-lock" aria-hidden="true"><Icon n="lock" size={14} /></span>}
               </button>
             </li>
           );
         })}
       </ol>
-      <FriendBattles mons={mons} floor={floor} onStart={setOnline} />
-      <h3 className="lg-section">Quick battle</h3>
-      <div className="ar-modes">
-        {MODES.map((md) => {
-          const pays = ARENA_LEVELS.includes(md.cpu);
-          const done = paid.includes(md.cpu);
-          return (
-            <button key={md.id} type="button" className="ar-mode" disabled={!mons.length} onClick={() => start(md.id)}>
-              <b>{md.name}</b>
-              <span>{md.says}</span>
-              {pays && <em className={done ? "done" : ""}>{done ? "Today's prize won" : `First win today ¥${arenaPay(md.cpu, level).toLocaleString()}`}</em>}
-            </button>
-          );
-        })}
-      </div>
-      <Help />
+      {m && (
+        <div className="ag-master">
+          <div>
+            <b>{m.name}</b>
+            <span>{floorName(m.arena)} · <i className={`ar-type t-${m.type}`}>{m.type}</i> · {m.cpu === "champion" ? "Champion" : m.cpu[0].toUpperCase() + m.cpu.slice(1)} CPU</span>
+          </div>
+          <span className="ag-master-team">{m.team.map(([id]) => <Sprite key={id} id={id} />)}</span>
+        </div>
+      )}
     </div>
+  );
+}
+
+/* THE ARENA'S OWN THREE (asked for, 2026-10-22): the Box's picker, three at
+   most, in fighting order - apart from the League's team, so a pick here
+   never reorders that one. "Use my League team" goes back to its first three. */
+function TeamEdit({ box, picked, custom, onSave, onClose }) {
+  useModalLock();
+  const mons = useMemo(() => box.filter((m) => !refusal(m) && !isEvent(m.species)), [box]);
+  const [keys, setKeys] = useState(() => picked.map(keyOf));
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const key = (e) => { if (e.key === "Escape") { e.stopPropagation(); close.current(); } };
+    addEventListener("keydown", key, true);
+    return () => removeEventListener("keydown", key, true);
+  }, []);
+  const uids = keys.map((k) => mons.find((m) => keyOf(m) === k)?.uid).filter((u) => u != null);
+  return createPortal(
+    <div className="sheet" {...useDismiss(onClose)}>
+      <div className="ag-editor" role="dialog" aria-modal="true" aria-label="Arena team" onClick={(e) => e.stopPropagation()}>
+        <header>
+          <div>
+            <h3>Arena team</h3>
+            <span>Pick up to three. The first one starts the fight; a tap on a picked one takes it out.</span>
+          </div>
+          <button type="button" className="ar-x" aria-label="Close" onClick={onClose}>✕</button>
+        </header>
+        <div className="ag-editor-body">
+          <Picker mons={mons} picked={keys} max={ARENA_TEAM} onChange={setKeys} prefer="high" sort="level" level
+            empty="Catch a Pokémon first - the Arena fights with your Box." />
+        </div>
+        <footer>
+          {custom && <button type="button" className="lg-go quiet" onClick={() => onSave([])}>Use my League team</button>}
+          <button type="button" className="lg-go" disabled={!uids.length} onClick={() => onSave(uids)}>Save team</button>
+        </footer>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -207,10 +461,9 @@ function FriendBattles({ mons, floor, onStart }) {
     else onStart({ role: "guest", invite: got.data, friend: inv.card });
   };
   return (
-    <>
-      <h3 className="lg-section">Battle a friend</h3>
-      <p className="ar-ground">Live, both of you at once. The Fair format: your team's species at Lv {FAIR_LEVEL} with their level-up moves. No prize and no rating - just the fight.</p>
-      {!can ? <p className="ev-quiet">Sign in to battle your friends online.</p> : (
+    <div className="ag-friends">
+      <p className="ag-say">Live, both of you at once. The Fair format: your team's species at Lv {FAIR_LEVEL} with their level-up moves. No prize and no rating - just the fight.</p>
+      {!can ? <p className="ag-say">Sign in to battle your friends online.</p> : (
         <>
           {invites.map((inv) => (
             <div key={inv.id} className="ar-invite" role="status">
@@ -219,7 +472,7 @@ function FriendBattles({ mons, floor, onStart }) {
               <button type="button" className="lg-go quiet" disabled={busy} onClick={() => answer(inv, false)}>Decline</button>
             </div>
           ))}
-          {friends == null ? <p className="ev-quiet">Loading your friends…</p>
+          {friends == null ? <p className="ag-say">Loading your friends…</p>
             : friends.length ? (
               <ul className="ar-friends">
                 {friends.map((c) => (
@@ -229,11 +482,11 @@ function FriendBattles({ mons, floor, onStart }) {
                   </li>
                 ))}
               </ul>
-            ) : <p className="ev-quiet">Add friends on your trainer card to battle them here.</p>}
+            ) : <p className="ag-say">Add friends on your trainer card to battle them here.</p>}
           {msg && <p className="ar-note" role="alert">{msg}</p>}
         </>
       )}
-    </>
+    </div>
   );
 }
 
@@ -243,7 +496,7 @@ function FriendBattles({ mons, floor, onStart }) {
 const nextSeed = (seed) => (Math.imul(seed, 1103515245) + 12345) | 0;
 // A team as the Fair format builds it, hashed: both ends must build the same fighters.
 const fairPrint = (ids) => hash(JSON.stringify(fairTeam(ids)));
-const fairIds = (ids) => (Array.isArray(ids) ? ids : []).filter((id) => Number.isInteger(id) && speciesById(id) && !isEvent(id)).slice(0, TEAM);
+const fairIds = (ids) => (Array.isArray(ids) ? ids : []).filter((id) => Number.isInteger(id) && speciesById(id) && !isEvent(id)).slice(0, ARENA_TEAM);
 const SAYS = {
   timeout: (n, host) => (host ? `${n} didn't answer in time.` : `Could not reach ${n}'s game.`),
   blocked: (n) => `Could not connect to ${n}: your two networks can't reach each other directly. Try another Wi-Fi, or mobile data.`,
@@ -262,7 +515,7 @@ function Online({ start, mons, onExit: done }) {
      which a development build runs once at mount (StrictMode) and which
      cancelled every challenge the moment it was made. */
   const onExit = () => { if (host) arenaCancel(start.invite.id); done(); };
-  /* ...and so does leaving any other way (another League tab, the Arena page
+  /* ...and so does leaving any other way (another tab, the Arena page
      closing): a cancel queued at unmount and taken back by a remount, so
      StrictMode's rehearsal unmount cancels nothing. */
   const unmounting = useRef(0);
@@ -368,9 +621,10 @@ function Online({ start, mons, onExit: done }) {
       onWin={() => 0} onAgain={() => { box.current.link.send({ t: "again" }); setAgain((a) => ({ ...a, me: true })); }} onExit={onExit} />;
   }
   return (
-    <div className="ar-lobby">
-      <section className="lg-hero ar-hero ar-waiting">
-        <span className="lg-kicker">Online · {floorName(start.invite.arena)}</span>
+    <div className="tc-page ag-page" role="dialog" aria-modal="true" aria-label="Online match" style={{ "--ag-bg": `url(${asset(`arena/${start.invite.arena}.webp`)})` }}>
+      <i className="ag-bg" aria-hidden="true" />
+      <div className="ag-wait">
+        <span className="ag-kicker">Online · {floorName(start.invite.arena)}</span>
         {phase === "failed" ? (
           <>
             <h2>No match</h2>
@@ -386,28 +640,78 @@ function Online({ start, mons, onExit: done }) {
           </>
         )}
         <button type="button" className="lg-go quiet" onClick={onExit}>{phase === "failed" ? "Back to the Arena" : "Cancel"}</button>
-      </section>
+      </div>
     </div>
   );
 }
 
-function Help() {
+/* HOW TO PLAY: every control on every device, from the same constants the
+   match reads, and the sprites' credits (CC BY-NC 4.0 asks for them). */
+function HowTo({ onClose }) {
+  useModalLock();
   const [credits, setCredits] = useState(false);
-  return (
-    <details className="ar-help">
-      <summary>Controls and moves</summary>
-      <ul>
-        <li><b>Move</b> WASD or the arrows · <b>Aim</b> the mouse · <b>Moves</b> left click, right click, Q and E (or 1-4)</li>
-        <li><b>Dodge</b> Space: you cannot be hit while you roll · <b>Switch</b> Tab, or Shift + 1-3 · <b>Pause</b> Esc</li>
-        <li><b>Surge</b> F: landing hits, taking them, rolling through an attack at the last moment (a <b>perfect dodge</b>) and taking a zone fill your meter. Full, it throws the foe off you and powers up your blows for {SURGE_T / TPS} s - even while you are staggered.</li>
-        <li><b>Controller</b>: left stick moves, right stick aims, A B X Y attack, RB dodges, LT surges, LB switches, Start pauses</li>
-        <li><b>On a phone</b>: the left thumb moves, the buttons attack in the direction you face</li>
-        <li>Every attack shows on the ground before it lands: a line for a shot or a beam, an arc for a blow, a ring for a pulse. Roll through it.</li>
-        <li>Statuses tick in real time: burn and poison hurt every 2 s, paralysis slows you, sleep and freeze hold you still. Stat changes wear off after 10 s.</li>
-        <li>The Arena's Pokémon are drawn by the artists of the PMD Sprite Repository (CC BY-NC 4.0). <button type="button" className="ar-link" onClick={() => setCredits(true)}>Sprite credits</button></li>
-      </ul>
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const key = (e) => { if (e.key === "Escape" && !credits) { e.stopPropagation(); close.current(); } };
+    addEventListener("keydown", key, true);
+    return () => removeEventListener("keydown", key, true);
+  }, [credits]);
+  const row = (keys, what) => <li><span className="ag-keys">{keys.map((k) => <kbd key={k}>{k}</kbd>)}</span><span>{what}</span></li>;
+  return createPortal(
+    <div className="sheet" {...useDismiss(onClose)}>
+      <div className="ag-howto" role="dialog" aria-modal="true" aria-label="How to play" onClick={(e) => e.stopPropagation()}>
+        <header>
+          <h3>How to play</h3>
+          <button type="button" className="ar-x" aria-label="Close" onClick={onClose}>✕</button>
+        </header>
+        <div className="ag-howto-body">
+          <section>
+            <h4>Keyboard and mouse</h4>
+            <ul>
+              {row(["W", "A", "S", "D"], "Move")}
+              {row(["Mouse"], "Aim")}
+              {row(["LMB"], "Basic attack - hold it to keep attacking")}
+              {row(SKILL_KEYS, "Your four moves")}
+              {row(["Space"], "Dodge: you cannot be hit while you roll")}
+              {row(["F"], "Surge, when the meter is full")}
+              {row(["1", "2", "3"], "Send out that Pokémon (Tab: the next one)")}
+              {row(["Esc"], "Pause")}
+            </ul>
+          </section>
+          <section>
+            <h4>Touch</h4>
+            <ul>
+              <li>The left thumb moves. The big button attacks - hold it; the four around it are your moves. Attacks aim at the foe by themselves.</li>
+              <li>Tap a Pokémon at the top left to send it out.</li>
+            </ul>
+          </section>
+          <section>
+            <h4>Controller</h4>
+            <ul>
+              {row(["RT"], "Basic attack (hold)")}
+              {row(["A", "B", "X", "Y"], "Your four moves")}
+              {row(["RB"], "Dodge")}
+              {row(["LT"], "Surge")}
+              {row(["LB"], "Next Pokémon")}
+            </ul>
+          </section>
+          <section>
+            <h4>The fight</h4>
+            <ul>
+              <li><b>The basic attack</b> never runs out and every third in a row hits harder. A fighter whose Attack is higher jabs up close; one whose Sp. Atk is higher throws a bolt.</li>
+              <li><b>Moves</b> hit with the League's own damage - types, STAB and all - and each has a cooldown and its PP.</li>
+              <li><b>Every attack shows on the ground</b> before it lands: a line, an arc or a ring. Roll through it at the last moment - a <b>perfect dodge</b>.</li>
+              <li><b>Surge</b> fills as you land hits, take them, dodge perfectly and hold a zone. Full, it throws the foe off you and powers you up for {SURGE_T / TPS} s.</li>
+              <li><b>Statuses</b> tick in real time: burn and poison hurt every 2 s, paralysis slows you, sleep and freeze hold you still.</li>
+            </ul>
+          </section>
+          <p className="ag-say">The Arena's Pokémon are drawn by the artists of the PMD Sprite Repository (CC BY-NC 4.0). <button type="button" className="ar-link" onClick={() => setCredits(true)}>Sprite credits</button></p>
+        </div>
+      </div>
       {credits && <Credits onClose={() => setCredits(false)} />}
-    </details>
+    </div>,
+    document.body,
   );
 }
 
@@ -462,6 +766,8 @@ function Credits({ onClose }) {
   );
 }
 
+const LEVEL_NAME = { dummy: "Training", easy: "Easy", normal: "Normal", hard: "Hard" };
+
 /* A MATCH: the loop, the input, the HUD. */
 function Match({ mons, mode, master, level, seed, floor, online = null, rematch = null, onWin, onAgain, onExit }) {
   const me = online?.me ?? 0;
@@ -478,8 +784,28 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   // would restart the match loop (and a paid prize re-renders the parent).
   const win = useRef(onWin);
   win.current = onWin;
-  const input = useRef({ keys: new Set(), mouse: null, fire: null, dodge: 0, swap: -1, surge: 0, stick: [0, 0], pad: [] });
-  const cpu = online ? null : master ? master.cpu : MODES.find((m) => m.id === mode).cpu;
+  /* `basic` is HELD (a mouse button, a key, a thumb, a trigger) and read
+     every tick; a move, a roll, a switch and a surge are presses, held a
+     few ticks until the match can take them. */
+  const input = useRef({ keys: new Set(), mouse: null, fire: null, basic: { mouse: false, touch: false, pad: false }, dodge: 0, swap: -1, surge: 0, stick: [0, 0], pad: [],
+    aim: null });
+  // The dragged move's arrow on the court and its Cancel, moved by the loop (never a render).
+  const aimEl = useRef(null);
+  const cancelEl = useRef(null);
+  /* UPRIGHT ON A PHONE the court plays small: before the first count the
+     match asks to be turned (paused until then, offline), and "Play upright"
+     is remembered on the device. Online nothing waits: a line says it. */
+  const [turn, setTurn] = useState(() => touch && !online && pref(UPRIGHT_KEY, "") !== "1" && matchMedia("(orientation: portrait)").matches);
+  const turnRef = useRef(turn);
+  turnRef.current = turn;
+  useEffect(() => {
+    if (!turn) return undefined;
+    const mq = matchMedia("(orientation: portrait)");
+    const on = () => { if (!mq.matches) setTurn(false); };
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [turn]);
+  const cpu = online ? null : master ? master.cpu : mode;
 
   const teams = useMemo(() => online ? online.teams : [
     mons.map((m) => playerFighter(m)),
@@ -492,7 +818,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   const s = useMemo(() => newMatch({ teams, cpu: [null, online ? null : cpu], seed, arena: floor, intro: INTRO }), [teams, cpu, seed, floor, online]);
   // Who fights, for the VS card.
   const names = useMemo(() => online ? online.names : [["You", nameOf(teams[0][0]?.id)],
-    [master ? master.name : `CPU · ${MODES.find((m) => m.id === mode)?.name.split("· ")[1] ?? "Training"}`, nameOf(teams[1][0]?.id)]], [teams, master, mode, online]);
+    [master ? master.name : `CPU · ${LEVEL_NAME[mode] ?? "Training"}`, nameOf(teams[1][0]?.id)]], [teams, master, mode, online]);
 
   useEffect(() => {
     const cv = canvas.current;
@@ -504,28 +830,32 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
     const end = (why) => { if (!cut) { cut = true; setNet(why); } };
     const onResize = () => r.resize();
     addEventListener("resize", onResize);
+    // A phone's URL bar coming and going resizes only the visual viewport.
+    visualViewport?.addEventListener("resize", onResize);
     let raf = 0, last = performance.now(), acc = 0, lastHud = 0, paid = false, shown = false;
     const step = 1000 / TPS;
     const inp = input.current;
 
-    // A controller, read once a frame: sticks past a dead zone, buttons on their press.
+    // A controller, read once a frame: sticks past a dead zone, buttons on their press, the trigger while held.
     const pad = () => {
       const gp = navigator.getGamepads?.()?.find(Boolean);
-      if (!gp) return null;
+      if (!gp) { inp.basic.pad = false; return null; }
       const dz = (v) => (Math.abs(v) < 0.25 ? 0 : v);
       const was = inp.pad, now = gp.buttons.map((b) => b.pressed);
       const pressed = (i) => now[i] && !was[i];
       inp.pad = now;
-      for (let k = 0; k < 4; k++) if (pressed(k)) inp.fire = { k, until: s.t + 7 };
-      if (pressed(5) || pressed(7)) inp.dodge = s.t + 7;
+      for (let k = 0; k < 4; k++) if (pressed(k)) inp.fire = { k, until: s.t + PRESS };
+      if (pressed(5)) inp.dodge = s.t + 7;
       if (pressed(6)) inp.surge = s.t + 7;
-      if (pressed(4)) inp.swap = nextAlive(s, me);
+      if (pressed(4) || pressed(15)) inp.swap = nextAlive(s, me, 1);
+      if (pressed(14)) inp.swap = nextAlive(s, me, -1);
       if (pressed(9)) setPaused((p) => !p);
+      inp.basic.pad = Boolean(now[7]);
       return { mx: dz(gp.axes[0] ?? 0), my: dz(gp.axes[1] ?? 0), ax: dz(gp.axes[2] ?? 0), ay: dz(gp.axes[3] ?? 0) };
     };
 
     const build = () => {
-      const mine = activeOf(s, me);
+      const mine = activeOf(s, me), foe = activeOf(s, 1 - me);
       const k = inp.keys;
       let mx = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
       let my = (k.has("s") || k.has("arrowdown") ? 1 : 0) - (k.has("w") || k.has("arrowup") ? 1 : 0);
@@ -534,28 +864,35 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       const gp = pad();
       if (gp && (gp.mx || gp.my)) { mx = gp.mx; my = gp.my; }
       if (gp && (gp.ax || gp.ay)) { ax = gp.ax * 5; ay = gp.ay * 5; }
-      else if (mine && inp.mouse && !touch) {
+      else if (mine && touch) {
+        /* A THUMB CANNOT AIM: touch attacks go at the foe by themselves -
+           never one hidden in tall grass, which is still where it was seen. */
+        if (foe && !foe.hidden) { ax = foe.x - mine.x; ay = foe.y - mine.y; }
+      } else if (mine && inp.mouse) {
         // The aim in TILES, so a hazard lands where the cursor is.
         const [px, py] = r.toScreen(mine.x, mine.y), tile = r.tile();
         ax = (inp.mouse[0] - px) / tile; ay = (inp.mouse[1] - py) / tile;
       }
+      // A move dragged to aim goes where the thumb pulled.
+      if (inp.fire?.aim && inp.fire.until > s.t) [ax, ay] = inp.fire.aim;
       // A press is held for a few ticks until the move or roll can take it.
       const fire = inp.fire && inp.fire.until > s.t ? inp.fire.k : -1;
       if (mine?.act && inp.fire && mine.act.k === inp.fire.k) inp.fire = null;
+      const basic = inp.basic.mouse || inp.basic.touch || inp.basic.pad || k.has("j");
       const dodge = inp.dodge > s.t;
       if (mine?.dodge) inp.dodge = 0;
       const swap = inp.swap;
       inp.swap = -1;
       const surge = inp.surge > s.t;
       if (mine?.surge) inp.surge = 0;
-      return { mx, my, ax, ay, fire, dodge, swap, surge };
+      return { mx, my, ax, ay, fire, basic, dodge, swap, surge };
     };
 
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
       let dt = Math.min(250, now - last);
       last = now;
-      if (pausedRef.current && !ls) return;      // the picture holds as it was
+      if ((pausedRef.current || turnRef.current) && !ls) return;      // the picture holds as it was
       if (ls) {
         /* Online: the match steps with the wall clock at both ends (a hit-stop
            here would leave the other end waiting), one extra tick when the
@@ -587,6 +924,16 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
         }
       }
       r.draw(s, Math.min(1, acc / step), now);
+      // The dragged move's arrow, from your Pokemon toward the pull.
+      const el = aimEl.current, a = inp.aim, at = activeOf(s, me);
+      if (el) {
+        if (a?.on && at) {
+          const [px, py] = r.toScreen(at.x, at.y), len = Math.min(1, Math.hypot(a.dx, a.dy) / AIM_PX) * AIM_TILES * r.tile();
+          el.style.transform = `translate(${px}px, ${py}px) rotate(${Math.atan2(a.dy, a.dx)}rad)`;
+          el.style.width = `${len}px`;
+          el.hidden = false;
+        } else el.hidden = true;
+      }
       if (s.over && !paid) {
         paid = true;
         setPrize(!online && s.winner === 0 && cpu !== "dummy" ? win.current(cpu) : 0);
@@ -602,6 +949,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
     return () => {
       cancelAnimationFrame(raf);
       removeEventListener("resize", onResize);
+      visualViewport?.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onHide);
     };
   }, [s, looks, touch, floor, cpu, names, me, online]);
@@ -609,25 +957,28 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   // Keyboard and mouse.
   useEffect(() => {
     const inp = input.current;
-    const press = (k) => { inp.fire = { k, until: s.t + 7 }; };
+    const press = (k) => { inp.fire = { k, until: s.t + PRESS }; };
     const down = (e) => {
       const key = e.key.toLowerCase();
       if (key === "escape") { e.preventDefault(); setPaused((p) => !p); return; }
-      if (key === "tab") { e.preventDefault(); inp.swap = nextAlive(s, me); return; }
-      if (e.shiftKey && /^[1-3]$/.test(e.key)) { e.preventDefault(); inp.swap = Number(e.key) - 1; return; }
-      if (key === " ") { e.preventDefault(); inp.dodge = s.t + 7; return; }
+      if (key === "tab") { e.preventDefault(); inp.swap = nextAlive(s, me, e.shiftKey ? -1 : 1); return; }
+      // 1-3 send out that Pokemon: the party bar shows the numbers.
+      if (/^[1-6]$/.test(e.key) && !e.repeat) { e.preventDefault(); inp.swap = Number(e.key) - 1; return; }
+      if (key === " " || key === "shift") { e.preventDefault(); inp.dodge = s.t + 7; return; }
       if (key === "f") { e.preventDefault(); inp.surge = s.t + 7; return; }
-      if (/^[1-4]$/.test(key)) { e.preventDefault(); press(Number(key) - 1); return; }
-      if (key === "q") { e.preventDefault(); press(2); return; }
-      if (key === "e") { e.preventDefault(); press(3); return; }
-      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) { e.preventDefault(); inp.keys.add(key); }
+      const skill = ["q", "e", "r"].indexOf(key);
+      if (skill >= 0) { e.preventDefault(); press(skill + 1); return; }
+      if (["w", "a", "s", "d", "j", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) { e.preventDefault(); inp.keys.add(key); }
     };
     const up = (e) => inp.keys.delete(e.key.toLowerCase());
-    const blur = () => inp.keys.clear();
+    // The basic attack is held: a mouse button let go anywhere ends it, and so does losing the window.
+    const mouseUp = (e) => { if (e.button === 0) inp.basic.mouse = false; };
+    const blur = () => { inp.keys.clear(); inp.basic.mouse = false; inp.basic.touch = false; };
     addEventListener("keydown", down);
     addEventListener("keyup", up);
+    addEventListener("pointerup", mouseUp);
     addEventListener("blur", blur);
-    return () => { removeEventListener("keydown", down); removeEventListener("keyup", up); removeEventListener("blur", blur); };
+    return () => { removeEventListener("keydown", down); removeEventListener("keyup", up); removeEventListener("pointerup", mouseUp); removeEventListener("blur", blur); };
   }, [s, me]);
 
   const onMouseMove = (e) => {
@@ -637,9 +988,46 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   const onMouseDown = (e) => {
     if (touch || e.pointerType === "touch") return;
     onMouseMove(e);
-    if (e.button === 0) input.current.fire = { k: 0, until: s.t + 7 };
-    if (e.button === 2) input.current.fire = { k: 1, until: s.t + 7 };
+    if (e.button === 0) input.current.basic.mouse = true;
+    if (e.button === 2) input.current.fire = { k: 0, until: s.t + PRESS };
   };
+  // A thumb on a button: held for the basic attack, pressed for the rest.
+  const hold = (on) => (e) => { e.preventDefault(); input.current.basic.touch = on; };
+  const tap = (fn) => (e) => { e.preventDefault(); fn(); };
+  /* A MOVE ON TOUCH, as a MOBA's: a tap throws it at the foe; a drag aims
+     it (the arrow on the court shows where) and letting go throws it; let go
+     over Cancel and it is not thrown. Window pointer events, no capture. */
+  const aimStart = (k) => (e) => {
+    e.preventDefault();
+    input.current.aim = { k, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, on: false };
+    if (cancelEl.current) cancelEl.current.hidden = false;
+  };
+  useEffect(() => {
+    if (!touch) return undefined;
+    const inp = input.current;
+    const move = (e) => {
+      const a = inp.aim;
+      if (!a || e.pointerId !== a.id) return;
+      a.dx = e.clientX - a.x0; a.dy = e.clientY - a.y0;
+      a.on = Math.hypot(a.dx, a.dy) > AIM_DEAD;
+      const c = cancelEl.current;
+      if (c) { const b = c.getBoundingClientRect(); c.classList.toggle("hot", e.clientX >= b.left && e.clientX <= b.right && e.clientY >= b.top && e.clientY <= b.bottom); }
+    };
+    const up = (e) => {
+      const a = inp.aim;
+      if (!a || e.pointerId !== a.id) return;
+      const c = cancelEl.current, cancelled = c?.classList.contains("hot");
+      if (c) { c.hidden = true; c.classList.remove("hot"); }
+      inp.aim = null;
+      if (cancelled || e.type === "pointercancel") return;
+      const k = Math.min(1, Math.hypot(a.dx, a.dy) / AIM_PX) * AIM_TILES / (Math.hypot(a.dx, a.dy) || 1);
+      inp.fire = { k: a.k, until: s.t + PRESS, aim: a.on ? [a.dx * k, a.dy * k] : null };
+    };
+    addEventListener("pointermove", move);
+    addEventListener("pointerup", up);
+    addEventListener("pointercancel", up);
+    return () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); removeEventListener("pointercancel", up); };
+  }, [touch, s]);
 
   const over = view?.over;
   const grade = useMemo(() => (over ? gradeOf(view) : null), [over]);
@@ -658,53 +1046,80 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
     try { localStorage.setItem(RECORD_KEY, JSON.stringify(mem)); } catch { /* a convenience */ }
     return { best: best && view.won, streak };
   }, [over, grade]);
-  /* PORTALLED TO THE BODY: the League page's `.tc-main` isolates, so a match
-     drawn inside it sat under the page's own pinned header and tab strip. */
+  /* PORTALLED TO THE BODY: a match owns the whole screen, over the page and
+     its bars (`body.fighting`). */
   return createPortal(
-    <div className="ar-match">
+    <div className={`ar-match${touch ? " touch" : ""}`}>
       <canvas ref={canvas} className="ar-canvas" onPointerMove={onMouseMove} onPointerDown={onMouseDown}
         onContextMenu={(e) => e.preventDefault()} aria-label="Arena" />
       {view && (
         <div className={`ar-hud${view.intro ? " intro" : ""}`}>
-          <Bar f={view.sides[0]} meter={view.meter[0]} mine />
-          <div className={`ar-clock${view.left <= FINAL_T && !view.over ? " final" : ""}${view.left <= 10 * TPS && !view.over ? " urgent" : ""}`}>
+          <Plate f={view.sides[0]} meter={view.meter[0]} who={names[me][0]} mine />
+          <div className={`ah-clock${view.left <= FINAL_T && !view.over ? " final" : ""}${view.left <= 10 * TPS && !view.over ? " urgent" : ""}`}>
             <b>{clock(view.left)}</b>
-            <button type="button" onClick={() => setPaused(true)} aria-label="Pause">Pause</button>
+            <button type="button" onClick={() => setPaused(true)} aria-label="Pause"><Icon n="menu" size={16} /></button>
           </div>
-          <Bar f={view.sides[1]} meter={view.meter[1]} />
-          <div className="ar-party">
+          <Plate f={view.sides[1]} meter={view.meter[1]} who={names[1 - me][0]} />
+
+          <div className="ah-party" role="group" aria-label="Your team">
             {view.party.map((p, k) => (
-              <button key={k} type="button" className={`ar-slot${p.active ? " on" : ""}${p.hp <= 0 ? " down" : ""}`}
-                disabled={p.active || p.hp <= 0} onClick={() => { input.current.swap = k; }}>
-                <b>{nameOf(p.id)}</b><span>{p.hp} HP</span>
+              <button key={k} type="button" className={`ah-mon${p.active ? " on" : ""}${p.hp <= 0 ? " down" : ""}`}
+                disabled={p.active || p.hp <= 0} style={{ "--hp": p.hp / p.max, "--cd": p.active || p.hp <= 0 ? 0 : view.swapCd }}
+                onPointerDown={tap(() => { input.current.swap = k; })} aria-label={`Send out ${nameOf(p.id)}, ${p.hp} HP`}>
+                <Sprite id={p.id} eager />
+                <i className="ah-mon-hp" aria-hidden="true"><i /></i>
+                {!touch && <kbd>{k + 1}</kbd>}
               </button>
             ))}
           </div>
-          <div className="ar-moves">
+
+          <div className="ah-skills">
             {view.kit.map((m, k) => {
               // Out of every damaging move: the empty buttons throw Struggle.
               const struggle = view.struggle && m.pp <= 0;
               return (
-              <button key={k} type="button" className={`ar-move t-${struggle ? "normal" : m.type}${(struggle ? view.struggleReady : m.ready) ? "" : " wait"}`}
-                style={{ "--cd": struggle ? view.struggleCd : m.cd }} disabled={m.pp <= 0 && !struggle}
-                onPointerDown={(e) => { e.preventDefault(); input.current.fire = { k, until: s.t + 7 }; }}>
-                {struggle ? <><b>Struggle</b><span>No PP left · Blow</span></> : <><b>{m.name}</b><span>{m.pp} / {m.max} PP · {SHAPE_WORD[m.shape]}</span></>}
-                <kbd>{touch ? "" : ["LMB", "RMB", "Q", "E"][k]}</kbd>
-              </button>
+                <button key={k} type="button" className={`ah-skill k${k} t-${struggle ? "normal" : m.type}${(struggle ? view.struggleReady : m.ready) ? "" : " wait"}`}
+                  style={{ "--cd": struggle ? view.struggleCd : m.cd }} disabled={m.pp <= 0 && !struggle}
+                  onPointerDown={touch ? aimStart(k) : tap(() => { input.current.fire = { k, until: s.t + PRESS }; })}
+                  aria-label={struggle ? "Struggle" : `${m.name}, ${m.pp} PP`}>
+                  <b>{struggle ? "Struggle" : m.name}</b>
+                  <span>{struggle ? "No PP" : `${m.pp}/${m.max}`}</span>
+                  {!touch && <kbd>{SKILL_KEYS[k]}</kbd>}
+                </button>
               );
             })}
-            <button type="button" className={`ar-move ar-dodge${view.dodge ? "" : " wait"}`} style={{ "--cd": view.dodgeCd }}
-              onPointerDown={(e) => { e.preventDefault(); input.current.dodge = s.t + 7; }}>
-              <b>Dodge</b><kbd>{touch ? "" : "Space"}</kbd>
+            <button type="button" className={`ah-basic${view.basic.ready ? "" : " wait"}${view.basic.boost ? " boost" : ""}`} style={{ "--cd": view.basic.cd }}
+              onPointerDown={hold(true)} onPointerUp={hold(false)} onPointerCancel={hold(false)} onPointerLeave={hold(false)}
+              aria-label="Basic attack - hold">
+              <Icon n="arena" size={touch ? 30 : 24} />
+              <b>{view.basic.jab ? "Jab" : "Bolt"}</b>
+              {!touch && <kbd>LMB</kbd>}
             </button>
-            <button type="button" className={`ar-move ar-surge${view.meter[0] >= 1 ? " full" : " wait"}${view.surging ? " on" : ""}`}
-              style={{ "--cd": view.surging ? 0 : 1 - view.meter[0] }} disabled={view.meter[0] < 1}
-              onPointerDown={(e) => { e.preventDefault(); input.current.surge = s.t + 7; }}>
-              <b>Surge</b><span>{view.surging ? "Surging!" : view.meter[0] >= 1 ? "Ready" : `${Math.floor(view.meter[0] * 100)}%`}</span><kbd>{touch ? "" : "F"}</kbd>
+            <button type="button" className={`ah-dodge${view.dodge ? "" : " wait"}`} style={{ "--cd": view.dodgeCd }}
+              onPointerDown={tap(() => { input.current.dodge = s.t + 7; })} aria-label="Dodge">
+              <b>Dodge</b>{!touch && <kbd>Space</kbd>}
+            </button>
+            <button type="button" className={`ah-surge${view.meter[0] >= 1 ? " full" : ""}${view.surging ? " on" : ""}`}
+              style={{ "--m": view.surging ? 1 : view.meter[0] }} disabled={view.meter[0] < 1}
+              onPointerDown={tap(() => { input.current.surge = s.t + 7; })} aria-label={view.meter[0] >= 1 ? "Surge - ready" : `Surge ${Math.floor(view.meter[0] * 100)}%`}>
+              <b>{view.surging ? "Surging" : "Surge"}</b><span>{view.surging ? "!" : view.meter[0] >= 1 ? "Ready" : `${Math.floor(view.meter[0] * 100)}%`}</span>
+              {!touch && <kbd>F</kbd>}
             </button>
           </div>
           {touch && <Stick input={input} />}
-          {touch && <p className="ar-turn">Turn your phone sideways for a bigger arena</p>}
+          {touch && <i className="ah-aim" ref={aimEl} hidden aria-hidden="true" />}
+          {touch && <span className="ah-cancel" ref={cancelEl} hidden>Cancel</span>}
+          {touch && online && <p className="ar-turn">Turn your phone sideways for a bigger arena</p>}
+        </div>
+      )}
+      {turn && (
+        <div className="ar-pause ah-turn" role="dialog" aria-label="Turn your phone">
+          <div className="ar-card">
+            <span className="ah-phone" aria-hidden="true"><i /></span>
+            <h3>Turn your phone sideways</h3>
+            <p>The Arena plays best in landscape: a wider court, and room for both thumbs.</p>
+            <button type="button" className="lg-go quiet" onClick={() => { keep(UPRIGHT_KEY, "1"); setTurn(false); }}>Play upright</button>
+          </div>
         </div>
       )}
       {paused && !over && !net && (
@@ -713,7 +1128,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
             <h3>{online ? "Leave the match?" : "Paused"}</h3>
             {online && <p>The match keeps going while you decide.</p>}
             <button type="button" className="lg-go" onClick={() => setPaused(false)}>{online ? "Keep playing" : "Resume"}</button>
-            <button type="button" className="lg-go quiet" onClick={onExit}>{online ? "Leave" : "Leave the Arena"}</button>
+            <button type="button" className="lg-go quiet" onClick={onExit}>{online ? "Leave" : "Leave the match"}</button>
           </div>
         </div>
       )}
@@ -783,10 +1198,11 @@ function gradeOf(v) {
     + (v.won && v.why === "knockout" ? (v.t < 90 * TPS ? 10 : v.t < 150 * TPS ? 5 : 0) : 0);
   return { letter: pts >= 88 ? "S" : pts >= 72 ? "A" : pts >= 55 ? "B" : pts >= 35 ? "C" : "D", pts };
 }
-const nextAlive = (s, me) => {
-  const sd = s.sides[me];
-  for (let k = 1; k < sd.team.length; k++) {
-    const i = (sd.active + k) % sd.team.length;
+// The next Pokemon still standing, forward or back round the team.
+const nextAlive = (s, me, way = 1) => {
+  const sd = s.sides[me], n = sd.team.length;
+  for (let k = 1; k < n; k++) {
+    const i = (sd.active + way * k + n * k) % n;
     if (sd.team[i].hp > 0) return i;
   }
   return -1;
@@ -804,7 +1220,8 @@ function snapshot(s, me) {
     t: s.t, left: LIMIT - s.t, over: s.over, won: s.over && s.winner === me, lost: s.over && s.winner === 1 - me, why: s.why, intro: s.intro > 0,
     meter: [me, 1 - me].map((k) => s.sides[k].meter / SURGE_MAX), surging: f0.surge > 0,
     sides: [side(me), side(1 - me)],
-    party: mine.team.map((f, k) => ({ id: f.id, hp: f.hp, active: k === mine.active })),
+    party: mine.team.map((f, k) => ({ id: f.id, hp: f.hp, max: f.max, active: k === mine.active })),
+    swapCd: mine.swapCd / SWAP_CD,
     stats: { ...mine.stats }, struggle: spent(f0),
     struggleReady: !(f0.struggle?.cd > 0), struggleCd: f0.struggle?.cd ? f0.struggle.cd / cooldownOf(moveOf(STRUGGLE)) : 0,
     hpShare: mine.team.reduce((n, f) => n + f.hp, 0) / Math.max(1, mine.team.reduce((n, f) => n + f.max, 0)),
@@ -813,27 +1230,35 @@ function snapshot(s, me) {
       return { name: moveName(m.i), type: data.t ?? "normal", pp: m.pp, max: Math.max(m.pp, Math.ceil((data.pp ?? 10) / 2), 3),
         ready: m.cd === 0, cd: m.cd ? m.cd / cooldownOf(data) : 0, shape: shapeOf(data) };
     }),
+    // The next basic attack is the third in a row: the button says so.
+    basic: { ready: f0.basic.cd === 0, cd: f0.basic.cd / BASIC_CD, jab: basicShape(f0) === "melee", boost: f0.basicN % 3 === 2 && s.t - f0.basicT < TPS },
     dodge: f0.dodgeCd === 0, dodgeCd: f0.dodgeCd ? f0.dodgeCd / DODGE_CD : 0,
     ko: [me, 1 - me].map((k) => s.sides[k].team.filter((f) => f.hp <= 0).length),
   };
 }
 
-function Bar({ f, meter, mine }) {
+/* A SIDE'S PLATE: its Pokemon's face, name and level, HP with the chunk a
+   hit took trailing behind it, statuses and stat changes, who is left, and
+   the Surge meter. */
+function Plate({ f, meter, who, mine }) {
   return (
-    <div className={`ar-bar${mine ? " mine" : ""}`}>
-      <div className="ar-bar-top"><b>{nameOf(f.id)}</b><span>Lv {f.level}</span></div>
-      <i className="ar-hp">
-        <i className="ar-hp-lag" style={{ transform: `scaleX(${Math.max(0, f.hp / f.max)})` }} />
-        <i style={{ transform: `scaleX(${Math.max(0, f.hp / f.max)})` }} />
-      </i>
-      <i className={`ar-meter${meter >= 1 ? " full" : ""}`}><i style={{ transform: `scaleX(${meter})` }} /></i>
-      <div className="ar-bar-low">
-        <span>{f.hp} / {f.max} HP</span>
-        <span className="ar-tags">
-          {f.status >= 0 && <em className={`ar-st st-${f.status}`}>{STATUS_TAG[f.status]}</em>}
-          {f.stages.map(([k, v]) => <em key={k} className={v > 0 ? "up" : "down"}>{STAT[k]}{v > 0 ? "▲" : "▼"}{Math.abs(v) > 1 ? 2 : ""}</em>)}
-          <span>{"●".repeat(f.left)}{"○".repeat(f.size - f.left)}</span>
-        </span>
+    <div className={`ah-plate${mine ? " mine" : ""}`}>
+      <span className="ah-face"><Sprite id={f.id} eager /></span>
+      <div className="ah-plate-body">
+        <div className="ah-plate-top"><b>{nameOf(f.id)}</b><span>Lv {f.level}</span><em>{who}</em></div>
+        <i className="ar-hp">
+          <i className="ar-hp-lag" style={{ transform: `scaleX(${Math.max(0, f.hp / f.max)})` }} />
+          <i style={{ transform: `scaleX(${Math.max(0, f.hp / f.max)})` }} />
+        </i>
+        <div className="ah-plate-low">
+          <span>{f.hp} / {f.max}</span>
+          <span className="ar-tags">
+            {f.status >= 0 && <em className={`ar-st st-${f.status}`}>{STATUS_TAG[f.status]}</em>}
+            {f.stages.map(([k, v]) => <em key={k} className={v > 0 ? "up" : "down"}>{STAT[k]}{v > 0 ? "▲" : "▼"}{Math.abs(v) > 1 ? 2 : ""}</em>)}
+          </span>
+          <span className="ah-left" aria-label={`${f.left} of ${f.size} left`}>{Array.from({ length: f.size }, (_, k) => <i key={k} className={k < f.left ? "on" : ""} />)}</span>
+        </div>
+        <i className={`ar-meter${meter >= 1 ? " full" : ""}`}><i style={{ transform: `scaleX(${meter})` }} /></i>
       </div>
     </div>
   );
@@ -864,13 +1289,15 @@ function Stick({ input }) {
     addEventListener("pointercancel", up);
     return () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); removeEventListener("pointercancel", up); };
   }, [input]);
+  /* A MOBA'S STICK: resting where the left thumb lives, so it is never a
+     guess; a touch anywhere in the left half moves it under the thumb. */
   return (
     <div className="ar-stickzone" onPointerDown={(e) => { id.current = e.pointerId; setAt([e.clientX, e.clientY, 0, 0]); }}>
-      {at && (
+      {at ? (
         <span className="ar-stick" style={{ left: at[0], top: at[1] }}>
           <i style={{ transform: `translate(${Math.max(-48, Math.min(48, at[2]))}px, ${Math.max(-48, Math.min(48, at[3]))}px)` }} />
         </span>
-      )}
+      ) : <span className="ar-stick rest" aria-hidden="true"><i /></span>}
     </div>
   );
 }
