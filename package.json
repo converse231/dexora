@@ -18,6 +18,7 @@
     "arenas": "python tools/build_arenas.py",
     "pmd": "python tools/build_pmd.py",
     "intro": "python tools/build_arena_intro.py",
+    "fx": "python tools/build_fx.py",
     "art": "python tools/build_assets.py",
     "map": "python tools/build_map.py",
     "layout": "python tools/study_layout.py",

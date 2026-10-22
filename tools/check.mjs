@@ -7274,6 +7274,23 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       assert.ok(existsSync(f), `public/arena/${a.id}.webp is missing - run npm run arenas`);
       assert.ok(statSync(f).size < 200_000, `${a.id}.webp is ${Math.round(statSync(f).size / 1000)}KB - npm run arenas shrinks it`);
     }
+    /* THE DRAWN EFFECTS (npm run fx): each strip's header is the frames and
+       size fx.js says, and FX_REV is the hash of the strips themselves - an
+       effect redrawn and shipped under its old stamp is the old one, cached. */
+    {
+      const { FX, FX_REV } = await import("../src/data/fx.js");
+      const { createHash } = await import("node:crypto");
+      const h = createHash("sha1");
+      for (const [name, m] of Object.entries(FX)) {
+        const f = new URL(`../public/arena/fx/${name}.png`, import.meta.url);
+        assert.ok(existsSync(f), `public/arena/fx/${name}.png is missing - run npm run fx`);
+        const png = readFileSync(f);
+        assert.ok(png.readUInt32BE(16) === m.n * m.w && png.readUInt32BE(20) === m.h, `${name}.png is not ${m.n} frames of ${m.w}x${m.h} - run npm run fx`);
+        assert.ok(png.length < 200_000, `${name}.png is ${Math.round(png.length / 1000)}KB - an effect that size is a picture, not a sprite`);
+        h.update(png);
+      }
+      assert.equal(h.digest("hex").slice(0, 10), FX_REV, "public/arena/fx changed since its stamp - run npm run fx");
+    }
     // ...and one drawn cover block per material a floor uses.
     for (const g of Object.values(A.GROUND)) {
       const f = new URL(`../public/arena/cover/${g.cover}.webp`, import.meta.url);
