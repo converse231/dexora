@@ -21,6 +21,7 @@ const THEME_NAME = { auto: "Auto", dark: "Night", light: "Day" };
 export default function You({
   trainerName, caught, xp, stats, bag, save, account, unread, titles = [], requests = 0, due = 0, invites = 0,
   onProfile, onInvite, onAchievements, onNews, onHelp, onForms, onWardrobe, onSettings, onLogOut, onReset, onSpend,
+  onJoin = null,
 }) {
   useModalLock();
   const [theme, setThemeState] = useState(themeChoice);
@@ -29,6 +30,8 @@ export default function You({
   const free = freePoints(stats, level);
 
   const items = [
+    // A guest's game lives on this browser alone until it has an account.
+    onJoin && ["users", "Save your progress", "A free account keeps your game on any device, and opens trading", onJoin, true],
     onProfile && ["card", "Your trainer card",
       requests ? `${requests} friend request${requests === 1 ? "" : "s"}` : "Your card and your friends", onProfile, requests > 0],
     onInvite && ["gift", "Invite friends",
@@ -87,10 +90,10 @@ export default function You({
           </div>
           {/* One or the other, never both: reset only survives in local mode,
               where there is no account to leave. */}
-          <button type="button" className="you-out" onClick={onLogOut ?? onReset}>
+          {!onJoin && <button type="button" className="you-out" onClick={onLogOut ?? onReset}>
             <Icon n={onLogOut ? "out" : "reset"} size={20} />
             <span><b>{onLogOut ? "Log out" : "Reset this save"}</b></span>
-          </button>
+          </button>}
         </nav>
 
         <div className="you-trainer" id="you-trainer">

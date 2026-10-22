@@ -20,8 +20,50 @@ export const CHECKIN_REWARDS = [
 ];
 export const WEEK = CHECKIN_REWARDS.length;
 
-// Streak days that get the celebration, not just the stamp.
-export const STREAK_MILESTONES = [7, 14, 30, 50, 100, 180, 365];
+/* THE STREAK'S CARD PACKS (asked for, 2026-10-22): days of the streak that
+   pay packs - 10 on day 10, 20 on 20, 30 on 30, 50 on 50, 70 on 70, 100 on
+   100, then STREAK_MONTHLY every STREAK_MONTH days after the last. They come
+   in LOTs of ten, each lot ONE set, landed by the reel (`lotSets`). */
+export const STREAK_PACKS = [[10, 10], [20, 20], [30, 30], [50, 50], [70, 70], [100, 100]];
+export const STREAK_MONTH = 30;
+export const STREAK_MONTHLY = 100;
+export const LOT = 10;
+export function streakPacks(day) {
+  const hit = STREAK_PACKS.find(([d]) => d === day);
+  if (hit) return hit[1];
+  const last = STREAK_PACKS.at(-1)[0];
+  return day > last && (day - last) % STREAK_MONTH === 0 ? STREAK_MONTHLY : 0;
+}
+// The next streak day that pays packs, after `streak`.
+export function nextPackDay(streak) {
+  const last = STREAK_PACKS.at(-1)[0];
+  const ahead = STREAK_PACKS.find(([d]) => d > streak);
+  return ahead ? ahead[0] : last + (Math.floor((streak - last) / STREAK_MONTH) + 1) * STREAK_MONTH;
+}
+// Streak days that take the whole screen: the first week, and every day that pays packs.
+export const isMilestone = (day) => day === 7 || streakPacks(day) > 0;
+/* WHICH SET EACH LOT IS: drawn from the sets open to you, weighted toward
+   the ones you are furthest from finishing (`missing`: set id -> the share
+   of its cards you lack, 0-1; a quarter on top so a finished set can still
+   land) - a long streak fills the collection instead of stacking spares.
+   `rng` is the engine's Math.random. */
+export function lotSets(open, missing, lots, rng) {
+  if (!open.length) return [];
+  const w = open.map((id) => 0.25 + Math.min(1, Math.max(0, missing[id] ?? 1)));
+  const total = w.reduce((n, x) => n + x, 0);
+  return Array.from({ length: lots }, () => {
+    let r = rng() * total;
+    for (let i = 0; i < open.length; i++) { r -= w[i]; if (r < 0) return open[i]; }
+    return open.at(-1);
+  });
+}
+/* THE STREAK AS IT STANDS RIGHT NOW, for the top bar: today's stamp, or
+   yesterday's still alive until today ends, or nothing once a day was
+   missed. `due` says today is not stamped yet. */
+export function streakNow(c, today = dayKey()) {
+  const st = checkinStatus(c, today);
+  return { streak: st.due ? (isYesterday(c?.last, today) ? c?.streak ?? 0 : 0) : st.streak, due: st.due };
+}
 
 /* THE ROULETTE: fifteen equal slots - thirteen card packs (a set, every
    one as likely, ROULETTE_PACKS of it) and two Gold Pokemon (any species

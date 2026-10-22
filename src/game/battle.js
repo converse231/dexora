@@ -240,15 +240,17 @@ const PAR = 0, BRN = 1, PSN = 2, SLP = 3, FRZ = 4;
 const IMMUNE = { [BRN]: "fire", [PSN]: ["poison", "steel"], [PAR]: "electric", [FRZ]: "ice" };
 
 export const STRUGGLE = -1;
-const moveOf = (i) => (i === STRUGGLE
+export const moveOf = (i) => (i === STRUGGLE
   ? { n: "struggle", t: null, c: 0, p: 50, pp: 1 }
   : MOVES[i]);
 
 export const speed = (f) => f.st[5] * STAGE(f.stages[5]) * (f.status === PAR ? 0.5 : 1);
 export const effectiveness = (moveType, defTypes) => (moveType == null ? 1
   : defTypes.reduce((m, d) => m * CHART[TYPES.indexOf(moveType)][d], 1));
-const immuneTo = (f, st) => [IMMUNE[st]].flat().some((t) => f.types.includes(TYPES.indexOf(t)));
+export const immuneTo = (f, st) => [IMMUNE[st]].flat().some((t) => f.types.includes(TYPES.indexOf(t)));
 
+/* `rawDamage` outside: the Arena (game/arena.js) hits with this same formula. */
+export { base as rawDamage, CRIT };
 function base(a, d, m, crit) {
   const phys = m.c === 0;
   const as = phys ? 1 : 3, ds = phys ? 2 : 4;

@@ -22,6 +22,7 @@
    NO ART: a step is marked done, never drawn (your call, 2026-10-10). Pure
    and browser-free, so check.mjs and tools/play read it in Node. */
 
+import { LADDER } from "./ladder.js";
 import { FEMALE_ART } from "../data/genders.js";
 import { SPECIES } from "../data/dex.js";
 import { CARD_SETS } from "../data/cards/index.js";
@@ -80,6 +81,8 @@ export const ACHIEVEMENTS = [
   { id: "badges", group: "battle", name: "Badge collector", sub: `Gym leaders beaten, across every region - ${BADGES} badges in all`, steps: upTo(BADGES, 1, 8, 32), of: (s) => badgesOf(s.beaten) },
   { id: "champion", group: "battle", name: "Champion", sub: "Regions where you beat the Elite Four and the Champion", steps: upTo(REGIONS.length, 1, 3),
     of: (s) => REGIONS.filter((rid) => leagueOf(rid).every((id) => won(s, id))).length },
+  { id: "arena", group: "battle", name: "Arena master", sub: `Masters of the Arena Ladder beaten - ${LADDER.length} in all, the Arena Champion last`,
+    steps: [1, 5, LADDER.length], of: (s) => (s.ladder ?? []).length },
   { id: "hard", group: "battle", name: "Hard mode", sub: "Regions where you beat every leader, the Elite Four and the Champion on hard mode", steps: upTo(REGIONS.length, 1, 3),
     of: (s) => REGIONS.filter((rid) => hardCleared(rid, s.beaten)).length },
 

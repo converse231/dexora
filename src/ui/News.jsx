@@ -16,6 +16,30 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-22-streak",
+    icon: "🔥",
+    date: "October 2026",
+    title: "Streaks pay card packs",
+    items: [
+      ["Your streak, always in sight", "The flame in the top bar counts your days in a row. Tap it for the check-in."],
+      ["Packs for showing up", "10 packs on day 10, then 20, 30, 50, 70 and 100 on day 100 - and 100 more every month after."],
+      ["The reel picks the sets", "Every 10 packs spin for a set, leaning toward the ones you're furthest from finishing."],
+    ],
+  },
+  {
+    id: "2026-10-22-arena",
+    icon: "⚔️",
+    date: "October 2026",
+    title: "The Arena: live battles",
+    items: [
+      ["Real-time fights", "Battles, then Arena: move, aim, dodge and switch as it happens, with your team."],
+      ["Surge", "Land hits and dodge at the last moment to fill your meter, then press F to power up."],
+      ["Arena Ladder", "Ten masters on six arenas, each with its own ground. Beat them in order."],
+      ["Battle a friend", "Challenge a friend from the Arena for a live match, on even terms."],
+      ["Every Pokémon animated", "Arena Pokémon walk, strike and flinch with sprites by the PMD Sprite Repository."],
+    ],
+  },
+  {
     id: "2026-10-20-looks",
     icon: "🧩",
     date: "October 2026",

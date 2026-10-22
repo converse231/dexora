@@ -585,6 +585,23 @@ Activity (daily actives, retention, busy hours) is recorded from step 1 on;
 sign-ups show their whole history at once. Two-factor is built but parked
 (docs/admin.md, Security 5): `admin.mfa_required()` returning `true` turns it on.
 
+## 3l. Online Arena battles — **run this once, after 3k** (added 2026-10-22)
+
+The Arena plan's phase 3: friends challenge each other from the Arena lobby
+and play a live match peer to peer. The server only holds the challenge.
+
+1. **`db/arena.sql`** - paste the whole file and run it. Re-runnable. It adds
+   `arena_invites` (unreadable to every client) and four functions:
+   `arena_challenge`, `arena_invites_mine`, `arena_answer`, `arena_cancel`.
+2. **Realtime is already on**: the two games introduce themselves over a
+   Realtime *broadcast* channel named after the challenge's secret room, and
+   broadcast needs no table, publication or setting. Each match costs about a
+   dozen Realtime messages; the match itself never touches Supabase.
+
+Until step 1 the Arena's "Battle a friend" panel says *Online battles aren't
+open yet*. Two networks that cannot reach each other directly (no relay
+server on the free tier) are told so instead of hanging.
+
 ## 4. Turn off email confirmation — **you have to do this one**
 
 It is the only step that cannot be done from here: the setting lives in GoTrue's

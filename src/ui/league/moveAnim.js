@@ -50,6 +50,29 @@ function image(path) {
 const sheetPath = (i) => (data.SHEETS[i]?.[0] ? `battle/anim/s/${data.SHEETS[i][0]}.png` : null);
 const bgPath = (i) => (i >= 0 && data.BGS[i] ? `battle/anim/bg/${data.BGS[i]}.png` : null);
 
+/* THE ARENA'S ART (game/arena.js, a top-down camera): a move's own Emerald
+   sprites, read off its timeline - the one it spawns most is what flies, the
+   last one spawned is the burst where it lands. Null for a move whose
+   timeline draws no sprite (the Arena falls back to its type's colours). */
+export function arenaArt(slug) {
+  const a = data?.ANIMS[slug];
+  if (!a) return null;
+  const specs = a[2].filter((e) => e[0] === "s").map((e) => e[2]);
+  if (!specs.length) return null;
+  const count = new Map();
+  for (const sp of specs) count.set(sp, (count.get(sp) ?? 0) + 1);
+  const main = [...count].sort((x, y) => y[1] - x[1])[0][0];
+  const pack = (spec) => {
+    const [sheet, frames, , , blend] = data.SPRITES[spec];
+    const sh = data.SHEETS[sheet];
+    const path = sheetPath(sheet);
+    return sh && path ? { path, w: sh[1], h: sh[2], frames, blend: Boolean(blend) } : null;
+  };
+  return { shot: pack(main), burst: pack(specs[specs.length - 1]) };
+}
+// The same cached loader the League's scenes use, for the Arena's sheets.
+export const artImage = (path) => image(path);
+
 // Every image a move's timeline draws.
 function needs(slug) {
   const a = data?.ANIMS[slug];

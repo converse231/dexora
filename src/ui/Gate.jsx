@@ -13,8 +13,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { nameProblem, NAME_MAX, ageProblem, MIN_AGE } from "../game/name.js";
-import { TrainerArt } from "./Sprite.jsx";
+import Sprite, { TrainerArt } from "./Sprite.jsx";
 import { read, REF_KEY } from "../game/store.js";
+import { STARTERS } from "../game/starter.js";
+import { speciesById } from "../game/biomes.js";
+import { label } from "../game/map.js";
 
 /* Both trainers, in the order `build_player` stacks them into player.png. The
    tile draws the real down-facing walk frame out of that same strip, so what is
@@ -24,10 +27,10 @@ const CHARS = [
   ["leaf", "Girl"],
 ];
 
-function Shell({ step, title, blurb, children, foot }) {
+function Shell({ step, title, blurb, children, foot, wide = false }) {
   return (
     <div className="gate">
-      <div className="gate-card" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`gate-card${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="gate-brand">
           <span className="title">Dexora</span>
           <span className="gate-step">{step}</span>
@@ -41,15 +44,46 @@ function Shell({ step, title, blurb, children, foot }) {
   );
 }
 
+/* ------------------------------------------------------------ the front door */
+
+/* PLAY FIRST, SIGN UP LATER (onboarding, 2026-10-22): an account was the
+   first thing the game asked for, before it had shown anything. Now the
+   front door is one button into the game; the account is offered once you
+   have something worth keeping (App's Save my progress). */
+export function Welcome({ onPlay, onAccount }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Shell
+      title="Catch them all, right here"
+      blurb="Walk the routes, meet wild Pokémon, chase rare forms and win badges. No sign-up to start."
+      foot={
+        <button type="button" className="gate-link" onClick={onAccount}>
+          I already have an account
+        </button>
+      }
+    >
+      <div className="gate-hero" aria-hidden="true">
+        {STARTERS.map((id) => <Sprite key={id} id={id} alt="" eager />)}
+      </div>
+      <button className="gate-go" type="button" autoFocus disabled={busy}
+        onClick={() => { setBusy(true); onPlay(); }}>
+        {busy ? "\u2026" : "PLAY NOW"}
+      </button>
+    </Shell>
+  );
+}
+
 /* --------------------------------------------------------------- the account */
 
 /* Who invited this device (an invite link, main.jsx): the form opens on
    sign-up and says so - an invite only counts for a NEW account. */
 const invitedBy = () => read(REF_KEY);
 
-export function Account({ onSignUp, onSignIn, onForgot = null, offline, notice = "" }) {
+/* `keeping`: a guest saving their progress - it opens on sign-up and says
+   their game comes with them. `onBack` returns to where they came from. */
+export function Account({ onSignUp, onSignIn, onForgot = null, offline, notice = "", keeping = false, onBack = null }) {
   const [invited] = useState(invitedBy);
-  const [mode, setMode] = useState(() => (invited ? "up" : "in"));        // "in" | "up" | "lost"
+  const [mode, setMode] = useState(() => (invited || keeping ? "up" : "in"));        // "in" | "up" | "lost"
   const [addr, setAddr] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -179,10 +213,12 @@ export function Account({ onSignUp, onSignIn, onForgot = null, offline, notice =
   return (
     <Shell
       step="STEP 1 OF 2"
-      title={up ? "Make an account" : "Welcome back"}
+      title={keeping && up ? "Save your progress" : up ? "Make an account" : "Welcome back"}
       blurb={up && invited
         ? `${invited} invited you! Make an account and get going - you both get a gift.`
-        : up
+        : keeping && up
+          ? "Your Pokédex, Box and bag come with you to the new account - and from then on, to any device."
+          : up
           ? "Your Pokédex lives on the account, so it follows you to any device."
           : "Log in and your Pokédex comes with you."}
       foot={
@@ -199,6 +235,11 @@ export function Account({ onSignUp, onSignIn, onForgot = null, offline, notice =
           {!up && onForgot && (
             <button type="button" className="gate-link" onClick={() => { setMode("lost"); setNote(""); }}>
               I have forgotten my password
+            </button>
+          )}
+          {onBack && (
+            <button type="button" className="gate-link" onClick={onBack}>
+              {keeping ? "Keep playing as a guest" : "Back"}
             </button>
           )}
         </>
@@ -264,8 +305,11 @@ export function Account({ onSignUp, onSignIn, onForgot = null, offline, notice =
 /* NAME AND TRAINER TOGETHER, because they are one question - who are you -
    and splitting them would make a two-field form into two screens. The rules
    themselves live in `game/name.js`, with the other pure rules. */
-export function Trainer({ onPick, busy, askName = false, error = null, onOut = null }) {
+/* `partner`: a new game also picks its first Pokemon here (starter.js) -
+   the one choice before the first catch, beside the other one. */
+export function Trainer({ onPick, busy, askName = false, error = null, onOut = null, partner = false }) {
   const [pick, setPick] = useState(null);
+  const [mon, setMon] = useState(null);
   const [name, setName] = useState("");
   const [born, setBorn] = useState("");
   const [touched, setTouched] = useState(false);
@@ -276,21 +320,21 @@ export function Trainer({ onPick, busy, askName = false, error = null, onOut = n
   const problem = askName ? (nameProblem(name) ?? ageProblem(born)) : null;
   // Only nag once they have typed something, or once they have tried to submit.
   const shown = error ?? (touched ? problem : null);
-  const ready = pick && !problem;
+  const ready = pick && !problem && (!partner || mon);
 
   const go = () => {
     setTouched(true);
     if (!ready) return;
-    onPick(pick, name.trim(), born || null);
+    onPick(pick, name.trim(), born || null, partner ? mon : null);
   };
 
   return (
     <Shell
       step="STEP 2 OF 2"
-      title={askName ? "Who are you?" : "Are you a boy, or a girl?"}
+      title={askName ? "Who are you?" : partner ? "Pick your trainer and partner" : "Are you a boy, or a girl?"}
       blurb={askName
         ? "Your name is how other trainers will see you. Nothing else here is."
-        : "It only changes who you see walking. You can start either way."}
+        : partner ? "Your partner walks beside you and joins your Box." : "It only changes who you see walking. You can start either way."}
       /* A WAY OUT OF EVERY SIGNED-IN SCREEN. This one is reached with a session
          already in hand, so anything that goes wrong with it - a name that will
          not save, an account that no longer exists - otherwise leaves somebody
@@ -360,6 +404,18 @@ export function Trainer({ onPick, busy, askName = false, error = null, onOut = n
         ))}
       </div>
 
+      {partner && (
+        <div className="gate-chars gate-mons" role="radiogroup" aria-label="Partner Pokémon">
+          {STARTERS.map((id) => (
+            <button key={id} type="button" role="radio" aria-checked={mon === id}
+              className={`gate-char${mon === id ? " on" : ""}`} onClick={() => setMon(id)}>
+              <Sprite id={id} alt="" eager />
+              <i>{label(speciesById(id))}</i>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Holds its line either way, so the button does not jump when the first
           thing goes wrong. */}
       <p className="gate-note" aria-live="polite">{shown}</p>
@@ -372,7 +428,7 @@ export function Trainer({ onPick, busy, askName = false, error = null, onOut = n
           : ready ? "START"
             : askName && nameProblem(name) ? "ENTER A NAME"
               : askName && ageProblem(born) ? "ENTER YOUR DATE OF BIRTH"
-                : "PICK A TRAINER"}
+                : !pick ? "PICK A TRAINER" : "PICK A PARTNER"}
       </button>
 
       {/* AGAINST THE BUTTON THAT ACCEPTS THEM. A tick-box in a footer is a

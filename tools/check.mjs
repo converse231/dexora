@@ -1899,7 +1899,8 @@ import { canRun, RUN_LEVEL } from "../src/game/items.js";
      same reason `tileBase` is checked against `route.json`. */
   {
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
-    const at = css.indexOf(".gate-art {");
+    // The rule itself, at a line's start - not a `.x .gate-art {` override inside a media query.
+    const at = css.search(/^\.gate-art \{/m);
     assert.ok(at >= 0, ".gate-art is gone - the trainer picker draws nothing");
     const rule = css.slice(at, css.indexOf("}", at));
     /* `[^)]*` stopped at the inner `var(--z)` paren and never reached the
@@ -7157,7 +7158,8 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
      (about 60KB gzipped) with room for a re-fetch, not a target. */
   const DATA = ["leagues.js", "moves.js", "learnsets.js", "types.js"];
   // battle.js, and the League page's own folder - App imports that lazily.
-  const allowed = (rel) => rel === "game/battle.js" || rel.startsWith("ui/league/");
+  // ...and the Arena's rules, which only the League's folder may import (below).
+  const allowed = (rel) => rel === "game/battle.js" || rel === "game/arena.js" || rel.startsWith("ui/league/");
   const walk = (dir) => readdirSync(new URL(dir, import.meta.url), { withFileTypes: true })
     .flatMap((e) => e.isDirectory() ? walk(`${dir}${e.name}/`) : [`${dir}${e.name}`]);
   for (const f of walk("../src/").filter((f) => /\.(js|jsx)$/.test(f))) {
@@ -7172,12 +7174,418 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     // battle.js carries all of it, so only the League page may import that -
     // and the referee (6b), which is bundled for the server and nothing in src imports.
     if (/from\s+["'][^"']*\/battle\.js["']/.test(src)) {
-      assert.ok(rel.startsWith("ui/league/") || rel === "game/referee.js",
+      assert.ok(rel.startsWith("ui/league/") || rel === "game/referee.js" || rel === "game/arena.js",
         `${rel} imports battle.js - that puts the League's data in the main bundle`);
+    }
+    // The Arena's rules carry battle.js with them, so they are the League page's alone too.
+    if (/from\s+["'][^"']*\/arena\.js["']/.test(src)) {
+      assert.ok(rel.startsWith("ui/league/"), `${rel} imports arena.js - that puts the League's data in the main bundle`);
     }
     assert.ok(!/from\s+["'][^"']*\/referee\.js["']/.test(src),
       `${rel} imports referee.js - the server's rules; the page gets views, never the state`);
   }
+  /* THE ARENA (game/arena.js, real-time battles, 2026-10-22). Its rules
+     replay EXACTLY from a seed - CPU-vs-CPU balance runs and lockstep netcode
+     both stand on that - so the file may use nothing that differs between
+     browsers or between runs: no trig, exp or pow (their last digits are the
+     engine's), no clock, no Math.random, no DOM. A match must end, a CPU
+     level must mean something, and every Pokemon must have a move to use. */
+  {
+    const A = await import("../src/game/arena.js");
+    const src = stripComments(readFileSync(new URL("../src/game/arena.js", import.meta.url), "utf8"));
+    for (const bad of [/Math\.(sin|cos|tan|asin|acos|atan2?|exp|pow|log|hypot|random)\b/, /\*\*/, /\bDate\b/, /\bperformance\b/,
+      /\b(window|document|localStorage|requestAnimationFrame)\b/]) {
+      const found = src.match(bad)?.[0];
+      assert.ok(!found, `game/arena.js uses ${found} - a match would not replay the same on every browser`);
+    }
+    const play = (seed, a, b) => {
+      const s = A.newMatch({ teams: [A.cpuTeam(seed, 50), A.cpuTeam(seed + 7, 50)], cpu: [a, b], seed });
+      while (!s.over) A.tick(s, [null, null]);
+      return s;
+    };
+    const one = play(4242, "hard", "normal"), two = play(4242, "hard", "normal");
+    assert.equal(A.stateHash(one), A.stateHash(two), "the same seed played two different Arena matches");
+    assert.notEqual(A.stateHash(one), A.stateHash(play(4243, "hard", "normal")), "two seeds played the same match - the seed reaches nothing");
+    let wins = 0, ended = 0;
+    for (let k = 1; k <= 12; k++) {
+      const s = play(k * 31, "normal", "easy");
+      assert.ok(s.over && s.t <= A.LIMIT, "an Arena match did not end by its clock");
+      if (s.winner === 0) wins++;
+      if (s.why === "knockout") ended++;
+    }
+    assert.ok(wins >= 8, `Normal beat Easy ${wins} times in 12 - the CPU levels mean nothing`);
+    // A bound, measured 2026-10-22: 5 of 12 end by knockout at DAMAGE 0.6, 0 of 12 at 0.32 (every match ran out the clock).
+    assert.ok(ended >= 3, `only ${ended} of 12 Normal-vs-Easy matches ended in a knockout - hits are worth too little (DAMAGE)`);
+    // Every Pokemon that can fight has a kit: its moves that hit, or Struggle.
+    for (const sp of SPECIES.filter((x) => !isForm(x.id)).slice(0, 400)) {
+      const kit = A.kitOf(bFighter(sp.id, 50, 1));
+      assert.ok(kit.length >= 1 && kit.length <= 4, `${sp.name} goes into the Arena with ${kit.length} moves`);
+    }
+    /* EVERY MOVE HAS A SHAPE (phase 1): of the moves the League can hand a
+       Pokemon, only the ones that heal an ally go unplayed - there is no ally
+       in a one-on-one. Every shape but the hazards is some move's (the
+       League's data marks Spikes and its kind never-chosen, so no kit holds
+       one yet); each shape's own rules are below. */
+    const { MOVES: AM } = await import("../src/data/moves.js");
+    const live = AM.filter((m) => !m.no);
+    const off = live.filter((m) => !A.shapeOf(m)).map((m) => m.n);
+    assert.deepEqual(off.filter((n) => !["heal-pulse", "floral-healing"].includes(n)), [],
+      `the Arena cannot play ${off.join(", ")} - give each a shape or leave it out on purpose`);
+    const used = new Set(live.map((m) => A.shapeOf(m)).filter(Boolean));
+    for (const sh of A.SHAPES.filter((x) => x !== "field")) assert.ok(used.has(sh), `no move is a ${sh} - the shape is dead code`);
+    for (const n of ["spikes", "toxic-spikes", "stealth-rock", "sticky-web"]) {
+      assert.equal(A.shapeOf(AM.find((m) => m.n === n)), "field", `${n} is not laid as a hazard`);
+    }
+    for (const [n, sh] of [["earthquake", "pulse"], ["hyper-beam", "beam"], ["quick-attack", "dash"], ["bullet-seed", "multi"],
+      ["flamethrower", "shot"], ["slash", "melee"], ["swords-dance", "self"], ["protect", "self"], ["thunder-wave", "shot"]]) {
+      const m = AM.find((x) => x.n === n);
+      if (m) assert.equal(A.shapeOf(m), sh, `${n} plays as a ${A.shapeOf(m)}, not a ${sh}`);
+    }
+    /* A STATUS IN REAL TIME: a Will-O-Wisp that lands burns the foe, the burn
+       ticks every 2 s and wears off at 8 s; a Fire type is immune. The
+       player's side is driven by hand: aim at the dummy, fire once. */
+    const idx = (n) => AM.findIndex((m) => m.n === n);
+    const burnRun = (foeId) => {
+      const s = A.newMatch({ teams: [[bFighter(37, 50, 1, [idx("will-o-wisp"), idx("ember")])], [bFighter(foeId, 50, 2, [idx("tackle")])]],
+        cpu: [null, null], seed: 7 });   // the target stands still: no CPU, no input
+      let burned = -1, ticks = 0, cured = -1;
+      for (let t = 0; t < 30 * A.TPS && cured < 0; t++) {
+        const me = A.activeOf(s, 0), foe = A.activeOf(s, 1);
+        // Walk into a shot's range, then throw it.
+        const dx = foe.x - me.x, dy = foe.y - me.y, near = dx * dx + dy * dy < 36;
+        const fire = burned < 0 && near && t % 30 === 0 ? 0 : -1;
+        A.tick(s, [{ ...A.NO_INPUT, mx: near ? 0 : dx, my: near ? 0 : dy, ax: dx, ay: dy, fire }, null]);
+        for (const e of s.ev) {
+          if (e.k === "status" && e.side === 1 && e.st === A.BRN) burned = s.t;
+          if (e.k === "tick" && e.side === 1) ticks++;
+          if (e.k === "cured" && e.side === 1 && burned >= 0) cured = s.t;
+        }
+      }
+      return { burned, ticks, cured };
+    };
+    const burn = burnRun(1);
+    assert.ok(burn.burned >= 0, "a Will-O-Wisp aimed at a standing foe never burned it");
+    assert.ok(burn.ticks >= 3 && burn.ticks <= 4, `a burn ticked ${burn.ticks} times - it hurts every 2 s for 8 s`);
+    assert.ok(Math.abs(burn.cured - burn.burned - 8 * A.TPS) <= 2, `a burn lasted ${(burn.cured - burn.burned) / A.TPS} s, not 8`);
+    assert.equal(burnRun(4).burned, -1, "a Fire type was burned");
+    // THE FLOORS: one built picture per arena (npm run arenas), small enough to fetch.
+    for (const a of A.ARENAS) {
+      const f = new URL(`../public/arena/${a.id}.webp`, import.meta.url);
+      assert.ok(existsSync(f), `public/arena/${a.id}.webp is missing - run npm run arenas`);
+      assert.ok(statSync(f).size < 200_000, `${a.id}.webp is ${Math.round(statSync(f).size / 1000)}KB - npm run arenas shrinks it`);
+    }
+    // ...and one drawn cover block per material a floor uses.
+    for (const g of Object.values(A.GROUND)) {
+      const f = new URL(`../public/arena/cover/${g.cover}.webp`, import.meta.url);
+      assert.ok(existsSync(f) && statSync(f).size < 20_000, `public/arena/cover/${g.cover}.webp is missing or large - run npm run arenas`);
+    }
+    /* THE ARENA'S PRIZE STAYS A SLIVER OF THE ROAD'S: its best day (every CPU
+       level, Lv 100) under 5% of what that day's road trainers pay. */
+    const RDA = await import("../src/game/road.js");
+    const roadDay = RDA.roadRegions(100).flatMap((g) => RDA.roadOf(g)).reduce((n, t) => n + t.pay, 0);
+    const arenaDay = RDA.ARENA_LEVELS.reduce((n, c) => n + RDA.arenaPay(c, 100), 0);
+    assert.ok(arenaDay < roadDay * 0.05, `the Arena pays ¥${arenaDay} a day against the road's ¥${roadDay} - past 5%`);
+    /* EACH ARENA'S GROUND (phase 2). On every floor, neither side is favoured
+       and the ground does what its floor says; a type is not handed its home
+       arena (Fire on the Caldera, Water on the Boardwalk, Ice on the Rink)
+       for good; the grass hides, the water slows, cover stops a shot. */
+    const typed = (type, seed) => {
+      const pool = SPECIES.filter((sp) => !isForm(sp.id) && !sp.legendary && sp.types[0] === type && !isEvent(sp.id)).map((sp) => sp.id);
+      return [0, 1, 2].map((k) => bFighter(pool[(seed * 7 + k * 13) % pool.length], 50, seed * 3 + k));
+    };
+    const ground = {};
+    for (const ar of A.ARENAS) {
+      let side0 = 0; const seen = {};
+      for (let k = 1; k <= 16; k++) {
+        const s = A.newMatch({ teams: [A.cpuTeam(k * 977, 50), A.cpuTeam(k * 977 + 7, 50)], cpu: ["hard", "hard"], seed: k, arena: ar.id });
+        while (!s.over) { A.tick(s, [null, null]); for (const e of s.ev) seen[e.k] = (seen[e.k] ?? 0) + 1; }
+        if (s.winner === 0) side0++;
+      }
+      assert.ok(side0 >= 4 && side0 <= 12, `${ar.id}: side 0 won ${side0} of 16 - one side of the court is favoured`);
+      assert.ok(seen.claim > 0, `${ar.id}: nobody claimed a zone in 16 matches`);
+      if (ar.id === "moon") assert.ok(seen.rock > 0, "no rock fell in Mt. Moon Cavern");
+      if (ar.id === "caldera") assert.ok(seen.break > 0, "the Caldera's basalt never wore away");
+      ground[ar.id] = side0;
+    }
+    for (const [arena, type] of [["caldera", "fire"], ["seaside", "water"], ["rink", "ice"]]) {
+      const rate = (at) => {
+        let won = 0;
+        for (let k = 1; k <= 12; k++) {
+          const s = A.newMatch({ teams: [typed(type, k), A.cpuTeam(k * 131, 50)], cpu: ["hard", "hard"], seed: k, arena: at });
+          while (!s.over) A.tick(s, [null, null]);
+          if (s.winner === 0) won++;
+        }
+        return won / 12;
+      };
+      const home = rate(arena), away = rate("indigo");
+      assert.ok(home - away <= 0.34, `${type} teams win ${Math.round(home * 100)}% on ${arena} against ${Math.round(away * 100)}% on a plain court - its home is a lasting edge`);
+      ground[`${type}+`] = Math.round((home - away) * 100);
+    }
+    {
+      /* Tall grass: a still Pokemon in the Grove's corner is never targeted
+         from range - the CPU must come within 2 tiles to find it. */
+      const s = A.newMatch({ teams: [[bFighter(1, 50, 1, [idx("tackle")])], [bFighter(4, 50, 2, [idx("ember"), idx("scratch")])]], cpu: [null, "hard"], seed: 3, arena: "grove" });
+      Object.assign(s.sides[0].team[0], { x: 3.5, y: 3.5, px: 3.5, py: 3.5 });
+      A.tick(s, [A.NO_INPUT, null]);
+      let far = 0;
+      for (let t = 0; t < 8 * A.TPS; t++) {
+        A.tick(s, [A.NO_INPUT, null]);
+        const me = s.sides[0].team[0];
+        for (const e of s.ev) if (e.k === "fire" && e.side === 1 && me.hidden && Math.abs(e.x - me.x) + Math.abs(e.y - me.y) > 2.5) far++;
+      }
+      assert.equal(far, 0, `a CPU threw ${far} attacks from range at a Pokemon hidden in tall grass`);
+      assert.ok(s.sides[0].team[0].hidden || s.sides[0].team[0].hp < s.sides[0].team[0].max, "a still Pokemon in the Grove's corner grass was not hidden");
+    }
+    {
+      // Water: a non-Water Pokemon wades at half speed; a Water type swims at full.
+      const walk = (id) => {
+        const s = A.newMatch({ teams: [[bFighter(id, 50, 1, [idx("tackle")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 1, arena: "seaside" });
+        const f = s.sides[0].team[0];
+        Object.assign(f, { x: 3, y: 1.9, px: 3, py: 1.9 });
+        A.tick(s, [A.NO_INPUT, null]);
+        const x0 = f.x;
+        for (let t = 0; t < 30; t++) A.tick(s, [{ ...A.NO_INPUT, mx: 1 }, null]);
+        return (f.x - x0) / (A.TPS * 0.5);
+      };
+      const wade = walk(19), swim = walk(54);   // Rattata, Psyduck (both 3-ish tiles/s on land)
+      assert.ok(wade < swim * 0.7, `a Rattata waded ${wade.toFixed(2)} tiles/s against a Psyduck's ${swim.toFixed(2)} - water does not slow it`);
+    }
+    {
+      // Cover: a shot into a block chips the block, never the foe behind it.
+      const s = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 1, arena: "indigo" });
+      Object.assign(s.sides[0].team[0], { x: 5, y: 5.2, px: 5, py: 5.2 });
+      Object.assign(s.sides[1].team[0], { x: 11, y: 5.2, px: 11, py: 5.2 });
+      const ev = [];
+      for (let t = 0; t < 3 * A.TPS; t++) { A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: t === 0 ? 0 : -1 }, null]); ev.push(...s.ev); }
+      assert.ok(ev.some((e) => e.k === "chip"), "an Ember into a statue did not chip it");
+      assert.ok(!ev.some((e) => e.k === "hit" && e.side === 1), "an Ember went through a statue to the foe behind");
+    }
+    /* THE OPENING AND SURGE (phase 3). Nobody moves or attacks in the count,
+       and its ticks are off the match clock; a full meter, one press: the
+       foe is thrown off, cooldowns run twice as fast for SURGE_T, and a
+       switch ends it. An empty meter does nothing, and a real fight fills it. */
+    let surges = 0;
+    {
+      const s = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")]), bFighter(7, 50, 3, [idx("tackle")])], [bFighter(1, 50, 2, [idx("tackle")])]],
+        cpu: [null, null], seed: 5, intro: A.INTRO });
+      const f = s.sides[0].team[0], d = s.sides[1].team[0], x0 = f.x;
+      let go = 0;
+      for (let t = 0; t < A.INTRO; t++) { A.tick(s, [{ ...A.NO_INPUT, mx: 1, fire: 0 }, null]); go += s.ev.filter((e) => e.k === "go").length; }
+      assert.ok(f.x === x0 && !f.act && s.t === 0 && go === 1, "a Pokemon moved or attacked in the opening count, or the count ran the match clock");
+      A.tick(s, [{ ...A.NO_INPUT, mx: 1 }, null]);
+      assert.ok(f.x > x0 && s.t === 1, "nobody could move once the count was over");
+      Object.assign(f, { x: 8, y: 8, px: 8, py: 8 }); Object.assign(d, { x: 9.5, y: 8, px: 9.5, py: 8 });
+      A.tick(s, [{ ...A.NO_INPUT, surge: true }, null]);
+      assert.equal(f.surge, 0, "a Surge went off on an empty meter");
+      s.sides[0].meter = A.SURGE_MAX;
+      A.tick(s, [{ ...A.NO_INPUT, surge: true }, null]);
+      assert.ok(f.surge > 0 && s.sides[0].meter === 0 && s.ev.some((e) => e.k === "surge"), "a full meter did not surge");
+      f.kit[0].cd = 100;
+      for (let t = 0; t < 10; t++) A.tick(s, [A.NO_INPUT, null]);
+      assert.ok(d.x > 10.5, `a Surge left the foe at ${d.x.toFixed(2)}, 1.5 tiles off - it throws nobody`);
+      assert.equal(f.kit[0].cd, 80, "a surging Pokemon's cooldowns did not run twice as fast");
+      s.sides[0].swapCd = 0;
+      A.tick(s, [{ ...A.NO_INPUT, swap: 1 }, null]);
+      assert.equal(f.surge, 0, "a Surge outlived its Pokemon's switch");
+      for (let k = 1; k <= 8; k++) {
+        const m = A.newMatch({ teams: [A.cpuTeam(k * 313, 50), A.cpuTeam(k * 313 + 7, 50)], cpu: ["hard", "hard"], seed: k });
+        while (!m.over) { A.tick(m, [null, null]); surges += m.ev.filter((e) => e.k === "surge").length; }
+      }
+      assert.ok(surges >= 8, `${surges} Surges in 8 Hard matches - the meter does not fill in a real fight`);
+    }
+    /* NO STALEMATE (2026-10-22). A third of Hard-vs-Hard matches ran out the
+       clock with both Pokemon out of PP and their benches untouched: a spent
+       Pokemon's button now throws Struggle, the CPU benches a spent Pokemon
+       for one that can still fight, and the final minute hits harder. */
+    let timeouts = 0;
+    {
+      const spentRun = () => {
+        const s = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 9 });
+        const f = s.sides[0].team[0], d = s.sides[1].team[0];
+        f.kit[0].pp = 0;
+        Object.assign(f, { x: 8, y: 8, px: 8, py: 8 }); Object.assign(d, { x: 9.2, y: 8, px: 9.2, py: 8 });
+        let hit = 0;
+        for (let t = 0; t < 2 * A.TPS; t++) { A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: t < 3 ? 0 : -1 }, null]); hit += s.ev.filter((e) => e.k === "hit" && e.side === 1).length; }
+        return { s, hit, struggled: Boolean(f.struggle) };
+      };
+      // A one-move kit on purpose: Struggle pushed onto a short kit landed at the wrong index and froze it.
+      const st = spentRun();
+      assert.ok(st.struggled && st.hit > 0, "a Pokemon out of PP could not Struggle - it stands still and the match runs out the clock");
+      // The CPU: a spent Pokemon on the field, a fresh one on the bench.
+      const s = A.newMatch({ teams: [[bFighter(1, 50, 1, [idx("tackle")])], [bFighter(4, 50, 2, [idx("ember")]), bFighter(7, 50, 3, [idx("water-gun")])]], cpu: [null, "hard"], seed: 4, intro: 0 });
+      s.sides[1].team[0].kit[0].pp = 0;
+      for (let t = 0; t < 3 * A.TPS && s.sides[1].active === 0; t++) A.tick(s, [A.NO_INPUT, null]);
+      assert.equal(s.sides[1].active, 1, "the CPU kept a Pokemon with no PP on the field while its bench could fight");
+      // The final minute: announced once, and the same blow hits half again as hard.
+      const blow = (late) => {
+        const m = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 21 });
+        if (late) m.t = A.LIMIT - A.FINAL_T + 1;
+        const f = m.sides[0].team[0], d = m.sides[1].team[0];
+        Object.assign(f, { x: 8, y: 8, px: 8, py: 8 }); Object.assign(d, { x: 11, y: 8, px: 11, py: 8 });
+        for (let t = 0; t < 3 * A.TPS; t++) { A.tick(m, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: t < 3 ? 0 : -1 }, null]); const h = m.ev.find((e) => e.k === "hit"); if (h) return h.dmg; }
+        return 0;
+      };
+      const early = blow(false), late = blow(true);
+      assert.ok(early > 0 && late >= Math.floor(early * 1.4), `a final-minute Ember hit ${late} against ${early} - the final minute does not hit harder`);
+      const an = A.newMatch({ teams: [A.cpuTeam(5, 50), A.cpuTeam(6, 50)], cpu: ["hard", "hard"], seed: 5 });
+      an.t = A.LIMIT - A.FINAL_T - 2;
+      let said = 0;
+      for (let t = 0; t < 4 && !an.over; t++) { A.tick(an, [null, null]); said += an.ev.filter((e) => e.k === "final").length; }
+      assert.equal(said, 1, "the final minute was not announced exactly once");
+      for (let k = 1; k <= 24; k++) {
+        const m = A.newMatch({ teams: [A.cpuTeam(k * 977, 50), A.cpuTeam(k * 977 + 7, 50)], cpu: ["hard", "hard"], seed: k, arena: A.ARENAS[k % 6].id });
+        while (!m.over) A.tick(m, [null, null]);
+        if (m.why === "time") timeouts++;
+      }
+      // Measured 2026-10-22: 13 of 40 before, 2 of 40 after. A third again is a stalemate back.
+      assert.ok(timeouts <= 5, `${timeouts} of 24 Hard-vs-Hard matches ran out the clock - a stalemate is back`);
+    }
+    /* PLAYING ONLINE (phase 3). Two lockstep ends over a link that holds each
+       message 1-9 frames (in order, as a reliable data channel is), each end
+       playing its own scripted inputs: the same match tick for tick, to the
+       same end, with no desync. A state nudged at one end is caught within
+       HASH_EVERY ticks; a message from the last round is ignored; a Fair
+       team is its species at FAIR_LEVEL whatever was brought. */
+    const duel = (spoil) => {
+      const lcg = [97, 131];
+      const roll = (k) => { lcg[k] = (Math.imul(lcg[k], 1103515245) + 12345) >>> 0; return lcg[k] / 4294967296; };
+      const inbox = [[], []];
+      let frame = 0;
+      const ends = [0, 1].map((me) => {
+        const s = A.newMatch({ teams: [A.fairTeam([6, 25, 94]), A.fairTeam([9, 3, 65])], cpu: [null, null], seed: 77, arena: "moon", intro: A.INTRO });
+        const link = { send: (m) => { const q = inbox[1 - me]; q.push([Math.max(q.at(-1)?.[0] ?? 0, frame + 1 + Math.floor(roll(me) * 9)), JSON.parse(JSON.stringify(m))]); } };
+        return { s, ls: A.lockstep(link, me, 2), me };
+      });
+      const sample = (me) => () => {
+        const r = roll(me);
+        return { mx: roll(me) * 2 - 1, my: roll(me) * 2 - 1, ax: (roll(me) * 2 - 1) * 9.37, ay: (roll(me) * 2 - 1) * 5.11,
+          fire: r < 0.3 ? Math.floor(roll(me) * 4) : -1, dodge: r > 0.95, swap: r > 0.993 ? Math.floor(roll(me) * 3) : -1, surge: r > 0.9 };
+      };
+      while (!(ends[0].s.over && ends[1].s.over) && frame < 40000) {
+        for (const e of ends) {
+          const q = inbox[e.me];
+          while (q.length && q[0][0] <= frame) e.ls.hear(q.shift()[1]);
+          if (e.s.over) continue;
+          for (let n = 0; n < 2 && e.ls.ready() && !e.s.over; n++) { e.ls.feed(sample(e.me)); if (!e.ls.ready()) break; e.ls.step(e.s); }
+          e.ls.feed(sample(e.me));
+        }
+        if (spoil && frame === 600) ends[1].s.sides[0].team[0].hp -= 1;
+        if (frame === 700) ends[0].ls.hear({ t: "in", r: 1, n: ends[0].ls.made + 1, i: { fire: 2 } });   // last round's
+        frame++;
+      }
+      return ends;
+    };
+    const fair = duel(false);
+    assert.ok(fair[0].s.over && fair[1].s.over, "an online match over a laggy link never ended");
+    assert.equal(A.stateHash(fair[0].s), A.stateHash(fair[1].s), "two ends of an online match finished different matches");
+    assert.ok(fair[0].ls.desync < 0 && fair[1].ls.desync < 0 && fair[0].s.winner === fair[1].s.winner, "a fair online match read as a desync, or two winners");
+    const spoilt = duel(true);
+    const caught = Math.max(spoilt[0].ls.desync, spoilt[1].ls.desync);
+    assert.ok(caught > 0, "a state nudged at one end of an online match was never caught");
+    assert.ok(A.fairTeam([6]).every((f) => f.level === A.FAIR_LEVEL && f.id === 6), "a Fair team is not its species at FAIR_LEVEL");
+    assert.equal(A.rulesPrint(), A.rulesPrint(), "the rules print is not stable within one build");
+    // THE LADDER (ladder.js): ten masters, each on a real floor at a real CPU level, its team the species it names.
+    const LD = await import("../src/game/ladder.js");
+    assert.equal(new Set(LD.LADDER.map((m) => m.id)).size, LD.LADDER.length, "two Arena masters share an id");
+    for (const m of LD.LADDER) {
+      assert.ok(A.ARENAS.some((a) => a.id === m.arena) && A.LEVELS[m.cpu], `${m.name} fights on no floor or at no CPU level`);
+      for (const [id, name] of m.team) assert.equal(speciesById(id)?.name, name, `${m.name}'s team names ${name} for #${id}, which is ${speciesById(id)?.name}`);
+      assert.ok(A.masterTeam(m).every((f) => f.level === m.level), `${m.name}'s team is not at its level`);
+    }
+    const ladderTotal = LD.LADDER.reduce((n, m) => n + LD.ladderPay(m), 0);
+    assert.ok(ladderTotal < roadDay * 0.25, `the Ladder pays ¥${ladderTotal} once against a road day's ¥${roadDay} - past a quarter`);
+    console.log(`arena ground ok — every floor fair (side 0 won ${Object.entries(ground).filter(([k]) => !k.endsWith("+")).map(([k, v]) => `${k} ${v}`).join(", ")} of 16), ` +
+      `zones claimed, rocks fall, basalt wears; home edge fire ${ground["fire+"]}, water ${ground["water+"]}, ice ${ground["ice+"]} points; ` +
+      `grass hides, water slows, cover stops a shot; ${LD.LADDER.length} masters pay ¥${ladderTotal} once; ` +
+      `the opening holds everyone off the clock, a Surge throws the foe and doubles cooldowns until a switch, ${surges} in 8 Hard matches; ` +
+      `a spent Pokemon Struggles and the CPU benches it, the final minute hits harder, ${timeouts}/24 Hard matches to the clock; ` +
+      `online, two lockstep ends over a laggy link finish one match (${fair[0].s.t} ticks, ${fair[0].s.why}) and a nudged state is caught at tick ${caught}`);
+    console.log(`arena ok — a seed replays one match exactly and another seed differs, no browser-dependent maths, ` +
+      `Normal beats Easy ${wins}/12 with ${ended}/12 by knockout, every match ends by its clock, every Pokemon has a kit; ` +
+      `${live.length - off.length}/${live.length} moves play as ${used.size} shapes, a burn ticks and ends on time, ` +
+      `${A.ARENAS.length} floors built, its best day ¥${arenaDay} against the road's ¥${roadDay}`);
+  }
+
+  /* THE ARENA'S PMD SPRITES (tools/build_pmd.py, `npm run pmd`). Every id
+     data/pmd.js lists has its atlas and sidecar and nothing else is in the
+     folder; every frame a sidecar names is a piece inside its atlas (the PNG's
+     own header); a mirrored row points at a stored one; the four floor
+     animations are there; it is a real species that battles; its artists are
+     credited (CC BY-NC 4.0); and no atlas decodes past PMD_DECODED - the
+     memory one body costs a phone, six to a match. Uncropped, Rayquaza's was
+     30 MB. The Arena alone draws them (your call, 2026-10-22): nothing else
+     names data/pmd.js or the folder. */
+  {
+    const { PMD_IDS } = await import("../src/data/pmd.js");
+    const ids = PMD_IDS.split(",").filter(Boolean).map((h) => parseInt(h, 16));
+    const dir = new URL("../public/arena/pmd/", import.meta.url);
+    const files = new Set(readdirSync(dir));
+    const credits = JSON.parse(readFileSync(new URL("credits.json", dir), "utf8"));
+    const PMD_DECODED = 8 * 1024 * 1024;
+    const MUST = ["Walk", "Idle", "Attack", "Hurt"];
+    let bytes = 0, biggest = [0, 0], shiny = 0;
+    for (const id of ids) {
+      const sp = speciesById(id);
+      assert.ok(sp && !isEvent(id), `pmd.js lists #${id}, which is no species that battles`);
+      assert.ok(files.has(`${id}.png`) && files.has(`${id}.json`), `#${id} (${sp.name}) has no PMD atlas or sidecar - run npm run pmd`);
+      const png = readFileSync(new URL(`${id}.png`, dir));
+      const W = png.readUInt32BE(16), H = png.readUInt32BE(20);
+      bytes += png.length;
+      if (W * H * 4 > biggest[0]) biggest = [W * H * 4, id];
+      assert.ok(W * H * 4 <= PMD_DECODED, `#${id}'s atlas decodes to ${Math.round(W * H * 4 / 1048576)} MB - past what a phone should hold for one body`);
+      const meta = JSON.parse(readFileSync(new URL(`${id}.json`, dir), "utf8"));
+      const pieces = meta.q.length / 6;
+      assert.ok(Number.isInteger(pieces) && pieces > 0, `#${id}'s sidecar pieces are not whole`);
+      for (let i = 0; i < pieces; i++) {
+        const [x, y, w, h] = meta.q.slice(i * 6, i * 6 + 4);
+        assert.ok(x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= W && y + h <= H, `#${id} piece ${i} lies outside its ${W}x${H} atlas`);
+      }
+      for (const m of MUST) assert.ok(meta.a[m], `#${id} ships without its ${m}`);
+      for (const [name, a] of Object.entries(meta.a)) {
+        assert.ok(a.r.length === 1 || a.r.length === 8, `#${id} ${name} has ${a.r.length} rows - one or eight`);
+        a.r.forEach((row, k) => {
+          if (typeof row === "number") {
+            assert.ok(Array.isArray(a.r[-1 - row]), `#${id} ${name} row ${k} mirrors a row that is not stored`);
+            return;
+          }
+          assert.equal(row.length, a.d.length, `#${id} ${name} row ${k} has ${row.length} frames for ${a.d.length} timings`);
+          for (const q of row) assert.ok(q >= -1 && q < pieces, `#${id} ${name} names piece ${q} of ${pieces}`);
+        });
+      }
+      // A shiny atlas exists exactly when the sidecar says, at the normal one's size (its pieces are the normal sidecar's).
+      assert.equal(Boolean(meta.S), files.has(`${id}-s.png`), `#${id}'s shiny atlas and its sidecar disagree - run npm run pmd`);
+      if (meta.S) {
+        const sp = readFileSync(new URL(`${id}-s.png`, dir));
+        assert.ok(sp.readUInt32BE(16) === W && sp.readUInt32BE(20) === H, `#${id}'s shiny atlas is not its normal atlas's size`);
+      }
+      shiny += Boolean(meta.s || meta.S);
+      assert.ok(Array.isArray(credits[id]) && credits[id].length, `#${id} (${sp.name}) ships with no artist credited`);
+    }
+    /* THE STAMP IS THE FILES' (PMD_REV): every url carries it, so a file
+       changed without a full re-bake would be read beside a day-cached old
+       one - the map's atlas drew garbage exactly so (ATLAS_REV, 2026-10-07).
+       The same hash build_pmd.py takes: each name then its bytes, by name. */
+    {
+      const { PMD_REV } = await import("../src/data/pmd.js");
+      const { createHash } = await import("node:crypto");
+      const h = createHash("sha1");
+      for (const f of [...files].sort()) { h.update(f); h.update(readFileSync(new URL(f, dir))); }
+      assert.equal(h.digest("hex").slice(0, 10), PMD_REV, "public/arena/pmd changed since its stamp - run npm run pmd");
+    }
+    const listed = new Set(ids);
+    for (const f of files) {
+      if (f === "credits.json") continue;
+      assert.ok(listed.has(parseInt(f, 10)), `public/arena/pmd/${f} is not in pmd.js - a stale file; run npm run pmd`);
+    }
+    for (const f of walk("../src/").filter((f) => /\.(js|jsx)$/.test(f))) {
+      if (f.includes("ui/league/arena/") || f.endsWith("data/pmd.js")) continue;
+      const src = readFileSync(new URL(f, import.meta.url), "utf8");
+      assert.ok(!/data\/pmd\.js|arena\/pmd\/[^c]/.test(src), `${f} reaches the PMD sprites - the Arena alone draws them`);
+    }
+    console.log(`pmd ok — ${ids.length} Arena atlases (${Math.round(bytes / 1048576)} MB on disk, ${shiny} with a shiny), every frame inside its atlas, ` +
+      `every sheet credited, the largest (#${biggest[1]}) ${Math.round(biggest[0] / 1048576 * 10) / 10} MB decoded; the Arena alone draws them`);
+  }
+
   /* AND THE LEAGUE'S FOLDER IS REACHED ONLY BY A LAZY IMPORT: a static import
      of it from anywhere else would pull every byte above into the first load. */
   for (const f of walk("../src/").filter((f) => /\.(js|jsx)$/.test(f))) {

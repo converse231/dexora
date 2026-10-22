@@ -1323,6 +1323,28 @@ function until(e, what, label, max = 2000) {
   assert.equal(got.raw, S(50), "local mode lost its own save");
   assert.equal(store.get(PARKED_KEY), undefined, "local mode parked its own save");
 
+  /* A GUEST WHO ASKED TO KEEP THEIR GAME (onboarding, 2026-10-22): the one
+     adoption - an unowned save, ADOPT_KEY set, a brand-new account. Into an
+     account with a game it is parked as ever, and the marker never outlives
+     the sign-in it was for. */
+  const { ADOPT_KEY, GUEST_KEY } = await import("../src/game/store.js");
+  given({ [SAVE_KEY]: S(60, 4), [ADOPT_KEY]: "1", [GUEST_KEY]: "1" });
+  got = await settle("A", ok(null));
+  assert.equal(got.raw, S(60, 4), "a guest who saved their progress started a new account empty");
+  assert.equal(store.get(OWNER_KEY), "A", "the adopted guest save was not given its owner");
+  assert.equal(store.get(ADOPT_KEY), undefined, "the adopt marker outlived its sign-in");
+  assert.equal(store.get(GUEST_KEY), undefined, "a signed-in player was still a guest");
+  given({ [SAVE_KEY]: S(60, 4), [ADOPT_KEY]: "1" });
+  got = await settle("A", ok(S(9000)));
+  assert.equal(got.raw, S(9000), "a guest's save went over an account that had a game");
+  assert.equal(store.get(PARKED_KEY), S(60, 4), "the guest's save was not parked to offer back");
+  given({ [SAVE_KEY]: S(60, 4) });
+  got = await settle("A", ok(null));
+  assert.equal(got.raw, null, "an unowned save was adopted without being asked");
+  given({ [SAVE_KEY]: S(60, 4), [ADOPT_KEY]: "1", [OWNER_KEY]: "B" });
+  got = await settle("A", ok(null));
+  assert.equal(got.raw, null, "B's save was adopted into A");
+
   // No login-time source grep survives: nothing may adopt an unowned cache.
   const code = readFileSync(new URL("../src/game/store.js", import.meta.url), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "");
@@ -2112,6 +2134,45 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
     assert.equal(gap.checkIn().streak, 1, "a gap kept the streak");
     assert.equal(gap.state.checkin.best, 12, "breaking the streak lost the best");
   }
+  /* THE STREAK'S PACKS (asked for, 2026-10-22): 10 on day 10 ... 100 on day
+     100, then 100 every STREAK_MONTH days; in lots of LOT, each lot one open
+     set, earned and stamped - and no other day pays a pack. */
+  {
+    const paid = Array.from({ length: 200 }, (_, i) => [i + 1, CI.streakPacks(i + 1)]).filter(([, n]) => n);
+    assert.deepEqual(paid.map(([d]) => d), [10, 20, 30, 50, 70, 100, 130, 160, 190], "the pack days moved");
+    assert.deepEqual(paid.map(([, n]) => n), [10, 20, 30, 50, 70, 100, 100, 100, 100], "a pack day pays the wrong count");
+    assert.ok(paid.every(([, n]) => n % CI.LOT === 0), "a pack day is not whole lots");
+    assert.deepEqual([0, 9, 10, 99, 100, 101, 130].map(CI.nextPackDay), [10, 10, 20, 100, 130, 130, 160], "the next pack day is wrong");
+    for (const [d] of paid) assert.ok(CI.isMilestone(d), `pack day ${d} takes no screen`);
+    for (const [streak, lots] of [[9, 1], [19, 2], [99, 10]]) {
+      const e = boot({ ...SAVE, xp: 1e9, checkin: { last: ago(1), streak, best: streak, spins: 0 } }).e;
+      const before = Object.values(e.state.packs ?? {}).reduce((a, b) => a + b, 0);
+      const r = e.checkIn();
+      assert.equal(r.packs.length, lots, `day ${streak + 1} rolled ${r.packs.length} lots`);
+      assert.equal(Object.values(e.state.packs).reduce((a, b) => a + b, 0), before + lots * CI.LOT, `day ${streak + 1}'s packs did not arrive`);
+      for (const id of new Set(r.packs)) {
+        assert.equal(e.state.earnedPacks[id].filter((s) => s === `checkin:${streak + 1}`).length, r.packs.filter((x) => x === id).length * CI.LOT, "streak packs were not stamped");
+      }
+    }
+    const plain = boot({ ...SAVE, checkin: { last: ago(1), streak: 10, best: 10, spins: 0 } }).e;
+    assert.deepEqual(plain.checkIn().packs, [], "day 11 paid packs");
+    // A new player's packs come only from the sets open at their level.
+    const fresh = boot({ ...SAVE, xp: 0, checkin: { last: ago(1), streak: 9, best: 9, spins: 0 } }).e;
+    const { setOpen } = await import("../src/game/cards.js");
+    const { CARD_SETS } = await import("../src/data/cards/index.js");
+    const opens = CARD_SETS.filter((s) => setOpen(s.id, 1)).map((s) => s.id);
+    for (const id of fresh.checkIn().packs) assert.ok(!opens.length ? id === CARD_SETS[0].id : opens.includes(id), `a Lv 1 streak paid shut set ${id}`);
+    // The reel favours what you lack: an untouched set lands more than a finished one, which still can.
+    let x = 11;
+    const rng = () => { x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648; };
+    const n = { fresh: 0, done: 0 };
+    for (const id of CI.lotSets(["fresh", "done"], { fresh: 1, done: 0 }, 20000, rng)) n[id]++;
+    assert.ok(n.fresh > n.done * 3 && n.done > 0, `the lots landed ${n.fresh} untouched to ${n.done} finished`);
+    // The top bar's streak: alive until today ends, gone once a day was missed.
+    assert.deepEqual(CI.streakNow({ last: ago(1), streak: 4 }), { streak: 4, due: true });
+    assert.deepEqual(CI.streakNow({ last: dayKey(), streak: 5 }), { streak: 5, due: false });
+    assert.deepEqual(CI.streakNow({ last: ago(2), streak: 9 }), { streak: 0, due: true });
+  }
   // The roulette: a pack slot gives a set's packs, earned; a Gold slot a gift; no spin, no roll.
   {
     const e = boot({ ...SAVE, checkin: { last: ago(1), streak: 7, best: 7, spins: 2 } }).e;
@@ -2141,7 +2202,79 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
     assert.ok(Math.abs(n.gold / 30000 - CI.ROULETTE.gold / slots) < 0.01, `Gold landed ${n.gold / 300}% of spins`);
     for (const s of sets) assert.ok(Math.abs(n[s] / 30000 - CI.ROULETTE.pack / slots / sets.length) < 0.015, `set ${s} landed ${n[s] / 300}%`);
   }
-  console.log("check-in ok — once a day, kept by yesterday and broken by a gap (the best kept), day 7 banks a spin, a spin gives earned packs or a caught Gold, the odds are 15 equal slots");
+  console.log("check-in ok — once a day, kept by yesterday and broken by a gap (the best kept), day 7 banks a spin, a spin gives earned packs or a caught Gold, the odds are 15 equal slots, pack days pay whole lots of open sets favouring the unfinished, the top bar's streak dies with a missed day");
+}
+
+/* THE FIRST DAYS (starter.js, 2026-10-22): a partner into an empty Box,
+   walking; a first throw that cannot miss, once; the Starter Path claimed
+   in order, each goal once; an old save with catches never sees it. */
+{
+  const ST = await import("../src/game/starter.js");
+  const { dexIndex } = await import("../src/game/biomes.js");
+  await savedField("path", 2, "junk", 0);
+  // A new game's first save is only its trainer (Boot): a clean load, not a broken one.
+  {
+    const { e } = boot({ char: "leaf" });
+    assert.equal(e.state.char, "leaf", "a new player's trainer was forgotten on the first load");
+    assert.equal(e.state.path, 0);
+    assert.ok(![...store.keys()].some((k) => k.includes("broken")), "a new game's first save was filed as broken");
+  }
+  assert.equal(boot({ ...SAVE, caught: 40 }).e.state.path, ST.PATH.length, "a player with catches was sent down the Starter Path");
+  {
+    const e = boot({ ...SAVE }).e;
+    assert.equal(e.grantStarter(25), null, "a Pikachu was handed out as a starter");
+    const uid = e.grantStarter(ST.STARTERS[1]);
+    const mon = e.state.box.find((m) => m.uid === uid);
+    assert.ok(mon && mon.species === ST.STARTERS[1] && mon.level === ST.STARTER_LEVEL, "the partner did not arrive at its level");
+    assert.deepEqual(e.state.party, [uid], "the partner is not walking");
+    assert.equal(e.state.dex[dexIndex(ST.STARTERS[1])], 2, "the partner left the Pokédex empty");
+    assert.equal(e.state.caught, 0, "the partner counted as a catch");
+    assert.equal(e.grantStarter(ST.STARTERS[0]), null, "a second starter was handed out");
+  }
+  // The first throw catches whatever the odds; the second is the dice again.
+  {
+    const e = boot({ ...SAVE }).e;
+    const enc = walkToEncounter(e);
+    until(e, (s) => s.encounter?.phase === "idle", "the encounter to settle");
+    enc.rate = 1;                                 // the hardest catch there is
+    enc.speciesId = 19;
+    enc.alpha = false;
+    e.throwBall("poke-ball");
+    assert.equal(e.state.encounter.pending.caught, true, "a new player's first throw missed");
+    until(e, (s) => !s.encounter, "the catch to close", 4000);
+    assert.equal(e.state.caught, 1);
+    const misses = Array.from({ length: 40 }, () => {
+      const n = walkToEncounter(e);
+      until(e, (s) => s.encounter?.phase === "idle", "the encounter to settle");
+      n.rate = 1; n.speciesId = 19; n.alpha = false;
+      e.throwBall("poke-ball");
+      const hit = e.state.encounter.pending.caught;
+      until(e, (s) => !s.encounter || s.encounter.phase === "idle", "the throw to resolve", 4000);
+      if (e.state.encounter) { e.flee(); until(e, (s) => !s.encounter, "the run", 4000); }
+      return !hit;
+    }).filter(Boolean).length;
+    assert.ok(misses > 0, "every throw after the first was sure too");
+  }
+  // The path: one goal at a time, claimed once it is met, paid once.
+  {
+    const e = boot({ ...SAVE }).e;
+    assert.equal(e.path().goal.id, "catch");
+    assert.equal(e.claimPath(), null, "an unmet goal was claimed");
+    e.state.caught = 3;
+    const balls = e.state.bag["great-ball"];
+    assert.equal(e.claimPath()?.id, "catch");
+    assert.equal(e.state.bag["great-ball"], balls + ST.PATH[0].pay.items["great-ball"], "the first goal paid nothing");
+    assert.equal(e.path().goal.id, "checkin", "the path did not move on");
+    assert.equal(e.claimPath(), null, "the next goal was paid before it was met");
+    e.checkIn();
+    const candy = e.state.candy;
+    e.claimPath();
+    assert.equal(e.state.candy, candy + ST.PATH[1].pay.candy);
+    assert.equal(JSON.parse(store.get("meadow-route") ?? "{}").path ?? e.state.path, 2);
+    e.state.path = ST.PATH.length;
+    assert.equal(e.path(), null, "a finished path still showed");
+  }
+  console.log("starter ok — a partner into an empty Box, walking; the first throw cannot miss and only the first; the path pays each goal once, in order; old saves skip it");
 }
 
 /* A SLOW FRAME IS NOT A TAB AWAY (2026-10-07): a gap over STALL with the
@@ -3132,7 +3265,8 @@ console.log("star ok — free, spends nothing, needs none in the Box, once, only
   const { TASKS } = await import("../src/game/research.js");
   const { TIERS: TIERS_ALL } = await import("../src/game/biomes.js");
   const id = outbreakPool(BIOMES.find((b) => b.id === "meadow"), 50).find(canBeAlpha);
-  const { e } = boot({ ...SAVE, outbreak: { key: dayKey(), areaId: "meadow", speciesId: id, left: 5 } });
+  // caught 1: a new player's first throw cannot miss (starter.js), and this one has to.
+  const { e } = boot({ ...SAVE, caught: 1, outbreak: { key: dayKey(), areaId: "meadow", speciesId: id, left: 5 } });
 
   const real = Math.random;
   try {
@@ -4800,6 +4934,44 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
         `a region ${g} road trainer fielded a form, a legendary or another region's Pokemon`);
     }
     await savedField("road", { day: dayKey(), won: [t.id] }, "junk", { day: null, won: [] });
+    /* AN ARENA WIN (game/arena.js) pays once a CPU level a day, into `arena`
+       and never `beaten`; Training pays nothing. */
+    {
+      const RDP = await import("../src/game/road.js");
+      const { e } = boot({ ...SAVE });
+      const was = e.state.money, beat = JSON.stringify(e.state.beaten);
+      assert.equal(e.arenaWin("dummy", 50), 0, "Training paid a prize");
+      assert.equal(e.arenaWin("hard", 50), RDP.arenaPay("hard", 50), "a first Hard win did not pay its prize");
+      assert.equal(e.arenaWin("hard", 50), 0, "a second Hard win the same day paid again");
+      assert.equal(e.arenaWin("easy", 50), RDP.arenaPay("easy", 50), "an Easy win after a Hard one was refused");
+      assert.equal(e.state.money, was + RDP.arenaPay("hard", 50) + RDP.arenaPay("easy", 50), "the Arena's prizes did not reach the wallet");
+      assert.equal(JSON.stringify(e.state.beaten), beat, "an Arena win moved the League's beaten");
+      const later = boot({ ...SAVE, arena: { day: "20200101", won: ["hard"] } }).e;
+      assert.equal(later.arenaWin("hard", 50), RDP.arenaPay("hard", 50), "yesterday's Arena win blocked today's");
+    }
+    await savedField("arena", { day: dayKey(), won: ["normal"] }, "junk", { day: null, won: [] });
+    /* THE ARENA LADDER (ladder.js): masters in order, a first win paid once,
+       practice free, the Champion a card pack; achievements count it. */
+    {
+      const LD = await import("../src/game/ladder.js");
+      const ACH = await import("../src/game/achievements.js");
+      const { e } = boot({ ...SAVE });
+      const was = e.state.money;
+      assert.equal(e.arenaMaster("cavern"), null, "the second master was fought before the first");
+      assert.equal(e.arenaMaster("nobody"), null, "a master that does not exist was paid");
+      const first = e.arenaMaster("court");
+      assert.ok(first?.first && first.pay === LD.ladderPay(LD.LADDER[0]), "the first master's first win did not pay");
+      assert.deepEqual(e.arenaMaster("court"), { pay: 0, pack: null, first: false }, "a master beaten again paid again");
+      assert.equal(e.state.money, was + LD.ladderPay(LD.LADDER[0]), "the Ladder's prize did not reach the wallet once");
+      for (const m of LD.LADDER.slice(1, -1)) assert.ok(e.arenaMaster(m.id)?.first, `${m.name} was refused in order`);
+      const packs = Object.values(e.state.packs ?? {}).reduce((n, v) => n + v, 0) + (e.state.earnedPacks?.length ?? 0);
+      const champ = e.arenaMaster("champion");
+      assert.ok(champ?.first && champ.pack, "the Arena Champion paid no card pack");
+      assert.ok(Object.values(e.state.packs ?? {}).reduce((n, v) => n + v, 0) + (e.state.earnedPacks?.length ?? 0) > packs, "the Champion's pack never reached the save");
+      const arenaAch = ACH.ACHIEVEMENTS.find((a) => a.id === "arena");
+      assert.equal(arenaAch.of(e.state), LD.LADDER.length, "the Arena master achievement does not count the Ladder");
+    }
+    await savedField("ladder", ["court", "cavern"], "junk", []);
     console.log(`road ok — today's trainer fights and pays ¥${t.pay} once, noted in road and never beaten; another day, a shut region and a second try are refused`);
   }
 

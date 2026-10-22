@@ -620,6 +620,46 @@ export const rankedFriends = () => rankedCall("ranked_friends");
 export const rankedStanding = (who) => rankedCall("ranked_standing", { who });
 export const myDefenseLog = () => rankedCall("my_defense_log");
 
+// ------------------------------------------------------------------ the arena
+/* ONLINE ARENA BATTLES (db/arena.sql, the Arena plan's phase 3): a challenge
+   between friends, and the room their two games meet in. The room is a
+   Realtime BROADCAST channel used only to introduce the two browsers -
+   WebRTC's offer, answer and candidates, a dozen messages - and closed the
+   moment their own link opens; the match never touches the server. */
+async function arenaCall(fn, args = {}) {
+  if (!CLOUD || !session) return { ok: false, error: "Sign in to battle your friends." };
+  const got = await tradeCall(fn, args);
+  return got.closed ? { ...got, error: "Online battles aren't open yet." } : got;
+}
+export const arenaChallenge = (other, ground) => arenaCall("arena_challenge", { other, ground });
+export const arenaInvites = () => arenaCall("arena_invites_mine");
+export const arenaAnswer = (invite, yes) => arenaCall("arena_answer", { invite, yes });
+export const arenaCancel = (invite) => arenaCall("arena_cancel", { invite });
+/* The room: `send` a message, `onMessage` hears the other end's, `ready` says
+   whether it opened. A room of the same name still LEAVING (a remount, a
+   second try) is waited out first: realtime hands that channel back, and a
+   subscribe on it never answers - the second try hung to its timeout. */
+export function arenaRoom(room, onMessage) {
+  if (!CLOUD || !session) return null;
+  const topic = `arena-${room}`;
+  let ch = null, closed = false;
+  const stale = supabase.getChannels().filter((c) => c.subTopic === topic || c.topic === `realtime:${topic}`);
+  const ready = Promise.all(stale.map((c) => supabase.removeChannel(c))).catch(() => null).then(() => new Promise((ok) => {
+    if (closed) { ok(false); return; }
+    ch = supabase.channel(topic, { config: { broadcast: { self: false, ack: false } } });
+    ch.on("broadcast", { event: "sig" }, ({ payload }) => onMessage(payload));
+    ch.subscribe((status) => {
+      if (status === "SUBSCRIBED") ok(true);
+      else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") ok(false);
+    });
+  }));
+  return {
+    ready,
+    send: (payload) => (ch ? ch.send({ type: "broadcast", event: "sig", payload }).catch(() => "error") : Promise.resolve("error")),
+    close: () => { closed = true; if (ch) supabase.removeChannel(ch); },
+  };
+}
+
 /* THE REFEREE (docs/ranked.md, 6b): the ranked-step Edge Function, which
    plays a ranked battle on the server. Answers {ok, data} or {ok: false,
    error} with the function's own code (handler.js), which the page says in

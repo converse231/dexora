@@ -15,14 +15,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import App from "./App.jsx";
-import { Account, Trainer, Trouble, NewPassword } from "./ui/Gate.jsx";
+import { Account, Trainer, Trouble, NewPassword, Welcome } from "./ui/Gate.jsx";
 import {
   CLOUD, restore, signIn, signUp, signOut, onAuth, pull, push, claim,
   getProfile, createProfile, updateProfile, deleteAccount, email as accountEmail,
   changePassword, requestReset, setPassword,
 } from "./net/cloud.js";
 import {
-  SAVE_KEY, OWNER_KEY, BACKUP_KEY, BROKEN_KEY, OTHER_KEY, PARKED_KEY,
+  SAVE_KEY, OWNER_KEY, BACKUP_KEY, BROKEN_KEY, OTHER_KEY, PARKED_KEY, GUEST_KEY, ADOPT_KEY, REF_KEY,
   read, write, drop, onSyncTrouble, flushNow, settle, scoped,
 } from "./game/store.js";
 
@@ -51,6 +51,8 @@ const fieldOf = (raw, key) => {
   if (!raw) return null;
   try { return JSON.parse(raw)[key] ?? null; } catch { return null; }
 };
+// A save with nothing in its Box is offered a partner (starter.js).
+const noBox = () => !(fieldOf(read(SAVE_KEY), "box")?.length);
 
 export default function Boot() {
   // "wait" until we know; then "account", "reset", "who", "trainer",
@@ -69,6 +71,12 @@ export default function Boot() {
   const [whoError, setWhoError] = useState(null);
   // Why the account screen is showing, when it is showing for a reason.
   const [gateNote, setGateNote] = useState("");
+  /* PLAYING BEFORE AN ACCOUNT (onboarding, 2026-10-22): the front door's
+     "Play now". A guest's game is local mode's - an unowned save, nothing
+     uploaded - until "Save my progress" (`join`) makes the account. */
+  const [guest, setGuest] = useState(false);
+  // The partner picked with the trainer, handed to the engine once it exists.
+  const starter = useRef(null);
   // The live engine, so a sync failure has somewhere to be reported to.
   const engineRef = useRef(null);
 
@@ -108,6 +116,10 @@ export default function Boot() {
       return;
     }
 
+    /* A GUEST ON A CLOUD BUILD: whatever owner was here has been parked by
+       `settle`, so the guest's save is unowned from here on - a stale owner
+       would have the next boot park the guest's game under somebody else. */
+    if (CLOUD) drop(OWNER_KEY);
     // Local mode: no profile to have, so the trainer is the only question.
     setPhase(fieldOf(raw, "char") ? "play" : "trainer");
   }, []);
@@ -122,7 +134,10 @@ export default function Boot() {
          here there is a session for `setPassword` to use, and the screen does
          not have to guess whether the link has landed yet. */
       if (CLOUD && session && RECOVERY) { setPhase("reset"); return; }
-      if (CLOUD && !session) { setPhase("account"); return; }
+      /* No session: a returning guest plays on, an invite link goes to the
+         sign-up it is for, and anybody else meets the front door. */
+      if (CLOUD && !session && read(GUEST_KEY)) { setGuest(true); await decide(null); return; }
+      if (CLOUD && !session) { setPhase(read(REF_KEY) ? "account" : "welcome"); return; }
       await decide(session);
     })();
 
@@ -134,7 +149,12 @@ export default function Boot() {
       /* The backstop for the URL read above: if the event beats the boot
          effect, this catches it. Either way the destination is the same. */
       if (evt === "PASSWORD_RECOVERY") { setPhase("reset"); return; }
-      if (!session) { setPhase("account"); setGen((n) => n + 1); }
+      /* Never a guest, and never off the front door: only a signed-in game
+         is sent back to log in. */
+      if (!session && !read(GUEST_KEY)) {
+        setPhase((p) => (p === "welcome" || p === "join" || p === "account" ? p : "account"));
+        setGen((n) => n + 1);
+      }
     });
     return () => { live = false; off(); };
   }, [decide]);
@@ -151,6 +171,7 @@ export default function Boot() {
 
   const afterAuth = async (got) => {
     if (!got.ok || got.pending) return got;
+    setGuest(false);
     setBusy(true);
     await decide(await restore());
     setGen((n) => n + 1);
@@ -197,6 +218,28 @@ export default function Boot() {
     return sent;
   };
 
+  // The guest becomes a guest again, or for the first time.
+  const asGuest = async () => {
+    write(GUEST_KEY, "1");
+    setGuest(true);
+    setGateNote("");
+    await decide(null);
+    setGen((n) => n + 1);
+  };
+  /* SAVE MY PROGRESS: the guest's game is written out and STOPPED (as `out`
+     does), and the next account made here adopts it - see ADOPT_KEY. */
+  const join = () => {
+    engineRef.current?.saveNow?.();
+    engineRef.current?.destroy?.();
+    write(ADOPT_KEY, "1");
+    setGateNote("");
+    setPhase("join");
+  };
+
+  if (phase === "welcome") {
+    return <Welcome onPlay={asGuest} onAccount={() => setPhase("account")} />;
+  }
+
   if (phase === "wait") {
     return (
       <div className="gate">
@@ -216,11 +259,13 @@ export default function Boot() {
     );
   }
 
-  if (phase === "account") {
+  if (phase === "account" || phase === "join") {
     return (
       <Account
         offline={!CLOUD}
         notice={gateNote}
+        keeping={phase === "join"}
+        onBack={phase === "join" ? asGuest : () => setPhase("welcome")}
         onSignUp={async (a, p) => afterAuth(await signUp(a, p))}
         onSignIn={async (a, p) => afterAuth(await signIn(a, p))}
         onForgot={requestReset}
@@ -276,10 +321,12 @@ export default function Boot() {
     return (
       <Trainer
         askName
+        partner={noBox()}
         busy={busy}
         error={whoError}
         onOut={out}
-        onPick={async (id, username, birthdate) => {
+        onPick={async (id, username, birthdate, mon) => {
+          starter.current = mon;
           setBusy(true);
           setWhoError(null);
           const got = await createProfile(username, id, birthdate);
@@ -307,8 +354,10 @@ export default function Boot() {
   if (phase === "trainer") {
     return (
       <Trainer
+        partner={noBox()}
         busy={busy}
-        onPick={(id) => {
+        onPick={(id, _name, _born, mon) => {
+          starter.current = mon;
           /* WRITTEN BEFORE THE ENGINE EXISTS, straight into the save the engine
              is about to read. Going through `setChar` would need an engine, and
              the engine is what this is choosing for. */
@@ -330,11 +379,12 @@ export default function Boot() {
   return (
     <App
       key={gen}
-      onLogOut={CLOUD ? out : null}
+      onLogOut={CLOUD && !guest ? out : null}
+      onJoin={CLOUD && guest ? join : null}
       trainerName={name}
       /* Everything the YOU panel needs to manage the account, assembled here
          because this is the only component that knows there IS one. */
-      account={CLOUD ? {
+      account={CLOUD && !guest ? {
         name,
         email: accountEmail(),
         char: profile?.char ?? "red",
@@ -376,7 +426,14 @@ export default function Boot() {
           return got;
         },
       } : null}
-      onEngine={(e) => { engineRef.current = e; }}
+      onEngine={(e) => {
+        engineRef.current = e;
+        /* Written through at once: a dev build's StrictMode builds the engine
+           twice, and the first one - the one granted to - is destroyed before
+           its debounced save would land. */
+        if (starter.current) { e?.grantStarter?.(starter.current); e?.saveNow?.(); }
+        starter.current = null;
+      }}
     />
   );
 }

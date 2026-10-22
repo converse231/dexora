@@ -26,8 +26,9 @@ import {
 } from "./tileset.js";
 import { followSheet, skinById, skinPrice, PARTY_MAX, partnerRule, isMastered, MASTERED_BOND } from "./cosmetics.js";
 import { fieldOf, rollFind, heartsOf, FRIEND_FINDS, HEARTS } from "./abilities.js";
-import { CHECKIN_REWARDS, checkinStatus, rollRoulette, STREAK_MILESTONES, ROULETTE_LEVEL } from "./checkin.js";
-import { isRoad, roadOpen, roadTrainer } from "./road.js";
+import { CHECKIN_REWARDS, checkinStatus, rollRoulette, isMilestone, streakPacks, lotSets, LOT, ROULETTE_LEVEL } from "./checkin.js";
+import { isRoad, roadOpen, roadTrainer, ARENA_LEVELS, arenaPay } from "./road.js";
+import { masterOf, ladderOpen, ladderPay, cleanLadder } from "./ladder.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
@@ -149,6 +150,7 @@ import {
 const mine = (key) => scoped(key, read(OWNER_KEY));
 import { push as pushCloud } from "../net/cloud.js";
 import { nextHint, HINT_IDS } from "./hints.js";
+import { STARTERS, STARTER_LEVEL, pathNow, cleanPath } from "./starter.js";
 
 /* THREE KEYS, AND THE OTHER TWO EXIST BECAUSE A COLLECTION WAS LOST.
 
@@ -225,6 +227,8 @@ function freshState() {
     party: [],            // up to PARTY_MAX box uids you can walk with - see `setParty`
     checkin: { last: null, streak: 0, best: 0, spins: 0 },   // the daily check-in - see checkin.js
     road: { day: null, won: [] },   // road trainers beaten today - see road.js
+    arena: { day: null, won: [] },  // Arena CPU levels beaten today - see `arenaWin`
+    ladder: [],           // Arena masters beaten, in order - see `arenaMaster`
     buddy: null,          // the one of them walking behind you now - see `setBuddy`
     skin: null,           // the trainer skin worn, null for your own - see cosmetics.js
     skins: [],            // the skins bought - see `buySkin`
@@ -273,6 +277,7 @@ function freshState() {
     // Each event's Bad Dreams, toward its hunt (events.js `huntDue`).
     dreams: {},
     achieved: {},              // achievement id -> steps claimed - see achievements.js
+    path: 0,                   // Starter Path goals claimed, in order - see starter.js
     // Where the levels go. Ranks are spent, never refunded.
     stats: emptyStats(),
     running: false,
@@ -498,6 +503,13 @@ function loadState() {
   try {
     if (!raw) return [freshState(), null];
     const s = JSON.parse(raw);
+    /* A NEW GAME'S FIRST SAVE IS ONLY ITS TRAINER: Boot writes `{ char }`
+       before the engine exists. That is not a broken save, and reading it as
+       one drew every new player's first session as Red, kept a BROKEN copy
+       and never uploaded (found 2026-10-22, building onboarding). */
+    if (s && !Array.isArray(s.dex) && Object.keys(s).every((k) => k === "char")) {
+      return [{ ...freshState(), char: CHARS.includes(s.char) ? s.char : null }, null];
+    }
     /* ANYTHING THAT FAILS IS KEPT BEFORE WE WALK AWAY FROM IT. `freshState()`
        here used to be the last moment that save existed. */
     if (!Array.isArray(s.dex)) {
@@ -600,6 +612,7 @@ function loadState() {
       medals: Array.isArray(s.medals) ? s.medals.filter((m) => typeof m === "string") : [],
       dreams: cleanDreams(s.dreams),
       achieved: cleanAchieved(s.achieved),
+      path: cleanPath(s.path, s),
       // A save from before stats existed has none, and a hand-edited one could
       // hold anything; the trainer module clamps each rank as it reads it.
       stats: { ...emptyStats(), ...(s.stats ?? {}) },
@@ -657,6 +670,12 @@ function loadState() {
       // Road trainers beaten today: a day and its ids, or nothing - a bad one is no wins.
       road: s.road && typeof s.road === "object" && /^\d{8}$/.test(s.road.day ?? "")
         ? { day: s.road.day, won: (Array.isArray(s.road.won) ? s.road.won : []).filter(isRoad).slice(0, 200) }
+        : { day: null, won: [] },
+      // The Arena Ladder's masters beaten: known ids, in their order.
+      ladder: cleanLadder(s.ladder),
+      // The Arena's first wins today: a day and the CPU levels beaten, or nothing.
+      arena: s.arena && typeof s.arena === "object" && /^\d{8}$/.test(s.arena.day ?? "")
+        ? { day: s.arena.day, won: [...new Set((Array.isArray(s.arena.won) ? s.arena.won : []).filter((c) => ARENA_LEVELS.includes(c)))] }
         : { day: null, won: [] },
       checkin: ((c) => {
         const n = (v, cap) => (Number.isInteger(v) && v >= 0 ? Math.min(v, cap) : 0);
@@ -2212,10 +2231,13 @@ export function createEngine(canvas, onChange, mini = null) {
     /* The Razz Berry is already inside `liveMult` - see there for why. Only
        the Nanab has to come through separately, because the flee roll is a
        different roll and nothing else was ever going to carry it. */
+    /* A NEW PLAYER'S FIRST THROW CANNOT FAIL (starter.js): the first catch
+       is the hook, and missing it read as the game being hard before it had
+       shown what it is. Any ball, once, while nothing has ever been caught - never a legendary. */
     const result = resolveThrow(
       e.rate,
       liveMult(ball, e) * catchMult(state.stats),
-      Math.random,
+      state.caught === 0 && !isLegendary(e.speciesId) ? () => 0 : Math.random,
       e.alpha ? 0 : berryCalm(e.berries));
     e.throws += 1;
     e.pending = result;
@@ -3343,10 +3365,16 @@ export function createEngine(canvas, onChange, mini = null) {
       last: dayKey(), streak: st.streak, best: Math.max(state.checkin.best, st.streak),
       spins: state.checkin.spins + (reward.spin ?? 0),
     };
+    /* A streak day that pays packs (checkin.js `streakPacks`): its lots, each
+       a set the reel favours, earned and stamped - decided and SAVED here, the
+       reel only shows them. */
+    const owed = streakPacks(st.streak);
+    const packs = owed ? lotSets(openSets(), missingShares(), owed / LOT, Math.random) : [];
+    for (const id of packs) grantPacks(LOT, `checkin:${st.streak}`, id);
     noteBingo({ checkin: 1 });
     save();
     changed();
-    return { ...st, reward, bonus, milestone: STREAK_MILESTONES.includes(st.streak) };
+    return { ...st, reward, bonus, milestone: isMilestone(st.streak), packs };
   }
   /* THE ROULETTE: one banked spin, decided and SAVED before the reel moves -
      a card set's packs, earned and stamped, or a Gold Pokemon that counts as
@@ -3419,6 +3447,18 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
+  // The card sets open at your level (the first before any is), and how much of each you still lack.
+  function openSets() {
+    const level = levelFromXp(state.xp);
+    const open = CARD_SETS.filter((s) => setOpen(s.id, level)).map((s) => s.id);
+    return open.length ? open : CARD_SETS.slice(0, 1).map((s) => s.id);
+  }
+  function missingShares() {
+    const have = {};
+    for (const id of Object.keys(state.cards ?? {})) { const set = id.slice(0, id.lastIndexOf("-")); have[set] = (have[set] ?? 0) + 1; }
+    return Object.fromEntries(CARD_SETS.map((s) => [s.id, 1 - (have[s.id] ?? 0) / Math.max(1, s.total)]));
+  }
+
   /* A REWARD IN PACKS, stamped with where it came from, for the newest set
      open (the first before any is): a badge, a Champion, a streak. */
   function grantPacks(n, stamp, to = null) {
@@ -3428,6 +3468,34 @@ export function createEngine(canvas, onChange, mini = null) {
     state.earnedPacks = { ...state.earnedPacks, [id]: [...(state.earnedPacks[id] ?? []), ...Array(n).fill(stamp)] };
     teach({ kind: "cardpack" });
     return id;
+  }
+
+  /* A NEW PLAYER'S PARTNER (starter.js): one of the three at STARTER_LEVEL,
+     into an EMPTY Box only and walking at once - a lone first partner is the
+     one `partnerRule` lets walk unearned. Registered like a gift, never a
+     catch. Answers its uid, or null. */
+  function grantStarter(id) {
+    if (state.stale || !STARTERS.includes(id) || state.box.length) return null;
+    const uid = state.nextUid++;
+    state.box.push({ uid, species: id, level: STARTER_LEVEL, at: Date.now() });
+    registerGift(id);
+    if (!setParty([uid])) { save(); changed(); }
+    return uid;
+  }
+
+  /* THE STARTER PATH, ONE GOAL AT A TIME (starter.js): the goal showing,
+     claimed once it is met, its pay in one save. Answers the goal paid. */
+  function claimPath() {
+    const now = pathNow(state);
+    if (state.stale || !now?.ready) return null;
+    const { money = 0, candy = 0, items = {} } = now.goal.pay;
+    state.money += money;
+    state.candy += candy;
+    give(items);
+    state.path = now.at + 1;
+    save();
+    changed();
+    return now.goal;
   }
 
   /* ACHIEVEMENTS, CLAIMED (achievements.js): every step met and not yet
@@ -4345,6 +4413,9 @@ export function createEngine(canvas, onChange, mini = null) {
     checkIn,
     spinRoulette,
     checkinStatus: () => checkinStatus(state.checkin),
+    grantStarter,
+    claimPath,
+    path: () => pathNow(state),
     quiz,
     answerQuiz,
     bingo: bingoNow,
@@ -4375,6 +4446,41 @@ export function createEngine(canvas, onChange, mini = null) {
       state.battle = battle;
       stepped();
       return null;
+    },
+    /* AN ARENA WIN (game/arena.js, real-time) pays like a road trainer, once
+       a CPU level a day, into `arena` - never `beaten`, so the League's ladder
+       and its solved prizes do not move. The Arena's rules run on its page;
+       this only pays. Answers what it paid (0: already paid today). */
+    arenaWin(cpu, level) {
+      if (!ARENA_LEVELS.includes(cpu)) return 0;
+      const day = dayKey();
+      const won = state.arena?.day === day ? state.arena.won : [];
+      if (won.includes(cpu)) return 0;
+      const pay = arenaPay(cpu, whole(level) || 1);
+      state.money += pay;
+      state.arena = { day, won: [...won, cpu] };
+      noteBingo({ win: 1 });
+      save();
+      changed();
+      return pay;
+    },
+    /* AN ARENA MASTER BEATEN (ladder.js): judged here, in the Ladder's order,
+       and paid once - its first win LADDER_YEN x its level, the Champion a
+       card pack beside it. A master beaten again is practice and pays
+       nothing; one out of order is refused. Answers { pay, pack, first } or
+       null for a refusal. */
+    arenaMaster(id) {
+      const m = masterOf(id);
+      if (!m || !ladderOpen(id, state.ladder)) return null;
+      if (state.ladder.includes(id)) return { pay: 0, pack: null, first: false };
+      const pay = ladderPay(m);
+      state.money += pay;
+      state.ladder = cleanLadder([...state.ladder, id]);
+      const pack = id === "champion" ? grantPacks(1, `arena:${id}`) : null;
+      noteBingo({ win: 1 });
+      save();
+      changed();
+      return { pay, pack, first: true };
     },
     /* THE RESULT, and the only place a League win is paid: recorded in
        `beaten` (a new object, so the page's memo sees it) with the step it

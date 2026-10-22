@@ -1853,6 +1853,27 @@ canvas {
 }
 
 .gate-chars { display: flex; gap: 12px; margin: 16px 0 6px; }
+/* THE FIRST DAYS (starter.js): the front door's three, and the partner row
+   under the trainers - sprites at their own pixels, a size up. */
+.gate-hero { display: flex; justify-content: center; gap: 4px; margin: 14px 0 12px; }
+.gate-hero img { width: 88px; height: 88px; image-rendering: pixelated; object-fit: contain; }
+.gate-mons { margin-top: 4px; }
+.gate-mons .gate-char { padding: 8px 4px 9px; gap: 2px; }
+.gate-mons img { width: 64px; height: 64px; image-rendering: pixelated; object-fit: contain; }
+/* A sideways phone (360-430px tall): wider, the blurb gone and every tile a
+   size down, so START stays on screen without scrolling the card. */
+@media (max-height: 460px) {
+  .gate { padding-block: 8px; }
+  .gate-card { width: min(560px, 100%); padding: 12px 18px 14px; }
+  .gate-title { margin-top: 2px; font-size: 19px; }
+  .gate-card:has(.gate-mons) .gate-blurb { display: none; }
+  .gate-chars { margin: 8px 0 2px; gap: 8px; }
+  .gate-char { padding: 5px 4px 6px; gap: 2px; }
+  .gate-char .gate-art { --z: 2; }
+  .gate-mons img { width: 44px; height: 44px; }
+  .gate-hero { margin: 6px 0; }
+  .gate-hero img { width: 64px; height: 64px; }
+}
 .gate-char {
   flex: 1; cursor: pointer;
   display: grid; justify-items: center; gap: 6px;
@@ -4198,6 +4219,114 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
    one that gets colour. "In progress" is most of the time. */
 .ms-tab.ready { border-color: var(--gold); background: var(--gold-soft); }
 .ms-tab.done i, .ms-tab.done b { color: var(--ink-faint); }
+/* THE STARTER PATH'S GOAL (Starter.jsx), in the quest's place: three lines -
+   which goal, what to do, and where (or what claiming it pays). */
+.st-path {
+  position: relative; display: grid; gap: 1px; max-width: min(260px, 100%); padding: 6px 12px 7px; text-align: left; cursor: pointer;
+  border: 1px solid var(--accent); border-radius: 14px; background: var(--surface); color: var(--ink);
+}
+.st-path i { font: 600 9px var(--pixel); font-style: normal; color: var(--accent); }
+.st-path b { font: 700 14px var(--display); color: var(--ink); }
+.st-path b u { text-decoration: none; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.st-path small { font-size: 11.5px; line-height: 1.3; color: var(--ink-soft); }
+.st-path small em { font-style: normal; font-weight: 700; color: var(--ink); }
+.st-path.ready { border-color: var(--gold); background: var(--gold-soft); }
+.st-path.ready i { color: var(--gold); }
+.st-path .ms-dot { position: absolute; top: -5px; right: -5px; }
+.st-join { justify-items: center; gap: 10px; width: min(400px, 100%); }
+.st-join > .ic { color: var(--accent); }
+.st-join h3 { margin: 0; font: 800 22px var(--display); color: var(--ink); }
+.st-join p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+
+/* ================================================================ THE ARENA IS OPEN
+   (ArenaIntro.jsx, variant C, 2026-10-22.) The whole screen once: two floors
+   split on a diagonal, two fighters mid-blow under a slash, the words big.
+   Art, so its colours are the same by day and night; the loops move
+   transform, opacity and a stroke only. */
+.ai-page {
+  position: fixed; inset: 0; z-index: 75; overflow: hidden; background: #070b17; color: #e9eeff;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 16px 40px;
+  padding: calc(28px + env(safe-area-inset-top, 0px)) max(44px, env(safe-area-inset-right, 0px)) calc(36px + env(safe-area-inset-bottom, 0px)) max(44px, env(safe-area-inset-left, 0px));
+  animation: ai-in 420ms ease-out;
+}
+@keyframes ai-in { from { opacity: 0; } }
+.ai-floor { position: absolute; inset: 0; background-size: cover; background-position: center; image-rendering: pixelated; }
+.ai-floor.l { background-image: var(--left); clip-path: polygon(0 0, 58% 0, 42% 100%, 0 100%); }
+.ai-floor.r { background-image: var(--right); clip-path: polygon(58% 0, 100% 0, 100% 100%, 42% 100%); }
+.ai-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(4, 7, 14, .55), rgba(4, 7, 14, .3) 38%, rgba(4, 7, 14, .92) 80%); }
+.ai-slash { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ai-slash path {
+  fill: none; stroke: #fff6c8; stroke-width: 9; stroke-linecap: round; vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: ai-slash 1.6s cubic-bezier(.2, .9, .3, 1) infinite;
+}
+@keyframes ai-slash { 0% { stroke-dashoffset: 1; opacity: 1; } 35% { stroke-dashoffset: 0; opacity: 1; } 70%, 100% { stroke-dashoffset: 0; opacity: 0; } }
+.ai-fight { position: absolute; left: 0; right: 0; top: 12%; height: 46%; display: flex; justify-content: center; align-items: center; gap: 6vw; pointer-events: none; }
+.ai-mon { image-rendering: pixelated; filter: drop-shadow(0 10px 8px rgba(0, 0, 0, .55)); }
+.ai-mon.a { height: min(30vh, 22vw); }
+.ai-mon.b { height: min(23.5vh, 17.2vw); margin-top: 4%; }
+.ai-kicker { grid-area: 1 / 1; position: relative; align-self: center; font: 700 14px var(--pixel); text-transform: uppercase; color: #ffcf4a; }
+.ai-skip {
+  grid-area: 1 / 2; justify-self: end; position: relative; height: 40px; padding: 0 18px; cursor: pointer;
+  border-radius: 999px; border: 1px solid rgba(255, 255, 255, .3); background: rgba(8, 12, 26, .6); color: #e9eeff; font: 600 14px var(--body);
+}
+.ai-copy { grid-area: 3 / 1; position: relative; align-self: end; display: grid; gap: 14px; min-width: 0; }
+.ai-copy h2 { margin: 0; font: italic 900 clamp(56px, 9.5vw, 132px)/.86 var(--display); text-transform: uppercase; letter-spacing: -.02em; }
+.ai-copy p { margin: 0; max-width: 34em; font: 400 clamp(15px, 1.4vw, 19px)/1.45 var(--body); color: #d3daf3; }
+.ai-side { grid-area: 3 / 2; position: relative; align-self: end; display: grid; gap: 14px; min-width: 0; }
+.ai-how { display: grid; gap: 12px; padding: 18px; border-radius: 18px; background: rgba(10, 16, 34, .86); border: 1px solid rgba(140, 160, 220, .3); }
+.ai-how ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ai-how li { display: flex; align-items: center; gap: 12px; font: 400 15px/1.3 var(--body); }
+.ai-how li b { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #1d2a55; font: 700 13px var(--pixel); }
+.ai-surge { display: flex; align-items: center; gap: 10px; }
+.ai-surge span { font: 700 11px var(--pixel); text-transform: uppercase; color: #ffcf4a; }
+.ai-surge i { position: relative; flex: 1; height: 12px; border-radius: 999px; background: #1a2346; overflow: hidden; }
+.ai-surge u { position: absolute; inset: 0; border-radius: inherit; background: #ffcf4a; transform-origin: left; animation: ai-fill 2.4s ease-in-out infinite; }
+@keyframes ai-fill { 0% { transform: scaleX(.08); } 70%, 100% { transform: scaleX(1); } }
+.ai-go { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.ai-go .quiet { width: auto; padding: 0 26px; }
+/* UPRIGHT: one column, the floors split across, the fighters stepped down
+   the middle, the steps left to the Arena's own Help. */
+@media (orientation: portrait) and (max-width: 760px) {
+  .ai-page { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 14px; padding-inline: 20px; }
+  .ai-floor.l { clip-path: polygon(0 0, 100% 0, 100% 44%, 0 56%); }
+  .ai-floor.r { clip-path: polygon(0 56%, 100% 44%, 100% 100%, 0 100%); }
+  .ai-kicker { font-size: 11px; }
+  .ai-skip { grid-area: 1 / 1; height: 36px; padding: 0 14px; font-size: 13px; }
+  .ai-fight { top: 9%; height: 46%; flex-direction: column; align-items: stretch; justify-content: center; gap: 2vh; padding: 0 6vw; }
+  .ai-mon.a { align-self: flex-start; height: min(17vh, 36vw); }
+  .ai-mon.b { align-self: flex-end; height: min(13.3vh, 28vw); margin: 0; }
+  .ai-copy { grid-area: 3 / 1; }
+  .ai-copy h2 { font-size: clamp(48px, 17vw, 76px); }
+  .ai-side { grid-area: 4 / 1; }
+  .ai-how { padding: 0; background: none; border: 0; }
+  .ai-how ol { display: none; }
+  .ai-go { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .ai-go .quiet { width: 100%; background: none; border: 0; }
+}
+/* A SIDEWAYS PHONE (360-430px tall): the same split, a size down, the steps
+   gone, so Fight now stays on screen. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .ai-page { grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: 8px 24px; padding-top: calc(12px + env(safe-area-inset-top, 0px)); padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .ai-kicker { font-size: 11px; }
+  .ai-skip { height: 36px; padding: 0 14px; font-size: 13px; }
+  .ai-fight { top: 8%; height: 50%; }
+  .ai-mon.a { height: 30vh; }
+  .ai-mon.b { height: 23.5vh; }
+  .ai-copy { gap: 6px; }
+  .ai-copy h2 { font-size: clamp(40px, 7vw, 64px); }
+  .ai-copy p { font-size: 14px; }
+  .ai-how { padding: 10px 12px; }
+  .ai-how ol { display: none; }
+  .ai-go .ci-go { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-page, .ai-surge u { animation: none; }
+  .ai-slash path { animation: none; stroke-dashoffset: 0; }
+}
+/* The map's Arena chip until the Arena is opened, in the check-in's orange. */
+.hud .ar-pill b { color: #ff7a38; }
+.hud .ar-pill > .ms-ic { color: #ff7a38; }
 .ms-dot {
   display: grid; place-items: center; width: 14px; height: 14px;
   border-radius: 50%; background: var(--gold); color: #3a2c05;
@@ -8027,6 +8156,34 @@ button:disabled { transition: none; }
 .ci-bonus > span { display: grid; gap: 1px; font-size: 12.5px; color: var(--ink-soft); }
 .ci-bonus b { font: 700 14px var(--display); color: #e8650f; }
 .ci-pill b { color: #ff7a38; }
+/* THE ROAD TO THE NEXT PACK DAY (checkin.js `streakPacks`): one bar, its
+   words above, the days left under. */
+.ci-goal { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; text-align: left; }
+.ci-goal > span { font: 600 13px var(--display); color: var(--ink-soft); }
+.ci-goal > span b { color: var(--ink); font-weight: 800; }
+.ci-goal > small { font: 600 10px var(--pixel); text-transform: uppercase; color: #ff7a38; }
+.ci-goal > i { grid-column: 1 / -1; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; position: relative; }
+.ci-goal > i::after { content: ""; position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--p));
+  background: linear-gradient(90deg, #ffcf4a, #ff7a38); transition: transform 600ms cubic-bezier(.2, 1, .4, 1); }
+.ci-packs-won { position: relative; font: 800 22px var(--display); font-style: normal; color: #ffcf4a; animation: ci-rise 480ms 300ms cubic-bezier(.2, 1.3, .4, 1) both; }
+/* A STREAK DAY'S PACKS (StreakPacks.jsx): the reel, then what each lot landed. */
+.sp-card { max-height: calc(100dvh - 24px); overflow-y: auto; }
+.sp-won { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.sp-won li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; text-align: left;
+  background: var(--surface-2); border: 1px solid var(--line); animation: ci-rise 380ms cubic-bezier(.2, 1.3, .4, 1); }
+.sp-won img { width: 36px; height: 48px; object-fit: contain; flex: none; }
+.sp-won span { display: grid; min-width: 0; font-size: 12px; color: var(--ink-soft); }
+.sp-won span b { font: 800 15px var(--display); color: var(--ink); }
+.sp-go { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.sp-go .quiet { width: auto; }
+@media (max-height: 460px) {
+  .sp-card { gap: 8px; padding: 12px; }
+  .sp-card .rl-strip { padding: 8px 0; }
+  .sp-card .rl-cell { height: 112px; }
+  .sp-card .rl-cell img { max-height: 70px; }
+  .sp-card .rl-hint { display: none; }
+  .ci-goal > small { display: none; }
+}
 /* The milestone: the whole screen, a turning burst, confetti, the number. */
 .ci-party { position: fixed; inset: 0; z-index: 90; display: grid; place-content: center; justify-items: center; gap: 10px; overflow: hidden;
   background: radial-gradient(circle at 50% 45%, rgba(40, 20, 6, .92), rgba(6, 10, 22, .96) 70%); cursor: pointer; animation: ci-fade 300ms ease; }
@@ -9230,6 +9387,15 @@ body.fighting .topbar, body.cd-opening .topbar { display: none; }
 .topbar .tb-stat.candy b { color: var(--candy); }
 .topbar .tb-stat.dex .ic { color: var(--good); }
 .tb-stat .tb-candy { width: 20px; height: 20px; image-rendering: pixelated; }
+/* THE STREAK CHIP (TopBar): a button among the figures, its flame lit while
+   the streak lives and its dot while today still wants a stamp. */
+button.tb-stat { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
+.topbar .tb-stat.streak .ic { color: #ff7a38; }
+.topbar .tb-stat.streak b { color: #ff7a38; }
+.topbar .tb-stat.streak.cold .ic, .topbar .tb-stat.streak.cold b { color: var(--ink-faint); }
+.tb-stat.streak .tb-dot { top: -3px; right: -7px; }
+.tb-stat.streak.due .ic { animation: ci-flicker 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
+@media (prefers-reduced-motion: reduce) { .tb-stat.streak.due .ic { animation: none; } }
 .topbar .tb-bell {
   position: relative; width: 44px; height: 44px; padding: 0; display: grid; place-items: center;
   border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink-soft);
@@ -10929,7 +11095,7 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   .hud .ci-pill > .ms-ic { color: #ff7a38; }
   .hud .qz-pill > .ms-ic { color: var(--accent); }
   .hud .bg-pill > .ms-ic { color: #2fbf71; }
-  .hud .dc-pill:not(.ci-pill):not(.qz-pill):not(.bg-pill) > .ms-ic { color: var(--gold, #ffcf4a); }
+  .hud .dc-pill:not(.ci-pill):not(.qz-pill):not(.bg-pill):not(.ar-pill) > .ms-ic { color: var(--gold, #ffcf4a); }
   .hud .rift-ring { width: 40px; height: 40px; }
   .hud .rift-ring > img, .hud .fx-ring > .item-fx { width: 24px; height: 24px; }
   .hud .combo-ring > img { width: 30px; height: 30px; }
@@ -11421,3 +11587,238 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 @keyframes ifx-breathe { 50% { opacity: .45; transform: scale(.85); } }
 @keyframes ifx-wisp { 0% { opacity: 0; transform: translateY(20%) scaleX(.6); } 30% { opacity: .9; } 100% { opacity: 0; transform: translate(30%, -60%) scaleX(1.2); } }
 @media (prefers-reduced-motion: reduce) { .item-spooky > i { animation: none; } }
+
+/* ================================================================ THE ARENA
+   Real-time battles (ui/league/arena/, the Arena plan phase 0). The lobby is a
+   League tab; a match covers the screen above the pages (the bars step aside
+   through body.fighting) with the canvas under a HUD that lets clicks through
+   to it except on its own controls. */
+.ar-lobby { display: grid; gap: 12px; }
+.ar-team { display: flex; flex-wrap: wrap; gap: 10px; }
+.ar-mon { display: grid; justify-items: center; gap: 2px; width: 104px; padding: 10px 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ar-mon img { width: 64px; height: 64px; image-rendering: pixelated; }
+.ar-mon b { font-size: 13px; text-align: center; }
+.ar-mon span { font: 600 11px var(--pixel); color: var(--ink-faint); }
+.ar-modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.ar-mode { display: grid; gap: 4px; text-align: left; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; min-height: 72px; }
+.ar-mode:hover:not(:disabled) { border-color: var(--accent); }
+.ar-mode:disabled { opacity: .5; cursor: not-allowed; }
+.ar-mode b { font-size: 15px; }
+.ar-mode span { color: var(--ink-soft); font-size: 13px; }
+.ar-help { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 10px 14px; }
+.ar-help summary { cursor: pointer; font-weight: 600; }
+.ar-help ul { margin: 8px 0 2px; padding-left: 18px; display: grid; gap: 4px; color: var(--ink-soft); font-size: 13.5px; }
+
+.ar-match { position: fixed; inset: 0; z-index: 65; background: #0b1124; touch-action: none; user-select: none; -webkit-user-select: none; }
+.ar-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+.ar-hud { position: absolute; inset: 0; pointer-events: none; display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: auto 1fr auto; gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.ar-hud button { pointer-events: auto; }
+.ar-bar { align-self: start; max-width: 360px; width: 100%; display: grid; gap: 4px; padding: 8px 12px; border-radius: 12px;
+  background: rgba(10, 15, 30, .78); border: 1px solid rgba(140, 160, 220, .28); color: #e9eeff; }
+.ar-bar:not(.mine) { justify-self: end; }
+.ar-bar-top, .ar-bar-low { display: flex; justify-content: space-between; gap: 8px; }
+.ar-bar-top b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ar-bar-top span, .ar-bar-low span { font: 600 11px var(--pixel); color: #b9c2e4; }
+.ar-hp { display: block; height: 8px; border-radius: 99px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.ar-hp > i { display: block; height: 100%; border-radius: inherit; transform-origin: left; transition: transform .18s linear;
+  background: linear-gradient(90deg, #5fe08a, #a8f07a); }
+.ar-bar:not(.mine) .ar-hp > i { background: linear-gradient(90deg, #ff6a5b, #ff9d52); transform-origin: right; }
+.ar-clock { display: grid; justify-items: center; gap: 4px; align-self: start; }
+.ar-clock b { font: 700 22px var(--pixel); color: #fff; padding: 4px 14px; border-radius: 10px; background: rgba(10, 15, 30, .78); border: 1px solid rgba(140, 160, 220, .28); font-variant-numeric: tabular-nums; }
+.ar-clock button { font: 600 12px var(--pixel); color: #e9eeff; background: rgba(10, 15, 30, .78); border: 1px solid rgba(140, 160, 220, .28); border-radius: 8px; padding: 4px 12px; cursor: pointer; min-height: 30px; }
+.ar-party { grid-row: 3; grid-column: 1; align-self: end; display: flex; gap: 6px; flex-wrap: wrap; }
+.ar-slot { display: grid; gap: 1px; padding: 6px 10px; border-radius: 10px; min-width: 84px; min-height: 40px; text-align: left; cursor: pointer;
+  background: rgba(10, 15, 30, .78); border: 1px solid rgba(140, 160, 220, .28); color: #e9eeff; font: inherit; }
+.ar-slot b { font-size: 12.5px; white-space: nowrap; }
+.ar-slot span { font: 600 10.5px var(--pixel); color: #b9c2e4; }
+.ar-slot.on { border-color: #45d4ff; }
+.ar-slot.down { opacity: .4; }
+.ar-slot:disabled { cursor: default; }
+.ar-moves { grid-row: 3; grid-column: 2 / 4; justify-self: end; align-self: end; display: grid; grid-template-columns: repeat(6, minmax(0, 122px)); gap: 6px; }
+.ar-move { position: relative; overflow: hidden; display: grid; align-content: center; gap: 1px; text-align: left; padding: 8px 10px; min-height: 52px;
+  border-radius: 12px; cursor: pointer; font: inherit; color: #fff;
+  background: rgba(10, 15, 30, .82); border: 1px solid color-mix(in srgb, var(--tc, #8d9ac4) 70%, transparent);
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--tc, #8d9ac4) 80%, transparent); }
+.ar-move b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
+.ar-move span { font: 600 10.5px var(--pixel); color: #b9c2e4; position: relative; }
+.ar-move kbd { position: absolute; top: 4px; right: 6px; font: 600 9.5px var(--pixel); color: #8d9ac4; }
+.ar-move::after { content: ""; position: absolute; inset: 0; background: rgba(5, 8, 20, .62);
+  transform-origin: bottom; transform: scaleY(var(--cd, 0)); pointer-events: none; }
+.ar-move.wait b { opacity: .75; }
+.ar-move:disabled { opacity: .4; }
+.ar-dodge { --tc: #45d4ff; }
+.ar-pause { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(5, 8, 18, .6); padding: 16px; }
+.ar-card { display: grid; gap: 10px; justify-items: center; text-align: center; width: min(360px, 100%); padding: 22px 20px; border-radius: 18px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--ink); }
+.ar-card h3 { font-size: 24px; margin: 0; }
+.ar-card p { margin: 0; color: var(--ink-soft); font-size: 14px; }
+.ar-card .lg-go { width: 100%; }
+.ar-stickzone { position: absolute; left: 0; top: 18%; bottom: 0; width: 45%; pointer-events: auto; }
+.ar-stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .22); pointer-events: none; }
+.ar-stick > i { width: 48px; height: 48px; border-radius: 50%; background: rgba(255, 255, 255, .35); }
+@media (max-width: 760px) {
+  .ar-moves { grid-template-columns: repeat(6, minmax(0, 1fr)); grid-column: 1 / 4; grid-row: 4; width: 100%; }
+  .ar-hud { grid-template-rows: auto 1fr auto auto; }
+  .ar-move { min-height: 48px; padding: 6px 8px; }
+  .ar-bar { padding: 6px 10px; }
+}
+/* Touch: the party sits under the clock in its own column, so it can never
+   cover an HP bar; held sideways (a short screen) everything a size down. */
+@media (hover: none) and (pointer: coarse) {
+  .ar-canvas { cursor: default; }
+  .ar-moves { grid-template-columns: repeat(3, minmax(0, 96px)); grid-column: 2 / 4; grid-row: 3; width: auto; }
+  .ar-dodge { grid-column: 3; grid-row: 1; }
+  .ar-move { min-height: 52px; }
+  .ar-party { grid-row: 2; grid-column: 2; align-self: start; justify-content: center; flex-wrap: nowrap; }
+  .ar-slot { min-width: 0; padding: 4px 8px; min-height: 36px; }
+}
+@media (hover: none) and (pointer: coarse) and (max-height: 500px) {
+  .ar-hud { gap: 6px; }
+  .ar-bar { max-width: 230px; padding: 5px 9px; gap: 2px; }
+  .ar-bar-top b { font-size: 12.5px; }
+  .ar-hp { height: 6px; }
+  .ar-clock b { font-size: 16px; padding: 2px 10px; }
+  .ar-clock button { min-height: 28px; padding: 2px 10px; }
+  .ar-moves { grid-template-columns: repeat(3, minmax(0, 88px)); }
+  .ar-move { min-height: 44px; padding: 5px 8px; }
+  .ar-move b { font-size: 12px; }
+}
+
+/* Arena phase 1: the lobby's floors, moves and prizes; the HUD's tags. */
+.ar-mon ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 1px; justify-items: center; }
+.ar-mon li { font-size: 11px; color: var(--ink-soft); }
+.ar-mon li.off { color: var(--ink-faint); text-decoration: line-through; }
+.ar-mon { width: 132px; }
+.ar-floors { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.ar-floor { display: grid; gap: 4px; padding: 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; text-align: left; }
+.ar-floor img, .ar-floor-any { display: block; width: 100%; aspect-ratio: 26 / 16; border-radius: 8px; object-fit: cover; }
+.ar-floor-any { display: grid; place-items: center; background: var(--surface-2); font: 700 22px var(--pixel); color: var(--ink-faint); }
+.ar-floor b { font-size: 12.5px; padding: 0 2px; }
+.ar-floor.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.ar-mode em { font: 600 11px var(--pixel); font-style: normal; color: var(--gold); }
+.ar-mode em.done { color: var(--ink-faint); }
+.ar-prize { font: 700 14px var(--pixel); color: var(--gold) !important; }
+.ar-prize.done { color: var(--ink-faint) !important; font-weight: 600; }
+.ar-tags { display: inline-flex; gap: 4px; align-items: center; }
+.ar-tags em { font: 700 9.5px var(--pixel); font-style: normal; padding: 1px 4px; border-radius: 4px; background: rgba(255, 255, 255, .12); color: #e9eeff; }
+.ar-tags em.up { color: #ffb37a; } .ar-tags em.down { color: #9ccaff; }
+.ar-tags .ar-st { color: #0b1020; }
+.ar-st.st-0 { background: #f6d23a; } .ar-st.st-1 { background: #ff7a3d; } .ar-st.st-2 { background: #b060e8; color: #fff; }
+.ar-st.st-3 { background: #9aa5c8; } .ar-st.st-4 { background: #8fe3ff; }
+
+/* Upright on a phone the wide court plays small: say so through the opening,
+   above the VS card, then go - it sat over the middle of the fight for the
+   whole match. */
+.ar-turn { display: none; }
+@keyframes ar-turn-out { to { opacity: 0; visibility: hidden; } }
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  .ar-turn { display: block; position: absolute; left: 50%; top: 28%; transform: translateX(-50%); margin: 0; white-space: nowrap;
+    font: 600 11px var(--pixel); color: #e9eeff; background: rgba(10, 15, 30, .75); padding: 4px 10px; border-radius: 8px; pointer-events: none;
+    animation: ar-turn-out .5s ease 5s forwards; }
+  /* Upright, the party takes its own full row: in the clock's column it
+     widened that column and squeezed both HP bars to a truncated name. */
+  .ar-party { grid-row: 2; grid-column: 1 / 4; justify-self: center; }
+  .ar-moves { grid-column: 1 / 4; justify-self: stretch; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Arena phase 2: the ground's words, the Ladder. */
+.ar-ground { margin: 0; color: var(--ink-soft); font-size: 13.5px; max-width: 72ch; }
+.ar-ground b { color: var(--ink); }
+.ar-ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ar-ladder button { width: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
+  padding: 8px 12px; min-height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.ar-ladder button:disabled { cursor: not-allowed; }
+.ar-ladder .shut button { opacity: .5; }
+.ar-ladder .next button { border-color: var(--accent); }
+.ar-ladder .won button { background: var(--surface-2); }
+.ar-rung { font: 700 15px var(--pixel); color: var(--ink-faint); text-align: center; }
+.ar-ladder .won .ar-rung { color: var(--good); }
+.ar-who { display: grid; min-width: 0; }
+.ar-who b { font-size: 14px; }
+.ar-who em { font-style: normal; font-size: 12px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ar-type { font: 700 10.5px var(--pixel); color: #fff; padding: 2px 8px; border-radius: 99px; text-transform: capitalize; }
+.ar-pay { font: 600 12px var(--pixel); color: var(--gold); white-space: nowrap; }
+.ar-ladder .won .ar-pay { color: var(--good); }
+.ar-ladder .shut .ar-pay { color: var(--ink-faint); }
+@media (max-width: 520px) { .ar-ladder button { grid-template-columns: 28px minmax(0, 1fr) auto; } .ar-type { display: none; } }
+
+/* Arena phase 3: the fight's feel - the damage chunk under each HP bar, the
+   Surge meter and its button, the HUD sliding in after the opening, and the
+   last ten seconds. */
+.ar-hp { position: relative; }
+.ar-hp > i { position: absolute; inset: 0; }
+.ar-bar .ar-hp > i.ar-hp-lag { background: #fff3c4; transition: transform .5s cubic-bezier(.3, .7, .4, 1) .35s; }
+.ar-meter { display: block; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.ar-meter > i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, #ffb02e, #ffd23f); transition: transform .2s linear; }
+.ar-bar:not(.mine) .ar-meter > i { transform-origin: right; background: linear-gradient(270deg, #ff8a3d, #ffd23f); }
+.ar-meter.full > i { animation: ar-meter .6s ease-in-out infinite alternate; }
+@keyframes ar-meter { to { filter: brightness(1.6); } }
+.ar-surge { --tc: #ffd23f; }
+.ar-surge.full { animation: ar-ready .9s ease-in-out infinite alternate; }
+@keyframes ar-ready { from { box-shadow: inset 0 -3px 0 #ffd23f, 0 0 0 1px #ffd23f, 0 0 10px rgba(255, 210, 63, .4); }
+  to { box-shadow: inset 0 -3px 0 #ffd23f, 0 0 0 1px #ffd23f, 0 0 26px rgba(255, 210, 63, .85); } }
+.ar-surge.on { --tc: #ff7a3d; }
+.ar-clock.urgent b { color: #ff6a5b; animation: ar-urgent 1s ease-in-out infinite; }
+@keyframes ar-urgent { 50% { transform: scale(1.14); } }
+.ar-hud .ar-bar, .ar-hud .ar-clock, .ar-hud .ar-moves, .ar-hud .ar-party { transition: opacity .35s ease, transform .5s cubic-bezier(.2, .9, .3, 1.2); }
+.ar-hud.intro .ar-bar.mine { opacity: 0; transform: translateX(-48px); }
+.ar-hud.intro .ar-bar:not(.mine) { opacity: 0; transform: translateX(48px); }
+.ar-hud.intro .ar-clock { opacity: 0; transform: translateY(-24px); }
+.ar-hud.intro .ar-moves, .ar-hud.intro .ar-party { opacity: 0; transform: translateY(32px); }
+@media (prefers-reduced-motion: reduce) { .ar-meter.full > i, .ar-surge.full, .ar-clock.urgent b { animation: none; } }
+
+/* Arena phase 3: battle a friend - the panel, a waiting challenge, the link's screen. */
+.ar-friends { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.ar-friends li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 14px; min-height: 52px;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
+.ar-friends b { font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ar-friends .lg-go { width: auto; min-height: 36px; padding: 6px 14px; }
+.ar-invite { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--cta); background: var(--surface); }
+.ar-invite > span { flex: 1 1 200px; font-size: 14px; }
+.ar-invite .lg-go { width: auto; min-height: 36px; padding: 6px 16px; }
+.ar-note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.ar-waiting { display: grid; gap: 10px; justify-items: start; }
+.ar-waiting .lg-go { width: auto; padding: 8px 20px; }
+.ar-spin { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: ar-spin .9s linear infinite; }
+@keyframes ar-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ar-spin { animation-duration: 3s; } }
+
+/* The Arena's sprite credits (CC BY-NC 4.0): a link in Help, a dialog over the page. */
+.ar-link { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+.ar-credits { width: min(560px, 100%); max-height: min(640px, calc(100dvh - 32px)); display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); gap: 10px;
+  padding: 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); }
+.ar-credits header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ar-credits h3 { margin: 0; font-size: 18px; }
+.ar-credits p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+.ar-credits input { font: inherit; padding: 10px 12px; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); }
+.ar-credits-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+.ar-x { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; font-size: 16px; }
+.ar-artists { line-height: 1.7; }
+.ar-credit-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ar-credit-list li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.ar-credit-list b { font-size: 14px; }
+.ar-credit-list span { font-size: 13px; color: var(--ink-soft); }
+@media (max-height: 540px) { .ar-credits { max-height: calc(100dvh - 16px); padding: 12px; gap: 8px; } }
+
+/* Arena: the final minute's clock, Struggle, and the result's grade and record. */
+.ar-clock.final b { color: #ff8a7a; border-color: rgba(255, 90, 77, .55); }
+.ar-result-head { display: flex; align-items: center; gap: 14px; }
+.ar-grade { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 14px; font: 800 34px var(--display);
+  color: #0b1124; background: #9aa5c8; animation: ar-grade .45s cubic-bezier(.2, 1.6, .4, 1) .15s both; }
+.ar-grade.g-S { background: linear-gradient(160deg, #fff3b0, #ffd23f 55%, #f0a020); box-shadow: 0 0 22px rgba(255, 210, 63, .55); }
+.ar-grade.g-A { background: linear-gradient(160deg, #c8f6ff, #45d4ff); }
+.ar-grade.g-B { background: linear-gradient(160deg, #d6ffe0, #5fe08a); }
+.ar-grade.g-C { background: #c6cde4; }
+.ar-grade.g-D { background: #8d95ad; }
+@keyframes ar-grade { from { transform: scale(2.2) rotate(-12deg); opacity: 0; } }
+.ar-stats { margin: 0; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ar-stats div { display: grid; gap: 2px; padding: 8px 6px; border-radius: 10px; background: var(--surface-2); }
+.ar-stats dt { font-size: 11.5px; color: var(--ink-soft); }
+.ar-stats dd { margin: 0; font: 700 16px var(--pixel); color: var(--ink); font-variant-numeric: tabular-nums; }
+.ar-record { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; font-size: 13.5px; font-weight: 700; color: var(--gold); }
+@media (prefers-reduced-motion: reduce) { .ar-grade { animation: none; } }
+@media (max-height: 540px) { .ar-card { gap: 6px; padding: 14px 16px; } .ar-stats div { padding: 5px 6px; } .ar-grade { width: 44px; height: 44px; font-size: 26px; } }
