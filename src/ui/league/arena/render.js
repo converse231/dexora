@@ -47,6 +47,7 @@ import { TYPES } from "../../../data/types.js";
 import { STRUGGLE } from "../../../game/battle.js";
 import { spriteUrl } from "../../Sprite.jsx";
 import { PMD_IDS, PMD_REV } from "../../../data/pmd.js";
+import { FX, FX_REV } from "../../../data/fx.js";
 
 const asset = (p) => new URL(p, document.baseURI).href;
 // The basic attack (arena.js) is no League move: no slug, no sprite - it is drawn in its user's colour.
@@ -107,6 +108,24 @@ function img(path, onload) {
   if (onload && !(im.complete && im.naturalWidth)) im.addEventListener("load", onload, { once: true });
   return im.complete && im.naturalWidth ? im : null;
 }
+/* THE DRAWN EFFECTS ARE WHITE (public/arena/fx, npm run fx): one sheet
+   serves every type, coloured here - multiplied by the type's colour, cut
+   back to the art's own alpha - and kept, one copy a sheet and colour. */
+const tints = new WeakMap();
+function tinted(im, colour) {
+  let per = tints.get(im);
+  if (!per) tints.set(im, (per = new Map()));
+  if (per.has(colour)) return per.get(colour);
+  const c = document.createElement("canvas");
+  c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const x = c.getContext("2d");
+  x.drawImage(im, 0, 0);
+  x.globalCompositeOperation = "multiply"; x.fillStyle = colour; x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = "destination-in"; x.drawImage(im, 0, 0);
+  per.set(colour, c);
+  return c;
+}
+const fxPath = (name) => `arena/fx/${name}.png?v=${FX_REV}`;
 const flats = new WeakMap();
 function flat(im, colour = "#fff") {
   let per = flats.get(im);
@@ -439,6 +458,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     if (id != null) img(`follow/${id}.png`);
     atlasOf(m.id, m.shiny);
   }
+  for (const name of Object.keys(FX)) img(fxPath(name));
   const leads = sides.map((team) => team[0] && spriteUrl(team[0].id, team[0].shiny ? "shiny" : null));
   for (const u of leads) if (u) img(u);
 
@@ -637,6 +657,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         const heavy = e.heavy || e.ko || e.frac > 0.25;
         fx.push({ k: "burst", x: e.x, y: e.y, art: art?.burst ?? art?.shot, colour, t: 0, life: bas && !e.boost ? 16 : 30 });
         impact(type, e.x, e.y, e.dx, e.dy, heavy);
+        sheet("impact", e.x, e.y - 0.25, bas ? (e.boost ? 2.1 : 1.3) : heavy ? 3.4 : 2.5, colour, bas && !e.boost ? 14 : 22, (rand() - 0.5) * 0.6);
+        if (heavy && !bas) sheet("shockwave", e.x, e.y + 0.35, 3.2, colour, 24);
         if (e.boost) {
           word(e.x + 0.5, e.y - 1.1, "x3!", "#ffd23f", 36, true);
           for (let i = 0; i < 2; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? colour : "#ffffff", life: 16, size: 0.25, grow: 0.12 - i * 0.03, t: -i * 2 });
@@ -714,7 +736,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           const pow = moveOf(e.move).p ?? 0;
           fx.push({ k: "call", x: body.x, y: body.y, text: callName(e.move), colour, mine: e.side === me, t: 0, life: 50 });
           part({ k: "ring", x: body.x, y: body.y + 0.3, colour, life: 16, size: 0.4, grow: 0.12 });
-          if (pow >= 90) { shake(0.32); zoomAt(body.x, body.y, 0.045); impactFrame(sx(body.x), sy(body.y)); }
+          if (pow >= 90) { shake(0.32); zoomAt(body.x, body.y, 0.045); impactFrame(sx(body.x), sy(body.y)); sheet("shockwave", body.x, body.y + 0.35, 2.8, colour, 22); }
           else if (pow) shake(0.08 + pow / 600);
         }
         if (e.shape === "melee" || e.shape === "dash") { p.ox += e.dx * 0.4; p.oy += e.dy * 0.4; p.sx = 0.86; p.sy = 1.16; if (e.shape === "dash") dust(body.x, body.y, 5); }
@@ -738,6 +760,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else if (e.k === "pulse") {
         const type = typeOf(e.move), colour = colourOf(e.move);
         fx.push({ k: "wave", x: e.x, y: e.y, r: e.r, colour, art: arenaArt(slugOf(e.move))?.burst, t: 0, life: 24 });
+        sheet("shockwave", e.x, e.y + 0.3, e.r * 2.3, colour, 26);
         if (!moveOf(e.move).p) continue;
         const quake = type === "ground" || type === "rock";
         shake(quake ? 0.55 : 0.25);
@@ -776,6 +799,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else if (e.k === "rock") {
         impact("rock", e.x, e.y, 0, 0, true);
         fx.push({ k: "ring", x: e.x, y: e.y, colour: "#c8b090", t: 0, life: 24, big: true });
+        sheet("shockwave", e.x, e.y + 0.2, 3.6, "#e0c8a0", 26);
         mark("crack", e.x, e.y + 0.2, 2.2);
         shake(0.6);
       } else if (e.k === "ready") {
@@ -787,6 +811,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         const colour = f ? colours[TYPES[f.types[0]]] ?? "#ffd23f" : "#ffd23f";
         for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? colour : "#ffffff", life: 26, size: 0.3, grow: 0.16 - i * 0.03, t: -i * 3 });
         impact(f ? TYPES[f.types[0]] : "normal", e.x, e.y, 0, 0, true);
+        sheet("impact", e.x, e.y - 0.3, 4.2, colour, 26);
+        sheet("shockwave", e.x, e.y + 0.35, 5.2, colour, 30);
         mark("ring", e.x, e.y + 0.3, 3, colour);
         overlays.push({ k: "cut", side: e.side, colour, id: f?.id, shiny: f ? shiny[e.side]?.[f.slot] : false, t: 0, life: 44 });
         stop(420); shake(0.6); zoomAt(e.x, e.y, 0.12); crowd(6);
@@ -797,6 +823,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         fx.push({ k: "corpse", id: f.id, side: e.side, slot: e.slot, x: e.x, y: e.y, dx, dy, frame: { anim: "Hurt", at: 1e6, row: rowOf(f.fx, f.fy), frame: frameOf(f, 0) }, t: 0, life: 40 });
         impactFrame(sx(e.x), sy(e.y), true);
         fx.push({ k: "ring", x: e.x, y: e.y, colour: "#ffffff", t: 0, life: 40, big: true });
+        sheet("shockwave", e.x, e.y + 0.35, 4.6, "#ffffff", 32);
         stop(160); shake(0.85); zoomAt(e.x, e.y, 0.1); crowd(10);
         if (last) slow(KO_SLOW, 0.3); else { slow(520, 0.35); word(e.x, e.y - 1.6, "KNOCKED OUT", "#ffffff", 60, true); }
       } else if (e.k === "dodge" && body) {
@@ -1018,7 +1045,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.restore();
       /* THE CHARGE: a rune turning at its feet - two rings, opposite ways, and
          six marks between - that brightens to the release. */
-      if (!still) {
+      if (!still && !sheetFx("rune", 0, sx(x), sy(y + 0.38), px * 3, clock / 420, colour, 0.35 + 0.6 * kk, 0.42)) {
         ctx.save();
         ctx.translate(sx(x), sy(y + 0.38)); ctx.scale(1, 0.42);
         ctx.globalCompositeOperation = "lighter";
@@ -1139,8 +1166,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       if (!bas) glow(sx(x), sy(y), px * 0.4, "#ffffff", 0.55);
       if (rand() < (bas ? 0.35 : 1.1) * k) trailBit(bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, colour);
       const art = arenaArt(slugOf(p.move))?.shot;
-      if (!drawArt(art, sx(x), sy(y), Math.max(1, px / 12), Math.atan2(p.dy, p.dx), clock / 16.7)) {
-        // No sprite (a basic bolt): a comet - a bright head and a tapered tail along its path.
+      if (!drawArt(art, sx(x), sy(y), Math.max(1, px / 12), Math.atan2(p.dy, p.dx), clock / 16.7)
+        && !sheetFx("bolt", clock / 70 % 4, sx(x), sy(y), px * (bas ? (p.boost ? 2.2 : 1.6) : 2.2), Math.atan2(p.dy, p.dx), colour)) {
+        // No sprite and the bolt not loaded yet: a comet - a bright head and a tapered tail along its path.
         const r = px * (bas ? (p.boost ? 0.3 : 0.2) : 0.32), ang = Math.atan2(p.dy, p.dx);
         ctx.save(); ctx.translate(sx(x), sy(y)); ctx.rotate(ang);
         ctx.globalCompositeOperation = "lighter";
@@ -1161,6 +1189,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       const colour = tintOf(moveAt(f, a.k).i, s, f.side);
       const ang = Math.atan2(a.dy, a.dx), r = (bas ? 1.25 : 1.7) * px;
       const sweep = Math.min(1, a.ph === "act" ? 1 - a.t / 6 : 1);
+      const reach = bas ? 0.75 : 1;
+      if (sheetFx("slash", 0, sx(x + Math.cos(ang) * reach), sy(y - 0.2 + Math.sin(ang) * reach), px * (bas ? 2.3 : 3.6) * (0.7 + 0.3 * sweep),
+        ang - Math.PI / 2, colour, a.ph === "act" ? 1 : 0.55, 1, a.id % 2 === 1)) continue;
       ctx.save();
       ctx.translate(sx(x), sy(y - 0.2));
       ctx.globalCompositeOperation = "lighter";
@@ -1355,6 +1386,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.restore();
       if (e.art) for (let d = 0.6; d < e.len; d += 0.8) drawArt(e.art, sx(e.x + e.dx * d), sy(e.y + e.dy * d), Math.max(1, px / 14), ang, e.t + d * 7, 1 - kk);
       glow(sx(e.x + e.dx * e.len), sy(e.y + e.dy * e.len), px * 1.2, e.colour, 0.6 * (1 - kk));
+    } else if (e.k === "sheet") {
+      const n = FX[e.name]?.n ?? 1;
+      sheetFx(e.name, kk * n, sx(e.x), sy(e.y), px * e.size, e.rot, e.colour, n > 1 ? (kk > 0.85 ? (1 - kk) / 0.15 : 1) : 1 - kk);
     } else if (e.k === "call") {
       // The move's name: punched in over its user, slanted, then lifting away.
       const pop = e.t < 6 ? back(e.t / 6) : 1, fade = kk > 0.72 ? (1 - kk) / 0.28 : 1;
@@ -1608,9 +1642,17 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     g.addColorStop(0, o.colour); g.addColorStop(0.5, "#0b0f22"); g.addColorStop(1, o.colour);
     ctx.fillStyle = g; ctx.fill();
     ctx.clip();
-    // Streaks running through the band.
+    // Streaks running through the band: the drawn ones, tiled and running; the plain ones while they load.
+    const streaks = img(fxPath("cutin"));
+    if (streaks) {
+      const bw = hgt * 2.6, bh = hgt * 1.02;
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.6; ctx.imageSmoothingEnabled = true;
+      if (dir < 0) { ctx.translate(cw, 0); ctx.scale(-1, 1); }
+      for (let x0 = ((clock * 2.4) % bw) - bw * 1.2; x0 < cw * 1.3; x0 += bw) ctx.drawImage(streaks, x0, y - bh / 2, bw, bh);
+      ctx.restore();
+    }
     ctx.fillStyle = "rgba(255,255,255,0.35)";
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < (streaks ? 0 : 14); i++) {
       const sy2 = y - hgt / 2 + ((i * 53) % 100) / 100 * hgt, l = cw * (0.15 + ((i * 37) % 10) / 30);
       const sx2 = ((clock * 2.4 * dir + i * 197) % (cw * 1.4) + cw * 1.4) % (cw * 1.4) - cw * 0.2;
       ctx.fillRect(sx2, sy2, l, Math.max(1, hgt * 0.012));
@@ -1786,6 +1828,27 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   /* A GLOW is one pre-drawn soft disc per colour (`glowOf`), stamped at its
      size: a fresh radial gradient per glow per frame ran to 100-200 a frame
      in a busy fight (a shot's trail alone is eleven). */
+  /* One frame of a drawn effect, `w` px wide, in its colour with the white
+     art laid over it lighter (so its core burns white), flattened onto the
+     floor by `squash` BEFORE it turns - a rune lies on the ground and spins
+     there. Answers false while the sheet is still loading. */
+  function sheetFx(name, frame, x, y, w, rot = 0, colour = "#ffffff", alpha = 1, squash = 1, flip = false) {
+    const im = img(fxPath(name)), meta = FX[name];
+    if (!im || !meta || !(alpha > 0) || !(w > 0)) return Boolean(im);
+    const f = clamp(Math.floor(frame), 0, meta.n - 1), h = w * meta.h / meta.w;
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(1, squash); if (rot) ctx.rotate(rot); if (flip) ctx.scale(-1, 1);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = Math.min(1, alpha);
+    ctx.drawImage(tinted(im, colour), f * meta.w, 0, meta.w, meta.h, -w / 2, -h / 2, w, h);
+    ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = Math.min(1, alpha) * 0.45;
+    ctx.drawImage(im, f * meta.w, 0, meta.w, meta.h, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    return true;
+  }
+  // A drawn effect played out on the floor: its frames across its life, `size` in tiles.
+  const sheet = (name, x, y, size, colour, life, rot = 0) => { if (!still) fx.push({ k: "sheet", name, x, y, size, colour, life, rot, t: 0 }); };
+
   function glow(x, y, r, colour, a = 0.55) {
     if (!(r > 0) || !(a > 0)) return;
     const prev = ctx.globalAlpha, op = ctx.globalCompositeOperation;

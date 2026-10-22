@@ -85,6 +85,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/sprites/<event look id>.png` and its shiny | `npm run eventart` from the drawn originals in `art/events/<event>/<base id>.jpg` (keyed, shrunk to the base's canvas, the shiny by the species' own recolour) |
 | `public/arena/<id>.webp`, `public/arena/cover/<material>.webp` | `npm run arenas` from the drawn floors in `art/arena/<id>.png` (26:16, shrunk to 832x512 WebP; one per `ARENAS` id) and the cover blocks in `art/arena/cover/` (transparent, cropped to solid pixels, 128px; one per `GROUND` material) - check.mjs holds both |
 | `public/arena/pmd/`, `src/data/pmd.js` | `npm run pmd` (PMD Sprite Repository, pinned `COMMIT`, cached in .assets-src/pmd; ~5 min on all cores - `-- 25 6` bakes a sample but writes no pmd.js) |
+| `public/arena/fx/`, `src/data/fx.js` | `npm run fx` from the drawn originals in `art/arena/fx/` (white pixel art, tinted per type by render.js's `tinted`; a sheet's frames found by the gaps nearest even spacing, each anchored in one box; check.mjs reads every header and re-hashes `FX_REV`) |
 | `public/arena/intro/` | `npm run intro` (the Arena announcement's two fighters, cut from the shipped PMD atlases; re-run after `npm run pmd`) |
 | `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
 
