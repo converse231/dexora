@@ -85,7 +85,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/sprites/<event look id>.png` and its shiny | `npm run eventart` from the drawn originals in `art/events/<event>/<base id>.jpg` (keyed, shrunk to the base's canvas, the shiny by the species' own recolour) |
 | `public/arena/<id>.webp`, `public/arena/cover/<material>.webp` | `npm run arenas` from the drawn floors in `art/arena/<id>.png` (26:16, shrunk to 832x512 WebP; one per `ARENAS` id) and the cover blocks in `art/arena/cover/` (transparent, cropped to solid pixels, 128px; one per `GROUND` material) - check.mjs holds both |
 | `public/arena/pmd/`, `src/data/pmd.js` | `npm run pmd` (PMD Sprite Repository, pinned `COMMIT`, cached in .assets-src/pmd; ~5 min on all cores - `-- 25 6` bakes a sample but writes no pmd.js) |
-| `public/arena/fx/`, `src/data/fx.js` | `npm run fx` from the drawn originals in `art/arena/fx/` (white pixel art, tinted per type by render.js's `tinted`; a sheet's frames found by the gaps nearest even spacing, each anchored in one box; check.mjs reads every header and re-hashes `FX_REV`) |
+| `public/arena/fx/`, `src/data/fx.js` | `npm run fx` from the drawn originals in `art/arena/fx/` (white pixel art, tinted per type by render.js's `tinted`; a sheet's frames found by the gaps nearest even spacing, each anchored in one box; check.mjs reads every header and re-hashes `FX_REV`), the moves' own colour art in `art/arena/fx/moves/` (a new file needs its frame count in `MOVES`, or the build stops; one whose frames grow across the row goes in `WIDEST`), and the optional ULTI panels `ult-<pattern>` / `ult-<dex id>` |
 | `public/arena/intro/` | `npm run intro` (the Arena announcement's two fighters, cut from the shipped PMD atlases; re-run after `npm run pmd`) |
 | `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
 
@@ -1173,11 +1173,18 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   is the map's - a new canvas resets it. Port a callback from its C; a
   guessed motion is where the bad frames were.
 - **The Arena is real-time battles** (2026-10-22, the Arena plan's phase 0)
-  and, since the same day, **its own app tab** (`#/arena`, `goTab("arena")`;
-  App lazy-loads `ui/league/arena/Arena.jsx`, whose default export is the
-  page: a game's lobby - team, four mode tiles, the Ladder's rungs, floors,
-  one pinned Battle - always dark, its sheets the app's own). The League page
-  no longer carries it. **The basic attack** (`BASIC_K`, `BASIC_P` jab /
+  and **half of the Battles tab** (2026-10-23, asked for: a fifth tab was one
+  too many): `BattleSwitch.jsx` heads both pages, Arena and Classic (the
+  League), and `goTab("battles")` opens the one last chosen (`BATTLES_KEY`),
+  the Arena first; `goTab("arena")` / `goTab("league")` open that one
+  (`#/arena`, `#/league`). App lazy-loads `ui/league/arena/Arena.jsx`, whose
+  default export is the page: a game's lobby - team, four mode tiles, the
+  Ladder's rungs, floors, one pinned Battle - always dark, its sheets the
+  app's own. **A match is built ONCE, at mount** (`Match`'s `useState`
+  initializer; reported 2026-10-23, "the battle restarts mid-match"): its
+  teams were a memo over the Box, a new array whenever the save moved, so a
+  paid prize or a walk notice built a new match under the loop. A rematch
+  and an online round remount it (`key`). **The basic attack** (`BASIC_K`, `BASIC_P` jab /
   `BASIC_S` bolt by the higher attack stat, `arenaMove` knows both): held,
   no PP, typeless, every third in a row `BASIC_BOOST`; a move pressed in its
   recovery cuts it; the CPU fills its cooldowns with it. It took a third of
@@ -1185,13 +1192,74 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   holds it under 45% of a fight's damage. **The Arena's three are
   `arenaTeam`** (`setArenaTeam`, `ARENA_TEAM` in ladder.js; empty is the
   League team's first three). Keys: LMB held basic, RMB/Q/E/R moves, 1-3
-  switch, Space dodge, F surge. **Touch is a MOBA's**: a resting stick, the
+  switch, Space dodge, F surge. **Touch is a MOBA's**: a FIXED stick in the
+  bottom-left corner that only a touch starting on it steers and that thumb
+  keeps (2026-10-23: the left half once floated it under any touch and took
+  the party's taps), the
   attack button with the moves on an arc (tap auto-aims at a visible foe,
   drag aims with an arrow and a Cancel), fullscreen and landscape where the
   browser allows (`immerse`), a "turn your phone" card otherwise, the match
   sized to `100dvh` and re-fitted on `visualViewport` resize (URL bars).
   The renderer calls a move by name, turns a rune under its charge, trails
-  each type's matter behind a shot and flashes a super-effective hit. `game/arena.js` is its rulebook: a
+  each type's matter behind a shot and flashes a super-effective hit.
+  **Power-ups** (2026-10-23, `PICKUPS` in arena.js): a MIRRORED pair every
+  `PICK_EVERY` (point for point, so the floors stay fair - check.mjs), gone
+  after `PICK_LIFE`; Potion, Full Heal and Shiny Stone work on touch, the X
+  items are HELD one a side (`sd.held`) and used (`use` input, G); the CPU
+  from Normal up takes them. **The clutch** is the picture's alone: both
+  under a fifth of their HP, within reach, one winding up - slow motion,
+  bars and "CLUTCH", once in nine seconds (online never slows its rules).
+  **Judgements** (GREAT at 5 hits to LEGENDARY at 25, a rationed COUNTER,
+  PERFECT dodges, a PERFECT win untouched) are drawn under the striker's
+  combo.
+  **Same day, asked for**: a beam TRACKS its aim while it charges
+  (`BEAM_TRACK` of the way a tick - a sweep; only a CPU that `lead`s steers
+  one, or Easy outran Normal), `BEAM_W` 0.5 and `MELEE_RANGE` 1.75;
+  SUDDEN DEATH (`SUDDEN_T`) when the clock runs out level on Pokemon - all
+  standing at 1 HP. Surge is called **ULTI** on every screen (the code keeps
+  "surge"). The renderer draws each type's own shot and beam (`shotStyle`,
+  `beamStyle`) under the move's sprite, a bolt from above for Thunder moves,
+  and bodies and cover sorted by depth (a pillar drew over a Pokemon in
+  front of it).
+  **The big update** (2026-10-23, asked for). Wind-ups are `WIND_K` (0.7) of
+  what they were, and with the ULTIs `DAMAGE` went 0.4 -> 0.3 to hold a 3v3
+  at ~76 s. **Weather**, one a match from the seed, the SAME odds on every
+  floor (a floor leaning to its own would hand a type its home): rain
+  (Water 1.5x, Fire 0.5x, Fire types slower, all soaked), sun (the reverse),
+  sand and snow (chip all but their types). **Type combos**: Water on a burn
+  is STEAM (`s.clouds`, hides whoever stands in it), Water soaks (`wet`), and
+  Electric on a soaked Pokemon is a SHOCK (1.5x). **Double Team's copies
+  stand** either side of their user and move with it (`clonesOf`); a shot,
+  blow, beam or blast that reaches one first pops it, the CPU may chase one,
+  the foe's are drawn as solid as the real one. **ULTIs** (`ultimate`, in
+  `surge`): each Pokemon's by its first type - a STORM, NOVA, CANNON or
+  BARRAGE - and the famous ones by dex id (`ULT_NAMES`: Pikachu's Thunder,
+  Charizard's Blast Burn...); every strike (`s.strikes`) shows on the ground
+  `ULT_WARN` first and stops following its target `ULT_LOCK` before it lands,
+  so a roll beats it; held to ~14% of the damage. **Moves that leave the
+  court** (`VANISH`: Fly, Bounce, Dig, Dive, Phantom and Shadow Force) take
+  their user off it (`away`: untouchable, unseen) and land it ON the foe as
+  a strike; **moves that fill it** (`WIDE`: Heat Wave, Blizzard, Petal
+  Blizzard) reach the foe anywhere at `WIDE_K` unless cover stands between.
+  **The match's events** (`s.plan`, from the seed; `events: false` for none):
+  a legendary flies over and drops a Full Restore in the dead centre, and
+  some matches the lights go out (`s.dark`: the CPU loses a foe past
+  `DARK_SEE`, the picture shows only what glows and what stands near you).
+  **The picture**: an ULTI's cut-in names it and its first landing is a
+  MANGA PANEL (negative, then black ink - its type's pattern, its
+  silhouette, its name - then the colour back; a famous one's printed on its
+  colour), drawn art `ult-<id>`/`ult-<pattern>` taking the pattern's place
+  where it exists (build_fx builds only what is there); a full-screen flash
+  at most every `FLASH_GAP` (seven Thunder strikes were a strobe); the
+  camera tilts (`tilt`) and shakes harder. Only beams of matter (fire,
+  water, ice, electric) mark the floor - a Psybeam left a dark scorch.
+  **A move's own art** (`art/arena/fx/moves/<slug>.png`, `MOVES` in
+  build_fx with its frames counted by eye, `c` in fx.js: drawn in its own
+  colours, 256 of them): a projectile loops along its path, a stream lies
+  down a beam or trails a shot, a blow plays at its reach, a dash trails its
+  user, a blast plays round it, Psychic and Rock Slide where they land
+  (`LANDS`), a hazard on the ground. A match loads only the moves its two
+  teams know. `game/arena.js` is its rulebook: a
   FIXED-STEP simulation (`TPS` 60) that `tick(s, inputs)` moves in place from
   the match's own seed (`s.rs`) and the inputs alone, so a seed and its inputs
   replay one match exactly. Nothing in it may differ between browsers: no
@@ -1281,7 +1349,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   2026-10-22): a full-screen takeover once a device on the map - after the
   day's check-in, never over an encounter, never before the Starter Path's
   second goal, never to a save that has fought there - then the map's
-  `ar-pill` chip until the Arena tab is opened (`ARENA_NEWS_KEY`: null,
+  `ar-pill` chip until the Arena is opened (`ARENA_NEWS_KEY`: null,
   "seen", "done"; League.jsx writes "done"). Fight now opens the League on
   its Arena tab (`LEAGUE_TAB_KEY`). One auto-announcement a session: the
   event's dialog waits when this one has played. Its two fighters are PMD

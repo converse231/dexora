@@ -23,7 +23,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL,
-  FINAL_T, spent, BASIC_CD, SWAP_CD, basicShape, basicOf, BASIC_P,
+  FINAL_T, spent, BASIC_CD, SWAP_CD, basicShape, basicOf, BASIC_P, PICKUPS, SUDDEN_T,
   cooldownOf, DODGE_CD, ARENAS, shapeOf, GROUND, ZONE_SAYS } from "../../../game/arena.js";
 import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, arenaCancel } from "../../../net/cloud.js";
 import { isEvent } from "../../../data/dex.js";
@@ -37,6 +37,7 @@ import { label } from "../../../game/map.js";
 import { ARENA_LEVELS, arenaPay } from "../../../game/road.js";
 import { dayKey, hash } from "../../../game/daily.js";
 import { ARENA_NEWS_KEY, write } from "../../../game/store.js";
+import BattleSwitch from "../BattleSwitch.jsx";
 import { createRenderer } from "./render.js";
 import { loadAnims } from "../moveAnim.js";
 import Sprite from "../../Sprite.jsx";
@@ -98,12 +99,15 @@ const LEVEL_SAYS = {
   hard: "Fast hands, sharp aim. Leads its shots, raises a shield, takes the zones.",
 };
 const MODE_NAME = { ladder: "Arena Ladder", quick: "Quick battle", training: "Training", friends: "Battle a friend" };
+const WEATHER_NAME = { rain: "Rain", sun: "Harsh sun", sand: "Sandstorm", snow: "Snow" };
+const WEATHER_TIP = { rain: "Water x1.5, Fire x0.5, Fire types slower", sun: "Fire x1.5, Water x0.5",
+  sand: "Chips all but Rock, Ground and Steel types", snow: "Chips all but Ice types" };
 
-/* THE ARENA PAGE: a tab of its own. The game underneath pauses while it is
+/* THE ARENA PAGE: half of Battles (BattleSwitch). The game underneath pauses while it is
    open, it takes the modal lock, and a match owns the whole screen through
    `body.fighting` (the bars step aside). Opening it is what the map's
    announcement waits for (ARENA_NEWS_KEY). */
-export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], onClose }) {
+export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], onMode, onClose }) {
   useModalLock();
   useEffect(() => {
     engine?.pause(true);
@@ -143,7 +147,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   if (online) return <Online start={online} mons={mons} onExit={() => setOnline(null)} />;
   return (
     <>
-      <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0}
+      <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0} onMode={onMode}
         onStart={(m) => { immerse(); setMatch(m); }} onOnline={(o) => { immerse(); setOnline(o); }} onEdit={() => setEditing(true)} onHowto={() => setHowto(true)} />
       {editing && <TeamEdit box={box} picked={mons} custom={arenaTeam.length > 0}
         onSave={(uids) => { engine?.setArenaTeam(uids); setEditing(false); }} onClose={() => setEditing(false)} />}
@@ -158,7 +162,7 @@ const pickFloor = (floor, seed) => (floor === "random" ? ARENAS[Math.abs(seed) %
    the floors under them, and one big Battle along the foot. Each mode is a
    tile; the chosen one opens its own panel (the Ladder's ten masters, a
    CPU's difficulty, your friends). */
-function Lobby({ mons, level, record, ladder, custom, onStart, onOnline, onEdit, onHowto }) {
+function Lobby({ mons, level, record, ladder, custom, onMode, onStart, onOnline, onEdit, onHowto }) {
   const [mode, setMode0] = useState(() => { const m = pref(MODE_KEY, "ladder"); return MODE_NAME[m] && (m !== "friends" || CLOUD) ? m : "ladder"; });
   const [cpu, setCpu0] = useState(() => pref(LEVEL_KEY, "normal"));
   const [floor, setFloor0] = useState(() => pref(FLOOR_KEY, "random"));
@@ -197,6 +201,7 @@ function Lobby({ mons, level, record, ladder, custom, onStart, onOnline, onEdit,
     <div className="tc-page ag-page" role="dialog" aria-modal="true" aria-label="The Arena" style={{ "--ag-bg": `url(${asset(`arena/${bg}.webp`)})` }}>
       <i className="ag-bg" aria-hidden="true" />
       <div className="ag-wrap">
+        {onMode && <BattleSwitch on="arena" onPick={onMode} />}
         <header className="ag-head">
           <div className="ag-brand">
             <span className="ag-mark" aria-hidden="true"><Icon n="arena" size={24} /></span>
@@ -289,7 +294,7 @@ function Lobby({ mons, level, record, ladder, custom, onStart, onOnline, onEdit,
                 </div>
               )}
               {mode === "training" && (
-                <p className="ag-say">A dummy walks a slow square and never hits back. Try every move, the basic attack's rhythm, rolling through and Surge - nothing is at stake.</p>
+                <p className="ag-say">A dummy walks a slow square and never hits back. Try every move, the basic attack's rhythm, rolling through and your ULTI - nothing is at stake.</p>
               )}
               {mode === "friends" && <FriendBattles mons={mons} floor={floor} onStart={onOnline} />}
             </div>
@@ -674,7 +679,8 @@ function HowTo({ onClose }) {
               {row(["LMB"], "Basic attack - hold it to keep attacking")}
               {row(SKILL_KEYS, "Your four moves")}
               {row(["Space"], "Dodge: you cannot be hit while you roll")}
-              {row(["F"], "Surge, when the meter is full")}
+              {row(["F"], "ULTI, when the meter is full")}
+              {row(["G"], "Use the X item you are holding")}
               {row(["1", "2", "3"], "Send out that Pokémon (Tab: the next one)")}
               {row(["Esc"], "Pause")}
             </ul>
@@ -683,7 +689,7 @@ function HowTo({ onClose }) {
             <h4>Touch</h4>
             <ul>
               <li>The left thumb moves. The big button attacks - hold it; the four around it are your moves. Attacks aim at the foe by themselves.</li>
-              <li>Tap a Pokémon at the top left to send it out.</li>
+              <li>Tap a Pokémon at the top left to send it out. A held X item shows in its slot beside Dodge - tap to use it.</li>
             </ul>
           </section>
           <section>
@@ -692,8 +698,9 @@ function HowTo({ onClose }) {
               {row(["RT"], "Basic attack (hold)")}
               {row(["A", "B", "X", "Y"], "Your four moves")}
               {row(["RB"], "Dodge")}
-              {row(["LT"], "Surge")}
+              {row(["LT"], "ULTI")}
               {row(["LB"], "Next Pokémon")}
+              {row(["D-pad up"], "Use your held item")}
             </ul>
           </section>
           <section>
@@ -702,7 +709,14 @@ function HowTo({ onClose }) {
               <li><b>The basic attack</b> never runs out and every third in a row hits harder. A fighter whose Attack is higher jabs up close; one whose Sp. Atk is higher throws a bolt.</li>
               <li><b>Moves</b> hit with the League's own damage - types, STAB and all - and each has a cooldown and its PP.</li>
               <li><b>Every attack shows on the ground</b> before it lands: a line, an arc or a ring. Roll through it at the last moment - a <b>perfect dodge</b>.</li>
-              <li><b>Surge</b> fills as you land hits, take them, dodge perfectly and hold a zone. Full, it throws the foe off you and powers you up for {SURGE_T / TPS} s.</li>
+              <li><b>ULTI</b> fills as you land hits, take them, dodge perfectly and hold a zone. Full, it throws the foe off you, powers you up for {SURGE_T / TPS} s and looses your Pokémon's signature: a storm of strikes, a blast all round, a huge cannon or a barrage - Pikachu calls down Thunder, Charizard Blast Burn. Every strike shows on the ground first: roll out of it.</li>
+              <li><b>Double Team</b> makes two copies either side of its user that move with it. A hit that reaches a copy first pops it - "Miss!" - and the foe cannot tell which is real.</li>
+              <li><b>Weather</b>, one a match: rain powers Water, weakens Fire and slows Fire types; harsh sun the other way round; a sandstorm chips all but Rock, Ground and Steel types, snow all but Ice.</li>
+              <li><b>Type combos</b>: Water on a burned Pokémon puts the burn out in a cloud of steam that hides whoever stands in it. Water soaks, and Electric on a soaked Pokémon hits half again as hard.</li>
+              <li><b>Mid-match</b>: a legendary may fly over and drop a Full Restore in the middle - half your HP, any status cured, half an ULTI. And the lights may go out: only what glows is seen, and the foe only up close.</li>
+              <li><b>Sudden death</b>: out of time with as many Pokémon standing on each side, everyone drops to 1 HP for {SUDDEN_T / TPS} more seconds. The next hit wins.</li>
+              <li><b>Power-ups</b> drop in pairs, one on each half: a Potion, a Full Heal or a Shiny Stone works when you touch it; an X Attack, X Speed or X Defense is held until you use it.</li>
+              <li><b>Clutch</b>: when both Pokémon are nearly down and one winds up, time slows. Make it count.</li>
               <li><b>Statuses</b> tick in real time: burn and poison hurt every 2 s, paralysis slows you, sleep and freeze hold you still.</li>
             </ul>
           </section>
@@ -787,7 +801,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   /* `basic` is HELD (a mouse button, a key, a thumb, a trigger) and read
      every tick; a move, a roll, a switch and a surge are presses, held a
      few ticks until the match can take them. */
-  const input = useRef({ keys: new Set(), mouse: null, fire: null, basic: { mouse: false, touch: false, pad: false }, dodge: 0, swap: -1, surge: 0, stick: [0, 0], pad: [],
+  const input = useRef({ keys: new Set(), mouse: null, fire: null, basic: { mouse: false, touch: false, pad: false }, dodge: 0, swap: -1, surge: 0, use: 0, stick: [0, 0], pad: [],
     aim: null });
   // The dragged move's arrow on the court and its Cancel, moved by the loop (never a render).
   const aimEl = useRef(null);
@@ -807,22 +821,32 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   }, [turn]);
   const cpu = online ? null : master ? master.cpu : mode;
 
-  const teams = useMemo(() => online ? online.teams : [
-    mons.map((m) => playerFighter(m)),
-    master ? masterTeam(master) : cpuTeam(seed, level, Math.max(1, mons.length)),
-  ], [mons, seed, level, master, online]);
-  const looks = useMemo(() => online ? online.looks : [
-    mons.map((m) => ({ id: m.species, shiny: variantOf(m) === "shiny" })),
-    teams[1].map((f) => ({ id: f.id, shiny: false })),
-  ], [mons, teams, online]);
-  const s = useMemo(() => newMatch({ teams, cpu: [null, online ? null : cpu], seed, arena: floor, intro: INTRO }), [teams, cpu, seed, floor, online]);
-  // Who fights, for the VS card.
-  const names = useMemo(() => online ? online.names : [["You", nameOf(teams[0][0]?.id)],
-    [master ? master.name : `CPU · ${LEVEL_NAME[mode] ?? "Training"}`, nameOf(teams[1][0]?.id)]], [teams, master, mode, online]);
+  /* THE MATCH IS BUILT ONCE, at mount (reported 2026-10-23: "the battle
+     suddenly restarts in the middle of the match"). Its teams were a memo
+     over the Box, and the Box is a new array whenever the save moves - a
+     prize paid, a walk notice - so a new match was built and the loop
+     restarted on it. A rematch and an online round remount (`key`). */
+  const [{ teams, looks, s, names }] = useState(() => {
+    const teams = online ? online.teams : [
+      mons.map((m) => playerFighter(m)),
+      master ? masterTeam(master) : cpuTeam(seed, level, Math.max(1, mons.length)),
+    ];
+    return {
+      teams,
+      looks: online ? online.looks : [
+        mons.map((m) => ({ id: m.species, shiny: variantOf(m) === "shiny" })),
+        teams[1].map((f) => ({ id: f.id, shiny: false })),
+      ],
+      s: newMatch({ teams, cpu: [null, online ? null : cpu], seed, arena: floor, intro: INTRO }),
+      // Who fights, for the VS card.
+      names: online ? online.names : [["You", nameOf(teams[0][0]?.id)],
+        [master ? master.name : `CPU · ${LEVEL_NAME[mode] ?? "Training"}`, nameOf(teams[1][0]?.id)]],
+    };
+  });
 
   useEffect(() => {
     const cv = canvas.current;
-    const r = createRenderer(cv, looks, floor, { names, me });
+    const r = createRenderer(cv, looks, floor, { names, me, moves: s.sides.flatMap((sd) => sd.team.flatMap((f) => f.kit.map((m) => m.i))) });
     // Online: the match steps only with both inputs for a tick (arena.js's lockstep).
     const ls = online ? lockstep(online.link, me, online.round) : null;
     if (ls) online.attach(ls);
@@ -849,6 +873,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       if (pressed(6)) inp.surge = s.t + 7;
       if (pressed(4) || pressed(15)) inp.swap = nextAlive(s, me, 1);
       if (pressed(14)) inp.swap = nextAlive(s, me, -1);
+      if (pressed(12)) inp.use = s.t + 7;
       if (pressed(9)) setPaused((p) => !p);
       inp.basic.pad = Boolean(now[7]);
       return { mx: dz(gp.axes[0] ?? 0), my: dz(gp.axes[1] ?? 0), ax: dz(gp.axes[2] ?? 0), ay: dz(gp.axes[3] ?? 0) };
@@ -885,7 +910,9 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       inp.swap = -1;
       const surge = inp.surge > s.t;
       if (mine?.surge) inp.surge = 0;
-      return { mx, my, ax, ay, fire, basic, dodge, swap, surge };
+      const use = inp.use > s.t;
+      if (!s.sides[me].held) inp.use = 0;
+      return { mx, my, ax, ay, fire, basic, dodge, swap, surge, use };
     };
 
     const frame = (now) => {
@@ -966,6 +993,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       if (/^[1-6]$/.test(e.key) && !e.repeat) { e.preventDefault(); inp.swap = Number(e.key) - 1; return; }
       if (key === " " || key === "shift") { e.preventDefault(); inp.dodge = s.t + 7; return; }
       if (key === "f") { e.preventDefault(); inp.surge = s.t + 7; return; }
+      if (key === "g") { e.preventDefault(); inp.use = s.t + 7; return; }
       const skill = ["q", "e", "r"].indexOf(key);
       if (skill >= 0) { e.preventDefault(); press(skill + 1); return; }
       if (["w", "a", "s", "d", "j", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) { e.preventDefault(); inp.keys.add(key); }
@@ -1055,9 +1083,11 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       {view && (
         <div className={`ar-hud${view.intro ? " intro" : ""}`}>
           <Plate f={view.sides[0]} meter={view.meter[0]} who={names[me][0]} mine />
-          <div className={`ah-clock${view.left <= FINAL_T && !view.over ? " final" : ""}${view.left <= 10 * TPS && !view.over ? " urgent" : ""}`}>
+          <div className={`ah-clock${view.left <= FINAL_T && !view.over ? " final" : ""}${view.left <= 10 * TPS && !view.over ? " urgent" : ""}${view.sudden ? " sudden" : ""}`}>
             <b>{clock(view.left)}</b>
             <button type="button" onClick={() => setPaused(true)} aria-label="Pause"><Icon n="menu" size={16} /></button>
+            {view.weather !== "clear" && <i className={`ah-weather w-${view.weather}`} data-tip={WEATHER_TIP[view.weather]}>{WEATHER_NAME[view.weather]}</i>}
+            {view.dark && <i className="ah-weather w-dark">Lights out</i>}
           </div>
           <Plate f={view.sides[1]} meter={view.meter[1]} who={names[1 - me][0]} />
 
@@ -1095,14 +1125,21 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
               <b>{view.basic.jab ? "Jab" : "Bolt"}</b>
               {!touch && <kbd>LMB</kbd>}
             </button>
+            {/* A HELD POWER-UP (arena.js PICKUPS): its slot, empty until one is picked up. */}
+            <button type="button" className={`ah-item${view.held ? " full" : ""}`} disabled={!view.held}
+              onPointerDown={tap(() => { input.current.use = s.t + 7; })}
+              aria-label={view.held ? `Use ${PICKUPS[view.held].name}` : "No item held"} data-tip={view.held ? PICKUPS[view.held].says : "Pick up an X item on the floor"}>
+              {view.held ? <img src={asset(`items/${view.held}.png`)} alt="" /> : <b>Item</b>}
+              {!touch && <kbd>G</kbd>}
+            </button>
             <button type="button" className={`ah-dodge${view.dodge ? "" : " wait"}`} style={{ "--cd": view.dodgeCd }}
               onPointerDown={tap(() => { input.current.dodge = s.t + 7; })} aria-label="Dodge">
               <b>Dodge</b>{!touch && <kbd>Space</kbd>}
             </button>
             <button type="button" className={`ah-surge${view.meter[0] >= 1 ? " full" : ""}${view.surging ? " on" : ""}`}
               style={{ "--m": view.surging ? 1 : view.meter[0] }} disabled={view.meter[0] < 1}
-              onPointerDown={tap(() => { input.current.surge = s.t + 7; })} aria-label={view.meter[0] >= 1 ? "Surge - ready" : `Surge ${Math.floor(view.meter[0] * 100)}%`}>
-              <b>{view.surging ? "Surging" : "Surge"}</b><span>{view.surging ? "!" : view.meter[0] >= 1 ? "Ready" : `${Math.floor(view.meter[0] * 100)}%`}</span>
+              onPointerDown={tap(() => { input.current.surge = s.t + 7; })} aria-label={view.meter[0] >= 1 ? "ULTI - ready" : `ULTI ${Math.floor(view.meter[0] * 100)}%`}>
+              <b>ULTI</b><span>{view.surging ? "!" : view.meter[0] >= 1 ? "Ready" : `${Math.floor(view.meter[0] * 100)}%`}</span>
               {!touch && <kbd>F</kbd>}
             </button>
           </div>
@@ -1157,7 +1194,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
               <div><dt>Damage</dt><dd>{view.stats.dealt.toLocaleString()}</dd></div>
               <div><dt>Best combo</dt><dd>{view.stats.best}</dd></div>
               <div><dt>Perfect dodges</dt><dd>{view.stats.perfect}</dd></div>
-              <div><dt>Surges</dt><dd>{view.stats.surges}</dd></div>
+              <div><dt>ULTIs</dt><dd>{view.stats.surges}</dd></div>
               <div><dt>Time</dt><dd>{clock(view.t)}</dd></div>
             </dl>
             {(record.best || record.streak > 1) && (
@@ -1217,7 +1254,7 @@ function snapshot(s, me) {
   };
   const mine = s.sides[me], f0 = mine.team[mine.active];
   return {
-    t: s.t, left: LIMIT - s.t, over: s.over, won: s.over && s.winner === me, lost: s.over && s.winner === 1 - me, why: s.why, intro: s.intro > 0,
+    t: s.t, left: s.sudden ? LIMIT + SUDDEN_T - s.t : LIMIT - s.t, sudden: Boolean(s.sudden), weather: s.weather, dark: s.dark > 0, over: s.over, won: s.over && s.winner === me, lost: s.over && s.winner === 1 - me, why: s.why, intro: s.intro > 0,
     meter: [me, 1 - me].map((k) => s.sides[k].meter / SURGE_MAX), surging: f0.surge > 0,
     sides: [side(me), side(1 - me)],
     party: mine.team.map((f, k) => ({ id: f.id, hp: f.hp, max: f.max, active: k === mine.active })),
@@ -1233,6 +1270,7 @@ function snapshot(s, me) {
     // The next basic attack is the third in a row: the button says so.
     basic: { ready: f0.basic.cd === 0, cd: f0.basic.cd / BASIC_CD, jab: basicShape(f0) === "melee", boost: f0.basicN % 3 === 2 && s.t - f0.basicT < TPS },
     dodge: f0.dodgeCd === 0, dodgeCd: f0.dodgeCd ? f0.dodgeCd / DODGE_CD : 0,
+    held: mine.held,
     ko: [me, 1 - me].map((k) => s.sides[k].team.filter((f) => f.hp <= 0).length),
   };
 }
@@ -1266,38 +1304,43 @@ function Plate({ f, meter, who, mine }) {
 
 /* THE THUMB STICK (touch): it appears where the left thumb lands and reads
    how far and which way it is pulled. Window pointer events, no capture. */
+/* A MOBA'S STICK, FIXED (asked for, 2026-10-23: "sticky, so it won't
+   interrupt the battle like tapping to switch Pokemon"): it stays in the
+   bottom-left corner, only a touch that starts ON it steers, and that
+   thumb keeps it wherever it drags until it lets go. The left half of the
+   screen floated it under any touch once, and took the party's taps. */
+const STICK_R = 48;
 function Stick({ input }) {
-  const [at, setAt] = useState(null);     // [x, y, dx, dy]
-  const id = useRef(null);
+  const base = useRef(null), knob = useRef(null), held = useRef(null);   // { id, cx, cy }
+  const [on, setOn] = useState(false);
   useEffect(() => {
-    const move = (e) => {
-      if (e.pointerId !== id.current) return;
-      setAt((a) => {
-        if (!a) return a;
-        const dx = e.clientX - a[0], dy = e.clientY - a[1], l = Math.hypot(dx, dy);
-        const k = l > 8 ? Math.min(1, l / 48) / l : 0;
-        input.current.stick = [dx * k, dy * k];
-        return [a[0], a[1], dx, dy];
-      });
+    const put = (dx, dy) => {
+      const l = Math.hypot(dx, dy), k = l > 8 ? Math.min(1, l / STICK_R) / l : 0;
+      input.current.stick = [dx * k, dy * k];
+      const c = l > STICK_R ? STICK_R / l : 1;
+      if (knob.current) knob.current.style.transform = `translate(${dx * c}px, ${dy * c}px)`;
     };
+    const move = (e) => { const h = held.current; if (h && e.pointerId === h.id) put(e.clientX - h.cx, e.clientY - h.cy); };
     const up = (e) => {
-      if (e.pointerId !== id.current) return;
-      id.current = null; setAt(null); input.current.stick = [0, 0];
+      if (!held.current || e.pointerId !== held.current.id) return;
+      held.current = null; setOn(false); put(0, 0);
     };
+    const down = (e) => {
+      e.preventDefault();
+      const b = base.current.getBoundingClientRect();
+      held.current = { id: e.pointerId, cx: b.left + b.width / 2, cy: b.top + b.height / 2 };
+      setOn(true); move(e);
+    };
+    const el = base.current;
+    el.addEventListener("pointerdown", down);
     addEventListener("pointermove", move);
     addEventListener("pointerup", up);
     addEventListener("pointercancel", up);
-    return () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); removeEventListener("pointercancel", up); };
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      removeEventListener("pointermove", move); removeEventListener("pointerup", up); removeEventListener("pointercancel", up);
+      input.current.stick = [0, 0];
+    };
   }, [input]);
-  /* A MOBA'S STICK: resting where the left thumb lives, so it is never a
-     guess; a touch anywhere in the left half moves it under the thumb. */
-  return (
-    <div className="ar-stickzone" onPointerDown={(e) => { id.current = e.pointerId; setAt([e.clientX, e.clientY, 0, 0]); }}>
-      {at ? (
-        <span className="ar-stick" style={{ left: at[0], top: at[1] }}>
-          <i style={{ transform: `translate(${Math.max(-48, Math.min(48, at[2]))}px, ${Math.max(-48, Math.min(48, at[3]))}px)` }} />
-        </span>
-      ) : <span className="ar-stick rest" aria-hidden="true"><i /></span>}
-    </div>
-  );
+  return <div ref={base} className={`ar-stick${on ? " on" : ""}`} aria-hidden="true"><i ref={knob} /></div>;
 }

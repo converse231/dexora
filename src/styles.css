@@ -11602,6 +11602,16 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ag-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 20%, rgba(7, 11, 23, .25), rgba(7, 11, 23, .94) 72%); }
 .ag-wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 20px 20px 28px; display: grid; gap: 18px; }
 
+/* Battles' two halves (BattleSwitch.jsx): the League's header, and the Arena's over its brand. */
+.bt-switch { flex: none; margin-left: auto; display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--line); }
+.bt-switch button { min-height: 32px; padding: 4px 16px; cursor: pointer; border: 0; border-radius: 9px; background: transparent;
+  font: 700 13px var(--display); color: var(--ink-soft); }
+.bt-switch button[aria-selected="true"] { color: #fff; background: var(--cta); box-shadow: 0 2px 0 rgba(0, 0, 0, .18); cursor: default; }
+.bt-switch button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.ag-page .bt-switch { width: max-content; margin: 0 0 14px; background: rgba(8, 12, 28, .6); border-color: rgba(255, 255, 255, .14); }
+.ag-page .bt-switch button { color: #b9c2e4; }
+.ag-page .bt-switch button[aria-selected="true"] { color: #fff; background: #ff7a38; }
 .ag-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
 .ag-brand { display: flex; align-items: center; gap: 12px; }
 .ag-mark { flex: none; width: 50px; height: 50px; border-radius: 15px; display: grid; place-items: center; background: #ff7a38; color: #fff;
@@ -11796,6 +11806,7 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 /* Sideways on a phone the menu key sits over the page's top-left corner. */
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
   .ag-head { padding-left: calc(56px + env(safe-area-inset-left, 0px)); }
+  .ag-page .bt-switch { margin-left: calc(56px + env(safe-area-inset-left, 0px)); }
 }
 @media (max-height: 460px) and (orientation: landscape) {
   .ag-go { padding-block: 8px; }
@@ -11862,6 +11873,16 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ah-clock button { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; cursor: pointer;
   background: rgba(10, 15, 30, .82); border: 1px solid rgba(140, 160, 220, .3); color: #e9eeff; }
 .ah-clock.final b { color: #ff8a7a; border-color: rgba(255, 90, 77, .55); }
+.ah-clock.sudden b { color: #fff; background: #c8102e; border-color: #ff8a9a; }
+/* The match's weather and its lights, under the clock. */
+.ah-weather { position: absolute; top: 100%; left: 50%; translate: -50% 4px; white-space: nowrap; padding: 2px 9px; border-radius: 999px;
+  font: 700 11px var(--pixel); font-style: normal; color: #e9eeff; background: rgba(8, 12, 28, .72); border: 1px solid rgba(255, 255, 255, .18); pointer-events: auto; }
+.ah-weather + .ah-weather { translate: -50% 26px; }
+.ah-weather.w-rain { color: #9fd0ff; }
+.ah-weather.w-sun { color: #ffcf6a; }
+.ah-weather.w-sand { color: #e0b878; }
+.ah-weather.w-snow { color: #dff4ff; }
+.ah-weather.w-dark { color: #b9c2e4; background: #05060e; }
 .ah-clock.urgent b { color: #ff6a5b; animation: ar-urgent 1s ease-in-out infinite; }
 @keyframes ar-urgent { 50% { transform: scale(1.14); } }
 
@@ -11897,6 +11918,15 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   background: conic-gradient(rgba(4, 7, 16, .55) calc(var(--cd, 0) * 1turn), transparent 0); }
 .ah-basic:active { transform: scale(.95); }
 .ah-dodge { width: 60px; height: 60px; background: rgba(10, 15, 30, .86); border: 2px solid #45d4ff; }
+/* The held power-up's slot: dashed while empty, gold and pulsing while full. */
+.ah-item { position: relative; flex: none; width: 56px; height: 56px; display: grid; place-items: center; padding: 0; border-radius: 50%; cursor: pointer;
+  background: rgba(10, 15, 30, .7); border: 2px dashed rgba(140, 160, 220, .4); color: #8d9ac4; }
+.ah-item b { font: 700 10px var(--display); }
+.ah-item > img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
+.ah-item.full { border: 2px solid #ffd23f; background: rgba(40, 30, 6, .9); animation: ar-ready .9s ease-in-out infinite alternate; }
+.ah-item:disabled { cursor: default; }
+.ar-match.touch .ah-item { position: absolute; right: 270px; bottom: 66px; width: 50px; height: 50px; }
+.ar-match.touch .ah-item:not(.full) { display: none; }
 .ah-dodge b { font: 700 11px var(--display); }
 .ah-surge { width: 66px; height: 66px; border: 0; background: conic-gradient(#ffd23f calc(var(--m, 0) * 1turn), rgba(255, 255, 255, .14) 0); }
 .ah-surge::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: rgba(10, 15, 30, .92); }
@@ -11921,7 +11951,7 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
    plate; the stick wherever the left thumb lands. */
 /* The arc: the moves' centres 122px from the attack's (their chord at 30
    degrees is then 63px, over a 62px button - 104px let two touch). */
-.ar-match.touch .ah-skills { position: absolute; right: var(--pr); bottom: var(--pb); width: 270px; height: 205px; display: block; }
+.ar-match.touch .ah-skills { position: absolute; right: var(--pr); bottom: var(--pb); width: 320px; height: 205px; display: block; }
 .ar-match.touch .ah-basic { position: absolute; right: 0; bottom: 0; width: 96px; height: 96px; }
 .ar-match.touch .ah-skill { position: absolute; width: 62px; height: 62px; min-height: 0; padding: 4px; border-radius: 50%;
   justify-items: center; text-align: center; box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--tc, #8d9ac4) 85%, transparent); border: 0; }
@@ -11938,11 +11968,12 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ar-match.touch .ah-mon { width: 50px; height: 50px; border-radius: 14px; }
 .ar-match.touch .ah-mon > img { width: 48px; height: 48px; }
 .ar-match.touch .ah-plate { width: min(300px, 40vw); }
-.ar-stickzone { position: absolute; left: 0; top: 30%; bottom: 0; width: 45%; pointer-events: auto; }
-.ar-stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; display: grid; place-items: center;
-  background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .22); pointer-events: none; }
-.ar-stick > i { width: 48px; height: 48px; border-radius: 50%; background: rgba(255, 255, 255, .35); }
-.ar-stick.rest { position: absolute; left: 34px; bottom: calc(var(--pb) + 18px); margin: 0; opacity: .5; }
+.ar-stick { position: absolute; left: calc(var(--pl) + 18px); bottom: calc(var(--pb) + 18px); width: 124px; height: 124px; border-radius: 50%;
+  display: grid; place-items: center; pointer-events: auto; touch-action: none; opacity: .62; transition: opacity .15s;
+  background: radial-gradient(circle, rgba(255, 255, 255, .04) 40%, rgba(255, 255, 255, .12)); border: 2px solid rgba(255, 255, 255, .25); }
+.ar-stick.on { opacity: 1; }
+.ar-stick > i { width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 255, 255, .42); pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35); }
 /* A dragged move's arrow on the court, and the Cancel a release over takes it back. */
 .ah-aim { position: absolute; left: 0; top: 0; height: 18px; margin-top: -9px; transform-origin: 0 50%; pointer-events: none;
   background: linear-gradient(90deg, rgba(69, 212, 255, .1), rgba(69, 212, 255, .6));
@@ -12050,7 +12081,7 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ar-record { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; font-size: 13.5px; font-weight: 700; color: var(--gold); }
 @media (max-height: 540px) { .ar-card { gap: 6px; padding: 14px 16px; } .ar-stats div { padding: 5px 6px; } .ar-grade { width: 44px; height: 44px; font-size: 26px; } }
 @media (prefers-reduced-motion: reduce) {
-  .ar-meter.full > i, .ah-surge.full, .ah-clock.urgent b, .ar-grade { animation: none; }
+  .ar-meter.full > i, .ah-surge.full, .ah-item.full, .ah-clock.urgent b, .ar-grade { animation: none; }
   .ar-spin { animation-duration: 3s; }
   .ah-plate, .ah-clock, .ah-party, .ah-skills { transition: none; }
 }

@@ -7,7 +7,7 @@ import { freePoints } from "./game/trainer.js";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel, isNight } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
-import { RAIL_KEY, ORDER_KEY, REF_KEY, ARENA_NEWS_KEY, read, write, drop, flushNow } from "./game/store.js";
+import { RAIL_KEY, ORDER_KEY, REF_KEY, ARENA_NEWS_KEY, BATTLES_KEY, read, write, drop, flushNow } from "./game/store.js";
 import { tradeInbox, push, myDefense, setReferrer, myReferrals } from "./net/cloud.js";
 import Invite from "./ui/Invite.jsx";
 import { referralDue } from "./game/referral.js";
@@ -75,7 +75,7 @@ const TradeScene = lazyPage(() => import("./ui/trade/TradeScene.jsx"));
 /* THE LEAGUE, the same way: the battle rules, rosters and moves are the
    heaviest data in the game, and only this chunk carries them (asserted). */
 const League = lazyPage(() => import("./ui/league/League.jsx"));
-// The Arena, its own tab since 2026-10-22: real-time battles, the League's data in its own chunk.
+// The Arena: real-time battles, the League's data in its own chunk. Half of Battles (2026-10-23), with Classic.
 const ArenaPage = lazyPage(() => import("./ui/league/arena/Arena.jsx"));
 // The walking party's editor: the trade picker, kept out of the main bundle.
 const PartyPick = lazyPage(() => import("./ui/PartyPick.jsx"));
@@ -371,11 +371,16 @@ export default function App({
      always means "back to the game" in one press, and pushes when you leave
      the map - each page reads its own hash and pushes nothing of its own. The
      `tc`/`lg` keys are what the pages' own closers already look for. */
-  const tab = arenaPage ? "arena" : league ? "battles" : cards ? "cards" : trade && !trade.profile ? "trade" : you || trade?.profile ? "you" : "catch";
-  const goTab = useCallback((t) => {
+  const tab = arenaPage || league ? "battles" : cards ? "cards" : trade && !trade.profile ? "trade" : you || trade?.profile ? "you" : "catch";
+  /* BATTLES IS TWO PAGES, the Arena and Classic (the League), behind one tab
+     (2026-10-23): "battles" opens the one last chosen, the Arena first;
+     "arena" and "league" open that one. */
+  const goTab = useCallback((t0) => {
+    const t = t0 === "battles" ? (read(BATTLES_KEY) === "league" ? "league" : "arena") : t0;
+    if (t === "arena" || t === "league") write(BATTLES_KEY, t);
     const onPage = /^#\/(trade|trainer\/|league|arena|cards|you)/.test(location.hash);
     setTrade(t === "trade" ? { name: null } : null);
-    setLeague(t === "battles");
+    setLeague(t === "league");
     setArenaPage(t === "arena");
     setCards(t === "cards");
     setYou(t === "you");
@@ -386,9 +391,9 @@ export default function App({
       else history.replaceState(null, "", location.pathname + location.search);
       return;
     }
-    const st = { page: 1, tc: t === "trade" ? 1 : undefined, lg: t === "battles" ? 1 : undefined,
+    const st = { page: 1, tc: t === "trade" ? 1 : undefined, lg: t === "league" ? 1 : undefined,
       ar: t === "arena" ? 1 : undefined, cd: t === "cards" ? 1 : undefined };
-    const hash = { trade: "#/trade", battles: "#/league", arena: "#/arena", cards: "#/cards", you: "#/you" }[t];
+    const hash = { trade: "#/trade", league: "#/league", arena: "#/arena", cards: "#/cards", you: "#/you" }[t];
     if (onPage) history.replaceState(st, "", hash);
     else history.pushState(st, "", hash);
   }, []);
@@ -973,6 +978,7 @@ export default function App({
             candy={st?.candy ?? 0}
             road={st?.road ?? null}
             signedIn={Boolean(account)}
+            onMode={goTab}
             onClose={() => {
               setLeague(false);
               if (history.state?.lg) history.back();
@@ -991,6 +997,7 @@ export default function App({
             arenaTeam={st?.arenaTeam ?? []}
             record={st?.arena ?? null}
             ladder={st?.ladder ?? []}
+            onMode={goTab}
             onClose={() => {
               setArenaPage(false);
               if (history.state?.ar) history.back();
@@ -1537,7 +1544,7 @@ export default function App({
               busy={Boolean(enc || evo)}
               onTravel={(id) => { if (engine.travel(id)) setRotom(false); }}
               onSelect={(id) => setEntry(id)}
-              onLeague={() => goTab("battles")}
+              onLeague={() => goTab("league")}
               onStar={(id) => engine.star(id)}
               bingo={bingo}
               onClaimBingo={() => engine.claimBingo()}
