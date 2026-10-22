@@ -68,6 +68,8 @@ await db.query(readFileSync(new URL("../db/trading.sql", import.meta.url), "utf8
 await db.query(readFileSync(new URL("../db/ranked.sql", import.meta.url), "utf8"));
 // Referrals read trading's profiles, saves and befriend - after it too.
 await db.query(readFileSync(new URL("../db/referrals.sql", import.meta.url), "utf8"));
+// Online Arena battles read trading's friends and blocks (the Arena plan, phase 3).
+await db.query(readFileSync(new URL("../db/arena.sql", import.meta.url), "utf8"));
 // The dashboard reads all three, so it goes on last (docs/admin.md).
 await db.query(readFileSync(new URL("../db/admin.sql", import.meta.url), "utf8"));
 
@@ -104,6 +106,7 @@ await q("delete from public.reports where reporter = any($1) or reported = any($
 await q("delete from public.defense_teams where owner = any($1)", [both]);
 await q("delete from public.ranked_battles where challenger = any($1) or defender = any($1)", [both]);
 await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
+await q("delete from public.arena_invites where a = any($1) or b = any($1)", [both]);
 // A browser pass signed in as a test trainer owns its save now (one writer per
 // save): the harness takes the claim back, or every upload here is refused.
 await q("update public.saves set session = null where user_id = any($1)", [both]);
@@ -1158,6 +1161,59 @@ await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
     "activity is one row a day and an hour and never costs an upload; the snapshot is idempotent, reads every field " +
     "and survives a malformed save; no read carries an email; each moderation write says why and is audited; " +
     "the admin schema is unreadable to players");
+}
+
+// ---- ARENA: a challenge between friends, its room, and nothing for anyone else ----
+{
+  await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
+  await q("delete from public.blocks where blocker = any($1) or blocked = any($1)", [both]);
+  await q("delete from public.arena_invites where a = any($1) or b = any($1)", [both]);
+  assert.equal(await rpc(A, "arena_challenge", { other: B.id, ground: "moon" }), null, "a trainer challenged a stranger");
+  await q("insert into public.friends (a, b, status) values ($1, $2, 'accepted')", [A.id, B.id]);
+  const one = await rpc(A, "arena_challenge", { other: B.id, ground: "moon" });
+  assert.ok(one?.id && /^[0-9a-f]{64}$/.test(one.room) && one.seed > 0 && one.arena === "moon", "a challenge between friends did not hand out a room");
+  const two = await rpc(A, "arena_challenge", { other: B.id, ground: "rink" });
+  assert.notEqual(two.room, one.room, "two challenges shared a room");
+  const waiting = await rpc(B, "arena_invites_mine", {});
+  assert.ok(waiting.length === 1 && waiting[0].id === two.id && !waiting[0].mine && waiting[0].room == null
+    && waiting[0].card.username === "TesterA" && waiting[0].left > 100, "B did not see one waiting challenge, roomless, from A");
+  assert.equal((await rpc(A, "arena_invites_mine", {}))[0].room, two.room, "A cannot read its own challenge's room");
+  assert.equal(await rpc(B, "arena_answer", { invite: one.id, yes: true }), null, "a replaced challenge could still be accepted");
+  assert.equal(await rpc(A, "arena_answer", { invite: two.id, yes: true }), null, "a trainer accepted their own challenge");
+  const yes = await rpc(B, "arena_answer", { invite: two.id, yes: true });
+  assert.ok(yes?.room === two.room && yes.seed === two.seed && yes.arena === "rink", "accepting did not hand B the same room, seed and arena");
+  assert.equal(await rpc(B, "arena_answer", { invite: two.id, yes: true }), null, "a challenge was accepted twice");
+  assert.equal((await rpc(A, "arena_invites_mine", {}))[0].status, "accepted", "A cannot see that B accepted");
+  // Declined, taken back, expired.
+  const three = await rpc(A, "arena_challenge", { other: B.id, ground: "indigo" });
+  assert.equal(await rpc(B, "arena_answer", { invite: three.id, yes: false }), null, "a declined challenge answered with a room");
+  assert.equal((await rpc(A, "arena_invites_mine", {}))[0].status, "declined", "A cannot see that B declined");
+  const four = await rpc(A, "arena_challenge", { other: B.id, ground: "indigo" });
+  assert.equal(await rpc(A, "arena_cancel", { invite: four.id }), true, "a challenge could not be taken back");
+  assert.equal(await rpc(B, "arena_answer", { invite: four.id, yes: true }), null, "a challenge taken back was accepted");
+  const five = await rpc(A, "arena_challenge", { other: B.id, ground: "indigo" });
+  await q("update public.arena_invites set created_at = now() - interval '3 minutes' where id = $1", [five.id]);
+  assert.deepEqual(await rpc(B, "arena_invites_mine", {}), [], "an expired challenge still showed");
+  assert.equal(await rpc(B, "arena_answer", { invite: five.id, yes: true }), null, "an expired challenge was accepted");
+  // Nobody reads or writes the table itself.
+  for (const who of [A, B]) {
+    const { data, error } = await who.c.from("arena_invites").select("*");
+    assert.ok(error || !data?.length, "a trainer read arena_invites directly");
+    const put = await who.c.from("arena_invites").insert({ a: A.id, b: B.id, arena: "moon" });
+    assert.ok(put.error, "a trainer wrote arena_invites directly");
+  }
+  // A block ends it: no challenge, and nothing waiting shows.
+  const six = await rpc(A, "arena_challenge", { other: B.id, ground: "indigo" });
+  await q("insert into public.blocks (blocker, blocked) values ($1, $2)", [B.id, A.id]);
+  assert.deepEqual(await rpc(B, "arena_invites_mine", {}), [], "a challenge showed across a block");
+  assert.equal(await rpc(B, "arena_answer", { invite: six.id, yes: true }), null, "a challenge was accepted across a block");
+  assert.equal(await rpc(A, "arena_challenge", { other: B.id, ground: "indigo" }), null, "a trainer challenged across a block");
+  await q("delete from public.blocks where blocker = any($1) or blocked = any($1)", [both]);
+  await q("delete from public.friends where a = any($1) or b = any($1)", [both]);
+  await q("delete from public.arena_invites where a = any($1) or b = any($1)", [both]);
+  console.log("tradedb arena ok — friends only, a new challenge replaces the last, the room goes to the challenger and to " +
+    "whoever accepts, once; declined, taken back and expired challenges answer nothing; the table is nobody's to read " +
+    "or write; a block ends it both ways");
 }
 
 await db.end();

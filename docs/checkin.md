@@ -27,8 +27,23 @@ you came back.
   | 7 | ¥5,000 and a roulette spin |
 
 - **The press pays and SAVES first;** the stamp and the celebration play after.
-- **Milestone days** (`STREAK_MILESTONES`: 7, 14, 30, 50, 100, 180 and 365)
-  take the whole screen: a turning burst, confetti and the number.
+- **The streak pays card packs** (asked for, 2026-10-22; `STREAK_PACKS`):
+  10 on day 10, 20 on 20, 30 on 30, 50 on 50, 70 on 70 and 100 on day 100,
+  then `STREAK_MONTHLY` (100) every `STREAK_MONTH` (30) days after - 130, 160,
+  and so on. They come in lots of `LOT` (10), and each lot is ONE set:
+  `lotSets` draws it from the sets open at your level, weighted 0.25 plus the
+  share of the set you still lack, so a long streak fills the collection
+  rather than stacking one set's spares, and a finished set can still land.
+  Decided, earned (`checkin:<day>`) and SAVED in `checkIn`; `StreakPacks.jsx`
+  (lazy) only shows the lots on the reel, quicker spins, Skip lands them all.
+  280 packs by day 100 (about ¥1.1M at `PACK_PRICE`), then ~3 a day: a
+  one-off pool for coming back, never income - cards are a collection.
+- **Milestone days** (`isMilestone`: day 7 and every pack day) take the whole
+  screen: a turning burst, confetti and the number.
+- **The streak is always on screen**: a flame chip in the top bar
+  (`streakNow`: the stamped streak, or yesterday's until today ends, 0 once a
+  day was missed), dotted while today is unstamped; it opens the check-in,
+  which draws the road to the next pack day as one bar.
 - **Saved as `checkin`:** `{ last, streak, best, spins }`, checked field by
   field on load.
 

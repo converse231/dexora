@@ -99,6 +99,15 @@ export const WRITER_KEY = `${SAVE_KEY}:writer`;
    the next time they log in here. */
 export const PARKED_KEY = `${SAVE_KEY}.parked`;
 
+/* PLAYING BEFORE AN ACCOUNT (onboarding, 2026-10-22): "Play now" on the
+   front door sets GUEST_KEY, and a guest's save is an unowned one - the same
+   as local mode's. "Save my progress" sets ADOPT_KEY, and the next `settle`
+   for a BRAND NEW account (nothing on the server) takes that guest save as
+   its own instead of parking it. Into an account that already holds a game
+   it is parked as ever, and offered back on You. */
+export const GUEST_KEY = `${SAVE_KEY}:guest`;
+export const ADOPT_KEY = `${SAVE_KEY}:adopt`;
+
 /* WHOSE COPY A RECOVERY KEY IS, and the answer was nobody's.
 
    BACKUP, BROKEN and OTHER were one key each for the whole browser, so the YOU
@@ -122,6 +131,13 @@ export const SCOPED_KEY = `${SAVE_KEY}:scoped`;
 /* AN INVITE LINK this device was opened with (`?ref=<username>`, referral.js),
    kept until a signed-in new account follows it. The device's, never a save's. */
 export const REF_KEY = "dexora-ref";
+/* THE ARENA'S ANNOUNCEMENT, the device's (ui/ArenaIntro.jsx): nothing yet,
+   "seen" once its takeover has played, "done" once the Arena tab has been
+   opened (League.jsx) - the map's Arena chip stands between the two. */
+export const ARENA_NEWS_KEY = "dexora-arena-news";
+/* The League page's last tab, a device preference - here, not in League.jsx,
+   so the announcement's Fight now can open the page on its Arena tab. */
+export const LEAGUE_TAB_KEY = "dexora-league-region";
 
 /* Reading never throws. A private window, cleared site data, or a browser that
    has revoked storage all arrive here as "no save", which is the same thing a
@@ -401,6 +417,15 @@ export async function settle(uid, pull) {
      straight out of SAVE_KEY. That path now clears it - so it is parked
      first, since clearing is the one thing a guest's only copy cannot survive. */
   const here = read(SAVE_KEY);
+  /* THE GUEST WHO ASKED TO KEEP THEIR GAME, into an account with none: the
+     only case where an unowned save is adopted, and only on that request. */
+  const adopt = Boolean(uid && !owner && !parked && here && read(ADOPT_KEY) && got.raw == null);
+  // Signed in, either way the guest is now this account's.
+  if (uid) { drop(ADOPT_KEY); drop(GUEST_KEY); }
+  if (adopt) {
+    write(OWNER_KEY, uid);
+    return { ok: true, raw: here };
+  }
   if (here && owner !== uid) keep(scoped(PARKED_KEY, owner), here);
 
   const winner = chosen ? local : newer(local, got.raw);

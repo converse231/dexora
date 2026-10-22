@@ -20,6 +20,16 @@ import { dayKey, hash } from "./daily.js";
 // call, with the Master Ball doubled: 175 trainers a day paid ~¥300,000).
 export const ROAD_YEN = 16;
 
+/* AN ARENA WIN (game/arena.js, real-time) pays like one road trainer, once a
+   CPU level a day: three a day at most against the road's ~175 trainers, so
+   the renewable income stays where the road set it. The level is the team's
+   (a Lv 50 Hard win is 50 x 16 x 2 = 1,600; check.mjs holds its best day
+   under 5% of the road's - measured 3%). */
+export const ARENA_LEVELS = ["easy", "normal", "hard"];
+const ARENA_MULT = { easy: 1, normal: 1.5, hard: 2 };
+export const arenaPay = (cpu, level) =>
+  ARENA_MULT[cpu] ? Math.round(Math.max(1, Math.min(100, level)) * ROAD_YEN * ARENA_MULT[cpu]) : 0;
+
 /* The rungs: team size, level over the region's own (its arrival level), and
    the AI. */
 const RUNG = {

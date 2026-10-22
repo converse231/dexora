@@ -83,6 +83,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
 | `src/data/cards/prices.js` | `npm run prices` (TCGplayer via TCGdex, a dated snapshot; display only) |
 | `public/sprites/<event look id>.png` and its shiny | `npm run eventart` from the drawn originals in `art/events/<event>/<base id>.jpg` (keyed, shrunk to the base's canvas, the shiny by the species' own recolour) |
+| `public/arena/<id>.webp`, `public/arena/cover/<material>.webp` | `npm run arenas` from the drawn floors in `art/arena/<id>.png` (26:16, shrunk to 832x512 WebP; one per `ARENAS` id) and the cover blocks in `art/arena/cover/` (transparent, cropped to solid pixels, 128px; one per `GROUND` material) - check.mjs holds both |
+| `public/arena/pmd/`, `src/data/pmd.js` | `npm run pmd` (PMD Sprite Repository, pinned `COMMIT`, cached in .assets-src/pmd; ~5 min on all cores - `-- 25 6` bakes a sample but writes no pmd.js) |
+| `public/arena/intro/` | `npm run intro` (the Arena announcement's two fighters, cut from the shipped PMD atlases; re-run after `npm run pmd`) |
 | `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
@@ -113,6 +116,17 @@ anything done. The run prints each suite; the count is not typed anywhere.
   `saves.session`, and `save_game(payload, sess)` checks ownership in the same
   statement. A losing tab stops writing localStorage too. `WRITER_KEY` does the
   same between tabs in local mode.
+- **A guest plays before an account** (onboarding, 2026-10-22): the front
+  door (`Welcome` in Gate.jsx) is PLAY NOW, which sets `GUEST_KEY` and plays
+  local mode's unowned save on a cloud build (Boot drops a stale
+  `OWNER_KEY` after `settle` has parked its save). "Save my progress" (You,
+  Trade, App's `JoinAsk` at `JOIN_AT` catches) sets `ADOPT_KEY`, and
+  `settle` ADOPTS the guest save only for a brand-new account with nothing
+  on the server and nothing parked; anything else parks it as below. An
+  invite link skips the door for the sign-up it is for.
+- **A save of only `{ char }` is a new game, not a broken one**: Boot writes
+  it before the engine exists, and reading it as unreadable drew every new
+  player's first session as Red and never uploaded it (2026-10-22).
 - **Other people's saves are parked, never written over** (`PARKED_KEY`, scoped
   to the owner). A guest save is parked at first sign-in and offered back.
   Recovery copies are `scoped(key, owner)`; BACKUP is written at load time,
@@ -714,6 +728,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   also outrank the Pokedex Charm (2x, a whole generation) and the Region Charm
   (1.5x, nine hard runs) - check.mjs refuses both.
   `loadState` drops a bad row, never the whole object.
+- **The first days are `starter.js`** (onboarding, 2026-10-22: new players
+  never found the core features). A partner picked with the trainer
+  (`STARTERS` at `STARTER_LEVEL`, `grantStarter` into an EMPTY Box only,
+  walking; Boot writes it through with `saveNow`, since a dev StrictMode
+  engine is built twice). A new player's first throw cannot fail (`caught`
+  0, never a legendary). The **Starter Path** (`PATH`, `path` = goals
+  claimed, in order, `claimPath`) stands where the daily quest does; the
+  quest and the check-in wait for its first goal, the quiz, bingo and an
+  event's chip and announcement for its second - one thing to do on a first
+  visit. Derived like achievements; a save with catches loads it finished
+  (`cleanPath`).
 - **The catch chain is `combo.js`** (Catch Combo, 2026-10-14): `state.combo`
   `{ species, n }`, keyed by `looksOf`'s base. A catch of it adds one, any
   other catch starts over, running from or losing ANOTHER species is free,
@@ -813,7 +838,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Battles are designed in docs/battles.md** - change a decision there
   first. They live on a League page (a lazy chunk), never on a map, and never
   give a Pokémon EXP or a level: a team is bought with Rare Candy. **Only
-  `game/battle.js` and `ui/League.jsx` may import the League's data**
+  `game/battle.js` and `ui/League.jsx` (and the Arena's `game/arena.js`) may import the League's data**
   (`leagues`, `moves`, `learnsets`, `types`; asserted), or a player who never
   battles downloads it. **League ids never change** (`beaten` keys on them;
   the fetch refuses to drop one). A leader's type comes from its OWN party,
@@ -1114,7 +1139,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   by yesterday, the week's ladder `CHECKIN_REWARDS`, and day 7 banks a spin.
   `checkIn` and `spinRoulette` pay and SAVE before any stamp or reel plays;
   the roulette's Gold Pokemon counts as caught
-  (species and Gold row), 2 slots in 15.
+  (species and Gold row), 2 slots in 15. **The streak pays packs**
+  (`streakPacks`, 2026-10-22: days 10/20/30/50/70/100, then 100 every 30
+  days), in lots of ten, each lot one open set weighted toward what you lack
+  (`lotSets`), earned and saved in `checkIn` before `StreakPacks.jsx` spins;
+  the top bar's flame (`streakNow`) shows the streak on every screen.
   Tips and banners wait while either is open.
 - **A running field item is a ring** (`fx-ring`, the rift's `.rift-ring`
   rules): its rim drains with steps left over the item's own `steps`.
@@ -1142,6 +1171,116 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   sprites and flashes over them and under the boxes. The bare `canvas` rule
   is the map's - a new canvas resets it. Port a callback from its C; a
   guessed motion is where the bad frames were.
+- **The Arena is real-time battles** (2026-10-22, the Arena plan's phase 0;
+  its own tab of the League page). `game/arena.js` is its rulebook: a
+  FIXED-STEP simulation (`TPS` 60) that `tick(s, inputs)` moves in place from
+  the match's own seed (`s.rs`) and the inputs alone, so a seed and its inputs
+  replay one match exactly. Nothing in it may differ between browsers: no
+  sin/cos/atan2/exp/pow/hypot (their last digits are the engine's), no clock,
+  no `Math.random`, no DOM - an aim arrives as a vector (check.mjs's `arena
+  ok`). A hit is `battle.js`'s own formula (`rawDamage`) times `DAMAGE`
+  (measured: 33 s a Pokemon, Hard against Hard), accuracy is aim (no random
+  misses), and a match never writes the save. Like battle.js it carries the
+  League's data, so only `ui/league/` may import it (asserted). The picture
+  (`ui/league/arena/render.js`) draws each move in its OWN Emerald sprites
+  (`arenaArt`, read off the move's League timeline by moveAnim.js - still the
+  only loader of anims.js), with a ground telegraph during every wind-up; the
+  match is PORTALLED to the body (`.tc-main` isolates) and owns the screen
+  through `body.fighting`. Its loop stops while the page is hidden.
+  **Phase 1**: every move is one of eight SHAPES (`shapeOf`: shot, beam,
+  melee, dash, pulse, field, self, multi - from its data plus short name
+  lists; check.mjs holds every playable move to one, only the ally heals
+  left out); statuses tick in real time (`afflict`, `stepStatus`: burn,
+  poison, toxic, paralysis, sleep, freeze, with the League's immunities) and
+  stat stages last 10 s capped at +/-2; the court sits `INSET` inside each
+  floor's own wall. A CPU win pays once a level a day (`engine.arenaWin`,
+  `arenaPay` in road.js, priced off ROAD_YEN; the save's `arena`), its best
+  day held under 5% of the road's (check.mjs).
+  **Phase 2**: each floor is its own GROUND (`GROUND` in arena.js, its
+  rectangles measured on the art): Mt. Moon's falling rock, the Boardwalk's
+  water (only Water and Flying types move freely), the Caldera's hot edge and
+  eroding basalt, the Grove's tall grass (hides you from range), the Rink's
+  ice; four blocks of cover in the floor's material (weak and resisted types;
+  shots stop, beams end, blows and pulses chip, bodies are pushed out); two
+  mirrored zones that open every 30 s and pay one team per cycle, held alone
+  for a second. No floor favours a side or hands a type its home (check.mjs).
+  **The Arena Ladder is `game/ladder.js`** - ten masters, ids append-only,
+  teams typed by dex id WITH their names; the engine judges the order and
+  pays each first win once (`arenaMaster`, the save's `ladder`), the Champion
+  a card pack; the Ladder's total held under a quarter of a road day.
+  **The fight's feel** (2026-10-22, asked for): the opening is `INTRO` ticks
+  of the sim itself (nobody moves, off the match clock, 0 in every test) so
+  both ends of an online match count the same ones; the VS card, the throws
+  and the count are drawn from it. **Surge is the twist**: a meter a side
+  (`SURGE_MAX`) filled by hits dealt and taken, a PERFECT DODGE (rolling
+  through an attack) and a zone; spent, it throws a close foe off, breaks a
+  stagger and gives `SURGE_T` of harder blows and double-speed cooldowns,
+  ended by a switch. It is a comeback for whoever is being hit, so Easy never
+  spends it (Normal beat the old Easy 64% with it; this Easy, 78%). The
+  renderer runs every effect on real time scaled by its own hit-stop and slow
+  motion (`rate`), which the offline page also steps the sim by: types throw
+  their own matter and leave fading floor marks, cover wobbles and crumbles,
+  each floor has its own air, the last KO is an impact frame, slow motion,
+  K.O. and the winner - and the result card waits for it (`done`). A particle
+  gets every field it is drawn with from `part`'s defaults (one without `vx`
+  went NaN and threw in `createRadialGradient` every frame).
+  **Phase 3, online between friends**: `db/arena.sql` (after trading.sql)
+  holds a challenge and its secret room, friends only, one open a trainer,
+  two minutes, the table readable by nobody; `net.js` links the two browsers
+  by WebRTC (STUN only, so "blocked" is said, never hung on), introduced over
+  a Realtime broadcast that `arenaRoom` in cloud.js opens and closes; the
+  match is `lockstep` in arena.js (inputs `DELAY` ticks ahead, `cleanInput`
+  at both ends, a state hash every `HASH_EVERY`, a round number per rematch)
+  in the Fair format (`fairTeam`: species at `FAIR_LEVEL`, IVs 31), and a
+  build whose `rulesPrint` differs is refused at the handshake. Online steps
+  with the wall clock, never the hit-stop (the other end would wait), has no
+  pause, pays nothing and rates nothing. A challenge is taken back by
+  LEAVING, never in an effect's cleanup: StrictMode runs that once at mount
+  and cancelled every challenge as it was made.
+  **Its bodies are PMD sprites** (2026-10-22, asked for: the ARENA ONLY - no
+  portraits, nothing on the map or anywhere else, asserted by check.mjs's
+  `pmd ok`): `tools/build_pmd.py` bakes nine animations a Pokemon (Walk,
+  Idle, Attack, Shoot, Charge, Hurt, Sleep, Hop, Double) into ONE atlas and a
+  sidecar - every frame cut to its own pixels, repeats stored once, a
+  left-facing row that is its right one mirrored drawn flipped (uncut,
+  Rayquaza decoded to 30 MB; check.mjs holds every atlas under 8 MB) - a
+  shiny as a palette swap, or its own `-s` atlas where one colour is two; a
+  form matched by NAME to PMD's subgroup. render.js loads one when a match
+  needs it (kept across matches, every url stamped `PMD_REV`), picks the
+  animation from the fighter (a blow's frames up to PMD's HitFrame run across
+  the wind-up, so it lands as the rules hit), draws it at the follower art's
+  pixel scale over the shadow, and tints one piece at a time through a
+  scratch canvas, never a whole-atlas copy per colour. A species PMD never
+  drew, or an atlas not yet arrived, fights in its follower art. CC BY-NC
+  4.0: `credits.json` names every sheet's artists, shown from the Arena's
+  Help. The tint cache keys an atlas by a SESSION-wide id (a renderer's own
+  counter restarted each match and drew a new foe in the last one's
+  silhouette), a glow is a pre-drawn disc stamped (a gradient per glow per
+  frame was the hot loop), and the stamp `PMD_REV` is re-hashed by check.mjs;
+  a sample bake writes to .assets-src, never the shipped folder.
+  **The Arena is announced like an event** (`ArenaIntro.jsx`, variant C,
+  2026-10-22): a full-screen takeover once a device on the map - after the
+  day's check-in, never over an encounter, never before the Starter Path's
+  second goal, never to a save that has fought there - then the map's
+  `ar-pill` chip until the Arena tab is opened (`ARENA_NEWS_KEY`: null,
+  "seen", "done"; League.jsx writes "done"). Fight now opens the League on
+  its Arena tab (`LEAGUE_TAB_KEY`). One auto-announcement a session: the
+  event's dialog waits when this one has played. Its two fighters are PMD
+  art baked to `public/arena/intro/` - the Arena's own, announcing it.
+  **No stalemate** (2026-10-22): a third of Hard-vs-Hard matches ran out the
+  clock with both Pokemon out of PP and full benches. A spent Pokemon's
+  buttons throw STRUGGLE (`spent`, kept apart as `f.struggle`, reached by
+  `moveAt` - pushed onto a short kit it froze), a CPU that switches benches a
+  spent Pokemon (Easy, which never switches, struggles), and the last
+  `FINAL_T` hits harder and fills Surge twice as fast - 13 of 40 to the clock
+  became 2-3. The result grades the win (S-D: the win, HP kept, best combo,
+  perfect dodges, a quick KO) from `stats` the sim keeps a side, and the
+  device remembers the best grade and the win streak (`dexora-arena-record`,
+  never the save). A fallen body is never drawn: the last KO ends the match in
+  its own tick, still "active". Online: messages before a match listens are
+  kept (each tick's input is sent once; a dropped one froze it), the hello
+  compares both Fair teams' hashes, a closed page says "bye" on `pagehide`,
+  and `connect` says "blocked" only when WebRTC does.
 - **The engine judges a League battle; `game/league.js` is the one rulebook.**
   The order (leaders in turn; inside a reached gym its trainers in the
   roster's order, then its leader - `gymReached`, rev 5; a win never taken

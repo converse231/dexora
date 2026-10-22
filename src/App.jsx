@@ -7,7 +7,7 @@ import { freePoints } from "./game/trainer.js";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel, isNight } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
-import { RAIL_KEY, ORDER_KEY, REF_KEY, read, write, drop, flushNow } from "./game/store.js";
+import { RAIL_KEY, ORDER_KEY, REF_KEY, ARENA_NEWS_KEY, LEAGUE_TAB_KEY, read, write, drop, flushNow } from "./game/store.js";
 import { tradeInbox, push, myDefense, setReferrer, myReferrals } from "./net/cloud.js";
 import Invite from "./ui/Invite.jsx";
 import { referralDue } from "./game/referral.js";
@@ -33,6 +33,7 @@ import Quiz from "./ui/Quiz.jsx";
 import { SeasonIntro, SeasonChip, seasonUnseen } from "./ui/Season.jsx";
 import { eventOn, eventSoon, huntDue } from "./game/events.js";
 import Icon from "./ui/Icon.jsx";
+import { streakNow } from "./game/checkin.js";
 import { followSheet, PARTY_MAX, partnerRule, isMastered } from "./game/cosmetics.js";
 import { RESEARCH_MAX } from "./game/research.js";
 import { COMBO_STEPS, comboLift, nextRung } from "./game/combo.js";
@@ -63,6 +64,10 @@ import { dexCaught } from "./data/dex.js";
 const WARM = 30;
 import Types from "./ui/Types.jsx";
 import Evolve from "./ui/Evolve.jsx";
+import { PathCard, JoinAsk } from "./ui/Starter.jsx";
+// A guest is asked to save their progress at these catch counts (App's JoinAsk).
+const JOIN_AT = [10, 30, 60];
+const JOIN_KEY = "dexora-join-asked";   // how many times, on this device
 /* ON DEMAND: the Trade Center is its own chunk, fetched the first time it
    opens, so the game's first load does not grow for anyone who never trades. */
 const TradeCenter = lazyPage(() => import("./ui/trade/TradeCenter.jsx"));
@@ -74,6 +79,10 @@ const League = lazyPage(() => import("./ui/league/League.jsx"));
 const PartyPick = lazyPage(() => import("./ui/PartyPick.jsx"));
 // The weekly roulette: only a spin loads it.
 const Roulette = lazyPage(() => import("./ui/Roulette.jsx"));
+// A streak day's card packs (checkin.js `streakPacks`): only a pack day loads it.
+const StreakPacks = lazyPage(() => import("./ui/StreakPacks.jsx"));
+// The Arena's announcement: shown once a device, so loaded once.
+const ArenaIntro = lazyPage(() => import("./ui/ArenaIntro.jsx"));
 // The fifth tab (docs/cards.md): its page, and every set's cards, load only when opened.
 const Cards = lazyPage(() => import("./ui/cards/Cards.jsx"));
 /* Which trades this DEVICE has shown its scene for - a per-device nicety like
@@ -160,7 +169,7 @@ const bestOf = (box, id) => box.filter((m) => m.species === id)
   .sort((a, b) => rank(a) - rank(b) || (b.alpha ? 1 : 0) - (a.alpha ? 1 : 0) || b.level - a.level)[0] ?? null;
 
 export default function App({
-  onLogOut = null, onEngine = null, trainerName = null, account = null,
+  onLogOut = null, onEngine = null, trainerName = null, account = null, onJoin = null,
 }) {
   const canvasRef = useRef(null);
   const miniRef = useRef(null);
@@ -226,10 +235,18 @@ export default function App({
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [quizOpen, setQuizOpen] = useState(false);
   const [rouletteOpen, setRouletteOpen] = useState(false);
+  const [streakLots, setStreakLots] = useState(null);   // { streak, lots } while its reel shows
   const askedCheckin = useRef(false);
   /* A DATED EVENT'S ANNOUNCEMENT (Season.jsx): opens by itself once per event
      on each device, after the check-in, and again from its board card. */
   const [seasonOpen, setSeasonOpen] = useState(false);
+  /* THE ARENA IS OPEN (ArenaIntro.jsx): the takeover once a device, then the
+     map's chip until the Arena tab is opened - `arenaNews` is null, "seen" or
+     "done" (ARENA_NEWS_KEY). One announcement a session: the event's waits a
+     visit when this one has just played. */
+  const [arenaNews, setArenaNews] = useState(() => read(ARENA_NEWS_KEY));
+  const [arenaIntro, setArenaIntro] = useState(false);
+  const announced = useRef(false);
   const onEditParty = useCallback(() => setPartyPick(true), []);
   const onJumped = useCallback(() => setBoxJump(null), []);
   /* THE ROTOM PANEL'S APP (Dex, Box, Shop, Map, Events), held here so the
@@ -551,22 +568,36 @@ export default function App({
      on the summary. */
   /* And while a Pokédex reward rolls (DexClaim): the "new packs" tip over the reel. */
   const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene || claimGen != null
-    || checkinOpen || rouletteOpen || quizOpen || seasonOpen;
+    || checkinOpen || rouletteOpen || streakLots || quizOpen || seasonOpen || arenaIntro;
   const checkin = engine?.checkinStatus?.() ?? null;
   const quiz = engine?.quiz?.() ?? null;
   // A bingo prize waiting (bingo.js) - a chip on the map until it is claimed on Events.
   const bingo = engine?.bingo?.() ?? null;
   const bingoDue = !!bingo && (dueLines(bingo).length > 0 || fullDue(bingo));
   const spins = st?.checkin?.spins ?? 0;
+  /* THE FIRST DAYS (starter.js): the Starter Path's goal stands where the
+     daily quest does until its first goal is claimed, and the day's other
+     chips wait for its second - one thing to do on a first visit, not six. */
+  const path = engine?.path?.() ?? null;
+  const pathAt = path ? path.at : Infinity;
+  /* SAVE YOUR PROGRESS, a guest's soft ask: after 10, 30 and 60 catches,
+     each once a device, and "Not now" is the whole of saying no. */
+  const [joinAsk, setJoinAsk] = useState(false);
+  useEffect(() => {
+    if (!onJoin || enc) return;
+    const asked = Number(read(JOIN_KEY)) || 0;
+    // Asked only once the count is written: a browser that will not store it is never asked again and again.
+    if (asked < JOIN_AT.length && (st?.caught ?? 0) >= JOIN_AT[asked] && write(JOIN_KEY, String(asked + 1)).ok) setJoinAsk(true);
+  }, [onJoin, enc, st?.caught]);
   // Finished generations not yet claimed - derived, so it is a button until pressed.
   const claims = engine?.dexClaims?.() ?? [];
   /* First visit of the day: the check-in asks by itself, once a session -
      never over an encounter or before the trainer is chosen. */
   useEffect(() => {
-    if (askedCheckin.current || !engine || !checkin?.due || enc || !st?.char) return;
+    if (askedCheckin.current || !engine || !checkin?.due || enc || !st?.char || pathAt < 1) return;
     askedCheckin.current = true;
     setCheckinOpen(true);
-  }, [engine, checkin?.due, enc, st?.char]);
+  }, [engine, checkin?.due, enc, st?.char, pathAt]);
   // The event announces itself once, never over an encounter or the check-in.
   // The event running, or the one about to open (its teaser and countdown).
   const season = eventOn() ?? eventSoon();
@@ -576,9 +607,25 @@ export default function App({
     /* AFTER the day's check-in, never beside it: both decide in one render,
        and on a Friday of the event the two opened stacked (found in QA). */
     if (!engine || !season || !seasonUnseen(season) || enc || !st?.char || checkinOpen || rouletteOpen
-      || checkin?.due) return;
+      || checkin?.due || pathAt < 2 || arenaIntro || announced.current) return;
+    announced.current = true;
     setSeasonOpen(true);
-  }, [engine, season, enc, st?.char, checkinOpen, rouletteOpen, checkin?.due]);
+  }, [engine, season, enc, st?.char, checkinOpen, rouletteOpen, checkin?.due, pathAt, arenaIntro]);
+  /* The Arena's turn, first: after the day's check-in, never over an
+     encounter, never on a first visit (the Starter Path's second goal), and
+     never to a player who has already fought there. */
+  const arenaPlayed = (st?.ladder?.length ?? 0) > 0 || Boolean(st?.arena?.day);
+  const arenaNewsTo = (v) => { write(ARENA_NEWS_KEY, v); setArenaNews(v); };
+  useEffect(() => {
+    if (arenaNews || arenaPlayed || !engine || !st?.char || enc || tab !== "catch" || checkinOpen || rouletteOpen
+      || streakLots || seasonOpen || checkin?.due || pathAt < 2 || announced.current) return;
+    announced.current = true;
+    arenaNewsTo("seen");
+    setArenaIntro(true);
+  }, [arenaNews, arenaPlayed, engine, st?.char, enc, tab, checkinOpen, rouletteOpen, streakLots, seasonOpen, checkin?.due, pathAt]);
+  // Back from the League page, which marks the Arena found.
+  useEffect(() => { if (!league) setArenaNews(read(ARENA_NEWS_KEY)); }, [league]);
+  const toArena = () => { arenaNewsTo("done"); write(LEAGUE_TAB_KEY, "arena"); setArenaIntro(false); goTab("battles"); };
 
   // The walking party's Box entries, for the strip on the map: rebuilt only when the party or the Box moves.
   /* WHAT THE ONE WALKING IS DOING OUT HERE, or null. Derived, never stored -
@@ -843,6 +890,7 @@ export default function App({
         <CheckIn status={checkin} best={st?.checkin?.best ?? 0}
           onCheckIn={() => engine.checkIn()}
           onSpin={() => { setCheckinOpen(false); setRouletteOpen(true); }}
+          onPacks={(streak, lots) => { setCheckinOpen(false); setStreakLots({ streak, lots }); }}
           onClose={() => setCheckinOpen(false)} />
       )}
       {quizOpen && quiz && (
@@ -860,6 +908,18 @@ export default function App({
             onClose={() => setRouletteOpen(false)} />
         </Suspense>
       )}
+      {streakLots && (
+        <Suspense fallback={null}>
+          <StreakPacks streak={streakLots.streak} lots={streakLots.lots}
+            onCards={() => { setStreakLots(null); goTab("cards"); }}
+            onClose={() => setStreakLots(null)} />
+        </Suspense>
+      )}
+      {arenaIntro && (
+        <Suspense fallback={null}>
+          <ArenaIntro onFight={toArena} onClose={() => setArenaIntro(false)} />
+        </Suspense>
+      )}
       {partyPick && engine && st && (
         <Suspense fallback={null}>
           <PartyPick engine={engine} box={st.box} party={st.party} research={st.research} stars={st.stars} onClose={() => setPartyPick(false)} />
@@ -871,6 +931,7 @@ export default function App({
         <Suspense fallback={null}>
           <TradeCenter
             signedIn={Boolean(account)}
+            onJoin={onJoin}
             engine={engine}
             sync={syncTrades}
             onTraded={onTraded}
@@ -906,6 +967,8 @@ export default function App({
             stats={st?.stats ?? null}
             candy={st?.candy ?? 0}
             road={st?.road ?? null}
+            arena={st?.arena ?? null}
+            ladder={st?.ladder ?? []}
             signedIn={Boolean(account)}
             onClose={() => {
               setLeague(false);
@@ -969,7 +1032,11 @@ export default function App({
           onSettings={account ? () => setSettings(true) : null}
           onLogOut={onLogOut ? () => setLeaving(true) : null}
           onReset={onLogOut ? null : () => engine?.reset()}
+          onJoin={onJoin}
         />
+      )}
+      {joinAsk && onJoin && (
+        <JoinAsk caught={st?.caught ?? 0} onJoin={() => { setJoinAsk(false); onJoin(); }} onClose={() => setJoinAsk(false)} />
       )}
 
       {invite && (
@@ -1015,7 +1082,7 @@ export default function App({
           and Hint.jsx for why it is a dialog rather than the bar it started as:
           a tip somebody scrolls past is a tip nobody read. */}
       {/* Tips wait for the check-in and the roulette too: a pack's first-time tip named the prize mid-spin. */}
-      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && !quizOpen && !seasonOpen && (
+      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && !streakLots && !quizOpen && !seasonOpen && !arenaIntro && (
         <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 
@@ -1032,6 +1099,9 @@ export default function App({
         parcel={parcel}
         money={st?.money ?? 0}
         candy={st?.candy ?? 0}
+        streak={streakNow(st?.checkin).streak}
+        streakDue={!!st?.char && streakNow(st?.checkin).due}
+        onStreak={() => setCheckinOpen(true)}
         deltas={deltas}
         xp={st?.xp ?? 0}
         /* LOG OUT REPLACES RESET once there is an account. Reset wiped the
@@ -1120,8 +1190,9 @@ export default function App({
                 </div>
                 {/* WHAT TODAY ASKS: the quest, then anything waiting on a tap. */}
                 <div className="hud-tasks">
-                  <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />
-                  {checkin?.due && !checkinOpen && (
+                  {path && <PathCard path={path} onClaim={() => engine.claimPath()} onGo={(w) => (w === "checkin" ? setCheckinOpen(true) : w === "box" ? openRail("box") : goTab(w))} />}
+                  {pathAt >= 1 && <Missions daily={engine?.daily?.()} onClaim={claimDaily} note={claimNote} />}
+                  {checkin?.due && !checkinOpen && pathAt >= 1 && (
                     <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setCheckinOpen(true)}
                       data-tip="Check in for today's reward and keep your streak">
                       <Icon n="flame" size={18} className="ms-ic" />
@@ -1130,9 +1201,9 @@ export default function App({
                     </button>
                   )}
                   {/* A DATED EVENT'S COUNTDOWN (Season.jsx): to its opening, then its close. */}
-                  {season && !seasonOpen && <SeasonChip ev={season} onOpen={() => setSeasonOpen(true)} />}
+                  {season && !seasonOpen && pathAt >= 2 && <SeasonChip ev={season} onOpen={() => setSeasonOpen(true)} />}
                   {/* TODAY'S QUIZ (quiz.js) until it is answered. */}
-                  {quiz && !quiz.done && !quizOpen && (
+                  {quiz && !quiz.done && !quizOpen && pathAt >= 2 && (
                     <button type="button" className="ms-tab ready dc-pill qz-pill" onClick={() => setQuizOpen(true)}
                       data-tip="Today's silhouette - guess it for Rare Candy">
                       <Icon n="help" size={18} className="ms-ic" />
@@ -1140,7 +1211,15 @@ export default function App({
                       <b>Who's that?<em className="ms-dot" aria-hidden="true">!</em></b>
                     </button>
                   )}
-                  {bingoDue && (
+                  {arenaNews === "seen" && !arenaPlayed && pathAt >= 2 && (
+                    <button type="button" className="ms-tab ready dc-pill ar-pill" onClick={toArena}
+                      data-tip="The Arena is open - live, real-time battles">
+                      <Icon n="arena" size={18} className="ms-ic" />
+                      <i>THE ARENA</i>
+                      <b>Fight now<em className="ms-dot" aria-hidden="true">!</em></b>
+                    </button>
+                  )}
+                  {bingoDue && pathAt >= 2 && (
                     <button type="button" className="ms-tab ready dc-pill bg-pill" onClick={() => openRail("events")}
                       data-tip="A bingo line is finished - claim its prize on Events">
                       <Icon n="board" size={18} className="ms-ic" />

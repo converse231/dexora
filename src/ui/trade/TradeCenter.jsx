@@ -216,7 +216,7 @@ function Surprise({ engine, box, inbox, sync, onTraded, friends }) {
 
 export default function TradeCenter({
   signedIn, engine, sync, onTraded, box = [], dexOf = () => 0, openName = null, openBoard = null, onInvite = null,
-  offers = 0, inbox = null, onClose, profile = false,
+  offers = 0, inbox = null, onClose, profile = false, onJoin = null,
 }) {
   useModalLock();
   /* THE PROFILE PAGE is this page on your card alone (`profile`): its own
@@ -468,7 +468,13 @@ export default function TradeCenter({
 
   let body;
   if (!signedIn) {
-    body = <p className="tc-gate">Trading needs an account - sign in, and your Pokémon and friends come with you.</p>;
+    // A guest's game comes with them (Boot's `join`), so the way in is right here.
+    body = onJoin ? (
+      <div className="tc-gate">
+        <p>Trading needs a free account - your Pokémon, Box and bag come with you.</p>
+        <button type="button" className="gate-go" onClick={onJoin}>SAVE MY PROGRESS</button>
+      </div>
+    ) : <p className="tc-gate">Trading needs an account - sign in, and your Pokémon and friends come with you.</p>;
   } else if (closed) {
     body = <p className="tc-gate">Trading isn&rsquo;t open yet. Check back soon!</p>;
   } else if (composing) {

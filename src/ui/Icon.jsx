@@ -6,6 +6,8 @@ const P = {
   ball: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h6M15 12h6M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
   swap: "M4 8h14l-4-4M20 16H6l4 4",
   trophy: "M8 4h8v5a4 4 0 0 1-8 0zM8 6H4a3 3 0 0 0 4 4M16 6h4a3 3 0 0 1-4 4M12 13v4M8 21h8M10 17h4",
+  // Two blades crossed: the Arena.
+  arena: "M4 4l9 9M20 4l-9 9M7 17l-3 3M17 17l3 3M5 14l5 5M19 14l-5 5",
   you: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",
   dex: "M5 3h11l3 3v15H5zM9 8h6M9 12h6M9 16h4",
   box: "M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10",

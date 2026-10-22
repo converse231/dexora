@@ -116,7 +116,7 @@ export default function TopBar({
   tab = "catch", onTab, caught, total, steps, money, candy = 0, deltas = [], parcel = null, xp,
   onNews = null, unread = false, tradeAlert = 0, youAlert = false, cardAlert = 0,
   trainerName = null,
-  stale = null,
+  stale = null, streak = 0, streakDue = false, onStreak = null,
 }) {
   const { level, into, need, frac } = levelProgress(xp);
   const r = dexRank(caught);
@@ -167,6 +167,15 @@ export default function TopBar({
       <span className="spacer" />
 
       <div className="tb-stats">
+        {/* THE STREAK, on every screen (asked for, 2026-10-22: "easy to be
+            seen"): the days in a row, lit while today still wants its stamp.
+            A button - it opens the check-in and the road to the next packs. */}
+        <button type="button" className={`tb-stat streak${streakDue ? " due" : ""}${streak ? "" : " cold"}`} onClick={onStreak}
+          aria-label={`${streak} day streak${streakDue ? ", check in today" : ""}`} data-tip={streakDue ? "Check in to keep your streak" : "Day streak"}>
+          <Icon n="flame" size={15} />
+          <b>{streak}</b>
+          {streakDue && <i className="tb-dot" aria-hidden="true" />}
+        </button>
         <span className={`tb-stat cash${deltas.length ? " bump" : ""}`} data-tip="Money">
           <Icon n="yen" size={15} />
           <b>{money.toLocaleString()}</b>

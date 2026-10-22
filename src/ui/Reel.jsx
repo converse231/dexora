@@ -14,7 +14,8 @@ export const WIN_AT = 49;           // the prize sits here, near the end of the 
 const SPIN_MS = 7000;
 const still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export default function Reel({ rolling, cells, onDone, children }) {
+// `ms`: a streak's ten lots spin quicker than the one weekly spin.
+export default function Reel({ rolling, cells, onDone, ms = SPIN_MS, children }) {
   const strip = useRef(null);
   const view = useRef(null);
   const timer = useRef(0);
@@ -40,9 +41,9 @@ export default function Reel({ rolling, cells, onDone, children }) {
     s.style.transform = "translateX(0px)";
     if (still()) { land(); return undefined; }
     void s.offsetWidth;                                 // commit the start before the move
-    s.style.transition = `transform ${SPIN_MS}ms cubic-bezier(.12, .72, .14, 1)`;
+    s.style.transition = `transform ${ms}ms cubic-bezier(.12, .72, .14, 1)`;
     s.style.transform = `translateX(${target.current}px)`;
-    timer.current = setTimeout(onDone, SPIN_MS + 80);
+    timer.current = setTimeout(onDone, ms + 80);
     return () => clearTimeout(timer.current);
   }, [rolling, cells]);
 

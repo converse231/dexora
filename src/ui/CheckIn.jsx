@@ -9,7 +9,7 @@ import Confetti from "./Confetti.jsx";
 import { ItemIcon } from "./Sprite.jsx";
 import { useDismiss, useModalLock } from "./modal.js";
 import { itemById } from "../game/items.js";
-import { CHECKIN_REWARDS, WEEK, STREAK_MILESTONES } from "../game/checkin.js";
+import { CHECKIN_REWARDS, WEEK, STREAK_PACKS, STREAK_MONTH, nextPackDay, streakPacks } from "../game/checkin.js";
 import { eventCheckin } from "../game/events.js";
 
 const yen = (n) => `¥${n.toLocaleString()}`;
@@ -32,7 +32,7 @@ function Reward({ r }) {
 const says = (r) => [r.money && yen(r.money), r.candy && `${r.candy} Rare Candy`,
   ...Object.entries(r.items ?? {}).map(([id, n]) => `${n} ${itemById(id)?.name ?? id}`), r.spin && "a roulette spin"].filter(Boolean).join(" + ");
 
-export default function CheckIn({ status, best, onCheckIn, onSpin, onClose }) {
+export default function CheckIn({ status, best, onCheckIn, onSpin, onPacks, onClose }) {
   useModalLock();
   const [got, setGot] = useState(null);         // what checkIn answered
   const [party, setParty] = useState(false);    // the milestone screen
@@ -47,12 +47,19 @@ export default function CheckIn({ status, best, onCheckIn, onSpin, onClose }) {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") { e.preventDefault(); if (party) setParty(false); else onClose(); }
-      else if (e.key === "Enter" && !got) { e.preventDefault(); press(); }
+      else if (e.key === "Enter" && !got && status.due) { e.preventDefault(); press(); }
     };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   });
-  const next = STREAK_MILESTONES.find((m) => m > streak);
+  /* THE ROAD TO THE NEXT PACK DAY (checkin.js `streakPacks`): a bar from the
+     last pack day to the next. Before today's press it counts today as done,
+     so the bar shows where the press takes you. */
+  // Today itself, while it pays packs and is not yet pressed.
+  const next = status.due && !got && streakPacks(streak) ? streak : nextPackDay(streak);
+  const prev = next > STREAK_PACKS.at(-1)[0] ? next - STREAK_MONTH : [0, ...STREAK_PACKS.map(([d]) => d)].filter((d) => d < next).at(-1);
+  const fill = (streak - prev) / (next - prev);
+  const packs = got?.packs ?? [];
   // An event's check-in day: its extra, named before the press and after.
   const bonus = got ? got.bonus : status.due ? eventCheckin() : null;
 
@@ -64,7 +71,12 @@ export default function CheckIn({ status, best, onCheckIn, onSpin, onClose }) {
         <div className="ci-streak">
           <Icon n="flame" size={34} />
           <b key={streak}>{streak}</b>
-          <span>day streak<i>{best > streak ? `Best ${best}` : next ? `${next - streak} to ${next}` : "Legendary"}</i></span>
+          <span>day streak<i>Best {Math.max(best, streak)}</i></span>
+        </div>
+        <div className={`ci-goal${next === streak ? " now" : ""}`} aria-label={next === streak ? `Check in for ${streakPacks(next)} card packs` : `${next - streak} days to ${streakPacks(next)} card packs`}>
+          <span><b>{next === streak ? "Today" : `Day ${next}`}</b> · {streakPacks(next)} card packs</span>
+          <i style={{ "--p": fill }} />
+          <small>{next === streak ? "Check in!" : next - streak === 1 ? "Tomorrow!" : `${next - streak} days to go`}</small>
         </div>
         {status.broken && !got && <p className="ci-broke">Your streak ended. A new one starts today - keep it going!</p>}
         <ol className="ci-week">
@@ -92,15 +104,23 @@ export default function CheckIn({ status, best, onCheckIn, onSpin, onClose }) {
         {got ? (
           <div className="ci-got" role="status">
             <span>Checked in</span>
-            <b>{says(got.reward)}{got.bonus ? ` + ${says({ items: got.bonus.items })}` : ""}</b>
-            {got.reward.spin
-              ? <button type="button" className="ci-go" autoFocus onClick={onSpin}><Icon n="gift" size={18} /> Spin the roulette</button>
-              : <button type="button" className="ci-go quiet" autoFocus onClick={onClose}>Continue</button>}
+            <b>{says(got.reward)}{got.bonus ? ` + ${says({ items: got.bonus.items })}` : ""}{packs.length ? ` + ${streakPacks(streak)} card packs` : ""}</b>
+            {/* Day 70 is a pack day AND a seventh day: the packs first, the spin waits as its pill. */}
+            {packs.length
+              ? <button type="button" className="ci-go" autoFocus onClick={() => onPacks(streak, packs)}><Icon n="gift" size={18} /> Reveal your {streakPacks(streak)} packs</button>
+              : got.reward.spin
+                ? <button type="button" className="ci-go" autoFocus onClick={onSpin}><Icon n="gift" size={18} /> Spin the roulette</button>
+                : <button type="button" className="ci-go quiet" autoFocus onClick={onClose}>Continue</button>}
           </div>
-        ) : (
+        ) : status.due ? (
           <button type="button" className="ci-go" autoFocus onClick={press}>Check in</button>
+        ) : (
+          <div className="ci-got" role="status">
+            <span>Checked in today</span>
+            <button type="button" className="ci-go quiet" autoFocus onClick={onClose}>Come back tomorrow</button>
+          </div>
         )}
-        <p className="ci-foot">Come back every day. Day {WEEK} of every week spins the roulette: card packs or a Gold Pokémon.</p>
+        <p className="ci-foot">Come back every day. Day {WEEK} of every week spins the roulette, and days {STREAK_PACKS.map(([d]) => d).join(", ")} pay card packs - then {streakPacks(STREAK_PACKS.at(-1)[0] + STREAK_MONTH)} every {STREAK_MONTH} days.</p>
       </div>
 
       {party && (
@@ -117,7 +137,8 @@ export default function CheckIn({ status, best, onCheckIn, onSpin, onClose }) {
             <b>{streak}</b>
             <span>DAY STREAK</span>
           </div>
-          <p>{streak >= 100 ? "Unstoppable." : streak >= 30 ? "A whole month. Incredible." : "A full week. Keep it burning!"}</p>
+          {packs.length > 0 && <em className="ci-packs-won">+{streakPacks(streak)} card packs</em>}
+          <p>{streak >= 100 ? "Unstoppable." : streak >= 30 ? "A whole month. Incredible." : packs.length ? "Your streak paid off. Keep it burning!" : "A full week. Keep it burning!"}</p>
           <small>Tap to continue</small>
         </div>
       )}
