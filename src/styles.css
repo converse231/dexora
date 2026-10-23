@@ -11958,6 +11958,9 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ah-skill b { position: relative; font: 700 13px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ah-skill::after { content: ""; position: absolute; inset: 0; background: rgba(4, 7, 16, .66); transform-origin: bottom; transform: scaleY(var(--cd, 0)); pointer-events: none; }
 .ah-skill:disabled { opacity: .4; }
+/* The seconds left on a move's cooldown, over its darkened face. */
+.ah-left-s { position: absolute; right: 10px; top: 50%; translate: 0 -50%; font: 800 20px var(--display); color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, .7); pointer-events: none; }
+.ar-match.touch .ah-left-s { right: 50%; translate: 50% -50%; font-size: 18px; }
 .ah-basic, .ah-dodge, .ah-surge { position: relative; flex: none; display: grid; place-items: center; align-content: center; gap: 0; padding: 0; cursor: pointer; border-radius: 50%; color: #fff; }
 .ah-basic { width: 84px; height: 84px; background: #ff7a38; border: 3px solid #ffd2b0; box-shadow: 0 8px 22px rgba(255, 122, 56, .5); }
 .ah-basic b { font: 800 13px var(--display); text-transform: uppercase; }

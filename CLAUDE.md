@@ -1419,7 +1419,18 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `SELF_CD` past `BUFF_T`, and a heal `HEAL_CD`. check.mjs throws the
   reported moves (drain, self-boost, always-crit, multi-hit, recoil) for
   20 s and holds each within `WORTH_OVER` of a plain 120 of its shape - on
-  power alone Leech Life and Power-Up Punch were 20-39% over.
+  power alone Leech Life and Power-Up Punch were 20-39% over. Every move
+  button counts its seconds down and the Tutor and team card print each
+  move's wait (`waitOf`). **Wall-splat** (2026-10-24, asked for): a real
+  blow's knockback (`SPLAT_PUSH`+, never a jab's or a shot's) stopped by the
+  wall or cover costs `SPLAT_HURT` of HP and stuns. **Perfect block**: a hit
+  in a shield's first `PARRY_T` hurts and staggers its attacker instead.
+  Beams are `BEAM_LEN` 13 x `BEAM_W` 0.85, and the picture and the wind-up's
+  marker draw from those two numbers. The default ULTI panel draws the
+  Pokemon in its own colours inside an ink rim (the flat silhouette read as
+  nobody). Move art falls back to a FAMILY sheet (render.js) - `slam`,
+  `claw`, and the shared `heal`, `power-up`, `stat-drop` - until drawn
+  alone; art/arena/fx/MOVE_PROMPTS.md holds only what is still to draw.
   **Evolving in a match** (asked for): a Pokemon with a next stage fills its
   bar (`xp`) with the share of a foe's HP it deals, a knockout a whole bar
   (`EVO_XP`), and evolves where it stands - `EVOLVE_T` untouchable and still,

@@ -50,7 +50,7 @@
    the dark only what glows - and what stands near you - is seen. */
 import { W, H, TPS, INSET, INTRO, LIMIT, FINAL_T, moveAt, activeOf, PAR, BRN, PSN, SLP, FRZ, GROUND, ZONE_SAYS, PICKUPS,
   arenaMove as moveOf, BASIC_P, BASIC_S, BASIC_K, clonesOf, ULT_NAMES, WIDE, VANISH, evoTargets, megaTargets, EVOLVE_T,
-  FLOOR_SAYS, waterOf, herdAt, LANE_RUN, LANE_WARN, LANE_H, HELPERS } from "../../../game/arena.js";
+  FLOOR_SAYS, waterOf, herdAt, LANE_RUN, LANE_WARN, LANE_H, HELPERS, BEAM_LEN, BEAM_W } from "../../../game/arena.js";
 import { speciesById } from "../../../game/biomes.js";
 import { label } from "../../../game/map.js";
 import { arenaArt, loadAnims } from "../moveAnim.js";
@@ -1263,6 +1263,18 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         word(e.x, e.y - 1.8, `Go, ${nameOf(HELPERS[e.kind].id)}!`, "#ffffff", 60, true);
         for (let i = 0; i < 2; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? "#ff5a5a" : "#ffffff", life: 18, size: 0.2, grow: 0.12, t: -i * 3 });
         sparks(e.x, e.y, "#ffffff", 14, 0.09); shake(0.2);
+      } else if (e.k === "splat") {
+        // Slammed into the wall: a crack where it hit, dust off it, the screen jolts.
+        impact("normal", e.x + e.dx * 0.4, e.y + e.dy * 0.4, e.dx, e.dy, true);
+        mark("crack", e.x + e.dx * 0.45, e.y + e.dy * 0.45 + 0.2, 1.6);
+        dust(e.x, e.y, 10); shake(0.8); stop(80);
+        word(e.x, e.y - 1.5, "WALL SPLAT!", "#ffb35a", 55, true);
+      } else if (e.k === "parry") {
+        // A perfect block: a ring off the shield and a bolt of it back at the attacker.
+        for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y - 0.3, colour: i ? "#9fe3ff" : "#ffffff", life: 20, size: 0.4, grow: 0.15, t: -i * 3, keep: true });
+        fx.push({ k: "zap", x: e.x, y: e.y - 0.4, tx: e.tx, ty: e.ty - 0.4, t: 0, life: 12 });
+        sparks(e.tx, e.ty, "#9fe3ff", 14, 0.1); shake(0.6); stop(90);
+        word(e.x, e.y - 1.6, "PERFECT BLOCK!", "#9fe3ff", 60, true);
       } else if (e.k === "zap") {
         // Magnemite's Thunder Shock: a bolt from it to the foe.
         fx.push({ k: "zap", x: e.x, y: e.y - 0.4, tx: e.tx, ty: e.ty - 0.4, t: 0, life: 10 });
@@ -1608,8 +1620,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.fillStyle = colour; ctx.strokeStyle = colour;
       ctx.translate(sx(x), sy(y));
       if (a.shape === "shot" || a.shape === "multi" || a.shape === "beam" || a.shape === "dash") {
-        const len = (a.shape === "beam" ? 10 : a.shape === "dash" ? 3.6 : 9) * px;
-        const wd = (a.shape === "beam" ? 1.5 : a.shape === "dash" ? 1 : 0.7) * px;
+        const len = (a.shape === "beam" ? BEAM_LEN : a.shape === "dash" ? 3.6 : 9) * px;
+        const wd = (a.shape === "beam" ? BEAM_W * 2.2 : a.shape === "dash" ? 1 : 0.7) * px;
         ctx.rotate(ang);
         ctx.fillRect(0, -wd / 2, len, wd);
         ctx.globalAlpha = 0.85;
@@ -2377,14 +2389,15 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       drawArt(e.art, sx(e.x), sy(e.y), Math.max(1, px / 11) * (1 + 0.4 * kk), 0, e.t, 1 - kk * kk);
     } else if (e.k === "beam") {
       // A beam: a wide glow, a white core, and the move's sprite laid down it.
-      const ang = Math.atan2(e.dy, e.dx), len = e.len * px, wide = px * (e.big ? 3.2 : 1.3) * (1 - kk) * (still ? 1 : 0.85 + rand() * 0.35);
+      // As wide as it hits (BEAM_W either side, and a glow past it), an ULTI's cannon wider.
+      const ang = Math.atan2(e.dy, e.dx), len = e.len * px, wide = px * (e.big ? 4 : BEAM_W * 2.2) * (1 - kk) * (still ? 1 : 0.85 + rand() * 0.35);
       ctx.save(); ctx.translate(sx(e.x), sy(e.y)); ctx.rotate(ang);
       ctx.globalCompositeOperation = "lighter";
       const stream = e.key && img(fxPath(e.key));
       if (stream) {
         // Its own stream, stretched down the beam over a glow of its colour, thinning as it fades.
         ctx.globalAlpha = 0.35 * (1 - kk); ctx.fillStyle = e.colour; ctx.fillRect(0, -wide, len, wide * 2);
-        const h = px * (e.big ? 3.8 : 1.8) * (1 - 0.5 * kk);
+        const h = px * (e.big ? 4.6 : BEAM_W * 2.8) * (1 - 0.5 * kk);
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1 - kk * kk; ctx.imageSmoothingEnabled = false;
         if (Math.cos(ang) < 0) ctx.scale(1, -1);
         ctx.drawImage(stream, 0, -h / 2, len, h);
@@ -2816,7 +2829,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   }
   /* THE ULTI'S PANEL (One Piece's impact frame): NEGATIVE for a few frames,
      then INK - a black page (a famous Pokemon's: its colour), the type's
-     pattern bursting from the hit, the silhouette huge on its side, the
+     pattern bursting from the hit, the Pokemon huge in its colours, the
      name - then the colour floods back in. Never a strobe: two cuts, then a
      fade, on the screen's own clock. */
   function manga(o) {
@@ -2863,16 +2876,17 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.restore();
     } else inkPattern(INK[o.type] ?? "speed", o.x, o.y, ink0, seeded(o.seed), u, pop);
     speedLines(o.x, o.y, o.famous ? "rgba(8,8,12,0.75)" : "rgba(255,255,255,0.8)", 1);
-    // The silhouette, huge, on its side of the page and facing the middle - unless its own panel drew it.
+    // The Pokemon, huge, on its side of the page and facing the middle - unless its own panel drew it.
+    // In its OWN colours inside an ink rim (2026-10-24, asked for: the flat white silhouette read as nobody).
     const lead = !(art && FX[`ult-${o.id}`]) && img(spriteUrl(o.id, o.shiny ? "shiny" : null));
     if (lead) {
       const ours = o.side === me, d = ch * (0.95 + 0.08 * pop);
       ctx.save(); ctx.imageSmoothingEnabled = false;
       ctx.translate(ours ? cw * 0.27 : cw * 0.73, ch * 0.52);
       if (ours) ctx.scale(-1, 1);
-      const rim = o.famous ? "#ffffff" : "#000000", body = o.famous ? "#08080c" : "#ffffff";
+      const rim = o.famous ? "#08080c" : "#ffffff";
       for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(flat(lead, rim), -d / 2 + dx * u * 0.012, -d / 2 + dy * u * 0.012, d, d);
-      ctx.drawImage(flat(lead, body), -d / 2, -d / 2, d, d);
+      ctx.drawImage(lead, -d / 2, -d / 2, d, d);
       ctx.restore();
     }
     // The name, slammed across the far side.

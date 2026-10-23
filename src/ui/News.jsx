@@ -27,6 +27,8 @@ export const NEWS = [
       ["Hits that hit", "Bigger numbers, basic attacks with your Pokémon's type, and longer bolts."],
       ["Fairer moves", "Draining, self-boosting and multi-hit moves now wait longer; Recover and Swords Dance too."],
       ["Poké Ball", "Grab one for a helper Pokémon - some strike once, some follow you for a while."],
+      ["Wall splats and perfect blocks", "Knock foes into walls for extra damage; Protect just in time to throw a hit back."],
+      ["Bigger beams", "Beams are wider and reach further, and every move shows its cooldown in seconds."],
       ["Rest in the ball", "Benched Pokémon slowly heal, up to three quarters of their HP."],
       ["Stronger basics", "Basic attacks hit a little harder."],
       ["Event costumes", "Halloween costumes now turn up as often as the Pokémon they dress."],
