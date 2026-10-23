@@ -56,14 +56,6 @@ export const HINTS = [
     text: "She's female - and for some Pokémon that means a look of her own. "
       + "Catch her and it goes in your Pokédex beside the usual one.",
   },
-  /* WEEKLY BINGO, the first time a square fills (2026-10-14): the update's
-     one-time card, said at the moment the card means something. */
-  {
-    id: "bingo",
-    when: (e) => e.kind === "bingo",
-    text: "Weekly Bingo! You just filled a square on this week's card. Finish a line of five "
-      + "for a prize - the centre is free. See it on the Events page.",
-  },
   /* THE CATCH CHAIN, the first time one starts (2026-10-14): the update's
      one-time card on the map, at the moment it means something. Before
      `duplicate`, which a second catch of a species also reaches. */

@@ -156,6 +156,14 @@ const fxPath = (name) => `arena/fx/${name}.png?v=${FX_REV}`;
    land instead: Psychic is a shot, Rock Slide a blast, and neither looks
    right flying or round its user. */
 const LANDS = new Set(["psychic", "rock-slide"]);
+/* A FAMOUS POKEMON'S IMPACT SEQUENCE (2026-10-23, asked for, after One
+   Piece's Gear 5 and Zoro's Asura cuts): up to four drawn stills,
+   `ult-<id>-1..4` in fx.js, in their own colours, the subject centred.
+   Each holds SEQ_HOLD frames - a cut every ~0.33 s keeps it under three
+   big changes a second, never a strobe - and the last fades back to the
+   fight. A Pokemon without them keeps its one panel. */
+const SEQ_HOLD = 20, SEQ_FADE = 14;
+const stillsOf = (id) => [1, 2, 3, 4].map((k) => `ult-${id}-${k}`).filter((k) => FX[k]);
 const inArea = (rects, x, y) => (rects ?? []).some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
 const flats = new WeakMap();
 function flat(im, colour = "#fff") {
@@ -604,7 +612,13 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   const cam = { x: W / 2, y: H / 2, z: 1, trauma: 0, kx: 0, ky: 0, rot: 0, tilt: 0 };
   // An ULTI cast waits for its first landing to play its panel (`ultAt`).
   const ultAt = [null, null];
-  let darkAt = 0, liveMatch = false, darkCv = null;
+  let darkAt = 0, liveMatch = false, darkCv = null, lock = null;
+  /* ADAPTIVE QUALITY (2026-10-23, asked for: "not too heavy for mobile"):
+     after the opening, a device averaging under ~45 fps over two seconds
+     goes LITE for the rest of the match - 1x pixels, half the particles
+     and air. The rules never know: only the picture thins. */
+  const coarse = matchMedia("(hover: none) and (pointer: coarse)").matches;
+  let lite = false, slowSum = 0, slowN = 0;
   const punch = { z: 0, x: W / 2, y: H / 2 };
   let stopMs = 0, slowMs = 0, slowK = 1, scale = 1;
   let clock = 0, lastNow = 0, ghostAcc = 0;
@@ -625,7 +639,11 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   for (const name of Object.keys(FX)) if (!name.startsWith("moves/") && !name.startsWith("ult-")) img(fxPath(name));
   for (const i of moves) { const key = artKey(i); if (key) img(fxPath(key)); }
   // Each fighter's ULTI panel - its own drawing, or its type's ink - so the first ULTI never draws the fallback.
-  for (const { id, type } of ults) { const key = FX[`ult-${id}`] ? `ult-${id}` : `ult-${INK[type] ?? "speed"}`; if (FX[key]) img(fxPath(key)); }
+  for (const { id, type } of ults) {
+    const key = FX[`ult-${id}`] ? `ult-${id}` : `ult-${INK[type] ?? "speed"}`;
+    if (FX[key]) img(fxPath(key));
+    for (const k of stillsOf(id)) img(fxPath(k));
+  }
   for (const kind of Object.keys(PICKUPS)) img(`items/${kind}.png`);
   const leads = sides.map((team) => team[0] && spriteUrl(team[0].id, team[0].shiny ? "shiny" : null));
   // Every fighter's front art: the VS card's leads, and any of them an ULTI's panel draws.
@@ -633,7 +651,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   img(spriteUrl(FLYER[arena] ?? 145));
 
   function resize() {
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    /* A phone draws at 1.5x at most (pixel art loses nothing, and a 3x phone
+       filled four times the pixels of 1.5x); a device that cannot hold the
+       frame rate drops to 1x and half the particles (`lite`, below). */
+    dpr = Math.min(lite ? 1 : coarse ? 1.5 : 2, window.devicePixelRatio || 1);
     const cw = canvas.clientWidth, ch = canvas.clientHeight;
     canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
     px = Math.max(8, Math.floor(Math.min(canvas.width / W, canvas.height / H)));
@@ -698,7 +719,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   }
 
   function part(p) {
-    if (parts.length > 420) parts.shift();
+    if (lite && !p.keep && rand() < 0.5) return;
+    if (parts.length > (lite ? 200 : 420)) parts.shift();
     parts.push({ t: 0, vx: 0, vy: 0, z: 0, vz: 0, g: 0, drag: 0.92, rot: rand() * TAU, vr: 0, size: 0.12, life: 30, ...p });
   }
   const spray = (dx, dy, cone, v) => {
@@ -798,7 +820,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   // The floor's own air, a few each frame.
   function weather(k, w) {
     if (still) return;
-    const spawn = (rate, make) => { let n = rate * k; while (n > 0) { if (n >= 1 || rand() < n) air.push(make()); n -= 1; } };
+    const spawn = (rate, make) => { let n = rate * k * (lite ? 0.5 : 1); while (n > 0) { if (n >= 1 || rand() < n) air.push(make()); n -= 1; } };
     // The match's own weather, over the floor's.
     if (w === "rain") spawn(1.6, () => ({ k: "rain", x: rand() * (W + 3), y: rand() * H, t: 0, life: 9 + rand() * 5 }));
     else if (w === "snow") spawn(0.55, () => ({ k: "snow", x: -2 + rand() * (W + 2), y: -0.5, vx: 0.02 + rand() * 0.015, vy: 0.025 + rand() * 0.02, t: 0, life: 900, size: 0.05 + rand() * 0.07, ph: rand() * TAU }));
@@ -879,6 +901,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         p.ox += e.dx * 0.25 * power; p.oy += e.dy * 0.25 * power;
         p.vt += (e.dx >= 0 ? 1 : -1) * 0.12 * power;
         p.tint = colour; p.tintT = 12; p.hurt = 16;
+        if (e.crit || e.eff > 1) p.angry = 70;
         lastHit[e.side] = [e.dx || 0, e.dy || 0];
         // A plain basic attack barely holds the frame: twenty a second of full hit-stops would be a slideshow.
         const hold = bas && !e.boost ? 14 : (e.ko ? 0 : 40) + (heavy ? 45 : 0) + (e.crit ? 25 : 0) + (e.eff > 1 ? 15 : 0) + (e.surge ? 20 : 0);
@@ -1190,7 +1213,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     if (!u0 || clock - u0.at > 3000) return;
     ultAt[side] = null;
     if (still) return;
-    const life = liveMatch ? 22 : u0.famous ? 48 : 36;
+    const n = stillsOf(u0.id).length;
+    const life = n ? n * (liveMatch ? 12 : SEQ_HOLD) + SEQ_FADE : liveMatch ? 22 : u0.famous ? 48 : 36;
     const [qx, qy] = worldToScreen(x, y);
     overlays.push({ k: "manga", ...u0, side, x: qx, y: qy, t: 0, life, seed: (rand() * 1e9) | 0 });
     stop(liveMatch ? 0 : life * 14); shake(1); zoomAt(x, y, 0.2); tilt(side === me ? -0.05 : 0.05);
@@ -1201,6 +1225,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
 
   function draw(s, alpha, now = performance.now()) {
     const rdt = lastNow ? clamp(now - lastNow, 0, 50) : 16.7;
+    if (!lite && lastNow && s.intro <= 0 && !s.over && !document.hidden) {
+      slowSum += rdt; slowN++;
+      if (slowN >= 120) { if (slowSum / slowN > 22) { lite = true; resize(); } slowSum = 0; slowN = 0; }
+    }
     lastNow = now;
     const k = (rdt / (1000 / 60)) * scale;     // effect frames this draw, through the hit-stop and slow motion
     clock += rdt;
@@ -1532,6 +1560,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       const surging = f.surge > 0;
       const tcol = colours[TYPES[f.types[0]]] ?? "#ffd23f";
       const at = { x: x + f.fx * lean + p.ox + jit[0], y: y + f.fy * lean + p.oy + jit[1] - hop, sx: p.sx * csx, sy: p.sy * csy, tilt: p.tilt };
+      if (!still && !atlasOf(f.id, shiny[f.side]?.[f.slot])) puppet(f, p, at);
       if (surging) {
         // The surge's aura: the body's own outline in its type's colour, flickering, and its colour rising off it.
         glow(sx(at.x), sy(at.y - 0.3), px * 1.3, tcol, 0.3 + 0.15 * Math.sin(clock / 60));
@@ -1555,6 +1584,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.restore();
       }
       statusOn(f, x, y, k);
+      if (!(f.hidden && f.side !== me)) emote(f, p, at.x, at.y, k);
       /* ITS HP OVER ITS HEAD (asked for, 2026-10-23: the plates are far from
          the fight on a big screen): green to amber to red, the chunk a hit
          took trailing behind in white, rimmed in its side's colour. Not over
@@ -1586,6 +1616,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     depth.sort((a, b) => a[0] - b[0]);
     for (const [, d] of depth) d();
 
+    // 2b'. Auto-aim's lock: four turning corners on what your attacks will go at.
+    if (lock && !s.over && intro == null) {
+      ctx.save(); ctx.translate(sx(lock[0]), sy(lock[1] - 0.25)); ctx.rotate(clock / 600);
+      ctx.strokeStyle = MINE; ctx.globalAlpha = 0.75; ctx.lineWidth = Math.max(2, px / 10);
+      const r0 = px * 0.95, c = px * 0.32;
+      for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(r0, r0 - c); ctx.lineTo(r0, r0); ctx.lineTo(r0 - c, r0); ctx.stroke(); }
+      ctx.restore();
+    }
     // 2c. Steam: a cloud over whoever stands in it, thinning as it goes.
     for (const c of s.clouds) {
       const a = Math.min(1, c.t / 40);
@@ -1783,6 +1821,56 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     ctx.fillRect(bx, by, bw * hp, bh);
     ctx.strokeStyle = f.side === me ? MINE : THEIRS; ctx.lineWidth = Math.max(1, px / 26);
     ctx.strokeRect(bx - 2, by - 2, bw + 4, bh + 4);
+    ctx.restore();
+  }
+
+  /* A BODY WITH NO PMD SHEET (its follower art: four facings and a walk, no
+     attack, hurt, sleep or roll frames) is posed by motion instead (asked
+     for, 2026-10-23): it breathes standing, bobs and sways walking, crouches
+     and trembles winding up, lunges into a blow and recoils off a shot,
+     twists through a roll, and lies down asleep. */
+  function puppet(f, p, at) {
+    const a = f.act, dir = (a ? a.dx : f.fx) >= 0 ? 1 : -1;
+    if (f.status === SLP) { at.tilt += 1.35 * dir; at.sy *= 0.92; return; }
+    if (f.status === FRZ) return;
+    if (f.dodge > 0) {
+      const q = Math.sin((p.fr?.prog ?? 0) * Math.PI);
+      at.tilt += q * 0.9 * (f.dx >= 0 ? 1 : -1); at.y -= q * 0.35; at.sx *= 1 + 0.12 * q; at.sy *= 1 - 0.12 * q;
+      return;
+    }
+    if (a?.ph === "wind") {
+      const kk = 1 - a.t / Math.max(1, a.t0);
+      at.x += (rand() - 0.5) * 0.07 * kk; at.sy *= 1 - 0.1 * kk; at.sx *= 1 + 0.08 * kk; at.tilt -= dir * 0.1 * kk;
+      return;
+    }
+    if (a) {
+      const blow = a.shape === "melee" || a.shape === "dash";
+      at.x += a.dx * (blow ? 0.35 : -0.12); at.y += a.dy * (blow ? 0.35 : -0.12);
+      at.sx *= 1.12; at.sy *= 0.94; at.tilt += dir * (blow ? 0.16 : -0.06);
+      return;
+    }
+    if (f.moving) { const ph = clock / 85; at.y -= Math.abs(Math.sin(ph)) * 0.14; at.tilt += Math.sin(ph) * 0.08; return; }
+    const br = Math.sin(clock / 420 + f.slot * 1.7);
+    at.sy *= 1 + 0.035 * br; at.sx *= 1 - 0.02 * br;
+  }
+  /* EXPRESSIONS over every head, as an RPG's emote marks: a sweat drop
+     under a quarter of its HP, an anger mark a moment after a
+     critical or super-effective hit. Drawn, never a font's glyph. */
+  function emote(f, p, x, y, k) {
+    if (p.angry > 0) p.angry -= k;
+    const hx = sx(x + 0.72), hy = sy(y - 1.72), u = px * 0.3;
+    ctx.save();
+    if (f.status === SLP) {
+      // Asleep, its status chip already floats its Z's.
+    } else if (p.angry > 0) {
+      ctx.translate(hx, hy); ctx.scale(1 + 0.15 * Math.sin(clock / 60), 1 + 0.15 * Math.sin(clock / 60));
+      ctx.strokeStyle = "#ff3b3b"; ctx.lineWidth = Math.max(2, u * 0.32); ctx.lineCap = "round"; ctx.globalAlpha = Math.min(1, p.angry / 15);
+      for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.arc(u * 0.75, u * 0.75, u * 0.5, Math.PI, Math.PI * 1.5); ctx.stroke(); }
+    } else if (f.hp > 0 && f.hp / f.max <= 0.25) {
+      const bob = Math.sin(clock / 200) * u * 0.25;
+      ctx.translate(hx, hy + bob); ctx.fillStyle = "#8fdcff"; ctx.strokeStyle = "#0b1124"; ctx.lineWidth = Math.max(1, u * 0.18);
+      ctx.beginPath(); ctx.moveTo(0, -u); ctx.quadraticCurveTo(u * 0.7, 0, 0, u * 0.55); ctx.quadraticCurveTo(-u * 0.7, 0, 0, -u); ctx.fill(); ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -2344,6 +2432,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
      name - then the colour floods back in. Never a strobe: two cuts, then a
      fade, on the screen's own clock. */
   function manga(o) {
+    const stills = stillsOf(o.id);
+    if (stills.length) { sequence(o, stills); return; }
     const cw = canvas.width, ch = canvas.height, u = Math.min(cw, ch);
     const neg = 4, ink = o.life - 12, f = o.t;
     ctx.save();
@@ -2412,6 +2502,32 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     // A thin frame round the page, as a panel's.
     ctx.strokeStyle = o.famous ? "#08080c" : "#ffffff"; ctx.lineWidth = Math.max(3, u * 0.012);
     ctx.strokeRect(u * 0.02, u * 0.02, cw - u * 0.04, ch - u * 0.04);
+    ctx.restore();
+  }
+  // The stills cut in turn, each pushing in a little; the name lands on the second, low and centred; the last fades out.
+  function sequence(o, stills) {
+    const cw = canvas.width, ch = canvas.height, u = Math.min(cw, ch);
+    const hold = (o.life - SEQ_FADE) / stills.length, k = Math.min(stills.length - 1, Math.floor(o.t / hold));
+    const within = Math.min(1, (o.t - k * hold) / hold), fade = o.t > o.life - SEQ_FADE ? (o.life - o.t) / SEQ_FADE : 1;
+    const art = img(fxPath(stills[k]));
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = "#050507"; ctx.fillRect(0, 0, cw, ch);
+    if (art) {
+      const sc = Math.max(cw / art.naturalWidth, ch / art.naturalHeight) * (1.02 + 0.06 * ease(within));
+      const dw = art.naturalWidth * sc, dh = art.naturalHeight * sc;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(art, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+    }
+    if (k >= Math.min(1, stills.length - 1)) {
+      const name = o.name.toUpperCase(), pop = k === Math.min(1, stills.length - 1) ? back(Math.min(1, within * 4)) : 1;
+      ctx.translate(cw / 2, ch * 0.84); ctx.scale(pop, pop); ctx.transform(1, 0, -0.18, 1, 0, 0);
+      ctx.font = `900 ${Math.round(u * 0.14)}px ${FACE}`;
+      const size = Math.round(u * 0.14 * Math.min(1, (cw * 0.8) / Math.max(1, ctx.measureText(name).width)));
+      ctx.font = `900 ${size}px ${FACE}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+      ctx.lineWidth = size * 0.16; ctx.strokeStyle = "#050507"; ctx.strokeText(name, 0, 0);
+      ctx.fillStyle = "#ffffff"; ctx.fillText(name, 0, 0);
+    }
     ctx.restore();
   }
   /* A type's ink, drawn: bolts, flames, waves, vines, a psychic spiral,
@@ -2834,6 +2950,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     done: () => overAt >= 0 && clock - overAt > DONE_AT,
     // Where a body is on screen, in CSS pixels - for aiming with the mouse.
     toScreen: (x, y) => { const [a, b] = worldToScreen(x, y); return [a / dpr, b / dpr]; },
+    // Where auto-aim is pointing, in tiles (or null), for its lock marker.
+    lockOn: (pt) => { lock = pt; },
     tile: () => (px * view.z) / dpr,
   };
 }

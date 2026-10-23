@@ -43,6 +43,13 @@ FRAMES = {
 # renderer draws its own where one is missing.
 ULT_PATTERNS = ["bolts", "flames", "waves", "vines", "psychic", "shadow", "fists", "dragon", "frost", "rocks", "stars", "wind", "speed"]
 ULT_FAMOUS = [25, 6, 9, 3, 150, 94, 448, 130, 149, 143, 384, 248, 445, 658, 282, 257]
+# A famous Pokemon's impact SEQUENCE (2026-10-23): up to four stills in their
+# own colours, the subject centred - `ult-<dex id>-1.png` .. `-4.png` - shipped
+# 960 wide (a still fills the screen for a third of a second) in 128 colours.
+for n in ULT_FAMOUS:
+    for k in range(1, 5):
+        if (SRC / f"ult-{n}-{k}.png").exists():
+            FRAMES[f"ult-{n}-{k}"] = (1, 960, False, "centre")
 for n in [*ULT_PATTERNS, *ULT_FAMOUS]:
     if (SRC / f"ult-{n}.png").exists():
         # 1280 wide: a panel fills the screen, and 768 smeared its ink on a desktop.
@@ -141,7 +148,8 @@ def build(name, n, width, hard, anchor):
     # A move's colour art in 256 colours: pixel art loses nothing to the eye, and the sheets were 5.5 MB in full colour.
     # An ULTI panel is white ink on nothing: 64 colours are plenty, and keep each under check.mjs's 200KB.
     # A famous Pokemon's own panel is ink on white, its dots black or white: 16 greys (its screentone ran past 200KB at 64).
-    colours = 16 if name[4:].isdigit() else 64 if name.startswith("ult-") else 256
+    still = name.startswith("ult-") and name.count("-") == 2
+    colours = 128 if still else 16 if name[4:].isdigit() else 64 if name.startswith("ult-") else 256
     (strip.quantize(colours, method=Image.Quantize.FASTOCTREE) if name.startswith(("moves/", "ult-")) else strip).save(out, optimize=True)
     print(f"{name}: {n} frame{'s' if n > 1 else ''} of {width}x{fh}, {out.stat().st_size // 1024} KB")
     return {"n": n, "w": width, "h": fh}
@@ -149,6 +157,9 @@ def build(name, n, width, hard, anchor):
 
 def main():
     meta = {name: build(name, *spec) for name, spec in FRAMES.items()}
+    for name in meta:
+        if name.startswith("ult-") and name.count("-") == 2:
+            meta[name]["c"] = 1                  # a sequence still is drawn in its own colours
     names = list(FRAMES)
     for slug, n in MOVES.items():
         if not (SRC / "moves" / f"{slug}.png").exists():

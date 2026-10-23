@@ -4918,36 +4918,6 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(COMBO_STEPS.at(-1)[1] <= DEX_CHARM,
         `a catch chain (x${COMBO_STEPS.at(-1)[1]}) outranks the Pokedex Charm (x${DEX_CHARM})`);
     }
-    /* WEEKLY BINGO (bingo.js): a whole week - every line and the full card -
-       pays no money, no Master Ball, and less candy than a week of daily
-       quests at the streak cap: a side card, not a second candy stream. And
-       every square is fed: each goal counts some event the engine sends
-       (`noteBingo` and the catch's facts), or it would be a square nobody
-       can fill. */
-    {
-      const B = await import("../src/game/bingo.js");
-      const D = await import("../src/game/daily.js");
-      const { genOf } = await import("../src/game/biomes.js");
-      const week = B.LINES.length * B.BINGO_LINE.candy + B.BINGO_FULL.candy;
-      const quests = 7 * D.reward(null, D.STREAK_CAP).candy;
-      assert.ok(week <= quests, `a week of bingo pays ${week} candy against ${quests} for a week of quests`);
-      for (const r of [B.BINGO_LINE, B.BINGO_FULL]) {
-        assert.ok(!r.money && !r.items?.["master-ball"], "bingo pays money or a Master Ball");
-      }
-      const src = stripComments(readFileSync(new URL("../src/game/engine.js", import.meta.url), "utf8"));
-      // Keys a note opens with, and the catch note's own keys beside `caught` (its chain).
-      const plain = [...src.matchAll(/noteBingo\(\{\s*(\w+):/g), ...src.matchAll(/caught: \{[\s\S]*?\},\s*(\w+):/g)]
-        .map((m) => m[1]).filter((k) => k !== "caught");
-      const caught = src.match(/caught: \{([\s\S]*?)\},\s*combo:/)?.[1] ?? "";
-      const facts = [...caught.matchAll(/(\w+)(?=[:,\s])/g)].map((m) => m[1]);
-      for (const [kind, g] of Object.entries(B.GOALS)) {
-        const param = kind === "type" ? "normal" : kind === "gen" ? genOf(1) : null;
-        const cell = { kind, need: g.need, param };
-        const fed = plain.some((k) => g.count(cell, { [k]: g.need }) > 0)
-          || facts.some((k) => g.count(cell, { caught: { id: 1, types: ["normal"], [k]: true } }) > 0);
-        assert.ok(fed, `the bingo square "${kind}" counts nothing the engine sends`);
-      }
-    }
     /* GENDER (gender.js): every female look ships its picture (and the shiny
        it is listed with) and nothing else does; none comes from 1-386, whose
        FireRed art has no female drawing (your call, 2026-10-15); and over the

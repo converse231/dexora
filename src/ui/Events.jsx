@@ -20,7 +20,6 @@ import {
   tasksFor, progress, researchLevel, researchPoints, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../game/research.js";
 import { badgesOf } from "../game/league.js";
-import Bingo from "./Bingo.jsx";
 import { SeasonCard, boardSeason } from "./Season.jsx";
 import { EVENTS } from "../data/eventforms.js";
 import Icon from "./Icon.jsx";
@@ -80,7 +79,7 @@ function Pips({ total, spent, label: aria }) {
 /* THE EVENTS BOARD, as the Rotom panel's Events app (2026-10-01). It was a
    dialog off the ☰ menu and the HUD's cards; both now open this app beside
    the game, which is still being played - so it locks no keys. */
-export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onStar, bingo, onClaimBingo, invite = null, onInvite = null, onClaimEvent = null, onEventIntro = null }) {
+export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onStar, invite = null, onInvite = null, onClaimEvent = null, onEventIntro = null }) {
   const season = boardSeason(EVENTS, state?.dex, state?.medals);
   const ob = world?.outbreak ?? null;
   const obSp = ob && speciesById(ob.speciesId);
@@ -111,9 +110,7 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
             <SeasonCard ev={season} dex={state?.dex} medals={state?.medals} dreams={state?.dreams} onSelect={onSelect}
               onClaim={() => onClaimEvent?.(season.id)} onIntro={onEventIntro} />
           )}
-          {/* WEEKLY BINGO - the week's card, first: it is what every other card feeds. */}
-          <Bingo card={bingo} onClaim={onClaimBingo} />
-          {/* INVITE FRIENDS, second on the board (asked for, 2026-10-16: on Events
+          {/* INVITE FRIENDS, first on the board (asked for, 2026-10-16: on Events
               so it is seen) - what you both get, how many have counted, and the
               dialog (Invite.jsx) one press away. Signed out, it says how to start. */}
           <section className={`ev-card ev-invite${invite?.due ? " live" : ""}`}>
