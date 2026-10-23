@@ -52,8 +52,9 @@ for n in ULT_FAMOUS:
             FRAMES[f"ult-{n}-{k}"] = (1, 960, False, "centre")
 for n in [*ULT_PATTERNS, *ULT_FAMOUS]:
     if (SRC / f"ult-{n}.png").exists():
-        # 1280 wide: a panel fills the screen, and 768 smeared its ink on a desktop.
-        FRAMES[f"ult-{n}"] = (1, 1280, False, "centre")
+        # 1216 wide: a panel fills the screen, and 768 smeared its ink on a desktop; at 1280 the centred
+        # Blastoise's screentone ran past check.mjs's 200KB whatever the colours (2026-10-23).
+        FRAMES[f"ult-{n}"] = (1, 1216, False, "centre")
 # A move's sheet: its frames, counted by eye (2026-10-23), and the three
 # whose frames grow across the row in cells of their own size, cut by their
 # widest gaps (`frames_of`).
@@ -75,6 +76,8 @@ MOVES = {
     # Prompted 2026-10-23 (art/arena/fx/MOVE_PROMPTS.md): shots loop, beams are one stream, Stone Edge a blow.
     "aura-sphere": 4, "focus-blast": 4, "energy-ball": 4, "sludge-bomb": 4, "moonblast": 4, "air-slash": 4,
     "dragon-pulse": 1, "dark-pulse": 1, "flash-cannon": 1, "stone-edge": 5,
+    # Evolving in a match (render.js `evolving`): played across the 1.6 s; the Mega symbol is one still.
+    "evolve": 8, "mega-evolve": 8, "mega-symbol": 1,
 }
 SEEN = 24                        # alpha that counts as drawn when looking for the gaps
 HARD = 110                       # alpha past which a shrunk pixel is solid, under which it is gone

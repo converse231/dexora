@@ -750,7 +750,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   the `combo` hint once - the update's map card.
 - **The game makes no sound** (your call, 2026-10-14): Pokemon cries and
   rustling grass spots were built and taken out the same day. Ask before
-  adding audio or a clock-driven map effect back.
+  adding audio or a clock-driven map effect back. The ONE exception is the
+  Arena's sound effects (2026-10-23, asked for), OFF until a player turns
+  them on in its pause menu: `ui/league/arena/sfx.js` makes every sound with
+  Web Audio from the match's events (no files), a device preference
+  (`dexora-arena-sound`), suspended while the page is hidden - and the only
+  file that may make a sound (check.mjs).
 - **Who's that Pokemon is `quiz.js`** (2026-10-14): `quizFor(dayKey())`
   hashes the day to a species (never a form) and three names of its
   generation; `answerQuiz` takes ONE answer a day (`state.quiz`
@@ -1179,7 +1184,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   holds it under 45% of a fight's damage. **The Arena's three are
   `arenaTeam`** (`setArenaTeam`, `ARENA_TEAM` in ladder.js; empty is the
   League team's first three). Keys: LMB held basic, RMB/Q/E/R moves, 1-3
-  switch, Space dodge, F surge. **Touch is a MOBA's**: a FIXED stick in the
+  switch, Space dash (the code's `dodge`), F surge. **Touch is a MOBA's**: a FIXED stick in the
   bottom-left corner that only a touch starting on it steers and that thumb
   keeps (2026-10-23: the left half once floated it under any touch and took
   the party's taps), the
@@ -1209,8 +1214,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   and bodies and cover sorted by depth (a pillar drew over a Pokemon in
   front of it).
   **The big update** (2026-10-23, asked for). Wind-ups are `WIND_K` (0.5
-  since the second ask, "still long") of what they were, cooldowns `0.6 +
-  p/45` s, and with the ULTIs `DAMAGE` went 0.4 -> 0.23 to hold a 3v3 at
+  since the second ask, "still long") of what they were, cooldowns `0.9 +
+  p/40` s (a bit longer once PP went), and with the ULTIs `DAMAGE` went 0.4 -> 0.23 to hold a 3v3 at
   ~77 s. **Weather**, one a match from the seed, the SAME odds on every
   floor (a floor leaning to its own would hand a type its home): rain
   (Water 1.5x, Fire 0.5x, Fire types slower, all soaked), sun (the reverse),
@@ -1269,7 +1274,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   and the confusion swirl - each from its drawn sheet (`moves/<slug>`,
   `-charge`, `stun`, `confused`, `smoke`, `psychic-lift`, `boulder`) once
   one exists. **ULTI impact frames are a shop** (`IMPACTS` in cosmetics.js,
-  the lobby's ULTI Shop: preview, buy, equip; the save's `impacts` and
+  the lobby's ULTI Shop - hidden while its shelf is empty: the first paid
+  sequences were WITHDRAWN (2026-10-23, your call; `WITHDRAWN`, refunded
+  once at load and dropped from `impacts`, never sold again) for the centred
+  single panels everyone sees; preview, buy, equip; the save's `impacts` and
   `impactsOff`, kept even when unknown): a look, never a strength, played
   only for YOUR Pokemon's ULTI. A price of 0 (Pikachu) is everyone's; an
   id is the art's (`ult-<dex>`, stills `ult-<dex>-<n>`) and never renamed -
@@ -1356,7 +1364,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   left-facing row that is its right one mirrored drawn flipped (uncut,
   Rayquaza decoded to 30 MB; check.mjs holds every atlas under 8 MB) - a
   shiny as a palette swap, or its own `-s` atlas where one colour is two; a
-  form matched by NAME to PMD's subgroup. render.js loads one when a match
+  form matched by NAME to PMD's subgroup (`ALIAS` where PMD names it
+  otherwise - Paldean Tauros, Crowned Zacian; 13 drawn forms fought in
+  follower art until 2026-10-23). PMD draws no Gigantamax and only portraits
+  of most Megas, so **a form fights in the Arena only with its own PMD body**
+  (`arenaReady` in arena.js, asked for 2026-10-23: "consistent battle
+  animations") - the team, the Fair format, evolving and Mega Evolving all
+  ask it; a species PMD has not drawn yet still fights in its follower art. render.js loads one when a match
   needs it (kept across matches, every url stamped `PMD_REV`), picks the
   animation from the fighter (a blow's frames up to PMD's HitFrame run across
   the wind-up, so it lands as the rules hit), draws it at the follower art's
@@ -1379,13 +1393,50 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   event's dialog waits when this one has played. Its two fighters are PMD
   art baked to `public/arena/intro/` - the Arena's own, announcing it.
   **No stalemate** (2026-10-22): a third of Hard-vs-Hard matches ran out the
-  clock with both Pokemon out of PP and full benches. A spent Pokemon's
-  buttons throw STRUGGLE (`spent`, kept apart as `f.struggle`, reached by
-  `moveAt` - pushed onto a short kit it froze), a CPU that switches benches a
-  spent Pokemon (Easy, which never switches, struggles), and the last
-  `FINAL_T` hits harder and fills Surge twice as fast - 13 of 40 to the clock
-  became 2-3. The result grades the win (S-D: the win, HP kept, best combo,
-  perfect dodges, a quick KO) from `stats` the sim keeps a side, and the
+  clock with both Pokemon out of PP and full benches; the last `FINAL_T`
+  hits harder and fills Surge twice as fast. **There is no PP** (2026-10-23,
+  asked for): a move waits on its cooldown alone, so Struggle-when-spent and
+  the CPU benching a spent Pokemon went with it (Struggle stays only for a
+  status-only kit), and Indigo's zone readies your slowest move. **The dodge
+  is a DASH** (same day, asked for): `DODGE_DIST` 3.2 tiles in 0.2 s,
+  untouchable for `DODGE_INV`, drawn as a lean, afterimages and streaks -
+  never a hop; through an attack it is still a PERFECT.
+  **Arena HP is ten times the stat** (`HP_K`, `DAMAGE` = `DAMAGE_K` x it;
+  reported 2026-10-23: a basic jab read 1-3 and `floor` ate small hits):
+  the same fight, numbers that read as hits. **The basic attack is its
+  user's first type** (asked for: type matchups meant nothing to it), STAB
+  and all, and a bolt reaches `BASIC_RANGE` 6.5 tiles (4.5 read as short).
+  A 3v3 is ~71 s (Hard v Hard), basics a third of the damage, and the
+  longer bolt is why `BRAWL_GUARD` is 0.6 (brawler teams fell to 9 of 40).
+  **Evolving in a match** (asked for): a Pokemon with a next stage fills its
+  bar (`xp`) with the share of a foe's HP it deals, a knockout a whole bar
+  (`EVO_XP`), and evolves where it stands - `EVOLVE_T` untouchable and still,
+  then the next stage's stats scaled from its own (IVs and perks carry), its
+  types, its HP share plus `EVO_HEAL`; twice in a match for a three-stage
+  line, a branch from the seed. **Mega Evolution** is once a match a side
+  (`megaUsed`, the `mega` input: T, D-pad down, the HUD's rainbow button),
+  for a line's Mega in `megas` - the page fills it from the Pokedex (caught
+  or made); the CPU from Hard and the Fair format get every one. Both only
+  into an `arenaReady` form. The picture is the games': white, flickering
+  between the two bodies faster and faster in a pillar of light (a Mega in
+  rainbow, its symbol's strands turning), then a white-out, a shockwave and
+  the new name stamped (`moves/evolve`, `moves/mega-evolve`,
+  `moves/mega-symbol` take over once drawn).
+  **Every floor has its own event** (`FLOOR_EVENT`, asked for: "maps should
+  have their unique mechanics or events"), once a match at a time read off
+  the seed (`plan.floor`, no draw): Indigo's crowd roars (+35 ULTI each),
+  a Moon Stone falls at Mt. Moon's centre (evolves whoever grabs it, else a
+  full ULTI), the Boardwalk's tide rises (`waterOf`), the Caldera erupts
+  (mirrored lava bombs through `drops`), a Tauros herd stampedes a shown
+  lane in the Grove (`lanes`, `herdAt`), and a whiteout blinds the Rink
+  (the lights-out machinery, `s.white`). **The Poke Ball** is one of the
+  mirrored pickups (asked for, Smash Bros.' item): it releases a `HELPERS`
+  Pokemon for its trainer from the seed - Electrode explodes where it
+  stands, Snorlax falls on the foe (it stops following `HELPER_LOCK` before,
+  so a dash beats it), Chansey heals a quarter, Jigglypuff sings a near foe
+  asleep. A title too wide for the screen is
+  shrunk to it (`stampAt`). The result grades the win (S-D: the win, HP kept, best combo,
+  perfect dashes, a quick KO) from `stats` the sim keeps a side, and the
   device remembers the best grade and the win streak (`dexora-arena-record`,
   never the save). A fallen body is never drawn: the last KO ends the match in
   its own tick, still "active". Online: messages before a match listens are

@@ -37,6 +37,8 @@ import { TYPES } from "../data/types.js";
 import { SPECIES, isForm, isEvent } from "../data/dex.js";
 import { speciesById } from "./biomes.js";
 import { hash } from "./daily.js";
+import { PMD_IDS } from "../data/pmd.js";
+import { EVOLUTIONS } from "../data/evolutions.js";
 
 export const TPS = 60;
 export const W = 26, H = 16;                    // the floor, in tiles
@@ -60,7 +62,7 @@ export const ARENAS = [
    `cover`: the material its four blocks are, and the types that break it
    fastest (`weak`) or barely (`resist`). `zone`: what holding a zone pays. */
 export const GROUND = {
-  indigo: { cover: "statue", weak: ["fighting", "ground"], zone: "pp" },
+  indigo: { cover: "statue", weak: ["fighting", "ground"], zone: "ready" },
   moon: { cover: "boulder", weak: ["fighting", "water"], resist: ["rock", "steel"], zone: "dodge", rocks: true },
   seaside: { cover: "crate", weak: ["fire"], zone: "cure",
     water: [[1.2, 0, 10, 2.3], [15.5, 0, 24.8, 2.3], [1.2, 13.4, 10, 16], [15.5, 13.4, 24.8, 16]] },
@@ -69,15 +71,20 @@ export const GROUND = {
     grass: [[2, 2, 5.2, 5.2], [20.8, 2, 24, 5.2], [2, 10.2, 5.2, 13.6], [20.6, 10.2, 24, 13.6]] },
   rink: { cover: "ice", weak: ["fire", "fighting"], zone: "swift", ice: true },
 };
-export const ZONE_SAYS = { pp: "+1 PP to your emptiest move", dodge: "Dodge ready at once", cure: "Cures burn and poison",
+export const ZONE_SAYS = { ready: "Your slowest move ready at once", dodge: "Dash ready at once", cure: "Cures burn and poison",
   cool: "-2 s on every cooldown", heal: "Heals 6% HP", swift: "+15% speed for 10 s" };
 const T = (name) => TYPES.indexOf(name);
 const inRects = (rects, x, y) => (rects ?? []).some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
 
 const R = 0.45;                                 // a body's radius
 const X0 = INSET + R, X1 = W - INSET - R, Y0 = INSET + R, Y1 = H - INSET - R;
+/* THE DASH (2026-10-23, asked for: "instead of dodge, let's use dash"; the
+   code keeps "dodge", as Surge is ULTI on screen): a short burst along the
+   stick, quicker and longer than the 0.3 s, 2.2-tile roll it replaced, still
+   untouchable for its first beat - so dashing THROUGH an attack is still a
+   PERFECT. */
 export const DODGE_CD = sec(1.6);
-const DODGE = sec(0.3), DODGE_INV = sec(0.22), DODGE_DIST = 2.2;
+const DODGE = sec(0.2), DODGE_INV = sec(0.16), DODGE_DIST = 3.2;
 export const SWAP_CD = sec(4);
 const SWAP = sec(0.6), SWAP_INV = sec(0.5), KO_WAIT = sec(1);
 const STUN = sec(0.12), KB = sec(0.15), FLINCH = sec(0.25);
@@ -188,6 +195,61 @@ const ZONE_AT = [[W / 2, INSET + 2.1], [W / 2, H - INSET - 2.1]];
 const ROCKS_EVERY = sec(25), ROCKS_FIRST = sec(15), ROCK_WARN = sec(1.2), ROCK_R = 1;
 const HEAT_BURN = sec(1), SWIFT = sec(10);
 
+/* WHO FIGHTS HERE (2026-10-23, asked for: "if there are no animations for
+   Gigantamax and other Megas, let's not make it usable - consistent battle
+   animations"): a FORM - a Mega, a Gigantamax, any other - only with its own
+   PMD body. A species PMD has not drawn yet still fights in its follower art. */
+const PMD = new Set(PMD_IDS.split(",").filter(Boolean).map((h) => parseInt(h, 16)));
+export const arenaReady = (id) => !isForm(id) || PMD.has(id);
+/* EVOLVING IN A MATCH (2026-10-23, asked for). A Pokemon with a next stage
+   fills its evolution bar (`xp`) with the share of a foe's HP it deals, a
+   knockout worth a whole bar (EVO_XP), and at a full bar EVOLVES where it
+   stands: EVOLVE_T untouchable and still, then the new stage's stats (its
+   own, scaled by what this one's were - IVs and perks carry), its types, its
+   HP share and EVO_HEAL more. A second stage can follow in the same match.
+   Only into what may fight here (`arenaReady`); a branch is drawn from the
+   seed. MEGA EVOLUTION is once a match a side, on the trainer's word (the
+   `mega` input), for a Pokemon whose line has a Mega it is allowed (`megas`,
+   which the page fills from the Pokedex; the CPU from Hard and the Fair
+   format, every one). */
+const EVO_ROWS = EVOLUTIONS.filter((r) => !r.look && !r.event && arenaReady(r.to));
+const MEGA = new Set(["mega", "primal"]);
+export const evoTargets = (id) => EVO_ROWS.filter((r) => r.from === id && !MEGA.has(r.kind) && r.kind !== "gmax").map((r) => r.to);
+export const megaTargets = (id) => EVO_ROWS.filter((r) => r.from === id && MEGA.has(r.kind)).map((r) => r.to);
+// Every Mega a Pokemon's line can reach in a match: its own, and its evolutions'.
+export function lineMegas(id, seen = new Set()) {
+  if (seen.has(id)) return [];
+  seen.add(id);
+  return [...megaTargets(id), ...evoTargets(id).flatMap((to) => lineMegas(to, seen))];
+}
+export const EVO_XP = 0.6;
+export const EVOLVE_T = sec(1.6);
+const EVO_HEAL = 0.15;
+/* EACH FLOOR'S OWN EVENT (2026-10-23, asked for: "maps should have their
+   unique mechanics or events"): once a match, at a time read off the seed
+   (no draw, so every other roll stays where it was), announced on screen -
+   and fair: whatever falls, falls mirrored or across the whole court. */
+export const FLOOR_EVENT = { indigo: "roar", moon: "moonstone", seaside: "tide", caldera: "eruption", grove: "stampede", rink: "whiteout" };
+export const FLOOR_SAYS = {
+  roar: ["THE CROWD ROARS!", "Both ULTI meters surge"],
+  moonstone: ["A MOON STONE FELL!", "Grab it: your Pokemon evolves on the spot"],
+  tide: ["HIGH TIDE!", "The water rises - only Water and Flying types move freely"],
+  eruption: ["ERUPTION!", "Lava bombs - watch the ground"],
+  stampede: ["STAMPEDE!", "Get out of the marked lane"],
+  whiteout: ["WHITEOUT!", "A blizzard hides everyone not close by"],
+};
+const FLOOR_FIRST = sec(30), FLOOR_SPAN = sec(25);
+const ROAR_GAIN = 35, TIDE_T = sec(12), TIDE_GROW = 2.4, WHITE_T = sec(10);
+export const ERUPT_T = sec(6);
+const ERUPT_EVERY = sec(0.6), LAVA_WARN = sec(1), LAVA_R = 1.1;
+export const LANE_WARN = sec(1.5), LANE_RUN = sec(1.2), LANE_H = 2.4;
+// The court's water, risen with the tide (the renderer draws the same rectangles).
+export const waterOf = (s) => (s.tide > 0
+  ? (GROUND[s.arena].water ?? []).map(([a, b, c, d]) => (b <= 0 ? [a, b, c, d + TIDE_GROW] : [a, b - TIDE_GROW, c, d]))
+  : GROUND[s.arena].water);
+// Where a stampede's herd is: its front, running the lane's length.
+export const herdAt = (l) => (l.dir > 0 ? -1 + (1 - l.t / LANE_RUN) * (W + 2) : W + 1 - (1 - l.t / LANE_RUN) * (W + 2));
+
 /* POWER-UPS ON THE FLOOR (asked for, 2026-10-23: "power ups on the maps,
    usable objects"). Every PICK_EVERY a MIRRORED PAIR of one kind appears -
    one on each half, point for point - so no side is nearer one by the
@@ -201,10 +263,26 @@ export const PICKUPS = {
   "x-attack": { held: true, name: "X Attack", says: "Use it: hits 30% harder for 8 s" },
   "x-speed": { held: true, name: "X Speed", says: "Use it: faster, and cooldowns run quicker, for 8 s" },
   "x-defense": { held: true, name: "X Defense", says: "Use it: a shield for 1.5 s" },
+  "poke-ball": { held: false, name: "Poke Ball", says: "Releases a helper Pokemon on your side" },
   // The flyover's drop alone (`stepEvents`), never one of a pair.
   "full-restore": { held: false, rare: true, name: "Full Restore", says: "Heals half, cures any status, +50% ULTI" },
+  // Mt. Moon's floor event alone.
+  "moon-stone": { held: false, rare: true, name: "Moon Stone", says: "Evolves your Pokemon on the spot - or fills its ULTI" },
 };
 const PICK_KINDS = Object.keys(PICKUPS).filter((k) => !PICKUPS[k].rare);
+/* THE POKE BALL (2026-10-23, asked for - Smash Bros.' item): touched, it
+   releases a HELPER for its trainer, drawn from the seed. Electrode flashes
+   and explodes where it stands; Snorlax falls on the foe (it stops following
+   HELPER_LOCK before it lands, so a dash beats it); Chansey's Soft-Boiled
+   heals its trainer; Jigglypuff sings a foe near it to sleep. Each takes
+   `t` to act - the picture's warning. */
+export const HELPERS = {
+  electrode: { id: 101, t: sec(1.2), r: 2.4 },
+  snorlax: { id: 143, t: sec(0.9), r: 1.5 },
+  chansey: { id: 113, t: sec(0.8) },
+  jigglypuff: { id: 39, t: sec(1.4), r: 4 },
+};
+const HELPER_KINDS = Object.keys(HELPERS), HELPER_LOCK = sec(0.3), HELPER_HEAL = 0.25;
 const PICK_FIRST = sec(10), PICK_EVERY = sec(16), PICK_LIFE = sec(14), PICK_R = 0.5;
 const X_TIME = sec(8), X_ATTACK = 1.3, X_GUARD = sec(1.5);
 /* WHAT ONE HIT IS WORTH, against the plan's 30-45 s a Pokemon. Measured
@@ -217,8 +295,14 @@ const X_TIME = sec(8), X_ATTACK = 1.3, X_GUARD = sec(1.5);
    the ULTIs' signatures (2026-10-23) brought it to 38 s; 0.3 with the ULTI
    parts below is 76 s again, an ULTI ~14% of the damage dealt. Shorter
    wind-ups and cooldowns (2026-10-23, asked for again) made it 53 s; 0.23 is
-   77 s, and brawler teams still win ~42% against blasters. */
-export const DAMAGE = 0.23;
+   77 s, and brawler teams still win ~42% against blasters.
+   ARENA HP (2026-10-23, reported: "my basic attack became just 3 or 4"): a
+   body's HP is its stat times HP_K and every hit DAMAGE_K of that larger
+   scale - the same fight, ten times the numbers, so a hit reads as a hit
+   and `floor` no longer eats most of a small one (a basic jab was 1). */
+export const HP_K = 10;
+const DAMAGE_K = 0.23;
+export const DAMAGE = DAMAGE_K * HP_K;
 /* THE OPENING: the count before a fight, in which nobody moves. It is
    ticks of the match - both ends of an online fight count the same ones -
    off the match clock, and 0 for every test that drives a match. */
@@ -232,23 +316,19 @@ export const INTRO = sec(3.2);
 export const SURGE_MAX = 100;
 export const SURGE_T = sec(6);
 const SURGE_DMG = 1.25, SURGE_PUSH = 2.6;
-/* STRUGGLE, as in the games: a Pokemon with no damaging move left (every one
-   out of PP) fights with it - any move button throws it. Without it a third
-   of Hard-vs-Hard matches (13 of 40, measured 2026-10-22) had their last hit
-   inside two minutes and then ran out the clock: both Pokemon out of PP,
-   their benches full of moves, nobody able to land anything. */
-export const STRUGGLE_K = 4;
-export const spent = (f) => f.kit.every((m) => m.pp <= 0 || !arenaMove(m.i).p);
-/* A move by its act's index: the kit's, or Struggle (`STRUGGLE_K`), which is
-   kept apart on the fighter - pushed onto a kit of fewer than four moves it
-   landed at the wrong index and the spent Pokemon froze. */
-export const moveAt = (f, k) => (k === STRUGGLE_K ? f.struggle : k === BASIC_K ? f.basic : f.kit[k]);
+/* THERE IS NO PP (2026-10-23, asked for): a move is limited by its cooldown
+   alone. PP ran out mid-match, and Struggle and a CPU benching a spent
+   Pokemon existed only to stop the stalemate that made (13 of 40 Hard
+   matches to the clock, 2026-10-22). A move by its act's index: the kit's,
+   or the basic attack's. */
+export const moveAt = (f, k) => (k === BASIC_K ? f.basic : f.kit[k]);
 
 /* THE BASIC ATTACK (asked for, 2026-10-22: "a normal attack that users can
    spam while waiting for the skills"): always there, no PP, HELD to repeat.
    A fighter whose Attack is the higher jabs - a blow in reach - and one
-   whose Sp. Atk is throws a short bolt; typeless, so no STAB and nothing
-   resists it. Every third in a row (each within BASIC_CHAIN of the last)
+   whose Sp. Atk is throws a bolt. It is its user's FIRST TYPE (2026-10-23,
+   asked for: typeless, a type advantage meant nothing to it), STAB and all,
+   so a Water type's jab douses a Fire type. Every third in a row (each within BASIC_CHAIN of the last)
    lands harder: the rhythm a held button wants. A filler between moves,
    never a strategy - check.mjs holds what it deals to a sliver of a kit's. */
 export const BASIC_K = 5;
@@ -266,7 +346,8 @@ function ultMove(i) {
 }
 export const isUlt = (i) => i <= ULT_BASE;
 export const BASIC_CD = sec(0.42);
-const BASIC_WIND = sec(0.1), BASIC_REC = sec(0.08), BASIC_RANGE = 4.5, BASIC_CHAIN = sec(1.2), BASIC_BOOST = 1.6;
+// BASIC_RANGE 4.5 until 2026-10-23 ("long range basic shots seem too short").
+const BASIC_WIND = sec(0.1), BASIC_REC = sec(0.08), BASIC_RANGE = 6.5, BASIC_CHAIN = sec(1.2), BASIC_BOOST = 1.6;
 export const basicShape = (f) => (f.basic.i === BASIC_P ? "melee" : "shot");
 /* ROLES (asked for, 2026-10-23: "they all feel long ranged and slow to
    attack - melee and ranged Pokemon, with perks for each"). By the higher
@@ -277,10 +358,12 @@ export const basicShape = (f) => (f.basic.i === BASIC_P ? "melee" : "shot");
    BLAST_RANGE farther, and charges a beam on BLAST_BEAM of its wind-up -
    built to keep it. Measured over 100 Hard matches of one role's team
    against the other's: with no perks brawlers won 18 (range was simply
-   better); these 48, a 3v3 still ~74 s. */
+   better); these 48, a 3v3 still ~74 s. The basic bolt's longer reach
+   (2026-10-23) took it to 9 of 40 again, and BRAWL_GUARD 0.72 -> 0.6 back to
+   16. */
 // A fighter outside a match (the lobby, the tutor) has no `basic` yet: its stats answer the same.
 export const roleOf = (f) => ((f.basic?.i ?? basicOf(f)) === BASIC_P ? "brawler" : "blaster");
-export const BRAWL_RUN = 1.2, BRAWL_CD = 0.65, BRAWL_HIT = 1.3, BRAWL_GUARD = 0.72;
+export const BRAWL_RUN = 1.2, BRAWL_CD = 0.65, BRAWL_HIT = 1.3, BRAWL_GUARD = 0.6;
 export const BLAST_SPEED = 1.15, BLAST_RANGE = 1.1, BLAST_BEAM = 0.85;
 export const basicCd = (f) => (roleOf(f) === "brawler" ? Math.round(BASIC_CD * BRAWL_CD) : BASIC_CD);
 // Which a fighter has: the jab for the higher Attack, the bolt for the higher Sp. Atk.
@@ -344,22 +427,22 @@ export const windOf = (m) => {
 };
 export const cooldownOf = (m) => {
   if (m.c === 2) return SHIELDS.has(m.n) ? sec(7) : m.n === "rest" ? sec(20) : m.st === 3 ? sec(15) : sec(9);
-  // 0.8 + p/35 until 2026-10-23 ("still long"): a Fire Blast waited 4 s, now 3.
-  return sec(0.6 + (m.p ?? 0) / 45);
+  // 0.8 + p/35, then 0.6 + p/45 ("still long"), then this with PP gone ("a bit of cooldown"): Fire Blast 3.65 s.
+  return sec(0.9 + (m.p ?? 0) / 40);
 };
-export const ppOf = (m) => Math.max(3, Math.ceil((m.pp ?? 10) / 2));
 const multiCount = (m) => (m.hits ? Math.round((m.hits[0] + m.hits[1]) / 2) : 1);
 
 // ------------------------------------------------------------------ fighters
 
 /* A FIGHTER'S KIT: its four League moves (`movesOf`/the Move Tutor) that the
-   Arena can play. A kit that would not hit at all keeps Struggle beside them. */
+   Arena can play. A kit that would not hit at all keeps Struggle beside them
+   (a status-only kit), thrown like any move. */
 export function kitOf(f) {
   const kit = f.moves.filter((m) => m.i !== STRUGGLE && shapeOf(arenaMove(m.i))).slice(0, 4)
-    .map((m) => ({ i: m.i, pp: ppOf(arenaMove(m.i)), cd: 0 }));
+    .map((m) => ({ i: m.i, cd: 0 }));
   if (!kit.some((m) => arenaMove(m.i).p > 0)) {
     if (kit.length === 4) kit.pop();
-    kit.push({ i: STRUGGLE, pp: 99, cd: 0 });
+    kit.push({ i: STRUGGLE, cd: 0 });
   }
   return kit;
 }
@@ -379,12 +462,13 @@ const turn = (x, y, k) => norm(x - y * k, y + x * k);
 
 function body(f, side, slot) {
   return {
-    ...f, side, slot, kit: kitOf(f), stages: [...f.stages], stageT: [0, 0, 0, 0, 0, 0, 0, 0],
+    ...f, hp: f.hp * HP_K, max: f.max * HP_K, side, slot, kit: kitOf(f), stages: [...f.stages], stageT: [0, 0, 0, 0, 0, 0, 0, 0],
     x: side ? X1 - 2.5 : X0 + 2.5, y: H / 2, px: 0, py: 0, fx: side ? -1 : 1, fy: 0, moving: false,
     act: null, dodge: 0, dx: 0, dy: 0, dodgeCd: 0, inv: 0, shield: 0, stun: 0, kbx: 0, kby: 0, kbt: 0, flash: 0,
     status: -1, statusT: 0, statusN: 0, badly: false, sleptAt: 0,
-    vx: 0, vy: 0, heat: 0, swift: 0, hidden: false, surge: 0, struggle: null, power: 0, haste: 0, clones: [], cloneT: 0, wet: 0, rained: false, away: null, confused: 0,
-    basic: { i: basicOf(f), pp: Infinity, cd: 0 }, basicN: 0, basicT: -BASIC_CHAIN,
+    vx: 0, vy: 0, heat: 0, swift: 0, hidden: false, surge: 0, power: 0, haste: 0, clones: [], cloneT: 0, wet: 0, rained: false, away: null, confused: 0,
+    basic: { i: basicOf(f), cd: 0 }, basicN: 0, basicT: -BASIC_CHAIN,
+    xp: 0, evo: 0, evoTo: 0, megaOn: false, megas: f.megas ?? [],
   };
 }
 
@@ -395,11 +479,11 @@ export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "ind
   const g = GROUND[arena] ? arena : "indigo";
   const s = {
     t: 0, intro, rs: seed | 0, over: false, winner: -1, why: "", ev: [], shots: [], hazards: [], nextId: 1,
-    arena: g, drops: [], items: [], strikes: [], clouds: [], dark: 0,
+    arena: g, drops: [], items: [], helpers: [], strikes: [], clouds: [], dark: 0, white: false, tide: 0, erupt: 0, lanes: [],
     cover: COVER_AT.map(([x, y], i) => ({ id: i, x, y, hp: COVER_HP, max: COVER_HP })),
     zone: { open: false, t: ZONE_FIRST, claimed: [false, false], hold: [[0, 0], [0, 0]] },
     sides: teams.map((team, side) => ({
-      team: team.map((f, slot) => body(f, side, slot)), active: 0, swapT: 0, next: -1, swapCd: 0, koT: 0, meter: 0, held: null,
+      team: team.map((f, slot) => body(f, side, slot)), active: 0, swapT: 0, next: -1, swapCd: 0, koT: 0, meter: 0, held: null, megaUsed: false,
       // What the result screen tells (never read by the rules): damage dealt, hits, the best run of hits unanswered, perfect dodges, surges.
       stats: { dealt: 0, hits: 0, chain: 0, best: 0, perfect: 0, surges: 0 },
       cpu: cpu[side] ? { level: cpu[side], seen: 0, seenId: 0, strafe: 1, dodged: 0, lx: W / 2, ly: H / 2 } : null,
@@ -412,7 +496,8 @@ export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "ind
   s.weather = weather ?? WEATHERS.find((w, k) => (acc += WEATHER_ODDS[k]) > roll) ?? "clear";
   const fly = FLY_FIRST + Math.floor(rnd(s) * FLY_SPAN), dir = rnd(s) < 0.5 ? 1 : -1;
   const dark = rnd(s) < DARK_ODDS ? DARK_FIRST + Math.floor(rnd(s) * DARK_SPAN) : -1;
-  s.plan = events ? { fly, dir, dark } : { fly: -1, dir, dark: -1 };
+  const floor = FLOOR_FIRST + (Math.imul(seed | 0, 2654435761) >>> 0) % FLOOR_SPAN;
+  s.plan = events ? { fly, dir, dark, floor } : { fly: -1, dir, dark: -1, floor: -1 };
   return s;
 }
 // Where Double Team's copies stand: beside their user, inside the court.
@@ -431,7 +516,7 @@ const alive = (sd) => sd.team.filter((f) => f.hp > 0);
 export const PAR = 0, BRN = 1, PSN = 2, SLP = 3, FRZ = 4;
 const held = (f) => f.stun > 0 || f.status === SLP || f.status === FRZ || Boolean(f.away);
 
-export const NO_INPUT = Object.freeze({ mx: 0, my: 0, ax: 0, ay: 0, fire: -1, basic: false, dodge: false, swap: -1, surge: false, use: false });
+export const NO_INPUT = Object.freeze({ mx: 0, my: 0, ax: 0, ay: 0, fire: -1, basic: false, dodge: false, swap: -1, surge: false, use: false, mega: false });
 
 export function tick(s, inputs) {
   if (s.over) return s;
@@ -477,7 +562,7 @@ function stepSide(s, side, inp) {
   }
   if (sd.koT > 0) return;
   const f = sd.team[sd.active];
-  for (const m of f.struggle ? [...f.kit, f.struggle, f.basic] : [...f.kit, f.basic]) if (m.cd > 0) m.cd = Math.max(0, m.cd - (f.surge > 0 || f.haste > 0 ? 2 : 1));
+  for (const m of [...f.kit, f.basic]) if (m.cd > 0) m.cd = Math.max(0, m.cd - (f.surge > 0 || f.haste > 0 ? 2 : 1));
   if (f.surge > 0) f.surge--;
   if (f.dodgeCd > 0) f.dodgeCd--;
   if (f.inv > 0) f.inv--;
@@ -486,6 +571,17 @@ function stepSide(s, side, inp) {
   for (let k = 1; k < 8; k++) if (f.stageT[k] > 0 && --f.stageT[k] === 0) f.stages[k] = 0;
   stepStatus(s, f);
   if (f.hp <= 0) return;
+  // Evolving: still and untouchable until the new stage stands there.
+  if (f.evo > 0) {
+    if (--f.evo === 0) evolveInto(s, f);
+    return;
+  }
+  if (!f.act && !f.dodge && !f.away && !held(f)) {
+    const mega = megaOf(f);
+    if (inp.mega && mega && !sd.megaUsed) { sd.megaUsed = true; startEvo(s, side, f, mega, true); return; }
+    const next = f.xp >= EVO_XP ? evoTargets(f.id) : [];
+    if (next.length) { startEvo(s, side, f, next.length > 1 ? next[Math.floor(rnd(s) * next.length)] : next[0], false); return; }
+  }
 
   const [ax, ay] = norm(inp.ax, inp.ay);
   let [mx, my] = norm(inp.mx, inp.my);
@@ -507,23 +603,19 @@ function stepSide(s, side, inp) {
       }
     }
     if (inp.dodge && f.dodgeCd === 0 && !f.dodge && f.act?.shape !== "dash") {
-      // A dodge cancels a wind-up, and the move's cooldown is not spent.
+      // A dash cancels a wind-up, and the move's cooldown is not spent.
       if (f.act?.ph === "wind") f.act = null;
       const [dx, dy] = mx || my ? [mx, my] : [-f.fx, -f.fy];
       f.dodge = DODGE; f.dx = dx; f.dy = dy; f.inv = Math.max(f.inv, DODGE_INV);
-      // Evasion stages shorten the roll's cooldown.
+      // Evasion stages shorten the dash's cooldown.
       f.dodgeCd = Math.round(DODGE_CD * (1 - 0.15 * clamp(f.stages[7], -2, 2)));
       s.ev.push({ k: "dodge", side });
     }
     // A move pressed during a basic attack's recovery cuts it short: the basic never holds a move back.
     if (inp.fire >= 0 && f.act?.basic && f.act.ph === "rec") f.act = null;
     if (inp.fire >= 0 && !f.act && !f.dodge) {
-      let k = inp.fire, m = f.kit[k];
-      if (m && m.pp <= 0 && spent(f)) {
-        f.struggle ??= { i: STRUGGLE, pp: 999, cd: 0 };
-        k = STRUGGLE_K; m = f.struggle;
-      }
-      if (m && m.cd === 0 && m.pp > 0) {
+      const k = inp.fire, m = f.kit[k];
+      if (m && m.cd === 0) {
         const data = arenaMove(m.i);
         const [dx, dy] = ax || ay ? [ax, ay] : [f.fx, f.fy];
         f.fx = dx; f.fy = dy;
@@ -541,7 +633,7 @@ function stepSide(s, side, inp) {
     }
   }
 
-  // Moving: a dodge rolls, a dash lunges, a wind-up walks at half speed, a recovery stands.
+  // Moving: a dodge dashes, a dash move lunges, a wind-up walks at half speed, a recovery stands.
   const v = speedOf(f);
   if (f.dodge > 0) {
     const d = DODGE_DIST / DODGE;
@@ -578,6 +670,25 @@ const speedOf = (f) => Math.min(6, Math.max(3, 3 + 2.5 * (f.st[5] * STAGE(f.stag
   / TPS * (f.status === PAR ? 0.5 : 1) * (f.swift > 0 ? 1.15 : 1) * (f.wading ? 0.5 : 1) * (f.rained ? RAIN_SLOW : 1)
   * (roleOf(f) === "brawler" ? BRAWL_RUN : 1) * (f.confused > 0 ? CONFUSE_SLOW : 1);
 
+// The Mega a fighter may become now: its own species', one the page allowed.
+export const megaOf = (f) => megaTargets(f.id).find((id) => f.megas.includes(id)) ?? 0;
+function startEvo(s, side, f, to, mega) {
+  f.evo = EVOLVE_T; f.evoTo = to; f.act = null; f.inv = Math.max(f.inv, EVOLVE_T);
+  s.ev.push({ k: "evolve", side, slot: f.slot, from: f.id, to, mega, x: f.x, y: f.y });
+}
+function evolveInto(s, f) {
+  const from = f.id, to = f.evoTo, mega = MEGA.has(EVO_ROWS.find((r) => r.from === from && r.to === to)?.kind);
+  const moves = f.moves.map((m) => m.i), was = fighter(from, f.level, f.uid ?? 1, moves), now = fighter(to, f.level, f.uid ?? 1, moves);
+  const share = f.hp / f.max;
+  f.st = f.st.map((v, k) => Math.max(1, Math.round(v * now.st[k] / was.st[k])));
+  f.max = f.st[0] * HP_K;
+  f.hp = Math.min(f.max, Math.round(f.max * share) + Math.floor(f.max * EVO_HEAL));
+  f.types = now.types; f.id = to; f.xp = 0; f.evoTo = 0;
+  if (mega) f.megaOn = true;
+  f.basic.i = basicOf(f);
+  s.ev.push({ k: "evolved", side: f.side, slot: f.slot, from, to, mega, x: f.x, y: f.y });
+}
+
 function stepAct(s, side, f) {
   const a = f.act;
   const m = moveAt(f, a.k), data = arenaMove(m.i);
@@ -592,7 +703,7 @@ function stepAct(s, side, f) {
       f.basicN = s.t - f.basicT <= BASIC_CHAIN ? f.basicN + 1 : 1;
       f.basicT = s.t;
       a.boost = f.basicN % 3 === 0;
-    } else { m.cd = cooldownOf(data); m.pp--; }
+    } else m.cd = cooldownOf(data);
     s.ev.push({ k: "fire", side, move: m.i, shape: a.shape, x: f.x, y: f.y, dx: a.dx, dy: a.dy, basic: Boolean(a.basic), boost: Boolean(a.boost) });
     // A move that changes its user's own stages does so as it fires (Close Combat, Overheat).
     if (data.p && data.sgu && data.sg && rnd(s) * 100 < (data.sgc ?? 100)) stages(s, f, data.sg);
@@ -857,19 +968,25 @@ function stepGround(s) {
       }
       s.ev.push({ k: "rumble" });
     }
-    s.drops = s.drops.filter((r) => {
-      if (--r.t > 0) return true;
-      s.ev.push({ k: "rock", x: r.x, y: r.y });
-      for (const f of bodies) {
-        if (!f || f.hp <= 0 || f.inv > 0) continue;
-        if ((f.x - r.x) * (f.x - r.x) + (f.y - r.y) * (f.y - r.y) > (ROCK_R + R) * (ROCK_R + R)) continue;
-        hurt(s, f, Math.max(1, Math.floor(f.max / 8 * effectiveness("rock", f.types))), null);
-        f.stun = Math.max(f.stun, sec(0.3));
-      }
-      return false;
-    });
   }
+  // A falling rock, or an eruption's lava bomb: shown on the ground, then down.
+  s.drops = s.drops.filter((r) => {
+    if (--r.t > 0) return true;
+    s.ev.push({ k: r.lava ? "lava" : "rock", x: r.x, y: r.y });
+    const rr = r.lava ? LAVA_R : ROCK_R;
+    for (const f of bodies) {
+      if (!f || f.hp <= 0 || f.inv > 0) continue;
+      if ((f.x - r.x) * (f.x - r.x) + (f.y - r.y) * (f.y - r.y) > (rr + R) * (rr + R)) continue;
+      if (r.lava) {
+        hurt(s, f, Math.max(1, Math.floor(f.max / 10 * effectiveness("fire", f.types))), null);
+        if (rnd(s) < 0.3) afflict(s, f, BRN);
+      } else hurt(s, f, Math.max(1, Math.floor(f.max / 8 * effectiveness("rock", f.types))), null);
+      f.stun = Math.max(f.stun, sec(0.3));
+    }
+    return false;
+  });
   stepItems(s, bodies);
+  stepHelpers(s);
   s.clouds = s.clouds.filter((c) => --c.t > 0);
   for (const f of bodies) {
     if (!f || f.hp <= 0) continue;
@@ -895,7 +1012,7 @@ function stepGround(s) {
       && !(s.weather === "sand" ? SAND_SAFE : SNOW_SAFE).some((t) => f.types.includes(T(t)))) hurt(s, f, Math.max(1, Math.floor(f.max / WEATHER_HURT)), null);
     if (f.haste > 0) f.haste--;
     // WATER (the Boardwalk): only a Water or Flying type moves freely in it.
-    f.wading = inRects(g.water, f.x, f.y) && !f.types.includes(T("water")) && !f.types.includes(T("flying"));
+    f.wading = inRects(waterOf(s), f.x, f.y) && !f.types.includes(T("water")) && !f.types.includes(T("flying"));
     // TALL GRASS (the Grove): it hides you while you are not attacking.
     f.hidden = Boolean(f.away) || (inRects(g.grass, f.x, f.y) && !f.act && !f.dodge)
       || s.clouds.some((c) => (c.x - f.x) * (c.x - f.x) + (c.y - f.y) * (c.y - f.y) < STEAM_R * STEAM_R);
@@ -936,7 +1053,38 @@ function stepItems(s, bodies) {
     return true;
   });
 }
+function stepHelpers(s) {
+  s.helpers = s.helpers.filter((h) => {
+    const foe = activeOf(s, 1 - h.side), mine = activeOf(s, h.side);
+    if (h.kind === "snorlax" && h.t > HELPER_LOCK && foe && foe.hp > 0) { h.x = foe.x; h.y = foe.y; }
+    if (--h.t > 0) return true;
+    s.ev.push({ k: "helperHit", kind: h.kind, side: h.side, x: h.x, y: h.y });
+    const r = HELPERS[h.kind].r ?? 0;
+    const near = foe && foe.hp > 0 && foe.inv <= 0 && (foe.x - h.x) * (foe.x - h.x) + (foe.y - h.y) * (foe.y - h.y) < (r + R) * (r + R);
+    if (h.kind === "chansey") { if (mine && mine.hp > 0) heal(s, mine, Math.floor(mine.max * HELPER_HEAL)); }
+    else if (h.kind === "jigglypuff") { if (near) afflict(s, foe, SLP); }
+    else if (near) {
+      hurt(s, foe, Math.max(1, Math.floor(foe.max / (h.kind === "snorlax" ? 6 : 7) * effectiveness("normal", foe.types))), null);
+      const [dx, dy] = norm(foe.x - h.x || 1, foe.y - h.y);
+      foe.kbx = dx * 1.4 / KB; foe.kby = dy * 1.4 / KB; foe.kbt = KB;
+      foe.stun = Math.max(foe.stun, sec(h.kind === "snorlax" ? 0.6 : 0.4));
+    }
+    return false;
+  });
+}
 function useItem(s, f, kind) {
+  if (kind === "poke-ball") {
+    const h = HELPER_KINDS[Math.floor(rnd(s) * HELPER_KINDS.length)], d = activeOf(s, 1 - f.side);
+    const [x, y] = h === "snorlax" && d ? [d.x, d.y] : [f.x, f.y];
+    s.helpers.push({ id: s.nextId++, kind: h, side: f.side, x, y, t: HELPERS[h].t });
+    s.ev.push({ k: "helper", kind: h, side: f.side, x, y });
+    return;
+  }
+  if (kind === "moon-stone") {
+    if (evoTargets(f.id).length) f.xp = Math.max(f.xp, EVO_XP);
+    else gain(s, f.side, SURGE_MAX);
+    return;
+  }
   if (kind === "potion") heal(s, f, Math.floor(f.max * 0.2));
   else if (kind === "full-heal") {
     if (f.status >= 0) { f.status = -1; f.badly = false; s.ev.push({ k: "cured", side: f.side }); }
@@ -955,9 +1103,9 @@ function useItem(s, f, kind) {
 // What holding a zone pays, by the arena's kind.
 function reward(s, f, kind) {
   if (!f) return;
-  if (kind === "pp") {
-    const m = [...f.kit].sort((a, b) => a.pp / ppOf(arenaMove(a.i)) - b.pp / ppOf(arenaMove(b.i)))[0];
-    if (m && m.pp < ppOf(arenaMove(m.i))) m.pp++;
+  if (kind === "ready") {
+    const m = [...f.kit].sort((a, b) => b.cd - a.cd)[0];
+    if (m) m.cd = 0;
   } else if (kind === "dodge") f.dodgeCd = 0;
   else if (kind === "cure") { if (f.status === BRN || f.status === PSN) { f.status = -1; f.badly = false; s.ev.push({ k: "cured", side: f.side }); } }
   else if (kind === "cool") for (const m of f.kit) m.cd = Math.max(0, m.cd - sec(2));
@@ -1074,7 +1222,7 @@ function surge(s, side, f) {
 // What a Pokemon's ULTI looses: its name and kind, by species, else by its first type.
 export function ultOf(f) {
   const type = TYPES[f.types[0]] ?? "normal";
-  const [name, kind] = ULT_NAMES[f.id] ?? [ULT_TYPE_NAME[type] ?? "Ultimate", ULT_KIND[type] ?? "nova"];
+  const [name, kind] = ULT_NAMES[f.id] ?? ULT_NAMES[speciesById(f.id)?.of] ?? [ULT_TYPE_NAME[type] ?? "Ultimate", ULT_KIND[type] ?? "nova"];
   return { name, kind, type };
 }
 function ultimate(s, side, f) {
@@ -1128,7 +1276,43 @@ function stepEvents(s) {
     s.ev.push({ k: "drop", x: W / 2, y: H / 2 });
   }
   if (s.t === s.plan.dark) { s.dark = DARK_T; s.ev.push({ k: "dark" }); }
-  else if (s.dark > 0 && --s.dark === 0) s.ev.push({ k: "light" });
+  else if (s.dark > 0 && --s.dark === 0) { s.white = false; s.ev.push({ k: "light" }); }
+  if (s.t === s.plan.floor) floorEvent(s);
+  if (s.tide > 0 && --s.tide === 0) s.ev.push({ k: "ebb" });
+  if (s.erupt > 0) {
+    if (s.erupt % ERUPT_EVERY === 0) {
+      const x = X0 + 1 + rnd(s) * (X1 - X0 - 2), y = Y0 + 1 + rnd(s) * (Y1 - Y0 - 2);
+      for (const [px, py] of [[x, y], [W - x, H - y]]) s.drops.push({ x: px, y: py, t: LAVA_WARN, lava: true });
+    }
+    s.erupt--;
+  }
+  // A stampede: the lane is shown, then the herd runs it and tramples whoever is in it.
+  s.lanes = s.lanes.filter((l) => {
+    if (--l.t <= 0) return false;
+    if (l.t > LANE_RUN) return true;
+    const hx = herdAt(l);
+    for (let side = 0; side < 2; side++) {
+      const f = activeOf(s, side);
+      if (!f || f.hp <= 0 || f.inv > 0 || l.hit[side] || Math.abs(f.y - l.y) > LANE_H / 2 || Math.abs(f.x - hx) > 1.2) continue;
+      l.hit[side] = true;
+      hurt(s, f, Math.max(1, Math.floor(f.max / 8 * effectiveness("normal", f.types))), null);
+      const out = f.y >= l.y ? 1 : -1;
+      f.kbx = l.dir * 1.5 / KB; f.kby = out * 1.2 / KB; f.kbt = KB;
+      f.stun = Math.max(f.stun, sec(0.5));
+      s.ev.push({ k: "trample", side, x: f.x, y: f.y });
+    }
+    return true;
+  });
+}
+function floorEvent(s) {
+  const kind = FLOOR_EVENT[s.arena];
+  s.ev.push({ k: "floor", kind });
+  if (kind === "roar") for (let side = 0; side < 2; side++) gain(s, side, ROAR_GAIN);
+  else if (kind === "moonstone") s.items.push({ id: s.nextId++, kind: "moon-stone", x: W / 2, y: H / 2, t: RARE_LIFE });
+  else if (kind === "tide") s.tide = TIDE_T;
+  else if (kind === "eruption") s.erupt = ERUPT_T;
+  else if (kind === "stampede") s.lanes.push({ y: Y0 + 2 + rnd(s) * (Y1 - Y0 - 4), dir: rnd(s) < 0.5 ? 1 : -1, t: LANE_WARN + LANE_RUN, hit: [false, false] });
+  else if (kind === "whiteout") { s.dark = WHITE_T; s.white = true; }
 }
 function gain(s, side, n) {
   const sd = s.sides[side], was = sd.meter;
@@ -1147,7 +1331,7 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     s.ev.push({ k: d.shield ? "blocked" : "evade", side: d.side, x: d.x, y: d.y, perfect });
     return;
   }
-  const m = arenaMove(move);
+  const m = BASIC[move] ? { ...BASIC[move], t: TYPES[a.types[0]] } : arenaMove(move);
   const eff = effectiveness(m.t, d.types);
   if (eff === 0) { s.ev.push({ k: "immune", side: d.side, x: d.x, y: d.y }); return; }
   let dmg = 0;
@@ -1161,6 +1345,7 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
       * (finalMinute(s) ? FINAL_DMG : 1) * weatherK(s, m.t) * (shock ? SHOCK : 1)
       * (contact && roleOf(a) === "brawler" ? BRAWL_HIT : 1) * (!contact && roleOf(d) === "brawler" ? BRAWL_GUARD : 1)));
     d.hp = Math.max(0, d.hp - dmg);
+    a.xp += dmg / d.max + (d.hp === 0 ? EVO_XP : 0);
     const st = s.sides[a.side].stats;
     st.dealt += dmg; st.hits++; st.chain++; st.best = Math.max(st.best, st.chain);
     s.sides[d.side].stats.chain = 0;
@@ -1246,9 +1431,9 @@ export const LEVELS = {
   // `jab`: how often it takes a basic attack it could (1 when unsaid). Easy swings at half its chances.
   easy: { react: sec(0.5), err: 0.45, dodge: 0.08, jab: 0.5 },
   normal: { react: sec(0.3), err: 0.18, dodge: 0.4, swap: 0.25, surge: 3, items: true },
-  hard: { react: sec(0.18), err: 0.07, dodge: 0.7, swap: 0.35, lead: true, shield: true, zones: true, surge: 3.5, items: true },
+  hard: { react: sec(0.18), err: 0.07, dodge: 0.7, swap: 0.35, lead: true, shield: true, zones: true, surge: 3.5, items: true, mega: true },
   // The Arena Ladder's top masters (ladder.js): faster, surer, and it takes the zones.
-  champion: { react: sec(0.14), err: 0.03, dodge: 0.8, swap: 0.35, lead: true, shield: true, zones: true, surge: 3.5, items: true },
+  champion: { react: sec(0.14), err: 0.03, dodge: 0.8, swap: 0.35, lead: true, shield: true, zones: true, surge: 3.5, items: true, mega: true },
 };
 
 // How far each shape reaches, for choosing where to stand and when to throw.
@@ -1285,6 +1470,10 @@ function cpuInput(s, side) {
     return { ...NO_INPUT, mx: k < 0.25 ? 1 : k < 0.5 ? 0 : k < 0.75 ? -1 : 0, my: k < 0.25 ? 0 : k < 0.5 ? 1 : k < 0.75 ? 0 : -1 };
   }
   if (!foe) return { ...NO_INPUT, mx: (W / 2 - me.x) > 0 ? 1 : -1 };
+  if (L.mega && megaOf(me) && !s.sides[side].megaUsed && !me.act && !me.evo) return { ...NO_INPUT, mega: true };
+  // A stampede's lane shown under it: off it, the short way.
+  const lane = s.lanes.find((l) => l.t > LANE_RUN && Math.abs(me.y - l.y) < LANE_H / 2 + 0.4);
+  if (lane && L.react) return { ...NO_INPUT, my: me.y >= lane.y ? 1 : -1 };
   /* A foe in tall grass is where it was last seen: the CPU goes there and
      holds its fire. */
   const gap = Math.abs(foe.x - me.x) + Math.abs(foe.y - me.y);
@@ -1327,7 +1516,7 @@ function cpuInput(s, side) {
         return { ...NO_INPUT, mx: -uy * way - ux * away, my: ux * way - uy * away, dodge: true };
       }
       if (L.shield && !me.act) {
-        const k = me.kit.findIndex((m) => SHIELDS.has(arenaMove(m.i).n) && !m.cd && m.pp > 0);
+        const k = me.kit.findIndex((m) => SHIELDS.has(arenaMove(m.i).n) && !m.cd);
         if (k >= 0) return { ...NO_INPUT, fire: k };
       }
     }
@@ -1345,19 +1534,11 @@ function cpuInput(s, side) {
      blows never usable, firing once in ten seconds. */
   let pick = -1, bestV = 0;
   me.kit.forEach((m, k) => {
-    if (m.cd || m.pp <= 0) return;
+    if (m.cd) return;
     const v = worth(me, foe, m);
     if (v > bestV) { bestV = v; pick = k; }
   });
-  /* Spent: a level that switches (`swap`) brings in a teammate that can still
-     fight; Easy, which never switches, struggles where it stands. */
-  if (pick < 0 && spent(me) && !me.act) {
-    const next = L.swap ? sd.team.findIndex((f, i) => i !== sd.active && f.hp > 0 && !spent(f)) : -1;
-
-    if (next >= 0 && sd.swapCd === 0) return { ...NO_INPUT, swap: next };
-    if (next < 0 && !(me.struggle?.cd > 0)) pick = 0;
-  }
-  const shapeAt = (k) => shapeOf(arenaMove(me.kit[k].pp <= 0 && spent(me) ? STRUGGLE : me.kit[k].i));
+  const shapeAt = (k) => shapeOf(arenaMove(me.kit[k].i));
   const reach = pick >= 0 ? reachOf(shapeAt(pick)) : 4;
   // Nothing ready: in to the basic attack's reach, a jab's or a bolt's.
   const basicReach = basicShape(me) === "melee" ? MELEE_RANGE + R * 0.5 : BASIC_RANGE * 0.8;
@@ -1390,7 +1571,7 @@ function cpuInput(s, side) {
   if (pick >= 0 && dist > reach) {
     let now = -1, nowV = 0;
     me.kit.forEach((m, k) => {
-      if (m.cd || m.pp <= 0 || dist > reachOf(shapeAt(k))) return;
+      if (m.cd || dist > reachOf(shapeAt(k))) return;
       const v = worth(me, foe, m);
       if (v > nowV) { nowV = v; now = k; }
     });
@@ -1465,7 +1646,7 @@ const q64 = (v, lim) => (Number.isFinite(v) ? Math.round(clamp(v, -lim, lim) * 6
 const pick = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : -1);
 export const cleanInput = (i) => ({
   mx: q64(i?.mx, 1), my: q64(i?.my, 1), ax: q64(i?.ax, 40), ay: q64(i?.ay, 40),
-  fire: pick(i?.fire, 0, 3), basic: Boolean(i?.basic), dodge: Boolean(i?.dodge), swap: pick(i?.swap, 0, 5), surge: Boolean(i?.surge), use: Boolean(i?.use),
+  fire: pick(i?.fire, 0, 3), basic: Boolean(i?.basic), dodge: Boolean(i?.dodge), swap: pick(i?.swap, 0, 5), surge: Boolean(i?.surge), use: Boolean(i?.use), mega: Boolean(i?.mega),
 });
 export function lockstep(link, me, round = 0) {
   const mine = new Map(), theirs = new Map(), myHash = new Map(), theirHash = new Map();
@@ -1523,8 +1704,8 @@ export function rulesPrint() {
 
 // What a replay compares: where everyone is and how they are, each tick's end.
 export const stateHash = (s) => hash(JSON.stringify([s.t, s.intro, s.rs, s.winner,
-  s.items.map((it) => [it.kind, it.x, it.y, it.t]), s.weather, s.dark, s.strikes.map((z) => [z.x, z.y, z.t]), s.clouds.map((c) => [c.x, c.y, c.t]),
+  s.items.map((it) => [it.kind, it.x, it.y, it.t]), s.weather, s.dark, s.tide, s.erupt, s.lanes.map((l) => [l.y, l.t]), s.helpers.map((h) => [h.kind, h.x, h.y, h.t]), s.strikes.map((z) => [z.x, z.y, z.t]), s.clouds.map((c) => [c.x, c.y, c.t]),
   s.sudden ? 1 : 0,
-  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.pp), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused])]),
+  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.cd), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused, f.id, f.xp, f.evo])]),
   s.shots.map((p) => [p.x, p.y]), s.hazards.map((z) => [z.x, z.y, z.t]),
   s.cover.map((c) => c.hp), [s.zone.open, s.zone.t, s.zone.claimed], s.drops.map((r) => [r.x, r.y, r.t])]));

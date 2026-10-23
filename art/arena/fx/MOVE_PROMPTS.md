@@ -116,3 +116,23 @@ Game Boy Advance Pokémon Emerald battle-animation pixel art of the move Flash C
 ```
 Game Boy Advance Pokémon Emerald battle-animation pixel art of the move Stone Edge erupting from the ground, 5 frames side by side in ONE horizontal row, each frame the same size and centred in its own cell, clear empty transparent space between frames, wide 5:2 canvas. Frame 1: a crack opens with three small pebbles jumping up. Frame 2: two sharp stone spears stab up out of the crack. Frame 3: a full jagged cluster of five pale stone spears at different heights and angles, a glint on the tallest tip. Frame 4: the spears crack across with chips flying. Frame 5: the spears crumble into falling rubble and dust. Palette: white, pale stone, warm grey, brown, dark brown outline. Crisp hard-edged pixels, no anti-aliasing, no blur, no gradients, no text, no Pokémon, no shadow, fully transparent background (PNG alpha).
 ```
+
+## Evolving in a match (optional - the game draws its own until these exist)
+
+`art/arena/fx/moves/evolve.png` - 8 frames, played behind the Pokemon across its 1.6 s evolution
+
+```
+Game Boy Advance Pokémon Emerald pixel art of the classic Pokémon evolution light, 8 frames side by side in ONE horizontal row, each frame the same size and centred in its own cell, clear empty transparent space between frames, wide 4:1 canvas. NO Pokémon in any frame - the middle of every frame is EMPTY, a creature will be drawn there. Frame 1: a faint ring of light on the ground. Frame 2: a thin pillar of pale blue-white light rises from the ring. Frames 3 to 6: the pillar widens and brightens, small sparkles and light motes spiral up and inward toward the empty centre, a second ring pulses outward on the ground. Frame 7: the pillar at its brightest, white-hot edges, the motes gathered tight around the empty centre. Frame 8: the pillar bursts outward into a ring of sparkles and short rays. Palette: white, pale cyan, ice blue, soft gold sparkles, light blue outline. Crisp hard-edged pixels, no anti-aliasing, no blur, no gradients, no text, no Pokémon, no ground texture, fully transparent background (PNG alpha).
+```
+
+`art/arena/fx/moves/mega-evolve.png` - 8 frames, behind a Pokemon as it Mega Evolves
+
+```
+Game Boy Advance Pokémon Emerald pixel art of Mega Evolution energy, 8 frames side by side in ONE horizontal row, each frame the same size and centred in its own cell, clear empty transparent space between frames, wide 4:1 canvas. NO Pokémon in any frame - the middle of every frame is EMPTY, a creature will be drawn there. Frame 1: a small rainbow Key Stone glint at the top of the frame. Frame 2: rainbow ribbons of light (pink, orange, yellow, green, cyan, purple) shoot down from it. Frames 3 to 6: the ribbons wrap around the empty centre as a twisting double helix and close into a glowing rainbow-edged sphere of light, crackling with white sparks. Frame 7: the sphere at full size, cracks of white light across its surface. Frame 8: the sphere shatters outward into rainbow shards and sparkles. Palette: white, hot pink, orange, yellow, green, cyan, violet, deep purple outline. Crisp hard-edged pixels, no anti-aliasing, no blur, no gradients, no text, no Pokémon, fully transparent background (PNG alpha).
+```
+
+`art/arena/fx/moves/mega-symbol.png` - 1 frame, shown over a new Mega
+
+```
+Game Boy Advance Pokémon Emerald pixel art of the Mega Evolution symbol as a single icon centred on a square transparent canvas: a round emblem whose outer ring is a rainbow (pink, orange, yellow, green, cyan, violet), inside it the classic Mega Evolution mark - two curved strands rising like a stylised DNA helix that meet at the top in a point, with a small round gem between them near the bottom. Bold white highlights, a thin dark outline, a soft glow ring. Crisp hard-edged pixels, no anti-aliasing, no blur, no gradients, no text, fully transparent background (PNG alpha).
+```

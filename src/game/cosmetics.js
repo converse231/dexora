@@ -97,10 +97,12 @@ export const SKINS = [
    styles of the same Pokemon take a new id. */
 export const IMPACTS = [
   { id: "ult-25", species: 25, name: "Thunder", style: "Sketch · Inversion · Strike", price: 0 },
-  { id: "ult-6", species: 6, name: "Blast Burn", style: "Sketch · Inversion · Strike", price: 60000 },
-  { id: "ult-9", species: 9, name: "Hydro Cannon", style: "Sketch · Inversion · Strike", price: 60000 },
-  { id: "ult-3", species: 3, name: "Frenzy Plant", style: "Sketch · Inversion · Strike", price: 60000 },
 ];
+/* WITHDRAWN (2026-10-23, your call): the first paid sequences, replaced for
+   everyone by the centred single panels. A save that bought one is REFUNDED
+   its price once at load and the id leaves `impacts` - so it cannot pay
+   twice. An id here is never sold again. */
+export const WITHDRAWN = { "ult-6": 60000, "ult-9": 60000, "ult-3": 60000 };
 export const impactById = (id) => IMPACTS.find((x) => x.id === id) ?? null;
 export const impactOwned = (id, bought) => impactById(id)?.price === 0 || bought.includes(id);
 // The impact frame a species plays: owned, not switched off.

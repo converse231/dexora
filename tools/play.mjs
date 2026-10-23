@@ -1942,21 +1942,33 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
   assert.deepEqual(boot({ ...pika, party: [1, 7] }).e.state.party, [1], "a party member not in the Box was kept");
   assert.equal(boot({ ...pika, buddy: 7 }).e.state.buddy, null, "a follower not in the Box was kept");
   await savedField("skins", ["giovanni", "from_a_newer_build"], "junk", []);
-  await savedField("impacts", ["ult-6", "ult-from-a-newer-build"], "junk", []);
+  await savedField("impacts", ["ult-25", "ult-from-a-newer-build"], "junk", []);
   await savedField("impactsOff", ["ult-25"], 7, []);
   {
     /* ULTI IMPACT FRAMES: a free one is owned and on; a paid one costs its
        price once and comes on; off is off; a second buy is refused. */
     const C = await import("../src/game/cosmetics.js");
-    const paid = C.IMPACTS.find((x) => x.price > 0), free = C.IMPACTS.find((x) => x.price === 0);
-    const { e } = boot({ ...SAVE, money: paid.price + 5 });
+    const free = C.IMPACTS.find((x) => x.price === 0);
+    const { e } = boot({ ...SAVE, money: 5 });
     assert.equal(C.impactFor(free.species, e.state.impacts, e.state.impactsOff), free.id, "the free impact frame was not on");
-    assert.ok(e.buyImpact(paid.id) && e.state.money === 5, "a paid impact frame did not cost its price");
-    assert.ok(!e.buyImpact(paid.id), "an impact frame was bought twice");
-    assert.equal(C.impactFor(paid.species, e.state.impacts, e.state.impactsOff), paid.id, "a bought impact frame was not on");
-    e.equipImpact(paid.id, false);
-    assert.equal(C.impactFor(paid.species, e.state.impacts, e.state.impactsOff), null, "an impact frame switched off still played");
-    assert.ok(!boot({ ...SAVE, money: 0 }).e.buyImpact(paid.id), "an impact frame was bought without the money");
+    e.equipImpact(free.id, false);
+    assert.equal(C.impactFor(free.species, e.state.impacts, e.state.impactsOff), null, "an impact frame switched off still played");
+    // A paid one on sale: costs its price once, then is on (a new style lands in IMPACTS).
+    const paid = C.IMPACTS.find((x) => x.price > 0);
+    if (paid) {
+      const { e: rich } = boot({ ...SAVE, money: paid.price + 5 });
+      assert.ok(rich.buyImpact(paid.id) && rich.state.money === 5 && !rich.buyImpact(paid.id), "a paid impact frame did not cost its price once");
+    }
+    /* WITHDRAWN (the first sequences, 2026-10-23): a save that bought one gets
+       its price back once - the id leaves `impacts`, so a reload pays nothing
+       more - and it can never be bought again. */
+    const [gone, price] = Object.entries(C.WITHDRAWN)[0];
+    const back = boot({ ...SAVE, money: 7, impacts: [gone, "ult-25"] }).e;
+    assert.equal(back.state.money, 7 + price, "a withdrawn impact frame was not refunded");
+    assert.deepEqual(back.state.impacts, ["ult-25"], "a refunded impact frame stayed in the save");
+    const again = boot({ ...SAVE, money: back.state.money, impacts: back.state.impacts }).e;
+    assert.equal(again.state.money, 7 + price, "a withdrawn impact frame was refunded twice");
+    assert.ok(!boot({ ...SAVE, money: 1e7 }).e.buyImpact(gone), "a withdrawn impact frame was sold again");
   }
   await savedField("skin", "lass", 42, null, { ...SAVE, skins: ["lass"] });
   assert.equal(boot({ ...SAVE, skin: "lass" }).e.state.skin, null, "a skin worn but never bought was kept");

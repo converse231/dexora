@@ -1,3 +1,31 @@
+# ULTI impact panels - centred (2026-10-23)
+
+One panel per Pokemon, the same black-and-white manga art as the first panels, with the Pokemon in the middle. Attach the current `art/arena/fx/ult-<id>.png` as a style reference when generating. Save over the old panel, then run `npm run fx`.
+
+## Pikachu - Thunder - `art/arena/fx/ult-25.png`
+
+```
+Black-and-white Japanese manga impact panel, clean black ink line art with grey halftone screentone shading, the same style as the attached reference image. Pikachu (a small chubby mouse with long pointed black-tipped ears, round red cheek pouches crackling with electricity and a lightning-bolt shaped tail) stands EXACTLY IN THE CENTRE of the image, full body, facing the viewer in a fierce three-quarter view, mouth open in a battle cry, unleashing Thunder: jagged white lightning bolts crash down from the top of the frame onto it and arc outward to both sides. Dense black speed lines radiate from the centre out to every edge of the image, framing Pikachu like a spotlight. Cracked ground and flying rock debris around its feet. Big bold outlined katakana sound effects in grey screentone: ドォン!! across the top left and top right corners, ドン!! in the lower left and lower right corners, all kept clear of Pikachu. Pikachu fills about 40% of the image height, the centre of its body on the centre of the image, symmetrical composition. Bottom fifth of the image calmer, with only debris and speed lines. No colour, no panel border, no watermark, no other characters. 16:9, 1376x768 pixels.
+```
+
+## Charizard - Blast Burn - `art/arena/fx/ult-6.png`
+
+```
+Black-and-white Japanese manga impact panel, clean black ink line art with grey halftone screentone shading, the same style as the attached reference image. Charizard (an orange dragon with a cream belly, huge wings with dark teal undersides, two horns, and a flame burning on the tip of its tail) stands EXACTLY IN THE CENTRE of the image, full body, facing the viewer, wings spread wide and symmetrical, head thrown back roaring, unleashing Blast Burn: a column of fire erupts from the ground around it and towering flames billow up behind its wings on both sides. Dense black speed lines radiate from the centre out to every edge of the image, framing Charizard like a spotlight. Cracked, scorched ground and flying rock debris around its feet. Big bold outlined katakana sound effects in grey screentone: ドォン!! across the top left and top right corners, ドン!! in the lower left and lower right corners, all kept clear of Charizard. Charizard fills about 55% of the image height, the centre of its body on the centre of the image, symmetrical composition. Bottom fifth of the image calmer, with only debris and speed lines. No colour, no panel border, no watermark, no other characters. 16:9, 1376x768 pixels.
+```
+
+## Blastoise - Hydro Cannon - `art/arena/fx/ult-9.png`
+
+```
+Black-and-white Japanese manga impact panel, clean black ink line art with grey halftone screentone shading, the same style as the attached reference image. Blastoise (a large bipedal blue tortoise with a heavy brown shell and two water cannons sticking up out of its shell over its shoulders) stands EXACTLY IN THE CENTRE of the image, full body, facing the viewer, feet planted wide, mouth open, unleashing Hydro Cannon: both shoulder cannons blast enormous jets of water straight toward the viewer, spraying and curling outward to both sides in great splashes. Dense black speed lines radiate from the centre out to every edge of the image, framing Blastoise like a spotlight. Cracked wet ground, water droplets and rock debris around its feet. Big bold outlined katakana sound effects in grey screentone: ドォン!! across the top left and top right corners, ドン!! in the lower left and lower right corners, all kept clear of Blastoise. Blastoise fills about 55% of the image height, the centre of its body on the centre of the image, symmetrical composition. Bottom fifth of the image calmer, with only debris and speed lines. No colour, no panel border, no watermark, no other characters. 16:9, 1376x768 pixels.
+```
+
+## Venusaur - Frenzy Plant - `art/arena/fx/ult-3.png`
+
+```
+Black-and-white Japanese manga impact panel, clean black ink line art with grey halftone screentone shading, the same style as the attached reference image. Venusaur (a large squat four-legged blue-green reptile with a huge pink flower in full bloom on its back, surrounded by broad palm-like leaves) stands EXACTLY IN THE CENTRE of the image, full body, facing the viewer head-on, glaring, unleashing Frenzy Plant: enormous thorny vines and roots burst up out of the ground on both sides of it and whip outward toward the edges. Dense black speed lines radiate from the centre out to every edge of the image, framing Venusaur like a spotlight. Cracked ground and flying rock debris around its feet. Big bold outlined katakana sound effects in grey screentone: ドォン!! across the top left and top right corners, ドン!! in the lower left and lower right corners, all kept clear of Venusaur. Venusaur fills about 50% of the image height, the centre of its body on the centre of the image, symmetrical composition. Bottom fifth of the image calmer, with only debris and speed lines. No colour, no panel border, no watermark, no other characters. 16:9, 1376x768 pixels.
+```
+
 # ULTI impact sequences - image prompts
 
 Each famous Pokemon's ULTI can play a SEQUENCE of up to four stills (the game cuts between them every third of a second, then the move's name lands low and centred).

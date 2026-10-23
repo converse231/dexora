@@ -16,13 +16,29 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-23-arena-evolve",
+    icon: "🧬",
+    date: "October 2026",
+    title: "Evolve mid-battle, Mega Evolution and floor events",
+    items: [
+      ["Evolve in battle", "Land hits to fill the green bar - your Pokémon evolves on the spot."],
+      ["Mega Evolution", "Once a match, Mega Evolve any Pokémon whose Mega your Pokédex has."],
+      ["Every floor has an event", "Crowd roars, Moon Stones, high tide, eruptions, stampedes and whiteouts."],
+      ["Hits that hit", "Bigger numbers, basic attacks with your Pokémon's type, and longer bolts."],
+      ["Poké Ball", "Grab one on the floor for a helper: Electrode, Snorlax, Chansey or Jigglypuff."],
+      ["Sound effects", "The Arena has sound now - off until you turn it on in the pause menu."],
+      ["ULTI Shop refunds", "The first impact-frame sets were withdrawn; anything you bought is refunded."],
+    ],
+  },
+  {
     id: "2026-10-23-ulti-shop",
     icon: "⚡",
     date: "October 2026",
     title: "The ULTI Shop and livelier moves",
     items: [
       ["ULTI Shop", "Buy and equip drawn impact frames for your ULTIs - Pikachu's Thunder is free."],
-      ["Faster skills", "Moves wind up and cool down quicker."],
+      ["No more PP", "Moves never run out - each one just waits on its cooldown."],
+      ["Dash", "The dodge is now a dash: a quick burst you can still use to slip through attacks."],
       ["Moves you can see", "Psychic lifts and throws, rocks are hurled, beams charge up, Fire Blast bursts into its fire kanji."],
       ["Confusion and Smokescreen", "Confused Pokémon stumble the wrong way; smoke hides whoever stands in it."],
       ["Double Team, alive", "The copies move on their own now."],
