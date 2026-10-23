@@ -156,6 +156,7 @@ const fxPath = (name) => `arena/fx/${name}.png?v=${FX_REV}`;
    land instead: Psychic is a shot, Rock Slide a blast, and neither looks
    right flying or round its user. */
 const LANDS = new Set(["psychic", "rock-slide"]);
+const inArea = (rects, x, y) => (rects ?? []).some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
 const flats = new WeakMap();
 function flat(im, colour = "#fff") {
   let per = flats.get(im);
@@ -433,7 +434,7 @@ const frameOf = (f, t) => {
 /* `sides`: each team's looks ({id, shiny}). `names`: per side, who fights
    ("You", a master's name, "CPU - Hard") for the VS card. `me`: which side
    is the player's (the low-HP pulse and the combo's corner). */
-export function createRenderer(canvas, sides, arena = "indigo", { names = [["You"], ["CPU"]], me = 0, moves = [] } = {}) {
+export function createRenderer(canvas, sides, arena = "indigo", { names = [["You"], ["CPU"]], me = 0, moves = [], ults = [] } = {}) {
   const ground = GROUND[arena] ?? GROUND.indigo;
   const coverPath = `arena/cover/${ground.cover}.webp`;
   const ctx = canvas.getContext("2d");
@@ -623,6 +624,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   // The shared sheets, and only the moves this match's two teams know (the moves' art is a megabyte in all).
   for (const name of Object.keys(FX)) if (!name.startsWith("moves/") && !name.startsWith("ult-")) img(fxPath(name));
   for (const i of moves) { const key = artKey(i); if (key) img(fxPath(key)); }
+  // Each fighter's ULTI panel - its own drawing, or its type's ink - so the first ULTI never draws the fallback.
+  for (const { id, type } of ults) { const key = FX[`ult-${id}`] ? `ult-${id}` : `ult-${INK[type] ?? "speed"}`; if (FX[key]) img(fxPath(key)); }
   for (const kind of Object.keys(PICKUPS)) img(`items/${kind}.png`);
   const leads = sides.map((team) => team[0] && spriteUrl(team[0].id, team[0].shiny ? "shiny" : null));
   // Every fighter's front art: the VS card's leads, and any of them an ULTI's panel draws.
@@ -952,7 +955,11 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           if (pow >= 90) { shake(0.32); zoomAt(body.x, body.y, 0.045); impactFrame(sx(body.x), sy(body.y)); sheet("shockwave", body.x, body.y + 0.35, 2.8, colour, 22); }
           else if (pow) shake(0.08 + pow / 600);
         }
-        if (e.shape === "melee" || e.shape === "dash") { p.ox += e.dx * 0.4; p.oy += e.dy * 0.4; p.sx = 0.86; p.sy = 1.16; if (e.shape === "dash") dust(body.x, body.y, 5); }
+        if (e.shape === "melee" || e.shape === "dash") {
+          p.ox += e.dx * 0.4; p.oy += e.dy * 0.4; p.sx = 0.86; p.sy = 1.16;
+          if (e.shape === "dash") dust(body.x, body.y, 5);
+          else if (!isBasic(e.move) || rand() < 0.4) dust(body.x + e.dx * 0.7, body.y + e.dy * 0.4, isBasic(e.move) ? 1 : 3);
+        }
         // A blow's own art, at its reach.
         const mk = e.shape === "melee" && !isBasic(e.move) && !LANDS.has(slugOf(e.move)) && !VANISH[slugOf(e.move)] && artKey(e.move);
         if (mk) fx.push({ k: "mv", key: mk, x: body.x + e.dx * 1.2, y: body.y - 0.2 + e.dy * 1.2, size: 3.2, ang: Math.atan2(e.dy, e.dx), t: 0, life: 24 });
@@ -979,14 +986,15 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         if (moveOf(e.move).p && bm) mark(bm, e.x + e.dx * e.len / 2, e.y + 0.25 + e.dy * e.len / 2, 0.9, null, e.len, Math.atan2(e.dy, e.dx));
       } else if (e.k === "pulse") {
         const type = typeOf(e.move), colour = colourOf(e.move), pk = !LANDS.has(slugOf(e.move)) && artKey(e.move);
-        if (pk) fx.push({ k: "mv", key: pk, x: e.x, y: e.y + 0.1, size: e.wide ? 6.5 : e.r * 2.4, ang: 0, t: 0, life: 32 });
+        const toward = (activeOf(s, 1 - e.side)?.x ?? W) < e.x ? Math.PI : 0;
+        if (pk) fx.push({ k: "mv", key: pk, x: e.x, y: e.y + 0.1, size: e.wide ? 6.5 : e.r * 2.4, ang: e.wide ? toward : 0, t: 0, life: 32 });
         if (e.wide) {
           /* THE WHOLE COURT: the move's colour floods the screen and its matter
              blows across every tile (its own art stamped over the court where
              it has one) - a Heat Wave, a Blizzard, a Petal Blizzard. */
           overlays.push({ k: "tint", colour, t: 0, life: 30 });
           const foe = activeOf(s, 1 - e.side), dir = foe && foe.x < e.x ? -1 : 1;
-          if (pk) for (let i = 0; i < 7; i++) fx.push({ k: "mv", key: pk, x: INSET + 1.5 + rand() * (W - 2 * INSET - 3), y: INSET + 1.5 + rand() * (H - 2 * INSET - 3), size: 4 + rand() * 2, ang: 0, t: -i * 3, life: 30 });
+          if (pk) for (let i = 0; i < 7; i++) fx.push({ k: "mv", key: pk, x: INSET + 1.5 + rand() * (W - 2 * INSET - 3), y: INSET + 1.5 + rand() * (H - 2 * INSET - 3), size: 4 + rand() * 2, ang: toward, t: -i * 3, life: 30 });
           const name = moveOf(e.move).n;
           for (let i = 0; i < (still ? 0 : 90); i++) {
             const x = INSET + rand() * (W - 2 * INSET), y = INSET + rand() * (H - 2 * INSET), vx = dir * (0.08 + rand() * 0.1), vy = (rand() - 0.5) * 0.02;
@@ -1235,7 +1243,11 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       const win = overSeen.winner >= 0 ? activeOf(s, overSeen.winner) : null;
       const lost = fx.find((e) => e.k === "corpse");
       if (outro < RESULT_AT && lost && overSeen.why === "knockout") { tz = 1.45; tx = lost.x; ty = lost.y; }
-      else if (win) { tz = 1.55; [tx, ty] = lerp(win); }
+      else if (win) {
+        tz = 1.55; [tx, ty] = lerp(win);
+        // Once the result card comes up from the bottom, the winner stands above it.
+        if (outro >= RESULT_AT) ty += (ch * 0.14) / (px * tz);
+      }
     } else if (bodies.length === 2) {
       const [ax, ay] = lerp(bodies[0]), [bx, by] = lerp(bodies[1]);
       if (ch > cw) {
@@ -1507,6 +1519,13 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       if (f.power > 0) glow(sx(x), sy(y - 0.3), px * 1.2, "#ff5a3d", 0.3 + 0.12 * Math.sin(clock / 90));
       if (ground.ice && f.moving && rand() < k / 4) part({ k: "dot", x, y: y + 0.35, vx: 0, vy: 0, colour: "#e8fbff", life: 18, size: 0.12 });
       if (!ground.ice && f.moving && !f.wading && rand() < k / 14) dust(x, y, 1);
+      // Its type in the air round it, faintly - embers off a fire type, droplets, sparks, a drifting leaf.
+      if (!still && rand() < 0.05 * k) trailBit(TYPES[f.types[0]] ?? "normal", x + (rand() - 0.5) * 0.8, y - 0.2 - rand() * 0.7, 0, 0.4, colours[TYPES[f.types[0]]] ?? "#ffffff");
+      // Knocked back, it skids: dust off the floor (spray on the Boardwalk's water).
+      if (f.kbt > 0 && rand() < 0.7 * k) {
+        if (f.wading) part({ k: "dot", x, y: y + 0.35, vx: (rand() - 0.5) * 0.03, vy: 0, vz: 0.05, g: 0.006, colour: "#d8f6ff", life: 18, size: 0.08 });
+        else dust(x, y, 1);
+      }
       // In tall grass: yours shows faint (you know where you are), the foe's barely.
       const hid = f.hidden ? (f.side === me ? 0.5 : 0.12) : 1;
       const jit = p.jit > 0 && !still ? [(rand() - 0.5) * 0.14, (rand() - 0.5) * 0.1] : [0, 0];
@@ -1536,6 +1555,17 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.restore();
       }
       statusOn(f, x, y, k);
+      /* ITS HP OVER ITS HEAD (asked for, 2026-10-23: the plates are far from
+         the fight on a big screen): green to amber to red, the chunk a hit
+         took trailing behind in white, rimmed in its side's colour. Not over
+         a foe hidden in grass or the dark - the dark sheet covers it. */
+      if (!(f.hidden && f.side !== me)) {
+        const hp = Math.max(0, f.hp / f.max);
+        p.hpShow = p.hpShow == null || p.hpShow < hp ? hp : Math.max(hp, p.hpShow - 0.01 * k);
+        hpBar(f, p, x, y);
+        // Double Team's copies carry the same bar: one over the real one alone gave the trick away.
+        for (const [cx, cy] of clonesOf({ clones: f.clones, x, y })) hpBar(f, p, cx, cy);
+      }
       if (f.shield > 0) {
         ctx.save(); ctx.globalAlpha = 0.35 + 0.25 * Math.abs(Math.sin(clock / 100));
         ctx.strokeStyle = "#9fe3ff"; ctx.lineWidth = Math.max(2, px / 8);
@@ -1584,6 +1614,11 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       glow(sx(x), sy(y), px * (bas ? 0.6 : 1.15), colour, 0.65);
       if (!bas) glow(sx(x), sy(y), px * 0.4, "#ffffff", 0.55);
       if (rand() < (bas ? 0.35 : 1.1) * k) trailBit(bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, colour);
+      // Skimming the Boardwalk's water it throws spray; over the Grove's grass, it tears a leaf loose.
+      if (!still && rand() < 0.3 * k) {
+        if (inArea(ground.water, x, y)) part({ k: "dot", x, y: y + 0.3, vx: p.dx * 0.02, vy: 0, vz: 0.06, g: 0.006, colour: "#d8f6ff", life: 20, size: 0.08, splash: true });
+        else if (inArea(ground.grass, x, y)) part({ k: "leaf", x, y: y + 0.3, vx: p.dx * 0.03, vy: -0.01, colour: rand() < 0.5 ? "#4fae47" : "#7fd35a", life: 34, size: 0.12, vr: 0.25 });
+      }
       const art = arenaArt(slugOf(p.move))?.shot, key = !bas && !LANDS.has(slugOf(p.move)) && artKey(p.move), ang0 = Math.atan2(p.dy, p.dx);
       // Its own art: a projectile looping along its path, or a stream trailing behind its head.
       if (key && (FX[key].n > 1 ? moveFx(key, clock / 70 % FX[key].n, sx(x), sy(y), px * 2.4, ang0, 1)
@@ -1736,6 +1771,19 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.25 + 0.4 * kk; ctx.strokeStyle = "#fff59a"; ctx.lineWidth = Math.max(1, px / 14);
       ctx.beginPath(); ctx.moveTo(sx(z.x) + (rand() - 0.5) * px, sy(z.y) - px * 9); ctx.lineTo(sx(z.x), sy(z.y)); ctx.stroke(); ctx.restore();
     }
+  }
+
+  function hpBar(f, p, x, y) {
+    const hp = Math.max(0, f.hp / f.max);
+    const bw = px * 1.7, bh = Math.max(6, Math.round(px * 0.2)), bx = sx(x) - bw / 2, by = sy(y) - px * 2.1;
+    ctx.save();
+    ctx.fillStyle = "rgba(6,8,18,0.82)"; ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+    ctx.fillStyle = "#fff3c4"; ctx.fillRect(bx, by, bw * (p.hpShow ?? hp), bh);
+    ctx.fillStyle = hp > 0.5 ? "#5fe08a" : hp > 0.2 ? "#ffd23f" : Math.floor(clock / 160) % 2 ? "#ff5a4d" : "#ff8a7a";
+    ctx.fillRect(bx, by, bw * hp, bh);
+    ctx.strokeStyle = f.side === me ? MINE : THEIRS; ctx.lineWidth = Math.max(1, px / 26);
+    ctx.strokeRect(bx - 2, by - 2, bw + 4, bh + 4);
+    ctx.restore();
   }
 
   function stepPart(p, k) {
@@ -2138,8 +2186,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         const won = res.winner === me, draw = res.winner < 0;
         // A win without losing a point of HP is a PERFECT, as a fighting game's is.
         const perfect = !draw && !hurtAt[res.winner];
+        // At the top: the result card comes up under it and never covers it (reported 2026-10-23).
         stampAt(draw ? "DRAW" : perfect ? "PERFECT" : won ? "VICTORY" : "DEFEAT", draw ? "#d8deff" : perfect ? "#45d4ff" : won ? "#ffd23f" : "#9aa5c8", t, Infinity,
-          perfect ? (won ? "Not a scratch" : "Not one hit landed") : null);
+          perfect ? (won ? "Not a scratch" : "Not one hit landed") : null, canvas.height * 0.17);
         if (won && !still) confetti(k, t);
       }
     }
@@ -2199,7 +2248,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     ctx.restore();
   }
   // A word slammed onto the screen: in big, landing with a jolt, held, then gone.
-  function stampAt(text, colour, t, life, sub = null) {
+  function stampAt(text, colour, t, life, sub = null, at = null) {
     if (t < 0) return;
     const cw = canvas.width, ch = canvas.height, u = Math.min(cw, ch);
     const inK = Math.min(1, t / 9);
@@ -2207,7 +2256,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     const size = u * (text.length > 5 ? 0.17 : 0.22) * (1 + (1 - ease(inK)) * 1.4) * (1 + outK * 0.3);
     ctx.save();
     ctx.globalAlpha = inK * (1 - outK);
-    ctx.translate(cw / 2, ch / 2); ctx.transform(1, 0, -0.16, 1, 0, 0);
+    ctx.translate(cw / 2, at ?? ch / 2); ctx.transform(1, 0, -0.16, 1, 0, 0);
     ctx.font = `900 ${Math.round(size)}px ${FACE}`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     // A band behind it, the width of the screen.
@@ -2324,11 +2373,15 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     const art = drawn && img(fxPath(key));
     if (art) {
       ctx.save(); ctx.globalAlpha = 0.95; ctx.imageSmoothingEnabled = true;
-      // A famous panel is drawn with its Pokemon on the left: the foe's is mirrored, its name on the free side.
-      if (FX[`ult-${o.id}`] && o.side !== me) { ctx.translate(cw, 0); ctx.scale(-1, 1); }
       const sc = Math.max(cw / art.naturalWidth, ch / art.naturalHeight) * (1.04 + 0.04 * pop);
       const dw = art.naturalWidth * sc, dh = art.naturalHeight * sc;
-      ctx.drawImage(o.famous ? tinted(art, ink0) : art, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+      /* A famous Pokemon's own panel is black ink on WHITE, printed onto its
+         colour by multiply - the white takes the colour, the ink stays ink -
+         and never mirrored: its lettering would read backwards. A type's
+         pattern is white ink on nothing: raw on the black page, tinted to
+         ink on a famous one's colour. */
+      if (FX[`ult-${o.id}`]) { ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = 1; ctx.drawImage(art, (cw - dw) / 2, (ch - dh) / 2, dw, dh); }
+      else ctx.drawImage(o.famous ? tinted(art, ink0) : art, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
       ctx.restore();
     } else inkPattern(INK[o.type] ?? "speed", o.x, o.y, ink0, seeded(o.seed), u, pop);
     speedLines(o.x, o.y, o.famous ? "rgba(8,8,12,0.75)" : "rgba(255,255,255,0.8)", 1);
@@ -2345,7 +2398,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.restore();
     }
     // The name, slammed across the far side.
-    const name = o.name.toUpperCase(), ours = o.side === me;
+    // On its own panel the name always goes right, where the drawing leaves room.
+    const name = o.name.toUpperCase(), ours = o.side === me || Boolean(FX[`ult-${o.id}`]);
     ctx.save();
     ctx.translate(ours ? cw * 0.68 : cw * 0.32, ch * 0.5); ctx.rotate(ours ? -0.08 : 0.08); ctx.transform(1, 0, -0.2, 1, 0, 0);
     ctx.font = `900 ${Math.round(u * 0.2)}px ${FACE}`;

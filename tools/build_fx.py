@@ -45,11 +45,12 @@ ULT_PATTERNS = ["bolts", "flames", "waves", "vines", "psychic", "shadow", "fists
 ULT_FAMOUS = [25, 6, 9, 3, 150, 94, 448, 130, 149, 143, 384, 248, 445, 658, 282, 257]
 for n in [*ULT_PATTERNS, *ULT_FAMOUS]:
     if (SRC / f"ult-{n}.png").exists():
-        FRAMES[f"ult-{n}"] = (1, 768, False, "centre")
+        # 1280 wide: a panel fills the screen, and 768 smeared its ink on a desktop.
+        FRAMES[f"ult-{n}"] = (1, 1280, False, "centre")
 # A move's sheet: its frames, counted by eye (2026-10-23), and the three
 # whose frames grow across the row in cells of their own size, cut by their
 # widest gaps (`frames_of`).
-WIDEST = {"explosion", "psychic", "shadow-claw"}
+WIDEST = {"explosion", "psychic", "shadow-claw", "fly"}
 MOVES = {
     "aqua-jet": 4, "brick-break": 5, "close-combat": 6, "crunch": 5, "dazzling-gleam": 6, "discharge": 6,
     "dragon-claw": 4, "earthquake": 6, "explosion": 8, "fire-fang": 5, "fire-punch": 5, "flamethrower": 1,
@@ -138,7 +139,10 @@ def build(name, n, width, hard, anchor):
     out = OUT / f"{name}.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     # A move's colour art in 256 colours: pixel art loses nothing to the eye, and the sheets were 5.5 MB in full colour.
-    (strip.quantize(256, method=Image.Quantize.FASTOCTREE) if name.startswith("moves/") else strip).save(out, optimize=True)
+    # An ULTI panel is white ink on nothing: 64 colours are plenty, and keep each under check.mjs's 200KB.
+    # A famous Pokemon's own panel is ink on white, its dots black or white: 16 greys (its screentone ran past 200KB at 64).
+    colours = 16 if name[4:].isdigit() else 64 if name.startswith("ult-") else 256
+    (strip.quantize(colours, method=Image.Quantize.FASTOCTREE) if name.startswith(("moves/", "ult-")) else strip).save(out, optimize=True)
     print(f"{name}: {n} frame{'s' if n > 1 else ''} of {width}x{fh}, {out.stat().st_size // 1024} KB")
     return {"n": n, "w": width, "h": fh}
 

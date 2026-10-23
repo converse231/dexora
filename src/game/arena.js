@@ -253,6 +253,21 @@ export const isUlt = (i) => i <= ULT_BASE;
 export const BASIC_CD = sec(0.42);
 const BASIC_WIND = sec(0.1), BASIC_REC = sec(0.08), BASIC_RANGE = 4.5, BASIC_CHAIN = sec(1.2), BASIC_BOOST = 1.6;
 export const basicShape = (f) => (f.basic.i === BASIC_P ? "melee" : "shot");
+/* ROLES (asked for, 2026-10-23: "they all feel long ranged and slow to
+   attack - melee and ranged Pokemon, with perks for each"). By the higher
+   attack stat, as the basic attack already is: a BRAWLER (Attack) runs
+   BRAWL_RUN faster, jabs on BRAWL_CD of the cooldown, hits BRAWL_HIT harder
+   with every blow and dash, and takes BRAWL_GUARD of a shot's damage - built
+   to close the gap; a BLASTER (Sp. Atk) fires shots BLAST_SPEED faster and
+   BLAST_RANGE farther, and charges a beam on BLAST_BEAM of its wind-up -
+   built to keep it. Measured over 100 Hard matches of one role's team
+   against the other's: with no perks brawlers won 18 (range was simply
+   better); these 48, a 3v3 still ~74 s. */
+// A fighter outside a match (the lobby, the tutor) has no `basic` yet: its stats answer the same.
+export const roleOf = (f) => ((f.basic?.i ?? basicOf(f)) === BASIC_P ? "brawler" : "blaster");
+export const BRAWL_RUN = 1.2, BRAWL_CD = 0.65, BRAWL_HIT = 1.3, BRAWL_GUARD = 0.72;
+export const BLAST_SPEED = 1.15, BLAST_RANGE = 1.1, BLAST_BEAM = 0.85;
+export const basicCd = (f) => (roleOf(f) === "brawler" ? Math.round(BASIC_CD * BRAWL_CD) : BASIC_CD);
 // Which a fighter has: the jab for the higher Attack, the bolt for the higher Sp. Atk.
 export const basicOf = (f) => (f.st[1] >= f.st[3] ? BASIC_P : BASIC_S);
 /* THE FINAL MINUTE: the clock's last FINAL_T hits harder and fills Surge
@@ -494,7 +509,7 @@ function stepSide(s, side, inp) {
         const data = arenaMove(m.i);
         const [dx, dy] = ax || ay ? [ax, ay] : [f.fx, f.fy];
         f.fx = dx; f.fy = dy;
-        const w = windOf(data);
+        const w = shapeOf(data) === "beam" && roleOf(f) === "blaster" ? Math.round(windOf(data) * BLAST_BEAM) : windOf(data);
         f.act = { k, ph: "wind", t: w, t0: w, dx, dy, id: s.nextId++, shape: shapeOf(data), aimX: inp.ax, aimY: inp.ay };
         s.ev.push({ k: "wind", side, move: m.i, shape: f.act.shape });
       }
@@ -542,7 +557,8 @@ function stepSide(s, side, inp) {
 
 // Speed from the Speed stat and its stage; paralysis halves it, a swift zone lifts it.
 const speedOf = (f) => Math.min(6, Math.max(3, 3 + 2.5 * (f.st[5] * STAGE(f.stages[5]) / 200)))
-  / TPS * (f.status === PAR ? 0.5 : 1) * (f.swift > 0 ? 1.15 : 1) * (f.wading ? 0.5 : 1) * (f.rained ? RAIN_SLOW : 1);
+  / TPS * (f.status === PAR ? 0.5 : 1) * (f.swift > 0 ? 1.15 : 1) * (f.wading ? 0.5 : 1) * (f.rained ? RAIN_SLOW : 1)
+  * (roleOf(f) === "brawler" ? BRAWL_RUN : 1);
 
 function stepAct(s, side, f) {
   const a = f.act;
@@ -554,7 +570,7 @@ function stepAct(s, side, f) {
   }
   if (a.ph === "wind") {
     if (a.basic) {
-      m.cd = BASIC_CD;
+      m.cd = basicCd(f);
       f.basicN = s.t - f.basicT <= BASIC_CHAIN ? f.basicN + 1 : 1;
       f.basicT = s.t;
       a.boost = f.basicN % 3 === 0;
@@ -598,7 +614,9 @@ function stepAct(s, side, f) {
 }
 
 function shoot(s, side, f, dx, dy, move, range = SHOT_RANGE, boost = false, k = 1) {
-  s.shots.push({ id: s.nextId++, side, move, x: f.x + dx * (R + SHOT_R), y: f.y + dy * (R + SHOT_R), dx, dy, left: range, from: f.slot, boost, k });
+  const blast = roleOf(f) === "blaster";
+  s.shots.push({ id: s.nextId++, side, move, x: f.x + dx * (R + SHOT_R), y: f.y + dy * (R + SHOT_R), dx, dy,
+    left: range * (blast ? BLAST_RANGE : 1), v: SHOT_SPEED * (blast ? BLAST_SPEED : 1), from: f.slot, boost, k });
 }
 // A burst: one shot of a multi-hit move, the spread fanning a little each time.
 function burst(s, side, f, a, data) {
@@ -985,7 +1003,7 @@ function hurt(s, f, n, move = null) {
 
 function stepShots(s) {
   s.shots = s.shots.filter((p) => {
-    p.x += p.dx * SHOT_SPEED; p.y += p.dy * SHOT_SPEED; p.left -= SHOT_SPEED;
+    p.x += p.dx * p.v; p.y += p.dy * p.v; p.left -= p.v;
     if (p.left <= 0 || p.x < INSET || p.x > W - INSET || p.y < INSET || p.y > H - INSET) { s.ev.push({ k: "fizzle", x: p.x, y: p.y, move: p.move }); return false; }
     const c = s.cover.find((b) => b.hp > 0 && Math.abs(p.x - b.x) < COVER_HALF + SHOT_R && Math.abs(p.y - b.y) < COVER_HALF + SHOT_R);
     if (c) { chip(s, c, p.move, p.x, p.y); return false; }
@@ -1106,7 +1124,8 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     const hits = shapeOf(m) === "multi" || !m.hits ? 1 : (m.hits[0] + m.hits[1]) / 2;
     const shock = m.t === "electric" && d.wet > 0;
     dmg = Math.max(1, Math.floor(rawDamage(a, d, m, crit) * (crit ? 1.5 : 1) * roll * hits * DAMAGE * boost * (a.surge > 0 ? SURGE_DMG : 1) * (a.power > 0 ? X_ATTACK : 1)
-      * (finalMinute(s) ? FINAL_DMG : 1) * weatherK(s, m.t) * (shock ? SHOCK : 1)));
+      * (finalMinute(s) ? FINAL_DMG : 1) * weatherK(s, m.t) * (shock ? SHOCK : 1)
+      * (contact && roleOf(a) === "brawler" ? BRAWL_HIT : 1) * (!contact && roleOf(d) === "brawler" ? BRAWL_GUARD : 1)));
     d.hp = Math.max(0, d.hp - dmg);
     const st = s.sides[a.side].stats;
     st.dealt += dmg; st.hits++; st.chain++; st.best = Math.max(st.best, st.chain);
@@ -1357,7 +1376,7 @@ function cpuInput(s, side) {
   // Aim, with the level's error, and on Hard a lead on a moving target.
   let tx = ex, ty = ey;
   if (L.lead && ["shot", "multi"].includes(shapeAt(pick))) {
-    const tt = dist / SHOT_SPEED;
+    const tt = dist / (SHOT_SPEED * (roleOf(me) === "blaster" ? BLAST_SPEED : 1));
     tx += (foe.x - foe.px) * tt; ty += (foe.y - foe.py) * tt;
   }
   const off = (rnd(s) * 2 - 1) * L.err;

@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-23-arena-roles",
+    icon: "🥊",
+    date: "October 2026",
+    title: "Brawlers, Blasters and a Classic journey",
+    items: [
+      ["Brawlers and Blasters", "Attack-led Pokémon rush in and hit hard up close; Sp. Atk-led ones fire faster, farther shots."],
+      ["Move Tutor in the Arena", "Tap Moves on a team card to teach the moves that suit its role."],
+      ["HP you can read", "Every Pokémon carries its HP over its head, and low HP pulses red."],
+      ["Classic, gamified", "Each region is now a road to the Champion, with your next battle front and centre."],
+    ],
+  },
+  {
     id: "2026-10-23-arena-ultis",
     icon: "💥",
     date: "October 2026",

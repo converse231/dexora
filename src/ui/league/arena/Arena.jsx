@@ -23,13 +23,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL,
-  FINAL_T, spent, BASIC_CD, SWAP_CD, basicShape, basicOf, BASIC_P, PICKUPS, SUDDEN_T,
+  FINAL_T, spent, SWAP_CD, basicShape, PICKUPS, SUDDEN_T, roleOf, basicCd, ultOf,
   cooldownOf, DODGE_CD, ARENAS, shapeOf, GROUND, ZONE_SAYS } from "../../../game/arena.js";
 import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, arenaCancel } from "../../../net/cloud.js";
 import { isEvent } from "../../../data/dex.js";
 import { connect } from "./net.js";
 import { LADDER, masterOf, ladderOpen, ladderPay, ARENA_TEAM } from "../../../game/ladder.js";
-import { playerFighter, moveOf, STRUGGLE, refusal } from "../../../game/battle.js";
+import { playerFighter, moveOf, STRUGGLE, refusal, learnable, movesOf } from "../../../game/battle.js";
+import { TUTOR_PRICE } from "../../../game/items.js";
+import { pricedAt } from "../../../game/trainer.js";
 import { MOVES } from "../../../data/moves.js";
 import { speciesById } from "../../../game/biomes.js";
 import { variantOf } from "../../../game/items.js";
@@ -99,6 +101,13 @@ const LEVEL_SAYS = {
   hard: "Fast hands, sharp aim. Leads its shots, raises a shield, takes the zones.",
 };
 const MODE_NAME = { ladder: "Arena Ladder", quick: "Quick battle", training: "Training", friends: "Battle a friend" };
+// A role in a word and its perks, for the lobby and the tutor (arena.js's roleOf).
+const ROLE = {
+  brawler: ["Brawler", "Attack-led: runs and jabs faster, hits harder up close, shrugs off shots"],
+  blaster: ["Blaster", "Sp. Atk-led: shots fly faster and farther, beams charge sooner"],
+};
+// What reaches how far: the tutor's filters, and which a role wants.
+const REACH = { melee: "close", dash: "close", shot: "range", beam: "range", multi: "range", pulse: "area", field: "area", self: "self" };
 const WEATHER_NAME = { rain: "Rain", sun: "Harsh sun", sand: "Sandstorm", snow: "Snow" };
 const WEATHER_TIP = { rain: "Water x1.5, Fire x0.5, Fire types slower", sun: "Fire x1.5, Water x0.5",
   sand: "Chips all but Rock, Ground and Steel types", snow: "Chips all but Ice types" };
@@ -107,7 +116,7 @@ const WEATHER_TIP = { rain: "Water x1.5, Fire x0.5, Fire types slower", sun: "Fi
    open, it takes the modal lock, and a match owns the whole screen through
    `body.fighting` (the bars step aside). Opening it is what the map's
    announcement waits for (ARENA_NEWS_KEY). */
-export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], onMode, onClose }) {
+export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], money = 0, stats = null, onMode, onClose }) {
   useModalLock();
   useEffect(() => {
     engine?.pause(true);
@@ -128,14 +137,15 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   const [online, setOnline] = useState(null);   // { role, invite, friend }
   const [editing, setEditing] = useState(false);
   const [howto, setHowto] = useState(false);
+  const [tutorFor, setTutorFor] = useState(null);   // a uid
   useEffect(() => { setLive(Boolean(match || online)); }, [match, online]);
   useEffect(() => { loadAnims(); }, []);
   // Escape leaves the page - unless a match, the editor or How to play has it.
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape" && !match && !online && !editing && !howto) { e.preventDefault(); onClose(); } };
+    const onKey = (e) => { if (e.key === "Escape" && !match && !online && !editing && !howto && tutorFor == null) { e.preventDefault(); onClose(); } };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [match, online, editing, howto, onClose]);
+  }, [match, online, editing, howto, tutorFor, onClose]);
 
   const level = mons.length ? Math.round(mons.reduce((n, m) => n + m.level, 0) / mons.length) : 5;
   if (match) {
@@ -147,11 +157,14 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   if (online) return <Online start={online} mons={mons} onExit={() => setOnline(null)} />;
   return (
     <>
-      <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0} onMode={onMode}
+      <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0} onMode={onMode} onTutor={setTutorFor}
         onStart={(m) => { immerse(); setMatch(m); }} onOnline={(o) => { immerse(); setOnline(o); }} onEdit={() => setEditing(true)} onHowto={() => setHowto(true)} />
       {editing && <TeamEdit box={box} picked={mons} custom={arenaTeam.length > 0}
         onSave={(uids) => { engine?.setArenaTeam(uids); setEditing(false); }} onClose={() => setEditing(false)} />}
       {howto && <HowTo onClose={() => setHowto(false)} />}
+      {tutorFor != null && box.some((m) => m.uid === tutorFor) && (
+        <MoveTutor engine={engine} mon={box.find((m) => m.uid === tutorFor)} money={money} stats={stats} onClose={() => setTutorFor(null)} />
+      )}
     </>
   );
 }
@@ -162,7 +175,7 @@ const pickFloor = (floor, seed) => (floor === "random" ? ARENAS[Math.abs(seed) %
    the floors under them, and one big Battle along the foot. Each mode is a
    tile; the chosen one opens its own panel (the Ladder's ten masters, a
    CPU's difficulty, your friends). */
-function Lobby({ mons, level, record, ladder, custom, onMode, onStart, onOnline, onEdit, onHowto }) {
+function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, onOnline, onEdit, onHowto }) {
   const [mode, setMode0] = useState(() => { const m = pref(MODE_KEY, "ladder"); return MODE_NAME[m] && (m !== "friends" || CLOUD) ? m : "ladder"; });
   const [cpu, setCpu0] = useState(() => pref(LEVEL_KEY, "normal"));
   const [floor, setFloor0] = useState(() => pref(FLOOR_KEY, "random"));
@@ -240,9 +253,10 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onStart, onOnline,
                   <li key={m.uid} className="ag-mon">
                     <span className="ag-slot" aria-label={`Slot ${k + 1}`}>{k + 1}</span>
                     <Sprite id={m.species} variant={variantOf(m)} />
+                    <button type="button" className="ag-learn" onClick={() => onTutor(m.uid)} aria-label={`Teach ${nameOf(m.species)} moves`}>Moves</button>
                     <div className="ag-mon-text">
                       <b>{nameOf(m.species)}</b>
-                      <span>Lv {m.level} · {basicOf(f) === BASIC_P ? "Jab" : "Bolt"} attack</span>
+                      <span>Lv {m.level} · <em className={`ag-role r-${roleOf(f)}`} data-tip={ROLE[roleOf(f)][1]}>{ROLE[roleOf(f)][0]}</em></span>
                       <Types of={sp.types} />
                       <ul className="ag-moves">
                         {f.moves.map((mv) => {
@@ -426,6 +440,102 @@ function TeamEdit({ box, picked, custom, onSave, onClose }) {
 /* BATTLE A FRIEND: your accepted friends, each a Challenge; the challenges
    waiting for you, each an Accept. Polled while the lobby shows (no
    realtime subscription: the room is only for a match about to start). */
+/* THE ARENA'S MOVE TUTOR (asked for, 2026-10-23: "learn move sets in the
+   Arena" - and the Arena's cash sink): the League's own tutor (engine.tutor,
+   TUTOR_PRICE a new move), shown the Arena's way - each move by how far it
+   reaches (a blow, a shot, a blast) and whether it suits the Pokemon's role.
+   Only moves the Arena plays are offered. What it teaches is the League's
+   too; online play still sets every move (the Fair format). */
+const KINDS = [["all", "All"], ["close", "Close"], ["range", "Ranged"], ["area", "Area"], ["self", "Self"]];
+function MoveTutor({ engine, mon, money, stats, onClose }) {
+  useModalLock();
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const key = (e) => { if (e.key === "Escape") { e.stopPropagation(); close.current(); } };
+    addEventListener("keydown", key, true);
+    return () => removeEventListener("keydown", key, true);
+  }, []);
+  const taught = mon.moves?.join() ?? "";
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const now = useMemo(() => movesOf(mon), [mon.uid, mon.species, mon.level, taught]);
+  const [draft, setDraft] = useState(now);
+  const [slot, setSlot] = useState(0);
+  const [kind, setKind] = useState("all");
+  const [note, setNote] = useState(null);
+  useEffect(() => { setDraft(now); setSlot(0); }, [now]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const can = useMemo(() => learnable(mon.species, mon.level).filter((i) => shapeOf(moveOf(i))), [mon.species, mon.level]);
+  const role = roleOf(playerFighter(mon));
+  const fits = (i) => REACH[shapeOf(moveOf(i))] === (role === "brawler" ? "close" : "range");
+  const price = pricedAt(TUTOR_PRICE, stats);
+  const fresh = draft.filter((i) => !now.includes(i)).length, cost = fresh * price;
+  const shown = can.filter((i) => kind === "all" || REACH[shapeOf(moveOf(i))] === kind)
+    .sort((a, b) => fits(b) - fits(a) || (moveOf(b).p ?? 0) - (moveOf(a).p ?? 0));
+  const put = (i) => {
+    if (draft.includes(i)) return;
+    setDraft((d) => { const next = [...d]; next[Math.min(slot, next.length)] = i; return next.slice(0, 4); });
+    setSlot((k) => Math.min(3, k + 1));
+    setNote(null);
+  };
+  const teach = () => {
+    const no = engine.tutor(mon.uid, draft.map((i) => MOVES[i].n), now.map((i) => MOVES[i].n));
+    setNote(no ? { stale: "Its moves changed - open it again.", money: "Not enough money.", same: "Nothing new to teach." }[no] ?? "Could not teach that." : "Learned!");
+  };
+  const chip = (i) => {
+    const data = moveOf(i), shape = shapeOf(data);
+    return <><b>{moveName(i)}</b><i>{SHAPE_WORD[shape]}{data.p ? ` · ${data.p}` : ""}</i></>;
+  };
+  return createPortal(
+    <div className="sheet" {...useDismiss(onClose)}>
+      <div className="ag-editor ag-tutor" role="dialog" aria-modal="true" aria-label="Move Tutor" onClick={(e) => e.stopPropagation()}>
+        <header>
+          <Sprite id={mon.species} variant={variantOf(mon)} alt="" />
+          <div>
+            <h3>{nameOf(mon.species)} <em className={`ag-role r-${role}`}>{ROLE[role][0]}</em></h3>
+            <span>{ROLE[role][1]}. Tap a slot, then a move. ¥{price.toLocaleString()} for each new one - you have ¥{money.toLocaleString()}.</span>
+          </div>
+          <button type="button" className="ar-x" aria-label="Close" onClick={onClose}>✕</button>
+        </header>
+        <div className="ag-editor-body">
+          <ol className="ag-slots" aria-label="Its four moves">
+            {[0, 1, 2, 3].map((k) => {
+              const i = draft[k];
+              return (
+                <li key={k}>
+                  <button type="button" aria-pressed={slot === k} onClick={() => setSlot(k)}
+                    className={`${i != null ? `t-${moveOf(i).t}` : "empty"}${i != null && !now.includes(i) ? " new" : ""}`}>
+                    {i != null ? chip(i) : <b>Empty</b>}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <div className="ag-kinds" role="radiogroup" aria-label="Reach">
+            {KINDS.map(([id, name]) => <button key={id} type="button" role="radio" aria-checked={kind === id} onClick={() => setKind(id)}>{name}</button>)}
+          </div>
+          <ul className="ag-learnlist">
+            {shown.map((i) => (
+              <li key={i}>
+                <button type="button" className={`t-${moveOf(i).t}${fits(i) ? " fits" : ""}`} disabled={draft.includes(i)} onClick={() => put(i)}
+                  data-tip={fits(i) ? `Suits a ${ROLE[role][0]}` : undefined}>{chip(i)}{fits(i) && <u className="ag-fit">Suits it</u>}</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <footer>
+          {note && <span className="ag-tutor-note" role="status">{note}</span>}
+          <button type="button" className="lg-go quiet" disabled={!fresh} onClick={() => setDraft(now)}>Undo</button>
+          <button type="button" className="lg-go" disabled={!fresh || cost > money} onClick={teach}>
+            {fresh ? `Teach ${fresh} · ¥${cost.toLocaleString()}` : "Teach"}
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 const POLL_MS = 4000;
 function FriendBattles({ mons, floor, onStart }) {
   const [friends, setFriends] = useState(null);
@@ -710,6 +820,7 @@ function HowTo({ onClose }) {
               <li><b>Moves</b> hit with the League's own damage - types, STAB and all - and each has a cooldown and its PP.</li>
               <li><b>Every attack shows on the ground</b> before it lands: a line, an arc or a ring. Roll through it at the last moment - a <b>perfect dodge</b>.</li>
               <li><b>ULTI</b> fills as you land hits, take them, dodge perfectly and hold a zone. Full, it throws the foe off you, powers you up for {SURGE_T / TPS} s and looses your Pokémon's signature: a storm of strikes, a blast all round, a huge cannon or a barrage - Pikachu calls down Thunder, Charizard Blast Burn. Every strike shows on the ground first: roll out of it.</li>
+              <li><b>Brawlers and Blasters</b>: a Pokémon whose Attack is higher is a Brawler - it runs and jabs faster, hits harder with blows and dashes and takes less from shots. One whose Sp. Atk is higher is a Blaster - its shots fly faster and farther and its beams charge sooner. Teach either the moves that suit it (Moves, on each team card).</li>
               <li><b>Double Team</b> makes two copies either side of its user that move with it. A hit that reaches a copy first pops it - "Miss!" - and the foe cannot tell which is real.</li>
               <li><b>Weather</b>, one a match: rain powers Water, weakens Fire and slows Fire types; harsh sun the other way round; a sandstorm chips all but Rock, Ground and Steel types, snow all but Ice.</li>
               <li><b>Type combos</b>: Water on a burned Pokémon puts the burn out in a cloud of steam that hides whoever stands in it. Water soaks, and Electric on a soaked Pokémon hits half again as hard.</li>
@@ -846,7 +957,8 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
 
   useEffect(() => {
     const cv = canvas.current;
-    const r = createRenderer(cv, looks, floor, { names, me, moves: s.sides.flatMap((sd) => sd.team.flatMap((f) => f.kit.map((m) => m.i))) });
+    const r = createRenderer(cv, looks, floor, { names, me, moves: s.sides.flatMap((sd) => sd.team.flatMap((f) => f.kit.map((m) => m.i))),
+      ults: s.sides.flatMap((sd) => sd.team.map((f) => ({ id: f.id, type: ultOf(f).type }))) });
     // Online: the match steps only with both inputs for a tick (arena.js's lockstep).
     const ls = online ? lockstep(online.link, me, online.round) : null;
     if (ls) online.attach(ls);
@@ -1081,7 +1193,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       <canvas ref={canvas} className="ar-canvas" onPointerMove={onMouseMove} onPointerDown={onMouseDown}
         onContextMenu={(e) => e.preventDefault()} aria-label="Arena" />
       {view && (
-        <div className={`ar-hud${view.intro ? " intro" : ""}`}>
+        <div className={`ar-hud${view.intro ? " intro" : ""}${view.over ? " over" : ""}`}>
           <Plate f={view.sides[0]} meter={view.meter[0]} who={names[me][0]} mine />
           <div className={`ah-clock${view.left <= FINAL_T && !view.over ? " final" : ""}${view.left <= 10 * TPS && !view.over ? " urgent" : ""}${view.sudden ? " sudden" : ""}`}>
             <b>{clock(view.left)}</b>
@@ -1182,11 +1294,11 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
         </div>
       )}
       {over && (
-        <div className="ar-pause" role="dialog" aria-label="Result">
-          <div className="ar-card">
-            <span className="lg-kicker">{online ? `Online · ${view.why === "time" ? "Time" : "Knockout"}` : view.why === "time" ? "Time" : "Knockout"}</span>
+        <div className="ar-pause ar-end" role="dialog" aria-label="Result">
+          <div className={`ar-card ar-result ${view.won ? "won" : view.lost ? "lost" : "drew"}`}>
             <div className="ar-result-head">
               <h3>{view.won ? "You win!" : view.lost ? "You lost" : "A draw"}</h3>
+              <span className="ar-why">{online ? `Online · ${view.why === "time" ? "Time" : "Knockout"}` : view.why === "time" ? "Time" : "Knockout"}</span>
               <b className={`ar-grade g-${grade.letter}`} aria-label={`Grade ${grade.letter}`}>{grade.letter}</b>
             </div>
             <dl className="ar-stats">
@@ -1208,13 +1320,15 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
             {master && view.won && prize && !prize.first && <p className="ar-prize done">Practice: {master.name}'s prize was won before.</p>}
             {!master && prize > 0 && <p className="ar-prize">First win today: ¥{prize.toLocaleString()}</p>}
             {!master && !online && prize === 0 && view.won && cpu !== "dummy" && <p className="ar-prize done">Today's prize for this level is already won.</p>}
-            {!rematch?.gone && (
-              <button type="button" className="lg-go" disabled={rematch?.asked} onClick={onAgain}>
-                {!online ? "Again" : rematch.asked ? `Waiting for ${online.foe}…` : rematch.offered ? `${online.foe} wants a rematch - accept` : "Rematch"}
-              </button>
-            )}
             {rematch?.gone && <p className="ar-note">{online.foe} has left.</p>}
-            <button type="button" className="lg-go quiet" onClick={onExit}>Back to the Arena</button>
+            <div className="ar-end-go">
+              <button type="button" className="lg-go quiet" onClick={onExit}>Back to the Arena</button>
+              {!rematch?.gone && (
+                <button type="button" className="lg-go" disabled={rematch?.asked} onClick={onAgain}>
+                  {!online ? "Again" : rematch.asked ? `Waiting for ${online.foe}…` : rematch.offered ? `${online.foe} wants a rematch - accept` : "Rematch"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1268,7 +1382,7 @@ function snapshot(s, me) {
         ready: m.cd === 0, cd: m.cd ? m.cd / cooldownOf(data) : 0, shape: shapeOf(data) };
     }),
     // The next basic attack is the third in a row: the button says so.
-    basic: { ready: f0.basic.cd === 0, cd: f0.basic.cd / BASIC_CD, jab: basicShape(f0) === "melee", boost: f0.basicN % 3 === 2 && s.t - f0.basicT < TPS },
+    basic: { ready: f0.basic.cd === 0, cd: f0.basic.cd / basicCd(f0), jab: basicShape(f0) === "melee", boost: f0.basicN % 3 === 2 && s.t - f0.basicT < TPS },
     dodge: f0.dodgeCd === 0, dodgeCd: f0.dodgeCd ? f0.dodgeCd / DODGE_CD : 0,
     held: mine.held,
     ko: [me, 1 - me].map((k) => s.sides[k].team.filter((f) => f.hp <= 0).length),
@@ -1280,7 +1394,7 @@ function snapshot(s, me) {
    the Surge meter. */
 function Plate({ f, meter, who, mine }) {
   return (
-    <div className={`ah-plate${mine ? " mine" : ""}`}>
+    <div className={`ah-plate${mine ? " mine" : ""}${f.hp > 0 && f.hp / f.max <= 0.25 ? " low" : ""}`}>
       <span className="ah-face"><Sprite id={f.id} eager /></span>
       <div className="ah-plate-body">
         <div className="ah-plate-top"><b>{nameOf(f.id)}</b><span>Lv {f.level}</span><em>{who}</em></div>
@@ -1302,8 +1416,6 @@ function Plate({ f, meter, who, mine }) {
   );
 }
 
-/* THE THUMB STICK (touch): it appears where the left thumb lands and reads
-   how far and which way it is pulled. Window pointer events, no capture. */
 /* A MOBA'S STICK, FIXED (asked for, 2026-10-23: "sticky, so it won't
    interrupt the battle like tapping to switch Pokemon"): it stays in the
    bottom-left corner, only a touch that starts ON it steers, and that

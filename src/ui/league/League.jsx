@@ -125,7 +125,7 @@ function Card({ o, kind, st, region, onBattle, order, beaten, steps }) {
   const tune = tuneOf(o, beaten, steps);
   const team = useMemo(() => teamOf(o, beaten), [o, beaten]);
   return (
-    <article className={`lg-card t-${o.type ?? "normal"}${kind === "champion" ? " champ" : ""}${st.won ? " won" : ""}${st.open ? "" : " shut"}`}>
+    <article id={`lg-o-${o.id}`} className={`lg-card t-${o.type ?? "normal"}${kind === "champion" ? " champ" : ""}${st.won ? " won" : ""}${st.open ? "" : " shut"}`}>
       <Head o={o} kind={kind} region={region} order={order} tune={tune} stamp={st.won ? "won" : st.open ? "open" : ""} />
       <Party team={team} />
       <div className="lg-card-go">
@@ -158,7 +158,7 @@ function GymCard({ g, st, region, order, beaten, steps, onBattle }) {
   const at = sel ?? (next >= 0 ? next : path.length - 1);
   const done = st.trainers.filter((t) => t.won).length;
   return (
-    <article className={`lg-card lg-gym t-${g.type ?? "normal"}${st.won ? " won" : ""}${st.reached ? "" : " shut"}`}>
+    <article id={`lg-o-${g.id}`} className={`lg-card lg-gym t-${g.type ?? "normal"}${st.won ? " won" : ""}${st.reached ? "" : " shut"}`}>
       <Head o={g} kind="leader" region={region} order={order} tune={tune} stamp={st.won ? "won" : st.reached ? "open" : ""} />
       {path.length > 1 && (
         <div className="lg-path-wrap">
@@ -211,6 +211,98 @@ function Stage({ p, next, leader, beaten, steps, onBattle }) {
         ) : <p className="lg-why"><Lock />{p.st.why}</p>}
       </div>
     </div>
+  );
+}
+
+/* THE CLASSIC LEAGUE AS A JOURNEY (asked for, 2026-10-23: "gamify the UI of
+   Classic battles"). A region is a ROAD of its leaders, then its Elite Four
+   and Champion: the road walked is gold, the next stop bounces with a flag,
+   the rest wait greyed; a stop jumps to its card. Over the road, the NEXT
+   BATTLE: your team against theirs, what it pays, one big button - the same
+   `onBattle` every card calls, so the rules are the cards' own. */
+function nextIn(region, rs, beaten) {
+  for (let k = 0; k < region.gyms.length; k++) {
+    const g = region.gyms[k], st = rs.gyms[k];
+    const t = g.trainers.findIndex((_, i) => st.trainers[i].open && !st.trainers[i].won);
+    if (t >= 0) return { o: g.trainers[t], kind: "trainer", gym: g };
+    if (st.open && !st.won) return { o: g, kind: "leader", gym: g };
+  }
+  const p = region.league.findIndex((_, k) => rs.league[k].open && !rs.league[k].won);
+  if (p < 0) return null;
+  const o = region.league[p];
+  return { o: { ...o, type: o.type ?? speciesById(teamOf(o, beaten).at(-1).id).types[0] }, kind: o.champion ? "champion" : "league" };
+}
+function JourneyRoad({ region, rs }) {
+  const stops = [
+    ...region.gyms.map((g, k) => ({ o: g, won: rs.gyms[k].won, open: rs.gyms[k].reached, badge: g.id, label: g.badge })),
+    ...region.league.map((p, k) => ({ o: p, won: rs.league[k].won, open: rs.league[k].open, champ: p.champion, label: p.champion ? "Champion" : `Elite Four ${k + 1}` })),
+  ];
+  const next = stops.findIndex((x) => x.open && !x.won);
+  const done = stops.filter((x) => x.won).length;
+  const jump = (id) => {
+    const el = document.getElementById(`lg-o-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("lg-flash"); void el.offsetWidth; el.classList.add("lg-flash");
+  };
+  return (
+    <section className="lg-road" aria-label={`${region.name}'s road: ${done} of ${stops.length}`}>
+      <ol style={{ "--done": stops.length > 1 ? (next < 0 ? 1 : Math.max(0, next) / (stops.length - 1)) : 1 }}>
+        {stops.map((x, k) => (
+          <li key={x.o.id} className={`${x.won ? "won" : x.open ? "open" : "locked"}${k === next ? " next" : ""}${x.champ ? " champ" : ""}`}>
+            <button type="button" onClick={() => jump(x.o.id)} data-tip={`${x.o.name} · ${x.label}`}
+              aria-label={`${x.o.name}, ${x.label}, ${x.won ? "beaten" : x.open ? "open" : "locked"}`}>
+              <img src={asset(`trainers/${x.o.pic}.png`)} alt="" loading="lazy" />
+              {x.badge && x.won && <img className="lg-road-badge" src={asset(`badges/${x.badge}.png`)} alt="" loading="lazy" />}
+              {!x.open && <Lock />}
+            </button>
+            {k === next && <b className="lg-road-flag">NEXT</b>}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+function NextBattle({ region, rs, beaten, steps, box, team, onBattle }) {
+  const up = nextIn(region, rs, beaten);
+  const foe = useMemo(() => (up ? teamOf(up.o, beaten) : []), [up?.o.id, beaten]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!rs.open) return null;
+  if (!up) {
+    return (
+      <section className="lg-next cleared">
+        <span className="lg-kicker">Region cleared</span>
+        <h3>Every {badgeWord(region).slice(0, -1).toLowerCase()} and the League are yours</h3>
+        <p>Rematches pay again as you walk, and they come back stronger. Hard mode is open above.</p>
+      </section>
+    );
+  }
+  const tune = tuneOf(up.o, beaten, steps);
+  const mine = team.map((uid) => box.find((m) => m.uid === uid)).filter(Boolean).slice(0, 6);
+  const role = up.kind === "trainer" ? `${up.gym.name}'s gym` : up.kind === "leader" ? `Gym leader · ${up.o.badge}`
+    : up.kind === "champion" ? "Champion" : "Elite Four";
+  return (
+    <section className={`lg-next t-${up.o.type ?? up.gym?.type ?? "normal"}`}>
+      <span className="lg-kicker">Next battle</span>
+      <div className="lg-next-vs">
+        <div className="lg-next-side mine">
+          <b>Your team</b>
+          <ul>{mine.length ? mine.map((m) => <li key={m.uid}><Sprite id={m.species} variant={m.tier} alt="" /></li>) : <li className="empty">Pick a team</li>}</ul>
+        </div>
+        <i className="lg-next-x" aria-hidden="true">VS</i>
+        <div className="lg-next-side foe">
+          <img className="lg-next-pic" src={asset(`trainers/${up.o.pic}.png`)} alt="" />
+          <div>
+            <b>{up.kind === "trainer" ? trainerName(up.o) : up.o.name}</b>
+            <span>{role}</span>
+            <ul>{foe.map((f, k) => <li key={k}><Sprite id={f.id} alt="" /><i>Lv {f.level}</i></li>)}</ul>
+          </div>
+        </div>
+      </div>
+      <div className="lg-next-go">
+        <span className="lg-prize">Prize <b>{yen(tune.pay)}</b></span>
+        <button type="button" className="lg-go big" onClick={() => onBattle(up.o, up.kind)}>Battle!</button>
+      </div>
+    </section>
   );
 }
 
@@ -942,6 +1034,9 @@ export default function League({
                 onBattle={(o, kind) => setPick({ o, kind })} />
             ) : (
               <>
+                {rs.open && <JourneyRoad region={region} rs={rs} />}
+                <NextBattle region={region} rs={rs} beaten={beaten} steps={steps} box={box} team={team}
+                  onBattle={(o, kind) => setPick({ o, kind })} />
                 <h3 className="lg-section">{region.id === "alola" ? "Island Kahunas" : "Gyms"}</h3>
                 <div className="lg-list">
                   {region.gyms.map((g, k) => (
