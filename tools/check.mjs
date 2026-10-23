@@ -7207,7 +7207,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       assert.equal(A.shapeOf(AM.find((m) => m.n === n)), "field", `${n} is not laid as a hazard`);
     }
     for (const [n, sh] of [["earthquake", "pulse"], ["hyper-beam", "beam"], ["quick-attack", "dash"], ["bullet-seed", "multi"],
-      ["flamethrower", "shot"], ["slash", "melee"], ["swords-dance", "self"], ["protect", "self"], ["thunder-wave", "shot"]]) {
+      ["flamethrower", "shot"], ["slash", "melee"], ["swords-dance", "self"], ["protect", "self"], ["thunder-wave", "shot"], ["rock-throw", "shot"]]) {
       const m = AM.find((x) => x.n === n);
       if (m) assert.equal(A.shapeOf(m), sh, `${n} plays as a ${A.shapeOf(m)}, not a ${sh}`);
     }
@@ -7583,6 +7583,37 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       assert.ok(burned.status === -1 && st.clouds.length === 1 && st.ev.some((e) => e.k === "steam"), "Water on a burn made no steam");
       A.tick(st, [null, null]);
       assert.ok(burned.hidden, "a Pokemon in steam was not hidden");
+      /* CONFUSION, SMOKE AND COPIES THAT WANDER (2026-10-23, asked for). A
+         Dynamic Punch always confuses, and a confused Pokemon walks the wrong
+         way; Smokescreen leaves a cloud that hides its user; Double Team's
+         copies move on their own. */
+      {
+        const [s, , d] = duel(68, "dynamic-punch", 143, { weather: "clear" });
+        let dizzy = false;
+        for (let t = 0; t < 2 * A.TPS && !dizzy; t++) { A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]); dizzy = s.ev.some((e) => e.k === "confused"); }
+        assert.ok(dizzy && d.confused > 0, "a Dynamic Punch did not confuse");
+        while (d.stun > 0) A.tick(s, [null, null]);
+        const x0 = d.x;
+        for (let t = 0; t < 20; t++) A.tick(s, [null, { ...A.NO_INPUT, mx: 1 }]);
+        assert.ok(d.x < x0, "a confused Pokemon walked the way it was steered");
+      }
+      {
+        const [s, a] = duel(116, "smokescreen", 143, { weather: "clear" });
+        let smoke = false;
+        for (let t = 0; t < 2 * A.TPS && !smoke; t++) { A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]); smoke = s.ev.some((e) => e.k === "smoke"); }
+        A.tick(s, [null, null]);
+        assert.ok(smoke && s.clouds.some((c) => c.smoke) && a.hidden, "Smokescreen left no cloud that hides its user");
+      }
+      {
+        const dt = A.newMatch({ teams: [[bFighter(1, 50, 1, [idx("tackle")])], [bFighter(25, 50, 2, [idx("double-team")])]], cpu: [null, null], seed: 4, weather: "clear", events: false });
+        const f = dt.sides[1].team[0];
+        for (let t = 0; t < 40 && !f.clones.length; t++) A.tick(dt, [null, { ...A.NO_INPUT, fire: 0 }]);
+        const rel = () => A.clonesOf(f).map(([x, y]) => [x - f.x, y - f.y]);
+        const was = rel();
+        for (let t = 0; t < 2 * A.TPS; t++) A.tick(dt, [null, null]);
+        const now = rel();
+        assert.ok(now.length === 2 && now.every(([x, y], k) => Math.hypot(x - was[k][0], y - was[k][1]) > 0.3), "Double Team's copies stood still round their user");
+      }
       // Sand chips all but Rock, Ground and Steel; rain slows a Fire type.
       {
         const [s, a, d] = duel(25, "tackle", 74, { weather: "sand" });

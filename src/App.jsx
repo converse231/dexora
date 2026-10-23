@@ -995,6 +995,8 @@ export default function App({
             ladder={st?.ladder ?? []}
             money={st?.money ?? 0}
             stats={st?.stats ?? null}
+            impacts={st?.impacts ?? []}
+            impactsOff={st?.impactsOff ?? []}
             onMode={goTab}
             onClose={() => {
               setArenaPage(false);

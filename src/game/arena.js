@@ -95,11 +95,23 @@ const BEAM_TRACK = 0.12;
    when hit"): two copies at CLONE_OFF either side of the user, moving with
    it, for CLONE_T. A shot, blow, beam or blast that reaches a copy first
    pops it and is spent; a CPU may chase a copy. */
-const CLONE_T = sec(8), CLONE_OFF = 1.7;
+const CLONE_T = sec(8), CLONE_OFF = 1.7, CLONE_WANDER = sec(0.9), CLONE_NEAR = 1.2;
 /* WIND-UPS, SHORTER (asked for, 2026-10-23: "it's hard to make it hit both
    on desktop and mobile"): every move charges WIND_K of what its power
    alone would make it. */
-const WIND_K = 0.7;
+const WIND_K = 0.5;     // 0.7 until the second ask, same day: "delays on skills are still long"
+/* CONFUSION (2026-10-23, asked for): the moves the games give a chance to
+   confuse (the League's data drops it - `fb`), here a dizzy CONFUSE_T in
+   which its movement runs backwards and slower. */
+const CONFUSES = { confusion: 10, psybeam: 10, "signal-beam": 10, "water-pulse": 20, "dizzy-punch": 20, "rock-climb": 20,
+  hurricane: 30, "strange-steam": 20, "dynamic-punch": 100 };
+const CONFUSE_T = sec(2.5), CONFUSE_SLOW = 0.85;
+/* SMOKE: Smokescreen leaves a cloud where its user stands, hiding whoever
+   is in it as steam does (2026-10-23). */
+const SMOKE = new Set(["smokescreen"]), SMOKE_T = sec(4);
+/* THROWN: a rock lifted and thrown is a shot, whatever its category says
+   (Rock Throw was a blow, 2026-10-23). */
+const THROWN = new Set(["rock-throw", "rock-tomb", "rock-wrecker"]);
 /* WEATHER, one a match (asked for, 2026-10-23), drawn from the seed - the
    same odds on every floor: a floor that leaned to its own (rain on the
    Boardwalk) would hand a type its home, which phase 2 rules out. Rain:
@@ -203,8 +215,10 @@ const X_TIME = sec(8), X_ATTACK = 1.3, X_GUARD = sec(1.5);
    its reach: a Hard-vs-Hard 3v3 fell from 83 s to 45 s at 0.6, so 0.4 -
    76 s, Normal over Easy 31 of 40, as it was. Wind-ups 30% shorter and
    the ULTIs' signatures (2026-10-23) brought it to 38 s; 0.3 with the ULTI
-   parts below is 76 s again, an ULTI ~14% of the damage dealt. */
-export const DAMAGE = 0.3;
+   parts below is 76 s again, an ULTI ~14% of the damage dealt. Shorter
+   wind-ups and cooldowns (2026-10-23, asked for again) made it 53 s; 0.23 is
+   77 s, and brawler teams still win ~42% against blasters. */
+export const DAMAGE = 0.23;
 /* THE OPENING: the count before a fight, in which nobody moves. It is
    ticks of the match - both ends of an online fight count the same ones -
    off the match clock, and 0 for every test that drives a match. */
@@ -314,6 +328,7 @@ export function shapeOf(m) {
   }
   if (!m.p) return null;
   if (PULSE.has(m.n)) return "pulse";
+  if (THROWN.has(m.n)) return "shot";
   if (m.hits) return "multi";
   if (m.c === 1 && (BEAM_NAMES.has(m.n) || (BEAM_RE.test(m.n) && m.n !== "charge-beam"))) return "beam";
   if (m.c === 0 && ((m.pr ?? 0) > 0 || (m.dr ?? 0) < 0 || DASH_NAMES.has(m.n))) return "dash";
@@ -329,7 +344,8 @@ export const windOf = (m) => {
 };
 export const cooldownOf = (m) => {
   if (m.c === 2) return SHIELDS.has(m.n) ? sec(7) : m.n === "rest" ? sec(20) : m.st === 3 ? sec(15) : sec(9);
-  return sec(0.8 + (m.p ?? 0) / 35);
+  // 0.8 + p/35 until 2026-10-23 ("still long"): a Fire Blast waited 4 s, now 3.
+  return sec(0.6 + (m.p ?? 0) / 45);
 };
 export const ppOf = (m) => Math.max(3, Math.ceil((m.pp ?? 10) / 2));
 const multiCount = (m) => (m.hits ? Math.round((m.hits[0] + m.hits[1]) / 2) : 1);
@@ -367,7 +383,7 @@ function body(f, side, slot) {
     x: side ? X1 - 2.5 : X0 + 2.5, y: H / 2, px: 0, py: 0, fx: side ? -1 : 1, fy: 0, moving: false,
     act: null, dodge: 0, dx: 0, dy: 0, dodgeCd: 0, inv: 0, shield: 0, stun: 0, kbx: 0, kby: 0, kbt: 0, flash: 0,
     status: -1, statusT: 0, statusN: 0, badly: false, sleptAt: 0,
-    vx: 0, vy: 0, heat: 0, swift: 0, hidden: false, surge: 0, struggle: null, power: 0, haste: 0, clones: [], cloneT: 0, wet: 0, rained: false, away: null,
+    vx: 0, vy: 0, heat: 0, swift: 0, hidden: false, surge: 0, struggle: null, power: 0, haste: 0, clones: [], cloneT: 0, wet: 0, rained: false, away: null, confused: 0,
     basic: { i: basicOf(f), pp: Infinity, cd: 0 }, basicN: 0, basicT: -BASIC_CHAIN,
   };
 }
@@ -472,7 +488,8 @@ function stepSide(s, side, inp) {
   if (f.hp <= 0) return;
 
   const [ax, ay] = norm(inp.ax, inp.ay);
-  const [mx, my] = norm(inp.mx, inp.my);
+  let [mx, my] = norm(inp.mx, inp.my);
+  if (f.confused > 0) { f.confused--; mx = -mx; my = -my; }     // dizzy: it walks the wrong way
   f.moving = Boolean(mx || my);
 
   // A surge breaks a stagger (never sleep or freeze): the fighting game's burst.
@@ -559,7 +576,7 @@ function stepSide(s, side, inp) {
 // Speed from the Speed stat and its stage; paralysis halves it, a swift zone lifts it.
 const speedOf = (f) => Math.min(6, Math.max(3, 3 + 2.5 * (f.st[5] * STAGE(f.stages[5]) / 200)))
   / TPS * (f.status === PAR ? 0.5 : 1) * (f.swift > 0 ? 1.15 : 1) * (f.wading ? 0.5 : 1) * (f.rained ? RAIN_SLOW : 1)
-  * (roleOf(f) === "brawler" ? BRAWL_RUN : 1);
+  * (roleOf(f) === "brawler" ? BRAWL_RUN : 1) * (f.confused > 0 ? CONFUSE_SLOW : 1);
 
 function stepAct(s, side, f) {
   const a = f.act;
@@ -745,6 +762,10 @@ function pulse(s, side, f, move) {
     return;
   }
   s.ev.push({ k: "pulse", side, move, x: f.x, y: f.y, r: PULSE_R });
+  if (SMOKE.has(arenaMove(move).n)) {
+    s.clouds.push({ id: s.nextId++, x: f.x, y: f.y, t: SMOKE_T, smoke: true });
+    s.ev.push({ k: "smoke", side, x: f.x, y: f.y });
+  }
   for (const c of s.cover) {
     if (c.hp <= 0) continue;
     const ex = c.x - f.x, ey = c.y - f.y;
@@ -855,6 +876,18 @@ function stepGround(s) {
     if (f.swift > 0) f.swift--;
     if (f.power > 0) f.power--;
     if (f.cloneT > 0 && --f.cloneT === 0 && f.clones.length) { s.ev.push({ k: "poof", side: f.side, at: clonesOf(f) }); f.clones = []; }
+    /* THE COPIES MOVE ON THEIR OWN (asked for, 2026-10-23): each drifts to a
+       new spot round its user every CLONE_WANDER, staggered, never closer
+       than CLONE_NEAR - so they weave and cross, and keep the eye guessing. */
+    f.clones.forEach((c, k) => {
+      if ((s.t + k * (CLONE_WANDER >> 1)) % CLONE_WANDER === 0) {
+        let tx = (rnd(s) * 2 - 1) * 2.4, ty = (rnd(s) * 2 - 1) * 1.7;
+        const l = Math.sqrt(tx * tx + ty * ty);
+        if (l < CLONE_NEAR) { const g = CLONE_NEAR / (l || 1); tx = (l ? tx : 1) * g; ty *= g; }
+        c[2] = tx; c[3] = ty;
+      }
+      c[0] += (c[2] - c[0]) * 0.07; c[1] += (c[3] - c[1]) * 0.07;
+    });
     if (f.wet > 0) f.wet--;
     if (s.weather === "rain") f.wet = Math.max(f.wet, 2);
     f.rained = s.weather === "rain" && f.types.includes(T("fire"));
@@ -944,7 +977,7 @@ function self(s, f, m) {
   if (m.sg) stages(s, f, m.sg);
   if (m.n === "double-team") {
     // Either side of the way it faces.
-    f.clones = [[-f.fy * CLONE_OFF, f.fx * CLONE_OFF], [f.fy * CLONE_OFF, -f.fx * CLONE_OFF]];
+    f.clones = [[-f.fy * CLONE_OFF, f.fx * CLONE_OFF], [f.fy * CLONE_OFF, -f.fx * CLONE_OFF]].map(([x, y]) => [x, y, x, y]);
     f.cloneT = CLONE_T;
     s.ev.push({ k: "clones", side: f.side, x: f.x, y: f.y });
   }
@@ -1139,7 +1172,8 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     // Sleep breaks on a hit after its first second; a Fire hit thaws.
     if (d.status === SLP && s.t - d.sleptAt > sec(1)) { d.status = -1; s.ev.push({ k: "cured", side: d.side }); }
     if (d.status === FRZ && m.t === "fire") { d.status = -1; s.ev.push({ k: "cured", side: d.side }); }
-    if (m.fl && rnd(s) * 100 < m.fl) { d.stun = Math.max(d.stun, FLINCH); }
+    if (m.fl && rnd(s) * 100 < m.fl) { d.stun = Math.max(d.stun, FLINCH); s.ev.push({ k: "flinch", side: d.side }); }
+    if (CONFUSES[m.n] && d.hp > 0 && rnd(s) * 100 < CONFUSES[m.n]) { d.confused = CONFUSE_T; s.ev.push({ k: "confused", side: d.side, x: d.x, y: d.y }); }
     // Water on a burn: the burn goes out in steam that hides whoever stands in it. Water soaks; a shock dries.
     if (m.t === "water") {
       if (d.status === BRN) {
@@ -1491,6 +1525,6 @@ export function rulesPrint() {
 export const stateHash = (s) => hash(JSON.stringify([s.t, s.intro, s.rs, s.winner,
   s.items.map((it) => [it.kind, it.x, it.y, it.t]), s.weather, s.dark, s.strikes.map((z) => [z.x, z.y, z.t]), s.clouds.map((c) => [c.x, c.y, c.t]),
   s.sudden ? 1 : 0,
-  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.pp), f.basic.cd, f.basicN, f.clones.length, f.wet, f.away])]),
+  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.pp), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused])]),
   s.shots.map((p) => [p.x, p.y]), s.hazards.map((z) => [z.x, z.y, z.t]),
   s.cover.map((c) => c.hp), [s.zone.open, s.zone.t, s.zone.claimed], s.drops.map((r) => [r.x, r.y, r.t])]));

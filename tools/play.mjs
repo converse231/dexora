@@ -1942,6 +1942,22 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
   assert.deepEqual(boot({ ...pika, party: [1, 7] }).e.state.party, [1], "a party member not in the Box was kept");
   assert.equal(boot({ ...pika, buddy: 7 }).e.state.buddy, null, "a follower not in the Box was kept");
   await savedField("skins", ["giovanni", "from_a_newer_build"], "junk", []);
+  await savedField("impacts", ["ult-6", "ult-from-a-newer-build"], "junk", []);
+  await savedField("impactsOff", ["ult-25"], 7, []);
+  {
+    /* ULTI IMPACT FRAMES: a free one is owned and on; a paid one costs its
+       price once and comes on; off is off; a second buy is refused. */
+    const C = await import("../src/game/cosmetics.js");
+    const paid = C.IMPACTS.find((x) => x.price > 0), free = C.IMPACTS.find((x) => x.price === 0);
+    const { e } = boot({ ...SAVE, money: paid.price + 5 });
+    assert.equal(C.impactFor(free.species, e.state.impacts, e.state.impactsOff), free.id, "the free impact frame was not on");
+    assert.ok(e.buyImpact(paid.id) && e.state.money === 5, "a paid impact frame did not cost its price");
+    assert.ok(!e.buyImpact(paid.id), "an impact frame was bought twice");
+    assert.equal(C.impactFor(paid.species, e.state.impacts, e.state.impactsOff), paid.id, "a bought impact frame was not on");
+    e.equipImpact(paid.id, false);
+    assert.equal(C.impactFor(paid.species, e.state.impacts, e.state.impactsOff), null, "an impact frame switched off still played");
+    assert.ok(!boot({ ...SAVE, money: 0 }).e.buyImpact(paid.id), "an impact frame was bought without the money");
+  }
   await savedField("skin", "lass", 42, null, { ...SAVE, skins: ["lass"] });
   assert.equal(boot({ ...SAVE, skin: "lass" }).e.state.skin, null, "a skin worn but never bought was kept");
 
