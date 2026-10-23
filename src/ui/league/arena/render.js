@@ -193,6 +193,17 @@ const SEQ_HOLD = 20, SEQ_FADE = 14, LIFT_T = 40;
 const RAINBOW = ["#ff5a8a", "#ffb02e", "#ffe14a", "#5fe08a", "#45d4ff", "#b06bff"];
 const FLOOR_COLOUR = { roar: "#ffd23f", moonstone: "#d8c8ff", tide: "#5ac8ff", eruption: "#ff6a2a", stampede: "#ffb35a", whiteout: "#e8f4ff" };
 const HERD = 128;
+/* THE ULTI ARCHETYPES' PICTURE (arena.js ARCHETYPES): each its own moment,
+   and an `ulti-<archetype>` sheet (white art, tinted to the ULTI's type)
+   played over it once drawn. A Domain names its field. */
+const DOMAIN_SAYS = { rain: ["RAIN DANCE", "Water hits harder, Fire weaker"], sun: ["SUNNY DAY", "Fire hits harder, Water weaker"],
+  sand: ["SANDSTORM", "Chips all but Rock, Ground and Steel"], snow: ["SNOWSCAPE", "Chips all but Ice types"],
+  "trick-room": ["TRICK ROOM", "The foe slows down, its caster speeds up"], tailwind: ["TAILWIND", "Its side runs faster"],
+  "electric-terrain": ["ELECTRIC TERRAIN", "Electric hits harder, nobody sleeps"], "psychic-terrain": ["PSYCHIC TERRAIN", "Psychic hits harder"],
+  "grassy-terrain": ["GRASSY TERRAIN", "Grass hits harder, its side heals"], "misty-terrain": ["MISTY TERRAIN", "Its side can't be statused"] };
+const DOMAIN_TINT = { "trick-room": "#c06bff", tailwind: "#9fe9ff", "electric-terrain": "#ffe14a", "psychic-terrain": "#ff6fb0",
+  "grassy-terrain": "#5fe08a", "misty-terrain": "#ffb7f0" };
+const SNARE_SAYS = { 0: ["Paralysed!", "#ffe14a"], 3: ["Sleep!", "#c8a0ff"], trap: ["Trapped!", "#ff6a55"], perish: ["Perish Song!", "#b9c2e4"] };
 const nameOf = (id) => label(speciesById(id));
 const stillsOf = (id) => [1, 2, 3, 4].map((k) => `ult-${id}-${k}`).filter((k) => FX[k]);
 const inArea = (rects, x, y) => (rects ?? []).some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
@@ -1023,6 +1034,12 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           if (pow >= 90) { shake(0.32); zoomAt(body.x, body.y, 0.045); impactFrame(sx(body.x), sy(body.y)); sheet("shockwave", body.x, body.y + 0.35, 2.8, colour, 22); }
           else if (pow) shake(0.08 + pow / 600);
         }
+        // A strong Psychic move hurls rocks pulled up off the floor round its user (Mewtwo's way), with its own blast.
+        const foe = activeOf(s, 1 - e.side), pm = moveOf(e.move);
+        if (!isBasic(e.move) && foe && typeOf(e.move) === "psychic" && pm.c === 1 && (pm.p ?? 0) >= 80) {
+          for (let i = 0; i < 3; i++) fx.push({ k: "hurl", x: body.x + (i - 1) * 0.9, y: body.y + (i === 1 ? -0.5 : 0.2), tx: foe.x + (rand() - 0.5) * 0.6, ty: foe.y, rot: rand() * TAU, t: -i * 3, life: 34 });
+          for (let i = 0; i < 3; i++) mark("crack", body.x + (i - 1) * 0.9, body.y + 0.4, 0.9);
+        }
         // A thrown rock rises out of the floor in front of its user first.
         if (BOULDERS.has(slugOf(e.move))) {
           fx.push({ k: "rise", x: body.x + e.dx * 0.8, y: body.y + e.dy * 0.5, t: 0, life: 14 });
@@ -1146,6 +1163,11 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ultAt[e.side] = { at: clock, id: e.id, name: e.name, type: e.type, colour, shiny: body ? shiny[e.side]?.[body.slot] : false, famous: Boolean(ULT_NAMES[e.id]), seq: seqOn.has(`${e.side}:${e.id}`) };
         zoomAt(e.x, e.y, 0.16); tilt(e.side === me ? 0.035 : -0.035); shake(0.5);
         if (e.kind === "storm") overlays.push({ k: "shade", colour: "rgba(6,8,30,", t: 0, life: 70 });
+        // A Cannon's and a Barrage's sheet play at the caster: neither lands as a strike.
+        if (e.arch === "Cannon" || e.arch === "Barrage") {
+          const foe = activeOf(s, 1 - e.side);
+          ulti(e.arch, e.x, e.y, 4, colour, foe ? Math.atan2(foe.y - e.y, foe.x - e.x) : 0);
+        }
         if (e.kind === "nova") for (let i = 0; i < 18; i++) { const a = (i / 18) * TAU; part({ k: "glow", x: e.x + Math.cos(a) * 3.6, y: e.y + Math.sin(a) * 3.6, vx: -Math.cos(a) * 0.06, vy: -Math.sin(a) * 0.06, colour, life: 40, size: 0.18, drag: 1 }); }
       } else if (e.k === "strike") {
         // An ULTI's strike lands: a blast the size of its ring, its type's matter, a bolt from the sky for a storm.
@@ -1164,6 +1186,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         } else if (type === "electric" || !e.nova && e.r < 1.5) strike(e.x, e.y);
         impact(type, e.x, e.y, 0, 0, true);
         sheet("shockwave", e.x, e.y + 0.3, e.r * 2.6, colour, 30);
+        if (e.arch && e.arch !== "Snare") ulti(e.arch, e.x, e.y, e.r * 2.6, colour);   // a Snare plays its own, in its colour, on "snare"
+        if (e.big) { impactFrame(sx(e.x), sy(e.y)); mark("crack", e.x, e.y + 0.3, e.r * 2); shake(1.2); stop(110); }
         sheet("impact", e.x, e.y - 0.3, e.r * (e.nova ? 1.6 : 2.2), colour, 24);
         for (let i = 0; i < (e.nova ? 3 : 2); i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? colour : "#ffffff", life: 24, size: 0.3, grow: (e.nova ? 0.26 : 0.12) - i * 0.03, t: -i * 3 });
         mark(MARK_OF[type] ?? "crack", e.x, e.y + 0.3, e.r * 1.8, colour);
@@ -1263,6 +1287,51 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         word(e.x, e.y - 1.8, `Go, ${nameOf(HELPERS[e.kind].id)}!`, "#ffffff", 60, true);
         for (let i = 0; i < 2; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? "#ff5a5a" : "#ffffff", life: 18, size: 0.2, grow: 0.12, t: -i * 3 });
         sparks(e.x, e.y, "#ffffff", 14, 0.09); shake(0.2);
+      } else if (e.k === "grab") {
+        // A GRAB: a vine (or a grip) lashes out, the foe hoisted on it before the throw.
+        fx.push({ k: "tether", x: e.x, y: e.y - 0.3, tx: e.tx, ty: e.ty - 0.3, colour: typeOf(e.move) === "grass" ? "#5fae3c" : "#e9eeff", t: 0, life: 22 });
+        const gp = poseOf(1 - e.side, s.sides[1 - e.side].active); gp.lift = LIFT_T * 0.6; gp.liftC = colourOf(e.move);
+        word(e.tx, e.ty - 1.5, "Grabbed!", "#ffd23f", 40, true);
+      } else if (e.k === "throw") {
+        for (let i = 0; i < 8; i++) part({ k: "streak", x: e.x + (rand() - 0.5) * 0.6, y: e.y - 0.3 + (rand() - 0.5) * 0.6, vx: -e.dx * 0.15, vy: -e.dy * 0.15, colour: "#ffffff", life: 10, size: 0.8, drag: 0.9 });
+        const tp = poseOf(e.side, s.sides[e.side].active); tp.vt += (e.dx >= 0 ? 1 : -1) * 0.6;
+        shake(0.5);
+      } else if (e.k === "rush") {
+        // ONSLAUGHT: a streak from where it was to where it strikes, and a slash.
+        for (let i = 0; i < 10; i++) { const q = i / 10; part({ k: "streak", x: e.x + (e.tx - e.x) * q, y: e.y - 0.3 + (e.ty - e.y) * q, vx: (e.tx - e.x) * 0.02, vy: 0, colour: "#ffffff", life: 10, size: 0.8, drag: 0.9 }); }
+        sheet("slash", e.tx, e.ty - 0.3, 2.6, "#ffffff", 14); shake(0.5); stop(60);
+      } else if (e.k === "sacrifice") {
+        overlays.push({ k: "tint", colour: "#ffffff", t: 0, life: 30 });
+        for (let i = 0; i < 4; i++) part({ k: "ring", x: e.x, y: e.y, colour: i % 2 ? "#ffb35a" : "#ffffff", life: 34, size: 0.5, grow: 0.3 - i * 0.04, t: -i * 4, keep: true });
+        poof(e.x, e.y, 4); shake(1.4); stop(140);
+        word(e.x, e.y - 1.6, "1 HP!", "#ff6a55", 60, true);
+      } else if (e.k === "fortress") {
+        word(e.x, e.y - 1.8, "FORTRESS!", "#9fe3ff", 60, true); ulti("Fortress", e.x, e.y, 3.4, "#9fe3ff"); shake(0.4);
+      } else if (e.k === "dome") {
+        word(e.x, e.y - 1.8, "BARRIER!", "#bff3ff", 60, true); ulti("Barrier", e.x, e.y, e.r * 2.4, "#bff3ff");
+        for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y, colour: "#bff3ff", life: 26, size: 0.4, grow: 0.12, t: -i * 4, keep: true });
+      } else if (e.k === "sanctuary") {
+        word(e.x, e.y - 1.8, "SANCTUARY!", "#7dffa8", 60, true); ulti("Sanctuary", e.x, e.y, 3.6, "#7dffa8");
+        sheet("shockwave", e.x, e.y + 0.3, 4, "#7dffa8", 30);
+        for (let i = 0; i < 24; i++) part({ k: "glow", x: e.x + (rand() - 0.5) * 2.4, y: e.y + 0.4, vx: 0, vy: -0.04 - rand() * 0.04, colour: i % 3 ? "#7dffa8" : "#ffffff", life: 44, size: 0.12, drag: 0.99, keep: true });
+      } else if (e.k === "awaken") {
+        word(e.x, e.y - 1.9, "AWAKENED!", "#ff9d52", 60, true); ulti("Awakening", e.x, e.y, 3.6, "#ff9d52");
+        overlays.push({ k: "tint", colour: "#ff9d52", t: 0, life: 16 });
+        for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y, colour: "#ffd23f", life: 24, size: 0.3, grow: 0.16, t: -i * 3, keep: true });
+        shake(0.7);
+      } else if (e.k === "domain") {
+        const [t1, t2] = DOMAIN_SAYS[e.kind] ?? ["DOMAIN", ""];
+        stamp(t1, DOMAIN_TINT[e.kind] ?? "#ffffff", 80, t2); ulti("Domain", e.x, e.y, 5, DOMAIN_TINT[e.kind] ?? "#ffffff");
+        overlays.push({ k: "tint", colour: DOMAIN_TINT[e.kind] ?? "#ffffff", t: 0, life: 20 });
+      } else if (e.k === "domainEnd") {
+        word(W / 2, H / 2 - 2, "The field returns", "#e9eeff", 50, true);
+      } else if (e.k === "snare") {
+        const [say, c] = SNARE_SAYS[e.what] ?? ["Snared!", "#c8a0ff"];
+        ulti("Snare", e.x, e.y, e.r * 2, c);
+        for (let i = 0; i < 26; i++) { const [vx, vy] = around(0.06); part({ k: "glow", x: e.x, y: e.y, vx, vy, colour: c, life: 40, size: 0.18, drag: 0.94, keep: true }); }
+        word(e.x, e.y - 1.8, say, c, 60, true);
+      } else if (e.k === "perish") {
+        word(e.x, e.y - 1.6, "Perish!", "#b9c2e4", 60, true); poof(e.x, e.y, 1.4);
       } else if (e.k === "splat") {
         // Slammed into the wall: a crack where it hit, dust off it, the screen jolts.
         impact("normal", e.x + e.dx * 0.4, e.y + e.dy * 0.4, e.dx, e.dy, true);
@@ -1533,6 +1602,40 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       }
       ctx.restore();
     }
+    // A DOMAIN's floor: its colour washed over the court, Trick Room's folded grid.
+    if (s.domain && DOMAIN_TINT[s.domain.kind]) {
+      const a = Math.min(1, s.domain.t / 30) * 0.12;
+      ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = DOMAIN_TINT[s.domain.kind]; ctx.fillRect(sx(INSET), sy(INSET), (W - 2 * INSET) * px, (H - 2 * INSET) * px);
+      if (s.domain.kind === "trick-room") {
+        ctx.globalAlpha = a * 3; ctx.strokeStyle = DOMAIN_TINT["trick-room"]; ctx.lineWidth = Math.max(1, px / 16);
+        const off = (clock / 900) % 2;
+        for (let x = INSET + off; x < W - INSET; x += 2) { ctx.beginPath(); ctx.moveTo(sx(x), sy(INSET)); ctx.lineTo(sx(x), sy(H - INSET)); ctx.stroke(); }
+        for (let y = INSET + off; y < H - INSET; y += 2) { ctx.beginPath(); ctx.moveTo(sx(INSET), sy(y)); ctx.lineTo(sx(W - INSET), sy(y)); ctx.stroke(); }
+      }
+      ctx.restore();
+    }
+    // LASTING FLAMES (a Flamethrower's path): a patch of fire licking up, dying down its last half second.
+    for (const fl of s.fires) {
+      const a = Math.min(1, fl.t / 30), fk = 0.8 + 0.2 * Math.sin(clock / 70 + fl.x * 3);
+      glow(sx(fl.x), sy(fl.y), px * 0.9 * fk, "#ff6a1f", 0.45 * a);
+      ctx.save(); ctx.globalAlpha = 0.9 * a;
+      for (let i = 0; i < 3; i++) {
+        const ox = (i - 1) * 0.22, h = (0.45 + 0.2 * Math.sin(clock / 90 + i * 2 + fl.y)) * fk;
+        ctx.fillStyle = i === 1 ? "#ffd27a" : "#ff6a1f";
+        ctx.beginPath(); ctx.moveTo(sx(fl.x + ox - 0.14), sy(fl.y + 0.2)); ctx.quadraticCurveTo(sx(fl.x + ox), sy(fl.y + 0.2 - h * 1.4), sx(fl.x + ox + 0.14), sy(fl.y + 0.2)); ctx.fill();
+      }
+      ctx.restore();
+      if (!still && rand() < 0.08) part({ k: "glow", x: fl.x + (rand() - 0.5) * 0.5, y: fl.y - 0.2, vx: 0, vy: -0.03, colour: "#ffd27a", life: 18, size: 0.08, drag: 0.98 });
+    }
+    // A BARRIER's dome: glass over its side, fading its last second.
+    for (const dm of s.domes) {
+      const a = Math.min(1, dm.t / TPS);
+      ctx.save(); ctx.globalAlpha = 0.14 * a; ctx.fillStyle = dm.side === me ? "#9fe3ff" : "#ffb7a8";
+      ctx.beginPath(); ctx.ellipse(sx(dm.x), sy(dm.y), px * dm.r, px * dm.r * 0.75, 0, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 0.6 * a; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1.5, px / 12); ctx.stroke();
+      ctx.globalAlpha = 0.25 * a; ctx.beginPath(); ctx.ellipse(sx(dm.x), sy(dm.y - dm.r * 0.3), px * dm.r * 0.6, px * dm.r * 0.25, 0, Math.PI, TAU); ctx.stroke();
+      ctx.restore();
+    }
     // HIGH TIDE (the Boardwalk): the water it rose over, washing in.
     if (s.tide > 0) {
       const a = Math.min(1, s.tide / 30) * (0.26 + 0.06 * Math.sin(clock / 300));
@@ -1750,6 +1853,30 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         at.y -= h * 1.3; at.x += (rand() - 0.5) * 0.06 * h + (p.liftDx ?? 0) * fl * 0.9; at.y += (p.liftDy ?? 0) * fl * 0.9;
         if (h > 0.2 && !(FX["moves/psychic-lift"] && sheetFx("moves/psychic-lift", clock / 70 % FX["moves/psychic-lift"].n, sx(at.x), sy(at.y - 0.3), px * 2.6, 0, null, h))) aura(f, at, fr, p.liftC ?? "#e070ff", 0.9);
         if (p.lift <= 0) { p.ox += (p.liftDx ?? 0) * 0.9; p.oy += (p.liftDy ?? 0) * 0.9; dust(x, y, 8); part({ k: "ring", x, y: y + 0.35, colour: "#ffffff", life: 16, size: 0.3, grow: 0.12 }); shake(0.45); }
+      }
+      if (f.fortress > 0) {
+        ctx.save(); ctx.globalAlpha = 0.5 + 0.2 * Math.sin(clock / 90); ctx.strokeStyle = "#9fe3ff"; ctx.fillStyle = "rgba(159,227,255,0.14)"; ctx.lineWidth = Math.max(2, px / 7);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) { const a2 = (i / 6) * TAU + Math.PI / 6; ctx.lineTo(sx(at.x) + Math.cos(a2) * px * 1.3, sy(at.y - 0.3) + Math.sin(a2) * px * 1.3); }
+        ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+      }
+      if (f.awake > 0) {
+        at.sx *= 1.1; at.sy *= 1.1;
+        glow(sx(at.x), sy(at.y - 0.6), px * 1.6, "#ff9d52", 0.3 + 0.1 * Math.sin(clock / 80));
+        if (!still && rand() < 0.6 * k) part({ k: "glow", x: at.x + (rand() - 0.5) * 1, y: at.y + 0.2, vx: 0, vy: -0.05, colour: rand() < 0.5 ? "#ff9d52" : "#ffd23f", life: 26, size: 0.14, drag: 0.98 });
+      }
+      if (f.regen > 0 && !still && rand() < 0.25 * k) part({ k: "glow", x: at.x + (rand() - 0.5) * 0.9, y: at.y + 0.1, vx: 0, vy: -0.03, colour: "#7dffa8", life: 26, size: 0.1, drag: 0.98 });
+      const sac = s.strikes.find((z) => z.sac && z.side === f.side);
+      if (sac) {
+        const q = 1 - sac.t / sac.t0, beat = Math.abs(Math.sin(q * q * Math.PI * 6));
+        at.sx *= 1 + 0.25 * q * beat; at.sy *= 1 + 0.25 * q * beat;
+        glow(sx(at.x), sy(at.y - 0.4), px * (1.2 + 2 * q), "#ffffff", 0.3 + 0.5 * q * beat);
+      }
+      if (s.perish > 0 && !f.hidden) {
+        ctx.save(); ctx.font = `800 ${Math.round(px * 0.55)}px "Chakra Petch", Rubik, sans-serif`; ctx.textAlign = "center";
+        ctx.fillStyle = "#e9eeff"; ctx.strokeStyle = "#000"; ctx.lineWidth = px / 10;
+        const n = String(Math.ceil(s.perish / TPS));
+        ctx.strokeText(n, sx(at.x), sy(at.y - 2.1)); ctx.fillText(n, sx(at.x), sy(at.y - 2.1)); ctx.restore();
       }
       if (surging) {
         // The surge's aura: the body's own outline in its type's colour, flickering, and its colour rising off it.
@@ -2020,6 +2147,19 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     if (s.white && !still) for (let i = 0; i < 3; i++) part({ k: "dot", x: -1 + rand() * (W + 2), y: rand() * H, vx: 0.09 + rand() * 0.05, vy: 0.02, colour: "#ffffff", life: 40, size: 0.08 + rand() * 0.06, drag: 1 });
   }
   // An ULTI's strike before it lands: its ring filling, or a cannon's lane, in its type's colour.
+  // An archetype's own sheet, once drawn: art/arena/fx/ulti-<archetype>.png (white, tinted to the ULTI's type).
+  /* AN ULTI ARCHETYPE'S OWN SHEET (art/arena/fx/ulti-<archetype>): most are drawn standing on the
+     ground - a sigil, a dome, a pillar - so they stand on the feet, not centred on them (a centred
+     Sanctuary sank its pillar half into the floor). Fortress and Barrage ring the body; Cannon is a
+     muzzle blast drawn facing right, turned to `face`. */
+  const ULTI_ROUND = new Set(["Fortress", "Barrage", "Cannon"]);
+  function ulti(arch, x, y, size, colour, face = 0) {
+    const key = `ulti-${arch.toLowerCase()}`, m = FX[key];
+    if (!m) return;
+    const at = ULTI_ROUND.has(arch) ? y - 0.55 : y + 0.35 + size * 0.1 - size * m.h / m.w / 2;   // its ground ring, not its edge, on the feet
+    const cannon = arch === "Cannon";
+    sheet(key, x + (cannon ? Math.cos(face) * size * 0.3 : 0), at + (cannon ? Math.sin(face) * size * 0.3 : 0), size, colour, 40, cannon ? face : 0);
+  }
   function strikeMark(z) {
     const colour = colours[z.type] ?? "#ffd23f", kk = clamp(1 - z.t / Math.max(1, z.t0), 0, 1);
     if (z.vanish) {
@@ -2409,6 +2549,19 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.restore();
       if (e.art && !e.key) for (let d = 0.6; d < e.len; d += 0.8) drawArt(e.art, sx(e.x + e.dx * d), sy(e.y + e.dy * d), Math.max(1, px / 14), ang, e.t + d * 7, 1 - kk);
       glow(sx(e.x + e.dx * e.len), sy(e.y + e.dy * e.len), px * 1.2, e.colour, 0.6 * (1 - kk));
+    } else if (e.k === "tether") {
+      // A vine or a grip from the user to the foe: drawn out, then gone.
+      const q = Math.min(1, kk * 4), x2 = e.x + (e.tx - e.x) * q, y2 = e.y + (e.ty - e.y) * q;
+      ctx.save(); ctx.globalAlpha = 1 - Math.max(0, kk - 0.7) / 0.3; ctx.strokeStyle = e.colour; ctx.lineWidth = Math.max(3, px / 5); ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(sx(e.x), sy(e.y));
+      ctx.quadraticCurveTo(sx((e.x + x2) / 2), sy((e.y + y2) / 2) - px * 0.8 * (1 - q), sx(x2), sy(y2)); ctx.stroke();
+      ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = Math.max(1, px / 14); ctx.stroke(); ctx.restore();
+    } else if (e.k === "hurl") {
+      // A rock lifted off the floor round the user (the first third), then thrown spinning at the foe.
+      const up = Math.min(1, kk * 3), go = Math.max(0, (kk - 0.35) / 0.65);
+      const x = e.x + (e.tx - e.x) * go, y = e.y - 1.2 * up + (e.ty - e.y) * go + go * (1 - go) * -1.5;
+      if (go > 0) glow(sx(x), sy(y), px * 0.7, "#e070ff", 0.3);
+      boulder(x, y, e.rot + kk * 6, 0.32, 1);
     } else if (e.k === "rise") {
       // A boulder pushed up out of the floor, then gone as the shot leaves.
       boulder(e.x, e.y + 0.3 - kk * 0.7, kk * 2, 0.42 * Math.min(1, kk * 2.5), 1 - Math.max(0, kk - 0.75) * 4);
@@ -3192,7 +3345,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     // A move's own art is drawn in its own colours; the shared sheets are white, coloured here.
     ctx.drawImage(meta.c ? im : tinted(im, colour), f * meta.w, 0, meta.w, meta.h, -w / 2, -h / 2, w, h);
     if (!meta.c) {
-      ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = Math.min(1, alpha) * 0.45;
+      // A spark wants its white core; an ULTI's sheet is big enough that the white washed its type out (a fire Nova read grey).
+      ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = Math.min(1, alpha) * (name.startsWith("ulti-") ? 0.12 : 0.45);
       ctx.drawImage(im, f * meta.w, 0, meta.w, meta.h, -w / 2, -h / 2, w, h);
     }
     ctx.restore();

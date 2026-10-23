@@ -1369,10 +1369,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   form matched by NAME to PMD's subgroup (`ALIAS` where PMD names it
   otherwise - Paldean Tauros, Crowned Zacian; 13 drawn forms fought in
   follower art until 2026-10-23). PMD draws no Gigantamax and only portraits
-  of most Megas, so **a form fights in the Arena only with its own PMD body**
-  (`arenaReady` in arena.js, asked for 2026-10-23: "consistent battle
-  animations") - the team, the Fair format, evolving and Mega Evolving all
-  ask it; a species PMD has not drawn yet still fights in its follower art. render.js loads one when a match
+  of most Megas, so **only a Pokemon with its own PMD body fights in the
+  Arena** (`arenaReady` in arena.js: forms 2026-10-23, every species
+  2026-10-24, asked for - "consistent battle animations"): the team picker,
+  the CPU's pool, the Fair format, evolving and Mega Evolving all ask it. render.js loads one when a match
   needs it (kept across matches, every url stamped `PMD_REV`), picks the
   animation from the fighter (a blow's frames up to PMD's HitFrame run across
   the wind-up, so it lands as the rules hit), draws it at the follower art's
@@ -1431,6 +1431,35 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   nobody). Move art falls back to a FAMILY sheet (render.js) - `slam`,
   `claw`, and the shared `heal`, `power-up`, `stat-drop` - until drawn
   alone; art/arena/fx/MOVE_PROMPTS.md holds only what is still to draw.
+  **ULTIs are fourteen ARCHETYPES** (2026-10-24, asked for: "bigger impacts,
+  really worth the use - some defensive, buff, attack"; the Arena Move
+  Codex artifact is the design): Cataclysm, Storm, Cannon, Nova, Barrage,
+  Onslaught, Phantom, Sacrifice, Fortress, Barrier, Sanctuary, Awakening,
+  Domain, Snare. **Every Pokemon has ONE** (`ultiPick`, remembered per
+  species): a named one (`ULT_NAMES`, now [name, archetype]), else its
+  signature move (90+ power, three or fewer learn it), else its own support
+  move (a wall's, or one three or fewer learn - `learnable(id, 100, true)`
+  reads the League's unused moves for this alone), else its strongest
+  same-type attack shaped into an archetype. A ULTI-tier move that is its
+  ULTI is never also in its kit (`kitOf`: Pikachu's Thunder); an everyday
+  attack made a ULTI stays (Machamp's Dynamic Punch). An attack ULTI's damage is a SHARE of the target's HP
+  (`ultDamage`: resisted 0.6x, super effective 1.4x, its attack over the
+  foe's defence held to 0.8-1.3x) - ~35% if it all lands, the same from a
+  Pichu as from a Mewtwo; every archetype telegraphs and has an answer.
+  check.mjs holds every archetype to somebody and to its effect.
+  **Moves that touch the foe** (same day, asked for): a GRAB (Vine Whip,
+  Power Whip, Circle Throw, Dragon Tail, Vital Throw, Submission) holds the
+  foe, then throws it `THROW_DIST` (a wall-splat if one is there); a FLAME
+  move's shot leaves burning patches (`s.fires`); a strong Psychic move
+  hurls rocks off the floor (the picture's). Teleport, Roar, Whirlwind and
+  Leech Seed are League-unused (`no`) and wait on an Arena-only move list.
+  A move that does nothing here is never in a kit (accuracy-only drops,
+  the placeholder power 1 of Ruination and Comeuppance).
+  **The team picker is a fighting game's character select**
+  (`FighterSelect.jsx`, asked for): three slots on top, a spotlight (sprite,
+  role, ULTI, stats, moves), a roster of one portrait a species (its best
+  copy; the others a switch in the spotlight), type filters, arrow keys,
+  Enter, Backspace, Escape.
   **Evolving in a match** (asked for): a Pokemon with a next stage fills its
   bar (`xp`) with the share of a foe's HP it deals, a knockout a whole bar
   (`EVO_XP`), and evolves where it stands - `EVOLVE_T` untouchable and still,

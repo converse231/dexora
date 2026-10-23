@@ -186,8 +186,8 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
             <span className="sn-mon solo sn-shade"><Sprite id={ev.hunt.id} alt="" eager /></span>
             <span>
               <b>The Nightmare</b>
-              Every costume you catch is a Bad Dream. At {ev.hunt.dreams}, the new moon rises - and
-              {" "}something waits in {AREAS[ev.hunt.area]?.name ?? "the dark"} after nightfall.
+              Catch {ev.hunt.dreams} costumed Pokémon. Then walk in {AREAS[ev.hunt.area]?.name}
+              {" "}at night - 20:00 to 05:00 on the map's clock - and it comes for you.
             </span>
           </section>
         )}
@@ -256,8 +256,8 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
             <span>
               <b>{won ? `${ev.hunt.name} ✓` : due ? "The new moon has risen" : "The Nightmare"}</b>
               <small>{won ? ev.hunt.title
-                : due ? `${AREAS[ev.hunt.area]?.name}, after dark`
-                  : `${n} of ${ev.hunt.dreams} Bad Dreams - one a costume caught`}</small>
+                : due ? `Walk in ${AREAS[ev.hunt.area]?.name}, 20:00-05:00`
+                  : `${n} of ${ev.hunt.dreams} costumes caught`}</small>
             </span>
             {!won && <Moons n={n} of={ev.hunt.dreams} />}
           </div>

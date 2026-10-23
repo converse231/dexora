@@ -41,6 +41,10 @@ FRAMES = {
 # art/arena/fx/: a manga ink background a type's ULTI flashes behind it
 # (`ult-<pattern>`), and a famous Pokemon's own panel (`ult-<dex id>`). The
 # renderer draws its own where one is missing.
+# THE ULTI ARCHETYPES' SHEETS (2026-10-24, render.js `ulti`): white art tinted to the ULTI's type, one an
+# archetype, frames counted by eye; built once drawn (art/arena/fx/ulti-<archetype>.png).
+ULTI_SHEETS = {"cataclysm": 8, "storm": 6, "cannon": 6, "nova": 8, "barrage": 6, "onslaught": 6, "phantom": 6, "sacrifice": 8,
+               "fortress": 6, "barrier": 6, "sanctuary": 8, "awakening": 8, "domain": 6, "snare": 6}
 ULT_PATTERNS = ["bolts", "flames", "waves", "vines", "psychic", "shadow", "fists", "dragon", "frost", "rocks", "stars", "wind", "speed"]
 ULT_FAMOUS = [25, 6, 9, 3, 150, 94, 448, 130, 149, 143, 384, 248, 445, 658, 282, 257]
 # A famous Pokemon's impact SEQUENCE (2026-10-23): up to four stills in their
@@ -55,6 +59,9 @@ for n in [*ULT_PATTERNS, *ULT_FAMOUS]:
         # 1216 wide: a panel fills the screen, and 768 smeared its ink on a desktop; at 1280 the centred
         # Blastoise's screentone ran past check.mjs's 200KB whatever the colours (2026-10-23).
         FRAMES[f"ult-{n}"] = (1, 1216, False, "centre")
+for _a, _n in ULTI_SHEETS.items():
+    if (SRC / f"ulti-{_a}.png").exists():
+        FRAMES[f"ulti-{_a}"] = (_n, 192, True, "centre")
 # A move's sheet: its frames, counted by eye (2026-10-23), and the three
 # whose frames grow across the row in cells of their own size, cut by their
 # widest gaps (`frames_of`).
@@ -80,7 +87,7 @@ MOVES = {
     "evolve": 8, "mega-evolve": 8, "mega-symbol": 1,
     # FAMILIES (render.js FAMILY / SHARED, 2026-10-24): one sheet for many moves - a body slam, a claw's
     # slash, any heal, any boost, any drop - until a move is drawn alone.
-    "slam": 5, "claw": 4, "heal": 6, "power-up": 6, "stat-drop": 6,
+    "slam": 5, "claw": 4, "heal": 6, "power-up": 6, "stat-drop": 7,
 }
 SEEN = 24                        # alpha that counts as drawn when looking for the gaps
 HARD = 110                       # alpha past which a shrunk pixel is solid, under which it is gone
@@ -109,6 +116,11 @@ def frames_of(a, n, how="even"):
                 gaps.append(((x0 + x) / 2, x - x0))
         else:
             x += 1
+    if how == "ulti":
+        # Exactly one clean gap between every two frames: those are the cuts (Cannon's cells are uneven).
+        # Too few, where glow runs frame into frame (Sacrifice): the widest piece splits at its emptiest
+        # column. Too many, a frame of loose orbs (Barrage, Domain): the gap nearest each even cut.
+        how = "near" if len(gaps) > n - 1 else "widest"
     if how == "widest":
         cuts = sorted(round(g) for g, _ in sorted(gaps, key=lambda g: -g[1])[:n - 1])
         while len(cuts) < n - 1:
@@ -141,7 +153,7 @@ def build(name, n, width, hard, anchor):
     box = a.point(lambda v: 255 if v > SEEN else 0).getbbox()
     assert box, f"{name}: the original is empty"
     top, bottom = box[1], box[3]
-    runs = frames_of(a, n, "even" if not name.startswith("moves/") else "widest" if name[6:] in WIDEST else "near")
+    runs = frames_of(a, n, "ulti" if name.startswith("ulti-") else "even" if not name.startswith("moves/") else "widest" if name[6:] in WIDEST else "near")
     # One box every frame shares: the widest drawing, a little room round it.
     cell = max(x1 - x0 for x0, x1 in runs) + 8
     scale = width / cell
@@ -163,8 +175,9 @@ def build(name, n, width, hard, anchor):
     # An ULTI panel is white ink on nothing: 64 colours are plenty, and keep each under check.mjs's 200KB.
     # A famous Pokemon's own panel is ink on white, its dots black or white: 16 greys (its screentone ran past 200KB at 64).
     still = name.startswith("ult-") and name.count("-") == 2
-    colours = 128 if still else 16 if name[4:].isdigit() else 64 if name.startswith("ult-") else 256
-    (strip.quantize(colours, method=Image.Quantize.FASTOCTREE) if name.startswith(("moves/", "ult-")) else strip).save(out, optimize=True)
+    # An ULTI archetype's sheet is white and grey too, tinted per type: 32 greys (full colour was 3.5 MB for the fourteen).
+    colours = 128 if still else 16 if name[4:].isdigit() else 64 if name.startswith("ult-") else 32 if name.startswith("ulti-") else 256
+    (strip.quantize(colours, method=Image.Quantize.FASTOCTREE) if name.startswith(("moves/", "ult-", "ulti-")) else strip).save(out, optimize=True)
     print(f"{name}: {n} frame{'s' if n > 1 else ''} of {width}x{fh}, {out.stat().st_size // 1024} KB")
     return {"n": n, "w": width, "h": fh}
 

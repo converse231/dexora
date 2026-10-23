@@ -43,12 +43,12 @@ import { dayKey, hash } from "../../../game/daily.js";
 import { ARENA_NEWS_KEY, write } from "../../../game/store.js";
 import BattleSwitch from "../BattleSwitch.jsx";
 import { createRenderer } from "./render.js";
+import FighterSelect from "./FighterSelect.jsx";
 import { play as playSound, soundOn, setSound } from "./sfx.js";
 import { loadAnims } from "../moveAnim.js";
 import Sprite from "../../Sprite.jsx";
 import Icon from "../../Icon.jsx";
 import Types from "../../Types.jsx";
-import Picker, { keyOf } from "../../trade/Picker.jsx";
 import { useModalLock, useDismiss } from "../../modal.js";
 import { PMD_REV } from "../../../data/pmd.js";
 
@@ -186,7 +186,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
     <>
       <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0} onMode={onMode} onTutor={setTutorFor}
         onStart={(m) => { immerse(); setMatch(m); }} onOnline={(o) => { immerse(); setOnline(o); }} onEdit={() => setEditing(true)} onHowto={() => setHowto(true)} onShop={() => setShop(true)} />
-      {editing && <TeamEdit box={box} picked={mons} custom={arenaTeam.length > 0}
+      {editing && <FighterSelect box={box} picked={mons} custom={arenaTeam.length > 0}
         onSave={(uids) => { engine?.setArenaTeam(uids); setEditing(false); }} onClose={() => setEditing(false)} />}
       {howto && <HowTo onClose={() => setHowto(false)} />}
       {shop && <UltShop engine={engine} money={money} impacts={impacts} impactsOff={impactsOff} onClose={() => setShop(false)} />}
@@ -424,46 +424,6 @@ function LadderBoard({ ladder, chosen, onPick }) {
         </div>
       )}
     </div>
-  );
-}
-
-/* THE ARENA'S OWN THREE (asked for, 2026-10-22): the Box's picker, three at
-   most, in fighting order - apart from the League's team, so a pick here
-   never reorders that one. "Use my League team" goes back to its first three. */
-function TeamEdit({ box, picked, custom, onSave, onClose }) {
-  useModalLock();
-  // Only what may fight here: a form with no Arena body (most Megas, every Gigantamax) is not offered (reported 2026-10-24).
-  const mons = useMemo(() => box.filter((m) => !refusal(m) && !isEvent(m.species) && arenaReady(m.species)), [box]);
-  const [keys, setKeys] = useState(() => picked.map(keyOf));
-  const close = useRef(onClose);
-  close.current = onClose;
-  useEffect(() => {
-    const key = (e) => { if (e.key === "Escape") { e.stopPropagation(); close.current(); } };
-    addEventListener("keydown", key, true);
-    return () => removeEventListener("keydown", key, true);
-  }, []);
-  const uids = keys.map((k) => mons.find((m) => keyOf(m) === k)?.uid).filter((u) => u != null);
-  return createPortal(
-    <div className="sheet" {...useDismiss(onClose)}>
-      <div className="ag-editor" role="dialog" aria-modal="true" aria-label="Arena team" onClick={(e) => e.stopPropagation()}>
-        <header>
-          <div>
-            <h3>Arena team</h3>
-            <span>Pick up to three. The first one starts the fight; a tap on a picked one takes it out.</span>
-          </div>
-          <button type="button" className="ar-x" aria-label="Close" onClick={onClose}>✕</button>
-        </header>
-        <div className="ag-editor-body">
-          <Picker mons={mons} picked={keys} max={ARENA_TEAM} onChange={setKeys} prefer="high" sort="level" level
-            empty="Catch a Pokémon first - the Arena fights with your Box." />
-        </div>
-        <footer>
-          {custom && <button type="button" className="lg-go quiet" onClick={() => onSave([])}>Use my League team</button>}
-          <button type="button" className="lg-go" disabled={!uids.length} onClick={() => onSave(uids)}>Save team</button>
-        </footer>
-      </div>
-    </div>,
-    document.body,
   );
 }
 
