@@ -103,16 +103,15 @@ export const EVENT_NAME = { outbreak: "Outbreak", rift: "Rift" };
    table row, so no spawn table, no League level and no rod moves for it: the
    event is over the day it ends and the world is exactly the world.
 
-   1 in 16 is a hunt, not a gift. Measured on the tables at Lv 50: a witch
-   Gastly is about one Pokemon Tower meeting in 115, a Pumpkin Mimikyu about
-   one in 1,100 there, a Vampire Zubat one in 400 in Mt. Moon - and the
-   evolved costumes are rarer still wild (a Gengar is 0.3% of the Tower), so
-   the line is mostly raised. Night doubles it (`EVENT_NIGHT`: the dead walk
-   at night, and night is already frozen on every encounter), and a Spooky
-   Honey multiplies it by its `lure`, never past `EVENT_CAP`. */
-export const EVENT_SHARE = 1 / 16;
-export const EVENT_NIGHT = 2;
-export const EVENT_CAP = 0.5;
+   HALF of the species' meetings (2026-10-24, asked for once the event was
+   live: "make their odds normal like the non-event Pokemon, just additional
+   Pokemon"): a costume is met as often as the species it dresses, as one
+   more Pokemon sharing its slot would be. It was 1 in 16 - a witch Gastly one
+   Pokemon Tower meeting in 115. Night (`EVENT_NIGHT`) and a Spooky Honey's
+   `lure` raise it, never past `EVENT_CAP`, so both still do something. */
+export const EVENT_SHARE = 1 / 2;
+export const EVENT_NIGHT = 1.5;
+export const EVENT_CAP = 0.75;
 
 // The event running on a local day (dayKey), or null.
 export const eventOn = (day = dayKey()) =>

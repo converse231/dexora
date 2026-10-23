@@ -281,8 +281,23 @@ export const HELPERS = {
   snorlax: { id: 143, t: sec(0.9), r: 1.5 },
   chansey: { id: 113, t: sec(0.8) },
   jigglypuff: { id: 39, t: sec(1.4), r: 4 },
+  /* SUPPORT (2026-10-24, asked for: "Pokemon that follow you for a while,
+     mini healings, buffs, or target the enemy"): each FOLLOWS its trainer's
+     Pokemon for FOLLOW_T. Audino's Heal Pulse heals a little every `every`;
+     Plusle's Helping Hand makes its trainer hit HELP_HIT harder; Mr. Mime's
+     Light Screen takes SCREEN_K off what its trainer is dealt; Magnemite
+     Thunder Shocks the foe every `every`, wherever it stands. */
+  audino: { id: 531, t: sec(8), follow: true, every: sec(1.5), name: "Heal Pulse" },
+  plusle: { id: 311, t: sec(8), follow: true, name: "Helping Hand" },
+  "mr-mime": { id: 122, t: sec(8), follow: true, name: "Light Screen" },
+  magnemite: { id: 81, t: sec(8), follow: true, every: sec(1.2), name: "Thunder Shock" },
 };
 const HELPER_KINDS = Object.keys(HELPERS), HELPER_LOCK = sec(0.3), HELPER_HEAL = 0.25;
+const PULSE_HEAL = 0.03, HELP_HIT = 1.25, SCREEN_K = 0.7, SHOCK_HURT = 40;
+// A follower's place: beside its trainer, a little behind.
+const SIDE_AT = { audino: [-0.9, 0.5], plusle: [0.9, 0.5], "mr-mime": [-0.9, -0.5], magnemite: [0.9, -0.6] };
+// A follower helping this side in this way, now.
+const helping = (s, side, kind) => s.helpers.some((h) => h.side === side && h.kind === kind);
 const PICK_FIRST = sec(10), PICK_EVERY = sec(16), PICK_LIFE = sec(14), PICK_R = 0.5;
 const X_TIME = sec(8), X_ATTACK = 1.3, X_GUARD = sec(1.5);
 /* WHAT ONE HIT IS WORTH, against the plan's 30-45 s a Pokemon. Measured
@@ -334,8 +349,9 @@ export const moveAt = (f, k) => (k === BASIC_K ? f.basic : f.kit[k]);
 export const BASIC_K = 5;
 export const BASIC_P = -2, BASIC_S = -3;
 const BASIC = {
-  [BASIC_P]: { n: "basic-attack", t: null, c: 0, p: 15, pp: 1 },
-  [BASIC_S]: { n: "basic-shot", t: null, c: 1, p: 15, pp: 1 },
+  // 15 until 2026-10-24 ("add a bit more damage in basic attacks").
+  [BASIC_P]: { n: "basic-attack", t: null, c: 0, p: 18, pp: 1 },
+  [BASIC_S]: { n: "basic-shot", t: null, c: 1, p: 18, pp: 1 },
 };
 export const arenaMove = (i) => BASIC[i] ?? (i <= ULT_BASE ? ultMove(i) : moveOf(i));
 // An ULTI's hit: a 90-power move of its user's first type, physical or special by the higher attack.
@@ -360,10 +376,10 @@ export const basicShape = (f) => (f.basic.i === BASIC_P ? "melee" : "shot");
    against the other's: with no perks brawlers won 18 (range was simply
    better); these 48, a 3v3 still ~74 s. The basic bolt's longer reach
    (2026-10-23) took it to 9 of 40 again, and BRAWL_GUARD 0.72 -> 0.6 back to
-   16. */
+   16; moves priced by their worth (2026-10-24) left 13, and 0.55 is 16. */
 // A fighter outside a match (the lobby, the tutor) has no `basic` yet: its stats answer the same.
 export const roleOf = (f) => ((f.basic?.i ?? basicOf(f)) === BASIC_P ? "brawler" : "blaster");
-export const BRAWL_RUN = 1.2, BRAWL_CD = 0.65, BRAWL_HIT = 1.3, BRAWL_GUARD = 0.6;
+export const BRAWL_RUN = 1.2, BRAWL_CD = 0.65, BRAWL_HIT = 1.3, BRAWL_GUARD = 0.55;
 export const BLAST_SPEED = 1.15, BLAST_RANGE = 1.1, BLAST_BEAM = 0.85;
 export const basicCd = (f) => (roleOf(f) === "brawler" ? Math.round(BASIC_CD * BRAWL_CD) : BASIC_CD);
 // Which a fighter has: the jab for the higher Attack, the bolt for the higher Sp. Atk.
@@ -425,10 +441,34 @@ export const windOf = (m) => {
   const s = shapeOf(m);
   return s === "beam" ? Math.round(base * 1.35) : s === "self" || s === "field" ? sec(0.22) : base;
 };
+/* A MOVE'S WAIT IS WHAT IT IS WORTH (2026-10-24, reported: "some healing
+   moves are OP - CDs should depend on the skill"). Power alone was the wait:
+   a drain move's heal came free (Leech Life, Drain Punch and Horn Leech were
+   the three best moves in the game), a multi-hit move waited on ONE hit's
+   power (Bullet Seed out-damaged Hyper Beam), a move that raised its user's
+   stats paid nothing for them (Power-Up Punch, 40 power, beat every 120),
+   and Recover and Swords Dance came back (9 s) before their effect was gone
+   - a boost lasts BUFF_T, so it never wore off, and Recover out-healed what
+   a shot deals. Now a damaging move waits on its VALUE (`valueOf`): its
+   power times its hits and its crits (Wicked Blow always lands one), plus
+   what it drains, plus STAGE_UP for each stage it raises its user (at its
+   chance) and less STAGE_DOWN for each it lowers. Recoil buys nothing back:
+   Brave Bird already hit as hard as any 120 (reported as too strong). A
+   boost waits SELF_CD, past its BUFF_T; a heal HEAL_CD - at 14 s Recover's
+   half was 3.6% a second, near a whole attacker's damage. */
+const STAGE_UP = 25, STAGE_DOWN = 10, SELF_CD = sec(14), HEAL_CD = sec(18);
+export const valueOf = (m) => {
+  const hits = m.hits ? (m.hits[0] + m.hits[1]) / 2 : 1;
+  let v = (m.p ?? 0) * hits * (1 + 0.5 * CRIT[Math.min(3, m.cr ?? 0)]) * (1 + Math.max(0, m.dr ?? 0) / 100);
+  // A raise of the stat it hits with makes every later hit half again as hard (Fiery Dance was 1.18x a Fire Blast): half its power.
+  const at = m.c === 1 ? 3 : 1, chance = (m.sgc ?? 100) / 100;
+  if (m.sgu && m.sg) v += m.sg.reduce((n, [st, k]) => n + (k > 0 ? (st === at ? (m.p ?? 0) * 0.5 * Math.min(1, 2 * chance) : k * STAGE_UP * chance) : k * STAGE_DOWN * chance), 0);
+  return Math.max(20, v);
+};
 export const cooldownOf = (m) => {
-  if (m.c === 2) return SHIELDS.has(m.n) ? sec(7) : m.n === "rest" ? sec(20) : m.st === 3 ? sec(15) : sec(9);
-  // 0.8 + p/35, then 0.6 + p/45 ("still long"), then this with PP gone ("a bit of cooldown"): Fire Blast 3.65 s.
-  return sec(0.9 + (m.p ?? 0) / 40);
+  if (m.c === 2) return SHIELDS.has(m.n) ? sec(7) : m.n === "rest" ? sec(20) : m.st === 3 ? sec(15) : m.h ? HEAL_CD : m.self ? SELF_CD : sec(9);
+  // 0.8 + p/35, then 0.6 + p/45 ("still long"), then 0.9 + p/40 with PP gone; now of the move's worth: Fire Blast 3.65 s.
+  return sec(0.9 + valueOf(m) / 40);
 };
 const multiCount = (m) => (m.hits ? Math.round((m.hits[0] + m.hits[1]) / 2) : 1);
 
@@ -536,6 +576,7 @@ export function tick(s, inputs) {
   stepHazards(s);
   stepGround(s);
   stepEvents(s);
+  stepBench(s);
   for (let side = 0; side < 2; side++) settleKO(s, side);
   s.t++;
   if (s.t === LIMIT - FINAL_T) s.ev.push({ k: "final" });
@@ -706,7 +747,8 @@ function stepAct(s, side, f) {
     } else m.cd = cooldownOf(data);
     s.ev.push({ k: "fire", side, move: m.i, shape: a.shape, x: f.x, y: f.y, dx: a.dx, dy: a.dy, basic: Boolean(a.basic), boost: Boolean(a.boost) });
     // A move that changes its user's own stages does so as it fires (Close Combat, Overheat).
-    if (data.p && data.sgu && data.sg && rnd(s) * 100 < (data.sgc ?? 100)) stages(s, f, data.sg);
+    // ...but never past +1 (2026-10-24: Fiery Dance re-raised itself to a standing +2, doubling all it dealt); +2 is a setup move's.
+    if (data.p && data.sgu && data.sg && rnd(s) * 100 < (data.sgc ?? 100)) stages(s, f, data.sg, 1);
     const rec = a.basic ? BASIC_REC : Math.max(1, Math.round(windOf(data) / 2));
     if (!a.basic && VANISH[data.n]) { vanish(s, side, f, m.i, VANISH[data.n]); return; }
     switch (a.shape) {
@@ -1053,10 +1095,35 @@ function stepItems(s, bodies) {
     return true;
   });
 }
+/* RESTING IN ITS BALL (2026-10-24, asked for): a Pokemon on the bench heals
+   BENCH_REGEN of its HP a second, never past BENCH_CAP - a switch out is a
+   breather, never a full heal. A fainted one stays down. */
+const BENCH_REGEN = 0.01, BENCH_CAP = 0.75;
+function stepBench(s) {
+  if (s.t % TPS) return;
+  for (const sd of s.sides) sd.team.forEach((f, k) => {
+    const cap = Math.floor(f.max * BENCH_CAP);
+    if (k !== sd.active && f.hp > 0 && f.hp < cap) f.hp = Math.min(cap, f.hp + Math.max(1, Math.floor(f.max * BENCH_REGEN)));
+  });
+}
 function stepHelpers(s) {
   s.helpers = s.helpers.filter((h) => {
     const foe = activeOf(s, 1 - h.side), mine = activeOf(s, h.side);
     if (h.kind === "snorlax" && h.t > HELPER_LOCK && foe && foe.hp > 0) { h.x = foe.x; h.y = foe.y; }
+    const H0 = HELPERS[h.kind];
+    if (H0.follow) {
+      if (mine) { const [ox, oy] = SIDE_AT[h.kind]; h.x += (mine.x + ox - h.x) * 0.12; h.y += (mine.y + oy - h.y) * 0.12; }
+      if (H0.every && (H0.t - h.t) % H0.every === H0.every - 1) {
+        if (h.kind === "audino" && mine && mine.hp > 0) heal(s, mine, Math.max(1, Math.floor(mine.max * PULSE_HEAL)));
+        else if (h.kind === "magnemite" && foe && foe.hp > 0 && foe.inv <= 0 && !foe.hidden && effectiveness("electric", foe.types) > 0) {
+          hurt(s, foe, Math.max(1, Math.floor(foe.max / SHOCK_HURT * effectiveness("electric", foe.types))), null);
+          s.ev.push({ k: "zap", side: h.side, x: h.x, y: h.y, tx: foe.x, ty: foe.y });
+        }
+      }
+      if (--h.t > 0) return true;
+      s.ev.push({ k: "helperGone", kind: h.kind, side: h.side, x: h.x, y: h.y });
+      return false;
+    }
     if (--h.t > 0) return true;
     s.ev.push({ k: "helperHit", kind: h.kind, side: h.side, x: h.x, y: h.y });
     const r = HELPERS[h.kind].r ?? 0;
@@ -1139,10 +1206,10 @@ function heal(s, f, n) {
 }
 
 // Timed stat stages: each lasts BUFF_T and the Arena caps them at +/-2.
-function stages(s, f, list) {
+function stages(s, f, list, cap = STAGE_CAP) {
   for (const [stat, n] of list) {
     if (stat < 1 || stat > 7) continue;
-    f.stages[stat] = clamp(f.stages[stat] + n, -STAGE_CAP, STAGE_CAP);
+    f.stages[stat] = clamp(f.stages[stat] + n, -STAGE_CAP, n > 0 ? Math.max(f.stages[stat], cap) : STAGE_CAP);
     f.stageT[stat] = BUFF_T;
     s.ev.push({ k: "stage", side: f.side, stat, n, x: f.x, y: f.y });
   }
@@ -1343,7 +1410,8 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     const shock = m.t === "electric" && d.wet > 0;
     dmg = Math.max(1, Math.floor(rawDamage(a, d, m, crit) * (crit ? 1.5 : 1) * roll * hits * DAMAGE * boost * (a.surge > 0 ? SURGE_DMG : 1) * (a.power > 0 ? X_ATTACK : 1)
       * (finalMinute(s) ? FINAL_DMG : 1) * weatherK(s, m.t) * (shock ? SHOCK : 1)
-      * (contact && roleOf(a) === "brawler" ? BRAWL_HIT : 1) * (!contact && roleOf(d) === "brawler" ? BRAWL_GUARD : 1)));
+      * (contact && roleOf(a) === "brawler" ? BRAWL_HIT : 1) * (!contact && roleOf(d) === "brawler" ? BRAWL_GUARD : 1)
+      * (helping(s, a.side, "plusle") ? HELP_HIT : 1) * (helping(s, d.side, "mr-mime") ? SCREEN_K : 1)));
     d.hp = Math.max(0, d.hp - dmg);
     a.xp += dmg / d.max + (d.hp === 0 ? EVO_XP : 0);
     const st = s.sides[a.side].stats;

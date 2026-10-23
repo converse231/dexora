@@ -430,7 +430,8 @@ function LadderBoard({ ladder, chosen, onPick }) {
    never reorders that one. "Use my League team" goes back to its first three. */
 function TeamEdit({ box, picked, custom, onSave, onClose }) {
   useModalLock();
-  const mons = useMemo(() => box.filter((m) => !refusal(m) && !isEvent(m.species)), [box]);
+  // Only what may fight here: a form with no Arena body (most Megas, every Gigantamax) is not offered (reported 2026-10-24).
+  const mons = useMemo(() => box.filter((m) => !refusal(m) && !isEvent(m.species) && arenaReady(m.species)), [box]);
   const [keys, setKeys] = useState(() => picked.map(keyOf));
   const close = useRef(onClose);
   close.current = onClose;
@@ -938,7 +939,8 @@ function HowTo({ onClose }) {
               <li><b>Type combos</b>: Water on a burned Pokémon puts the burn out in a cloud of steam that hides whoever stands in it. Water soaks, and Electric on a soaked Pokémon hits half again as hard.</li>
               <li><b>Mid-match</b>: a legendary may fly over and drop a Full Restore in the middle - half your HP, any status cured, half an ULTI. And the lights may go out: only what glows is seen, and the foe only up close.</li>
               <li><b>Sudden death</b>: out of time with as many Pokémon standing on each side, everyone drops to 1 HP for {SUDDEN_T / TPS} more seconds. The next hit wins.</li>
-              <li><b>Power-ups</b> drop in pairs, one on each half: a Potion, a Full Heal or a Shiny Stone works when you touch it; an X Attack, X Speed or X Defense is held until you use it. A <b>Poké Ball</b> releases a helper on your side: Electrode explodes, Snorlax falls on the foe (dash out from under it), Chansey heals you, Jigglypuff sings the foe to sleep.</li>
+              <li><b>Power-ups</b> drop in pairs, one on each half: a Potion, a Full Heal or a Shiny Stone works when you touch it; an X Attack, X Speed or X Defense is held until you use it. A <b>Poké Ball</b> releases a helper on your side: Electrode explodes, Snorlax falls on the foe (dash out from under it), Chansey heals you, Jigglypuff sings the foe to sleep - or one follows you for 8 s: Audino heals a little at a time, Plusle makes your hits harder, Mr. Mime's Light Screen softens what you take, Magnemite zaps the foe.</li>
+              <li><b>Resting</b>: a Pokémon in its ball slowly heals, up to three quarters of its HP. Switching out is a breather.</li>
               <li><b>Clutch</b>: when both Pokémon are nearly down and one winds up, time slows. Make it count.</li>
               <li><b>Statuses</b> tick in real time: burn and poison hurt every 2 s, paralysis slows you, sleep and freeze hold you still.</li>
             </ul>

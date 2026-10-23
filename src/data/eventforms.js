@@ -57,6 +57,6 @@ export const EVENTS = [
        dark IS it. Lost - fled or run from - it waxes back to `keep`, and three
        more costumes bring it round again. Caught, it is the `medal` and its
        `name`, a title of its own beside the event's. */
-    hunt: { id: 19908, of: 491, title: "Scarecrow Darkrai", flavor: "It stitched a sack over its head and stuffed its sleeves with straw to stand in the fields - and every crow that lands on it dreams of the dark.", medal: "nightmare", name: "Nightmare King", dreams: 7, keep: 4, area: "tower" },
+    hunt: { id: 19908, of: 491, title: "Scarecrow Darkrai", flavor: "It stitched a sack over its head and stuffed its sleeves with straw to stand in the fields - and every crow that lands on it dreams of the dark.", medal: "nightmare", name: "Nightmare King", dreams: 20, keep: 12, area: "tower" },   // 7 and 4 at 1 costume in 16 meetings; now 1 in 2 (2026-10-24)
   },
 ];
