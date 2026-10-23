@@ -37,7 +37,6 @@ import { streakNow } from "./game/checkin.js";
 import { followSheet, PARTY_MAX, partnerRule, isMastered } from "./game/cosmetics.js";
 import { RESEARCH_MAX } from "./game/research.js";
 import { COMBO_STEPS, comboLift, nextRung } from "./game/combo.js";
-import { dueLines, fullDue } from "./game/bingo.js";
 import { sexOf } from "./game/gender.js";
 import Events from "./ui/Events.jsx";
 import News, { newsUnread } from "./ui/News.jsx";
@@ -581,9 +580,6 @@ export default function App({
     || checkinOpen || rouletteOpen || streakLots || quizOpen || seasonOpen || arenaIntro;
   const checkin = engine?.checkinStatus?.() ?? null;
   const quiz = engine?.quiz?.() ?? null;
-  // A bingo prize waiting (bingo.js) - a chip on the map until it is claimed on Events.
-  const bingo = engine?.bingo?.() ?? null;
-  const bingoDue = !!bingo && (dueLines(bingo).length > 0 || fullDue(bingo));
   const spins = st?.checkin?.spins ?? 0;
   /* THE FIRST DAYS (starter.js): the Starter Path's goal stands where the
      daily quest does until its first goal is claimed, and the day's other
@@ -1249,14 +1245,6 @@ export default function App({
                       <b>Fight now<em className="ms-dot" aria-hidden="true">!</em></b>
                     </button>
                   )}
-                  {bingoDue && pathAt >= 2 && (
-                    <button type="button" className="ms-tab ready dc-pill bg-pill" onClick={() => openRail("events")}
-                      data-tip="A bingo line is finished - claim its prize on Events">
-                      <Icon n="board" size={18} className="ms-ic" />
-                      <i>WEEKLY BINGO</i>
-                      <b>Bingo!<em className="ms-dot" aria-hidden="true">!</em></b>
-                    </button>
-                  )}
                   {spins > 0 && !rouletteOpen && (
                     <button type="button" className="ms-tab ready dc-pill ci-pill" onClick={() => setRouletteOpen(true)}
                       data-tip="A banked roulette spin">
@@ -1548,8 +1536,6 @@ export default function App({
               onSelect={(id) => setEntry(id)}
               onLeague={() => goTab("league")}
               onStar={(id) => engine.star(id)}
-              bingo={bingo}
-              onClaimBingo={() => engine.claimBingo()}
               onClaimEvent={(id) => engine.claimEvent(id)}
               onEventIntro={() => setSeasonOpen(true)}
               invite={{ due: refDue, counted: (refInfo?.invited ?? []).filter((x) => x.paid).length }}

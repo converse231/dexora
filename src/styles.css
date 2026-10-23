@@ -8522,7 +8522,6 @@ button:disabled { transition: none; }
 :root[data-theme="dark"] .ev-league .ev-banner { background: linear-gradient(90deg, #3d3018, #2a2416); border-color: #6a5224; }
 :root[data-theme="dark"] .ev-board .ev-banner { background: linear-gradient(90deg, #3d2c1c, #2a2118); border-color: #5e4428; }
 :root[data-theme="dark"] .ev-surprise .ev-banner { background: linear-gradient(90deg, #1b3340, #172630); border-color: #2d5163; }
-:root[data-theme="dark"] .ev-bingo .ev-banner { background: linear-gradient(90deg, #173a2c, #142a22); border-color: #2a5c46; }
 :root[data-theme="dark"] .ev-invite .ev-banner { background: linear-gradient(90deg, #40261a, #2b1d16); border-color: #6e3f26; }
 :root[data-theme="dark"] .dx-notes .ev-banner { background: linear-gradient(90deg, #1f3328, #1a2a21); border-color: #2f4a3a; }
 :root[data-theme="dark"] .ev-stamp.live { color: #ff7a66; }
@@ -11138,7 +11137,7 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 /* An alert's icon: drawn on touch only, where the alerts are icon chips. */
 .ms-ic { display: none; }
 /* On touch the map is small: the rings a size down, and the ALERTS (check-in,
-   quiz, bingo, a spin, a reward) are ICON CHIPS with the dot on the corner -
+   quiz, a spin, a reward) are ICON CHIPS with the dot on the corner -
    four of them as pills took three rows of an upright phone's map and ran
    into the D-pad held sideways (2026-10-14). The quest keeps its pill: it is
    a count, not an alert. The words stay in the button for a screen reader. */
@@ -11151,8 +11150,7 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   .hud .dc-pill .ms-dot { position: absolute; top: -4px; right: -4px; margin: 0; font-size: 9px; }
   .hud .ci-pill > .ms-ic { color: #ff7a38; }
   .hud .qz-pill > .ms-ic { color: var(--accent); }
-  .hud .bg-pill > .ms-ic { color: #2fbf71; }
-  .hud .dc-pill:not(.ci-pill):not(.qz-pill):not(.bg-pill):not(.ar-pill) > .ms-ic { color: var(--gold, #ffcf4a); }
+  .hud .dc-pill:not(.ci-pill):not(.qz-pill):not(.ar-pill) > .ms-ic { color: var(--gold, #ffcf4a); }
   .hud .rift-ring { width: 40px; height: 40px; }
   .hud .rift-ring > img, .hud .fx-ring > .item-fx { width: 24px; height: 24px; }
   .hud .combo-ring > img { width: 30px; height: 30px; }
@@ -11283,73 +11281,6 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   .qz-stage { width: min(150px, 34vh); }
   .qz-title { font-size: 20px; }
   .qz-choice { min-height: 44px; }
-}
-
-/* ================================================================ WEEKLY BINGO
-   (bingo.js, 2026-10-14.) A card on the Events board: five by five, a goal a
-   square, the fill along a square's foot its progress, a finished square
-   stamped with the accent. The centre is free. Two short lines a square fit
-   a 60px square on a phone; the full sentence sits under the card. */
-.ev-bingo .ev-banner { background: linear-gradient(90deg, #dff3e9, #f1faf5); border-color: #b7e0c9; }
-.ev-bingo .ev-banner > .ic { color: #2f9e6c; flex: none; }
-.ev-bingo.live { border-color: #2fbf71; }
-/* THE CARD (2026-10-15): the app's own glass - tokens, so it follows the
-   theme - a ball sprite over each B-I-N-G-O column, a caught square tinted
-   with the accent and stamped with a Poke Ball, a finished line's squares
-   rimmed gold. Held to a card's width: on a sideways phone the board is the
-   whole screen, and stretched squares (134px) made a card taller than it. */
-.bg-card {
-  width: 100%; max-width: 360px; margin-inline: auto; padding: 8px; border-radius: 14px;
-  border: 1px solid var(--line-firm); background: var(--surface);
-}
-.bg-head { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 2px 0 6px; }
-.bg-ball { display: flex; align-items: center; justify-content: center; gap: 3px; font: 800 17px / 1 var(--display); color: var(--ink); }
-.bg-ball img { width: 22px; height: 22px; image-rendering: pixelated; }
-.bg-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; container-type: inline-size; }
-.bg-sq {
-  position: relative; aspect-ratio: 1; min-width: 0; padding: 4px 3px; overflow: hidden;
-  display: grid; align-content: center; justify-items: center; gap: 2px; text-align: center;
-  border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
-  cursor: pointer; font: 600 11px/1.15 var(--body);
-}
-.bg-sq > span { overflow-wrap: break-word; }
-/* A narrow card (the desktop rail's 57px squares): a size down, so a word
-   like "outbreak" fits whole rather than breaking mid-word. */
-@container (max-width: 320px) { .bg-sq { font-size: 10px; } }
-.bg-sq > i { font: 600 9px var(--pixel); font-style: normal; color: var(--ink-faint); }
-/* Progress fills along the foot - drawn, as the rest of the board's is. */
-.bg-sq::after {
-  content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p, 0) * 100%);
-  background: var(--accent); pointer-events: none;
-}
-.bg-sq.sel { outline: 2px dashed var(--accent); outline-offset: -3px; }
-/* CAUGHT: the accent's tint and a Poke Ball stamped in the corner - the words stay. */
-.bg-sq.done { background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
-.bg-sq.done::after { display: none; }
-.bg-caught { position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; image-rendering: pixelated;
-  animation: bg-catch .4s cubic-bezier(.3, 1.6, .5, 1) both; }
-@keyframes bg-catch { from { transform: scale(0) rotate(-90deg); } }
-/* A FINISHED LINE: its squares rimmed and lit gold. */
-.bg-sq.won { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold), 0 0 10px color-mix(in srgb, var(--gold) 35%, transparent); }
-.bg-sq.free { cursor: default; gap: 0; }
-.bg-sq.free > img { width: 28px; height: 28px; image-rendering: pixelated; }
-.bg-sq.free > b { font: 700 10px var(--pixel); color: var(--ink-soft); }
-.bg-foot { display: flex; justify-content: space-between; padding: 6px 2px 0; font: 600 10px var(--pixel); color: var(--ink-faint); }
-@media (prefers-reduced-motion: reduce) { .bg-caught { animation: none; } }
-.bg-say { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
-.bg-say > b { color: var(--ink); font-weight: 600; }
-.bg-say > span { flex: none; font: 600 11px var(--pixel); color: var(--ink-faint); }
-.ev-card p.bg-got { color: #2f9e6c; font-weight: 600; }
-.bg-pill b { color: #2fbf71; }
-/* A WIDE PANEL (the Rotom panel is the whole screen held sideways): the card
-   left, what a square asks, the claim and the prizes right - stacked, the
-   claim sat a scroll below a centred grid with dead space either side. */
-@container rail (min-width: 620px) {
-  .ev-bingo { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); column-gap: 18px; align-items: start; }
-  .ev-bingo > .ev-banner { grid-column: 1 / -1; }
-  .ev-bingo > .bg-card { grid-column: 1; grid-row: 2 / span 6; }
-  .ev-bingo > :not(.ev-banner):not(.bg-card) { grid-column: 2; }
-  .ev-bingo > .ev-meta { flex-direction: column; gap: 4px; }
 }
 
 /* ================================================================ GENDER
@@ -12113,6 +12044,11 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ar-card h3 { font-size: 24px; margin: 0; }
 .ar-card p { margin: 0; color: var(--ink-soft); font-size: 14px; }
 .ar-card .lg-go { width: 100%; }
+/* A switch in the pause card (Auto-aim): its word, and On/Off in a pill. */
+.ar-toggle { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px;
+  border-radius: 11px; cursor: pointer; font: 700 15px var(--display); color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); }
+.ar-toggle i { font: 700 12px var(--pixel); font-style: normal; padding: 3px 10px; border-radius: 999px; color: var(--ink-soft); background: var(--surface); }
+.ar-toggle[aria-checked="true"] i { color: #fff; background: var(--accent); }
 .ar-prize { font: 700 14px var(--pixel); color: var(--gold) !important; }
 /* THE RESULT comes up from the bottom (reported 2026-10-23: centred, it
    covered the VICTORY and the winner): the stamp sits at the top of the

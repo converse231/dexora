@@ -277,7 +277,6 @@ export const NEWS = [
       ["Turn the pages", "Pages flip in 3D. Swipe, use the arrows, or drag a card to the edge."],
       ["Drag and drop", "Move cards between pockets. On a phone, hold a card first."],
       ["Real prices, bigger", "Every card shows its raw TCGplayer price, and your binder adds it up."],
-      ["A Pokémon Bingo card", "Ball columns, a Poké Ball on every square you clear, and gold lines."],
     ],
   },
   {
@@ -300,17 +299,6 @@ export const NEWS = [
       ["Every Pokémon has a gender", "Look for ♂ or ♀ on the nameplate and in the Box."],
       ["Female looks", "38 species look different as females, from Gen 4 on. Catch her for her own sprite."],
       ["In your Pokédex", "Her look joins the Forms tab, and a new achievement counts them."],
-    ],
-  },
-  {
-    id: "2026-10-14-bingo",
-    icon: "🎯",
-    date: "October 2026",
-    title: "Weekly Bingo",
-    items: [
-      ["A new card every Monday", "25 squares on the Events page, the centre free. Each square is a goal."],
-      ["Fill a line of five", "Any row, column or diagonal pays 2 Rare Candy and 5 Great Balls."],
-      ["Fill the whole card", "Every square pays 10 Rare Candy and a card pack."],
     ],
   },
   {

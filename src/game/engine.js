@@ -68,9 +68,6 @@ import { comboLift, comboKey, nextCombo, cleanCombo, COMBO_STEPS } from "./combo
 import { quizFor, cleanQuiz, QUIZ_PAY } from "./quiz.js";
 import { referralDue, cleanRefPaid } from "./referral.js";
 import { sexAt, sexOf, looksFemale, cleanFemales } from "./gender.js";
-import {
-  weekKey, fresh as freshBingo, advanceBingo, dueLines, fullDue, cleanBingo, BINGO_LINE, BINGO_FULL,
-} from "./bingo.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
    that froze every catch in the game. `createEngine` has its own
    `function advance(now)` driving the phase machine, declared INSIDE the
@@ -220,7 +217,6 @@ function freshState() {
     combo: null,          // the catch chain, `{ species, n }` - see combo.js
     females: [],          // dex ids whose female look you have held - see gender.js
     quiz: null,           // today's quiz answered, `{ day, ok }` - see quiz.js
-    bingo: null,          // this week's card and its progress - see bingo.js
     gifted: [],           // LEGACY: dex ids once held back from rewards as trades - paid and cleared at boot
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
@@ -658,7 +654,6 @@ function loadState() {
         .filter((id) => Number.isInteger(id) && speciesById(id)),
       combo: cleanCombo(s.combo, speciesById),
       quiz: cleanQuiz(s.quiz),
-      bingo: cleanBingo(s.bingo),
       females: cleanFemales(s.females),
       gifted: [...new Set(Array.isArray(s.gifted) ? s.gifted : [])]
         .filter((id) => Number.isInteger(id) && speciesById(id)),
@@ -1507,7 +1502,6 @@ export function createEngine(canvas, onChange, mini = null) {
     d.claimed = true;
     d.streak = isYesterday(d.last, d.key) ? d.streak + 1 : 1;
     d.last = d.key;
-    noteBingo({ quest: 1 });
     state.money += won.money;
     state.candy += won.candy;
     for (const [id, n] of Object.entries(won.items)) {
@@ -1548,7 +1542,6 @@ export function createEngine(canvas, onChange, mini = null) {
     state.steps++;
     teach({ kind: "step", steps: state.steps });
     noteDaily({ steps: 1 });
-    noteBingo({ steps: 1 });
     /* One step off every running effect; the slot empties when it runs out,
        and says so on the way. Announced HERE rather than by the panel noticing
        the slot is empty, because only this line knows the difference between
@@ -1697,7 +1690,6 @@ export function createEngine(canvas, onChange, mini = null) {
       const find = riftFind(Math.random, levelFromXp(state.xp));
       if (!find) return false;
       give(find.items);
-      noteBingo({ rift: 1 });
       state.candy += find.candy ?? 0;
       const [id] = Object.keys(find.items ?? {});
       cheer({ kind: "rift", sub: "Found in the rift.", items: find.items,
@@ -2255,9 +2247,7 @@ export function createEngine(canvas, onChange, mini = null) {
      something calls this with what just happened; `nextHint` is pure and picks
      at most one, or none. Banked immediately so a reload cannot repeat it -
      the tip is cheap and being told twice is what makes one annoying. */
-  /* `quiet`: the caller notifies itself (a bingo note inside Open all, which
-     must stay ONE changed()), so the tip rides that notify instead. */
-  function teach(event, quiet = false) {
+  function teach(event) {
     if (state.hint) return false;           // one on screen is the whole rule
     const hit = nextHint(event, state.hints);
     if (!hit) return false;
@@ -2273,7 +2263,7 @@ export function createEngine(canvas, onChange, mini = null) {
     held.clear();
     state.running = false;
     save();
-    if (!quiet) changed();
+    changed();
     return true;
   }
 
@@ -2594,14 +2584,6 @@ export function createEngine(canvas, onChange, mini = null) {
       e.msg = `Gotcha! ${e.name} was caught!${tail}`;
       chainOn(e.speciesId, "caught");
       huntOn(e, "caught");
-      noteBingo({
-        caught: {
-          id: e.speciesId, types: sp.types, night: !!e.night, first: e.throws === 1, sized: !!sizeTag(e.size),
-          rare: !!e.variant, dupe, isNew: e.isNew, fished: e.source === "fishing",
-          outbreak: state.outbreak?.speciesId === e.speciesId && state.outbreak?.areaId === e.areaId,
-        },
-        combo: state.combo?.n ?? 0,
-      });
       if (gained) {
         e.levelUp = gained.level;
         e.reward = gained.items;
@@ -3280,51 +3262,6 @@ export function createEngine(canvas, onChange, mini = null) {
     return true;
   }
 
-  /* WEEKLY BINGO (bingo.js): this week's card, FROZEN at first sight from
-     what you can do now (a level gained mid-week cannot reshuffle it), moved
-     by every event a square counts. A finished square shows the card's tip
-     once; a finished line or card is a banner - its prize is CLAIMED on the
-     Events page (`claimBingo`), never paid on the moment. */
-  function bingoNow() {
-    const week = weekKey();
-    if (state.bingo?.week !== week) {
-      const level = levelFromXp(state.xp);
-      state.bingo = freshBingo(week, {
-        // a fixed roll: whether a set is open must not spend a random draw
-        level, fish: !!bestRod(state.bag), packs: randomOpen(level, () => 0) != null,
-        missing: DEX_TOTAL - dexCaught(state.dex),
-      });
-    }
-    return state.bingo;
-  }
-  function noteBingo(event) {
-    const b = bingoNow();
-    const { filled, lines } = advanceBingo(b, event);
-    if (!filled.length) return;
-    teach({ kind: "bingo" }, true);    // every caller notifies after its note
-    if (fullDue(b)) cheer({ kind: "bingo", title: "FULL CARD!", sub: "Every square this week. Claim the prize on Events." });
-    else if (lines.length) cheer({ kind: "bingo", title: "BINGO!", sub: "A line of five. Claim the prize on Events." });
-  }
-  function claimBingo() {
-    if (state.stale) return null;
-    const b = bingoNow();
-    const lines = dueLines(b);
-    const full = fullDue(b);
-    if (!lines.length && !full) return null;
-    const got = { lines: lines.length, full, candy: lines.length * BINGO_LINE.candy, items: {}, packs: 0 };
-    for (const [id, n] of Object.entries(BINGO_LINE.items)) got.items[id] = n * lines.length;
-    if (full) {
-      got.candy += BINGO_FULL.candy;
-      if (grantPacks(BINGO_FULL.packs, `bingo:${b.week}`)) got.packs = BINGO_FULL.packs;
-    }
-    state.bingo = { ...b, lines: [...b.lines, ...lines], full: b.full || full };
-    state.candy += got.candy;
-    give(got.items);
-    save();
-    changed();
-    return got;
-  }
-
   /* WHO'S THAT POKEMON (quiz.js): today's quiz, and whether and how it was
      answered. One answer a day, judged, paid and SAVED here; a right one
      also puts the species in the Pokedex as seen. */
@@ -3341,7 +3278,6 @@ export function createEngine(canvas, onChange, mini = null) {
     const seen = ok && state.dex[at] === 0;
     if (seen) state.dex[at] = 1;
     if (ok) state.candy += QUIZ_PAY.candy;
-    if (ok) noteBingo({ quiz: 1 });
     state.quiz = { day: q.key, ok };
     save();
     changed();
@@ -3373,7 +3309,6 @@ export function createEngine(canvas, onChange, mini = null) {
     const owed = streakPacks(st.streak);
     const packs = owed ? lotSets(openSets(), missingShares(), owed / LOT, Math.random) : [];
     for (const id of packs) grantPacks(LOT, `checkin:${st.streak}`, id);
-    noteBingo({ checkin: 1 });
     save();
     changed();
     return { ...st, reward, bonus, milestone: isMilestone(st.streak), packs };
@@ -3740,7 +3675,6 @@ export function createEngine(canvas, onChange, mini = null) {
   function openCardPack(set) {
     const got = rollCardPack(set);
     if (!got) return null;
-    noteBingo({ pack: 1 });
     settleOpen(got.pulls.some((p) => !p.isNew));
     return got;
   }
@@ -3751,7 +3685,6 @@ export function createEngine(canvas, onChange, mini = null) {
     const out = [];
     for (let got = out.length < max && rollCardPack(set); got; got = out.length < max && rollCardPack(set)) out.push(got);
     if (!out.length) return null;
-    noteBingo({ pack: out.length });
     settleOpen(out.some((r) => r.pulls.some((p) => !p.isNew)));
     return out;
   }
@@ -4035,7 +3968,6 @@ export function createEngine(canvas, onChange, mini = null) {
       levelUp: gained?.level ?? null,
       reward: gained?.items ?? null,
     };
-    noteBingo({ evolve: 1 });
     save();
     changed();
     return state.evolution;
@@ -4071,7 +4003,6 @@ export function createEngine(canvas, onChange, mini = null) {
       got += candyValue(speciesById(mon.species));
       return false;
     });
-    noteBingo({ spare: had - state.box.length });
     got = candyAt(got, state.stats);
     state.candy += got;
     save();
@@ -4095,7 +4026,6 @@ export function createEngine(canvas, onChange, mini = null) {
       got += candyValue(speciesById(mon.species));
       return false;
     });
-    noteBingo({ spare: had - state.box.length });
     got = candyAt(got, state.stats);
     state.candy += got;
     save();
@@ -4261,7 +4191,6 @@ export function createEngine(canvas, onChange, mini = null) {
     e.ate = (e.ate ?? 0) + 1;
     e.lastAte = id;      // which one to draw tossing in
     study(e.speciesId, ["fed"]);
-    noteBingo({ berry: 1 });
     e.msg = stage > 1
       ? `${e.name} is eating another ${berry.name}!`
       : `${e.name} is eating the ${berry.name}.`;
@@ -4342,7 +4271,6 @@ export function createEngine(canvas, onChange, mini = null) {
       earned += valueOf(speciesById(mon.species));
       return false;
     });
-    noteBingo({ spare: had - state.box.length });
     state.money += earned;
     save();
     changed();
@@ -4420,8 +4348,6 @@ export function createEngine(canvas, onChange, mini = null) {
     path: () => pathNow(state),
     quiz,
     answerQuiz,
-    bingo: bingoNow,
-    claimBingo,
     buySkin,
     wearSkin,
     setBuddy,
@@ -4470,7 +4396,6 @@ export function createEngine(canvas, onChange, mini = null) {
       const pay = arenaPay(cpu, whole(level) || 1);
       state.money += pay;
       state.arena = { day, won: [...won, cpu] };
-      noteBingo({ win: 1 });
       save();
       changed();
       return pay;
@@ -4488,7 +4413,6 @@ export function createEngine(canvas, onChange, mini = null) {
       state.money += pay;
       state.ladder = cleanLadder([...state.ladder, id]);
       const pack = id === "champion" ? grantPacks(1, `arena:${id}`) : null;
-      noteBingo({ win: 1 });
       save();
       changed();
       return { pay, pack, first: true };
@@ -4500,7 +4424,6 @@ export function createEngine(canvas, onChange, mini = null) {
     battleEnd() {
       const over = state.battle?.over ?? -1;
       let pay = 0, first = false, fee = 0, gift = null, master = false, charm = null, pack = null, packs = 0;
-      if (over === 0) noteBingo({ win: 1 });
       /* A ROAD WIN pays its money, once a trainer a day, and is noted in
          `road` - never `beaten`: the League's ladder does not move. */
       if (over === 0 && fight?.road) {

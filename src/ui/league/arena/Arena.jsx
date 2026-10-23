@@ -23,7 +23,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL,
-  FINAL_T, spent, SWAP_CD, basicShape, PICKUPS, SUDDEN_T, roleOf, basicCd, ultOf,
+  FINAL_T, spent, SWAP_CD, basicShape, PICKUPS, SUDDEN_T, roleOf, basicCd, ultOf, clonesOf, DARK_SEE, SHOT_SPEED, BLAST_SPEED,
   cooldownOf, DODGE_CD, ARENAS, shapeOf, GROUND, ZONE_SAYS } from "../../../game/arena.js";
 import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, arenaCancel } from "../../../net/cloud.js";
 import { isEvent } from "../../../data/dex.js";
@@ -81,6 +81,27 @@ const unimmerse = () => {
   if (document.fullscreenElement) document.exitFullscreen?.()?.catch?.(() => {});
 };
 const UPRIGHT_KEY = "dexora-arena-upright";
+/* AUTO-AIM (asked for, 2026-10-23: "it's so hard to aim skills"), on unless
+   the device turned it off: every attack and the basic go at the foe, led
+   by a shot's flight time. Never at a foe the player could not see - in
+   tall grass, gone with Fly or Dig, or past DARK_SEE in the dark - and
+   among Double Team's copies it takes the one nearest the player's own aim
+   (the cursor, or the way it faces), so the lock never tells them apart.
+   A dragged move and a controller's right stick still aim by hand. It is
+   the input's, never the rules': online both ends see the same aim. */
+const AIM_KEY = "dexora-arena-aim";
+function autoAim(s, mine, foe, hx, hy) {
+  if (!foe || foe.hp <= 0 || foe.hidden || foe.away) return null;
+  if (s.dark > 0 && Math.hypot(foe.x - mine.x, foe.y - mine.y) > DARK_SEE) return null;
+  const hl = Math.hypot(hx, hy) || 1;
+  let best = [foe.x, foe.y], bestC = -2;
+  for (const [x, y] of [[foe.x, foe.y], ...clonesOf(foe)]) {
+    const dx = x - mine.x, dy = y - mine.y, c = (dx * hx + dy * hy) / ((Math.hypot(dx, dy) || 1) * hl);
+    if (c > bestC) { bestC = c; best = [x, y]; }
+  }
+  const fly = Math.min(60, Math.hypot(best[0] - mine.x, best[1] - mine.y) / (SHOT_SPEED * (roleOf(mine) === "blaster" ? BLAST_SPEED : 1)));
+  return [best[0] + (foe.x - foe.px) * fly - mine.x, best[1] + (foe.y - foe.py) * fly - mine.y];
+}
 // A dragged move reaches this far: a thumb's pull of AIM_PX aims AIM_TILES away (a hazard lands there).
 const AIM_PX = 72, AIM_TILES = 6, AIM_DEAD = 14;
 
@@ -820,6 +841,7 @@ function HowTo({ onClose }) {
               <li><b>Moves</b> hit with the League's own damage - types, STAB and all - and each has a cooldown and its PP.</li>
               <li><b>Every attack shows on the ground</b> before it lands: a line, an arc or a ring. Roll through it at the last moment - a <b>perfect dodge</b>.</li>
               <li><b>ULTI</b> fills as you land hits, take them, dodge perfectly and hold a zone. Full, it throws the foe off you, powers you up for {SURGE_T / TPS} s and looses your Pokémon's signature: a storm of strikes, a blast all round, a huge cannon or a barrage - Pikachu calls down Thunder, Charizard Blast Burn. Every strike shows on the ground first: roll out of it.</li>
+              <li><b>Auto-aim</b> is on: every attack goes at the foe you can see, leading a moving one. Turn it off in the pause menu to aim with the mouse, or drag a skill on a phone to aim it by hand.</li>
               <li><b>Brawlers and Blasters</b>: a Pokémon whose Attack is higher is a Brawler - it runs and jabs faster, hits harder with blows and dashes and takes less from shots. One whose Sp. Atk is higher is a Blaster - its shots fly faster and farther and its beams charge sooner. Teach either the moves that suit it (Moves, on each team card).</li>
               <li><b>Double Team</b> makes two copies either side of its user that move with it. A hit that reaches a copy first pops it - "Miss!" - and the foe cannot tell which is real.</li>
               <li><b>Weather</b>, one a match: rain powers Water, weakens Fire and slows Fire types; harsh sun the other way round; a sandstorm chips all but Rock, Ground and Steel types, snow all but Ice.</li>
@@ -905,6 +927,9 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   const [prize, setPrize] = useState(null);
   const pausedRef = useRef(false);
   pausedRef.current = paused;
+  const [aimAuto, setAimAuto] = useState(() => pref(AIM_KEY, "auto") === "auto");
+  const aimRef = useRef(aimAuto);
+  aimRef.current = aimAuto;
   // The prize is the parent's, held in a ref: a fresh callback each render
   // would restart the match loop (and a paid prize re-renders the parent).
   const win = useRef(onWin);
@@ -1000,15 +1025,15 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       let ax = 0, ay = 0;
       const gp = pad();
       if (gp && (gp.mx || gp.my)) { mx = gp.mx; my = gp.my; }
+      inp.lock = null;
       if (gp && (gp.ax || gp.ay)) { ax = gp.ax * 5; ay = gp.ay * 5; }
-      else if (mine && touch) {
-        /* A THUMB CANNOT AIM: touch attacks go at the foe by themselves -
-           never one hidden in tall grass, which is still where it was seen. */
-        if (foe && !foe.hidden) { ax = foe.x - mine.x; ay = foe.y - mine.y; }
-      } else if (mine && inp.mouse) {
-        // The aim in TILES, so a hazard lands where the cursor is.
-        const [px, py] = r.toScreen(mine.x, mine.y), tile = r.tile();
-        ax = (inp.mouse[0] - px) / tile; ay = (inp.mouse[1] - py) / tile;
+      else if (mine) {
+        // The player's own aim, in TILES (a hazard lands where the cursor is): the cursor, or the way it faces.
+        let hx = mine.fx, hy = mine.fy;
+        if (!touch && inp.mouse) { const [px, py] = r.toScreen(mine.x, mine.y), tile = r.tile(); hx = (inp.mouse[0] - px) / tile; hy = (inp.mouse[1] - py) / tile; }
+        const lock = aimRef.current && autoAim(s, mine, foe, hx, hy);
+        if (lock) { [ax, ay] = lock; inp.lock = [mine.x + lock[0], mine.y + lock[1]]; }
+        else if (!touch && inp.mouse) { ax = hx; ay = hy; }
       }
       // A move dragged to aim goes where the thumb pulled.
       if (inp.fire?.aim && inp.fire.until > s.t) [ax, ay] = inp.fire.aim;
@@ -1062,6 +1087,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
           if (s.over) break;
         }
       }
+      r.lockOn(inp.lock);
       r.draw(s, Math.min(1, acc / step), now);
       // The dragged move's arrow, from your Pokemon toward the pull.
       const el = aimEl.current, a = inp.aim, at = activeOf(s, me);
@@ -1277,6 +1303,10 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
             <h3>{online ? "Leave the match?" : "Paused"}</h3>
             {online && <p>The match keeps going while you decide.</p>}
             <button type="button" className="lg-go" onClick={() => setPaused(false)}>{online ? "Keep playing" : "Resume"}</button>
+            <button type="button" className="ar-toggle" role="switch" aria-checked={aimAuto}
+              onClick={() => { keep(AIM_KEY, aimAuto ? "manual" : "auto"); setAimAuto(!aimAuto); }}>
+              <span>Auto-aim</span><i>{aimAuto ? "On" : "Off"}</i>
+            </button>
             <button type="button" className="lg-go quiet" onClick={onExit}>{online ? "Leave" : "Leave the match"}</button>
           </div>
         </div>

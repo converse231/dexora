@@ -121,7 +121,8 @@ const STEAM_T = sec(3.5), STEAM_R = 1.7, WET_T = sec(5), SHOCK = 1.5;
    and, DARK_ODDS of the time, the lights go out for DARK_T, when only what
    glows is seen (the CPU loses a foe past DARK_SEE, as a player does). */
 const FLY_FIRST = sec(25), FLY_SPAN = sec(30), FLY_DROP = sec(1.6), RARE_LIFE = sec(20);
-const DARK_ODDS = 0.45, DARK_FIRST = sec(35), DARK_SPAN = sec(40), DARK_T = sec(14), DARK_SEE = 5;
+const DARK_ODDS = 0.45, DARK_FIRST = sec(35), DARK_SPAN = sec(40), DARK_T = sec(14);
+export const DARK_SEE = 5;
 /* ULTIS (asked for, 2026-10-23: "Pikachu's ULTI calls Thunder down on the
    whole court"): a full meter still throws the foe off and powers its user
    up, and now also looses a SIGNATURE in its first type: a STORM (strikes

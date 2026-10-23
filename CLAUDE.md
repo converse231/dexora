@@ -736,7 +736,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   engine is built twice). A new player's first throw cannot fail (`caught`
   0, never a legendary). The **Starter Path** (`PATH`, `path` = goals
   claimed, in order, `claimPath`) stands where the daily quest does; the
-  quest and the check-in wait for its first goal, the quiz, bingo and an
+  quest and the check-in wait for its first goal, the quiz and an
   event's chip and announcement for its second - one thing to do on a first
   visit. Derived like achievements; a save with catches loads it finished
   (`cleanPath`).
@@ -758,23 +758,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   an unseen species SEEN, never caught. The silhouette carries no name - no
   alt, no tip. A HUD task chip until answered; banners and tips wait while
   it is open.
-- **Weekly Bingo is `bingo.js`** (2026-10-14): `state.bingo`, a 5x5 card
-  a week (`weekKey`, Monday), the centre free, FROZEN at first sight by
-  `bingoNow` from the week's hash and what you can do (no rod, no shut
-  region, no new entry on a full Pokedex) - 24 squares DRAWN from every open
-  goal, so weeks differ in what they ask. Squares move only through
-  `noteBingo(event)` (the step, the catch's frozen facts and its chain, a
-  rift find, the quiz, a check-in, a claimed quest, an evolution, a berry,
-  a pack, spares sold or converted, a battle won); check.mjs fails a goal
-  nothing the engine sends can fill. It is DRAWN as a Pokemon bingo card in
-  the app's glass (2026-10-15): a ball sprite over each B-I-N-G-O column, a
-  finished square CAUGHT (tinted, a Poke Ball stamp, its words kept) and a
-  finished line rimmed gold - a paper card's ink daubs and marker strokes
-  buried every word at eight lines. Its tip is `teach(..., quiet)` - every
-  caller notifies after (Open all stays ONE changed()). A line or the card
-  banners; the prize is CLAIMED on Events (`claimBingo`, each line once),
-  never paid on the moment: `BINGO_LINE` / `BINGO_FULL`, no money or Master
-  Ball, a week under the daily quest's candy at the streak cap (check.mjs).
+- **There is no Weekly Bingo** (your call, 2026-10-23: it crowded the
+  Events board). It was built 2026-10-14 and taken out whole - `bingo.js`,
+  its card, chip, tip and prizes; an old save's `bingo` field is simply not
+  read. Ask before adding a weekly card back.
 - **Gender is `gender.js`** (2026-10-15), DERIVED from species and size,
   never stored: `size` already rides every save and trade (trading.sql's
   column), so no new field and no server change. `sexAt` places the size in
@@ -929,7 +916,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   down (30px chips, 34px rings: a bottom screen under the map read as outside
   the game, 2026-10-14); held sideways the tasks take the left column under
   Menu, on the Menu key's own offsets. On touch the ALERTS (check-in, quiz,
-  bingo, a spin, a reward: `.dc-pill`) are icon chips with the dot on the
+  a spin, a reward: `.dc-pill`) are icon chips with the dot on the
   corner - as pills, four took three rows of an upright map and ran into the
   sideways D-pad; the quest keeps its pill. A new HUD element joins a zone,
   never a corner of its own. Audit at all nine sizes (desktop, laptop, both tablets, two phones,
@@ -1548,7 +1535,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   each id once (`referralsPaid`). A followed link's answer is never dropped
   for an effect re-run (the account object changes right after sign-in).
   The way in is You › Invite friends, Trading's Your friends banner, and an
-  Invite card second on the Events board (after Bingo, 2026-10-16).
+  Invite card on the Events board (2026-10-16).
   **A block works both ways and ends the friendship**, and friending refuses
   across one, so friends implies no block and the friends-only modes need no
   check of their own; every other read (search, card, shelf, offer, request)

@@ -36,7 +36,7 @@ export function hash(str) {
   return (h >>> 0);
 }
 
-/* FNV is weak on keys a character apart (a bingo card's squares barely
+/* FNV is weak on keys a character apart (a card's squares barely
    shuffled; sizes 99 and 100 sat in one bucket): mix before taking a
    remainder or ordering by it. */
 export const mix = (h) => {
