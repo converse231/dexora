@@ -7692,7 +7692,8 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
           let gone = 0, hurtGone = false, landed = null;
           for (let t = 0; t < 3 * A.TPS; t++) {
             const hp = a.hp;
-            A.tick(s, [t < 30 ? { ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 } : null, { ...A.NO_INPUT, ax: -1, ay: 0, basic: true }]);
+            // The foe swings only once it is gone: a brawler's jab would break the wind-up first.
+            A.tick(s, [t < 30 ? { ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 } : null, a.away ? { ...A.NO_INPUT, ax: -1, ay: 0, basic: true } : null]);
             Object.assign(d, { x: 9.2, y: 8 });
             if (a.away) { gone++; if (a.hp < hp) hurtGone = true; } else if (gone && !landed) landed = [a.x, a.y];
           }
@@ -7718,6 +7719,30 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
           const c = s.cover[0];
           Object.assign(a, { x: c.x - 3, y: c.y, px: c.x - 3, py: c.y }); Object.assign(d, { x: c.x + 2, y: c.y, px: c.x + 2, py: c.y });
         }), "Heat Wave struck a foe sheltering behind cover");
+      }
+      {
+        /* ROLES (2026-10-23, asked for): a brawler runs and jabs faster than a
+           blaster of the same speed, a blaster's shots fly faster and farther -
+           and neither role's team wins Hard matches out of hand (with no perks
+           brawler teams won 18 of 100: range was simply better). */
+        const [s0, br] = duel(66, "karate-chop", 143, { weather: "clear" }), [s1, bl] = duel(63, "psybeam", 143, { weather: "clear" });
+        assert.ok(A.roleOf(br) === "brawler" && A.roleOf(bl) === "blaster", "Machop is not a brawler or Abra not a blaster");
+        assert.ok(A.basicCd(br) < A.basicCd(bl), "a brawler jabs no faster than a blaster bolts");
+        Object.assign(br.st, { 5: bl.st[5] }); br.stages[5] = bl.stages[5] = 0;
+        for (let t = 0; t < 20; t++) { A.tick(s0, [{ ...A.NO_INPUT, mx: 1 }, null]); A.tick(s1, [{ ...A.NO_INPUT, mx: 1 }, null]); }
+        assert.ok(br.x > bl.x, "a brawler runs no faster than a blaster");
+        A.tick(s1, [{ ...A.NO_INPUT, ax: 0, ay: -1, basic: true }, null]);
+        for (let t = 0; t < 20 && !s1.shots.length; t++) A.tick(s1, [null, null]);
+        assert.ok(s1.shots[0]?.v > A.SHOT_SPEED, "a blaster's shot flies no faster");
+        const pick = (seed, brawl) => { const out = []; for (let k = 0; out.length < 3 && k < 400; k++) { const t = A.cpuTeam(seed * 1000 + k, 50, 1)[0]; if ((t.st[1] >= t.st[3]) === brawl) out.push(t); } return out; };
+        let won = 0;
+        for (let k = 0; k < 40; k++) {
+          const flip = k % 2, b = pick(k, true), r = pick(k + 500, false);
+          const m = A.newMatch({ teams: flip ? [r, b] : [b, r], cpu: ["hard", "hard"], seed: k + 1, arena: A.ARENAS[k % 6].id });
+          while (!m.over) A.tick(m, [null, null]);
+          if (m.winner === (flip ? 1 : 0)) won++;
+        }
+        assert.ok(won >= 12 && won <= 28, `brawler teams won ${won} of 40 Hard matches against blasters - one role wins out of hand`);
       }
 
       const late = (sizes) => {

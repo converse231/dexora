@@ -1259,7 +1259,26 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   down a beam or trails a shot, a blow plays at its reach, a dash trails its
   user, a blast plays round it, Psychic and Rock Slide where they land
   (`LANDS`), a hazard on the ground. A match loads only the moves its two
-  teams know. `game/arena.js` is its rulebook: a
+  teams know.
+  **Roles** (2026-10-23, asked for: "all long ranged and slow to attack"):
+  `roleOf` by the higher attack stat, as the basic attack is - a BRAWLER
+  runs, jabs and hits up close harder and takes less from shots, a BLASTER's
+  shots fly faster and farther and its beams charge sooner. With no perks
+  brawler teams won 18 of 100 Hard matches against blasters (range simply
+  won); the `BRAWL_*`/`BLAST_*` numbers are 48, and check.mjs holds 40 of
+  them inside 30-70%. **The Arena's Move Tutor** is the League's own
+  (`engine.tutor`, `TUTOR_PRICE`: the Arena's cash sink) shown the Arena's
+  way - each move by its reach, those suiting the role first; online still
+  plays the Fair format. **HP over every head** (and over Double Team's
+  copies, or the bar gave the trick away), bigger desktop plates, a plate
+  pulsing red under a quarter. **The result comes up from the bottom** and
+  VICTORY sits at the top of the canvas (`stampAt`'s `at`), the winner
+  framed above the card and the HUD faded (`.ar-hud.over`) - centred, the
+  card covered both. **Classic is a journey** (League.jsx's `JourneyRoad`,
+  `NextBattle`): a region's leaders, Elite Four and Champion as a road
+  (gold as far as you have walked, the next stop flagged, a stop jumps to
+  its card) and a VS card for the next battle through the cards' own
+  `onBattle`. `game/arena.js` is its rulebook: a
   FIXED-STEP simulation (`TPS` 60) that `tick(s, inputs)` moves in place from
   the match's own seed (`s.rs`) and the inputs alone, so a seed and its inputs
   replay one match exactly. Nothing in it may differ between browsers: no

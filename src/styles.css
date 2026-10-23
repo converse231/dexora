@@ -7080,6 +7080,63 @@ button:disabled { transition: none; }
 .lg-go.quiet { color: var(--ink); background: var(--surface-2); box-shadow: 0 8px 22px var(--shadow-soft); }
 .lg-go.small { min-height: 34px; padding: 5px 12px; font-size: 13px; }
 .lg-go.big { min-height: 50px; padding: 10px 26px; font-size: 17px; }
+/* THE JOURNEY (asked for, 2026-10-23: Classic gamified). The road: a stop a
+   leader, then the Elite Four and Champion, joined by a line gold as far as
+   you have walked (--done); a stop is its portrait - in colour with its
+   badge once beaten, bouncing under a NEXT flag, greyed while locked. */
+.lg-road { overflow-x: auto; scrollbar-width: thin; padding: 6px 2px 4px; }
+.lg-road ol { position: relative; list-style: none; margin: 0; padding: 18px 8px 4px; display: flex; gap: 10px; min-width: max-content; }
+.lg-road ol::before, .lg-road ol::after { content: ""; position: absolute; left: 34px; right: 34px; top: 46px; height: 6px; border-radius: 99px; background: var(--line); }
+.lg-road ol::after { background: linear-gradient(90deg, #f0a020, #ffd23f); transform-origin: left; transform: scaleX(var(--done, 0)); }
+.lg-road li { position: relative; z-index: 1; flex: none; display: grid; justify-items: center; }
+.lg-road button { position: relative; width: 56px; height: 56px; padding: 0; cursor: pointer; border-radius: 16px; display: grid; place-items: center;
+  background: var(--surface-2); border: 2px solid var(--line); box-shadow: 0 3px 0 rgba(0, 0, 0, .18); }
+.lg-road button > img:first-child { width: 52px; height: 52px; object-fit: contain; image-rendering: pixelated; }
+.lg-road li.won button { background: linear-gradient(160deg, #fff3b0, #ffd23f); border-color: #f0a020; }
+.lg-road li.locked button > img:first-child { filter: grayscale(1); opacity: .45; }
+.lg-road li.locked .lg-lock { position: absolute; width: 18px; height: 18px; right: -4px; bottom: -4px; padding: 2px; border-radius: 6px; background: var(--surface); }
+.lg-road li.champ button { width: 64px; height: 64px; margin-top: -4px; border-radius: 18px; }
+.lg-road li.next button { border-color: var(--cta); animation: lg-bob 1.1s ease-in-out infinite; }
+.lg-road-badge { position: absolute; right: -8px; bottom: -8px; width: 26px; height: 26px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .4)); }
+.lg-road-flag { position: absolute; top: -18px; padding: 1px 7px; border-radius: 6px; font: 700 10px var(--pixel); color: #fff; background: var(--cta); }
+@keyframes lg-bob { 50% { transform: translateY(-5px); } }
+/* A card jumped to from the road flashes once. */
+.lg-flash { animation: lg-flash 1.2s ease-out; }
+@keyframes lg-flash { 0%, 40% { box-shadow: 0 0 0 3px var(--cta), 0 8px 22px var(--shadow-soft); } }
+/* THE NEXT BATTLE: a game's VS card, always dark, lit by the foe's type. */
+.lg-next { position: relative; overflow: hidden; display: grid; gap: 10px; padding: 16px 18px; border-radius: 20px; color: #fff;
+  background: radial-gradient(circle at 82% 40%, color-mix(in srgb, var(--tc, #8d9ac4) 45%, transparent), transparent 60%), linear-gradient(120deg, #141d44, #0b1124 65%);
+  border: 1px solid rgba(140, 160, 220, .3); box-shadow: 0 10px 28px rgba(0, 0, 0, .3); }
+.lg-next .lg-kicker { color: #ffd23f; }
+.lg-next h3 { margin: 0; font: 800 20px var(--display); }
+.lg-next p { margin: 0; color: #b9c2e4; font-size: 14px; }
+.lg-next-vs { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.4fr); align-items: center; gap: 12px; }
+.lg-next-side > b { display: block; font: 800 17px var(--display); }
+.lg-next-side ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px; }
+.lg-next-side li { position: relative; width: 48px; height: 48px; display: grid; place-items: center; }
+.lg-next-side li img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
+.lg-next-side li .sprite-fx { width: 48px; height: 48px; }
+.lg-next-side li .sprite-fx > img { width: 100%; height: 100%; object-fit: contain; }
+.lg-next-side li .sprite-strip { width: calc(48px * .77); height: calc(48px * .77); }
+.lg-next-side li i { position: absolute; bottom: -2px; font: 600 9px var(--pixel); font-style: normal; color: #e9eeff; text-shadow: 0 1px 2px #000; }
+.lg-next-side li.empty { width: auto; font-size: 13px; color: #b9c2e4; }
+.lg-next-side.mine li img { transform: scaleX(-1); }
+.lg-next-side.foe { display: flex; align-items: center; gap: 10px; }
+.lg-next-side.foe > div { min-width: 0; }
+.lg-next-side.foe span { display: block; font-size: 12.5px; color: #b9c2e4; }
+/* The result's turn: the plates and buttons step aside for VICTORY and the card. */
+.ar-hud.over .ah-plate, .ar-hud.over .ah-clock, .ar-hud.over .ah-party, .ar-hud.over .ah-skills { opacity: 0; pointer-events: none; }
+.lg-next-pic { flex: none; width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .5)); }
+.lg-next-x { font: italic 900 34px var(--display); color: #ffd23f; text-shadow: 0 3px 0 #b5470b, 0 0 18px rgba(255, 210, 63, .5); }
+.lg-next-go { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+.lg-next .lg-prize { color: #e9eeff; }
+.lg-next .lg-go.big { background: var(--cta); font-size: 20px; padding: 10px 34px; }
+@media (max-width: 620px) {
+  .lg-next-vs { grid-template-columns: minmax(0, 1fr); }
+  .lg-next-x { justify-self: center; font-size: 26px; }
+  .lg-next-pic { width: 72px; height: 72px; }
+  .lg-next-go .lg-go.big { flex: 1; }
+}
 .lg-card.champ .lg-go { background: var(--gold); }
 .lg-more {
   min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer;
@@ -11652,6 +11709,40 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ag-moves li { font: 600 11px var(--body); padding: 2px 7px; border-radius: 6px; color: #e9eeff;
   background: color-mix(in srgb, var(--tc, #8d9ac4) 34%, rgba(12, 18, 38, .9)); border: 1px solid color-mix(in srgb, var(--tc, #8d9ac4) 60%, transparent); }
 .ag-moves li.off { opacity: .45; text-decoration: line-through; }
+/* A role in a word (Brawler, Blaster), and the card's way to its Move Tutor. */
+.ag-role { font-style: normal; font-weight: 700; color: #ffb37a; }
+.ag-role.r-blaster { color: #8fdcff; }
+.ag-learn { position: absolute; top: 8px; right: 8px; min-height: 30px; padding: 4px 10px; border-radius: 9px; cursor: pointer;
+  font: 700 12px var(--display); color: #e9eeff; background: rgba(69, 212, 255, .14); border: 1px solid rgba(69, 212, 255, .45); }
+.ag-learn:hover { background: rgba(69, 212, 255, .26); }
+/* The Arena's Move Tutor: four slots, the reach filters, what it can learn. */
+.ag-tutor header { align-items: center; }
+.ag-tutor header > img, .ag-tutor header > .sprite-fx { flex: none; width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; }
+.ag-tutor header > .sprite-fx > img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.ag-tutor header > .sprite-strip { flex: none; width: calc(64px * .77); height: calc(64px * .77); margin: 7.4px; }
+.ag-tutor header > div { flex: 1; min-width: 0; }
+.ag-tutor h3 em { font-size: 13px; margin-left: 6px; }
+.ag-slots, .ag-learnlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ag-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
+.ag-learnlist { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.ag-slots button, .ag-learnlist button { width: 100%; min-height: 48px; display: grid; gap: 1px; align-content: center; text-align: left; padding: 6px 10px; cursor: pointer;
+  border-radius: 10px; color: var(--ink); background: color-mix(in srgb, var(--tc, #8d9ac4) 18%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--tc, #8d9ac4) 45%, transparent); }
+.ag-slots button b, .ag-learnlist button b { font: 700 13px var(--body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-slots button i, .ag-learnlist button i { font: 600 11px var(--pixel); font-style: normal; color: var(--ink-soft); }
+.ag-slots button.empty { border-style: dashed; background: none; color: var(--ink-faint); }
+.ag-slots button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ag-slots button.new { box-shadow: inset 0 0 0 2px var(--gold); }
+.ag-fit { justify-self: start; font: 700 10px var(--pixel); text-decoration: none; color: #0b1124; background: var(--gold); padding: 0 6px; border-radius: 6px; }
+.ag-learnlist button:disabled { opacity: .4; cursor: default; }
+.ag-kinds { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.ag-kinds button { min-height: 34px; padding: 4px 12px; border-radius: 999px; cursor: pointer; font: 600 13px var(--body);
+  color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); }
+.ag-kinds button[aria-checked="true"] { color: #fff; background: var(--accent); border-color: transparent; }
+.ag-tutor footer { align-items: center; }
+.ag-tutor-note { margin-right: auto; font-size: 13px; color: var(--ink-soft); }
+@media (max-height: 460px) { .ag-tutor header span { display: none; } .ag-tutor header > img, .ag-tutor header > .sprite-fx { width: 44px; height: 44px; } }
+@media (max-width: 520px) { .ag-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ag-mon.empty { padding: 0; border-style: dashed; background: none; }
 .ag-mon.empty button { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 92px; width: 100%;
   border: 0; background: none; color: #8d9ac4; font: 600 14px var(--body); cursor: pointer; border-radius: inherit; }
@@ -11775,6 +11866,8 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   .ag-mons { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ag-mon { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; padding: 10px 8px; }
   .ag-mon-text { justify-items: center; }
+  /* Stacked, the Moves button goes under the card's words: in the corner it sat on the sprite. */
+  .ag-learn { position: static; order: 3; width: 100%; }
   .ag-mon-text > b { max-width: 100%; }
   .ag-moves { display: none; }
 }
@@ -12021,6 +12114,52 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ar-card p { margin: 0; color: var(--ink-soft); font-size: 14px; }
 .ar-card .lg-go { width: 100%; }
 .ar-prize { font: 700 14px var(--pixel); color: var(--gold) !important; }
+/* THE RESULT comes up from the bottom (reported 2026-10-23: centred, it
+   covered the VICTORY and the winner): the stamp sits at the top of the
+   canvas, the winner above the card, and the card is the Arena's own dark
+   glass whatever the theme, gold for a win. */
+.ar-end { place-items: end center; background: linear-gradient(rgba(5, 8, 18, 0) 35%, rgba(5, 8, 18, .78)); padding-bottom: max(16px, var(--pb, 0px)); }
+.ar-result { width: min(620px, 100%); gap: 12px; padding: 16px 18px; color: #fff; background: rgba(10, 14, 30, .94);
+  border: 1px solid rgba(140, 160, 220, .3); box-shadow: 0 -10px 40px rgba(0, 0, 0, .45); animation: ar-end-in .45s cubic-bezier(.2, 1, .3, 1) both; }
+.ar-result.won { border-color: rgba(255, 210, 63, .7); box-shadow: 0 -10px 40px rgba(255, 190, 40, .2); }
+.ar-result.lost { border-color: rgba(154, 165, 200, .4); }
+.ar-result h3 { font: 900 26px var(--display); font-style: italic; text-transform: uppercase; }
+.ar-result.won h3 { color: #ffd23f; }
+.ar-result p { color: #b9c2e4; }
+.ar-result .ar-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.ar-result .ar-stats div { background: rgba(255, 255, 255, .06); }
+.ar-result .ar-stats dt { color: #8d9ac4; }
+.ar-result .ar-stats dd { color: #fff; }
+.ar-why { font: 600 12px var(--pixel); color: #8d9ac4; }
+.ar-result .ar-result-head { width: 100%; justify-content: center; }
+.ar-end-go { display: flex; gap: 8px; width: 100%; }
+.ar-end-go .lg-go { flex: 1; width: auto; }
+@keyframes ar-end-in { from { transform: translateY(40px); opacity: 0; } }
+@media (max-width: 560px) { .ar-result .ar-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-height: 460px) {
+  .ar-result { gap: 6px; padding: 10px 14px; }
+  .ar-result h3 { font-size: 20px; }
+  .ar-result .ar-grade { width: 40px; height: 40px; font-size: 24px; }
+  .ar-result .ar-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .ar-result .ar-stats div { padding: 4px; }
+  .ar-result .ar-stats dt { font-size: 10px; }
+  .ar-result .ar-stats dd { font-size: 13px; }
+}
+/* HP that reads from across a big screen (asked for, 2026-10-23): a desktop's
+   plates are bigger, their bars thicker, and a Pokemon under a quarter of its
+   HP has a bar that pulses red. */
+.ah-plate.low .ar-hp > i:not(.ar-hp-lag) { background: linear-gradient(90deg, #ff3b3b, #ff8a5b); animation: ar-low .8s ease-in-out infinite; }
+@keyframes ar-low { 50% { opacity: .55; } }
+@media (hover: hover) and (min-width: 1100px) {
+  .ah-plate { width: min(440px, 34vw); padding: 10px 14px 10px 10px; gap: 12px; }
+  .ah-plate:not(.mine) { padding: 10px 10px 10px 14px; }
+  .ah-face { width: 60px; height: 60px; }
+  .ah-face img { width: 68px; height: 68px; }
+  .ah-plate-top b { font-size: 17px; }
+  .ah-plate-top span { font-size: 12.5px; }
+  .ar-hp { height: 15px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+  .ah-plate-low { font-size: 12.5px; }
+}
 .ar-prize.done { color: var(--ink-faint) !important; font-weight: 600; }
 
 /* Upright on a phone the wide court plays small: say so through the opening,
