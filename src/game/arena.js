@@ -91,7 +91,14 @@ const STUN = sec(0.12), KB = sec(0.15), FLINCH = sec(0.25);
 export const SHOT_SPEED = 10 / TPS;
 const SHOT_RANGE = 9, SHOT_R = 0.35;
 const MELEE_RANGE = 1.75, MELEE_COS = 0.6;      // an arc of about 105 degrees (1.5 read as too small, 2026-10-23)
-const BEAM_LEN = 10, BEAM_W = 0.5;               // 0.32 was hard to land (2026-10-23)
+// 0.32 was hard to land (2026-10-23); 10 x 0.5 read as thin and short beside its drawing (2026-10-24, asked for).
+export const BEAM_LEN = 13, BEAM_W = 0.85;
+/* WALL-SPLAT (2026-10-24, asked for): a Pokemon knocked back into the wall
+   or a block of cover - a real blow's knockback, SPLAT_PUSH or more, never a jab's or a shot's - takes SPLAT_HURT of its HP and is stunned SPLAT_STUN -
+   once a knockback. Where you fight starts to matter. PERFECT BLOCK: a hit
+   that lands in a shield's first PARRY_T is thrown back - its attacker takes
+   PARRY_HURT of its HP and reels PARRY_STUN. */
+const SPLAT_PUSH = 0.9, SPLAT_HURT = 14, SPLAT_STUN = sec(0.5), PARRY_T = sec(0.25), PARRY_HURT = 12, PARRY_STUN = sec(0.4);
 /* A BEAM FOLLOWS ITS AIM while it charges (asked for, 2026-10-23: "it
    should follow as it is channelling"): each tick of the wind-up its line
    turns BEAM_TRACK of the way to where the player aims now - a sweep, never
@@ -695,9 +702,18 @@ function stepSide(s, side, inp) {
   } else if (GROUND[s.arena].ice && !f.types.includes(T("ice"))) {
     f.vx *= 0.94; f.vy *= 0.94; f.x += f.vx; f.y += f.vy;
   }
-  if (f.kbt > 0) { f.x += f.kbx; f.y += f.kby; f.kbt--; }
+  const flung = f.kbt > 0, wx = f.x + (flung ? f.kbx : 0), wy = f.y + (flung ? f.kby : 0);
+  if (flung) { f.x = wx; f.y = wy; f.kbt--; }
   f.x = clamp(f.x, X0, X1); f.y = clamp(f.y, Y0, Y1);
   pushOut(s, f);
+  // Flung into the wall or cover: stopped short of where the blow sent it.
+  if (flung && !f.splat && f.inv <= 0 && (f.kbx * f.kbx + f.kby * f.kby) * KB * KB >= SPLAT_PUSH * SPLAT_PUSH && (Math.abs(f.x - wx) > 1e-6 || Math.abs(f.y - wy) > 1e-6)) {
+    f.splat = true; f.kbt = 0;
+    hurt(s, f, Math.max(1, Math.floor(f.max / SPLAT_HURT)), null);
+    f.stun = Math.max(f.stun, SPLAT_STUN);
+    s.ev.push({ k: "splat", side, x: f.x, y: f.y, dx: Math.sign(wx - f.x), dy: Math.sign(wy - f.y) });
+  }
+  if (!f.kbt) f.splat = false;
 
   if (f.act?.shape === "beam" && f.act.ph === "wind" && (ax || ay)) {
     const [nx, ny] = norm(f.act.dx + (ax - f.act.dx) * BEAM_TRACK, f.act.dy + (ay - f.act.dy) * BEAM_TRACK);
@@ -1392,6 +1408,13 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
   // Struck in its wind-up: a COUNTER (the picture calls it; the rules already cancel the move).
   const counter = d.act?.ph === "wind" && d.act.k !== BASIC_K;
   if (d.inv > 0) {
+    // Blocked as it raised its shield: a PERFECT BLOCK throws the hit back on its attacker.
+    if (d.shield > SHIELD - PARRY_T && a.hp > 0 && !a.away) {
+      hurt(s, a, Math.max(1, Math.floor(a.max / PARRY_HURT)), null);
+      a.stun = Math.max(a.stun, PARRY_STUN);
+      if (a.act?.ph === "wind") a.act = null;
+      s.ev.push({ k: "parry", side: d.side, x: d.x, y: d.y, tx: a.x, ty: a.y });
+    }
     // Rolled THROUGH it: a perfect dodge, paid in Surge.
     const perfect = !d.shield && d.dodge > 0;
     if (perfect) { gain(s, d.side, GAIN_DODGE); s.sides[d.side].stats.perfect++; }
@@ -1774,6 +1797,6 @@ export function rulesPrint() {
 export const stateHash = (s) => hash(JSON.stringify([s.t, s.intro, s.rs, s.winner,
   s.items.map((it) => [it.kind, it.x, it.y, it.t]), s.weather, s.dark, s.tide, s.erupt, s.lanes.map((l) => [l.y, l.t]), s.helpers.map((h) => [h.kind, h.x, h.y, h.t]), s.strikes.map((z) => [z.x, z.y, z.t]), s.clouds.map((c) => [c.x, c.y, c.t]),
   s.sudden ? 1 : 0,
-  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.cd), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused, f.id, f.xp, f.evo])]),
+  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.cd), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused, f.id, f.xp, f.evo, f.splat])]),
   s.shots.map((p) => [p.x, p.y]), s.hazards.map((z) => [z.x, z.y, z.t]),
   s.cover.map((c) => c.hp), [s.zone.open, s.zone.t, s.zone.claimed], s.drops.map((r) => [r.x, r.y, r.t])]));

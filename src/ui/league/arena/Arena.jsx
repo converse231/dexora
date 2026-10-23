@@ -53,6 +53,8 @@ import { useModalLock, useDismiss } from "../../modal.js";
 import { PMD_REV } from "../../../data/pmd.js";
 
 const nameOf = (id) => label(speciesById(id));
+// A move's cooldown in seconds, as the Tutor, the team card and the button say it (arena.js `cooldownOf`: its worth).
+const waitOf = (data) => Math.round(cooldownOf(data) / TPS * 10) / 10;
 const moveName = (i) => (i === STRUGGLE ? "Struggle" : MOVES[i].n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "));
 const touchDevice = () => matchMedia("(hover: none) and (pointer: coarse)").matches;
 const clock = (ticks) => { const s = Math.max(0, Math.ceil(ticks / TPS)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
@@ -288,7 +290,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                       <ul className="ag-moves">
                         {f.moves.map((mv) => {
                           const data = moveOf(mv.i), shape = shapeOf(data);
-                          return <li key={mv.i} className={`t-${data.t ?? "normal"}${shape ? "" : " off"}`} data-tip={shape ? SHAPE_WORD[shape] : "Not played in the Arena"}>{moveName(mv.i)}</li>;
+                          return <li key={mv.i} className={`t-${data.t ?? "normal"}${shape ? "" : " off"}`} data-tip={shape ? `${SHAPE_WORD[shape]} · ${waitOf(data)} s cooldown` : "Not played in the Arena"}>{moveName(mv.i)}</li>;
                         })}
                       </ul>
                     </div>
@@ -512,7 +514,7 @@ function MoveTutor({ engine, mon, money, stats, onClose }) {
   };
   const chip = (i) => {
     const data = moveOf(i), shape = shapeOf(data);
-    return <><b>{moveName(i)}</b><i>{SHAPE_WORD[shape]}{data.p ? ` · ${data.p}` : ""}</i></>;
+    return <><b>{moveName(i)}</b><i>{SHAPE_WORD[shape]}{data.p ? ` · ${data.p}` : ""} · {waitOf(data)} s</i></>;
   };
   return createPortal(
     <div className="sheet" {...useDismiss(onClose)}>
@@ -940,6 +942,8 @@ function HowTo({ onClose }) {
               <li><b>Mid-match</b>: a legendary may fly over and drop a Full Restore in the middle - half your HP, any status cured, half an ULTI. And the lights may go out: only what glows is seen, and the foe only up close.</li>
               <li><b>Sudden death</b>: out of time with as many Pokémon standing on each side, everyone drops to 1 HP for {SUDDEN_T / TPS} more seconds. The next hit wins.</li>
               <li><b>Power-ups</b> drop in pairs, one on each half: a Potion, a Full Heal or a Shiny Stone works when you touch it; an X Attack, X Speed or X Defense is held until you use it. A <b>Poké Ball</b> releases a helper on your side: Electrode explodes, Snorlax falls on the foe (dash out from under it), Chansey heals you, Jigglypuff sings the foe to sleep - or one follows you for 8 s: Audino heals a little at a time, Plusle makes your hits harder, Mr. Mime's Light Screen softens what you take, Magnemite zaps the foe.</li>
+              <li><b>Cooldowns</b> follow what a move does - a drain, a self-boost or many hits wait longer. Each button counts its seconds down; the Move Tutor lists them.</li>
+              <li><b>Wall-splat</b>: knock a foe into the wall or a block of cover with a real blow and it takes extra damage and is stunned. <b>Perfect block</b>: raise Protect just as a hit lands and the attacker takes the damage and reels.</li>
               <li><b>Resting</b>: a Pokémon in its ball slowly heals, up to three quarters of its HP. Switching out is a breather.</li>
               <li><b>Clutch</b>: when both Pokémon are nearly down and one winds up, time slows. Make it count.</li>
               <li><b>Statuses</b> tick in real time: burn and poison hurt every 2 s, paralysis slows you, sleep and freeze hold you still.</li>
@@ -1344,8 +1348,9 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
             {view.kit.map((m, k) => (
               <button key={k} type="button" className={`ah-skill k${k} t-${m.type}${m.ready ? "" : " wait"}`} style={{ "--cd": m.cd }}
                 onPointerDown={touch ? aimStart(k) : tap(() => { input.current.fire = { k, until: s.t + PRESS }; })}
-                aria-label={m.name}>
+                aria-label={m.ready ? m.name : `${m.name}, ready in ${m.left} s`} data-tip={`${m.wait} s cooldown`}>
                 <b>{m.name}</b>
+                {!m.ready && <span className="ah-left-s">{m.left}</span>}
                 {!touch && <kbd>{SKILL_KEYS[k]}</kbd>}
               </button>
             ))}
@@ -1514,7 +1519,8 @@ function snapshot(s, me) {
     kit: f0.kit.map((m) => {
       const data = moveOf(m.i);
       return { name: moveName(m.i), type: data.t ?? "normal",
-        ready: m.cd === 0, cd: m.cd ? m.cd / cooldownOf(data) : 0, shape: shapeOf(data) };
+        ready: m.cd === 0, cd: m.cd ? m.cd / cooldownOf(data) : 0, shape: shapeOf(data),
+        left: Math.ceil(m.cd / TPS), wait: waitOf(data) };
     }),
     // The next basic attack is the third in a row: the button says so.
     basic: { ready: f0.basic.cd === 0, cd: f0.basic.cd / basicCd(f0), jab: basicShape(f0) === "melee", boost: f0.basicN % 3 === 2 && s.t - f0.basicT < TPS },

@@ -7536,6 +7536,39 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         assert.ok(along("magnemite").zaps >= 5, "Magnemite did not keep zapping the foe");
         assert.ok(none.bench > 0.7 && none.bench <= 0.75, `a benched Pokemon rested to ${(none.bench * 100).toFixed(0)}% - it heals, up to three quarters`);
       }
+      /* WALL-SPLAT, PERFECT BLOCK AND THE WIDER BEAM (2026-10-24, asked for).
+         A real blow into the wall splats; the same blow mid-court and a jab
+         into the wall do not. A shield raised just before a blow lands throws
+         it back; one raised late only blocks. A beam reaches a foe 12 tiles
+         off and 0.7 off its line. */
+      {
+        const fight = (move, foeX, opts = {}) => {
+          const s = A.newMatch({ teams: [[bFighter(68, 50, 1, [idx(move)])], [bFighter(143, 50, 2, [idx("protect")])]], cpu: [null, null], seed: 2, weather: "clear", events: false });
+          const [a, d] = [s.sides[0].team[0], s.sides[1].team[0]];
+          Object.assign(a, { x: foeX - 1.3, y: 8, px: foeX - 1.3, py: 8 }); Object.assign(d, { x: foeX, y: 8, px: foeX, py: 8 });
+          const seen = [];
+          for (let t = 0; t < 90; t++) {
+            const go = t >= (opts.at ?? 0);
+            A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, basic: go && Boolean(opts.basic), fire: go && !opts.basic ? 0 : -1 }, { ...A.NO_INPUT, fire: t === opts.shield ? 0 : -1 }]);
+            seen.push(...s.ev.map((e) => e.k));
+          }
+          return seen;
+        };
+        const wall = A.W - 1.9;
+        assert.ok(fight("cross-chop", wall).includes("splat"), "a blow into the wall did not splat");
+        assert.ok(!fight("cross-chop", 12).includes("splat"), "a blow in the open splatted");
+        assert.ok(!fight("cross-chop", wall, { basic: true }).includes("splat"), "a jab splatted - every jab against a wall would hit twice");
+        // The blow lands ~17 ticks after it is thrown, a shield ~12 after it is raised.
+        assert.ok(fight("cross-chop", 12, { at: 30, shield: 32 }).includes("parry"), "a shield raised as the blow landed did not throw it back");
+        const held = fight("cross-chop", 12, { at: 30, shield: 1 });
+        assert.ok(held.includes("blocked") && !held.includes("parry"), "a shield up long before the blow threw it back - it only blocks");
+        const bs = A.newMatch({ teams: [[bFighter(143, 50, 1, [idx("hyper-beam")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 2, weather: "clear", events: false });
+        const [ba, bd] = [bs.sides[0].team[0], bs.sides[1].team[0]];
+        Object.assign(ba, { x: 5, y: 8, px: 5, py: 8 });
+        let beamed = false;
+        for (let t = 0; t < 3 * A.TPS && !beamed; t++) { Object.assign(bd, { x: 17, y: 9.1 }); A.tick(bs, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]); beamed = bs.ev.some((e) => e.k === "hit" && e.side === 1); }
+        assert.ok(beamed, "a beam missed a foe 12 tiles off and 1.1 off its line - it is still the thin, short one");
+      }
       /* A MOVE'S WAIT IS ITS WORTH (2026-10-24, reported: "healing moves are
          OP - CDs should depend on the skill"). Thrown whenever ready for 20 s
          by a neutral fighter in the role it suits, no move the reports named -
