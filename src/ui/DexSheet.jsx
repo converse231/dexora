@@ -75,7 +75,7 @@ function whereToFind(id) {
     if (sp.hunt) {
       return [
         { key: "event", where: ev.name, how: live ? `${eventDaysLeft(ev)} days left` : "the event is over" },
-        { key: "hunt", where: AREAS[ev.hunt.area]?.name ?? "", how: `after dark, at ${ev.hunt.dreams} Bad Dreams` },
+        { key: "hunt", where: AREAS[ev.hunt.area]?.name ?? "", how: `catch ${ev.hunt.dreams} costumes, then walk here 20:00-05:00` },
       ];
     }
     const wild = live ? whereToFind(sp.of).filter((r) => !r.key.startsWith("evo-")).map((r) => ({

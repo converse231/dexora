@@ -2718,7 +2718,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!confirmed && (isLegendary(e.speciesId) || e.alpha || e.hunt)) {
       ask("flee", () => flee(true),
         `Run from ${e.alpha ? "the alpha " : ""}${e.name}?`,
-        e.hunt ? "The Nightmare fades if you run - three more costumes bring it back."
+        e.hunt ? "The Nightmare fades if you run - catch more costumes to bring it back."
           : isLegendary(e.speciesId)
           ? "A legendary. There is no telling when you will meet another."
           : "An alpha never runs from you, but it will be gone if you run from it.");

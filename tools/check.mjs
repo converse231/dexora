@@ -7199,7 +7199,9 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     const { MOVES: AM } = await import("../src/data/moves.js");
     const live = AM.filter((m) => !m.no);
     const off = live.filter((m) => !A.shapeOf(m)).map((m) => m.n);
-    assert.deepEqual(off.filter((n) => !["heal-pulse", "floral-healing"].includes(n)), [],
+    // Left out on purpose: the ally heals, and four that would do nothing here (2026-10-24) - accuracy drops where aim is
+    // the accuracy, and the placeholder power of moves whose rule the Arena does not play.
+    assert.deepEqual(off.filter((n) => !["heal-pulse", "floral-healing", "sand-attack", "kinesis", "ruination", "comeuppance"].includes(n)), [],
       `the Arena cannot play ${off.join(", ")} - give each a shape or leave it out on purpose`);
     const used = new Set(live.map((m) => A.shapeOf(m)).filter(Boolean));
     for (const sh of A.SHAPES.filter((x) => x !== "field")) assert.ok(used.has(sh), `no move is a ${sh} - the shape is dead code`);
@@ -7840,9 +7842,67 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         const walk = (weather) => { const [w, f] = duel(4, "tackle", 1, { weather }); for (let t = 0; t < 30; t++) A.tick(w, [{ ...A.NO_INPUT, mx: 1 }, null]); return f.x - 8; };
         assert.ok(walk("rain") < walk("clear") * 0.95, "rain did not slow a Fire type");
       }
-      // Every type has an ULTI, and a famous one its own.
-      assert.ok((await import("../src/data/types.js")).TYPES.every((t) => A.ULT_KIND[t] && A.ULT_TYPE_NAME[t]), "a type has no ULTI");
-      assert.ok(Object.values(A.ULT_NAMES).every(([n, k]) => n && Object.values(A.ULT_KIND).includes(k)), "a famous ULTI has no kind");
+      /* THE ULTI ARCHETYPES (2026-10-24, asked for). Every Pokemon that fights
+         here has ONE ULTI in one of the fourteen archetypes, and every
+         archetype is somebody's; its ULTI's own move is never also in its
+         kit. Each archetype does its one thing: an attack lands between 15%
+         and 60% of a neutral foe's HP (a Sacrifice more, its user left at
+         1 HP), a Fortress, a Barrier, a Sanctuary, an Awakening, a Domain and
+         a Snare each do theirs. */
+      assert.ok((await import("../src/data/types.js")).TYPES.every((t) => A.ULT_TYPE_NAME[t]), "a type has no ULTI to fall back on");
+      {
+        const { SPECIES: SP } = await import("../src/data/dex.js");
+        const by = {};
+        for (const sp of SP) if (sp.id <= 1025 && A.arenaReady(sp.id)) {
+          const u = A.ultiPick(sp.id);
+          assert.ok(A.ARCHETYPES.includes(u.arch) && u.name, `${sp.name}'s ULTI ${u.name} has no archetype`);
+          (by[u.arch] ??= []).push(sp.id);
+        }
+        assert.deepEqual(A.ARCHETYPES.filter((a) => !by[a]), [], "an archetype is nobody's ULTI");
+        const pika = bFighter(25, 50, 1, [idx("thunder"), idx("thunderbolt")]);
+        assert.ok(A.ultiPick(25).move === idx("thunder") && !A.kitOf(pika).some((m) => m.i === idx("thunder")), "Pikachu's ULTI move is also in its kit - two of one ULTI");
+        const neutral = 151;
+        const run = (id) => {
+          const s = A.newMatch({ teams: [[bFighter(id, 50, 1, [idx("tackle")]), bFighter(id, 50, 3, [idx("tackle")])], [bFighter(neutral, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 4, weather: "clear", events: false });
+          const [a, d] = [s.sides[0].team[0], s.sides[1].team[0]];
+          Object.assign(a, { x: 10, y: 8, px: 10, py: 8 }); Object.assign(d, { x: 12.5, y: 8, px: 12.5, py: 8 });
+          a.hp = a.max >> 1; s.sides[0].team[1].hp = s.sides[0].team[1].max >> 1; s.sides[0].meter = A.SURGE_MAX;
+          const out = { s, a, d, foeLost: 0, ev: new Set(), healed: 0 };
+          for (let t = 0; t < 3 * A.TPS; t++) {
+            A.tick(s, [{ ...A.NO_INPUT, surge: t === 0, ax: d.x - a.x, ay: d.y - a.y }, null]);
+            Object.assign(d, { x: 12.5, y: 8 });
+            for (const e of s.ev) { out.ev.add(e.k); if (e.k === "hit" && e.side === 1 && e.ult) out.foeLost += e.dmg / d.max; if (e.k === "heal" && e.side === 0) out.healed += e.n / a.max; }
+          }
+          return out;
+        };
+        for (const arch of A.ARCHETYPES) {
+          const id = by[arch][0];      // Mew, the foe, is immune to no type
+          const r = run(id), who = `${arch} (#${id}, ${A.ultiPick(id).name})`;
+          if (arch === "Sacrifice") assert.ok(r.foeLost > 0.4 && r.a.hp === 1, `${who} did not blast hard and leave its user at 1 HP`);
+          else if (["Cataclysm", "Storm", "Cannon", "Nova", "Barrage", "Onslaught", "Phantom"].includes(arch)) assert.ok(r.foeLost >= 0.15 && r.foeLost <= 0.6, `${who} took ${(r.foeLost * 100).toFixed(0)}% of a neutral foe - outside 15-60%`);
+          else if (arch === "Fortress") assert.ok(r.ev.has("fortress"), `${who} raised no fortress`);
+          else if (arch === "Barrier") assert.ok(r.s.domes.length === 1, `${who} raised no dome`);
+          else if (arch === "Sanctuary") assert.ok(r.healed >= 0.3, `${who} healed ${(r.healed * 100).toFixed(0)}% - under 30%`);
+          else if (arch === "Awakening") assert.ok(r.a.stages.filter((v) => v >= 2).length >= 2, `${who} raised no two stats to +2`);
+          else if (arch === "Domain") assert.ok(r.s.domain?.side === 0, `${who} took over no field`);
+          else if (arch === "Snare") assert.ok(r.ev.has("snare"), `${who} snared nothing`);
+        }
+        // Only what has an Arena body fights; a move that does nothing here is never in a kit.
+        assert.ok(!A.arenaReady(10196) && !A.arenaReady(514) && A.arenaReady(6), "a Pokemon with no Arena body may fight there");
+        for (const n of ["sand-attack", "kinesis", "ruination", "comeuppance"]) assert.equal(A.shapeOf(AM.find((m) => m.n === n)), null, `${n} does nothing in the Arena and is still played`);
+        /* MOVES THAT TOUCH THE FOE: Vine Whip grabs and throws; a Flamethrower leaves fire on the floor. */
+        const touch = (atk, move, foeX) => {
+          const s = A.newMatch({ teams: [[bFighter(atk, 50, 1, [idx(move)])], [bFighter(143, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 2, weather: "clear", events: false });
+          const [a, d] = [s.sides[0].team[0], s.sides[1].team[0]];
+          Object.assign(a, { x: 8, y: 8, px: 8, py: 8 }); Object.assign(d, { x: foeX, y: 8, px: foeX, py: 8 });
+          const ev = []; let fires = 0;
+          for (let t = 0; t < 150; t++) { A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: t < 5 ? 0 : -1 }, null]); ev.push(...s.ev.map((e) => e.k)); fires = Math.max(fires, s.fires.length); }
+          return { ev, moved: d.x - foeX, fires };
+        };
+        const vine = touch(1, "vine-whip", 9.3);
+        assert.ok(vine.ev.includes("grab") && vine.ev.includes("throw") && vine.moved > 2, `Vine Whip did not grab and throw (moved ${vine.moved.toFixed(1)})`);
+        assert.ok(touch(6, "flamethrower", 14).fires >= 2, "a Flamethrower left no fire on the floor");
+      }
       {
         // Pikachu's ULTI is Thunder: strikes shown on the ground, then landing on a foe that stands there.
         const [s, a, d] = duel(25, "tackle", 143, { weather: "clear" });

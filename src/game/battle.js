@@ -75,11 +75,12 @@ export function movesAt(id, level) {
 
 /* THE MOVE TUTOR (phase 8): every usable level-up move of the line at or
    below its level, in the order the line learns them, once each. */
-export function learnable(id, level) {
+// `all` keeps the moves no League battle plays (Trick Room, King's Shield): the Arena's ULTIs read them.
+export function learnable(id, level, all = false) {
   const out = [];
   for (const x of rowsOf(id)) {
     const mi = x % 1000;
-    if (Math.floor(x / 1000) <= level && !MOVES[mi].no && !out.includes(mi)) out.push(mi);
+    if (Math.floor(x / 1000) <= level && (all || !MOVES[mi].no) && !out.includes(mi)) out.push(mi);
   }
   return out;
 }

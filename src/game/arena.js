@@ -32,7 +32,8 @@
 
    Units are tiles and ticks. The court is W x H tiles inside a wall `INSET`
    deep (the arena floors' own walls). */
-import { moveOf, rawDamage, CRIT, effectiveness, expected, fighter, movesAt, stageAt, neverHits, STRUGGLE, immuneTo } from "./battle.js";
+import { moveOf, rawDamage, CRIT, effectiveness, expected, fighter, movesAt, stageAt, neverHits, STRUGGLE, immuneTo, learnable } from "./battle.js";
+import { MOVES } from "../data/moves.js";
 import { TYPES } from "../data/types.js";
 import { SPECIES, isForm, isEvent } from "../data/dex.js";
 import { speciesById } from "./biomes.js";
@@ -93,6 +94,15 @@ const SHOT_RANGE = 9, SHOT_R = 0.35;
 const MELEE_RANGE = 1.75, MELEE_COS = 0.6;      // an arc of about 105 degrees (1.5 read as too small, 2026-10-23)
 // 0.32 was hard to land (2026-10-23); 10 x 0.5 read as thin and short beside its drawing (2026-10-24, asked for).
 export const BEAM_LEN = 13, BEAM_W = 0.85;
+/* MOVES THAT TOUCH THE FOE (2026-10-24, asked for: "Vine Whip grabbing the
+   Pokemon then throwing it; flamethrowers with lasting flames"). A GRAB
+   lands, holds the foe GRAB_T pulled in toward its user, then hurls it
+   THROW_DIST along the blow - into a wall-splat where there is a wall. A
+   FLAME move's shot leaves FIRE patches along its path for FIRE_T: whoever
+   of the other side stands in one is singed every FIRE_TICK and may burn. */
+const GRABS = new Set(["vine-whip", "power-whip", "circle-throw", "dragon-tail", "vital-throw", "submission"]);
+const FLAMES = new Set(["flamethrower", "inferno", "fire-blast"]);
+const GRAB_T = sec(0.3), THROW_DIST = 3.2, FIRE_T = sec(3), FIRE_TICK = sec(0.5), FIRE_R = 0.6, FIRE_EVERY = 6, FIRE_MAX = 24;
 /* WALL-SPLAT (2026-10-24, asked for): a Pokemon knocked back into the wall
    or a block of cover - a real blow's knockback, SPLAT_PUSH or more, never a jab's or a shot's - takes SPLAT_HURT of its HP and is stunned SPLAT_STUN -
    once a knockback. Where you fight starts to matter. PERFECT BLOCK: a hit
@@ -159,19 +169,9 @@ export const DARK_SEE = 5;
    can be dodged. Its hits are the League's formula on a 90-power move of
    that type, scaled by the part (`k`). */
 const ULT_BASE = -100, ULT_P = 90, ULT_WARN = sec(0.75), ULT_LOCK = sec(0.45);
-export const ULT_KIND = { electric: "storm", flying: "storm", fire: "nova", ground: "nova", fighting: "nova", normal: "nova", rock: "nova",
-  water: "cannon", ice: "cannon", dragon: "cannon", psychic: "cannon", steel: "cannon",
-  grass: "barrage", bug: "barrage", poison: "barrage", ghost: "barrage", dark: "barrage", fairy: "barrage" };
 export const ULT_TYPE_NAME = { electric: "Thunderstorm", fire: "Inferno", water: "Tidal Cannon", grass: "Leaf Storm", ice: "Absolute Zero",
   fighting: "Final Fist", poison: "Venom Rain", ground: "Fissure", flying: "Hurricane", psychic: "Mind Crush", bug: "Swarm",
   rock: "Rockfall", ghost: "Phantom Barrage", dragon: "Draco Cannon", dark: "Nightfall", steel: "Steel Cannon", fairy: "Starfall", normal: "Hyper Impact" };
-// Famous ones, by dex id: [name, kind].
-export const ULT_NAMES = { 25: ["Thunder", "storm"], 26: ["Thunder", "storm"], 145: ["Thunder", "storm"], 135: ["Thunder", "storm"],
-  6: ["Blast Burn", "nova"], 9: ["Hydro Cannon", "cannon"], 3: ["Frenzy Plant", "barrage"], 150: ["Psystrike", "cannon"],
-  94: ["Shadow Storm", "barrage"], 448: ["Aura Sphere", "barrage"], 130: ["Hyper Beam", "cannon"], 149: ["Outrage", "nova"],
-  143: ["Giga Impact", "nova"], 384: ["Dragon Ascent", "cannon"], 248: ["Stone Edge", "nova"], 445: ["Dragon Rush", "nova"],
-  658: ["Water Shuriken", "barrage"], 282: ["Moonblast", "barrage"], 257: ["Blaze Kick", "nova"] };
-const ULT_PART = { storm: 0.4, nova: 0.7, cannon: 0.8, barrage: 0.28 };
 /* MOVES THAT LEAVE THE COURT (asked for, 2026-10-23: "Fly takes the Pokemon
    out of the map, then dives into the enemy; Dig appears exactly under
    it"): its user is gone - up, under, beneath the water, into the shadows -
@@ -204,10 +204,11 @@ const HEAT_BURN = sec(1), SWIFT = sec(10);
 
 /* WHO FIGHTS HERE (2026-10-23, asked for: "if there are no animations for
    Gigantamax and other Megas, let's not make it usable - consistent battle
-   animations"): a FORM - a Mega, a Gigantamax, any other - only with its own
-   PMD body. A species PMD has not drawn yet still fights in its follower art. */
+   animations"): only a Pokemon with its own PMD body - a form, and since
+   2026-10-24 a species too ("still able to pick Pokemon that have no sprites
+   for the Arena"): every fighter moves the same way. */
 const PMD = new Set(PMD_IDS.split(",").filter(Boolean).map((h) => parseInt(h, 16)));
-export const arenaReady = (id) => !isForm(id) || PMD.has(id);
+export const arenaReady = (id) => PMD.has(id);
 /* EVOLVING IN A MATCH (2026-10-23, asked for). A Pokemon with a next stage
    fills its evolution bar (`xp`) with the share of a foe's HP it deals, a
    knockout worth a whole bar (EVO_XP), and at a full bar EVOLVES where it
@@ -427,12 +428,15 @@ export function shapeOf(m) {
   if (FIELD_NAMES.has(m.n)) return "field";
   if (m.c === 2) {
     if (SHIELDS.has(m.n) || m.n === "rest") return "self";
+    // Accuracy means nothing where aim is the accuracy: Sand Attack and Kinesis would do nothing (2026-10-24).
+    if (m.sg && m.sg.every(([st]) => st === 6) && !SMOKE.has(m.n)) return null;
     if (m.self && (m.sg || m.h)) return "self";
     if (!m.self && m.st != null) return "shot";            // a status shot: Thunder Wave, Will-O-Wisp
     if (!m.self && m.sg) return "pulse";                  // a stat drop around you: Growl, Screech
     return null;
   }
-  if (!m.p) return null;
+  // A power of 1 is a placeholder for a rule the Arena does not play (Ruination, Comeuppance): no damage, so no move.
+  if (!m.p || m.p <= 1) return null;
   if (PULSE.has(m.n)) return "pulse";
   if (THROWN.has(m.n)) return "shot";
   if (m.hits) return "multi";
@@ -485,7 +489,11 @@ const multiCount = (m) => (m.hits ? Math.round((m.hits[0] + m.hits[1]) / 2) : 1)
    Arena can play. A kit that would not hit at all keeps Struggle beside them
    (a status-only kit), thrown like any move. */
 export function kitOf(f) {
-  const kit = f.moves.filter((m) => m.i !== STRUGGLE && shapeOf(arenaMove(m.i))).slice(0, 4)
+  /* A ULTI-tier move that is its ULTI is never also one of its four (2026-10-24: one ULTI a Pokemon, and
+     only one - Pikachu's Thunder). A ULTI made from an everyday attack leaves that move in the kit:
+     Machamp kept no Dynamic Punch to throw. */
+  const u = ultiPick(f.id), ult = u.move >= 0 && ultiArchetype(u.move) ? u.move : -1;
+  const kit = f.moves.filter((m) => m.i !== STRUGGLE && m.i !== ult && shapeOf(arenaMove(m.i))).slice(0, 4)
     .map((m) => ({ i: m.i, cd: 0 }));
   if (!kit.some((m) => arenaMove(m.i).p > 0)) {
     if (kit.length === 4) kit.pop();
@@ -515,7 +523,7 @@ function body(f, side, slot) {
     status: -1, statusT: 0, statusN: 0, badly: false, sleptAt: 0,
     vx: 0, vy: 0, heat: 0, swift: 0, hidden: false, surge: 0, power: 0, haste: 0, clones: [], cloneT: 0, wet: 0, rained: false, away: null, confused: 0,
     basic: { i: basicOf(f), cd: 0 }, basicN: 0, basicT: -BASIC_CHAIN,
-    xp: 0, evo: 0, evoTo: 0, megaOn: false, megas: f.megas ?? [],
+    xp: 0, evo: 0, evoTo: 0, megaOn: false, megas: f.megas ?? [], fortress: 0, regen: 0, awake: 0,
   };
 }
 
@@ -526,11 +534,11 @@ export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "ind
   const g = GROUND[arena] ? arena : "indigo";
   const s = {
     t: 0, intro, rs: seed | 0, over: false, winner: -1, why: "", ev: [], shots: [], hazards: [], nextId: 1,
-    arena: g, drops: [], items: [], helpers: [], strikes: [], clouds: [], dark: 0, white: false, tide: 0, erupt: 0, lanes: [],
+    arena: g, drops: [], items: [], helpers: [], strikes: [], clouds: [], dark: 0, white: false, tide: 0, erupt: 0, lanes: [], domes: [], domain: null, perish: 0, throws: [], fires: [],
     cover: COVER_AT.map(([x, y], i) => ({ id: i, x, y, hp: COVER_HP, max: COVER_HP })),
     zone: { open: false, t: ZONE_FIRST, claimed: [false, false], hold: [[0, 0], [0, 0]] },
     sides: teams.map((team, side) => ({
-      team: team.map((f, slot) => body(f, side, slot)), active: 0, swapT: 0, next: -1, swapCd: 0, koT: 0, meter: 0, held: null, megaUsed: false,
+      team: team.map((f, slot) => body(f, side, slot)), active: 0, swapT: 0, next: -1, swapCd: 0, koT: 0, meter: 0, held: null, megaUsed: false, trapT: 0,
       // What the result screen tells (never read by the rules): damage dealt, hits, the best run of hits unanswered, perfect dodges, surges.
       stats: { dealt: 0, hits: 0, chain: 0, best: 0, perfect: 0, surges: 0 },
       cpu: cpu[side] ? { level: cpu[side], seen: 0, seenId: 0, strafe: 1, dodged: 0, lx: W / 2, ly: H / 2 } : null,
@@ -598,6 +606,7 @@ export function tick(s, inputs) {
 function stepSide(s, side, inp) {
   const sd = s.sides[side];
   if (sd.swapCd > 0) sd.swapCd--;
+  if (sd.trapT > 0) sd.trapT--;
   // A switch in progress: the side has nobody out until it lands.
   if (sd.swapT > 0) {
     if (--sd.swapT === 0) {
@@ -612,6 +621,10 @@ function stepSide(s, side, inp) {
   const f = sd.team[sd.active];
   for (const m of [...f.kit, f.basic]) if (m.cd > 0) m.cd = Math.max(0, m.cd - (f.surge > 0 || f.haste > 0 ? 2 : 1));
   if (f.surge > 0) f.surge--;
+  if (f.fortress > 0) f.fortress--;
+  if (f.awake > 0) f.awake--;
+  // Sanctuary's warmth: a little a second, until a hit lands.
+  if (f.regen > 0 && --f.regen % TPS === 0 && f.hp > 0) heal(s, f, Math.max(1, Math.floor(f.max * SANCT_REGEN)));
   if (f.dodgeCd > 0) f.dodgeCd--;
   if (f.inv > 0) f.inv--;
   if (f.shield > 0) f.shield--;
@@ -642,7 +655,7 @@ function stepSide(s, side, inp) {
   if (held(f)) { if (f.stun > 0) f.stun--; }
   else {
     if (inp.use && sd.held) { useItem(s, f, sd.held); s.ev.push({ k: "use", side, item: sd.held, x: f.x, y: f.y }); sd.held = null; }
-    if (inp.swap >= 0 && sd.swapCd === 0 && !f.act && !f.dodge) {
+    if (inp.swap >= 0 && sd.swapCd === 0 && !sd.trapT && !f.act && !f.dodge) {
       const next = inp.swap < sd.team.length ? inp.swap : -1;
       if (next >= 0 && next !== sd.active && sd.team[next].hp > 0) {
         sd.next = next; sd.swapT = SWAP; sd.swapCd = SWAP_CD; f.surge = 0; f.clones = [];
@@ -682,7 +695,7 @@ function stepSide(s, side, inp) {
   }
 
   // Moving: a dodge dashes, a dash move lunges, a wind-up walks at half speed, a recovery stands.
-  const v = speedOf(f);
+  const v = speedOf(f) * domainSpeed(s, f);
   if (f.dodge > 0) {
     const d = DODGE_DIST / DODGE;
     f.x += f.dx * d; f.y += f.dy * d; f.dodge--;
@@ -1241,6 +1254,7 @@ function stages(s, f, list, cap = STAGE_CAP) {
 const LASTS = { [PAR]: sec(6), [BRN]: sec(8), [PSN]: sec(10), [FRZ]: sec(2.5) };
 function afflict(s, f, st, badly = false, sleep = 0) {
   if (f.status !== -1 || f.hp <= 0 || immuneTo(f, st)) return false;
+  if (s.domain && ((s.domain.kind === "misty-terrain" && s.domain.side === f.side) || (s.domain.kind === "electric-terrain" && st === SLP))) return false;
   f.status = st; f.badly = badly; f.statusN = 0;
   f.statusT = st === SLP ? (sleep || sec(2 + rnd(s) * 2)) : LASTS[st];
   f.sleptAt = s.t;
@@ -1269,6 +1283,10 @@ function hurt(s, f, n, move = null) {
 function stepShots(s) {
   s.shots = s.shots.filter((p) => {
     p.x += p.dx * p.v; p.y += p.dy * p.v; p.left -= p.v;
+    if (FLAMES.has(arenaMove(p.move).n) && (p.age = (p.age ?? 0) + 1) % FIRE_EVERY === 0) {
+      if (s.fires.length >= FIRE_MAX) s.fires.shift();
+      s.fires.push({ x: p.x, y: p.y, t: FIRE_T, side: p.side });
+    }
     if (p.left <= 0 || p.x < INSET || p.x > W - INSET || p.y < INSET || p.y > H - INSET) { s.ev.push({ k: "fizzle", x: p.x, y: p.y, move: p.move }); return false; }
     const c = s.cover.find((b) => b.hp > 0 && Math.abs(p.x - b.x) < COVER_HALF + SHOT_R && Math.abs(p.y - b.y) < COVER_HALF + SHOT_R);
     if (c) { chip(s, c, p.move, p.x, p.y); return false; }
@@ -1302,28 +1320,176 @@ function surge(s, side, f) {
   s.ev.push({ k: "surge", side, x: f.x, y: f.y });
   ultimate(s, side, f);
 }
-// What a Pokemon's ULTI looses: its name and kind, by species, else by its first type.
-export function ultOf(f) {
-  const type = TYPES[f.types[0]] ?? "normal";
-  const [name, kind] = ULT_NAMES[f.id] ?? ULT_NAMES[speciesById(f.id)?.of] ?? [ULT_TYPE_NAME[type] ?? "Ultimate", ULT_KIND[type] ?? "nova"];
-  return { name, kind, type };
+/* THE ULTI ARCHETYPES (2026-10-24, asked for: "ULTs should have bigger
+   impacts, more epic, really worth the use - some defensive, buff, attack").
+   Every Pokemon has ONE ULTI (`ultiPick`): a named one the game already had,
+   its signature move, a support ULTI for a wall, else its strongest
+   same-type attack - each in one of fourteen ARCHETYPES. An attack ULTI is
+   worth ~35% of its target's HP if it all lands (`ultDamage`: a SHARE of the
+   target's HP, its type matchup and the two Pokemon's stats folded in, so
+   it is the same size from a Pichu as from a Mewtwo); a defence, a buff or
+   a control one is worth as much in what it prevents, adds or takes away.
+   Everything telegraphs, everything has an answer (docs: the Arena Move
+   Codex). */
+export const ARCHETYPES = ["Cataclysm", "Storm", "Cannon", "Nova", "Barrage", "Onslaught", "Phantom", "Sacrifice",
+  "Fortress", "Barrier", "Sanctuary", "Awakening", "Domain", "Snare"];
+const FORT_T = sec(3), FORT_HURT = 0.1, DOME_T = sec(10), DOME_R = 2.5, DOME_K = 0.6, VEIL_K = 0.5;
+const SANCT_HEAL = 0.35, SANCT_REGEN = 0.03, SANCT_T = sec(6), SANCT_BENCH = 0.15, AWAKE_T = sec(10);
+const DOMAIN_T = sec(12), SNARE_R = 4, TRAP_T = sec(8), PERISH_T = sec(6);
+const ULT_STORM = new Set(["thunder", "blizzard", "hurricane", "draco-meteor", "precipice-blades", "thousand-arrows", "diamond-storm", "bleakwind-storm",
+  "wildbolt-storm", "sandsear-storm", "springtide-storm", "meteor-beam", "fire-blast", "leaf-storm", "seed-flare", "judgment", "core-enforcer"]);
+const ULT_FORTRESS = new Set(["kings-shield", "spiky-shield", "baneful-bunker", "obstruct", "silk-trap", "burning-bulwark", "max-guard", "wide-guard", "mat-block", "crafty-shield"]);
+const ULT_BARRIER = new Set(["reflect", "light-screen", "aurora-veil", "safeguard"]);
+const ULT_SANCT = new Set(["wish", "healing-wish", "lunar-dance", "life-dew", "jungle-healing", "lunar-blessing", "heal-bell", "aromatherapy", "moonlight",
+  "morning-sun", "synthesis", "recover", "roost", "slack-off", "soft-boiled", "milk-drink", "shore-up", "heal-order"]);
+const ULT_DOMAIN = { "rain-dance": "rain", "sunny-day": "sun", sandstorm: "sand", hail: "snow", snowscape: "snow", "trick-room": "trick-room",
+  gravity: "trick-room", "tailwind": "tailwind", "electric-terrain": "electric-terrain", "psychic-terrain": "psychic-terrain",
+  "grassy-terrain": "grassy-terrain", "misty-terrain": "misty-terrain" };
+const ULT_SNARE = { spore: SLP, hypnosis: SLP, "sleep-powder": SLP, "dark-void": SLP, sing: SLP, "grass-whistle": SLP, "lovely-kiss": SLP,
+  glare: PAR, "stun-spore": PAR, "mean-look": "trap", block: "trap", octolock: "trap", "perish-song": "perish" };
+// Named ULTIs the game already had (by dex id): [name, archetype].
+export const ULT_NAMES = { 25: ["Thunder", "Storm"], 26: ["Thunder", "Storm"], 145: ["Thunder", "Storm"], 135: ["Thunder", "Storm"],
+  6: ["Blast Burn", "Nova"], 9: ["Hydro Cannon", "Cannon"], 3: ["Frenzy Plant", "Storm"], 150: ["Psystrike", "Cannon"],
+  94: ["Shadow Storm", "Barrage"], 448: ["Aura Sphere", "Barrage"], 130: ["Hyper Beam", "Cannon"], 149: ["Outrage", "Onslaught"],
+  143: ["Giga Impact", "Onslaught"], 384: ["Dragon Ascent", "Onslaught"], 248: ["Stone Edge", "Nova"], 445: ["Dragon Rush", "Onslaught"],
+  658: ["Water Shuriken", "Barrage"], 282: ["Moonblast", "Cataclysm"], 257: ["Blaze Kick", "Onslaught"] };
+// How many species learn each move by Lv 100 - a move three or fewer learn is a SIGNATURE. Counted once, when first asked.
+let LEARNED = null;
+const learnersOf = (i) => {
+  if (!LEARNED) {
+    LEARNED = new Map();
+    for (const sp of SPECIES) if (sp.id <= 1025) for (const j of learnable(sp.id, 100, true)) LEARNED.set(j, (LEARNED.get(j) ?? 0) + 1);
+  }
+  return LEARNED.get(i) ?? 0;
+};
+const titled = (n) => n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+/* A move's ULTI archetype, or null when it is no ULTI. An attack is one at
+   130 power or more, a signature at 90 or more, or a named storm. */
+export function ultiArchetype(i) {
+  const m = MOVES[i];
+  if (!m) return null;
+  if (ULT_FORTRESS.has(m.n)) return "Fortress";
+  if (ULT_BARRIER.has(m.n)) return "Barrier";
+  if (ULT_SANCT.has(m.n) && (m.h >= 50 || !m.h)) return "Sanctuary";
+  if (ULT_DOMAIN[m.n]) return "Domain";
+  if (ULT_SNARE[m.n] != null) return "Snare";
+  if (m.c === 2 && m.sg && m.self && m.sg.reduce((n, [, k]) => n + Math.max(0, k), 0) >= 3) return "Awakening";
+  if (!m.p || m.p <= 1) return null;
+  const big = m.p >= 130 || (learnersOf(i) <= 3 && m.p >= 90) || ["hyper-beam", "giga-impact", "explosion", "self-destruct", "misty-explosion"].includes(m.n);
+  if (!big && !ULT_STORM.has(m.n)) return null;
+  return ultiShape(m);
 }
+const ultiShape = (m) => (["explosion", "self-destruct", "misty-explosion"].includes(m.n) ? "Sacrifice" : VANISH[m.n] ? "Phantom"
+  : ULT_STORM.has(m.n) ? "Storm" : ({ beam: "Cannon", pulse: "Nova", multi: "Barrage", melee: "Onslaught", dash: "Onslaught" })[shapeOf(m)] ?? "Cataclysm");
+const SUPPORT_ORDER = ["Sanctuary", "Fortress", "Barrier", "Awakening", "Domain", "Snare"];
+/* A POKEMON'S ONE ULTI: { move (its MOVES index, -1 for a named one), name,
+   arch, type, why }. Remembered per species. */
+const PICKS = new Map();
+export function ultiPick(id) {
+  if (PICKS.has(id)) return PICKS.get(id);
+  const sp = speciesById(id);
+  const types = sp?.types ?? ["normal"];
+  const named = ULT_NAMES[id] ?? ULT_NAMES[sp?.of];
+  let pick = null;
+  if (named) {
+    const i = MOVES.findIndex((m) => titled(m.n) === named[0]);
+    pick = { move: i, name: named[0], arch: named[1], type: i >= 0 ? MOVES[i].t : types[0], why: "named" };
+  }
+  if (!pick && sp) {
+    const st = fighter(id, 50, 1, []).st, physical = st[1] >= st[3];
+    const can = learnable(id, 100, true);
+    const sig = can.filter((i) => MOVES[i].p && learnersOf(i) <= 3 && MOVES[i].p >= 90 && ultiArchetype(i)).sort((a, b) => MOVES[b].p - MOVES[a].p)[0];
+    // Its most ITS OWN support move first (fewest learners - King's Shield is Aegislash's), then by archetype.
+    const support = can.filter((i) => SUPPORT_ORDER.includes(ultiArchetype(i)))
+      .sort((a, b) => learnersOf(a) - learnersOf(b) || SUPPORT_ORDER.indexOf(ultiArchetype(a)) - SUPPORT_ORDER.indexOf(ultiArchetype(b)))[0];
+    const atk = can.filter((i) => MOVES[i].p > 1 && shapeOf(MOVES[i]))
+      .sort((a, b) => worthOf(MOVES[b]) - worthOf(MOVES[a]))[0];
+    function worthOf(m) { return m.p * (types.includes(m.t) ? 1.5 : 1) * ((m.c === 0) === physical ? 1.2 : 1); }
+    const as = (i, why) => ({ move: i, name: titled(MOVES[i].n), arch: ultiArchetype(i) ?? ultiShape(MOVES[i]), type: MOVES[i].t, why });
+    if (sig != null) pick = as(sig, "signature");
+    // A wall's ULTI protects; so does anyone's whose support move is its own (three or fewer learn it).
+    else if (support != null && (Math.max(st[1], st[3]) < Math.max(st[2], st[4]) * 0.8 || learnersOf(support) <= 3)) pick = as(support, "support");
+    else if (atk != null) pick = as(atk, "attack");
+    else if (support != null) pick = as(support, "support");
+  }
+  if (!pick) pick = { move: -1, name: ULT_TYPE_NAME[types[0]] ?? "Ultimate", arch: "Nova", type: types[0], why: "type" };
+  PICKS.set(id, pick);
+  return pick;
+}
+// What a Pokemon's ULTI looses: its one pick (`kind` the archetype, lower-case, as the picture names it).
+export function ultOf(f) {
+  const u = ultiPick(f.id);
+  return { name: u.name, kind: u.arch.toLowerCase(), arch: u.arch, type: u.type, move: u.move };
+}
+/* A ULTI's damage: a SHARE of the target's max HP, by type matchup (resisted
+   0.6x, super effective 1.4x, doubly 1.6x) and by the two Pokemon's stats
+   (its attack over the foe's matching defence, held to 0.8-1.3x). */
+function ultDamage(a, d, m, eff, share) {
+  const effK = eff >= 4 ? 1.6 : eff > 1 ? 1.4 : eff < 1 ? 0.6 : 1;
+  const [as, ds] = m.c === 0 ? [1, 2] : [3, 4];
+  const ratio = (a.st[as] * STAGE(a.stages[as])) / Math.max(1, d.st[ds] * STAGE(d.stages[ds]));
+  return d.max * share * effK * clamp(0.75 + 0.25 * ratio, 0.8, 1.3);
+}
+// A Barrier dome its side stands in, and a terrain's lift for its side's moves.
+const domeK = (s, d) => s.domes.find((dm) => dm.side === d.side && (d.x - dm.x) * (d.x - dm.x) + (d.y - dm.y) * (d.y - dm.y) < dm.r * dm.r)?.k ?? 1;
+const TERRAIN_TYPE = { "electric-terrain": "electric", "psychic-terrain": "psychic", "grassy-terrain": "grass", "misty-terrain": "fairy" };
+const domainHit = (s, a, t) => (s.domain && s.domain.side === a.side && TERRAIN_TYPE[s.domain.kind] === t ? 1.3 : 1);
+const domainSpeed = (s, f) => (!s.domain ? 1 : s.domain.kind === "trick-room" ? (f.side === s.domain.side ? 1.3 : 0.7)
+  : s.domain.kind === "tailwind" && f.side === s.domain.side ? 1.3 : 1);
 function ultimate(s, side, f) {
-  const { name, kind, type } = ultOf(f);
-  const move = ULT_BASE - TYPES.indexOf(type) * 2 - (f.st[1] >= f.st[3] ? 0 : 1);
+  const u = ultOf(f);
+  const move = ULT_BASE - TYPES.indexOf(u.type) * 2 - (f.st[1] >= f.st[3] ? 0 : 1);
   const d = activeOf(s, 1 - side);
   const tx = d ? d.x : W - f.x, ty = d ? d.y : f.y;
-  const k = ULT_PART[kind];
-  s.ev.push({ k: "ult", side, name, kind, type, id: f.id, x: f.x, y: f.y });
-  const strike = (z) => s.strikes.push({ id: s.nextId++, side, from: f.slot, move, k, t0: z.t, type, ...z });
-  if (kind === "storm") {
-    for (let n = 0; n < 3; n++) strike({ x: tx, y: ty, t: ULT_WARN + n * sec(0.45), r: 1.2, follow: true });
-    for (let n = 0; n < 4; n++) strike({ x: X0 + 1 + rnd(s) * (X1 - X0 - 2), y: Y0 + 1 + rnd(s) * (Y1 - Y0 - 2), t: ULT_WARN + sec(0.2) + n * sec(0.3), r: 1.4 });
-  } else if (kind === "nova") strike({ x: f.x, y: f.y, t: ULT_WARN, r: 4.2, nova: true });
-  else if (kind === "cannon") { const [dx, dy] = norm(tx - f.x, ty - f.y); strike({ x: f.x, y: f.y, dx: dx || 1, dy, t: ULT_WARN, beam: true, follow: true }); }
-  else {
-    const [dx, dy] = norm(tx - f.x, ty - f.y);
-    for (const sp of [-0.32, -0.16, 0, 0.16, 0.32]) { const [ax, ay] = turn(dx || 1, dy, sp); shoot(s, side, f, ax, ay, move, SHOT_RANGE * 1.2, false, k); }
+  s.ev.push({ k: "ult", side, name: u.name, kind: u.kind, arch: u.arch, type: u.type, id: f.id, x: f.x, y: f.y });
+  const strike = (z) => s.strikes.push({ id: s.nextId++, side, from: f.slot, move, t0: z.t, type: u.type, arch: u.arch, ...z });
+  const [dx, dy] = norm(tx - f.x, ty - f.y);
+  switch (u.arch) {
+    case "Cataclysm": strike({ x: tx, y: ty, t: ULT_WARN + sec(0.3), r: 1.6, follow: true, k: 0.35, big: true }); break;
+    case "Storm":
+      for (let n = 0; n < 3; n++) strike({ x: tx, y: ty, t: ULT_WARN + n * sec(0.45), r: 1.2, follow: true, k: 0.1 });
+      for (let n = 0; n < 4; n++) strike({ x: X0 + 1 + rnd(s) * (X1 - X0 - 2), y: Y0 + 1 + rnd(s) * (Y1 - Y0 - 2), t: ULT_WARN + sec(0.2) + n * sec(0.3), r: 1.4, k: 0.05 });
+      break;
+    case "Cannon": strike({ x: f.x, y: f.y, dx: dx || 1, dy, t: ULT_WARN, beam: true, follow: true, k: 0.32 }); break;
+    case "Nova": strike({ x: f.x, y: f.y, t: ULT_WARN, r: 4.5, nova: true, k: 0.3, kb: 2.2 }); break;
+    case "Barrage":
+      for (const sp of [-0.45, -0.3, -0.15, 0, 0.15, 0.3, 0.45]) { const [ax, ay] = turn(dx || 1, dy, sp); shoot(s, side, f, ax, ay, move, SHOT_RANGE * 1.2, false, 0.05); }
+      break;
+    case "Onslaught":
+      f.inv = Math.max(f.inv, sec(1.4));
+      for (let n = 0; n < 3; n++) strike({ x: tx, y: ty, t: sec(0.4) + n * sec(0.3), r: 1.1, follow: true, k: 0.12, rush: true, kb: n === 2 ? 2.4 : 0 });
+      break;
+    case "Phantom": vanish(s, side, f, move, "shadow"); Object.assign(s.strikes[s.strikes.length - 1], { k: 0.33, crit: true, arch: "Phantom" }); break;
+    case "Sacrifice": strike({ x: f.x, y: f.y, t: sec(1), r: 6, nova: true, k: 0.6, kb: 2.5, sac: true }); break;
+    case "Fortress": f.fortress = FORT_T; f.shield = Math.max(f.shield, FORT_T); f.inv = Math.max(f.inv, FORT_T); s.ev.push({ k: "fortress", side, x: f.x, y: f.y }); break;
+    case "Barrier": s.domes.push({ id: s.nextId++, side, x: f.x, y: f.y, r: DOME_R, t: DOME_T, k: u.name === "Aurora Veil" ? VEIL_K : DOME_K }); s.ev.push({ k: "dome", side, x: f.x, y: f.y, r: DOME_R }); break;
+    case "Sanctuary": {
+      heal(s, f, Math.floor(f.max * SANCT_HEAL));
+      if (f.status >= 0) { f.status = -1; f.badly = false; s.ev.push({ k: "cured", side }); }
+      f.regen = SANCT_T;
+      s.sides[side].team.forEach((b, k2) => { if (k2 !== s.sides[side].active && b.hp > 0) b.hp = Math.min(b.max, b.hp + Math.floor(b.max * SANCT_BENCH)); });
+      s.ev.push({ k: "sanctuary", side, x: f.x, y: f.y });
+      break;
+    }
+    case "Awakening": {
+      // Its two best stats (of Atk, Def, SpA, SpD, Spe) to +2, and cooldowns running twice as fast.
+      const best = [1, 2, 3, 4, 5].sort((a, b) => f.st[b] - f.st[a] || a - b).slice(0, 2);
+      stages(s, f, best.map((st) => [st, 2]));
+      for (const st of best) f.stageT[st] = AWAKE_T;
+      f.awake = AWAKE_T; f.haste = Math.max(f.haste, AWAKE_T);
+      s.ev.push({ k: "awaken", side, x: f.x, y: f.y });
+      break;
+    }
+    case "Domain": {
+      const kind = ULT_DOMAIN[MOVES[u.move]?.n] ?? "trick-room";
+      const weather = ["rain", "sun", "sand", "snow"].includes(kind);
+      const was = s.domain?.was ?? s.weather;
+      s.domain = { kind, side, t: DOMAIN_T, was: weather ? was : null };
+      if (weather) s.weather = kind;
+      s.ev.push({ k: "domain", side, kind, x: f.x, y: f.y });
+      break;
+    }
+    case "Snare": strike({ x: tx, y: ty, t: ULT_WARN, r: SNARE_R, k: 0, snare: ULT_SNARE[MOVES[u.move]?.n] ?? SLP }); break;
   }
 }
 /* An ULTI's strikes: each shows where it will land, follows its target
@@ -1344,8 +1510,32 @@ function stepStrikes(s) {
       a.inv = 0;
       pushOut(s, a);
     }
+    if (z.snare != null) {
+      // A SNARE lands: whoever it caught sleeps, is paralysed, is trapped - or Perish Song starts counting for everyone.
+      s.ev.push({ k: "snare", side: z.side, x: z.x, y: z.y, r: z.r, what: z.snare });
+      if (z.snare === "perish") { s.perish = PERISH_T; return false; }
+      if (d && d.hp > 0 && !d.away && (d.x - z.x) * (d.x - z.x) + (d.y - z.y) * (d.y - z.y) < (z.r + R) * (z.r + R)) {
+        if (z.snare === "trap") s.sides[1 - z.side].trapT = TRAP_T; else afflict(s, d, z.snare, false, sec(2));
+      }
+      return false;
+    }
+    if (z.rush && a.hp > 0) {
+      // ONSLAUGHT: its user is there with each blow, from alternate sides.
+      const sideX = (z.t0 / sec(0.3)) % 2 ? 1 : -1;
+      a.x = a.px = clamp(z.x - sideX * 1.1, X0, X1); a.y = a.py = z.y;
+      s.ev.push({ k: "rush", side: z.side, x: a.x, y: a.y, tx: z.x, ty: z.y });
+    }
     if (z.beam) beamAt(s, z.side, a, z.x, z.y, z.dx, z.dy, z.move, BEAM_W * 2.6, BEAM_LEN * 1.7, z.k, true);
-    else { s.ev.push({ k: "strike", side: z.side, x: z.x, y: z.y, r: z.r, nova: Boolean(z.nova), move: z.move, vanish: z.vanish ?? null }); blast(s, a, z.x, z.y, z.r, z.move, z.k); }
+    else {
+      s.ev.push({ k: "strike", side: z.side, x: z.x, y: z.y, r: z.r, nova: Boolean(z.nova), move: z.move, vanish: z.vanish ?? null, big: Boolean(z.big || z.sac), arch: z.arch ?? null });
+      blast(s, a, z.x, z.y, z.r, z.move, z.k);
+      // A Nova, a Sacrifice, the last blow of an Onslaught: whoever it hit is hurled - into a wall-splat if there is one.
+      if (z.kb && d && d.hp > 0 && !d.inv && (d.x - z.x) * (d.x - z.x) + (d.y - z.y) * (d.y - z.y) <= (z.r + R) * (z.r + R)) {
+        const [kx, ky] = norm(d.x - (z.rush ? a.x : z.x) || 1, d.y - (z.rush ? a.y : z.y));
+        d.kbx = kx * z.kb / KB; d.kby = ky * z.kb / KB; d.kbt = KB;
+      }
+    }
+    if (z.sac && a.hp > 1) { a.hp = 1; s.ev.push({ k: "sacrifice", side: z.side, x: a.x, y: a.y }); }
     return false;
   });
 }
@@ -1361,6 +1551,34 @@ function stepEvents(s) {
   if (s.t === s.plan.dark) { s.dark = DARK_T; s.ev.push({ k: "dark" }); }
   else if (s.dark > 0 && --s.dark === 0) { s.white = false; s.ev.push({ k: "light" }); }
   if (s.t === s.plan.floor) floorEvent(s);
+  s.domes = s.domes.filter((dm) => --dm.t > 0);
+  s.throws = s.throws.filter((th) => {
+    if (--th.t > 0) return true;
+    const d = activeOf(s, th.side);
+    if (d && d.hp > 0) { d.kbx = th.dx * THROW_DIST / KB; d.kby = th.dy * THROW_DIST / KB; d.kbt = KB; s.ev.push({ k: "throw", side: th.side, x: d.x, y: d.y, dx: th.dx, dy: th.dy }); }
+    return false;
+  });
+  s.fires = s.fires.filter((fl) => {
+    if (fl.t % FIRE_TICK === 0) {
+      const d = activeOf(s, 1 - fl.side);
+      if (d && d.hp > 0 && d.inv <= 0 && !d.away && (d.x - fl.x) * (d.x - fl.x) + (d.y - fl.y) * (d.y - fl.y) < (FIRE_R + R) * (FIRE_R + R)) {
+        const k = effectiveness("fire", d.types);
+        if (k > 0) { hurt(s, d, Math.max(1, Math.floor(d.max / 60 * k)), null); if (rnd(s) < 0.1) afflict(s, d, BRN); }
+      }
+    }
+    return --fl.t > 0;
+  });
+  if (s.domain && --s.domain.t <= 0) {
+    if (s.domain.was) s.weather = s.domain.was;
+    s.ev.push({ k: "domainEnd", kind: s.domain.kind });
+    s.domain = null;
+  } else if (s.domain?.kind === "grassy-terrain" && s.t % TPS === 0) {
+    const f = activeOf(s, s.domain.side);
+    if (f && f.hp > 0) heal(s, f, Math.max(1, Math.floor(f.max * 0.01)));
+  }
+  if (s.perish > 0 && --s.perish === 0) {
+    for (let side = 0; side < 2; side++) { const f = activeOf(s, side); if (f && f.hp > 1) { f.hp = 1; s.ev.push({ k: "perish", side, x: f.x, y: f.y }); } }
+  }
   if (s.tide > 0 && --s.tide === 0) s.ev.push({ k: "ebb" });
   if (s.erupt > 0) {
     if (s.erupt % ERUPT_EVERY === 0) {
@@ -1408,6 +1626,14 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
   // Struck in its wind-up: a COUNTER (the picture calls it; the rules already cancel the move).
   const counter = d.act?.ph === "wind" && d.act.k !== BASIC_K;
   if (d.inv > 0) {
+    // A FORTRESS throws a blow back hard: its attacker hurt and hurled off.
+    if (d.fortress > 0 && contact && a.hp > 0 && !a.away) {
+      hurt(s, a, Math.max(1, Math.floor(a.max * FORT_HURT)), null);
+      const [kx, ky] = norm(a.x - d.x || 1, a.y - d.y);
+      a.kbx = kx * 2 / KB; a.kby = ky * 2 / KB; a.kbt = KB;
+      a.stun = Math.max(a.stun, sec(0.4));
+      s.ev.push({ k: "parry", side: d.side, x: d.x, y: d.y, tx: a.x, ty: a.y });
+    }
     // Blocked as it raised its shield: a PERFECT BLOCK throws the hit back on its attacker.
     if (d.shield > SHIELD - PARRY_T && a.hp > 0 && !a.away) {
       hurt(s, a, Math.max(1, Math.floor(a.max / PARRY_HURT)), null);
@@ -1431,10 +1657,14 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     // A multi-shot's every shot is one of its hits; a pulse or a blow carries the average.
     const hits = shapeOf(m) === "multi" || !m.hits ? 1 : (m.hits[0] + m.hits[1]) / 2;
     const shock = m.t === "electric" && d.wet > 0;
-    dmg = Math.max(1, Math.floor(rawDamage(a, d, m, crit) * (crit ? 1.5 : 1) * roll * hits * DAMAGE * boost * (a.surge > 0 ? SURGE_DMG : 1) * (a.power > 0 ? X_ATTACK : 1)
+    const guard = (helping(s, d.side, "mr-mime") ? SCREEN_K : 1) * domeK(s, d) * domainHit(s, a, m.t);
+    dmg = isUlt(move) ? ultDamage(a, d, m, eff, boost) * weatherK(s, m.t) * guard
+      : rawDamage(a, d, m, crit) * (crit ? 1.5 : 1) * roll * hits * DAMAGE * boost * (a.surge > 0 ? SURGE_DMG : 1) * (a.power > 0 ? X_ATTACK : 1)
       * (finalMinute(s) ? FINAL_DMG : 1) * weatherK(s, m.t) * (shock ? SHOCK : 1)
       * (contact && roleOf(a) === "brawler" ? BRAWL_HIT : 1) * (!contact && roleOf(d) === "brawler" ? BRAWL_GUARD : 1)
-      * (helping(s, a.side, "plusle") ? HELP_HIT : 1) * (helping(s, d.side, "mr-mime") ? SCREEN_K : 1)));
+      * (helping(s, a.side, "plusle") ? HELP_HIT : 1) * guard;
+    dmg = Math.max(1, Math.floor(dmg));
+    d.regen = 0;
     d.hp = Math.max(0, d.hp - dmg);
     a.xp += dmg / d.max + (d.hp === 0 ? EVO_XP : 0);
     const st = s.sides[a.side].stats;
@@ -1444,6 +1674,13 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     d.flash = sec(0.08); d.stun = Math.max(d.stun, STUN);
     const push = contact ? (m.p ?? 40) / 40 : 0.25;
     d.kbx = dx * push / KB; d.kby = dy * push / KB; d.kbt = KB;
+    if (contact && GRABS.has(m.n) && d.hp > 0) {
+      // Caught: pulled in, held, then thrown along the blow.
+      d.kbx = -dx * 0.5 / KB; d.kby = -dy * 0.5 / KB;
+      d.stun = Math.max(d.stun, GRAB_T + sec(0.35));
+      s.throws.push({ side: d.side, t: GRAB_T, dx, dy });
+      s.ev.push({ k: "grab", side: a.side, x: a.x, y: a.y, tx: d.x, ty: d.y, move });
+    }
     if (d.act?.ph === "wind") d.act = null;     // a hit interrupts a wind-up
     // Sleep breaks on a hit after its first second; a Fire hit thaws.
     if (d.status === SLP && s.t - d.sleptAt > sec(1)) { d.status = -1; s.ev.push({ k: "cured", side: d.side }); }
@@ -1698,7 +1935,7 @@ function cpuInput(s, side) {
    at the stage its level reaches (`stageAt`, as the League's opponents are),
    chosen by the seed so a match's foes replay with it. */
 const POOL = SPECIES.filter((sp) => !isForm(sp.id) && !isEvent(sp.id) && !sp.legendary && !sp.mythical
-  && !neverHits(sp.id)).map((sp) => sp.id);
+  && !neverHits(sp.id) && arenaReady(sp.id)).map((sp) => sp.id);
 export function cpuTeam(seed, level, n = 3) {
   const s = { rs: seed | 0 };
   const lv = clamp(Math.round(level), 5, 100);
@@ -1795,8 +2032,8 @@ export function rulesPrint() {
 
 // What a replay compares: where everyone is and how they are, each tick's end.
 export const stateHash = (s) => hash(JSON.stringify([s.t, s.intro, s.rs, s.winner,
-  s.items.map((it) => [it.kind, it.x, it.y, it.t]), s.weather, s.dark, s.tide, s.erupt, s.lanes.map((l) => [l.y, l.t]), s.helpers.map((h) => [h.kind, h.x, h.y, h.t]), s.strikes.map((z) => [z.x, z.y, z.t]), s.clouds.map((c) => [c.x, c.y, c.t]),
+  s.items.map((it) => [it.kind, it.x, it.y, it.t]), s.weather, s.dark, s.tide, s.erupt, s.lanes.map((l) => [l.y, l.t]), s.helpers.map((h) => [h.kind, h.x, h.y, h.t]), s.domes.map((dm) => [dm.x, dm.y, dm.t]), s.domain && [s.domain.kind, s.domain.t], s.perish, s.throws.map((th) => th.t), s.fires.map((fl) => [fl.x, fl.y, fl.t]), s.strikes.map((z) => [z.x, z.y, z.t]), s.clouds.map((c) => [c.x, c.y, c.t]),
   s.sudden ? 1 : 0,
-  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.cd), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused, f.id, f.xp, f.evo, f.splat])]),
+  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.cd), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused, f.id, f.xp, f.evo, f.splat, f.fortress, f.regen, f.awake]), sd.trapT]),
   s.shots.map((p) => [p.x, p.y]), s.hazards.map((z) => [z.x, z.y, z.t]),
   s.cover.map((c) => c.hp), [s.zone.open, s.zone.t, s.zone.claimed], s.drops.map((r) => [r.x, r.y, r.t])]));

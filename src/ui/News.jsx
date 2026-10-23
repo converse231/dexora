@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-24-ulti-archetypes",
+    icon: "🌋",
+    date: "October 2026",
+    title: "Fourteen kinds of ULTI and a new fighter select",
+    items: [
+      ["Every ULTI is its own", "Storms, cannons, rushes, fortresses, domes, heals, power-ups, field takeovers and snares."],
+      ["Choose your fighters", "The Arena team picker is a fighting game's character select."],
+      ["Grabs and lasting flames", "Vine Whip grabs and throws, Flamethrower leaves fire, Psychic hurls rocks."],
+      ["Only real fighters", "Pokémon without Arena animations no longer enter the Arena."],
+    ],
+  },
+  {
     id: "2026-10-23-arena-evolve",
     icon: "🧬",
     date: "October 2026",
@@ -159,11 +171,11 @@ export const NEWS = [
     title: "Hallowed Night",
     items: [
       ["24 Oct - 7 Nov", "Witch Hat Gastlys, Vampire Zubats and a Pumpkin Mimikyu, in costume where they live."],
-      ["Night hunts", "Costumes come out twice as often after dark."],
+      ["Night hunts", "Costumes come out more often at night (20:00-05:00)."],
       ["Event shop", "A Spooky Honey to lure them and a Hallow Ball to catch them."],
       ["Friday check-ins", "Check in on a Friday during the event for 5 Hallow Balls."],
       ["Catch all seven", "The Hallowed Hunter title and a card pack, on the Events board."],
-      ["The Nightmare", "Every costume is a Bad Dream. At seven, something waits in the Haunted Tower after dark..."],
+      ["The Nightmare", "Catch 20 costumes, then walk in the Haunted Tower at night..."],
     ],
   },
   {
