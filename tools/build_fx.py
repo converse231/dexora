@@ -48,7 +48,7 @@ ULT_FAMOUS = [25, 6, 9, 3, 150, 94, 448, 130, 149, 143, 384, 248, 445, 658, 282,
 # 960 wide (a still fills the screen for a third of a second) in 128 colours.
 for n in ULT_FAMOUS:
     for k in range(1, 5):
-        if (SRC / f"ult-{n}-{k}.png").exists():
+        if any((SRC / f"ult-{n}-{k}.{x}").exists() for x in ("png", "jpg")):
             FRAMES[f"ult-{n}-{k}"] = (1, 960, False, "centre")
 for n in [*ULT_PATTERNS, *ULT_FAMOUS]:
     if (SRC / f"ult-{n}.png").exists():
@@ -69,6 +69,12 @@ MOVES = {
     "volt-tackle": 4, "x-scissor": 4,
     # Asked for 2026-10-23, built once drawn: the court-wide two, and Fly's and Dig's landings.
     "blizzard": 6, "petal-blizzard": 6, "fly": 6, "dig": 6,
+    # Asked for 2026-10-23, the renderer draws its own until these arrive:
+    "fire-blast": 6, "hyper-beam-charge": 6, "solar-beam-charge": 6, "boulder": 4,
+    "stun": 4, "confused": 4, "smoke": 6, "psychic-lift": 6,
+    # Prompted 2026-10-23 (art/arena/fx/MOVE_PROMPTS.md): shots loop, beams are one stream, Stone Edge a blow.
+    "aura-sphere": 4, "focus-blast": 4, "energy-ball": 4, "sludge-bomb": 4, "moonblast": 4, "air-slash": 4,
+    "dragon-pulse": 1, "dark-pulse": 1, "flash-cannon": 1, "stone-edge": 5,
 }
 SEEN = 24                        # alpha that counts as drawn when looking for the gaps
 HARD = 110                       # alpha past which a shrunk pixel is solid, under which it is gone
@@ -122,7 +128,9 @@ def frames_of(a, n, how="even"):
 
 
 def build(name, n, width, hard, anchor):
-    im = Image.open(SRC / f"{name}.png").convert("RGBA")
+    # A sequence still may come as a JPG (a generator's own format): no alpha to keep.
+    src = SRC / f"{name}.png"
+    im = Image.open(src if src.exists() else SRC / f"{name}.jpg").convert("RGBA")
     a = im.getchannel("A")
     box = a.point(lambda v: 255 if v > SEEN else 0).getbbox()
     assert box, f"{name}: the original is empty"

@@ -16,6 +16,19 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-23-ulti-shop",
+    icon: "⚡",
+    date: "October 2026",
+    title: "The ULTI Shop and livelier moves",
+    items: [
+      ["ULTI Shop", "Buy and equip drawn impact frames for your ULTIs - Pikachu's Thunder is free."],
+      ["Faster skills", "Moves wind up and cool down quicker."],
+      ["Moves you can see", "Psychic lifts and throws, rocks are hurled, beams charge up, Fire Blast bursts into its fire kanji."],
+      ["Confusion and Smokescreen", "Confused Pokémon stumble the wrong way; smoke hides whoever stands in it."],
+      ["Double Team, alive", "The copies move on their own now."],
+    ],
+  },
+  {
     id: "2026-10-23-arena-roles",
     icon: "🥊",
     date: "October 2026",

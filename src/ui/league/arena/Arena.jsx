@@ -31,6 +31,8 @@ import { connect } from "./net.js";
 import { LADDER, masterOf, ladderOpen, ladderPay, ARENA_TEAM } from "../../../game/ladder.js";
 import { playerFighter, moveOf, STRUGGLE, refusal, learnable, movesOf } from "../../../game/battle.js";
 import { TUTOR_PRICE } from "../../../game/items.js";
+import { IMPACTS, impactOwned, impactFor } from "../../../game/cosmetics.js";
+import { FX, FX_REV } from "../../../data/fx.js";
 import { pricedAt } from "../../../game/trainer.js";
 import { MOVES } from "../../../data/moves.js";
 import { speciesById } from "../../../game/biomes.js";
@@ -137,7 +139,7 @@ const WEATHER_TIP = { rain: "Water x1.5, Fire x0.5, Fire types slower", sun: "Fi
    open, it takes the modal lock, and a match owns the whole screen through
    `body.fighting` (the bars step aside). Opening it is what the map's
    announcement waits for (ARENA_NEWS_KEY). */
-export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], money = 0, stats = null, onMode, onClose }) {
+export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], money = 0, stats = null, impacts = [], impactsOff = [], onMode, onClose }) {
   useModalLock();
   useEffect(() => {
     engine?.pause(true);
@@ -159,30 +161,32 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   const [editing, setEditing] = useState(false);
   const [howto, setHowto] = useState(false);
   const [tutorFor, setTutorFor] = useState(null);   // a uid
+  const [shop, setShop] = useState(false);
   useEffect(() => { setLive(Boolean(match || online)); }, [match, online]);
   useEffect(() => { loadAnims(); }, []);
   // Escape leaves the page - unless a match, the editor or How to play has it.
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape" && !match && !online && !editing && !howto && tutorFor == null) { e.preventDefault(); onClose(); } };
+    const onKey = (e) => { if (e.key === "Escape" && !match && !online && !editing && !howto && tutorFor == null && !shop) { e.preventDefault(); onClose(); } };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
-  }, [match, online, editing, howto, tutorFor, onClose]);
+  }, [match, online, editing, howto, tutorFor, shop, onClose]);
 
   const level = mons.length ? Math.round(mons.reduce((n, m) => n + m.level, 0) / mons.length) : 5;
   if (match) {
-    return <Match key={match.seed} mons={mons} mode={match.mode} master={match.master} level={level} seed={match.seed} floor={match.floor}
+    return <Match key={match.seed} mons={mons} mode={match.mode} master={match.master} level={level} seed={match.seed} floor={match.floor} impacts={impacts} impactsOff={impactsOff}
       onWin={(cpu) => (match.master ? engine?.arenaMaster(match.master.id) : engine?.arenaWin(cpu, level)) ?? 0}
       onAgain={() => { const seed = (match.seed * 1103515245 + 12345) | 0; setMatch({ ...match, seed, floor: match.master || match.fixed ? match.floor : pickFloor(match.pick, seed) }); }}
       onExit={() => setMatch(null)} />;
   }
-  if (online) return <Online start={online} mons={mons} onExit={() => setOnline(null)} />;
+  if (online) return <Online start={online} mons={mons} impacts={impacts} impactsOff={impactsOff} onExit={() => setOnline(null)} />;
   return (
     <>
       <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0} onMode={onMode} onTutor={setTutorFor}
-        onStart={(m) => { immerse(); setMatch(m); }} onOnline={(o) => { immerse(); setOnline(o); }} onEdit={() => setEditing(true)} onHowto={() => setHowto(true)} />
+        onStart={(m) => { immerse(); setMatch(m); }} onOnline={(o) => { immerse(); setOnline(o); }} onEdit={() => setEditing(true)} onHowto={() => setHowto(true)} onShop={() => setShop(true)} />
       {editing && <TeamEdit box={box} picked={mons} custom={arenaTeam.length > 0}
         onSave={(uids) => { engine?.setArenaTeam(uids); setEditing(false); }} onClose={() => setEditing(false)} />}
       {howto && <HowTo onClose={() => setHowto(false)} />}
+      {shop && <UltShop engine={engine} money={money} impacts={impacts} impactsOff={impactsOff} onClose={() => setShop(false)} />}
       {tutorFor != null && box.some((m) => m.uid === tutorFor) && (
         <MoveTutor engine={engine} mon={box.find((m) => m.uid === tutorFor)} money={money} stats={stats} onClose={() => setTutorFor(null)} />
       )}
@@ -196,7 +200,7 @@ const pickFloor = (floor, seed) => (floor === "random" ? ARENAS[Math.abs(seed) %
    the floors under them, and one big Battle along the foot. Each mode is a
    tile; the chosen one opens its own panel (the Ladder's ten masters, a
    CPU's difficulty, your friends). */
-function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, onOnline, onEdit, onHowto }) {
+function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, onOnline, onEdit, onHowto, onShop }) {
   const [mode, setMode0] = useState(() => { const m = pref(MODE_KEY, "ladder"); return MODE_NAME[m] && (m !== "friends" || CLOUD) ? m : "ladder"; });
   const [cpu, setCpu0] = useState(() => pref(LEVEL_KEY, "normal"));
   const [floor, setFloor0] = useState(() => pref(FLOOR_KEY, "random"));
@@ -248,6 +252,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
             <span className="ag-stat"><b>{ladder.length}<u>/{LADDER.length}</u></b><i>Ladder</i></span>
             <span className="ag-stat"><b className={best.grade ? `g-${best.grade}` : ""}>{best.grade ?? "-"}</b><i>Best grade</i></span>
             <span className="ag-stat"><b>{best.streak}</b><i>Win streak</i></span>
+            <button type="button" className="ag-help ag-shopkey" onClick={onShop}><Icon n="shop" size={18} /><span>ULTI Shop</span></button>
             <button type="button" className="ag-help" onClick={onHowto}><Icon n="help" size={18} /><span>How to play</span></button>
           </div>
         </header>
@@ -557,6 +562,81 @@ function MoveTutor({ engine, mon, money, stats, onClose }) {
   );
 }
 
+/* THE ULTI SHOP (asked for, 2026-10-23): drawn ULTI impact sequences, a
+   look for your own Pokemon's ULTI (cosmetics.js IMPACTS) - each previewed as
+   it plays (its stills cut at the match's own pace, the name low and
+   centred), bought once, switched on and off. Only those whose art has
+   shipped are on the shelf. */
+const stillUrl = (key) => asset(`arena/fx/${key}.png?v=${FX_REV}`);
+const stillsFor = (species) => [1, 2, 3, 4].map((k) => `ult-${species}-${k}`).filter((k) => FX[k]);
+function UltShop({ engine, money, impacts, impactsOff, onClose }) {
+  useModalLock();
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const key = (e) => { if (e.key === "Escape") { e.stopPropagation(); close.current(); } };
+    addEventListener("keydown", key, true);
+    return () => removeEventListener("keydown", key, true);
+  }, []);
+  const shelf = IMPACTS.filter((x) => stillsFor(x.species).length);
+  const [sel, setSel] = useState(shelf[0]?.id ?? null);
+  const it = shelf.find((x) => x.id === sel) ?? null;
+  const stills = it ? stillsFor(it.species) : [];
+  // The preview: the stills cut every third of a second, as in a match, then a beat of the last.
+  const [beat, setBeat] = useState(0);
+  useEffect(() => { setBeat(0); const t = setInterval(() => setBeat((b) => b + 1), 333); return () => clearInterval(t); }, [sel]);
+  const frame = Math.min(stills.length - 1, beat % (stills.length + 2));
+  const owned = it && impactOwned(it.id, impacts), on = owned && !impactsOff.includes(it.id);
+  return createPortal(
+    <div className="sheet" {...useDismiss(onClose)}>
+      <div className="ag-editor ag-ultshop" role="dialog" aria-modal="true" aria-label="ULTI Shop" onClick={(e) => e.stopPropagation()}>
+        <header>
+          <div>
+            <h3>ULTI Shop</h3>
+            <span>Drawn impact frames for your Pokémon's ULTI. A look, never a strength. You have ¥{money.toLocaleString()}.</span>
+          </div>
+          <button type="button" className="ar-x" aria-label="Close" onClick={onClose}>✕</button>
+        </header>
+        <div className="ag-editor-body">
+          {it && (
+            <section className="us-stage" aria-label={`${it.name} preview`}>
+              {stills.map((k, n) => <img key={k} src={stillUrl(k)} alt="" className={n === frame ? "on" : ""} />)}
+              {frame >= Math.min(1, stills.length - 1) && <b className="us-name">{it.name}</b>}
+              <span className="us-tag">{nameOf(it.species)} · {it.style}</span>
+            </section>
+          )}
+          <ul className="us-shelf">
+            {shelf.map((x) => {
+              const mine = impactOwned(x.id, impacts), lit = mine && !impactsOff.includes(x.id);
+              return (
+                <li key={x.id}>
+                  <button type="button" aria-pressed={x.id === sel} onClick={() => setSel(x.id)}>
+                    <img src={stillUrl(stillsFor(x.species).at(-1))} alt="" loading="lazy" />
+                    <b>{nameOf(x.species)}</b>
+                    <i>{x.name}</i>
+                    <u className={lit ? "on" : mine ? "own" : ""}>{lit ? "Equipped" : mine ? "Owned" : x.price ? `¥${x.price.toLocaleString()}` : "Free"}</u>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        <footer>
+          {it && !owned && (
+            <button type="button" className="lg-go" disabled={money < it.price} onClick={() => engine?.buyImpact(it.id)}>
+              {money < it.price ? `Need ¥${it.price.toLocaleString()}` : `Buy · ¥${it.price.toLocaleString()}`}
+            </button>
+          )}
+          {it && owned && (
+            <button type="button" className={`lg-go${on ? " quiet" : ""}`} onClick={() => engine?.equipImpact(it.id, !on)}>{on ? "Unequip" : "Equip"}</button>
+          )}
+        </footer>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 const POLL_MS = 4000;
 function FriendBattles({ mons, floor, onStart }) {
   const [friends, setFriends] = useState(null);
@@ -645,7 +725,7 @@ const SAYS = {
   expired: () => "The challenge expired.",
   left: (n) => `${n} left.`,
 };
-function Online({ start, mons, onExit: done }) {
+function Online({ start, mons, impacts = [], impactsOff = [], onExit: done }) {
   const host = start.role === "host", foe = start.friend.username;
   /* Leaving takes a challenge back - here, never in an effect's cleanup,
      which a development build runs once at mount (StrictMode) and which
@@ -752,7 +832,7 @@ function Online({ start, mons, onExit: done }) {
   if (online) {
     let seed = start.invite.seed;
     for (let k = 0; k < round; k++) seed = nextSeed(seed);
-    return <Match key={round} mons={mons} mode="online" level={FAIR_LEVEL} seed={seed} floor={start.invite.arena} online={online}
+    return <Match key={round} mons={mons} mode="online" level={FAIR_LEVEL} seed={seed} floor={start.invite.arena} online={online} impacts={impacts} impactsOff={impactsOff}
       rematch={{ asked: again.me, offered: again.them, gone: why === "left" }}
       onWin={() => 0} onAgain={() => { box.current.link.send({ t: "again" }); setAgain((a) => ({ ...a, me: true })); }} onExit={onExit} />;
   }
@@ -916,7 +996,7 @@ function Credits({ onClose }) {
 const LEVEL_NAME = { dummy: "Training", easy: "Easy", normal: "Normal", hard: "Hard" };
 
 /* A MATCH: the loop, the input, the HUD. */
-function Match({ mons, mode, master, level, seed, floor, online = null, rematch = null, onWin, onAgain, onExit }) {
+function Match({ mons, mode, master, level, seed, floor, online = null, rematch = null, impacts = [], impactsOff = [], onWin, onAgain, onExit }) {
   const me = online?.me ?? 0;
   const [net, setNet] = useState(null);         // an online match cut short: "left", "lost", "desync"
   useEffect(() => { if (rematch?.gone) setNet("left"); }, [rematch?.gone]);
@@ -983,7 +1063,9 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   useEffect(() => {
     const cv = canvas.current;
     const r = createRenderer(cv, looks, floor, { names, me, moves: s.sides.flatMap((sd) => sd.team.flatMap((f) => f.kit.map((m) => m.i))),
-      ults: s.sides.flatMap((sd) => sd.team.map((f) => ({ id: f.id, type: ultOf(f).type }))) });
+      // Your equipped ULTI impact frames play for your side's Pokemon alone.
+      ults: s.sides.flatMap((sd, side) => sd.team.map((f) => ({ id: f.id, type: ultOf(f).type, side,
+        seq: side === me && impactFor(f.id, impacts, impactsOff) != null }))) });
     // Online: the match steps only with both inputs for a tick (arena.js's lockstep).
     const ls = online ? lockstep(online.link, me, online.round) : null;
     if (ls) online.attach(ls);

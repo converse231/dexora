@@ -89,6 +89,26 @@ export const SKINS = [
     ["wallace", "Wallace"]]),
 ];
 
+/* ULTI IMPACT FRAMES (2026-10-23, asked for): a famous Pokemon's drawn ULTI
+   sequence, bought once and switched on or off in the Arena's ULTI Shop - a
+   look, never a strength (it plays only for YOUR Pokemon's ULTI). An id is
+   the art's own (`ult-<dex id>`, its stills `ult-<dex id>-<n>` in fx.js) and
+   is saved: never rename one. A price of 0 is owned by everyone. Later
+   styles of the same Pokemon take a new id. */
+export const IMPACTS = [
+  { id: "ult-25", species: 25, name: "Thunder", style: "Sketch · Inversion · Strike", price: 0 },
+  { id: "ult-6", species: 6, name: "Blast Burn", style: "Sketch · Inversion · Strike", price: 60000 },
+  { id: "ult-9", species: 9, name: "Hydro Cannon", style: "Sketch · Inversion · Strike", price: 60000 },
+  { id: "ult-3", species: 3, name: "Frenzy Plant", style: "Sketch · Inversion · Strike", price: 60000 },
+];
+export const impactById = (id) => IMPACTS.find((x) => x.id === id) ?? null;
+export const impactOwned = (id, bought) => impactById(id)?.price === 0 || bought.includes(id);
+// The impact frame a species plays: owned, not switched off.
+export const impactFor = (species, bought, off) => {
+  const it = IMPACTS.find((x) => x.species === species);
+  return it && impactOwned(it.id, bought) && !off.includes(it.id) ? it.id : null;
+};
+
 const BY_ID = new Map(SKINS.map((s) => [s.id, s]));
 const PRICE = new Map(SKIN_TIERS.map(([t, , price]) => [t, price]));
 

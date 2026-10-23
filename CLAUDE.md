@@ -1208,9 +1208,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `beamStyle`) under the move's sprite, a bolt from above for Thunder moves,
   and bodies and cover sorted by depth (a pillar drew over a Pokemon in
   front of it).
-  **The big update** (2026-10-23, asked for). Wind-ups are `WIND_K` (0.7) of
-  what they were, and with the ULTIs `DAMAGE` went 0.4 -> 0.3 to hold a 3v3
-  at ~76 s. **Weather**, one a match from the seed, the SAME odds on every
+  **The big update** (2026-10-23, asked for). Wind-ups are `WIND_K` (0.5
+  since the second ask, "still long") of what they were, cooldowns `0.6 +
+  p/45` s, and with the ULTIs `DAMAGE` went 0.4 -> 0.23 to hold a 3v3 at
+  ~77 s. **Weather**, one a match from the seed, the SAME odds on every
   floor (a floor leaning to its own would hand a type its home): rain
   (Water 1.5x, Fire 0.5x, Fire types slower, all soaked), sun (the reverse),
   sand and snow (chip all but their types). **Type combos**: Water on a burn
@@ -1256,7 +1257,24 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   them inside 30-70%. **The Arena's Move Tutor** is the League's own
   (`engine.tutor`, `TUTOR_PRICE`: the Arena's cash sink) shown the Arena's
   way - each move by its reach, those suiting the role first; online still
-  plays the Fair format. **HP over every head** (and over Double Team's
+  plays the Fair format.
+  **Status you can see** (same day, asked for): **confusion** (`CONFUSES`,
+  the games' own chances, which the League's data drops) walks a Pokemon
+  backwards and slower for `CONFUSE_T`; **Smokescreen** leaves a cloud that
+  hides its user as steam does; a **thrown rock** (`THROWN`) is a shot; and
+  Double Team's copies WANDER round their user (`CLONE_WANDER`, never nearer
+  than `CLONE_NEAR`) - check.mjs holds all four. The renderer lifts and
+  throws a Psychic's target, raises a boulder for Rock Throw, charges Hyper
+  and Solar Beam as an orb, writes Fire Blast's 大, and draws flinch stars
+  and the confusion swirl - each from its drawn sheet (`moves/<slug>`,
+  `-charge`, `stun`, `confused`, `smoke`, `psychic-lift`, `boulder`) once
+  one exists. **ULTI impact frames are a shop** (`IMPACTS` in cosmetics.js,
+  the lobby's ULTI Shop: preview, buy, equip; the save's `impacts` and
+  `impactsOff`, kept even when unknown): a look, never a strength, played
+  only for YOUR Pokemon's ULTI. A price of 0 (Pikachu) is everyone's; an
+  id is the art's (`ult-<dex>`, stills `ult-<dex>-<n>`) and never renamed -
+  another style of the same Pokemon is a new id.
+  **HP over every head** (and over Double Team's
   copies, or the bar gave the trick away), bigger desktop plates, a plate
   pulsing red under a quarter. **The result comes up from the bottom** and
   VICTORY sits at the top of the canvas (`stampAt`'s `at`), the winner

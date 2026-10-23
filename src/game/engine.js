@@ -24,7 +24,7 @@ import {
   TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame, drawGrass,
   drawFollower,
 } from "./tileset.js";
-import { followSheet, skinById, skinPrice, PARTY_MAX, partnerRule, isMastered, MASTERED_BOND } from "./cosmetics.js";
+import { followSheet, skinById, skinPrice, PARTY_MAX, partnerRule, isMastered, MASTERED_BOND, impactById, impactOwned } from "./cosmetics.js";
 import { fieldOf, rollFind, heartsOf, FRIEND_FINDS, HEARTS } from "./abilities.js";
 import { CHECKIN_REWARDS, checkinStatus, rollRoulette, isMilestone, streakPacks, lotSets, LOT, ROULETTE_LEVEL } from "./checkin.js";
 import { isRoad, roadOpen, roadTrainer, ARENA_LEVELS, arenaPay } from "./road.js";
@@ -229,6 +229,8 @@ function freshState() {
     buddy: null,          // the one of them walking behind you now - see `setBuddy`
     skin: null,           // the trainer skin worn, null for your own - see cosmetics.js
     skins: [],            // the skins bought - see `buySkin`
+    impacts: [],          // ULTI impact frames bought - see `buyImpact`
+    impactsOff: [],       // impact frames owned but switched off
     /* CARDS (docs/cards.md): copies by card id (`me01-004`, never a
        position) as `{ n, h, r, earned }`; unopened packs and which of them
        were earned, by set; and each set's pity counters. */
@@ -683,6 +685,9 @@ function loadState() {
       /* A skin id this build does not know is KEPT, bought in a newer one:
          a purchase is never lost. It draws as your own trainer here. */
       skins: [...new Set(Array.isArray(s.skins) ? s.skins : [])].filter((id) => typeof id === "string" && /^\w{1,32}$/.test(id)),
+      // Kept even when this build does not know one (a purchase is never lost), as skins are.
+      impacts: [...new Set(Array.isArray(s.impacts) ? s.impacts : [])].filter((id) => typeof id === "string" && /^[\w-]{1,32}$/.test(id)),
+      impactsOff: [...new Set(Array.isArray(s.impactsOff) ? s.impactsOff : [])].filter((id) => typeof id === "string" && /^[\w-]{1,32}$/.test(id)),
       skin: typeof s.skin === "string" ? s.skin : null,
       /* CARDS, row by row: a bad row is dropped, never the collection. An id
          from a set this build does not ship is KEPT (a newer build's), shown
@@ -3209,6 +3214,24 @@ export function createEngine(canvas, onChange, mini = null) {
     changed();
     return true;
   }
+  /* An ULTI impact frame (cosmetics.js IMPACTS): bought once, then on. */
+  function buyImpact(id) {
+    const it = impactById(id);
+    if (!it || impactOwned(id, state.impacts) || state.money < it.price) return false;
+    state.money -= it.price;
+    state.impacts = [...state.impacts, id];
+    state.impactsOff = state.impactsOff.filter((x) => x !== id);
+    save();
+    changed();
+    return true;
+  }
+  function equipImpact(id, on) {
+    if (!impactOwned(id, state.impacts)) return false;
+    state.impactsOff = on ? state.impactsOff.filter((x) => x !== id) : [...new Set([...state.impactsOff, id])];
+    save();
+    changed();
+    return true;
+  }
   function wearSkin(id) {
     if (id !== null && !state.skins.includes(id)) return false;
     state.skin = id;
@@ -4350,6 +4373,8 @@ export function createEngine(canvas, onChange, mini = null) {
     answerQuiz,
     buySkin,
     wearSkin,
+    buyImpact,
+    equipImpact,
     setBuddy,
     cycleBuddy,
     setParty,
