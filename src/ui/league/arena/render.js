@@ -49,7 +49,10 @@
    picture's too: rain, sun, sand and snow in the air and the light, and in
    the dark only what glows - and what stands near you - is seen. */
 import { W, H, TPS, INSET, INTRO, LIMIT, FINAL_T, moveAt, activeOf, PAR, BRN, PSN, SLP, FRZ, GROUND, ZONE_SAYS, PICKUPS,
-  arenaMove as moveOf, BASIC_P, BASIC_S, BASIC_K, clonesOf, ULT_NAMES, WIDE, VANISH } from "../../../game/arena.js";
+  arenaMove as moveOf, BASIC_P, BASIC_S, BASIC_K, clonesOf, ULT_NAMES, WIDE, VANISH, evoTargets, megaTargets, EVOLVE_T,
+  FLOOR_SAYS, waterOf, herdAt, LANE_RUN, LANE_WARN, LANE_H, HELPERS } from "../../../game/arena.js";
+import { speciesById } from "../../../game/biomes.js";
+import { label } from "../../../game/map.js";
 import { arenaArt, loadAnims } from "../moveAnim.js";
 import { followSheet } from "../../../game/cosmetics.js";
 import { MOVES } from "../../../data/moves.js";
@@ -170,6 +173,11 @@ const BOULDERS = new Set(["rock-throw", "rock-tomb", "rock-wrecker", "rock-blast
    big changes a second, never a strobe - and the last fades back to the
    fight. A Pokemon without them keeps its one panel. */
 const SEQ_HOLD = 20, SEQ_FADE = 14, LIFT_T = 40;
+// A Mega's colours, the floors' event colours, and the Grove's herd (Tauros).
+const RAINBOW = ["#ff5a8a", "#ffb02e", "#ffe14a", "#5fe08a", "#45d4ff", "#b06bff"];
+const FLOOR_COLOUR = { roar: "#ffd23f", moonstone: "#d8c8ff", tide: "#5ac8ff", eruption: "#ff6a2a", stampede: "#ffb35a", whiteout: "#e8f4ff" };
+const HERD = 128;
+const nameOf = (id) => label(speciesById(id));
 const stillsOf = (id) => [1, 2, 3, 4].map((k) => `ult-${id}-${k}`).filter((k) => FX[k]);
 const inArea = (rects, x, y) => (rects ?? []).some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d);
 const flats = new WeakMap();
@@ -637,11 +645,15 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   // The sheets this match can draw, fetched before the first frame needs them.
   loadAnims();
   img(coverPath);
-  for (const team of sides) for (const m of team) {
-    const id = followSheet(m.id);
+  // Every stage a fighter can become this match (evolving, Mega Evolving), so the reveal never waits on a fetch.
+  const stagesOf = (id, seen = new Set()) => (seen.has(id) ? [] : (seen.add(id), [id, ...megaTargets(id), ...evoTargets(id).flatMap((to) => stagesOf(to, seen))]));
+  for (const team of sides) for (const m of team) for (const at of stagesOf(m.id)) {
+    const id = followSheet(at);
     if (id != null) img(`follow/${id}.png`);
-    atlasOf(m.id, m.shiny);
+    atlasOf(at, m.shiny);
   }
+  if (arena === "grove") atlasOf(HERD, false);
+  for (const h of Object.values(HELPERS)) atlasOf(h.id, false);
   // The shared sheets, and only the moves this match's two teams know (the moves' art is a megabyte in all).
   for (const name of Object.keys(FX)) if (!name.startsWith("moves/") && !name.startsWith("ult-")) img(fxPath(name));
   for (const i of moves) { const key = artKey(i); if (key) img(fxPath(key)); }
@@ -716,12 +728,12 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     else if (f.status === FRZ) { anim = "Hurt"; hold = true; }
     else if (p.hurt > 0) anim = "Hurt";
     else if (a) anim = SHAPE_ANIM[a.shape] ?? "Attack";
-    else if (f.dodge > 0) anim = "Hop";
+    else if (f.dodge > 0) anim = "Walk";      // the dash: a sprint, never a hop
     else if (f.moving) anim = "Walk";
     const key = a && !won ? `${anim}:${a.id}:${a.ph === "wind" ? "w" : "go"}` : anim;
     if (key !== p.key) { p.key = key; p.at = 0; p.d0 = f.dodge; }
     else if (!hold) p.at += k;
-    const prog = a?.ph === "wind" ? 1 - a.t / Math.max(1, a.t0) : anim === "Hop" && f.dodge > 0 ? 1 - f.dodge / Math.max(1, p.d0) : null;
+    const prog = a?.ph === "wind" ? 1 - a.t / Math.max(1, a.t0) : f.dodge > 0 ? 1 - f.dodge / Math.max(1, p.d0) : null;
     const still = f.status === SLP || f.status === FRZ;
     p.fr = { anim, at: p.at, prog, go: Boolean(a) && a.ph !== "wind" && !won, row: rowOf(a ? a.dx : f.fx, a ? a.dy : f.fy),
       frame: still ? frameOf({ ...f, moving: false }, 0) : frameOf(f, t) };
@@ -1186,6 +1198,69 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         sheet("shockwave", e.x, e.y + 0.35, 3.2, colour, 24);
         for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y, colour, life: 22, size: 0.3, grow: 0.12, t: -i * 3 });
         shake(0.2);
+      } else if (e.k === "evolve") {
+        // The start of an evolution: the camera in, the call, rings closing on it.
+        poseOf(e.side, e.slot).evoMega = e.mega;
+        word(e.x, e.y - 2.1, e.mega ? `${nameOf(e.from)} is Mega Evolving!` : `What? ${nameOf(e.from)} is evolving!`, e.mega ? "#ffd23f" : "#ffffff", 90, true);
+        zoomAt(e.x, e.y, 0.2); crowd(14); shake(0.25);
+        for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y - 0.3, colour: e.mega ? RAINBOW[i * 2] : "#ffffff", life: 34, size: 2.6, grow: -0.07, t: -i * 7, keep: true });
+      } else if (e.k === "evolved") {
+        // The reveal: white out, a shockwave, sparks everywhere, its new name stamped.
+        overlays.push({ k: "tint", colour: "#ffffff", t: 0, life: 24 });
+        if (e.mega) impactFrame(canvas.width / 2, canvas.height / 2);
+        sheet("shockwave", e.x, e.y + 0.3, 5.2, e.mega ? "#ff8af0" : "#bfefff", 34);
+        sparks(e.x, e.y - 0.4, "#ffffff", 30, 0.14);
+        for (let i = 0; i < (e.mega ? 6 : 3); i++) part({ k: "ring", x: e.x, y: e.y - 0.3, colour: e.mega ? RAINBOW[i] : i ? "#7dffa8" : "#ffffff", life: 30, size: 0.3, grow: 0.16 - i * 0.015, t: -i * 3, keep: true });
+        stop(120); shake(0.9); crowd(18);
+        stamp(e.mega ? "MEGA EVOLUTION" : "EVOLVED!", e.mega ? "#ff8af0" : "#7dffa8", 90, `${nameOf(e.from)} became ${nameOf(e.to)}!`);
+        if (e.mega) fx.push({ k: "megasym", x: e.x, y: e.y - 2.4, t: 0, life: 80 });
+      } else if (e.k === "floor") {
+        // A floor's own event (arena.js FLOOR_EVENT): announced, and each its own entrance.
+        const [title, sub] = FLOOR_SAYS[e.kind];
+        stamp(title, FLOOR_COLOUR[e.kind] ?? "#ffd23f", 90, sub);
+        crowd(e.kind === "roar" ? 30 : 10);
+        if (e.kind === "roar") {
+          for (let i = 0; i < 48; i++) part({ k: "glow", x: INSET + rand() * (W - 2 * INSET), y: INSET + rand() * 1.5, vx: (rand() - 0.5) * 0.03, vy: 0.04 + rand() * 0.03, colour: RAINBOW[i % RAINBOW.length], life: 80, size: 0.1, drag: 1 });
+          shake(0.4);
+        } else if (e.kind === "moonstone") {
+          sheet("shockwave", W / 2, H / 2 + 0.3, 4.4, "#d8c8ff", 30); sparks(W / 2, H / 2, "#f0e8ff", 22, 0.1); shake(0.35);
+        } else if (e.kind === "eruption") {
+          overlays.push({ k: "tint", colour: "#ff5a2a", t: 0, life: 34 }); shake(1);
+        } else if (e.kind === "whiteout") darkAt = s.t;
+        else if (e.kind === "tide") shake(0.2);
+      } else if (e.k === "lava") {
+        impact("fire", e.x, e.y, 0, 0, true);
+        mark("scorch", e.x, e.y + 0.2, 1.8);
+        sheet("shockwave", e.x, e.y + 0.2, 3, "#ff8a3d", 24);
+        shake(0.4);
+      } else if (e.k === "trample") {
+        impact("normal", e.x, e.y, 0, 0, true);
+        word(e.x, e.y - 1.3, "Trampled!", "#ffb35a", 50, true);
+        shake(0.7);
+      } else if (e.k === "helper") {
+        // A Poke Ball's helper bursts out: the ball's flash and its name called.
+        word(e.x, e.y - 1.8, `Go, ${nameOf(HELPERS[e.kind].id)}!`, "#ffffff", 60, true);
+        for (let i = 0; i < 2; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? "#ff5a5a" : "#ffffff", life: 18, size: 0.2, grow: 0.12, t: -i * 3 });
+        sparks(e.x, e.y, "#ffffff", 14, 0.09); shake(0.2);
+      } else if (e.k === "helperHit") {
+        if (e.kind === "electrode") {
+          overlays.push({ k: "tint", colour: "#ffffff", t: 0, life: 14 });
+          sheet("impact", e.x, e.y - 0.2, 4.4, "#ffd23f", 26); sheet("shockwave", e.x, e.y + 0.3, 5, "#ff8a3d", 30);
+          impact("electric", e.x, e.y, 0, 0, true); mark("scorch", e.x, e.y + 0.2, 2.6);
+          word(e.x, e.y - 1.6, "Explosion!", "#ffd23f", 55, true); shake(1.1); stop(90);
+        } else if (e.kind === "snorlax") {
+          impact("normal", e.x, e.y, 0, 0, true); dust(e.x, e.y, 14); mark("crack", e.x, e.y + 0.2, 2.6);
+          sheet("shockwave", e.x, e.y + 0.3, 4.6, "#ffffff", 30);
+          word(e.x, e.y - 1.6, "Body Slam!", "#ffffff", 55, true); shake(1.2); stop(110);
+        } else if (e.kind === "chansey") {
+          for (let i = 0; i < 16; i++) { const [vx, vy] = around(0.05); part({ k: "glow", x: e.x, y: e.y - 0.4, vx, vy, colour: i % 2 ? "#ffb7d5" : "#7dffa8", life: 30, size: 0.14 }); }
+          word(e.x, e.y - 1.6, "Soft-Boiled!", "#7dffa8", 55, true);
+        } else {
+          for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y, colour: "#ff9ad5", life: 30, size: 0.4, grow: 0.14, t: -i * 6 });
+          word(e.x, e.y - 1.6, "Sing!", "#ff9ad5", 55, true);
+        }
+      } else if (e.k === "ebb") {
+        word(W / 2, H / 2 - 2, "The tide goes out", "#bfefff", 50, true);
       } else if (e.k === "rumble") {
         shake(0.35);
       } else if (e.k === "rock") {
@@ -1219,7 +1294,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         stop(160); shake(1); zoomAt(e.x, e.y, 0.14); tilt(e.side === me ? -0.03 : 0.03); crowd(10);
         if (last) slow(KO_SLOW, 0.3); else { slow(520, 0.35); word(e.x, e.y - 1.6, "KNOCKED OUT", "#ffffff", 60, true); }
       } else if (e.k === "dodge" && body) {
-        dust(body.x, body.y, 4);
+        // The dash's kick-off: dust thrown back and a ring where it pushed off.
+        dust(body.x, body.y, 7);
+        part({ k: "ring", x: body.x, y: body.y + 0.35, colour: "#ffffff", life: 12, size: 0.25, grow: 0.09 });
         if (ground.water && body.wading) part({ k: "ring", x: body.x, y: body.y + 0.35, colour: "#bff3ff", life: 18, size: 0.3, grow: 0.06 });
       } else if (e.k === "go") {
         stamp("FIGHT!", "#ffd23f", s.weather !== "clear" ? 80 : 46, WEATHER_SAYS[s.weather] ?? null);
@@ -1401,16 +1478,43 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       }
       ctx.restore();
     });
-    // Falling rock (Mt. Moon): a shadow that grows, then the rock.
+    // Falling rock (Mt. Moon) or a lava bomb (the Caldera's eruption): a shadow that grows, then it.
     for (const r of s.drops) {
-      const kk = 1 - r.t / Math.round(1.2 * TPS);
-      ctx.save(); ctx.globalAlpha = 0.25 + 0.45 * kk; ctx.fillStyle = "#1a1410";
+      const kk = 1 - r.t / Math.round((r.lava ? 1 : 1.2) * TPS);
+      ctx.save(); ctx.globalAlpha = 0.25 + 0.45 * kk; ctx.fillStyle = r.lava ? "#3a0e04" : "#1a1410";
       ctx.beginPath(); ctx.ellipse(sx(r.x), sy(r.y), px * (0.4 + 0.75 * kk), px * (0.25 + 0.45 * kk), 0, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 0.8; ctx.strokeStyle = "#ffb37a"; ctx.lineWidth = Math.max(2, px / 10);
-      ctx.beginPath(); ctx.arc(sx(r.x), sy(r.y), px * 1.45, 0, TAU * kk); ctx.stroke();
+      ctx.globalAlpha = 0.8; ctx.strokeStyle = r.lava ? "#ff5a2a" : "#ffb37a"; ctx.lineWidth = Math.max(2, px / 10);
+      ctx.beginPath(); ctx.arc(sx(r.x), sy(r.y), px * (r.lava ? 1.6 : 1.45), 0, TAU * kk); ctx.stroke();
       if (kk > 0.7) {
         const fall = (1 - kk) / 0.3;
-        ctx.fillStyle = "#8a7a68"; ctx.beginPath(); ctx.arc(sx(r.x), sy(r.y) - fall * px * 4, px * 0.45, 0, TAU); ctx.fill();
+        if (r.lava) glow(sx(r.x), sy(r.y) - fall * px * 4, px * 0.9, "#ff8a2a", 0.8);
+        ctx.fillStyle = r.lava ? "#ffcf5a" : "#8a7a68"; ctx.beginPath(); ctx.arc(sx(r.x), sy(r.y) - fall * px * 4, px * 0.45, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+    }
+    // HIGH TIDE (the Boardwalk): the water it rose over, washing in.
+    if (s.tide > 0) {
+      const a = Math.min(1, s.tide / 30) * (0.26 + 0.06 * Math.sin(clock / 300));
+      for (const [x0, y0, x1, y1] of waterOf(s)) {
+        ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = "#3c9cf0"; ctx.fillRect(sx(x0), sy(y0), (x1 - x0) * px, (y1 - y0) * px);
+        ctx.globalAlpha = a * 2; ctx.strokeStyle = "#dff6ff"; ctx.lineWidth = Math.max(1.5, px / 12);
+        const edge = y0 <= 0 ? y1 : y0;
+        ctx.beginPath();
+        for (let x = x0; x <= x1; x += 0.25) ctx.lineTo(sx(x), sy(edge + Math.sin(x * 2 + clock / 260) * 0.08));
+        ctx.stroke(); ctx.restore();
+      }
+    }
+    // A STAMPEDE's lane while it is shown: a red band and chevrons the way the herd will come.
+    for (const l of s.lanes) {
+      if (l.t <= LANE_RUN) continue;
+      const kk = 1 - (l.t - LANE_RUN) / LANE_WARN;
+      ctx.save(); ctx.globalAlpha = 0.14 + 0.16 * kk + 0.08 * Math.sin(clock / 70);
+      ctx.fillStyle = "#ff5a3d"; ctx.fillRect(sx(INSET), sy(l.y - LANE_H / 2), (W - 2 * INSET) * px, LANE_H * px);
+      ctx.globalAlpha = 0.6; ctx.strokeStyle = "#ffd2b0"; ctx.lineWidth = Math.max(2, px / 9);
+      const shift = (clock / 140) % 2;
+      for (let x = INSET + shift; x < W - INSET; x += 2) {
+        const cx = l.dir > 0 ? x : W - x, d = l.dir * 0.3;
+        ctx.beginPath(); ctx.moveTo(sx(cx - d), sy(l.y - 0.45)); ctx.lineTo(sx(cx + d), sy(l.y)); ctx.lineTo(sx(cx - d), sy(l.y + 0.45)); ctx.stroke();
       }
       ctx.restore();
     }
@@ -1545,6 +1649,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         const tint = lunging ? colourOf(moveAt(f, f.act.k).i) : f.surge > 0 ? colours[TYPES[f.types[0]]] : f.haste > 0 ? "#45d4ff" : f.dodge > 0 ? "#9fe9ff" : null;
         ghosts.push({ x, y, f: poseOf(f.side, f.slot).fr ?? { frame: frameOf(f, t) }, id: f.id, side: f.side, slot: f.slot, life: lunging ? 10 : 14, t: 0, tint });
       }
+      if (f.dodge > 0 && rand() < k * 1.5) part({ k: "streak", x: x + (rand() - 0.5) * 0.6, y: y - 0.3 + (rand() - 0.5) * 0.6, vx: -f.dx * 0.14, vy: -f.dy * 0.14, colour: "#bff3ff", life: 8, size: 0.6, drag: 0.88 });
       if (lunging && rand() < k) { const [vx, vy] = [-f.act.dx * 0.12, -f.act.dy * 0.12]; part({ k: "streak", x: x + (rand() - 0.5) * 0.6, y: y - 0.3 + (rand() - 0.5) * 0.6, vx, vy, colour: "#ffffff", life: 9, size: 0.7, drag: 0.9 }); }
     }
     if (ghostAcc >= 2) ghostAcc = 0;
@@ -1619,7 +1724,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.beginPath(); ctx.ellipse(sx(cx), sy(cy + 0.42), px * 0.6, px * 0.22, 0, 0, TAU); ctx.fill(); ctx.restore();
         sprite(f.id, f.side, f.slot, cx, cy, fr, (f.side === me ? 0.5 : 1) * hid, null, { ...at, x: cx, y: cy, sx: 1, sy: 1, tilt: 0 });
       }
-      sprite(f.id, f.side, f.slot, at.x, at.y, fr, (blink ? 0.45 : 1) * hid, f.flash > 0 ? "#ffffff" : null, at);
+      if (f.megaOn && !still && rand() < 0.3 * k) part({ k: "glow", x: at.x + (rand() - 0.5) * 0.9, y: at.y + 0.1, vx: 0, vy: -0.025, colour: RAINBOW[Math.floor(rand() * RAINBOW.length)], life: 22, size: 0.1, drag: 0.98 });
+      if (f.evo > 0) evolving(f, p, at, fr);
+      else sprite(f.id, f.side, f.slot, at.x, at.y, fr, (blink ? 0.45 : 1) * hid, f.flash > 0 ? "#ffffff" : null, at);
       if (p.tintT > 0 && p.tint && f.flash <= 0) sprite(f.id, f.side, f.slot, at.x, at.y, fr, 0.55 * (p.tintT / 12) * hid, p.tint, at);
       if (f.hidden) {
         ctx.save(); ctx.fillStyle = "rgba(40,110,45,0.85)";
@@ -1682,7 +1789,42 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.beginPath(); ctx.arc(sx(qx), sy(qy), px * (0.85 + 0.15 * Math.sin(clock / 300 + i)), 0, TAU); ctx.fill(); ctx.restore();
       }
     }
-    // 2d. The lights out: everything under it dark but what glows and what stands near you.
+    // 2c. A POKE BALL'S HELPERS, each drawing its own warning: Electrode flashing faster and faster,
+    // Snorlax's shadow growing under it as it falls, Jigglypuff's song reaching out, Chansey's hearts.
+    for (const h of s.helpers) {
+      const H0 = HELPERS[h.kind], kk = 1 - h.t / H0.t, fr = { anim: "Idle", at: clock / 16, row: 0, frame: Math.floor(clock / 200) % 2 };
+      if (H0.r) {
+        ctx.save(); ctx.globalAlpha = 0.25 + 0.5 * kk; ctx.strokeStyle = h.kind === "jigglypuff" ? "#ff9ad5" : "#ff5a3d"; ctx.lineWidth = Math.max(2, px / 9);
+        ctx.setLineDash([px * 0.35, px * 0.2]); ctx.beginPath(); ctx.ellipse(sx(h.x), sy(h.y + 0.35), px * H0.r, px * H0.r * 0.55, 0, 0, TAU * Math.max(0.05, kk)); ctx.stroke();
+        ctx.restore();
+      }
+      if (h.kind === "snorlax") {
+        ctx.save(); ctx.globalAlpha = 0.2 + 0.4 * kk; ctx.fillStyle = "#000";
+        ctx.beginPath(); ctx.ellipse(sx(h.x), sy(h.y + 0.42), px * (0.4 + 1.1 * kk), px * (0.2 + 0.45 * kk), 0, 0, TAU); ctx.fill(); ctx.restore();
+        const up = (1 - kk) * 7;
+        sprite(H0.id, -1, 0, h.x, h.y - up, fr, 1, null, { x: h.x, y: h.y - up, sx: 1.25, sy: 1.25, tilt: 0 });
+      } else {
+        const flash = h.kind === "electrode" && Math.sin(kk * kk * TAU * 8) > 0;
+        sprite(H0.id, -1, 0, h.x, h.y, fr, 1, flash ? "#ff4a4a" : null, { x: h.x, y: h.y, sx: 1, sy: 1, tilt: 0 });
+        if (!still && rand() < 0.25) {
+          const c = h.kind === "chansey" ? "#ffb7d5" : h.kind === "jigglypuff" ? "#ff9ad5" : "#ffd23f";
+          part({ k: "glow", x: h.x + (rand() - 0.5) * 0.8, y: h.y - 0.8, vx: (rand() - 0.5) * 0.02, vy: -0.03, colour: c, life: 26, size: 0.12, drag: 0.98 });
+        }
+      }
+    }
+    // 2c'. A STAMPEDE: the herd running its lane, a cloud of dust behind it.
+    for (const l of s.lanes) {
+      if (l.t > LANE_RUN) continue;
+      const hx = herdAt(l), fr = { anim: "Walk", at: clock / 12, row: rowOf(l.dir, 0), frame: Math.floor(clock / 110) % 2 };
+      for (let n = 0; n < 5; n++) {
+        const x = hx - l.dir * n * 1.15, y = l.y + ((n % 3) - 1) * 0.7;
+        if (x < -1 || x > W + 1) continue;
+        sprite(HERD, -1, 0, x, y, fr, 1, null, { x, y, sx: 1, sy: 1, tilt: 0 });
+        if (rand() < 0.5) dust(x - l.dir * 0.4, y, 1);
+      }
+      shake(0.06);
+    }
+    // 2d. The lights out (or a whiteout): everything under it hidden but what glows and what stands near you.
     if (s.dark > 0) darkness(s, bodies, lerp);
     // 2e. An ULTI's strikes, marked on the ground over the dark - they glow, and they must be dodgeable.
     for (const z of s.strikes) strikeMark(z);
@@ -1799,7 +1941,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     d.setTransform(1, 0, 0, 1, 0, 0);
     d.globalCompositeOperation = "source-over"; d.globalAlpha = 1;
     d.clearRect(0, 0, cw, ch);
-    d.fillStyle = `rgba(3,4,12,${(0.9 * a).toFixed(3)})`; d.fillRect(0, 0, cw, ch);
+    d.fillStyle = s.white ? `rgba(232,240,252,${(0.8 * a).toFixed(3)})` : `rgba(3,4,12,${(0.9 * a).toFixed(3)})`; d.fillRect(0, 0, cw, ch);
     d.setTransform(ctx.getTransform());
     d.globalCompositeOperation = "destination-out";
     const hole = (x, y, r, n) => { d.globalAlpha = n; d.drawImage(glowOf("#ffffff"), sx(x) - r * px, sy(y) - r * px, r * px * 2, r * px * 2); };
@@ -1814,6 +1956,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     }
     for (const it of s.items) hole(it.x, it.y, 1, 0.7);
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(darkCv, 0, 0); ctx.restore();
+    // A whiteout's snow, driven across the court.
+    if (s.white && !still) for (let i = 0; i < 3; i++) part({ k: "dot", x: -1 + rand() * (W + 2), y: rand() * H, vx: 0.09 + rand() * 0.05, vy: 0.02, colour: "#ffffff", life: 40, size: 0.08 + rand() * 0.06, drag: 1 });
   }
   // An ULTI's strike before it lands: its ring filling, or a cannon's lane, in its type's colour.
   function strikeMark(z) {
@@ -1937,6 +2081,42 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     ctx.restore();
   }
   // Confused: a spiral turning over its head, and a question mark bobbing beside it.
+  /* EVOLVING (arena.js `evolveInto`), as the games draw it: the body goes
+     white and flickers between itself and what it becomes, faster and faster,
+     in a pillar of light with motes drawn into it - or its drawn sheet,
+     `moves/evolve` / `moves/mega-evolve`, behind it once there is one. A Mega Evolution
+     turns in a rainbow orb, the two strands of its symbol round it. */
+  function evolving(f, p, at, fr) {
+    const q = 1 - f.evo / EVOLVE_T, mega = Boolean(p.evoMega);
+    const key = mega ? "moves/mega-evolve" : "moves/evolve";
+    if (FX[key]) sheetFx(key, Math.floor(q * FX[key].n * 0.999), sx(at.x), sy(at.y - 0.6), px * 4.2, 0, null, 1);
+    else {
+      const top = sy(at.y - 7), bot = sy(at.y + 0.4), w = px * (0.7 + 0.7 * q);
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.4 + 0.5 * q;
+      const g = ctx.createLinearGradient(0, top, 0, bot);
+      g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(1, mega ? "rgba(255,170,240,0.6)" : "rgba(190,240,255,0.6)");
+      ctx.fillStyle = g; ctx.fillRect(sx(at.x) - w / 2, top, w, bot - top);
+      ctx.restore();
+    }
+    glow(sx(at.x), sy(at.y - 0.4), px * (1.4 + 1.3 * q), mega ? RAINBOW[Math.floor(clock / 90) % RAINBOW.length] : "#bfefff", 0.35 + 0.4 * q);
+    if (!still && rand() < 0.9) {
+      const a = rand() * TAU, r = 2.3;
+      part({ k: "glow", x: at.x + Math.cos(a) * r, y: at.y - 0.4 + Math.sin(a) * r * 0.7, vx: -Math.cos(a) * r / 18, vy: -Math.sin(a) * r * 0.7 / 18,
+        colour: mega ? RAINBOW[Math.floor(rand() * RAINBOW.length)] : "#ffffff", life: 18, size: 0.12, drag: 1, keep: true });
+    }
+    if (mega) {
+      for (let i = 0; i < 12; i++) {
+        const h = i / 12, a = clock / 240 + h * TAU;
+        for (const off of [0, Math.PI]) {
+          const front = Math.sin(a + off) > 0;
+          ctx.save(); ctx.globalAlpha = front ? 1 : 0.4; ctx.fillStyle = RAINBOW[i % RAINBOW.length];
+          ctx.beginPath(); ctx.arc(sx(at.x + Math.cos(a + off) * 0.95), sy(at.y - 1.8 + h * 2.2), px * 0.09, 0, TAU); ctx.fill(); ctx.restore();
+        }
+      }
+    }
+    const to = Math.sin(q * q * TAU * 9) > 0, beat = 1 + 0.06 * Math.sin(clock / 50);
+    sprite(to ? f.evoTo : f.id, f.side, f.slot, at.x, at.y, fr, 1, "#ffffff", { ...at, sx: at.sx * beat, sy: at.sy * beat });
+  }
   function confusedSwirl(x, y) {
     if (FX["moves/confused"] && sheetFx("moves/confused", clock / 90 % FX["moves/confused"].n, sx(x), sy(y - 1.7), px * 2.1, 0, null, 1)) return;
     ctx.save(); ctx.translate(sx(x), sy(y - 1.6)); ctx.rotate(clock / 200);
@@ -1958,8 +2138,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     if (f.status === SLP) { at.tilt += 1.35 * dir; at.sy *= 0.92; return; }
     if (f.status === FRZ) return;
     if (f.dodge > 0) {
+      // The dash: low, leaning into it, stretched along the way it goes.
       const q = Math.sin((p.fr?.prog ?? 0) * Math.PI);
-      at.tilt += q * 0.9 * (f.dx >= 0 ? 1 : -1); at.y -= q * 0.35; at.sx *= 1 + 0.12 * q; at.sy *= 1 - 0.12 * q;
+      at.tilt += q * 0.28 * (f.dx >= 0 ? 1 : -1); at.sx *= 1 + 0.22 * q; at.sy *= 1 - 0.14 * q;
       return;
     }
     if (a?.ph === "wind") {
@@ -2185,6 +2366,20 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     } else if (e.k === "launch") {
       // Fly or Bounce: the body leaps up and off the screen, a streak under it.
       sprite(e.id, e.side, e.slot, e.x, e.y - kk * kk * 10, { anim: "Hop", at: e.t * 16.7, frame: 0, row: 4 }, 1 - kk * 0.5, null, { x: e.x, y: e.y, sx: 1 - kk * 0.3, sy: 1 + kk * 0.6, tilt: 0 });
+    } else if (e.k === "megasym") {
+      /* THE MEGA SYMBOL over the new Mega: a rainbow ring and the strand it
+         carries, swelling in and fading - or its drawn sheet once there is one. */
+      const grow = Math.min(1, kk * 5), fade = kk > 0.7 ? (1 - kk) / 0.3 : 1;
+      if (!(FX["moves/mega-symbol"] && sheetFx("moves/mega-symbol", 0, sx(e.x), sy(e.y), px * 2.2 * grow, 0, null, fade))) {
+        const r = px * 0.8 * grow;
+        ctx.save(); ctx.translate(sx(e.x), sy(e.y)); ctx.globalAlpha = fade; ctx.lineWidth = Math.max(2, px / 7);
+        RAINBOW.forEach((c, i) => { ctx.strokeStyle = c; ctx.beginPath(); ctx.arc(0, 0, r, (i / RAINBOW.length) * TAU + clock / 400, ((i + 1) / RAINBOW.length) * TAU + clock / 400); ctx.stroke(); });
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(2, px / 9);
+        ctx.beginPath(); ctx.moveTo(-r * 0.5, r * 0.55); ctx.bezierCurveTo(-r * 0.9, -r * 0.2, r * 0.2, -r * 0.1, 0, -r * 0.6);
+        ctx.moveTo(r * 0.5, r * 0.55); ctx.bezierCurveTo(r * 0.9, -r * 0.2, -r * 0.2, -r * 0.1, 0, -r * 0.6); ctx.stroke();
+        ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(0, r * 0.15, r * 0.16, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
     } else if (e.k === "fly") {
       /* THE FLYOVER: a legendary crosses the court high up, its shadow
          sweeping the floor under it; it is gone before the drop lands. */
@@ -2477,11 +2672,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     const cw = canvas.width, ch = canvas.height, u = Math.min(cw, ch);
     const inK = Math.min(1, t / 9);
     const outK = life === Infinity ? 0 : clamp((t - (life - 10)) / 10, 0, 1);
-    const size = u * (text.length > 5 ? 0.17 : 0.22) * (1 + (1 - ease(inK)) * 1.4) * (1 + outK * 0.3);
+    let size = u * (text.length > 5 ? 0.17 : 0.22) * (1 + (1 - ease(inK)) * 1.4) * (1 + outK * 0.3);
     ctx.save();
     ctx.globalAlpha = inK * (1 - outK);
     ctx.translate(cw / 2, at ?? ch / 2); ctx.transform(1, 0, -0.16, 1, 0, 0);
     ctx.font = `900 ${Math.round(size)}px ${FACE}`;
+    // Held to the screen's width once it has landed: "THE CROWD ROARS!" ran off both sides.
+    const wide = ctx.measureText(text).width, room = cw * 0.9 * (1 + (1 - ease(inK)) * 1.4);
+    if (wide > room) { size *= room / wide; ctx.font = `900 ${Math.round(size)}px ${FACE}`; }
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     // A band behind it, the width of the screen.
     if (inK >= 1 || life === Infinity) {

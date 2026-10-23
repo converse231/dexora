@@ -23,8 +23,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL,
-  FINAL_T, spent, SWAP_CD, basicShape, PICKUPS, SUDDEN_T, roleOf, basicCd, ultOf, clonesOf, DARK_SEE, SHOT_SPEED, BLAST_SPEED,
-  cooldownOf, DODGE_CD, ARENAS, shapeOf, GROUND, ZONE_SAYS } from "../../../game/arena.js";
+  FINAL_T, SWAP_CD, basicShape, PICKUPS, SUDDEN_T, roleOf, basicCd, ultOf, clonesOf, DARK_SEE, SHOT_SPEED, BLAST_SPEED,
+  cooldownOf, DODGE_CD, ARENAS, shapeOf, GROUND, ZONE_SAYS, arenaReady, lineMegas, megaOf, evoTargets, EVO_XP, FLOOR_EVENT, FLOOR_SAYS } from "../../../game/arena.js";
 import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, arenaCancel } from "../../../net/cloud.js";
 import { isEvent } from "../../../data/dex.js";
 import { connect } from "./net.js";
@@ -35,7 +35,7 @@ import { IMPACTS, impactOwned, impactFor } from "../../../game/cosmetics.js";
 import { FX, FX_REV } from "../../../data/fx.js";
 import { pricedAt } from "../../../game/trainer.js";
 import { MOVES } from "../../../data/moves.js";
-import { speciesById } from "../../../game/biomes.js";
+import { speciesById, dexIndex } from "../../../game/biomes.js";
 import { variantOf } from "../../../game/items.js";
 import { label } from "../../../game/map.js";
 import { ARENA_LEVELS, arenaPay } from "../../../game/road.js";
@@ -43,6 +43,7 @@ import { dayKey, hash } from "../../../game/daily.js";
 import { ARENA_NEWS_KEY, write } from "../../../game/store.js";
 import BattleSwitch from "../BattleSwitch.jsx";
 import { createRenderer } from "./render.js";
+import { play as playSound, soundOn, setSound } from "./sfx.js";
 import { loadAnims } from "../moveAnim.js";
 import Sprite from "../../Sprite.jsx";
 import Icon from "../../Icon.jsx";
@@ -120,7 +121,7 @@ const floorName = (id) => ARENAS.find((a) => a.id === id)?.name ?? id;
 
 const LEVEL_SAYS = {
   easy: "Slow to react, loose aim. Good for learning the ropes.",
-  normal: "Dodges about half of what it sees and switches out when low.",
+  normal: "Dashes from about half of what it sees and switches out when low.",
   hard: "Fast hands, sharp aim. Leads its shots, raises a shield, takes the zones.",
 };
 const MODE_NAME = { ladder: "Arena Ladder", quick: "Quick battle", training: "Training", friends: "Battle a friend" };
@@ -139,7 +140,7 @@ const WEATHER_TIP = { rain: "Water x1.5, Fire x0.5, Fire types slower", sun: "Fi
    open, it takes the modal lock, and a match owns the whole screen through
    `body.fighting` (the bars step aside). Opening it is what the map's
    announcement waits for (ARENA_NEWS_KEY). */
-export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], money = 0, stats = null, impacts = [], impactsOff = [], onMode, onClose }) {
+export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], money = 0, stats = null, impacts = [], impactsOff = [], dex = null, onMode, onClose }) {
   useModalLock();
   useEffect(() => {
     engine?.pause(true);
@@ -155,7 +156,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   useEffect(() => unimmerse, []);
 
   const ids = arenaTeam.length ? arenaTeam : team;
-  const mons = useMemo(() => ids.map((uid) => box.find((m) => m.uid === uid)).filter((m) => m && !refusal(m)).slice(0, ARENA_TEAM), [box, ids]);
+  const mons = useMemo(() => ids.map((uid) => box.find((m) => m.uid === uid)).filter((m) => m && !refusal(m) && arenaReady(m.species)).slice(0, ARENA_TEAM), [box, ids]);
   const [match, setMatch] = useState(null);     // { mode, seed, floor, master }
   const [online, setOnline] = useState(null);   // { role, invite, friend }
   const [editing, setEditing] = useState(false);
@@ -173,7 +174,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
 
   const level = mons.length ? Math.round(mons.reduce((n, m) => n + m.level, 0) / mons.length) : 5;
   if (match) {
-    return <Match key={match.seed} mons={mons} mode={match.mode} master={match.master} level={level} seed={match.seed} floor={match.floor} impacts={impacts} impactsOff={impactsOff}
+    return <Match key={match.seed} mons={mons} mode={match.mode} master={match.master} level={level} seed={match.seed} floor={match.floor} impacts={impacts} impactsOff={impactsOff} dex={dex}
       onWin={(cpu) => (match.master ? engine?.arenaMaster(match.master.id) : engine?.arenaWin(cpu, level)) ?? 0}
       onAgain={() => { const seed = (match.seed * 1103515245 + 12345) | 0; setMatch({ ...match, seed, floor: match.master || match.fixed ? match.floor : pickFloor(match.pick, seed) }); }}
       onExit={() => setMatch(null)} />;
@@ -252,7 +253,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
             <span className="ag-stat"><b>{ladder.length}<u>/{LADDER.length}</u></b><i>Ladder</i></span>
             <span className="ag-stat"><b className={best.grade ? `g-${best.grade}` : ""}>{best.grade ?? "-"}</b><i>Best grade</i></span>
             <span className="ag-stat"><b>{best.streak}</b><i>Win streak</i></span>
-            <button type="button" className="ag-help ag-shopkey" onClick={onShop}><Icon n="shop" size={18} /><span>ULTI Shop</span></button>
+            {SHOP_OPEN && <button type="button" className="ag-help ag-shopkey" onClick={onShop}><Icon n="shop" size={18} /><span>ULTI Shop</span></button>}
             <button type="button" className="ag-help" onClick={onHowto}><Icon n="help" size={18} /><span>How to play</span></button>
           </div>
         </header>
@@ -569,6 +570,10 @@ function MoveTutor({ engine, mon, money, stats, onClose }) {
    shipped are on the shelf. */
 const stillUrl = (key) => asset(`arena/fx/${key}.png?v=${FX_REV}`);
 const stillsFor = (species) => [1, 2, 3, 4].map((k) => `ult-${species}-${k}`).filter((k) => FX[k]);
+/* The shop opens only with something on its shelf: the first sequences were
+   withdrawn (2026-10-23, your call - the centred single panels replaced
+   them for everyone), and a new style of art brings it back. */
+const SHOP_OPEN = IMPACTS.some((x) => stillsFor(x.species).length);
 function UltShop({ engine, money, impacts, impactsOff, onClose }) {
   useModalLock();
   const close = useRef(onClose);
@@ -712,7 +717,7 @@ function FriendBattles({ mons, floor, onStart }) {
 const nextSeed = (seed) => (Math.imul(seed, 1103515245) + 12345) | 0;
 // A team as the Fair format builds it, hashed: both ends must build the same fighters.
 const fairPrint = (ids) => hash(JSON.stringify(fairTeam(ids)));
-const fairIds = (ids) => (Array.isArray(ids) ? ids : []).filter((id) => Number.isInteger(id) && speciesById(id) && !isEvent(id)).slice(0, ARENA_TEAM);
+const fairIds = (ids) => (Array.isArray(ids) ? ids : []).filter((id) => Number.isInteger(id) && speciesById(id) && !isEvent(id) && arenaReady(id)).slice(0, ARENA_TEAM);
 const SAYS = {
   timeout: (n, host) => (host ? `${n} didn't answer in time.` : `Could not reach ${n}'s game.`),
   blocked: (n) => `Could not connect to ${n}: your two networks can't reach each other directly. Try another Wi-Fi, or mobile data.`,
@@ -889,9 +894,10 @@ function HowTo({ onClose }) {
               {row(["Mouse"], "Aim")}
               {row(["LMB"], "Basic attack - hold it to keep attacking")}
               {row(SKILL_KEYS, "Your four moves")}
-              {row(["Space"], "Dodge: you cannot be hit while you roll")}
+              {row(["Space"], "Dash: a burst along your stick, untouchable as it starts")}
               {row(["F"], "ULTI, when the meter is full")}
               {row(["G"], "Use the X item you are holding")}
+              {row(["T"], "Mega Evolve, once a match")}
               {row(["1", "2", "3"], "Send out that Pokémon (Tab: the next one)")}
               {row(["Esc"], "Pause")}
             </ul>
@@ -900,7 +906,7 @@ function HowTo({ onClose }) {
             <h4>Touch</h4>
             <ul>
               <li>The left thumb moves. The big button attacks - hold it; the four around it are your moves. Attacks aim at the foe by themselves.</li>
-              <li>Tap a Pokémon at the top left to send it out. A held X item shows in its slot beside Dodge - tap to use it.</li>
+              <li>Tap a Pokémon at the top left to send it out. A held X item shows in its slot beside Dash - tap to use it.</li>
             </ul>
           </section>
           <section>
@@ -908,19 +914,23 @@ function HowTo({ onClose }) {
             <ul>
               {row(["RT"], "Basic attack (hold)")}
               {row(["A", "B", "X", "Y"], "Your four moves")}
-              {row(["RB"], "Dodge")}
+              {row(["RB"], "Dash")}
               {row(["LT"], "ULTI")}
               {row(["LB"], "Next Pokémon")}
               {row(["D-pad up"], "Use your held item")}
+              {row(["D-pad down"], "Mega Evolve")}
             </ul>
           </section>
           <section>
             <h4>The fight</h4>
             <ul>
               <li><b>The basic attack</b> never runs out and every third in a row hits harder. A fighter whose Attack is higher jabs up close; one whose Sp. Atk is higher throws a bolt.</li>
-              <li><b>Moves</b> hit with the League's own damage - types, STAB and all - and each has a cooldown and its PP.</li>
-              <li><b>Every attack shows on the ground</b> before it lands: a line, an arc or a ring. Roll through it at the last moment - a <b>perfect dodge</b>.</li>
-              <li><b>ULTI</b> fills as you land hits, take them, dodge perfectly and hold a zone. Full, it throws the foe off you, powers you up for {SURGE_T / TPS} s and looses your Pokémon's signature: a storm of strikes, a blast all round, a huge cannon or a barrage - Pikachu calls down Thunder, Charizard Blast Burn. Every strike shows on the ground first: roll out of it.</li>
+              <li><b>Moves</b> hit with the League's own damage - types, STAB and all - and each waits on its cooldown. There is no PP. The basic attack is your Pokémon's first type too, so type matchups count on every hit.</li>
+              <li><b>Evolving</b>: a Pokémon that can still evolve fills the green bar under its plate by dealing damage - a knockout fills it whole - and evolves on the spot, a little healed. A Charmander can be a Charizard by the end of the fight.</li>
+              <li><b>Mega Evolution</b>: once a match, press Mega with a Pokémon whose Mega you have caught or made. Megas and other forms fight here only where they have their own Arena animation.</li>
+              <li><b>Every floor has its own event</b> once a match: the Indigo crowd roars and fills both ULTIs, a Moon Stone falls on Mt. Moon, the tide rises on the Boardwalk, the Caldera erupts, a herd stampedes through the Grove, and a whiteout blinds the Rink.</li>
+              <li><b>Every attack shows on the ground</b> before it lands: a line, an arc or a ring. Dash through it at the last moment - a <b>perfect dash</b>.</li>
+              <li><b>ULTI</b> fills as you land hits, take them, dash through attacks and hold a zone. Full, it throws the foe off you, powers you up for {SURGE_T / TPS} s and looses your Pokémon's signature: a storm of strikes, a blast all round, a huge cannon or a barrage - Pikachu calls down Thunder, Charizard Blast Burn. Every strike shows on the ground first: dash out of it.</li>
               <li><b>Auto-aim</b> is on: every attack goes at the foe you can see, leading a moving one. Turn it off in the pause menu to aim with the mouse, or drag a skill on a phone to aim it by hand.</li>
               <li><b>Brawlers and Blasters</b>: a Pokémon whose Attack is higher is a Brawler - it runs and jabs faster, hits harder with blows and dashes and takes less from shots. One whose Sp. Atk is higher is a Blaster - its shots fly faster and farther and its beams charge sooner. Teach either the moves that suit it (Moves, on each team card).</li>
               <li><b>Double Team</b> makes two copies either side of its user that move with it. A hit that reaches a copy first pops it - "Miss!" - and the foe cannot tell which is real.</li>
@@ -928,7 +938,7 @@ function HowTo({ onClose }) {
               <li><b>Type combos</b>: Water on a burned Pokémon puts the burn out in a cloud of steam that hides whoever stands in it. Water soaks, and Electric on a soaked Pokémon hits half again as hard.</li>
               <li><b>Mid-match</b>: a legendary may fly over and drop a Full Restore in the middle - half your HP, any status cured, half an ULTI. And the lights may go out: only what glows is seen, and the foe only up close.</li>
               <li><b>Sudden death</b>: out of time with as many Pokémon standing on each side, everyone drops to 1 HP for {SUDDEN_T / TPS} more seconds. The next hit wins.</li>
-              <li><b>Power-ups</b> drop in pairs, one on each half: a Potion, a Full Heal or a Shiny Stone works when you touch it; an X Attack, X Speed or X Defense is held until you use it.</li>
+              <li><b>Power-ups</b> drop in pairs, one on each half: a Potion, a Full Heal or a Shiny Stone works when you touch it; an X Attack, X Speed or X Defense is held until you use it. A <b>Poké Ball</b> releases a helper on your side: Electrode explodes, Snorlax falls on the foe (dash out from under it), Chansey heals you, Jigglypuff sings the foe to sleep.</li>
               <li><b>Clutch</b>: when both Pokémon are nearly down and one winds up, time slows. Make it count.</li>
               <li><b>Statuses</b> tick in real time: burn and poison hurt every 2 s, paralysis slows you, sleep and freeze hold you still.</li>
             </ul>
@@ -996,7 +1006,7 @@ function Credits({ onClose }) {
 const LEVEL_NAME = { dummy: "Training", easy: "Easy", normal: "Normal", hard: "Hard" };
 
 /* A MATCH: the loop, the input, the HUD. */
-function Match({ mons, mode, master, level, seed, floor, online = null, rematch = null, impacts = [], impactsOff = [], onWin, onAgain, onExit }) {
+function Match({ mons, mode, master, level, seed, floor, online = null, rematch = null, impacts = [], impactsOff = [], dex = null, onWin, onAgain, onExit }) {
   const me = online?.me ?? 0;
   const [net, setNet] = useState(null);         // an online match cut short: "left", "lost", "desync"
   useEffect(() => { if (rematch?.gone) setNet("left"); }, [rematch?.gone]);
@@ -1008,6 +1018,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   const pausedRef = useRef(false);
   pausedRef.current = paused;
   const [aimAuto, setAimAuto] = useState(() => pref(AIM_KEY, "auto") === "auto");
+  const [sound, setSoundOn] = useState(soundOn);
   const aimRef = useRef(aimAuto);
   aimRef.current = aimAuto;
   // The prize is the parent's, held in a ref: a fresh callback each render
@@ -1044,7 +1055,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
      restarted on it. A rematch and an online round remount (`key`). */
   const [{ teams, looks, s, names }] = useState(() => {
     const teams = online ? online.teams : [
-      mons.map((m) => playerFighter(m)),
+      mons.map((m) => ({ ...playerFighter(m), megas: lineMegas(m.species).filter((id) => dex?.[dexIndex(id)] === 2) })),
       master ? masterTeam(master) : cpuTeam(seed, level, Math.max(1, mons.length)),
     ];
     return {
@@ -1093,6 +1104,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       if (pressed(4) || pressed(15)) inp.swap = nextAlive(s, me, 1);
       if (pressed(14)) inp.swap = nextAlive(s, me, -1);
       if (pressed(12)) inp.use = s.t + 7;
+      if (pressed(13)) inp.mega = s.t + 7;
       if (pressed(9)) setPaused((p) => !p);
       inp.basic.pad = Boolean(now[7]);
       return { mx: dz(gp.axes[0] ?? 0), my: dz(gp.axes[1] ?? 0), ax: dz(gp.axes[2] ?? 0), ay: dz(gp.axes[3] ?? 0) };
@@ -1131,7 +1143,9 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       if (mine?.surge) inp.surge = 0;
       const use = inp.use > s.t;
       if (!s.sides[me].held) inp.use = 0;
-      return { mx, my, ax, ay, fire, basic, dodge, swap, surge, use };
+      const mega = inp.mega > s.t;
+      if (s.sides[me].megaUsed) inp.mega = 0;
+      return { mx, my, ax, ay, fire, basic, dodge, swap, surge, use, mega };
     };
 
     const frame = (now) => {
@@ -1150,7 +1164,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
           while (n-- > 0 && !s.over) {
             ls.feed(build);
             if (!ls.ready()) break;
-            ls.step(s); r.take(s.ev, s);
+            ls.step(s); r.take(s.ev, s); playSound(s.ev);
             acc = Math.max(0, acc - step);
             lastStep = now;
           }
@@ -1164,7 +1178,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
         acc += dt;
         while (acc >= step) {
           tick(s, [build(), null]);
-          r.take(s.ev, s);
+          r.take(s.ev, s); playSound(s.ev);
           acc -= step;
           if (s.over) break;
         }
@@ -1214,6 +1228,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       if (key === " " || key === "shift") { e.preventDefault(); inp.dodge = s.t + 7; return; }
       if (key === "f") { e.preventDefault(); inp.surge = s.t + 7; return; }
       if (key === "g") { e.preventDefault(); inp.use = s.t + 7; return; }
+      if (key === "t") { e.preventDefault(); inp.mega = s.t + 7; return; }
       const skill = ["q", "e", "r"].indexOf(key);
       if (skill >= 0) { e.preventDefault(); press(skill + 1); return; }
       if (["w", "a", "s", "d", "j", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) { e.preventDefault(); inp.keys.add(key); }
@@ -1307,7 +1322,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
             <b>{clock(view.left)}</b>
             <button type="button" onClick={() => setPaused(true)} aria-label="Pause"><Icon n="menu" size={16} /></button>
             {view.weather !== "clear" && <i className={`ah-weather w-${view.weather}`} data-tip={WEATHER_TIP[view.weather]}>{WEATHER_NAME[view.weather]}</i>}
-            {view.dark && <i className="ah-weather w-dark">Lights out</i>}
+            {view.dark && <i className="ah-weather w-dark">{view.white ? "Whiteout" : "Lights out"}</i>}
           </div>
           <Plate f={view.sides[1]} meter={view.meter[1]} who={names[1 - me][0]} />
 
@@ -1324,20 +1339,14 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
           </div>
 
           <div className="ah-skills">
-            {view.kit.map((m, k) => {
-              // Out of every damaging move: the empty buttons throw Struggle.
-              const struggle = view.struggle && m.pp <= 0;
-              return (
-                <button key={k} type="button" className={`ah-skill k${k} t-${struggle ? "normal" : m.type}${(struggle ? view.struggleReady : m.ready) ? "" : " wait"}`}
-                  style={{ "--cd": struggle ? view.struggleCd : m.cd }} disabled={m.pp <= 0 && !struggle}
-                  onPointerDown={touch ? aimStart(k) : tap(() => { input.current.fire = { k, until: s.t + PRESS }; })}
-                  aria-label={struggle ? "Struggle" : `${m.name}, ${m.pp} PP`}>
-                  <b>{struggle ? "Struggle" : m.name}</b>
-                  <span>{struggle ? "No PP" : `${m.pp}/${m.max}`}</span>
-                  {!touch && <kbd>{SKILL_KEYS[k]}</kbd>}
-                </button>
-              );
-            })}
+            {view.kit.map((m, k) => (
+              <button key={k} type="button" className={`ah-skill k${k} t-${m.type}${m.ready ? "" : " wait"}`} style={{ "--cd": m.cd }}
+                onPointerDown={touch ? aimStart(k) : tap(() => { input.current.fire = { k, until: s.t + PRESS }; })}
+                aria-label={m.name}>
+                <b>{m.name}</b>
+                {!touch && <kbd>{SKILL_KEYS[k]}</kbd>}
+              </button>
+            ))}
             <button type="button" className={`ah-basic${view.basic.ready ? "" : " wait"}${view.basic.boost ? " boost" : ""}`} style={{ "--cd": view.basic.cd }}
               onPointerDown={hold(true)} onPointerUp={hold(false)} onPointerCancel={hold(false)} onPointerLeave={hold(false)}
               aria-label="Basic attack - hold">
@@ -1353,9 +1362,15 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
               {!touch && <kbd>G</kbd>}
             </button>
             <button type="button" className={`ah-dodge${view.dodge ? "" : " wait"}`} style={{ "--cd": view.dodgeCd }}
-              onPointerDown={tap(() => { input.current.dodge = s.t + 7; })} aria-label="Dodge">
-              <b>Dodge</b>{!touch && <kbd>Space</kbd>}
+              onPointerDown={tap(() => { input.current.dodge = s.t + 7; })} aria-label="Dash">
+              <b>Dash</b>{!touch && <kbd>Space</kbd>}
             </button>
+            {view.mega && (
+              <button type="button" className="ah-mega" onPointerDown={tap(() => { input.current.mega = s.t + 7; })}
+                aria-label={`Mega Evolve into ${nameOf(view.mega)}`} data-tip={`Mega Evolve into ${nameOf(view.mega)} - once a match`}>
+                <b>Mega</b>{!touch && <kbd>T</kbd>}
+              </button>
+            )}
             <button type="button" className={`ah-surge${view.meter[0] >= 1 ? " full" : ""}${view.surging ? " on" : ""}`}
               style={{ "--m": view.surging ? 1 : view.meter[0] }} disabled={view.meter[0] < 1}
               onPointerDown={tap(() => { input.current.surge = s.t + 7; })} aria-label={view.meter[0] >= 1 ? "ULTI - ready" : `ULTI ${Math.floor(view.meter[0] * 100)}%`}>
@@ -1389,6 +1404,11 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
               onClick={() => { keep(AIM_KEY, aimAuto ? "manual" : "auto"); setAimAuto(!aimAuto); }}>
               <span>Auto-aim</span><i>{aimAuto ? "On" : "Off"}</i>
             </button>
+            {/* Off until a player turns it on (sfx.js): the game makes no sound by default. */}
+            <button type="button" className="ar-toggle" role="switch" aria-checked={sound}
+              onClick={() => { setSound(!sound); setSoundOn(!sound); }}>
+              <span>Sound effects</span><i>{sound ? "On" : "Off"}</i>
+            </button>
             <button type="button" className="lg-go quiet" onClick={onExit}>{online ? "Leave" : "Leave the match"}</button>
           </div>
         </div>
@@ -1417,7 +1437,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
               <div><dt>Knocked out</dt><dd>{view.ko[1]} / {view.sides[1].size}</dd></div>
               <div><dt>Damage</dt><dd>{view.stats.dealt.toLocaleString()}</dd></div>
               <div><dt>Best combo</dt><dd>{view.stats.best}</dd></div>
-              <div><dt>Perfect dodges</dt><dd>{view.stats.perfect}</dd></div>
+              <div><dt>Perfect dashes</dt><dd>{view.stats.perfect}</dd></div>
               <div><dt>ULTIs</dt><dd>{view.stats.surges}</dd></div>
               <div><dt>Time</dt><dd>{clock(view.t)}</dd></div>
             </dl>
@@ -1476,7 +1496,8 @@ function snapshot(s, me) {
   const side = (n) => {
     const sd = s.sides[n], f = sd.team[sd.active];
     return { id: f.id, level: f.level, hp: f.hp, max: f.max, left: sd.team.filter((x) => x.hp > 0).length, size: sd.team.length,
-      status: f.status, stages: f.stages.map((v, k) => [k, v]).filter(([k, v]) => k > 0 && v) };
+      status: f.status, stages: f.stages.map((v, k) => [k, v]).filter(([k, v]) => k > 0 && v),
+      evo: evoTargets(f.id).length ? Math.min(1, f.xp / EVO_XP) : null, megaOn: f.megaOn, evolving: f.evo > 0 };
   };
   const mine = s.sides[me], f0 = mine.team[mine.active];
   return {
@@ -1484,13 +1505,13 @@ function snapshot(s, me) {
     meter: [me, 1 - me].map((k) => s.sides[k].meter / SURGE_MAX), surging: f0.surge > 0,
     sides: [side(me), side(1 - me)],
     party: mine.team.map((f, k) => ({ id: f.id, hp: f.hp, max: f.max, active: k === mine.active })),
-    swapCd: mine.swapCd / SWAP_CD,
-    stats: { ...mine.stats }, struggle: spent(f0),
-    struggleReady: !(f0.struggle?.cd > 0), struggleCd: f0.struggle?.cd ? f0.struggle.cd / cooldownOf(moveOf(STRUGGLE)) : 0,
+    swapCd: mine.swapCd / SWAP_CD, white: s.white,
+    mega: !mine.megaUsed && !f0.evo ? megaOf(f0) : 0,
+    stats: { ...mine.stats },
     hpShare: mine.team.reduce((n, f) => n + f.hp, 0) / Math.max(1, mine.team.reduce((n, f) => n + f.max, 0)),
     kit: f0.kit.map((m) => {
       const data = moveOf(m.i);
-      return { name: moveName(m.i), type: data.t ?? "normal", pp: m.pp, max: Math.max(m.pp, Math.ceil((data.pp ?? 10) / 2), 3),
+      return { name: moveName(m.i), type: data.t ?? "normal",
         ready: m.cd === 0, cd: m.cd ? m.cd / cooldownOf(data) : 0, shape: shapeOf(data) };
     }),
     // The next basic attack is the third in a row: the button says so.
@@ -1509,7 +1530,7 @@ function Plate({ f, meter, who, mine }) {
     <div className={`ah-plate${mine ? " mine" : ""}${f.hp > 0 && f.hp / f.max <= 0.25 ? " low" : ""}`}>
       <span className="ah-face"><Sprite id={f.id} eager /></span>
       <div className="ah-plate-body">
-        <div className="ah-plate-top"><b>{nameOf(f.id)}</b><span>Lv {f.level}</span><em>{who}</em></div>
+        <div className="ah-plate-top"><b>{nameOf(f.id)}</b>{f.megaOn && <i className="ah-megatag">Mega</i>}<span>Lv {f.level}</span><em>{who}</em></div>
         <i className="ar-hp">
           <i className="ar-hp-lag" style={{ transform: `scaleX(${Math.max(0, f.hp / f.max)})` }} />
           <i style={{ transform: `scaleX(${Math.max(0, f.hp / f.max)})` }} />
@@ -1523,6 +1544,7 @@ function Plate({ f, meter, who, mine }) {
           <span className="ah-left" aria-label={`${f.left} of ${f.size} left`}>{Array.from({ length: f.size }, (_, k) => <i key={k} className={k < f.left ? "on" : ""} />)}</span>
         </div>
         <i className={`ar-meter${meter >= 1 ? " full" : ""}`}><i style={{ transform: `scaleX(${meter})` }} /></i>
+        {f.evo != null && <i className={`ar-evo${f.evo >= 1 || f.evolving ? " full" : ""}`} data-tip="Evolution: deal damage or knock one out"><i style={{ transform: `scaleX(${f.evo})` }} /></i>}
       </div>
     </div>
   );

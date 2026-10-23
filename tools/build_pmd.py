@@ -89,6 +89,16 @@ def species():
     return json.loads(out.stdout)
 
 
+# Forms whose PMD subgroup is named otherwise (2026-10-23: 13 drawn forms fell
+# back to follower art because the names differ). Keyed by our full name.
+ALIAS = {
+    "tauros-paldea-combat-breed": "Paldea", "tauros-paldea-blaze-breed": "Paldea_Blaze",
+    "tauros-paldea-aqua-breed": "Paldea_Aqua", "wormadam-sandy": "Sand",
+    "basculin-blue-striped": "Blue", "basculin-white-striped": "White", "oricorio-pau": "Pa_U",
+    "toxtricity-low-key": "Lowkey", "maushold-family-of-three": "Three",
+    "zacian-crowned": "Crowned_Sword", "zamazenta-crowned": "Crowned_Shield",
+    "darmanitan-galar-standard": "Galar", "tatsugiri-curly-mega": "Mega",
+}
 norm = lambda s: re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
@@ -317,7 +327,7 @@ def main():
         if form:
             if not of or not base or not name.startswith(base + "-"):
                 continue
-            hit = node_for(tracker, of, name[len(base) + 1:])
+            hit = node_for(tracker, of, ALIAS.get(name, name[len(base) + 1:]))
         else:
             hit = node_for(tracker, id, None)
         if hit:

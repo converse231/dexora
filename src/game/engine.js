@@ -24,7 +24,7 @@ import {
   TILE, loadArt, drawTile, drawPlayer, drawOverhangs, drawOverlays, drawBobber, fishFrame, drawGrass,
   drawFollower,
 } from "./tileset.js";
-import { followSheet, skinById, skinPrice, PARTY_MAX, partnerRule, isMastered, MASTERED_BOND, impactById, impactOwned } from "./cosmetics.js";
+import { followSheet, skinById, skinPrice, PARTY_MAX, partnerRule, isMastered, MASTERED_BOND, impactById, impactOwned, WITHDRAWN } from "./cosmetics.js";
 import { fieldOf, rollFind, heartsOf, FRIEND_FINDS, HEARTS } from "./abilities.js";
 import { CHECKIN_REWARDS, checkinStatus, rollRoulette, isMilestone, streakPacks, lotSets, LOT, ROULETTE_LEVEL } from "./checkin.js";
 import { isRoad, roadOpen, roadTrainer, ARENA_LEVELS, arenaPay } from "./road.js";
@@ -579,11 +579,14 @@ function loadState() {
         : (({ walked, ...rest }) => rest)(m)));
 
     const fresh = freshState();
+    // A withdrawn impact frame (cosmetics.js WITHDRAWN) pays its price back once, and is gone from `impacts`.
+    const bought = [...new Set(Array.isArray(s.impacts) ? s.impacts : [])].filter((id) => typeof id === "string" && /^[\w-]{1,32}$/.test(id));
+    const refund = bought.reduce((n, id) => n + (WITHDRAWN[id] ?? 0), 0);
     const loaded = {
       ...fresh, ...s,
       box, nextUid,
       limbo: pool.filter((m) => !sound(m)),
-      money: Math.max(0, Number(s.money) || 0),
+      money: Math.max(0, Number(s.money) || 0) + refund,
       /* A save from before shinies existed has neither of these, and a
          hand-edited or imported one could hold anything at all - so both are
          rebuilt to the right shape rather than trusted. */
@@ -686,7 +689,7 @@ function loadState() {
          a purchase is never lost. It draws as your own trainer here. */
       skins: [...new Set(Array.isArray(s.skins) ? s.skins : [])].filter((id) => typeof id === "string" && /^\w{1,32}$/.test(id)),
       // Kept even when this build does not know one (a purchase is never lost), as skins are.
-      impacts: [...new Set(Array.isArray(s.impacts) ? s.impacts : [])].filter((id) => typeof id === "string" && /^[\w-]{1,32}$/.test(id)),
+      impacts: bought.filter((id) => !WITHDRAWN[id]),
       impactsOff: [...new Set(Array.isArray(s.impactsOff) ? s.impactsOff : [])].filter((id) => typeof id === "string" && /^[\w-]{1,32}$/.test(id)),
       skin: typeof s.skin === "string" ? s.skin : null,
       /* CARDS, row by row: a bad row is dropped, never the collection. An id

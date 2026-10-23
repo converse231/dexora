@@ -997,6 +997,7 @@ export default function App({
             stats={st?.stats ?? null}
             impacts={st?.impacts ?? []}
             impactsOff={st?.impactsOff ?? []}
+            dex={st?.dex ?? null}
             onMode={goTab}
             onClose={() => {
               setArenaPage(false);

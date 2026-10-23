@@ -11956,7 +11956,6 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   border-radius: 14px; color: #fff; background: rgba(10, 15, 30, .86); border: 1px solid color-mix(in srgb, var(--tc, #8d9ac4) 75%, transparent);
   box-shadow: inset 0 -4px 0 color-mix(in srgb, var(--tc, #8d9ac4) 85%, transparent); }
 .ah-skill b { position: relative; font: 700 13px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ah-skill span { position: relative; font: 600 10.5px var(--pixel); color: #b9c2e4; }
 .ah-skill::after { content: ""; position: absolute; inset: 0; background: rgba(4, 7, 16, .66); transform-origin: bottom; transform: scaleY(var(--cd, 0)); pointer-events: none; }
 .ah-skill:disabled { opacity: .4; }
 .ah-basic, .ah-dodge, .ah-surge { position: relative; flex: none; display: grid; place-items: center; align-content: center; gap: 0; padding: 0; cursor: pointer; border-radius: 50%; color: #fff; }
@@ -11986,6 +11985,18 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ah-surge.full { animation: ar-ready .9s ease-in-out infinite alternate; }
 @keyframes ar-ready { from { box-shadow: 0 0 6px rgba(255, 210, 63, .4); } to { box-shadow: 0 0 26px rgba(255, 210, 63, .9); } }
 .ah-surge.on::before { background: rgba(255, 122, 61, .9); }
+/* MEGA EVOLUTION: there only while one can be pressed; the Mega's rainbow round it. */
+.ah-mega { position: relative; flex: none; width: 60px; height: 60px; display: grid; place-items: center; padding: 0; cursor: pointer; border-radius: 50%; color: #fff; border: 0;
+  background: conic-gradient(#ff5a8a, #ffd23f, #5fe08a, #45d4ff, #b06bff, #ff5a8a); animation: ar-ready .9s ease-in-out infinite alternate; }
+.ah-mega::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: rgba(10, 15, 30, .92); }
+.ah-mega b { position: relative; font: 800 11px var(--display); text-transform: uppercase; }
+.ah-megatag { font: 800 10px var(--display); font-style: normal; text-transform: uppercase; padding: 0 5px; border-radius: 4px; color: #0b1020;
+  background: linear-gradient(90deg, #ff5a8a, #ffd23f, #5fe08a, #45d4ff, #b06bff); }
+/* The evolution bar: green, under the ULTI meter, while the Pokemon can still evolve. */
+.ar-evo { display: block; height: 3px; margin-top: 2px; border-radius: 99px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.ar-evo > i { display: block; height: 100%; transform-origin: left; background: linear-gradient(90deg, #5fe08a, #c8ffd8); transition: transform .2s linear; }
+.ah-plate:not(.mine) .ar-evo > i { transform-origin: right; }
+.ar-evo.full > i { background: #fff; }
 .ah-surge.on b { color: #fff; }
 
 /* The opening: the HUD slides in after the count. */
@@ -12005,7 +12016,6 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ar-match.touch .ah-skill { position: absolute; width: 62px; height: 62px; min-height: 0; padding: 4px; border-radius: 50%;
   justify-items: center; text-align: center; box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--tc, #8d9ac4) 85%, transparent); border: 0; }
 .ar-match.touch .ah-skill b { font-size: 9.5px; white-space: normal; line-height: 1.05; max-height: 2.1em; overflow: hidden; }
-.ar-match.touch .ah-skill span { font-size: 9px; }
 .ar-match.touch .ah-skill::after { transform: none; border-radius: 50%; background: conic-gradient(rgba(4, 7, 16, .66) calc(var(--cd, 0) * 1turn), transparent 0); }
 .ar-match.touch .ah-skill.k0 { right: 139px; bottom: 17px; }
 .ar-match.touch .ah-skill.k1 { right: 123px; bottom: 78px; }
@@ -12013,6 +12023,7 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ar-match.touch .ah-skill.k3 { right: 17px; bottom: 139px; }
 .ar-match.touch .ah-dodge { position: absolute; right: 210px; bottom: 10px; width: 54px; height: 54px; }
 .ar-match.touch .ah-surge { position: absolute; right: 190px; bottom: 120px; width: 54px; height: 54px; }
+.ar-match.touch .ah-mega { position: absolute; right: 196px; bottom: 182px; width: 50px; height: 50px; }
 .ar-match.touch .ah-party { left: var(--pl); top: calc(var(--pt) + 84px); bottom: auto; gap: 6px; }
 .ar-match.touch .ah-mon { width: 50px; height: 50px; border-radius: 14px; }
 .ar-match.touch .ah-mon > img { width: 48px; height: 48px; }

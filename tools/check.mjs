@@ -7380,29 +7380,150 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       }
       assert.ok(surges >= 8, `${surges} Surges in 8 Hard matches - the meter does not fill in a real fight`);
     }
-    /* NO STALEMATE (2026-10-22). A third of Hard-vs-Hard matches ran out the
-       clock with both Pokemon out of PP and their benches untouched: a spent
-       Pokemon's button now throws Struggle, the CPU benches a spent Pokemon
-       for one that can still fight, and the final minute hits harder. */
+    /* NO PP (2026-10-23, asked for): a move is held back by its cooldown
+       alone, so it never runs dry - thrown at every chance for 40 s it fires
+       as often as the cooldown allows. And the final minute hits harder. */
     let timeouts = 0;
     {
-      const spentRun = () => {
-        const s = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 9 });
-        const f = s.sides[0].team[0], d = s.sides[1].team[0];
-        f.kit[0].pp = 0;
-        Object.assign(f, { x: 8, y: 8, px: 8, py: 8 }); Object.assign(d, { x: 9.2, y: 8, px: 9.2, py: 8 });
-        let hit = 0;
-        for (let t = 0; t < 2 * A.TPS; t++) { A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: t < 3 ? 0 : -1 }, null]); hit += s.ev.filter((e) => e.k === "hit" && e.side === 1).length; }
-        return { s, hit, struggled: Boolean(f.struggle) };
+      const s = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(143, 100, 2, [idx("tackle")])]], cpu: [null, null], seed: 9, weather: "clear", events: false });
+      const f = s.sides[0].team[0], d = s.sides[1].team[0];
+      let fired = 0;
+      for (let t = 0; t < 40 * A.TPS; t++) {
+        Object.assign(d, { x: 12, y: 8, hp: d.max });
+        A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]);
+        fired += s.ev.filter((e) => e.k === "fire" && e.side === 0 && !e.basic).length;
+      }
+      const each = A.cooldownOf(A.arenaMove(f.kit[0].i)) + 20;      // its cooldown and a wind-up
+      assert.ok(fired >= Math.floor(40 * A.TPS / each) - 1, `Ember fired ${fired} times in 40 s - it runs dry`);
+      /* THE DASH replaced the roll: a burst along the stick that outruns a
+         walk several times over, untouchable as it starts. */
+      const dash = A.newMatch({ teams: [[bFighter(143, 50, 1, [idx("tackle")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 3, weather: "clear", events: false });
+      const df = dash.sides[0].team[0];
+      Object.assign(df, { x: 6, y: 8, px: 6, py: 8 });
+      A.tick(dash, [{ ...A.NO_INPUT, mx: 1, dodge: true }, null]);
+      assert.ok(df.inv > 0, "a dash was not untouchable as it started");
+      for (let t = 0; t < 12; t++) A.tick(dash, [{ ...A.NO_INPUT, mx: 1 }, null]);
+      const walked = A.newMatch({ teams: [[bFighter(143, 50, 1, [idx("tackle")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 3, weather: "clear", events: false });
+      const wf = walked.sides[0].team[0];
+      Object.assign(wf, { x: 6, y: 8, px: 6, py: 8 });
+      for (let t = 0; t < 13; t++) A.tick(walked, [{ ...A.NO_INPUT, mx: 1 }, null]);
+      assert.ok(df.x - 6 > (wf.x - 6) * 3 && df.x - 6 > 2.5, `a dash went ${(df.x - 6).toFixed(2)} tiles against a walk's ${(wf.x - 6).toFixed(2)} - not a dash`);
+    /* ENTRY, EVOLVING, MEGA EVOLUTION AND THE FLOORS' EVENTS (2026-10-23,
+       asked for). A form fights here only with its own Arena body; a full
+       evolution bar evolves a Pokemon where it stands, once per stage, and a
+       Mega comes once a match, only where the page allowed it; each floor's
+       event fires once, with its own effect. */
+    {
+      const formsIn = SPECIES.filter((sp) => sp.id > 10000 && A.arenaReady(sp.id)).length;
+      const formsOut = SPECIES.filter((sp) => sp.id > 10000 && !A.arenaReady(sp.id) && /-(mega|gmax)/.test(sp.name)).length;
+      assert.ok(formsIn > 0 && formsOut > 0 && !A.arenaReady(10196) && A.arenaReady(6), "a Gigantamax with no Arena body may fight there, or a species may not");
+      for (const m of (await import("../src/game/ladder.js")).LADDER) for (const [id, name] of m.team) assert.ok(A.arenaReady(id), `the ${m.name}'s ${name} has no Arena body`);
+      for (const sp of SPECIES) for (const to of [...A.evoTargets(sp.id), ...A.megaTargets(sp.id)]) assert.ok(A.arenaReady(to), `#${sp.id} evolves in a match into #${to}, which has no Arena body`);
+      // The basic attack is its user's type: a Water type's jab on a Fire type is super effective.
+      const [js, jf, jd] = (() => { const s = A.newMatch({ teams: [[bFighter(9, 50, 1, [idx("tackle")])], [bFighter(6, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 2, weather: "clear", events: false }); return [s, s.sides[0].team[0], s.sides[1].team[0]]; })();
+      Object.assign(jf, { x: 8, y: 8, px: 8, py: 8 });
+      let jab = null;
+      for (let t = 0; t < 60 && !jab; t++) { Object.assign(jd, { x: 9.3, y: 8 }); A.tick(js, [{ ...A.NO_INPUT, ax: 1, ay: 0, basic: true }, null]); jab = js.ev.find((e) => e.k === "hit" && e.basic); }
+      assert.ok(jab && jab.eff > 1, "a Water type's basic attack was not super effective on a Fire type");
+      // A blaster's bolt reaches a foe over seven tiles off (4.5 tiles until 2026-10-23: "too short").
+      const bs = A.newMatch({ teams: [[bFighter(65, 50, 1, [idx("tackle")])], [bFighter(143, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 2, weather: "clear", events: false });
+      const [bf, bd] = [bs.sides[0].team[0], bs.sides[1].team[0]];
+      Object.assign(bf, { x: 6, y: 8, px: 6, py: 8 });
+      let bolt = 0;
+      for (let t = 0; t < 90 && !bolt; t++) { Object.assign(bd, { x: 13.3, y: 8 }); A.tick(bs, [{ ...A.NO_INPUT, ax: 1, ay: 0, basic: true }, null]); bolt += bs.ev.filter((e) => e.k === "hit" && e.basic).length; }
+      assert.ok(bolt > 0, "a basic bolt did not reach a foe 7.3 tiles away");
+      // Charmander knocks one out, evolves (untouchable while it does), and is stronger for it.
+      const ev = (megas) => {
+        const ch = bFighter(4, 50, 1, [idx("ember")]); ch.megas = megas;
+        const s = A.newMatch({ teams: [[ch], [1, 2, 3].map((k) => bFighter(143, 50, k + 1, [idx("tackle")]))], cpu: [null, null], seed: 3, weather: "clear", events: false });
+        const f = s.sides[0].team[0];
+        Object.assign(f, { x: 8, y: 8, px: 8, py: 8 });
+        return [s, f];
       };
-      // A one-move kit on purpose: Struggle pushed onto a short kit landed at the wrong index and froze it.
-      const st = spentRun();
-      assert.ok(st.struggled && st.hit > 0, "a Pokemon out of PP could not Struggle - it stands still and the match runs out the clock");
-      // The CPU: a spent Pokemon on the field, a fresh one on the bench.
-      const s = A.newMatch({ teams: [[bFighter(1, 50, 1, [idx("tackle")])], [bFighter(4, 50, 2, [idx("ember")]), bFighter(7, 50, 3, [idx("water-gun")])]], cpu: [null, "hard"], seed: 4, intro: 0 });
-      s.sides[1].team[0].kit[0].pp = 0;
-      for (let t = 0; t < 3 * A.TPS && s.sides[1].active === 0; t++) A.tick(s, [A.NO_INPUT, null]);
-      assert.equal(s.sides[1].active, 1, "the CPU kept a Pokemon with no PP on the field while its bench could fight");
+      {
+        const [s, f] = ev([]), atk = f.st[1];
+        A.activeOf(s, 1).hp = 1;
+        let seen = null, safe = true;
+        for (let t = 0; t < 4 * A.TPS && !seen; t++) {
+          const d = A.activeOf(s, 1); if (d) Object.assign(d, { x: 10, y: 8 });
+          A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]);
+          if (f.evo > 0 && f.inv <= 0) safe = false;
+          seen = s.ev.find((e) => e.k === "evolved");
+        }
+        assert.ok(seen && f.id === 5 && f.st[1] > atk, "a Charmander that knocked one out did not evolve into a stronger Charmeleon");
+        assert.ok(safe, "an evolving Pokemon could be hit");
+        // Mega: not allowed, never; allowed, once a match.
+        const [s2, f2] = ev(A.lineMegas(4));
+        assert.deepEqual(A.lineMegas(4), A.megaTargets(6).filter(A.arenaReady), "Charmander's line does not reach its Megas");
+        Object.assign(f2, { id: 6 });
+        let megas = 0;
+        for (let t = 0; t < 6 * A.TPS; t++) { A.tick(s2, [{ ...A.NO_INPUT, mega: true }, null]); megas += s2.ev.filter((e) => e.k === "evolve" && e.mega).length; }
+        assert.ok(megas === 1 && f2.megaOn && f2.id === A.lineMegas(4)[0], `a Mega came ${megas} times - it is once`);
+        // Once a MATCH, not once a Pokemon: another Charizard on the same side gets none.
+        Object.assign(f2, { id: 6, megaOn: false });
+        for (let t = 0; t < 2 * A.TPS; t++) A.tick(s2, [{ ...A.NO_INPUT, mega: true }, null]);
+        assert.equal(f2.id, 6, "a side Mega Evolved twice in one match");
+        const [s3, f3] = ev([]);
+        Object.assign(f3, { id: 6 });
+        for (let t = 0; t < 2 * A.TPS; t++) A.tick(s3, [{ ...A.NO_INPUT, mega: true }, null]);
+        assert.equal(f3.id, 6, "a Pokemon Mega Evolved without its Mega allowed");
+      }
+      // Every floor's event, once, with its own effect.
+      const floorRun = (arena, test) => {
+        const s = A.newMatch({ teams: [[bFighter(143, 50, 1, [idx("tackle")])], [bFighter(143, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 5, arena, weather: "clear" });
+        s.plan.fly = -1; s.plan.dark = -1;
+        const at = s.plan.floor;
+        assert.ok(at > 0, `${arena} has no event planned`);
+        s.t = at - 1;
+        let fired = 0, ok = false;
+        for (let t = 0; t < 8 * A.TPS; t++) { A.tick(s, [A.NO_INPUT, A.NO_INPUT]); fired += s.ev.filter((e) => e.k === "floor").length; ok ||= test(s); }
+        assert.ok(fired === 1 && ok, `${arena}'s event (${A.FLOOR_EVENT[arena]}) fired ${fired} times or did nothing`);
+      };
+      floorRun("indigo", (s) => s.sides.every((sd) => sd.meter >= 30));
+      floorRun("moon", (s) => s.items.some((it) => it.kind === "moon-stone"));
+      floorRun("seaside", (s) => s.tide > 0 && A.waterOf(s).some(([, y0, , y1], k) => y1 - y0 > 3));
+      floorRun("caldera", (s) => s.ev.some((e) => e.k === "lava"));
+      floorRun("grove", (s) => { const f = A.activeOf(s, 0), l = s.lanes[0]; if (l && f) { f.y = l.y; f.x = 13; } return s.ev.some((e) => e.k === "trample"); });
+      floorRun("rink", (s) => s.dark > 0 && s.white);
+      /* THE POKE BALL (2026-10-23, asked for): touched, a helper for its
+         trainer - each does its one thing, and Snorlax, which follows the
+         foe, can be dashed out from under. */
+      {
+        const ball = (seed, onFoe) => {
+          const s = A.newMatch({ teams: [[bFighter(25, 50, 1, [idx("tackle")])], [bFighter(6, 50, 2, [idx("tackle")])]], cpu: [null, null], seed, weather: "clear", events: false });
+          const [a, d] = [s.sides[0].team[0], s.sides[1].team[0]];
+          Object.assign(a, { x: 8, y: 8, px: 8, py: 8 }); Object.assign(d, { x: 9.5, y: 8, px: 9.5, py: 8 }); a.hp = a.max >> 1;
+          s.items.push({ id: 999, kind: "poke-ball", x: 8, y: 8, t: 600 });
+          const was = [a.hp, d.hp];
+          let kind = null;
+          for (let t = 0; t < 2 * A.TPS; t++) { A.tick(s, [A.NO_INPUT, onFoe ? onFoe(s, d, t) : A.NO_INPUT]); kind ??= s.ev.find((e) => e.k === "helper")?.kind; }
+          return { kind, healed: a.hp - was[0], hurt: was[1] - d.hp, slept: d.status === A.SLP };
+        };
+        const seen = {};
+        for (let seed = 1; seed <= 24 && Object.keys(seen).length < 4; seed++) { const r = ball(seed); seen[r.kind] ??= { ...r, seed }; }
+        assert.deepEqual(Object.keys(seen).sort(), Object.keys(A.HELPERS).sort(), `a Poke Ball never released ${Object.keys(A.HELPERS).filter((k) => !seen[k])}`);
+        assert.ok(seen.chansey.healed > 0, "Chansey did not heal its trainer");
+        assert.ok(seen.jigglypuff.slept, "Jigglypuff did not sing the foe to sleep");
+        assert.ok(seen.electrode.hurt > 0 && seen.snorlax.hurt > 0, "Electrode or Snorlax hurt nobody");
+        const fled = ball(seen.snorlax.seed, (s, d, t) => (t === 40 ? { ...A.NO_INPUT, my: 1, dodge: true } : A.NO_INPUT));
+        assert.equal(fled.hurt, 0, "Snorlax landed on a foe that dashed out from under it");
+      }
+      /* THE ARENA'S SOUND is OFF until a player turns it on (2026-10-23, your
+         call), and sfx.js is the one place any sound is made. */
+      {
+        // A device that never chose: an empty localStorage (Node has none, which would read as off whatever the rule).
+        const had = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+        Object.defineProperty(globalThis, "localStorage", { value: { getItem: () => null, setItem() {} }, configurable: true });
+        const X = await import("../src/ui/league/arena/sfx.js?never-chosen");
+        if (had) Object.defineProperty(globalThis, "localStorage", had); else delete globalThis.localStorage;
+        assert.equal(X.soundOn(), false, "the Arena's sound is on by default");
+        const files = (dir) => readdirSync(new URL(dir, import.meta.url), { withFileTypes: true })
+          .flatMap((e) => (e.isDirectory() ? files(`${dir}${e.name}/`) : [`${dir}${e.name}`]));
+        for (const f of files("../src/").filter((f) => /\.(js|jsx)$/.test(f) && !f.endsWith("arena/sfx.js"))) {
+          assert.ok(!/AudioContext|new Audio\(/.test(readFileSync(new URL(f, import.meta.url), "utf8")), `${f} makes a sound - sfx.js is the one place, and it starts off`);
+        }
+      }
+    }
       // The final minute: announced once, and the same blow hits half again as hard.
       const blow = (late) => {
         const m = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 21 });
@@ -7450,7 +7571,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       assert.equal(A.basicShape(bolt.f), "shot", "a special attacker's basic attack is not a bolt");
       for (const r of [jab, bolt]) {
         assert.ok(r.dmg.length >= 5, `a held basic attack landed ${r.dmg.length} times in 3 s - it does not repeat`);
-        assert.equal(r.f.kit[0].pp, A.kitOf(r.f)[0].pp, "a basic attack spent a move's PP");
+        assert.equal(r.f.kit[0].cd, 0, "a basic attack put a move on cooldown");
         const plain = r.dmg.filter(([, b]) => !b).map(([n]) => n), big = r.dmg.filter(([, b]) => b).map(([n]) => n);
         const avg = (l) => l.reduce((n, x) => n + x, 0) / l.length;
         assert.ok(big.length >= 1 && avg(big) > avg(plain) * 1.3, `every third basic attack is not the harder one (${big} against ${plain})`);
@@ -7818,8 +7939,8 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       `zones claimed, rocks fall, basalt wears; home edge fire ${ground["fire+"]}, water ${ground["water+"]}, ice ${ground["ice+"]} points; ` +
       `grass hides, water slows, cover stops a shot; ${LD.LADDER.length} masters pay ¥${ladderTotal} once; ` +
       `the opening holds everyone off the clock, a Surge throws the foe and doubles cooldowns until a switch, ${surges} in 8 Hard matches; ` +
-      `a spent Pokemon Struggles and the CPU benches it, the final minute hits harder, ${timeouts}/24 Hard matches to the clock; ` +
-      `a held basic attack repeats without PP, every third harder, a move cuts its recovery, ${basicShare}% of a real fight's damage; ` +
+      `no PP - a move fires whenever its cooldown allows, a dash outruns a walk, a basic attack carries its type and reaches 7 tiles, a form fights only with its Arena body, a full bar evolves (untouchable) and a Mega comes once a match, every floor's event fires once, the final minute hits harder, ${timeouts}/24 Hard matches to the clock; ` +
+      `a held basic attack repeats, every third harder, a move cuts its recovery, ${basicShare}% of a real fight's damage; ` +
       `power-ups drop mirrored, a Potion heals on touch, an X item waits to be used, ${picked} picked up by the CPU in 6 Hard matches; ` +
       `online, two lockstep ends over a laggy link finish one match (${fair[0].s.t} ticks, ${fair[0].s.why}) and a nudged state is caught at tick ${caught}`);
     console.log(`arena ok — a seed replays one match exactly and another seed differs, no browser-dependent maths, ` +
@@ -7900,7 +8021,8 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       assert.ok(listed.has(parseInt(f, 10)), `public/arena/pmd/${f} is not in pmd.js - a stale file; run npm run pmd`);
     }
     for (const f of walk("../src/").filter((f) => /\.(js|jsx)$/.test(f))) {
-      if (f.includes("ui/league/arena/") || f.endsWith("data/pmd.js")) continue;
+      // game/arena.js is the Arena's rulebook: a form fights there only with its PMD body (`arenaReady`).
+      if (f.includes("ui/league/arena/") || f.endsWith("data/pmd.js") || f.endsWith("game/arena.js")) continue;
       const src = readFileSync(new URL(f, import.meta.url), "utf8");
       assert.ok(!/data\/pmd\.js|arena\/pmd\/[^c]/.test(src), `${f} reaches the PMD sprites - the Arena alone draws them`);
     }
