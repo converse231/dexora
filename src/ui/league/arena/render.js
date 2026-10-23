@@ -65,7 +65,23 @@ import { FX, FX_REV } from "../../../data/fx.js";
 const asset = (p) => new URL(p, document.baseURI).href;
 // The basic attack (arena.js) is no League move: no slug, no sprite - it is drawn in its user's colour.
 const slugOf = (i) => (i === STRUGGLE ? "struggle" : MOVES[i]?.n ?? null);
-const artKey = (i) => { const key = `moves/${slugOf(i)}`; return FX[key] ? key : null; };
+/* A MOVE'S ART: its own sheet, else its FAMILY's (2026-10-24: 58 of 609
+   moves had drawn art, and the commonest without - Take Down, Double-Edge,
+   Body Slam, Slash, Thrash - are a few looks). A family sheet stands in
+   until a move is drawn alone. */
+const FAMILY = Object.fromEntries([
+  ["slam", ["take-down", "double-edge", "body-slam", "slam", "thrash", "headbutt", "skull-bash", "heavy-slam", "heat-crash", "zen-headbutt",
+    "head-smash", "giga-impact", "rollout", "horn-attack", "stomp", "tackle", "high-horsepower", "body-press", "outrage", "rock-smash"]],
+  ["claw", ["slash", "scratch", "fury-swipes", "crush-claw", "metal-claw", "aerial-ace", "cut", "psycho-cut", "sacred-sword", "false-swipe",
+    "fury-cutter", "dual-chop", "cross-poison", "smart-strike", "secret-sword", "behemoth-blade", "kowtow-cleave", "ceaseless-edge"]],
+].flatMap(([fam, ns]) => ns.map((n) => [n, fam])));
+const artKey = (i) => {
+  const slug = slugOf(i);
+  for (const k of [slug, FAMILY[slug]]) if (k && FX[`moves/${k}`]) return `moves/${k}`;
+  return null;
+};
+// What every match may play, whatever its moves: a heal's, a boost's and a drop's own sheets (drawn or not yet).
+const SHARED = ["moves/heal", "moves/power-up", "moves/stat-drop"];
 const isBasic = (i) => i === BASIC_P || i === BASIC_S;
 // A move's name as the callout says it ("Thunder Punch").
 const callName = (i) => (i === STRUGGLE ? "Struggle" : MOVES[i].n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "));
@@ -637,7 +653,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   const punch = { z: 0, x: W / 2, y: H / 2 };
   let stopMs = 0, slowMs = 0, slowK = 1, scale = 1;
   let clock = 0, lastNow = 0, ghostAcc = 0;
-  let landed = false, overAt = -1, overSeen = null;
+  let landed = false, overAt = -1, overSeen = null, stageOnce = "";
   const shiny = sides.map((team) => team.map((m) => m?.shiny ?? false));
   const floorPath = `arena/${arena}.webp`;
   const still = calm();
@@ -657,6 +673,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   // The shared sheets, and only the moves this match's two teams know (the moves' art is a megabyte in all).
   for (const name of Object.keys(FX)) if (!name.startsWith("moves/") && !name.startsWith("ult-")) img(fxPath(name));
   for (const i of moves) { const key = artKey(i); if (key) img(fxPath(key)); }
+  for (const key of SHARED) if (FX[key]) img(fxPath(key));
   // Each fighter's ULTI panel - its own drawing, or its type's ink - so the first ULTI never draws the fallback.
   // A drawn SEQUENCE plays only where its owner equipped it (`seq`, the ULTI Shop) - for that side's Pokemon.
   const seqOn = new Set(ults.filter((u) => u.seq).map((u) => `${u.side}:${u.id}`));
@@ -961,7 +978,11 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else if (e.k === "heal") {
         fx.push({ k: "num", x: e.x, y: e.y - 0.6, text: `+${e.n}`, size: 0.46, colour: "#5fe08a", t: 0, life: 50 });
         for (let i = 0; i < 8; i++) fx.push({ k: "rise", x: e.x + (rand() - 0.5) * 1.2, y: e.y + 0.3, colour: "#7dffa8", t: -i * 3, life: 34 });
+        if (FX["moves/heal"]) fx.push({ k: "mv", key: "moves/heal", x: e.x, y: e.y - 0.5, size: 3, ang: 0, t: 0, life: 40 });
       } else if (e.k === "stage") {
+        // Its family sheet once a tick a side, however many stats moved.
+        const sk = e.n > 0 ? "moves/power-up" : "moves/stat-drop", once = `${e.side}:${s.t}:${sk}`;
+        if (FX[sk] && stageOnce !== once) { stageOnce = once; fx.push({ k: "mv", key: sk, x: e.x, y: e.y - 0.5, size: 3, ang: 0, t: 0, life: 40 }); }
         word(e.x, e.y - 1.1 - (e.stat % 2) * 0.35, `${STAT[e.stat]} ${e.n > 0 ? "▲" : "▼"}`, e.n > 0 ? "#ff9d52" : "#7ab8ff", 45);
         for (let i = 0; i < 6; i++) fx.push({ k: "arrow", x: e.x + (rand() - 0.5), y: e.y + 0.2, up: e.n > 0, colour: e.n > 0 ? "#ff9d52" : "#7ab8ff", t: -i * 4, life: 30 });
       } else if (e.k === "status") {
@@ -1242,6 +1263,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         word(e.x, e.y - 1.8, `Go, ${nameOf(HELPERS[e.kind].id)}!`, "#ffffff", 60, true);
         for (let i = 0; i < 2; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? "#ff5a5a" : "#ffffff", life: 18, size: 0.2, grow: 0.12, t: -i * 3 });
         sparks(e.x, e.y, "#ffffff", 14, 0.09); shake(0.2);
+      } else if (e.k === "zap") {
+        // Magnemite's Thunder Shock: a bolt from it to the foe.
+        fx.push({ k: "zap", x: e.x, y: e.y - 0.4, tx: e.tx, ty: e.ty - 0.4, t: 0, life: 10 });
+        impact("electric", e.tx, e.ty, e.tx - e.x, e.ty - e.y, false);
+      } else if (e.k === "helperGone") {
+        // A follower's time is up: back into its ball.
+        fx.push({ k: "ball", x: e.x, y: e.y, out: true, t: 0, life: 20 });
+        sparks(e.x, e.y, "#ffffff", 8, 0.06);
       } else if (e.k === "helperHit") {
         if (e.kind === "electrode") {
           overlays.push({ k: "tint", colour: "#ffffff", t: 0, life: 14 });
@@ -1793,6 +1822,25 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     // Snorlax's shadow growing under it as it falls, Jigglypuff's song reaching out, Chansey's hearts.
     for (const h of s.helpers) {
       const H0 = HELPERS[h.kind], kk = 1 - h.t / H0.t, fr = { anim: "Idle", at: clock / 16, row: 0, frame: Math.floor(clock / 200) % 2 };
+      if (H0.follow) {
+        /* A FOLLOWER: small at its trainer's side, its time left a ring under
+           it, and its help drawn on the one it helps. */
+        const owner = bodies.find((b) => b.side === h.side);
+        ctx.save(); ctx.globalAlpha = 0.7; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1.5, px / 14);
+        ctx.beginPath(); ctx.ellipse(sx(h.x), sy(h.y + 0.3), px * 0.42, px * 0.18, 0, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - kk)); ctx.stroke(); ctx.restore();
+        const bob = still ? 0 : Math.sin(clock / 180 + h.id) * 0.08;
+        sprite(H0.id, -1, 0, h.x, h.y - bob, fr, 1, null, { x: h.x, y: h.y - bob, sx: 0.72, sy: 0.72, tilt: 0 });
+        if (owner) {
+          const [ox, oy] = lerp(owner);
+          if (h.kind === "plusle") glow(sx(ox), sy(oy - 0.3), px * 1.2, "#ff8a3d", 0.22 + 0.08 * Math.sin(clock / 120));
+          else if (h.kind === "mr-mime") {
+            ctx.save(); ctx.globalAlpha = 0.18 + 0.06 * Math.sin(clock / 160); ctx.fillStyle = "#c8a0ff"; ctx.strokeStyle = "#f0e0ff"; ctx.lineWidth = Math.max(1.5, px / 14);
+            ctx.beginPath(); ctx.arc(sx(ox), sy(oy - 0.3), px * 1.1, 0, TAU); ctx.fill(); ctx.globalAlpha = 0.5; ctx.stroke(); ctx.restore();
+          } else if (h.kind === "audino" && !still && rand() < 0.2) part({ k: "glow", x: ox + (rand() - 0.5) * 0.8, y: oy, vx: 0, vy: -0.03, colour: "#ffb7d5", life: 24, size: 0.1, drag: 0.98 });
+        }
+        if (h.kind === "magnemite" && !still && rand() < 0.15) part({ k: "glow", x: h.x + (rand() - 0.5) * 0.5, y: h.y - 0.5, vx: 0, vy: -0.02, colour: "#ffe14a", life: 14, size: 0.08 });
+        continue;
+      }
       if (H0.r) {
         ctx.save(); ctx.globalAlpha = 0.25 + 0.5 * kk; ctx.strokeStyle = h.kind === "jigglypuff" ? "#ff9ad5" : "#ff5a3d"; ctx.lineWidth = Math.max(2, px / 9);
         ctx.setLineDash([px * 0.35, px * 0.2]); ctx.beginPath(); ctx.ellipse(sx(h.x), sy(h.y + 0.35), px * H0.r, px * H0.r * 0.55, 0, 0, TAU * Math.max(0.05, kk)); ctx.stroke();
@@ -2366,6 +2414,12 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     } else if (e.k === "launch") {
       // Fly or Bounce: the body leaps up and off the screen, a streak under it.
       sprite(e.id, e.side, e.slot, e.x, e.y - kk * kk * 10, { anim: "Hop", at: e.t * 16.7, frame: 0, row: 4 }, 1 - kk * 0.5, null, { x: e.x, y: e.y, sx: 1 - kk * 0.3, sy: 1 + kk * 0.6, tilt: 0 });
+    } else if (e.k === "zap") {
+      // A jagged bolt, redrawn each frame so it crackles.
+      ctx.save(); ctx.globalAlpha = 1 - kk; ctx.strokeStyle = "#fff6a0"; ctx.lineWidth = Math.max(2, px / 8); ctx.globalCompositeOperation = "lighter";
+      ctx.beginPath(); ctx.moveTo(sx(e.x), sy(e.y));
+      for (let i = 1; i < 6; i++) { const q = i / 6; ctx.lineTo(sx(e.x + (e.tx - e.x) * q + (rand() - 0.5) * 0.5), sy(e.y + (e.ty - e.y) * q + (rand() - 0.5) * 0.5)); }
+      ctx.lineTo(sx(e.tx), sy(e.ty)); ctx.stroke(); ctx.restore();
     } else if (e.k === "megasym") {
       /* THE MEGA SYMBOL over the new Mega: a rainbow ring and the strand it
          carries, swelling in and fading - or its drawn sheet once there is one. */

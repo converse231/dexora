@@ -78,6 +78,9 @@ MOVES = {
     "dragon-pulse": 1, "dark-pulse": 1, "flash-cannon": 1, "stone-edge": 5,
     # Evolving in a match (render.js `evolving`): played across the 1.6 s; the Mega symbol is one still.
     "evolve": 8, "mega-evolve": 8, "mega-symbol": 1,
+    # FAMILIES (render.js FAMILY / SHARED, 2026-10-24): one sheet for many moves - a body slam, a claw's
+    # slash, any heal, any boost, any drop - until a move is drawn alone.
+    "slam": 5, "claw": 4, "heal": 6, "power-up": 6, "stat-drop": 6,
 }
 SEEN = 24                        # alpha that counts as drawn when looking for the gaps
 HARD = 110                       # alpha past which a shrunk pixel is solid, under which it is gone

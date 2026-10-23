@@ -208,7 +208,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
   `form: "event"`, ids 19901+ (under trading.sql's 20000), built from its
   species in dex.js and appended by `wave` (fetch-forms takes a wave past
   it). It is met ONLY as a substitution (`eventLook` in events.js, after
-  `rollLook`): `EVENT_SHARE` of its species' meetings on the event's days,
+  `rollLook`): `EVENT_SHARE` of its species' meetings on the event's days
+  (HALF since 2026-10-24, asked for once live: as common as the species it
+  dresses, like one more Pokemon in its slot; the hunt's `dreams` rose 7 -> 20),
   `EVENT_NIGHT` at night, a Spooky Honey's `lure`, never past `EVENT_CAP` -
   so no table, rod or League level moves, and no roll is drawn outside the
   event (seeded records replay). It evolves only into its event's look of
@@ -1407,7 +1409,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   user's first type** (asked for: type matchups meant nothing to it), STAB
   and all, and a bolt reaches `BASIC_RANGE` 6.5 tiles (4.5 read as short).
   A 3v3 is ~71 s (Hard v Hard), basics a third of the damage, and the
-  longer bolt is why `BRAWL_GUARD` is 0.6 (brawler teams fell to 9 of 40).
+  longer bolt is why `BRAWL_GUARD` is 0.55 (brawler teams fell to 9 of 40).
+  **A move waits on its WORTH, not its power** (`valueOf`, 2026-10-24,
+  reported: "healing moves are OP - CDs should depend on the skill"): power
+  x hits x crits, plus its drain, plus a raise of its own attacking stat at
+  half its power (other stats `STAGE_UP`), less `STAGE_DOWN` a stage it
+  lowers; recoil buys nothing back. A damaging move raises its user to +1 at
+  most (Fiery Dance stood at +2); +2 is a setup move's, which waits
+  `SELF_CD` past `BUFF_T`, and a heal `HEAL_CD`. check.mjs throws the
+  reported moves (drain, self-boost, always-crit, multi-hit, recoil) for
+  20 s and holds each within `WORTH_OVER` of a plain 120 of its shape - on
+  power alone Leech Life and Power-Up Punch were 20-39% over.
   **Evolving in a match** (asked for): a Pokemon with a next stage fills its
   bar (`xp`) with the share of a foe's HP it deals, a knockout a whole bar
   (`EVO_XP`), and evolves where it stands - `EVOLVE_T` untouchable and still,
@@ -1434,7 +1446,13 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   Pokemon for its trainer from the seed - Electrode explodes where it
   stands, Snorlax falls on the foe (it stops following `HELPER_LOCK` before,
   so a dash beats it), Chansey heals a quarter, Jigglypuff sings a near foe
-  asleep. A title too wide for the screen is
+  asleep - or one FOLLOWS its trainer's Pokemon for 8 s (2026-10-24, asked
+  for): Audino heals a little at a time, Plusle's Helping Hand (`HELP_HIT`),
+  Mr. Mime's Light Screen (`SCREEN_K`, both in the one damage line), and
+  Magnemite Thunder-Shocking the foe. **A benched Pokemon rests**
+  (`stepBench`): `BENCH_REGEN` of its HP a second up to `BENCH_CAP` (75%),
+  never a fainted one. The basic attack is 18 power (15 until 2026-10-24,
+  asked for); basics are ~42% of a fight's damage against check.mjs's 45%. A title too wide for the screen is
   shrunk to it (`stampAt`). The result grades the win (S-D: the win, HP kept, best combo,
   perfect dashes, a quick KO) from `stats` the sim keeps a side, and the
   device remembers the best grade and the win streak (`dexora-arena-record`,

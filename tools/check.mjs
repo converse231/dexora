@@ -7500,13 +7500,77 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
           return { kind, healed: a.hp - was[0], hurt: was[1] - d.hp, slept: d.status === A.SLP };
         };
         const seen = {};
-        for (let seed = 1; seed <= 24 && Object.keys(seen).length < 4; seed++) { const r = ball(seed); seen[r.kind] ??= { ...r, seed }; }
+        for (let seed = 1; seed <= 120 && Object.keys(seen).length < Object.keys(A.HELPERS).length; seed++) { const r = ball(seed); seen[r.kind] ??= { ...r, seed }; }
         assert.deepEqual(Object.keys(seen).sort(), Object.keys(A.HELPERS).sort(), `a Poke Ball never released ${Object.keys(A.HELPERS).filter((k) => !seen[k])}`);
         assert.ok(seen.chansey.healed > 0, "Chansey did not heal its trainer");
         assert.ok(seen.jigglypuff.slept, "Jigglypuff did not sing the foe to sleep");
         assert.ok(seen.electrode.hurt > 0 && seen.snorlax.hurt > 0, "Electrode or Snorlax hurt nobody");
         const fled = ball(seen.snorlax.seed, (s, d, t) => (t === 40 ? { ...A.NO_INPUT, my: 1, dodge: true } : A.NO_INPUT));
         assert.equal(fled.hurt, 0, "Snorlax landed on a foe that dashed out from under it");
+        /* THE FOLLOWERS (2026-10-24, asked for): for 8 s Audino heals its
+           trainer, Plusle makes it hit harder, Mr. Mime makes it take less,
+           Magnemite zaps the foe - each against the same 8 s with none. And a
+           benched Pokemon rests up to three quarters of its HP, never past. */
+        const along = (kind) => {
+          const s = A.newMatch({ teams: [[bFighter(25, 50, 1, [idx("tackle")]), bFighter(1, 50, 3, [idx("tackle")])], [bFighter(6, 50, 2, [idx("tackle")])]],
+            cpu: [null, null], seed: 3, weather: "clear", events: false });
+          const [a, d, bench] = [s.sides[0].team[0], s.sides[1].team[0], s.sides[0].team[1]];
+          Object.assign(a, { x: 8, y: 8, px: 8, py: 8 }); a.hp = a.max >> 1; bench.hp = Math.floor(bench.max * 0.7);
+          if (kind) s.helpers.push({ id: 99, kind, side: 0, x: 8, y: 8, t: A.HELPERS[kind].t });
+          const out = { dealt: 0, taken: 0, healed: 0, zaps: 0 };
+          for (let t = 0; t < 8 * A.TPS; t++) {
+            A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, basic: true }, { ...A.NO_INPUT, ax: -1, ay: 0, basic: true }]);
+            Object.assign(d, { x: a.x + 1.5, y: a.y });
+            for (const e of s.ev) {
+              if (e.k === "hit") out[e.side === 1 ? "dealt" : "taken"] += e.dmg;
+              if (e.k === "heal" && e.side === 0) out.healed += e.n;
+              if (e.k === "zap") out.zaps++;
+            }
+          }
+          return { ...out, bench: bench.hp / bench.max };
+        };
+        const none = along(null);
+        assert.ok(along("audino").healed > none.healed, "Audino healed nobody");
+        assert.ok(along("plusle").dealt > none.dealt * 1.15, "Plusle's Helping Hand added nothing");
+        assert.ok(along("mr-mime").taken < none.taken * 0.85, "Mr. Mime's Light Screen took nothing off");
+        assert.ok(along("magnemite").zaps >= 5, "Magnemite did not keep zapping the foe");
+        assert.ok(none.bench > 0.7 && none.bench <= 0.75, `a benched Pokemon rested to ${(none.bench * 100).toFixed(0)}% - it heals, up to three quarters`);
+      }
+      /* A MOVE'S WAIT IS ITS WORTH (2026-10-24, reported: "healing moves are
+         OP - CDs should depend on the skill"). Thrown whenever ready for 20 s
+         by a neutral fighter in the role it suits, no move the reports named -
+         a drain, a self-boost, an always-crit, a multi-hit, a recoil - is worth
+         more per second (damage, plus healing, less recoil) than a plain
+         120-power move of its shape and category by more than WORTH_OVER. On
+         power alone Leech Life and Power-Up Punch (40 power) were 20% over. */
+      {
+        const WORTH_OVER = 1.15;
+        const worth = (n) => {
+          const i = idx(n), m = A.arenaMove(i), sh = A.shapeOf(m);
+          const a0 = bFighter(151, 50, 1, [i]), d0 = bFighter(151, 50, 2, [idx("tackle")]);
+          a0.types = []; d0.types = [];
+          if (m.c === 1) a0.st[3] = a0.st[1] + 5; else a0.st[1] = a0.st[3] + 5;
+          d0.st[3] = d0.st[1] + 5;
+          const s = A.newMatch({ teams: [[a0], [d0]], cpu: [null, null], seed: 1, weather: "clear", events: false });
+          s.cover.forEach((c) => (c.hp = 0));
+          const [a, d] = [s.sides[0].team[0], s.sides[1].team[0]], gap = ["melee", "dash", "pulse"].includes(sh) ? 1.3 : 4;
+          Object.assign(a, { x: 9, y: 8, px: 9, py: 8 }); a.hp = a.max >> 1;
+          let net = 0;
+          for (let t = 0; t < 20 * A.TPS; t++) {
+            Object.assign(d, { x: a.x + gap, y: a.y, hp: d.max, status: -1, stun: 0, kbt: 0, stages: [0, 0, 0, 0, 0, 0, 0, 0] });
+            const was = a.hp;
+            A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]);
+            net += s.ev.filter((e) => e.k === "hit" && e.side === 1).reduce((n, e) => n + e.dmg, 0) + (a.hp - was);
+            if (a.hp < a.max * 0.3) a.hp = a.max >> 1;
+            a.status = -1;
+          }
+          return net / a.max;
+        };
+        for (const [n, ref] of [["leech-life", "mega-kick"], ["drain-punch", "mega-kick"], ["power-up-punch", "mega-kick"], ["wicked-blow", "mega-kick"],
+          ["meteor-mash", "mega-kick"], ["bullet-seed", "mega-kick"], ["brave-bird", "megahorn"], ["giga-drain", "fire-blast"], ["fiery-dance", "fire-blast"]]) {
+          const [w, r] = [worth(n), worth(ref)];
+          assert.ok(w <= r * WORTH_OVER, `${n} is worth ${(w / r).toFixed(2)}x a ${ref} a second - its wait does not price what it does`);
+        }
       }
       /* THE ARENA'S SOUND is OFF until a player turns it on (2026-10-23, your
          call), and sfx.js is the one place any sound is made. */
