@@ -20,7 +20,10 @@ import { EVENTS, EVENT_WAVE } from "./eventforms.js";
 const base = new Map(NATIONAL.map((sp) => [sp.id, sp]));
 /* An event's hunted one (its `hunt`, Darkrai) is a look too, marked `hunt` -
    a legendary's strength and catch rate, met only by its hunt (events.js). */
-const EVENT_LOOKS = EVENTS.flatMap((ev) => [...ev.looks, ...(ev.hunt ? [{ ...ev.hunt, hunt: true }] : [])].map((l) => {
+/* A look's place follows its ID, never where it is written (a save is keyed by
+   position): the second wave of Hallowed Night (19909+) came after the hunt
+   (19908), and written beside the first seven it would have moved Darkrai. */
+const EVENT_LOOKS = EVENTS.flatMap((ev) => [...ev.looks, ...(ev.hunt ? [{ ...ev.hunt, hunt: true }] : [])].sort((a, b) => a.id - b.id).map((l) => {
   const sp = base.get(l.of);
   return {
     ...sp, id: l.id, name: `${sp.name}-${ev.id}`, from: sp.name, of: sp.id,
