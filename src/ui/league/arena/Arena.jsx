@@ -22,7 +22,7 @@
    challenger is side 0; each end draws itself as `me`. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL, MEGA_WARM,
+import { enteringAs, newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL, MEGA_WARM,
   FINAL_T, SWAP_CD, basicShape, PICKUPS, SUDDEN_T, roleOf, basicCd, ultOf, clonesOf, DARK_SEE, SHOT_SPEED, BLAST_SPEED,
   cooldownOf, DODGE_CD, ARENAS, shapeOf, GROUND, ZONE_SAYS, arenaReady, lineMegas, megaOf, evoTargets, EVO_XP, FLOOR_EVENT, FLOOR_SAYS } from "../../../game/arena.js";
 import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, arenaCancel } from "../../../net/cloud.js";
@@ -161,7 +161,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
 
   // No Arena team, no League team: a new player starts on three rentals (ladder.js).
   const ids = arenaTeam.length ? arenaTeam : team.length ? team : RENTALS.slice(0, ARENA_TEAM).map(([id]) => -id);
-  const mons = useMemo(() => ids.map((uid) => box.find((m) => m.uid === uid) ?? rentalOf(uid)).filter((m) => m && !refusal(m) && arenaReady(m.species)).slice(0, ARENA_TEAM), [box, ids]);
+  const mons = useMemo(() => ids.map((uid) => box.find((m) => m.uid === uid) ?? rentalOf(uid)).filter((m) => m && !refusal(m) && arenaReady(enteringAs(m).species)).slice(0, ARENA_TEAM), [box, ids]);
   const [match, setMatch] = useState(null);     // { mode, seed, floor, master }
   const [online, setOnline] = useState(null);   // { role, invite, friend }
   const [editing, setEditing] = useState(false);
@@ -294,7 +294,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                     </li>
                   );
                 }
-                const f = playerFighter(m);
+                const f = playerFighter(enteringAs(m));
                 const sp = speciesById(m.species);
                 return (
                   <li key={m.uid} className="ag-mon">
@@ -305,6 +305,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                     <div className="ag-mon-text">
                       {/* MELEE OR RANGED at a glance (asked for): the role's reach as a pill by the name. */}
                       <b>{nameOf(m.species)} <i className={`ag-reach r-${roleOf(f)}`} data-tip={`${ROLE[roleOf(f)][0]}: ${ROLE[roleOf(f)][1]}`}>{ROLE[roleOf(f)][2]}</i></b>
+                      {enteringAs(m).species !== m.species && <span className="ag-megain">Enters as {nameOf(enteringAs(m).species)}{enteringAs(m).mega ? " · Mega Evolves in battle" : ""}</span>}
                       <span className="ag-lvrow">Lv {m.level} · <em className={`ag-role r-${roleOf(f)}`} data-tip={ROLE[roleOf(f)][1]}>{ROLE[roleOf(f)][0]}</em>
                         {m.level < 100 && !m.lock && !m.rental && (
                           <span className="ag-lvup" role="group" aria-label={`Raise ${nameOf(m.species)} with Rare Candy`}>
@@ -711,7 +712,7 @@ function FriendBattles({ mons, floor, onStart }) {
 const nextSeed = (seed) => (Math.imul(seed, 1103515245) + 12345) | 0;
 // A team as the Fair format builds it, hashed: both ends must build the same fighters.
 const fairPrint = (ids) => hash(JSON.stringify(fairTeam(ids)));
-const fairIds = (ids) => (Array.isArray(ids) ? ids : []).filter((id) => Number.isInteger(id) && speciesById(id) && !isEvent(id) && arenaReady(id)).slice(0, ARENA_TEAM);
+const fairIds = (ids) => (Array.isArray(ids) ? ids : []).filter((id) => Number.isInteger(id) && speciesById(id) && !isEvent(id) && arenaReady(enteringAs({ species: id }).species)).slice(0, ARENA_TEAM);
 const SAYS = {
   timeout: (n, host) => (host ? `${n} didn't answer in time.` : `Could not reach ${n}'s game.`),
   blocked: (n) => `Could not connect to ${n}: your two networks can't reach each other directly. Try another Wi-Fi, or mobile data.`,
@@ -821,7 +822,7 @@ function Online({ start, mons, impacts = [], impactsOff = [], onExit: done }) {
     return {
       link: b.link, me, round, foe,
       teams: sides.map((t) => fairTeam(t.ids)),
-      looks: sides.map((t) => t.ids.map((id, k) => ({ id, shiny: t.shiny[k] }))),
+      looks: sides.map((t) => t.ids.map((id, k) => ({ id: enteringAs({ species: id }).species, shiny: t.shiny[k] }))),
       names: sides.map((t, k) => [k === me ? "You" : foe, nameOf(t.ids[0])]),
       /* This round's early messages are heard and still kept (StrictMode's
          rehearsal attaches a lockstep it throws away); older rounds' go. */
@@ -1052,13 +1053,14 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
      restarted on it. A rematch and an online round remount (`key`). */
   const [{ teams, looks, s, names }] = useState(() => {
     const teams = online ? online.teams : [
-      mons.map((m) => ({ ...playerFighter(m), megas: lineMegas(m.species).filter((id) => dex?.[dexIndex(id)] === 2) })),
+      // A Mega enters as its base with that Mega to turn into; a plain Pokemon has none (`enteringAs`).
+      mons.map((m) => { const e = enteringAs(m); return { ...playerFighter(e), megas: e.mega ? [e.mega] : [] }; }),
       master ? masterTeam(master) : cpuTeam(seed, level, Math.max(1, mons.length)),
     ];
     return {
       teams,
       looks: online ? online.looks : [
-        mons.map((m) => ({ id: m.species, shiny: variantOf(m) === "shiny" })),
+        mons.map((m) => ({ id: enteringAs(m).species, shiny: variantOf(m) === "shiny" })),
         teams[1].map((f) => ({ id: f.id, shiny: false })),
       ],
       // The equipped cards' perks are yours alone, and never online (the Fair format).

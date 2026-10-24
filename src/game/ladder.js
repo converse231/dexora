@@ -27,8 +27,10 @@ export const ARENA_TEAM = 3;
    them; catching one is what unlocks it. Ids typed WITH the names they were
    checked by (check.mjs reads every one, and holds each to an Arena body). */
 export const RENTAL_LEVEL = 30;
+// Three ranged and three melee (2026-10-24: with roles by species, Squirtle and Pikachu came out ranged,
+// so Totodile and Riolu took Squirtle's and Gastly's places).
 export const RENTALS = [
-  [1, "Bulbasaur"], [4, "Charmander"], [7, "Squirtle"], [25, "Pikachu"], [66, "Machop"], [92, "Gastly"],
+  [1, "Bulbasaur"], [4, "Charmander"], [25, "Pikachu"], [66, "Machop"], [158, "Totodile"], [447, "Riolu"],
 ];
 export const SHOWCASE = [
   [6, "Charizard"], [150, "Mewtwo"], [448, "Lucario"], [445, "Garchomp"], [94, "Gengar"], [658, "Greninja"],

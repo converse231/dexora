@@ -1268,7 +1268,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   (`LANDS`), a hazard on the ground. A match loads only the moves its two
   teams know.
   **Roles** (2026-10-23, asked for: "all long ranged and slow to attack"):
-  `roleOf` by the higher attack stat, as the basic attack is - a BRAWLER
+  `roleOf` - the SPECIES' role (`speciesRole`, 2026-10-24: Jirachi, 100 and
+  100, came out either way by an IV point): a 15% lean in base Attack or Sp.
+  Atk decides, closer its ULTI's move (its signature), a close line takes its
+  last stage's, a support ULTI the power of what it learns; the jab or bolt
+  and the ULTI's stat follow it - a BRAWLER
   runs, jabs and hits up close harder and takes less from shots, a BLASTER's
   shots fly faster and farther and its beams charge sooner. With no perks
   brawler teams won 18 of 100 Hard matches against blasters (range simply
@@ -1495,8 +1499,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   types, its HP share plus `EVO_HEAL`; twice in a match for a three-stage
   line, a branch from the seed. **Mega Evolution** is once a match a side
   (`megaUsed`, the `mega` input: T, D-pad down, the HUD's rainbow button),
-  for a line's Mega in `megas` - the page fills it from the Pokedex (caught
-  or made) - and only `MEGA_WARM` into the match (asked for: "not something
+  for the Mega in `megas` - and only YOUR Mega: a Box entry that is a Mega
+  ENTERS AS ITS BASE and may turn into that one, a plain one never Mega
+  Evolves (`enteringAs`/`megaBase`, 2026-10-24, asked for: "consistent, less
+  confusing"; a Mega with no Arena body fights as its base) - and only `MEGA_WARM` into the match (asked for: "not something
   immediately ready"; the button fills toward it); the CPU from Hard and the Fair format get every one. Both only
   into an `arenaReady` form. The picture is the games': white, flickering
   between the two bodies faster and faster in a pillar of light (a Mega in
