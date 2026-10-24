@@ -17,6 +17,26 @@ export const LADDER_YEN = 80;
 // How many fight a side in the Arena: the save's `arenaTeam` holds at most this many.
 export const ARENA_TEAM = 3;
 
+/* RENTALS AND THE LOCKED SHOWCASE (2026-10-24, asked for: "a small pool new
+   players can freely use, and some locked ones to entice them - catch it to
+   unlock"). A rental is a first stage at RENTAL_LEVEL anybody may field -
+   three melee, three ranged, each evolving mid-match as its line does - and
+   is no box entry: its uid is the negative of its dex id (`rentalOf`), which
+   `setArenaTeam` and the page resolve. The showcase is famous fighters a
+   player does not hold yet, drawn locked in the picker with where to find
+   them; catching one is what unlocks it. Ids typed WITH the names they were
+   checked by (check.mjs reads every one, and holds each to an Arena body). */
+export const RENTAL_LEVEL = 30;
+export const RENTALS = [
+  [1, "Bulbasaur"], [4, "Charmander"], [7, "Squirtle"], [25, "Pikachu"], [66, "Machop"], [92, "Gastly"],
+];
+export const SHOWCASE = [
+  [6, "Charizard"], [150, "Mewtwo"], [448, "Lucario"], [445, "Garchomp"], [94, "Gengar"], [658, "Greninja"],
+  [149, "Dragonite"], [248, "Tyranitar"], [384, "Rayquaza"], [282, "Gardevoir"], [257, "Blaziken"], [197, "Umbreon"],
+];
+export const isRental = (uid) => uid < 0 && RENTALS.some(([id]) => id === -uid);
+export const rentalOf = (uid) => (isRental(uid) ? { uid, species: -uid, level: RENTAL_LEVEL, size: 50, rental: 1 } : null);
+
 export const LADDER = [
   { id: "court", name: "Court Master", arena: "indigo", level: 20, cpu: "normal", type: "normal",
     team: [[16, "pidgey"], [52, "meowth"], [133, "eevee"]] },

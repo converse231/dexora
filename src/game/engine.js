@@ -27,8 +27,9 @@ import {
 import { followSheet, skinById, skinPrice, PARTY_MAX, partnerRule, isMastered, MASTERED_BOND, impactById, impactOwned, WITHDRAWN } from "./cosmetics.js";
 import { fieldOf, rollFind, heartsOf, FRIEND_FINDS, HEARTS } from "./abilities.js";
 import { CHECKIN_REWARDS, checkinStatus, rollRoulette, isMilestone, streakPacks, lotSets, LOT, ROULETTE_LEVEL } from "./checkin.js";
-import { isRoad, roadOpen, roadTrainer, ARENA_LEVELS, arenaPay } from "./road.js";
-import { masterOf, ladderOpen, ladderPay, cleanLadder, ARENA_TEAM } from "./ladder.js";
+import { isRoad, roadOpen, roadTrainer, ARENA_LEVELS, ARENA_DAILY, arenaPay, arenaLeft } from "./road.js";
+import { masterOf, ladderOpen, ladderPay, cleanLadder, ARENA_TEAM, isRental } from "./ladder.js";
+import { ARENA_CARDS } from "./cardperks.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
@@ -221,6 +222,7 @@ function freshState() {
     beaten: {},           // League wins, `{ [opponent id]: { wins, at } }` - see league.js
     team: [],             // the last League team, box uids - see `battleBegin`
     arenaTeam: [],        // the Arena's three, box uids; empty is the League team's first three
+    arenaCards: [],       // up to three card ids equipped as Arena perks - see cardperks.js
     party: [],            // up to PARTY_MAX box uids you can walk with - see `setParty`
     checkin: { last: null, streak: 0, best: 0, spins: 0 },   // the daily check-in - see checkin.js
     road: { day: null, won: [] },   // road trainers beaten today - see road.js
@@ -666,6 +668,9 @@ function loadState() {
       beaten: cleanBeaten(s.beaten),
       team: [...new Set(Array.isArray(s.team) ? s.team : [])].filter(Number.isInteger).slice(0, TEAM_MAX),
       arenaTeam: [...new Set(Array.isArray(s.arenaTeam) ? s.arenaTeam : [])].filter(Number.isInteger).slice(0, ARENA_TEAM),
+      // Kept by id even when the card is gone: the page fights only with what is held.
+      arenaCards: [...new Set(Array.isArray(s.arenaCards) ? s.arenaCards : [])]
+        .filter((id) => typeof id === "string" && /^[A-Za-z0-9_.]+-[A-Za-z0-9_]+$/.test(id)).slice(0, ARENA_CARDS),
       party: [...new Set(Array.isArray(s.party) ? s.party : [])].filter(Number.isInteger).slice(0, PARTY_MAX),
       /* The check-in, field by field: a bad count is 0, a bad day forgets the
          last stamp (today asks again) - never the rest. */
@@ -677,7 +682,8 @@ function loadState() {
       ladder: cleanLadder(s.ladder),
       // The Arena's first wins today: a day and the CPU levels beaten, or nothing.
       arena: s.arena && typeof s.arena === "object" && /^\d{8}$/.test(s.arena.day ?? "")
-        ? { day: s.arena.day, won: [...new Set((Array.isArray(s.arena.won) ? s.arena.won : []).filter((c) => ARENA_LEVELS.includes(c)))] }
+        // A level may be won ARENA_DAILY times a day: repeats are the count, never more than that a level.
+        ? { day: s.arena.day, won: ARENA_LEVELS.flatMap((c) => (Array.isArray(s.arena.won) ? s.arena.won : []).filter((x) => x === c).slice(0, ARENA_DAILY)) }
         : { day: null, won: [] },
       checkin: ((c) => {
         const n = (v, cap) => (Number.isInteger(v) && v >= 0 ? Math.min(v, cap) : 0);
@@ -4390,9 +4396,17 @@ export function createEngine(canvas, onChange, mini = null) {
     /* THE ARENA'S OWN THREE (asked for, 2026-10-22: "how can I edit my
        team?"), apart from the League's six, so picking for one never
        reorders the other. Box uids, in fighting order. */
+    /* THE ARENA'S CARDS (cardperks.js): up to ARENA_CARDS card ids, each one you hold. */
+    setArenaCards(ids) {
+      if (!Array.isArray(ids)) return;
+      state.arenaCards = [...new Set(ids)].filter((id) => typeof id === "string" && Object.values(state.cards[id] ?? {}).some((n) => n > 0)).slice(0, ARENA_CARDS);
+      save();
+      changed();
+    },
     setArenaTeam(uids) {
       if (!Array.isArray(uids)) return;
-      state.arenaTeam = [...new Set(uids)].filter((u) => state.box.some((m) => m.uid === u)).slice(0, ARENA_TEAM);
+      // A box entry, or a rental (ladder.js: a negative uid, no entry of its own).
+      state.arenaTeam = [...new Set(uids)].filter((u) => state.box.some((m) => m.uid === u) || isRental(u)).slice(0, ARENA_TEAM);
       save();
       changed();
     },
@@ -4412,15 +4426,15 @@ export function createEngine(canvas, onChange, mini = null) {
       stepped();
       return null;
     },
-    /* AN ARENA WIN (game/arena.js, real-time) pays like a road trainer, once
-       a CPU level a day, into `arena` - never `beaten`, so the League's ladder
-       and its solved prizes do not move. The Arena's rules run on its page;
-       this only pays. Answers what it paid (0: already paid today). */
+    /* AN ARENA WIN (game/arena.js, real-time) pays ARENA_DAILY times a CPU
+       level a day, into `arena` - never `beaten`, so the League's ladder and
+       its solved prizes do not move. The Arena's rules run on its page; this
+       only pays. Answers what it paid (0: today's wins at that level are paid). */
     arenaWin(cpu, level) {
       if (!ARENA_LEVELS.includes(cpu)) return 0;
       const day = dayKey();
       const won = state.arena?.day === day ? state.arena.won : [];
-      if (won.includes(cpu)) return 0;
+      if (arenaLeft(state.arena, cpu, day) <= 0) return 0;
       const pay = arenaPay(cpu, whole(level) || 1);
       state.money += pay;
       state.arena = { day, won: [...won, cpu] };

@@ -937,7 +937,11 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   three sideways).
 - **Cards are designed in docs/cards.md** - change a decision there first, and
   build one phase at a time behind its QA gate. **A collection, never a
-  strength**: no rule module (`catch`, `biomes`, `battle`, `league`, `trainer`,
+  strength** - except as ARENA CARDS (2026-10-24, your call: up to three
+  equipped as passive perks against the CPU and the Ladder, never online,
+  ranked or the League; `game/cardperks.js` derives each from rarity and
+  type, gold and each set's `CHASE` card unique; arena.js gets numbers, the
+  save's `arenaCards`, `engine.setArenaCards`): no rule module (`catch`, `biomes`, `battle`, `league`, `trainer`,
   `items`, `perks`, `research`, `events`) imports `game/cards.js` or card
   data (asserted). Cards is the FIFTH tab (`#/cards`, `goTab`), a lazy page
   (`ui/cards/`); `ui/cards/load.js` is the only module that names
@@ -1360,7 +1364,23 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   match is `lockstep` in arena.js (inputs `DELAY` ticks ahead, `cleanInput`
   at both ends, a state hash every `HASH_EVERY`, a round number per rematch)
   in the Fair format (`fairTeam`: species at `FAIR_LEVEL`, IVs 31), and a
-  build whose `rulesPrint` differs is refused at the handshake. Online steps
+  build whose `rulesPrint` differs is refused at the handshake.
+  **A friend's challenge reaches you anywhere** (`ui/ArenaCall.jsx`, asked
+  for 2026-10-24: one sent to somebody walking the map expired unseen): App
+  asks `arena_invites_mine` every `CALL_MS` while signed in, seen and not
+  fighting, raises the dialog when no encounter is undecided, and hands an
+  accepted one to the Arena page as `join`. It names the floor from
+  `game/floors.js` (arena.js re-exports it - the main bundle never imports
+  arena.js). The lobby's team card raises its Pokemon with Rare Candy
+  (`engine.levelUp`, +1/+10/Max) and wears a MELEE or RANGED pill by its role.
+  **Rentals and the locked showcase** (ladder.js, asked for 2026-10-24): six
+  first stages at `RENTAL_LEVEL` anybody may field, no box entry - a uid is
+  the negative of the dex id (`rentalOf`, `isRental`; `setArenaTeam` takes
+  them) - and a new player with no team starts on three; `SHOWCASE` is drawn
+  locked in the picker with where to catch it until one is held. The picker
+  filters Melee / Ranged. **Quick battles pay `ARENA_DAILY` (5) wins a level
+  a day** (`arenaLeft`; the save's `won` repeats are the count), held under a
+  quarter of the road's day. Online steps
   with the wall clock, never the hit-stop (the other end would wait), has no
   pause, pays nothing and rates nothing. A challenge is taken back by
   LEAVING, never in an effect's cleanup: StrictMode runs that once at mount
@@ -1447,9 +1467,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   signature move (90+ power, three or fewer learn it), else its own support
   move (a wall's, or one three or fewer learn - `learnable(id, 100, true)`
   reads the League's unused moves for this alone), else its strongest
-  same-type attack shaped into an archetype. A ULTI-tier move that is its
-  ULTI is never also in its kit (`kitOf`: Pikachu's Thunder); an everyday
-  attack made a ULTI stays (Machamp's Dynamic Punch). An attack ULTI's damage is a SHARE of the target's HP
+  same-type attack shaped into an archetype. Its ULTI's move is NEVER also
+  in its kit (`kitOf`; reported 2026-10-24, Machamp's fourth button was its
+  Dynamic Punch ULTI): the slot goes to the newest other move it has learned. An attack ULTI's damage is a SHARE of the target's HP
   (`ultDamage`: resisted 0.6x, super effective 1.4x, its attack over the
   foe's defence held to 0.8-1.3x) - ~35% if it all lands, the same from a
   Pichu as from a Mewtwo; every archetype telegraphs and has an answer.
@@ -1475,7 +1495,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   line, a branch from the seed. **Mega Evolution** is once a match a side
   (`megaUsed`, the `mega` input: T, D-pad down, the HUD's rainbow button),
   for a line's Mega in `megas` - the page fills it from the Pokedex (caught
-  or made); the CPU from Hard and the Fair format get every one. Both only
+  or made) - and only `MEGA_WARM` into the match (asked for: "not something
+  immediately ready"; the button fills toward it); the CPU from Hard and the Fair format get every one. Both only
   into an `arenaReady` form. The picture is the games': white, flickering
   between the two bodies faster and faster in a pillar of light (a Mega in
   rainbow, its symbol's strands turning), then a white-out, a shockwave and

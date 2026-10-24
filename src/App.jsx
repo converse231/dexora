@@ -8,7 +8,8 @@ import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel, isNight } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
 import { RAIL_KEY, ORDER_KEY, REF_KEY, ARENA_NEWS_KEY, BATTLES_KEY, read, write, drop, flushNow } from "./game/store.js";
-import { tradeInbox, push, myDefense, setReferrer, myReferrals } from "./net/cloud.js";
+import { tradeInbox, push, myDefense, setReferrer, myReferrals, CLOUD, arenaInvites, arenaAnswer } from "./net/cloud.js";
+import { ArenaCall, CALL_MS } from "./ui/ArenaCall.jsx";
 import Invite from "./ui/Invite.jsx";
 import { referralDue } from "./game/referral.js";
 import { inboxToReconcile, freshTrades } from "./game/trade.js";
@@ -589,6 +590,43 @@ export default function App({
   /* SAVE YOUR PROGRESS, a guest's soft ask: after 10, 30 and 60 catches,
      each once a device, and "Not now" is the whole of saying no. */
   const [joinAsk, setJoinAsk] = useState(false);
+  /* A FRIEND'S ARENA CHALLENGE (ui/ArenaCall.jsx): asked for every CALL_MS
+     while signed in and the page is seen, never during a fight (the Arena
+     page owns the screen then). `callSeen` holds the ones answered or put
+     aside, so one is raised once; `arenaJoin` hands an accepted one to the
+     Arena page, which starts the match on it. */
+  const [arenaCall, setArenaCall] = useState(null);       // { inv, until }
+  const [callBusy, setCallBusy] = useState(false);
+  const [callError, setCallError] = useState("");
+  const [arenaJoin, setArenaJoin] = useState(null);       // { role, invite, friend }
+  const callSeen = useRef(new Set());
+  useEffect(() => {
+    if (!CLOUD || !account) return undefined;
+    let live = true;
+    const poll = () => {
+      if (document.hidden || document.body.classList.contains("fighting")) return;
+      arenaInvites().then((got) => {
+        if (!live || !got.ok) return;
+        const inv = got.data.find((i) => !i.mine && i.status === "open" && i.left > 0 && !callSeen.current.has(i.id));
+        setArenaCall((cur) => (!inv ? null : cur?.inv.id === inv.id ? cur : { inv, until: Date.now() + inv.left * 1000 }));
+      });
+    };
+    poll();
+    const t = setInterval(poll, CALL_MS);
+    return () => { live = false; clearInterval(t); };
+  }, [account]);
+  const putCall = () => { if (arenaCall) callSeen.current.add(arenaCall.inv.id); setArenaCall(null); setCallError(""); };
+  const answerCall = async (yes) => {
+    const inv = arenaCall.inv;
+    setCallBusy(true); setCallError("");
+    const got = await arenaAnswer(inv.id, yes);
+    setCallBusy(false);
+    if (yes && !got.ok) { setCallError(got.error); return; }
+    if (yes && !got.data) { setCallError(`${inv.card.username}'s challenge has gone - taken back, or it ran out.`); callSeen.current.add(inv.id); return; }
+    callSeen.current.add(inv.id);
+    setArenaCall(null);
+    if (yes) { setArenaJoin({ role: "guest", invite: got.data, friend: inv.card }); goTab("arena"); }
+  };
   useEffect(() => {
     if (!onJoin || enc) return;
     const asked = Number(read(JOIN_KEY)) || 0;
@@ -998,6 +1036,11 @@ export default function App({
             impacts={st?.impacts ?? []}
             impactsOff={st?.impactsOff ?? []}
             dex={st?.dex ?? null}
+            candy={st?.candy ?? 0}
+            join={arenaJoin}
+            cards={st?.cards ?? null}
+            arenaCards={st?.arenaCards ?? []}
+            onJoined={() => setArenaJoin(null)}
             onMode={goTab}
             onClose={() => {
               setArenaPage(false);
@@ -1063,6 +1106,10 @@ export default function App({
           onReset={onLogOut ? null : () => engine?.reset()}
           onJoin={onJoin}
         />
+      )}
+      {/* Held while an encounter is undecided, as the banners are: accepting leaves the map. */}
+      {arenaCall && !held && (
+        <ArenaCall call={arenaCall} busy={callBusy} error={callError} onAnswer={answerCall} onClose={putCall} />
       )}
       {joinAsk && onJoin && (
         <JoinAsk caught={st?.caught ?? 0} onJoin={() => { setJoinAsk(false); onJoin(); }} onClose={() => setJoinAsk(false)} />

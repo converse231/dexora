@@ -7268,12 +7268,13 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       const f = new URL(`../public/arena/cover/${g.cover}.webp`, import.meta.url);
       assert.ok(existsSync(f) && statSync(f).size < 20_000, `public/arena/cover/${g.cover}.webp is missing or large - run npm run arenas`);
     }
-    /* THE ARENA'S PRIZE STAYS A SLIVER OF THE ROAD'S: its best day (every CPU
-       level, Lv 100) under 5% of what that day's road trainers pay. */
+    /* THE ARENA'S PRIZE STAYS UNDER A QUARTER OF THE ROAD'S: its best day
+       (ARENA_DAILY wins at every CPU level, Lv 100) against what that day's
+       road trainers pay - five a level since 2026-10-24 (asked for), ~21%. */
     const RDA = await import("../src/game/road.js");
     const roadDay = RDA.roadRegions(100).flatMap((g) => RDA.roadOf(g)).reduce((n, t) => n + t.pay, 0);
-    const arenaDay = RDA.ARENA_LEVELS.reduce((n, c) => n + RDA.arenaPay(c, 100), 0);
-    assert.ok(arenaDay < roadDay * 0.05, `the Arena pays ¥${arenaDay} a day against the road's ¥${roadDay} - past 5%`);
+    const arenaDay = RDA.ARENA_LEVELS.reduce((n, c) => n + RDA.arenaPay(c, 100), 0) * RDA.ARENA_DAILY;
+    assert.ok(arenaDay < roadDay * 0.25, `the Arena pays ¥${arenaDay} a day against the road's ¥${roadDay} - past a quarter`);
     /* EACH ARENA'S GROUND (phase 2). On every floor, neither side is favoured
        and the ground does what its floor says; a type is not handed its home
        arena (Fire on the Caldera, Water on the Boardwalk, Ice on the Rink)
@@ -7459,6 +7460,10 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         assert.deepEqual(A.lineMegas(4), A.megaTargets(6).filter(A.arenaReady), "Charmander's line does not reach its Megas");
         Object.assign(f2, { id: 6 });
         let megas = 0;
+        // It warms up first (asked for, 2026-10-24): pressed at the bell, nothing.
+        for (let t = 0; t < 2 * A.TPS; t++) { A.tick(s2, [{ ...A.NO_INPUT, mega: true }, null]); megas += s2.ev.filter((e) => e.k === "evolve" && e.mega).length; }
+        assert.ok(megas === 0 && f2.id === 6, "a Mega was ready at the start of the match - it warms up");
+        s2.t = A.MEGA_WARM;
         for (let t = 0; t < 6 * A.TPS; t++) { A.tick(s2, [{ ...A.NO_INPUT, mega: true }, null]); megas += s2.ev.filter((e) => e.k === "evolve" && e.mega).length; }
         assert.ok(megas === 1 && f2.megaOn && f2.id === A.lineMegas(4)[0], `a Mega came ${megas} times - it is once`);
         // Once a MATCH, not once a Pokemon: another Charizard on the same side gets none.
@@ -7467,6 +7472,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         assert.equal(f2.id, 6, "a side Mega Evolved twice in one match");
         const [s3, f3] = ev([]);
         Object.assign(f3, { id: 6 });
+        s3.t = A.MEGA_WARM;          // warm, so only the missing permission refuses it
         for (let t = 0; t < 2 * A.TPS; t++) A.tick(s3, [{ ...A.NO_INPUT, mega: true }, null]);
         assert.equal(f3.id, 6, "a Pokemon Mega Evolved without its Mega allowed");
       }
@@ -7808,7 +7814,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
          way; Smokescreen leaves a cloud that hides its user; Double Team's
          copies move on their own. */
       {
-        const [s, , d] = duel(68, "dynamic-punch", 143, { weather: "clear" });
+        const [s, , d] = duel(107, "dynamic-punch", 143, { weather: "clear" });   // Hitmonchan: Machamp's ULTI IS Dynamic Punch
         let dizzy = false;
         for (let t = 0; t < 2 * A.TPS && !dizzy; t++) { A.tick(s, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]); dizzy = s.ev.some((e) => e.k === "confused"); }
         assert.ok(dizzy && d.confused > 0, "a Dynamic Punch did not confuse");
@@ -7861,6 +7867,11 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         assert.deepEqual(A.ARCHETYPES.filter((a) => !by[a]), [], "an archetype is nobody's ULTI");
         const pika = bFighter(25, 50, 1, [idx("thunder"), idx("thunderbolt")]);
         assert.ok(A.ultiPick(25).move === idx("thunder") && !A.kitOf(pika).some((m) => m.i === idx("thunder")), "Pikachu's ULTI move is also in its kit - two of one ULTI");
+        // EVERY Pokemon, its own four (reported 2026-10-24: Machamp's fourth button was its ULTI, Dynamic Punch),
+        // and the slot its ULTI leaves is filled from what it has learned.
+        const twice = SP.filter((sp) => sp.id <= 1025 && A.arenaReady(sp.id) && A.ultiPick(sp.id).move >= 0 && A.kitOf(bFighter(sp.id, 50, 1)).some((m) => m.i === A.ultiPick(sp.id).move));   // -1 is Struggle's index too: a ULTI with no move of its own
+        assert.deepEqual(twice.map((sp) => sp.name), [], "a Pokemon's ULTI move is also one of its four");
+        assert.equal(A.kitOf(bFighter(68, 50, 1)).length, 4, "Machamp's ULTI left a hole in its kit");
         const neutral = 151;
         const run = (id) => {
           const s = A.newMatch({ teams: [[bFighter(id, 50, 1, [idx("tackle")]), bFighter(id, 50, 3, [idx("tackle")])], [bFighter(neutral, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 4, weather: "clear", events: false });
@@ -8082,6 +8093,62 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     assert.ok(caught > 0, "a state nudged at one end of an online match was never caught");
     assert.ok(A.fairTeam([6]).every((f) => f.level === A.FAIR_LEVEL && f.id === 6), "a Fair team is not its species at FAIR_LEVEL");
     assert.equal(A.rulesPrint(), A.rulesPrint(), "the rules print is not stable within one build");
+    /* ARENA CARDS (cardperks.js, 2026-10-24, asked for): a set's chase card is the card it
+       names; a common is no perk, a Rare a small one, a hit a bigger one; gold adds its
+       family's golden flag, a chase the signature; a team's numbers are capped; and every
+       lever moves the match it is given to. */
+    {
+      const CP = await import("../src/game/cardperks.js");
+      const setIds = readdirSync(new URL("../src/data/cards/sets/", import.meta.url)).map((f) => f.replace(/\.js$/, ""));
+      for (const id of setIds) {
+        const { CARDS } = await import(`../src/data/cards/sets/${id}.js`);
+        const [lid, name] = CP.CHASE[id] ?? [];
+        const c = CARDS.find((x) => x[0] === lid);
+        assert.ok(c && c[1] === name && c[2] === "P", `${id}'s chase card is ${lid} ${name}, which the set does not hold as a Pokemon card`);
+        const p = CP.cardPerk(id, c);
+        assert.ok(p.chase && p.k === CP.CHASE_K && p.sig === CP.SIGNATURE[id]?.[0], `${id}'s chase card carries no signature`);
+        const common = CARDS.find((x) => x[2] === "P" && x[3] === "common" && x[0] !== lid);
+        if (common) assert.equal(CP.cardPerk(id, common), null, `a common (${id} ${common[1]}) carries a perk`);
+        const gold = CARDS.find((x) => x[2] === "P" && CP.GOLD.has(x[3]) && x[0] !== lid && x[5]?.length);
+        if (gold) assert.ok(CP.cardPerk(id, gold).flag, `a gold card (${id} ${gold[1]}) has no golden perk`);
+      }
+      assert.equal(Object.keys(CP.CHASE).length, setIds.length, "a chase card names a set the game does not ship");
+      const big = { family: "dmg", k: 1, line: CP.rootOf(6), flag: "flame" };
+      assert.ok(CP.teamPerks([big, big, big], [6])[0].dmg <= CP.CAP.dmg, "a team's card perks run past their cap");
+      assert.equal(CP.teamPerks([{ family: "dmg", k: 0.06, line: CP.rootOf(6) }], [5, 25]).map((p) => p.dmg).join(), "0.12,0.06", "a card of a Pokemon's own line does not count double for it alone");
+      // In a match: each lever, against the same match without it.
+      const duel = (cp, seed = 3) => {
+        const s = A.newMatch({ teams: [[bFighter(6, 50, 1, [idx("ember")])], [bFighter(143, 50, 2, [idx("tackle")])]], cpu: [null, "hard"], seed, weather: "clear", events: false,
+          perks: [[{ dmg: 0, regen: 0, cd: 0, guard: 0, ult: 0, status: 0, ...cp }], null] });
+        const out = { dealt: 0, taken: 0, fires: 0, meter: s.sides[0].meter, healed: 0 };
+        for (let t = 0; t < 12 * A.TPS && !s.over; t++) {
+          A.tick(s, [{ ...A.NO_INPUT, basic: true, ax: 1, ay: 0 }, null]);
+          for (const e of s.ev) { if (e.k === "hit" && e.side === 1) out.dealt += e.dmg; if (e.k === "hit" && e.side === 0) out.taken += e.dmg; if (e.k === "heal" && e.side === 0) out.healed += e.n; }
+          out.fires = Math.max(out.fires, s.fires.length);
+        }
+        return out;
+      };
+      const plain = duel({});
+      assert.ok(duel({ dmg: 0.3 }).dealt > plain.dealt * 1.1, "a damage card dealt no more");
+      assert.ok(duel({ guard: 0.3 }).taken < plain.taken * 0.9, "a guard card took no less");
+      assert.ok(duel({ regen: 0.02 }).healed > plain.healed, "a healing card healed nothing");
+      assert.ok(duel({ flame: true }).fires > plain.fires, "Golden Flame left no fire");
+      assert.ok(duel({ shade: true }).meter > plain.meter, "Golden Shade did not start the ULTI charged");
+      /* EVERY CHASE CARD'S SIGNATURE IS ITS OWN, and arena.js plays every one: each kind once, named in
+         arena.js's source as `hasSig(_, "<kind>")`. And a few, played: Moonlight heals, Lost Impact hurts
+         its user, Star Raid starts the ULTI full, Drought brings the sun - none without its Pokemon. */
+      const kinds = Object.values(CP.SIGNATURE).map(([k]) => k);
+      assert.equal(new Set(kinds).size, kinds.length, "two chase cards share a signature");
+      assert.deepEqual(Object.keys(CP.SIGNATURE).sort(), Object.keys(CP.CHASE).sort(), "a chase card has no signature, or a signature no chase card");
+      const arenaSrc = readFileSync(new URL("../src/game/arena.js", import.meta.url), "utf8");
+      assert.deepEqual(kinds.filter((k) => !arenaSrc.includes(`"${k}")`)), [], "a signature arena.js never plays");
+      const sigOn = (kind, id = 6) => CP.teamPerks([{ family: "dmg", k: 0, line: CP.rootOf(id), sig: kind }], [id])[0];
+      assert.deepEqual(CP.teamPerks([{ family: "dmg", k: 0, line: CP.rootOf(25), sig: "moonlight" }], [6])[0].sig, [], "a signature worked without its Pokemon on the team");
+      assert.ok(duel(sigOn("moonlight")).healed > plain.healed, "Moonlight healed nothing");
+      assert.ok(duel(sigOn("starraid")).meter === A.SURGE_MAX, "Star Raid did not start the ULTI full");
+      const sun = A.newMatch({ teams: [[bFighter(6, 50, 1)], [bFighter(143, 50, 2)]], cpu: [null, null], seed: 1, weather: "rain", perks: [[sigOn("drought")], null] });
+      assert.equal(sun.weather, "sun", "Drought did not bring the sun");
+    }
     // THE LADDER (ladder.js): ten masters, each on a real floor at a real CPU level, its team the species it names.
     const LD = await import("../src/game/ladder.js");
     assert.equal(new Set(LD.LADDER.map((m) => m.id)).size, LD.LADDER.length, "two Arena masters share an id");
@@ -8090,6 +8157,17 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       for (const [id, name] of m.team) assert.equal(speciesById(id)?.name, name, `${m.name}'s team names ${name} for #${id}, which is ${speciesById(id)?.name}`);
       assert.ok(A.masterTeam(m).every((f) => f.level === m.level), `${m.name}'s team is not at its level`);
     }
+    /* RENTALS AND THE SHOWCASE (2026-10-24): every one named for its id, with an Arena
+       body; the rentals a melee-and-ranged mix of first stages, none in the showcase. */
+    for (const [id, name] of [...LD.RENTALS, ...LD.SHOWCASE]) {
+      assert.equal(speciesById(id)?.name.toLowerCase(), name.toLowerCase(), `ladder.js names #${id} ${name}, which is ${speciesById(id)?.name}`);
+      assert.ok(A.arenaReady(id), `${name} is a rental or in the showcase with no Arena body`);
+    }
+    const rentRoles = new Set(LD.RENTALS.map(([id]) => A.roleOf(bFighter(id, LD.RENTAL_LEVEL, 1))));
+    assert.equal(rentRoles.size, 2, "the rentals are all one role - a new player gets no choice of reach");
+    assert.ok(LD.RENTALS.every(([id]) => !LD.SHOWCASE.some(([s]) => s === id)), "a rental is also in the locked showcase");
+    assert.ok(LD.RENTALS.every(([id]) => LD.isRental(-id) && LD.rentalOf(-id).species === id) && !LD.isRental(1) && !LD.isRental(-150),
+      "a rental's uid does not resolve, or a box uid or a non-rental reads as one");
     const ladderTotal = LD.LADDER.reduce((n, m) => n + LD.ladderPay(m), 0);
     assert.ok(ladderTotal < roadDay * 0.25, `the Ladder pays ¥${ladderTotal} once against a road day's ¥${roadDay} - past a quarter`);
     console.log(`arena ground ok — every floor fair (side 0 won ${Object.entries(ground).filter(([k]) => !k.endsWith("+")).map(([k, v]) => `${k} ${v}`).join(", ")} of 16), ` +

@@ -4868,17 +4868,20 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
         `a region ${g} road trainer fielded a form, a legendary or another region's Pokemon`);
     }
     await savedField("road", { day: dayKey(), won: [t.id] }, "junk", { day: null, won: [] });
-    /* AN ARENA WIN (game/arena.js) pays once a CPU level a day, into `arena`
-       and never `beaten`; Training pays nothing. */
+    /* AN ARENA WIN (game/arena.js) pays ARENA_DAILY times a CPU level a day
+       (five since 2026-10-24, asked for), into `arena` and never `beaten`;
+       Training pays nothing. */
     {
       const RDP = await import("../src/game/road.js");
       const { e } = boot({ ...SAVE });
       const was = e.state.money, beat = JSON.stringify(e.state.beaten);
       assert.equal(e.arenaWin("dummy", 50), 0, "Training paid a prize");
-      assert.equal(e.arenaWin("hard", 50), RDP.arenaPay("hard", 50), "a first Hard win did not pay its prize");
-      assert.equal(e.arenaWin("hard", 50), 0, "a second Hard win the same day paid again");
-      assert.equal(e.arenaWin("easy", 50), RDP.arenaPay("easy", 50), "an Easy win after a Hard one was refused");
-      assert.equal(e.state.money, was + RDP.arenaPay("hard", 50) + RDP.arenaPay("easy", 50), "the Arena's prizes did not reach the wallet");
+      for (let k = 0; k < RDP.ARENA_DAILY; k++) assert.equal(e.arenaWin("hard", 50), RDP.arenaPay("hard", 50), `Hard win ${k + 1} of ${RDP.ARENA_DAILY} did not pay its prize`);
+      assert.equal(e.arenaWin("hard", 50), 0, `a Hard win past ${RDP.ARENA_DAILY} the same day paid again`);
+      assert.equal(e.arenaWin("easy", 50), RDP.arenaPay("easy", 50), "an Easy win after the Hard ones was refused");
+      assert.equal(e.state.money, was + RDP.ARENA_DAILY * RDP.arenaPay("hard", 50) + RDP.arenaPay("easy", 50), "the Arena's prizes did not reach the wallet");
+      // A reload keeps the count: the save's repeats are it.
+      assert.equal(boot({ ...SAVE, arena: e.state.arena }).e.arenaWin("hard", 50), 0, "a reload forgot today's Hard wins");
       assert.equal(JSON.stringify(e.state.beaten), beat, "an Arena win moved the League's beaten");
       const later = boot({ ...SAVE, arena: { day: "20200101", won: ["hard"] } }).e;
       assert.equal(later.arenaWin("hard", 50), RDP.arenaPay("hard", 50), "yesterday's Arena win blocked today's");
@@ -5191,6 +5194,22 @@ console.log("elevation ok — Frost Hollow's shelf and the Safari Zone's platfor
   await savedField("beaten", { [brock.id]: { wins: 2, at: 40 } }, "junk", {});
   await savedField("team", [1, 3], "junk", [], { ...SAVE, box, nextUid: 7 });
   await savedField("arenaTeam", [3, 1], "junk", [], { ...SAVE, box, nextUid: 7 });
+  await savedField("arenaCards", ["swsh7-215", "sv03.5-199"], "junk", []);
+  {
+    // Equipping takes only cards held, three at most.
+    const e = boot({ ...SAVE, cards: { "swsh7-215": { h: 1 }, "sv01-1": { n: 2 }, "sv02-2": { n: 1 }, "sv03-3": { r: 1 } } }).e;
+    e.setArenaCards(["swsh7-215", "base1-4", "sv01-1", "sv02-2", "sv03-3"]);
+    assert.deepEqual(e.state.arenaCards, ["swsh7-215", "sv01-1", "sv02-2"], "an Arena card not held was equipped, or more than three");
+  }
+  {
+    /* A RENTAL (ladder.js) joins the Arena team by its negative uid, survives a reload,
+       and a negative uid that is no rental is refused. */
+    const { RENTALS } = await import("../src/game/ladder.js");
+    const e = boot({ ...SAVE, box, nextUid: 7 }).e;
+    e.setArenaTeam([-RENTALS[0][0], 3, -150]);
+    assert.deepEqual(e.state.arenaTeam, [-RENTALS[0][0], 3], "a rental was refused, or a non-rental negative uid kept");
+    assert.deepEqual(boot({ ...SAVE, box, nextUid: 7, arenaTeam: e.state.arenaTeam }).e.state.arenaTeam, [-RENTALS[0][0], 3], "a reload dropped a rental");
+  }
   {
     const e = boot({ ...SAVE, box, nextUid: 7, team: [3, 99, 1],
       beaten: { [brock.id]: { wins: 1, at: 5 }, [misty.id]: { wins: "x", at: 1 }, "from-a-newer-build": { wins: 1, at: 0 } } }).e;

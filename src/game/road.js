@@ -20,13 +20,18 @@ import { dayKey, hash } from "./daily.js";
 // call, with the Master Ball doubled: 175 trainers a day paid ~¥300,000).
 export const ROAD_YEN = 16;
 
-/* AN ARENA WIN (game/arena.js, real-time) pays like one road trainer, once a
-   CPU level a day: three a day at most against the road's ~175 trainers, so
-   the renewable income stays where the road set it. The level is the team's
-   (a Lv 50 Hard win is 50 x 16 x 2 = 1,600; check.mjs holds its best day
-   under 5% of the road's - measured 3%). */
+/* AN ARENA WIN (game/arena.js, real-time) pays `ARENA_DAILY` times a CPU
+   level a day (2026-10-24, asked for: it was once - "5x battles each on easy,
+   normal and hard daily", and "bump the prices"). The level is the team's: a
+   Lv 50 Hard win is 50 x 16 x 3 = 2,400. Fifteen paid wins at Lv 100 are
+   ~21% of a day of the road's 175 trainers, in about 25 minutes of real-time
+   fighting - per minute, what the road pays; check.mjs holds the day under a
+   quarter of the road's (it was 3%, three wins a day). */
 export const ARENA_LEVELS = ["easy", "normal", "hard"];
-const ARENA_MULT = { easy: 1, normal: 1.5, hard: 2 };
+export const ARENA_DAILY = 5;
+const ARENA_MULT = { easy: 1.25, normal: 2, hard: 3 };
+// How many of a level's paid wins are left today, from the save's `arena` ({ day, won: [level, ...] }).
+export const arenaLeft = (record, cpu, day) => ARENA_DAILY - (record?.day === day ? record.won.filter((c) => c === cpu).length : 0);
 export const arenaPay = (cpu, level) =>
   ARENA_MULT[cpu] ? Math.round(Math.max(1, Math.min(100, level)) * ROAD_YEN * ARENA_MULT[cpu]) : 0;
 
