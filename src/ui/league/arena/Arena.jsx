@@ -305,7 +305,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                     <div className="ag-mon-text">
                       {/* MELEE OR RANGED at a glance (asked for): the role's reach as a pill by the name. */}
                       <b>{nameOf(m.species)} <i className={`ag-reach r-${roleOf(f)}`} data-tip={`${ROLE[roleOf(f)][0]}: ${ROLE[roleOf(f)][1]}`}>{ROLE[roleOf(f)][2]}</i></b>
-                      {enteringAs(m).species !== m.species && <span className="ag-megain">Enters as {nameOf(enteringAs(m).species)}{enteringAs(m).mega ? " · Mega Evolves in battle" : ""}</span>}
+                      {enteringAs(m).mega && <span className="ag-megain">Enters as {nameOf(enteringAs(m).species)} · Mega Evolves in battle</span>}
                       <span className="ag-lvrow">Lv {m.level} · <em className={`ag-role r-${roleOf(f)}`} data-tip={ROLE[roleOf(f)][1]}>{ROLE[roleOf(f)][0]}</em>
                         {m.level < 100 && !m.lock && !m.rental && (
                           <span className="ag-lvup" role="group" aria-label={`Raise ${nameOf(m.species)} with Rare Candy`}>

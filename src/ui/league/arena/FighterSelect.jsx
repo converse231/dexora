@@ -157,7 +157,7 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
                 <em className={`fs-role r-${role}`}>{ROLE_WORD[role]} · {role === "brawler" ? "Brawler" : "Blaster"}</em>
                 {mon.rental && <em className="fs-role fs-rent">Rental</em>}
               </div>
-              {enter.species !== mon.species && <p className="fs-megain">Enters as <b>{nameOf(enter.species)}</b>{enter.mega ? " and Mega Evolves in battle." : " - this Mega has no Arena animation yet, so it fights unevolved."}</p>}
+              {enter.mega && <p className="fs-megain">Enters as <b>{nameOf(enter.species)}</b> and Mega Evolves in battle.</p>}
               {focus.length > 1 && (
                 <div className="fs-copies" role="group" aria-label="Which one">
                   {focus.map((m) => (

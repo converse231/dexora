@@ -223,11 +223,12 @@ export const megaTargets = (id) => EVO_ROWS.filter((r) => r.from === id && MEGA.
    IS a Mega fights as the Pokemon it Mega Evolves from - Mega Charizard X as Charizard - with that one
    Mega to turn into (`megas`); a plain one has none. `enteringAs` is the entry a match builds from, the
    lobby and picker show, and the Fair format takes; `megaBase` the Pokemon a Mega comes from (0: none).
-   A Mega with no Arena body of its own (Mega Charizard Y) still fights - as its base, with no Mega to turn into. */
+   A Mega with no Arena body of its own (Mega Charizard Y) does not fight at all (your call, same day: one that
+   entered and never Mega Evolved read as broken). */
 export const megaBase = (id) => EVOLUTIONS.find((r) => r.to === id && MEGA.has(r.kind))?.from ?? 0;
 export const enteringAs = (m) => {
   const base = megaBase(m.species);
-  return base && arenaReady(base) ? { ...m, species: base, mega: arenaReady(m.species) ? m.species : 0 } : m;
+  return base && arenaReady(base) && arenaReady(m.species) ? { ...m, species: base, mega: m.species } : m;
 };
 // Every Mega a Pokemon's line can reach in a match: its own, and its evolutions'.
 export function lineMegas(id, seen = new Set()) {
@@ -242,7 +243,10 @@ export const EVO_XP = 0.6;
 export const MEGA_WARM = sec(25);
 export const megaReady = (s) => s.t >= MEGA_WARM;
 export const EVOLVE_T = sec(1.6);
-const EVO_HEAL = 0.15;
+/* EVOLVING IS A POWER SPIKE (2026-10-24, asked for: would a Charmander ever be picked?): a stage that can
+   still evolve fills its bar EVO_FAST faster, and evolving heals EVO_HEAL and charges EVO_ULT of the ULTI -
+   so a first stage is a ramp that rides two comebacks, not a worse Charizard. Mega Evolution is its own. */
+export const EVO_HEAL = 0.3, EVO_FAST = 1.5, EVO_ULT = 0.35;
 /* EACH FLOOR'S OWN EVENT (2026-10-23, asked for: "maps should have their
    unique mechanics or events"): once a match, at a time read off the seed
    (no draw, so every other roll stays where it was), announced on screen -
@@ -840,6 +844,7 @@ function evolveInto(s, f) {
   f.hp = Math.min(f.max, Math.round(f.max * share) + Math.floor(f.max * EVO_HEAL));
   f.types = now.types; f.id = to; f.xp = 0; f.evoTo = 0;
   if (mega) f.megaOn = true;
+  else gain(s, f.side, SURGE_MAX * EVO_ULT);
   f.basic.i = basicOf(f);
   s.ev.push({ k: "evolved", side: f.side, slot: f.slot, from, to, mega, x: f.x, y: f.y });
 }
@@ -1759,7 +1764,7 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     if (isUlt(move) && hasSig(a, "requiem") && d.hp <= d.max / 4) dmg = d.hp;
     d.regen = 0;
     d.hp = Math.max(0, d.hp - dmg);
-    a.xp += (dmg / d.max + (d.hp === 0 ? EVO_XP : 0)) * (hasSig(a, "splash") ? 2 : 1);
+    a.xp += (dmg / d.max + (d.hp === 0 ? EVO_XP : 0)) * (hasSig(a, "splash") ? 2 : 1) * (evoTargets(a.id).length ? EVO_FAST : 1);
     const st = s.sides[a.side].stats;
     st.dealt += dmg; st.hits++; st.chain++; st.best = Math.max(st.best, st.chain);
     s.sides[d.side].stats.chain = 0;
