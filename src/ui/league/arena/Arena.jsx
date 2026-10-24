@@ -131,8 +131,8 @@ const LEVEL_SAYS = {
 const MODE_NAME = { ladder: "Arena Ladder", quick: "Quick battle", training: "Training", friends: "Battle a friend" };
 // A role in a word and its perks, for the lobby and the tutor (arena.js's roleOf).
 const ROLE = {
-  brawler: ["Brawler", "Attack-led: runs and jabs faster, hits harder up close, shrugs off shots", "Melee"],
-  blaster: ["Blaster", "Sp. Atk-led: shots fly faster and farther, beams charge sooner", "Ranged"],
+  brawler: ["Brawler", "Attack-led: runs and jabs faster, hits harder up close, shrugs off shots"],
+  blaster: ["Blaster", "Sp. Atk-led: shots fly faster and farther, beams charge sooner"],
 };
 // What reaches how far: the tutor's filters, and which a role wants.
 const REACH = { melee: "close", dash: "close", shot: "range", beam: "range", multi: "range", pulse: "area", field: "area", self: "self" };
@@ -303,8 +303,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                     {m.rental ? <span className="ag-learn ag-rent" data-tip="A rental - catch your own to train it">Rental</span>
                       : <button type="button" className="ag-learn" onClick={() => onTutor(m.uid)} aria-label={`Teach ${nameOf(m.species)} moves`}>Moves</button>}
                     <div className="ag-mon-text">
-                      {/* MELEE OR RANGED at a glance (asked for): the role's reach as a pill by the name. */}
-                      <b>{nameOf(m.species)} <i className={`ag-reach r-${roleOf(f)}`} data-tip={`${ROLE[roleOf(f)][0]}: ${ROLE[roleOf(f)][1]}`}>{ROLE[roleOf(f)][2]}</i></b>
+                      <b>{nameOf(m.species)}</b>
                       {enteringAs(m).mega && <span className="ag-megain">Enters as {nameOf(enteringAs(m).species)} · Mega Evolves in battle</span>}
                       <span className="ag-lvrow">Lv {m.level} · <em className={`ag-role r-${roleOf(f)}`} data-tip={ROLE[roleOf(f)][1]}>{ROLE[roleOf(f)][0]}</em>
                         {m.level < 100 && !m.lock && !m.rental && (

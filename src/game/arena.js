@@ -288,6 +288,11 @@ export const PICKUPS = {
   "poke-ball": { held: false, name: "Poke Ball", says: "Releases a helper Pokemon on your side" },
   // The flyover's drop alone (`stepEvents`), never one of a pair.
   "full-restore": { held: false, rare: true, name: "Full Restore", says: "Heals half, cures any status, +50% ULTI" },
+  /* THE REVIVE (2026-10-24, asked for: "a revive mid-game, reviving a random downed teammate"): once a
+     match, from REVIVE_AT and only once somebody has fainted, the pair a PICK_EVERY lays is Revives -
+     still mirrored, so neither side is nearer. Touched, it brings a random fainted teammate back to the
+     bench at REVIVE_HP; a side with nobody down walks over it. */
+  revive: { held: false, rare: true, name: "Revive", says: "Brings a fainted teammate back at half HP" },
   // Mt. Moon's floor event alone.
   "moon-stone": { held: false, rare: true, name: "Moon Stone", says: "Evolves your Pokemon on the spot - or fills its ULTI" },
 };
@@ -321,6 +326,8 @@ const SIDE_AT = { audino: [-0.9, 0.5], plusle: [0.9, 0.5], "mr-mime": [-0.9, -0.
 // A follower helping this side in this way, now.
 const helping = (s, side, kind) => s.helpers.some((h) => h.side === side && h.kind === kind);
 const PICK_FIRST = sec(10), PICK_EVERY = sec(16), PICK_LIFE = sec(14), PICK_R = 0.5;
+export const REVIVE_AT = sec(35), REVIVE_HP = 0.5;
+const downed = (sd) => sd.team.filter((f) => f.hp <= 0);
 const X_TIME = sec(8), X_ATTACK = 1.3, X_GUARD = sec(1.5);
 /* WHAT ONE HIT IS WORTH, against the plan's 30-45 s a Pokemon. Measured
    2026-10-22 over 40 Hard-vs-Hard CPU matches at Lv 50: 0.32 was 54 s a
@@ -1191,7 +1198,9 @@ function stepGround(s) {
    second where it lies); gone after PICK_LIFE. */
 function stepItems(s, bodies) {
   if (s.t >= PICK_FIRST && (s.t - PICK_FIRST) % PICK_EVERY === 0) {
-    const kind = PICK_KINDS[Math.floor(rnd(s) * PICK_KINDS.length)];
+    const revive = !s.revived && s.t >= REVIVE_AT && s.sides.some((sd) => downed(sd).length);
+    if (revive) s.revived = true;
+    const kind = revive ? "revive" : PICK_KINDS[Math.floor(rnd(s) * PICK_KINDS.length)];
     let x = 0, y = 0;
     for (let n = 0; n < 6; n++) {
       x = X0 + 2 + rnd(s) * (W / 2 - X0 - 3); y = Y0 + 1.2 + rnd(s) * (Y1 - Y0 - 2.4);
@@ -1206,6 +1215,7 @@ function stepItems(s, bodies) {
       if (!f || f.hp <= 0) continue;
       if ((f.x - it.x) * (f.x - it.x) + (f.y - it.y) * (f.y - it.y) > (R + PICK_R) * (R + PICK_R)) continue;
       const sd = s.sides[f.side];
+      if (it.kind === "revive" && !downed(sd).length) continue;
       if (PICKUPS[it.kind].held) { if (sd.held) continue; sd.held = it.kind; }
       else useItem(s, f, it.kind);
       s.ev.push({ k: "pick", side: f.side, item: it.kind, x: it.x, y: it.y, held: PICKUPS[it.kind].held });
@@ -1269,6 +1279,12 @@ function useItem(s, f, kind) {
   if (kind === "moon-stone") {
     if (evoTargets(f.id).length) f.xp = Math.max(f.xp, EVO_XP);
     else gain(s, f.side, SURGE_MAX);
+    return;
+  }
+  if (kind === "revive") {
+    const down = downed(s.sides[f.side]), back = down[Math.floor(rnd(s) * down.length)];
+    back.hp = Math.max(1, Math.floor(back.max * REVIVE_HP)); back.status = -1; back.badly = false; back.stages = back.stages.map(() => 0);
+    s.ev.push({ k: "revived", side: f.side, slot: back.slot, id: back.id, x: f.x, y: f.y });
     return;
   }
   if (kind === "potion") heal(s, f, Math.floor(f.max * 0.2));
@@ -1998,7 +2014,7 @@ function cpuInput(s, side) {
     || (hi === "x-defense" && fa?.ph === "wind" && (fa.dx * -ux + fa.dy * -uy) > 0.85))) return { ...NO_INPUT, use: true };
   // Nothing ready, and a power-up nearer than the foe: the CPU goes for it.
   if (L.items && pick < 0 && !me.act) {
-    const near = s.items.filter((it) => !(PICKUPS[it.kind].held && hi))
+    const near = s.items.filter((it) => !(PICKUPS[it.kind].held && hi) && (it.kind !== "revive" || downed(s.sides[side]).length))
       .map((it) => [(it.x - me.x) * (it.x - me.x) + (it.y - me.y) * (it.y - me.y), it]).sort((a, b) => a[0] - b[0])[0];
     if (near && near[0] < 25 && near[0] < dist * dist) { mx = near[1].x - me.x; my = near[1].y - me.y; }
   }
@@ -2155,7 +2171,7 @@ export function rulesPrint() {
 // What a replay compares: where everyone is and how they are, each tick's end.
 export const stateHash = (s) => hash(JSON.stringify([s.t, s.intro, s.rs, s.winner,
   s.items.map((it) => [it.kind, it.x, it.y, it.t]), s.weather, s.dark, s.tide, s.erupt, s.lanes.map((l) => [l.y, l.t]), s.helpers.map((h) => [h.kind, h.x, h.y, h.t]), s.domes.map((dm) => [dm.x, dm.y, dm.t]), s.domain && [s.domain.kind, s.domain.t], s.perish, s.throws.map((th) => th.t), s.fires.map((fl) => [fl.x, fl.y, fl.t]), s.strikes.map((z) => [z.x, z.y, z.t]), s.clouds.map((c) => [c.x, c.y, c.t]),
-  s.sudden ? 1 : 0,
+  s.sudden ? 1 : 0, s.revived ? 1 : 0,
   s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.cd), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused, f.id, f.xp, f.evo, f.splat, f.fortress, f.regen, f.awake]), sd.trapT]),
   s.shots.map((p) => [p.x, p.y]), s.hazards.map((z) => [z.x, z.y, z.t]),
   s.cover.map((c) => c.hp), [s.zone.open, s.zone.t, s.zone.claimed], s.drops.map((r) => [r.x, r.y, r.t])]));

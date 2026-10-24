@@ -1212,7 +1212,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   `PICK_EVERY` (point for point, so the floors stay fair - check.mjs), gone
   after `PICK_LIFE`; Potion, Full Heal and Shiny Stone work on touch, the X
   items are HELD one a side (`sd.held`) and used (`use` input, G); the CPU
-  from Normal up takes them. **The clutch** is the picture's alone: both
+  from Normal up takes them. **The Revive** (2026-10-24, asked for) is that slot's pair ONCE a match,
+  from `REVIVE_AT` and only once somebody has fainted: a random fainted
+  teammate back on the bench at `REVIVE_HP`; a side with nobody down walks
+  over it (`s.revived`, in the hash). **The clutch** is the picture's alone: both
   under a fifth of their HP, within reach, one winding up - slow motion,
   bars and "CLUTCH", once in nine seconds (online never slows its rules).
   **Judgements** (GREAT at 5 hits to LEGENDARY at 25, a rationed COUNTER,
@@ -1377,13 +1380,14 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   accepted one to the Arena page as `join`. It names the floor from
   `game/floors.js` (arena.js re-exports it - the main bundle never imports
   arena.js). The lobby's team card raises its Pokemon with Rare Candy
-  (`engine.levelUp`, +1/+10/Max) and wears a MELEE or RANGED pill by its role.
+  (`engine.levelUp`, +1/+10/Max); its role reads Brawler or Blaster - one
+  word everywhere (a MELEE/RANGED pill beside it said the same, removed 2026-10-24).
   **Rentals and the locked showcase** (ladder.js, asked for 2026-10-24): six
   first stages at `RENTAL_LEVEL` anybody may field, no box entry - a uid is
   the negative of the dex id (`rentalOf`, `isRental`; `setArenaTeam` takes
   them) - and a new player with no team starts on three; `SHOWCASE` is drawn
   locked in the picker with where to catch it until one is held. The picker
-  filters Melee / Ranged. **Quick battles pay `ARENA_DAILY` (5) wins a level
+  filters Brawler / Blaster. **Quick battles pay `ARENA_DAILY` (5) wins a level
   a day** (`arenaLeft`; the save's `won` repeats are the count), held under a
   quarter of the road's day. Online steps
   with the wall clock, never the hit-stop (the other end would wait), has no

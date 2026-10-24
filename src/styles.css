@@ -11681,10 +11681,6 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 /* A role in a word (Brawler, Blaster), and the card's way to its Move Tutor. */
 .ag-role { font-style: normal; font-weight: 700; color: #ffb37a; }
 .ag-role.r-blaster { color: #8fdcff; }
-/* Melee or Ranged by the name, in the role's own colour. */
-.ag-reach { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; vertical-align: 2px;
-  font: 700 10px var(--pixel); font-style: normal; text-transform: uppercase; color: #1a0e04; background: #ffb37a; }
-.ag-reach.r-blaster { color: #04131c; background: #8fdcff; }
 .ag-rent { cursor: default; color: #ffd23f; }
 /* A Mega on the team: what enters first (arena.js enteringAs). */
 .ag-megain { display: block; font: 600 10.5px var(--pixel); color: #ff8ad8; }
