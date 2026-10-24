@@ -941,7 +941,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   equipped as passive perks against the CPU and the Ladder, never online,
   ranked or the League; `game/cardperks.js` derives each from rarity and
   type, gold and each set's `CHASE` card unique; arena.js gets numbers, the
-  save's `arenaCards`, `engine.setArenaCards`): no rule module (`catch`, `biomes`, `battle`, `league`, `trainer`,
+  save's `arenaCards`, `engine.setArenaCards`; equipped from the lobby header's
+  `DeckStrip` through a deck builder in the fighter select's frame, CardPerks.jsx): no rule module (`catch`, `biomes`, `battle`, `league`, `trainer`,
   `items`, `perks`, `research`, `events`) imports `game/cards.js` or card
   data (asserted). Cards is the FIFTH tab (`#/cards`, `goTab`), a lazy page
   (`ui/cards/`); `ui/cards/load.js` is the only module that names
