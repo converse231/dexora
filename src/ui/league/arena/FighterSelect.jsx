@@ -9,7 +9,7 @@
    Backspace takes the last one out, Escape leaves. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { arenaReady, roleOf, ultiPick, shapeOf } from "../../../game/arena.js";
+import { arenaReady, roleOf, ultiPick, shapeOf, enteringAs } from "../../../game/arena.js";
 import { playerFighter, refusal, moveOf } from "../../../game/battle.js";
 import { isEvent } from "../../../data/dex.js";
 import { speciesById, tierName } from "../../../game/biomes.js";
@@ -42,7 +42,7 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
   /* Your own fighters, then a RENTAL of each rental species you hold no fighter
      of (ladder.js), then the SHOWCASE you have not caught - locked. */
   const fighters = useMemo(() => {
-    const own = box.filter((m) => !refusal(m) && !isEvent(m.species) && arenaReady(m.species));
+    const own = box.filter((m) => !refusal(m) && !isEvent(m.species) && arenaReady(enteringAs(m).species));
     const held = new Set(own.map((m) => m.species));
     return [...own, ...RENTALS.filter(([id]) => !held.has(id) && arenaReady(id)).map(([id]) => rentalOf(-id))];
   }, [box]);
@@ -108,9 +108,11 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
   useEffect(() => { grid.current?.querySelector(".fs-cell.cur")?.scrollIntoView({ block: "nearest" }); }, [cur]);
   useEffect(() => { if (slam >= 0) { const t = setTimeout(() => setSlam(-1), 450); return () => clearTimeout(t); } }, [slam]);
 
-  const f = useMemo(() => mon && playerFighter(mon), [mon]);
+  // A Mega is shown as what enters: its base's role, ULTI, stats and moves (arena.js `enteringAs`).
+  const enter = mon && enteringAs(mon);
+  const f = useMemo(() => enter && playerFighter(enter), [mon]);   // eslint-disable-line react-hooks/exhaustive-deps
   const role = f && roleOf(f);
-  const ult = mon && ultiPick(mon.species);
+  const ult = enter && ultiPick(enter.species);
   const kit = f ? f.moves.map((m) => m.i).filter((i) => i !== ult.move && shapeOf(moveOf(i))) : [];
   const teamMons = team.map((u) => fighters.find((m) => m.uid === u)).filter(Boolean);
   const types = useMemo(() => [...new Set(roster.flatMap((c) => speciesById(c[0].species).types))].sort(), [roster]);
@@ -155,6 +157,7 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
                 <em className={`fs-role r-${role}`}>{ROLE_WORD[role]} · {role === "brawler" ? "Brawler" : "Blaster"}</em>
                 {mon.rental && <em className="fs-role fs-rent">Rental</em>}
               </div>
+              {enter.species !== mon.species && <p className="fs-megain">Enters as <b>{nameOf(enter.species)}</b>{enter.mega ? " and Mega Evolves in battle." : " - this Mega has no Arena animation yet, so it fights unevolved."}</p>}
               {focus.length > 1 && (
                 <div className="fs-copies" role="group" aria-label="Which one">
                   {focus.map((m) => (

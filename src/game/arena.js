@@ -219,6 +219,16 @@ const EVO_ROWS = EVOLUTIONS.filter((r) => !r.look && !r.event && arenaReady(r.to
 const MEGA = new Set(["mega", "primal"]);
 export const evoTargets = (id) => EVO_ROWS.filter((r) => r.from === id && !MEGA.has(r.kind) && r.kind !== "gmax").map((r) => r.to);
 export const megaTargets = (id) => EVO_ROWS.filter((r) => r.from === id && MEGA.has(r.kind)).map((r) => r.to);
+/* A MEGA ENTERS AS ITS BASE (2026-10-24, asked for: "consistent and less confusing"). A Box entry that
+   IS a Mega fights as the Pokemon it Mega Evolves from - Mega Charizard X as Charizard - with that one
+   Mega to turn into (`megas`); a plain one has none. `enteringAs` is the entry a match builds from, the
+   lobby and picker show, and the Fair format takes; `megaBase` the Pokemon a Mega comes from (0: none).
+   A Mega with no Arena body of its own (Mega Charizard Y) still fights - as its base, with no Mega to turn into. */
+export const megaBase = (id) => EVOLUTIONS.find((r) => r.to === id && MEGA.has(r.kind))?.from ?? 0;
+export const enteringAs = (m) => {
+  const base = megaBase(m.species);
+  return base && arenaReady(base) ? { ...m, species: base, mega: arenaReady(m.species) ? m.species : 0 } : m;
+};
 // Every Mega a Pokemon's line can reach in a match: its own, and its evolutions'.
 export function lineMegas(id, seen = new Set()) {
   if (seen.has(id)) return [];
@@ -390,8 +400,45 @@ export const roleOf = (f) => ((f.basic?.i ?? basicOf(f)) === BASIC_P ? "brawler"
 export const BRAWL_RUN = 1.2, BRAWL_CD = 0.65, BRAWL_HIT = 1.3, BRAWL_GUARD = 0.55;
 export const BLAST_SPEED = 1.15, BLAST_RANGE = 1.1, BLAST_BEAM = 0.85;
 export const basicCd = (f) => (roleOf(f) === "brawler" ? Math.round(BASIC_CD * BRAWL_CD) : BASIC_CD);
-// Which a fighter has: the jab for the higher Attack, the bolt for the higher Sp. Atk.
-export const basicOf = (f) => (f.st[1] >= f.st[3] ? BASIC_P : BASIC_S);
+/* A SPECIES' ROLE (2026-10-24, reported: "Jirachi is a Brawler - it should be a Blaster"). It was the
+   fighter's own Attack against its Sp. Atk, IVs and all, so a species whose two are level (Jirachi's
+   100 and 100) came out either way by a point of IV. Now it is the SPECIES': a clear lean in its base
+   stats (`ROLE_LEAN`, 15%) decides; closer than that, its ULTI's move does - the signature it is known
+   by - and a support ULTI leaves it to the power of what it learns. Jirachi's Doom Desire: a Blaster.
+   The jab, the bolt and the ULTI's stat all follow the role. */
+const ROLE_LEAN = 1.15;
+const ROLES = new Map();
+export function speciesRole(id) {
+  if (ROLES.has(id)) return ROLES.get(id);
+  const st = speciesById(id)?.stats ?? [0, 1, 0, 1, 0, 0];
+  let role;
+  if (st[1] >= st[3] * ROLE_LEAN) role = "brawler";
+  else if (st[3] >= st[1] * ROLE_LEAN) role = "blaster";
+  else {
+    // Its ULTI's move - its signature, the move it is known by (Hydro Cannon, Aura Sphere, Doom Desire)
+    // - decides; a support ULTI leaves it to what it learns, a move of its own type counting double.
+    // A line keeps one role where it is close: an earlier stage takes its evolution's (Squirtle, Blastoise's).
+    // The four named ULTIs no move entry holds - Frenzy Plant, Blast Burn, Hydro Cannon, Shadow Storm - are special.
+    const u = ultiPick(id), ult = MOVES[u.move], next = evoTargets(id);
+    if (next.length) role = speciesRole(next[0]);
+    else if (u.move < 0 && u.why === "named") role = "blaster";
+    else if (ult?.p > 1 && ult.c < 2) role = ult.c === 0 ? "brawler" : "blaster";
+    else {
+      let phys = 0, spec = 0;
+      const types = speciesById(id)?.types ?? [];
+      for (const i of learnable(id, 100, true)) {
+        const m = MOVES[i];
+        if (!(m.p > 1)) continue;
+        if (m.c === 0) phys += m.p * (types.includes(m.t) ? 2 : 1); else if (m.c === 1) spec += m.p * (types.includes(m.t) ? 2 : 1);
+      }
+      role = spec > phys ? "blaster" : phys > spec ? "brawler" : st[1] >= st[3] ? "brawler" : "blaster";
+    }
+  }
+  ROLES.set(id, role);
+  return role;
+}
+// Which a fighter has: the jab for a Brawler, the bolt for a Blaster.
+export const basicOf = (f) => (speciesRole(f.id) === "brawler" ? BASIC_P : BASIC_S);
 /* THE FINAL MINUTE: the clock's last FINAL_T hits harder and fills Surge
    twice as fast, announced on screen - a long fight ends on a swing, not a
    tally of HP. */
@@ -1434,7 +1481,8 @@ export function ultiPick(id) {
     pick = { move: i, name: named[0], arch: named[1], type: i >= 0 ? MOVES[i].t : types[0], why: "named" };
   }
   if (!pick && sp) {
-    const st = fighter(id, 50, 1, []).st, physical = st[1] >= st[3];
+    // Its base stats' lean, not `speciesRole` (which asks this for its ULTI): which attacks to weigh.
+    const st = sp.stats ?? [0, 1, 0, 1, 0, 0], physical = st[1] >= st[3];
     const can = learnable(id, 100, true);
     const sig = can.filter((i) => MOVES[i].p && learnersOf(i) <= 3 && MOVES[i].p >= 90 && ultiArchetype(i)).sort((a, b) => MOVES[b].p - MOVES[a].p)[0];
     // Its most ITS OWN support move first (fewest learners - King's Shield is Aegislash's), then by archetype.
@@ -1478,7 +1526,7 @@ function ultimate(s, side, f) {
   const u = ultOf(f);
   // Star Chronos (Dialga's chase card): its ULTI readies every move.
   if (hasSig(f, "chrono")) for (const m of f.kit) m.cd = 0;
-  const move = ULT_BASE - TYPES.indexOf(u.type) * 2 - (f.st[1] >= f.st[3] ? 0 : 1);
+  const move = ULT_BASE - TYPES.indexOf(u.type) * 2 - (roleOf(f) === "brawler" ? 0 : 1);   // its ULTI hits with its role's stat
   const d = activeOf(s, 1 - side);
   const tx = d ? d.x : W - f.x, ty = d ? d.y : f.y;
   s.ev.push({ k: "ult", side, name: u.name, kind: u.kind, arch: u.arch, type: u.type, id: f.id, x: f.x, y: f.y });
@@ -2020,7 +2068,11 @@ export const masterTeam = (m) => m.team.map(([id], slot) => {
    FAIR_LEVEL with every IV at 31 and its level-up moves there - what you
    bring is which Pokemon, never how far you raised them. */
 export const FAIR_LEVEL = 50;
-export const fairTeam = (ids) => ids.map((id) => fighter(id, FAIR_LEVEL, hash(`fair:${id}`), movesAt(id, FAIR_LEVEL), 0, 31));
+// A Mega in it enters as its base and may Mega Evolve into it, as offline (`enteringAs`).
+export const fairTeam = (ids) => ids.map((id) => {
+  const e = enteringAs({ species: id }), at = e.species;
+  return { ...fighter(at, FAIR_LEVEL, hash(`fair:${id}`), movesAt(at, FAIR_LEVEL), 0, 31), megas: e.mega ? [e.mega] : [] };
+});
 
 // ------------------------------------------------------------------ playing online
 

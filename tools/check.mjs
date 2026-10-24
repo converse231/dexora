@@ -7475,6 +7475,16 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         s3.t = A.MEGA_WARM;          // warm, so only the missing permission refuses it
         for (let t = 0; t < 2 * A.TPS; t++) A.tick(s3, [{ ...A.NO_INPUT, mega: true }, null]);
         assert.equal(f3.id, 6, "a Pokemon Mega Evolved without its Mega allowed");
+        /* YOUR MEGA ENTERS AS ITS BASE (2026-10-24, asked for): Mega Charizard X fights as Charizard and may
+           turn into X alone; a plain Charizard never Mega Evolves; a Mega with no Arena body (Y) fights as
+           Charizard with none; the Fair format the same. */
+        const xm = A.lineMegas(4)[0];
+        assert.deepEqual(A.enteringAs({ species: xm }), { species: 6, mega: xm }, "a Mega does not enter as its base, able to turn into it");
+        assert.deepEqual(A.enteringAs({ species: 6 }), { species: 6 }, "a plain Pokemon enters with a Mega");
+        const noBody = (await import("../src/data/evolutions.js")).EVOLUTIONS.find((r) => r.from === 6 && r.kind === "mega" && !A.arenaReady(r.to));
+        assert.ok(noBody, "Charizard has no Mega without an Arena body to test with");
+        assert.deepEqual(A.enteringAs({ species: noBody.to }), { species: 6, mega: 0 }, "a Mega with no Arena body may Mega Evolve");
+        assert.deepEqual(A.fairTeam([xm, 6]).map((f) => [f.id, f.megas]), [[6, [xm]], [6, []]], "the Fair format does not enter a Mega as its base");
       }
       // Every floor's event, once, with its own effect.
       const floorRun = (arena, test) => {
@@ -7520,7 +7530,8 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
            Magnemite zaps the foe - each against the same 8 s with none. And a
            benched Pokemon rests up to three quarters of its HP, never past. */
         const along = (kind) => {
-          const s = A.newMatch({ teams: [[bFighter(25, 50, 1, [idx("tackle")]), bFighter(1, 50, 3, [idx("tackle")])], [bFighter(6, 50, 2, [idx("tackle")])]],
+          // Snorlax leads: it must stand the 8 s (a Pikachu at half HP fell, and the rested bench came in).
+          const s = A.newMatch({ teams: [[bFighter(143, 50, 1, [idx("tackle")]), bFighter(1, 50, 3, [idx("tackle")])], [bFighter(6, 50, 2, [idx("tackle")])]],
             cpu: [null, null], seed: 3, weather: "clear", events: false });
           const [a, d, bench] = [s.sides[0].team[0], s.sides[1].team[0], s.sides[0].team[1]];
           Object.assign(a, { x: 8, y: 8, px: 8, py: 8 }); a.hp = a.max >> 1; bench.hp = Math.floor(bench.max * 0.7);
@@ -8163,8 +8174,19 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       assert.equal(speciesById(id)?.name.toLowerCase(), name.toLowerCase(), `ladder.js names #${id} ${name}, which is ${speciesById(id)?.name}`);
       assert.ok(A.arenaReady(id), `${name} is a rental or in the showcase with no Arena body`);
     }
-    const rentRoles = new Set(LD.RENTALS.map(([id]) => A.roleOf(bFighter(id, LD.RENTAL_LEVEL, 1))));
-    assert.equal(rentRoles.size, 2, "the rentals are all one role - a new player gets no choice of reach");
+    const rentMelee = LD.RENTALS.filter(([id]) => A.roleOf(bFighter(id, LD.RENTAL_LEVEL, 1)) === "brawler").length;
+    assert.equal(rentMelee * 2, LD.RENTALS.length, "the rentals are not half melee, half ranged");
+    /* A ROLE IS THE SPECIES' (2026-10-24, reported: Jirachi a Brawler). Never a fighter's IVs: every
+       uid of a species has its role; Jirachi, level stats and Doom Desire, is a Blaster; and a close
+       line keeps one role (Squirtle to Blastoise). */
+    {
+      const { SPECIES: SP } = await import("../src/data/dex.js");
+      const split = SP.filter((sp) => sp.id <= 1025 && A.arenaReady(sp.id)
+        && new Set([1, 2, 3, 4, 5, 6, 7, 8].map((u) => A.roleOf(bFighter(sp.id, 50, u)))).size > 1);
+      assert.deepEqual(split.map((sp) => sp.name), [], "a species' role turns on its IVs");
+      assert.equal(A.speciesRole(385), "blaster", "Jirachi is no Blaster");
+      assert.deepEqual([7, 8, 9].map(A.speciesRole), ["blaster", "blaster", "blaster"], "Squirtle's line is not one role");
+    }
     assert.ok(LD.RENTALS.every(([id]) => !LD.SHOWCASE.some(([s]) => s === id)), "a rental is also in the locked showcase");
     assert.ok(LD.RENTALS.every(([id]) => LD.isRental(-id) && LD.rentalOf(-id).species === id) && !LD.isRental(1) && !LD.isRental(-150),
       "a rental's uid does not resolve, or a box uid or a non-rental reads as one");
