@@ -29,9 +29,8 @@ import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, 
 import { isEvent } from "../../../data/dex.js";
 import { connect } from "./net.js";
 import { LADDER, masterOf, ladderOpen, ladderPay, ARENA_TEAM, rentalOf, RENTALS } from "../../../game/ladder.js";
-import { teamPerks, ARENA_CARDS } from "../../../game/cardperks.js";
-import { useEquipped, CardPerkPick } from "./CardPerks.jsx";
-import CardFace from "../../cards/Card.jsx";
+import { teamPerks } from "../../../game/cardperks.js";
+import { useEquipped, CardPerkPick, DeckStrip } from "./CardPerks.jsx";
 import { playerFighter, moveOf, STRUGGLE, refusal, learnable, movesOf } from "../../../game/battle.js";
 import { TUTOR_PRICE } from "../../../game/items.js";
 import { IMPACTS, impactOwned, impactFor } from "../../../game/cosmetics.js";
@@ -202,7 +201,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
       {editing && <FighterSelect box={box} picked={mons} custom={arenaTeam.length > 0}
         onSave={(uids) => { engine?.setArenaTeam(uids); setEditing(false); }} onClose={() => setEditing(false)} />}
       {howto && <HowTo onClose={() => setHowto(false)} />}
-      {cardPick && <CardPerkPick owned={cards} equipped={equipped} onClose={() => setCardPick(false)}
+      {cardPick && <CardPerkPick owned={cards} equipped={equipped} team={mons.map((m) => m.species)} onClose={() => setCardPick(false)}
         onSave={(ids) => { engine?.setArenaCards(ids); setCardPick(false); }} />}
       {shop && <UltShop engine={engine} money={money} impacts={impacts} impactsOff={impactsOff} onClose={() => setShop(false)} />}
       {tutorFor != null && box.some((m) => m.uid === tutorFor) && (
@@ -270,6 +269,8 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
             <span className="ag-stat"><b>{ladder.length}<u>/{LADDER.length}</u></b><i>Ladder</i></span>
             <span className="ag-stat"><b className={best.grade ? `g-${best.grade}` : ""}>{best.grade ?? "-"}</b><i>Best grade</i></span>
             <span className="ag-stat"><b>{best.streak}</b><i>Win streak</i></span>
+            {/* ARENA CARDS (cardperks.js): the three equipped, small, up here - out of the team's way. */}
+            <DeckStrip equipped={equipped} onOpen={onCards} />
             {SHOP_OPEN && <button type="button" className="ag-help ag-shopkey" onClick={onShop}><Icon n="shop" size={18} /><span>ULTI Shop</span></button>}
             <button type="button" className="ag-help" onClick={onHowto}><Icon n="help" size={18} /><span>How to play</span></button>
           </div>
@@ -329,24 +330,6 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
               })}
             </ol>
             <p className="ag-note">{custom ? "Your Arena team - apart from your League team." : "Your League team's first three. Edit to pick an Arena team of its own."}</p>
-            {/* ARENA CARDS (cardperks.js): three passive perks against the CPU and the Ladder. */}
-            <div className="ag-sec ag-cards-head">
-              <h3>Cards</h3>
-              <button type="button" className="ag-edit" onClick={onCards}><Icon n="cards" size={16} />Equip</button>
-            </div>
-            <ol className="ag-cards">
-              {Array.from({ length: ARENA_CARDS }, (_, k) => {
-                const e = equipped[k];
-                return e ? (
-                  <li key={e.id} className={`ag-card${e.perk.chase ? " chase" : e.perk.gold ? " gold" : ""}`} data-tip={e.perk.says.join(" · ")}>
-                    <CardFace setId={e.set} card={e.card} variant="n" still lazy />
-                    <b>{e.perk.title}</b><span>{e.perk.says[0].replace("Your team: ", "")}</span>
-                  </li>
-                ) : (
-                  <li key={k} className="ag-card empty"><button type="button" onClick={onCards}><Icon n="plus" size={18} /><span>Add a card</span></button></li>
-                );
-              })}
-            </ol>
           </section>
 
           <section className="ag-play" aria-label="Choose how to fight">
