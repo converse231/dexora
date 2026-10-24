@@ -1496,13 +1496,16 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   bar (`xp`) with the share of a foe's HP it deals, a knockout a whole bar
   (`EVO_XP`), and evolves where it stands - `EVOLVE_T` untouchable and still,
   then the next stage's stats scaled from its own (IVs and perks carry), its
-  types, its HP share plus `EVO_HEAL`; twice in a match for a three-stage
+  types, its HP share plus `EVO_HEAL` and `EVO_ULT` of the ULTI, its bar
+  filling `EVO_FAST` faster while it can evolve (2026-10-24, asked for: a
+  first stage is a ramp, not a worse pick - first-stage teams went 1 -> 6
+  wins in 20 against Normal); twice in a match for a three-stage
   line, a branch from the seed. **Mega Evolution** is once a match a side
   (`megaUsed`, the `mega` input: T, D-pad down, the HUD's rainbow button),
   for the Mega in `megas` - and only YOUR Mega: a Box entry that is a Mega
   ENTERS AS ITS BASE and may turn into that one, a plain one never Mega
   Evolves (`enteringAs`/`megaBase`, 2026-10-24, asked for: "consistent, less
-  confusing"; a Mega with no Arena body fights as its base) - and only `MEGA_WARM` into the match (asked for: "not something
+  confusing"; a Mega with no Arena body does not fight at all, your call) - and only `MEGA_WARM` into the match (asked for: "not something
   immediately ready"; the button fills toward it); the CPU from Hard and the Fair format get every one. Both only
   into an `arenaReady` form. The picture is the games': white, flickering
   between the two bodies faster and faster in a pillar of light (a Mega in

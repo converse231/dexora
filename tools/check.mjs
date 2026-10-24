@@ -7454,6 +7454,19 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
           seen = s.ev.find((e) => e.k === "evolved");
         }
         assert.ok(seen && f.id === 5 && f.st[1] > atk, "a Charmander that knocked one out did not evolve into a stronger Charmeleon");
+        // ...and evolving is a spike (2026-10-24): it charges the ULTI and heals (EVO_ULT, EVO_HEAL).
+        assert.ok(s.sides[0].meter >= A.SURGE_MAX * A.EVO_ULT, "evolving charged no ULTI");
+        /* A stage that can evolve fills its bar EVO_FAST faster than one that cannot: the same hit, Charmander and
+           Charizard. */
+        const xpOf = (id) => {
+          const m = A.newMatch({ teams: [[bFighter(id, 50, 1, [idx("ember")])], [bFighter(143, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 3, weather: "clear", events: false });
+          const [a, d] = [m.sides[0].team[0], m.sides[1].team[0]];
+          Object.assign(a, { x: 8, y: 8, px: 8, py: 8 }); Object.assign(d, { x: 10, y: 8, px: 10, py: 8 });
+          let dealt = 0;
+          for (let t = 0; t < 2 * A.TPS; t++) { A.tick(m, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: t < 3 ? 0 : -1 }, null]); for (const e of m.ev) if (e.k === "hit" && e.side === 1) dealt += e.frac; }
+          return a.xp / dealt;
+        };
+        assert.ok(Math.abs(xpOf(4) / xpOf(6) - A.EVO_FAST) < 0.01, "a first stage's evolution bar fills no faster than a last stage's");
         assert.ok(safe, "an evolving Pokemon could be hit");
         // Mega: not allowed, never; allowed, once a match.
         const [s2, f2] = ev(A.lineMegas(4));
@@ -7476,14 +7489,14 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         for (let t = 0; t < 2 * A.TPS; t++) A.tick(s3, [{ ...A.NO_INPUT, mega: true }, null]);
         assert.equal(f3.id, 6, "a Pokemon Mega Evolved without its Mega allowed");
         /* YOUR MEGA ENTERS AS ITS BASE (2026-10-24, asked for): Mega Charizard X fights as Charizard and may
-           turn into X alone; a plain Charizard never Mega Evolves; a Mega with no Arena body (Y) fights as
-           Charizard with none; the Fair format the same. */
+           turn into X alone; a plain Charizard never Mega Evolves; a Mega with no Arena body (Y) does not
+           fight at all; the Fair format the same. */
         const xm = A.lineMegas(4)[0];
         assert.deepEqual(A.enteringAs({ species: xm }), { species: 6, mega: xm }, "a Mega does not enter as its base, able to turn into it");
         assert.deepEqual(A.enteringAs({ species: 6 }), { species: 6 }, "a plain Pokemon enters with a Mega");
         const noBody = (await import("../src/data/evolutions.js")).EVOLUTIONS.find((r) => r.from === 6 && r.kind === "mega" && !A.arenaReady(r.to));
         assert.ok(noBody, "Charizard has no Mega without an Arena body to test with");
-        assert.deepEqual(A.enteringAs({ species: noBody.to }), { species: 6, mega: 0 }, "a Mega with no Arena body may Mega Evolve");
+        assert.ok(!A.arenaReady(A.enteringAs({ species: noBody.to }).species), "a Mega with no Arena body may fight");
         assert.deepEqual(A.fairTeam([xm, 6]).map((f) => [f.id, f.megas]), [[6, [xm]], [6, []]], "the Fair format does not enter a Mega as its base");
       }
       // Every floor's event, once, with its own effect.
@@ -7889,10 +7902,10 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
           const [a, d] = [s.sides[0].team[0], s.sides[1].team[0]];
           Object.assign(a, { x: 10, y: 8, px: 10, py: 8 }); Object.assign(d, { x: 12.5, y: 8, px: 12.5, py: 8 });
           a.hp = a.max >> 1; s.sides[0].team[1].hp = s.sides[0].team[1].max >> 1; s.sides[0].meter = A.SURGE_MAX;
-          const out = { s, a, d, foeLost: 0, ev: new Set(), healed: 0 };
+          const out = { s, a, d, foeLost: 0, ev: new Set(), healed: 0, low: a.hp };
           for (let t = 0; t < 3 * A.TPS; t++) {
             A.tick(s, [{ ...A.NO_INPUT, surge: t === 0, ax: d.x - a.x, ay: d.y - a.y }, null]);
-            Object.assign(d, { x: 12.5, y: 8 });
+            Object.assign(d, { x: 12.5, y: 8 }); out.low = Math.min(out.low, a.hp);
             for (const e of s.ev) { out.ev.add(e.k); if (e.k === "hit" && e.side === 1 && e.ult) out.foeLost += e.dmg / d.max; if (e.k === "heal" && e.side === 0) out.healed += e.n / a.max; }
           }
           return out;
@@ -7900,7 +7913,8 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         for (const arch of A.ARCHETYPES) {
           const id = by[arch][0];      // Mew, the foe, is immune to no type
           const r = run(id), who = `${arch} (#${id}, ${A.ultiPick(id).name})`;
-          if (arch === "Sacrifice") assert.ok(r.foeLost > 0.4 && r.a.hp === 1, `${who} did not blast hard and leave its user at 1 HP`);
+          // Its user down to 1 HP - at the lowest: the blast can fill its evolution bar, and evolving heals.
+          if (arch === "Sacrifice") assert.ok(r.foeLost > 0.4 && r.low === 1, `${who} did not blast hard and leave its user at 1 HP`);
           else if (["Cataclysm", "Storm", "Cannon", "Nova", "Barrage", "Onslaught", "Phantom"].includes(arch)) assert.ok(r.foeLost >= 0.15 && r.foeLost <= 0.6, `${who} took ${(r.foeLost * 100).toFixed(0)}% of a neutral foe - outside 15-60%`);
           else if (arch === "Fortress") assert.ok(r.ev.has("fortress"), `${who} raised no fortress`);
           else if (arch === "Barrier") assert.ok(r.s.domes.length === 1, `${who} raised no dome`);
