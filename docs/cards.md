@@ -33,6 +33,23 @@ nothing in `game/` except the engine's card actions, and never by `catch.js`,
 `biomes.js`, `battle.js`, `league.js`, `trainer.js`, `perks.js` or `items.js`
 (check.mjs, the same shape as the League's data rule).
 
+**The one exception: Arena cards** *(2026-10-24, your call: "use cards as
+Arena items like passive perks users equip before battle, up to 3"; "Gold and
+set chase cards should have unique perks")*. Up to three equipped cards are
+passive perks in an Arena match against the CPU or the Ladder - never online
+(the Fair format), ranked, the League, a catch or a price. A perk is DERIVED
+in `game/cardperks.js`, and kept small (same day, your call: "not game
+breaking - just the top chase cards a bit better; no rare, holo rare or
+double rare"): a Pokemon card ABOVE the Double rare only; its rarity sets the
+strength (2%, the Special illustrations 4%), its Pokemon's first type the
+lever (damage, healing, cooldowns, guard, ULTI charge, status chance), each
+capped low; a card of a team member's own line counts double for it; a Gold
+card (Hyper, Mega Hyper) adds its family's small golden rule; and each set's
+CHASE card (one a set, frozen from the price snapshot - prices stay display
+only) is 6% and a SIGNATURE of its own Pokemon (`SIGNATURE`, every one
+different), working only while that Pokemon's line is on the team. arena.js never reads a card: the
+page hands it numbers (`teamPerks`).
+
 ## Decisions
 
 | | Decided | Why |

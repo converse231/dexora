@@ -16,7 +16,9 @@ import { speciesById, tierName } from "../../../game/biomes.js";
 import { variantOf } from "../../../game/items.js";
 import { label } from "../../../game/map.js";
 import { MOVES } from "../../../data/moves.js";
-import { ARENA_TEAM } from "../../../game/ladder.js";
+import { ARENA_TEAM, RENTALS, SHOWCASE, rentalOf } from "../../../game/ladder.js";
+import { foundIn } from "../../../game/biomes.js";
+import Icon from "../../Icon.jsx";
 import Sprite from "../../Sprite.jsx";
 import Types from "../../Types.jsx";
 import { useModalLock } from "../../modal.js";
@@ -33,9 +35,19 @@ const ARCH_SAYS = {
 // A copy's worth for the roster's face: level first, then a rare form over a plain one.
 const rank = (m) => m.level * 10 + (variantOf(m) ? 1 : 0) + (m.alpha ? 2 : 0);
 
+const ROLE_WORD = { brawler: "Melee", blaster: "Ranged" };
+
 export default function FighterSelect({ box, picked, custom, onSave, onClose }) {
   useModalLock();
-  const fighters = useMemo(() => box.filter((m) => !refusal(m) && !isEvent(m.species) && arenaReady(m.species)), [box]);
+  /* Your own fighters, then a RENTAL of each rental species you hold no fighter
+     of (ladder.js), then the SHOWCASE you have not caught - locked. */
+  const fighters = useMemo(() => {
+    const own = box.filter((m) => !refusal(m) && !isEvent(m.species) && arenaReady(m.species));
+    const held = new Set(own.map((m) => m.species));
+    return [...own, ...RENTALS.filter(([id]) => !held.has(id) && arenaReady(id)).map(([id]) => rentalOf(-id))];
+  }, [box]);
+  const owned = useMemo(() => new Set(box.map((m) => m.species)), [box]);
+  const locked = useMemo(() => SHOWCASE.map(([id]) => id).filter((id) => !owned.has(id) && arenaReady(id)), [owned]);
   // One portrait a species: its best copy; the rest are its alternates.
   const roster = useMemo(() => {
     const by = new Map();
@@ -45,11 +57,20 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
   }, [fighters]);
   const [team, setTeam] = useState(() => picked.map((m) => m.uid).filter((u) => fighters.some((m) => m.uid === u)).slice(0, ARENA_TEAM));
   const [type, setType] = useState("");
+  const [reach, setReach] = useState("");       // "", "brawler" (melee) or "blaster" (ranged)
   const [q, setQ] = useState("");
+  const roleBy = useMemo(() => new Map(roster.map((c) => [c[0].species, roleOf(playerFighter(c[0]))])), [roster]);
   const shown = useMemo(() => roster.filter((copies) => {
     const sp = speciesById(copies[0].species);
-    return (!type || sp.types.includes(type)) && (!q || nameOf(sp.id).toLowerCase().includes(q.toLowerCase()));
-  }), [roster, type, q]);
+    return (!type || sp.types.includes(type)) && (!reach || roleBy.get(sp.id) === reach)
+      && (!q || nameOf(sp.id).toLowerCase().includes(q.toLowerCase()));
+  }), [roster, type, reach, q, roleBy]);
+  // The locked ones answer the same filters, so a search for Charizard finds it locked.
+  const lockedShown = useMemo(() => locked.filter((id) => {
+    const sp = speciesById(id);
+    return (!type || sp.types.includes(type)) && (!q || nameOf(id).toLowerCase().includes(q.toLowerCase()));
+  }), [locked, type, q]);
+  const [peek, setPeek] = useState(null);       // a locked species under the cursor
   const [cur, setCur] = useState(0);
   const [alt, setAlt] = useState({});           // species -> the copy chosen in the spotlight
   const copyOf = (copies) => copies.find((m) => m.uid === alt[copies[0].species]) ?? copies[0];
@@ -120,7 +141,7 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
 
       <div className="fs-main">
         <aside className="fs-spot" aria-live="polite">
-          {mon ? (
+          {!peek && mon ? (
             <>
               <div className={`fs-stage t-${speciesById(mon.species).types[0]}`}>
                 <Sprite id={mon.species} variant={variantOf(mon)} eager alt="" />
@@ -131,7 +152,8 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
               </div>
               <div className="fs-tags">
                 <Types of={speciesById(mon.species).types} />
-                <em className={`fs-role r-${role}`}>{role === "brawler" ? "Brawler" : "Blaster"}</em>
+                <em className={`fs-role r-${role}`}>{ROLE_WORD[role]} · {role === "brawler" ? "Brawler" : "Blaster"}</em>
+                {mon.rental && <em className="fs-role fs-rent">Rental</em>}
               </div>
               {focus.length > 1 && (
                 <div className="fs-copies" role="group" aria-label="Which one">
@@ -159,12 +181,25 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
                 {team.includes(mon.uid) ? "Take out" : "Pick"}
               </button>
             </>
-          ) : <p className="fs-none">Catch a Pokémon first - the Arena fights with your Box.</p>}
+          ) : !peek && <p className="fs-none">Catch a Pokémon first - the Arena fights with your Box.</p>}
+          {peek && (
+            /* A LOCKED one under the cursor: what it is and where it lives - catching it is the key. */
+            <div className="fs-locked" role="status">
+              <div className={`fs-stage t-${speciesById(peek).types[0]}`}><Sprite id={peek} eager alt="" /><Icon n="lock" size={34} /></div>
+              <h2>{nameOf(peek)}</h2>
+              <p>Locked - catch one to fight with it.{foundIn(peek).areas.length ? ` Found in ${foundIn(peek).areas.slice(0, 2).map((a) => a.name).join(" and ")}.` : ""}</p>
+            </div>
+          )}
         </aside>
 
         <section className="fs-roster">
           <div className="fs-filters">
             <input id="fs-q" type="search" placeholder="Find a fighter" value={q} onChange={(e) => { setQ(e.target.value); setCur(0); }} aria-label="Find a fighter" />
+            <div className="fs-types fs-reach" role="group" aria-label="Melee or ranged">
+              {[["", "Any reach"], ["brawler", "Melee"], ["blaster", "Ranged"]].map(([r, w]) => (
+                <button key={w} type="button" className={`${r ? `r-${r}` : ""}${reach === r ? " on" : ""}`} onClick={() => { setReach(r); setCur(0); }}>{w}</button>
+              ))}
+            </div>
             <div className="fs-types" role="group" aria-label="Type">
               <button type="button" className={type ? "" : "on"} onClick={() => { setType(""); setCur(0); }}>All</button>
               {types.map((t) => (
@@ -183,9 +218,18 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
                   <Sprite id={m.species} variant={variantOf(m)} alt="" />
                   {at >= 0 && <em>{at === 0 ? "L" : at + 1}</em>}
                   {copies.length > 1 && <i>×{copies.length}</i>}
+                  {m.rental && <i className="fs-tag">Rent</i>}
                 </button>
               );
             })}
+            {!reach && lockedShown.map((id) => (
+              <button key={`lock-${id}`} type="button" className="fs-cell lock" aria-disabled="true"
+                onMouseEnter={() => setPeek(id)} onMouseLeave={() => setPeek(null)} onFocus={() => setPeek(id)} onBlur={() => setPeek(null)}
+                onClick={() => setPeek(peek === id ? null : id)} aria-label={`${nameOf(id)} - locked, catch one to unlock`}>
+                <Sprite id={id} alt="" />
+                <i className="fs-tag"><Icon n="lock" size={12} /></i>
+              </button>
+            ))}
           </div>
         </section>
       </div>

@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-24-arena-cards",
+    icon: "🃏",
+    date: "October 2026",
+    title: "Arena cards, rentals and daily prizes",
+    items: [
+      ["Arena cards", "Equip up to three of your cards as perks. Gold and each set's chase card are special."],
+      ["Rentals", "New to the Arena? Six free fighters to start with - and twelve locked ones to catch."],
+      ["Five prizes a level", "Quick battles pay five wins a day on Easy, Normal and Hard, and pay more."],
+      ["Melee or Ranged", "Every fighter says which, and the picker filters by it."],
+    ],
+  },
+  {
     id: "2026-10-24-hallowed-wave-two",
     icon: "👻",
     date: "October 2026",

@@ -48,14 +48,9 @@ export const LIMIT = 5 * 60 * TPS;              // 5:00, then the clock decides
 const sec = (s) => Math.round(s * TPS);
 
 /* The floors (public/arena/<id>.webp, `npm run arenas` from art/arena/). */
-export const ARENAS = [
-  { id: "indigo", name: "Indigo Court" },
-  { id: "moon", name: "Mt. Moon Cavern" },
-  { id: "seaside", name: "Seaside Boardwalk" },
-  { id: "caldera", name: "Ember Caldera" },
-  { id: "grove", name: "Monsoon Grove" },
-  { id: "rink", name: "Icefall Rink" },
-];
+// The floors live in floors.js, where the main bundle can name one without this file.
+import { ARENAS } from "./floors.js";
+export { ARENAS };
 
 /* THE GROUND, arena by arena. Tile rectangles [x0, y0, x1, y1] are measured
    on the floors themselves (art/arena/, on a tile grid): Seaside's water
@@ -231,6 +226,11 @@ export function lineMegas(id, seen = new Set()) {
   return [...megaTargets(id), ...evoTargets(id).flatMap((to) => lineMegas(to, seen))];
 }
 export const EVO_XP = 0.6;
+/* MEGA EVOLUTION WARMS UP (2026-10-24, asked for: "not something immediately ready"): it unlocks this
+   far into the match - off the intro, the same clock both ends of an online match count - and the
+   button fills toward it like the ULTI's meter. */
+export const MEGA_WARM = sec(25);
+export const megaReady = (s) => s.t >= MEGA_WARM;
 export const EVOLVE_T = sec(1.6);
 const EVO_HEAL = 0.15;
 /* EACH FLOOR'S OWN EVENT (2026-10-23, asked for: "maps should have their
@@ -489,12 +489,17 @@ const multiCount = (m) => (m.hits ? Math.round((m.hits[0] + m.hits[1]) / 2) : 1)
    Arena can play. A kit that would not hit at all keeps Struggle beside them
    (a status-only kit), thrown like any move. */
 export function kitOf(f) {
-  /* A ULTI-tier move that is its ULTI is never also one of its four (2026-10-24: one ULTI a Pokemon, and
-     only one - Pikachu's Thunder). A ULTI made from an everyday attack leaves that move in the kit:
-     Machamp kept no Dynamic Punch to throw. */
-  const u = ultiPick(f.id), ult = u.move >= 0 && ultiArchetype(u.move) ? u.move : -1;
+  /* ITS ULTI'S MOVE IS NEVER ALSO ONE OF ITS FOUR (2026-10-24, reported: Machamp's fourth button and its
+     ULTI were both Dynamic Punch). The slot it leaves goes to the newest other move it has learned by its
+     level that the Arena plays - a kit stays four where the learnset allows. */
+  const ult = ultiPick(f.id).move;
   const kit = f.moves.filter((m) => m.i !== STRUGGLE && m.i !== ult && shapeOf(arenaMove(m.i))).slice(0, 4)
     .map((m) => ({ i: m.i, cd: 0 }));
+  if (ult >= 0 && kit.length < 4 && f.moves.some((m) => m.i === ult)) {
+    const more = learnable(f.id, f.level ?? 100).reverse()
+      .find((i) => i !== ult && i !== STRUGGLE && !kit.some((m) => m.i === i) && arenaMove(i).p > 1 && shapeOf(arenaMove(i)));
+    if (more != null) kit.push({ i: more, cd: 0 });
+  }
   if (!kit.some((m) => arenaMove(m.i).p > 0)) {
     if (kit.length === 4) kit.pop();
     kit.push({ i: STRUGGLE, cd: 0 });
@@ -515,8 +520,25 @@ const STAGE = (n) => (n >= 0 ? (2 + n) / 2 : 2 / (2 - n));
 // A small turn, without trig: rotate by about `k` radians (exact enough for a spread).
 const turn = (x, y, k) => norm(x - y * k, y + x * k);
 
-function body(f, side, slot) {
+/* A CARD'S PERKS (game/cardperks.js `teamPerks`), one object a Pokemon: plain numbers and flags, so
+   this file never reads a card. None for the CPU, online or a test. */
+const NO_CP = Object.freeze({ dmg: 0, regen: 0, cd: 0, guard: 0, ult: 0, status: 0, sig: [] });
+/* Small on purpose (2026-10-24, asked for: "not game breaking - just the chase cards a bit better"):
+   the golden rules' numbers, and every chase card's SIGNATURE (cardperks.js says each in words). */
+const AEGIS_T = sec(1), SPRING_K = 0.15, SHADE_START = 0.25, VENOM_P = 1 / 12, FLAME_P = 0.25, SPARK_K = 0.75;
+export const hasSig = (f, k) => (f.cp?.sig ?? []).includes(k);
+// A signature's hand on the damage of one hit, attacker and defender.
+function sigK(s, a, d, m, move, contact) {
+  const fallen = s.sides[a.side].team.filter((x) => x.hp <= 0).length;
+  return (isUlt(move) && hasSig(a, "vflare") ? 1.5 : 1) * (a.megaOn && hasSig(a, "aura") ? 1.1 : 1)
+    * ((m.t === "fire" || m.t === "dragon") && hasSig(a, "blueflame") ? 1.15 : 1) * (!contact && hasSig(a, "shuriken") ? 1.15 : 1)
+    * (hasSig(a, "rage") ? 1 + 0.03 * Math.floor((1 - a.hp / a.max) * 10) : 1)
+    * (hasSig(a, "protean") && !BASIC[move] && !isUlt(move) && !a.types.some((t) => TYPES[t] === m.t) ? 1.5 : 1)
+    * (hasSig(a, "lost") ? 1.25 : 1) * (hasSig(a, "fury") ? 1 + 0.08 * fallen : 1) * (!contact && hasSig(d, "shell") ? 0.8 : 1);
+}
+function body(f, side, slot, cp = NO_CP) {
   return {
+    cp,
     ...f, hp: f.hp * HP_K, max: f.max * HP_K, side, slot, kit: kitOf(f), stages: [...f.stages], stageT: [0, 0, 0, 0, 0, 0, 0, 0],
     x: side ? X1 - 2.5 : X0 + 2.5, y: H / 2, px: 0, py: 0, fx: side ? -1 : 1, fy: 0, moving: false,
     act: null, dodge: 0, dx: 0, dy: 0, dodgeCd: 0, inv: 0, shield: 0, stun: 0, kbx: 0, kby: 0, kbt: 0, flash: 0,
@@ -530,7 +552,7 @@ function body(f, side, slot) {
 /* A MATCH. `teams`: two lists of League fighters (`playerFighter` for yours,
    `fighter` for the CPU's). `cpu`: per side, null for a person or a CPU's
    level (`LEVELS`, or "dummy"). `arena`: a GROUND id, its cover and zones. */
-export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "indigo", intro = 0, weather = null, events = true }) {
+export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "indigo", intro = 0, weather = null, events = true, perks = [null, null] }) {
   const g = GROUND[arena] ? arena : "indigo";
   const s = {
     t: 0, intro, rs: seed | 0, over: false, winner: -1, why: "", ev: [], shots: [], hazards: [], nextId: 1,
@@ -538,13 +560,20 @@ export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "ind
     cover: COVER_AT.map(([x, y], i) => ({ id: i, x, y, hp: COVER_HP, max: COVER_HP })),
     zone: { open: false, t: ZONE_FIRST, claimed: [false, false], hold: [[0, 0], [0, 0]] },
     sides: teams.map((team, side) => ({
-      team: team.map((f, slot) => body(f, side, slot)), active: 0, swapT: 0, next: -1, swapCd: 0, koT: 0, meter: 0, held: null, megaUsed: false, trapT: 0,
+      team: team.map((f, slot) => body(f, side, slot, perks?.[side]?.[slot] ?? NO_CP)), active: 0, swapT: 0, next: -1, swapCd: 0, koT: 0, meter: 0, held: null, megaUsed: false, trapT: 0,
       // What the result screen tells (never read by the rules): damage dealt, hits, the best run of hits unanswered, perfect dodges, surges.
       stats: { dealt: 0, hits: 0, chain: 0, best: 0, perfect: 0, surges: 0 },
       cpu: cpu[side] ? { level: cpu[side], seen: 0, seenId: 0, strafe: 1, dodged: 0, lx: W / 2, ly: H / 2 } : null,
     })),
   };
   for (const side of s.sides) for (const f of side.team) { f.px = f.x; f.py = f.y; }
+  // Golden Shade: the ULTI starts part-charged; Golden Aegis: the lead comes out untouchable.
+  for (const sd of s.sides) {
+    if (sd.team.some((f) => f.cp.shade)) sd.meter = Math.round(SURGE_MAX * SHADE_START);
+    if (sd.team.some((f) => hasSig(f, "starraid"))) sd.meter = SURGE_MAX;
+    if (sd.team[0]?.cp.aegis) sd.team[0].inv = AEGIS_T;
+    for (const f of sd.team) f.fresh = true;
+  }
   // The weather and the match's two events, drawn now so a seed replays them.
   const roll = rnd(s) * WEATHER_ODDS.reduce((n, x) => n + x, 0);
   let acc = 0;
@@ -553,6 +582,8 @@ export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "ind
   const dark = rnd(s) < DARK_ODDS ? DARK_FIRST + Math.floor(rnd(s) * DARK_SPAN) : -1;
   const floor = FLOOR_FIRST + (Math.imul(seed | 0, 2654435761) >>> 0) % FLOOR_SPAN;
   s.plan = events ? { fly, dir, dark, floor } : { fly: -1, dir, dark: -1, floor: -1 };
+  // Drought (Groudon's chase card): the sun is out from the start.
+  if (s.sides.some((sd) => sd.team.some((f) => hasSig(f, "drought")))) s.weather = "sun";
   return s;
 }
 // Where Double Team's copies stand: beside their user, inside the court.
@@ -611,7 +642,7 @@ function stepSide(s, side, inp) {
   if (sd.swapT > 0) {
     if (--sd.swapT === 0) {
       const from = sd.team[sd.active], to = sd.team[sd.next];
-      Object.assign(to, { x: from.x, y: from.y, px: from.x, py: from.y, fx: from.fx, fy: from.fy, inv: SWAP_INV, act: null, dodge: 0, kbt: 0 });
+      Object.assign(to, { x: from.x, y: from.y, px: from.x, py: from.y, fx: from.fx, fy: from.fy, inv: to.cp.aegis ? AEGIS_T : SWAP_INV, act: null, dodge: 0, kbt: 0, fresh: true });
       sd.active = sd.next; sd.next = -1;
       s.ev.push({ k: "in", side, slot: sd.active });
     }
@@ -625,6 +656,11 @@ function stepSide(s, side, inp) {
   if (f.awake > 0) f.awake--;
   // Sanctuary's warmth: a little a second, until a hit lands.
   if (f.regen > 0 && --f.regen % TPS === 0 && f.hp > 0) heal(s, f, Math.max(1, Math.floor(f.max * SANCT_REGEN)));
+  // A healing card: its share of HP a second, while out.
+  const rg = f.cp.regen + (hasSig(f, "moonlight") ? 0.01 : 0);
+  if (rg > 0 && s.t % TPS === 0 && f.hp > 0 && f.hp < f.max) heal(s, f, Math.max(1, Math.floor(f.max * rg)));
+  // Speed Boost (Blaziken's): +1 Speed every 10 s, to +2, held there.
+  if (hasSig(f, "speedboost") && s.t > 0 && s.t % sec(10) === 0) { f.stages[5] = Math.min(2, f.stages[5] + 1); f.stageT[5] = sec(11); }
   if (f.dodgeCd > 0) f.dodgeCd--;
   if (f.inv > 0) f.inv--;
   if (f.shield > 0) f.shield--;
@@ -639,7 +675,7 @@ function stepSide(s, side, inp) {
   }
   if (!f.act && !f.dodge && !f.away && !held(f)) {
     const mega = megaOf(f);
-    if (inp.mega && mega && !sd.megaUsed) { sd.megaUsed = true; startEvo(s, side, f, mega, true); return; }
+    if (inp.mega && mega && !sd.megaUsed && (megaReady(s) || hasSig(f, "aura"))) { sd.megaUsed = true; startEvo(s, side, f, mega, true); return; }
     const next = f.xp >= EVO_XP ? evoTargets(f.id) : [];
     if (next.length) { startEvo(s, side, f, next.length > 1 ? next[Math.floor(rnd(s) * next.length)] : next[0], false); return; }
   }
@@ -669,7 +705,7 @@ function stepSide(s, side, inp) {
       const [dx, dy] = mx || my ? [mx, my] : [-f.fx, -f.fy];
       f.dodge = DODGE; f.dx = dx; f.dy = dy; f.inv = Math.max(f.inv, DODGE_INV);
       // Evasion stages shorten the dash's cooldown.
-      f.dodgeCd = Math.round(DODGE_CD * (1 - 0.15 * clamp(f.stages[7], -2, 2)));
+      f.dodgeCd = Math.round(DODGE_CD * (1 - 0.15 * clamp(f.stages[7], -2, 2)) * (f.cp.spark ? SPARK_K : 1));
       s.ev.push({ k: "dodge", side });
     }
     // A move pressed during a basic attack's recovery cuts it short: the basic never holds a move back.
@@ -680,7 +716,8 @@ function stepSide(s, side, inp) {
         const data = arenaMove(m.i);
         const [dx, dy] = ax || ay ? [ax, ay] : [f.fx, f.fy];
         f.fx = dx; f.fy = dy;
-        const w = shapeOf(data) === "beam" && roleOf(f) === "blaster" ? Math.round(windOf(data) * BLAST_BEAM) : windOf(data);
+        const w = Math.round((shapeOf(data) === "beam" && roleOf(f) === "blaster" ? windOf(data) * BLAST_BEAM : windOf(data))
+          * (shapeOf(data) === "beam" && hasSig(f, "psydrive") ? 0.6 : 1));
         f.act = { k, ph: "wind", t: w, t0: w, dx, dy, id: s.nextId++, shape: shapeOf(data), aimX: inp.ax, aimY: inp.ay };
         s.ev.push({ k: "wind", side, move: m.i, shape: f.act.shape });
       }
@@ -738,7 +775,8 @@ function stepSide(s, side, inp) {
 // Speed from the Speed stat and its stage; paralysis halves it, a swift zone lifts it.
 const speedOf = (f) => Math.min(6, Math.max(3, 3 + 2.5 * (f.st[5] * STAGE(f.stages[5]) / 200)))
   / TPS * (f.status === PAR ? 0.5 : 1) * (f.swift > 0 ? 1.15 : 1) * (f.wading ? 0.5 : 1) * (f.rained ? RAIN_SLOW : 1)
-  * (roleOf(f) === "brawler" ? BRAWL_RUN : 1) * (f.confused > 0 ? CONFUSE_SLOW : 1);
+  * (roleOf(f) === "brawler" ? BRAWL_RUN : 1) * (f.confused > 0 ? CONFUSE_SLOW : 1)
+  * (hasSig(f, "mythic") ? 1.15 : 1) * (hasSig(f, "tailwind") ? 1.1 : 1);
 
 // The Mega a fighter may become now: its own species', one the page allowed.
 export const megaOf = (f) => megaTargets(f.id).find((id) => f.megas.includes(id)) ?? 0;
@@ -773,7 +811,7 @@ function stepAct(s, side, f) {
       f.basicN = s.t - f.basicT <= BASIC_CHAIN ? f.basicN + 1 : 1;
       f.basicT = s.t;
       a.boost = f.basicN % 3 === 0;
-    } else m.cd = cooldownOf(data);
+    } else m.cd = Math.round(cooldownOf(data) * (1 - f.cp.cd) * (hasSig(f, "ancient") ? 0.8 : 1) * (data.t === "fire" && hasSig(f, "reign") ? 0.7 : 1));
     s.ev.push({ k: "fire", side, move: m.i, shape: a.shape, x: f.x, y: f.y, dx: a.dx, dy: a.dy, basic: Boolean(a.basic), boost: Boolean(a.boost) });
     // A move that changes its user's own stages does so as it fires (Close Combat, Overheat).
     // ...but never past +1 (2026-10-24: Fiery Dance re-raised itself to a standing +2, doubling all it dealt); +2 is a setup move's.
@@ -1132,7 +1170,7 @@ function stepBench(s) {
   if (s.t % TPS) return;
   for (const sd of s.sides) sd.team.forEach((f, k) => {
     const cap = Math.floor(f.max * BENCH_CAP);
-    if (k !== sd.active && f.hp > 0 && f.hp < cap) f.hp = Math.min(cap, f.hp + Math.max(1, Math.floor(f.max * BENCH_REGEN)));
+    if (k !== sd.active && f.hp > 0 && f.hp < cap) f.hp = Math.min(cap, f.hp + Math.max(1, Math.floor(f.max * BENCH_REGEN * (hasSig(f, "friend") ? 2 : 1))));
   });
 }
 function stepHelpers(s) {
@@ -1438,6 +1476,8 @@ const domainSpeed = (s, f) => (!s.domain ? 1 : s.domain.kind === "trick-room" ? 
   : s.domain.kind === "tailwind" && f.side === s.domain.side ? 1.3 : 1);
 function ultimate(s, side, f) {
   const u = ultOf(f);
+  // Star Chronos (Dialga's chase card): its ULTI readies every move.
+  if (hasSig(f, "chrono")) for (const m of f.kit) m.cd = 0;
   const move = ULT_BASE - TYPES.indexOf(u.type) * 2 - (f.st[1] >= f.st[3] ? 0 : 1);
   const d = activeOf(s, 1 - side);
   const tx = d ? d.x : W - f.x, ty = d ? d.y : f.y;
@@ -1617,7 +1657,8 @@ function floorEvent(s) {
 }
 function gain(s, side, n) {
   const sd = s.sides[side], was = sd.meter;
-  sd.meter = Math.min(SURGE_MAX, sd.meter + n * (finalMinute(s) ? FINAL_GAIN : 1));
+  const f = sd.team[sd.active];
+  sd.meter = Math.min(SURGE_MAX, sd.meter + n * (finalMinute(s) ? FINAL_GAIN : 1) * (1 + (f?.cp.ult ?? 0) + (f && hasSig(f, "embrace") ? 0.5 : 0)));
   if (was < SURGE_MAX && sd.meter >= SURGE_MAX) s.ev.push({ k: "ready", side });
 }
 
@@ -1647,12 +1688,13 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     s.ev.push({ k: d.shield ? "blocked" : "evade", side: d.side, x: d.x, y: d.y, perfect });
     return;
   }
+  if (hasSig(d, "phase") && rnd(s) < 0.2) { s.ev.push({ k: "evade", side: d.side, x: d.x, y: d.y, perfect: false }); return; }
   const m = BASIC[move] ? { ...BASIC[move], t: TYPES[a.types[0]] } : arenaMove(move);
   const eff = effectiveness(m.t, d.types);
   if (eff === 0) { s.ev.push({ k: "immune", side: d.side, x: d.x, y: d.y }); return; }
   let dmg = 0;
   if (m.p) {
-    const crit = rnd(s) < CRIT[Math.min(3, (m.cr ?? 0) + (a.perk?.crit ?? 0))];
+    const crit = rnd(s) < CRIT[Math.min(3, (m.cr ?? 0) + (a.perk?.crit ?? 0) + (hasSig(a, "victory") ? 1 : 0))];
     const roll = 0.85 + rnd(s) * (a.perk?.roll ?? 0.15);
     // A multi-shot's every shot is one of its hits; a pulse or a blow carries the average.
     const hits = shapeOf(m) === "multi" || !m.hits ? 1 : (m.hits[0] + m.hits[1]) / 2;
@@ -1663,15 +1705,19 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
       * (finalMinute(s) ? FINAL_DMG : 1) * weatherK(s, m.t) * (shock ? SHOCK : 1)
       * (contact && roleOf(a) === "brawler" ? BRAWL_HIT : 1) * (!contact && roleOf(d) === "brawler" ? BRAWL_GUARD : 1)
       * (helping(s, a.side, "plusle") ? HELP_HIT : 1) * guard;
+    dmg *= (1 + a.cp.dmg) * (1 - d.cp.guard) * sigK(s, a, d, m, move, contact);
     dmg = Math.max(1, Math.floor(dmg));
+    // Star Requiem (Giratina's): its ULTI finishes a foe under a quarter of its HP.
+    if (isUlt(move) && hasSig(a, "requiem") && d.hp <= d.max / 4) dmg = d.hp;
     d.regen = 0;
     d.hp = Math.max(0, d.hp - dmg);
-    a.xp += dmg / d.max + (d.hp === 0 ? EVO_XP : 0);
+    a.xp += (dmg / d.max + (d.hp === 0 ? EVO_XP : 0)) * (hasSig(a, "splash") ? 2 : 1);
     const st = s.sides[a.side].stats;
     st.dealt += dmg; st.hits++; st.chain++; st.best = Math.max(st.best, st.chain);
     s.sides[d.side].stats.chain = 0;
     gain(s, a.side, GAIN_DEAL * dmg / d.max); gain(s, d.side, GAIN_TAKE * dmg / d.max);
-    d.flash = sec(0.08); d.stun = Math.max(d.stun, STUN);
+    // Inner Focus (Umbreon's): never staggered.
+    d.flash = sec(0.08); if (!hasSig(d, "focus")) d.stun = Math.max(d.stun, STUN);
     const push = contact ? (m.p ?? 40) / 40 : 0.25;
     d.kbx = dx * push / KB; d.kby = dy * push / KB; d.kbt = KB;
     if (contact && GRABS.has(m.n) && d.hp > 0) {
@@ -1681,11 +1727,11 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
       s.throws.push({ side: d.side, t: GRAB_T, dx, dy });
       s.ev.push({ k: "grab", side: a.side, x: a.x, y: a.y, tx: d.x, ty: d.y, move });
     }
-    if (d.act?.ph === "wind") d.act = null;     // a hit interrupts a wind-up
+    if (d.act?.ph === "wind" && !hasSig(d, "focus")) d.act = null;     // a hit interrupts a wind-up
     // Sleep breaks on a hit after its first second; a Fire hit thaws.
     if (d.status === SLP && s.t - d.sleptAt > sec(1)) { d.status = -1; s.ev.push({ k: "cured", side: d.side }); }
     if (d.status === FRZ && m.t === "fire") { d.status = -1; s.ev.push({ k: "cured", side: d.side }); }
-    if (m.fl && rnd(s) * 100 < m.fl) { d.stun = Math.max(d.stun, FLINCH); s.ev.push({ k: "flinch", side: d.side }); }
+    if (m.fl && !hasSig(d, "focus") && rnd(s) * 100 < m.fl) { d.stun = Math.max(d.stun, FLINCH); s.ev.push({ k: "flinch", side: d.side }); }
     if (CONFUSES[m.n] && d.hp > 0 && rnd(s) * 100 < CONFUSES[m.n]) { d.confused = CONFUSE_T; s.ev.push({ k: "confused", side: d.side, x: d.x, y: d.y }); }
     // Water on a burn: the burn goes out in steam that hides whoever stands in it. Water soaks; a shock dries.
     if (m.t === "water") {
@@ -1697,6 +1743,25 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
       d.wet = Math.max(d.wet, WET_T);
     }
     if (shock && s.weather !== "rain") d.wet = 0;
+    // Golden Flame leaves fire where it hits (G-Max Wildfire every time); Golden Spring heals on a knockout; Golden Venom's basics poison.
+    if (d.hp > 0 && (hasSig(a, "wildfire") || (a.cp.flame && rnd(s) < FLAME_P))) {
+      if (s.fires.length >= FIRE_MAX) s.fires.shift();
+      s.fires.push({ x: d.x, y: d.y, t: FIRE_T, side: a.side });
+    }
+    if (a.cp.spring && d.hp === 0) heal(s, a, Math.floor(a.max * SPRING_K));
+    if (a.cp.venom && BASIC[move] && d.hp > 0 && rnd(s) < VENOM_P) afflict(s, d, PSN);
+    // The chase cards' signatures that ride a hit.
+    if (d.hp > 0) {
+      if (m.t === "fire" && hasSig(a, "classicburn") && rnd(s) < 1 / 3) afflict(s, d, BRN);
+      if (hasSig(a, "void") && rnd(s) < 0.1) afflict(s, d, SLP);
+      if (BASIC[move] && hasSig(a, "lick") && rnd(s) < 1 / 7) afflict(s, d, PAR);
+      if (m.t === "electric" && hasSig(a, "static") && rnd(s) < 0.25) afflict(s, d, PAR);
+      if (hasSig(a, "terror")) s.sides[d.side].trapT = Math.max(s.sides[d.side].trapT, sec(3));
+      if (a.fresh && hasSig(a, "fakeout") && !hasSig(d, "focus")) d.stun = Math.max(d.stun, sec(0.6));
+      if (hasSig(d, "core") && !d.coreUsed && d.hp < d.max * 0.3) { d.coreUsed = true; heal(s, d, Math.floor(d.max / 3)); }
+    }
+    a.fresh = false;
+    if (hasSig(a, "lost")) hurt(s, a, Math.max(1, Math.floor(dmg / 10)));
     if (m.dr > 0) heal(s, a, Math.floor(dmg * m.dr / 100));
     if (m.dr < 0) hurt(s, a, Math.max(1, Math.floor(dmg * -m.dr / 100)));
     // Where it came from and how hard, for the picture alone (events are not in the replay hash).
@@ -1704,7 +1769,7 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
   } else {
     s.ev.push({ k: "touch", side: d.side, x: hx, y: hy, move });
   }
-  if (m.st != null && rnd(s) * 100 < (m.p ? m.stc ?? 0 : 100)) afflict(s, d, m.st, m.n === "toxic");
+  if (m.st != null && rnd(s) * 100 < (m.p ? (m.stc ?? 0) * (1 + a.cp.status) : 100)) afflict(s, d, m.st, m.n === "toxic");
   if (m.sg && !m.sgu && !m.self && rnd(s) * 100 < (m.sgc ?? 100)) stages(s, d, m.sg);
 }
 
@@ -1714,7 +1779,7 @@ function settleKO(s, side) {
     if (--sd.koT === 0) {
       const next = sd.team.findIndex((f) => f.hp > 0);
       const from = sd.team[sd.active], to = sd.team[next];
-      Object.assign(to, { x: from.x, y: from.y, px: from.x, py: from.y, inv: SWAP_INV, act: null });
+      Object.assign(to, { x: from.x, y: from.y, px: from.x, py: from.y, inv: to.cp.aegis ? AEGIS_T : SWAP_INV, act: null, fresh: true });
       sd.active = next;
       s.ev.push({ k: "in", side, slot: next });
     }
@@ -1798,7 +1863,7 @@ function cpuInput(s, side) {
     return { ...NO_INPUT, mx: k < 0.25 ? 1 : k < 0.5 ? 0 : k < 0.75 ? -1 : 0, my: k < 0.25 ? 0 : k < 0.5 ? 1 : k < 0.75 ? 0 : -1 };
   }
   if (!foe) return { ...NO_INPUT, mx: (W / 2 - me.x) > 0 ? 1 : -1 };
-  if (L.mega && megaOf(me) && !s.sides[side].megaUsed && !me.act && !me.evo) return { ...NO_INPUT, mega: true };
+  if (L.mega && megaOf(me) && !s.sides[side].megaUsed && megaReady(s) && !me.act && !me.evo) return { ...NO_INPUT, mega: true };
   // A stampede's lane shown under it: off it, the short way.
   const lane = s.lanes.find((l) => l.t > LANE_RUN && Math.abs(me.y - l.y) < LANE_H / 2 + 0.4);
   if (lane && L.react) return { ...NO_INPUT, my: me.y >= lane.y ? 1 : -1 };

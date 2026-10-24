@@ -22,13 +22,16 @@
    challenger is side 0; each end draws itself as `me`. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL,
+import { newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL, MEGA_WARM,
   FINAL_T, SWAP_CD, basicShape, PICKUPS, SUDDEN_T, roleOf, basicCd, ultOf, clonesOf, DARK_SEE, SHOT_SPEED, BLAST_SPEED,
   cooldownOf, DODGE_CD, ARENAS, shapeOf, GROUND, ZONE_SAYS, arenaReady, lineMegas, megaOf, evoTargets, EVO_XP, FLOOR_EVENT, FLOOR_SAYS } from "../../../game/arena.js";
 import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, arenaCancel } from "../../../net/cloud.js";
 import { isEvent } from "../../../data/dex.js";
 import { connect } from "./net.js";
-import { LADDER, masterOf, ladderOpen, ladderPay, ARENA_TEAM } from "../../../game/ladder.js";
+import { LADDER, masterOf, ladderOpen, ladderPay, ARENA_TEAM, rentalOf, RENTALS } from "../../../game/ladder.js";
+import { teamPerks, ARENA_CARDS } from "../../../game/cardperks.js";
+import { useEquipped, CardPerkPick } from "./CardPerks.jsx";
+import CardFace from "../../cards/Card.jsx";
 import { playerFighter, moveOf, STRUGGLE, refusal, learnable, movesOf } from "../../../game/battle.js";
 import { TUTOR_PRICE } from "../../../game/items.js";
 import { IMPACTS, impactOwned, impactFor } from "../../../game/cosmetics.js";
@@ -38,7 +41,7 @@ import { MOVES } from "../../../data/moves.js";
 import { speciesById, dexIndex } from "../../../game/biomes.js";
 import { variantOf } from "../../../game/items.js";
 import { label } from "../../../game/map.js";
-import { ARENA_LEVELS, arenaPay } from "../../../game/road.js";
+import { ARENA_LEVELS, ARENA_DAILY, arenaPay, arenaLeft } from "../../../game/road.js";
 import { dayKey, hash } from "../../../game/daily.js";
 import { ARENA_NEWS_KEY, write } from "../../../game/store.js";
 import BattleSwitch from "../BattleSwitch.jsx";
@@ -129,8 +132,8 @@ const LEVEL_SAYS = {
 const MODE_NAME = { ladder: "Arena Ladder", quick: "Quick battle", training: "Training", friends: "Battle a friend" };
 // A role in a word and its perks, for the lobby and the tutor (arena.js's roleOf).
 const ROLE = {
-  brawler: ["Brawler", "Attack-led: runs and jabs faster, hits harder up close, shrugs off shots"],
-  blaster: ["Blaster", "Sp. Atk-led: shots fly faster and farther, beams charge sooner"],
+  brawler: ["Brawler", "Attack-led: runs and jabs faster, hits harder up close, shrugs off shots", "Melee"],
+  blaster: ["Blaster", "Sp. Atk-led: shots fly faster and farther, beams charge sooner", "Ranged"],
 };
 // What reaches how far: the tutor's filters, and which a role wants.
 const REACH = { melee: "close", dash: "close", shot: "range", beam: "range", multi: "range", pulse: "area", field: "area", self: "self" };
@@ -142,7 +145,7 @@ const WEATHER_TIP = { rain: "Water x1.5, Fire x0.5, Fire types slower", sun: "Fi
    open, it takes the modal lock, and a match owns the whole screen through
    `body.fighting` (the bars step aside). Opening it is what the map's
    announcement waits for (ARENA_NEWS_KEY). */
-export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], money = 0, stats = null, impacts = [], impactsOff = [], dex = null, onMode, onClose }) {
+export default function ArenaPage({ engine, box, team, arenaTeam = [], record, ladder = [], money = 0, stats = null, impacts = [], impactsOff = [], dex = null, candy = 0, join = null, onJoined, cards = null, arenaCards = [], onMode, onClose }) {
   useModalLock();
   useEffect(() => {
     engine?.pause(true);
@@ -157,15 +160,23 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   }, [live]);
   useEffect(() => unimmerse, []);
 
-  const ids = arenaTeam.length ? arenaTeam : team;
-  const mons = useMemo(() => ids.map((uid) => box.find((m) => m.uid === uid)).filter((m) => m && !refusal(m) && arenaReady(m.species)).slice(0, ARENA_TEAM), [box, ids]);
+  // No Arena team, no League team: a new player starts on three rentals (ladder.js).
+  const ids = arenaTeam.length ? arenaTeam : team.length ? team : RENTALS.slice(0, ARENA_TEAM).map(([id]) => -id);
+  const mons = useMemo(() => ids.map((uid) => box.find((m) => m.uid === uid) ?? rentalOf(uid)).filter((m) => m && !refusal(m) && arenaReady(m.species)).slice(0, ARENA_TEAM), [box, ids]);
   const [match, setMatch] = useState(null);     // { mode, seed, floor, master }
   const [online, setOnline] = useState(null);   // { role, invite, friend }
   const [editing, setEditing] = useState(false);
   const [howto, setHowto] = useState(false);
   const [tutorFor, setTutorFor] = useState(null);   // a uid
   const [shop, setShop] = useState(false);
+  const [cardPick, setCardPick] = useState(false);
+  const equipped = useEquipped(arenaCards, cards);
   useEffect(() => { setLive(Boolean(match || online)); }, [match, online]);
+  // A challenge accepted from anywhere (App's ArenaCall): straight into its match.
+  useEffect(() => {
+    if (!join) return;
+    setMatch(null); immerse(); setOnline(join); onJoined?.();
+  }, [join, onJoined]);
   useEffect(() => { loadAnims(); }, []);
   // Escape leaves the page - unless a match, the editor or How to play has it.
   useEffect(() => {
@@ -177,6 +188,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   const level = mons.length ? Math.round(mons.reduce((n, m) => n + m.level, 0) / mons.length) : 5;
   if (match) {
     return <Match key={match.seed} mons={mons} mode={match.mode} master={match.master} level={level} seed={match.seed} floor={match.floor} impacts={impacts} impactsOff={impactsOff} dex={dex}
+      cardPerks={equipped.map((e) => e.perk)}
       onWin={(cpu) => (match.master ? engine?.arenaMaster(match.master.id) : engine?.arenaWin(cpu, level)) ?? 0}
       onAgain={() => { const seed = (match.seed * 1103515245 + 12345) | 0; setMatch({ ...match, seed, floor: match.master || match.fixed ? match.floor : pickFloor(match.pick, seed) }); }}
       onExit={() => setMatch(null)} />;
@@ -185,10 +197,13 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   return (
     <>
       <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0} onMode={onMode} onTutor={setTutorFor}
+        candy={candy} onLevel={(uid, n) => engine?.levelUp(uid, n)} equipped={equipped} onCards={() => setCardPick(true)}
         onStart={(m) => { immerse(); setMatch(m); }} onOnline={(o) => { immerse(); setOnline(o); }} onEdit={() => setEditing(true)} onHowto={() => setHowto(true)} onShop={() => setShop(true)} />
       {editing && <FighterSelect box={box} picked={mons} custom={arenaTeam.length > 0}
         onSave={(uids) => { engine?.setArenaTeam(uids); setEditing(false); }} onClose={() => setEditing(false)} />}
       {howto && <HowTo onClose={() => setHowto(false)} />}
+      {cardPick && <CardPerkPick owned={cards} equipped={equipped} onClose={() => setCardPick(false)}
+        onSave={(ids) => { engine?.setArenaCards(ids); setCardPick(false); }} />}
       {shop && <UltShop engine={engine} money={money} impacts={impacts} impactsOff={impactsOff} onClose={() => setShop(false)} />}
       {tutorFor != null && box.some((m) => m.uid === tutorFor) && (
         <MoveTutor engine={engine} mon={box.find((m) => m.uid === tutorFor)} money={money} stats={stats} onClose={() => setTutorFor(null)} />
@@ -203,7 +218,7 @@ const pickFloor = (floor, seed) => (floor === "random" ? ARENAS[Math.abs(seed) %
    the floors under them, and one big Battle along the foot. Each mode is a
    tile; the chosen one opens its own panel (the Ladder's ten masters, a
    CPU's difficulty, your friends). */
-function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, onOnline, onEdit, onHowto, onShop }) {
+function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, onOnline, onEdit, onHowto, onShop, candy = 0, onLevel, equipped = [], onCards }) {
   const [mode, setMode0] = useState(() => { const m = pref(MODE_KEY, "ladder"); return MODE_NAME[m] && (m !== "friends" || CLOUD) ? m : "ladder"; });
   const [cpu, setCpu0] = useState(() => pref(LEVEL_KEY, "normal"));
   const [floor, setFloor0] = useState(() => pref(FLOOR_KEY, "random"));
@@ -236,7 +251,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
       : mode === "quick" ? `${cpu[0].toUpperCase()}${cpu.slice(1)} CPU · ${floor === "random" ? "Any arena" : floorName(floor)}` : "";
   const prize = mode === "ladder"
     ? (ladder.includes(chosen.id) ? "Practice - its prize is won" : `First win ¥${ladderPay(chosen).toLocaleString()}${chosen.id === "champion" ? " + a card pack" : ""}`)
-    : mode === "quick" ? (paid.includes(cpu) ? "Today's prize is won" : `First win today ¥${arenaPay(cpu, level).toLocaleString()}`) : "";
+    : mode === "quick" ? (arenaLeft(record, cpu, dayKey()) <= 0 ? "Today's prizes are won" : `Win ¥${arenaPay(cpu, level).toLocaleString()} · ${arenaLeft(record, cpu, dayKey())} of ${ARENA_DAILY} left today`) : "";
 
   return (
     <div className="tc-page ag-page" role="dialog" aria-modal="true" aria-label="The Arena" style={{ "--ag-bg": `url(${asset(`arena/${bg}.webp`)})` }}>
@@ -264,6 +279,8 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
           <section className="ag-team" aria-label="Your team">
             <div className="ag-sec">
               <h3>Your team</h3>
+              {/* Rare Candy on hand: the team is raised here, not on a trip to the League's Train tab. */}
+              <span className="ag-candy" data-tip="Rare Candy - a level each"><img src={asset("items/rare-candy.png")} alt="Rare Candy" />{candy.toLocaleString("en-US")}</span>
               <button type="button" className="ag-edit" onClick={onEdit}><Icon n="edit" size={16} />Edit</button>
             </div>
             <ol className="ag-mons">
@@ -282,10 +299,23 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                   <li key={m.uid} className="ag-mon">
                     <span className="ag-slot" aria-label={`Slot ${k + 1}`}>{k + 1}</span>
                     <Sprite id={m.species} variant={variantOf(m)} />
-                    <button type="button" className="ag-learn" onClick={() => onTutor(m.uid)} aria-label={`Teach ${nameOf(m.species)} moves`}>Moves</button>
+                    {m.rental ? <span className="ag-learn ag-rent" data-tip="A rental - catch your own to train it">Rental</span>
+                      : <button type="button" className="ag-learn" onClick={() => onTutor(m.uid)} aria-label={`Teach ${nameOf(m.species)} moves`}>Moves</button>}
                     <div className="ag-mon-text">
-                      <b>{nameOf(m.species)}</b>
-                      <span>Lv {m.level} · <em className={`ag-role r-${roleOf(f)}`} data-tip={ROLE[roleOf(f)][1]}>{ROLE[roleOf(f)][0]}</em></span>
+                      {/* MELEE OR RANGED at a glance (asked for): the role's reach as a pill by the name. */}
+                      <b>{nameOf(m.species)} <i className={`ag-reach r-${roleOf(f)}`} data-tip={`${ROLE[roleOf(f)][0]}: ${ROLE[roleOf(f)][1]}`}>{ROLE[roleOf(f)][2]}</i></b>
+                      <span className="ag-lvrow">Lv {m.level} · <em className={`ag-role r-${roleOf(f)}`} data-tip={ROLE[roleOf(f)][1]}>{ROLE[roleOf(f)][0]}</em>
+                        {m.level < 100 && !m.lock && !m.rental && (
+                          <span className="ag-lvup" role="group" aria-label={`Raise ${nameOf(m.species)} with Rare Candy`}>
+                            {[1, 10].map((n) => (
+                              <button key={n} type="button" disabled={!candy} onClick={() => onLevel(m.uid, Math.min(n, 100 - m.level))}
+                                data-tip={candy ? `${Math.min(n, 100 - m.level)} Rare Candy` : "No Rare Candy - the Shop sells it"}>+{Math.min(n, 100 - m.level)}</button>
+                            ))}
+                            <button type="button" disabled={!candy} onClick={() => onLevel(m.uid, 100 - m.level)}
+                              data-tip={candy ? `Up to ${Math.min(candy, 100 - m.level)} Rare Candy` : "No Rare Candy - the Shop sells it"}>Max</button>
+                          </span>
+                        )}
+                      </span>
                       <Types of={sp.types} />
                       <ul className="ag-moves">
                         {f.moves.map((mv) => {
@@ -299,6 +329,24 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
               })}
             </ol>
             <p className="ag-note">{custom ? "Your Arena team - apart from your League team." : "Your League team's first three. Edit to pick an Arena team of its own."}</p>
+            {/* ARENA CARDS (cardperks.js): three passive perks against the CPU and the Ladder. */}
+            <div className="ag-sec ag-cards-head">
+              <h3>Cards</h3>
+              <button type="button" className="ag-edit" onClick={onCards}><Icon n="cards" size={16} />Equip</button>
+            </div>
+            <ol className="ag-cards">
+              {Array.from({ length: ARENA_CARDS }, (_, k) => {
+                const e = equipped[k];
+                return e ? (
+                  <li key={e.id} className={`ag-card${e.perk.chase ? " chase" : e.perk.gold ? " gold" : ""}`} data-tip={e.perk.says.join(" · ")}>
+                    <CardFace setId={e.set} card={e.card} variant="n" still lazy />
+                    <b>{e.perk.title}</b><span>{e.perk.says[0].replace("Your team: ", "")}</span>
+                  </li>
+                ) : (
+                  <li key={k} className="ag-card empty"><button type="button" onClick={onCards}><Icon n="plus" size={18} /><span>Add a card</span></button></li>
+                );
+              })}
+            </ol>
           </section>
 
           <section className="ag-play" aria-label="Choose how to fight">
@@ -331,7 +379,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                     <button key={c} type="button" role="radio" aria-checked={cpu === c} className={`ag-level${cpu === c ? " on" : ""}`} onClick={() => setCpu(c)}>
                       <b>{c[0].toUpperCase() + c.slice(1)}</b>
                       <span>{LEVEL_SAYS[c]}</span>
-                      <em className={paid.includes(c) ? "done" : ""}>{paid.includes(c) ? "Today's prize won" : `First win today ¥${arenaPay(c, level).toLocaleString()}`}</em>
+                      <em className={arenaLeft(record, c, dayKey()) <= 0 ? "done" : ""}>{arenaLeft(record, c, dayKey()) <= 0 ? "Today's prizes won" : `¥${arenaPay(c, level).toLocaleString()} a win · ${arenaLeft(record, c, dayKey())}/${ARENA_DAILY} today`}</em>
                     </button>
                   ))}
                 </div>
@@ -972,7 +1020,7 @@ function Credits({ onClose }) {
 const LEVEL_NAME = { dummy: "Training", easy: "Easy", normal: "Normal", hard: "Hard" };
 
 /* A MATCH: the loop, the input, the HUD. */
-function Match({ mons, mode, master, level, seed, floor, online = null, rematch = null, impacts = [], impactsOff = [], dex = null, onWin, onAgain, onExit }) {
+function Match({ mons, mode, master, level, seed, floor, online = null, rematch = null, impacts = [], impactsOff = [], dex = null, cardPerks = [], onWin, onAgain, onExit }) {
   const me = online?.me ?? 0;
   const [net, setNet] = useState(null);         // an online match cut short: "left", "lost", "desync"
   useEffect(() => { if (rematch?.gone) setNet("left"); }, [rematch?.gone]);
@@ -1030,7 +1078,9 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
         mons.map((m) => ({ id: m.species, shiny: variantOf(m) === "shiny" })),
         teams[1].map((f) => ({ id: f.id, shiny: false })),
       ],
-      s: newMatch({ teams, cpu: [null, online ? null : cpu], seed, arena: floor, intro: INTRO }),
+      // The equipped cards' perks are yours alone, and never online (the Fair format).
+      s: newMatch({ teams, cpu: [null, online ? null : cpu], seed, arena: floor, intro: INTRO,
+        perks: [online ? null : teamPerks(cardPerks, teams[0].map((f) => f.id)), null] }),
       // Who fights, for the VS card.
       names: online ? online.names : [["You", nameOf(teams[0][0]?.id)],
         [master ? master.name : `CPU · ${LEVEL_NAME[mode] ?? "Training"}`, nameOf(teams[1][0]?.id)]],
@@ -1333,9 +1383,11 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
               <b>Dash</b>{!touch && <kbd>Space</kbd>}
             </button>
             {view.mega && (
-              <button type="button" className="ah-mega" onPointerDown={tap(() => { input.current.mega = s.t + 7; })}
-                aria-label={`Mega Evolve into ${nameOf(view.mega)}`} data-tip={`Mega Evolve into ${nameOf(view.mega)} - once a match`}>
-                <b>Mega</b>{!touch && <kbd>T</kbd>}
+              <button type="button" className={`ah-mega${view.megaWarm < 1 ? " wait" : ""}`} style={{ "--m": view.megaWarm }}
+                disabled={view.megaWarm < 1} onPointerDown={tap(() => { input.current.mega = s.t + 7; })}
+                aria-label={view.megaWarm < 1 ? `Mega Evolution warming up, ${Math.floor(view.megaWarm * 100)}%` : `Mega Evolve into ${nameOf(view.mega)}`}
+                data-tip={`Mega Evolve into ${nameOf(view.mega)} - once a match, ${MEGA_WARM / TPS} s in`}>
+                <b>Mega</b>{view.megaWarm < 1 && <span>{Math.floor(view.megaWarm * 100)}%</span>}{!touch && <kbd>T</kbd>}
               </button>
             )}
             <button type="button" className={`ah-surge${view.meter[0] >= 1 ? " full" : ""}${view.surging ? " on" : ""}`}
@@ -1417,8 +1469,8 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
             {online && <p className="ar-prize done">A friendly match: no prize, no rating.</p>}
             {master && view.won && prize?.first && <p className="ar-prize">{master.name} beaten! ¥{prize.pay.toLocaleString()}{prize.pack ? " and a card pack in My Packs" : ""}</p>}
             {master && view.won && prize && !prize.first && <p className="ar-prize done">Practice: {master.name}'s prize was won before.</p>}
-            {!master && prize > 0 && <p className="ar-prize">First win today: ¥{prize.toLocaleString()}</p>}
-            {!master && !online && prize === 0 && view.won && cpu !== "dummy" && <p className="ar-prize done">Today's prize for this level is already won.</p>}
+            {!master && prize > 0 && <p className="ar-prize">Won: ¥{prize.toLocaleString()}</p>}
+            {!master && !online && prize === 0 && view.won && cpu !== "dummy" && <p className="ar-prize done">Today's {ARENA_DAILY} prizes for this level are already won.</p>}
             {rematch?.gone && <p className="ar-note">{online.foe} has left.</p>}
             <div className="ar-end-go">
               <button type="button" className="lg-go quiet" onClick={onExit}>Back to the Arena</button>
@@ -1474,6 +1526,7 @@ function snapshot(s, me) {
     party: mine.team.map((f, k) => ({ id: f.id, hp: f.hp, max: f.max, active: k === mine.active })),
     swapCd: mine.swapCd / SWAP_CD, white: s.white,
     mega: !mine.megaUsed && !f0.evo ? megaOf(f0) : 0,
+    megaWarm: Math.min(1, s.t / MEGA_WARM),
     stats: { ...mine.stats },
     hpShare: mine.team.reduce((n, f) => n + f.hp, 0) / Math.max(1, mine.team.reduce((n, f) => n + f.max, 0)),
     kit: f0.kit.map((m) => {
