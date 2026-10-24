@@ -7566,6 +7566,33 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         assert.ok(along("plusle").dealt > none.dealt * 1.15, "Plusle's Helping Hand added nothing");
         assert.ok(along("mr-mime").taken < none.taken * 0.85, "Mr. Mime's Light Screen took nothing off");
         assert.ok(along("magnemite").zaps >= 5, "Magnemite did not keep zapping the foe");
+        /* THE REVIVE (2026-10-24, asked for): not before REVIVE_AT, not while nobody is down; then once, a
+           mirrored pair; touched by a side with someone down, that one is back at REVIVE_HP; a side with
+           nobody down leaves it lying. */
+        {
+          const s = A.newMatch({ teams: [[bFighter(143, 50, 1), bFighter(6, 50, 2)], [bFighter(143, 50, 3), bFighter(25, 50, 4)]], cpu: [null, null], seed: 9, weather: "clear", events: false });
+          const [mine, foe] = [s.sides[0], s.sides[1]];
+          mine.team[1].hp = 0;
+          let laid = -1;
+          for (let t = 0; t < A.REVIVE_AT + 40 * A.TPS && laid < 0; t++) {
+            A.tick(s, [null, null]);
+            if (s.items.some((it) => it.kind === "revive")) laid = s.t;
+          }
+          assert.ok(laid >= A.REVIVE_AT, `a Revive was laid at ${laid}, before ${A.REVIVE_AT}`);
+          const rv = s.items.filter((it) => it.kind === "revive");
+          assert.ok(rv.length === 2 && Math.abs((rv[0].x - A.W / 2) + (rv[1].x - A.W / 2)) < 1e-6, "the Revives are not a mirrored pair");
+          // The foe, nobody down, walks over it; then the side with a fainted Charizard takes it.
+          const [fa, ma] = [foe.team[foe.active], mine.team[mine.active]];
+          Object.assign(fa, { x: rv[0].x, y: rv[0].y, px: rv[0].x, py: rv[0].y });
+          A.tick(s, [null, null]);
+          assert.ok(s.items.some((it) => it.kind === "revive" && it.id === rv[0].id), "a side with nobody down took a Revive");
+          Object.assign(fa, { x: 3, y: 3 }); Object.assign(ma, { x: rv[1].x, y: rv[1].y, px: rv[1].x, py: rv[1].y });
+          A.tick(s, [null, null]);
+          assert.equal(mine.team[1].hp, Math.floor(mine.team[1].max * A.REVIVE_HP), "the Revive did not bring the fainted one back at half HP");
+          let again = 0;
+          for (let t = 0; t < 60 * A.TPS; t++) { mine.team[1].hp = 0; A.tick(s, [null, null]); again += s.ev.filter((e) => e.k === "items" && e.kind === "revive").length; }
+          assert.equal(again, 0, "a second Revive was laid in one match");
+        }
         assert.ok(none.bench > 0.7 && none.bench <= 0.75, `a benched Pokemon rested to ${(none.bench * 100).toFixed(0)}% - it heals, up to three quarters`);
       }
       /* WALL-SPLAT, PERFECT BLOCK AND THE WIDER BEAM (2026-10-24, asked for).

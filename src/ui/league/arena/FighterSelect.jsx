@@ -35,7 +35,6 @@ const ARCH_SAYS = {
 // A copy's worth for the roster's face: level first, then a rare form over a plain one.
 const rank = (m) => m.level * 10 + (variantOf(m) ? 1 : 0) + (m.alpha ? 2 : 0);
 
-const ROLE_WORD = { brawler: "Melee", blaster: "Ranged" };
 
 export default function FighterSelect({ box, picked, custom, onSave, onClose }) {
   useModalLock();
@@ -154,7 +153,7 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
               </div>
               <div className="fs-tags">
                 <Types of={speciesById(mon.species).types} />
-                <em className={`fs-role r-${role}`}>{ROLE_WORD[role]} · {role === "brawler" ? "Brawler" : "Blaster"}</em>
+                <em className={`fs-role r-${role}`}>{role === "brawler" ? "Brawler" : "Blaster"}</em>
                 {mon.rental && <em className="fs-role fs-rent">Rental</em>}
               </div>
               {enter.mega && <p className="fs-megain">Enters as <b>{nameOf(enter.species)}</b> and Mega Evolves in battle.</p>}
@@ -198,8 +197,8 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
         <section className="fs-roster">
           <div className="fs-filters">
             <input id="fs-q" type="search" placeholder="Find a fighter" value={q} onChange={(e) => { setQ(e.target.value); setCur(0); }} aria-label="Find a fighter" />
-            <div className="fs-types fs-reach" role="group" aria-label="Melee or ranged">
-              {[["", "Any reach"], ["brawler", "Melee"], ["blaster", "Ranged"]].map(([r, w]) => (
+            <div className="fs-types fs-reach" role="group" aria-label="Brawler or Blaster">
+              {[["", "Any role"], ["brawler", "Brawler"], ["blaster", "Blaster"]].map(([r, w]) => (
                 <button key={w} type="button" className={`${r ? `r-${r}` : ""}${reach === r ? " on" : ""}`} onClick={() => { setReach(r); setCur(0); }}>{w}</button>
               ))}
             </div>

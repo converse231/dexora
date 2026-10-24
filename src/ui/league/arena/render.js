@@ -1237,6 +1237,11 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         for (let i = 0; i < 2; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? "#ffd23f" : "#ffffff", life: 18, size: 0.2, grow: 0.1, t: -i * 3 });
         sparks(e.x, e.y, "#fff6c8", 14, 0.09);
         sheet("impact", e.x, e.y - 0.2, 1.8, "#ffd23f", 16);
+      } else if (e.k === "revived") {
+        // A Revive: the fainted one is back on the bench - named, over its trainer's Pokemon.
+        word(e.x, e.y - 1.7, `${nameOf(e.id)} is back!`, "#7dffa8", 70, true);
+        for (let i = 0; i < 3; i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? "#7dffa8" : "#ffffff", life: 26, size: 0.25, grow: 0.14, t: -i * 4 });
+        sparks(e.x, e.y, "#d8ffe6", 22, 0.11);
       } else if (e.k === "use") {
         const colour = { "x-attack": "#ff6a4d", "x-speed": "#45d4ff", "x-defense": "#9fe3ff" }[e.item] ?? "#ffd23f";
         word(e.x, e.y - 1.3, PICKUPS[e.item].name, colour, 50, true);
