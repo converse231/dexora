@@ -37,6 +37,8 @@ SPRITES = os.path.join(ROOT, "public", "sprites")
 FORMS = os.path.join(ROOT, "src", "data", "eventforms.js")
 # How near a look's colour must be to one of the base's to take its shiny shift.
 NEAR = 30
+# The outline gap the background fill is sealed against, in the original's pixels (`key`).
+SEAL = 3
 # The share of a look that must still wear its species' colours for those to
 # be what its shiny moves (else the whole look turns by the species' hue).
 SHARED = 0.25
@@ -52,6 +54,17 @@ HOLE_FIT = 0.85          # the share of a pocket on a checker's squares that mak
 SPECK = 0.004
 
 
+def grow(m, r):
+    """`m` widened by r pixels every way (a square), by shifts: no scipy here."""
+    h, w = m.shape
+    p = np.pad(m, r)
+    out = np.zeros_like(m)
+    for dy in range(2 * r + 1):
+        for dx in range(2 * r + 1):
+            out |= p[dy:dy + h, dx:dx + w]
+    return out
+
+
 def key(a):
     """Opaque mask: everything the border flood over light greys cannot reach."""
     h, w, _ = a.shape
@@ -59,22 +72,31 @@ def key(a):
     # The checker is two neutral greys (~195 and ~255); white is white. Light
     # AND unsaturated, so the fill never runs into a coloured body.
     bg = (mn > 168) & (mx - mn < 22)
+    # SEALED FIRST (2026-10-24): where a pale outline steps diagonally, JPEG blur
+    # leaves a light corner between its two pixels, and the fill ran through it
+    # and took Drifloon's white puff. The fill runs only where the art is more
+    # than SEAL away, then takes back the rim it left - a gap of SEAL*2 is shut,
+    # an art pixel (10-16 of the original's) is not. A PLAIN backdrop only: on a
+    # painted checker the seal walled squares of it into Darkrai.
+    seal = SEAL if grid(mn) is None else 0
+    open_ = bg & ~grow(~bg, seal)
     seen = np.zeros((h, w), bool)
     q = deque()
     for x in range(w):
         for y in (0, h - 1):
-            if bg[y, x] and not seen[y, x]:
+            if open_[y, x] and not seen[y, x]:
                 seen[y, x] = True; q.append((y, x))
     for y in range(h):
         for x in (0, w - 1):
-            if bg[y, x] and not seen[y, x]:
+            if open_[y, x] and not seen[y, x]:
                 seen[y, x] = True; q.append((y, x))
     while q:
         y, x = q.popleft()
         for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             yy, xx = y + dy, x + dx
-            if 0 <= yy < h and 0 <= xx < w and bg[yy, xx] and not seen[yy, xx]:
+            if 0 <= yy < h and 0 <= xx < w and open_[yy, xx] and not seen[yy, xx]:
                 seen[yy, xx] = True; q.append((yy, xx))
+    seen |= grow(seen, seal) & bg
     holes(bg, seen, mn)
     return specks(~seen)
 

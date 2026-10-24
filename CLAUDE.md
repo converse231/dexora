@@ -214,7 +214,14 @@ anything done. The run prints each suite; the count is not typed anywhere.
   `EVENT_NIGHT` at night, a Spooky Honey's `lure`, never past `EVENT_CAP` -
   so no table, rod or League level moves, and no roll is drawn outside the
   event (seeded records replay). It evolves only into its event's look of
-  the next stage (`event` rows, fetch-evolutions). **It is no entry of the
+  the next stage (`event` rows, fetch-evolutions); one whose next stage
+  nobody drew is a dead end - the SECOND WAVE (2026-10-24, asked for: seven
+  looks in three families were an afternoon's work) is seven one-of-a-kind
+  costumes on seven maps, each a catch. **A look's place follows its id**
+  (dex.js sorts them), so a later wave goes after the hunt and never moves
+  it; `event_slots()` grows with it (re-apply trading.sql). The
+  announcement's seen key carries the count of looks, so a wave is announced
+  again. **It is no entry of the
   Pokedex**: `DEX_TOTAL`/`dexCaught` (dex.js) and trading.sql's
   `event_slots()` (held equal) skip it - no medal, milestone, rank, dex
   bonus or "left to find" - and the Dex files it under the Event region.

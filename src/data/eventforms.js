@@ -50,6 +50,19 @@ export const EVENTS = [
       { id: 19905, of: 41, title: "Vampire Zubat", flavor: "A fledgling that has only just found its fangs. It practises its bite on berries and gets the juice everywhere." },
       { id: 19906, of: 42, title: "Vampire Golbat", flavor: "It sweeps its cape over its face and opens a mouth full of dripping fangs. It is only ever hungry." },
       { id: 19907, of: 169, title: "Vampire Crobat", flavor: "The Count of the caves. It wears a gold medallion and a high collar, and four wings carry it without a sound." },
+      /* THE SECOND WAVE (2026-10-24, asked for: the first seven were three
+         families and an afternoon's work). One a map, each a costume of its
+         own: no next stage is drawn, so evolving one leaves the costume behind
+         (fetch-evolutions writes no row) and every look is a catch. Ids run on
+         past the hunt's - a position follows its id (dex.js), so the hunt
+         never moves. */
+      { id: 19909, of: 163, title: "Sheet Ghost Hoothoot", flavor: "It found a bedsheet on a washing line and cut two holes for its eyes. It hoots \"boo\" at anyone who walks under its tree." },
+      { id: 19910, of: 228, title: "Skeleton Houndour", flavor: "Its bones are only painted on, but it rattles them anyway. The pack follows the one in the skull hood." },
+      { id: 19911, of: 261, title: "Werewolf Poochyena", flavor: "Under the full moon it pulls on a wolf's head and howls far bigger than it is. The claws are cardboard." },
+      { id: 19912, of: 361, title: "Mummy Snorunt", flavor: "It wrapped itself up against the cold and kept going. One loose bandage always trails behind it in the snow." },
+      { id: 19913, of: 622, title: "Frankenstein Golett", flavor: "Somebody bolted its neck and stitched its brow, and it has never once stopped to ask why. The jacket was always too small." },
+      { id: 19914, of: 425, title: "Trick-or-Treat Drifloon", flavor: "It drifts from door to door in cat ears with its bucket held out. Nobody has ever dared to give it a trick." },
+      { id: 19915, of: 592, title: "Ghost Bride Frillish", flavor: "It drifts up the shore in a veil of old lace, holding roses that wilted long ago. It is still waiting at the water's edge." },
     ],
     /* THE NIGHTMARE: the event's legendary, never a swap and never in the
        grass. Every costume caught on the event's days is a Bad Dream; at

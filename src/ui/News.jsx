@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-24-hallowed-wave-two",
+    icon: "👻",
+    date: "October 2026",
+    title: "Seven more costumes for Hallowed Night",
+    items: [
+      ["One a map", "Hoothoot, Houndour, Poochyena, Snorunt, Golett, Drifloon and Frillish, each on its own map."],
+      ["Catch each one", "These don't evolve in costume - every one is a catch of its own."],
+      ["All fourteen", "Catch every costume for the Hallowed Hunter title."],
+    ],
+  },
+  {
     id: "2026-10-24-ulti-archetypes",
     icon: "🌋",
     date: "October 2026",
@@ -174,7 +185,7 @@ export const NEWS = [
       ["Night hunts", "Costumes come out more often at night (20:00-05:00)."],
       ["Event shop", "A Spooky Honey to lure them and a Hallow Ball to catch them."],
       ["Friday check-ins", "Check in on a Friday during the event for 5 Hallow Balls."],
-      ["Catch all seven", "The Hallowed Hunter title and a card pack, on the Events board."],
+      ["Catch every costume", "The Hallowed Hunter title and a card pack, on the Events board."],
       ["The Nightmare", "Catch 20 costumes, then walk in the Haunted Tower at night..."],
     ],
   },

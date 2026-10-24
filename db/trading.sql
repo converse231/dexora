@@ -707,7 +707,7 @@ $$;
 -- this list equal to the game's `EVENT_SLOTS`.
 create or replace function public.event_slots()
 returns int[] language sql immutable set search_path = '' as $$
-  select array[1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423]
+  select array[1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430]
 $$;
 
 -- A card's numbers, and its showcase kept honest, from a save document.

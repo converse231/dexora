@@ -24,8 +24,10 @@ import {
 } from "../game/events.js";
 
 /* Seen per device, never the save - the teaser and the opening are two
-   announcements, so each is seen once. */
-const SEEN = (ev, soon) => `dexora-event-seen:${ev.id}${soon ? ":soon" : ""}`;
+   announcements, so each is seen once. The count of looks is in the key: a
+   second wave of costumes (Hallowed Night's, 2026-10-24) is announced again to
+   a device that saw the first. */
+const SEEN = (ev, soon) => `dexora-event-seen:${ev.id}${soon ? ":soon" : ""}:${ev.looks.length}`;
 const isSoon = (ev) => eventOn()?.id !== ev.id && eventOpens(ev) > Date.now();
 export const seasonUnseen = (ev) => {
   try { return !!ev && localStorage.getItem(SEEN(ev, isSoon(ev))) !== "1"; } catch { return false; }
@@ -162,8 +164,9 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
               {" "}any of these can turn up where its species lives - and only then.</>}
         </p>
 
+        <h3 className="sn-sub">Evolve in costume</h3>
         <div className="sn-lineup">
-          {lines(ev).map(({ line, where }) => (
+          {lines(ev).filter(({ line }) => line.length > 1).map(({ line, where }) => (
             <section key={line[0].id} className="sn-line">
               <div className="sn-mons">
                 {line.map((l, k) => (
@@ -177,6 +180,21 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
               </div>
               <b>{line.length > 1 ? `${line[0].title.split(" ").slice(0, -1).join(" ")} line` : line[0].title}</b>
               <small>{where.length ? `Where ${label(speciesById(line[0].of))} lives: ${where.join(", ")}` : ""}</small>
+            </section>
+          ))}
+        </div>
+        {/* ONE OF A KIND: no costumed next stage, so each is a catch of its own -
+            fourteen sections ran the dialog four screens long, so a grid. */}
+        <h3 className="sn-sub">One of a kind · catch each</h3>
+        <div className="sn-solos">
+          {lines(ev).filter(({ line }) => line.length === 1).map(({ line: [l], where }) => (
+            <section key={l.id} className="sn-solo">
+              <span className="sn-mon" style={{ "--k": l.id % 4 }}>
+                <Sprite id={l.id} alt={l.title} eager />
+                {dex?.[dexIndex(l.id)] === 2 && <i className="sn-got" aria-label="caught">✓</i>}
+              </span>
+              <b>{l.title}</b>
+              <small>{where[0] ?? ""}</small>
             </section>
           ))}
         </div>
@@ -194,7 +212,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
 
         <ul className="sn-how">
           <li><em>🌙</em><span><b>{EVENT_NIGHT}× after dark</b>The costumes come out at night.</span></li>
-          <li><em>🎃</em><span><b>1 in {Math.round(1 / EVENT_SHARE)} wear one</b>Evolve it and it keeps the costume.</span></li>
+          <li><em>🎃</em><span><b>1 in {Math.round(1 / EVENT_SHARE)} wear one</b>A line evolves in costume; the rest, catch each one.</span></li>
           {honey && <li><em>🍯</em><span><b>{honey.name}</b>{honey.lure}× as likely for {honey.steps} steps.</span></li>}
           {ball && <li><em>🔮</em><span><b>{ball.name}</b>{ball.boost}× catch on costumed ones.</span></li>}
           <li><em>✨</em><span><b>Rare forms too</b>Shiny, Gold, Diamond and more can wear the costume.</span></li>
