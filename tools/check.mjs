@@ -2757,11 +2757,14 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      trainer card that holds the title. */
   {
     const { titleBadge } = await import("../src/game/titles.js");
-    const drawn = [...Array(9)].map((_, i) => `dex:${i + 1}`).map(titleBadge);
-    assert.ok(drawn.every(Boolean), "a region's Dex Master has no badge path");
+    // Every event's title and its hunt's medal too (2026-10-26: Hallowed Hunter shipped as a pill).
+    const { EVENTS } = await import("../src/data/eventforms.js");
+    const drawn = [...[...Array(9)].map((_, i) => `dex:${i + 1}`),
+      ...EVENTS.flatMap((ev) => [`event:${ev.id}`, ...(ev.hunt ? [`event:${ev.hunt.medal}`] : [])])].map(titleBadge);
+    assert.ok(drawn.every(Boolean), "a Dex Master or an event title has no badge path");
     for (const b of drawn) {
       const f = new URL(`../public/${b}`, import.meta.url);
-      assert.ok(existsSync(f), `${b} is missing - is the original in art/titles, and was npm run ranks run?`);
+      assert.ok(existsSync(f), `${b} is missing - draw art/${b} (every event ships its title badges), then npm run ranks`);
       const png = readFileSync(f);
       assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [128, 128], `${b} is not the built 128px badge`);
       assert.ok(png.length < 24 * 1024, `${b} is ${png.length >> 10}KB - run npm run ranks`);

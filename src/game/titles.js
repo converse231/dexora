@@ -33,7 +33,11 @@ export function titleIds(milestones = {}, medals = []) {
 /* THE DRAWN ONES: public/titles/<kind>-<id>.png (art/titles, npm run ranks).
    Every region's Dex Master so far; a card set's gets a line here once its
    art exists (check.mjs holds each named file to the disk). */
-const DRAWN = /^dex:[1-9]$/;
+/* An event's titles are drawn too (2026-10-26, reported: Hallowed Hunter was
+   a text pill beside the drawn medals) - its own and its hunt's medal, art in
+   art/titles/event-<id>.png; check.mjs holds every event to both, so a new
+   event cannot ship without them. */
+const DRAWN = /^(dex:[1-9]|event:[a-z0-9-]+)$/;
 /* A TIER'S POKEDEX wears its region's badge with the tier's own mark as a
    tag at its foot (`titleTier`; asked for, 2026-10-15 - no art of its own). */
 export const titleTier = (t) => (/^tier:[a-z]+:[1-9]$/.test(t) ? t.split(":")[1] : null);

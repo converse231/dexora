@@ -2,9 +2,17 @@
    a medal with its name in the tooltip; a card set's title is the set's logo,
    a Master's with a gold tag under it; a text pill for anything else. One
    component for You and every trainer card. */
+import { useState } from "react";
 import { titleBadge, titleName, titleLogo, shownTitles, titleTier, regionTiers } from "../game/titles.js";
 
 const asset = (path) => new URL(path, document.baseURI).href;
+
+// A medal whose art is not built yet (a new event's) falls back to its pill, never an empty img.
+function Medal({ t, src }) {
+  const [gone, setGone] = useState(false);
+  return gone ? <i>{titleName(t)}</i>
+    : <img className="title-badge" src={src} alt={titleName(t)} data-tip={titleName(t)} loading="lazy" onError={() => setGone(true)} />;
+}
 
 export default function TitleBadges({ titles }) {
   if (!titles?.length) return null;
@@ -24,7 +32,7 @@ export default function TitleBadges({ titles }) {
             </span>
           );
         }
-        if (b) return <img key={t} className="title-badge" src={asset(b)} alt={titleName(t)} data-tip={titleName(t)} loading="lazy" />;
+        if (b) return <Medal key={t} t={t} src={asset(b)} />;
         if (logo) {
           return (
             <span key={t} className={`title-set${t.startsWith("master:") ? " master" : ""}`} data-tip={titleName(t)}>

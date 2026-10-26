@@ -51,17 +51,19 @@ const joined = (at) => (at
 
 /* The Pokedex ring and its counts: how far, how far in the League, how rare,
    how finished, how social. The ring is the one that is a proportion, so it
-   is the one drawn. Badges are counted by the server from the stored save's
+   is the one drawn, inside the Pokedex's own tile - which takes a whole row
+   on a phone, the four counts sharing the next (one row of six ran off a
+   320px screen). Badges are counted by the server from the stored save's
    League wins (db/trading.sql `card_stats`); a server that has not run that
    SQL yet sends none, which reads as 0. */
 function Stats({ card }) {
   const pct = card.dex_count / DEX_TOTAL;
   return (
     <div className="tp-stats">
-      <span className="tp-ring" style={{ "--p": pct }} data-tip={`${card.dex_count} of ${DEX_TOTAL} species`}>
-        <b>{Math.round(pct * 100)}<i>%</i></b>
+      <span className="tp-dex" data-tip={`${card.dex_count} of ${DEX_TOTAL} species`}>
+        <span className="tp-ring" style={{ "--p": pct }}><b>{Math.round(pct * 100)}<i>%</i></b></span>
+        <span><b>{card.dex_count}</b>Pokédex · of {DEX_TOTAL}</span>
       </span>
-      <span><b>{card.dex_count}</b>Pokédex</span>
       <span><b>{card.badges ?? 0}</b>badges</span>
       <span><b>{card.variants}</b>rare forms</span>
       <span><b>{card.stars}</b>stars</span>
@@ -94,9 +96,11 @@ function Badges({ ids }) {
 }
 
 /* An empty slot on YOUR card is a "+" that opens the showcase picker; on
-   anybody else's it is only an empty frame. */
+   anybody else's it is not drawn (four empty frames were most of a phone's
+   screen). */
 function Showcase({ list, onAdd }) {
-  const slots = Array.from({ length: LIMITS.SHOWCASE }, (_, i) => list[i] ?? null);
+  if (!onAdd && !list.length) return <p className="ev-quiet">Nothing shown yet.</p>;
+  const slots = onAdd ? Array.from({ length: LIMITS.SHOWCASE }, (_, i) => list[i] ?? null) : list;
   return (
     <div className="tp-show">
       {slots.map((m, i) => {
@@ -185,7 +189,7 @@ function FriendCode({ code }) {
   };
   return (
     <span className="tp-code" data-tip="Friends add you with this code">
-      FRIEND CODE <b>{code}</b>
+      <i>FRIEND CODE</i> <b>{code}</b>
       <button type="button" className={`tp-copy${copied ? " done" : ""}`} onClick={copy}
         aria-label={copied ? "Friend code copied" : "Copy friend code"} data-tip={copied ? "Copied" : "Copy"}>
         {copied ? (
@@ -255,16 +259,18 @@ export default function TrainerProfile({
         <span className="tp-art-frame"><TrainerArt char={card.char} className="tp-art" /></span>
         <div className="tp-id">
           <h4>{card.username}</h4>
-          <span>Lv {level} trainer · since {joined(card.joined_at)}</span>
+          <span>Lv {level} · since {joined(card.joined_at)}</span>
           {/* Their Pokédex rank, off the count the card already carries. */}
           <span className="tp-title">
             <RankMedal set="dex" id={dexRank(card.dex_count).id} color={dexRank(card.dex_count).color} />
             {dexRank(card.dex_count).name}
           </span>
-          {/* Titles the server derived from the stored save (card_titles). */}
-          <TitleBadges titles={card.titles} />
-          {self && <FriendCode code={card.friend_code} />}
         </div>
+        {/* Titles the server derived from the stored save (card_titles), and
+            the code: rows of the hero's own, full width on a phone - beside the
+            portrait they wrapped a pill per line and ran off a 320px screen. */}
+        <TitleBadges titles={card.titles} />
+        {self && <FriendCode code={card.friend_code} />}
       </header>
 
       <Stats card={card} />

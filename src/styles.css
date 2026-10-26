@@ -6411,12 +6411,22 @@ button:disabled { transition: none; }
 }
 
 /* ------------------------------------------------ the profile */
-.tp { display: grid; gap: 12px; }
+/* A grid item's min-width is its content's: without the zeros one long row
+   (the stats, a title strip) widened the whole card past a phone's edge. */
+.tp { display: grid; gap: 12px; min-width: 0; }
+.tp > * { min-width: 0; }
+/* The hero: portrait, then name / titles / code down the column beside it;
+   on a phone the titles and the code take the hero's whole width. */
 .tp-hero {
-  position: relative; display: flex; align-items: center; gap: 14px; padding: 14px;
+  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "art id" "art titles" "art code"; column-gap: 14px; align-items: center; padding: 14px;
   border-radius: 18px; border: 1px solid var(--line);
   background: linear-gradient(135deg, var(--canopy-soft), var(--surface-2) 70%);
 }
+.tp-hero > .tp-art-frame { grid-area: art; }
+.tp-hero > .tp-id { grid-area: id; }
+.tp-hero > .you-titles { grid-area: titles; margin-top: 8px; gap: 6px; }
+.tp-hero > .tp-code { grid-area: code; margin-top: 10px; }
 .tp-hero.ch-leaf { background: linear-gradient(135deg, var(--path-soft), var(--surface-2) 70%); }
 .tp-art-frame {
   flex: none; width: 76px; height: 76px; display: grid; place-items: center; border-radius: 50%;
@@ -6429,14 +6439,14 @@ button:disabled { transition: none; }
   margin: 0; font-family: var(--display); font-size: 22px; font-weight: 700; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.tp-id > span { font-size: 12.5px; color: var(--ink-soft); }
+.tp-id > span { font-size: 12.5px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tp-code {
-  justify-self: start; margin-top: 3px; padding: 3px 8px; border-radius: 7px;
-  font-family: var(--pixel); font-size: 9px; color: var(--ink-soft);
+  justify-self: start; display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 8px; border-radius: 9px;
+  font-family: var(--pixel); font-size: 9px; color: var(--ink-soft); white-space: nowrap;
   background: var(--surface); border: 1px dashed var(--line-firm);
 }
-.tp-code { display: inline-flex; align-items: center; gap: 4px; }
-.tp-code b { font-size: 12px; color: var(--ink); margin-left: 4px; }
+.tp-code i { font-style: normal; }
+.tp-code b { font-size: 12px; color: var(--ink); }
 .tp-copy {
   display: grid; place-items: center; width: 26px; height: 26px; margin: -3px -5px -3px 2px; padding: 0; cursor: pointer;
   color: var(--ink-soft); background: none; border: 0; border-radius: 6px;
@@ -6445,23 +6455,24 @@ button:disabled { transition: none; }
 .tp-copy:hover { color: var(--canopy); background: var(--surface-2); }
 .tp-copy.done { color: var(--good); }
 .tp-copy:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
-.tp-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.tp-stats { flex-wrap: nowrap; }
-/* One row at any width: the five counts share what the ring leaves. */
-.tp-stats > span:not(.tp-ring) {
-  flex: 1 1 0; min-width: 0;
-  display: grid; justify-items: center; padding: 5px 4px;
-  font-size: 10.5px; color: var(--ink-faint);
+/* The Pokedex tile (ring and count) and four counts, one tile each; every
+   label on one line, the tiles one height. */
+.tp-stats { display: grid; grid-template-columns: minmax(0, 1.8fr) repeat(4, minmax(0, 1fr)); gap: 6px; }
+.tp-stats > span {
+  min-width: 0; display: grid; justify-items: center; align-content: center; padding: 6px 4px;
+  font-size: 10.5px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
 }
-.tp-stats b { font-family: var(--display); font-size: 16px; color: var(--ink); line-height: 1.1; }
+.tp-stats > .tp-dex { grid-template-columns: auto minmax(0, 1fr); justify-content: start; justify-items: start; align-items: center; gap: 8px; padding: 5px 10px 5px 5px; }
+.tp-dex > span:last-child { display: grid; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tp-stats b { font-family: var(--display); font-size: 16px; color: var(--ink); line-height: 1.1; font-variant-numeric: tabular-nums; }
 .tp-ring {
-  width: 54px; height: 54px; display: grid; place-items: center; border-radius: 50%;
+  width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%;
   background: conic-gradient(var(--canopy) calc(var(--p) * 360deg), var(--line) 0);
 }
-.tp-ring b {
-  width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%;
-  font-size: 14px; background: var(--surface);
+.tp-stats .tp-ring b {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%;
+  font-size: 13px; background: var(--surface);
 }
 .tp-ring i { font-style: normal; font-size: 9px; }
 .tp-count { font-family: var(--pixel); font-size: 10px; color: var(--ink-faint); }
@@ -6521,9 +6532,10 @@ button:disabled { transition: none; }
 /* Trainers to meet: the shuffle on the banner's right, a request sent where its Add was. */
 .tc-shuffle { margin-left: auto; padding: 4px 12px; }
 .tc-asked { flex: none; margin-left: auto; padding: 0 8px; font: 600 12px var(--body); color: var(--ink-faint); }
-.tp-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Gym badges in even columns that fill the card's width, never past it. */
+.tp-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 6px 4px; justify-items: center; }
 .tp-badges img { width: 32px; height: 32px; image-rendering: pixelated; }  /* the art's own size */
-.tp-show { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tp-show { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .tp-slot {
   position: relative; margin: 0; display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px;
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; min-width: 0;
@@ -6605,8 +6617,15 @@ button:disabled { transition: none; }
   cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-firm); text-underline-offset: 2px;
 }
 .of-name:hover { color: var(--canopy); text-decoration-color: currentColor; }
+@media (max-width: 560px) {
+  .tp-hero { grid-template-areas: "art id" "titles titles" "code code"; }
+  .tp-hero > .tp-code { justify-self: stretch; justify-content: space-between; }
+  .tp-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tp-stats > .tp-dex { grid-column: 1 / -1; }
+}
 @media (max-width: 420px) {
-  .tp-hero { padding: 11px; gap: 10px; }
+  .tp-hero { padding: 11px; column-gap: 10px; }
+  .evcard .tp-id h4 { font-size: 20px; }
   .tp-art-frame { width: 62px; height: 62px; }
   .tp-art.gate-art { --z: 2.5; }
   .tp-slot > img, .tp-slot > .sprite-fx { width: 56px; height: 56px; }
