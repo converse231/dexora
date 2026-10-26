@@ -12500,8 +12500,44 @@ button.wl-chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2
   .ph-wallet { display: inline-flex; }
 }
 /* The top bar's money and candy are buttons now (the Mart). */
-.topbar button.tb-stat.cash, .topbar button.tb-stat.candy { border-radius: 10px; }
-.topbar button.tb-stat.cash:hover, .topbar button.tb-stat.candy:hover { background: var(--surface-2); }
+/* THE TOP BAR'S BUTTONS LOOK LIKE BUTTONS (2026-10-26, reported: "I didn't
+   know it was a button"): the streak, money and candy are tinted pills you
+   press - money and candy with the Mart's "+" - and the Pokédex count stays a
+   plain readout beside them. */
+.topbar button.tb-stat { flex-direction: row; align-items: center; height: 34px; padding: 0 12px; gap: 6px; border-radius: 999px;
+  border: 1px solid var(--tint-b, var(--line-firm)); background: var(--tint, var(--surface-2)); box-shadow: 0 1px 0 var(--shadow-soft);
+  transition: border-color .15s, transform .1s; }
+.topbar button.tb-stat.streak { --tint: color-mix(in srgb, #ff7a38 13%, var(--surface)); --tint-b: color-mix(in srgb, #ff7a38 45%, transparent); }
+.topbar button.tb-stat.streak.cold { --tint: var(--surface-2); --tint-b: var(--line-firm); }
+.topbar button.tb-stat.cash { --tint: color-mix(in srgb, var(--gold) 13%, var(--surface)); --tint-b: color-mix(in srgb, var(--gold) 45%, transparent); }
+.topbar button.tb-stat.candy { --tint: color-mix(in srgb, var(--candy) 15%, var(--surface)); --tint-b: color-mix(in srgb, var(--candy) 45%, transparent); }
+.topbar button.tb-stat:hover { border-color: var(--accent); }
+.topbar button.tb-stat:active { transform: scale(.95); }
+.topbar button.tb-stat:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.topbar .tb-stat .tb-plus { display: grid; place-items: center; width: 18px; height: 18px; margin-right: -5px; border-radius: 50%;
+  background: var(--cta); color: #fff; font: 800 13px/1 var(--display); font-style: normal; }
+.topbar .tb-stat.dex { padding-left: 4px; }
+.topbar .tb-stats { gap: 8px; }
+.topbar .tb-stat:not(button) { padding: 0 6px; }
+/* With three pills the bar is full under 1560px: caught and steps (both on You) stand down first. */
+@media (max-width: 1560px) { .topbar .tb-stat.tb-extra { display: none; } }
+/* A phone's bar: one row, the three pills a thumb's height, the count last. */
+@media (hover: none) and (pointer: coarse) {
+  .topbar .tb-stats { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; }
+  .topbar button.tb-stat { height: 36px; padding: 0 10px; }
+  .topbar .tb-stat.dex { margin-left: auto; padding: 0 2px; border: 0; }
+}
+@media (hover: none) and (pointer: coarse) and (max-width: 380px) {
+  .topbar button.tb-stat { padding: 0 8px; gap: 4px; }
+  .topbar .tb-stat.cash .tb-plus { display: none; }
+  .topbar .tb-stat.dex b u { display: none; }
+}
+/* Held sideways the numbers are a column of slim chips (SIDEWAYS): kept slim. */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .topbar .tb-stats { flex-direction: column; align-items: stretch; gap: 4px; }
+  .topbar button.tb-stat { height: 30px; border-radius: 10px; justify-content: flex-start; }
+  .topbar .tb-stat.dex { margin-left: 0; padding: 0 10px; border: 1px solid var(--line); }
+}
 
 /* THE POKÉ MART: a card over any page, its shelves in tabs, one scroll. */
 .mart-sheet { z-index: 75; }

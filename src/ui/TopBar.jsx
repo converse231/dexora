@@ -177,9 +177,10 @@ export default function TopBar({
           {streakDue && <i className="tb-dot" aria-hidden="true" />}
         </button>
         {/* Money and candy open the Poké Mart (Mart.jsx) from any tab. */}
-        <button type="button" className={`tb-stat cash${deltas.length ? " bump" : ""}`} data-tip="Money - open the Poké Mart" onClick={() => onMart?.("catching")}>
+        <button type="button" className={`tb-stat cash${deltas.length ? " bump" : ""}`} data-tip="Money - open the Poké Mart" aria-label={`¥${money.toLocaleString()} - open the Poké Mart`} onClick={() => onMart?.("catching")}>
           <Icon n="yen" size={15} />
           <b>{money.toLocaleString()}</b>
+          <i className="tb-plus" aria-hidden="true">+</i>
           <span className="deltas" aria-hidden="true">
             {deltas.map((d) => (
               <em key={d.id} className={d.amount > 0 ? "up" : "down"}>
@@ -190,9 +191,10 @@ export default function TopBar({
         </button>
         {/* Beside the money, because it is the other half of the same
             decision: a spare is one or the other and you pick every time. */}
-        <button type="button" className="tb-stat candy" data-tip="Rare Candy - buy more" onClick={() => onMart?.("training")}>
+        <button type="button" className="tb-stat candy" data-tip="Rare Candy - buy more" aria-label={`${candy} Rare Candy - buy more`} onClick={() => onMart?.("training")}>
           <img src="items/rare-candy.png" alt="" className="tb-candy" />
           <b>{candy.toLocaleString()}</b>
+          <i className="tb-plus" aria-hidden="true">+</i>
         </button>
         {/* The dex SIZE from SPECIES, never typed: 151 once told every player
             they had finished at 151 of 358. */}
