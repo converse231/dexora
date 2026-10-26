@@ -205,7 +205,7 @@ const NAME_FIX = {
 // Real names that keep a lower-case hyphen: Jangmo-o's line, and the games'
 // own "Spiky-eared" Pichu (a look, titled from PokeAPI's English form name),
 // and Hallowed Night's hand-written "Trick-or-Treat" Drifloon.
-export const HYPHEN_NAMES = ["jangmo-o", "hakamo-o", "kommo-o", "spiky-eared", "trick-or-treat"];
+export const HYPHEN_NAMES = ["jangmo-o", "hakamo-o", "kommo-o", "spiky-eared", "trick-or-treat", "jack-o'-lantern", "will-o'-wisp"];
 const cap = (w) => w[0].toUpperCase() + w.slice(1);
 
 /* A FORM IS NAMED THE WAY THE GAMES NAME IT, not the way PokeAPI keys it.

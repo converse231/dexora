@@ -289,7 +289,7 @@ export function sparesOf(row, variant) {
    is SHARED by its printings, so each printing is taken from what the one
    before it left - counted alone, a normal and a reverse holo could each
    spend the same room and dust an earned copy. The engine's sweep and the
-   Dust tab's button both read this. */
+   binder's dust bar both read this. */
 /* `every`: false is normal commons and uncommons, true every printing up to
    a Double rare, and "all" every spare at all - an Illustration rare and up
    too (2026-10-21, asked for: a hit's spare had no use but dust, one tap at a

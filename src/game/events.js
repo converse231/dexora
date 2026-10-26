@@ -96,7 +96,7 @@ export function riftFind(random, level) {
 // What the "it is over" card calls each event.
 export const EVENT_NAME = { outbreak: "Outbreak", rift: "Rift" };
 
-/* A DATED EVENT (eventforms.js): for its fortnight, a species it dressed is
+/* A DATED EVENT (eventforms.js): for its week, a species it dressed is
    sometimes met in its costume instead - `EVENT_SHARE` of the meetings with
    that species, wherever and however it is met (grass, water, a rod, an
    outbreak), and never where the species is not. A substitution and not a
@@ -116,20 +116,49 @@ export const EVENT_CAP = 0.75;
 // The event running on a local day (dayKey), or null.
 export const eventOn = (day = dayKey()) =>
   EVENTS.find((ev) => day >= ev.start && day <= ev.end) ?? null;
+// The items an event sells (items.js `event`): its celebration's, shared by its weeks.
+export const shelfOf = (ev) => ev?.shelf ?? ev?.id ?? null;
+/* THE NEXT WEEK, when another event opens within TEASE_DAYS of this one's
+   end: the running week's card says what follows (the teaser never runs
+   while an event does - `eventSoon`). */
+export function eventAfter(ev) {
+  const end = eventCloses(ev);
+  return EVENTS.find((e) => e !== ev && eventOpens(e) >= end && eventOpens(e) - end < TEASE_DAYS * 86400000) ?? null;
+}
 
 // Every event look, by the species it dresses, for the event running.
 export const eventLooks = (day) => eventOn(day)?.looks ?? [];
 
-export const eventChance = ({ night = false, lure = 1 } = {}) =>
-  Math.min(EVENT_CAP, EVENT_SHARE * (night ? EVENT_NIGHT : 1) * lure);
+// An event may set its own `share` (The Haunting's is harder); night and a lure still lift it, never past the cap.
+export const shareOf = (ev) => ev?.share ?? EVENT_SHARE;
+export const eventChance = ({ night = false, lure = 1, share = EVENT_SHARE } = {}) =>
+  Math.min(EVENT_CAP, share * (night ? EVENT_NIGHT : 1) * lure);
 
 /* The species met: `sp`, or its costume. Draws from `random` ONLY when the
    running event dressed this species, so every other roll in the game - and
-   every seeded record check.mjs replays - is untouched by an event. */
+   every seeded record check.mjs replays - is untouched by an event.
+   A LOOK `on` ANOTHER SPECIES (eventforms.js) is met in place of it too: a
+   line's later stages, costumed, where its base lives - the costume is one of
+   them, picked evenly by a second draw only when there is a choice. */
+/* A `rare` look takes that share of the odds (Phantom Thief Sableye, a
+   fifth): in a choice it is picked by weight, so the others keep theirs. */
 export function eventLook(sp, random, { day, night, lure } = {}) {
-  const look = eventLooks(day).find((l) => l.of === sp.id);
-  if (!look || random() >= eventChance({ night, lure })) return sp;
-  return speciesById(look.id);
+  const ev = eventOn(day);
+  const looks = (ev?.looks ?? []).filter((l) => l.of === sp.id || l.on === sp.id);
+  if (!looks.length) return sp;
+  const w = looks.map((l) => l.rare ?? 1), sum = w.reduce((a, b) => a + b, 0);
+  if (random() >= eventChance({ night, lure, share: shareOf(ev) }) * (sum / looks.length)) return sp;
+  if (looks.length === 1) return speciesById(looks[0].id);
+  let r = random() * sum, k = 0;
+  while (r >= w[k] && k < looks.length - 1) r -= w[k++];
+  return speciesById(looks[k].id);
+}
+/* ONE MEETING IN HOW MANY with its base is this look, by day and without a
+   lure (the Dex's and the poster's number). */
+export function lookEvery(ev, look) {
+  const base = look.on ?? look.of;
+  const n = ev.looks.filter((l) => l.of === base || l.on === base).length;
+  return Math.round(n / (shareOf(ev) * (look.rare ?? 1)));
 }
 
 /* EVERY LOOK OF AN EVENT IN THE POKEDEX, AND ITS HUNT, is its medal

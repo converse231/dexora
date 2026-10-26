@@ -203,8 +203,22 @@ anything done. The run prints each suite; the count is not typed anywhere.
   shown as slugs ("Iron-bundle", "Chi-yu", "Type-null") until 2026-09-29.
 - **`genOf` has its own Map** because it runs at module init, before
   `speciesById` exists.
+- **An event is ONE WEEK** (2026-10-26, your call: a fortnight was finished
+  in days): seven local days, none overlapping (check.mjs). A longer
+  celebration is a run of weeks, each its own event - costumes, hunted
+  legendary, title, title badge - sharing a `shelf` (`shelfOf`: the items
+  sold on their days, so a Hallow Ball from week one works in week two). The
+  running week's board card names the next (`eventAfter`), and a finished
+  week's Claim stays on the board beside it (`boardSeasons`). Hallowed Night
+  is 10-24 to 10-30, The Haunting 10-31 to 11-06. **A week may dress whole
+  lines without evolving them** (`evolves: false`, The Haunting, your call:
+  second and final stages, each its own catch - fetch-evolutions writes no
+  row): a later stage is rarely met wild, so a look `on` its line's base is
+  met in that base's place too (`eventLook`: one draw for the costume, a
+  second to pick among the line only when there is a choice; check.mjs holds
+  `on` to the line's base and every such look to being met).
 - **An event look is a costume from a dated event** (`src/data/eventforms.js`,
-  hand-written; Hallowed Night, 2026-10-24 to 11-07, asked for 2026-10-19):
+  hand-written; Hallowed Night, asked for 2026-10-19):
   `form: "event"`, ids 19901+ (under trading.sql's 20000), built from its
   species in dex.js and appended by `wave` (fetch-forms takes a wave past
   it). It is met ONLY as a substitution (`eventLook` in events.js, after
@@ -242,7 +256,12 @@ anything done. The run prints each suite; the count is not typed anywhere.
   caught on its days is a Bad Dream (`state.dreams`, `huntOn`); at `dreams`
   the next wild meeting in its `area` after dark IS it (`huntDue`, no alpha,
   it asks before you run); lost, the count falls to `keep`; caught, it is
-  `event:<medal>`, a title of its own. Event art is keyed by
+  `event:<medal>` - NO title of its own (2026-10-26, your call): the
+  event's title asks for every look AND it (`eventDone`), and `shownTitles`
+  never draws a hunt medal. Every event's title is a DRAWN medal
+  (`art/titles/event-<id>.png`, check.mjs holds it to the disk), and every
+  drawn medal opens full size (TitleBadges' zoom, `titles/full/`, 512px from
+  `npm run ranks`). Event art is keyed by
   build_event_sprites.py: the border flood, enclosed pockets that fit a
   checker at its own square size (Gemini paints a pocket on a grid of its
   own), specks, and accent colours one at a time.
@@ -678,6 +697,27 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
 - **Every dialog closes through `useDismiss`**, never a bare `onClick` on a
   scrim, and takes the modal lock (`App` ignores keys while `modalOpen()`).
   Custom listboxes carry keyboard handling, focus return and the lock.
+  **Every PAGE takes the lock too** (Cards did not, 2026-10-26), and a
+  page's own Escape listener checks `stacked()` (modal.js: a second lock is
+  a dialog on top): registered first, it ran first, and Escape on a confirm
+  over the Arena closed the whole Arena. check.mjs's `one game` reads every
+  page's handler.
+- **Four tabs, one game** (2026-10-26, asked for: "take the Arena's
+  gamified path so the features don't feel separated"). **Every page's head
+  is `PageHead`** - the Arena's mark, heavy italic name and line, in the
+  tab's own colour (`--fc`, set on each page's class and the tab bar's),
+  the selected section that colour too (`.lg-strip`: Trade's tabs are the
+  League's and the Cards' strip now). **One wallet** (`wallet.jsx`): App
+  provides money, candy, dust and `openMart` once (`WalletProvider`); a
+  page draws `<Wallet />`, never threads money through props. It shows in a
+  page's head on touch only - a desktop's top bar carries the same chips,
+  buttons now. **One shop, the Poké Mart** (Mart.jsx): every shelf by what
+  it is for (`SHELVES`: Training, Catching, Battle; Shop.jsx `Sections`, the
+  rail's Shop is the same list), Cards a link. **Candy is bought where it
+  is spent**: `useRaise` raises a Pokemon and, short of candy, buys the rest
+  in the same press (asked first - money moves); the Box, Train and the
+  Arena's team all go through it. A share is `pct` (ui/pct.js): floored, so
+  1414 of 1415 is 99%, never 100.
 - **Window key handlers ignore typing** (`typing(ev)`); key releases are never
   gated. Check `KEYS` before claiming a letter.
 - **Mobile is gated on `(hover: none) and (pointer: coarse)`, never width.**
@@ -978,15 +1018,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   all over; a card you do not own wears none. **Crafting ends at the Double rare**
   (`canCraft`, your call 2026-10-07): an Illustration rare and up - the ACE
   SPEC too - is packs only (`PACK_ONLY`, derived), and so is a set's own top rarity
-  (`canCraft(rarity, cards)`: Base Set's Holo rare, 2026-10-10). The Dust
-  tab's Missing list is PER PRINTING: owning a normal card hid its holo and
-  reverse holo from it (2026-10-12). The sweep is `sweepOf` (engine and
-  Dust tab both): normal commons and uncommons, every printing up to a
+  (`canCraft(rarity, cards)`: Base Set's Holo rare, 2026-10-10). **There is
+  no Dust tab** (2026-10-26, asked for): a set's binder carries its dust
+  (`DustBar`: sweep, craft all, a dust pack), and its two lists are the
+  binder's own filters, "With spares" and "Missing a printing". Missing is
+  PER PRINTING: owning a normal card hid its holo and reverse holo from it
+  (2026-10-12). The sweep is `sweepOf` (engine and the dust bar both):
+  normal commons and uncommons, every printing up to a
   Double rare, or every spare at all (`"all"`, 2026-10-21: a hit's spare had
   no use but dust), the room above earned stamps spent ONCE across printings. The
   card view offers a held printing only its spares and a missing one only its
-  craft (2026-10-13); one set (`SetPicker`, grouped by series) is shared by
-  the Binder and Dust. **The Binder draws pages through `BinderPages`**
+  craft (2026-10-13); one set at a time (`SetPicker`, grouped by series). **The Binder draws pages through `BinderPages`**
   (Binders.jsx: nine pockets, a two-page spread from 720px), and **My
   Binders** are the save's `binders` (`cleanBinders` in cards.js; the engine's
   `newBinder`, `setBinder`, `deleteBinder`, `addToBinder`): a pocket keeps a
@@ -1557,8 +1599,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   battle pays or records a win, replacing `beaten` rather than editing it
   (the page's memo keys on it). A loss, forfeit or reload pays nothing.
 - **The Battle shelf is `HEALS` in items.js, one list**: the League page's
-  Shop tab sells it (`ShopShelf`, shared with the rail's shop, which no
-  longer carries it - phase 8) and `battle.js` reads what each item does from it - a SHARE of max HP,
+  Shop tab sells it (`ShopShelf`) and so does the Poké Mart (Shop.jsx
+  `Sections`), and `battle.js` reads what each item does from it - a SHARE of max HP,
   never a flat amount (a flat Potion lowered a late gym's win rate; check.mjs
   holds the share from Lv 5 to 100). `canUse` is the one answer to whether
   an item would do anything (the Bag greys on it, `step` refuses on it with

@@ -18,6 +18,7 @@ import { peakRank, seasonName } from "../../game/ranked.js";
 import { rankedStanding } from "../../net/cloud.js";
 import TitleBadges from "../TitleBadges.jsx";
 import CardShow from "../cards/CardShow.jsx";
+import { pct as pct100 } from "../pct.js";
 
 /* THEIR RANK (docs/ranked.md, 6c), read from the server when the profile
    opens; nothing while it loads, on a server without ranked, or for a trainer
@@ -61,7 +62,7 @@ function Stats({ card }) {
   return (
     <div className="tp-stats">
       <span className="tp-dex" data-tip={`${card.dex_count} of ${DEX_TOTAL} species`}>
-        <span className="tp-ring" style={{ "--p": pct }}><b>{Math.round(pct * 100)}<i>%</i></b></span>
+        <span className="tp-ring" style={{ "--p": pct }}><b>{pct100(card.dex_count, DEX_TOTAL)}<i>%</i></b></span>
         <span><b>{card.dex_count}</b>Pokédex · of {DEX_TOTAL}</span>
       </span>
       <span><b>{card.badges ?? 0}</b>badges</span>

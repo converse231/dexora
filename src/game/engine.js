@@ -34,7 +34,7 @@ import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
-  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, cleanDreams, eventCheckin,
+  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, cleanDreams, eventCheckin, shelfOf,
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
@@ -3835,7 +3835,7 @@ export function createEngine(canvas, onChange, mini = null) {
   }
 
   /* CRAFT one copy of a card in a variant it is printed in, for dust. */
-  /* CRAFT A BATCH (asked for, 2026-10-12): the Dust tab's "Craft all", so a
+  /* CRAFT A BATCH (asked for, 2026-10-12): the set binder's "Craft all", so a
      set is not completed one press at a time. Each pick passes exactly the
      checks `craftCard` makes; they go CHEAPEST FIRST, as many as the dust
      covers - sorted, so the first that does not fit ends it - and the whole
@@ -3891,7 +3891,7 @@ export function createEngine(canvas, onChange, mini = null) {
     // free, since the cost of qty x 0 is 0.
     if (!item || !forSale(item) || !qty) return false;
     // An event's items are on the shelf only while it runs (items.js).
-    if (item.event && eventOn()?.id !== item.event) return false;
+    if (item.event && shelfOf(eventOn()) !== item.event) return false;
     const cost = priceOf(item) * qty;
     if (state.money < cost) return false;
     state.money -= cost;
@@ -4129,7 +4129,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const item = fieldById(id);
     if (!item || (state.bag[item.id] ?? 0) <= 0) return false;
     // A Spooky Honey after its event would lure nothing - kept, never spent.
-    if (item.event && eventOn()?.id !== item.event) return false;
+    if (item.event && shelfOf(eventOn()) !== item.event) return false;
     /* AND IT ASKS BEFORE IT THROWS STEPS AWAY (your call, 2026-10-09). The
        swap below is not reversible and the jar is already spent, so this is
        the same press `star` and `travel`-out-of-a-rift are: gated HERE rather

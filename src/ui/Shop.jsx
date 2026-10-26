@@ -1,5 +1,5 @@
 /* The shelves: balls to catch with, berries, field items, stones to evolve
-   with. (The Battle shelf is the League page's - `ShopShelf` is shared.)
+   with, and the Battle shelf (`ShopShelf` is shared with the League page).
 
    Nine items each needing a name, a price, a stock count and a way to pick a
    quantity is more than fits in a rail, so only the row you are actually buying
@@ -12,9 +12,9 @@
 
 import { useState } from "react";
 import {
-  SHOP_BALLS, STONES, CANDY_PRICE, SHOP_FIELD, BERRIES, onShelf, speciesNeedingStone, eventShelf,
+  SHOP_BALLS, STONES, CANDY_PRICE, SHOP_FIELD, BERRIES, HEALS, onShelf, speciesNeedingStone, eventShelf,
 } from "../game/items.js";
-import { eventOn, eventDaysLeft } from "../game/events.js";
+import { eventOn, eventDaysLeft, shelfOf } from "../game/events.js";
 import { speciesById } from "../game/biomes.js";
 import { label } from "../game/map.js";
 import { pricedAt } from "../game/trainer.js";
@@ -191,7 +191,13 @@ export function ShopShelf({ items, money, bag, level, stats, onBuy, first = null
   );
 }
 
-export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCandy }) {
+/* THE SHELVES BY WHAT THEY ARE FOR (2026-10-26): the rail's Shop shows them
+   all; the Poké Mart (Mart.jsx), reached from every tab, opens one. One list,
+   so a new shelf reaches both. The Battle shelf is here too: it was the
+   League's alone, and Potions sold only on another tab read as missing. */
+export const SHELVES = [["training", "Training", "train"], ["catching", "Catching", "ball"], ["battle", "Battle", "trophy"]];
+
+export function Sections({ only = null, money, bag, level, stats, candy, onBuy, onBuyCandy }) {
   // Through the same discount as everything else, or Haggle has two rules.
   const candyPrice = pricedAt(CANDY_PRICE, stats);
   // The event running today, whose shelf leads the shop (items.js `eventShelf`).
@@ -199,127 +205,104 @@ export default function Shop({ money, bag, level, stats, candy, onBuy, onBuyCand
   const shelf = (items, first = null) => (
     <ShopShelf items={items} money={money} bag={bag} level={level} stats={stats} onBuy={onBuy} first={first} />
   );
+  const show = (k) => !only || only === k;
 
+  return (
+    <>
+      {show("catching") && ev && (
+        <>
+          <div className="sh-head sh-event">
+            <span>{ev.name.toUpperCase()}</span>
+            <span>{eventDaysLeft(ev) === 1 ? "LAST DAY" : `${eventDaysLeft(ev)} DAYS LEFT`}</span>
+          </div>
+          {shelf(eventShelf(shelfOf(ev)))}
+          <p className="shop-note">Sold only during the event.</p>
+        </>
+      )}
+
+      {/* RARE CANDY, and it is priced to lose. ¥120 against the ¥40 a common
+          duplicate sells for means three sold to buy one candy, where
+          converting that same duplicate gives one outright - so buying is
+          always the impatient option and catching is always the efficient
+          one. That ordering is the rule; the number is a starting value.
+
+          No purchase cap, and it needs none: cash comes from selling
+          duplicates, so cash-bought candy is gated by catching anyway.
+
+          Its own row rather than an entry in a shelf, because candy is a
+          currency and not a bag item: it is spent per level rather than
+          selected and used, and it sits beside the money in every wallet. */}
+      {show("training") && (
+        <>
+          <div className="sh-head">
+            <span>RARE CANDY</span>
+            <span>YOU HAVE {candy}</span>
+          </div>
+          <div className="candyrow">
+            <img src="items/rare-candy.png" alt="" className="cr-pic" />
+            <span className="cr-copy">
+              <b>Rare Candy</b>
+              <i>1 candy = 1 level</i>
+            </span>
+            <span className="cr-price">¥{candyPrice.toLocaleString()}</span>
+            {[1, 10, 50].map((n) => (
+              <button key={n} type="button" className="cr-buy" disabled={money < candyPrice * n}
+                onClick={() => onBuyCandy(n)} data-tip={`¥${(candyPrice * n).toLocaleString()}`}>
+                +{n}
+              </button>
+            ))}
+          </div>
+          <p className="shop-note">Raise a Pokémon from its Box row, the League&rsquo;s Train tab or the Arena&rsquo;s team.</p>
+        </>
+      )}
+
+      {/* Opens on the ball everyone owns, so the shop explains itself. */}
+      {show("catching") && (
+        <>
+          <div className="sh-head"><span>POKÉ BALLS</span><span>TO THROW</span></div>
+          {shelf(SHOP_BALLS, only ? null : SHOP_BALLS[0].id)}
+          <p className="shop-note">Better balls raise the odds, not the reward.</p>
+
+          {/* BERRIES, then the field items: the thing you use on the Pokémon in
+              front of you, then the thing you start before you set off. */}
+          <div className="sh-head"><span>BERRIES</span><span>FED IN THE WILD</span></div>
+          {shelf(BERRIES)}
+          <p className="shop-note">One berry at a time — the next one replaces it.</p>
+
+          <div className="sh-head"><span>FIELD ITEMS</span><span>WHILE YOU WALK</span></div>
+          {shelf(SHOP_FIELD)}
+          <p className="shop-note">One of each kind runs at a time, and they are spent in steps.</p>
+        </>
+      )}
+
+      {show("training") && (
+        <>
+          <div className="sh-head"><span>EVOLUTION STONES</span><span>+ THE LEVEL</span></div>
+          {shelf(STONES)}
+          <p className="shop-note">A stone is used up by the evolution it makes.</p>
+        </>
+      )}
+
+      {show("battle") && (
+        <>
+          <div className="sh-head"><span>BATTLE ITEMS</span><span>LEAGUE BATTLES</span></div>
+          {shelf(HEALS)}
+          <p className="shop-note">Used from the Bag in a League battle, in place of a move.</p>
+        </>
+      )}
+    </>
+  );
+}
+
+export default function Shop(props) {
   return (
     <div className="panel">
       <div className="panel-head">
         <span>SHOP</span>
-        <span>¥{money.toLocaleString()}</span>
+        <span>¥{props.money.toLocaleString()}</span>
       </div>
-
-      {/* One scroller for the whole shop, like every other tab has. Two lists
-          each scrolling on their own would be worse than one long page. */}
-      <div className="shopscroll">
-        {ev && (
-          <>
-            <div className="sh-head sh-event">
-              <span>{ev.name.toUpperCase()}</span>
-              <span>{eventDaysLeft(ev) === 1 ? "LAST DAY" : `${eventDaysLeft(ev)} DAYS LEFT`}</span>
-            </div>
-            {shelf(eventShelf(ev.id))}
-            <p className="shop-note">Sold only during the event.</p>
-          </>
-        )}
-
-        {/* RARE CANDY, and it is priced to lose. ¥120 against the ¥40 a common
-            duplicate sells for means three sold to buy one candy, where
-            converting that same duplicate gives one outright - so buying is
-            always the impatient option and catching is always the efficient
-            one. That ordering is the rule; the number is a starting value.
-
-            No purchase cap, and it needs none: cash comes from selling
-            duplicates, so cash-bought candy is gated by catching anyway. The
-            sink is self-limiting because its input is the same input - and it
-            puts candy in competition with Poké Balls for one wallet, which is
-            the choice that makes the shop interesting.
-
-            Its own row rather than an entry in the shelf above, because candy
-            is a currency and not a bag item: it has no sprite, it is spent per
-            level rather than selected and used, and it belongs beside the money
-            in the top bar, which is where it is. */}
-        <div className="sh-head">
-          <span>RARE CANDY</span>
-          <span>YOU HAVE {candy}</span>
-        </div>
-
-        <div className="candyrow">
-          <img src="items/rare-candy.png" alt="" className="cr-pic" />
-          <span className="cr-copy">
-            <b>Rare Candy</b>
-            <i>1 candy = 1 level</i>
-          </span>
-          <span className="cr-price">¥{candyPrice.toLocaleString()}</span>
-          {[1, 5, 10].map((n) => (
-            <button
-              key={n}
-              type="button"
-              className="cr-buy"
-              disabled={money < candyPrice * n}
-              onClick={() => onBuyCandy(n)}
-              data-tip={`¥${(candyPrice * n).toLocaleString()}`}
-            >
-              +{n}
-            </button>
-          ))}
-        </div>
-
-
-        <div className="sh-head">
-          <span>POKÉ BALLS</span>
-          <span>TO THROW</span>
-        </div>
-
-        {/* Opens on the ball everyone owns, so the shop explains itself. */}
-        {shelf(SHOP_BALLS, SHOP_BALLS[0].id)}
-
-        <p className="shop-note">Better balls raise the odds, not the reward.</p>
-
-        {/* BERRIES, then the field items, then the stones: the shelves are in
-            the order you reach for them - the thing you use on the Pokémon in
-            front of you, the thing you start before you set off, and the thing
-            you go home and use on something you already own.
-
-            Ordinary shelves now, not the one-click rows these two started as.
-            "Buying is using" was right while there were two field items and
-            wrong the moment there were eight: you cannot carry a Max Repel for
-            the cave you are about to enter if buying it starts it in the field
-            you are standing in. They are bag items, bought here in quantity and
-            used from the floating rail. */}
-        <div className="sh-head">
-          <span>BERRIES</span>
-          <span>FED IN THE WILD</span>
-        </div>
-
-        {shelf(BERRIES)}
-
-        <p className="shop-note">One berry at a time — the next one replaces it.</p>
-
-        <div className="sh-head">
-          <span>FIELD ITEMS</span>
-          <span>WHILE YOU WALK</span>
-        </div>
-
-        {shelf(SHOP_FIELD)}
-
-        <p className="shop-note">
-          One of each kind runs at a time, and they are spent in steps.
-        </p>
-
-        <div className="sh-head">
-          <span>EVOLUTION STONES</span>
-          <span>+ THE LEVEL</span>
-        </div>
-
-        {shelf(STONES)}
-
-        <p className="shop-note">
-          A stone is used up by the evolution it makes.
-        </p>
-
-        {/* THE BATTLE SHELF moved to the League page (phase 8): it is for
-            battles, so it is sold where they are. */}
-        <p className="shop-note">Potions, Revives and X items are in the Pokémon League&rsquo;s shop.</p>
-      </div>
+      {/* One scroller for the whole shop, like every other tab has. */}
+      <div className="shopscroll"><Sections {...props} /></div>
     </div>
   );
 }

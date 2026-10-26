@@ -42,6 +42,10 @@ SEAL = 3
 # The share of a look that must still wear its species' colours for those to
 # be what its shiny moves (else the whole look turns by the species' hue).
 SHARED = 0.25
+# A shiny must look like one: under this share of its pixels visibly changed
+# (2026-10-26: grey gargoyles and black reaper robes came out 0-3% changed,
+# Sheet Ghost Hoothoot 0%) it is tinted toward the species' own shiny colour.
+SEEN = 0.15
 COLOURS = 16
 # Of those, up to this many are held back for small strong colours (an eye).
 ACCENTS = 3
@@ -274,6 +278,36 @@ def looks():
 
 
 def shiny(look, base_id):
+    """The look's shiny: `recolour`, or - when that barely shows - `tint`."""
+    out = recolour(look, base_id)
+    a, b = np.asarray(look).astype(int), np.asarray(out).astype(int)
+    on = a[..., 3] > 0
+    moved = ((np.abs(a[..., :3] - b[..., :3]).sum(-1) > 30) & on).sum() / max(1, on.sum())
+    return out if moved >= SEEN else tint(look, base_id)
+
+
+def tint(look, base_id):
+    """Every mid-tone pixel pulled toward the species' shiny hue: its
+    circular mean over the shiny sprite's coloured pixels, weighted by how
+    coloured each is. Greys take the hue at a fixed saturation, so a stone
+    gargoyle goes gold where Geodude's shiny does, and outlines and
+    highlights (the darkest and lightest) stay as drawn."""
+    sh = np.asarray(Image.open(os.path.join(SPRITES, "shiny", f"{base_id}.png")).convert("RGBA")).astype(int)
+    z = 0j
+    for c in sh[sh[..., 3] > 0][:, :3]:
+        h, l, s_ = colorsys.rgb_to_hls(*(c / 255))
+        if 0.15 < l < 0.85:
+            z += s_ * cmath.exp(2j * math.pi * h)
+    hue = (cmath.phase(z) / (2 * math.pi)) % 1
+    a = np.asarray(look).copy()
+    for y, x in zip(*np.nonzero(a[..., 3])):
+        h, l, s_ = colorsys.rgb_to_hls(*(a[y, x, :3] / 255))
+        if 0.12 < l < 0.9:
+            a[y, x, :3] = np.round(np.array(colorsys.hls_to_rgb(hue, l, max(s_, 0.45))) * 255)
+    return Image.fromarray(a.astype(np.uint8), "RGBA")
+
+
+def recolour(look, base_id):
     """The look recoloured by its species' own normal -> shiny shift.
 
     Where the look still wears the species' own colours (the Gastly line,

@@ -6,6 +6,7 @@
    Settings stay the dialogs they were; this is where they are reached from. */
 import { useState } from "react";
 import Icon from "./Icon.jsx";
+import PageHead from "./PageHead.jsx";
 import Trainer from "./Trainer.jsx";
 import { RankMedal } from "./RankBadge.jsx";
 import { useModalLock } from "./modal.js";
@@ -47,6 +48,9 @@ export default function You({
 
   return (
     <div className="tc-page you-page" role="dialog" aria-modal="true" aria-label="You">
+      <header className="tc-head">
+        <div className="tc-bar"><PageHead icon="you" title="You" sub="Your trainer, titles and settings" /></div>
+      </header>
       <main className="you-main">
         <section className="you-hero">
           <span className="you-medal"><RankMedal set="dex" id={r.id} color={r.color} /></span>

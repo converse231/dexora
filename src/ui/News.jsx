@@ -16,6 +16,30 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-26-haunting",
+    icon: "💀",
+    date: "October 2026",
+    title: "Hallowed Night, week two: The Haunting",
+    items: [
+      ["From Halloween", "Fourteen costumes, Oct 31 to Nov 6 - whole lines: Reapers, Gargoyles, Gravediggers and more."],
+      ["A new legendary", "Catch twenty costumes and Grim Reaper Giratina haunts the Pokémon Mansion after dark."],
+      ["One week each", "Hallowed Night's first week ends October 30 - catch its costumes and Scarecrow Darkrai before then."],
+      ["Dust in your Binder", "Dusting and crafting moved into each set's Binder - the Dust tab is gone."],
+    ],
+  },
+  {
+    id: "2026-10-26-one-mart",
+    icon: "🛒",
+    date: "October 2026",
+    title: "One Poké Mart, everywhere",
+    items: [
+      ["Your wallet on every page", "Money and Rare Candy sit at the top of every tab - tap either to shop."],
+      ["The Poké Mart", "Candy, stones, balls, berries, field and battle items in one shop, from any tab."],
+      ["Raise in one tap", "Short of candy? Raising a Pokémon buys the rest for you - in the Box, Train and the Arena."],
+      ["Hallowed Hunter", "The title now asks for every costume and Scarecrow Darkrai. Tap any title to see it full size."],
+    ],
+  },
+  {
     id: "2026-10-24-arena-cards",
     icon: "🃏",
     date: "October 2026",

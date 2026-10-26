@@ -20,6 +20,8 @@ import { BinderPages, MyBinders, Cover, leatherOf } from "./Binders.jsx";
 import Opening, { OpenAll } from "./Opening.jsx";
 import { loadSet, logoUrl, packUrl } from "./load.js";
 import Icon from "../Icon.jsx";
+import PageHead from "../PageHead.jsx";
+import { useModalLock, stacked } from "../modal.js";
 import { ShopGrid, Product, Cart, Done, MyPacks, readCart, writeCart, variantsOf } from "./CardShop.jsx";
 import { titleIds, titleName, shownTitles, MASTER_STEP } from "../../game/titles.js";
 import { showKey, CARD_SHOW, printingsOf } from "../../game/cards.js";
@@ -27,7 +29,10 @@ import { showKey, CARD_SHOW, printingsOf } from "../../game/cards.js";
 const yen = (n) => `¥${n.toLocaleString()}`;
 const oneIn = (p) => Math.round(1 / p);
 // The store, then what you hold (asked for, 2026-10-07: shop, cart, checkout, My Packs).
-const TABS = [["shop", "Card Shop", "shop"], ["mine", "My Packs", "cards"], ["binder", "Binder", "book"], ["dex", "Card Dex", "dex"], ["dust", "Dust", "forms"]];
+/* NO DUST TAB (2026-10-26, asked for: "dusting can just be in the binder"):
+   the set binder carries the set's dust - sweep, craft, a dust pack - and its
+   own filters are the spares and missing lists the tab drew twice. */
+const TABS = [["shop", "Card Shop", "shop"], ["mine", "My Packs", "cards"], ["binder", "Binder", "book"], ["dex", "Card Dex", "dex"]];
 /* THE CARD DEX ADDS TILES A PAGE AT A TIME as its end scrolls near (the
    Picker's rule): 188 tiles at once was a 103ms task on a throttled phone. */
 const TILE_PAGE = 48;
@@ -36,6 +41,8 @@ const CHASE = ["mega", "hyper", "blackwhite", "futuristic", "special"];
 const bestVariant = (row, card) => ["h", "r", "n"].find((v) => row?.[v] && card[4].includes(v)) ?? card[4][0];
 
 export default function Cards({ engine, st, level, onClose, onSpecies, onScene }) {
+  // A page like the others: the map hears no keys under it, and `stacked` sees a dialog on top.
+  useModalLock();
   // Packs waiting (a reward, the roulette, a checkout) open on My Packs; otherwise the shop.
   const [tab, setTab] = useState(() => (Object.values(st?.packs ?? {}).some((n) => n > 0) ? "mine" : "shop"));
   const [sets, setSets] = useState({});            // id -> { SET, CARDS }, as each loads
@@ -84,7 +91,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   }, []);
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== "Escape" || opening || inspect || engine?.state.ask) return;
+      if (e.key !== "Escape" || opening || inspect || engine?.state.ask || stacked()) return;
       e.preventDefault();
       onClose();
     };
@@ -140,15 +147,13 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
     <div className={`tc-page evcard cd-page${opening ? " opening" : ""}`} role="dialog" aria-modal="true" aria-label="Cards" ref={page}>
       <header className="tc-head">
         <div className="tc-bar">
-          <button type="button" className="cs-cartbtn" aria-label={`Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
-            onClick={() => { setTab("shop"); setShop({ v: "cart" }); }}>
-            <Icon n="shop" size={20} />{cartCount > 0 && <em>{cartCount}</em>}
-          </button>
-          <div className="tc-titles">
-            <h3>Cards</h3>
-            <span>{owned} cards collected · {unopened} pack{unopened === 1 ? "" : "s"} to open · {dust.toLocaleString()} dust
-              {titles.length ? ` · ${titles.length} title${titles.length === 1 ? "" : "s"}` : ""}</span>
-          </div>
+          <PageHead icon="cards" title="Cards" dust
+            sub={`${owned.toLocaleString()} collected · ${unopened} to open${titles.length ? ` · ${titles.length} title${titles.length === 1 ? "" : "s"}` : ""}`}>
+            <button type="button" className="cs-cartbtn" aria-label={`Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
+              onClick={() => { setTab("shop"); setShop({ v: "cart" }); }}>
+              <Icon n="shop" size={20} />{cartCount > 0 && <em>{cartCount}</em>}
+            </button>
+          </PageHead>
         </div>
         <nav className="lg-strip-wrap" aria-label="Cards">
           <div className="lg-strip" role="tablist">
@@ -157,7 +162,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
                 className={`rk-tab${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>
                 <Icon n={ic} className="side-ic" />
                 <b>{name}</b>
-                <em>{{ shop: yen(st?.money ?? 0), mine: `${unopened} to open`, binder: `${owned} owned`, dex: "Every card", dust: `${dust.toLocaleString()} dust` }[id]}</em>
+                <em>{{ shop: "Packs and boxes", mine: `${unopened} to open`, binder: `${owned} owned · dust`, dex: "Every card" }[id]}</em>
               </button>
             ))}
           </div>
@@ -207,12 +212,11 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
           </div>
         )}
         {tab === "binder" && <Binder sets={sets} cards={cards} dex={dex} log={st?.cardLog ?? []} onLook={look}
-          milestones={st?.milestones ?? {}} setId={setId} onSet={setSetId} onDust={() => setTab("dust")}
+          milestones={st?.milestones ?? {}} setId={setId} onSet={setSetId}
+          onCraftAll={(id, picks) => engine.craftCards(sets[id], picks)}
+          onSweep={(id, every) => engine.dustSpares(sets[id], every)} onDustPack={(id) => engine.dustPack(id)}
           binders={st?.binders ?? []} engine={engine} dust={dust} level={level} beaten={st?.beaten} />}
         {tab === "dex" && <CardDex sets={sets} cards={cards} dex={dex} onLook={look} />}
-        {tab === "dust" && <Dust sets={sets} cards={cards} dust={dust} onLook={look} setId={setId} onSet={setSetId}
-          onCraftAll={(id, picks) => engine.craftCards(sets[id], picks)}
-          onSweep={(id, every) => engine.dustSpares(sets[id], every)} level={level} onDustPack={(id) => engine.dustPack(id)} />}
         <p className="cd-credit">
           Card data and small images from TCGdex; pack and card-back art from Bulbagarden Archives; each card names
           its illustrator. Pokémon and the TCG are © Nintendo, Creatures and GAME FREAK. Cards change nothing in the wild.
@@ -239,7 +243,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
           showcase={st?.cardShowcase ?? []}
           onShow={(v, on) => engine.showCard(cardId(inspect.setId, inspect.localId), v, on)}
           onDust={(v, n) => engine.dustCard(sets[inspect.setId], inspect.localId, v, n)}
-          onBulk={() => { setSetId(inspect.setId); setInspect(null); setTab("dust"); }}
+          onBulk={() => { setSetId(inspect.setId); setInspect(null); setTab("binder"); }}
           binders={st?.binders ?? []}
           onAddToBinder={(bid, v) => {
             const id = bid === "new" ? engine.newBinder() : bid;
@@ -335,7 +339,7 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
               <div key={k} className="cd-meter">
                 <span>{name} <em>within {left.toLocaleString()} pack{left === 1 ? "" : "s"}</em></span>
                 <i style={{ "--p": n / net[k].hard }} />
-                {k !== "hit" && n + 1 > net[k].soft && <small>Odds up: {Math.round(chanceOf(k, n, rules) * 100)}% this pack</small>}
+                {k !== "hit" && n + 1 > net[k].soft && <small>Odds up: {chanceOf(k, n, rules) >= 1 ? 100 : Math.min(99, Math.round(chanceOf(k, n, rules) * 100))}% this pack</small>}
               </div>
             );
           })}
@@ -352,7 +356,7 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
    nine pockets each, a spread where there is room (`BinderPages`). The pulls
    wall goes under them. An empty pocket names the card faintly; a filled one
    holds the best copy, a count and the earned mark. */
-function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDust, binders = [], engine, dust, level, beaten }) {
+function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onSweep, onDustPack, onCraftAll, binders = [], engine, dust, level, beaten }) {
   const [mode, setMode] = useState("set");
   const [pageNo, setPage] = useState(0);
   /* FILTERS (2026-10-13, asked for): the Card Dex's, scoped to this set, and
@@ -412,8 +416,8 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
           <span className="bn-cover">
             {masterDone ? `★ Master set · ${titleName(`master:${setId}`)}` : done ? `✓ Complete · ${titleName(`set:${setId}`)}`
               : `${set.CARDS.length - ownedN} to go for the cover`}
-            {/* Bulk lives on the Dust tab; the binder is where you notice the gaps. */}
-            {master < variants && <button type="button" className="tp-quiet" onClick={onDust}>Craft missing ›</button>}
+            {/* The gaps, as the binder's own filter: crafting is in the dust bar below. */}
+            {master < variants && <button type="button" className="tp-quiet" onClick={() => filter({ have: "printing" })}>Show missing ›</button>}
           </span>
         </div>
         {/* REAL-LIFE VALUE (2026-10-15): this set's copies, raw, counting up;
@@ -433,6 +437,8 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onDus
           </div>
         )}
       </section>
+      <DustBar set={set} setId={setId} cards={cards} dust={dust} level={level} have={f.have}
+        onSweep={onSweep} onDustPack={onDustPack} onCraftAll={onCraftAll} onShow={(have) => filter({ have: f.have === have ? "" : have })} />
       <CardFilters f={f} onChange={filter}
         rarities={CARD_RARITIES.filter((r) => set.CARDS.some((c) => c[3] === r))} />
       {filtering && (
@@ -638,125 +644,89 @@ function CardDex({ sets, cards, dex, onLook }) {
   );
 }
 
-/* DUST: your spares and what they are worth, the one sweep, and what a
-   missing card costs to craft. Every individual dust or craft happens in the
-   card view, which asks first for anything rare. */
-function Dust({ sets, cards, dust, level, onLook, onSweep, onDustPack, onCraftAll, setId, onSet }) {
+/* THE SET'S DUST, in its binder: what you hold, the one sweep, a pack for
+   dust, and CRAFT ALL. Its two lists are the binder's own filters - "With
+   spares" and "Missing a printing" - so a pocket is where you dust or craft
+   one card (the card view asks first for anything rare). */
+function DustBar({ set, setId, cards, dust, level, have, onSweep, onDustPack, onCraftAll, onShow }) {
   // THE SWEEP: normal commons and uncommons, every printing up to a Double rare, or every spare (`sweepOf`).
   const [every, setEvery] = useState(false);
   // CRAFT ALL: every printing, or the normal ones only - a set completes on any printing.
   const [scope, setScope] = useState("all");
   const [asking, setAsking] = useState(false);
-  const set = sets[setId];
-  if (!set) return <p className="ev-quiet">Loading…</p>;
-  const spares = set.CARDS.map((c) => {
-    const row = cards[cardId(setId, c[0])];
-    const per = c[4].split("").map((v) => [v, sparesOf(row, v)]).filter(([, k]) => k);
-    return { c, per, worth: per.reduce((a, [v, k]) => a + k * dustOf(c[3], v), 0) };
-  }).filter((x) => x.per.length);
+  const spareN = set.CARDS.filter((c) => c[4].split("").some((v) => sparesOf(cards[cardId(setId, c[0])], v))).length;
   const take = sweepOf(cards, setId, set.CARDS, every);
   const sweepN = take.reduce((a, [, , n]) => a + n, 0);
   const sweep = take.reduce((a, [c, v, n]) => a + n * dustOf(c[3], v), 0);
-  /* MISSING IS PER PRINTING (2026-10-12): a card counted as missing only
-     when no printing of it was held, so owning a normal Pikachu hid its
-     reverse holo and holo from this list - reported as holos and reverse
-     holos that could not be bought with dust. Each printing not held is its
-     own tile, at its own cost. */
+  /* MISSING IS PER PRINTING (2026-10-12): owning a normal Pikachu must not
+     hide its reverse holo and holo - each printing not held is its own craft. */
   const missing = set.CARDS.flatMap((c) => {
     const row = cards[cardId(setId, c[0])];
     return c[4].split("").filter((v) => !row?.[v]).map((v) => ({ c, v }));
   });
+  /* What "Craft all" would buy: craftable, in scope, cheapest first, as far
+     as the dust goes - the engine's own order, so the button never promises
+     more than it makes. */
+  const want = missing.filter(({ c, v }) => canCraft(c[3], set.CARDS) && (scope === "all" || v === "n"))
+    .map(({ c, v }) => ({ c, v, cost: craftCost(c[3], v) })).sort((a, b) => a.cost - b.cost);
+  let left = dust;
+  const plan = [];
+  for (const x of want) { if (left < x.cost) break; left -= x.cost; plan.push(x); }
+  const spend = dust - left;
   return (
-    <div className="cd-dustpage">
-      <SetPicker setId={setId} cards={cards} onSet={onSet} />
-      <section className="ev-card cd-dusthead">
+    <section className="ev-card cd-dusthead">
+      <div className="cd-dust-top">
         <b>{dust.toLocaleString()}</b>
-        <span>Card Dust<small>Spares become dust. Dust buys packs, and crafts the cards you are missing up to a Double rare - Illustration rares and up, and a set's own top rarity, come from packs only. You always keep one of each printing.</small></span>
-        <div className="cd-sweep">
-          <div className="you-seg" role="radiogroup" aria-label="Which spares to dust">
-            {[[false, "Commons & uncommons"], [true, "Up to Double rare"], ["all", "Every spare"]].map(([k, name]) => (
-              <button key={name} type="button" role="radio" aria-checked={every === k}
-                className={every === k ? "on" : ""} onClick={() => setEvery(k)}>{name}</button>
-            ))}
-          </div>
-          <button type="button" className="lg-go" disabled={!sweepN} onClick={() => onSweep(setId, every)}>
-            {sweepN ? `Dust ${sweepN} spare${sweepN === 1 ? "" : "s"} · +${sweep.toLocaleString()}` : "No spares to dust"}
-          </button>
+        <span>Card Dust<small>Spares become dust; dust crafts what you are missing up to a Double rare, or buys a pack. You always keep one of each printing.</small></span>
+        <span className="cd-dust-lists" role="group" aria-label="Show in the binder">
+          <button type="button" aria-pressed={have === "spare"} onClick={() => onShow("spare")}>Spares · {spareN}</button>
+          <button type="button" aria-pressed={have === "printing"} onClick={() => onShow("printing")}>Missing · {missing.length}</button>
+        </span>
+      </div>
+      <div className="cd-sweep">
+        <div className="you-seg" role="radiogroup" aria-label="Which spares to dust">
+          {[[false, "Commons & uncommons"], [true, "Up to Double rare"], ["all", "Every spare"]].map(([k, name]) => (
+            <button key={name} type="button" role="radio" aria-checked={every === k}
+              className={every === k ? "on" : ""} onClick={() => setEvery(k)}>{name}</button>
+          ))}
         </div>
+        <button type="button" className="lg-go" disabled={!sweepN} onClick={() => onSweep(setId, every)}>
+          {sweepN ? `Dust ${sweepN} spare${sweepN === 1 ? "" : "s"} · +${sweep.toLocaleString()}` : "No spares to dust"}
+        </button>
+      </div>
+      <div className="cd-bulk">
+        <div className="you-seg" role="radiogroup" aria-label="Which printings to craft">
+          {[["all", "Every printing"], ["n", "Normal only"]].map(([k, name]) => (
+            <button key={k} type="button" role="radio" aria-checked={scope === k}
+              className={scope === k ? "on" : ""} onClick={() => setScope(k)}>{name}</button>
+          ))}
+        </div>
+        <button type="button" className="lg-go" disabled={!plan.length} onClick={() => setAsking(true)}>
+          {plan.length ? `Craft ${plan.length} · ${spend.toLocaleString()} dust` : want.length ? "Not enough dust" : "Nothing to craft"}
+        </button>
         {/* Dust's other use: a pack of this set, if it is open to you. */}
         <button type="button" className="lg-go quiet" disabled={dust < DUST_PACK || !setOpen(setId, level)} onClick={() => onDustPack(setId)}
           data-tip={setOpen(setId, level) ? "Added to your packs on the Packs tab" : `Opens at Lv ${SET_LEVEL[setId]}`}>
-          {setOpen(setId, level) ? `1 ${set.SET?.name ?? ""} pack · ${DUST_PACK} dust` : `Opens at Lv ${SET_LEVEL[setId]}`}
+          {setOpen(setId, level) ? `1 pack · ${DUST_PACK} dust` : `Opens at Lv ${SET_LEVEL[setId]}`}
         </button>
-      </section>
-      <h5 className="cd-h">Spares <span>{spares.length} cards</span></h5>
-      {spares.length ? (
-        <div className="cd-grid">
-          {spares.map(({ c, per, worth }) => (
-            <button key={c[0]} type="button" className="cd-tile got" onClick={() => onLook(setId, c[0])}>
-              <CardFace setId={setId} card={c} variant={per[0][0]} still lazy />
-              <em>+{worth}</em>
-              <span className="cd-tile-cap"><RarityMark rarity={c[3]} />{per.map(([v, k]) => `${k} ${v === "n" ? "" : v === "r" ? "rev." : "holo"}`).join(" · ")}</span>
-            </button>
-          ))}
-        </div>
-      ) : <p className="ev-quiet">No spares yet - every card you hold is your only copy.</p>}
-      <h5 className="cd-h">Missing <span>{missing.length} to craft</span></h5>
-      {(() => {
-        /* What "Craft all" would buy: craftable, in scope, cheapest first, as
-           far as the dust goes - the engine's own order, so the button never
-           promises more than it makes. */
-        const want = missing.filter(({ c, v }) => canCraft(c[3], set.CARDS) && (scope === "all" || v === "n"))
-          .map(({ c, v }) => ({ c, v, cost: craftCost(c[3], v) })).sort((a, b) => a.cost - b.cost);
-        let left = dust;
-        const plan = [];
-        for (const x of want) { if (left < x.cost) break; left -= x.cost; plan.push(x); }
-        const spend = dust - left;
-        return (
-          <div className="cd-bulk">
-            <div className="you-seg" role="radiogroup" aria-label="Which printings to craft">
-              {[["all", "Every printing"], ["n", "Normal only"]].map(([k, name]) => (
-                <button key={k} type="button" role="radio" aria-checked={scope === k}
-                  className={scope === k ? "on" : ""} onClick={() => setScope(k)}>{name}</button>
-              ))}
-            </div>
-            <button type="button" className="lg-go" disabled={!plan.length} onClick={() => setAsking(true)}>
-              {plan.length ? `Craft ${plan.length} · ${spend.toLocaleString()} dust` : want.length ? "Not enough dust" : "Nothing to craft"}
-            </button>
-            {want.length > plan.length && plan.length > 0 && (
-              <small>{want.length - plan.length} more need more dust</small>
-            )}
-            {asking && (
-              <Confirm
-                title={`Craft ${plan.length} card${plan.length === 1 ? "" : "s"}?`}
-                lines={[
-                  ["Cards", plan.length],
-                  ["Dust spent", spend.toLocaleString()],
-                  ["Dust left", left.toLocaleString()],
-                  ...(want.length > plan.length ? [["Still missing", want.length - plan.length]] : []),
-                ]}
-                note="Cheapest first. Illustration rares and up, and a set's own top rarity, come from packs only."
-                confirmLabel={`CRAFT ${plan.length}`}
-                tone="buy"
-                onConfirm={() => { onCraftAll(setId, plan.map(({ c, v }) => [c[0], v])); setAsking(false); }}
-                onCancel={() => setAsking(false)}
-              />
-            )}
-          </div>
-        );
-      })()}
-      <div className="cd-grid">
-        {missing.map(({ c, v }) => (
-          <button key={`${c[0]}${v}`} type="button" className="cd-tile" onClick={() => onLook(setId, c[0])}
-            aria-label={`${c[1]}, ${VARIANT_NAME[v]}`}>
-            <CardFace setId={setId} card={c} variant={v} still lazy />
-            <span className="cd-tile-cap"><RarityMark rarity={c[3]} />
-              {/* Which printing, only where the card has more than one (a holo-only hit needs no tag). */}
-              {c[4].length > 1 && v !== "n" && <i className="cd-tile-v">{v === "h" ? "Holo" : "Rev."}</i>}
-              {canCraft(c[3], set.CARDS) ? craftCost(c[3], v).toLocaleString() : "Packs only"}</span>
-          </button>
-        ))}
+        {want.length > plan.length && plan.length > 0 && <small>{want.length - plan.length} more need more dust</small>}
       </div>
-    </div>
+      {asking && (
+        <Confirm
+          title={`Craft ${plan.length} card${plan.length === 1 ? "" : "s"}?`}
+          lines={[
+            ["Cards", plan.length],
+            ["Dust spent", spend.toLocaleString()],
+            ["Dust left", left.toLocaleString()],
+            ...(want.length > plan.length ? [["Still missing", want.length - plan.length]] : []),
+          ]}
+          note="Cheapest first. Illustration rares and up, and a set's own top rarity, come from packs only."
+          confirmLabel={`CRAFT ${plan.length}`}
+          tone="buy"
+          onConfirm={() => { onCraftAll(setId, plan.map(({ c, v }) => [c[0], v])); setAsking(false); }}
+          onCancel={() => setAsking(false)}
+        />
+      )}
+    </section>
   );
 }

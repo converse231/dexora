@@ -20,7 +20,7 @@ import {
   tasksFor, progress, researchLevel, researchPoints, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../game/research.js";
 import { badgesOf } from "../game/league.js";
-import { SeasonCard, boardSeason } from "./Season.jsx";
+import { SeasonCard, boardSeasons } from "./Season.jsx";
 import { EVENTS } from "../data/eventforms.js";
 import Icon from "./Icon.jsx";
 import { REF_EACH, REF_WELCOME, REF_RULE, rewardWords } from "../game/referral.js";
@@ -80,7 +80,7 @@ function Pips({ total, spent, label: aria }) {
    dialog off the ☰ menu and the HUD's cards; both now open this app beside
    the game, which is still being played - so it locks no keys. */
 export default function Events({ world, state, level, busy, onTravel, onSelect, onLeague, onStar, invite = null, onInvite = null, onClaimEvent = null, onEventIntro = null }) {
-  const season = boardSeason(EVENTS, state?.dex, state?.medals);
+  const seasons = boardSeasons(EVENTS, state?.dex, state?.medals);
   const ob = world?.outbreak ?? null;
   const obSp = ob && speciesById(ob.speciesId);
   const obLive = ob && ob.left > 0;
@@ -105,11 +105,11 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
 
   const board = (
         <div className="hp-body">
-          {/* A DATED EVENT, first while it runs (Season.jsx) - a fortnight, then gone. */}
-          {season && (
-            <SeasonCard ev={season} dex={state?.dex} medals={state?.medals} dreams={state?.dreams} onSelect={onSelect}
+          {/* A DATED EVENT, first while it runs (Season.jsx) - a week, then gone; a finished week's claim waits beside it. */}
+          {seasons.map((season) => (
+            <SeasonCard key={season.id} ev={season} dex={state?.dex} medals={state?.medals} dreams={state?.dreams} onSelect={onSelect}
               onClaim={() => onClaimEvent?.(season.id)} onIntro={onEventIntro} />
-          )}
+          ))}
           {/* INVITE FRIENDS, first on the board (asked for, 2026-10-16: on Events
               so it is seen) - what you both get, how many have counted, and the
               dialog (Invite.jsx) one press away. Signed out, it says how to start. */}

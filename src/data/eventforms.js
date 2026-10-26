@@ -29,19 +29,27 @@
 
 export const EVENT_WAVE = 6;
 
+/* AN EVENT IS ONE WEEK (2026-10-26, your call: "with the amount of Pokemon we
+   have it is easy to complete within days"): seven local days, start to end
+   inclusive, and a longer celebration is a run of weeks, each its own event
+   - its own costumes, its own hunted legendary, its own title (check.mjs
+   holds every event to seven days and none to overlap). Events of one
+   celebration share a `shelf`: the items sold on their days (items.js
+   `event`), so a Hallow Ball bought in week one still works in week two. */
 export const EVENTS = [
   {
     id: "halloween",
     name: "Hallowed Night",
     // The title every look in the Pokedex earns (titles.js).
     title: "Hallowed Hunter",
+    shelf: "halloween",
     /* A check-in on this weekday (0 Sunday .. 6 Saturday) while the event
        runs pays these on top of the day's own reward (asked for, 2026-10-20:
        Friday's check-in, Hallow Balls). Five are a check-in day's worth. */
     checkin: { weekday: 5, items: { "hallow-ball": 5 } },
     // Local days, inclusive, as dayKey() writes them (daily.js).
     start: "20261024",
-    end: "20261107",
+    end: "20261030",   // a fortnight until 2026-10-26: the second week is The Haunting
     looks: [
       { id: 19901, of: 92, title: "Witch Hat Gastly", flavor: "It found a witch's hat in the Pokémon Tower and will not give it back. The gas curls round the brim to keep it on." },
       { id: 19902, of: 93, title: "Witch Hat Haunter", flavor: "It pulls the hat down over its eyes and sneaks up on anyone out after dark. The spikes poke out under the brim." },
@@ -71,5 +79,46 @@ export const EVENTS = [
        more costumes bring it round again. Caught, it is the `medal` and its
        `name`, a title of its own beside the event's. */
     hunt: { id: 19908, of: 491, title: "Scarecrow Darkrai", flavor: "It stitched a sack over its head and stuffed its sleeves with straw to stand in the fields - and every crow that lands on it dreams of the dark.", medal: "nightmare", name: "Nightmare King", dreams: 20, keep: 12, area: "tower" },   // 7 and 4 at 1 costume in 16 meetings; now 1 in 2 (2026-10-24)
+  },
+  /* HALLOWED NIGHT'S SECOND WEEK (2026-10-26, asked for): fourteen costumes
+     and a new legendary, from Halloween itself - whole lines this time, second
+     and final stages too, and NONE EVOLVES (`evolves: false`, your call): each
+     stage is a catch of its own. A later stage is rarely met wild (Dusknoir
+     almost never), so a look may also be met `on` its line's base: meeting a
+     Duskull can be any of the three Reapers (events.js `eventLook`). Themes
+     the first week did not wear, and no devils (your call). */
+  {
+    id: "haunting",
+    name: "The Haunting",
+    title: "Phantom Hunter",
+    shelf: "halloween",
+    evolves: false,
+    // HARDER (2026-10-26, asked for): a third of the species' meetings, where the first week had half.
+    share: 1 / 3,
+    checkin: { weekday: 5, items: { "hallow-ball": 5 } },
+    start: "20261031",
+    end: "20261106",
+    looks: [
+      { id: 19916, of: 355, title: "Grim Reaper Duskull", flavor: "It drags a scythe twice its size and never quite lifts it. It counts the hours to midnight on its one red eye." },
+      { id: 19917, of: 356, on: 355, title: "Grim Reaper Dusclops", flavor: "Its hooded robe hides the hollow body, and the scythe rests on its shoulder. Whatever it swallows, it keeps an hourglass for." },
+      { id: 19918, of: 477, on: 355, title: "Grim Reaper Dusknoir", flavor: "The reaper of the Pokémon Tower. It reads names off a long scroll by candlelight, and its scythe never makes a sound." },
+      { id: 19919, of: 52, title: "Black Cat Meowth", flavor: "It painted its fur black and its charm moon silver, and it crosses every path it can find. Nobody's luck has changed." },
+      { id: 19920, of: 278, title: "Ghost Pirate Wingull", flavor: "It flies a tattered flag from a ship that sank a hundred years ago. The eyepatch is on the wrong eye." },
+      { id: 19921, of: 279, on: 278, title: "Ghost Captain Pelipper", flavor: "Captain of a ship nobody has seen in a century. It still carries the crew's last letters in its bill." },
+      { id: 19922, of: 54, title: "Zombie Psyduck", flavor: "Its headache finally won. It shuffles about with its arms out, moaning - which is what it always did." },
+      { id: 19923, of: 74, title: "Gargoyle Geodude", flavor: "It perches on the mansion's roof with stone wings and stone horns, and holds its pose until dawn." },
+      { id: 19924, of: 75, on: 74, title: "Gargoyle Graveler", flavor: "Four stone arms and a pair of stone wings. It guards the mansion's gate and pretends to be a statue whenever anyone looks." },
+      { id: 19925, of: 76, on: 74, title: "Gargoyle Golem", flavor: "The great gargoyle of the bell tower. When the midnight bell rings, it stretches its wings for the first time all year." },
+      { id: 19926, of: 50, title: "Gravedigger Diglett", flavor: "It pops up in the old graveyard beside a crooked headstone, lantern in hand, and pops back down before you can read the name." },
+      { id: 19927, of: 51, on: 50, title: "Gravedigger Dugtrio", flavor: "Three gravediggers, three top hats, one very old headstone. They never agree on whose turn it is to dig." },
+      /* Two that never evolve (2026-10-26, asked for): full-grown, and met at
+         3-5% where they live. */
+      { id: 19928, of: 324, title: "Cauldron Torkoal", flavor: "Its shell became a witch's cauldron, and the smoke from its nostrils bubbles up green. Something in there smells like soup." },
+      // RARE (asked for: "its sprite looks so special"): a fifth of the week's odds - about one Tower meeting in 200 by day.
+      { id: 19929, of: 302, rare: 0.2, title: "Phantom Thief Sableye", flavor: "A domino mask, a swirling cape and a sack of stolen gems. It leaves a calling card in every tomb it robs." },
+      // Drawn from an earlier prompt, and back in the week for it (2026-10-26).
+      { id: 19930, of: 77, title: "Headless Horseman Ponyta", flavor: "It gallops through the fields in a rider's tattered cloak, a glowing jack-o'-lantern swinging from its saddle." },
+    ],
+    hunt: { id: 19931, of: 487, title: "Grim Reaper Giratina", flavor: "It rose out of the Distortion World in a reaper's hood, its scythe as long as its wings - and the Pokémon Mansion's clocks all stopped at midnight.", medal: "reaper", name: "The Reaper", dreams: 20, keep: 12, area: "mansion" },
   },
 ];

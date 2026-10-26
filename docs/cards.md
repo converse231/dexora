@@ -256,7 +256,7 @@ can be dusted; dust buys a pack, or crafts a missing card up to a Double rare.
 *Proposed.* The relation is the rule: **craft = 8 × dust**. Never your last
 copy; never an `earned` copy without asking (a keeper, like a rare-form
 Pokémon); dusting rare-or-better asks first (`state.ask`); dust is earned only,
-never bought with ¥. The Dust tab's sweep has three reaches: normal commons
+never bought with ¥. The sweep (a set binder's dust bar, since 2026-10-26) has three reaches: normal commons
 and uncommons, every printing up to a Double rare, and every spare (2026-10-21:
 a hit's spare had no use but dust, one tap at a time). Each keeps one of every
 printing and every earned copy, and asks first.

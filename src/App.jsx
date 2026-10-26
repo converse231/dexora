@@ -64,6 +64,8 @@ import { dexCaught } from "./data/dex.js";
 const WARM = 30;
 import Types from "./ui/Types.jsx";
 import Evolve from "./ui/Evolve.jsx";
+import Mart from "./ui/Mart.jsx";
+import { WalletProvider } from "./ui/wallet.jsx";
 import { PathCard, JoinAsk } from "./ui/Starter.jsx";
 // A guest is asked to save their progress at these catch counts (App's JoinAsk).
 const JOIN_AT = [10, 30, 60];
@@ -402,6 +404,8 @@ export default function App({
   const [help, setHelp] = useState(false);
   const [forms, setForms] = useState(false);
   const [wardrobe, setWardrobe] = useState(false);
+  // THE POKÉ MART, open at a shelf (wallet.jsx): one shop, reached from every tab.
+  const [mart, setMart] = useState(null);
   const [feats, setFeats] = useState(false);   // Achievements, a page off You
   useEffect(() => { if (!you) setFeats(false); }, [you]);   // a tab away lands back on You
   const [news, setNews] = useState(false);
@@ -798,6 +802,10 @@ export default function App({
   // The Pokedex's count: an event look is no entry of it (dex.js).
   const caught = st ? dexCaught(st.dex) : 0;
   const level = levelFromXp(st?.xp ?? 0);
+  // ONE WALLET for every page (wallet.jsx): what you hold, and the way to the Mart.
+  const wallet = useMemo(() => ({
+    money: st?.money ?? 0, candy: st?.candy ?? 0, dust: st?.dust ?? 0, stats: st?.stats ?? null, engine, openMart: setMart,
+  }), [st?.money, st?.candy, st?.dust, st?.stats, engine]);
   /* Steps due, for the You dot. On the collection's rev and the thousand
      steps (every walking step is a multiple of 1,000): not on every step. */
   const due = useMemo(() => (st ? dueCount(st) : 0), [st?.colRev, level, Math.floor((st?.steps ?? 0) / 1000)]);
@@ -842,6 +850,7 @@ export default function App({
   const biome = biomeFor(st?.areaId);
 
   return (
+    <WalletProvider value={wallet}>
     <div className={`app tab-${tab}${enc || evo ? " busy" : ""}`}>
       {/* ONE of these, at the root, for the whole app - see Tip.jsx for why it
           is an attribute rather than a wrapper. It renders nothing until
@@ -1175,6 +1184,7 @@ export default function App({
         parcel={parcel}
         money={st?.money ?? 0}
         candy={st?.candy ?? 0}
+        onMart={setMart}
         streak={streakNow(st?.checkin).streak}
         streakDue={!!st?.char && streakNow(st?.checkin).due}
         onStreak={() => setCheckinOpen(true)}
@@ -1723,7 +1733,11 @@ export default function App({
           onConfirm={() => engine.answerAsk(true)}
         />
       )}
-
+      {mart && engine && (
+        <Mart shelf={mart} bag={st?.bag ?? {}} level={level}
+          onCards={() => { setMart(null); goTab("cards"); }} onClose={() => setMart(null)} />
+      )}
     </div>
+    </WalletProvider>
   );
 }

@@ -229,6 +229,8 @@ for (const f of FORMS) {
    evolves into an ordinary Haunter. A stage its event did not draw is where
    the line stops. */
 for (const ev of EVENTS) {
+  // An event whose costumes are each a catch of their own (`evolves: false`) writes none.
+  if (ev.evolves === false) continue;
   for (const l of ev.looks) {
     for (const r of baseRows.filter((e) => e.from === l.of && e.to < 10000)) {
       const kin = ev.looks.find((k) => k.of === r.to);

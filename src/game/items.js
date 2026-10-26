@@ -128,7 +128,8 @@ export const BALLS = [
   {
     id: "hallow-ball", hideWhenEmpty: true, boost: 4, name: "Hallow Ball", short: "HALLOW", mult: PLAIN_MULT,
     price: 200, level: 1, event: "halloween", hint: "on costumed ones",
-    bonus: (enc) => (enc.event === "halloween" ? 4 : PLAIN_MULT),
+    // Any costume: the ball is used only on its shelf's days, when only those weeks' costumes are met.
+    bonus: (enc) => (enc.event ? 4 : PLAIN_MULT),
   },
   /* NEVER FAILS, AND NOW IT HAS A PRICE - which reverses what this comment
      used to say, so here is the old argument and what changed.

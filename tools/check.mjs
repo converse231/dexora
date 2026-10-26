@@ -836,7 +836,7 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
       for (const look of looksOf(id)) reach.add(look);
       /* AN EVENT LOOK IS REACHED WHERE ITS SPECIES IS, while its event runs
          (events.js `eventLook` swaps it for a meeting with the species). */
-      for (const l of EVENTS.flatMap((ev) => ev.looks)) if (l.of === id) reach.add(l.id);
+      for (const l of EVENTS.flatMap((ev) => ev.looks)) if (l.of === id || l.on === id) reach.add(l.id);
     }
   /* AN EVENT'S HUNTED ONE is reached by its hunt: its Bad Dreams are its
      costumes caught, so it is reachable when they are and its area is a map. */
@@ -2722,7 +2722,40 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         `${sp.name} has no sprite or shiny - npm run eventart`);
       assert.ok(l.id < 20000, `${sp.name}'s id is past the 20000 the trading server takes`);
     }
-    console.log(`event looks ok — ${looks.length} in ${EVENTS.length} event(s), outside every count of the dex`);
+    /* AN EVENT IS ONE WEEK (2026-10-26, your call): seven local days, none
+       overlapping another (eventOn takes the first match), an id the server's
+       titles can take, and a shelf that sells something. */
+    const dayOf = (k) => Date.UTC(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)) / 86400000;
+    for (const ev of EVENTS) {
+      assert.equal(dayOf(ev.end) - dayOf(ev.start) + 1, 7, `${ev.id} runs ${dayOf(ev.end) - dayOf(ev.start) + 1} days - an event is one week`);
+      assert.ok(/^[a-z]+$/.test(ev.id), `${ev.id} is not an id trading.sql's card_titles takes`);
+      for (const o of EVENTS) if (o !== ev) assert.ok(ev.end < o.start || o.end < ev.start, `${ev.id} overlaps ${o.id}`);
+      const { eventShelf } = await import("../src/game/items.js");
+      const { shelfOf } = await import("../src/game/events.js");
+      assert.ok(eventShelf(shelfOf(ev)).length, `${ev.id} sells nothing on its days - its shelf is empty`);
+    }
+    /* A LOOK `on` A SPECIES is met in its place: the base of its own line, and a
+       meeting with that base can be it (eventLook's second draw); an event that
+       does not evolve writes no row for its looks. */
+    {
+      const { eventLook } = await import("../src/game/events.js");
+      const { mulberry32 } = await import("../src/game/battle.js");
+      const rowsOf = evolutionsOf;
+      for (const ev of EVENTS) {
+        for (const l of ev.looks.filter((x) => x.on)) {
+          let base = speciesById(l.of);
+          while (base.from && SPECIES.find((x) => x.name === base.from)) base = SPECIES.find((x) => x.name === base.from);
+          assert.equal(l.on, base.id, `${speciesById(l.id).name} is met on ${l.on}, not its line's base`);
+          const seen = new Set();
+          for (let k = 0; k < 400; k++) seen.add(eventLook(speciesById(l.on), mulberry32(k), { day: ev.start, night: true, lure: 3 }).id);
+          assert.ok(seen.has(l.id), `${speciesById(l.id).name} is never met where ${speciesById(l.on).name} lives`);
+        }
+        if (ev.evolves === false) {
+          for (const l of ev.looks) assert.ok(!rowsOf(l.id).some((r) => r.event), `${speciesById(l.id).name} evolves in costume, but ${ev.id} does not evolve`);
+        }
+      }
+    }
+    console.log(`event looks ok — ${looks.length} in ${EVENTS.length} event(s) of one week each, outside every count of the dex`);
   }
   assert.equal(new Set(DEX_RANKS.map((r) => r.id)).size, DEX_RANKS.length, "two Pokédex ranks share an id");
   for (const [i, r] of DEX_RANKS.entries()) {
@@ -6171,7 +6204,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
    `lines`, so the missing one reads as a design choice rather than a fault.
    Asserted against the source because there is nothing to catch it at runtime. */
 {
-  const files = ["Box.jsx", "Shop.jsx", "Trainer.jsx", "Confirm.jsx"];
+  const files = ["Box.jsx", "Shop.jsx", "Trainer.jsx", "wallet.jsx", "Confirm.jsx"];
   let dialogs = 0;
   for (const f of files) {
     const src = readFileSync(new URL(`../src/ui/${f}`, import.meta.url), "utf8");
@@ -6190,6 +6223,29 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     }
   }
   console.log(`confirm ok — all ${dialogs} dialogs pass a title Confirm actually reads`);
+}
+
+/* ONE GAME, FOUR TABS (2026-10-26, asked for). Every page's head is
+   PageHead - the Arena's mark and name, the wallet that opens the one Poké
+   Mart - and every page that closes on Escape lets a dialog over it have the
+   key first (`stacked`): Escape on a buy-and-raise confirm closed the whole
+   Arena. A share never reads 100% short of the whole (1414 of 1415 did). */
+{
+  const pages = ["ui/league/League.jsx", "ui/league/arena/Arena.jsx", "ui/cards/Cards.jsx", "ui/trade/TradeCenter.jsx", "ui/You.jsx"];
+  for (const f of pages) {
+    const src = stripComments(readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8"));
+    assert.ok(/<PageHead\b/.test(src), `${f} draws its own head - use PageHead, the one every tab shares`);
+    for (const m of src.matchAll(/e\.key\s*[!=]==?\s*"Escape"[\s\S]{0,160}?\b(onClose|back)\(\)/g)) {
+      assert.ok(/stacked\(\)/.test(m[0]), `${f}'s own Escape ignores a dialog over the page: ${m[0].slice(0, 90)}`);
+    }
+  }
+  const { pct } = await import("../src/ui/pct.js");
+  assert.deepEqual([pct(1414, 1415), pct(1415, 1415), pct(29, 100), pct(0, 0)], [99, 100, 29, 0], "pct rounds a share up to a finish");
+  const shop = readFileSync(new URL("../src/ui/Shop.jsx", import.meta.url), "utf8");
+  for (const shelf of ["SHOP_BALLS", "BERRIES", "SHOP_FIELD", "STONES", "HEALS"]) {
+    assert.ok(shop.includes(`shelf(${shelf}`), `the Poké Mart sells no ${shelf} - every shelf belongs in its one shop`);
+  }
+  console.log("one game ok — every page's head is PageHead, Escape leaves a dialog its key, the Mart sells every shelf, no share rounds up to 100%");
 }
 
 /* THE GENERATION LADDER IS DERIVED, so the thing to assert is the SHAPE - and

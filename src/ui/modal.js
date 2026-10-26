@@ -13,6 +13,11 @@ import { useEffect, useRef } from "react";
 let depth = 0;
 
 export const modalOpen = () => depth > 0;
+/* SOMETHING IS OVER THE PAGE: a page holds one lock itself, so a second is a
+   dialog on top of it - and that dialog owns Escape. A page's own Escape
+   listener was registered first and ran first, so Escape on a confirm over
+   the Arena closed the whole Arena (2026-10-26). */
+export const stacked = () => depth > 1;
 
 export function useModalLock() {
   useEffect(() => {

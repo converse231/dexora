@@ -29,7 +29,7 @@ import { variantOf } from "../../game/items.js";
 import { hash, dayKey } from "../../game/daily.js";
 import { roadOf, roadRegions, rosterSize } from "../../game/road.js";
 import { REGION_NAME } from "../../game/biomes.js";
-import { useModalLock } from "../modal.js";
+import { useModalLock, stacked } from "../modal.js";
 import Sprite from "../Sprite.jsx";
 import Icon from "../Icon.jsx";
 import Types from "../Types.jsx";
@@ -43,6 +43,8 @@ import { CHAR_PIC } from "../../game/ranked.js";
 import { rankedStep } from "../../net/cloud.js";
 import { LEAGUE_TAB_KEY } from "../../game/store.js";
 import BattleSwitch from "./BattleSwitch.jsx";
+import PageHead from "../PageHead.jsx";
+import { useRaise } from "../wallet.jsx";
 
 /* The Ranked tab sits first in the region strip under its own id, which is
    not a region's; the strip remembers it like one. */
@@ -497,8 +499,9 @@ function Train({ engine, box, money, stats, candy }) {
   const can = useMemo(() => (mon ? learnable(mon.species, mon.level) : []), [mon?.species, mon?.level]);
   const candyPrice = pricedAt(CANDY_PRICE, stats);
   const toTop = mon ? Math.max(0, 100 - mon.level) : 0;
-  const raise = (n) => engine.levelUp(mon.uid, Math.min(n, toTop, candy));
-  const lacking = Math.max(0, toTop - candy);
+  // Short of candy, a raise buys the rest in the same press (asked first).
+  const { ask, can: canRaise, dialog } = useRaise();
+  const raise = (n) => ask(mon, n, { name: label(speciesById(mon.species)) });
   const price = pricedAt(TUTOR_PRICE, stats);
   const fresh = draft.filter((i) => !now.includes(i)).length;
   const cost = fresh * price;
@@ -546,21 +549,15 @@ function Train({ engine, box, money, stats, candy }) {
             {toTop > 0 && (
               <div className="lg-raise-go">
                 {[1, 10].map((n) => (
-                  <button key={n} type="button" className="lg-go small quiet" disabled={!candy}
+                  <button key={n} type="button" className="lg-go small quiet" disabled={!canRaise(mon)}
+                    data-tip={candy >= Math.min(n, toTop) ? `${Math.min(n, toTop)} Rare Candy` : `Buys the candy it lacks · ${yen(candyPrice)} each`}
                     onClick={() => raise(n)}>+{Math.min(n, toTop)} Lv</button>
                 ))}
-                <button type="button" className="lg-go small" disabled={!candy} onClick={() => raise(toTop)}>
-                  {candy >= toTop ? "To Lv 100" : `+${candy} Lv`}
-                </button>
-                {lacking > 0 && (
-                  <button type="button" className="lg-go small quiet" disabled={money < candyPrice * lacking}
-                    data-tip={`${lacking} Rare Candy for ${yen(candyPrice * lacking)}`}
-                    onClick={() => engine.buyCandy(lacking)}>
-                    Buy {lacking} candy · {yen(candyPrice * lacking)}
-                  </button>
-                )}
+                <button type="button" className="lg-go small" disabled={!canRaise(mon)} onClick={() => raise(toTop)}
+                  data-tip={candy >= toTop ? `${toTop} Rare Candy` : `Buys the ${toTop - candy} candy it lacks`}>To Lv 100</button>
               </div>
             )}
+            {dialog}
           </section>
           <span className="lg-kicker lg-moves-head">Moves</span>
           <ol className="lg-slots" aria-label="Its four moves">
@@ -847,7 +844,7 @@ export default function League({
     else onClose();
   }, [fight, pick, ranked, editing, onClose]);
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape" && !fight) { e.preventDefault(); back(); } };
+    const onKey = (e) => { if (e.key === "Escape" && !fight && !stacked()) { e.preventDefault(); back(); } };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, [back, fight]);
@@ -926,17 +923,15 @@ export default function League({
     <div className={`tc-page evcard lg-page${sub ? " sub" : ""}`} role="dialog" aria-modal="true" aria-label="Pokémon League" ref={page}>
       <header className="tc-head" ref={head}>
         <div className="tc-bar">
-          {/* The tabs leave the page now; this is the Back for a sub-view. */}
-          {sub && (
-            <button type="button" className="tc-home" onClick={back} aria-label="Back to the League">
-              <span aria-hidden="true">‹</span> Back
-            </button>
-          )}
-          <div className="tc-titles">
-            <h3>Pokémon League</h3>
-            <span>{totalBadges} badge{totalBadges === 1 ? "" : "s"} · {st.filter((s) => s.cleared).length} of {LEAGUES.length} regions cleared</span>
-          </div>
-          {!sub && onMode && <BattleSwitch on="league" onPick={onMode} />}
+          {/* The tabs leave the page now; the Back is for a sub-view. */}
+          <PageHead icon="trophy" title="League" sub={`${totalBadges} badge${totalBadges === 1 ? "" : "s"} · ${st.filter((s) => s.cleared).length} of ${LEAGUES.length} regions cleared`}
+            back={sub && (
+              <button type="button" className="tc-home" onClick={back} aria-label="Back to the League">
+                <span aria-hidden="true">‹</span> Back
+              </button>
+            )}>
+            {!sub && onMode && <BattleSwitch on="league" onPick={onMode} />}
+          </PageHead>
         </div>
         {!sub && (
           <nav className="lg-strip-wrap" aria-label="Regions">
@@ -963,7 +958,7 @@ export default function League({
                 className={`rk-tab${shop ? " on" : ""}`} onClick={() => choose(SHOP)}>
                 <Icon n="shop" className="side-ic" />
                 <b>Shop</b>
-                <em>{yen(money)}</em>
+                <em>Battle items</em>
               </button>
               <button type="button" role="tab" aria-selected={train}
                 className={`rk-tab split${train ? " on" : ""}`} onClick={() => choose(TRAIN)}>

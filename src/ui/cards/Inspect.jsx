@@ -135,7 +135,7 @@ export default function Inspect({ set, localId, cards, dust, dex, showcase = [],
               </select>
             )}
             {added && <span className="cd-added" role="status">{added}</span>}
-            {/* Every spare and every missing printing of the set at once: the Dust tab, on this set. */}
+            {/* Every spare and every missing printing of the set at once: the set's binder and its dust bar. */}
             {onBulk && <button type="button" className="lg-go quiet" onClick={onBulk}>Dust or craft the whole set</button>}
           </div>
         </div>

@@ -31,6 +31,7 @@ import Mark from "./Marks.jsx";
 import { researchLevel, RESEARCH_MAX } from "../game/research.js";
 import { dexRank, genReward } from "../game/medals.js";
 import { RankMedal } from "./RankBadge.jsx";
+import { pct } from "./pct.js";
 
 const STATE = ["unseen", "seen", "caught"];
 
@@ -418,7 +419,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
       <div className={`count${tier ? ` tiered t-${tier}` : ""}`}>
         {tier && <span className="dx-tier"><Mark tier={tier} size={13} />{tierName(tier)}{region !== "all" ? ` · ${REGION_NAME[region]}` : ""}</span>}
         <b>{scope.caught}</b> <span>/ {scope.total.toLocaleString()}</span>
-        <em>{Math.round((scope.caught / Math.max(1, scope.total)) * 100)}%</em>
+        <em>{pct(scope.caught, scope.total)}%</em>
       </div>
       {/* Two fills in one track: everything met, and everything caught. `seen`
           already counts entries at state 1 OR 2, so it is the outer bound and

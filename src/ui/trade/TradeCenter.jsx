@@ -26,9 +26,10 @@ import Picker, { SpeciesFind, keyOf } from "./Picker.jsx";
 import Browse from "./Browse.jsx";
 import { enterTrading } from "./enter.js";
 import BoardTab from "./Board.jsx";
-import { useModalLock } from "../modal.js";
+import { useModalLock, stacked } from "../modal.js";
 import Sprite, { TrainerArt } from "../Sprite.jsx";
 import Icon from "../Icon.jsx";
+import PageHead from "../PageHead.jsx";
 import Mark from "../Marks.jsx";
 import TrainerProfile from "./TrainerProfile.jsx";
 import CardShowEdit from "../cards/CardShowEdit.jsx";
@@ -298,7 +299,7 @@ export default function TradeCenter({
     if (me) trainerShelf(me.user_id).then((got) => got.ok && setMyShelf(got.data));
   }, [me]);
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); back(); } };
+    const onKey = (e) => { if (e.key === "Escape" && !stacked()) { e.preventDefault(); back(); } };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, [back]);
@@ -468,13 +469,24 @@ export default function TradeCenter({
 
   let body;
   if (!signedIn) {
-    // A guest's game comes with them (Boot's `join`), so the way in is right here.
-    body = onJoin ? (
-      <div className="tc-gate">
-        <p>Trading needs a free account - your Pokémon, Box and bag come with you.</p>
-        <button type="button" className="gate-go" onClick={onJoin}>SAVE MY PROGRESS</button>
+    /* WHAT TRADING IS, before the ask (2026-10-26: a line of text on an empty
+       page read as a broken tab). A guest's game comes with them (Boot's
+       `join`), so the way in is right here. */
+    body = (
+      <div className="tc-gate tr-gate">
+        <ul className="tr-feats">
+          {[["users", "Trainers", "Meet trainers, add friends, visit their cards"],
+            ["swap", "Offers", "Up to six a side, straight to a trainer"],
+            ["board", "Board", "List one Pokémon for the one you want"],
+            ["gift", "Surprise Trade", "Send one, get a stranger's"]].map(([ic, name, says]) => (
+            <li key={name}><span className="ph-mark"><Icon n={ic} size={20} /></span><b>{name}</b><span>{says}</span></li>
+          ))}
+        </ul>
+        <p>{onJoin ? "Trading needs a free account - your Pokémon, Box and bag come with you."
+          : "Trading needs an account - sign in, and your Pokémon and friends come with you."}</p>
+        {onJoin && <button type="button" className="gate-go" onClick={onJoin}>SAVE MY PROGRESS</button>}
       </div>
-    ) : <p className="tc-gate">Trading needs an account - sign in, and your Pokémon and friends come with you.</p>;
+    );
   } else if (closed) {
     body = <p className="tc-gate">Trading isn&rsquo;t open yet. Check back soon!</p>;
   } else if (composing) {
@@ -616,33 +628,32 @@ export default function TradeCenter({
      does), the tabs go to the game. It was a second "‹ Back" in the body,
      drawn centred by the grid it sat in, under the header's own "‹ Game". */
   return (
-    <div className={`tc-page evcard${signedIn && !closed && !stacked && !profile ? "" : " sub"}`} role="dialog" aria-modal="true" aria-label="Trade Center" ref={page}>
+    <div className={`tc-page evcard tr-page${signedIn && !closed && !stacked && !profile ? "" : " sub"}`} role="dialog" aria-modal="true" aria-label="Trade Center" ref={page}>
       <header className="tc-head" ref={head}>
         <div className="tc-bar">
-          {/* The tabs leave the page now; this is the Back for a stacked view,
-              and for your card, which you reached from You. */}
-          {(stacked || profile) && (
-            <button type="button" className="tc-home" onClick={stacked ? back : onClose}
-              aria-label={stacked ? "Back" : "Back to You"}>
-              <span aria-hidden="true">‹</span> Back
-            </button>
-          )}
-          <div className="tc-titles">
-            <h3>{profile ? "Your trainer card" : "Trade"}</h3>
-            <span>{profile ? "Your trainer card: what other trainers see" : "Trainers, offers, the board and Surprise Trade"}</span>
-          </div>
+          {/* The tabs leave the page now; the Back is for a stacked view, and
+              for your card, which you reached from You. */}
+          <PageHead icon={profile ? "card" : "swap"} title={profile ? "Trainer card" : "Trade"}
+            sub={profile ? "What other trainers see" : "Trainers, offers, the board and Surprise Trade"}
+            back={(stacked || profile) && (
+              <button type="button" className="tc-home" onClick={stacked ? back : onClose}
+                aria-label={stacked ? "Back" : "Back to You"}>
+                <span aria-hidden="true">‹</span> Back
+              </button>
+            )} />
         </div>
+        {/* The League's and the Cards' own strip: one kind of section tab on every page. */}
         {signedIn && !closed && !stacked && !profile && (
-          <div className="tc-tabbar"><div className="sheet-tabs tc-tabs" role="tablist">
-            {[["trainers", "Trainers", null, "users"], ["offers", "Offers", offers || null, "swap"],
-              ["board", "Board", null, "board"], ["surprise", "Surprise", null, "gift"]].map(([id, name, n, ic]) => (
+          <nav className="lg-strip-wrap" aria-label="Trade"><div className="lg-strip" role="tablist">
+            {[["trainers", "Trainers", "Friends and more", "users"], ["offers", "Offers", offers ? `${offers} waiting` : "Yours and theirs", "swap"],
+              ["board", "Board", "Listings", "board"], ["surprise", "Surprise", "A blind swap", "gift"]].map(([id, name, sub, ic]) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id}
-                className={tab === id ? "on" : ""} onClick={() => { setTab(id); setNote(null); }}>
+                className={`rk-tab${tab === id ? " on" : ""}${id === "offers" && offers ? " hot" : ""}`} onClick={() => { setTab(id); setNote(null); }}>
                 <Icon n={ic} className="side-ic" />
-                <b>{name}</b>{n ? <em>{n}</em> : null}
+                <b>{name}</b><em>{sub}</em>
               </button>
             ))}
-          </div></div>
+          </div></nav>
         )}
       </header>
       <main className="hp-body tc-main">

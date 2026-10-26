@@ -27,6 +27,7 @@ import { label } from "../game/map.js";
 import Types from "./Types.jsx";
 import FilterBar from "./FilterBar.jsx";
 import { valuedAt, candyAt } from "../game/trainer.js";
+import { useRaise, useWallet } from "./wallet.jsx";
 import Confirm from "./Confirm.jsx";
 import { defendNote } from "../game/ranked.js";
 import Note from "./Note.jsx";
@@ -525,8 +526,17 @@ function Box({
      One press rather than one per level: clicking a Dratini from 5 to 55 fifty
      times is not a decision, it is a chore, and the clamp is in the engine so
      the button and the charge cannot disagree about how many it could afford. */
+  const raise = useRaise();
+  const { money } = useWallet();
+  const canBuy = money >= raise.price;
   const confirmRaise = (group) => {
     const sp = speciesById(group.species);
+    // Short of candy with money for more: one press buys the rest (wallet.jsx, asked first).
+    if (group.need > candy && canBuy) {
+      raise.ask(group.hero, group.need, { name: label(sp), lines: [[group.goal ?? "Evolves at", `Lv ${group.at}`]],
+        done: (got) => got && setFlash(`${label(sp)} is Lv ${group.hero.level}`) });
+      return;
+    }
     const spend = Math.min(group.need, candy);
     setPending({
       title: `Raise ${label(sp)} to Lv ${group.hero.level + spend}?`,
@@ -673,12 +683,13 @@ function Box({
 
       <div className="boxlist" ref={list}>
         {shown.map((group) => (
-          <BoxRow key={group.key} group={group} sig={group.sig} candy={candy} stats={stats} act={act} />
+          <BoxRow key={group.key} group={group} sig={group.sig} candy={candy} canBuy={canBuy} stats={stats} act={act} />
         ))}
       </div>
 
       {peek && <Preview group={peek} onClose={() => setPeek(null)} />}
 
+      {raise.dialog}
       {pending && (
         <Confirm
           title={pending.title}
@@ -722,7 +733,7 @@ const blockedWhy = (path) => {
    re-rendered the Box, and with it all 800 rows of a big one - 150ms a time on
    a slowed CPU, several times an encounter. `sig` is the group's words; the
    handlers come through the Box's one stable `act`. */
-const BoxRow = memo(function BoxRow({ group, candy, stats, act }) {
+const BoxRow = memo(function BoxRow({ group, candy, canBuy, stats, act }) {
   // Haggle and Coach, quoted as paid - the Box's `worth` and `candyOf`.
   const worth = (x) => valuedAt(sellValue(x), stats);
   const candyOf = (x, n = 1) => candyAt(n * candyValue(x), stats);
@@ -821,11 +832,14 @@ const BoxRow = memo(function BoxRow({ group, candy, stats, act }) {
         {/* RAISE only shows where candy would actually do something:
             there is a next step, it is not already reached, and a stone
             is not the only thing missing. Hidden rather than disabled
-            when there is no candy, because a permanently dead button on
-            every row of a long list is noise. */}
-        {group.need > 0 && candy > 0 && (
-          <button className="raisebtn" onClick={() => act("raise", group.key)}>
-            ▲ Lv +{Math.min(group.need, candy)}
+            when there is neither candy nor money for one, because a
+            permanently dead button on every row of a long list is noise.
+            Short of candy with money, it raises the whole way and buys the
+            rest (asked first). */}
+        {group.need > 0 && (candy > 0 || canBuy) && (
+          <button className="raisebtn" onClick={() => act("raise", group.key)}
+            data-tip={candy >= group.need || !canBuy ? `${Math.min(group.need, candy)} Rare Candy` : `Buys the ${group.need - candy} candy it lacks`}>
+            ▲ Lv +{candy >= group.need || !canBuy ? Math.min(group.need, candy) : group.need}
           </button>
         )}
         {spare > 0 && (
@@ -849,6 +863,6 @@ const BoxRow = memo(function BoxRow({ group, candy, stats, act }) {
       </div>
     </div>
   );
-}, (a, b) => a.sig === b.sig && a.candy === b.candy && a.stats === b.stats && a.act === b.act);
+}, (a, b) => a.sig === b.sig && a.candy === b.candy && a.canBuy === b.canBuy && a.stats === b.stats && a.act === b.act);
 
 export default memo(Box);

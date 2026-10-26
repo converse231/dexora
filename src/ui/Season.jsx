@@ -18,9 +18,9 @@ import { useModalLock, useDismiss } from "./modal.js";
 import { label, AREAS } from "../game/map.js";
 import { speciesById, foundIn, dexIndex } from "../game/biomes.js";
 import { eventShelf } from "../game/items.js";
-import {
+import { shelfOf, eventAfter,
   eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, eventDone, huntDue,
-  EVENT_SHARE, EVENT_NIGHT, EVENT_PACKS,
+  shareOf, EVENT_NIGHT, EVENT_PACKS,
 } from "../game/events.js";
 
 /* Seen per device, never the save - the teaser and the opening are two
@@ -142,7 +142,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
   const live = eventOn()?.id === ev.id;
   const soon = isSoon(ev);
   const held = eventHeld(ev, dex);
-  const [ball, honey] = [eventShelf(ev.id).find((i) => i.bonus), eventShelf(ev.id).find((i) => i.lure)];
+  const [ball, honey] = [eventShelf(shelfOf(ev)).find((i) => i.bonus), eventShelf(shelfOf(ev)).find((i) => i.lure)];
 
   return (
     <div className="sheet sn-sheet" {...useDismiss(onClose)}>
@@ -159,12 +159,15 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
         {(soon || live) && <Countdown to={soon ? eventOpens(ev) : eventCloses(ev)} label={soon ? "Starts in" : "Ends in"} />}
         <p className="sn-lede">
           {soon
-            ? <>Pokémon are coming out in costume! From {day(ev.start)}, any of these can turn up where its species lives - for two weeks only.</>
-            : <>Pokémon are out in costume! For {live ? (left === 1 ? "one last day" : `${left} more days`) : "a fortnight"},
+            ? <>Pokémon are coming out in costume! From {day(ev.start)}, any of these can turn up where its species lives - for one week only.</>
+            : <>Pokémon are out in costume! For {live ? (left === 1 ? "one last day" : `${left} more days`) : "a week"},
               {" "}any of these can turn up where its species lives - and only then.</>}
         </p>
 
-        <h3 className="sn-sub">Evolve in costume</h3>
+        {/* THE POSTER KEEPS THE SECRET (2026-10-26, asked for): a costume is a
+            dark silhouette until you catch it - the names say what to hunt, the
+            art is the reward. */}
+        <h3 className="sn-sub">{ev.evolves === false ? "Whole lines in costume · catch each" : "Evolve in costume"}</h3>
         <div className="sn-lineup">
           {lines(ev).filter(({ line }) => line.length > 1).map(({ line, where }) => (
             <section key={line[0].id} className="sn-line">
@@ -172,7 +175,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
                 {line.map((l, k) => (
                   /* A look alone in its line is drawn bigger: it has the
                      room, and Mimikyu's art fills a third of its 96px canvas. */
-                  <span key={l.id} className={`sn-mon${line.length === 1 ? " solo" : ""}`} style={{ "--k": k }}>
+                  <span key={l.id} className={`sn-mon${line.length === 1 ? " solo" : ""}${dex?.[dexIndex(l.id)] === 2 ? "" : " sn-dark"}`} style={{ "--k": k }}>
                     <Sprite id={l.id} alt={l.title} eager />
                     {dex?.[dexIndex(l.id)] === 2 && <i className="sn-got" aria-label="caught">✓</i>}
                   </span>
@@ -189,12 +192,12 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
         <div className="sn-solos">
           {lines(ev).filter(({ line }) => line.length === 1).map(({ line: [l], where }) => (
             <section key={l.id} className="sn-solo">
-              <span className="sn-mon" style={{ "--k": l.id % 4 }}>
+              <span className={`sn-mon${dex?.[dexIndex(l.id)] === 2 ? "" : " sn-dark"}`} style={{ "--k": l.id % 4 }}>
                 <Sprite id={l.id} alt={l.title} eager />
                 {dex?.[dexIndex(l.id)] === 2 && <i className="sn-got" aria-label="caught">✓</i>}
               </span>
               <b>{l.title}</b>
-              <small>{where[0] ?? ""}</small>
+              <small>{l.rare ? <em className="sn-rare">Rare</em> : null}{where[0] ?? ""}</small>
             </section>
           ))}
         </div>
@@ -203,7 +206,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
           <section className="sn-hunt">
             <span className="sn-mon solo sn-shade"><Sprite id={ev.hunt.id} alt="" eager /></span>
             <span>
-              <b>The Nightmare</b>
+              <b>{ev.hunt.name}</b>
               Catch {ev.hunt.dreams} costumed Pokémon. Then walk in {AREAS[ev.hunt.area]?.name}
               {" "}at night - 20:00 to 05:00 on the map's clock - and it comes for you.
             </span>
@@ -212,7 +215,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
 
         <ul className="sn-how">
           <li><em>🌙</em><span><b>{EVENT_NIGHT}× after dark</b>The costumes come out at night.</span></li>
-          <li><em>🎃</em><span><b>1 in {Math.round(1 / EVENT_SHARE)} wear one</b>A line evolves in costume; the rest, catch each one.</span></li>
+          <li><em>🎃</em><span><b>1 in {Math.round(1 / shareOf(ev))} wear one</b>{ev.evolves === false ? "Every stage is its own catch - the big ones turn up where their line starts." : "A line evolves in costume; the rest, catch each one."}</span></li>
           {honey && <li><em>🍯</em><span><b>{honey.name}</b>{honey.lure}× as likely for {honey.steps} steps.</span></li>}
           {ball && <li><em>🔮</em><span><b>{ball.name}</b>{ball.boost}× catch on costumed ones.</span></li>}
           <li><em>✨</em><span><b>Rare forms too</b>Shiny, Gold, Diamond and more can wear the costume.</span></li>
@@ -239,6 +242,7 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
   const done = medals.includes(`event:${ev.id}`);
   const due = eventDone(ev, dex, medals) && !done;
   const left = eventDaysLeft(ev);
+  const next = eventAfter(ev);
   return (
     <section className={`ev-card sn-board-card ev-${ev.id}${live || due || soon ? " live" : ""}`}>
       <header className="ev-banner">
@@ -272,7 +276,7 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
               <Sprite id={ev.hunt.id} alt="" />
             </button>
             <span>
-              <b>{won ? `${ev.hunt.name} ✓` : due ? "The new moon has risen" : "The Nightmare"}</b>
+              <b>{won ? `${ev.hunt.name} ✓` : due ? "The new moon has risen" : ev.hunt.name}</b>
               <small>{won ? ev.hunt.title
                 : due ? `Walk in ${AREAS[ev.hunt.area]?.name}, 20:00-05:00`
                   : `${n} of ${ev.hunt.dreams} costumes caught`}</small>
@@ -285,6 +289,10 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
         <span>{held} of {ev.looks.length} caught</span>
         <span>{done ? `${ev.title} ✓` : `All ${ev.looks.length}${ev.hunt ? ` + ${ev.hunt.title.split(" ").pop()}` : ""}: the ${ev.title} title`}</span>
       </div>
+      {/* THE NEXT WEEK, while this one runs (eventAfter): new costumes are coming. */}
+      {live && next && (
+        <p className="sn-next"><b>Next: {next.name}</b> · new costumes and a new legendary, from {day(next.start)}</p>
+      )}
       {due
         ? <button type="button" className="ev-go" onClick={onClaim}>Claim {ev.title} ›</button>
         : (live || soon) && <button type="button" className="ev-go" onClick={onIntro}>{soon ? "Preview the event ›" : "About the event ›"}</button>}
@@ -292,7 +300,10 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
   );
 }
 
-// The event to put on the board: the one running, one about to open, or
-// one whose claim waits.
-export const boardSeason = (EVENTS, dex, medals = []) => eventOn() ?? eventSoon()
-  ?? EVENTS.find((ev) => eventDone(ev, dex, medals) && !medals.includes(`event:${ev.id}`)) ?? null;
+/* The events to put on the board: the one running (or about to open), then
+   every other whose claim waits - a week that ended finished must not lose
+   its Claim to the next week's card. */
+export const boardSeasons = (EVENTS, dex, medals = []) => {
+  const now = eventOn() ?? eventSoon();
+  return [now, ...EVENTS.filter((ev) => ev !== now && eventDone(ev, dex, medals) && !medals.includes(`event:${ev.id}`))].filter(Boolean);
+};

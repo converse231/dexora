@@ -44,6 +44,8 @@ import { ARENA_LEVELS, ARENA_DAILY, arenaPay, arenaLeft } from "../../../game/ro
 import { dayKey, hash } from "../../../game/daily.js";
 import { ARENA_NEWS_KEY, write } from "../../../game/store.js";
 import BattleSwitch from "../BattleSwitch.jsx";
+import PageHead from "../../PageHead.jsx";
+import { useRaise } from "../../wallet.jsx";
 import { createRenderer } from "./render.js";
 import FighterSelect from "./FighterSelect.jsx";
 import { play as playSound, soundOn, setSound } from "./sfx.js";
@@ -51,7 +53,7 @@ import { loadAnims } from "../moveAnim.js";
 import Sprite from "../../Sprite.jsx";
 import Icon from "../../Icon.jsx";
 import Types from "../../Types.jsx";
-import { useModalLock, useDismiss } from "../../modal.js";
+import { useModalLock, useDismiss, stacked } from "../../modal.js";
 import { PMD_REV } from "../../../data/pmd.js";
 
 const nameOf = (id) => label(speciesById(id));
@@ -179,7 +181,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   useEffect(() => { loadAnims(); }, []);
   // Escape leaves the page - unless a match, the editor or How to play has it.
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape" && !match && !online && !editing && !howto && tutorFor == null && !shop) { e.preventDefault(); onClose(); } };
+    const onKey = (e) => { if (e.key === "Escape" && !stacked() && !match && !online && !editing && !howto && tutorFor == null && !shop) { e.preventDefault(); onClose(); } };
     addEventListener("keydown", onKey);
     return () => removeEventListener("keydown", onKey);
   }, [match, online, editing, howto, tutorFor, shop, onClose]);
@@ -196,7 +198,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   return (
     <>
       <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0} onMode={onMode} onTutor={setTutorFor}
-        candy={candy} onLevel={(uid, n) => engine?.levelUp(uid, n)} equipped={equipped} onCards={() => setCardPick(true)}
+        candy={candy} equipped={equipped} onCards={() => setCardPick(true)}
         onStart={(m) => { immerse(); setMatch(m); }} onOnline={(o) => { immerse(); setOnline(o); }} onEdit={() => setEditing(true)} onHowto={() => setHowto(true)} onShop={() => setShop(true)} />
       {editing && <FighterSelect box={box} picked={mons} custom={arenaTeam.length > 0}
         onSave={(uids) => { engine?.setArenaTeam(uids); setEditing(false); }} onClose={() => setEditing(false)} />}
@@ -217,7 +219,9 @@ const pickFloor = (floor, seed) => (floor === "random" ? ARENAS[Math.abs(seed) %
    the floors under them, and one big Battle along the foot. Each mode is a
    tile; the chosen one opens its own panel (the Ladder's ten masters, a
    CPU's difficulty, your friends). */
-function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, onOnline, onEdit, onHowto, onShop, candy = 0, onLevel, equipped = [], onCards }) {
+function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, onOnline, onEdit, onHowto, onShop, candy = 0, equipped = [], onCards }) {
+  // The team is raised here: short of candy, a raise buys the rest (the wallet in the head shows what you hold).
+  const raise = useRaise();
   const [mode, setMode0] = useState(() => { const m = pref(MODE_KEY, "ladder"); return MODE_NAME[m] && (m !== "friends" || CLOUD) ? m : "ladder"; });
   const [cpu, setCpu0] = useState(() => pref(LEVEL_KEY, "normal"));
   const [floor, setFloor0] = useState(() => pref(FLOOR_KEY, "random"));
@@ -256,15 +260,11 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
     <div className="tc-page ag-page" role="dialog" aria-modal="true" aria-label="The Arena" style={{ "--ag-bg": `url(${asset(`arena/${bg}.webp`)})` }}>
       <i className="ag-bg" aria-hidden="true" />
       <div className="ag-wrap">
-        {onMode && <BattleSwitch on="arena" onPick={onMode} />}
         <header className="ag-head">
-          <div className="ag-brand">
-            <span className="ag-mark" aria-hidden="true"><Icon n="arena" size={24} /></span>
-            <div>
-              <h2>Arena</h2>
-              <span>Real-time Pokémon battles</span>
-            </div>
-          </div>
+          {/* Every tab's head (PageHead): the mark, the name, the wallet. */}
+          <PageHead icon="arena" title="Arena" sub="Real-time Pokémon battles">
+            {onMode && <BattleSwitch on="arena" onPick={onMode} />}
+          </PageHead>
           <div className="ag-stats">
             <span className="ag-stat"><b>{ladder.length}<u>/{LADDER.length}</u></b><i>Ladder</i></span>
             <span className="ag-stat"><b className={best.grade ? `g-${best.grade}` : ""}>{best.grade ?? "-"}</b><i>Best grade</i></span>
@@ -280,8 +280,6 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
           <section className="ag-team" aria-label="Your team">
             <div className="ag-sec">
               <h3>Your team</h3>
-              {/* Rare Candy on hand: the team is raised here, not on a trip to the League's Train tab. */}
-              <span className="ag-candy" data-tip="Rare Candy - a level each"><img src={asset("items/rare-candy.png")} alt="Rare Candy" />{candy.toLocaleString("en-US")}</span>
               <button type="button" className="ag-edit" onClick={onEdit}><Icon n="edit" size={16} />Edit</button>
             </div>
             <ol className="ag-mons">
@@ -306,14 +304,15 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                       <b>{nameOf(m.species)}</b>
                       {enteringAs(m).mega && <span className="ag-megain">Enters as {nameOf(enteringAs(m).species)} · Mega Evolves in battle</span>}
                       <span className="ag-lvrow">Lv {m.level} · <em className={`ag-role r-${roleOf(f)}`} data-tip={ROLE[roleOf(f)][1]}>{ROLE[roleOf(f)][0]}</em>
+                        {/* Short of candy, a raise buys the rest in the same press (useRaise, asked first). */}
                         {m.level < 100 && !m.lock && !m.rental && (
                           <span className="ag-lvup" role="group" aria-label={`Raise ${nameOf(m.species)} with Rare Candy`}>
-                            {[1, 10].map((n) => (
-                              <button key={n} type="button" disabled={!candy} onClick={() => onLevel(m.uid, Math.min(n, 100 - m.level))}
-                                data-tip={candy ? `${Math.min(n, 100 - m.level)} Rare Candy` : "No Rare Candy - the Shop sells it"}>+{Math.min(n, 100 - m.level)}</button>
+                            {[1, 10, 100].map((n) => Math.min(n, 100 - m.level)).map((n, k) => (
+                              <button key={k} type="button" disabled={!raise.can(m)} onClick={() => raise.ask(m, n, { name: nameOf(m.species) })}
+                                data-tip={candy >= n ? `${n} Rare Candy` : `Buys the ${n - candy} candy it lacks`}>
+                                {k === 2 ? "Max" : `+${n}`}
+                              </button>
                             ))}
-                            <button type="button" disabled={!candy} onClick={() => onLevel(m.uid, 100 - m.level)}
-                              data-tip={candy ? `Up to ${Math.min(candy, 100 - m.level)} Rare Candy` : "No Rare Candy - the Shop sells it"}>Max</button>
                           </span>
                         )}
                       </span>
@@ -329,6 +328,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                 );
               })}
             </ol>
+            {raise.dialog}
             <p className="ag-note">{custom ? "Your Arena team - apart from your League team." : "Your League team's first three. Edit to pick an Arena team of its own."}</p>
           </section>
 

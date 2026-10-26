@@ -181,7 +181,7 @@ export function Cart({ cart, money, dust = 0, level, onQty, onRemove, onCheckout
           </div>
           {byDust && (
             <p className="cs-short">
-              In dust every pack is {DUST_PACK}{deals ? ", so bundles and boxes are full price" : ""}. Dust comes from spare cards, on the Dust tab.
+              In dust every pack is {DUST_PACK}{deals ? ", so bundles and boxes are full price" : ""}. Dust comes from spare cards, in each set's Binder.
             </p>
           )}
           {shut.length > 0 && <p className="cs-short">{setName(shut[0].set)} is not open to you yet - remove it to check out.</p>}
