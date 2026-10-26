@@ -42,6 +42,8 @@ export const EVENTS = [
     name: "Hallowed Night",
     // The title every look in the Pokedex earns (titles.js).
     title: "Hallowed Hunter",
+    // Its mark on the chip, the board and the poster; its look is `.ev-<id>` (styles.css).
+    emblem: "🎃",
     shelf: "halloween",
     /* A check-in on this weekday (0 Sunday .. 6 Saturday) while the event
        runs pays these on top of the day's own reward (asked for, 2026-10-20:
@@ -91,6 +93,7 @@ export const EVENTS = [
     id: "haunting",
     name: "The Haunting",
     title: "Phantom Hunter",
+    emblem: "👻",
     shelf: "halloween",
     evolves: false,
     // HARDER (2026-10-26, asked for): a third of the species' meetings, where the first week had half.

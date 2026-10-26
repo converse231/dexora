@@ -54,6 +54,17 @@ ACCENT_MIN = 60          # source pixels: a 1024px eye is hundreds, JPEG noise i
 SAME = 24                # two chosen colours this close are one
 HOLE_MIN = 400           # source pixels: an enclosed pocket smaller is part of the art
 HOLE_FIT = 0.85          # the share of a pocket on a checker's squares that makes it one
+# HOLLOW DRAWINGS (2026-10-26, reported: Grim Reaper Giratina kept white
+# between its wing ribs and inside its scythe's curve). On a plain backdrop the
+# fill cannot reach background the art ENCLOSES, and white inside the art is
+# usually the art (Hoothoot's sheet, the mummy's bandages, Drifloon's puff) - so
+# only a drawing named here has its enclosed near-white pockets taken out, with
+# the pale tinted glow round them. No share of white tells the two apart
+# (Giratina's trapped background is 11% of it, Wingull's own white body 15%):
+# a look is named here by eye.
+HOLLOW = {("haunting", "487")}
+POCKET_WHITE = 236       # near-white: a pocket's pixels
+POCKET_RIM = 4           # source pixels of tinted glow round a pocket that go with it
 # An island smaller than this share of the body is a speck of background.
 SPECK = 0.004
 
@@ -67,6 +78,40 @@ def grow(m, r):
         for dx in range(2 * r + 1):
             out |= p[dy:dy + h, dx:dx + w]
     return out
+
+
+def pockets(a, m):
+    """The near-white regions the kept mask encloses, HOLE_MIN pixels or more,
+    as one mask."""
+    white = m & (a.min(axis=2).astype(int) > POCKET_WHITE)
+    h, w = white.shape
+    seen = np.zeros((h, w), bool)
+    out = np.zeros((h, w), bool)
+    for y0, x0 in zip(*np.nonzero(white)):
+        if seen[y0, x0]:
+            continue
+        q, comp = deque([(y0, x0)]), [(y0, x0)]
+        seen[y0, x0] = True
+        while q:
+            y, x = q.popleft()
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                yy, xx = y + dy, x + dx
+                if 0 <= yy < h and 0 <= xx < w and white[yy, xx] and not seen[yy, xx]:
+                    seen[yy, xx] = True; q.append((yy, xx)); comp.append((yy, xx))
+        if len(comp) >= HOLE_MIN:
+            ys, xs = zip(*comp)
+            out[list(ys), list(xs)] = True
+    return out
+
+
+def hollow(a, m):
+    """A HOLLOW drawing's mask without its enclosed pockets and their glow:
+    light, TINTED pixels within POCKET_RIM of one (a silver blade is light but
+    grey, and stays)."""
+    pk = pockets(a, m)
+    mn, mx = a.min(axis=2).astype(int), a.max(axis=2).astype(int)
+    rim = grow(pk, POCKET_RIM) & m & (mn > 200) & (mx - mn >= 12)
+    return specks(m & ~pk & ~rim)
 
 
 def key(a):
@@ -267,6 +312,32 @@ def shrink(a, m, base):
     return out
 
 
+def thin(img):
+    """ONE PIXEL OF OUTLINE, as the games draw it (2026-10-26, reported: Trick-
+    or-Treat Drifloon's border "so thick"). The drawings' pixels are coarser
+    than the sprite grid, so fitting one to its species' body makes each drawn
+    pixel about two, and the outline two thick - 30-97% of a look's edge was
+    doubled, 15-32% of the games' own. Where the silhouette's edge is dark,
+    the next pixel in is dark too and the one after that is colour, the outer
+    one goes. A part that is dark all through (Drifloon's strings, a scythe's
+    handle) has no colour behind it and stays."""
+    a = np.asarray(img).copy()
+    al = a[..., 3] > 0
+    dark = al & (a[..., :3].astype(int).sum(-1) < 200)
+    H, W = al.shape
+    cut = []
+    for y, x in zip(*np.nonzero(dark)):
+        for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            oy, ox, iy, ix, jy, jx = y + dy, x + dx, y - dy, x - dx, y - 2 * dy, x - 2 * dx
+            outside = not (0 <= oy < H and 0 <= ox < W) or not al[oy, ox]
+            if outside and 0 <= jy < H and 0 <= jx < W and dark[iy, ix] and al[jy, jx] and not dark[jy, jx]:
+                cut.append((y, x))
+                break
+    for y, x in cut:
+        a[y, x, 3] = 0
+    return Image.fromarray(a, "RGBA")
+
+
 def looks():
     """(event, base id) -> look id, read off eventforms.js."""
     src = open(FORMS, encoding="utf-8").read()
@@ -366,8 +437,10 @@ def build(path, ids):
         sys.exit(f"{path}: no look of {base_id} in event {event!r} (eventforms.js)")
     a = np.asarray(Image.open(path).convert("RGB"))
     m = key(a)
+    if (event, base_id) in HOLLOW:
+        m = hollow(a, m)
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
-    out = shrink(a, m, base)
+    out = thin(shrink(a, m, base))
     out.save(os.path.join(SPRITES, f"{lid}.png"), optimize=True)
     shiny(out, base_id).save(os.path.join(SPRITES, "shiny", f"{lid}.png"), optimize=True)
     print(f"{event}/{base_id} -> {lid}: {out.size[0]}px, {len(out.getcolors(4096)) - 1} colours")

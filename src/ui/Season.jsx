@@ -86,7 +86,7 @@ export function SeasonChip({ ev, onOpen }) {
   return (
     <button type="button" className="ms-tab ready dc-pill sn-pill" onClick={onOpen}
       data-tip={soon ? `${ev.name} starts in ${shortLeft(left)}` : `${ev.name} ends in ${shortLeft(left)}`}>
-      <span className="ms-ic sn-pill-ic" aria-hidden="true">🎃</span>
+      <span className="ms-ic sn-pill-ic" aria-hidden="true">{ev.emblem ?? "🎃"}</span>
       <i>{ev.name.toUpperCase()}</i>
       <b>{soon ? "Starts" : "Ends"} {shortLeft(left)}<em className="ms-dot" aria-hidden="true">{shortLeft(left).split(" ")[0]}</em></b>
     </button>
@@ -215,7 +215,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
 
         <ul className="sn-how">
           <li><em>🌙</em><span><b>{EVENT_NIGHT}× after dark</b>The costumes come out at night.</span></li>
-          <li><em>🎃</em><span><b>1 in {Math.round(1 / shareOf(ev))} wear one</b>{ev.evolves === false ? "Every stage is its own catch - the big ones turn up where their line starts." : "A line evolves in costume; the rest, catch each one."}</span></li>
+          <li><em>{ev.emblem ?? "🎃"}</em><span><b>1 in {Math.round(1 / shareOf(ev))} wear one</b>{ev.evolves === false ? "Every stage is its own catch - the big ones turn up where their line starts." : "A line evolves in costume; the rest, catch each one."}</span></li>
           {honey && <li><em>🍯</em><span><b>{honey.name}</b>{honey.lure}× as likely for {honey.steps} steps.</span></li>}
           {ball && <li><em>🔮</em><span><b>{ball.name}</b>{ball.boost}× catch on costumed ones.</span></li>}
           <li><em>✨</em><span><b>Rare forms too</b>Shiny, Gold, Diamond and more can wear the costume.</span></li>
@@ -246,7 +246,7 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
   return (
     <section className={`ev-card sn-board-card ev-${ev.id}${live || due || soon ? " live" : ""}`}>
       <header className="ev-banner">
-        <span className="sn-emblem" aria-hidden="true">🎃</span>
+        <span className="sn-emblem" aria-hidden="true">{ev.emblem ?? "🎃"}</span>
         <h4>{ev.name}</h4>
         <span className={`ev-stamp${live || due || soon ? " live" : ""}`}>
           {due ? "CLAIM!" : soon ? "SOON" : live ? (left === 1 ? "LAST DAY" : `${left} DAYS`) : "OVER"}
@@ -290,12 +290,15 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
         <span>{done ? `${ev.title} ✓` : `All ${ev.looks.length}${ev.hunt ? ` + ${ev.hunt.title.split(" ").pop()}` : ""}: the ${ev.title} title`}</span>
       </div>
       {/* THE NEXT WEEK, while this one runs (eventAfter): new costumes are coming. */}
+      {/* A button: the next week's poster, its costumes still silhouettes. */}
       {live && next && (
-        <p className="sn-next"><b>Next: {next.name}</b> · new costumes and a new legendary, from {day(next.start)}</p>
+        <button type="button" className="sn-next" onClick={() => onIntro?.(next)}>
+          <b>Next: {next.name}</b> · new costumes and a new legendary, from {day(next.start)}<i aria-hidden="true">Preview ›</i>
+        </button>
       )}
       {due
         ? <button type="button" className="ev-go" onClick={onClaim}>Claim {ev.title} ›</button>
-        : (live || soon) && <button type="button" className="ev-go" onClick={onIntro}>{soon ? "Preview the event ›" : "About the event ›"}</button>}
+        : (live || soon) && <button type="button" className="ev-go" onClick={() => onIntro?.()}>{soon ? "Preview the event ›" : "About the event ›"}</button>}
     </section>
   );
 }

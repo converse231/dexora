@@ -949,8 +949,9 @@ export default function App({
       {quizOpen && quiz && (
         <Quiz quiz={quiz} onAnswer={(id) => engine.answerQuiz(id)} onClose={() => setQuizOpen(false)} />
       )}
-      {seasonOpen && season && (
-        <SeasonIntro ev={season} dex={st?.dex} onClose={() => setSeasonOpen(false)}
+      {/* `seasonOpen` is true (the running or coming event) or an event itself (the next week's preview). */}
+      {seasonOpen && (seasonOpen.id ? seasonOpen : season) && (
+        <SeasonIntro ev={seasonOpen.id ? seasonOpen : season} dex={st?.dex} onClose={() => setSeasonOpen(false)}
           onBoard={() => { setSeasonOpen(false); goTab("catch"); openRail("events"); }} />
       )}
       {rouletteOpen && engine && (
@@ -1597,7 +1598,7 @@ export default function App({
               onLeague={() => goTab("league")}
               onStar={(id) => engine.star(id)}
               onClaimEvent={(id) => engine.claimEvent(id)}
-              onEventIntro={() => setSeasonOpen(true)}
+              onEventIntro={(ev) => setSeasonOpen(ev ?? true)}
               invite={{ due: refDue, counted: (refInfo?.invited ?? []).filter((x) => x.paid).length }}
               onInvite={account ? () => setInvite({ welcome: false }) : null}
             />

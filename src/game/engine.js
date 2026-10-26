@@ -2245,8 +2245,13 @@ export function createEngine(canvas, onChange, mini = null) {
     const result = resolveThrow(
       e.rate,
       liveMult(ball, e) * catchMult(state.stats),
-      state.caught === 0 && !isLegendary(e.speciesId) ? () => 0 : Math.random,
-      e.alpha ? 0 : berryCalm(e.berries));
+      state.caught === 0 && !isLegendary(e.speciesId) && !e.hunt ? () => 0 : Math.random,
+      /* NEITHER AN ALPHA NOR THE HUNTED ONE FLEES (2026-10-26, reported: Darkrai
+         "hard to catch"). A legendary's rate is 3 - an Ultra Ball 3.5% - and
+         its flee 20% a miss, so a hunt ended uncaught four times in five, and
+         each cost eight costumes to bring back. It still takes balls, or a
+         Master Ball; it no longer takes the hunt away. */
+      e.alpha || e.hunt ? 0 : berryCalm(e.berries));
     e.throws += 1;
     e.pending = result;
     e.shakesTotal = result.shakes;

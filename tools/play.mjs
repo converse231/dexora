@@ -3044,7 +3044,8 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     let night = SAVE.steps;
     while (!isNight(night)) night++;
     const moon = { [ev.id]: ev.hunt.dreams };
-    const dark = boot({ ...SAVE, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
+    // Caught before: a first-ever throw cannot fail (starter.js), which is not what this tests.
+    const dark = boot({ ...SAVE, caught: 50, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
     Math.random = () => 0.01;
     try {
       for (const dir of ["right", "down", "left", "up"]) {
@@ -3058,6 +3059,15 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     assert.equal(nm?.speciesId, ev.hunt.id, "a full moon in the Tower after dark met no Nightmare");
     assert.ok(nm.hunt && !nm.alpha, "the Nightmare is not marked the hunt's, or rolled an alpha");
     until(dark, (s) => s.encounter?.phase === "idle", "the Nightmare to settle");
+    // It never flees (2026-10-26): every roll is 0.01, which misses the catch and would flee anything else.
+    Math.random = () => 0.01;
+    try {
+      for (let k = 0; k < 6; k++) {
+        dark.throwBall("poke-ball");
+        until(dark, (s) => !s.encounter || (s.encounter.phase === "idle" && s.encounter.throws > k), "a throw at the Nightmare");
+        assert.ok(dark.state.encounter, `the Nightmare fled on throw ${k + 1}`);
+      }
+    } finally { Math.random = real; }
     dark.flee();
     assert.equal(dark.state.ask?.kind, "flee", "running from the Nightmare did not ask");
     dark.answerAsk(true);
