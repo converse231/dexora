@@ -180,7 +180,8 @@ export default function TopBar({
         <button type="button" className={`tb-stat cash${deltas.length ? " bump" : ""}`} data-tip="Money - open the Poké Mart" aria-label={`¥${money.toLocaleString()} - open the Poké Mart`} onClick={() => onMart?.("catching")}>
           <Icon n="yen" size={15} />
           <b>{money.toLocaleString()}</b>
-          <i className="tb-plus" aria-hidden="true">+</i>
+          {/* The Mart's bag, never a "+": money is earned, not bought (a "+" read as "add money"). */}
+          <span className="tb-shop" aria-hidden="true"><Icon n="shop" size={11} /></span>
           <span className="deltas" aria-hidden="true">
             {deltas.map((d) => (
               <em key={d.id} className={d.amount > 0 ? "up" : "down"}>

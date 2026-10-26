@@ -12478,6 +12478,8 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
    two, gold on a third and violet pills on the fourth). */
 .lg-strip button.on, .lg-strip .rk-tab.on { background: var(--fc, var(--canopy)); border-color: var(--fc, var(--canopy)); color: #fff; }
 .lg-strip button.on em, .lg-strip .rk-tab.on em { color: rgba(255, 255, 255, .85); }
+/* Its icon too: in the tab's colour it vanished into the selected fill (2026-10-26, reported). */
+.lg-strip button.on .side-ic { color: #fff; }
 .lg-strip .rk-tab.hot:not(.on) em { color: var(--fc); font-weight: 700; }
 
 /* THE WALLET: money and candy as chips that open the Mart. In a page's head
@@ -12490,6 +12492,7 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .wl-chip img { width: 20px; height: 20px; image-rendering: pixelated; }
 .wl-chip i { display: grid; place-items: center; width: 18px; height: 18px; margin-right: -4px; border-radius: 50%;
   background: var(--cta); color: #fff; font: 800 13px/1 var(--display); font-style: normal; }
+.wl-shop { display: grid; place-items: center; width: 18px; height: 18px; margin-right: -4px; border-radius: 50%; background: color-mix(in srgb, var(--gold) 28%, transparent); color: var(--gold); }
 .wl-chip.dust { cursor: default; }
 .wl-chip.dust .ic { color: #b48cff; }
 button.wl-chip:hover { border-color: var(--fc, var(--accent)); }
@@ -12516,6 +12519,8 @@ button.wl-chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2
 .topbar button.tb-stat:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .topbar .tb-stat .tb-plus { display: grid; place-items: center; width: 18px; height: 18px; margin-right: -5px; border-radius: 50%;
   background: var(--cta); color: #fff; font: 800 13px/1 var(--display); font-style: normal; }
+.topbar .tb-stat .tb-shop { display: grid; place-items: center; width: 18px; height: 18px; margin-right: -5px; border-radius: 50%;
+  background: color-mix(in srgb, var(--gold) 28%, transparent); color: var(--gold); }
 .topbar .tb-stat.dex { padding-left: 4px; }
 .topbar .tb-stats { gap: 8px; }
 .topbar .tb-stat:not(button) { padding: 0 6px; }
@@ -12529,7 +12534,7 @@ button.wl-chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2
 }
 @media (hover: none) and (pointer: coarse) and (max-width: 380px) {
   .topbar button.tb-stat { padding: 0 8px; gap: 4px; }
-  .topbar .tb-stat.cash .tb-plus { display: none; }
+  .topbar .tb-stat.cash .tb-shop { display: none; }
   .topbar .tb-stat.dex b u { display: none; }
 }
 /* Held sideways the numbers are a column of slim chips (SIDEWAYS): kept slim. */

@@ -27,7 +27,7 @@ export function Wallet({ dust = false, className = "" }) {
   return (
     <span className={`wallet ${className}`}>
       <button type="button" className="wl-chip cash" onClick={() => w.openMart("catching")} aria-label={`¥${w.money.toLocaleString()} - open the Poké Mart`}>
-        <Icon n="yen" size={14} /><b>{w.money.toLocaleString()}</b>
+        <Icon n="yen" size={14} /><b>{w.money.toLocaleString()}</b><span className="wl-shop" aria-hidden="true"><Icon n="shop" size={11} /></span>
       </button>
       <button type="button" className="wl-chip candy" onClick={() => w.openMart("training")} aria-label={`${w.candy} Rare Candy - buy more`}>
         <img src={new URL("items/rare-candy.png", document.baseURI).href} alt="" /><b>{w.candy.toLocaleString()}</b><i aria-hidden="true">+</i>
