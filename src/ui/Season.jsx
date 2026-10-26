@@ -19,7 +19,7 @@ import { label, AREAS } from "../game/map.js";
 import { speciesById, foundIn, dexIndex } from "../game/biomes.js";
 import { eventShelf } from "../game/items.js";
 import {
-  eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, huntDue,
+  eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, eventDone, huntDue,
   EVENT_SHARE, EVENT_NIGHT, EVENT_PACKS,
 } from "../game/events.js";
 
@@ -216,7 +216,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
           {honey && <li><em>🍯</em><span><b>{honey.name}</b>{honey.lure}× as likely for {honey.steps} steps.</span></li>}
           {ball && <li><em>🔮</em><span><b>{ball.name}</b>{ball.boost}× catch on costumed ones.</span></li>}
           <li><em>✨</em><span><b>Rare forms too</b>Shiny, Gold, Diamond and more can wear the costume.</span></li>
-          <li><em>🏆</em><span><b>Catch all {ev.looks.length}</b>The {ev.title} title and {EVENT_PACKS === 1 ? "a card pack" : `${EVENT_PACKS} card packs`}.</span></li>
+          <li><em>🏆</em><span><b>Catch all {ev.looks.length}{ev.hunt ? ` and ${ev.hunt.title.split(" ").pop()}` : ""}</b>The {ev.title} title and {EVENT_PACKS === 1 ? "a card pack" : `${EVENT_PACKS} card packs`}.</span></li>
         </ul>
 
         <div className="sn-foot">
@@ -237,7 +237,7 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
   const soon = isSoon(ev);
   const held = eventHeld(ev, dex);
   const done = medals.includes(`event:${ev.id}`);
-  const due = held === ev.looks.length && !done;
+  const due = eventDone(ev, dex, medals) && !done;
   const left = eventDaysLeft(ev);
   return (
     <section className={`ev-card sn-board-card ev-${ev.id}${live || due || soon ? " live" : ""}`}>
@@ -283,7 +283,7 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
       })()}
       <div className="ev-meta">
         <span>{held} of {ev.looks.length} caught</span>
-        <span>{done ? `${ev.title} ✓` : `All ${ev.looks.length}: the ${ev.title} title`}</span>
+        <span>{done ? `${ev.title} ✓` : `All ${ev.looks.length}${ev.hunt ? ` + ${ev.hunt.title.split(" ").pop()}` : ""}: the ${ev.title} title`}</span>
       </div>
       {due
         ? <button type="button" className="ev-go" onClick={onClaim}>Claim {ev.title} ›</button>
@@ -295,4 +295,4 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
 // The event to put on the board: the one running, one about to open, or
 // one whose claim waits.
 export const boardSeason = (EVENTS, dex, medals = []) => eventOn() ?? eventSoon()
-  ?? EVENTS.find((ev) => eventHeld(ev, dex) === ev.looks.length && !medals.includes(`event:${ev.id}`)) ?? null;
+  ?? EVENTS.find((ev) => eventDone(ev, dex, medals) && !medals.includes(`event:${ev.id}`)) ?? null;

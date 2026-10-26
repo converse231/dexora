@@ -132,14 +132,19 @@ export function eventLook(sp, random, { day, night, lure } = {}) {
   return speciesById(look.id);
 }
 
-/* EVERY LOOK OF AN EVENT IN THE POKEDEX is its medal (`event:<id>`) and its
-   title, claimed on the Events board (`claimEvent`) - never paid on the
-   catch, like a generation. A trade counts, as it does for the Pokedex; a
-   look evolved into counts, which is how most of each line is held. */
+/* EVERY LOOK OF AN EVENT IN THE POKEDEX, AND ITS HUNT, is its medal
+   (`event:<id>`) and its title, claimed on the Events board (`claimEvent`) -
+   never paid on the catch, like a generation. A trade counts, as it does for
+   the Pokedex; a look evolved into counts, which is how most of each line is
+   held. The hunt's own medal is no title of its own (2026-10-26, asked for:
+   "Hallowed Hunter only when all are caught, Darkrai included") - it is
+   what the title waits on. A title claimed before that rule is kept. */
 export const EVENT_PACKS = 1;
 export const eventHeld = (ev, dex) => ev.looks.filter((l) => dex?.[dexIndex(l.id)] === 2).length;
+export const eventDone = (ev, dex, medals = []) => eventHeld(ev, dex) === ev.looks.length
+  && (!ev.hunt || medals.includes(`event:${ev.hunt.medal}`));
 export const eventDue = (dex, medals = []) =>
-  EVENTS.filter((ev) => eventHeld(ev, dex) === ev.looks.length && !medals.includes(`event:${ev.id}`));
+  EVENTS.filter((ev) => eventDone(ev, dex, medals) && !medals.includes(`event:${ev.id}`));
 
 /* THE NIGHTMARE (an event's `hunt`, eventforms.js): `state.dreams` holds
    each event's Bad Dreams, one a costume caught on its days. Full, the hunt

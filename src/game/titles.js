@@ -33,14 +33,14 @@ export function titleIds(milestones = {}, medals = []) {
 /* THE DRAWN ONES: public/titles/<kind>-<id>.png (art/titles, npm run ranks).
    Every region's Dex Master so far; a card set's gets a line here once its
    art exists (check.mjs holds each named file to the disk). */
-/* An event's titles are drawn too (2026-10-26, reported: Hallowed Hunter was
-   a text pill beside the drawn medals) - its own and its hunt's medal, art in
-   art/titles/event-<id>.png; check.mjs holds every event to both, so a new
-   event cannot ship without them. */
+/* An event's title is drawn too (2026-10-26, reported: Hallowed Hunter was a
+   text pill beside the drawn medals), art in art/titles/event-<id>.png;
+   check.mjs holds every event to it, so a new event cannot ship without. */
 const DRAWN = /^(dex:[1-9]|event:[a-z0-9-]+)$/;
 /* A TIER'S POKEDEX wears its region's badge with the tier's own mark as a
    tag at its foot (`titleTier`; asked for, 2026-10-15 - no art of its own). */
 export const titleTier = (t) => (/^tier:[a-z]+:[1-9]$/.test(t) ? t.split(":")[1] : null);
+export const titleFull = (t) => titleBadge(t)?.replace("titles/", "titles/full/");
 export const titleBadge = (t) => (DRAWN.test(t) ? `titles/${t.replace(":", "-")}.png`
   : titleTier(t) ? `titles/dex-${t.split(":")[2]}.png` : null);
 
@@ -58,8 +58,10 @@ export const titleLogo = (t) => (/^(set|master):/.test(t) ? `cards/${t.split(":"
 const tierRank = (t) => TIERS.indexOf(titleTier(t));
 export const regionTiers = (titles, gen) => titles.filter((t) => titleTier(t) && t.endsWith(`:${gen}`))
   .sort((a, b) => tierRank(a) - tierRank(b));
+/* A hunt's medal is no title (events.js `eventDone`): the event's title is. */
+const HUNTS = new Set(EVENTS.filter((ev) => ev.hunt).map((ev) => `event:${ev.hunt.medal}`));
 export const shownTitles = (titles = []) =>
-  titles.filter((t) => !(t.startsWith("set:") && titles.includes(`master:${t.slice(4)}`))
+  titles.filter((t) => !HUNTS.has(t) && !(t.startsWith("set:") && titles.includes(`master:${t.slice(4)}`))
     && !(titleTier(t) && regionTiers(titles, t.split(":")[2])[0] !== t));
 
 const setName = (id) => CARD_SETS.find((s) => s.id === id)?.name ?? id;

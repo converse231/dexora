@@ -2757,14 +2757,29 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      trainer card that holds the title. */
   {
     const { titleBadge } = await import("../src/game/titles.js");
-    // Every event's title and its hunt's medal too (2026-10-26: Hallowed Hunter shipped as a pill).
+    // Every event's title too (2026-10-26: Hallowed Hunter shipped as a pill), and each its full picture (the zoom).
     const { EVENTS } = await import("../src/data/eventforms.js");
-    const drawn = [...[...Array(9)].map((_, i) => `dex:${i + 1}`),
-      ...EVENTS.flatMap((ev) => [`event:${ev.id}`, ...(ev.hunt ? [`event:${ev.hunt.medal}`] : [])])].map(titleBadge);
+    const { titleFull, shownTitles } = await import("../src/game/titles.js");
+    const EV = await import("../src/game/events.js");
+    const ids = [...[...Array(9)].map((_, i) => `dex:${i + 1}`), ...EVENTS.map((ev) => `event:${ev.id}`)];
+    const drawn = ids.map(titleBadge);
     assert.ok(drawn.every(Boolean), "a Dex Master or an event title has no badge path");
+    for (const t of ids) {
+      const f = new URL(`../public/${titleFull(t)}`, import.meta.url);
+      assert.ok(existsSync(f), `${titleFull(t)} is missing - run npm run ranks`);
+      const png = readFileSync(f);
+      assert.equal(png.readUInt32BE(16), 512, `${titleFull(t)} is not the built 512px picture`);
+    }
+    // A hunt's medal gates its event's title and is never shown as one.
+    for (const ev of EVENTS.filter((e) => e.hunt)) {
+      assert.deepEqual(shownTitles([`event:${ev.id}`, `event:${ev.hunt.medal}`]), [`event:${ev.id}`], `${ev.hunt.name} shows as a title`);
+      const dex = []; for (const l of ev.looks) dex[SPECIES.findIndex((s) => s.id === l.id)] = 2;
+      assert.equal(EV.eventDue(dex, []).some((e) => e.id === ev.id), false, `${ev.title} is claimable without ${ev.hunt.title}`);
+      assert.equal(EV.eventDue(dex, [`event:${ev.hunt.medal}`]).some((e) => e.id === ev.id), true, `${ev.title} is not claimable with every look and ${ev.hunt.title}`);
+    }
     for (const b of drawn) {
       const f = new URL(`../public/${b}`, import.meta.url);
-      assert.ok(existsSync(f), `${b} is missing - draw art/${b} (every event ships its title badges), then npm run ranks`);
+      assert.ok(existsSync(f), `${b} is missing - draw art/${b} (every event ships its title badge), then npm run ranks`);
       const png = readFileSync(f);
       assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [128, 128], `${b} is not the built 128px badge`);
       assert.ok(png.length < 24 * 1024, `${b} is ${png.length >> 10}KB - run npm run ranks`);

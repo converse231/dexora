@@ -37,6 +37,7 @@ MARGIN = 0.04   # of the side, each edge
 TITLES = ROOT / "art" / "titles"
 TITLE_OUT = ROOT / "public" / "titles"
 TITLE_SIZE = 128
+TITLE_FULL = 512   # the badge opened full size (TitleBadges' zoom), at public/titles/full/
 
 
 def build(src: Path, dst: Path, size: int = SIZE) -> int:
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         total += n
         print(f"{src.parent.name}/{src.name}: {n // 1024}KB")
     for src in sorted(TITLES.glob("*.png")):
-        n = build(src, TITLE_OUT / src.name, TITLE_SIZE)
+        n = build(src, TITLE_OUT / src.name, TITLE_SIZE) + build(src, TITLE_OUT / "full" / src.name, TITLE_FULL)
         total += n
         print(f"titles/{src.name}: {n // 1024}KB")
     print(f"{total // 1024}KB for all")

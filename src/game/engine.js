@@ -2677,7 +2677,9 @@ export function createEngine(canvas, onChange, mini = null) {
     if (e.hunt) {
       if (outcome === "caught") {
         state.medals.push(`event:${h.medal}`);
-        cheer({ kind: "medal", title: h.name.toUpperCase(), sub: `${h.title} is yours. A new title for your trainer card.` });
+        cheer({ kind: "medal", title: h.name.toUpperCase(), sub: `${h.title} is yours.${eventDue(state.dex, state.medals).some((x) => x.id === ev.id)
+          ? ` ${ev.title} waits on the Events board.`
+          : state.medals.includes(`event:${ev.id}`) ? "" : ` Catch every ${ev.name} look for ${ev.title}.`}` });
       } else {
         state.dreams = { ...state.dreams, [ev.id]: Math.min(state.dreams[ev.id] ?? 0, h.keep) };
         cheer({ kind: "medal", title: "THE NIGHTMARE FADES",
@@ -3546,7 +3548,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!ev) return null;
     state.medals.push(`event:${ev.id}`);
     const set = grantPacks(EVENT_PACKS, `event:${ev.id}`);
-    cheer({ kind: "medal", title: ev.title.toUpperCase(), sub: `Every ${ev.name} look caught. A new title, and a card pack.` });
+    cheer({ kind: "medal", title: ev.title.toUpperCase(), sub: `Every ${ev.name} Pokémon caught. A new title, and a card pack.` });
     save();
     changed();
     return { id: ev.id, set, packs: set ? EVENT_PACKS : 0 };
