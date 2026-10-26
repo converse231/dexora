@@ -22,13 +22,13 @@
    challenger is side 0; each end draws itself as `me`. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { enteringAs, newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL, MEGA_WARM,
+import { gymMaster, enteringAs, newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL, MEGA_WARM,
   FINAL_T, SWAP_CD, basicShape, PICKUPS, SUDDEN_T, roleOf, basicCd, ultOf, clonesOf, DARK_SEE, SHOT_SPEED, BLAST_SPEED,
-  cooldownOf, DODGE_CD, ARENAS, shapeOf, GROUND, ZONE_SAYS, arenaReady, lineMegas, megaOf, evoTargets, EVO_XP, FLOOR_EVENT, FLOOR_SAYS } from "../../../game/arena.js";
+  cooldownOf, DODGE_CD, ARENAS, shapeOf, arenaMove, GROUND, ZONE_SAYS, arenaReady, lineMegas, megaOf, evoTargets, EVO_XP, FLOOR_EVENT, FLOOR_SAYS } from "../../../game/arena.js";
 import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, arenaCancel } from "../../../net/cloud.js";
 import { isEvent } from "../../../data/dex.js";
 import { connect } from "./net.js";
-import { LADDER, masterOf, ladderOpen, ladderPay, ARENA_TEAM, rentalOf, RENTALS } from "../../../game/ladder.js";
+import { LADDER, masterOf, ladderOpen, ladderPay, ARENA_TEAM, rentalOf, RENTALS, CIRCUIT_REGIONS, circuitOf, gymKey, gymOpen, gymPay, gymCpu, isChampion, regionDone } from "../../../game/ladder.js";
 import { teamPerks } from "../../../game/cardperks.js";
 import { useEquipped, CardPerkPick, DeckStrip } from "./CardPerks.jsx";
 import { playerFighter, moveOf, STRUGGLE, refusal, learnable, movesOf } from "../../../game/battle.js";
@@ -230,7 +230,19 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
   const setFloor = (v) => { setFloor0(v); keep(FLOOR_KEY, v); };
   const next = LADDER.find((m) => !ladder.includes(m.id)) ?? LADDER.at(-1);
   const [master, setMaster] = useState(next.id);
-  const chosen = masterOf(master) ?? next;
+  /* THE LADDER'S CHAPTERS (2026-10-27): the ten masters, then a region each -
+     its gyms, Elite Four and Champion (ladder.js's circuit). It opens on the
+     first chapter not finished, the device remembering one chosen. */
+  const firstOpen = CIRCUIT_REGIONS.find((r) => !regionDone(r, ladder)) ?? CIRCUIT_REGIONS.at(-1);
+  const chapterOpen = (c) => c === "masters" || CIRCUIT_REGIONS.indexOf(c) === 0 || (CIRCUIT_REGIONS.includes(c) && regionDone(CIRCUIT_REGIONS[CIRCUIT_REGIONS.indexOf(c) - 1], ladder));
+  const [chapter, setChapter0] = useState(() => { const c = pref(CHAPTER_KEY, firstOpen); return chapterOpen(c) ? c : firstOpen; });
+  const setChapter = (v) => { setChapter0(v); keep(CHAPTER_KEY, v); };
+  const gyms = chapter === "masters" ? [] : circuitOf(chapter);
+  const nextGym = gyms.find((id) => !ladder.includes(gymKey(id))) ?? gyms.at(-1);
+  const [gymPick, setGymPick] = useState(null);
+  const gymId = gyms.includes(gymPick) && gymOpen(gymPick, ladder) ? gymPick : nextGym;
+  const gym = useMemo(() => (gymId ? gymMaster(gymId, level, gymCpu(gymId)) : null), [gymId, level]);
+  const chosen = chapter === "masters" ? masterOf(master) ?? next : gym ?? next;
   const paid = record?.day === dayKey() ? record.won : [];
   const best = useMemo(() => {
     let mem = {};
@@ -242,18 +254,24 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
   const ready = mons.length > 0;
   const go = () => {
     if (!ready) { onEdit(); return; }
-    if (mode === "ladder") onStart({ mode: chosen.cpu, master: chosen, seed: seed(), floor: chosen.arena });
+    if (mode === "ladder") {
+      if (chosen.gym && !gymOpen(chosen.gym, ladder)) return;
+      onStart({ mode: chosen.cpu, master: chosen, seed: seed(), floor: chosen.arena });
+    }
     else if (mode === "quick" || mode === "training") {
       const s = seed();
       onStart({ mode: mode === "training" ? "dummy" : cpu, seed: s, floor: pickFloor(floor, s), pick: floor });
     }
   };
   const bg = mode === "ladder" ? chosen.arena : floor === "random" ? "indigo" : floor;
-  const summary = mode === "ladder" ? `${chosen.name} · Lv ${chosen.level} · ${floorName(chosen.arena)}`
+  const summary = mode === "ladder" ? `${chosen.gym ? `${chosen.title} ` : ""}${chosen.name} · Lv ${chosen.level} · ${floorName(chosen.arena)}`
     : mode === "training" ? `A dummy that never hits back · ${floor === "random" ? "Any arena" : floorName(floor)}`
       : mode === "quick" ? `${cpu[0].toUpperCase()}${cpu.slice(1)} CPU · ${floor === "random" ? "Any arena" : floorName(floor)}` : "";
   const prize = mode === "ladder"
-    ? (ladder.includes(chosen.id) ? "Practice - its prize is won" : `First win ¥${ladderPay(chosen).toLocaleString()}${chosen.id === "champion" ? " + a card pack" : ""}`)
+    ? (chosen.gym && !gymOpen(chosen.gym, ladder) ? "Clear the region before first"
+      : ladder.includes(chosen.id) ? "Practice - its prize is won"
+        : chosen.gym ? `First win ¥${gymPay(chosen.gym).toLocaleString()}${isChampion(chosen.gym) ? " + a card pack" : ""}`
+          : `First win ¥${ladderPay(chosen).toLocaleString()}${chosen.id === "champion" ? " + a card pack" : ""}`)
     : mode === "quick" ? (arenaLeft(record, cpu, dayKey()) <= 0 ? "Today's prizes are won" : `Win ¥${arenaPay(cpu, level).toLocaleString()} · ${arenaLeft(record, cpu, dayKey())} of ${ARENA_DAILY} left today`) : "";
 
   return (
@@ -335,8 +353,8 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
           <section className="ag-play" aria-label="Choose how to fight">
             <div className="ag-modes" role="radiogroup" aria-label="Mode">
               <ModeTile id="ladder" mode={mode} onPick={setMode} floor={next.arena}
-                title="Arena Ladder" says={`${ladder.length >= LADDER.length ? "Every master beaten" : `Next: ${next.name}`}`}>
-                <Sprite id={next.team.at(-1)[0]} />
+                title="Arena Ladder" says={chapter === "masters" ? `${LADDER.every((m) => ladder.includes(m.id)) ? "Every master beaten" : `Next: ${next.name}`}` : `${cap(chapter)}: ${gym ? gym.name : ""}`}>
+                {chapter !== "masters" && gym?.pic ? <img className="ag-tile-pic" src={asset(`trainers/${gym.pic}.png`)} alt="" /> : <Sprite id={next.team.at(-1)[0]} />}
                 <span className="ag-pips" aria-label={`${ladder.length} of ${LADDER.length} beaten`}>
                   {LADDER.map((m) => <i key={m.id} className={ladder.includes(m.id) ? "on" : m.id === next.id ? "next" : ""} />)}
                 </span>
@@ -355,7 +373,25 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
             </div>
 
             <div className="ag-panel">
-              {mode === "ladder" && <LadderBoard ladder={ladder} chosen={chosen.id} onPick={setMaster} />}
+              {mode === "ladder" && (
+                <>
+                  <div className="ag-chapters" role="tablist" aria-label="Ladder chapters">
+                    {["masters", ...CIRCUIT_REGIONS].map((c, k) => {
+                      const open = c === "masters" || k === 1 || regionDone(CIRCUIT_REGIONS[k - 2], ladder);
+                      const done = c === "masters" ? LADDER.every((m) => ladder.includes(m.id)) : regionDone(c, ladder);
+                      return (
+                        <button key={c} type="button" role="tab" aria-selected={chapter === c} disabled={!open}
+                          className={`ag-chapter${chapter === c ? " on" : ""}${done ? " done" : ""}`} onClick={() => setChapter(c)}>
+                          {!open && <Icon n="lock" size={12} />}{c === "masters" ? "Masters" : cap(c)}{done && <Icon n="check" size={12} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {chapter === "masters"
+                    ? <LadderBoard ladder={ladder} chosen={chosen.id} onPick={setMaster} />
+                    : <GymBoard gyms={gyms} level={level} ladder={ladder} chosen={gym} onPick={setGymPick} />}
+                </>
+              )}
               {mode === "quick" && (
                 <div className="ag-levels" role="radiogroup" aria-label="Difficulty">
                   {ARENA_LEVELS.map((c) => (
@@ -402,6 +438,50 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
           <button type="button" className="ag-battle" onClick={go}>
             <Icon n="arena" size={22} />{ready ? "Battle" : "Pick team"}
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const cap = (w) => w[0].toUpperCase() + w.slice(1);
+const CHAPTER_KEY = "dexora-arena-chapter";
+
+/* A REGION'S CIRCUIT, drawn as rungs: each leader's portrait (their badge at
+   its corner), then the Elite Four and the Champion; beaten ones ticked, the
+   next lit, the rest locked. Under them, the one chosen: who, their three,
+   where and how hard. */
+function GymBoard({ gyms, level, ladder, chosen, onPick }) {
+  return (
+    <div className="ag-ladder">
+      <ol className="ag-rungs circuit">
+        {gyms.map((id, k) => {
+          const m = gymMaster(id, level, gymCpu(id)), beat = ladder.includes(gymKey(id)), open = gymOpen(id, ladder);
+          return (
+            <li key={id}>
+              <button type="button" disabled={!open} aria-pressed={chosen?.gym === id}
+                className={`ag-rung${beat ? " won" : open ? " open" : " shut"}${chosen?.gym === id ? " on" : ""}${isChampion(id) ? " champ" : ""}`}
+                style={{ "--tile": `url(${asset(`arena/${m.arena}.webp`)})` }} onClick={() => onPick(id)}
+                aria-label={`${m.title} ${m.name}${beat ? ", beaten" : open ? "" : ", locked"}`}>
+                <span className="ag-rung-n">{k + 1}</span>
+                <img className="ag-rung-pic" src={asset(`trainers/${m.pic}.png`)} alt="" loading="lazy" />
+                {m.badge && <img className="ag-rung-badge" src={asset(`badges/${m.badge}.png`)} alt="" loading="lazy" />}
+                <span className="ag-rung-lv">{m.name}</span>
+                {beat && <span className="ag-tick" aria-hidden="true"><Icon n="check" size={12} /></span>}
+                {!open && <span className="ag-lock" aria-hidden="true"><Icon n="lock" size={14} /></span>}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      {chosen && (
+        <div className="ag-master">
+          <img className="ag-master-pic" src={asset(`trainers/${chosen.pic}.png`)} alt="" />
+          <div>
+            <b>{chosen.title} {chosen.name}</b>
+            <span>Lv {chosen.level} · {floorName(chosen.arena)} · <i className={`ar-type t-${chosen.type}`}>{chosen.type}</i> · {chosen.cpu === "champion" ? "Champion" : cap(chosen.cpu)} CPU</span>
+          </div>
+          <span className="ag-master-team">{chosen.team.map(([id]) => <Sprite key={id} id={id} />)}</span>
         </div>
       )}
     </div>
@@ -1025,8 +1105,11 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   /* `basic` is HELD (a mouse button, a key, a thumb, a trigger) and read
      every tick; a move, a roll, a switch and a surge are presses, held a
      few ticks until the match can take them. */
+  /* `held`: the move keys down now (Q/E/R, the right mouse button, a pad's
+     face buttons), which is what keeps a STREAM pouring (arena.js, hold and
+     aim); `stream`: a thumb holding one on touch, and where it has dragged. */
   const input = useRef({ keys: new Set(), mouse: null, fire: null, basic: { mouse: false, touch: false, pad: false }, dodge: 0, swap: -1, surge: 0, use: 0, stick: [0, 0], pad: [],
-    aim: null });
+    aim: null, held: new Set(), stream: null });
   // The dragged move's arrow on the court and its Cancel, moved by the loop (never a render).
   const aimEl = useRef(null);
   const cancelEl = useRef(null);
@@ -1098,7 +1181,10 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       const was = inp.pad, now = gp.buttons.map((b) => b.pressed);
       const pressed = (i) => now[i] && !was[i];
       inp.pad = now;
-      for (let k = 0; k < 4; k++) if (pressed(k)) inp.fire = { k, until: s.t + PRESS };
+      for (let k = 0; k < 4; k++) {
+        if (pressed(k)) inp.fire = { k, until: s.t + PRESS };
+        if (now[k]) inp.held.add(`pad${k}`); else inp.held.delete(`pad${k}`);
+      }
       if (pressed(5)) inp.dodge = s.t + 7;
       if (pressed(6)) inp.surge = s.t + 7;
       if (pressed(4) || pressed(15)) inp.swap = nextAlive(s, me, 1);
@@ -1129,8 +1215,12 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
         if (lock) { [ax, ay] = lock; inp.lock = [mine.x + lock[0], mine.y + lock[1]]; }
         else if (!touch && inp.mouse) { ax = hx; ay = hy; }
       }
-      // A move dragged to aim goes where the thumb pulled.
+      // A move dragged to aim goes where the thumb pulled; a stream held on touch, where it is dragged now.
       if (inp.fire?.aim && inp.fire.until > s.t) [ax, ay] = inp.fire.aim;
+      const st = inp.stream;
+      if (st?.on) { const n = Math.hypot(st.dx, st.dy) || 1; [ax, ay] = [st.dx / n * AIM_TILES, st.dy / n * AIM_TILES]; }
+      // Which move is held down: the one keeping a stream going.
+      const hold = st ? st.k : [0, 1, 2, 3].find((k) => inp.held.has(`k${k}`) || inp.held.has(`pad${k}`)) ?? -1;
       // A press is held for a few ticks until the move or roll can take it.
       const fire = inp.fire && inp.fire.until > s.t ? inp.fire.k : -1;
       if (mine?.act && inp.fire && mine.act.k === inp.fire.k) inp.fire = null;
@@ -1145,7 +1235,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       if (!s.sides[me].held) inp.use = 0;
       const mega = inp.mega > s.t;
       if (s.sides[me].megaUsed) inp.mega = 0;
-      return { mx, my, ax, ay, fire, basic, dodge, swap, surge, use, mega };
+      return { mx, my, ax, ay, fire, hold, basic, dodge, swap, surge, use, mega };
     };
 
     const frame = (now) => {
@@ -1230,13 +1320,18 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       if (key === "g") { e.preventDefault(); inp.use = s.t + 7; return; }
       if (key === "t") { e.preventDefault(); inp.mega = s.t + 7; return; }
       const skill = ["q", "e", "r"].indexOf(key);
-      if (skill >= 0) { e.preventDefault(); press(skill + 1); return; }
+      if (skill >= 0) { e.preventDefault(); if (!e.repeat) press(skill + 1); inp.held.add(`k${skill + 1}`); return; }
       if (["w", "a", "s", "d", "j", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) { e.preventDefault(); inp.keys.add(key); }
     };
-    const up = (e) => inp.keys.delete(e.key.toLowerCase());
-    // The basic attack is held: a mouse button let go anywhere ends it, and so does losing the window.
-    const mouseUp = (e) => { if (e.button === 0) inp.basic.mouse = false; };
-    const blur = () => { inp.keys.clear(); inp.basic.mouse = false; inp.basic.touch = false; };
+    const up = (e) => {
+      const key = e.key.toLowerCase();
+      inp.keys.delete(key);
+      const skill = ["q", "e", "r"].indexOf(key);
+      if (skill >= 0) inp.held.delete(`k${skill + 1}`);
+    };
+    // The basic attack and a stream are held: a button let go anywhere ends them, and so does losing the window.
+    const mouseUp = (e) => { if (e.button === 0) inp.basic.mouse = false; if (e.button === 2) inp.held.delete("k0"); };
+    const blur = () => { inp.keys.clear(); inp.held.clear(); inp.basic.mouse = false; inp.basic.touch = false; };
     addEventListener("keydown", down);
     addEventListener("keyup", up);
     addEventListener("pointerup", mouseUp);
@@ -1252,7 +1347,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
     if (touch || e.pointerType === "touch") return;
     onMouseMove(e);
     if (e.button === 0) input.current.basic.mouse = true;
-    if (e.button === 2) input.current.fire = { k: 0, until: s.t + PRESS };
+    if (e.button === 2) { input.current.fire = { k: 0, until: s.t + PRESS }; input.current.held.add("k0"); }
   };
   // A thumb on a button: held for the basic attack, pressed for the rest.
   const hold = (on) => (e) => { e.preventDefault(); input.current.basic.touch = on; };
@@ -1262,6 +1357,13 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
      over Cancel and it is not thrown. Window pointer events, no capture. */
   const aimStart = (k) => (e) => {
     e.preventDefault();
+    const at = activeOf(s, me), m = at?.kit[k];
+    // A STREAM (hold and aim): it pours from the press, the thumb's drag steers it, letting go ends it.
+    if (m && shapeOf(arenaMove(m.i)) === "beam") {
+      input.current.fire = { k, until: s.t + PRESS };
+      input.current.stream = { k, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, on: false };
+      return;
+    }
     input.current.aim = { k, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, on: false };
     if (cancelEl.current) cancelEl.current.hidden = false;
   };
@@ -1269,6 +1371,8 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
     if (!touch) return undefined;
     const inp = input.current;
     const move = (e) => {
+      const st = inp.stream;
+      if (st && e.pointerId === st.id) { st.dx = e.clientX - st.x0; st.dy = e.clientY - st.y0; st.on = Math.hypot(st.dx, st.dy) > AIM_DEAD; return; }
       const a = inp.aim;
       if (!a || e.pointerId !== a.id) return;
       a.dx = e.clientX - a.x0; a.dy = e.clientY - a.y0;
@@ -1277,6 +1381,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       if (c) { const b = c.getBoundingClientRect(); c.classList.toggle("hot", e.clientX >= b.left && e.clientX <= b.right && e.clientY >= b.top && e.clientY <= b.bottom); }
     };
     const up = (e) => {
+      if (inp.stream && e.pointerId === inp.stream.id) { inp.stream = null; return; }
       const a = inp.aim;
       if (!a || e.pointerId !== a.id) return;
       const c = cancelEl.current, cancelled = c?.classList.contains("hot");

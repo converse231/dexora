@@ -50,6 +50,7 @@ const sec = (s) => Math.round(s * TPS);
 /* The floors (public/arena/<id>.webp, `npm run arenas` from art/arena/). */
 // The floors live in floors.js, where the main bundle can name one without this file.
 import { ARENAS } from "./floors.js";
+import { LEAGUES } from "../data/leagues.js";
 export { ARENAS };
 
 /* THE GROUND, arena by arena. Tile rectangles [x0, y0, x1, y1] are measured
@@ -104,11 +105,6 @@ const GRAB_T = sec(0.3), THROW_DIST = 3.2, FIRE_T = sec(3), FIRE_TICK = sec(0.5)
    that lands in a shield's first PARRY_T is thrown back - its attacker takes
    PARRY_HURT of its HP and reels PARRY_STUN. */
 const SPLAT_PUSH = 0.9, SPLAT_HURT = 14, SPLAT_STUN = sec(0.5), PARRY_T = sec(0.25), PARRY_HURT = 12, PARRY_STUN = sec(0.4);
-/* A BEAM FOLLOWS ITS AIM while it charges (asked for, 2026-10-23: "it
-   should follow as it is channelling"): each tick of the wind-up its line
-   turns BEAM_TRACK of the way to where the player aims now - a sweep, never
-   a snap, and nothing after it fires. */
-const BEAM_TRACK = 0.12;
 /* DOUBLE TEAM MAKES COPIES THAT STAND THERE (asked for twice, 2026-10-23:
    "multiply the sprites, like Naruto's shadow clones; an illusion is gone
    when hit"): two copies at CLONE_OFF either side of the user, moving with
@@ -119,6 +115,21 @@ const CLONE_T = sec(8), CLONE_OFF = 1.7, CLONE_WANDER = sec(0.9), CLONE_NEAR = 1
    on desktop and mobile"): every move charges WIND_K of what its power
    alone would make it. */
 const WIND_K = 0.5;     // 0.7 until the second ask, same day: "delays on skills are still long"
+/* NO CHARGE AT ALL (2026-10-27, asked for: "remove the charges in skills, it
+   makes it really hard to aim"): a move goes QUICK ticks after the press -
+   enough for its flash and its sound - and what was its wind-up is now its
+   RECOVERY, the stand after it (`recOf`), so a big hit still costs a big
+   moment, just never between the aim and the target. */
+const QUICK = 2;
+/* HOLD AND AIM (asked for: "flamethrower and hydro pump are hold-and-aim
+   skills"): a beam-shaped move is a STREAM - it pours out while its button is
+   held (at least STREAM_MIN, at most STREAM_MAX), sweeping after the aim at
+   STREAM_TRACK a tick, and strikes along its line every STREAM_TICK for a
+   share of one beam's hit: held to the end it deals a beam, let go early
+   less. A tick never staggers (a stream would stun-lock), and its chances to
+   burn or flinch are shared out the same way. */
+export const STREAM_MAX = sec(1.2), STREAM_MIN = sec(0.3), STREAM_TICK = sec(0.15);
+const STREAM_PART = 1 / Math.ceil(STREAM_MAX / STREAM_TICK), STREAM_TRACK = 0.22;
 /* CONFUSION (2026-10-23, asked for): the moves the games give a chance to
    confuse (the League's data drops it - `fb`), here a dizzy CONFUSE_T in
    which its movement runs backwards and slower. */
@@ -400,7 +411,7 @@ export const basicShape = (f) => (f.basic.i === BASIC_P ? "melee" : "shot");
    BRAWL_RUN faster, jabs on BRAWL_CD of the cooldown, hits BRAWL_HIT harder
    with every blow and dash, and takes BRAWL_GUARD of a shot's damage - built
    to close the gap; a BLASTER (Sp. Atk) fires shots BLAST_SPEED faster and
-   BLAST_RANGE farther, and charges a beam on BLAST_BEAM of its wind-up -
+   BLAST_RANGE farther, and its streams reach BLAST_RANGE farther too -
    built to keep it. Measured over 100 Hard matches of one role's team
    against the other's: with no perks brawlers won 18 (range was simply
    better); these 48, a 3v3 still ~74 s. The basic bolt's longer reach
@@ -409,7 +420,7 @@ export const basicShape = (f) => (f.basic.i === BASIC_P ? "melee" : "shot");
 // A fighter outside a match (the lobby, the tutor) has no `basic` yet: its stats answer the same.
 export const roleOf = (f) => ((f.basic?.i ?? basicOf(f)) === BASIC_P ? "brawler" : "blaster");
 export const BRAWL_RUN = 1.2, BRAWL_CD = 0.65, BRAWL_HIT = 1.3, BRAWL_GUARD = 0.55;
-export const BLAST_SPEED = 1.15, BLAST_RANGE = 1.1, BLAST_BEAM = 0.85;
+export const BLAST_SPEED = 1.15, BLAST_RANGE = 1.1;
 export const basicCd = (f) => (roleOf(f) === "brawler" ? Math.round(BASIC_CD * BRAWL_CD) : BASIC_CD);
 /* A SPECIES' ROLE (2026-10-24, reported: "Jirachi is a Brawler - it should be a Blaster"). It was the
    fighter's own Attack against its Sp. Atk, IVs and all, so a species whose two are level (Jirachi's
@@ -471,7 +482,7 @@ const DASH_NAMES = new Set(["tackle", "take-down", "body-slam", "headbutt", "zen
   "giga-impact", "rollout", "rapid-spin", "u-turn", "flip-turn", "dragon-rush", "skull-bash", "submission",
   "high-horsepower", "spin-out", "steel-roller", "dive", "fly", "bounce", "horn-drill", "megahorn", "smart-strike",
   "aerial-ace", "wing-attack", "drill-run", "play-rough", "seismic-toss"]);
-const BEAM_NAMES = new Set(["hydro-pump", "eternabeam", "dynamax-cannon", "prismatic-laser", "origin-pulse",
+const BEAM_NAMES = new Set(["hydro-pump", "flamethrower", "eternabeam", "dynamax-cannon", "prismatic-laser", "origin-pulse",
   "dark-pulse", "dragon-pulse", "blast-burn", "frenzy-plant", "hydro-cannon", "seed-flare", "luster-purge",
   "mist-ball", "doom-desire", "psystrike", "steel-beam", "meteor-beam", "fleur-cannon", "core-enforcer"]);
 const BEAM_RE = /(beam|cannon|laser)$/;
@@ -506,10 +517,11 @@ export const SHAPES = ["shot", "beam", "melee", "dash", "pulse", "field", "self"
 
 // A move's timing, from its own data: big hits are slow and readable.
 export const windOf = (m) => {
-  const base = Math.max(sec(0.08), Math.round((sec(0.18 + 0.004 * (m.p ?? 0)) - sec(0.12) * (m.pr ?? 0)) * WIND_K));
   const s = shapeOf(m);
-  return s === "beam" ? Math.round(base * 1.35) : s === "self" || s === "field" ? sec(0.22) : base;
+  return s === "self" || s === "field" ? sec(0.12) : QUICK;
 };
+// The stand after a move: what its wind-up was, halved - big hits are still slow to follow up.
+const recOf = (m) => Math.max(1, Math.round(Math.max(sec(0.08), Math.round((sec(0.18 + 0.004 * (m.p ?? 0)) - sec(0.12) * (m.pr ?? 0)) * WIND_K)) / 2));
 /* A MOVE'S WAIT IS WHAT IT IS WORTH (2026-10-24, reported: "some healing
    moves are OP - CDs should depend on the skill"). Power alone was the wait:
    a drain move's heal came free (Leech Life, Drain Punch and Horn Leech were
@@ -589,7 +601,7 @@ export const hasSig = (f, k) => (f.cp?.sig ?? []).includes(k);
 function sigK(s, a, d, m, move, contact) {
   const fallen = s.sides[a.side].team.filter((x) => x.hp <= 0).length;
   return (isUlt(move) && hasSig(a, "vflare") ? 1.5 : 1) * (a.megaOn && hasSig(a, "aura") ? 1.1 : 1)
-    * ((m.t === "fire" || m.t === "dragon") && hasSig(a, "blueflame") ? 1.15 : 1) * (!contact && hasSig(a, "shuriken") ? 1.15 : 1)
+    * ((m.t === "fire" || m.t === "dragon") && hasSig(a, "blueflame") ? 1.15 : 1) * (shapeOf(m) === "beam" && hasSig(a, "psydrive") ? 1.15 : 1) * (!contact && hasSig(a, "shuriken") ? 1.15 : 1)
     * (hasSig(a, "rage") ? 1 + 0.03 * Math.floor((1 - a.hp / a.max) * 10) : 1)
     * (hasSig(a, "protean") && !BASIC[move] && !isUlt(move) && !a.types.some((t) => TYPES[t] === m.t) ? 1.5 : 1)
     * (hasSig(a, "lost") ? 1.25 : 1) * (hasSig(a, "fury") ? 1 + 0.08 * fallen : 1) * (!contact && hasSig(d, "shell") ? 0.8 : 1);
@@ -660,7 +672,7 @@ const alive = (sd) => sd.team.filter((f) => f.hp > 0);
 export const PAR = 0, BRN = 1, PSN = 2, SLP = 3, FRZ = 4;
 const held = (f) => f.stun > 0 || f.status === SLP || f.status === FRZ || Boolean(f.away);
 
-export const NO_INPUT = Object.freeze({ mx: 0, my: 0, ax: 0, ay: 0, fire: -1, basic: false, dodge: false, swap: -1, surge: false, use: false, mega: false });
+export const NO_INPUT = Object.freeze({ mx: 0, my: 0, ax: 0, ay: 0, fire: -1, hold: -1, basic: false, dodge: false, swap: -1, surge: false, use: false, mega: false });
 
 export function tick(s, inputs) {
   if (s.over) return s;
@@ -758,8 +770,8 @@ function stepSide(s, side, inp) {
       }
     }
     if (inp.dodge && f.dodgeCd === 0 && !f.dodge && f.act?.shape !== "dash") {
-      // A dash cancels a wind-up, and the move's cooldown is not spent.
-      if (f.act?.ph === "wind") f.act = null;
+      // A dash cancels a wind-up (the move's cooldown not spent), and ends a stream.
+      if (f.act?.ph === "wind" || f.act?.ph === "chan") f.act = null;
       const [dx, dy] = mx || my ? [mx, my] : [-f.fx, -f.fy];
       f.dodge = DODGE; f.dx = dx; f.dy = dy; f.inv = Math.max(f.inv, DODGE_INV);
       // Evasion stages shorten the dash's cooldown.
@@ -774,8 +786,7 @@ function stepSide(s, side, inp) {
         const data = arenaMove(m.i);
         const [dx, dy] = ax || ay ? [ax, ay] : [f.fx, f.fy];
         f.fx = dx; f.fy = dy;
-        const w = Math.round((shapeOf(data) === "beam" && roleOf(f) === "blaster" ? windOf(data) * BLAST_BEAM : windOf(data))
-          * (shapeOf(data) === "beam" && hasSig(f, "psydrive") ? 0.6 : 1));
+        const w = windOf(data);
         f.act = { k, ph: "wind", t: w, t0: w, dx, dy, id: s.nextId++, shape: shapeOf(data), aimX: inp.ax, aimY: inp.ay };
         s.ev.push({ k: "wind", side, move: m.i, shape: f.act.shape });
       }
@@ -823,10 +834,12 @@ function stepSide(s, side, inp) {
   }
   if (!f.kbt) f.splat = false;
 
-  if (f.act?.shape === "beam" && f.act.ph === "wind" && (ax || ay)) {
-    const [nx, ny] = norm(f.act.dx + (ax - f.act.dx) * BEAM_TRACK, f.act.dy + (ay - f.act.dy) * BEAM_TRACK);
+  // A stream sweeps after the aim while it pours; it pours while its button is held.
+  if (f.act?.ph === "chan" && (ax || ay)) {
+    const [nx, ny] = norm(f.act.dx + (ax - f.act.dx) * STREAM_TRACK, f.act.dy + (ay - f.act.dy) * STREAM_TRACK);
     if (nx || ny) { f.act.dx = nx; f.act.dy = ny; f.fx = nx; f.fy = ny; }
   }
+  if (f.act) f.act.held = inp.hold === f.act.k;
   if (f.act) stepAct(s, side, f);
 }
 
@@ -859,6 +872,15 @@ function evolveInto(s, f) {
 function stepAct(s, side, f) {
   const a = f.act;
   const m = moveAt(f, a.k), data = arenaMove(m.i);
+  if (a.ph === "chan") {
+    // Struck as it starts (stepAct's switch), then every STREAM_TICK while it pours.
+    const gone = STREAM_MAX - --a.t;
+    if (gone % STREAM_TICK === 0 && a.t > 0) stream(s, side, f, a, m.i);
+    // Let go after STREAM_MIN, or poured out: the stream stops.
+    if (a.t > 0 && (a.held || gone < STREAM_MIN)) return;
+    a.ph = "rec"; a.t = Math.round(recOf(data) * 1.4); a.len = 0;
+    return;
+  }
   if (--a.t > 0) {
     if (a.ph === "act" && (a.shape === "melee" || a.shape === "dash") && !a.hit) contact(s, side, f);
     if (a.ph === "act" && a.shape === "multi" && a.t % 4 === 0 && a.left > 0) burst(s, side, f, a, data);
@@ -875,7 +897,7 @@ function stepAct(s, side, f) {
     // A move that changes its user's own stages does so as it fires (Close Combat, Overheat).
     // ...but never past +1 (2026-10-24: Fiery Dance re-raised itself to a standing +2, doubling all it dealt); +2 is a setup move's.
     if (data.p && data.sgu && data.sg && rnd(s) * 100 < (data.sgc ?? 100)) stages(s, f, data.sg, 1);
-    const rec = a.basic ? BASIC_REC : Math.max(1, Math.round(windOf(data) / 2));
+    const rec = a.basic ? BASIC_REC : recOf(data);
     if (!a.basic && VANISH[data.n]) { vanish(s, side, f, m.i, VANISH[data.n]); return; }
     switch (a.shape) {
       case "shot":
@@ -886,8 +908,8 @@ function stepAct(s, side, f) {
         burst(s, side, f, a, data);
         a.ph = "act"; a.t = 4 * a.left + 1; break;
       case "beam":
-        beam(s, side, f, a, m.i);
-        a.ph = "rec"; a.t = Math.round(rec * 1.4); break;
+        a.ph = "chan"; a.t = STREAM_MAX;
+        stream(s, side, f, a, m.i); break;
       case "melee":
         a.ph = "act"; a.t = ACTIVE;
         contact(s, side, f); break;
@@ -904,7 +926,7 @@ function stepAct(s, side, f) {
         a.ph = "rec"; a.t = rec; break;
     }
   } else if (a.ph === "act") {
-    a.ph = "rec"; a.t = a.basic ? BASIC_REC : Math.max(1, Math.round(windOf(data) / 2));
+    a.ph = "rec"; a.t = a.basic ? BASIC_REC : recOf(data);
   } else {
     f.act = null;
   }
@@ -956,31 +978,37 @@ function contact(s, side, f) {
   if (f.act.shape === "dash") { f.act.ph = "rec"; f.act.t = sec(0.25); }
 }
 
-// A beam: a line drawn during the wind-up, hitting all along it at once - up to the first cover.
-function beam(s, side, f, a, move) {
-  beamAt(s, side, f, f.x, f.y, a.dx, a.dy, move, BEAM_W, BEAM_LEN, 1);
+// A stream's strike: the beam along where it points now, for its share; its length is the picture's.
+function stream(s, side, f, a, move) {
+  a.len = beamAt(s, side, f, f.x, f.y, a.dx, a.dy, move, BEAM_W, BEAM_LEN * (roleOf(f) === "blaster" ? BLAST_RANGE : 1), STREAM_PART, false, true);
+  // A Flamethrower sets the floor alight where it lands, as its shot did.
+  if (FLAMES.has(arenaMove(move).n)) {
+    if (s.fires.length >= FIRE_MAX) s.fires.shift();
+    s.fires.push({ x: f.x + a.dx * a.len, y: f.y + a.dy * a.len, t: FIRE_T, side });
+  }
 }
 /* A beam from (x, y): up to the first cover; the first of the foe and its
    copies along it is struck - a copy pops and the beam is spent on it. */
-function beamAt(s, side, a, x, y, dx, dy, move, width, length, k, big = false) {
+function beamAt(s, side, a, x, y, dx, dy, move, width, length, k, big = false, part = false) {
   let len = length, block = null;
   for (const c of s.cover) {
     if (c.hp <= 0) continue;
     const t = rayBox(x, y, dx, dy, c, width);
     if (t != null && t < len) { len = t; block = c; }
   }
-  s.ev.push({ k: "beam", side, move, x, y, dx, dy, len, big });
+  s.ev.push({ k: "beam", side, move, x, y, dx, dy, len, big, stream: part });
   if (block) chip(s, block, move, x + dx * len, y + dy * len);
   const d = activeOf(s, 1 - side);
-  if (!d || d.hp <= 0) return;
+  if (!d || d.hp <= 0) return len;
   const along = (tx, ty) => {
     const ex = tx - x, ey = ty - y, l = ex * dx + ey * dy;
     return l > 0 && l < len + R && Math.abs(ex * dy - ey * dx) < R + width ? l : -1;
   };
   const real = along(d.x, d.y);
   const copies = clonesOf(d).map(([cx, cy], n) => [along(cx, cy), n]).filter(([l]) => l >= 0).sort((p, q) => p[0] - q[0]);
-  if (copies.length && (real < 0 || copies[0][0] < real)) { popClone(s, d, copies[0][1]); return; }
-  if (real >= 0) hit(s, a, d, move, dx, dy, false, d.x, d.y, k);
+  if (copies.length && (real < 0 || copies[0][0] < real)) { popClone(s, d, copies[0][1]); return len; }
+  if (real >= 0) hit(s, a, d, move, dx, dy, false, d.x, d.y, k, part ? k : 1);
+  return len;
 }
 
 /* Where a ray from (x, y) along (dx, dy) first enters a block (its half
@@ -1364,7 +1392,7 @@ function afflict(s, f, st, badly = false, sleep = 0) {
   f.status = st; f.badly = badly; f.statusN = 0;
   f.statusT = st === SLP ? (sleep || sec(2 + rnd(s) * 2)) : LASTS[st];
   f.sleptAt = s.t;
-  if (f.act?.ph === "wind" && (st === SLP || st === FRZ)) f.act = null;
+  if ((f.act?.ph === "wind" || f.act?.ph === "chan") && (st === SLP || st === FRZ)) f.act = null;
   s.ev.push({ k: "status", side: f.side, st, x: f.x, y: f.y });
   return true;
 }
@@ -1731,7 +1759,7 @@ function gain(s, side, n) {
   if (was < SURGE_MAX && sd.meter >= SURGE_MAX) s.ev.push({ k: "ready", side });
 }
 
-function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
+function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1, part = 1) {
   if (d.away) return;
   // Struck in its wind-up: a COUNTER (the picture calls it; the rules already cancel the move).
   const counter = d.act?.ph === "wind" && d.act.k !== BASIC_K;
@@ -1786,8 +1814,8 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     s.sides[d.side].stats.chain = 0;
     gain(s, a.side, GAIN_DEAL * dmg / d.max); gain(s, d.side, GAIN_TAKE * dmg / d.max);
     // Inner Focus (Umbreon's): never staggered.
-    d.flash = sec(0.08); if (!hasSig(d, "focus")) d.stun = Math.max(d.stun, STUN);
-    const push = contact ? (m.p ?? 40) / 40 : 0.25;
+    d.flash = sec(0.08); if (!hasSig(d, "focus") && part === 1) d.stun = Math.max(d.stun, STUN);
+    const push = (contact ? (m.p ?? 40) / 40 : 0.25) * part;
     d.kbx = dx * push / KB; d.kby = dy * push / KB; d.kbt = KB;
     if (contact && GRABS.has(m.n) && d.hp > 0) {
       // Caught: pulled in, held, then thrown along the blow.
@@ -1800,8 +1828,8 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
     // Sleep breaks on a hit after its first second; a Fire hit thaws.
     if (d.status === SLP && s.t - d.sleptAt > sec(1)) { d.status = -1; s.ev.push({ k: "cured", side: d.side }); }
     if (d.status === FRZ && m.t === "fire") { d.status = -1; s.ev.push({ k: "cured", side: d.side }); }
-    if (m.fl && !hasSig(d, "focus") && rnd(s) * 100 < m.fl) { d.stun = Math.max(d.stun, FLINCH); s.ev.push({ k: "flinch", side: d.side }); }
-    if (CONFUSES[m.n] && d.hp > 0 && rnd(s) * 100 < CONFUSES[m.n]) { d.confused = CONFUSE_T; s.ev.push({ k: "confused", side: d.side, x: d.x, y: d.y }); }
+    if (m.fl && !hasSig(d, "focus") && rnd(s) * 100 < m.fl * part) { d.stun = Math.max(d.stun, FLINCH); s.ev.push({ k: "flinch", side: d.side }); }
+    if (CONFUSES[m.n] && d.hp > 0 && rnd(s) * 100 < CONFUSES[m.n] * part) { d.confused = CONFUSE_T; s.ev.push({ k: "confused", side: d.side, x: d.x, y: d.y }); }
     // Water on a burn: the burn goes out in steam that hides whoever stands in it. Water soaks; a shock dries.
     if (m.t === "water") {
       if (d.status === BRN) {
@@ -1838,8 +1866,8 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1) {
   } else {
     s.ev.push({ k: "touch", side: d.side, x: hx, y: hy, move });
   }
-  if (m.st != null && rnd(s) * 100 < (m.p ? (m.stc ?? 0) * (1 + a.cp.status) : 100)) afflict(s, d, m.st, m.n === "toxic");
-  if (m.sg && !m.sgu && !m.self && rnd(s) * 100 < (m.sgc ?? 100)) stages(s, d, m.sg);
+  if (m.st != null && rnd(s) * 100 < (m.p ? (m.stc ?? 0) * (1 + a.cp.status) * part : 100)) afflict(s, d, m.st, m.n === "toxic");
+  if (m.sg && !m.sgu && !m.self && rnd(s) * 100 < (m.sgc ?? 100) * part) stages(s, d, m.sg);
 }
 
 function settleKO(s, side) {
@@ -1966,9 +1994,16 @@ function cpuInput(s, side) {
   const ux = ex / dist, uy = ey / dist;
   if (L.surge && s.sides[side].meter >= SURGE_MAX && !me.act && dist < L.surge) return { ...NO_INPUT, surge: true, ax: ex, ay: ey };
 
-  // A wind-up aimed at me: seen after its reaction time, rolled from (or shielded) at its odds.
-  const fa = foe.act;
-  if (fa?.ph === "wind" && c.dodged !== fa.id && ((fa.dx * -ux + fa.dy * -uy) > 0.85 || fa.shape === "pulse")) {
+  /* AN ATTACK AIMED AT ME: a stream pouring my way, a lunge or a blow under
+     way, or a shot in flight toward me (with no wind-up, what it can read is
+     what is already coming) - seen after its reaction time, rolled from (or
+     shielded) at its odds. */
+  const incoming = s.shots.find((p) => p.side !== side && c.dodged !== p.id
+    && (p.x - me.x) * (p.x - me.x) + (p.y - me.y) * (p.y - me.y) < 3.5 * 3.5
+    && (p.dx * (me.x - p.x) + p.dy * (me.y - p.y)) > 0.92 * Math.sqrt((p.x - me.x) * (p.x - me.x) + (p.y - me.y) * (p.y - me.y)));
+  const fa = incoming ? { id: incoming.id, dx: incoming.dx, dy: incoming.dy, shape: "shot", ph: "wind" }
+    : foe.act && foe.act.ph !== "rec" && !foe.act.basic ? foe.act : null;
+  if (fa && c.dodged !== fa.id && ((fa.dx * -ux + fa.dy * -uy) > 0.85 || fa.shape === "pulse")) {
     if (c.seenId !== fa.id) { c.seen = s.t; c.seenId = fa.id; }
     if (s.t - c.seen >= L.react) {
       c.dodged = fa.id;
@@ -2011,7 +2046,7 @@ function cpuInput(s, side) {
   // A held X item: X Attack in reach of the foe, X Speed at once, X Defense against a wind-up aimed at it.
   const hi = s.sides[side].held;
   if (hi && L.items && !me.act && (hi === "x-speed" || (hi === "x-attack" && dist < 4)
-    || (hi === "x-defense" && fa?.ph === "wind" && (fa.dx * -ux + fa.dy * -uy) > 0.85))) return { ...NO_INPUT, use: true };
+    || (hi === "x-defense" && fa && (fa.dx * -ux + fa.dy * -uy) > 0.85))) return { ...NO_INPUT, use: true };
   // Nothing ready, and a power-up nearer than the foe: the CPU goes for it.
   if (L.items && pick < 0 && !me.act) {
     const near = s.items.filter((it) => !(PICKUPS[it.kind].held && hi) && (it.kind !== "revive" || downed(s.sides[side]).length))
@@ -2044,8 +2079,11 @@ function cpuInput(s, side) {
     const off = (rnd(s) * 2 - 1) * L.err;
     return { ...NO_INPUT, mx, my, ax: ux - uy * off, ay: uy + ux * off, basic: true };
   }
-  // Only a CPU that leads its shots steers a charging beam after its target.
-  if (me.act) return { ...NO_INPUT, mx, my, ax: L.lead || me.act.shape !== "beam" ? ex : 0, ay: L.lead || me.act.shape !== "beam" ? ey : 0 };
+  // A stream is held and steered after its target - a CPU that leads its shots holds it to the end, the rest let go early.
+  if (me.act) {
+    const pour = me.act.ph === "chan" && (L.lead || me.act.t > STREAM_MAX / 3);
+    return { ...NO_INPUT, mx, my, ax: ex, ay: ey, hold: pour ? me.act.k : -1 };
+  }
   if (pick < 0) return { ...NO_INPUT, mx, my, ax: ex, ay: ey };
   // A shot or a beam into cover is a shot at the cover: step round it instead.
   if (["shot", "beam", "multi"].includes(shapeAt(pick)) && blocked(s, me.x, me.y, foe.x, foe.y)) {
@@ -2078,12 +2116,58 @@ export function cpuTeam(seed, level, n = 3) {
   return [...picks].filter((id) => speciesById(id)).map((id, slot) => fighter(id, lv, hash(`arena:${seed}:${slot}`), movesAt(id, lv)));
 }
 
+/* A GYM OF THE CIRCUIT (ladder.js): the League's own leader, Elite Four
+   member or Champion as an Arena opponent - name, portrait, badge, a floor
+   for their type - with their three strongest: from their strongest roster
+   (the hard party, where the League has one), highest level first and the
+   bigger base stats on a tie, one of a species, each with an Arena body (a
+   Mega enters as its base, Mega Evolving in the match). They fight at the
+   player's level or their own, whichever is higher, with their own moves
+   where the Arena plays them and their level-up moves to fill the rest. */
+const GYM_OF = new Map(LEAGUES.flatMap((r) => [
+  ...r.gyms.map((o) => [o.id, { ...o, title: r.id === "alola" ? "Kahuna" : "Gym Leader" }]),
+  ...r.league.map((o) => [o.id, { ...o, title: o.champion ? "Champion" : "Elite Four" }]),
+]));
+const GYM_FLOOR = { rock: "moon", ground: "moon", steel: "moon", ghost: "moon", dark: "moon", water: "seaside", flying: "seaside",
+  ice: "rink", fire: "caldera", dragon: "caldera", grass: "grove", bug: "grove", poison: "grove", fairy: "grove" };
+const bstOf = (id) => (speciesById(id)?.stats ?? []).reduce((a, b) => a + b, 0);
+function gymPicks(o) {
+  // The strongest roster first; its everyday party fills in where that has too few with an Arena body (Kalos).
+  const out = [];
+  const rank = (list) => [...(list ?? [])].sort((a, b) => b[1] - a[1] || bstOf(b[0]) - bstOf(a[0]));
+  for (const [sp, lv, moves] of [...rank(o.hard), ...rank(o.party)]) {
+    const e = enteringAs({ species: sp });
+    if (!arenaReady(e.species) || out.some((p) => p.sp === e.species)) continue;
+    out.push({ sp: e.species, lv, moves: moves ?? [], mega: e.mega ?? 0 });
+    if (out.length === 3) break;
+  }
+  return out;
+}
+export const gymOf = (id) => GYM_OF.get(id) ?? null;
+export function gymMaster(id, level, cpu) {
+  const o = GYM_OF.get(id);
+  if (!o) return null;
+  const picks = gymPicks(o);
+  const lv = clamp(Math.max(Math.round(level), ...picks.map((p) => p.lv)), 5, 100);
+  const type = o.type ?? speciesById(picks.at(-1)?.sp)?.types?.[0] ?? "normal";
+  return { id: `gym:${id}`, gym: id, name: o.name, title: o.title, pic: o.pic, badge: o.badge ? id : null, cpu, level: lv,
+    arena: o.champion ? "indigo" : GYM_FLOOR[type] ?? "indigo", type, team: picks.map((p) => [p.sp, speciesById(p.sp)?.name]) };
+}
+// Its moves: its own where the Arena plays them, then its level-up moves, four at most.
+function gymMoves(sp, names, lv) {
+  const own = names.map((n) => MOVES.findIndex((m) => m.n === n)).filter((i) => i >= 0 && shapeOf(arenaMove(i)));
+  for (const i of movesAt(sp, lv)) if (own.length < 4 && !own.includes(i) && shapeOf(arenaMove(i))) own.push(i);
+  return own.slice(0, 4);
+}
+export const gymTeam = (m) => gymPicks(GYM_OF.get(m.gym)).map((p, slot) =>
+  ({ ...fighter(p.sp, m.level, hash(`gym:${m.gym}:${slot}`), gymMoves(p.sp, p.moves, m.level)), megas: p.mega ? [p.mega] : [] }));
+
 /* AN ARENA MASTER'S TEAM (ladder.js): its species at the stage the
-   master's level reaches, with their own level-up moves. */
-export const masterTeam = (m) => m.team.map(([id], slot) => {
+   master's level reaches, with their own level-up moves. A gym is its own (`gymTeam`). */
+export const masterTeam = (m) => (m.gym ? gymTeam(m) : m.team.map(([id], slot) => {
   const at = stageAt(id, m.level);
   return fighter(at, m.level, hash(`ladder:${m.id}:${slot}`), movesAt(at, m.level));
-});
+}));
 
 /* THE FAIR FORMAT (an online match between friends): your species, each at
    FAIR_LEVEL with every IV at 31 and its level-up moves there - what you
@@ -2112,7 +2196,7 @@ const q64 = (v, lim) => (Number.isFinite(v) ? Math.round(clamp(v, -lim, lim) * 6
 const pick = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : -1);
 export const cleanInput = (i) => ({
   mx: q64(i?.mx, 1), my: q64(i?.my, 1), ax: q64(i?.ax, 40), ay: q64(i?.ay, 40),
-  fire: pick(i?.fire, 0, 3), basic: Boolean(i?.basic), dodge: Boolean(i?.dodge), swap: pick(i?.swap, 0, 5), surge: Boolean(i?.surge), use: Boolean(i?.use), mega: Boolean(i?.mega),
+  fire: pick(i?.fire, 0, 3), hold: pick(i?.hold, 0, 3), basic: Boolean(i?.basic), dodge: Boolean(i?.dodge), swap: pick(i?.swap, 0, 5), surge: Boolean(i?.surge), use: Boolean(i?.use), mega: Boolean(i?.mega),
 });
 export function lockstep(link, me, round = 0) {
   const mine = new Map(), theirs = new Map(), myHash = new Map(), theirHash = new Map();

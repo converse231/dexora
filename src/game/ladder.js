@@ -13,6 +13,8 @@
    WHAT A FIRST WIN PAYS: once, LADDER_YEN x its level - the ten together are
    held under a quarter of one day's road trainers by check.mjs - and the
    Champion adds a card pack. */
+import { GYMTUNE } from "../data/gymtune.js";
+
 export const LADDER_YEN = 80;
 // How many fight a side in the Arena: the save's `arenaTeam` holds at most this many.
 export const ARENA_TEAM = 3;
@@ -63,6 +65,46 @@ export const LADDER = [
 ];
 
 export const masterOf = (id) => LADDER.find((m) => m.id === id) ?? null;
+
+/* THE GYM CIRCUIT (2026-10-27, asked for: "the Arena Ladder is done in a
+   snap with Lv 100s - attach the gym ladders, with their top 3"): every
+   region's leaders, Elite Four and Champion, in the League's own order, each
+   with the three strongest of their strongest roster (arena.js `gymTeam`) at
+   your team's level or their own, whichever is higher - a team of 100s still
+   meets a fight - against a CPU that sharpens through a region and across
+   them (`gymCpu`). A region opens once the one before it is cleared; Kanto is
+   open from the start, beside the ten masters. Read off gymtune.js (the main
+   bundle carries it for the League's own rules), never the League's rosters:
+   the engine judges and pays from here. The save's `ladder` keys a gym as
+   "gym:<League id>" beside the masters' ids - the League's ids never change.
+   A first win pays GYM_SHARE of the League's own first-win prize; a
+   Champion adds a card pack. */
+export const GYM_SHARE = 0.3;
+export const CIRCUIT_REGIONS = [...new Set(Object.values(GYMTUNE).map((r) => r.region))];
+const KIND_ORDER = { leader: 0, league: 1 };
+export const circuitOf = (region) => Object.entries(GYMTUNE).filter(([, r]) => r.region === region)
+  .sort(([, a], [, b]) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.k - b.k).map(([id]) => id);
+export const gymKey = (id) => `gym:${id}`;
+export const isChampion = (id) => circuitOf(GYMTUNE[id]?.region).at(-1) === id;
+export const regionDone = (region, ladder = []) => circuitOf(region).every((id) => ladder.includes(gymKey(id)));
+export function gymOpen(id, ladder = []) {
+  const region = GYMTUNE[id]?.region;
+  if (!region) return false;
+  const r = CIRCUIT_REGIONS.indexOf(region);
+  if (r > 0 && !regionDone(CIRCUIT_REGIONS[r - 1], ladder)) return false;
+  const c = circuitOf(region);
+  return c.slice(0, c.indexOf(id)).every((x) => ladder.includes(gymKey(x)));
+}
+export const gymPay = (id) => Math.round((GYMTUNE[id]?.prize ?? 0) * GYM_SHARE);
+// The CPU a gym fights with: Normal for a first region's first four gyms, then Hard, the Elite Four Champion-grade from Hoenn on.
+export function gymCpu(id) {
+  const g = GYMTUNE[id];
+  if (!g) return "normal";
+  const r = CIRCUIT_REGIONS.indexOf(g.region);
+  if (isChampion(id)) return "champion";
+  if (g.kind === "league") return r < 2 ? "hard" : "champion";
+  return g.k < 4 && r < 2 ? "normal" : r < 5 || g.k < 4 ? "hard" : "champion";
+}
 export const ladderPay = (m) => (m ? m.level * LADDER_YEN : 0);
 /* MAY THIS ONE BE FOUGHT? In order: the first not yet beaten, and any
    already beaten again (for the practice; it never pays twice). */
@@ -72,4 +114,5 @@ export function ladderOpen(id, beaten = []) {
   return LADDER.slice(0, k).every((m) => beaten.includes(m.id));
 }
 // The save's `ladder`: known ids, each once, in the list's order.
-export const cleanLadder = (v) => (Array.isArray(v) ? LADDER.map((m) => m.id).filter((id) => v.includes(id)) : []);
+export const cleanLadder = (v) => (Array.isArray(v)
+  ? [...LADDER.map((m) => m.id), ...Object.keys(GYMTUNE).map(gymKey)].filter((id) => v.includes(id)) : []);

@@ -7283,7 +7283,7 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       assert.equal(A.shapeOf(AM.find((m) => m.n === n)), "field", `${n} is not laid as a hazard`);
     }
     for (const [n, sh] of [["earthquake", "pulse"], ["hyper-beam", "beam"], ["quick-attack", "dash"], ["bullet-seed", "multi"],
-      ["flamethrower", "shot"], ["slash", "melee"], ["swords-dance", "self"], ["protect", "self"], ["thunder-wave", "shot"], ["rock-throw", "shot"]]) {
+      ["flamethrower", "beam"], ["slash", "melee"], ["swords-dance", "self"], ["protect", "self"], ["thunder-wave", "shot"], ["rock-throw", "shot"]]) {
       const m = AM.find((x) => x.n === n);
       if (m) assert.equal(A.shapeOf(m), sh, `${n} plays as a ${A.shapeOf(m)}, not a ${sh}`);
     }
@@ -7691,8 +7691,8 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
         assert.ok(fight("cross-chop", wall).includes("splat"), "a blow into the wall did not splat");
         assert.ok(!fight("cross-chop", 12).includes("splat"), "a blow in the open splatted");
         assert.ok(!fight("cross-chop", wall, { basic: true }).includes("splat"), "a jab splatted - every jab against a wall would hit twice");
-        // The blow lands ~17 ticks after it is thrown, a shield ~12 after it is raised.
-        assert.ok(fight("cross-chop", 12, { at: 30, shield: 32 }).includes("parry"), "a shield raised as the blow landed did not throw it back");
+        // The blow lands ~2 ticks after it is thrown (no charge, 2026-10-27), a shield ~7 after it is raised.
+        assert.ok(fight("cross-chop", 12, { at: 30, shield: 22 }).includes("parry"), "a shield raised as the blow landed did not throw it back");
         const held = fight("cross-chop", 12, { at: 30, shield: 1 });
         assert.ok(held.includes("blocked") && !held.includes("parry"), "a shield up long before the blow threw it back - it only blocks");
         const bs = A.newMatch({ teams: [[bFighter(143, 50, 1, [idx("hyper-beam")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 2, weather: "clear", events: false });
@@ -7860,17 +7860,39 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       }
       assert.ok(picked > 0, "the CPU never picked up a power-up in 6 Hard matches");
     }
-    /* A BEAM FOLLOWS ITS AIM while it charges, and not after; SUDDEN DEATH puts
-       everyone standing at 1 HP when the clock runs out level, and the
-       clock decides as before when it does not (2026-10-23). */
+    /* NO CHARGE, AND A STREAM IS HELD AND AIMED (2026-10-27, asked for): a
+       move goes within a few ticks of its press; a beam-shaped move pours
+       while its button is held - to STREAM_MAX, sweeping after the aim, a
+       sweep and never a snap - and stops soon after it is let go (never
+       before STREAM_MIN); held to the end it strikes STREAM_MAX/STREAM_TICK
+       times, a tap a few. SUDDEN DEATH puts everyone standing at 1 HP when
+       the clock runs out level, and the clock decides as before when it does
+       not (2026-10-23). */
     {
-      const beamer = A.newMatch({ teams: [[bFighter(150, 50, 1, [idx("hyper-beam")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 2 });
-      A.tick(beamer, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]);
-      const act = beamer.sides[0].team[0].act;
-      assert.ok(act?.shape === "beam", "Hyper Beam did not wind up as a beam");
-      for (let t = 0; t < 8; t++) A.tick(beamer, [{ ...A.NO_INPUT, ax: 0, ay: 1 }, null]);
-      assert.ok(act.dy > 0.3 && act.dx < 0.97, `a charging beam did not turn toward the aim (${act.dx.toFixed(2)}, ${act.dy.toFixed(2)})`);
-      assert.ok(act.dy < 0.99, "a charging beam snapped to the aim instead of sweeping");
+      const pour = (hold) => {
+        const m = A.newMatch({ teams: [[bFighter(150, 50, 1, [idx("hyper-beam")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 2 });
+        A.tick(m, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0, hold: 0 }, null]);
+        const f = m.sides[0].team[0];
+        let poured = 0, strikes = 0;
+        for (let t = 0; t < A.STREAM_MAX + 20; t++) {
+          A.tick(m, [{ ...A.NO_INPUT, ax: 0, ay: 1, hold: hold ? 0 : -1 }, null]);
+          strikes += m.ev.filter((e) => e.k === "beam" && e.stream).length;
+          if (f.act?.ph === "chan") { poured++; if (t === 8 && hold) {
+            assert.ok(f.act.dy > 0.3 && f.act.dx < 0.97, `a stream did not sweep toward the aim (${f.act.dx.toFixed(2)}, ${f.act.dy.toFixed(2)})`);
+            assert.ok(f.act.dy < 0.999, "a stream snapped to the aim instead of sweeping");
+          } }
+        }
+        return { poured, strikes };
+      };
+      const held = pour(true), tapped = pour(false);
+      assert.ok(held.poured >= A.STREAM_MAX - 6, `a held stream poured ${held.poured} ticks, not its ${A.STREAM_MAX}`);
+      assert.ok(tapped.poured <= A.STREAM_MIN + 4 && tapped.poured >= A.STREAM_MIN - 4, `a stream let go poured ${tapped.poured} ticks, not about ${A.STREAM_MIN}`);
+      assert.ok(held.strikes >= 7 && tapped.strikes < held.strikes / 2, `a held stream struck ${held.strikes} times and a tap ${tapped.strikes}`);
+      // No charge: a shot is in the air within a few ticks of the press.
+      const quick = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("ember")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 2 });
+      A.tick(quick, [{ ...A.NO_INPUT, ax: 1, ay: 0, fire: 0 }, null]);
+      for (let t = 0; t < 3 && !quick.shots.length; t++) A.tick(quick, [A.NO_INPUT, null]);
+      assert.ok(quick.shots.length > 0, "a move still charges before it goes");
 
       /* DOUBLE TEAM's copies stand either side of their user and move with it;
          a blow or a shot that reaches one first pops it ("Miss!") and the
@@ -8258,7 +8280,9 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       assert.ok(duel({ dmg: 0.3 }).dealt > plain.dealt * 1.1, "a damage card dealt no more");
       assert.ok(duel({ guard: 0.3 }).taken < plain.taken * 0.9, "a guard card took no less");
       assert.ok(duel({ regen: 0.02 }).healed > plain.healed, "a healing card healed nothing");
-      assert.ok(duel({ flame: true }).fires > plain.fires, "Golden Flame left no fire");
+      // Over several seeds: a dozen seconds lands only a few basics, and one seed's few could all miss the 1-in-4.
+      const fireOf = (cp) => [3, 4, 5, 6, 7, 8].reduce((n, sd) => n + duel(cp, sd).fires, 0);
+      assert.ok(fireOf({ flame: true }) > fireOf({}), "Golden Flame left no fire");
       assert.ok(duel({ shade: true }).meter > plain.meter, "Golden Shade did not start the ULTI charged");
       /* EVERY CHASE CARD'S SIGNATURE IS ITS OWN, and arena.js plays every one: each kind once, named in
          arena.js's source as `hasSig(_, "<kind>")`. And a few, played: Moonlight heals, Lost Impact hurts
@@ -8305,6 +8329,26 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     assert.ok(LD.RENTALS.every(([id]) => !LD.SHOWCASE.some(([s]) => s === id)), "a rental is also in the locked showcase");
     assert.ok(LD.RENTALS.every(([id]) => LD.isRental(-id) && LD.rentalOf(-id).species === id) && !LD.isRental(1) && !LD.isRental(-150),
       "a rental's uid does not resolve, or a box uid or a non-rental reads as one");
+    /* THE GYM CIRCUIT (2026-10-27, asked for): every region's leaders, Elite Four and Champion in the
+       League's own order, each a team of Arena bodies at no lower than your level; a region opens on the
+       last one's Champion, a gym on the one before it; a save keeps only gyms that exist. */
+    {
+      const { LEAGUES } = await import("../src/data/leagues.js");
+      assert.deepEqual(LD.CIRCUIT_REGIONS, LEAGUES.map((r) => r.id), "the circuit's regions are not the League's, in order");
+      for (const r of LEAGUES) assert.deepEqual(LD.circuitOf(r.id), [...r.gyms, ...r.league].map((o) => o.id), `${r.name}'s circuit is not the League's order`);
+      const all = LD.CIRCUIT_REGIONS.flatMap(LD.circuitOf);
+      for (const id of all) {
+        const m = A.gymMaster(id, 100, LD.gymCpu(id)), team = A.gymTeam(m);
+        assert.ok(team.length >= 2 && team.every((f) => A.arenaReady(f.id) && f.level === 100), `${id}'s Arena team is short, bodiless or under your level`);
+        assert.ok(team.every((f) => A.kitOf(f).length >= 2), `${id} fields a Pokemon with no Arena moves`);
+      }
+      const kanto = LD.circuitOf(LD.CIRCUIT_REGIONS[0]);
+      assert.ok(LD.gymOpen(kanto[0], []) && !LD.gymOpen(kanto[1], []), "the circuit's first gym is shut, or its second open from the start");
+      assert.ok(!LD.gymOpen(LD.circuitOf(LD.CIRCUIT_REGIONS[1])[0], kanto.slice(0, -1).map(LD.gymKey)) && LD.gymOpen(LD.circuitOf(LD.CIRCUIT_REGIONS[1])[0], kanto.map(LD.gymKey)),
+        "a region opened before the one before it was cleared, or stayed shut after");
+      assert.ok(LD.isChampion(kanto.at(-1)) && !LD.isChampion(kanto[0]), "the circuit's Champion is not its last");
+      assert.deepEqual(LD.cleanLadder(["court", LD.gymKey(kanto[0]), "gym:nobody"]), ["court", LD.gymKey(kanto[0])], "a save's ladder kept a gym that does not exist");
+    }
     const ladderTotal = LD.LADDER.reduce((n, m) => n + LD.ladderPay(m), 0);
     assert.ok(ladderTotal < roadDay * 0.25, `the Ladder pays ¥${ladderTotal} once against a road day's ¥${roadDay} - past a quarter`);
     console.log(`arena ground ok — every floor fair (side 0 won ${Object.entries(ground).filter(([k]) => !k.endsWith("+")).map(([k, v]) => `${k} ${v}`).join(", ")} of 16), ` +

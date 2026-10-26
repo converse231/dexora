@@ -1264,9 +1264,21 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   **Judgements** (GREAT at 5 hits to LEGENDARY at 25, a rationed COUNTER,
   PERFECT dodges, a PERFECT win untouched) are drawn under the striker's
   combo.
-  **Same day, asked for**: a beam TRACKS its aim while it charges
-  (`BEAM_TRACK` of the way a tick - a sweep; only a CPU that `lead`s steers
-  one, or Easy outran Normal), `BEAM_W` 0.5 and `MELEE_RANGE` 1.75;
+  **No charge, and a stream is held and aimed** (2026-10-27, asked for:
+  "charges make it hard to aim"; Flamethrower and Hydro Pump as the
+  reference): every move goes `QUICK` ticks after its press (a setup or
+  field move `sec(0.12)`), its recovery `recOf`. A beam-shaped move
+  (Flamethrower joined `BEAM_NAMES`) is a STREAM: phase `chan`, poured while
+  the input's `hold` names its key (`cleanInput`, so lockstep carries it),
+  `STREAM_MIN` to `STREAM_MAX`, a strike every `STREAM_TICK` at
+  `STREAM_PART` of a hit (`hit`'s `part` scales push and every chance, stun
+  only whole), sweeping `STREAM_TRACK` of the way to the aim a tick - never
+  a snap; a dash, sleep or freeze cuts it. The CPU pours while it `lead`s or
+  for a third of the max. The renderer's `pour` draws it by type (a jet with
+  foam, a fire cone, bolts, ice); `signatureShot`/`signatureHit` draw Water
+  Shuriken, Shadow Ball, Aura Sphere, Focus Blast, Energy Ball and Sludge
+  Bomb as themselves; every ULTI strike raises its type's `pillar`.
+  `BEAM_W` 0.5 and `MELEE_RANGE` 1.75;
   SUDDEN DEATH (`SUDDEN_T`) when the clock runs out level on Pokemon - all
   standing at 1 HP. Surge is called **ULTI** on every screen (the code keeps
   "surge"). The renderer draws each type's own shot and beam (`shotStyle`,
@@ -1391,6 +1403,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   teams typed by dex id WITH their names; the engine judges the order and
   pays each first win once (`arenaMaster`, the save's `ladder`), the Champion
   a card pack; the Ladder's total held under a quarter of a road day.
+  **The Gym Circuit** (2026-10-27, asked for: "done in a snap with Lv
+  100s"): the Ladder's chapters after Masters are the regions
+  (`CIRCUIT_REGIONS`, `circuitOf`: leaders, then the Elite Four and Champion,
+  read off GYMTUNE so the engine judges it without League data), a region
+  open once the last is cleared (`gymOpen`), saved in `ladder` as
+  `gym:<League id>`, a first win paying `GYM_SHARE` of the League's prize
+  (`gymPay`), a Champion a pack. arena.js's `gymMaster`/`gymTeam` field the
+  trainer's top three of its hard roster or party (by level, then base
+  stats, Arena-ready, a Mega as its base) at your level or theirs, whichever
+  is higher, against `gymCpu`'s CPU. check.mjs holds every team to two or
+  more.
   **The fight's feel** (2026-10-22, asked for): the opening is `INTRO` ticks
   of the sim itself (nobody moves, off the match clock, 0 in every test) so
   both ends of an online match count the same ones; the VS card, the throws

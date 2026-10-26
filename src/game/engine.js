@@ -28,7 +28,7 @@ import { followSheet, skinById, skinPrice, PARTY_MAX, partnerRule, isMastered, M
 import { fieldOf, rollFind, heartsOf, FRIEND_FINDS, HEARTS } from "./abilities.js";
 import { CHECKIN_REWARDS, checkinStatus, rollRoulette, isMilestone, streakPacks, lotSets, LOT, ROULETTE_LEVEL } from "./checkin.js";
 import { isRoad, roadOpen, roadTrainer, ARENA_LEVELS, ARENA_DAILY, arenaPay, arenaLeft } from "./road.js";
-import { masterOf, ladderOpen, ladderPay, cleanLadder, ARENA_TEAM, isRental } from "./ladder.js";
+import { masterOf, ladderOpen, ladderPay, cleanLadder, ARENA_TEAM, isRental, gymOpen, gymPay, isChampion } from "./ladder.js";
 import { ARENA_CARDS } from "./cardperks.js";
 import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
@@ -4453,6 +4453,19 @@ export function createEngine(canvas, onChange, mini = null) {
        nothing; one out of order is refused. Answers { pay, pack, first } or
        null for a refusal. */
     arenaMaster(id) {
+      // A gym of the circuit ("gym:<League id>"): judged in its region's order, paid once, a Champion a pack.
+      if (String(id).startsWith("gym:")) {
+        const g = id.slice(4);
+        if (!gymOpen(g, state.ladder)) return null;
+        if (state.ladder.includes(id)) return { pay: 0, pack: null, first: false };
+        const pay = gymPay(g);
+        state.money += pay;
+        state.ladder = cleanLadder([...state.ladder, id]);
+        const pack = isChampion(g) ? grantPacks(1, `arena:${id}`) : null;
+        save();
+        changed();
+        return { pay, pack, first: true };
+      }
       const m = masterOf(id);
       if (!m || !ladderOpen(id, state.ladder)) return null;
       if (state.ladder.includes(id)) return { pay: 0, pack: null, first: false };

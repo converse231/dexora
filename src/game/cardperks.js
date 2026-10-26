@@ -101,7 +101,7 @@ export const SIGNATURE = {
   sv09: ["friend", "Friend Guard", "your benched Pokémon rest twice as fast"],
   "sv10.5b": ["victory", "Victory Star", "your whole team lands critical hits more often"],
   "sv10.5w": ["vflare", "V-Flare", "its ULTI hits 50% harder"],
-  sv10: ["psydrive", "Psycho Drive", "its beams charge 40% faster"],
+  sv10: ["psydrive", "Psycho Drive", "its streams hit 15% harder"],
   "swsh10.5": ["starraid", "Star Raid", "your ULTI starts the match fully charged"],
   swsh10: ["chrono", "Star Chronos", "using its ULTI readies all its moves"],
   swsh11: ["lost", "Lost Impact", "hits 25% harder, and takes a tenth of it back"],

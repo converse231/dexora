@@ -11886,6 +11886,23 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ag-rung.won { border-color: rgba(95, 224, 138, .6); }
 .ag-rung.open:not(.won) { border-color: #45d4ff; }
 .ag-rung.champ { border-color: rgba(255, 207, 74, .8); }
+/* THE GYM CIRCUIT (Arena.jsx GymBoard): a chapter a region, a rung a trainer -
+   their portrait, their badge at its corner, their name - scrolling sideways
+   where thirteen will not fit. */
+.ag-chapters { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-bottom: 8px; }
+.ag-chapters::-webkit-scrollbar { display: none; }
+.ag-chapter { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .16); background: rgba(8, 12, 28, .6); color: #b9c2e4; font: 700 12px var(--body); }
+.ag-chapter.on { background: #ff7a38; border-color: #ff7a38; color: #fff; }
+.ag-chapter.done:not(.on) { border-color: rgba(95, 224, 138, .6); color: #b8f5cb; }
+.ag-chapter:disabled { opacity: .45; cursor: not-allowed; }
+.ag-rungs.circuit { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(58px, 1fr); overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; }
+.ag-rung > .ag-rung-pic { position: absolute; left: 50%; top: 44%; width: 86%; max-width: 72px; transform: translate(-50%, -50%); object-fit: contain; image-rendering: pixelated; }
+.ag-rung.shut > .ag-rung-pic { filter: brightness(.3) grayscale(1); }
+.ag-rung-badge { position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; image-rendering: pixelated; }
+.ag-rung.circuit .ag-rung-lv, .ag-rungs.circuit .ag-rung-lv { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.ag-master-pic { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; flex: none; }
+.ag-tile-pic { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; }
 .ag-rung.on { box-shadow: 0 0 0 2px #ff7a38, 0 6px 18px rgba(255, 122, 56, .4); }
 .ag-tick, .ag-lock { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; }
 .ag-tick { background: #2fbf71; color: #fff; }

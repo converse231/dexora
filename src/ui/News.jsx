@@ -16,6 +16,19 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-27-arena-gyms",
+    icon: "🔥",
+    date: "October 2026",
+    title: "Arena: the Gym Circuit, and no more charging",
+    items: [
+      ["The Gym Circuit", "The Arena Ladder now runs every region's leaders, Elite Four and Champion with their top three."],
+      ["They match you", "Gym teams fight at your level or theirs, whichever is higher - Lv 100s still meet a fight."],
+      ["No charge", "Every move goes the moment you press it."],
+      ["Hold and aim", "Flamethrower, Hydro Pump and every beam pour while held - sweep them onto your foe."],
+      ["Signature looks", "Water Shuriken, Aura Sphere and more have their own art, and every ULTI raises its type's pillar."],
+    ],
+  },
+  {
     id: "2026-10-26-haunting",
     icon: "💀",
     date: "October 2026",
