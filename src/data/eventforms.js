@@ -82,7 +82,7 @@ export const EVENTS = [
        `name`, a title of its own beside the event's. */
     hunt: { id: 19908, of: 491, title: "Scarecrow Darkrai", flavor: "It stitched a sack over its head and stuffed its sleeves with straw to stand in the fields - and every crow that lands on it dreams of the dark.", medal: "nightmare", name: "Nightmare King", dreams: 20, keep: 12, area: "tower" },   // 7 and 4 at 1 costume in 16 meetings; now 1 in 2 (2026-10-24)
   },
-  /* HALLOWED NIGHT'S SECOND WEEK (2026-10-26, asked for): fourteen costumes
+  /* HALLOWED NIGHT'S SECOND WEEK (2026-10-26, asked for): costumes
      and a new legendary, from Halloween itself - whole lines this time, second
      and final stages too, and NONE EVOLVES (`evolves: false`, your call): each
      stage is a catch of its own. A later stage is rarely met wild (Dusknoir
@@ -121,6 +121,18 @@ export const EVENTS = [
       { id: 19929, of: 302, rare: 0.2, title: "Phantom Thief Sableye", flavor: "A domino mask, a swirling cape and a sack of stolen gems. It leaves a calling card in every tomb it robs." },
       // Drawn from an earlier prompt, and back in the week for it (2026-10-26).
       { id: 19930, of: 77, title: "Headless Horseman Ponyta", flavor: "It gallops through the fields in a rider's tattered cloak, a glowing jack-o'-lantern swinging from its saddle." },
+      /* THE THIRD WAVE (2026-10-27, asked for: two more lines and three more
+         one-of-a-kind catches). Ids run on past the Reaper's, so the hunt never
+         moves; each needs its row in trading.sql's event_slots(). */
+      { id: 19932, of: 198, title: "Plague Doctor Murkrow", flavor: "A beaked mask, a little leather hat and a cane it is far too proud of. It makes its rounds of the graveyard every night." },
+      { id: 19933, of: 430, on: 198, title: "Plague Doctor Honchkrow", flavor: "The head doctor of the night. Its lantern is the last light in the street, and every Murkrow follows it on its rounds." },
+      { id: 19934, of: 63, title: "Fortune Teller Abra", flavor: "It dozes under a little turban beside a crystal ball. It already knows your fortune - it just will not wake up to tell you." },
+      { id: 19935, of: 64, on: 63, title: "Fortune Teller Kadabra", flavor: "It fans a hand of tarot cards and its spoon points at one. It always draws the same card for you, and it never says which." },
+      { id: 19936, of: 65, on: 63, title: "Fortune Teller Alakazam", flavor: "The seer of the fair. Two spoons circle its crystal ball, and the mist inside it shows next year's Halloween." },
+      // Evolved, so each is met on its line's first stage too: still one costume and one catch.
+      { id: 19937, of: 448, on: 447, title: "Monster Hunter Lucario", flavor: "It reads every costume's aura by lantern light. It has hunted down every monster in the mansion and found them all very friendly." },
+      { id: 19938, of: 199, on: 79, title: "Ghost Story Slowking", flavor: "It holds a candle under its chin and opens the old book. Its stories are so slow that the scary part arrives after sunrise." },
+      { id: 19939, of: 465, on: 114, title: "Swamp Monster Tangrowth", flavor: "It rose out of the bog wearing half of it. A frog has lived on its shoulder for three Halloweens and has never once been asked to leave." },
     ],
     hunt: { id: 19931, of: 487, title: "Grim Reaper Giratina", flavor: "It rose out of the Distortion World in a reaper's hood, its scythe as long as its wings - and the Pokémon Mansion's clocks all stopped at midnight.", medal: "reaper", name: "The Reaper", dreams: 20, keep: 12, area: "mansion" },
   },

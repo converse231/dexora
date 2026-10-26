@@ -34,7 +34,7 @@ export const NEWS = [
     date: "October 2026",
     title: "Hallowed Night, week two: The Haunting",
     items: [
-      ["From Halloween", "Fourteen costumes, Oct 31 to Nov 6 - whole lines: Reapers, Gargoyles, Gravediggers and more."],
+      ["From Halloween", "Twenty-three costumes, Oct 31 to Nov 6 - whole lines: Reapers, Plague Doctors, Fortune Tellers and more."],
       ["A new legendary", "Catch twenty costumes and Grim Reaper Giratina is your next meeting in the Pokémon Mansion."],
       ["One week each", "Hallowed Night's first week ends October 30 - catch its costumes and Scarecrow Darkrai before then."],
       ["Dust in your Binder", "Dusting and crafting moved into each set's Binder - the Dust tab is gone."],
