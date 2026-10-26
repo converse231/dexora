@@ -3094,11 +3094,15 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     assert.equal(sat.state.bag["hallow-ball"], 0, "a Saturday check-in gave Hallow Balls");
     sat.destroy();
 
-    // The claim: every look held, paid once, and its title.
+    // The claim: every look held AND its hunt won (2026-10-26), paid once, and its title.
     const dex = Array(358).fill(0);
     const full = boot({ ...SAVE, dex }).e;
     assert.equal(full.claimEvent(ev.id), null, "an event was claimed with nothing caught");
     for (const l of ev.looks) full.state.dex[dexIndex(l.id)] = 2;
+    if (ev.hunt) {
+      assert.equal(full.claimEvent(ev.id), null, "an event was claimed before its hunt was won");
+      full.state.medals.push(`event:${ev.hunt.medal}`);
+    }
     const got = full.claimEvent(ev.id);
     assert.ok(got?.packs >= 1, "a finished event paid no pack");
     assert.ok(full.state.medals.includes(`event:${ev.id}`), "a finished event left no medal");
