@@ -208,7 +208,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
             <span>
               <b>{ev.hunt.name}</b>
               Catch {ev.hunt.dreams} costumed Pokémon. Then walk in {AREAS[ev.hunt.area]?.name}
-              {" "}at night - 20:00 to 05:00 on the map's clock - and it comes for you.
+              {" "}- the first Pokémon you meet there is it.
             </span>
           </section>
         )}
@@ -278,7 +278,7 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
             <span>
               <b>{won ? `${ev.hunt.name} ✓` : due ? "The new moon has risen" : ev.hunt.name}</b>
               <small>{won ? ev.hunt.title
-                : due ? `Walk in ${AREAS[ev.hunt.area]?.name}, 20:00-05:00`
+                : due ? `Walk in ${AREAS[ev.hunt.area]?.name} - your next meeting there`
                   : `${n} of ${ev.hunt.dreams} costumes caught`}</small>
             </span>
             {!won && <Moons n={n} of={ev.hunt.dreams} />}

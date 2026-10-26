@@ -75,7 +75,7 @@ function whereToFind(id) {
     if (sp.hunt) {
       return [
         { key: "event", where: ev.name, how: live ? `${eventDaysLeft(ev)} days left` : "the event is over" },
-        { key: "hunt", where: AREAS[ev.hunt.area]?.name ?? "", how: `catch ${ev.hunt.dreams} costumes, then walk here 20:00-05:00` },
+        { key: "hunt", where: AREAS[ev.hunt.area]?.name ?? "", how: `catch ${ev.hunt.dreams} costumes, then your next meeting here` },
       ];
     }
     // A look `on` its line's base is met where the base lives (events.js `eventLook`).

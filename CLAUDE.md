@@ -254,10 +254,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
   (`eventCheckin`: Friday, five Hallow Balls). **An event's `hunt` is its legendary**
   (Scarecrow Darkrai, 2026-10-20): never a swap or a table row. Each costume
   caught on its days is a Bad Dream (`state.dreams`, `huntOn`); at `dreams`
-  the next wild meeting in its `area` after dark IS it (`huntDue`, no alpha,
-  it asks before you run, and it NEVER FLEES - calm 0, as an alpha, since a
-  rate-3 legendary got away four hunts in five, 2026-10-26); run from, the
-  count falls to `keep`; caught, it is
+  the next wild meeting in its `area` IS it, day or night (2026-10-27: it
+  waited for dark, ~235 steps and 16 meetings of walking) (`huntDue`, no alpha,
+  it asks before you run); lost, the count falls to `keep`; caught, it is
   `event:<medal>` - NO title of its own (2026-10-26, your call): the
   event's title asks for every look AND it (`eventDone`), and `shownTitles`
   never draws a hunt medal. Every event's title is a DRAWN medal

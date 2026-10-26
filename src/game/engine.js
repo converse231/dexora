@@ -1877,10 +1877,13 @@ export function createEngine(canvas, onChange, mini = null) {
        Spooky Honey. Night is read here as the encounter below freezes it. */
     const lure = running("event");
     /* THE NIGHTMARE FALLS (events.js `huntDue`): its Bad Dreams full, the
-       first wild meeting in its area after dark IS the hunted one - and is
-       never a swap or a roll anywhere else. */
+       first wild meeting in its area IS the hunted one - and is never a swap
+       or a roll anywhere else. DAY OR NIGHT (2026-10-27, reported: "hard to
+       encounter walking"): it waited for the map's night, and a player who
+       came due by day walked ~235 steps through ~16 other meetings for it -
+       up to 750 and 50 just after dawn. The twenty costumes are the hunt. */
     const hunt = source === "wild" ? huntDue(state.dreams, state.medals) : null;
-    const nightmare = !!hunt && state.areaId === hunt.area && isNight(state.steps);
+    const nightmare = !!hunt && state.areaId === hunt.area;
     const owned = (id) => state.dex[dexIndex(id)] === 2;
     const sp = nightmare ? speciesById(hunt.id)
       : eventLook(rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(table), Math.random,
@@ -2246,12 +2249,7 @@ export function createEngine(canvas, onChange, mini = null) {
       e.rate,
       liveMult(ball, e) * catchMult(state.stats),
       state.caught === 0 && !isLegendary(e.speciesId) && !e.hunt ? () => 0 : Math.random,
-      /* NEITHER AN ALPHA NOR THE HUNTED ONE FLEES (2026-10-26, reported: Darkrai
-         "hard to catch"). A legendary's rate is 3 - an Ultra Ball 3.5% - and
-         its flee 20% a miss, so a hunt ended uncaught four times in five, and
-         each cost eight costumes to bring back. It still takes balls, or a
-         Master Ball; it no longer takes the hunt away. */
-      e.alpha || e.hunt ? 0 : berryCalm(e.berries));
+      e.alpha ? 0 : berryCalm(e.berries));
     e.throws += 1;
     e.pending = result;
     e.shakesTotal = result.shakes;
@@ -2699,7 +2697,7 @@ export function createEngine(canvas, onChange, mini = null) {
     state.dreams = { ...state.dreams, [ev.id]: was + 1 };
     if (was + 1 === h.dreams) {
       cheer({ kind: "medal", title: "THE NEW MOON RISES",
-        sub: `Something waits in ${AREAS[h.area]?.name ?? "the dark"} after nightfall...` });
+        sub: `Something waits in ${AREAS[h.area]?.name ?? "the dark"}... Walk in.` });
     }
   }
 

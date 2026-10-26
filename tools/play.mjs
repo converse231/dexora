@@ -3037,15 +3037,14 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     assert.equal(dexCaught(e.state.dex), before, "an event look moved the Pokedex's count");
     e.destroy();
 
-    /* THE NIGHTMARE: dreams full, the Tower after dark, the next wild meeting
-       is the hunted one - it asks before you run, and running from it waxes
-       the moon back to `keep`. */
+    /* THE NIGHTMARE: dreams full, the Tower, the next wild meeting is the
+       hunted one - BY DAY too (2026-10-27: waiting for night was the walk) -
+       it asks before you run, and running from it waxes the moon back to `keep`. */
     const { isNight } = await import("../src/game/clock.js");
     let night = SAVE.steps;
-    while (!isNight(night)) night++;
+    while (isNight(night)) night++;      // a DAY step, the case that used to meet nothing
     const moon = { [ev.id]: ev.hunt.dreams };
-    // Caught before: a first-ever throw cannot fail (starter.js), which is not what this tests.
-    const dark = boot({ ...SAVE, caught: 50, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
+    const dark = boot({ ...SAVE, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
     Math.random = () => 0.01;
     try {
       for (const dir of ["right", "down", "left", "up"]) {
@@ -3056,18 +3055,9 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
       }
     } finally { Math.random = real; }
     const nm = dark.state.encounter;
-    assert.equal(nm?.speciesId, ev.hunt.id, "a full moon in the Tower after dark met no Nightmare");
+    assert.equal(nm?.speciesId, ev.hunt.id, "a full moon in the Tower by day met no Nightmare");
     assert.ok(nm.hunt && !nm.alpha, "the Nightmare is not marked the hunt's, or rolled an alpha");
     until(dark, (s) => s.encounter?.phase === "idle", "the Nightmare to settle");
-    // It never flees (2026-10-26): every roll is 0.01, which misses the catch and would flee anything else.
-    Math.random = () => 0.01;
-    try {
-      for (let k = 0; k < 6; k++) {
-        dark.throwBall("poke-ball");
-        until(dark, (s) => !s.encounter || (s.encounter.phase === "idle" && s.encounter.throws > k), "a throw at the Nightmare");
-        assert.ok(dark.state.encounter, `the Nightmare fled on throw ${k + 1}`);
-      }
-    } finally { Math.random = real; }
     dark.flee();
     assert.equal(dark.state.ask?.kind, "flee", "running from the Nightmare did not ask");
     dark.answerAsk(true);
