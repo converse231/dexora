@@ -421,13 +421,28 @@ function padDex(arr, len) {
    still open. What cannot be repaired is a file that was never a save at all,
    and that is what this catches - along with, one day, a save from a version
    that knew more species than this one does. */
+/* EMPTY PLACES PAST THIS BUILD'S DEX ARE NOT A NEWER SAVE (2026-10-27,
+   reported: "This page is out of date" that no reload cleared). A build
+   that held places this one dropped before they shipped - Shichi-Go-San's 18
+   costumes, built and taken out in a day - wrote saves that long, every extra
+   place empty. Nothing is lost by cutting what holds nothing, so the save is
+   trimmed to this build and loads; a save that RECORDED anything past it is
+   a newer game's and is still refused. In place; true when it now fits. */
+function trimEmptyTail(s) {
+  if (!Array.isArray(s?.dex) || s.dex.length <= SPECIES.length) return true;
+  const empty = (a) => !Array.isArray(a) || a.slice(SPECIES.length).every((v) => !v);
+  if (!empty(s.dex) || !TIERS.every((t) => empty(s[t])) || !empty(s.origin) || !empty(s.astral)) return false;
+  for (const k of ["dex", ...TIERS, "origin", "astral"]) if (Array.isArray(s[k])) s[k] = s[k].slice(0, SPECIES.length);
+  return true;
+}
+
 export function saveProblem(s) {
   if (!s || typeof s !== "object" || Array.isArray(s)) return "That is not a save file.";
   if (!Array.isArray(s.dex)) return "No Pokédex in that file.";
   /* An older, SHORTER dex is fine - `loadState` pads it. Only a longer one is
      rejected, because that is a save from a game that knows more than this one
      does and padding cannot invent what it means. */
-  if (s.dex.length > SPECIES.length)
+  if (!trimEmptyTail(s))
     return `That save holds ${s.dex.length} species; this game knows ${SPECIES.length}.`;
   if (!Array.isArray(s.box)) return "No storage box in that file.";
   if (typeof s.money !== "number" || !Number.isFinite(s.money))
@@ -531,7 +546,7 @@ function loadState() {
        check.mjs asserts that alignment rather than trusting it; if a future
        generation is ever inserted BEFORE Kanto, this stops being true and that
        assertion is what will say so. */
-    if (s.dex.length > SPECIES.length) {
+    if (!trimEmptyTail(s)) {
       keep(mine(BROKEN_KEY), raw);
       return [freshState(), "outdated"];
     }

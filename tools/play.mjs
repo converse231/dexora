@@ -1370,7 +1370,8 @@ function until(e, what, label, max = 2000) {
      Padding cannot invent what extra positions mean and saving would drop
      them, so the verdict latches the session shut - locally AND upward. */
   {
-    const future = { ...SAVE, dex: Array(SPECIES.length + 70).fill(0) };
+    // Something RECORDED past this build (a caught species it has never heard of): an empty tail is trimmed (below).
+    const future = { ...SAVE, dex: [...Array(SPECIES.length + 70).fill(0).slice(0, -1), 2] };
     const { e } = boot(future);
     const raw = store.get(SAVE_KEY);
     assert.equal(e.state.stale, "outdated", "a newer build's save loaded as if it were ours");
@@ -1384,6 +1385,20 @@ function until(e, what, label, max = 2000) {
     assert.equal(pushed, 0, "an older build uploaded a fresh game over the account");
     e.syncTrouble("offline");
     assert.equal(e.state.stale, "outdated", "a sync blip cleared the out-of-date latch");
+    e.destroy();
+  }
+
+  /* EMPTY PLACES PAST THIS BUILD ARE TRIMMED, NOT A NEWER GAME (2026-10-27,
+     reported: Shichi-Go-San's 18 places, taken out before they shipped, left
+     every save written meanwhile "out of date" for good). It loads, keeps
+     every catch, writes and uploads. */
+  {
+    const dex = [...SAVE.dex, ...Array(SPECIES.length + 18 - SAVE.dex.length).fill(0)];
+    const { e } = boot({ ...SAVE, dex, shiny: [...(SAVE.shiny ?? []), ...Array(18).fill(0)] });
+    assert.notEqual(e.state.stale, "outdated", "a save whose extra places hold nothing was read as a newer build's");
+    assert.equal(e.state.dex.length, SPECIES.length, "the empty tail was not trimmed to this build");
+    assert.deepEqual(e.state.dex.slice(0, SAVE.dex.length).filter((v) => v === 2).length, SAVE.dex.filter((v) => v === 2).length,
+      "trimming the tail lost a catch");
     e.destroy();
   }
 

@@ -135,7 +135,10 @@ anything done. The run prints each suite; the count is not typed anywhere.
   BROKEN keeps unparseable text verbatim.
 - **`loadState` returns `[state, verdict]`.** Only a clean load mirrors upward.
   An unreadable save plays a fresh game and never uploads it. A save longer than
-  this build's dex is `stale: "outdated"`: nothing is written anywhere.
+  this build's dex is `stale: "outdated"`: nothing is written anywhere -
+  unless every place past this build is EMPTY (`trimEmptyTail`, 2026-10-27:
+  a build that dropped places before shipping left saves "out of date" for
+  good), which is trimmed and loads.
 - **Session fields never ride in a save.** `VOLATILE` is the one list, stripped
   on write and export and reset on load.
 - **Every new saved field gets one `savedField(name, good, bad, empty)` line in

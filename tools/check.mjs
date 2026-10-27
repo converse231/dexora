@@ -3517,13 +3517,16 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     /* A dex LONGER than this game knows, which is a save from a newer build and
        cannot be padded into meaning. A shorter one is an older save and is now
        accepted on purpose - see padDex. */
-    [{ dex: new Array(SPECIES.length + 1).fill(0), box: [], money: 0 },
+    // One that RECORDED a species past this build; an empty tail is trimmed instead (engine `trimEmptyTail`, below).
+    [{ dex: [...new Array(SPECIES.length).fill(0), 2], box: [], money: 0 },
       "a dex longer than the game knows"],
     [{ dex: ok.dex, money: 0 }, "no box"],
     [{ dex: ok.dex, box: [], money: "lots" }, "money that is not a number"],
     [{ dex: ok.dex, box: [], money: NaN }, "money that is NaN"],
   ])
     assert.ok(saveProblem(bad), `an import accepted ${why}`);
+  assert.equal(saveProblem({ dex: new Array(SPECIES.length + 18).fill(0), box: [], money: 0 }), null,
+    "an import refused a save whose places past this build are all empty");
 
   /* AND AN OLDER, SHORTER SAVE IS ACCEPTED, because rejecting it is how an
      update deletes somebody's collection. It only works because Gen 1 sits at
