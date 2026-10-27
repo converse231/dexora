@@ -19,7 +19,7 @@ import { label, AREAS } from "../game/map.js";
 import { speciesById, foundIn, dexIndex } from "../game/biomes.js";
 import { eventShelf } from "../game/items.js";
 import { shelfOf, eventAfter,
-  eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, eventDone, huntDue,
+  eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, eventDone, huntDue, huntWords,
   shareOf, EVENT_NIGHT, EVENT_PACKS,
 } from "../game/events.js";
 
@@ -117,10 +117,11 @@ function lines(ev) {
 }
 
 /* THE MOON OVER THE HUNT: one disc a Bad Dream, waning to the new moon as
-   they come - full (lit) is a dream still to catch, dark is one caught. */
-function Moons({ n, of }) {
+   they come - full (lit) is a dream still to catch, dark is one caught. An
+   event's CSS redraws the discs (Shichi-Go-San's are shrine bells). */
+function Moons({ n, of, says }) {
   return (
-    <span className="sn-moons" role="img" aria-label={`${n} of ${of} Bad Dreams`}>
+    <span className="sn-moons" role="img" aria-label={`${n} of ${of} ${says}`}>
       {Array.from({ length: of }, (_, k) => <i key={k} className={k < n ? "dark" : ""} />)}
     </span>
   );
@@ -156,6 +157,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
         <button type="button" className="set-x sn-x" aria-label="Close" onClick={onClose}>✕</button>
         <span className="sn-kicker">{soon ? "Coming soon" : "Limited-time event"} · {day(ev.start)} – {day(ev.end)}</span>
         <h2 id="sn-title" className="sn-title">{ev.name}</h2>
+        {ev.lore && <p className="sn-lore">{ev.lore}</p>}
         {(soon || live) && <Countdown to={soon ? eventOpens(ev) : eventCloses(ev)} label={soon ? "Starts in" : "Ends in"} />}
         <p className="sn-lede">
           {soon
@@ -214,7 +216,9 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
         )}
 
         <ul className="sn-how">
-          <li><em>🌙</em><span><b>{EVENT_NIGHT}× after dark</b>The costumes come out at night.</span></li>
+          {ev.daytime
+            ? <li><em>🌞</em><span><b>{EVENT_NIGHT}× by day</b>The costumes come out in daylight.</span></li>
+            : <li><em>🌙</em><span><b>{EVENT_NIGHT}× after dark</b>The costumes come out at night.</span></li>}
           <li><em>{ev.emblem ?? "🎃"}</em><span><b>1 in {Math.round(1 / shareOf(ev))} wear one</b>{ev.evolves === false ? "Every stage is its own catch - the big ones turn up where their line starts." : "A line evolves in costume; the rest, catch each one."}</span></li>
           {honey && <li><em>🍯</em><span><b>{honey.name}</b>{honey.lure}× as likely for {honey.steps} steps.</span></li>}
           {ball && <li><em>🔮</em><span><b>{ball.name}</b>{ball.boost}× catch on costumed ones.</span></li>}
@@ -276,12 +280,12 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
               <Sprite id={ev.hunt.id} alt="" />
             </button>
             <span>
-              <b>{won ? `${ev.hunt.name} ✓` : due ? "The new moon has risen" : ev.hunt.name}</b>
+              <b>{won ? `${ev.hunt.name} ✓` : due ? huntWords(ev.hunt).due : ev.hunt.name}</b>
               <small>{won ? ev.hunt.title
                 : due ? `Walk in ${AREAS[ev.hunt.area]?.name} - your next meeting there`
                   : `${n} of ${ev.hunt.dreams} costumes caught`}</small>
             </span>
-            {!won && <Moons n={n} of={ev.hunt.dreams} />}
+            {!won && <Moons n={n} of={ev.hunt.dreams} says={huntWords(ev.hunt).tokens} />}
           </div>
         );
       })()}

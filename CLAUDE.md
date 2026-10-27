@@ -210,7 +210,17 @@ anything done. The run prints each suite; the count is not typed anywhere.
   sold on their days, so a Hallow Ball from week one works in week two). The
   running week's board card names the next (`eventAfter`), and a finished
   week's Claim stays on the board beside it (`boardSeasons`). Hallowed Night
-  is 10-24 to 10-30, The Haunting 10-31 to 11-06. **A week may dress whole
+  is 10-24 to 10-30, The Haunting 10-31 to 11-06, then three days' rest and
+  Shichi-Go-San 11-10 to 11-16 (2026-10-27, asked for: its lines are the
+  ages three, five and seven). **An event speaks for itself**: `lore` is its
+  story on the poster, `daytime` moves the `EVENT_NIGHT` lift to daylight
+  (and drops the hunt's night veil), `hunt.words` (`huntWords`, events.js)
+  names its tokens, bell or moon, in every message - Hallowed Night's dreams
+  and new moon are the defaults - and its theme is `.ev-<id>` in styles.css,
+  the sky's moon, fog and bats redrawn. **No event ball past the Hallow
+  Ball**: every ball takes a number key, and check.mjs allows nine; the
+  Hallow Ball works on any costume, so a later week sells only its own
+  honey (two events' jars are not tiers of each other). **A week may dress whole
   lines without evolving them** (`evolves: false`, The Haunting, your call:
   second and final stages, each its own catch - fetch-evolutions writes no
   row): a later stage is rarely met wild, so a look `on` its line's base is
@@ -1278,6 +1288,15 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   foam, a fire cone, bolts, ice); `signatureShot`/`signatureHit` draw Water
   Shuriken, Shadow Ball, Aura Sphere, Focus Blast, Energy Ball and Sludge
   Bomb as themselves; every ULTI strike raises its type's `pillar`.
+  **Instant moves cost their dodge, so damage came down** (2026-10-27,
+  reported: "my Pokemon is dead though same level and type advantage"):
+  with no wind-up Hard v Hard fell from 63 s to 40 s, a Pokemon to 10 s on
+  court, a type-advantaged team from 96% to 79%, and Surge carried 44% of
+  the damage. `DAMAGE_K` 0.23 -> 0.16, `SURGE_DMG` 1.15 with cooldowns 1.5x
+  (whole ticks, every other tick), `GAIN_DEAL`/`GAIN_TAKE` 45/30, and no
+  blow but an ULTI takes more than `HIT_CAP` (30%) of a body: 57 s, ~16 s,
+  ~90%, Surge ~30%. Measure with a seeded Hard v Hard sweep (`newMatch`,
+  `tick`, the `hit` events' `frac`) before moving any of them.
   `BEAM_W` 0.5 and `MELEE_RANGE` 1.75;
   SUDDEN DEATH (`SUDDEN_T`) when the clock runs out level on Pokemon - all
   standing at 1 HP. Surge is called **ULTI** on every screen (the code keeps

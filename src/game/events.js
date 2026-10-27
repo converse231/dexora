@@ -142,12 +142,15 @@ export const eventChance = ({ night = false, lure = 1, share = EVENT_SHARE } = {
    them, picked evenly by a second draw only when there is a choice. */
 /* A `rare` look takes that share of the odds (Phantom Thief Sableye, a
    fifth): in a choice it is picked by weight, so the others keep theirs. */
+/* A `daytime` event (Shichi-Go-San: a shrine visit is by day) takes the
+   EVENT_NIGHT lift in daylight instead. */
 export function eventLook(sp, random, { day, night, lure } = {}) {
   const ev = eventOn(day);
   const looks = (ev?.looks ?? []).filter((l) => l.of === sp.id || l.on === sp.id);
   if (!looks.length) return sp;
   const w = looks.map((l) => l.rare ?? 1), sum = w.reduce((a, b) => a + b, 0);
-  if (random() >= eventChance({ night, lure, share: shareOf(ev) }) * (sum / looks.length)) return sp;
+  const lit = ev.daytime ? !night : !!night;
+  if (random() >= eventChance({ night: lit, lure, share: shareOf(ev) }) * (sum / looks.length)) return sp;
   if (looks.length === 1) return speciesById(looks[0].id);
   let r = random() * sum, k = 0;
   while (r >= w[k] && k < looks.length - 1) r -= w[k++];
@@ -179,6 +182,14 @@ export const eventDue = (dex, medals = []) =>
    each event's Bad Dreams, one a costume caught on its days. Full, the hunt
    is DUE until its medal is won: the next wild meeting in its area after
    dark is it. A save's count is held to the hunt's own range. */
+/* THE HUNT'S WORDS: Hallowed Night's dreams and new moon, unless an event
+   names its own (`hunt.words`: Shichi-Go-San's blessings and shrine bell). */
+const HUNT_WORDS = {
+  token: "Bad Dream", tokens: "Bad Dreams", due: "The new moon has risen", rise: "THE NEW MOON RISES",
+  falls: "The Nightmare falls...", fade: "THE NIGHTMARE FADES", back: "the new moon will bring it back",
+  run: "The Nightmare fades if you run",
+};
+export const huntWords = (h) => ({ ...HUNT_WORDS, ...h?.words });
 export function huntDue(dreams, medals = [], day) {
   const ev = eventOn(day);
   const h = ev?.hunt;

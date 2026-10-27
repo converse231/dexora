@@ -650,7 +650,8 @@ export default function App({
   // The event running, or the one about to open (its teaser and countdown).
   const season = eventOn() ?? eventSoon();
   const nightmare = st ? huntDue(st.dreams, st.medals) : null;
-  const nightmareNear = !!nightmare && st.areaId === nightmare.area && isNight(st.steps);
+  // A daytime event's hunt (Shichi-Go-San) draws no closing dark.
+  const nightmareNear = !!nightmare && !eventOn()?.daytime && st.areaId === nightmare.area && isNight(st.steps);
   useEffect(() => {
     /* AFTER the day's check-in, never beside it: both decide in one render,
        and on a Friday of the event the two opened stacked (found in QA). */

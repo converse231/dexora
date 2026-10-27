@@ -447,6 +447,11 @@ export const FIELD = [
     id: "spooky-honey", art: "honey", fx: "spooky", family: "event", name: "Spooky Honey", price: 1200, level: 3,
     event: "halloween", steps: HONEY_STEPS, lure: 3, blurb: "Costumes in 3 of 4 meetings",   // a lure up to EVENT_CAP: half by day already (2026-10-24)
   },
+  // Shichi-Go-San's: thousand-year candy in the jar (`.item-chitose`), the same lure.
+  {
+    id: "chitose-honey", art: "honey", fx: "chitose", family: "event", name: "Chitose Honey", price: 1200, level: 3,
+    event: "shichigosan", steps: HONEY_STEPS, lure: 3, blurb: "Costumes in 3 of 4 meetings",
+  },
 ];
 
 /* WHICH BALL EACH NUMBER KEY THROWS, AND IT IS THE PLAYER'S TO ARRANGE.

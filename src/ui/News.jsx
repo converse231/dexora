@@ -24,6 +24,7 @@ export const NEWS = [
       ["The Gym Circuit", "The Arena Ladder now runs every region's leaders, Elite Four and Champion with their top three."],
       ["They match you", "Gym teams fight at your level or theirs, whichever is higher - Lv 100s still meet a fight."],
       ["No charge", "Every move goes the moment you press it."],
+      ["Fairer fights", "Hits land softer and no single blow takes over 30% of HP. Type advantage counts again."],
       ["Hold and aim", "Flamethrower, Hydro Pump and every beam pour while held - sweep them onto your foe."],
       ["Signature looks", "Water Shuriken, Aura Sphere and more have their own art, and every ULTI raises its type's pillar."],
     ],

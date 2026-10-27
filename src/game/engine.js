@@ -34,7 +34,7 @@ import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
-  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, cleanDreams, eventCheckin, shelfOf,
+  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntWords, cleanDreams, eventCheckin, shelfOf,
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
@@ -2024,7 +2024,7 @@ export function createEngine(canvas, onChange, mini = null) {
       source,
       // The hunted one, which asks before you run and ends its hunt (`huntOn`).
       hunt: nightmare,
-      msg: nightmare ? `The Nightmare falls... ${label(sp).toUpperCase()} is here!`
+      msg: nightmare ? `${huntWords(hunt).falls} ${label(sp).toUpperCase()} is here!`
         : source === "fishing"
         ? `Something bit! A wild ${label(sp).toUpperCase()}!`
         : `A wild ${label(sp).toUpperCase()} appeared!`,
@@ -2685,8 +2685,8 @@ export function createEngine(canvas, onChange, mini = null) {
           : state.medals.includes(`event:${ev.id}`) ? "" : ` Catch every ${ev.name} look for ${ev.title}.`}` });
       } else {
         state.dreams = { ...state.dreams, [ev.id]: Math.min(state.dreams[ev.id] ?? 0, h.keep) };
-        cheer({ kind: "medal", title: "THE NIGHTMARE FADES",
-          sub: `Catch ${h.dreams - h.keep} more costumes and the new moon will bring it back.` });
+        cheer({ kind: "medal", title: huntWords(h).fade,
+          sub: `Catch ${h.dreams - h.keep} more costumes and ${huntWords(h).back}.` });
       }
       return;
     }
@@ -2696,7 +2696,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (was >= h.dreams) return;
     state.dreams = { ...state.dreams, [ev.id]: was + 1 };
     if (was + 1 === h.dreams) {
-      cheer({ kind: "medal", title: "THE NEW MOON RISES",
+      cheer({ kind: "medal", title: huntWords(h).rise,
         sub: `Something waits in ${AREAS[h.area]?.name ?? "the dark"}... Walk in.` });
     }
   }
@@ -2729,7 +2729,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!confirmed && (isLegendary(e.speciesId) || e.alpha || e.hunt)) {
       ask("flee", () => flee(true),
         `Run from ${e.alpha ? "the alpha " : ""}${e.name}?`,
-        e.hunt ? "The Nightmare fades if you run - catch more costumes to bring it back."
+        e.hunt ? `${huntWords(eventOn()?.hunt).run} - catch more costumes to bring it back.`
           : isLegendary(e.speciesId)
           ? "A legendary. There is no telling when you will meet another."
           : "An alpha never runs from you, but it will be gone if you run from it.");

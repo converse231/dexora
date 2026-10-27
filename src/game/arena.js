@@ -350,13 +350,18 @@ const X_TIME = sec(8), X_ATTACK = 1.3, X_GUARD = sec(1.5);
    the ULTIs' signatures (2026-10-23) brought it to 38 s; 0.3 with the ULTI
    parts below is 76 s again, an ULTI ~14% of the damage dealt. Shorter
    wind-ups and cooldowns (2026-10-23, asked for again) made it 53 s; 0.23 is
-   77 s, and brawler teams still win ~42% against blasters.
+   77 s, and brawler teams still win ~42% against blasters. NO CHARGE
+   (2026-10-27) took every wind-up, and with it every chance to dodge or
+   read a blow: Hard v Hard fell to 40 s, a Pokemon to 10 s on court, and a
+   type-advantaged team won 79% (96% before) - reported as "my Pokemon is
+   dead though it has the same level and type advantage". 0.16 with the
+   Surge and hit-cap changes below is 57 s, 16 s and ~90%.
    ARENA HP (2026-10-23, reported: "my basic attack became just 3 or 4"): a
    body's HP is its stat times HP_K and every hit DAMAGE_K of that larger
    scale - the same fight, ten times the numbers, so a hit reads as a hit
    and `floor` no longer eats most of a small one (a basic jab was 1). */
 export const HP_K = 10;
-const DAMAGE_K = 0.23;
+const DAMAGE_K = 0.16;
 export const DAMAGE = DAMAGE_K * HP_K;
 /* THE OPENING: the count before a fight, in which nobody moves. It is
    ticks of the match - both ends of an online fight count the same ones -
@@ -365,12 +370,15 @@ export const INTRO = sec(3.2);
 /* SURGE, the Arena's twist: a meter a side, filled by landing hits, taking
    them, a PERFECT DODGE (rolling through an attack) and a zone. Full, one
    press: a shockwave that throws the foe off you and breaks a stagger, then
-   SURGE_T of blows at SURGE_DMG with cooldowns recovering twice as fast. The
-   meter rides across a switch; the surge ends with the Pokemon. Both sides
-   have it, so the per-arena fairness suites hold it fair. */
+   SURGE_T of blows at SURGE_DMG with cooldowns recovering half as fast
+   again. The meter rides across a switch; the surge ends with the Pokemon.
+   Both sides have it, so the per-arena fairness suites hold it fair. With
+   the meter filling on a knockout's worth of trading and cooldowns doubled,
+   it carried 44% of all damage (2026-10-27): the sudden deaths. Now 1.15x,
+   1.5x the recovery and slower gains (GAIN_DEAL, GAIN_TAKE): about 30%. */
 export const SURGE_MAX = 100;
 export const SURGE_T = sec(6);
-const SURGE_DMG = 1.25, SURGE_PUSH = 2.6;
+const SURGE_DMG = 1.15, SURGE_PUSH = 2.6;
 /* THERE IS NO PP (2026-10-23, asked for): a move is limited by its cooldown
    alone. PP ran out mid-match, and Struggle and a CPU benching a spent
    Pokemon existed only to stop the stalemate that made (13 of 40 Hard
@@ -467,7 +475,12 @@ export const basicOf = (f) => (speciesRole(f.id) === "brawler" ? BASIC_P : BASIC
 export const FINAL_T = sec(60);
 const FINAL_DMG = 1.5, FINAL_GAIN = 2;
 const finalMinute = (s) => s.t >= LIMIT - FINAL_T;
-const GAIN_DEAL = 70, GAIN_TAKE = 45, GAIN_DODGE = 12, GAIN_ZONE = 15;
+const GAIN_DEAL = 45, GAIN_TAKE = 30, GAIN_DODGE = 12, GAIN_ZONE = 15;
+/* NO ONE BLOW TAKES MORE THAN HIT_CAP OF A BODY (2026-10-27): every move is
+   instant now, so a stacked hit (STAB, super effective, a crit, the weather,
+   Surge, an X Attack) could not be seen coming - High Jump Kick took 89%.
+   An ULTI is exempt: it is telegraphed, and a dash beats it. */
+const HIT_CAP = 0.3;
 
 // ------------------------------------------------------------------ shapes
 
@@ -720,7 +733,8 @@ function stepSide(s, side, inp) {
   }
   if (sd.koT > 0) return;
   const f = sd.team[sd.active];
-  for (const m of [...f.kit, f.basic]) if (m.cd > 0) m.cd = Math.max(0, m.cd - (f.surge > 0 || f.haste > 0 ? 2 : 1));
+  // Surge recovers 1.5x (2 ticks every other tick, whole ticks so a replay is exact); an X Speed 2x.
+  for (const m of [...f.kit, f.basic]) if (m.cd > 0) m.cd = Math.max(0, m.cd - (f.haste > 0 ? 2 : f.surge > 0 ? (s.t % 2 ? 2 : 1) : 1));
   if (f.surge > 0) f.surge--;
   if (f.fortress > 0) f.fortress--;
   if (f.awake > 0) f.awake--;
@@ -1803,7 +1817,7 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1, part
       * (contact && roleOf(a) === "brawler" ? BRAWL_HIT : 1) * (!contact && roleOf(d) === "brawler" ? BRAWL_GUARD : 1)
       * (helping(s, a.side, "plusle") ? HELP_HIT : 1) * guard;
     dmg *= (1 + a.cp.dmg) * (1 - d.cp.guard) * sigK(s, a, d, m, move, contact);
-    dmg = Math.max(1, Math.floor(dmg));
+    dmg = Math.max(1, Math.floor(isUlt(move) ? dmg : Math.min(dmg, d.max * HIT_CAP)));
     // Star Requiem (Giratina's): its ULTI finishes a foe under a quarter of its HP.
     if (isUlt(move) && hasSig(a, "requiem") && d.hp <= d.max / 4) dmg = d.hp;
     d.regen = 0;

@@ -5258,8 +5258,11 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     /* A TIER MUST BEAT THE ONE BELOW IT, on duration AND on effect AND on
        price. A Super Repel that costs more and does no more is a price with no
        product, and nothing else in the suite would say so. */
-    for (const fam of FAMILIES) {
-      const line = FIELD.filter((f) => f.family === fam);
+    /* Two events' jars are not tiers of each other (Spooky and Chitose Honey,
+       2026-10-27): each is the one jar on its own shelf, so a line is a family
+       on ONE shelf. */
+    for (const fam of FAMILIES) for (const shelf of new Set(FIELD.map((f) => f.event ?? ""))) {
+      const line = FIELD.filter((f) => f.family === fam && (f.event ?? "") === shelf);
       for (let k = 1; k < line.length; k++) {
         const lo = line[k - 1], hi = line[k];
         assert.ok(hi.price > lo.price, `${hi.id} costs no more than ${lo.id}`);
@@ -7447,7 +7450,8 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       f.kit[0].cd = 100;
       for (let t = 0; t < 10; t++) A.tick(s, [A.NO_INPUT, null]);
       assert.ok(d.x > 10.5, `a Surge left the foe at ${d.x.toFixed(2)}, 1.5 tiles off - it throws nobody`);
-      assert.equal(f.kit[0].cd, 80, "a surging Pokemon's cooldowns did not run twice as fast");
+      // 1.5x since 2026-10-27 (Surge carried 44% of the damage at 2x): ten ticks recover fifteen.
+      assert.equal(f.kit[0].cd, 85, "a surging Pokemon's cooldowns did not run half as fast again");
       s.sides[0].swapCd = 0;
       A.tick(s, [{ ...A.NO_INPUT, swap: 1 }, null]);
       assert.equal(f.surge, 0, "a Surge outlived its Pokemon's switch");
