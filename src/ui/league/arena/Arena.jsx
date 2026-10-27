@@ -47,6 +47,7 @@ import BattleSwitch from "../BattleSwitch.jsx";
 import PageHead from "../../PageHead.jsx";
 import { useRaise } from "../../wallet.jsx";
 import { createRenderer } from "./render.js";
+import KitList from "./Kit.jsx";
 import FighterSelect from "./FighterSelect.jsx";
 import { play as playSound, soundOn, setSound } from "./sfx.js";
 import { loadAnims } from "../moveAnim.js";
@@ -133,7 +134,7 @@ const LEVEL_SAYS = {
 const MODE_NAME = { ladder: "Arena Ladder", quick: "Quick battle", training: "Training", friends: "Battle a friend" };
 // A role in a word and its perks, for the lobby and the tutor (arena.js's roleOf).
 const ROLE = {
-  brawler: ["Brawler", "Attack-led: runs and jabs faster, hits harder up close, shrugs off shots"],
+  brawler: ["Brawler", "Attack-led: runs and jabs faster, shrugs off shots"],
   blaster: ["Blaster", "Sp. Atk-led: shots fly faster and farther, beams charge sooner"],
 };
 // What reaches how far: the tutor's filters, and which a role wants.
@@ -316,8 +317,7 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                   <li key={m.uid} className="ag-mon">
                     <span className="ag-slot" aria-label={`Slot ${k + 1}`}>{k + 1}</span>
                     <Sprite id={m.species} variant={variantOf(m)} />
-                    {m.rental ? <span className="ag-learn ag-rent" data-tip="A rental - catch your own to train it">Rental</span>
-                      : <button type="button" className="ag-learn" onClick={() => onTutor(m.uid)} aria-label={`Teach ${nameOf(m.species)} moves`}>Moves</button>}
+                    {m.rental && <span className="ag-learn ag-rent" data-tip="A rental - catch your own to train it">Rental</span>}
                     <div className="ag-mon-text">
                       <b>{nameOf(m.species)}</b>
                       {enteringAs(m).mega && <span className="ag-megain">Enters as {nameOf(enteringAs(m).species)} · Mega Evolves in battle</span>}
@@ -335,12 +335,8 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                         )}
                       </span>
                       <Types of={sp.types} />
-                      <ul className="ag-moves">
-                        {f.moves.map((mv) => {
-                          const data = moveOf(mv.i), shape = shapeOf(data);
-                          return <li key={mv.i} className={`t-${data.t ?? "normal"}${shape ? "" : " off"}`} data-tip={shape ? `${SHAPE_WORD[shape]} · ${waitOf(data)} s cooldown` : "Not played in the Arena"}>{moveName(mv.i)}</li>;
-                        })}
-                      </ul>
+                      {/* Its FIXED kit (docs/arena-kits.md): the same four for every trainer's one. */}
+                      <KitList id={f.id} className="ag-moves" />
                     </div>
                   </li>
                 );

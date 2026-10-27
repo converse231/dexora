@@ -11620,21 +11620,6 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 @keyframes ifx-breathe { 50% { opacity: .45; transform: scale(.85); } }
 @keyframes ifx-wisp { 0% { opacity: 0; transform: translateY(20%) scaleX(.6); } 30% { opacity: .9; } 100% { opacity: 0; transform: translate(30%, -60%) scaleX(1.2); } }
 @media (prefers-reduced-motion: reduce) { .item-spooky > i { animation: none; } }
-/* THE CHITOSE HONEY (Shichi-Go-San): the jar blushed festival pink, a gold
-   glow, and a red-and-white thousand-year candy stick standing out of it. */
-.item-chitose { position: relative; }
-.item-chitose > img { filter: hue-rotate(-40deg) saturate(1.6) brightness(1.05) !important; }
-.item-chitose > .ifx-glow {
-  position: absolute; left: 22%; top: 40%; width: 56%; height: 46%; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle, rgba(255, 225, 130, 1) 0 22%, rgba(255, 190, 70, .6) 45%, rgba(255, 190, 70, 0) 72%);
-  mix-blend-mode: screen; animation: ifx-breathe 2.6s ease-in-out infinite;
-}
-.item-chitose > .ifx-wisp {
-  position: absolute; left: 56%; top: -10%; width: 10%; height: 46%; border-radius: 3px; pointer-events: none; rotate: 14deg;
-  background: repeating-linear-gradient(-45deg, #e8303a 0 3px, #fff6f0 3px 6px);
-  box-shadow: 0 0 0 1px rgba(90, 10, 20, .35);
-}
-@media (prefers-reduced-motion: reduce) { .item-chitose > i { animation: none; } }
 
 /* ================================================================ THE ARENA
    Real-time battles, its own tab since 2026-10-22 (ui/league/arena/Arena.jsx).
@@ -11720,6 +11705,11 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .ag-moves li { font: 600 11px var(--body); padding: 2px 7px; border-radius: 6px; color: #e9eeff;
   background: color-mix(in srgb, var(--tc, #8d9ac4) 34%, rgba(12, 18, 38, .9)); border: 1px solid color-mix(in srgb, var(--tc, #8d9ac4) 60%, transparent); }
 .ag-moves li.off { opacity: .45; text-decoration: line-through; }
+/* A FIXED KIT (ui/league/arena/Kit.jsx): each move with its key, then the class and the combo it teaches. */
+.kit-list .kit-key { margin-right: 5px; padding: 0 4px; border-radius: 4px; font: 700 9px var(--pixel); font-style: normal; background: rgba(0, 0, 0, .35); color: #fff; }
+.kit-combo { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 11px; color: #b9c2e4; }
+.kit-combo em { font: 700 10px var(--pixel); font-style: normal; text-transform: uppercase; color: #ffd36b; }
+@media (hover: none) and (pointer: coarse) { .kit-list .kit-key { display: none; } }
 /* A role in a word (Brawler, Blaster), and the card's way to its Move Tutor. */
 .ag-role { font-style: normal; font-weight: 700; color: #ffb37a; }
 .ag-role.r-blaster { color: #8fdcff; }
@@ -12659,47 +12649,5 @@ button.wl-chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2
 .sn-board-card.ev-haunting .sn-tile { border-color: color-mix(in srgb, #3fd6b0 45%, transparent); }
 .sn-board-card.ev-haunting .sn-tile b { color: #19a07f; }
 
-/* SHICHI-GO-SAN'S POSTER AND CARD (2026-10-27): a shrine by day - lacquer
-   red under a gold sun, cloud bands, paper cranes where the bats flew, and
-   the hunt's pips shrine bells. */
-.sn-card.ev-shichigosan {
-  --sn-glow: #ffd36b; --sn-ink: #fff6ec; --sn-soft: #f3cfc4; --sn-night: #3a0a14;
-  border-color: rgba(255, 211, 107, .5);
-  background: radial-gradient(120% 70% at 50% 0%, #b8323a 0%, #7a1626 45%, var(--sn-night) 100%);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, .6), inset 0 0 60px rgba(255, 211, 107, .12);
-}
-.ev-shichigosan .sn-moon {
-  background: radial-gradient(circle at 50% 50%, #fff4c8 0 44%, #ffd36b 60%, #f2a43a 100%);
-  box-shadow: 0 0 40px 12px rgba(255, 200, 90, .4), 0 0 110px 40px rgba(255, 170, 60, .18);
-}
-.ev-shichigosan .sn-fog {
-  background: radial-gradient(40% 30% at 25% 60%, rgba(255, 220, 140, .3), transparent 70%),
-    radial-gradient(35% 26% at 70% 50%, rgba(255, 220, 140, .24), transparent 70%);
-}
-/* A paper crane: one clip-path, gliding (no flap - paper does not beat). */
-.ev-shichigosan .sn-bat {
-  width: 28px; height: 16px; background: #fff6ec;
-  clip-path: polygon(0 55%, 38% 45%, 50% 0, 60% 45%, 100% 30%, 66% 62%, 54% 100%, 44% 66%);
-  filter: drop-shadow(0 2px 2px rgba(60, 0, 10, .35)); animation: sn-fly 11s ease-in-out infinite;
-}
-.ev-shichigosan .sn-go { background: linear-gradient(180deg, #ffd36b, #e89a2a); color: #3a0a14; box-shadow: 0 10px 28px rgba(255, 190, 70, .4); }
-.ev-shichigosan .sn-sub, .ev-shichigosan .sn-kicker { color: var(--sn-glow); }
-.ev-shichigosan .sn-dark > img { filter: brightness(0) drop-shadow(0 0 6px rgba(255, 211, 107, .6)) !important; }
-.ev-shichigosan .sn-title { color: #fff1c9; text-shadow: 0 0 18px rgba(255, 211, 107, .7), 0 3px 0 #5c0d1a; }
-.ev-shichigosan .sn-tile { border-color: rgba(255, 211, 107, .45); box-shadow: inset 0 -3px 0 rgba(255, 211, 107, .15); }
-.ev-shichigosan .sn-tile b { color: #ffd36b; }
-.ev-shichigosan .sn-hunt { border-color: rgba(255, 211, 107, .45); }
-.ev-shichigosan .sn-hunt b { color: #ffe39a; }
-.ev-shichigosan .sn-shade > img { filter: brightness(0) drop-shadow(0 0 10px rgba(140, 255, 160, .9)) !important; }
-.sn-board-card.ev-shichigosan .ev-banner { background: linear-gradient(90deg, #7a1626, #b8323a); }
-.evcard .sn-board-card.ev-shichigosan .ev-banner h4 { color: #ffd36b; }
-.sn-board-card.ev-shichigosan .sn-slot.got { border-color: #e8a83a; }
-.sn-board-card.ev-shichigosan .sn-tile { border-color: color-mix(in srgb, #e8a83a 45%, transparent); }
-.sn-board-card.ev-shichigosan .sn-tile b { color: #c4561f; }
-.sn-board-card.ev-shichigosan .sn-hunt-row.due { box-shadow: inset 0 0 0 1px #e8a83a, 0 0 18px rgba(232, 168, 58, .35); }
-/* A shrine bell a Blessing: a dark bell still to ring, gold once rung (`.dark`
-   is a caught one - Hallowed Night's moon wanes as they come). */
-.ev-shichigosan .sn-moons i { border-radius: 45% 45% 30% 30%; background: #5c0d1a; box-shadow: inset 0 0 0 1px #c4561f; }
-.ev-shichigosan .sn-moons i.dark { background: linear-gradient(#ffe39a, #e8a83a); box-shadow: 0 0 4px rgba(255, 200, 90, .5); }
 /* The event's story, under its name (eventforms.js `lore`). */
 .sn-lore { margin: -6px 0 0; max-width: 52ch; font-size: 12.5px; line-height: 1.5; color: var(--sn-soft); }

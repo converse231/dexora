@@ -40,6 +40,7 @@ import { speciesById } from "./biomes.js";
 import { hash } from "./daily.js";
 import { PMD_IDS } from "../data/pmd.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
+import { KITS } from "../data/kits.js";
 
 export const TPS = 60;
 export const W = 26, H = 16;                    // the floor, in tiles
@@ -96,7 +97,7 @@ export const BEAM_LEN = 13, BEAM_W = 0.85;
    THROW_DIST along the blow - into a wall-splat where there is a wall. A
    FLAME move's shot leaves FIRE patches along its path for FIRE_T: whoever
    of the other side stands in one is singed every FIRE_TICK and may burn. */
-const GRABS = new Set(["vine-whip", "power-whip", "circle-throw", "dragon-tail", "vital-throw", "submission"]);
+export const GRABS = new Set(["vine-whip", "power-whip", "circle-throw", "dragon-tail", "vital-throw", "submission"]);
 const FLAMES = new Set(["flamethrower", "inferno", "fire-blast"]);
 const GRAB_T = sec(0.3), THROW_DIST = 3.2, FIRE_T = sec(3), FIRE_TICK = sec(0.5), FIRE_R = 0.6, FIRE_EVERY = 6, FIRE_MAX = 24;
 /* WALL-SPLAT (2026-10-24, asked for): a Pokemon knocked back into the wall
@@ -133,7 +134,7 @@ const STREAM_PART = 1 / Math.ceil(STREAM_MAX / STREAM_TICK), STREAM_TRACK = 0.22
 /* CONFUSION (2026-10-23, asked for): the moves the games give a chance to
    confuse (the League's data drops it - `fb`), here a dizzy CONFUSE_T in
    which its movement runs backwards and slower. */
-const CONFUSES = { confusion: 10, psybeam: 10, "signal-beam": 10, "water-pulse": 20, "dizzy-punch": 20, "rock-climb": 20,
+export const CONFUSES = { confusion: 10, psybeam: 10, "signal-beam": 10, "water-pulse": 20, "dizzy-punch": 20, "rock-climb": 20,
   hurricane: 30, "strange-steam": 20, "dynamic-punch": 100 };
 const CONFUSE_T = sec(2.5), CONFUSE_SLOW = 0.85;
 /* SMOKE: Smokescreen leaves a cloud where its user stands, hiding whoever
@@ -424,10 +425,13 @@ export const basicShape = (f) => (f.basic.i === BASIC_P ? "melee" : "shot");
    against the other's: with no perks brawlers won 18 (range was simply
    better); these 48, a 3v3 still ~74 s. The basic bolt's longer reach
    (2026-10-23) took it to 9 of 40 again, and BRAWL_GUARD 0.72 -> 0.6 back to
-   16; moves priced by their worth (2026-10-24) left 13, and 0.55 is 16. */
+   16; moves priced by their worth (2026-10-24) left 13, and 0.55 is 16.
+   FIXED KITS (2026-10-27) handed brawlers their lines' dashes and melee
+   finishers, and they won 33 of 40: BRAWL_HIT 1.3 -> 1 (the kit is the
+   punch now) and BRAWL_GUARD 0.55 -> 0.85 is 20 of 40 (43 of 80). */
 // A fighter outside a match (the lobby, the tutor) has no `basic` yet: its stats answer the same.
 export const roleOf = (f) => ((f.basic?.i ?? basicOf(f)) === BASIC_P ? "brawler" : "blaster");
-export const BRAWL_RUN = 1.2, BRAWL_CD = 0.65, BRAWL_HIT = 1.3, BRAWL_GUARD = 0.55;
+export const BRAWL_RUN = 1.2, BRAWL_CD = 0.65, BRAWL_HIT = 1, BRAWL_GUARD = 0.85;
 export const BLAST_SPEED = 1.15, BLAST_RANGE = 1.1;
 export const basicCd = (f) => (roleOf(f) === "brawler" ? Math.round(BASIC_CD * BRAWL_CD) : BASIC_CD);
 /* A SPECIES' ROLE (2026-10-24, reported: "Jirachi is a Brawler - it should be a Blaster"). It was the
@@ -500,7 +504,7 @@ const BEAM_NAMES = new Set(["hydro-pump", "flamethrower", "eternabeam", "dynamax
   "mist-ball", "doom-desire", "psystrike", "steel-beam", "meteor-beam", "fleur-cannon", "core-enforcer"]);
 const BEAM_RE = /(beam|cannon|laser)$/;
 const FIELD_NAMES = new Set(["spikes", "toxic-spikes", "stealth-rock", "sticky-web"]);
-const SHIELDS = new Set(["protect", "detect", "kings-shield", "spiky-shield", "baneful-bunker", "obstruct",
+export const SHIELDS = new Set(["protect", "detect", "kings-shield", "spiky-shield", "baneful-bunker", "obstruct",
   "silk-trap", "burning-bulwark", "max-guard", "endure"]);
 
 /* A MOVE'S SHAPE, or null for a status move the Arena cannot play. */
@@ -571,7 +575,22 @@ const multiCount = (m) => (m.hits ? Math.round((m.hits[0] + m.hits[1]) / 2) : 1)
 /* A FIGHTER'S KIT: its four League moves (`movesOf`/the Move Tutor) that the
    Arena can play. A kit that would not hit at all keeps Struggle beside them
    (a status-only kit), thrown like any move. */
+/* A FIXED KIT (docs/arena-kits.md, 2026-10-27, asked for: "consistent move
+   sets, easier to learn and master"): every Pokemon fights with its line's
+   four from tools/build_kits.mjs - Main (RMB), Move (Q), Control (E), Power
+   (R) - whatever it knows in the League, so two players' Pikachu are one
+   Pikachu. Only a test's fighter that names its own moves (`custom`) plays
+   those instead. */
+const KIT_AT = new Map(MOVES.map((m, i) => [m.n, i]));
+export const SLOT_NAMES = ["Main", "Move", "Control", "Power"];
+export const fixedKit = (id) => (KITS[id] ?? []).slice(0, 4).map((n) => (n == null ? -1 : KIT_AT.get(n) ?? -1));
+export const kitClass = (id) => KITS[id]?.[4] ?? null;
 export function kitOf(f) {
+  if (!f.custom && KITS[f.id]) {
+    const kit = fixedKit(f.id).filter((i) => i >= 0 && shapeOf(arenaMove(i))).map((i) => ({ i, cd: 0 }));
+    if (!kit.some((m) => arenaMove(m.i).p > 0)) { if (kit.length === 4) kit.pop(); kit.push({ i: STRUGGLE, cd: 0 }); }
+    return kit;
+  }
   /* ITS ULTI'S MOVE IS NEVER ALSO ONE OF ITS FOUR (2026-10-24, reported: Machamp's fourth button and its
      ULTI were both Dynamic Punch). The slot it leaves goes to the newest other move it has learned by its
      level that the Arena plays - a kit stays four where the learnset allows. */
@@ -877,6 +896,8 @@ function evolveInto(s, f) {
   f.max = f.st[0] * HP_K;
   f.hp = Math.min(f.max, Math.round(f.max * share) + Math.floor(f.max * EVO_HEAL));
   f.types = now.types; f.id = to; f.xp = 0; f.evoTo = 0;
+  // The line's kit grows with it: each slot takes the new stage's move, its cooldown kept.
+  if (!f.custom && KITS[to]) fixedKit(to).forEach((i, k) => { if (i >= 0 && f.kit[k] && shapeOf(arenaMove(i))) f.kit[k].i = i; });
   if (mega) f.megaOn = true;
   else gain(s, f.side, SURGE_MAX * EVO_ULT);
   f.basic.i = basicOf(f);

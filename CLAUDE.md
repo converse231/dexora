@@ -87,6 +87,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/arena/pmd/`, `src/data/pmd.js` | `npm run pmd` (PMD Sprite Repository, pinned `COMMIT`, cached in .assets-src/pmd; ~5 min on all cores - `-- 25 6` bakes a sample but writes no pmd.js) |
 | `public/arena/fx/`, `src/data/fx.js` | `npm run fx` from the drawn originals in `art/arena/fx/` (white pixel art, tinted per type by render.js's `tinted`; a sheet's frames found by the gaps nearest even spacing, each anchored in one box; check.mjs reads every header and re-hashes `FX_REV`), the moves' own colour art in `art/arena/fx/moves/` (a new file needs its frame count in `MOVES`, or the build stops; one whose frames grow across the row goes in `WIDEST`), and the optional ULTI panels `ult-<pattern>` / `ult-<dex id>` |
 | `public/arena/intro/` | `npm run intro` (the Arena announcement's two fighters, cut from the shipped PMD atlases; re-run after `npm run pmd`) |
+| `src/data/kits.js`, `reports/Arena kits.md` | `npm run kits` (tools/build_kits.mjs: each line's fixed Arena kit from its learnsets, `FIXED` the hand-written ones, every move checked against the Pokemon) |
 | `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
 
 - **`SPECIES` comes from `src/data/dex.js`**, never `species.js` (that is the
@@ -210,9 +211,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
   sold on their days, so a Hallow Ball from week one works in week two). The
   running week's board card names the next (`eventAfter`), and a finished
   week's Claim stays on the board beside it (`boardSeasons`). Hallowed Night
-  is 10-24 to 10-30, The Haunting 10-31 to 11-06, then three days' rest and
-  Shichi-Go-San 11-10 to 11-16 (2026-10-27, asked for: its lines are the
-  ages three, five and seven). **An event speaks for itself**: `lore` is its
+  is 10-24 to 10-30, The Haunting 10-31 to 11-06. (Shichi-Go-San was built
+  and taken out before it shipped, 2026-10-27, your call: its design and art
+  prompts wait in `reports/Shichi-Go-San event prompts.md`.) **An event speaks for itself**: `lore` is its
   story on the poster, `daytime` moves the `EVENT_NIGHT` lift to daylight
   (and drops the hunt's night veil), `hunt.words` (`huntWords`, events.js)
   names its tokens, bell or moon, in every message - Hallowed Night's dreams
@@ -1418,6 +1419,18 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   shots stop, beams end, blows and pulses chip, bodies are pushed out); two
   mirrored zones that open every 30 s and pay one team per cycle, held alone
   for a second. No floor favours a side or hands a type its home (check.mjs).
+  **Every Pokemon has ONE fixed kit** (docs/arena-kits.md, 2026-10-27,
+  asked for: "consistent move sets, easier to master", MOBA-style): Main
+  (RMB), Move (Q), Control (E), Power (R) - its line's from `src/data/kits.js`
+  (`npm run kits`), whatever the League taught it; the Arena's Move Tutor
+  button is gone (Kit Mastery replaces it). A line shares its slots and each
+  stage fills them from its own learnset, so evolving in a match swaps each
+  slot's move (`evolveInto`). The rules pick from a line's learnset; `FIXED`
+  in the tool hand-writes ~100, each move checked learnable (`free` for the
+  seven that learn too little); a kit never holds its own ULTI's move (a
+  hand-written one that is falls to the rules). A test fighter that names its
+  moves is `custom` and plays them. `Kit.jsx` draws a kit: keys, class and
+  the combo (Control, then Power where it hits, else Main).
   **The Arena Ladder is `game/ladder.js`** - ten masters, ids append-only,
   teams typed by dex id WITH their names; the engine judges the order and
   pays each first win once (`arenaMaster`, the save's `ladder`), the Champion

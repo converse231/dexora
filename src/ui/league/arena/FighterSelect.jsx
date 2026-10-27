@@ -21,6 +21,7 @@ import { foundIn } from "../../../game/biomes.js";
 import Icon from "../../Icon.jsx";
 import Sprite from "../../Sprite.jsx";
 import Types from "../../Types.jsx";
+import KitList from "./Kit.jsx";
 import { useModalLock } from "../../modal.js";
 
 const nameOf = (id) => label(speciesById(id));
@@ -112,7 +113,6 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
   const f = useMemo(() => enter && playerFighter(enter), [mon]);   // eslint-disable-line react-hooks/exhaustive-deps
   const role = f && roleOf(f);
   const ult = enter && ultiPick(enter.species);
-  const kit = f ? f.moves.map((m) => m.i).filter((i) => i !== ult.move && shapeOf(moveOf(i))) : [];
   const teamMons = team.map((u) => fighters.find((m) => m.uid === u)).filter(Boolean);
   const types = useMemo(() => [...new Set(roster.flatMap((c) => speciesById(c[0].species).types))].sort(), [roster]);
   const maxStat = 255;
@@ -175,9 +175,7 @@ export default function FighterSelect({ box, picked, custom, onSave, onClose }) 
                   <div key={n}><dt>{n}</dt><dd><i style={{ "--v": Math.min(1, f.st[k] / maxStat) }} /><span>{f.st[k]}</span></dd></div>
                 ))}
               </dl>
-              <ul className="fs-moves">
-                {kit.map((i) => <li key={i} className={`t-${MOVES[i].t}`}>{moveName(i)}</li>)}
-              </ul>
+              <KitList id={enter.species} className="fs-moves" />
               <button type="button" className={`fs-pick${team.includes(mon.uid) ? " out" : ""}`} onClick={() => pick(mon)}
                 disabled={!team.includes(mon.uid) && team.length >= ARENA_TEAM && !teamMons.some((m) => m.species === mon.species)}>
                 {team.includes(mon.uid) ? "Take out" : "Pick"}

@@ -7268,6 +7268,45 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       const kit = A.kitOf(bFighter(sp.id, 50, 1));
       assert.ok(kit.length >= 1 && kit.length <= 4, `${sp.name} goes into the Arena with ${kit.length} moves`);
     }
+    /* FIXED KITS (docs/arena-kits.md, 2026-10-27): every Pokemon that fights in
+       the Arena has its line's kit in src/data/kits.js (npm run kits), and plays
+       it whatever it knows in the League - two trainers' Pikachu are one
+       Pikachu; a kit's slots are each a move the Arena plays, never its own
+       ULTI's; and evolving in a match swaps each slot for the next stage's. */
+    {
+      const { KITS } = await import("../src/data/kits.js");
+      const { MOVES: KM } = await import("../src/data/moves.js");
+      const idx = (n) => KM.findIndex((m) => m.n === n);
+      const { readFileSync: rf } = await import("node:fs");
+      const fighters = SPECIES.filter((x) => A.arenaReady(x.id) && !["mega", "gmax", "event", "look"].includes(x.form));
+      const missing = fighters.filter((x) => !KITS[x.id]).map((x) => x.name);
+      assert.equal(missing.length, 0, `no fixed kit for ${missing.slice(0, 8).join(", ")} - npm run kits`);
+      for (const x of fighters) {
+        const k = A.fixedKit(x.id);
+        assert.ok(k.filter((i) => i >= 0 && A.shapeOf(A.arenaMove(i))).length >= 2, `${x.name}'s kit has under two moves the Arena plays`);
+        assert.ok(!k.includes(A.ultiPick(x.id).move), `${x.name}'s kit holds its own ULTI's move`);
+        assert.ok(["Fighter", "Assassin", "Mage", "Marksman", "Tank", "Support"].includes(A.kitClass(x.id)), `${x.name} has no class`);
+      }
+      // One kit, whatever the League taught: a Pikachu that knows only Tackle still fights as Pikachu.
+      const taught = A.kitOf({ ...bFighterOf(25, 50, 1, [idx("tackle")]) }).map((m) => m.i);
+      assert.deepEqual(taught, A.fixedKit(25).filter((i) => i >= 0), "a Pokemon's League moves changed its Arena kit");
+      assert.equal(A.fixedKit(25)[0], idx("thunderbolt"), "Pikachu's Main is not its hand-written Thunderbolt");
+      // The generator's copy is current: a kit edited in tools/build_kits.mjs and not rebuilt is caught here.
+      const tool = rf(new URL("./build_kits.mjs", import.meta.url), "utf8");
+      for (const [n2, i] of [["garchomp", 3], ["gengar", 2]]) {
+        const sp = SPECIES.find((y) => y.name === n2);
+        const want = new RegExp(`\\n  ${n2}: \\[([^\\]]*)\\]`).exec(tool)?.[1].split(",")[i].trim().replace(/"/g, "");
+        assert.equal(KITS[sp.id][i], want, `kits.js is not tools/build_kits.mjs's ${n2} - npm run kits`);
+      }
+      // Evolving in a match: each slot takes the next stage's move.
+      const s = A.newMatch({ teams: [[bFighterOf(4, 50, 1)], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 3 });
+      const f = s.sides[0].team[0];
+      assert.deepEqual(f.kit.map((m) => m.i), A.fixedKit(4).filter((i) => i >= 0), "Charmander did not enter on its own kit");
+      f.evo = 1; f.evoTo = 5;   // the last tick of an evolution (startEvo's)
+      A.tick(s, [A.NO_INPUT, null]);
+      assert.equal(f.id, 5, "Charmander did not evolve");
+      assert.deepEqual(f.kit.map((m) => m.i), A.fixedKit(5).filter((i) => i >= 0), "Charmeleon kept Charmander's kit");
+    }
     /* EVERY MOVE HAS A SHAPE (phase 1): of the moves the League can hand a
        Pokemon, only the ones that heal an ally go unplayed - there is no ally
        in a one-on-one. Every shape but the hazards is some move's (the
@@ -8564,9 +8603,11 @@ import { SHEETS as A_SHEETS, SPRITES as A_SPRITES, BGS as A_BGS, ANIMS as A_ANIM
    tools/league-sim.mjs the model both the solver and this suite play against
    - one reference player, so the two cannot measure different things. */
 import {
-  step as bStep, newBattle as bNew, simulate as bSim, fighter as bFighter, refusal as bRefusal,
+  step as bStep, newBattle as bNew, simulate as bSim, fighter as bFighterOf, refusal as bRefusal,
   TURN_LIMIT, TEAM_MAX as B_TEAM, canUse as bCanUse,
 } from "../src/game/battle.js";
+// A test fighter that names its moves plays them (arena.js `custom`); one that does not plays its fixed kit.
+function bFighter(...a) { return { ...bFighterOf(...a), ...(a.length > 3 ? { custom: true } : {}) }; }
 import { HEALS } from "../src/game/items.js";
 import { SHARE as T_SHARE, GYM_PRIZE, REMATCH_STEPS, GYMTUNE, TRAINERTUNE } from "../src/data/gymtune.js";
 import {

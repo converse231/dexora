@@ -15,6 +15,7 @@
     "assets": "node tools/fetch-species.mjs && node tools/fetch-items.mjs && node tools/fetch-evolutions.mjs && python tools/build_origin.py",
     "forms": "node tools/fetch-forms.mjs && node tools/fetch-evolutions.mjs",
     "eventart": "python tools/build_event_sprites.py",
+    "kits": "node tools/build_kits.mjs",
     "arenas": "python tools/build_arenas.py",
     "pmd": "python tools/build_pmd.py",
     "intro": "python tools/build_arena_intro.py",
