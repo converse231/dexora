@@ -89,7 +89,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/arena/pmd/`, `src/data/pmd.js` | `npm run pmd` (PMD Sprite Repository, pinned `COMMIT`, cached in .assets-src/pmd; ~5 min on all cores - `-- 25 6` bakes a sample but writes no pmd.js) |
 | `public/arena/fx/`, `src/data/fx.js` | `npm run fx` from the drawn originals in `art/arena/fx/` (white pixel art, tinted per type by render.js's `tinted`; a sheet's frames found by the gaps nearest even spacing, each anchored in one box; check.mjs reads every header and re-hashes `FX_REV`), the moves' own colour art in `art/arena/fx/moves/` (a new file needs its frame count in `MOVES`, or the build stops; one whose frames grow across the row goes in `WIDEST`), and the optional ULTI panels `ult-<pattern>` / `ult-<dex id>` |
 | `public/arena/intro/` | `npm run intro` (the Arena announcement's two fighters, cut from the shipped PMD atlases; re-run after `npm run pmd`) |
-| `public/events/drift/` | `npm run drift` (each event's `drift` Pokemon, their Arena Walk cut from the shipped PMD atlases for its poster's sky; re-run after `npm run pmd`) |
+| `public/events/drift/`, `src/data/drift.js` | `npm run drift` (each event's `drift` Pokemon, their Arena Walk cut from the shipped PMD atlases for its poster's sky - facing right, and left (`-l`, `DRIFT_LEFT`) only where PMD's artist drew it, never a CSS mirror; re-run after `npm run pmd`) |
 | `src/data/kits.js`, `reports/Arena kits.md` | `npm run kits` (tools/build_kits.mjs: each line's fixed Arena kit from its learnsets, `FIXED` the hand-written ones, every move checked against the Pokemon) |
 | `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
 
@@ -1320,7 +1320,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   inside. All three in the replay hash; check.mjs holds each. **Little
   flashing** (same day, players: "too flashy"): no full-screen white, no
   photo negative in the ULTI panel, a faint super-effective tint, a slow KO
-  blink - the hit-stop, shake and zoom carry the impact.
+  blink - the hit-stop, shake and zoom carry the impact. The camera's shake,
+  jolt and tilt run at `SHAKE_K` (0.45) of what they were (same day, asked for).
   **Instant moves cost their dodge, so damage came down** (2026-10-27,
   reported: "my Pokemon is dead though same level and type advantage"):
   with no wind-up Hard v Hard fell from 63 s to 40 s, a Pokemon to 10 s on

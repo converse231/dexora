@@ -2803,11 +2803,17 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
     }
     /* AN EVENT'S SKY (`drift`, 2026-10-29): each Pokemon has an Arena body and
        its Walk baked by npm run drift - at most the poster's five places. */
+    // ...and it flies leftward only in a left-facing walk PMD's artist DREW, never a mirror (DRIFT_LEFT).
+    const { DRIFT_LEFT } = await import("../src/data/drift.js");
     for (const ev of EVENTS.filter((e) => e.drift)) {
       assert.ok(ev.drift.length <= 5, `${ev.id} drifts ${ev.drift.length} Pokemon - its sky has five places`);
       for (const id of ev.drift) {
-        assert.ok(existsSync(new URL(`../public/arena/pmd/${id}.json`, import.meta.url)), `${ev.id}'s sky names #${id}, which has no Arena body`);
+        const at = new URL(`../public/arena/pmd/${id}.json`, import.meta.url);
+        assert.ok(existsSync(at), `${ev.id}'s sky names #${id}, which has no Arena body`);
         assert.ok(existsSync(new URL(`../public/events/drift/${id}.png`, import.meta.url)), `#${id} is not baked for ${ev.id}'s sky - npm run drift`);
+        const drawn = !Number.isInteger(JSON.parse(readFileSync(at, "utf8")).a.Walk.r[6]);
+        assert.equal(DRIFT_LEFT.includes(id), drawn, `drift.js says #${id} ${drawn ? "has no" : "has a"} drawn left-facing walk - npm run drift`);
+        if (drawn) assert.ok(existsSync(new URL(`../public/events/drift/${id}-l.png`, import.meta.url)), `#${id}'s left-facing walk is not baked - npm run drift`);
       }
     }
     console.log(`event looks ok — ${looks.length} in ${EVENTS.length} event(s) of one week each, outside every count of the dex`);

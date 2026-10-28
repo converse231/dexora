@@ -114,6 +114,10 @@ const seeded = (n) => () => { n = (n + 0x6d2b79f5) | 0; let t = Math.imul(n ^ (n
 const VS_IN = 0.12, VS_SLAM = 0.5, VS_OUT = 1.1, THROW = 1.15, LAND = 1.6, COUNT = [1.75, 2.2, 2.65];
 /* THE ENDING'S, in real milliseconds once the match is over. */
 const FLASH_GAP = 1200;
+/* THE CAMERA, LESS (2026-10-29, players: "lessen the camera shakes"): every
+   shake, jolt and tilt at this share of what it was - the hit-stop, zoom and
+   sparks still carry an impact. One number, applied where the camera moves. */
+const SHAKE_K = 0.45;
 const KO_SLOW = 1100, RESULT_AT = 1150, DONE_AT = 2400;
 // How close the upright camera may come (the court fills the width at 1).
 const UPRIGHT_ZOOM = 2.4;
@@ -999,10 +1003,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   // ------------------------------------------------------------- feel
 
   const shake = (n) => { if (!still) cam.trauma = Math.min(1, cam.trauma + n); };
-  const kick = (dx, dy, n) => { if (!still) { cam.kx += dx * n; cam.ky += dy * n; } };
+  const kick = (dx, dy, n) => { if (!still) { cam.kx += dx * n * SHAKE_K; cam.ky += dy * n * SHAKE_K; } };
   const zoomAt = (x, y, n) => { if (!still && n > punch.z) { punch.z = n; punch.x = x; punch.y = y; } };
   // A dutch angle that rights itself: an ULTI's cast and its landing.
-  const tilt = (n) => { if (!still) cam.tilt = n; };
+  const tilt = (n) => { if (!still) cam.tilt = n * SHAKE_K; };
   const stop = (ms) => { stopMs = Math.max(stopMs, ms); };
   const slow = (ms, k) => { slowMs = Math.max(slowMs, ms); slowK = Math.min(slowK, k); };
   const poseOf = (side, slot) => {
@@ -1838,8 +1842,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     fxw = lx[0] <= lx[1] ? clamp(fxw, lx[0], lx[1]) : W / 2;
     fyw = ly[0] <= ly[1] ? clamp(fyw, ly[0], ly[1]) : H / 2;
     const sh = cam.trauma * cam.trauma;
-    const jx = (rand() * 2 - 1) * sh * px * 0.7 + cam.kx, jy = (rand() * 2 - 1) * sh * px * 0.7 + cam.ky;
-    const rot = (rand() * 2 - 1) * sh * 0.016 + cam.tilt;
+    const jx = (rand() * 2 - 1) * sh * px * 0.7 * SHAKE_K + cam.kx, jy = (rand() * 2 - 1) * sh * px * 0.7 * SHAKE_K + cam.ky;
+    const rot = (rand() * 2 - 1) * sh * 0.016 * SHAKE_K + cam.tilt;
     cam.tilt *= 0.9 ** (rdt / 16.7);
     cam.trauma = Math.max(0, cam.trauma - 0.022 * (rdt / 16.7));
     cam.kx *= 0.8 ** (rdt / 16.7); cam.ky *= 0.8 ** (rdt / 16.7);

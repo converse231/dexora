@@ -11431,7 +11431,8 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
    Arena's atlases at native pixels, ALL AT ONE SCALE so each keeps its size
    against the others (2026-10-29, asked for: a Rayquaza dwarfs a Wingull).
    Each FLOATS ACROSS the whole poster on its own lane and speed, bobbing as
-   it goes - the right-facing ones rightward, the mirrored ones leftward -
+   it goes - rightward, or leftward (`.left`) only in PMD's own left-facing
+   walk: a CSS mirror read as the sprite flatly flipping (reported, same day) -
    behind the title and the countdown (the sky is under the card's content),
    their lanes clear of the small lines (the dates, "Starts in", the lede),
    which a sprite behind made hard to read.
@@ -11445,10 +11446,11 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   animation-delay: var(--sn-at, 0s), 0s;
 }
 .sn-card .sn-sky .sn-bat.sn-drift.b0 { top: 80px; --sn-t: 24s; --sn-at: -4s; }
-.sn-card .sn-sky .sn-bat.sn-drift.b1 { top: 104px; --sn-t: 30s; --sn-at: -19s; transform: scaleX(-1); animation-direction: reverse, alternate; }
+.sn-card .sn-sky .sn-bat.sn-drift.b1 { top: 104px; --sn-t: 30s; --sn-at: -19s; }
 .sn-card .sn-sky .sn-bat.sn-drift.b2 { top: -2px; --sn-t: 27s; --sn-at: -13s; }
 .sn-card .sn-sky .sn-bat.sn-drift.b3 { top: 190px; --sn-t: 21s; --sn-at: -9s; }
-.sn-card .sn-sky .sn-bat.sn-drift.b4 { top: 162px; --sn-t: 33s; --sn-at: -26s; transform: scaleX(-1); animation-direction: reverse, alternate; }
+.sn-card .sn-sky .sn-bat.sn-drift.b4 { top: 162px; --sn-t: 33s; --sn-at: -26s; }
+.sn-card .sn-sky .sn-bat.sn-drift.left { animation-direction: reverse, alternate; }
 @keyframes sn-cross { from { left: -14%; } to { left: 106%; } }
 @keyframes sn-bob { from { translate: 0 -5px; } to { translate: 0 5px; } }
 /* A phone's poster is narrow and busy: three cross it, the rest stay home. */

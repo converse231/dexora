@@ -14,6 +14,7 @@
    least of all - renders once a second for it. */
 import { useEffect, useRef, useState } from "react";
 import Sprite from "./Sprite.jsx";
+import { DRIFT_LEFT } from "../data/drift.js";
 import { useModalLock, useDismiss } from "./modal.js";
 import { label, AREAS } from "../game/map.js";
 import { speciesById, foundIn, dexIndex } from "../game/biomes.js";
@@ -158,9 +159,13 @@ export function SeasonIntro({ ev, dex, onClose, onBoard, onNext }) {
           <i className="sn-fog a" /><i className="sn-fog b" />
           {/* ITS POKEMON, where an event names them (`drift`): the Arena's own PMD walks
               (npm run drift), crisp at native pixels; the rest of the sky its bats. */}
-          {[0, 1, 2, 3, 4].map((k) => (ev.drift?.[k]
-            ? <img key={k} className={`sn-bat sn-drift b${k}`} src={driftUrl(ev.drift[k])} alt="" />
-            : <i key={k} className={`sn-bat b${k}`} />))}
+          {[0, 1, 2, 3, 4].map((k) => {
+            const id = ev.drift?.[k];
+            if (!id) return <i key={k} className={`sn-bat b${k}`} />;
+            // The second and fifth lanes fly leftward - but only in PMD's own left-facing walk, never a mirror.
+            const left = (k === 1 || k === 4) && DRIFT_LEFT.includes(id);
+            return <img key={k} className={`sn-bat sn-drift b${k}${left ? " left" : ""}`} src={driftUrl(left ? `${id}-l` : id)} alt="" />;
+          })}
         </div>
         <button type="button" className="set-x sn-x" aria-label="Close" onClick={onClose}>✕</button>
         <span className="sn-kicker">{soon ? "Coming soon" : "Limited-time event"} · {day(ev.start)} – {day(ev.end)}</span>
