@@ -33,7 +33,7 @@ import { evoLevel, itemById } from "../game/items.js";
 import { EVOLUTIONS } from "../data/evolutions.js";
 import Mark from "./Marks.jsx";
 import DexCards from "./cards/DexCards.jsx";
-import { sageArt, SAGE_CREDIT, tierName } from "../game/biomes.js";
+import { tierName } from "../game/biomes.js";
 import { hasLook } from "../game/gender.js";
 import {
   tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT,
@@ -389,10 +389,6 @@ export default function DexSheet({
             {seen ? (
               <>
                 <div className="sheet-genus">{caught ? sp.genus : "Seen, not caught"}</div>
-                {/* Under the genus, not on the portrait: 96px wrapped it over the art. */}
-                {caught && shown === "origin" && sageArt(id) && (
-                  <div className="art-credit">{SAGE_CREDIT}</div>
-                )}
                 <div className="sheet-types">
                   {sp.types.map((t) => (
                     <span key={t} className={`type t-${t}`}>{t.toUpperCase()}</span>

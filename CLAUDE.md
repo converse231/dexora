@@ -78,6 +78,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `src/data/anims.js`, `public/battle/anim/` | `npm run anims` (pokeemerald-expansion, pinned; restart a running dev server after) |
 | `public/follow/`, `src/data/follow.js` | `npm run follow` (the same pin; check.mjs reads each header) |
 | `public/skins/` | `npm run skins` (from `SKINS` in cosmetics.js plus the tool's `SRC`) |
+| `public/sprites/origin/<id>.png` after Johto, `src/data/retro.js` | `npm run retro` from our drawings in `art/origin/<id>.png` (keyed like event art, shrunk to the species' canvas, held to 6 colours) |
 | `src/data/abilities.js` | `npm run abilities` (PokeAPI, cached in .assets-src/abilities) |
 | `public/sprites/cadence/`, `src/data/cadence.js` | `npm run cadence` (Black and White's own idle, 16-frame strips at native pixels; `tools/strip_frames.py`, shared with Showdown's builder) |
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
@@ -442,11 +443,12 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   which of them failed** - Origin, Showdown and Cadence are three gates and all
   eight combinations occur in the dex, so the old "three named Sets and a
   branch" shape does not survive a third one. A fourth gate is one row. Origin means debut art older than the base art (`genOf < baseArtGen`,
-  `ART_GEN` a row per generation) **or a SageDeoxys drawing** (`SAGE_IDS`,
-  written by `build_origin.py` from `art/sage/`, imported once by
-  `tools/import_sage.py`; Kanto and Johto keep their own debut art), and
-  every Sage Origin shown carries `SAGE_CREDIT` (catch banner, encounter
-  corner, Dex header, Rare forms). `build_origin.py` READS the ordinary
+  `ART_GEN` a row per generation) **or our own retro drawing** (`RETRO_IDS`,
+  written by `build_retro.py` from `art/origin/`, added a few at a time;
+  prompts in `reports/Origin retro prompts.md`). **No SageDeoxys art**
+  (2026-10-28: he did not approve its use; removed, history purged): an
+  Origin held of a species with no drawing keeps its tier and draws its
+  ordinary picture (`spriteUrl`). `build_origin.py` READS the ordinary
   sprites and never resizes them: they are 64, 80 and 96px by generation,
   and its old `normalise` shrank 2,062 of them. Showdown needs a real strip
   (`hasShowdown` reads the files).

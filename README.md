@@ -3364,10 +3364,9 @@ wrappers from [Bulbagarden Archives](https://archives.bulbagarden.net/); every c
 illustrator TCGdex names, and the cards are © Nintendo, Creatures and GAME
 FREAK, used here non-commercially like the rest of the game's art.
 
-**Origin sprites for every species after Johto are by SageDeoxys** - Game Boy
-Color-style drawings, credited in the game wherever one is shown ("Sprites by
-SageDeoxys"). `tools/import_sage.py` keeps the first frame of each in
-`art/sage/`, and `tools/build_origin.py` frames them like the 1996 art.
+**Origin sprites after Johto are drawn for this game**, a few at a time
+(`art/origin/`, `npm run retro`, prompts in `reports/Origin retro prompts.md`).
+SageDeoxys' sprites were used here until 2026-10-28 and removed at his request.
 
 **The Poké Ball throw animation is [All Pokeball Sprites for throw animation by
 Anarlaurendil](https://www.deviantart.com/anarlaurendil/art/All-Pokeball-Sprites-for-throw-animation-815730891),

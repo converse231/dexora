@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { SPECIES, isForm, isEvent, EVENT_SLOTS, DEX_TOTAL, dexCaught } from "../src/data/dex.js";
 import { EVENTS } from "../src/data/eventforms.js";
-import { SAGE_IDS } from "../src/data/sage.js";
+import { RETRO_IDS } from "../src/data/retro.js";
 import { evoCycleFrames, EVO_SWAPS, SCALE_MAX } from "../src/game/evocycle.js";
 import {
   STATS, MAX_RANK, emptyStats, rank, spentPoints, freePoints, earnedPoints,
@@ -3147,13 +3147,13 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      qualify - and there is no 1996 drawing of a Mega Charizard, because Mega
      Evolution was invented in 2013. A form has exactly one drawing. */
   for (const sp of SPECIES) {
-    assert.equal(hasOrigin(sp.id), !isForm(sp.id) && (genOf(sp.id) < baseArtGen(sp.id) || SAGE_IDS.has(sp.id)),
+    assert.equal(hasOrigin(sp.id), !isForm(sp.id) && (genOf(sp.id) < baseArtGen(sp.id) || RETRO_IDS.has(sp.id)),
       `#${sp.id} disagrees with its own rule`);
-    /* SageDeoxys draws only what has no older art: a Sage id that also has a
-       debut drawing would be two Origins for one species, a form one that
-       the game never asks for. */
-    if (SAGE_IDS.has(sp.id)) assert.ok(!isForm(sp.id) && genOf(sp.id) >= baseArtGen(sp.id),
-      `#${sp.id} is a SageDeoxys Origin but has older art of its own (or is a form)`);
+    /* We draw only what has no older art: a retro id that also has a debut
+       drawing would be two Origins for one species, a form one that the game
+       never asks for. */
+    if (RETRO_IDS.has(sp.id)) assert.ok(!isForm(sp.id) && genOf(sp.id) >= baseArtGen(sp.id),
+      `#${sp.id} is a retro Origin but has older art of its own (or is a form)`);
   }
 
   /* THE ROSETTE MUST STAY REACHABLE, and that is now a number rather than a

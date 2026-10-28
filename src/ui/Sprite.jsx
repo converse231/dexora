@@ -107,7 +107,12 @@ export const STRIP_FRAMES = 16;
 /* THE ART'S STAMP (vite.config's `artRev`): the browser keeps sprites and
    cards a month (vercel.json), so a redrawn file must change its url. */
 export const ART_REV = typeof __ART_REV__ === "undefined" ? "" : __ART_REV__;
+/* AN ORIGIN WITH NO DRAWING (2026-10-28): a player may hold an Origin of a
+   species whose art has gone (SageDeoxys' sprites, removed) or is not drawn
+   yet - it is still theirs and still Origin, drawn in its ordinary picture
+   under the tier's own class rather than as a missing file. */
 export const spriteUrl = (id, variant = null, sex = null) => {
+  if (variant === "origin" && lockedTiers(id)?.has("origin")) variant = null;
   const her = sex === "f" && femaleArtFor(id, variant);
   const folder = her ? (variant === "shiny" ? "shiny/female/" : "female/") : FOLDER[variant] ?? "";
   return new URL(`sprites/${folder}${id}.png?v=${ART_REV}${STRIP_TIERS.has(variant) ? `&f=${STRIP_FRAMES}` : ""}`,

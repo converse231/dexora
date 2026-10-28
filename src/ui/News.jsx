@@ -16,6 +16,16 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-28-origin-art",
+    icon: "🎨",
+    date: "October 2026",
+    title: "Origin art after Johto is being redrawn",
+    items: [
+      ["Our own retro art", "Origin after Johto is being redrawn for Dexora, a few Pokémon at a time."],
+      ["Yours stay Origin", "An Origin you hold keeps its tier; until it is redrawn it shows its usual picture."],
+    ],
+  },
+  {
     id: "2026-10-27-arena-gyms",
     icon: "🔥",
     date: "October 2026",
@@ -770,7 +780,6 @@ export const NEWS = [
       ["Meteor Falls", "Its log bridge no longer strands a surfer under it."],
       ["One water key", "C or A at the water asks: surf or fish?"],
       ["Rosette", "The 4-form badge now says Rosette, not Complete - it never needed every form."],
-      ["Origin for everyone", "260 more Pokémon can be Origin, in sprites by SageDeoxys."],
     ],
   },
   {
