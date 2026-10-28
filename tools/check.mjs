@@ -7359,6 +7359,76 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     assert.ok(burn.ticks >= 3 && burn.ticks <= 4, `a burn ticked ${burn.ticks} times - it hurts every 2 s for 8 s`);
     assert.ok(Math.abs(burn.cured - burn.burned - 8 * A.TPS) <= 2, `a burn lasted ${(burn.cured - burn.burned) / A.TPS} s, not 8`);
     assert.equal(burnRun(4).burned, -1, "a Fire type was burned");
+    /* COMBO, TAG-IN AND THE RING (2026-10-28, asked for). A kit's Control
+       landing, then its payoff inside COMBO_WIN, hits harder and stuns; a
+       payoff alone does neither. A switch within TAG_WIN of a hit tags in
+       with a staggering basic attack, one later does not. The ring burns
+       only who stands outside it, only once it closes, and says so. */
+    {
+      // combo
+      const comboRun = (seed, opener) => {
+        const s = A.newMatch({ teams: [[bFighter(37, 50, 1, [idx("tackle"), idx("scratch"), idx("will-o-wisp"), idx("ember")])], [bFighter(1, 50, 2, [idx("tackle")])]],
+          cpu: [null, null], seed });
+        let opened = !opener;
+        for (let t = 0; t < 10 * A.TPS; t++) {
+          const me = A.activeOf(s, 0), foe = A.activeOf(s, 1);
+          const dx = foe.x - me.x, dy = foe.y - me.y, near = dx * dx + dy * dy < 36;
+          const k = opened ? 3 : 2;
+          const fire = near && !me.act && me.kit[k].cd === 0 ? k : -1;
+          A.tick(s, [{ ...A.NO_INPUT, mx: near ? 0 : dx, my: near ? 0 : dy, ax: dx, ay: dy, fire }, null]);
+          for (const e of s.ev) {
+            if (e.k === "comboOpen" && e.side === 0) opened = true;
+            if (e.k === "hit" && e.side === 1 && e.move === idx("ember")) return { dmg: e.dmg / foe.max, combo: s.ev.some((x) => x.k === "combo"), stun: foe.stun };
+          }
+        }
+        return null;
+      };
+      const seeds = Array.from({ length: 24 }, (_, i) => i + 1);
+      const withC = seeds.map((k) => comboRun(k, true)), plain = seeds.map((k) => comboRun(k, false));
+      assert.ok(withC.every((r) => r?.combo), "a Control then its payoff did not land the combo");
+      assert.ok(plain.every((r) => r && !r.combo), "a payoff alone counted as a combo");
+      assert.ok(withC.every((r) => r.stun >= A.COMBO_STUN - 2), "a combo did not stun");
+      const mean = (a) => a.reduce((x, r) => x + r.dmg, 0) / a.length;
+      assert.ok(mean(withC) / mean(plain) > 1.15, "a combo's payoff hit no harder");
+
+      // ---- tag
+      const tagRun = (delay) => {
+        const s = A.newMatch({ teams: [[bFighter(4, 50, 1, [idx("scratch")]), bFighter(7, 50, 1, [idx("tackle")])], [bFighter(1, 50, 2, [idx("tackle")])]], cpu: [null, null], seed: 5 });
+        Object.assign(s.sides[0].team[0], { x: 10, y: 8 }); Object.assign(s.sides[1].team[0], { x: 11.4, y: 8 });
+        let struck = -1, out = false, tag = false, hurt = 0;
+        for (let t = 0; t < 6 * A.TPS; t++) {
+          const me = A.activeOf(s, 0), foe = A.activeOf(s, 1);
+          const swap = struck >= 0 && !out && s.t >= struck + delay ? 1 : -1;
+          const foeIn = me && foe && struck < 0 ? { ...A.NO_INPUT, ax: me.x - foe.x, ay: me.y - foe.y, fire: foe.act ? -1 : 0 } : null;
+          A.tick(s, [{ ...A.NO_INPUT, swap }, foeIn]);
+          for (const e of s.ev) {
+            if (e.k === "hit" && e.side === 0 && struck < 0) struck = s.t;
+            if (e.k === "out" && e.side === 0) out = true;
+            if (e.k === "tag") tag = A.activeOf(s, 1).stun >= A.TAG_STUN - 2;
+            if (e.k === "hit" && e.side === 1) hurt += e.dmg;
+          }
+        }
+        return { struck, out, tag, hurt };
+      };
+      const quick = tagRun(0), late = tagRun(A.TAG_WIN + A.TPS);
+      assert.ok(quick.struck >= 0 && quick.out && quick.tag && quick.hurt > 0, "a switch right after a hit was no tag");
+      assert.ok(late.out && !late.tag && late.hurt === 0, "a switch long after a hit tagged");
+
+      // ---- ring
+      const ringRun = (at) => {
+        const s = A.newMatch({ teams: [[bFighter(1, 50, 1, [idx("tackle")])], [bFighter(4, 50, 2, [idx("scratch")])]], cpu: [null, null], seed: 1 });
+        s.t = at;
+        const [out, inn] = [s.sides[0].team[0], s.sides[1].team[0]];
+        Object.assign(out, { x: A.INSET + 0.7, y: A.INSET + 0.7 }); Object.assign(inn, { x: A.W / 2, y: A.H / 2 });
+        const h0 = [out.hp, inn.hp]; let rang = false;
+        for (let t = 0; t < 2 * A.TPS; t++) { A.tick(s, [null, null]); if (s.ev.some((e) => e.k === "ring")) rang = true; }
+        return { out: (h0[0] - out.hp) / out.max, inn: (h0[1] - inn.hp) / inn.max, rang };
+      };
+      const early = ringRun(A.LIMIT - A.RING_T - 3 * A.TPS), closing = ringRun(A.LIMIT - 8 * A.TPS), opening = ringRun(A.LIMIT - A.RING_T - A.TPS);
+      assert.equal(early.out, 0, "the ring burned before it closed");
+      assert.ok(Math.abs(closing.out - 2 * A.RING_HURT) < 0.02 && closing.inn === 0, "the ring did not burn only the one outside it");
+      assert.ok(opening.rang, "the ring closed unannounced");
+    }
     // THE FLOORS: one built picture per arena (npm run arenas), small enough to fetch.
     for (const a of A.ARENAS) {
       const f = new URL(`../public/arena/${a.id}.webp`, import.meta.url);

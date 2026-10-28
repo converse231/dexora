@@ -479,6 +479,25 @@ export const basicOf = (f) => (speciesRole(f.id) === "brawler" ? BASIC_P : BASIC
 export const FINAL_T = sec(60);
 const FINAL_DMG = 1.5, FINAL_GAIN = 2;
 const finalMinute = (s) => s.t >= LIMIT - FINAL_T;
+/* THE RING (2026-10-28, asked for: "a match never ends in a slow chase"):
+   the clock's last RING_T closes the court to RING_KEEP of its span, and
+   whoever stands outside it loses RING_HURT of its HP a second. It stays
+   closed through sudden death. `ringOf` is [x0, y0, x1, y1], or null while
+   open. */
+export const RING_T = sec(30), RING_KEEP = 0.45, RING_HURT = 0.05;
+export function ringOf(s) {
+  const k = clamp((s.t - (LIMIT - RING_T)) / RING_T, 0, 1);
+  if (k <= 0) return null;
+  const ix = (X1 - X0) * (1 - RING_KEEP) / 2 * k, iy = (Y1 - Y0) * (1 - RING_KEEP) / 2 * k;
+  return [X0 + ix, Y0 + iy, X1 - ix, Y1 - iy];
+}
+const outsideRing = (r, f) => f.x < r[0] || f.x > r[2] || f.y < r[1] || f.y > r[3];
+/* TAG-IN (same day, asked for: "switching becomes a play, not an escape"):
+   a switch pressed within TAG_WIN of taking a hit is a TAG - the one coming
+   in arrives with its basic attack on the foe at TAG_HIT, wherever the foe
+   stands within TAG_RANGE, staggering it TAG_STUN - the pressure broken.
+   SWAP_CD still paces it. */
+export const TAG_WIN = sec(0.6), TAG_HIT = 2.5, TAG_RANGE = 7, TAG_STUN = sec(0.6);
 const GAIN_DEAL = 45, GAIN_TAKE = 30, GAIN_DODGE = 12, GAIN_ZONE = 15;
 /* NO ONE BLOW TAKES MORE THAN HIT_CAP OF A BODY (2026-10-27): every move is
    instant now, so a stacked hit (STAB, super effective, a crit, the weather,
@@ -585,6 +604,18 @@ const KIT_AT = new Map(MOVES.map((m, i) => [m.n, i]));
 export const SLOT_NAMES = ["Main", "Move", "Control", "Power"];
 export const fixedKit = (id) => (KITS[id] ?? []).slice(0, 4).map((n) => (n == null ? -1 : KIT_AT.get(n) ?? -1));
 export const kitClass = (id) => KITS[id]?.[4] ?? null;
+/* THE KIT'S COMBO (2026-10-28, asked for: "turns skill into a reward"): its
+   Control move landing opens COMBO_WIN; its payoff - Power where Power hits,
+   else Main (`payoffSlot`, which Kit.jsx prints) - landing inside it hits
+   COMBO_DMG harder and stuns COMBO_STUN. A Control that touches nobody (a
+   setup, a hazard) opens it as it is cast. */
+export const COMBO_WIN = sec(3), COMBO_DMG = 1.3, COMBO_STUN = sec(0.5);
+export const payoffSlot = (kit) => (kit[3] >= 0 && arenaMove(kit[3]).p > 0 ? 3 : 0);
+const CONTROL = 2;
+function openCombo(s, f) {
+  if (f.comboT <= s.t) s.ev.push({ k: "comboOpen", side: f.side, x: f.x, y: f.y });
+  f.comboT = s.t + COMBO_WIN;
+}
 export function kitOf(f) {
   if (!f.custom && KITS[f.id]) {
     const kit = fixedKit(f.id).filter((i) => i >= 0 && shapeOf(arenaMove(i))).map((i) => ({ i, cd: 0 }));
@@ -648,6 +679,7 @@ function body(f, side, slot, cp = NO_CP) {
     vx: 0, vy: 0, heat: 0, swift: 0, hidden: false, surge: 0, power: 0, haste: 0, clones: [], cloneT: 0, wet: 0, rained: false, away: null, confused: 0,
     basic: { i: basicOf(f), cd: 0 }, basicN: 0, basicT: -BASIC_CHAIN,
     xp: 0, evo: 0, evoTo: 0, megaOn: false, megas: f.megas ?? [], fortress: 0, regen: 0, awake: 0,
+    comboT: 0, hitAt: -sec(9), tag: false,
   };
 }
 
@@ -662,7 +694,7 @@ export function newMatch({ teams, cpu = [null, "normal"], seed = 1, arena = "ind
     cover: COVER_AT.map(([x, y], i) => ({ id: i, x, y, hp: COVER_HP, max: COVER_HP })),
     zone: { open: false, t: ZONE_FIRST, claimed: [false, false], hold: [[0, 0], [0, 0]] },
     sides: teams.map((team, side) => ({
-      team: team.map((f, slot) => body(f, side, slot, perks?.[side]?.[slot] ?? NO_CP)), active: 0, swapT: 0, next: -1, swapCd: 0, koT: 0, meter: 0, held: null, megaUsed: false, trapT: 0,
+      team: team.map((f, slot) => body(f, side, slot, perks?.[side]?.[slot] ?? NO_CP)), active: 0, swapT: 0, next: -1, swapCd: 0, tag: false, koT: 0, meter: 0, held: null, megaUsed: false, trapT: 0,
       // What the result screen tells (never read by the rules): damage dealt, hits, the best run of hits unanswered, perfect dodges, surges.
       stats: { dealt: 0, hits: 0, chain: 0, best: 0, perfect: 0, surges: 0 },
       cpu: cpu[side] ? { level: cpu[side], seen: 0, seenId: 0, strafe: 1, dodged: 0, lx: W / 2, ly: H / 2 } : null,
@@ -725,9 +757,11 @@ export function tick(s, inputs) {
   stepGround(s);
   stepEvents(s);
   stepBench(s);
+  stepRing(s);
   for (let side = 0; side < 2; side++) settleKO(s, side);
   s.t++;
   if (s.t === LIMIT - FINAL_T) s.ev.push({ k: "final" });
+  if (s.t === LIMIT - RING_T) s.ev.push({ k: "ring" });
   if (!s.over && s.t >= LIMIT && !s.sudden) {
     if (alive(s.sides[0]).length === alive(s.sides[1]).length) suddenDeath(s);
     else timeUp(s);
@@ -747,6 +781,7 @@ function stepSide(s, side, inp) {
       Object.assign(to, { x: from.x, y: from.y, px: from.x, py: from.y, fx: from.fx, fy: from.fy, inv: to.cp.aegis ? AEGIS_T : SWAP_INV, act: null, dodge: 0, kbt: 0, fresh: true });
       sd.active = sd.next; sd.next = -1;
       s.ev.push({ k: "in", side, slot: sd.active });
+      if (sd.tag) { sd.tag = false; tagIn(s, side, to); }
     }
     return;
   }
@@ -798,6 +833,7 @@ function stepSide(s, side, inp) {
       const next = inp.swap < sd.team.length ? inp.swap : -1;
       if (next >= 0 && next !== sd.active && sd.team[next].hp > 0) {
         sd.next = next; sd.swapT = SWAP; sd.swapCd = SWAP_CD; f.surge = 0; f.clones = [];
+        sd.tag = s.t - f.hitAt <= TAG_WIN;
         s.ev.push({ k: "out", side, slot: sd.active });
         return;
       }
@@ -934,6 +970,7 @@ function stepAct(s, side, f) {
     if (data.p && data.sgu && data.sg && rnd(s) * 100 < (data.sgc ?? 100)) stages(s, f, data.sg, 1);
     const rec = a.basic ? BASIC_REC : recOf(data);
     if (!a.basic && VANISH[data.n]) { vanish(s, side, f, m.i, VANISH[data.n]); return; }
+    if (!a.basic && a.k === CONTROL && (a.shape === "self" || a.shape === "field")) openCombo(s, f);
     switch (a.shape) {
       case "shot":
         shoot(s, side, f, a.dx, a.dy, m.i, a.basic ? BASIC_RANGE : SHOT_RANGE, a.boost);
@@ -1824,6 +1861,8 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1, part
   const m = BASIC[move] ? { ...BASIC[move], t: TYPES[a.types[0]] } : arenaMove(move);
   const eff = effectiveness(m.t, d.types);
   if (eff === 0) { s.ev.push({ k: "immune", side: d.side, x: d.x, y: d.y }); return; }
+  const slot = BASIC[move] ? -1 : a.kit.findIndex((km) => km.i === move);
+  const combo = slot >= 0 && a.comboT > s.t && slot === payoffSlot(a.kit.map((km) => km.i));
   let dmg = 0;
   if (m.p) {
     const crit = rnd(s) < CRIT[Math.min(3, (m.cr ?? 0) + (a.perk?.crit ?? 0) + (hasSig(a, "victory") ? 1 : 0))];
@@ -1836,13 +1875,14 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1, part
       : rawDamage(a, d, m, crit) * (crit ? 1.5 : 1) * roll * hits * DAMAGE * boost * (a.surge > 0 ? SURGE_DMG : 1) * (a.power > 0 ? X_ATTACK : 1)
       * (finalMinute(s) ? FINAL_DMG : 1) * weatherK(s, m.t) * (shock ? SHOCK : 1)
       * (contact && roleOf(a) === "brawler" ? BRAWL_HIT : 1) * (!contact && roleOf(d) === "brawler" ? BRAWL_GUARD : 1)
-      * (helping(s, a.side, "plusle") ? HELP_HIT : 1) * guard;
+      * (helping(s, a.side, "plusle") ? HELP_HIT : 1) * guard * (combo ? COMBO_DMG : 1) * (a.tag ? TAG_HIT : 1);
     dmg *= (1 + a.cp.dmg) * (1 - d.cp.guard) * sigK(s, a, d, m, move, contact);
     dmg = Math.max(1, Math.floor(isUlt(move) ? dmg : Math.min(dmg, d.max * HIT_CAP)));
     // Star Requiem (Giratina's): its ULTI finishes a foe under a quarter of its HP.
     if (isUlt(move) && hasSig(a, "requiem") && d.hp <= d.max / 4) dmg = d.hp;
     d.regen = 0;
     d.hp = Math.max(0, d.hp - dmg);
+    d.hitAt = s.t;
     a.xp += (dmg / d.max + (d.hp === 0 ? EVO_XP : 0)) * (hasSig(a, "splash") ? 2 : 1) * (evoTargets(a.id).length ? EVO_FAST : 1);
     const st = s.sides[a.side].stats;
     st.dealt += dmg; st.hits++; st.chain++; st.best = Math.max(st.best, st.chain);
@@ -1850,6 +1890,11 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1, part
     gain(s, a.side, GAIN_DEAL * dmg / d.max); gain(s, d.side, GAIN_TAKE * dmg / d.max);
     // Inner Focus (Umbreon's): never staggered.
     d.flash = sec(0.08); if (!hasSig(d, "focus") && part === 1) d.stun = Math.max(d.stun, STUN);
+    if (combo) {
+      a.comboT = 0;
+      if (!hasSig(d, "focus")) d.stun = Math.max(d.stun, COMBO_STUN);
+      s.ev.push({ k: "combo", side: a.side, x: hx, y: hy });
+    }
     const push = (contact ? (m.p ?? 40) / 40 : 0.25) * part;
     d.kbx = dx * push / KB; d.kby = dy * push / KB; d.kbt = KB;
     if (contact && GRABS.has(m.n) && d.hp > 0) {
@@ -1903,6 +1948,32 @@ function hit(s, a, d, move, dx, dy, contact, hx = d.x, hy = d.y, boost = 1, part
   }
   if (m.st != null && rnd(s) * 100 < (m.p ? (m.stc ?? 0) * (1 + a.cp.status) * part : 100)) afflict(s, d, m.st, m.n === "toxic");
   if (m.sg && !m.sgu && !m.self && rnd(s) * 100 < (m.sgc ?? 100) * part) stages(s, d, m.sg);
+  if (slot === CONTROL && d.hp > 0) openCombo(s, a);
+}
+
+// A tag's arrival: its basic attack, TAG_HIT over, on a foe within reach.
+function tagIn(s, side, f) {
+  const foe = activeOf(s, 1 - side);
+  if (!foe || foe.hp <= 0 || foe.away) return;
+  const ex = foe.x - f.x, ey = foe.y - f.y;
+  if (ex * ex + ey * ey > TAG_RANGE * TAG_RANGE) return;
+  const [dx, dy] = norm(ex || f.fx, ey);
+  f.fx = dx; f.fy = dy;
+  s.ev.push({ k: "tag", side, x: f.x, y: f.y, tx: foe.x, ty: foe.y });
+  f.tag = true;
+  hit(s, f, foe, f.basic.i, dx, dy, basicShape(f) === "melee", foe.x, foe.y);
+  f.tag = false;
+  if (foe.hitAt === s.t && !hasSig(foe, "focus")) foe.stun = Math.max(foe.stun, TAG_STUN);
+}
+
+// The ring's burn: outside it, a share of HP every half second.
+function stepRing(s) {
+  const r = ringOf(s);
+  if (!r || s.t % (TPS / 2)) return;
+  for (let side = 0; side < 2; side++) {
+    const f = activeOf(s, side);
+    if (f && f.hp > 0 && !f.away && outsideRing(r, f)) hurt(s, f, Math.max(1, Math.floor(f.max * RING_HURT / 2)));
+  }
 }
 
 function settleKO(s, side) {
@@ -2099,6 +2170,12 @@ function cpuInput(s, side) {
   const edge = INSET + 1.3;
   if (me.x < edge) mx += 1; else if (me.x > W - edge) mx -= 1;
   if (me.y < edge) my += 1; else if (me.y > H - edge) my -= 1;
+  // Inside the closing ring, with a step to spare.
+  const ring = ringOf(s);
+  if (ring) {
+    if (me.x < ring[0] + 0.6) mx = 2; else if (me.x > ring[2] - 0.6) mx = -2;
+    if (me.y < ring[1] + 0.6) my = 2; else if (me.y > ring[3] - 0.6) my = -2;
+  }
   // On the way, anything ready that reaches now is thrown.
   if (pick >= 0 && dist > reach) {
     let now = -1, nowV = 0;
@@ -2291,6 +2368,6 @@ export function rulesPrint() {
 export const stateHash = (s) => hash(JSON.stringify([s.t, s.intro, s.rs, s.winner,
   s.items.map((it) => [it.kind, it.x, it.y, it.t]), s.weather, s.dark, s.tide, s.erupt, s.lanes.map((l) => [l.y, l.t]), s.helpers.map((h) => [h.kind, h.x, h.y, h.t]), s.domes.map((dm) => [dm.x, dm.y, dm.t]), s.domain && [s.domain.kind, s.domain.t], s.perish, s.throws.map((th) => th.t), s.fires.map((fl) => [fl.x, fl.y, fl.t]), s.strikes.map((z) => [z.x, z.y, z.t]), s.clouds.map((c) => [c.x, c.y, c.t]),
   s.sudden ? 1 : 0, s.revived ? 1 : 0,
-  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.cd), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused, f.id, f.xp, f.evo, f.splat, f.fortress, f.regen, f.awake]), sd.trapT]),
+  s.sides.map((sd) => [sd.active, sd.swapT, sd.koT, sd.meter, sd.held, sd.team.map((f) => [f.x, f.y, f.hp, f.status, f.stages, f.surge, f.kit.map((m) => m.cd), f.basic.cd, f.basicN, f.clones.flat(), f.wet, f.away, f.confused, f.id, f.xp, f.evo, f.splat, f.fortress, f.regen, f.awake, f.comboT, f.hitAt]), sd.trapT, sd.tag]),
   s.shots.map((p) => [p.x, p.y]), s.hazards.map((z) => [z.x, z.y, z.t]),
   s.cover.map((c) => c.hp), [s.zone.open, s.zone.t, s.zone.claimed], s.drops.map((r) => [r.x, r.y, r.t])]));

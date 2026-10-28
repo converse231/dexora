@@ -1294,6 +1294,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   foam, a fire cone, bolts, ice); `signatureShot`/`signatureHit` draw Water
   Shuriken, Shadow Ball, Aura Sphere, Focus Blast, Energy Ball and Sludge
   Bomb as themselves; every ULTI strike raises its type's `pillar`.
+  **Combos, tag-ins and the ring** (2026-10-28, asked for): a kit's Control
+  landing (or cast, for one that touches nobody) opens `COMBO_WIN`, and its
+  payoff (`payoffSlot`: Power where it hits, else Main - Kit.jsx prints the
+  same) inside it hits `COMBO_DMG` and stuns `COMBO_STUN`; a switch within
+  `TAG_WIN` of a hit is a TAG, the newcomer's basic attack at `TAG_HIT` on a
+  foe within `TAG_RANGE` plus `TAG_STUN`; the last `RING_T` closes the court
+  to `RING_KEEP` (`ringOf`), outside it `RING_HURT` a second, the CPU kept
+  inside. All three in the replay hash; check.mjs holds each. **Little
+  flashing** (same day, players: "too flashy"): no full-screen white, no
+  photo negative in the ULTI panel, a faint super-effective tint, a slow KO
+  blink - the hit-stop, shake and zoom carry the impact.
   **Instant moves cost their dodge, so damage came down** (2026-10-27,
   reported: "my Pokemon is dead though same level and type advantage"):
   with no wind-up Hard v Hard fell from 63 s to 40 s, a Pokemon to 10 s on

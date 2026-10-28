@@ -16,6 +16,18 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-28-arena-dynamics",
+    icon: "⚡",
+    date: "October 2026",
+    title: "Arena: combos, tag-ins and the closing ring",
+    items: [
+      ["Combos pay", "Land a kit's Control move, then its payoff within 3 s: harder hit and a stun."],
+      ["Tag in", "Switch right after taking a hit and your next Pokémon comes in striking."],
+      ["The ring", "In the last 30 s the court closes in - outside the red line burns."],
+      ["Easier on the eyes", "Far less flashing: no more white screens or flickering ULTI panels."],
+    ],
+  },
+  {
     id: "2026-10-28-origin-art",
     icon: "🎨",
     date: "October 2026",

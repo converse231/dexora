@@ -24,7 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { gymMaster, enteringAs, newMatch, tick, cpuTeam, masterTeam, fairTeam, lockstep, rulesPrint, activeOf, TPS, LIMIT, INTRO, SURGE_MAX, SURGE_T, FAIR_LEVEL, MEGA_WARM,
   FINAL_T, SWAP_CD, basicShape, PICKUPS, SUDDEN_T, roleOf, basicCd, ultOf, clonesOf, DARK_SEE, SHOT_SPEED, BLAST_SPEED,
-  cooldownOf, DODGE_CD, ARENAS, shapeOf, arenaMove, GROUND, ZONE_SAYS, arenaReady, lineMegas, megaOf, evoTargets, EVO_XP, FLOOR_EVENT, FLOOR_SAYS } from "../../../game/arena.js";
+  cooldownOf, DODGE_CD, ARENAS, shapeOf, arenaMove, GROUND, ZONE_SAYS, arenaReady, lineMegas, megaOf, evoTargets, EVO_XP, FLOOR_EVENT, FLOOR_SAYS, COMBO_WIN, COMBO_DMG, TAG_WIN, RING_T, RING_HURT } from "../../../game/arena.js";
 import { CLOUD, signedIn, myFriends, arenaChallenge, arenaInvites, arenaAnswer, arenaCancel } from "../../../net/cloud.js";
 import { isEvent } from "../../../data/dex.js";
 import { connect } from "./net.js";
@@ -1002,14 +1002,17 @@ function HowTo({ onClose }) {
               <li><b>Every attack shows on the ground</b> before it lands: a line, an arc or a ring. Dash through it at the last moment - a <b>perfect dash</b>.</li>
               <li><b>ULTI</b> fills as you land hits, take them, dash through attacks and hold a zone. Full, it throws the foe off you, powers you up for {SURGE_T / TPS} s and looses your Pokémon's signature: a storm of strikes, a blast all round, a huge cannon or a barrage - Pikachu calls down Thunder, Charizard Blast Burn. Every strike shows on the ground first: dash out of it.</li>
               <li><b>Auto-aim</b> is on: every attack goes at the foe you can see, leading a moving one. Turn it off in the pause menu to aim with the mouse, or drag a skill on a phone to aim it by hand.</li>
-              <li><b>Brawlers and Blasters</b>: a Pokémon whose Attack is higher is a Brawler - it runs and jabs faster, hits harder with blows and dashes and takes less from shots. One whose Sp. Atk is higher is a Blaster - its shots fly faster and farther and its beams charge sooner. Teach either the moves that suit it (Moves, on each team card).</li>
+              <li><b>Brawlers and Blasters</b>: a Pokémon whose Attack is higher is a Brawler - it runs and jabs faster, hits harder with blows and dashes and takes less from shots. One whose Sp. Atk is higher is a Blaster - its shots fly faster and farther and its beams charge sooner. Each Pokémon's kit is built to suit it.</li>
               <li><b>Double Team</b> makes two copies either side of its user that move with it. A hit that reaches a copy first pops it - "Miss!" - and the foe cannot tell which is real.</li>
               <li><b>Weather</b>, one a match: rain powers Water, weakens Fire and slows Fire types; harsh sun the other way round; a sandstorm chips all but Rock, Ground and Steel types, snow all but Ice.</li>
               <li><b>Type combos</b>: Water on a burned Pokémon puts the burn out in a cloud of steam that hides whoever stands in it. Water soaks, and Electric on a soaked Pokémon hits half again as hard.</li>
               <li><b>Mid-match</b>: a legendary may fly over and drop a Full Restore in the middle - half your HP, any status cured, half an ULTI. And the lights may go out: only what glows is seen, and the foe only up close.</li>
               <li><b>Sudden death</b>: out of time with as many Pokémon standing on each side, everyone drops to 1 HP for {SUDDEN_T / TPS} more seconds. The next hit wins.</li>
+              <li><b>Combos</b>: every kit names one - its Control move, then its payoff. Land the payoff within {COMBO_WIN / TPS} s of the Control and it hits {COMBO_DMG}x as hard and stuns.</li>
+              <li><b>Tag in</b>: switch within {TAG_WIN / TPS} s of taking a hit and your next Pokémon comes in striking - a hard basic attack that staggers the foe.</li>
+              <li><b>The ring</b>: in the last {RING_T / TPS} s the court closes in. Outside the red line you lose {Math.round(RING_HURT * 100)}% of your HP a second.</li>
               <li><b>Power-ups</b> drop in pairs, one on each half: a Potion, a Full Heal or a Shiny Stone works when you touch it; an X Attack, X Speed or X Defense is held until you use it. A <b>Poké Ball</b> releases a helper on your side: Electrode explodes, Snorlax falls on the foe (dash out from under it), Chansey heals you, Jigglypuff sings the foe to sleep - or one follows you for 8 s: Audino heals a little at a time, Plusle makes your hits harder, Mr. Mime's Light Screen softens what you take, Magnemite zaps the foe.</li>
-              <li><b>Cooldowns</b> follow what a move does - a drain, a self-boost or many hits wait longer. Each button counts its seconds down; the Move Tutor lists them.</li>
+              <li><b>Cooldowns</b> follow what a move does - a drain, a self-boost or many hits wait longer. Each button counts its seconds down; the team card lists them.</li>
               <li><b>Wall-splat</b>: knock a foe into the wall or a block of cover with a real blow and it takes extra damage and is stunned. <b>Perfect block</b>: raise Protect just as a hit lands and the attacker takes the damage and reels.</li>
               <li><b>Resting</b>: a Pokémon in its ball slowly heals, up to three quarters of its HP. Switching out is a breather.</li>
               <li><b>Clutch</b>: when both Pokémon are nearly down and one winds up, time slows. Make it count.</li>

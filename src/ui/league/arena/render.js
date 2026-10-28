@@ -50,7 +50,7 @@
    the dark only what glows - and what stands near you - is seen. */
 import { W, H, TPS, INSET, INTRO, LIMIT, FINAL_T, moveAt, activeOf, PAR, BRN, PSN, SLP, FRZ, GROUND, ZONE_SAYS, PICKUPS,
   arenaMove as moveOf, BASIC_P, BASIC_S, BASIC_K, clonesOf, ULT_NAMES, WIDE, VANISH, evoTargets, megaTargets, EVOLVE_T,
-  FLOOR_SAYS, waterOf, herdAt, LANE_RUN, LANE_WARN, LANE_H, HELPERS, BEAM_LEN, BEAM_W } from "../../../game/arena.js";
+  FLOOR_SAYS, waterOf, herdAt, LANE_RUN, LANE_WARN, LANE_H, HELPERS, BEAM_LEN, BEAM_W, ringOf } from "../../../game/arena.js";
 import { speciesById } from "../../../game/biomes.js";
 import { label } from "../../../game/map.js";
 import { arenaArt, loadAnims } from "../moveAnim.js";
@@ -113,7 +113,7 @@ const seeded = (n) => () => { n = (n + 0x6d2b79f5) | 0; let t = Math.imul(n ^ (n
 /* THE OPENING'S BEATS, in seconds of INTRO (the sim's own ticks). */
 const VS_IN = 0.12, VS_SLAM = 0.5, VS_OUT = 1.1, THROW = 1.15, LAND = 1.6, COUNT = [1.75, 2.2, 2.65];
 /* THE ENDING'S, in real milliseconds once the match is over. */
-const FLASH_GAP = 350;
+const FLASH_GAP = 1200;
 const KO_SLOW = 1100, RESULT_AT = 1150, DONE_AT = 2400;
 // How close the upright camera may come (the court fills the width at 1).
 const UPRIGHT_ZOOM = 2.4;
@@ -1172,8 +1172,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     for (let i = 0; i < n; i++) { const [vx, vy] = around(v); part({ k: "dot", x, y, vx, vy, colour, life: 22, size: 0.14, drag: 0.9 }); }
   };
   const stamp = (text, colour, life, sub = null) => overlays.push({ k: "stamp", text, colour, t: 0, life, sub });
-  /* A full-screen flash at most every FLASH_GAP ms (a KO's dark one always): Thunder's seven strikes were
-     seven white screens in two seconds - a strobe. */
+  /* An impact frame at most every FLASH_GAP ms (a KO's dark one always): Thunder's seven strikes were
+     seven white screens in two seconds - a strobe. NO WHITE SCREEN at all since 2026-10-28 (players:
+     "too flashy"): the frame is speed lines and a dim, never a bright fill. */
   let flashAt = -1e9;
   const impactFrame = (x, y, dark = false) => {
     if (still || (!dark && clock - flashAt < FLASH_GAP)) return;
@@ -1709,6 +1710,21 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else if (e.k === "final") {
         stamp("FINAL MINUTE", "#ff5a4d", 80, "Hits land harder · ULTI fills twice as fast");
         shake(0.35); crowd(8);
+      } else if (e.k === "ring") {
+        stamp("THE RING CLOSES", "#ff7a4d", 80, "Stay inside - outside burns");
+        shake(0.3);
+      } else if (e.k === "comboOpen" && e.side === me) {
+        word(e.x, e.y - 1.5, "COMBO READY", "#ffe9a8", 40);
+      } else if (e.k === "combo") {
+        // The payoff of a kit's combo: its word, a gold ring, the court shaken.
+        word(e.x, e.y - 1.9, "COMBO!", "#ffd23f", 60, true);
+        fx.push({ k: "ring", x: e.x, y: e.y, colour: "#ffd23f", t: 0, life: 24, big: true });
+        sparks(e.x, e.y - 0.3, "#ffd23f", 14, 0.1); shake(0.5);
+      } else if (e.k === "tag") {
+        // A tag's arrival: streaks from the newcomer to the foe it strikes.
+        word(e.x, e.y - 1.6, "TAG IN!", "#45d4ff", 55, true);
+        const [dx, dy] = [e.tx - e.x, e.ty - e.y], n = Math.hypot(dx, dy) || 1;
+        for (let i = 0; i < 8; i++) part({ k: "streak", x: e.x + dx * i / 8, y: e.y - 0.3 + dy * i / 8, vx: dx / n * 0.15, vy: dy / n * 0.15, colour: i % 2 ? "#45d4ff" : "#ffffff", life: 12, size: 0.5, drag: 0.88 });
       } else if (e.k === "in" || e.k === "out") {
         const f = activeOf(s, e.side) ?? s.sides[e.side].team[e.slot];
         fx.push({ k: "ball", x: f.x, y: f.y, t: 0, life: 26, out: e.k === "out" });
@@ -2073,6 +2089,20 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       glow(sx(x), sy(y - 0.3), px * (0.55 + 0.8 * kk), colour, 0.2 + 0.4 * kk);
       if (kk > 0.82) glow(sx(x), sy(y - 0.3), px * 0.5, "#ffffff", 0.5 * (kk - 0.82) / 0.18);
       if (a.shape === "beam") chargeOrb(m.i, x + a.dx * 0.75, y - 0.35 + a.dy * 0.75, kk, colour);
+    }
+
+    // 1z. The closing ring: the court outside it dimmed red, its edge drawn - still, never a flash.
+    const ring = ringOf(s);
+    if (ring) {
+      const [x0, y0, x1, y1] = [sx(ring[0]), sy(ring[1]), sx(ring[2]), sy(ring[3])];
+      const [L, T, Rr, B] = [sx(INSET), sy(INSET), sx(W - INSET), sy(H - INSET)];
+      ctx.save();
+      ctx.fillStyle = "rgba(200,40,30,0.22)";
+      ctx.fillRect(L, T, Rr - L, y0 - T); ctx.fillRect(L, y1, Rr - L, B - y1);
+      ctx.fillRect(L, y0, x0 - L, y1 - y0); ctx.fillRect(x1, y0, Rr - x1, y1 - y0);
+      ctx.strokeStyle = "rgba(255,110,80,0.9)"; ctx.lineWidth = Math.max(2, px * 0.08);
+      ctx.setLineDash([px * 0.4, px * 0.2]); ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); ctx.setLineDash([]);
+      ctx.restore();
     }
 
     // 2. Bodies: shadow, afterimages, the walking sprite, its status and flash.
@@ -2982,7 +3012,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       const fly = ease(Math.min(1, kk * 1.3));
       const x = e.x + e.dx * fly * 1.6, y = e.y + e.dy * fly * 1.6 - Math.sin(Math.min(1, kk * 1.3) * Math.PI) * 1.1;
       const at = { x, y, sx: 1 - kk * 0.3, sy: 1 - kk * 0.3, tilt: (e.dx >= 0 ? 1 : -1) * kk * TAU * 1.2 };
-      const flash = Math.floor(e.t / 3) % 2 === 0;
+      const flash = Math.floor(e.t / 9) % 2 === 0;
       sprite(e.id, e.side, e.slot, x, y, e.frame, Math.min(1, (1 - kk) * 2.2), flash ? "#ffffff" : null, at);
     } else if (e.k === "num" || e.k === "word") {
       // A number pops, arcs off the blow and falls; a word rises.
@@ -3069,12 +3099,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       if (o.k === "frame") {
         ctx.save();
         if (o.dark && o.t < 4) {
-          ctx.fillStyle = "rgba(6,4,14,0.78)"; ctx.fillRect(0, 0, cw, ch);
-          speedLines(o.x, o.y, "rgba(255,255,255,0.85)", 1);
+          ctx.fillStyle = "rgba(6,4,14,0.45)"; ctx.fillRect(0, 0, cw, ch);
+          speedLines(o.x, o.y, "rgba(255,255,255,0.6)", 1);
         } else {
-          ctx.globalCompositeOperation = "lighter";
-          ctx.fillStyle = `rgba(255,255,255,${(0.35 * (1 - kk)).toFixed(3)})`; ctx.fillRect(0, 0, cw, ch);
-          ctx.globalCompositeOperation = "source-over";
           speedLines(o.x, o.y, "rgba(10,8,20,0.5)", 1 - kk);
         }
         ctx.restore();
@@ -3109,7 +3136,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       else if (o.k === "shade") {
         ctx.save(); ctx.fillStyle = `${o.colour}${(0.45 * Math.sin(Math.min(1, kk * 1.5) * Math.PI)).toFixed(3)})`; ctx.fillRect(0, 0, cw, ch); ctx.restore();
       } else if (o.k === "tint") {
-        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.3 * (1 - kk); ctx.fillStyle = o.colour; ctx.fillRect(0, 0, cw, ch); ctx.restore();
+        ctx.save(); ctx.globalAlpha = 0.1 * (1 - kk); ctx.fillStyle = o.colour; ctx.fillRect(0, 0, cw, ch); ctx.restore();
       } else if (o.k === "cut") cutIn(o, kk);
       else if (o.k === "stamp") stampAt(o.text, o.colour, o.t, o.life, o.sub);
     }
@@ -3280,7 +3307,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a;
     ctx.drawImage(glowOf(colour), x - r, y - r, r * 2, r * 2); ctx.restore();
   }
-  /* THE ULTI'S PANEL (One Piece's impact frame): NEGATIVE for a few frames,
+  /* THE ULTI'S PANEL (One Piece's impact frame): DARK for a few frames (a
+     photo negative until 2026-10-28 - the brightest flash in a match),
      then INK - a black page (a famous Pokemon's: its colour), the type's
      pattern bursting from the hit, the Pokemon huge in its colours, the
      name - then the colour floods back in. Never a strobe: two cuts, then a
@@ -3292,18 +3320,16 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     const neg = 4, ink = o.life - 12, f = o.t;
     ctx.save();
     if (f < neg) {
-      ctx.globalCompositeOperation = "saturation"; ctx.fillStyle = "#808080"; ctx.fillRect(0, 0, cw, ch);
-      ctx.globalCompositeOperation = "difference"; ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cw, ch);
-      ctx.globalCompositeOperation = "source-over";
-      speedLines(o.x, o.y, "rgba(0,0,0,0.9)", 1);
+      ctx.fillStyle = "rgba(4,4,10,0.6)"; ctx.fillRect(0, 0, cw, ch);
+      speedLines(o.x, o.y, "rgba(255,255,255,0.7)", 1);
       ctx.restore();
       return;
     }
     if (f >= ink) {
       // The colour back: a wash of the type, the lines thinning out.
       const a = 1 - (f - ink) / (o.life - ink);
-      ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.4 * a; ctx.fillStyle = o.colour; ctx.fillRect(0, 0, cw, ch);
-      ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.15 * a; ctx.fillStyle = o.colour; ctx.fillRect(0, 0, cw, ch);
+      ctx.globalAlpha = 1;
       speedLines(o.x, o.y, o.colour, a * 0.8);
       ctx.restore();
       return;
