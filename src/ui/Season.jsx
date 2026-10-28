@@ -216,7 +216,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard, onNext }) {
                 {dex?.[dexIndex(l.id)] === 2 && <i className="sn-got" aria-label="caught">✓</i>}
               </span>
               <b>{l.title}</b>
-              <small>{l.rare ? <em className="sn-rare">Rare</em> : null}{where[0] ?? ""}{l.card && <em className="sn-card-tag" data-tip="Its real promo card is yours on the first catch">CARD</em>}</small>
+              <small>{l.rare < 1 ? <em className="sn-rare">Rare</em> : null}{where[0] ?? ""}{l.card && <em className="sn-card-tag" data-tip="Its real promo card is yours on the first catch">CARD</em>}</small>
             </section>
           ))}
         </div>

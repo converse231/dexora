@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sections, SHELVES } from "./Shop.jsx";
 import { Wallet, useWallet } from "./wallet.jsx";
-import { useModalLock, useDismiss } from "./modal.js";
+import { useModalLock, useDismiss, stacked } from "./modal.js";
 import Icon from "./Icon.jsx";
 
 export default function Mart({ shelf = "catching", bag, level, onCards, onClose }) {
@@ -17,7 +17,8 @@ export default function Mart({ shelf = "catching", bag, level, onCards, onClose 
   const body = useRef(null);
   useEffect(() => { body.current?.scrollTo(0, 0); }, [tab]);
   useEffect(() => {
-    const esc = (e) => { if (e.key === "Escape") { e.stopImmediatePropagation(); onClose(); } };
+    // A confirm over the Mart closes first (modal.js `stacked`): it has its own Escape.
+    const esc = (e) => { if (e.key === "Escape" && !stacked()) { e.stopImmediatePropagation(); onClose(); } };
     addEventListener("keydown", esc, true);
     return () => removeEventListener("keydown", esc, true);
   }, [onClose]);

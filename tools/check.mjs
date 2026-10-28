@@ -2755,6 +2755,29 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         }
       }
     }
+    /* EVERY COSTUME IS FINDABLE IN A WEEK (audited 2026-10-29): by day, with no
+       lure, on its base's best map at the cap. At a third of the meetings the
+       Plague Doctors took ~2,000 each and the Monster Hunter ~800, on species
+       0.2-0.3% of their maps; `rare` 3 brought them to ~820 and ~310. 1,000 is
+       about a week of an hour a day; the Tower's set is ~310. A later stage of
+       an event that evolves is a first stage's candy, not a meeting. */
+    {
+      const { eventChance, shareOf } = await import("../src/game/events.js");
+      const best = new Map();
+      for (const b of BIOMES) {
+        const t = encounterTable(b, MAX_LEVEL), tot = t.reduce((n, [, w]) => n + w, 0);
+        for (const [id, w] of t) best.set(id, Math.max(best.get(id) ?? 0, w / tot));
+      }
+      for (const ev of EVENTS.filter((e) => !e.roam)) {
+        for (const l of ev.looks.filter((x) => ev.evolves === false || !speciesById(x.of).from)) {
+          const base = l.on ?? l.of, looks = ev.looks.filter((x) => (x.on ?? x.of) === base);
+          const sum = looks.reduce((n, x) => n + (x.rare ?? 1), 0);
+          const met = looks.map((x) => x.of).concat(base).reduce((n, id) => n + (best.get(id) ?? 0), 0);
+          const p = met * Math.min(1, eventChance({ share: shareOf(ev) }) * sum / looks.length) * (l.rare ?? 1) / sum;
+          assert.ok(1 / p <= 1000, `${speciesById(l.id).name} is one meeting in ${Math.round(1 / p)} - its species is too rare where it lives`);
+        }
+      }
+    }
     /* A ROAMING WEEK (Poncho Parade, 2026-10-28): its looks are met by
        roamLook alone - on a map whose types its poncho's Pokemon shares, never
        one it does not, never in a Pikachu's place - and no roll is drawn on any

@@ -141,7 +141,9 @@ export const eventChance = ({ night = false, lure = 1, share = EVENT_SHARE } = {
    line's later stages, costumed, where its base lives - the costume is one of
    them, picked evenly by a second draw only when there is a choice. */
 /* A `rare` look takes that share of the odds (Phantom Thief Sableye, a
-   fifth): in a choice it is picked by weight, so the others keep theirs. */
+   fifth): in a choice it is picked by weight, so the others keep theirs.
+   Above 1 it lifts them instead - 3 dresses every one met (the Plague
+   Doctors and the Monster Hunter, on species rare where they live). */
 /* A `daytime` event (Shichi-Go-San: a shrine visit is by day) takes the
    EVENT_NIGHT lift in daylight instead. */
 export function eventLook(sp, random, { day, night, lure } = {}) {

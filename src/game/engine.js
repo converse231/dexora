@@ -2043,7 +2043,7 @@ export function createEngine(canvas, onChange, mini = null) {
       source,
       // The hunted one, which asks before you run and ends its hunt (`huntOn`).
       hunt: nightmare,
-      msg: nightmare ? `${huntWords(hunt).falls} ${label(sp).toUpperCase()} is here!`
+      msg: nightmare ? `${huntWords(hunt).falls} ${label(sp).toUpperCase()} is here! A Nanab Berry keeps it from running.`
         : source === "fishing"
         ? `Something bit! A wild ${label(sp).toUpperCase()}!`
         : `A wild ${label(sp).toUpperCase()} appeared!`,
@@ -2730,7 +2730,7 @@ export function createEngine(canvas, onChange, mini = null) {
     state.dreams = { ...state.dreams, [ev.id]: was + 1 };
     if (was + 1 === h.dreams) {
       cheer({ kind: "medal", title: huntWords(h).rise,
-        sub: `Something waits in ${AREAS[h.area]?.name ?? "the dark"}... Walk in.` });
+        sub: `Something waits in ${AREAS[h.area]?.name ?? "the dark"}... Walk in - and bring a Nanab Berry, or it may run.` });
     }
   }
 

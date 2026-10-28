@@ -104,7 +104,7 @@ export default function Confirm({
      layer is placed and stacked in - so the Shop's buy dialog sat inside the
      panel, under a wild encounter (reported 2026-10-04). */
   return createPortal(
-    <div className="sheet" {...useDismiss(onCancel)}>
+    <div className="sheet cf-sheet" {...useDismiss(onCancel)}>
       <div
         className="confirm"
         role="dialog"

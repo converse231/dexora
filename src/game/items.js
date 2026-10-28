@@ -445,7 +445,7 @@ export const FIELD = [
     /* The one jar, as every honey is (`art`), wearing its event's look in
        CSS (`fx`, ItemIcon) - nobody draws a jar per event. */
     id: "spooky-honey", art: "honey", fx: "spooky", family: "event", name: "Spooky Honey", price: 1200, level: 3,
-    event: "halloween", steps: HONEY_STEPS, lure: 3, blurb: "Costumes in 3 of 4 meetings",   // a lure up to EVENT_CAP: half by day already (2026-10-24)
+    event: "halloween", steps: HONEY_STEPS, lure: 3, blurb: "Up to 3 in 4 in costume",   // a lure up to EVENT_CAP: half by day already (2026-10-24)
   },
   {
     // Poncho Parade's (2026-10-28): the same jar in Pikachu yellow, luring the week's roaming ponchos.

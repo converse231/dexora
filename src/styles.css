@@ -12620,6 +12620,10 @@ button.wl-chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2
 
 /* THE POKÉ MART: a card over any page, its shelves in tabs, one scroll. */
 .mart-sheet { z-index: 75; }
+/* A confirm is asked BY whatever is open, so it sits over every page and card
+   (80 at most) - at the plain sheet's 70 the Mart's Buy asked behind the Mart
+   (reported 2026-10-29). Under the ceremonies (90). */
+.cf-sheet { z-index: 85; }
 .mart { --fc: #ff6a2b; position: relative; width: min(600px, 100%); max-height: min(760px, calc(100dvh - 32px));
   display: grid; grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden;
   background: var(--paper); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 24px 60px var(--shadow-soft); }
