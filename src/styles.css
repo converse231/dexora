@@ -11428,27 +11428,41 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 @keyframes sn-flap { to { clip-path: polygon(0 60%, 18% 40%, 30% 45%, 42% 25%, 50% 30%, 58% 25%, 70% 45%, 82% 40%, 100% 60%, 82% 80%, 62% 60%, 50% 100%, 38% 60%, 18% 80%); } }
 @keyframes sn-fly { 50% { translate: 24px -10px; } }
 /* AN EVENT'S OWN POKEMON in its sky (Season.jsx `drift`): a Walk from the
-   Arena's atlases at native pixels, blown up crisp; it faces right, so the two
-   on the right face in. More specific than every event's own bat rule. */
-/* `scale`, never `zoom`: zoom scales the place as well as the body, and put
-   Dusknoir on the title. Their own places, along the poster's edges, clear
-   of the kicker, the title and the moon. */
+   Arena's atlases at native pixels, ALL AT ONE SCALE so each keeps its size
+   against the others (2026-10-29, asked for: a Rayquaza dwarfs a Wingull).
+   Each FLOATS ACROSS the whole poster on its own lane and speed, bobbing as
+   it goes - the right-facing ones rightward, the mirrored ones leftward -
+   behind the title and the countdown (the sky is under the card's content),
+   their lanes clear of the small lines (the dates, "Starts in", the lede),
+   which a sprite behind made hard to read.
+   More specific than every event's own bat rule; `scale` and `left`, never
+   `zoom`, which moved the places too and put Dusknoir on the title. */
 .sn-card .sn-sky .sn-bat.sn-drift {
-  width: auto; height: auto; scale: 1.7; background: none; clip-path: none; border-radius: 0;
+  width: auto; height: auto; scale: 1.6; background: none; clip-path: none; border-radius: 0;
   box-shadow: none; image-rendering: pixelated; filter: drop-shadow(0 0 6px rgba(255, 255, 255, .25));
-  transform-origin: center; animation: sn-fly 9s ease-in-out infinite;
+  left: -14%; transform-origin: center;
+  animation: sn-cross var(--sn-t, 22s) linear infinite, sn-bob 2.8s ease-in-out infinite alternate;
+  animation-delay: var(--sn-at, 0s), 0s;
 }
-.sn-card .sn-sky .sn-bat.sn-drift.b0 { top: 34px; left: 9%; }
-.sn-card .sn-sky .sn-bat.sn-drift.b1 { top: 128px; left: auto; right: 7%; transform: scaleX(-1); animation-delay: -3s; }
-.sn-card .sn-sky .sn-bat.sn-drift.b2 { top: 30px; left: 26%; scale: 1.3; animation-delay: -5s; }
-.sn-card .sn-sky .sn-bat.sn-drift.b3 { top: 132px; left: 5%; animation-delay: -7s; }
-.sn-card .sn-sky .sn-bat.sn-drift.b4 { top: 30px; left: auto; right: 26%; scale: 1.3; transform: scaleX(-1); animation-delay: -1s; }
-/* A phone's poster has no room either side of its kicker and title: two, in
-   the top-left corner over the title, and the rest stay home. */
+.sn-card .sn-sky .sn-bat.sn-drift.b0 { top: 80px; --sn-t: 24s; --sn-at: -4s; }
+.sn-card .sn-sky .sn-bat.sn-drift.b1 { top: 104px; --sn-t: 30s; --sn-at: -19s; transform: scaleX(-1); animation-direction: reverse, alternate; }
+.sn-card .sn-sky .sn-bat.sn-drift.b2 { top: -2px; --sn-t: 27s; --sn-at: -13s; }
+.sn-card .sn-sky .sn-bat.sn-drift.b3 { top: 190px; --sn-t: 21s; --sn-at: -9s; }
+.sn-card .sn-sky .sn-bat.sn-drift.b4 { top: 162px; --sn-t: 33s; --sn-at: -26s; transform: scaleX(-1); animation-direction: reverse, alternate; }
+@keyframes sn-cross { from { left: -14%; } to { left: 106%; } }
+@keyframes sn-bob { from { translate: 0 -5px; } to { translate: 0 5px; } }
+/* A phone's poster is narrow and busy: three cross it, the rest stay home. */
 @media (max-width: 560px) {
-  .sn-card .sn-sky .sn-bat.sn-drift.b0 { top: 20px; left: 5%; }
-  .sn-card .sn-sky .sn-bat.sn-drift.b1 { top: 76px; left: 5%; right: auto; }
-  .sn-card .sn-sky .sn-bat.sn-drift.b2, .sn-card .sn-sky .sn-bat.sn-drift.b3, .sn-card .sn-sky .sn-bat.sn-drift.b4 { display: none; }
+  .sn-card .sn-sky .sn-bat.sn-drift.b3, .sn-card .sn-sky .sn-bat.sn-drift.b4 { display: none; }
+}
+/* Still for a player who asked for less motion: each holds a place along the edges. */
+@media (prefers-reduced-motion: reduce) {
+  .sn-card .sn-sky .sn-bat.sn-drift { animation: none; }
+  .sn-card .sn-sky .sn-bat.sn-drift.b0 { left: 8%; }
+  .sn-card .sn-sky .sn-bat.sn-drift.b1 { left: 84%; }
+  .sn-card .sn-sky .sn-bat.sn-drift.b2 { left: 26%; }
+  .sn-card .sn-sky .sn-bat.sn-drift.b3 { left: 4%; }
+  .sn-card .sn-sky .sn-bat.sn-drift.b4 { left: 70%; }
 }
 .ev-halloween .sn-sky .sn-bat.sn-drift, .ev-haunting .sn-sky .sn-bat.sn-drift { opacity: .9; }
 /* STICKY, not absolute: the card scrolls on a phone, and the X must not

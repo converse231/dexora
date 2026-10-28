@@ -45,10 +45,12 @@ export const EVENTS = [
     // Its mark on the chip, the board and the poster; its look is `.ev-<id>` (styles.css).
     emblem: "🎃",
     shelf: "halloween",
-    /* ITS SKY: the Pokemon that drift across its poster (Season.jsx), the
-       Arena's own PMD walks baked by `npm run drift` - up to five, left to
-       right as the poster places them (asked for, 2026-10-29). */
-    drift: [92, 93, 94, 778, 41],
+    /* ITS SKY: the Pokemon that float across its poster (Season.jsx), the
+       Arena's own PMD walks baked by `npm run drift` - up to five, each on its
+       own lane (asked for, 2026-10-29). FLIERS AND FLOATERS ONLY: a walker
+       (Sableye, Gengar, Mimikyu, Pikachu) striding through the air read
+       wrong. */
+    drift: [92, 93, 42, 425, 41],
     /* A check-in on this weekday (0 Sunday .. 6 Saturday) while the event
        runs pays these on top of the day's own reward (asked for, 2026-10-20:
        Friday's check-in, Hallow Balls). Five are a check-in day's worth. */
@@ -99,7 +101,7 @@ export const EVENTS = [
     title: "Phantom Hunter",
     emblem: "👻",
     shelf: "halloween",
-    drift: [93, 355, 477, 198, 302],
+    drift: [93, 355, 477, 198, 278],
     evolves: false,
     // HARDER (2026-10-26, asked for): a third of the species' meetings, where the first week had half.
     share: 1 / 3,
@@ -162,8 +164,8 @@ export const EVENTS = [
     title: "Poncho Collector",
     emblem: "⚡",
     shelf: "ponchos",
-    // Pikachu and Mew among the bunting: the rest of the sky stays pennants.
-    drift: [25, 151],
+    // Mew, Rayquaza and Altaria among the bunting (a Pikachu walks; it does not fly).
+    drift: [151, 384, 334],
     evolves: false,
     roam: true,
     daytime: true,

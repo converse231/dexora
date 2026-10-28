@@ -1528,7 +1528,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   portraits, nothing on the map or anywhere else, asserted by check.mjs's
   `pmd ok`; two baked exceptions, both announcements: the Arena's own intro
   and, since 2026-10-29 (asked for), an event poster's sky - its `drift`
-  Pokemon walking by, `npm run drift`, at most five, two on a phone): `tools/build_pmd.py` bakes nine animations a Pokemon (Walk,
+  Pokemon floating across it on their own lanes at ONE scale (true sizes),
+  fliers and floaters only, `npm run drift`, at most five, three on a phone): `tools/build_pmd.py` bakes nine animations a Pokemon (Walk,
   Idle, Attack, Shoot, Charge, Hurt, Sleep, Hop, Double) into ONE atlas and a
   sidecar - every frame cut to its own pixels, repeats stored once, a
   left-facing row that is its right one mirrored drawn flipped (uncut,
