@@ -59,6 +59,9 @@ export const RARITY = {
   blackwhite:   { name: "Black White Rare", icon: "✦" },
   hyper:        { name: "Hyper rare", icon: "✦" },
   mega:         { name: "Mega Hyper Rare", icon: "✦" },
+  /* A PROMO is no rung (outside CARD_RARITIES): no pack rolls it, no craft
+     makes it - a promo set's card comes by playing (data/cards/promos.js). */
+  promo:        { name: "Promo", icon: "P" },
 };
 export const rungOf = (rarity) => CARD_RARITIES.indexOf(rarity);
 // A HIT is Base Set's Holo Rare or a Double rare or better - what the `hit` pity counts.

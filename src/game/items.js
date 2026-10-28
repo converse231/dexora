@@ -447,6 +447,11 @@ export const FIELD = [
     id: "spooky-honey", art: "honey", fx: "spooky", family: "event", name: "Spooky Honey", price: 1200, level: 3,
     event: "halloween", steps: HONEY_STEPS, lure: 3, blurb: "Costumes in 3 of 4 meetings",   // a lure up to EVENT_CAP: half by day already (2026-10-24)
   },
+  {
+    // Poncho Parade's (2026-10-28): the same jar in Pikachu yellow, luring the week's roaming ponchos.
+    id: "poncho-honey", art: "honey", fx: "poncho", family: "event", name: "Poncho Honey", price: 1200, level: 3,
+    event: "ponchos", steps: HONEY_STEPS, lure: 3, blurb: "Poncho Pikachu 3× as likely",
+  },
 ];
 
 /* WHICH BALL EACH NUMBER KEY THROWS, AND IT IS THE PLAYER'S TO ARRANGE.

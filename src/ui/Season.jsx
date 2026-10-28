@@ -20,13 +20,14 @@ import { speciesById, foundIn, dexIndex } from "../game/biomes.js";
 import { eventShelf } from "../game/items.js";
 import { shelfOf, eventAfter,
   eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, eventDone, huntDue, huntWords,
-  shareOf, EVENT_NIGHT, EVENT_PACKS,
+  shareOf, EVENT_NIGHT, EVENT_PACKS, roamAreas,
 } from "../game/events.js";
 
 /* Seen per device, never the save - the teaser and the opening are two
    announcements, so each is seen once. The count of looks is in the key: a
    second wave of costumes (Hallowed Night's, 2026-10-24) is announced again to
    a device that saw the first. */
+const driftUrl = (id) => new URL(`events/drift/${id}.png`, document.baseURI).href;
 const SEEN = (ev, soon) => `dexora-event-seen:${ev.id}${soon ? ":soon" : ""}:${ev.looks.length}`;
 const isSoon = (ev) => eventOn()?.id !== ev.id && eventOpens(ev) > Date.now();
 export const seasonUnseen = (ev) => {
@@ -110,8 +111,8 @@ function lines(ev) {
       line.push(next);
       at = next;
     }
-    // Where the first stage is met, which is where the costume starts.
-    const where = foundIn(first.of).areas.slice(0, 2).map((a) => a.name);
+    // Where the first stage is met, which is where the costume starts - a roaming look's own maps.
+    const where = (ev.roam ? roamAreas(first) : foundIn(first.of).areas).slice(0, 2).map((a) => a.name);
     return { line, where };
   });
 }
@@ -127,7 +128,7 @@ function Moons({ n, of, says }) {
   );
 }
 
-export function SeasonIntro({ ev, dex, onClose, onBoard }) {
+export function SeasonIntro({ ev, dex, onClose, onBoard, onNext }) {
   useModalLock();
   /* FOCUS WITHOUT SCROLLING: `autoFocus` scrolled a phone's card to its foot,
      past the lineup and the close button (found in QA, 2026-10-19). */
@@ -144,6 +145,9 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
   const soon = isSoon(ev);
   const held = eventHeld(ev, dex);
   const [ball, honey] = [eventShelf(shelfOf(ev)).find((i) => i.bonus), eventShelf(shelfOf(ev)).find((i) => i.lure)];
+  // THE NEXT WEEK, announced inside this one's poster while it runs (asked for, 2026-10-28).
+  const next = live ? eventAfter(ev) : null;
+  const cards = ev.looks.filter((l) => l.card).length;
 
   return (
     <div className="sheet sn-sheet" {...useDismiss(onClose)}>
@@ -152,7 +156,11 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
         <div className="sn-sky" aria-hidden="true">
           <i className="sn-moon" />
           <i className="sn-fog a" /><i className="sn-fog b" />
-          {[0, 1, 2, 3, 4].map((k) => <i key={k} className={`sn-bat b${k}`} />)}
+          {/* ITS POKEMON, where an event names them (`drift`): the Arena's own PMD walks
+              (npm run drift), crisp at native pixels; the rest of the sky its bats. */}
+          {[0, 1, 2, 3, 4].map((k) => (ev.drift?.[k]
+            ? <img key={k} className={`sn-bat sn-drift b${k}`} src={driftUrl(ev.drift[k])} alt="" />
+            : <i key={k} className={`sn-bat b${k}`} />))}
         </div>
         <button type="button" className="set-x sn-x" aria-label="Close" onClick={onClose}>✕</button>
         <span className="sn-kicker">{soon ? "Coming soon" : "Limited-time event"} · {day(ev.start)} – {day(ev.end)}</span>
@@ -160,7 +168,11 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
         {ev.lore && <p className="sn-lore">{ev.lore}</p>}
         {(soon || live) && <Countdown to={soon ? eventOpens(ev) : eventCloses(ev)} label={soon ? "Starts in" : "Ends in"} />}
         <p className="sn-lede">
-          {soon
+          {ev.roam ? (soon
+            ? <>From {day(ev.start)}, Pikachu in ponchos turn up on every map - each where its poncho's Pokémon would live. One week only.</>
+            : <>Pikachu in ponchos are out on every map! For {live ? (left === 1 ? "one last day" : `${left} more days`) : "a week"},
+              {" "}each turns up where its poncho's Pokémon would live - and only then.</>)
+            : soon
             ? <>Pokémon are coming out in costume! From {day(ev.start)}, any of these can turn up where its species lives - for one week only.</>
             : <>Pokémon are out in costume! For {live ? (left === 1 ? "one last day" : `${left} more days`) : "a week"},
               {" "}any of these can turn up where its species lives - and only then.</>}
@@ -169,7 +181,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
         {/* THE POSTER KEEPS THE SECRET (2026-10-26, asked for): a costume is a
             dark silhouette until you catch it - the names say what to hunt, the
             art is the reward. */}
-        <h3 className="sn-sub">{ev.evolves === false ? "Whole lines in costume · catch each" : "Evolve in costume"}</h3>
+        {lines(ev).some(({ line }) => line.length > 1) && <h3 className="sn-sub">{ev.evolves === false ? "Whole lines in costume · catch each" : "Evolve in costume"}</h3>}
         <div className="sn-lineup">
           {lines(ev).filter(({ line }) => line.length > 1).map(({ line, where }) => (
             <section key={line[0].id} className="sn-line">
@@ -190,7 +202,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
         </div>
         {/* ONE OF A KIND: no costumed next stage, so each is a catch of its own -
             fourteen sections ran the dialog four screens long, so a grid. */}
-        <h3 className="sn-sub">One of a kind · catch each</h3>
+        <h3 className="sn-sub">{ev.roam ? `${ev.looks.length} ponchos · catch each` : "One of a kind · catch each"}</h3>
         <div className="sn-solos">
           {lines(ev).filter(({ line }) => line.length === 1).map(({ line: [l], where }) => (
             <section key={l.id} className="sn-solo">
@@ -199,7 +211,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
                 {dex?.[dexIndex(l.id)] === 2 && <i className="sn-got" aria-label="caught">✓</i>}
               </span>
               <b>{l.title}</b>
-              <small>{l.rare ? <em className="sn-rare">Rare</em> : null}{where[0] ?? ""}</small>
+              <small>{l.rare ? <em className="sn-rare">Rare</em> : null}{where[0] ?? ""}{l.card && <em className="sn-card-tag" data-tip="Its real promo card is yours on the first catch">CARD</em>}</small>
             </section>
           ))}
         </div>
@@ -219,12 +231,21 @@ export function SeasonIntro({ ev, dex, onClose, onBoard }) {
           {ev.daytime
             ? <li><em>🌞</em><span><b>{EVENT_NIGHT}× by day</b>The costumes come out in daylight.</span></li>
             : <li><em>🌙</em><span><b>{EVENT_NIGHT}× after dark</b>The costumes come out at night.</span></li>}
-          <li><em>{ev.emblem ?? "🎃"}</em><span><b>1 in {Math.round(1 / shareOf(ev))} wear one</b>{ev.evolves === false ? "Every stage is its own catch - the big ones turn up where their line starts." : "A line evolves in costume; the rest, catch each one."}</span></li>
+          {ev.roam
+            ? <li><em>{ev.emblem}</em><span><b>1 meeting in {Math.round(1 / shareOf(ev))}</b>A poncho turns up on any map that matches its Pokémon's type.</span></li>
+            : <li><em>{ev.emblem ?? "🎃"}</em><span><b>1 in {Math.round(1 / shareOf(ev))} wear one</b>{ev.evolves === false ? "Every stage is its own catch - the big ones turn up where their line starts." : "A line evolves in costume; the rest, catch each one."}</span></li>}
+          {cards > 0 && <li><em>🃏</em><span><b>{cards} real promo cards</b>Catch a poncho marked CARD and its real promo card is yours, once.</span></li>}
           {honey && <li><em>🍯</em><span><b>{honey.name}</b>{honey.lure}× as likely for {honey.steps} steps.</span></li>}
           {ball && <li><em>🔮</em><span><b>{ball.name}</b>{ball.boost}× catch on costumed ones.</span></li>}
           <li><em>✨</em><span><b>Rare forms too</b>Shiny, Gold, Diamond and more can wear the costume.</span></li>
           <li><em>🏆</em><span><b>Catch all {ev.looks.length}{ev.hunt ? ` and ${ev.hunt.title.split(" ").pop()}` : ""}</b>The {ev.title} title and {EVENT_PACKS === 1 ? "a card pack" : `${EVENT_PACKS} card packs`}.</span></li>
         </ul>
+
+        {next && (
+          <button type="button" className="sn-next" onClick={() => onNext?.(next)}>
+            <b>Next week: {next.emblem} {next.name}</b> · from {day(next.start)}<i aria-hidden="true">Preview ›</i>
+          </button>
+        )}
 
         <div className="sn-foot">
           <span className="sn-held">{soon ? `Opens ${day(ev.start)}` : `${held} / ${ev.looks.length} caught`}</span>

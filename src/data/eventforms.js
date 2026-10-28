@@ -45,6 +45,10 @@ export const EVENTS = [
     // Its mark on the chip, the board and the poster; its look is `.ev-<id>` (styles.css).
     emblem: "🎃",
     shelf: "halloween",
+    /* ITS SKY: the Pokemon that drift across its poster (Season.jsx), the
+       Arena's own PMD walks baked by `npm run drift` - up to five, left to
+       right as the poster places them (asked for, 2026-10-29). */
+    drift: [92, 93, 94, 778, 41],
     /* A check-in on this weekday (0 Sunday .. 6 Saturday) while the event
        runs pays these on top of the day's own reward (asked for, 2026-10-20:
        Friday's check-in, Hallow Balls). Five are a check-in day's worth. */
@@ -95,6 +99,7 @@ export const EVENTS = [
     title: "Phantom Hunter",
     emblem: "👻",
     shelf: "halloween",
+    drift: [93, 355, 477, 198, 302],
     evolves: false,
     // HARDER (2026-10-26, asked for): a third of the species' meetings, where the first week had half.
     share: 1 / 3,
@@ -135,5 +140,88 @@ export const EVENTS = [
       { id: 19939, of: 465, on: 114, title: "Swamp Monster Tangrowth", flavor: "It rose out of the bog wearing half of it. A frog has lived on its shoulder for three Halloweens and has never once been asked to leave." },
     ],
     hunt: { id: 19931, of: 487, title: "Grim Reaper Giratina", flavor: "It rose out of the Distortion World in a reaper's hood, its scythe as long as its wings - and the Pokémon Mansion's clocks all stopped at midnight.", medal: "reaper", name: "The Reaper", dreams: 20, keep: 12, area: "mansion" },
+  },
+  /* PONCHO PARADE (2026-10-28, asked for): Pikachu in the Pokemon Center's
+     ponchos - the 16 printed on Japan's promo cards, three sold only as
+     figures and keychains (Sableye, Altaria, Scizor), the Magikarp and
+     Gyarados costumes of the same series, and one of our own (Mega Gengar,
+     for the ghosts). Pinsir, Latias, Latios, Venusaur, Blastoise and
+     Garchomp were drawn up and left out (2026-10-29, your call) - so the
+     Mirage Desert, Ground alone, has no poncho.
+     Every look is a Pikachu, so a poncho is never met in a Pikachu's place:
+     the week ROAMS (`roam`, events.js `roamLook`) - a share of every walking
+     meeting on a map is a poncho whose Pokemon (`wears`) shares a type with
+     the map, so a Charizard poncho is met on the volcano and a Gyarados one
+     by the water. A poncho printed on a real card (`card`, the promo set in
+     data/cards/sets/poncho.js) files that card into your collection on its
+     first catch (the engine's `grantPromo`); a card that shows three ponchos
+     comes with each of them. Daylight: the ponchos are out by day. */
+  {
+    id: "ponchos",
+    name: "Poncho Parade",
+    title: "Poncho Collector",
+    emblem: "⚡",
+    shelf: "ponchos",
+    // Pikachu and Mew among the bunting: the rest of the sky stays pennants.
+    drift: [25, 151],
+    evolves: false,
+    roam: true,
+    daytime: true,
+    // Of EVERY walking meeting on a map with a poncho that fits it, not of one species'.
+    share: 1 / 12,
+    checkin: { weekday: 5, items: { "poncho-honey": 1 } },
+    // Two days after The Haunting (asked for, 2026-10-29).
+    start: "20261108",
+    end: "20261114",
+    lore: "Every autumn the Pokémon Center sews a new parade of ponchos - and this year the Pikachu got to the rack first. They are out all over the region with the hoods pulled up: wings flapping, tails trailing, sleeves two sizes too long. Each poncho draws its Pikachu where its Pokémon would live, so the Charizard ones are by the volcano and the Gyarados ones down by the water. Catch one that was ever printed on a card and the card is yours. And something pink has been seen in the Safari Zone, wearing a poncho of its own.",
+    looks: [
+      // On a real card: the Mega Charizard X and Y Special Boxes (2016).
+      { id: 19940, of: 25, wears: 10034, card: "poncho-xy207", title: "Charizard X Poncho Pikachu", flavor: "Its poncho is Mega Charizard X: black, with blue flames stitched round the hood. It practises a roar in the mirror and squeaks every time." },
+      { id: 19941, of: 25, wears: 10035, card: "poncho-xy208", title: "Charizard Y Poncho Pikachu", flavor: "It wears Mega Charizard Y's great orange wings on its back and flaps them hard on every hilltop. It has not taken off yet." },
+      // The Skytree Town Special Box (2016): Rayquaza, and its shiny in black.
+      { id: 19942, of: 25, wears: 384, card: "poncho-xy230", title: "Rayquaza Poncho Pikachu", flavor: "A long green Rayquaza poncho with a tail that trails behind it for metres. It coils up in the tail to sleep." },
+      // RARE: the black one, as rare in its box as a shiny is in the grass.
+      { id: 19943, of: 25, wears: 384, card: "poncho-xy231", rare: 0.25, title: "Shiny Rayquaza Poncho Pikachu", flavor: "The black Rayquaza poncho, gold rings down its length. Only a few were ever sewn, and this Pikachu will not let anyone else try it on." },
+      { id: 19944, of: 25, wears: 10079, card: "poncho-xy274", title: "Mega Rayquaza Poncho Pikachu", flavor: "Mega Rayquaza's golden whiskers stream from the hood when it runs. It runs everywhere, just to see them stream." },
+      // The Pikachu Mega Campaign (2015): three in one card.
+      { id: 19945, of: 25, wears: 10069, card: "poncho-xy203", title: "Audino Poncho Pikachu", flavor: "A soft white Mega Audino poncho with long frilled ears. It pats anyone who looks tired on the head." },
+      { id: 19946, of: 25, wears: 10059, card: "poncho-xy203", title: "Lucario Poncho Pikachu", flavor: "It wears Mega Lucario's blue hood and red-tipped sleeves, and stands like a fighter whenever anyone is watching." },
+      { id: 19947, of: 25, wears: 10071, card: "poncho-xy203", title: "Slowbro Poncho Pikachu", flavor: "A pink Mega Slowbro poncho with a grey shell on the back. It takes a very long time to notice that it is wearing it." },
+      // The Mega Battle Play Point cards (2016): four, and three.
+      { id: 19948, of: 25, wears: 10068, card: "poncho-xy274", title: "Gallade Poncho Pikachu", flavor: "Mega Gallade's green crest and white cape. It sweeps the cape about with great dignity and trips on it." },
+      { id: 19949, of: 25, wears: 10045, card: "poncho-xy274", title: "Ampharos Poncho Pikachu", flavor: "A yellow Mega Ampharos poncho with a white mane and a glowing red bead on its tail. Its cheeks and the bead light up together." },
+      { id: 19950, of: 25, wears: 10052, card: "poncho-xy274", title: "Mawile Poncho Pikachu", flavor: "Two great Mega Mawile jaws hang from the back of its hood. It is very sweet, and the jaws are very not." },
+      { id: 19951, of: 25, wears: 10088, card: "poncho-xy275", title: "Lopunny Poncho Pikachu", flavor: "Mega Lopunny's long ears and fluffy cream cuffs. It hops instead of walking whenever it is wearing them." },
+      { id: 19952, of: 25, wears: 10075, card: "poncho-xy275", title: "Diancie Poncho Pikachu", flavor: "A pink Mega Diancie poncho set with little gems that catch the light. It insists on being called Princess." },
+      { id: 19953, of: 25, wears: 10051, card: "poncho-xy275", title: "Gardevoir Poncho Pikachu", flavor: "Mega Gardevoir's long white gown, gathered up so it can run. It twirls whenever the wind gets under it." },
+      // The Alolan Vulpix and Vulpix Special Box (2017).
+      { id: 19954, of: 25, wears: 37, card: "poncho-sm038", title: "Vulpix Poncho Pikachu", flavor: "A russet Vulpix poncho with six curled tails bobbing behind it. It chases them round and round." },
+      { id: 19955, of: 25, wears: 10103, card: "poncho-sm037", title: "Alolan Vulpix Poncho Pikachu", flavor: "A snow-white Alolan Vulpix poncho with six pale curls of tail. Its breath puffs white even on warm days." },
+      /* The Hiroshima Special Box (2015): Magikarp and Gyarados, the same series
+         named "Pretend" on the card (asked for, 2026-10-29), and the red Gyarados
+         Pokemon Shuffle dressed it in. Ids past the hunt's: a look's place follows
+         its id, so the hunt never moves. */
+      { id: 19967, of: 25, wears: 129, card: "poncho-xy150", title: "Magikarp Poncho Pikachu", flavor: "A bright red Magikarp poncho, the fish's own gaping mouth framing its face. It flops about on dry land and is very proud of the splash it makes." },
+      { id: 19968, of: 25, wears: 130, card: "poncho-xy151", title: "Gyarados Poncho Pikachu", flavor: "It evolved its Magikarp poncho into a Gyarados one overnight. It glares like a sea serpent, and then giggles." },
+      // RARE: the red one, as rare as a red Gyarados in a lake.
+      { id: 19969, of: 25, wears: 130, rare: 0.25, title: "Shiny Gyarados Poncho Pikachu", flavor: "The red Gyarados poncho from the lake of rage. Only a few Pikachu have ever been seen in it, and every one of them was furious about something." },
+      // Sold only as figures and keychains, never printed.
+      { id: 19956, of: 25, wears: 10066, title: "Sableye Poncho Pikachu", flavor: "Mega Sableye's great red gem held out in front like a shield. Its eyes glitter in the dark under the hood." },
+      { id: 19957, of: 25, wears: 10067, title: "Altaria Poncho Pikachu", flavor: "A fluffy cloud of a Mega Altaria poncho. It naps on the softest part and calls it a bed." },
+      { id: 19958, of: 25, wears: 10046, title: "Scizor Poncho Pikachu", flavor: "A red Mega Scizor poncho with two pincer mittens. It snaps them at everything, very politely." },
+      // Our own: the poncho the Center never made.
+      { id: 19965, of: 25, wears: 10038, title: "Gengar Poncho Pikachu", flavor: "A purple Mega Gengar poncho with a wide stitched grin. It hides in shadows and giggles, and the giggle gives it away." },
+    ],
+    /* THE SPECIAL ONE: the other way round - Mew in a Pikachu poncho. Twenty
+       ponchos caught and the next meeting in the Safari Zone is it. */
+    hunt: { id: 19966, of: 151,
+      title: "Pikachu Poncho Mew", medal: "mischief", name: "Pink Mischief", dreams: 20, keep: 12, area: "safari",
+      flavor: "It borrowed a Pikachu poncho from the rack and wears it back to front, the hood's ears flopping over its eyes. When you call it a Pikachu it giggles and vanishes.",
+      words: {
+        token: "Poncho Stamp", tokens: "Poncho Stamps", due: "Something pink is in the Safari Zone", rise: "A PINK SHIMMER",
+        falls: "Mew giggles and slips away...", fade: "MEW SLIPS AWAY", back: "it will come back to play",
+        run: "Mew slips away if you run",
+      },
+    },
   },
 ];

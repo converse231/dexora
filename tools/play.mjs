@@ -3084,6 +3084,52 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     assert.equal(day.state.dreams[ev.id], ev.hunt.dreams, "a full moon did not survive a load");
     day.destroy();
 
+    /* PONCHO PARADE: a roaming week's look is met on a map its poncho fits
+       (the meadow's first, Charizard Y), and its first catch files its promo
+       card - ONE copy, never a second, nor one for a card already held. */
+    {
+      const pe = EVENTS.find((x) => x.roam);
+      off();
+      on(pe.start);
+      const meet = (save) => {
+        const pg = boot(save).e;
+        Math.random = () => 0.01;
+        try {
+          for (const dir of ["right", "down", "left", "up"]) {
+            pg.press(dir);
+            for (let i = 0; i < 30 && !pg.state.encounter; i++) tick(16);
+            pg.clearHeld();
+            if (pg.state.encounter) break;
+          }
+        } finally { Math.random = real; }
+        return pg;
+      };
+      const catchIt = (pg) => {
+        until(pg, (st) => st.encounter?.phase === "idle", "the poncho to settle");
+        pg.throwBall("master-ball");
+        pg.answerAsk(true);
+        until(pg, (st) => !st.encounter || st.encounter.phase === "caught", "the master ball to land");
+      };
+      const first = pe.looks.find((l) => l.card && l.wears === 10035);
+      const pg = meet({ ...SAVE, areaId: "meadow" });
+      assert.equal(pg.state.encounter?.speciesId, first.id, "a parade-day step in the meadow met no poncho");
+      catchIt(pg);
+      assert.deepEqual(pg.state.cards[first.card], { h: 1, earned: [`look:${first.id}`] }, "a poncho's first catch filed no promo card");
+      const saved = { ...SAVE, areaId: "meadow", dex: pg.state.dex, cards: pg.state.cards };
+      pg.destroy();
+      const again = meet(saved);
+      catchIt(again);
+      assert.equal(again.state.cards[first.card].h, 1, "a second catch of a poncho filed its card again");
+      again.destroy();
+      // Another poncho on a card already held (three share 203) files nothing more.
+      const [p1] = pe.looks.filter((l) => l.card === "poncho-xy203");
+      const held = meet({ ...SAVE, areaId: "meadow", cards: { "poncho-xy203": { h: 1, earned: ["look:0"] } } });
+      held.state.encounter.speciesId = p1.id;     // the meadow's draw, swapped for one of 203's ponchos
+      catchIt(held);
+      assert.equal(held.state.cards["poncho-xy203"].h, 1, "a card already held was filed a second copy");
+      held.destroy();
+    }
+
     off();
     on("20261201");
     const after = boot({ ...SAVE, bag: { ...SAVE.bag, "spooky-honey": 1 } }).e;

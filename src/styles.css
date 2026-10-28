@@ -11427,6 +11427,30 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .sn-bat.b4 { top: 58px; left: 88%; scale: .45; animation-delay: .15s, -1s; }
 @keyframes sn-flap { to { clip-path: polygon(0 60%, 18% 40%, 30% 45%, 42% 25%, 50% 30%, 58% 25%, 70% 45%, 82% 40%, 100% 60%, 82% 80%, 62% 60%, 50% 100%, 38% 60%, 18% 80%); } }
 @keyframes sn-fly { 50% { translate: 24px -10px; } }
+/* AN EVENT'S OWN POKEMON in its sky (Season.jsx `drift`): a Walk from the
+   Arena's atlases at native pixels, blown up crisp; it faces right, so the two
+   on the right face in. More specific than every event's own bat rule. */
+/* `scale`, never `zoom`: zoom scales the place as well as the body, and put
+   Dusknoir on the title. Their own places, along the poster's edges, clear
+   of the kicker, the title and the moon. */
+.sn-card .sn-sky .sn-bat.sn-drift {
+  width: auto; height: auto; scale: 1.7; background: none; clip-path: none; border-radius: 0;
+  box-shadow: none; image-rendering: pixelated; filter: drop-shadow(0 0 6px rgba(255, 255, 255, .25));
+  transform-origin: center; animation: sn-fly 9s ease-in-out infinite;
+}
+.sn-card .sn-sky .sn-bat.sn-drift.b0 { top: 34px; left: 9%; }
+.sn-card .sn-sky .sn-bat.sn-drift.b1 { top: 128px; left: auto; right: 7%; transform: scaleX(-1); animation-delay: -3s; }
+.sn-card .sn-sky .sn-bat.sn-drift.b2 { top: 30px; left: 26%; scale: 1.3; animation-delay: -5s; }
+.sn-card .sn-sky .sn-bat.sn-drift.b3 { top: 132px; left: 5%; animation-delay: -7s; }
+.sn-card .sn-sky .sn-bat.sn-drift.b4 { top: 30px; left: auto; right: 26%; scale: 1.3; transform: scaleX(-1); animation-delay: -1s; }
+/* A phone's poster has no room either side of its kicker and title: two, in
+   the top-left corner over the title, and the rest stay home. */
+@media (max-width: 560px) {
+  .sn-card .sn-sky .sn-bat.sn-drift.b0 { top: 20px; left: 5%; }
+  .sn-card .sn-sky .sn-bat.sn-drift.b1 { top: 76px; left: 5%; right: auto; }
+  .sn-card .sn-sky .sn-bat.sn-drift.b2, .sn-card .sn-sky .sn-bat.sn-drift.b3, .sn-card .sn-sky .sn-bat.sn-drift.b4 { display: none; }
+}
+.ev-halloween .sn-sky .sn-bat.sn-drift, .ev-haunting .sn-sky .sn-bat.sn-drift { opacity: .9; }
 /* STICKY, not absolute: the card scrolls on a phone, and the X must not
    scroll away with it. It takes no room (the negative margin). */
 .sn-x {
@@ -11614,6 +11638,21 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 @keyframes ifx-breathe { 50% { opacity: .45; transform: scale(.85); } }
 @keyframes ifx-wisp { 0% { opacity: 0; transform: translateY(20%) scaleX(.6); } 30% { opacity: .9; } 100% { opacity: 0; transform: translate(30%, -60%) scaleX(1.2); } }
 @media (prefers-reduced-motion: reduce) { .item-spooky > i { animation: none; } }
+/* THE PONCHO HONEY: the same jar in Pikachu yellow, a red cheek glow
+   breathing in its belly and a spark off the lid. */
+.item-poncho { position: relative; }
+.item-poncho > img { filter: sepia(1) hue-rotate(5deg) saturate(4) brightness(1.1) !important; }
+.item-poncho > .ifx-glow {
+  position: absolute; left: 22%; top: 40%; width: 56%; height: 46%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 90, 70, .9) 0 20%, rgba(255, 90, 70, .45) 45%, rgba(255, 90, 70, 0) 72%);
+  mix-blend-mode: screen; animation: ifx-breathe 2.4s ease-in-out infinite;
+}
+.item-poncho > .ifx-wisp {
+  position: absolute; left: 44%; top: -4%; width: 12%; height: 26%; pointer-events: none;
+  background: #fff59a; clip-path: polygon(60% 0, 0 55%, 45% 55%, 30% 100%, 100% 40%, 55% 40%);
+  animation: ifx-wisp 2.6s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .item-poncho > i { animation: none; } }
 
 /* ================================================================ THE ARENA
    Real-time battles, its own tab since 2026-10-22 (ui/league/arena/Arena.jsx).
@@ -12642,6 +12681,39 @@ button.wl-chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2
 .ev-haunting .sn-tile b { color: #7af0cf; }
 .sn-board-card.ev-haunting .sn-tile { border-color: color-mix(in srgb, #3fd6b0 45%, transparent); }
 .sn-board-card.ev-haunting .sn-tile b { color: #19a07f; }
+
+/* PONCHO PARADE'S POSTER AND CARD (2026-10-28): a parade at golden hour - a
+   warm sky, a low yellow sun where the moon hangs, soft clouds for the fog,
+   and pennants of bunting where the bats flew. Pikachu yellow for the glow. */
+.sn-card.ev-ponchos {
+  --sn-glow: #ffd23f; --sn-ink: #fff8e6; --sn-soft: #f3dcb0; --sn-night: #2a1d3a;
+  border-color: rgba(255, 210, 63, .5);
+  background: radial-gradient(120% 70% at 50% 0%, #c8603a 0%, #6b3a5c 45%, var(--sn-night) 100%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .55), inset 0 0 60px rgba(255, 210, 63, .12);
+}
+.ev-ponchos .sn-moon {
+  background: radial-gradient(circle, #fff3b0 0 40%, #ffd23f 62%, #ffb02e 100%);
+  box-shadow: none; filter: drop-shadow(0 0 22px rgba(255, 200, 70, .7));
+}
+.ev-ponchos .sn-fog {
+  background: radial-gradient(40% 50% at 25% 60%, rgba(255, 236, 210, .22), transparent 70%),
+    radial-gradient(35% 45% at 70% 50%, rgba(255, 236, 210, .18), transparent 70%);
+}
+.ev-ponchos .sn-bat {
+  width: 16px; height: 18px; background: #ffd23f; border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  box-shadow: none; animation: sn-fly 10s ease-in-out infinite;
+}
+.ev-ponchos .sn-bat.b1, .ev-ponchos .sn-bat.b3 { background: #ff6b5a; }
+.ev-ponchos .sn-go { background: linear-gradient(180deg, #ffd23f, #e8a90f); color: #2a1600; box-shadow: 0 10px 28px rgba(255, 190, 40, .4); }
+.ev-ponchos .sn-sub, .ev-ponchos .sn-kicker { color: var(--sn-glow); }
+.ev-ponchos .sn-dark > img { filter: brightness(0) drop-shadow(0 0 6px rgba(255, 210, 63, .6)) !important; }
+.sn-board-card.ev-ponchos .ev-banner { background: linear-gradient(90deg, #6b3a5c, #c8603a); }
+.evcard .sn-board-card.ev-ponchos .ev-banner h4 { color: #ffe27a; }
+.sn-board-card.ev-ponchos .sn-slot.got { border-color: #ffd23f; }
+.ev-ponchos .sn-title { color: #fff3c4; text-shadow: 0 0 18px rgba(255, 210, 63, .8), 0 3px 0 #7a3b12; }
+/* A poncho on a real card says so on the poster (Season.jsx). */
+.sn-card-tag { margin-left: 4px; padding: 0 5px; border-radius: 4px; font: 700 9px var(--pixel); color: #2a1600; background: #ffd23f; }
 
 /* The event's story, under its name (eventforms.js `lore`). */
 .sn-lore { margin: -6px 0 0; max-width: 52ch; font-size: 12.5px; line-height: 1.5; color: var(--sn-soft); }

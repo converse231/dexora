@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-28-poncho-parade",
+    icon: "🧥",
+    date: "October 2026",
+    title: "Coming November 8: Poncho Parade",
+    items: [
+      ["23 Poncho Pikachu", "Each on the maps its poncho's Pokémon would live on."],
+      ["Real promo cards", "Catch a poncho printed on a card and its Poncho-wearing Pikachu card is yours."],
+      ["Something pink", "Catch 20 ponchos and Mew comes out in the Safari Zone - in a Pikachu poncho."],
+    ],
+  },
+  {
     id: "2026-10-28-arena-dynamics",
     icon: "⚡",
     date: "October 2026",

@@ -83,11 +83,13 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/sprites/cadence/`, `src/data/cadence.js` | `npm run cadence` (Black and White's own idle, 16-frame strips at native pixels; `tools/strip_frames.py`, shared with Showdown's builder) |
 | `public/titles/` | `npm run ranks` from the drawn originals in `art/titles/` |
 | `src/data/cards/prices.js` | `npm run prices` (TCGplayer via TCGdex, a dated snapshot; display only) |
-| `public/sprites/<event look id>.png` and its shiny | `npm run eventart` from the drawn originals in `art/events/<event>/<base id>.jpg` (keyed, shrunk to the base's canvas, the shiny by the species' own recolour) |
+| `public/sprites/<event look id>.png` and its shiny | `npm run eventart` from the drawn originals in `art/events/<event>/<base id>.jpg` - or `<look id>.jpg` where a week's looks share a species (Poncho Parade) - keyed, shrunk to the base's canvas, the shiny by the species' own recolour |
+| `public/cards/<promo set>/`, `src/data/cards/sets/<promo set>.js`, `src/data/cards/promos.js` | `npm run promos` (tools/fetch_promo_cards.py: real promo cards no pack sells, scans from Bulbagarden Archives cached in .assets-src/promo) |
 | `public/arena/<id>.webp`, `public/arena/cover/<material>.webp` | `npm run arenas` from the drawn floors in `art/arena/<id>.png` (26:16, shrunk to 832x512 WebP; one per `ARENAS` id) and the cover blocks in `art/arena/cover/` (transparent, cropped to solid pixels, 128px; one per `GROUND` material) - check.mjs holds both |
 | `public/arena/pmd/`, `src/data/pmd.js` | `npm run pmd` (PMD Sprite Repository, pinned `COMMIT`, cached in .assets-src/pmd; ~5 min on all cores - `-- 25 6` bakes a sample but writes no pmd.js) |
 | `public/arena/fx/`, `src/data/fx.js` | `npm run fx` from the drawn originals in `art/arena/fx/` (white pixel art, tinted per type by render.js's `tinted`; a sheet's frames found by the gaps nearest even spacing, each anchored in one box; check.mjs reads every header and re-hashes `FX_REV`), the moves' own colour art in `art/arena/fx/moves/` (a new file needs its frame count in `MOVES`, or the build stops; one whose frames grow across the row goes in `WIDEST`), and the optional ULTI panels `ult-<pattern>` / `ult-<dex id>` |
 | `public/arena/intro/` | `npm run intro` (the Arena announcement's two fighters, cut from the shipped PMD atlases; re-run after `npm run pmd`) |
+| `public/events/drift/` | `npm run drift` (each event's `drift` Pokemon, their Arena Walk cut from the shipped PMD atlases for its poster's sky; re-run after `npm run pmd`) |
 | `src/data/kits.js`, `reports/Arena kits.md` | `npm run kits` (tools/build_kits.mjs: each line's fixed Arena kit from its learnsets, `FIXED` the hand-written ones, every move checked against the Pokemon) |
 | `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
 
@@ -232,6 +234,19 @@ anything done. The run prints each suite; the count is not typed anywhere.
   met in that base's place too (`eventLook`: one draw for the costume, a
   second to pick among the line only when there is a choice; check.mjs holds
   `on` to the line's base and every such look to being met).
+- **A roaming week** (`roam`, Poncho Parade 2026-11-08, asked for 2026-10-28:
+  23 Pikachu in the Pokemon Center's ponchos and costumes and one of ours
+  (six drawn up were left out, your call) - plus Mew in a Pikachu poncho as its hunt): its looks are all one
+  species, so none is met in its species' place (`eventLook` returns the
+  species). Instead `roamLook` takes `share` of every WALKING meeting on a
+  map and makes it a look whose `wears` (the Pokemon its poncho shows) shares
+  a type with the map - the Charizard ponchos by the volcano, Latias at the
+  falls; never on an `only` map, no roll drawn on any other day (check.mjs).
+  A look with a `card` (a real Poncho-wearing Pikachu promo) files ONE copy
+  of it on its first catch (the engine's `grantPromo`, asked for: "the card
+  should only be one"), stamped `earned`, never a second for a card already
+  held - three ponchos share card 203. The running week's poster names the
+  next week (`eventAfter`, `onNext`), so the Haunting announces it.
 - **An event look is a costume from a dated event** (`src/data/eventforms.js`,
   hand-written; Hallowed Night, asked for 2026-10-19):
   `form: "event"`, ids 19901+ (under trading.sql's 20000), built from its
@@ -1010,7 +1025,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   wrappers, cosmetic) writes them;
   a Mega card links its Mega FORM by `label()`, and the fetch stops on a Mega
   it cannot match or a rarity not on `CARD_RARITIES`. The engine's
-  `buyPacks` and `openCardPack(set)` are the only writers of `cards`,
+  `buyPacks` and `openCardPack(set)` (and `grantPromo`, a roaming look's
+  promo card) are the only writers of `cards`,
   `packs`, `earnedPacks` and `cardPity`; a pack is decided and SAVED before
   the scene plays, an earned pack opens first and stamps its cards, and a
   first badge pays one (`battleEnd`'s `pack`) - every reward pack is a
@@ -1510,7 +1526,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   and cancelled every challenge as it was made.
   **Its bodies are PMD sprites** (2026-10-22, asked for: the ARENA ONLY - no
   portraits, nothing on the map or anywhere else, asserted by check.mjs's
-  `pmd ok`): `tools/build_pmd.py` bakes nine animations a Pokemon (Walk,
+  `pmd ok`; two baked exceptions, both announcements: the Arena's own intro
+  and, since 2026-10-29 (asked for), an event poster's sky - its `drift`
+  Pokemon walking by, `npm run drift`, at most five, two on a phone): `tools/build_pmd.py` bakes nine animations a Pokemon (Walk,
   Idle, Attack, Shoot, Charge, Hurt, Sleep, Hop, Double) into ONE atlas and a
   sidecar - every frame cut to its own pixels, repeats stored once, a
   left-facing row that is its right one mirrored drawn flipped (uncut,

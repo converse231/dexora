@@ -952,7 +952,7 @@ export default function App({
       )}
       {/* `seasonOpen` is true (the running or coming event) or an event itself (the next week's preview). */}
       {seasonOpen && (seasonOpen.id ? seasonOpen : season) && (
-        <SeasonIntro ev={seasonOpen.id ? seasonOpen : season} dex={st?.dex} onClose={() => setSeasonOpen(false)}
+        <SeasonIntro ev={seasonOpen.id ? seasonOpen : season} dex={st?.dex} onClose={() => setSeasonOpen(false)} onNext={(ev) => setSeasonOpen(ev)}
           onBoard={() => { setSeasonOpen(false); goTab("catch"); openRail("events"); }} />
       )}
       {rouletteOpen && engine && (

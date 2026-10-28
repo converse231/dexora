@@ -40,7 +40,9 @@
     "cadence": "python tools/build_cadence.py",
     "cards": "node tools/fetch-cards.mjs && python tools/fetch_card_art.py",
     "prices": "node tools/fetch-prices.mjs",
-    "retro": "python tools/build_retro.py"
+    "retro": "python tools/build_retro.py",
+    "promos": "python tools/fetch_promo_cards.py",
+    "drift": "python tools/build_event_drift.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

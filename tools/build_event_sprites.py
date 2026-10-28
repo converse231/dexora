@@ -338,13 +338,21 @@ def thin(img):
     return Image.fromarray(a, "RGBA")
 
 
+# Each look's species, by look id (the canvas it is shrunk to and its shiny's base).
+OF = {}
+
+
 def looks():
-    """(event, base id) -> look id, read off eventforms.js."""
+    """(event, base id) -> look id, read off eventforms.js - and (event, look id)
+    -> look id: a week whose looks are all ONE species (Poncho Parade's 26
+    Pikachu) names each drawing by its look id, `art/events/ponchos/19940.jpg`."""
     src = open(FORMS, encoding="utf-8").read()
     out = {}
     for ev in re.finditer(r'\n    id: "([a-z0-9-]+)",(.*?)\n  \},', src, re.S):
         for lid, of in re.findall(r"\{ id: (\d+), of: (\d+),", ev.group(2)):
             out[(ev.group(1), of)] = int(lid)
+            out[(ev.group(1), lid)] = int(lid)
+            OF[int(lid)] = of
     return out
 
 
@@ -431,10 +439,11 @@ def hue_shift(normal, shiny_):
 
 def build(path, ids):
     event = os.path.basename(os.path.dirname(path))
-    base_id = os.path.splitext(os.path.basename(path))[0]
-    lid = ids.get((event, base_id))
+    stem = os.path.splitext(os.path.basename(path))[0]
+    lid = ids.get((event, stem))
     if lid is None:
-        sys.exit(f"{path}: no look of {base_id} in event {event!r} (eventforms.js)")
+        sys.exit(f"{path}: no look of {stem} in event {event!r} (eventforms.js)")
+    base_id = OF[lid]
     a = np.asarray(Image.open(path).convert("RGB"))
     m = key(a)
     if (event, base_id) in HOLLOW:

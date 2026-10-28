@@ -4,6 +4,7 @@
    UI actually shows has changed (a step, a dex entry, an encounter phase). */
 
 import { SPECIES, DEX_TOTAL, dexCaught, isEvent } from "../data/dex.js";
+import { EVENTS } from "../data/eventforms.js";
 import {
   AREAS, AREA_IDS, areaOf, walkable, rideable, SURFABLE, label, LEDGE, RAIL, MINI, MINI_UNKNOWN,
   HIGH_ELEV,
@@ -34,7 +35,7 @@ import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
-  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntWords, cleanDreams, eventCheckin, shelfOf,
+  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook,
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
@@ -1900,8 +1901,11 @@ export function createEngine(canvas, onChange, mini = null) {
     const hunt = source === "wild" ? huntDue(state.dreams, state.medals) : null;
     const nightmare = !!hunt && state.areaId === hunt.area;
     const owned = (id) => state.dex[dexIndex(id)] === 2;
-    const sp = nightmare ? speciesById(hunt.id)
-      : eventLook(rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(table), Math.random,
+    // A roaming week (events.js `roamLook`): a walking meeting may be one of its looks, by the map's types.
+    const roam = !nightmare && !flood && source === "wild"
+      ? roamLook(biomeFor(state.areaId)?.types, Math.random, { night: isNight(state.steps), lure: lure?.lure ?? 1 }) : null;
+    const sp = nightmare ? speciesById(hunt.id) : roam
+      ?? eventLook(rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(table), Math.random,
         { owned, types: biomeFor(state.areaId)?.types }), Math.random,
         { night: isNight(state.steps), lure: lure?.lure ?? 1 });
     /* Whether the dex already has this one, read BEFORE the throw can register
@@ -2615,6 +2619,7 @@ export function createEngine(canvas, onChange, mini = null) {
       e.msg = `Gotcha! ${e.name} was caught!${tail}`;
       chainOn(e.speciesId, "caught");
       huntOn(e, "caught");
+      grantPromo(e);
       if (gained) {
         e.levelUp = gained.level;
         e.reward = gained.items;
@@ -2687,6 +2692,20 @@ export function createEngine(canvas, onChange, mini = null) {
      caught on its event's days is a Bad Dream; the last one says the
      Nightmare is due. The hunted one caught is its medal - its title -
      at once; lost, the moon waxes back to `keep`. */
+  /* A LOOK'S CARD (eventforms.js `card`, 2026-10-28, asked for: "once you
+     catch the pokemon you'll be given the card"): a poncho printed on a real
+     promo card files that card into the collection - ONE copy, the first
+     time it is caught, and never a second for a card already held (three
+     ponchos share card 203). Stamped `earned`, so no sweep turns it to dust.
+     With `buyPacks` and `openCardPack`, the only writer of `cards`. */
+  function grantPromo(e) {
+    const card = e.isNew && EVENTS.flatMap((ev) => ev.looks).find((l) => l.id === e.speciesId)?.card;
+    if (!card || state.cards[card]) return;
+    state.cards = { ...state.cards, [card]: { h: 1, earned: [`look:${e.speciesId}`] } };
+    state.cardLog = [[card, "h", Date.now()], ...state.cardLog].slice(0, LOG_MAX);
+    cheer({ kind: "medal", title: "PROMO CARD!", sub: `${e.name}'s real promo card is in your collection.` });
+  }
+
   function huntOn(e, outcome) {
     const ev = eventOn();
     const h = ev?.hunt;

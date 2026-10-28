@@ -8,6 +8,7 @@
    Cards are a collection, never a strength - nothing here reaches a roll. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CARD_SETS } from "../../data/cards/index.js";
+import { PROMO_SETS } from "../../data/cards/promos.js";
 import { WRAPPERS } from "../../data/cards/art.js";
 import {
   RARITY, CARD_RARITIES, landsOn, rulesOf, GOD_PACK, PACK_PRICE, PACK_SIZE, SET_LEVEL, MILESTONES, BOXES, setOpen, cardId,
@@ -27,6 +28,10 @@ import { titleIds, titleName, shownTitles, MASTER_STEP } from "../../game/titles
 import { showKey, CARD_SHOW, printingsOf } from "../../game/cards.js";
 
 const yen = (n) => `¥${n.toLocaleString()}`;
+/* THE PROMO SETS (tools/fetch_promo_cards.py): real cards no pack sells, a
+   card filed by a catch (the engine's `grantPromo`). Their binder is a
+   binder like any set's, without the dust bar - nothing crafts a promo. */
+const isPromo = (id) => PROMO_SETS.some((s) => s.id === id);
 const oneIn = (p) => Math.round(1 / p);
 // The store, then what you hold (asked for, 2026-10-07: shop, cart, checkout, My Packs).
 /* NO DUST TAB (2026-10-26, asked for: "dusting can just be in the binder"):
@@ -53,7 +58,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   const [setId, setSetId] = useState(() => {
     const last = st?.cardLog?.[0]?.[0];
     const id = last && last.slice(0, last.lastIndexOf("-"));
-    return CARD_SETS.some((s) => s.id === id) ? id : CARD_SETS[0]?.id;
+    return CARD_SETS.some((s) => s.id === id) || isPromo(id) ? id : CARD_SETS[0]?.id;
   });
   const [note, setNote] = useState("");
   // The shop's view: the grid, a product, the cart, or the order just placed.
@@ -86,7 +91,7 @@ export default function Cards({ engine, st, level, onClose, onSpecies, onScene }
   }, []);
   useEffect(() => {
     let live = true;
-    for (const s of CARD_SETS) loadSet(s.id).then((m) => live && m && setSets((o) => ({ ...o, [s.id]: m })));
+    for (const s of [...CARD_SETS, ...PROMO_SETS]) loadSet(s.id).then((m) => live && m && setSets((o) => ({ ...o, [s.id]: m })));
     return () => { live = false; };
   }, []);
   useEffect(() => {
@@ -414,7 +419,8 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onSwe
             <small>Master set {master} of {variants} printings</small>
           </div>
           <span className="bn-cover">
-            {masterDone ? `★ Master set · ${titleName(`master:${setId}`)}` : done ? `✓ Complete · ${titleName(`set:${setId}`)}`
+            {isPromo(setId) ? "Each card comes with its poncho's first catch"
+              : masterDone ? `★ Master set · ${titleName(`master:${setId}`)}` : done ? `✓ Complete · ${titleName(`set:${setId}`)}`
               : `${set.CARDS.length - ownedN} to go for the cover`}
             {/* The gaps, as the binder's own filter: crafting is in the dust bar below. */}
             {master < variants && <button type="button" className="tp-quiet" onClick={() => filter({ have: "printing" })}>Show missing ›</button>}
@@ -437,10 +443,10 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onSwe
           </div>
         )}
       </section>
-      <DustBar set={set} setId={setId} cards={cards} dust={dust} level={level} have={f.have}
-        onSweep={onSweep} onDustPack={onDustPack} onCraftAll={onCraftAll} onShow={(have) => filter({ have: f.have === have ? "" : have })} />
-      <CardFilters f={f} onChange={filter}
-        rarities={CARD_RARITIES.filter((r) => set.CARDS.some((c) => c[3] === r))} />
+      {!isPromo(setId) && <DustBar set={set} setId={setId} cards={cards} dust={dust} level={level} have={f.have}
+        onSweep={onSweep} onDustPack={onDustPack} onCraftAll={onCraftAll} onShow={(have) => filter({ have: f.have === have ? "" : have })} />}
+      {!isPromo(setId) && <CardFilters f={f} onChange={filter}
+        rarities={CARD_RARITIES.filter((r) => set.CARDS.some((c) => c[3] === r))} />}
       {filtering && (
         <p className="cd-sub">
           {shown.length} of {set.CARDS.length} cards{" "}
@@ -490,9 +496,9 @@ function Binder({ sets, cards, dex, log, onLook, milestones, setId, onSet, onSwe
    with steps either side, and the rest behind it grouped by series, newest
    first, each with its own progress. Progress counts card ids, so it needs no
    set loaded. */
-const SERIES = [["me", "Mega Evolution"], ["sv", "Scarlet & Violet"], ["swsh", "Sword & Shield"], ["", "Classics and celebrations"]];
-const seriesOf = (id) => SERIES.find(([k]) => k && id.startsWith(k))?.[0] ?? "";
-const PICK_ORDER = SERIES.flatMap(([k]) => CARD_SETS.filter((s) => seriesOf(s.id) === k)
+const SERIES = [["me", "Mega Evolution"], ["sv", "Scarlet & Violet"], ["swsh", "Sword & Shield"], ["", "Classics and celebrations"], ["promo", "Promo cards · caught, never packed"]];
+const seriesOf = (id) => (isPromo(id) ? "promo" : SERIES.find(([k]) => k && k !== "promo" && id.startsWith(k))?.[0] ?? "");
+const PICK_ORDER = SERIES.flatMap(([k]) => [...CARD_SETS, ...PROMO_SETS].filter((s) => seriesOf(s.id) === k)
   .sort((a, b) => b.released.localeCompare(a.released)));
 
 function SetPicker({ setId, cards, onSet }) {

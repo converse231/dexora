@@ -2755,6 +2755,61 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         }
       }
     }
+    /* A ROAMING WEEK (Poncho Parade, 2026-10-28): its looks are met by
+       roamLook alone - on a map whose types its poncho's Pokemon shares, never
+       one it does not, never in a Pikachu's place - and no roll is drawn on any
+       other day. Every look is met somewhere; every card it names is a card of
+       its promo set, and every promo card is some look's. */
+    {
+      const { roamLook, roamsOn, eventLook } = await import("../src/game/events.js");
+      const { mulberry32 } = await import("../src/game/battle.js");
+      const { BIOMES } = await import("../src/game/biomes.js");
+      const { PROMO_SETS } = await import("../src/data/cards/promos.js");
+      let drawn = 0;
+      const counting = () => { drawn++; return 0; };
+      for (const ev of EVENTS.filter((e) => !e.roam)) for (const b of BIOMES) roamLook(b.types, counting, { day: ev.start, night: true, lure: 3 });
+      roamLook(["fire"], counting, { day: "20260101" });
+      assert.equal(drawn, 0, "roamLook drew a roll outside a roaming week");
+      for (const ev of EVENTS.filter((e) => e.roam)) {
+        const met = new Set();
+        for (const b of BIOMES.filter((x) => x.types?.length)) {
+          for (let k = 0; k < 600; k++) {
+            const sp = roamLook(b.types, mulberry32(k * 31 + b.level), { day: ev.start, night: false, lure: 3 });
+            if (!sp) continue;
+            const l = ev.looks.find((x) => x.id === sp.id);
+            assert.ok(l && roamsOn(l, b.types), `${sp.name} roamed onto ${b.id}, which its poncho's types do not match`);
+            met.add(sp.id);
+          }
+        }
+        for (const l of ev.looks) assert.ok(met.has(l.id), `${l.title} is never met on any map`);
+        const pika = speciesById(ev.looks[0].of);
+        for (let k = 0; k < 200; k++) assert.equal(eventLook(pika, mulberry32(k), { day: ev.start, night: true, lure: 3 }).id, pika.id, `${ev.id} dressed a ${pika.name} in its own place`);
+        for (const l of ev.looks.filter((x) => x.card)) {
+          const [set, lid] = [l.card.slice(0, l.card.lastIndexOf("-")), l.card.slice(l.card.lastIndexOf("-") + 1)];
+          assert.ok(PROMO_SETS.some((x) => x.id === set), `${l.title}'s card ${l.card} is not of a promo set`);
+          const { CARDS } = await import(`../src/data/cards/sets/${set}.js`);
+          assert.ok(CARDS.some((c) => c[0] === lid), `${l.title}'s card ${l.card} is not in its set - npm run promos`);
+        }
+      }
+      for (const ps of PROMO_SETS) {
+        const { CARDS } = await import(`../src/data/cards/sets/${ps.id}.js`);
+        for (const c of CARDS) {
+          assert.ok(EVENTS.some((ev) => ev.looks.some((l) => l.card === `${ps.id}-${c[0]}`)), `promo card ${ps.id}-${c[0]} is no look's - nothing can give it`);
+          assert.ok(existsSync(new URL(`../public/cards/${ps.id}/${c[0]}.webp`, import.meta.url))
+            && existsSync(new URL(`../public/cards/${ps.id}/hi/${c[0]}/high.webp`, import.meta.url)), `${ps.id}-${c[0]} has no picture - npm run promos`);
+        }
+        assert.ok(existsSync(new URL(`../public/cards/${ps.id}/logo.webp`, import.meta.url)), `${ps.id} has no logo - npm run promos`);
+      }
+    }
+    /* AN EVENT'S SKY (`drift`, 2026-10-29): each Pokemon has an Arena body and
+       its Walk baked by npm run drift - at most the poster's five places. */
+    for (const ev of EVENTS.filter((e) => e.drift)) {
+      assert.ok(ev.drift.length <= 5, `${ev.id} drifts ${ev.drift.length} Pokemon - its sky has five places`);
+      for (const id of ev.drift) {
+        assert.ok(existsSync(new URL(`../public/arena/pmd/${id}.json`, import.meta.url)), `${ev.id}'s sky names #${id}, which has no Arena body`);
+        assert.ok(existsSync(new URL(`../public/events/drift/${id}.png`, import.meta.url)), `#${id} is not baked for ${ev.id}'s sky - npm run drift`);
+      }
+    }
     console.log(`event looks ok — ${looks.length} in ${EVENTS.length} event(s) of one week each, outside every count of the dex`);
   }
   assert.equal(new Set(DEX_RANKS.map((r) => r.id)).size, DEX_RANKS.length, "two Pokédex ranks share an id");
@@ -8363,7 +8418,10 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
        lever moves the match it is given to. */
     {
       const CP = await import("../src/game/cardperks.js");
-      const setIds = readdirSync(new URL("../src/data/cards/sets/", import.meta.url)).map((f) => f.replace(/\.js$/, ""));
+      // Every PACK set's file; a promo set (data/cards/promos.js) has no chase - no pack to chase it in.
+      const { PROMO_SETS } = await import("../src/data/cards/promos.js");
+      const setIds = readdirSync(new URL("../src/data/cards/sets/", import.meta.url)).map((f) => f.replace(/\.js$/, ""))
+        .filter((id) => !PROMO_SETS.some((x) => x.id === id));
       for (const id of setIds) {
         const { CARDS } = await import(`../src/data/cards/sets/${id}.js`);
         const [lid, name] = CP.CHASE[id] ?? [];

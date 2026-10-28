@@ -146,6 +146,8 @@ export const eventChance = ({ night = false, lure = 1, share = EVENT_SHARE } = {
    EVENT_NIGHT lift in daylight instead. */
 export function eventLook(sp, random, { day, night, lure } = {}) {
   const ev = eventOn(day);
+  // A roaming week's looks are met by `roamLook` alone, never in their species' place.
+  if (ev?.roam) return sp;
   const looks = (ev?.looks ?? []).filter((l) => l.of === sp.id || l.on === sp.id);
   if (!looks.length) return sp;
   const w = looks.map((l) => l.rare ?? 1), sum = w.reduce((a, b) => a + b, 0);
@@ -156,6 +158,31 @@ export function eventLook(sp, random, { day, night, lure } = {}) {
   while (r >= w[k] && k < looks.length - 1) r -= w[k++];
   return speciesById(looks[k].id);
 }
+/* A ROAMING WEEK (Poncho Parade, 2026-10-28): its looks are all one species
+   (a Pikachu in a poncho), so none is met in its species' place. Instead
+   `share` of every WALKING meeting on a map is one of its looks whose `wears`
+   shares a type with the map - a Charizard poncho by the volcano, a Latias
+   one at the falls - picked by `rare` weight. Draws from `random` ONLY while
+   a roaming week runs on a map with a look that fits, so every other roll
+   and every seeded record is untouched. An `only` map has no types, so
+   nothing roams there. */
+export const roamsOn = (look, types) => !!look.wears && speciesById(look.wears).types.some((t) => types.includes(t));
+export function roamLook(types, random, { day, night, lure } = {}) {
+  const ev = eventOn(day);
+  if (!ev?.roam || !types?.length) return null;
+  const looks = ev.looks.filter((l) => roamsOn(l, types));
+  if (!looks.length) return null;
+  const lit = ev.daytime ? !night : !!night;
+  if (random() >= eventChance({ night: lit, lure, share: shareOf(ev) })) return null;
+  const w = looks.map((l) => l.rare ?? 1);
+  let r = random() * w.reduce((a, b) => a + b, 0), k = 0;
+  while (r >= w[k] && k < looks.length - 1) r -= w[k++];
+  return speciesById(looks[k].id);
+}
+// The maps a roaming look is met on, opened earliest first (the poster's and the Dex's).
+export const roamAreas = (look) => BIOMES.filter((b) => b.types?.length && roamsOn(look, b.types))
+  .sort((a, b) => a.level - b.level);
+
 /* ONE MEETING IN HOW MANY with its base is this look, by day and without a
    lure (the Dex's and the poster's number). */
 export function lookEvery(ev, look) {

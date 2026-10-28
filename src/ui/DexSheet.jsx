@@ -22,7 +22,7 @@ import { useEffect, useState } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
 import { SPECIES, isEvent } from "../data/dex.js";
 import { EVENTS } from "../data/eventforms.js";
-import { eventOn, eventDaysLeft, lookEvery } from "../game/events.js";
+import { eventOn, eventDaysLeft, lookEvery, roamAreas, shareOf } from "../game/events.js";
 import { label, AREAS } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx, STRIP_TIERS } from "./Sprite.jsx";
 import {
@@ -78,8 +78,15 @@ function whereToFind(id) {
         { key: "hunt", where: AREAS[ev.hunt.area]?.name ?? "", how: `catch ${ev.hunt.dreams} costumes, then your next meeting here` },
       ];
     }
-    // A look `on` its line's base is met where the base lives (events.js `eventLook`).
     const look = ev.looks.find((l) => l.id === id);
+    // A roaming look (Poncho Parade) is met on the maps its poncho's Pokemon would live on (events.js `roamLook`).
+    if (ev.roam && look) {
+      return [
+        { key: "event", where: ev.name, how: live ? `${eventDaysLeft(ev)} days left` : "the event is over" },
+        ...(live ? roamAreas(look).map((b) => ({ key: b.id, where: b.name, how: `1 meeting in ${Math.round(1 / shareOf(ev))} is a poncho${look.rare ? " · rare" : ""}` })) : []),
+      ];
+    }
+    // A look `on` its line's base is met where the base lives (events.js `eventLook`).
     const base = look?.on ?? sp.of;
     const wild = live && look ? whereToFind(base).filter((r) => !r.key.startsWith("evo-")).map((r) => ({
       ...r, how: `1 in ${lookEvery(ev, look)} ${label(speciesById(base))} · ${r.how}`,

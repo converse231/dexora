@@ -856,6 +856,30 @@ now and then when a step started an encounter.
   call). It is the game's binder, one a player: **Reset** empties it, and it
   is never deleted.
 
+## Promo cards *(2026-10-28, asked for: Poncho Parade)*
+
+Real cards no pack sells, filed into the collection by PLAYING. The first is
+the **Poncho-wearing Pikachu** set (`poncho`): Japan's eleven XY-P and SM-P
+promos (150, 151, 203, 207, 208, 230, 231, 274, 275; SM 037, 038), all Kouki
+Saitou's - 150 and 151 are the same series' Pretend Magikarp and Pretend
+Gyarados Pikachu.
+TCGdex carries neither promo set, so `npm run promos`
+(tools/fetch_promo_cards.py) takes the scans from Bulbagarden Archives and
+writes the set file in a pack set's shape plus `promos.js` (`PROMO_SETS`).
+
+- **Out of `CARD_SETS`**, on purpose: no shop, pack, roulette, reward box,
+  dust pack, craft, milestone, set title or achievement ever sees it - each of
+  those reads `CARD_SETS`. Its rarity is `promo`, a name in `RARITY` and no
+  rung of `CARD_RARITIES`, so no roll lands on it and `canCraft` refuses it.
+- **How a card arrives:** an event look's `card` (eventforms.js) is filed by
+  the engine's `grantPromo` on that look's FIRST catch - one copy, stamped
+  `earned` (so no sweep dusts it), and never a second for a card already
+  held: three ponchos share card 203 (asked for: "the card should only be
+  one"). A banner says so; the Pulls wall logs it.
+- **Where it shows:** the Binder's set picker, in its own group (Promo cards
+  · caught, never packed); its binder has no dust bar or filters, and the
+  cover line says where the cards come from.
+
 ## Deferred on purpose *(each with the trigger that brings it back)*
 
 - **Trading cards** - needs server-minted card rows; trigger: players asking

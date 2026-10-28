@@ -20,7 +20,7 @@ REST = 500                 # ms held on the last frame, a beat between blows
 BODIES = [("garchomp", 445, "Attack", 2), ("lucario", 448, "Attack", 6)]
 
 
-def bake(name, dex, anim, row):
+def bake(name, dex, anim, row, out=OUT, rest=REST):
     meta = json.loads((SRC / f"{dex}.json").read_text())
     sheet = Image.open(SRC / f"{dex}.png").convert("RGBA")
     a = meta["a"][anim]
@@ -46,12 +46,13 @@ def bake(name, dex, anim, row):
         frames.append(c)
     # PMD's timings are 60ths of a second; a frame under 20 ms is clamped by browsers.
     dur = [max(20, round(a["d"][k % len(a["d"])] * 1000 / 60)) for k in range(len(frames))]
-    dur[-1] += REST
-    OUT.mkdir(parents=True, exist_ok=True)
-    frames[0].save(OUT / f"{name}.png", save_all=True, append_images=frames[1:], duration=dur,
+    dur[-1] += rest
+    out.mkdir(parents=True, exist_ok=True)
+    frames[0].save(out / f"{name}.png", save_all=True, append_images=frames[1:], duration=dur,
                    loop=0, disposal=1, blend=0)
     print(f"{name}: {frames[0].size[0]}x{frames[0].size[1]}, {len(frames)} frames")
 
 
-for body in BODIES:
-    bake(*body)
+if __name__ == "__main__":
+    for body in BODIES:
+        bake(*body)
