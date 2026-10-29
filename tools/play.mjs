@@ -1957,6 +1957,14 @@ await savedField("achieved", { catches: 2, someday: 1 }, "junk", {});
   assert.deepEqual(boot({ ...pika, party: [1, 7] }).e.state.party, [1], "a party member not in the Box was kept");
   assert.equal(boot({ ...pika, buddy: 7 }).e.state.buddy, null, "a follower not in the Box was kept");
   await savedField("skins", ["giovanni", "from_a_newer_build"], "junk", []);
+  await savedField("rod", "good-rod", "fishing-net", null);
+  {
+    // R at the water steps through the rods held, the one in hand first.
+    const fisher = boot({ ...SAVE, bag: { ...SAVE.bag, "old-rod": 1, "good-rod": 1, "super-rod": 1 } }).e;
+    const seen = [1, 2, 3].map(() => (fisher.cycleRod(), fisher.state.rod));
+    assert.deepEqual(seen, ["old-rod", "good-rod", "super-rod"], "switching rods skipped one or stuck");
+    fisher.destroy();
+  }
   await savedField("impacts", ["ult-25", "ult-from-a-newer-build"], "junk", []);
   await savedField("impactsOff", ["ult-25"], 7, []);
   {

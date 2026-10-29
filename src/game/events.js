@@ -160,6 +160,12 @@ export function eventLook(sp, random, { day, night, lure } = {}) {
   while (r >= w[k] && k < looks.length - 1) r -= w[k++];
   return speciesById(looks[k].id);
 }
+/* WHETHER THE RUNNING WEEK DRESSED A SPECIES (a costume of it, or `on` it):
+   what a lure's `pull` draws the map's meeting from (the engine's `lured`). */
+export const dressed = (id, day) => {
+  const ev = eventOn(day);
+  return !!ev && !ev.roam && ev.looks.some((l) => l.of === id || l.on === id);
+};
 /* A ROAMING WEEK (Poncho Parade, 2026-10-28): its looks are all one species
    (a Pikachu in a poncho), so none is met in its species' place. Instead
    `share` of every WALKING meeting on a map is one of its looks whose `wears`

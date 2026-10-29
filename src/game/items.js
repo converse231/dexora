@@ -445,7 +445,11 @@ export const FIELD = [
     /* The one jar, as every honey is (`art`), wearing its event's look in
        CSS (`fx`, ItemIcon) - nobody draws a jar per event. */
     id: "spooky-honey", art: "honey", fx: "spooky", family: "event", name: "Spooky Honey", price: 1200, level: 3,
-    event: "halloween", steps: HONEY_STEPS, lure: 3, blurb: "Up to 3 in 4 in costume",   // a lure up to EVENT_CAP: half by day already (2026-10-24)
+    /* `pull` (2026-10-29, players: "even with the honey I keep running into
+       non-costumed Kanto Pokemon"): the lure only dressed a species that HAS a
+       costume, and most of a map has none - so half the meetings under it are
+       drawn from the map's costumed species alone (the engine's `lured`). */
+    event: "halloween", steps: HONEY_STEPS, lure: 3, pull: 0.5, blurb: "Lures costumed Pokémon",   // a lure up to EVENT_CAP: half by day already (2026-10-24)
   },
   {
     // Poncho Parade's (2026-10-28): the same jar in Pikachu yellow, luring the week's roaming ponchos.
@@ -725,6 +729,14 @@ export const holding = (bag, id) => (bag?.[id] ?? 0) > 0;
 // Best rod held, or null. Later rods are strictly better, so last wins.
 export const bestRod = (bag) =>
   [...KEY_ITEMS].reverse().find((k) => k.id.endsWith("-rod") && holding(bag, k.id)) ?? null;
+
+/* THE ROD YOU CAST: the one chosen (`state.rod`, You's key items) while you
+   hold it, else the best. A better rod's table is not a wider one - the Super
+   Rod has Jellicent and no Frillish - so the older rods stay worth casting
+   (reported 2026-10-29: no way back to the Good Rod for a Frillish). */
+export const heldRods = (bag) => KEY_ITEMS.filter((k) => k.id.endsWith("-rod") && holding(bag, k.id));
+export const rodInHand = (bag, chosen) =>
+  (chosen && holding(bag, chosen) && KEY_ITEMS.find((k) => k.id === chosen && k.id.endsWith("-rod"))) || bestRod(bag);
 
 /* What the shop will actually sell. A price of zero means it is not for sale at
    any level - the Master Ball's whole design, and the key items' too. */

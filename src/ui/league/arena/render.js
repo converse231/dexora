@@ -114,10 +114,10 @@ const seeded = (n) => () => { n = (n + 0x6d2b79f5) | 0; let t = Math.imul(n ^ (n
 const VS_IN = 0.12, VS_SLAM = 0.5, VS_OUT = 1.1, THROW = 1.15, LAND = 1.6, COUNT = [1.75, 2.2, 2.65];
 /* THE ENDING'S, in real milliseconds once the match is over. */
 const FLASH_GAP = 1200;
-/* THE CAMERA, LESS (2026-10-29, players: "lessen the camera shakes"): every
-   shake, jolt and tilt at this share of what it was - the hit-stop, zoom and
-   sparks still carry an impact. One number, applied where the camera moves. */
-const SHAKE_K = 0.45;
+/* THE CAMERA HOLDS STILL (2026-10-29, asked for: 0.45 that morning, then
+   "remove the camera shakes"): every shake, jolt and tilt is multiplied by
+   this - the hit-stop, zoom and sparks carry an impact alone. */
+const SHAKE_K = 0;
 const KO_SLOW = 1100, RESULT_AT = 1150, DONE_AT = 2400;
 // How close the upright camera may come (the court fills the width at 1).
 const UPRIGHT_ZOOM = 2.4;

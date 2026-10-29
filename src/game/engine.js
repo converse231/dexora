@@ -35,7 +35,7 @@ import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
-  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook,
+  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook, dressed,
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
@@ -61,7 +61,7 @@ import { ACHIEVEMENTS, standing, payOf, cleanAchieved } from "./achievements.js"
 import {
   ballById, liveMult, itemById, forSale, sellValue, candyValue, CANDY_PRICE, TUTOR_PRICE,
   evolveState, evoLevel, startingState, dexBonus, catchBounty, levelReward,
-  evolutionRow, bestRod, holding, canRun, canSurf, KEY_ITEMS,
+  evolutionRow, rodInHand, heldRods, holding, canRun, canSurf, KEY_ITEMS,
   fieldById, berryById, berryCalm, berryXp, berryRoom, FAMILIES,
   stepReward, keeper, alphaCandy, canBike, variantOf,
 } from "./items.js";
@@ -231,6 +231,7 @@ function freshState() {
     ladder: [],           // Arena masters beaten, in order - see `arenaMaster`
     buddy: null,          // the one of them walking behind you now - see `setBuddy`
     skin: null,           // the trainer skin worn, null for your own - see cosmetics.js
+    rod: null,            // the rod cast, null for the best held - see `setRod`
     skins: [],            // the skins bought - see `buySkin`
     impacts: [],          // ULTI impact frames bought - see `buyImpact`
     impactsOff: [],       // impact frames owned but switched off
@@ -714,6 +715,7 @@ function loadState() {
       impacts: bought.filter((id) => !WITHDRAWN[id]),
       impactsOff: [...new Set(Array.isArray(s.impactsOff) ? s.impactsOff : [])].filter((id) => typeof id === "string" && /^[\w-]{1,32}$/.test(id)),
       skin: typeof s.skin === "string" ? s.skin : null,
+      rod: KEY_ITEMS.some((k) => k.id === s.rod && k.id.endsWith("-rod")) ? s.rod : null,
       /* CARDS, row by row: a bad row is dropped, never the collection. An id
          from a set this build does not ship is KEPT (a newer build's), shown
          nowhere. */
@@ -1695,7 +1697,7 @@ export function createEngine(canvas, onChange, mini = null) {
          `tableFor` caches, because this is asked on every step that spawns. */
       const here = tableFor(biome, levelFromXp(state.xp));
       if (ride && ride !== "V") {
-        const rod = bestRod(state.bag);
+        const rod = rodInHand(state.bag, state.rod);
         const pool = surfTable(biome, levelFromXp(state.xp), rod?.id);
         startEncounter(pool && pool.length ? pool : here, "surf");
       } else {
@@ -1878,6 +1880,14 @@ export function createEngine(canvas, onChange, mini = null) {
     for (const [id, w] of rolled) if ((r -= w) < 0) return speciesById(id);
     return speciesById(table[0][0]);
   }
+  /* A LURE'S PULL (items.js, the Spooky Honey): `pull` of the meetings under
+     it are drawn from the table's dressed species alone, so the honey works on
+     a map where most Pokemon wear nothing. Draws only while one runs. */
+  function lured(table, lure) {
+    if (!lure?.pull || Math.random() >= lure.pull) return table;
+    const some = table.filter(([id]) => dressed(id));
+    return some.length ? some : table;
+  }
 
   function startEncounter(table, source = "wild") {
     held.clear();
@@ -1905,7 +1915,7 @@ export function createEngine(canvas, onChange, mini = null) {
     const roam = !nightmare && !flood && source === "wild"
       ? roamLook(biomeFor(state.areaId)?.types, Math.random, { night: isNight(state.steps), lure: lure?.lure ?? 1 }) : null;
     const sp = nightmare ? speciesById(hunt.id) : roam
-      ?? eventLook(rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(table), Math.random,
+      ?? eventLook(rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(lured(table, lure)), Math.random,
         { owned, types: biomeFor(state.areaId)?.types }), Math.random,
         { night: isNight(state.steps), lure: lure?.lure ?? 1 });
     /* Whether the dex already has this one, read BEFORE the throw can register
@@ -2107,7 +2117,7 @@ export function createEngine(canvas, onChange, mini = null) {
        tile away from a trainer who is already in the pool, and the rod set is
        drawn standing on a bank. Ride ashore to fish. */
     if (surfing()) return null;
-    return bestRod(state.bag);
+    return rodInHand(state.bag, state.rod);
   }
 
   /* Can you ride the tile you are facing? The same shape as `castable`, and it
@@ -2172,6 +2182,23 @@ export function createEngine(canvas, onChange, mini = null) {
   /* Cosmetic and reversible, so no confirm and no cost: it is the one choice in
      the game you are allowed to change your mind about. Refuses an unknown name
      for the same reason `loadState` validates it - the string indexes the art. */
+  // Which rod a cast uses (You's key items): one you hold, or null for the best.
+  function setRod(id) {
+    if (id !== null && !(KEY_ITEMS.some((k) => k.id === id && k.id.endsWith("-rod")) && holding(state.bag, id))) return false;
+    state.rod = id;
+    save();
+    changed();
+    return true;
+  }
+  /* THE NEXT ROD YOU HOLD, from the water's edge (R, or the prompt's Switch;
+     2026-10-29, asked for: You's key items were too many steps away). */
+  function cycleRod() {
+    const rods = heldRods(state.bag);
+    if (rods.length < 2) return false;
+    const at = rods.findIndex((r) => r.id === rodInHand(state.bag, state.rod)?.id);
+    return setRod(rods[(at + 1) % rods.length].id);
+  }
+
   function setChar(name) {
     if (!CHARS.includes(name) || state.char === name) return false;
     state.char = name;
@@ -4689,6 +4716,8 @@ export function createEngine(canvas, onChange, mini = null) {
       ctx.imageSmoothingEnabled = false;
     },
     setChar,
+    setRod,
+    cycleRod,
     /* Dismissing is not the same as banking it - the id went into `hints` the
        moment it was shown, so closing it is only about the screen. It can never
        come back, which is the point. */

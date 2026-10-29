@@ -22,7 +22,7 @@ const THEME_NAME = { auto: "Auto", dark: "Night", light: "Day" };
 export default function You({
   trainerName, caught, xp, stats, bag, save, account, unread, titles = [], requests = 0, due = 0, invites = 0,
   onProfile, onInvite, onAchievements, onNews, onHelp, onForms, onWardrobe, onSettings, onLogOut, onReset, onSpend,
-  onJoin = null,
+  onJoin = null, rod = null, onRod = null,
 }) {
   useModalLock();
   const [theme, setThemeState] = useState(themeChoice);
@@ -101,7 +101,7 @@ export default function You({
         </nav>
 
         <div className="you-trainer" id="you-trainer">
-          <Trainer stats={stats} level={level} bag={bag} onSpend={onSpend} save={save} account={account} />
+          <Trainer stats={stats} level={level} bag={bag} onSpend={onSpend} save={save} account={account} rod={rod} onRod={onRod} />
         </div>
       </main>
     </div>

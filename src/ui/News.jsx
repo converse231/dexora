@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-29-honey-rods",
+    icon: "🍯",
+    date: "October 2026",
+    title: "A stronger Spooky Honey, and your choice of rod",
+    items: [
+      ["Spooky Honey", "Now draws costumed Pokémon to you - about 2 in 5 meetings, on any map with one."],
+      ["Switch rods", "At the water, press R or tap Switch rod. Only the Good Rod fishes up Frillish."],
+      ["Calmer Arena", "No more camera shake."],
+    ],
+  },
+  {
     id: "2026-10-28-poncho-parade",
     icon: "🧥",
     date: "October 2026",

@@ -45,7 +45,7 @@ import Bag from "./ui/Bag.jsx";
 import Encounter from "./ui/Encounter.jsx";
 import BallRail from "./ui/BallRail.jsx";
 import {
-  BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall, keeper, variantOf,
+  BALLS, FAMILIES, fieldById, stepReward, ballOrder, promoteBall, defaultBall, keeper, variantOf, heldRods,
 } from "./game/items.js";
 import Sprite, { ItemIcon, eventIcon, preloadSprites } from "./ui/Sprite.jsx";
 import { perkName, fieldText, heartsOf, HEARTS } from "./game/abilities.js";
@@ -522,6 +522,9 @@ export default function App({
         else if (r) e.fish();
         return;
       }
+
+      // R at the water: the next rod you hold (R runs only in an encounter, handled above).
+      if ((ev.key === "r" || ev.key === "R") && e.castable()) { ev.preventDefault(); e.cycleRod(); return; }
 
       // Q: the next of the walking party (Q and E were free; check `KEYS` first).
       if (ev.key === "q" || ev.key === "Q") { ev.preventDefault(); e.cycleBuddy(); return; }
@@ -1097,6 +1100,8 @@ export default function App({
           account={account}
           unread={unread}
           onSpend={(id) => engine.spend(id)}
+          rod={st?.rod ?? null}
+          onRod={(id) => engine.setRod(id)}
           save={engine && {
             read: () => engine.exportSave(),
             inspect: (obj) => engine.inspectSave(obj),
@@ -1546,6 +1551,14 @@ export default function App({
                   <img src={`items/${rod.id}.png`} alt="" />
                   <span><b>{rod.name}</b> ready</span>
                   <kbd>F</kbd>
+                </button>
+              ) : null}
+              {/* The rods differ in what bites (the Good Rod's Frillish), so the switch is here. */}
+              {rod && heldRods(st?.bag ?? {}).length > 1 ? (
+                <button className="hint-act" onClick={() => engine.cycleRod()}
+                        data-tip="Fish with your next rod">
+                  <span>Switch rod</span>
+                  <kbd>R</kbd>
                 </button>
               ) : null}
 

@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import {
   STATS, MAX_RANK, rank, freePoints, earnedPoints, spentPoints,
 } from "../game/trainer.js";
-import { KEY_ITEMS, holding } from "../game/items.js";
+import { KEY_ITEMS, holding, rodInHand } from "../game/items.js";
 import Confirm from "./Confirm.jsx";
 import Note from "./Note.jsx";
 
@@ -47,7 +47,7 @@ const FROM = {
 };
 
 export default function Trainer({
-  stats, level, bag, onSpend, save, account = null,
+  stats, level, bag, onSpend, save, account = null, rod = null, onRod = null,
 }) {
   // Which row just changed, so the click has something to show for itself.
   const [lit, setLit] = useState(null);
@@ -307,6 +307,9 @@ export default function Trainer({
         <div className="trkeys">
           {KEY_ITEMS.map((key) => {
             const have = holding(bag, key.id);
+            // A held rod is chosen here: the Super Rod has no Frillish, the Good Rod does.
+            const isRod = have && onRod && key.id.endsWith("-rod");
+            const inHand = isRod && rodInHand(bag, rod)?.id === key.id;
             return (
               <div key={key.id} className={`trkey${have ? "" : " locked"}`}>
                 <img src={`items/${key.id}.png`} alt="" />
@@ -316,6 +319,9 @@ export default function Trainer({
                     {have ? key.blurb : `Earned at trainer Lv ${key.level}`}
                   </span>
                 </div>
+                {isRod && (inHand
+                  ? <span className="tk-use on">IN HAND</span>
+                  : <button type="button" className="ts-btn tk-use" onClick={() => onRod(key.id)}>Use</button>)}
               </div>
             );
           })}
