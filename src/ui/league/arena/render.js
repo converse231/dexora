@@ -909,9 +909,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           if (pow >= 90) { shake(0.32); zoomAt(body.x, body.y, 0.045); impactFrame(sx(body.x), sy(body.y)); sheet("shockwave", body.x, body.y + 0.35, 2.8, colour, 22); }
           else if (pow) shake(0.08 + pow / 600);
         }
-        // A strong Psychic move hurls rocks pulled up off the floor round its user (Mewtwo's way), with its own blast.
+        // A strong Psychic move hurls rocks pulled up off the floor round its user (Mewtwo's way), with its own blast -
+        // never a signature move, which is drawn as the anime draws it (Psychic and Future Sight throw no rocks there).
         const foe = activeOf(s, 1 - e.side), pm = moveOf(e.move);
-        if (!isBasic(e.move) && foe && typeOf(e.move) === "psychic" && pm.c === 1 && (pm.p ?? 0) >= 80) {
+        if (!isBasic(e.move) && !SIG.has(slugOf(e.move)) && foe && typeOf(e.move) === "psychic" && pm.c === 1 && (pm.p ?? 0) >= 80) {
           for (let i = 0; i < 3; i++) fx.push({ k: "hurl", x: body.x + (i - 1) * 0.9, y: body.y + (i === 1 ? -0.5 : 0.2), tx: foe.x + (rand() - 0.5) * 0.6, ty: foe.y, rot: rand() * TAU, t: -i * 3, life: 34 });
           for (let i = 0; i < 3; i++) mark("crack", body.x + (i - 1) * 0.9, body.y + 0.4, 0.9);
         }

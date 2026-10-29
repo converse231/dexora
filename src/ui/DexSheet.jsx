@@ -75,7 +75,7 @@ function whereToFind(id) {
     if (sp.hunt) {
       return [
         { key: "event", where: ev.name, how: live ? `${eventDaysLeft(ev)} days left` : "the event is over" },
-        { key: "hunt", where: AREAS[ev.hunt.area]?.name ?? "", how: `catch ${ev.hunt.dreams} costumes, then your next meeting here` },
+        { key: "hunt", where: AREAS[ev.hunt.area]?.name ?? "", how: `catch ${ev.hunt.dreams} costumes (${ev.hunt.again} each time after), then your next meeting here` },
       ];
     }
     const look = ev.looks.find((l) => l.id === id);

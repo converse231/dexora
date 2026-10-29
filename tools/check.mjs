@@ -2695,7 +2695,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   {
     const looks = EVENTS.flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])]);
     for (const ev of EVENTS.filter((e) => e.hunt)) {
-      assert.ok(ev.hunt.keep < ev.hunt.dreams && ev.hunt.keep >= 0, `${ev.id}'s hunt keeps more dreams than it needs`);
+      assert.ok(ev.hunt.again >= ev.hunt.dreams, `${ev.id}'s hunt comes back for fewer costumes than it first asked`);
       assert.ok(BIOMES.some((b) => b.id === ev.hunt.area), `${ev.id}'s hunt waits in no map`);
       assert.ok(/^[a-z]+$/.test(ev.hunt.medal) && !EVENTS.some((e) => e.id === ev.hunt.medal),
         `${ev.id}'s hunt medal is not an event: id the server's titles can take`);
@@ -8682,10 +8682,12 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     const { SIGNATURES } = await import("../src/ui/league/arena/pixfx.js");
     const { MOVES: SIG_MOVES } = await import("../src/data/moves.js");
     const { shapeOf: sigShape } = await import("../src/game/arena.js");
+    const sigFamilies = [...renderSrc.matchAll(/\["([a-z-]+)", \["/g)].map((m) => m[1]);
     for (const n of SIGNATURES) {
       assert.ok(sigShape(SIG_MOVES.find((m) => m.n === n)), `the signature move ${n} is no move the Arena plays`);
-      assert.ok(pixSrc.includes(`    ${/-/.test(n) ? `"${n}"` : n}: {`), `the signature move ${n} has no entry in pixfx.js's SIG`);
-      assert.ok(!FX[`moves/${n}`], `the signature move ${n} still ships a drawn sheet - retire it in build_fx.py`);
+      assert.ok(pixSrc.includes(`    ${/-/.test(n) ? `"${n}"` : n}: {`) || new RegExp(`STREAM_RAMP = \{[^}]*"${n}"`).test(pixSrc), `the signature move ${n} has no entry in pixfx.js's SIG or STREAM_RAMP`);
+      // A family's sheet (render.js FAMILY: `slam` serves Thrash, Giga Impact...) stays for the moves it still draws.
+      assert.ok(!FX[`moves/${n}`] || sigFamilies.includes(n), `the signature move ${n} still ships a drawn sheet - retire it in build_fx.py`);
     }
     console.log(`pixfx ok — ${TYPES.length} type ramps of ${RAMP_STEPS}, one pixel size (${Math.round(BODY_PX * 10) / 10} a tile) for bodies and effects, no alpha or gradient in the pixel layer; ` +
       `${named.length} named ULTIs drawn as themselves, ${SIGNATURES.length} signature moves, ${sheets.length} move sheets on the grid, ${retired.length} retired`);

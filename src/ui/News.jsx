@@ -16,6 +16,55 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-30-hunt-again",
+    icon: "🎯",
+    date: "October 2026",
+    title: "The event legendary's hunt, clearer",
+    items: [
+      ["How to call it", "Catch any 20 costumed Pokémon of the event, then walk in its place."],
+      ["Calling it again", "Once you've met it, 25 more costumes bring it back - a Poké Ball for each one caught."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-moves-7",
+    icon: "✨",
+    date: "October 2026",
+    title: "Twenty more moves, the anime way",
+    items: [
+      ["Close Combat, Superpower, Foul Play", "A flurry of blows; a towering red aura; a foe wrapped in darkness."],
+      ["Dazzling Gleam, Hyper Voice", "A burst of pink-white light and stars; jagged rings of sound."],
+      ["Flash Cannon, Psyshock, Brine", "A polished steel beam, psychic shards, a ball of salt water."],
+      ["Seed Bomb, Magical Leaf, Sleep Powder", "Seeds that pop, leaves of many colours, a drifting cloud."],
+      ["And more", "Dragon Tail, Last Resort, Amnesia, Rapid Spin, Synthesis, Scratch, Nuzzle, Acrobatics, U-turn."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-moves-6",
+    icon: "🪨",
+    date: "October 2026",
+    title: "Twenty more moves, the anime way",
+    items: [
+      ["Stone Edge, Giga Impact, Outrage", "Stones jut up round the foe; a violet-orange charge; a blazing red rampage."],
+      ["Night Slash, Leaf Blade, Metal Claw", "A dark crescent, a green crescent, three silver streaks."],
+      ["Zap Cannon, Power Gem, Hurricane", "A crackling ball down the beam, glittering gems, a whirling tornado."],
+      ["Agility, Iron Defense, Flame Charge", "Orange afterimages, a body of steel, a charge wrapped in flames."],
+      ["And more", "Bug Bite, Poison Jab, Bug Buzz, Water Gun, Thrash, Stun Spore, Aerial Ace, Stomp."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-moves-5",
+    icon: "🌈",
+    date: "October 2026",
+    title: "Twenty more moves, the anime way",
+    items: [
+      ["Take Down, Double-Edge, Body Slam", "Charges with auras and recoil; Body Slam lands with a ground-shaking impact."],
+      ["Headbutt, Slam, Slash, Spark", "A knock and circling stars, a tail's whip, white claw streaks, an electric tackle."],
+      ["Psybeam, Bubble Beam, Mud Shot", "A rainbow beam, a stream of bubbles, globs of mud."],
+      ["Sing, Future Sight, Uproar", "Notes floating to the foe, a pillar of light from above, rings of sound."],
+      ["And more", "Fake Out, Wing Attack, Extreme Speed, String Shot, Bulldoze, Harden, Defense Curl."],
+    ],
+  },
+  {
     id: "2026-10-30-anime-moves-4",
     icon: "👻",
     date: "October 2026",

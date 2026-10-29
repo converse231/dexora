@@ -14,10 +14,17 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "rea
 import { useOffscreenPause } from "./pause.js";
 import { SPECIES, DEX_TOTAL, isEvent } from "../data/dex.js";
 import { EVENTS } from "../data/eventforms.js";
+import { dayKey } from "../game/daily.js";
 
 /* WHICH ENTRIES A REGION IS: a generation's, never its event looks - they
-   are the Event region's alone, and "All" counts none of them (dex.js). */
-const inRegion = (sp, region) => (region === "event" ? isEvent(sp.id)
+   are the Event region's alone, and "All" counts none of them (dex.js).
+   AN EVENT THAT HAS NOT OPENED IS NOT IN IT (2026-10-30, reported: the
+   Poncho Parade's empty slots were counted and numbered in the Dex a week
+   early - a spoiler): a look joins once its week has begun, or once you
+   have met it. `seen` is the dex's state for it (1 or 2). */
+const START = new Map(EVENTS.map((ev) => [ev.id, ev.start]));
+const opened = (sp, seen) => seen || (START.get(sp.event) ?? "") <= dayKey();
+const inRegion = (sp, region, seen = 0) => (region === "event" ? isEvent(sp.id) && opened(sp, seen >= 1)
   : region === "all" || (!isEvent(sp.id) && genOf(sp.id) === Number(region)));
 import { label } from "../game/map.js";
 import {
@@ -246,7 +253,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
   const tier = TIERS.includes(only) ? only : null;
   const scope = useMemo(() => {
     // "All" measures the Pokedex, which no event look is part of.
-    let mine = SPECIES.filter((sp) => (region === "all" ? !isEvent(sp.id) : inRegion(sp, region)));
+    let mine = SPECIES.filter((sp) => (region === "all" ? !isEvent(sp.id) : inRegion(sp, region, at(sp.id))));
     if (tier) {
       mine = mine.filter((sp) => tiersFor(sp.id).includes(tier));
       const got = mine.filter((sp) => has(tier, sp.id)).length;
@@ -265,7 +272,7 @@ function Dex({ dex, tiers, caught, level = 1, colRev, onSelect, onRank }) {
 
   const shown = SPECIES.filter((sp) => {
     const state = at(sp.id);
-    if (!inRegion(sp, region)) return false;
+    if (!inRegion(sp, region, state)) return false;
     if (only === "caught" && state !== 2) return false;
     // A look whose fortnight you missed is not "missing" from the Pokedex.
     if (only === "missing" && (state === 2 || (isEvent(sp.id) && region !== "event"))) return false;

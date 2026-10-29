@@ -1918,7 +1918,7 @@ async function savedField(name, good, bad, empty, base = SAVE) {
     `a garbage "${name}" was trusted instead of dropped to empty`);
 }
 await savedField("dry", 123, "lots", 0);
-await savedField("dreams", { halloween: 3 }, { halloween: 99, nowhere: 2 }, {});
+await savedField("dreams", { halloween: 3, "halloween+": 1 }, { halloween: 99, nowhere: 2, "haunting+": 7 }, {});
 /* CARDS (docs/cards.md): each field loads empty from an old save, survives a
    reload, and drops garbage - row by row for the collection. */
 await savedField("cards", { "me01-001": { n: 2, r: 1, earned: ["badge:kanto-brock"] } }, "junk", {});
@@ -3085,14 +3085,17 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     assert.equal(dark.state.ask?.kind, "flee", "running from the Nightmare did not ask");
     dark.answerAsk(true);
     until(dark, (s) => !s.encounter, "the Nightmare to fade", 4000);
-    assert.equal(dark.state.dreams[ev.id], ev.hunt.keep, "a Nightmare run from did not wax the moon back");
+    assert.equal(dark.state.dreams[ev.id], 0, "a Nightmare run from did not start its count over");
+    assert.equal(dark.state.dreams[`${ev.id}+`], 1, "a Nightmare met was not marked met");
     dark.destroy();
     /* IT COMES AGAIN (2026-10-30, asked for: "let us catch more"): caught,
        the moon wanes to `keep` as a loss does, the medal is the first catch's
        alone, and a full moon meets it again - each meeting a tier roll. */
     const twice = boot({ ...SAVE, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
     for (let n = 0; n < 2; n++) {
-      twice.state.dreams = { ...twice.state.dreams, [ev.id]: ev.hunt.dreams };
+      // The first time it asks `dreams`; once met, `again` (25) - one short of it is not enough.
+      if (n) { twice.state.dreams = { ...twice.state.dreams, [ev.id]: ev.hunt.again - 1 }; assert.equal((await import("../src/game/events.js")).huntDue(twice.state.dreams), null, "a met Nightmare came back short of `again` costumes"); }
+      twice.state.dreams = { ...twice.state.dreams, [ev.id]: n ? ev.hunt.again : ev.hunt.dreams };
       Math.random = () => 0.01;
       try {
         for (const dir of ["right", "down", "left", "up"]) {
@@ -3108,7 +3111,7 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
       twice.answerAsk(true);
       until(twice, (s) => !s.encounter || s.encounter.phase === "caught", "the master ball to land");
       until(twice, (s) => !s.encounter, "the Nightmare to be filed");
-      assert.equal(twice.state.dreams[ev.id], ev.hunt.keep, "a Nightmare caught did not wane the moon to keep");
+      assert.equal(twice.state.dreams[ev.id], 0, "a Nightmare caught did not start its count over");
     }
     assert.equal(twice.state.medals.filter((m) => m === `event:${ev.hunt.medal}`).length, 1, "a second Nightmare paid its medal again");
     assert.equal(twice.state.box.filter((m) => m.species === ev.hunt.id).length, 2, "the second Nightmare never reached the Box");

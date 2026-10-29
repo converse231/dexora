@@ -20,7 +20,7 @@ import { label, AREAS } from "../game/map.js";
 import { speciesById, foundIn, dexIndex } from "../game/biomes.js";
 import { eventShelf } from "../game/items.js";
 import { shelfOf, eventAfter,
-  eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, eventDone, huntDue, huntWords,
+  eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, eventDone, huntDue, huntNeed, huntWords,
   shareOf, EVENT_NIGHT, EVENT_PACKS, roamAreas,
 } from "../game/events.js";
 
@@ -118,13 +118,13 @@ function lines(ev) {
   });
 }
 
-/* THE MOON OVER THE HUNT: one disc a Bad Dream, waning to the new moon as
-   they come - full (lit) is a dream still to catch, dark is one caught. An
-   event's CSS redraws the discs (Shichi-Go-San's are shrine bells). */
+/* THE HUNT'S TALLY: a tiny Poke Ball for every costume caught, a faint
+   empty slot for each still to go (2026-10-30, asked for: the old discs went
+   dark when caught, so a full row read as empty). */
 function Moons({ n, of, says }) {
   return (
     <span className="sn-moons" role="img" aria-label={`${n} of ${of} ${says}`}>
-      {Array.from({ length: of }, (_, k) => <i key={k} className={k < n ? "dark" : ""} />)}
+      {Array.from({ length: of }, (_, k) => <i key={k} className={k < n ? "got" : ""} />)}
     </span>
   );
 }
@@ -226,8 +226,9 @@ export function SeasonIntro({ ev, dex, onClose, onBoard, onNext }) {
             <span className="sn-mon solo sn-shade"><Sprite id={ev.hunt.id} alt="" eager /></span>
             <span>
               <b>{ev.hunt.name}</b>
-              Catch {ev.hunt.dreams} costumed Pokémon. Then walk in {AREAS[ev.hunt.area]?.name}
-              {" "}- the first Pokémon you meet there is it.
+              Catch any {ev.hunt.dreams} costumed Pokémon of this event (repeats count). Then walk in
+              {" "}{AREAS[ev.hunt.area]?.name} - the first Pokémon you meet there is it. Once you have
+              {" "}met it, {ev.hunt.again} more costumes bring it back.
             </span>
           </section>
         )}
@@ -297,7 +298,7 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
       </div>
       {ev.hunt && (() => {
         const won = medals.includes(`event:${ev.hunt.medal}`);
-        const n = dreams[ev.id] ?? 0;
+        const n = dreams[ev.id] ?? 0, need = huntNeed(dreams, ev), met = Boolean(dreams[`${ev.id}+`]);
         const due = !!huntDue(dreams) && live;
         return (
           <div className={`sn-hunt-row${due ? " due" : ""}`}>
@@ -308,9 +309,9 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
             <span>
               <b>{won ? `${ev.hunt.name} ✓` : due ? huntWords(ev.hunt).due : ev.hunt.name}</b>
               <small>{due ? `Walk in ${AREAS[ev.hunt.area]?.name} - your next meeting there`
-                : `${n} of ${ev.hunt.dreams} costumes caught${won ? " - it comes again" : ""}`}</small>
+                : `Catch ${need - n} more costumed Pokémon to call it${met ? " back" : ""} (${n} of ${need})`}</small>
             </span>
-            {(!won || live) && <Moons n={n} of={ev.hunt.dreams} says={huntWords(ev.hunt).tokens} />}
+            {(!won || live) && <Moons n={n} of={need} says={huntWords(ev.hunt).tokens} />}
           </div>
         );
       })()}

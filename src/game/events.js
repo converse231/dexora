@@ -217,9 +217,11 @@ export const eventDue = (dex, medals = []) =>
    each event's Bad Dreams, one a costume caught on its days. Full, the hunt
    is DUE: the next wild meeting in its area is it. It REPEATS (2026-10-30,
    asked for: "let us catch more" - one meeting was one tier roll, so its
-   rare forms were out of reach): caught or lost, the moon wanes to `keep`.
-   The medal is the first catch's. A save's count is held to the hunt's own
-   range. */
+   rare forms were out of reach): caught or lost, the count starts over and
+   it asks `again` (25) costumes each time after the first `dreams` (20) -
+   `<id>+` in the same object marks it met (asked for the same day; no new
+   save field). The medal is the first catch's. A save's count is held to
+   the hunt's own range. */
 /* THE HUNT'S WORDS: Hallowed Night's dreams and new moon, unless an event
    names its own (`hunt.words`: Shichi-Go-San's blessings and shrine bell). */
 const HUNT_WORDS = {
@@ -228,15 +230,17 @@ const HUNT_WORDS = {
   run: "The Nightmare fades if you run",
 };
 export const huntWords = (h) => ({ ...HUNT_WORDS, ...h?.words });
+// How many costumes call it now: `dreams` the first time, `again` once it has been met.
+export const huntNeed = (dreams, ev) => (dreams?.[`${ev.id}+`] ? ev.hunt.again : ev.hunt.dreams);
 export function huntDue(dreams, day) {
   const ev = eventOn(day);
   const h = ev?.hunt;
   if (!h) return null;
-  return (dreams?.[ev.id] ?? 0) >= h.dreams ? h : null;
+  return (dreams?.[ev.id] ?? 0) >= huntNeed(dreams, ev) ? h : null;
 }
 export const cleanDreams = (d) => Object.fromEntries(EVENTS.filter((ev) => ev.hunt).flatMap((ev) => {
-  const n = d?.[ev.id];
-  return Number.isInteger(n) && n >= 0 && n <= ev.hunt.dreams ? [[ev.id, n]] : [];
+  const n = d?.[ev.id], met = d?.[`${ev.id}+`] === 1;
+  return [...(Number.isInteger(n) && n >= 0 && n <= Math.max(ev.hunt.dreams, ev.hunt.again) ? [[ev.id, n]] : []), ...(met ? [[`${ev.id}+`, 1]] : [])];
 }));
 
 /* THE CLOCK ON AN EVENT, for its countdowns: it opens at local midnight on

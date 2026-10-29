@@ -99,7 +99,8 @@ RETIRED = {"flamethrower", "hydro-pump", "ice-beam", "hyper-beam", "solar-beam",
            "sludge-bomb", "flare-blitz", "volt-tackle", "aqua-jet", "explosion", "thunderbolt", "discharge", "dazzling-gleam",
            "hyper-voice", "heat-wave", "sludge-wave", "psychic", "earthquake", "surf", "stun", "confused", "smoke", "heal",
            "power-up", "stat-drop", "quick-attack", "crunch", "fire-fang", "ice-fang", "thunder-fang", "play-rough",
-           "razor-leaf", "fire-blast", "dragon-claw", "rock-slide", "air-slash"}   # 2026-10-30: drawn the anime way by pixfx's `sig`
+           "razor-leaf", "fire-blast", "dragon-claw", "rock-slide", "air-slash",
+           "stone-edge", "night-slash", "poison-jab", "leaf-blade", "close-combat"}   # 2026-10-30: drawn the anime way by pixfx's `sig`
 # THE BODIES' GRID (2026-10-30): every kept move sheet is re-gridded to GRID px wide - its usual drawn size in
 # the Arena (tiles) times BODY_PX, the Pokemon's own pixels a tile (render.js draws a PMD body at px / BODY_PX)
 # - whole frames downscaled, 16 colours, a sprite's 1 px dark outline. fx.js marks it `g`, and the pixel look

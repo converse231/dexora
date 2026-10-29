@@ -35,7 +35,7 @@ import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
-  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook, dressed,
+  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntNeed, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook, dressed,
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
@@ -2718,7 +2718,7 @@ export function createEngine(canvas, onChange, mini = null) {
   /* THE HUNT'S END, and the dreams that feed it (events.js). A costume
      caught on its event's days is a Bad Dream; the last one says the
      Nightmare is due. The hunted one caught the first time is its medal;
-     caught or lost, the moon wanes back to `keep`, and it comes again. */
+     caught or lost, the count starts over at `again`, and it comes again. */
   /* A LOOK'S CARD (eventforms.js `card`, 2026-10-28, asked for: "once you
      catch the pokemon you'll be given the card"): a poncho printed on a real
      promo card files that card into the collection - ONE copy, the first
@@ -2738,8 +2738,8 @@ export function createEngine(canvas, onChange, mini = null) {
     const h = ev?.hunt;
     if (!h) return;
     if (e.hunt) {
-      state.dreams = { ...state.dreams, [ev.id]: Math.min(state.dreams[ev.id] ?? 0, h.keep) };
-      const again = `Catch ${h.dreams - h.keep} more costumes and ${huntWords(h).back}.`;
+      state.dreams = { ...state.dreams, [ev.id]: 0, [`${ev.id}+`]: 1 };
+      const again = `Catch ${h.again} more costumes and ${huntWords(h).back}.`;
       if (outcome === "caught" && !state.medals.includes(`event:${h.medal}`)) {
         state.medals.push(`event:${h.medal}`);
         cheer({ kind: "medal", title: h.name.toUpperCase(), sub: `${h.title} is yours.${eventDue(state.dex, state.medals).some((x) => x.id === ev.id)
@@ -2749,10 +2749,10 @@ export function createEngine(canvas, onChange, mini = null) {
       return;
     }
     if (outcome !== "caught" || speciesById(e.speciesId)?.event !== ev.id) return;
-    const was = state.dreams[ev.id] ?? 0;
-    if (was >= h.dreams) return;
+    const was = state.dreams[ev.id] ?? 0, need = huntNeed(state.dreams, ev);
+    if (was >= need) return;
     state.dreams = { ...state.dreams, [ev.id]: was + 1 };
-    if (was + 1 === h.dreams) {
+    if (was + 1 === need) {
       cheer({ kind: "medal", title: huntWords(h).rise,
         sub: `Something waits in ${AREAS[h.area]?.name ?? "the dark"}... Walk in - and bring a Nanab Berry, or it may run.` });
     }

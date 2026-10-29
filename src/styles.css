@@ -11616,11 +11616,13 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .sn-hunt-row small { font-size: 11.5px; color: var(--ink-soft); }
 /* Its own row under the words, wrapping: at 20 Bad Dreams (2026-10-24) a single line ran the card off the side. */
 .sn-moons { display: flex; flex-wrap: wrap; gap: 3px; grid-column: 1 / -1; justify-content: center; }
-.sn-moons i {
-  width: 10px; height: 10px; border-radius: 50%;
-  background: radial-gradient(circle at 38% 36%, #fff8dc, #f3c66a); box-shadow: 0 0 4px rgba(255, 220, 140, .5);
+/* A slot still to catch: faint. A caught one: a tiny Poke Ball - red top, white bottom, the band and button. */
+.sn-moons i { width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(160, 130, 220, .35); }
+.sn-moons i.got {
+  background: radial-gradient(circle at 50% 50%, #fff 0 1.4px, #222 1.5px 2.4px, transparent 2.5px),
+    linear-gradient(to bottom, #ee3b3b 0 44%, #222 44% 56%, #f4f4f4 56%);
+  box-shadow: 0 0 0 1px #222, 0 0 4px rgba(255, 255, 255, .25);
 }
-.sn-moons i.dark { background: #1b1030; box-shadow: inset 0 0 0 1px #6a4fa0; }
 .sn-hunt {
   width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; text-align: left;
   padding: 10px 14px; border-radius: 16px; background: rgba(0, 0, 0, .35); border: 1px solid rgba(138, 92, 255, .4);

@@ -268,7 +268,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
   again. **It is no entry of the
   Pokedex**: `DEX_TOTAL`/`dexCaught` (dex.js) and trading.sql's
   `event_slots()` (held equal) skip it - no medal, milestone, rank, dex
-  bonus or "left to find" - and the Dex files it under the Event region.
+  bonus or "left to find" - and the Dex files it under the Event region,
+  but only once its week has OPENED or you have met it (Dex.jsx `opened`,
+  2026-10-30, reported: the Poncho Parade's slots were numbered a week early).
   Front art only, so it never battles (`refusal`, `teamProblem`, the anchors'
   field) and walks as its species. Every look of an event in the Pokedex is
   `event:<id>`, claimed on the Events board (`claimEvent`): the title and a
@@ -286,9 +288,11 @@ anything done. The run prints each suite; the count is not typed anywhere.
   caught on its days is a Bad Dream (`state.dreams`, `huntOn`); at `dreams`
   the next wild meeting in its `area` IS it, day or night (2026-10-27: it
   waited for dark, ~235 steps and 16 meetings of walking) (`huntDue`, no alpha,
-  it asks before you run); lost OR caught, the count falls to `keep` and it
+  it asks before you run); lost OR caught, the count starts over and it
   comes again (2026-10-30, asked for: "let us catch more" - one meeting was
-  one tier roll, its rare forms out of reach); the first catch is
+  one tier roll, its rare forms out of reach) after `again` (25) costumes,
+  `<id>+` in `dreams` marking it met (`huntNeed`); the card's tally is a
+  Poke Ball a catch; the first catch is
   `event:<medal>` - NO title of its own (2026-10-26, your call): the
   event's title asks for every look AND it (`eventDone`), and `shownTitles`
   never draws a hunt medal. Every event's title is a DRAWN medal
@@ -1366,8 +1370,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   check.mjs refuses one shipped). A beam-shaped move is a held STREAM, so
   its colours are `STREAM_RAMP` (Solar Beam, Hyper Beam); the `beam` moment
   is a Cannon ULTI's. Volt Tackle is in no learnset the League reads, so its
-  look is Wild Charge's. Batches 2-4 (same day) are the moves the most
-  kits carry; a status shot (Hypnosis, Thunder Wave) has no hit, so its landing is the
+  look is Wild Charge's. Batches 2-8 (same day) are the moves the most
+  kits carry (6 went straight to the game, asked for: "more moves instead
+  of bit by bit"; each still checked in a real match); a status shot (Hypnosis, Thunder Wave) has no hit, so its landing is the
   status's own look. Hyper Beam's spent flicker is
   cosmetic; Outrage leaves no dizzy stars (stars mean confusion here).
   **The drawn move sheets are on the bodies' grid** (Phase 7b): 41 RETIRED

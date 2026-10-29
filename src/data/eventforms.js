@@ -86,7 +86,7 @@ export const EVENTS = [
        dark IS it. Lost - fled or run from - it waxes back to `keep`, and three
        more costumes bring it round again. Caught, it is the `medal` and its
        `name`, a title of its own beside the event's. */
-    hunt: { id: 19908, of: 491, title: "Scarecrow Darkrai", flavor: "It stitched a sack over its head and stuffed its sleeves with straw to stand in the fields - and every crow that lands on it dreams of the dark.", medal: "nightmare", name: "Nightmare King", dreams: 20, keep: 12, area: "tower" },   // 7 and 4 at 1 costume in 16 meetings; now 1 in 2 (2026-10-24)
+    hunt: { id: 19908, of: 491, title: "Scarecrow Darkrai", flavor: "It stitched a sack over its head and stuffed its sleeves with straw to stand in the fields - and every crow that lands on it dreams of the dark.", medal: "nightmare", name: "Nightmare King", dreams: 20, again: 25, area: "tower" },   // 7 and 4 at 1 costume in 16 meetings; now 1 in 2 (2026-10-24)
   },
   /* HALLOWED NIGHT'S SECOND WEEK (2026-10-26, asked for): costumes
      and a new legendary, from Halloween itself - whole lines this time, second
@@ -144,7 +144,7 @@ export const EVENTS = [
       { id: 19938, of: 199, on: 79, title: "Ghost Story Slowking", flavor: "It holds a candle under its chin and opens the old book. Its stories are so slow that the scary part arrives after sunrise." },
       { id: 19939, of: 465, on: 114, title: "Swamp Monster Tangrowth", flavor: "It rose out of the bog wearing half of it. A frog has lived on its shoulder for three Halloweens and has never once been asked to leave." },
     ],
-    hunt: { id: 19931, of: 487, title: "Grim Reaper Giratina", flavor: "It rose out of the Distortion World in a reaper's hood, its scythe as long as its wings - and the Pokémon Mansion's clocks all stopped at midnight.", medal: "reaper", name: "The Reaper", dreams: 20, keep: 12, area: "mansion" },
+    hunt: { id: 19931, of: 487, title: "Grim Reaper Giratina", flavor: "It rose out of the Distortion World in a reaper's hood, its scythe as long as its wings - and the Pokémon Mansion's clocks all stopped at midnight.", medal: "reaper", name: "The Reaper", dreams: 20, again: 25, area: "mansion" },
   },
   /* PONCHO PARADE (2026-10-28, asked for): Pikachu in the Pokemon Center's
      ponchos - the 16 printed on Japan's promo cards, three sold only as
@@ -220,7 +220,7 @@ export const EVENTS = [
     /* THE SPECIAL ONE: the other way round - Mew in a Pikachu poncho. Twenty
        ponchos caught and the next meeting in the Safari Zone is it. */
     hunt: { id: 19966, of: 151,
-      title: "Pikachu Poncho Mew", medal: "mischief", name: "Pink Mischief", dreams: 20, keep: 12, area: "safari",
+      title: "Pikachu Poncho Mew", medal: "mischief", name: "Pink Mischief", dreams: 20, again: 25, area: "safari",
       flavor: "It borrowed a Pikachu poncho from the rack and wears it back to front, the hood's ears flopping over its eyes. When you call it a Pikachu it giggles and vanishes.",
       words: {
         token: "Poncho Stamp", tokens: "Poncho Stamps", due: "Something pink is in the Safari Zone", rise: "A PINK SHIMMER",
