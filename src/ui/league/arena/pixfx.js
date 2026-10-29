@@ -94,7 +94,26 @@ export const SIGNATURES = ["surf", "razor-leaf", "thunderbolt", "vine-whip", "ps
   "stun-spore", "aerial-ace", "giga-impact", "zap-cannon", "flame-charge", "metal-claw", "iron-defense", "outrage", "stomp", "hurricane",
   // Batch 8 (same day): twenty more.
   "close-combat", "dragon-tail", "seed-bomb", "sleep-powder", "hyper-voice", "dazzling-gleam", "last-resort", "magical-leaf", "amnesia", "rapid-spin",
-  "psyshock", "brine", "synthesis", "foul-play", "scratch", "flash-cannon", "superpower", "nuzzle", "acrobatics", "u-turn"];
+  "psyshock", "brine", "synthesis", "foul-play", "scratch", "flash-cannon", "superpower", "nuzzle", "acrobatics", "u-turn",
+  // Batch 9 (same day, asked for: "bigger batch"): thirty-seven more.
+  "lick", "shadow-sneak", "venoshock", "assurance", "drill-peck", "belch", "hex", "covet", "muddy-water", "rollout",
+  "razor-shell", "pound", "air-cutter", "knock-off", "pluck", "ice-shard", "wood-hammer", "dynamic-punch", "sacred-sword", "power-whip",
+  "glare", "peck", "will-o-wisp", "swallow", "leech-life", "extrasensory", "lava-plume", "brick-break", "shadow-claw", "head-smash",
+  "crush-claw", "disarming-voice", "low-sweep", "dream-eater", "liquidation", "dark-pulse", "incinerate",
+  // Batch 10 (same day, asked for: "anime accurate, much better"): the last drawn blow sheets.
+  "thunder-punch", "fire-punch", "ice-punch", "x-scissor", "iron-tail"];
+const XSC = ["#ffffff", "#f4ffd8", "#d8f880", "#a8e040", "#6ab028", "#3a6a18", "#18300a"].map(hex);
+const TONGUE = ["#ffffff", "#ffd8ec", "#ff9ac8", "#e868a8", "#b04080", "#6a2048", "#300c20"].map(hex);
+const VENOM = ["#ffffff", "#f0d8ff", "#d098f8", "#a85ae0", "#7a30b8", "#481878", "#200838"].map(hex);
+const GASR = ["#e8f0c8", "#c0d088", "#98a860", "#a87ab8", "#7a5090", "#4a3058"].map(hex);
+const WOODR = ["#ffffff", "#f0f8d0", "#c8d888", "#8aa850", "#a07040", "#6a4824", "#30200e"].map(hex);
+const BLAST = ["#ffffff", "#fff0c0", "#ffc870", "#ff8a3a", "#e0501e", "#902a10", "#401006"].map(hex);
+const EYESR = ["#ffffff", "#fffbd0", "#fff07a", "#ffd83a", "#c8a018", "#7a600c", "#342804"].map(hex);
+const DRAINRED = ["#ffffff", "#ffd8d8", "#ff9a9a", "#e85a6a", "#b02a40", "#6a1224", "#30060e"].map(hex);
+const EXTRA = ["#ffffff", "#e8fff8", "#a8f8e0", "#6ae0c8", "#3aa8b0", "#22607a", "#0e2c3a"].map(hex);
+const DREAM = ["#ffffff", "#f4e8ff", "#d8c0ff", "#b498f0", "#8a6ad0", "#5a4090", "#2a1c48"].map(hex);
+const DARKPB = ["#d8c8f0", "#5a3a90", "#3a2468", "#2a1850", "#1a0e38", "#100822", "#06040e"].map(hex);
+const SWORD = ["#ffffff", "#fffbf0", "#fff0c0", "#f8d880", "#d8a840", "#8a6420", "#3a280a"].map(hex);
 const FIGHTR = ["#ffffff", "#ffe0c8", "#ffa870", "#f06a2a", "#c03a1a", "#701a0e", "#300a06"].map(hex);
 const SLEEPR = ["#ffffff", "#e0fff8", "#9af0e0", "#5ad0c8", "#3a98a8", "#225a70", "#0e2a3a"].map(hex);
 const VOICE = ["#ffffff", "#fff0f8", "#ffd0ec", "#ff9ad0", "#e060a8", "#90306a", "#401430"].map(hex);
@@ -153,7 +172,7 @@ const GREYS = hex("#5a5f78"), SHADE = hex("#0b0d18");
 const HYPERB = ["#fff3c0", "#ff9a3d", "#ffb45a", "#e8641e", "#c84a14", "#a83a12", "#4f1a08"].map(hex);
 // Dragon Pulse's band: a pale blue core, blue through it, violet at its edge (DPULSE's white top read as a white beam).
 const DPULSEB = ["#d8f0ff", "#5a8cff", "#7a7cf0", "#5a4ce0", "#4a3ac0", "#3a2aa0", "#1a1250"].map(hex);
-const STREAM_RAMP = { "solar-beam": SUNR, "hyper-beam": HYPERB, "dragon-pulse": DPULSEB, "bubble-beam": BUBBLER, "psybeam": PSYBEAMR, "zap-cannon": RAMP.electric, "flash-cannon": FLASHC };
+const STREAM_RAMP = { "solar-beam": SUNR, "hyper-beam": HYPERB, "dragon-pulse": DPULSEB, "bubble-beam": BUBBLER, "psybeam": PSYBEAMR, "zap-cannon": RAMP.electric, "flash-cannon": FLASHC, "dark-pulse": DARKPB };
 const SHURIKEN = ["#ffffff", "#fff0c8", "#ffc46a", "#ff9a3d", "#e8641e", "#a83a12", "#4f1a08"].map(hex);
 const ramp = (R, k) => R[Math.max(0, Math.min(R.length - 1, Math.floor(k * R.length)))];
 
@@ -612,6 +631,8 @@ export function createPix(W, H) {
       // Flash Cannon: a silver beam with glints running down it and a white flare at its mouth.
       if (slug === "flash-cannon") { for (let i = 0; i < 4; i++) { const d = (time * 200 + (i * len) / 4) % Math.max(1, len); sparkle(L.f, x + dx * d, y + dy * d, 3, FLASHC[0], FLASHC[2]); } sparkle(L.f, x, y, 5, FLASHC[0], FLASHC[3]); L.l.glow(x, y, hw * 3, FLASHC[2], 0.6); }
       if (slug === "zap-cannon") { const d = (time * 160) % Math.max(1, len), bx = x + dx * d, by = y + dy * d; orbAt(L, bx, by, 6, RAMP.electric); for (let i = 0; i < 3; i++) { const p = bolt(bx, by, bx + range(-10, 10), by + range(-10, 10), 0.4); for (let j = 0; j < p.length - 1; j++) L.f.line(p[j][0], p[j][1], p[j + 1][0], p[j + 1][1], RAMP.electric[1]); } }
+      // Dark Pulse: dark rings of malice rolling down it, a pale rim to each.
+      if (slug === "dark-pulse") for (let i = 0; i < 5; i++) { const d = (time * 110 + (i * len) / 5) % Math.max(1, len); for (let q = 0; q < TAU; q += 0.2) L.f.dot(x + dx * d + dx * Math.cos(q) * 3 - dy * Math.sin(q) * (hw + 4), y + dy * d + dy * Math.cos(q) * 3 + dx * Math.sin(q) * (hw + 4), q < Math.PI ? T[0] : T[2], 1); }
       // Dragon Pulse's rings of force running down it.
       if (slug === "dragon-pulse") for (let i = 0; i < 4; i++) { const d = (time * 140 + (i * len) / 4) % Math.max(1, len); for (let q = 0; q < TAU; q += 0.25) L.f.dot(x + dx * d + dx * Math.cos(q) * 2.5 - dy * Math.sin(q) * (hw + 3), y + dy * d + dy * Math.cos(q) * 2.5 + dx * Math.sin(q) * (hw + 3), T[i % 2 ? 1 : 2], 1); }
       // Hyper Beam's light pink streaks twisting round it.
@@ -1922,6 +1943,185 @@ export function createPix(W, H) {
     "u-turn": {
       fire({ side, x: wx, y: wy }) { const trail = []; timed(0.7, (L, t) => { const k = 1 - smooth(0.45, 0.7, t); for (let i = 1; i < trail.length; i++) { const [ax, ay] = trail[i - 1], [bx, by] = trail[i]; L.f.line(ax, ay, bx, by, BUGG[2], k); L.f.line(ax, ay + 1, bx, by + 1, BUGG[4], k * 0.8); } }, (t) => { if (t < 0.6) trail.push(at(side, wx, wy).slice(0, 2)); }); },
       hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35); fxs.push(blowFx(x, y, BUGG, false)); },
+    },
+  });
+  /* ---------- batch 9 (2026-10-30): thirty-seven more ---------- */
+  // A blob of liquid with drips (Venoshock, Belch's gas uses `puff`).
+  function blob(L, x, y, r, C, wob = 1) { for (let py = Math.floor(y - r - 2); py <= y + r + 2; py++) for (let px2 = Math.floor(x - r - 2); px2 <= x + r + 2; px2++) { const dx = px2 + 0.5 - x, dy = py + 0.5 - y, a = Math.atan2(dy, dx), rr = r * (1 + 0.15 * wob * Math.sin(a * 5 + time * 12)), d = Math.hypot(dx, dy); if (d <= rr) L.f.set(px2, py, d > rr - 1 ? C[5] : dx + dy < -r * 0.4 ? C[1] : C[3]); } L.l.glow(x, y, r * 2.5, C[3], 0.4); }
+  // A burst of matter: count particles of `k` thrown round a point.
+  const spray2 = (k, x, y, n, ramp, a, b, extra = {}) => { for (let i = 0; i < n; i++) { const q = range(0, TAU), sp = range(a, b); add({ k, x, y, vx: Math.cos(q) * sp, vy: Math.sin(q) * sp - 20, drag: 2.5, life: range(0.4, 0.8), size: 2, ramp, a: range(0, TAU), va: range(-10, 10), ...extra }); } };
+  // A drain: beads streaming from `from` to `to` (side bodies) for `life`.
+  function drainBeads(fromSide, toSide, wf, ramp, life = 0.8) { timed(life, () => {}, (t) => { if (t > life - 0.2 || rand() > 0.8) return; const [bx, by] = at(fromSide, wf.x, wf.y), [ax, ay] = at(toSide, wf.ux, wf.uy), yy = by + range(-6, 6); add({ k: "mote", x: bx + range(-4, 4), y: yy, vx: (ax - bx) * 2.2, vy: (ay - yy) * 2.2, life: 0.45, ramp }); }); }
+  Object.assign(SIG, {
+    // A long pink tongue lashes out to the foe, a ghostly shiver where it licks.
+    lick: { fire({ side, x: wx, y: wy, dx, dy }) { const [cx, cy] = at(side, wx, wy), [tx, ty] = reachOf(wx, wy, dx, dy, 1.2); timed(0.4, (L, t) => { const reach = t < 0.1 ? t / 0.1 : 1 - smooth(0.2, 0.4, t), p1 = [(cx + tx) / 2, Math.min(cy, ty) - 8 + Math.sin(time * 20) * 3]; let last = [cx, cy]; for (let q = 0; q <= reach; q += 0.02) { const [x, y] = bez([cx + dx * 6, cy], p1, [tx, ty], q); L.f.disc(x, y, 2 - q * 0.6, TONGUE[3]); L.f.set(x, y - 1, TONGUE[1]); last = [x, y]; } L.f.disc(last[0], last[1], 2.4, TONGUE[2]); }); }, hit({ side }) { timed(0.4, (L, t) => outline(L, bodies[side], GHOSTF[2], 1 - t / 0.4)); } },
+    // Its shadow stretches across the floor to the foe and strikes up out of it.
+    "shadow-sneak": {
+      fire({ side, x: wx, y: wy, dx, dy }) { const [sx2, sy2] = toPx(wx, wy + 0.42), [tx, ty] = toPx(wx + dx * 2.2, wy + 0.42 + dy * 2.2); timed(0.5, (L, t) => { const u = smooth(0, 0.18, t), k = 1 - smooth(0.3, 0.5, t); for (let q = 0; q <= u; q += 0.01) { const x = sx2 + (tx - sx2) * q, y = sy2 + (ty - sy2) * q, w = 4 * (1 - q * 0.5); for (let o = -w; o <= w; o++) L.b.dot(x - dy * o, y + dx * o * 0.4, DARKP[q > u - 0.08 ? 3 : 5], k); } }); },
+      hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.2), gy = toPx(0, wy + 0.42)[1]; timed(0.45, (L, t) => { const u = Math.min(1, t / 0.12), k = 1 - smooth(0.25, 0.45, t); for (const ox of [-5, 0, 5]) { const h = (14 + Math.abs(ox)) * u; for (let yy = 0; yy < h; yy++) L.f.dot(x + ox + Math.sin(yy * 0.4 + ox) * 1.5, gy - yy, DARKP[yy > h - 3 ? 2 : 4], k); } L.l.glow(x, y, 14, DARKP[3], 0.5 * k); }); },
+    },
+    // A glob of poisonous liquid (the shot) splashing the foe in purple.
+    venoshock: { shot({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35); if (rand() < 0.5) add({ k: "drop", x, y: y + 3, vx: range(-10, 10), vy: 10, g: 320, life: 0.4, ramp: VENOM, gy: y + 14 }); queued.push((L) => { blob(L, x, y, 6.5, VENOM); for (let i = 1; i < 4; i++) L.f.disc(x - i * 4, y + i * 0.6, 2.4 - i * 0.5, VENOM[3], 1 - i / 4); }); return true; },
+      hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35), gy = toPx(0, wy + 0.42)[1]; spray2("drop", x, y, 14, VENOM, 40, 110, { g: 320, gy }); spray2("bubble", x, y, 6, VENOM, 10, 30, { vy: -20, sway: 15, size: 1.5 }); } },
+    // A dark fist with a double-hard punch: a dark burst and a ring of shadow.
+    assurance: { fire({ side }) { timed(0.3, (L, t) => auraOn(L, bodies[side], SUCKER, 1 - t / 0.3, 0.4, -1)); }, hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35); fxs.push(blowFx(x, y, SUCKER, true)); timed(0.4, (L, t) => L.f.ring(x, y, 6 + t * 70, 2, SUCKER[3], 1 - t / 0.4)); } },
+    // Its beak spins like a drill: a white spiral boring into the foe.
+    "drill-peck": { fire({ x: wx, y: wy, dx, dy }) { const [x, y] = reachOf(wx, wy, dx, dy, 1.0); timed(0.4, (L, t) => { const k = 1 - smooth(0.25, 0.4, t); for (let q = 0; q < 14; q += 0.25) { const r = 6 * (1 - q / 14), a = q * 1.6 + time * 30; L.f.dot(x - dx * q + -dy * Math.cos(a) * r, y - dy * q + dx * Math.cos(a) * r + Math.sin(a) * r * 0.3, q < 3 ? RAMP.normal[0] : AIRB[2], k); } L.l.glow(x, y, 10, AIRB[3], 0.5 * k); }); }, hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35); fxs.push(blowFx(x, y, AIRB, false)); } },
+    // A belch of foul gas, a green-purple cloud.
+    belch: { shot({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35); if (rand() < 0.7) add({ k: "smoke", x: x + range(-4, 4), y: y + range(-4, 4), vx: range(-10, 10), vy: -range(2, 10), life: range(0.4, 0.7), size: range(2, 3.5), smoke: GASR }); queued.push((L) => { for (let i = 0; i < 5; i++) { const a = i * 1.3 + time * 3; L.f.disc(x + Math.cos(a) * 3, y + Math.sin(a) * 2.5, 3, GASR[i % 2 ? 1 : 3], 0.9); } }); return true; }, hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35); for (let i = 0; i < 10; i++) add({ k: "smoke", x: x + range(-8, 8), y: y + range(-6, 6), vx: range(-15, 15), vy: -range(4, 14), life: range(0.6, 1), size: range(2.5, 4), smoke: GASR }); } },
+    // A ghostly wisp-orb with a staring ring (the shot); the foe's outline flickers with purple ghost-fire.
+    hex: { shot({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.4); queued.push((L) => { orbAt(L, x, y, 3.5, DARKP); for (let i = 0; i < 3; i++) { const a = time * 7 + (i * TAU) / 3; L.f.disc(x + Math.cos(a) * 7, y + Math.sin(a) * 4, 1.4, GHOSTF[2]); } }); return true; }, hit({ side }) { timed(0.6, (L, t) => edgeFlames(L, bodies[side], DARKP, 1 - t / 0.6, 0, 1, 0.9)); } },
+    // It glows pink and lunges, hearts bursting off the foe.
+    covet: { fire({ side }) { timed(0.35, (L, t) => auraOn(L, bodies[side], TONGUE, 1 - t / 0.35, 0, 1)); }, hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.4); spray2("heart", x, y, 6, TONGUE, 30, 70); fxs.push(blowFx(x, y, TONGUE, false)); } },
+    // A muddy wave rolls out to the pulse's reach.
+    "muddy-water": { pulse({ x: wx, y: wy, r }) { const [x, gy] = toPx(wx, wy + 0.42), R = r * BODY_PX; timed(0.8, (L, t) => { const u = smooth(0, 0.55, t), rr = 4 + (R - 4) * u, H = 12 * (1 - 0.8 * smooth(0.5, 0.8, t)), fade = 1 - smooth(0.6, 0.8, t); const n = Math.ceil(rr * 5); for (let k = 0; k < n; k++) { const q = (k / n) * TAU, px2 = x + Math.cos(q) * rr, py = gy + Math.sin(q) * rr * 0.42, buf = Math.sin(q) < 0 ? L.b : L.f; const h = H * (0.8 + 0.3 * noise(q * 4 + t * 6, 2)); for (let yy = 0; yy < h; yy++) { const f = yy / h; buf.dot(px2, py - yy, f > 0.85 ? MUD[1] : f > 0.5 ? MUD[2] : MUD[3], fade); } } }); spray2("drop", x, gy - 8, 16, MUD, 30, 90, { g: 320, gy, delay: 0.2 }); } },
+    // It curls up and rolls: a spinning dust ring round it and a trail of dust.
+    rollout: { fire({ side, x: wx, y: wy }) { timed(0.5, (L, t) => { const b = bodies[side]; if (!b) return; const [cx, cy] = centreOf(b), k = 1 - smooth(0.35, 0.5, t), r = Math.max(b.w, b.h) * 0.5; for (let q = 0; q < TAU; q += 0.1) { const a = q + time * 25; if ((Math.floor(q * 3) & 1) === 0) L.f.dot(cx + Math.cos(a) * r, cy + Math.sin(a) * r, DUSTR[1], k); } }, () => { if (rand() < 0.6) { const [cx, cy] = at(side, wx, wy); add({ k: "dust", x: cx, y: cy + 8, vx: range(-20, 20), vy: -range(2, 10), drag: 4, life: 0.5, size: 2, front: false }); } }); } },
+    // A blade of water off its shell: a blue crescent.
+    "razor-shell": { fire({ x: wx, y: wy, dx, dy }) { const [x, y] = reachOf(wx, wy, dx, dy, 0.9), a = Math.atan2(dy, dx); timed(0.45, (L, t) => { crescentCut(L, x, y, a, 17, t, RAMP.water); crescentCut(L, x, y, a + 0.2, 12, t - 0.04, BRINE); }); } },
+    // A plain hard pound: a small white star.
+    pound: { hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.4); timed(0.35, (L, t) => powStar(L, x, y, t * 1.3)); } },
+    // Blades of wind: crescents whirling out toward the foe.
+    "air-cutter": { pulse({ side, x: wx, y: wy, r, fx: fwx, fy: fwy }) { const [cx, cy] = at(side, wx, wy), R = r * BODY_PX, a0 = fwx != null ? Math.atan2(fwy - wy, fwx - wx) : 0; timed(0.5, (L, t) => { for (let i = 0; i < 3; i++) { const u = (t - i * 0.06) / 0.35; if (u <= 0 || u >= 1) continue; const a = a0 + (i - 1) * 0.35; crescentCut(L, cx + Math.cos(a) * u * R, cy + Math.sin(a) * u * R * 0.75, a, 9, 0.08, AIRB); } }); } },
+    // A dark swipe that knocks something loose: a gold glint flies off the foe.
+    "knock-off": { fire({ x: wx, y: wy, dx, dy }) { const [x, y] = reachOf(wx, wy, dx, dy, 1.0), a = Math.atan2(dy, dx) + 0.6; timed(0.4, (L, t) => crescentCut(L, x, y, a, 14, t, NIGHT)); }, hit({ x: wx, y: wy, dx }) { const [x, y] = toPx(wx, wy - 0.5); add({ k: "star", x, y, vx: (dx || 1) * 90, vy: -90, g: 300, life: 0.7, size: 3, ramp: SPORE }); } },
+    // Quick pecks: two small white jabs and a feather.
+    pluck: { hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.4); for (let i = 0; i < 2; i++) timed(0.25 + i * 0.08, (L, t) => { const u = t - i * 0.08; if (u >= 0) powStar(L, x + (i ? 5 : -4), y + (i ? 3 : -3), u * 2); }); add({ k: "leaf", x, y, vx: range(-30, 30), vy: -40, g: 40, drag: 2, life: 0.9, a: 0, va: 6, ramp: RAMP.normal }); } },
+    peck: { hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.4); timed(0.25, (L, t) => powStar(L, x, y, t * 2)); } },
+    // Shards of ice flung fast ahead of it.
+    "ice-shard": { fire({ side, x: wx, y: wy, dx, dy }) { const [cx, cy] = at(side, wx, wy); for (let i = 0; i < 8; i++) add({ k: "shard", x: cx + dx * 6, y: cy, vx: dx * range(160, 240) + range(-30, 30), vy: dy * range(160, 240) + range(-30, 30), drag: 2, life: range(0.25, 0.4), size: range(1.5, 2.5), a: Math.atan2(dy, dx), ramp: RAMP.ice }); }, hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35); spray2("shard", x, y, 10, RAMP.ice, 50, 120); } },
+    // A trunk of hard wood swung down: a green-brown aura, then splinters everywhere.
+    "wood-hammer": { fire({ side }) { timed(0.35, (L, t) => auraOn(L, bodies[side], WOODR, 1 - t / 0.35, 0.4, 1)); }, hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35), gy = toPx(0, wy + 0.42)[1]; fxs.push(blowFx(x, y, WOODR, true)); spray2("chunk", x, y, 14, WOODR, 60, 140, { g: 380, gy }); } },
+    // A punch with all its might: its fist glows, and the blow explodes.
+    "dynamic-punch": { fire({ side }) { timed(0.3, (L, t) => edgeFlames(L, bodies[side], BLAST, 1 - t / 0.3, 0.3, 0.8, 0.8)); }, hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.4); fxs.push(blowFx(x, y, BLAST, true)); timed(0.6, (L, t) => { for (let i = 0; i < 3; i++) { const u = (t - i * 0.07) / 0.4; if (u > 0 && u < 1) L.f.ring(x, y, 5 + u * 32, 2.5 - i * 0.5, BLAST[i + 1], 1 - u); } }); for (let i = 0; i < 8; i++) add({ k: "smoke", x: x + range(-8, 8), y: y + range(-8, 8), vx: range(-20, 20), vy: -range(5, 20), life: range(0.6, 1), size: range(2.5, 4), delay: 0.08 }); } },
+    // A long blade of white-gold light cuts the foe.
+    "sacred-sword": { fire({ x: wx, y: wy, dx, dy }) { const [x, y] = reachOf(wx, wy, dx, dy, 0.8), a = Math.atan2(dy, dx); timed(0.5, (L, t) => { crescentCut(L, x, y, a, 22, t, SWORD); if (t < 0.15) sparkle(L.f, x + Math.cos(a) * 22, y + Math.sin(a) * 18, 4, SWORD[0], SWORD[3]); }); } },
+    // One long, thick vine whips down on the foe.
+    "power-whip": { fire({ side, x: wx, y: wy, dx, dy }) { const [cx, cy] = at(side, wx, wy), [tx, ty] = reachOf(wx, wy, dx, dy, 1.5); timed(0.45, (L, t) => { const reach = t < 0.12 ? 1 - Math.pow(2, -10 * t / 0.12) : 1 - smooth(0.2, 0.4, t), p1 = [(cx + tx) / 2, Math.min(cy, ty) - 22 + Math.sin(time * 18) * 3]; let last = [cx, cy]; for (let q = 0; q <= reach; q += 0.012) { const [x, y] = bez([cx, cy - 4], p1, [tx, ty], q); L.f.disc(x, y, 2.2 - q, VINE[4]); L.f.set(x, y - 1, VINE[2]); L.f.set(x, y, VINE[3]); last = [x, y]; } if (t > 0.1 && t < 0.2) { sparkle(L.f, last[0], last[1], 4, RAMP.normal[0], VINE[1]); L.l.glow(last[0], last[1], 12, VINE[1], 0.6); } }); } },
+    // A paralysing stare: two glowing yellow eyes fly at the foe (the shot).
+    glare: { shot({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.45); queued.push((L) => { for (const sd of [-1, 1]) { const ex = x + sd * 8; for (let i = -6; i <= 6; i++) { const h = 3.2 * Math.sqrt(1 - (i / 6.5) ** 2); for (let j = -h; j <= h; j += 0.5) { const yy = y + j + i * 0.3 * sd; L.f.set(ex + i, yy, Math.abs(j) > h - 0.8 ? EYESR[5] : Math.hypot(i, j * 1.4) < 2.2 ? RAMP.normal[6] : EYESR[j < 0 ? 1 : 2]); } } L.f.set(ex - 1, y - 1, RAMP.normal[0]); } L.l.glow(x, y, 20, EYESR[3], 0.8); }); return true; } },
+    // Ghostly blue-purple flames drifting to the foe (the shot); the burn is the status's own.
+    "will-o-wisp": { shot({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.4); queued.push((L) => { for (let i = 0; i < 3; i++) { const a = time * 6 + (i * TAU) / 3, fx2 = x + Math.cos(a) * 6, fy2 = y + Math.sin(a) * 4; for (let yy = 0; yy < 6; yy++) { const w = 2.2 * (1 - yy / 6); for (let o = -w; o <= w; o += 0.5) L.f.set(fx2 + o + Math.sin(yy + time * 15) * 0.6, fy2 - yy, BLUEFIRE[yy < 2 ? 3 : yy < 4 ? 2 : 1]); } } L.l.glow(x, y, 12, BLUEFIRE[3], 0.5); }); return true; } },
+    // It swallows its stockpile: a green glow drawn in and a heal.
+    swallow: { fire({ side, x: wx, y: wy }) { const [cx, cy] = at(side, wx, wy); for (let i = 0; i < 12; i++) { const a = range(0, TAU), d = range(16, 26); add({ k: "mote", x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, vx: -Math.cos(a) * d * 3, vy: -Math.sin(a) * d * 3, life: 0.32, ramp: SYNTH, delay: i * 0.02 }); } timed(0.6, (L, t) => auraOn(L, bodies[side], SYNTH, smooth(0.2, 0.35, t) * (1 - smooth(0.4, 0.6, t)), 0, 1)); } },
+    // It bites and drinks: red beads streaming back to it.
+    "leech-life": { hit({ side, x: wx, y: wy, ux, uy }) { const [x, y] = toPx(wx, wy - 0.25); timed(0.3, (L, t) => jawsAt(L, x, y, t, DRAINRED, 0.8)); drainBeads(side, 1 - side, { x: wx, y: wy, ux, uy }, DRAINRED, 0.7); } },
+    // Odd, unseen power: green-blue ripples like an eye's gaze (the shot), the foe's outline flashing eerie.
+    extrasensory: { shot({ x: wx, y: wy, dx }) { const [x, y] = toPx(wx, wy - 0.4); queued.push((L) => { for (let i = 0; i < 3; i++) { const q = (time * 3 + i / 3) % 1; for (let a = 0; a < TAU; a += 0.15) L.f.dot(x - dx * q * 8 + Math.cos(a) * (3 + q * 6), y + Math.sin(a) * (2 + q * 4) + Math.sin(a * 4 + time * 20) * 0.8, EXTRA[i === 1 ? 1 : 3], 1 - q); } L.f.disc(x, y, 2, EXTRA[0]); L.l.glow(x, y, 10, EXTRA[3], 0.5); }); return true; }, hit({ side }) { timed(0.4, (L, t) => outline(L, bodies[side], EXTRA[1], 1 - t / 0.4)); } },
+    // Lava bursts up round it to the pulse's reach.
+    "lava-plume": { pulse({ x: wx, y: wy, r }) { const [cx, gy] = toPx(wx, wy + 0.42), R = r * BODY_PX; for (let i = 0; i < 18; i++) { const a = (i / 18) * TAU, d = R * range(0.4, 1); add({ k: "flame", x: cx + Math.cos(a) * d, y: gy + Math.sin(a) * d * 0.42 - 2, vx: range(-8, 8), vy: -range(30, 70), drag: 2, life: range(0.4, 0.7), size: range(1.2, 2), delay: (d / R) * 0.2 }); } timed(0.7, (L, t) => { const u = smooth(0, 0.3, t); L.b.ring(cx, gy, 4 + u * R, 3, HEAT[4], 1 - smooth(0.4, 0.7, t), 0.42); L.b.ring(cx, gy + 1, 2 + u * R, 2, HEAT[6], 1 - smooth(0.4, 0.7, t), 0.42); }); } },
+    // A karate chop straight down: a white-orange downward streak, and the guard breaking into pieces.
+    "brick-break": { fire({ x: wx, y: wy, dx, dy }) { const [x, y] = reachOf(wx, wy, dx, dy, 1.0); timed(0.35, (L, t) => streaks(L, x, y, Math.PI / 2, t, FIGHTR, 1, 0, 16)); }, hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35), gy = toPx(0, wy + 0.42)[1]; spray2("chunk", x, y, 10, FIGHTR, 50, 120, { g: 380, gy }); } },
+    // A huge ghostly claw: three dark purple slashes.
+    "shadow-claw": { fire({ x: wx, y: wy, dx, dy }) { const [x, y] = reachOf(wx, wy, dx, dy, 1.1), a = Math.atan2(dy, dx) + Math.PI / 2 + 0.4; timed(0.5, (L, t) => streaks(L, x, y, a, t, DARKP, 3, 7, 18)); } },
+    // A reckless headbutt wrapped in rock: a stone aura, then a burst, rubble and a floor ring.
+    "head-smash": { fire({ side }) { timed(0.4, (L, t) => auraOn(L, bodies[side], STONEB, 1 - t / 0.4, 0.6, 0.5)); }, hit({ side, x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35), gy = toPx(0, wy + 0.42)[1]; fxs.push(blowFx(x, y, STONEB, true)); spray2("chunk", x, y, 16, ROCKC, 60, 150, { g: 380, gy }); timed(0.5, (L, t) => { L.b.ring(x, gy, 6 + t * 80, 2.5, DUSTR[0], 1 - t / 0.5, 0.4); outline(L, bodies[1 - side], STONEB[1], 1 - t / 0.5); }); } },
+    // Heavy claws that crush: three thick white streaks and grit.
+    "crush-claw": { fire({ x: wx, y: wy, dx, dy }) { const [x, y] = reachOf(wx, wy, dx, dy), a = Math.atan2(dy, dx) + Math.PI / 2 + 0.3; timed(0.45, (L, t) => streaks(L, x, y, a, t, RAMP.normal, 3, 6, 15)); }, hit({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.35); spray2("chunk", x, y, 6, DUSTR, 40, 90, { g: 380, gy: y + 14 }); } },
+    // A charming cry: pink rings of sound and hearts out to the pulse's reach.
+    "disarming-voice": { pulse({ side, x: wx, y: wy, r }) { const [cx, cy] = at(side, wx, wy), R = r * BODY_PX; spray2("heart", cx, cy, 8, TONGUE, 40, 80); timed(0.6, (L, t) => { for (let i = 0; i < 3; i++) { const u = (t - i * 0.1) / 0.4; if (u > 0 && u < 1) L.f.ring(cx, cy, 6 + u * R * 0.8, 1.5, TONGUE[i % 2 ? 1 : 2], 1 - u, 0.75); } }); } },
+    // A low sweeping kick at the foe's feet: an arc along the floor and dust.
+    "low-sweep": { fire({ x: wx, y: wy, dx, dy }) { const [x] = toPx(wx + dx * 0.9, wy), gy = toPx(0, wy + 0.42 + dy * 0.9)[1]; timed(0.4, (L, t) => { const u = smooth(0, 0.12, t), k = 1 - smooth(0.2, 0.4, t); for (let q = -1.4; q <= -1.4 + 2.8 * u; q += 0.03) L.f.disc(x + Math.cos(q) * 16, gy - 3 + Math.sin(q) * 4, 1.3, q > -1.4 + 2.8 * u - 0.4 ? RAMP.normal[0] : FIGHTR[2], k); }); for (let i = 0; i < 6; i++) add({ k: "dust", x: x + range(-10, 10), y: gy - 1, vx: range(-30, 30), vy: -range(2, 10), drag: 4, life: 0.5, size: 2, front: false, delay: 0.08 }); } },
+    // It eats the foe's dreams: a lilac dream-wisp (the shot), and the dream drained back into it.
+    "dream-eater": { shot({ x: wx, y: wy }) { const [x, y] = toPx(wx, wy - 0.4); queued.push((L) => { for (let i = 0; i < 16; i++) { const a = time * 5 + i * 0.5, r = 1 + i * 0.35; L.f.dot(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.8, DREAM[i < 5 ? 1 : 3], 1); } L.l.glow(x, y, 10, DREAM[3], 0.5); }); return true; }, hit({ side, x: wx, y: wy, ux, uy }) { drainBeads(side, 1 - side, { x: wx, y: wy, ux, uy }, DREAM, 0.8); timed(0.5, (L, t) => auraOn(L, bodies[side], DREAM, 1 - t / 0.5, 0, -1)); } },
+    // A strike wrapped in water: a crashing wave crescent, then a big splash.
+    liquidation: { fire({ x: wx, y: wy, dx, dy }) { const [x, y] = reachOf(wx, wy, dx, dy, 1.0), a = Math.atan2(dy, dx); timed(0.4, (L, t) => crescentCut(L, x, y, a, 16, t, RAMP.water)); }, hit({ x: wx, y: wy }) { const V = RAMP.water, [x, y] = toPx(wx, wy - 0.35), gy = toPx(0, wy + 0.42)[1]; spray2("drop", x, y, 20, V, 60, 140, { g: 320, gy }); timed(0.45, (L, t) => { L.f.ring(x, y, 6 + t * 50, 2, V[1], 1 - t / 0.45); L.b.ring(x, gy, 4 + t * 60, 2, V[2], 1 - t / 0.45, 0.4); }); } },
+    // A ball of fire with an ember tail (the shot); the foe's edges catch fire.
+    incinerate: { shot({ x: wx, y: wy, dx, dy }) { const [x, y] = toPx(wx, wy - 0.35); if (rand() < 0.8) add({ k: "ember", x: x - dx * 4, y: y + range(-3, 3), vx: -dx * 30 + range(-10, 10), vy: -range(10, 30), life: range(0.3, 0.6) }); queued.push((L) => { for (let i = 1; i < 6; i++) L.f.disc(x - dx * i * 2.5, y - dy * i * 2.5, 3.5 - i * 0.5, HEAT[Math.min(9, 2 + i)], 1 - i / 7); L.f.disc(x, y, 3.8, HEAT[4]); L.f.disc(x, y, 2.6, HEAT[2]); L.f.set(x - 1, y - 1, HEAT[0]); L.l.glow(x, y, 12, HEAT[4], 0.6); }); return true; }, hit({ side }) { timed(0.5, (L, t) => edgeFlames(L, bodies[side], HEAT, 1 - t / 0.5, 0, 1, 1)); } },
+  });
+  /* ---------- batch 10 (2026-10-30): the elemental punches, X-Scissor, Iron Tail ---------- */
+  // Where its leading fist is: the front edge of its body, a little above the middle, along the blow's line.
+  const fistOf = (side, wx, wy, dx, dy) => { const b = bodies[side]; if (!b) return toPx(wx + dx * 0.5, wy - 0.45 + dy * 0.5); const [cx, cy] = centreOf(b); return [cx + dx * b.w * 0.5, cy - b.h * 0.08 + dy * b.h * 0.3]; };
+  // A fist of light: a hard white core, its element's glow and rim, pulsing as it winds up.
+  function fistGlow(L, x, y, C, k, r = 4) { const p = 1 + 0.15 * Math.sin(time * 40); L.f.disc(x, y, (r + 1.5) * p, C[4], k); L.f.disc(x, y, r * p, C[2], k); L.f.disc(x - 0.5, y - 0.5, r * 0.55, C[0], k); L.l.glow(x, y, r * 5, C[3], 0.7 * k); }
+  // A punch's shockwave: an oval ring flattened along the blow, expanding past the foe.
+  function punchRing(L, x, y, dx, u, C, k) { const rr = 4 + u * 26; for (let q = 0; q < TAU; q += 0.04) { const ax = Math.cos(q) * rr * 0.45, ay = Math.sin(q) * rr; L.f.dot(x + ax * (dx || 1) + dx * u * 10, y + ay, C[q < Math.PI ? 1 : 3], k); } }
+  Object.assign(SIG, {
+    // ITS FIST CRACKLES WITH ELECTRICITY (Pikachu, Electabuzz): arcs leap round the glowing fist as it swings;
+    // the punch lands in a burst of bolts that crawl over the foe.
+    "thunder-punch": {
+      fire({ side, x: wx, y: wy, dx, dy }) {
+        let f = -1, arcs = [];
+        timed(0.32, (L, t) => { const [fx2, fy2] = fistOf(side, wx, wy, dx, dy), k = 1 - smooth(0.22, 0.32, t); fistGlow(L, fx2, fy2, RAMP.electric, k); for (const p of arcs) boltLine(L, p.map(([a, b]) => [fx2 + a, fy2 + b]), RAMP.electric[p.c], k); },
+          (t) => { const n = Math.floor(t * 20); if (n !== f) { f = n; arcs = [0, 1, 2, 3].map((i) => { const a = range(0, TAU), a2 = a + range(-1, 1); const p = bolt(Math.cos(a) * 3, Math.sin(a) * 3, Math.cos(a2) * range(8, 13), Math.sin(a2) * range(8, 13), 0.45); p.c = i % 2 ? 0 : 2; return p; }); } });
+      },
+      hit({ side, x: wx, y: wy, dx }) {
+        const V = RAMP.electric, [x, y] = toPx(wx, wy - 0.4);
+        fxs.push(blowFx(x, y, V, true));
+        let f = -1, bolts = [];
+        timed(0.55, (L, t) => { const k = 1 - smooth(0.3, 0.55, t); if (t < 0.25) punchRing(L, x, y, dx, t / 0.25, V, 1 - t / 0.25); for (const p of bolts) { boltLine(L, p, V[0], k); for (let j = 0; j < p.length; j += 4) L.l.glow(p[j][0], p[j][1], 6, V[3], 0.45 * k); } outline(L, bodies[side], V[1], k * 0.9); },
+          (t) => { const n = Math.floor(t * 15); if (n !== f) { f = n; bolts = Array.from({ length: 6 }, () => { const a = range(0, TAU), l = range(10, 22); return bolt(x, y, x + Math.cos(a) * l, y + Math.sin(a) * l, 0.4); }); } });
+        for (let i = 0; i < 14; i++) { const a = range(0, TAU), sp = range(70, 170); add({ k: "spark", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 3, life: range(0.15, 0.35), ramp: V }); }
+      },
+    },
+    // ITS FIST BURSTS INTO FLAME (Hitmonchan, Infernape): a blazing fist trailing fire; the punch
+    // explodes in a fireball that licks up the foe's outline and showers embers.
+    "fire-punch": {
+      fire({ side, x: wx, y: wy, dx, dy }) {
+        timed(0.32, (L, t) => { const [fx2, fy2] = fistOf(side, wx, wy, dx, dy), k = 1 - smooth(0.22, 0.32, t); fistGlow(L, fx2, fy2, HEAT, k, 3.5); for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (i - 2.5) * 0.45, h = 6 + 4 * Math.sin(time * 30 + i); for (let d = 0; d < h; d++) L.f.dot(fx2 + Math.cos(a) * (3 + d * 0.5), fy2 - 2 - d + Math.sin(a) * 2, HEAT[Math.min(9, 1 + Math.floor(d / h * 6))], k); } },
+          (t) => { if (t < 0.25) { const [fx2, fy2] = fistOf(side, wx, wy, dx, dy); add({ k: "flame", x: fx2 - dx * 3, y: fy2, vx: -dx * 30 + range(-10, 10), vy: -range(20, 40), drag: 2, life: range(0.2, 0.35), size: range(0.8, 1.3) }); } });
+      },
+      hit({ side, x: wx, y: wy, dx }) {
+        const [x, y] = toPx(wx, wy - 0.4);
+        fxs.push(blowFx(x, y, HEAT, true));
+        for (let i = 0; i < 14; i++) { const a = range(0, TAU), sp = range(30, 90); add({ k: "flame", x: x + Math.cos(a) * 3, y: y + Math.sin(a) * 3, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30, drag: 2.5, life: range(0.3, 0.55), size: range(1.2, 2) }); }
+        for (let i = 0; i < 10; i++) add({ k: "ember", x: x + range(-6, 6), y: y + range(-6, 6), vx: range(-30, 30), vy: -range(30, 80), life: range(0.6, 1.1), delay: 0.05 });
+        timed(0.6, (L, t) => { if (t < 0.25) punchRing(L, x, y, dx, t / 0.25, HEAT, 1 - t / 0.25); edgeFlames(L, bodies[side], HEAT, 1 - smooth(0.2, 0.6, t), 0, 1, 1.1); });
+      },
+    },
+    // ITS FIST GLOWS ICY LIGHT BLUE, CRYSTALS FORMING ROUND IT (Hitmonchan, Sneasel): the punch
+    // cracks ice across the foe - shards fly, and frost crystals stay on it a moment.
+    "ice-punch": {
+      fire({ side, x: wx, y: wy, dx, dy }) {
+        timed(0.32, (L, t) => { const [fx2, fy2] = fistOf(side, wx, wy, dx, dy), k = 1 - smooth(0.22, 0.32, t); fistGlow(L, fx2, fy2, RAMP.ice, k); for (let i = 0; i < 5; i++) { const a = time * 4 + (i * TAU) / 5, r = 7; sparkle(L.f, fx2 + Math.cos(a) * r, fy2 + Math.sin(a) * r * 0.7, 2, RAMP.ice[0], RAMP.ice[3]); } },
+          (t) => { if (t < 0.25 && rand() < 0.6) { const [fx2, fy2] = fistOf(side, wx, wy, dx, dy); add({ k: "mote", x: fx2, y: fy2, vx: range(-20, 20), vy: range(-20, 10), drag: 3, life: 0.35, ramp: RAMP.ice }); } });
+      },
+      hit({ side, x: wx, y: wy, dx }) {
+        const I = RAMP.ice, [x, y] = toPx(wx, wy - 0.4), gy = toPx(0, wy + 0.42)[1];
+        fxs.push(blowFx(x, y, I, true));
+        for (let i = 0; i < 14; i++) { const a = range(0, TAU), sp = range(60, 150); add({ k: "shard", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, g: 300, life: range(0.4, 0.7), size: range(1.5, 2.8), a: range(0, TAU), va: range(-12, 12), ramp: I, gy }); }
+        // Frost crystals growing on the foe where the punch landed, then shattering.
+        const xs = Array.from({ length: 5 }, () => [range(-9, 9), range(-10, 8), range(3, 6), range(0, TAU)]);
+        timed(0.8, (L, t) => { if (t < 0.25) punchRing(L, x, y, dx, t / 0.25, I, 1 - t / 0.25); const g = Math.min(1, t / 0.12) * (1 - smooth(0.55, 0.8, t)); for (const [ox, oy, r, a] of xs) for (let i = 0; i < 6; i++) { const q = a + (i * TAU) / 6; for (let d = 0; d <= r * g; d += 0.5) L.f.set(x + ox + Math.cos(q) * d, y + oy + Math.sin(q) * d, d > r * g - 1 ? I[0] : I[2]); } outline(L, bodies[side], I[1], g * 0.8); });
+      },
+    },
+    // ITS CLAWS GLOW AND CROSS, SLASHING AN X (Scizor, Scyther): two blades of green-white light
+    // sweep in opposite diagonals one after the other and stay crossed as an X a beat before fading.
+    "x-scissor": {
+      fire({ side }) { timed(0.25, (L, t) => edgeLit(L, bodies[side], XSC, 1 - t / 0.25, 9)); },
+      hit({ x: wx, y: wy }) {
+        const [x, y] = toPx(wx, wy - 0.5), R = 24;
+        timed(0.75, (L, t) => {
+          const fade = 1 - smooth(0.45, 0.75, t);
+          for (const [t0, a] of [[0, Math.PI / 4], [0.08, -Math.PI / 4]]) {
+            const u = Math.min(1, Math.max(0, (t - t0) / 0.07)); if (u <= 0) continue;
+            for (let d = -R; d <= -R + 2 * R * u; d += 0.5) { const w = 3.6 * (1 - (Math.abs(d) / R) ** 2) + 0.5; for (let o = -w - 1; o <= w + 1; o += 0.5) L.f.dot(x + Math.cos(a) * d - Math.sin(a) * o, y + Math.sin(a) * d + Math.cos(a) * o, Math.abs(o) > w ? XSC[6] : Math.abs(o) < w * 0.35 ? XSC[0] : Math.abs(o) < w * 0.7 ? XSC[2] : XSC[4], fade); }
+            L.l.glow(x, y, R * 1.6, XSC[3], 0.7 * fade);
+          }
+          if (t > 0.15 && t < 0.35) { const v = (t - 0.15) / 0.2; sparkle(L.f, x, y, 9 * (1 - v) + 2, XSC[0], XSC[2]); L.f.ring(x, y, 4 + v * 28, 2, XSC[1], 1 - v); }
+        });
+        for (let i = 0; i < 10; i++) { const a = (i % 4) * Math.PI / 2 + Math.PI / 4 + range(-0.2, 0.2), sp = range(60, 140); add({ k: "spark", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 3, life: range(0.15, 0.3), ramp: XSC, delay: 0.14 }); }
+      },
+    },
+    // ITS TAIL GLOWS WHITE AND HARDENS LIKE STEEL (Pikachu, Steelix): its whole outline turns to
+    // shining steel, it swings an arc of silver down - and the blow rings like metal on the foe.
+    "iron-tail": {
+      fire({ side, x: wx, y: wy, dx, dy }) {
+        const [cx, cy] = reachOf(wx, wy, dx, dy, 0.6), base = Math.atan2(dy, dx) - 2.4;
+        timed(0.4, (L, t) => {
+          const k = 1 - smooth(0.25, 0.4, t); edgeLit(L, bodies[side], STEELW, k, 6); steelTop(L, bodies[side], k * 0.5);
+          const u = smooth(0.02, 0.18, t); for (let q = 0; q <= 2.4 * u; q += 0.02) { const w = 3.2 * Math.sin((q / 2.4) * Math.PI) + 0.8, r = 24; for (let o = 0; o <= w; o += 0.5) L.f.dot(cx + Math.cos(base + q) * (r - o), cy + Math.sin(base + q) * (r - o) * 0.75, o < 1 ? STEELW[0] : o < w - 1 ? STEELW[2] : STEELW[5], k); } L.l.glow(cx, cy, 22, STEELW[2], 0.5 * k);
+        });
+      },
+      hit({ side, x: wx, y: wy, dx }) {
+        const [x, y] = toPx(wx, wy - 0.4);
+        // Gunmetal, not white: the hit's own flash is white, and a white clang vanished into it.
+        const GUN = [STEELW[0], STEELW[2], STEELW[3], STEELW[4], STEELW[6], STEELW[5], STEELW[6]];
+        fxs.push(blowFx(x, y, GUN, true));
+        timed(0.6, (L, t) => { for (let i = 0; i < 3; i++) { const u = (t - i * 0.06) / 0.3; if (u > 0 && u < 1) L.f.ring(x, y, 5 + u * 30, 2.5, STEELW[i ? 5 : 4], 1 - u); } if (t < 0.35) { const g = t < 0.04 ? t / 0.04 : 1 - (t - 0.04) / 0.31; starAt(L, x, y, 14 * g + 1, 0.3, GUN, 1); } outline(L, bodies[side], STEELW[2], 1 - t / 0.6); });
+        // The clang: metal sparks, hot orange as well as white.
+        for (let i = 0; i < 18; i++) { const [vx, vy] = spray(-(dx || 1), 0, 3.4, 80, 200); add({ k: "spark", x, y, vx, vy: vy - 40, g: 300, drag: 1.5, life: range(0.25, 0.5), ramp: i % 3 ? STEELW : HEAT.slice(0, 7), gy: y + 18 }); }
+      },
     },
   });
   // A signature move's moment (`fire`, `hit`, `beam`, `pulse`): true when it drew it, so render.js leaves the generic look out.

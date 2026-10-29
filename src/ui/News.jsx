@@ -16,6 +16,29 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-30-anime-punches",
+    icon: "🥊",
+    date: "October 2026",
+    title: "The elemental punches, redone",
+    items: [
+      ["Thunder, Fire and Ice Punch", "The fist crackles, blazes or frosts over - then lands in bolts, a fireball or ice crystals."],
+      ["X-Scissor, Iron Tail", "A big glowing X across the foe; a steel tail swing that lands with a metal clang."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-moves-8",
+    icon: "👁️",
+    date: "October 2026",
+    title: "Thirty-seven more moves, the anime way",
+    items: [
+      ["Ghosts", "Lick's tongue, Shadow Sneak rising from the floor, Hex's ghost-fire, Will-O-Wisp."],
+      ["Blows", "Dynamic Punch explodes, Head Smash in rock, Sacred Sword's golden blade, Shadow Claw."],
+      ["Water and fire", "Muddy Water's wave, Liquidation's splash, Lava Plume, Incinerate."],
+      ["Poison and mind", "Venoshock's dripping glob, Belch, Glare's eyes, Dream Eater, Extrasensory."],
+      ["And more", "Dark Pulse, Drill Peck, Power Whip, Wood Hammer, Leech Life, Ice Shard and others."],
+    ],
+  },
+  {
     id: "2026-10-30-hunt-again",
     icon: "🎯",
     date: "October 2026",

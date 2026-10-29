@@ -124,7 +124,10 @@ function lines(ev) {
 function Moons({ n, of, says }) {
   return (
     <span className="sn-moons" role="img" aria-label={`${n} of ${of} ${says}`}>
-      {Array.from({ length: of }, (_, k) => <i key={k} className={k < n ? "got" : ""} />)}
+      {/* In fives, each five its own unit, so a row only ever breaks between them. */}
+      {Array.from({ length: Math.ceil(of / 5) }, (_, g) => (
+        <b key={g}>{Array.from({ length: Math.min(5, of - g * 5) }, (_, k) => <i key={k} className={g * 5 + k < n ? "got" : ""} />)}</b>
+      ))}
     </span>
   );
 }

@@ -292,7 +292,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
   comes again (2026-10-30, asked for: "let us catch more" - one meeting was
   one tier roll, its rare forms out of reach) after `again` (25) costumes,
   `<id>+` in `dreams` marking it met (`huntNeed`); the card's tally is a
-  Poke Ball a catch; the first catch is
+  Poke Ball a slot in fives, an empty one greyed (hollow rings read as broken); the first catch is
   `event:<medal>` - NO title of its own (2026-10-26, your call): the
   event's title asks for every look AND it (`eventDone`), and `shownTitles`
   never draws a hunt medal. Every event's title is a DRAWN medal
@@ -1370,7 +1370,7 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   check.mjs refuses one shipped). A beam-shaped move is a held STREAM, so
   its colours are `STREAM_RAMP` (Solar Beam, Hyper Beam); the `beam` moment
   is a Cannon ULTI's. Volt Tackle is in no learnset the League reads, so its
-  look is Wild Charge's. Batches 2-8 (same day) are the moves the most
+  look is Wild Charge's. Batches 2-10 (same day) are the moves the most
   kits carry (6 went straight to the game, asked for: "more moves instead
   of bit by bit"; each still checked in a real match); a status shot (Hypnosis, Thunder Wave) has no hit, so its landing is the
   status's own look. Hyper Beam's spent flicker is
