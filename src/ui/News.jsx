@@ -16,6 +16,21 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-29-pixel-hits",
+    icon: "✨",
+    date: "October 2026",
+    title: "Pixel-art moves in the Arena",
+    items: [
+      ["Every hit", "Sparks, rings and each type's own matter, drawn on the Pokémon's own pixels."],
+      ["Every shot", "Pixel trails that shed their type, and move sprites at the Pokémon's own size."],
+      ["Streams and beams", "Flamethrower's heat cone, Hydro Pump's foaming jet, crackling bolts."],
+      ["Statuses", "A burn flickers up the Pokémon's outline, paralysis crackles, a freeze crusts it in ice."],
+      ["Dash, guard, heal", "Afterimages of the real Pokémon, Protect's hex dome that shatters, rising crosses, boost auras."],
+      ["Big moments", "Thunder's sky strike scorches the floor, ULTI pillars, and pixel rain, snow and sand."],
+      ["Prefer the old look?", "Pause a match › Pixel effects › Off."],
+    ],
+  },
+  {
     id: "2026-10-29-honey-rods",
     icon: "🍯",
     date: "October 2026",

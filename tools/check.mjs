@@ -8649,6 +8649,26 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
       `every sheet credited, the largest (#${biggest[1]}) ${Math.round(biggest[0] / 1048576 * 10) / 10} MB decoded; the Arena alone draws them`);
   }
 
+  /* THE PIXEL EFFECTS (pixfx.js, 2026-10-29): the Arena's effects on its
+     bodies' own pixel grid. One pixel size - the bodies read BODY_PX, never a
+     scale of their own - a ramp for every type, fades by dither and never by
+     alpha or a gradient, and nothing of the rules: arena.js never sees it. */
+  {
+    const { RAMP, RAMP_STEPS, BODY_PX } = await import("../src/ui/league/arena/pixfx.js");
+    const { TYPES } = await import("../src/data/types.js");
+    const read = (f) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+    const pixSrc = read("ui/league/arena/pixfx.js"), renderSrc = read("ui/league/arena/render.js");
+    for (const t of TYPES) assert.equal(RAMP[t]?.length, RAMP_STEPS, `the ${t} type has no ${RAMP_STEPS}-step pixel ramp`);
+    assert.ok(!/globalAlpha|create(Radial|Linear)Gradient|shadowBlur|filter\s*=/.test(pixSrc), "pixfx.js fades by alpha, a gradient or a blur - a pixel effect dithers");
+    assert.ok(/const sc = px \/ BODY_PX;/.test(renderSrc) && !/\(px \* 2\.6\) \/ 32/.test(renderSrc), "a PMD body is drawn at a scale of its own, not the effects' BODY_PX");
+    assert.ok(!/^import/m.test(pixSrc), "pixfx.js imports something - it is drawing alone, never the rules");
+    // The games' own move sprites too (Phase 2): the bodies' pixel, turned only by quarter turns - any other angle shears a pixel.
+    assert.ok(/if \(!classicFx\(\)\) \{ sc = px \/ BODY_PX; angle = Math\.round\(angle \/ \(Math\.PI \/ 2\)\) \* \(Math\.PI \/ 2\); \}/.test(renderSrc),
+      "drawArt draws a move sprite at its own scale or angle in the pixel look - one pixel size, quarter turns only");
+    assert.ok(!/pixfx/.test(read("game/arena.js")), "arena.js reaches the pixel effects - the rules must never depend on the picture");
+    console.log(`pixfx ok — ${TYPES.length} type ramps of ${RAMP_STEPS}, one pixel size (${Math.round(BODY_PX * 10) / 10} a tile) for bodies and effects, no alpha or gradient in the pixel layer`);
+  }
+
   /* AND THE LEAGUE'S FOLDER IS REACHED ONLY BY A LAZY IMPORT: a static import
      of it from anywhere else would pull every byte above into the first load. */
   for (const f of walk("../src/").filter((f) => /\.(js|jsx)$/.test(f))) {

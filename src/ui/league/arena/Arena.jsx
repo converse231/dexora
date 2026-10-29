@@ -50,6 +50,7 @@ import { createRenderer } from "./render.js";
 import KitList from "./Kit.jsx";
 import FighterSelect from "./FighterSelect.jsx";
 import { play as playSound, soundOn, setSound } from "./sfx.js";
+import { classicFx, setClassicFx } from "./pixfx.js";
 import { loadAnims } from "../moveAnim.js";
 import Sprite from "../../Sprite.jsx";
 import Icon from "../../Icon.jsx";
@@ -1095,6 +1096,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
   pausedRef.current = paused;
   const [aimAuto, setAimAuto] = useState(() => pref(AIM_KEY, "auto") === "auto");
   const [sound, setSoundOn] = useState(soundOn);
+  const [pixel, setPixel] = useState(() => !classicFx());
   const aimRef = useRef(aimAuto);
   aimRef.current = aimAuto;
   // The prize is the parent's, held in a ref: a fresh callback each render
@@ -1515,6 +1517,11 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
             <button type="button" className="ar-toggle" role="switch" aria-checked={sound}
               onClick={() => { setSound(!sound); setSoundOn(!sound); }}>
               <span>Sound effects</span><i>{sound ? "On" : "Off"}</i>
+            </button>
+            {/* The pixel effects (pixfx.js), on by default; Off is the classic vector look, kept while they ship. */}
+            <button type="button" className="ar-toggle" role="switch" aria-checked={pixel}
+              onClick={() => { setClassicFx(pixel); setPixel(!pixel); }}>
+              <span>Pixel effects</span><i>{pixel ? "On" : "Off"}</i>
             </button>
             <button type="button" className="lg-go quiet" onClick={onExit}>{online ? "Leave" : "Leave the match"}</button>
           </div>

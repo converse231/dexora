@@ -1320,8 +1320,38 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   inside. All three in the replay hash; check.mjs holds each. **Little
   flashing** (same day, players: "too flashy"): no full-screen white, no
   photo negative in the ULTI panel, a faint super-effective tint, a slow KO
-  blink - the hit-stop, shake and zoom carry the impact. The camera's shake,
-  jolt and tilt run at `SHAKE_K` (0.45) of what they were (same day, asked for).
+  blink - the hit-stop and zoom carry the impact. There is NO camera shake,
+  jolt or tilt (`SHAKE_K` 0; 0.45 the day before, then asked for: "remove").
+  **Effects are pixel art on the bodies' own grid** (`pixfx.js`, 2026-10-29,
+  asked for; the plan and its drafts are the Arena VFX Lab artifact): a
+  buffer of `BODY_PX` effect pixels a tile - the PMD body's own pixel, which
+  `pmdBody` reads (one size, check.mjs's `pixfx ok`) - in a 7-step ramp a
+  type, fading by Bayer DITHER, never alpha, a gradient or a blur, with glow
+  in its own light buffer added soft on top; drawn BACK (under the bodies)
+  and FRONT (over them). Phased: hits first (`impact` dispatches every blow,
+  freeze and paralysis jolt to it; a hit's flash strobes twice), then shots
+  (`pix.shot`, queued each frame before the layer paints: a dithered trail,
+  each type's matter shed behind, a pixel ball where the move has no art of
+  its own; `drawArt` draws the games' sprites at `BODY_PX`, quarter turns
+  only), then streams and beams (`pix.stream` queued from a pouring act,
+  `pix.beam` from a fired one without stream art of its own - one banded
+  drawer, `band`: fire a heat cone, water a foamed jet, electric bolts
+  re-rolled on 2s), then statuses on the body's own outline (`pix.status`
+  from render.js's `maskOf`, the PMD frame's alpha, one frame late: burn
+  tongues on the top edge, paralysis crackle between edge pixels, poison
+  bubbles, an ice crust, pixel Zs; follower art keeps the classic marks),
+  then movement and guarding (`afterimage` of the real silhouette for a
+  dash, dodge, lunge or surge, `speed` lines; Protect a hex `shield` dome
+  queued while it holds, rippled by `shieldHit`, shattering once not queued
+  since the last paint; `heal` crosses; `boost`, an aura from the body's
+  distance field for a stat moved), then the big moments (`strike`, a sky
+  bolt with a stepped leader, a flickering stroke and a scorch cooling to
+  soot; every ULTI strike's `pillar`; the weather's rain, snow, sand, embers
+  and motes through `air`, queued as `drawAir` moves them). The classic
+  look and its switch stay until players have had their say.
+  The vector look stays behind the pause menu's Pixel effects switch
+  (`dexora-arena-classic`, a device preference) until the last phase deletes
+  it. Never imported by arena.js: the rules never see the picture.
   **Instant moves cost their dodge, so damage came down** (2026-10-27,
   reported: "my Pokemon is dead though same level and type advantage"):
   with no wind-up Hard v Hard fell from 63 s to 40 s, a Pokemon to 10 s on

@@ -61,6 +61,7 @@ import { STRUGGLE } from "../../../game/battle.js";
 import { spriteUrl } from "../../Sprite.jsx";
 import { PMD_IDS, PMD_REV } from "../../../data/pmd.js";
 import { FX, FX_REV } from "../../../data/fx.js";
+import { createPix, classicFx, BODY_PX } from "./pixfx.js";
 
 const asset = (p) => new URL(p, document.baseURI).href;
 // The basic attack (arena.js) is no League move: no slug, no sprite - it is drawn in its user's colour.
@@ -621,7 +622,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   // A bolt from above onto the struck (Thunderbolt, Thunder, Zap Cannon...).
   function strike(x, y) {
     if (still) return;
-    fx.push({ k: "strike", x, y, t: 0, life: 12, seed: rand() });
+    if (!classicFx()) pix.strike(x, y);
+    else fx.push({ k: "strike", x, y, t: 0, life: 12, seed: rand() });
     shake(0.35); impactFrame(sx(x), sy(y));
   }
 
@@ -926,6 +928,28 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   const parts = [];       // matter: embers, droplets, shards, chunks...
   const air = [];         // the floor's weather, apart so a fight never evicts it
   const marks = [];       // on the floor, fading
+  const pix = createPix(W, H);   // the pixel effects' buffers (pixfx.js)
+  /* A BODY'S SILHOUETTE for its status (Phase 4): the PMD frame it was drawn
+     in, its alpha a pixel each, read once a frame of art and kept (least
+     recently made out past 400). The pixel layer draws it one frame late,
+     as it paints before the bodies - a 60th of a second nobody sees. */
+  const masks = new Map(), lastBody = [null, null];
+  function maskOf(f, fr, at) {
+    const atlas = atlasOf(f.id, shiny[f.side]?.[f.slot]), pc = atlas && pieceOf(atlas.meta, fr);
+    if (!pc) return null;
+    const [qx, qy, w, h, ox, oy, flip] = pc, key = `${f.id}:${shiny[f.side]?.[f.slot] ? 1 : 0}:${qx}:${qy}`;
+    let m = masks.get(key);
+    if (!m) {
+      const c = Object.assign(document.createElement("canvas"), { width: w, height: h }), x2 = c.getContext("2d", { willReadFrequently: true });
+      x2.drawImage(atlas.img, qx, qy, w, h, 0, 0, w, h);
+      const d = x2.getImageData(0, 0, w, h).data;
+      m = new Uint8Array(w * h);
+      for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] > 100 ? 1 : 0;
+      masks.set(key, m);
+      if (masks.size > 400) masks.delete(masks.keys().next().value);
+    }
+    return { wx: at.x, wy: at.y + 0.42, ox: flip ? -ox - w : ox, oy: oy - atlas.meta.f, w, h, m, flip };
+  }
   const overlays = [];    // screen space: impact frames, speed lines, cut-ins, stamps
   const trails = new Map();
   const ghosts = [];
@@ -949,7 +973,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   const punch = { z: 0, x: W / 2, y: H / 2 };
   let stopMs = 0, slowMs = 0, slowK = 1, scale = 1;
   let clock = 0, lastNow = 0, ghostAcc = 0;
-  let landed = false, overAt = -1, overSeen = null, stageOnce = "";
+  let landed = false, overAt = -1, overSeen = null, stageOnce = "", auraOnce = "";
   const shiny = sides.map((team) => team.map((m) => m?.shiny ?? false));
   const floorPath = `arena/${arena}.webp`;
   const still = calm();
@@ -993,6 +1017,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     const cw = canvas.clientWidth, ch = canvas.clientHeight;
     canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
     px = Math.max(8, Math.floor(Math.min(canvas.width / W, canvas.height / H)));
+    pix.lite(lite);
     ox = Math.floor((canvas.width - W * px) / 2); oy = Math.floor((canvas.height - H * px) / 2);
     floor = bakeFloor(px, img(floorPath, () => { floor = bakeFloor(px, img(floorPath)); }));
   }
@@ -1071,6 +1096,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   /* WHAT EACH TYPE THROWS where it lands: the line of the blow first (every
      hit sprays along it), then its own matter. */
   function impact(type, x, y, dx, dy, heavy) {
+    if (!classicFx()) { pix.impact(type, x, y, dx, dy, heavy); return; }
     const n = heavy ? 1.7 : 1;
     const c = colours[type] ?? "#fff";
     const hx = dx || rand() - 0.5, hy = dy || rand() - 0.5;
@@ -1201,7 +1227,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         fx.push({ k: "burst", x: e.x, y: e.y, art: art?.burst ?? art?.shot, colour, t: 0, life: bas && !e.boost ? 16 : 30 });
         impact(type, e.x, e.y, e.dx, e.dy, heavy);
         if (!bas) signatureHit(slugOf(e.move), e.x, e.y, e.dx, e.dy);
-        sheet("impact", e.x, e.y - 0.25, bas ? (e.boost ? 2.1 : 1.3) : heavy ? 3.4 : 2.5, colour, bas && !e.boost ? 14 : 22, (rand() - 0.5) * 0.6);
+        if (classicFx()) sheet("impact", e.x, e.y - 0.25, bas ? (e.boost ? 2.1 : 1.3) : heavy ? 3.4 : 2.5, colour, bas && !e.boost ? 14 : 22, (rand() - 0.5) * 0.6);
         if (!bas && LIFTS.has(slugOf(e.move))) { const lp = poseOf(e.side, s.sides[e.side].active); lp.lift = LIFT_T; lp.liftC = colour; lp.liftDx = e.dx ?? 0; lp.liftDy = e.dy ?? 0; }
         if (!bas && slugOf(e.move) === "fire-blast" && !artKey(e.move)) fx.push({ k: "dai", x: e.x, y: e.y - 0.4, t: 0, life: 46 });
         const lk = !bas && LANDS.has(slugOf(e.move)) && artKey(e.move);
@@ -1250,7 +1276,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         if (heavy) {
           zoomAt(e.x, e.y, e.crit ? 0.1 : 0.07); impactFrame(sx(e.x), sy(e.y)); crowd(3);
           // Debris thrown off a heavy blow, along it.
-          for (let i = 0; i < 8; i++) { const [vx, vy] = spray(e.dx || 1, e.dy, 1.6, 0.12); part({ k: "streak", x: e.x, y: e.y - 0.2, vx, vy, colour: i % 2 ? colour : "#ffffff", life: 12, size: 0.5, drag: 0.88 }); }
+          if (classicFx()) for (let i = 0; i < 8; i++) { const [vx, vy] = spray(e.dx || 1, e.dy, 1.6, 0.12); part({ k: "streak", x: e.x, y: e.y - 0.2, vx, vy, colour: i % 2 ? colour : "#ffffff", life: 12, size: 0.5, drag: 0.88 }); }
         }
         if (MARK_OF[type] && (heavy || type !== "fighting" && type !== "steel" && rand() < 0.55)) mark(MARK_OF[type], e.x + (rand() - 0.5) * 0.3, e.y + 0.3, heavy ? 1.6 : 1.1, colour);
         else if (heavy) mark("ring", e.x, e.y + 0.3, 1.4, colour);
@@ -1275,14 +1301,16 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         const p = poseOf(e.side, s.sides[e.side].active); p.sx = 1.12; p.sy = 0.9; p.tint = STATUS[e.st]?.colour; p.tintT = 8;
       } else if (e.k === "heal") {
         fx.push({ k: "num", x: e.x, y: e.y - 0.6, text: `+${e.n}`, size: 0.46, colour: "#5fe08a", t: 0, life: 50 });
-        for (let i = 0; i < 8; i++) fx.push({ k: "rise", x: e.x + (rand() - 0.5) * 1.2, y: e.y + 0.3, colour: "#7dffa8", t: -i * 3, life: 34 });
+        if (!classicFx()) pix.heal(e.x, e.y - 0.2);
+        else for (let i = 0; i < 8; i++) fx.push({ k: "rise", x: e.x + (rand() - 0.5) * 1.2, y: e.y + 0.3, colour: "#7dffa8", t: -i * 3, life: 34 });
         if (FX["moves/heal"]) fx.push({ k: "mv", key: "moves/heal", x: e.x, y: e.y - 0.5, size: 3, ang: 0, t: 0, life: 40 });
       } else if (e.k === "stage") {
         // Its family sheet once a tick a side, however many stats moved.
         const sk = e.n > 0 ? "moves/power-up" : "moves/stat-drop", once = `${e.side}:${s.t}:${sk}`;
         if (FX[sk] && stageOnce !== once) { stageOnce = once; fx.push({ k: "mv", key: sk, x: e.x, y: e.y - 0.5, size: 3, ang: 0, t: 0, life: 40 }); }
         word(e.x, e.y - 1.1 - (e.stat % 2) * 0.35, `${STAT[e.stat]} ${e.n > 0 ? "▲" : "▼"}`, e.n > 0 ? "#ff9d52" : "#7ab8ff", 45);
-        for (let i = 0; i < 6; i++) fx.push({ k: "arrow", x: e.x + (rand() - 0.5), y: e.y + 0.2, up: e.n > 0, colour: e.n > 0 ? "#ff9d52" : "#7ab8ff", t: -i * 4, life: 30 });
+        if (!classicFx()) { const o2 = `${e.side}:${s.t}:${e.n > 0}`; if (auraOnce !== o2) { auraOnce = o2; pix.boost(e.side, e.n > 0); } }
+        else for (let i = 0; i < 6; i++) fx.push({ k: "arrow", x: e.x + (rand() - 0.5), y: e.y + 0.2, up: e.n > 0, colour: e.n > 0 ? "#ff9d52" : "#7ab8ff", t: -i * 4, life: 30 });
       } else if (e.k === "status") {
         word(e.x, e.y - 1.2, { [PAR]: "Paralysed!", [BRN]: "Burned!", [PSN]: "Poisoned!", [SLP]: "Fell asleep!", [FRZ]: "Frozen solid!" }[e.st], STATUS[e.st].colour, 55);
         sparks(e.x, e.y, STATUS[e.st].colour, 10, 0.07);
@@ -1298,6 +1326,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           slow(260, 0.3);
         } else word(e.x, e.y - 1, "Dodged", "#45d4ff", 40);
       } else if (e.k === "blocked") {
+        if (!classicFx()) pix.shieldHit(e.side, e.x, e.y);
         word(e.x, e.y - 1, "Blocked", "#9fe3ff", 40);
         fx.push({ k: "ring", x: e.x, y: e.y, colour: "#9fe3ff", t: 0, life: 18 });
         sparks(e.x, e.y - 0.3, "#e8fbff", 8, 0.08);
@@ -1357,6 +1386,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else if (e.k === "beam") {
         fx.push({ k: "beam", x: e.x, y: e.y, dx: e.dx, dy: e.dy, len: e.len, colour: colourOf(e.move), art: arenaArt(slugOf(e.move))?.shot, type: typeOf(e.move), t: 0, life: e.big ? 44 : 26, big: e.big,
           key: artKey(e.move) && FX[artKey(e.move)].n === 1 ? artKey(e.move) : null });
+        // A beam with no stream art of its own is the pixel layer's; its Emerald sprite is still laid down it (`drawFx`).
+        if (!classicFx() && !fx[fx.length - 1].key) pix.beam(typeOf(e.move), e.x, e.y, e.dx, e.dy, e.len, BEAM_W * (e.big ? 2 : 1), (e.big ? 44 : 26) / 60);
         shake(e.big ? 0.9 : 0.45); kick(-e.dx, -e.dy, px * (e.big ? 0.3 : 0.16));
         if (e.big) { zoomAt(e.x + e.dx * e.len / 2, e.y + e.dy * e.len / 2, 0.12); tilt(e.dx > 0 ? -0.03 : 0.03); }
         // Sparks thrown off all along it, and a burst where it ends.
@@ -1479,7 +1510,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           else poof(e.x, e.y, 1.6);
         } else if (type === "electric" || !e.nova && e.r < 1.5) strike(e.x, e.y);
         impact(type, e.x, e.y, 0, 0, true);
-        if (!still) { fx.push({ k: "pillar", type, x: e.x, y: e.y, r: e.r, t: 0, life: 52, seed: rand() }); pillarBurst(type, e.x, e.y, e.r); }
+        if (!still && !classicFx()) pix.pillar(type, e.x, e.y, e.r, 52 / 60);
+        else if (!still) { fx.push({ k: "pillar", type, x: e.x, y: e.y, r: e.r, t: 0, life: 52, seed: rand() }); pillarBurst(type, e.x, e.y, e.r); }
         sheet("shockwave", e.x, e.y + 0.3, e.r * 2.6, colour, 30);
         if (e.arch && e.arch !== "Snare") ulti(e.arch, e.x, e.y, e.r * 2.6, colour);   // a Snare plays its own, in its colour, on "snare"
         if (e.big) { impactFrame(sx(e.x), sy(e.y)); mark("crack", e.x, e.y + 0.3, e.r * 2); shake(1.2); stop(110); }
@@ -2109,6 +2141,28 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.restore();
     }
 
+    // 1b. The pixel effects' back layer (pixfx.js): rings on the floor, smoke - under the bodies.
+    pix.step(k);
+    if (!classicFx()) for (const p of s.shots) {
+      const x = p.x - p.dx * (10 / TPS) * (1 - alpha), y = p.y - p.dy * (10 / TPS) * (1 - alpha), bas = isBasic(p.move), slug = slugOf(p.move);
+      const own = BOULDERS.has(slug) || (!bas && !LANDS.has(slug) && artKey(p.move)) || arenaArt(slug)?.shot;
+      pix.shot(p.id, bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, trails.get(p.id) ?? [], { basic: bas, boost: p.boost, orb: !own, k });
+    }
+    // A stream pouring, from the fighter's own act (Phase 3); `pour` below is the classic look's.
+    if (!classicFx()) for (const f of bodies) if (f.act?.ph === "chan") {
+      const [x, y] = lerp(f), a = f.act;
+      pix.stream(f.side, typeOf(moveAt(f, a.k).i), x + a.dx * 0.45, y - 0.3 + a.dy * 0.45, a.dx, a.dy, Math.max(0.6, a.len || 0), BEAM_W, k);
+    }
+    // Each body's status on its own outline, from the frame it was drawn in last.
+    if (!classicFx()) for (let side = 0; side < 2; side++) {
+      const lb = lastBody[side], kind = lb && { [BRN]: "brn", [PAR]: "par", [PSN]: "psn", [FRZ]: "frz", [SLP]: "slp" }[lb.st];
+      pix.setBody(side, lb?.body ?? null);
+      if (kind && !still) pix.status(side, kind, lb.body, k);
+      lastBody[side] = null;
+    }
+    const pixOn = !classicFx() && pix.paint(!lite), pxs = px / BODY_PX;
+    if (pixOn) pix.blit(ctx, "back", sx(-pix.MARGIN), sy(-pix.MARGIN), pxs);
+
     // 2. Bodies: shadow, afterimages, the walking sprite, its status and flash.
     ghostAcc += k;
     for (const f of bodies) {
@@ -2118,12 +2172,16 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.beginPath(); ctx.ellipse(sx(x), sy(y + 0.42), px * 0.6, px * 0.22, 0, 0, TAU); ctx.fill();
       ctx.restore();
       const lunging = f.act?.shape === "dash" && f.act.ph === "act";
+      const pixGhost = !classicFx() && !f.hidden;
       if ((f.dodge > 0 || lunging || ((f.surge > 0 || f.haste > 0) && f.moving)) && ghostAcc >= 2) {
         const tint = lunging ? colourOf(moveAt(f, f.act.k).i) : f.surge > 0 ? colours[TYPES[f.types[0]]] : f.haste > 0 ? "#45d4ff" : f.dodge > 0 ? "#9fe9ff" : null;
-        ghosts.push({ x, y, f: poseOf(f.side, f.slot).fr ?? { frame: frameOf(f, t) }, id: f.id, side: f.side, slot: f.slot, life: lunging ? 10 : 14, t: 0, tint });
+        const fr0 = poseOf(f.side, f.slot).fr ?? { frame: frameOf(f, t) }, body = pixGhost && maskOf(f, fr0, { x, y });
+        if (body) pix.afterimage(body, lunging ? typeOf(moveAt(f, f.act.k).i) : f.surge > 0 ? TYPES[f.types[0]] ?? "normal" : f.haste > 0 ? "water" : "dash", lunging ? 0.24 : 0.32);
+        else ghosts.push({ x, y, f: fr0, id: f.id, side: f.side, slot: f.slot, life: lunging ? 10 : 14, t: 0, tint });
       }
-      if (f.dodge > 0 && rand() < k * 1.5) part({ k: "streak", x: x + (rand() - 0.5) * 0.6, y: y - 0.3 + (rand() - 0.5) * 0.6, vx: -f.dx * 0.14, vy: -f.dy * 0.14, colour: "#bff3ff", life: 8, size: 0.6, drag: 0.88 });
-      if (lunging && rand() < k) { const [vx, vy] = [-f.act.dx * 0.12, -f.act.dy * 0.12]; part({ k: "streak", x: x + (rand() - 0.5) * 0.6, y: y - 0.3 + (rand() - 0.5) * 0.6, vx, vy, colour: "#ffffff", life: 9, size: 0.7, drag: 0.9 }); }
+      if (pixGhost && (f.dodge > 0 || lunging) && rand() < k * 1.2) pix.speed(x, y, f.dodge > 0 ? f.dx : f.act.dx, f.dodge > 0 ? f.dy : f.act.dy, lunging ? typeOf(moveAt(f, f.act.k).i) : "dash");
+      else if (!pixGhost && f.dodge > 0 && rand() < k * 1.5) part({ k: "streak", x: x + (rand() - 0.5) * 0.6, y: y - 0.3 + (rand() - 0.5) * 0.6, vx: -f.dx * 0.14, vy: -f.dy * 0.14, colour: "#bff3ff", life: 8, size: 0.6, drag: 0.88 });
+      if (!pixGhost && lunging && rand() < k) { const [vx, vy] = [-f.act.dx * 0.12, -f.act.dy * 0.12]; part({ k: "streak", x: x + (rand() - 0.5) * 0.6, y: y - 0.3 + (rand() - 0.5) * 0.6, vx, vy, colour: "#ffffff", life: 9, size: 0.7, drag: 0.9 }); }
     }
     if (ghostAcc >= 2) ghostAcc = 0;
     for (let i = ghosts.length - 1; i >= 0; i--) {
@@ -2224,14 +2282,19 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       if (f.megaOn && !still && rand() < 0.3 * k) part({ k: "glow", x: at.x + (rand() - 0.5) * 0.9, y: at.y + 0.1, vx: 0, vy: -0.025, colour: RAINBOW[Math.floor(rand() * RAINBOW.length)], life: 22, size: 0.1, drag: 0.98 });
       if (f.evo > 0) evolving(f, p, at, fr);
       else sprite(f.id, f.side, f.slot, at.x, at.y, fr, (blink ? 0.45 : 1) * hid, f.flash > 0 ? "#ffffff" : null, at);
-      if (p.tintT > 0 && p.tint && f.flash <= 0) sprite(f.id, f.side, f.slot, at.x, at.y, fr, 0.55 * (p.tintT / 12) * hid, p.tint, at);
+      if (p.tintT > 0 && p.tint && f.flash <= 0) {
+        if (classicFx()) sprite(f.id, f.side, f.slot, at.x, at.y, fr, 0.55 * (p.tintT / 12) * hid, p.tint, at);
+        else if (Math.floor(p.tintT / 3) % 2 === 1) sprite(f.id, f.side, f.slot, at.x, at.y, fr, 0.9 * hid, p.tint, at);
+      }
       if (f.hidden) {
         ctx.save(); ctx.fillStyle = "rgba(40,110,45,0.85)";
         const sway = Math.sin(clock / 300) * 0.04;
         for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(sx(x + i * 0.22), sy(y + 0.45)); ctx.lineTo(sx(x + i * 0.22 + 0.08 + sway), sy(y - 0.25)); ctx.lineTo(sx(x + i * 0.22 + 0.16), sy(y + 0.45)); ctx.fill(); }
         ctx.restore();
       }
-      statusOn(f, x, y, k);
+      // Its silhouette as drawn: its status and a stat's aura follow it in the pixel layer.
+      if (!classicFx() && !f.hidden) { const body = maskOf(f, fr, at); if (body) lastBody[f.side] = { st: f.status, body }; }
+      statusOn(f, x, y, k, !!lastBody[f.side]);
       if (p.dizzy > 0) { p.dizzy -= k; dizzyStars(at.x, at.y, p.dizzy / 50); }
       if (f.confused > 0) confusedSwirl(at.x, at.y);
       if (!(f.hidden && f.side !== me)) emote(f, p, at.x, at.y, k);
@@ -2246,7 +2309,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         // Double Team's copies carry the same bar: one over the real one alone gave the trick away.
         for (const [cx, cy] of clonesOf({ clones: f.clones, x, y })) hpBar(f, p, cx, cy);
       }
-      if (f.shield > 0) {
+      if (f.shield > 0 && !classicFx()) pix.shield(f.side, x, y);
+      else if (f.shield > 0) {
         ctx.save(); ctx.globalAlpha = 0.35 + 0.25 * Math.abs(Math.sin(clock / 100));
         ctx.strokeStyle = "#9fe3ff"; ctx.lineWidth = Math.max(2, px / 8);
         ctx.fillStyle = "rgba(160,230,255,0.15)";
@@ -2354,10 +2418,12 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       const tr = trails.get(p.id) ?? [];
       tr.push([x, y]); if (tr.length > (bas ? 6 : 12)) tr.shift();
       trails.set(p.id, tr);
-      tr.forEach(([qx, qy], n) => glow(sx(qx), sy(qy), px * (bas ? 0.1 + 0.04 * n : 0.18 + 0.07 * n), colour, 0.07 + 0.05 * n));
-      glow(sx(x), sy(y), px * (bas ? 0.6 : 1.15), colour, 0.65);
-      if (!bas) glow(sx(x), sy(y), px * 0.4, "#ffffff", 0.55);
-      if (rand() < (bas ? 0.35 : 1.1) * k) trailBit(bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, colour);
+      if (classicFx()) {
+        tr.forEach(([qx, qy], n) => glow(sx(qx), sy(qy), px * (bas ? 0.1 + 0.04 * n : 0.18 + 0.07 * n), colour, 0.07 + 0.05 * n));
+        glow(sx(x), sy(y), px * (bas ? 0.6 : 1.15), colour, 0.65);
+        if (!bas) glow(sx(x), sy(y), px * 0.4, "#ffffff", 0.55);
+        if (rand() < (bas ? 0.35 : 1.1) * k) trailBit(bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, colour);
+      }
       // Skimming the Boardwalk's water it throws spray; over the Grove's grass, it tears a leaf loose.
       if (!still && rand() < 0.3 * k) {
         if (inArea(ground.water, x, y)) part({ k: "dot", x, y: y + 0.3, vx: p.dx * 0.02, vy: 0, vz: 0.06, g: 0.006, colour: "#d8f6ff", life: 20, size: 0.08, splash: true });
@@ -2368,6 +2434,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       // Its own art: a projectile looping along its path, or a stream trailing behind its head.
       if (key && (FX[key].n > 1 ? moveFx(key, clock / 70 % FX[key].n, sx(x), sy(y), px * 2.4, ang0, 1)
         : moveFx(key, 0, sx(x - p.dx * 1.7), sy(y - p.dy * 1.7), px * 4.2, ang0, 1))) continue;
+      if (!classicFx()) { drawArt(art, sx(x), sy(y), 0, ang0, clock / 16.7); continue; }
       if (!bas) shotStyle(typeOf(p.move), sx(x), sy(y), Math.atan2(p.dy, p.dx), px * 0.75, colour, moveOf(p.move).n ?? "");
       if (!drawArt(art, sx(x), sy(y), Math.max(1, px / 10), Math.atan2(p.dy, p.dx), clock / 16.7)
         && !sheetFx("bolt", clock / 70 % 4, sx(x), sy(y), px * (bas ? (p.boost ? 2.2 : 1.6) : 2.2), Math.atan2(p.dy, p.dx), colour)) {
@@ -2384,7 +2451,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     for (const id of trails.keys()) if (!live.has(id)) trails.delete(id);
 
     // 3b. Streams pouring (hold and aim): drawn from the fighter's own act, every frame.
-    for (const f of bodies) if (f.act?.ph === "chan") { const [x, y] = lerp(f); pour(f, x, y, k); }
+    if (classicFx()) for (const f of bodies) if (f.act?.ph === "chan") { const [x, y] = lerp(f); pour(f, x, y, k); }
 
     // 4. A dash's own art, trailing its user (a cloud, as Play Rough's, round it).
     for (const f of bodies) {
@@ -2417,7 +2484,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.restore();
     }
 
-    // 5. Matter and effects over everything.
+    // 5. Matter and effects over everything - the pixel effects' front layer first, then its light.
+    if (pixOn) { pix.blit(ctx, "front", sx(-pix.MARGIN), sy(-pix.MARGIN), pxs); if (!lite) pix.blit(ctx, "light", sx(-pix.MARGIN), sy(-pix.MARGIN), pxs); }
     for (let i = parts.length - 1; i >= 0; i--) {
       const p = parts[i];
       if ((p.t += k) > p.life) { if (p.splash && !still) mark("wet", p.x, p.y, 0.35); parts.splice(i, 1); continue; }
@@ -2818,20 +2886,24 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   }
   function drawAir(a, k) {
     const x = sx(a.x), y = sy(a.y);
-    const kk = a.t / a.life;
+    const kk = a.t / a.life, pixel = !classicFx() && a.k !== "bulb";
     ctx.save();
     if (a.k === "ember") {
       a.x += a.vx * k + Math.sin(a.t / 9) * 0.004 * k; a.y += a.vy * k;
-      ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = Math.sin(kk * Math.PI) * (0.6 + 0.4 * Math.sin(a.t / 3));
-      ctx.fillStyle = kk < 0.5 ? "#ffcf6a" : "#ff6a2a";
-      const s = a.size * px; ctx.fillRect(x - s / 2, y - s / 2, s, s);
+      if (pixel) pix.air("ember", a.x, a.y, kk);
+      else {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = Math.sin(kk * Math.PI) * (0.6 + 0.4 * Math.sin(a.t / 3));
+        ctx.fillStyle = kk < 0.5 ? "#ffcf6a" : "#ff6a2a";
+        const s = a.size * px; ctx.fillRect(x - s / 2, y - s / 2, s, s);
+      }
     } else if (a.k === "snow") {
       a.x += (a.vx + Math.sin(a.t / 40 + a.ph) * 0.006) * k; a.y += a.vy * k;
       if (a.y > H + 0.5) a.t = a.life;
-      ctx.globalAlpha = 0.8; ctx.fillStyle = "#ffffff";
-      ctx.beginPath(); ctx.arc(x, y, a.size * px, 0, TAU); ctx.fill();
+      if (pixel) pix.air("snow", a.x, a.y, kk, a.size);
+      else { ctx.globalAlpha = 0.8; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(x, y, a.size * px, 0, TAU); ctx.fill(); }
     } else if (a.k === "rain") {
+      if (pixel) { pix.air("rain", a.x, a.y, kk); ctx.restore(); return; }
       const fall = kk * 1.4;
       ctx.globalAlpha = 0.28; ctx.strokeStyle = "#cfe8ff"; ctx.lineWidth = Math.max(1, px / 28);
       ctx.beginPath(); ctx.moveTo(x - fall * px * 0.5, y + fall * px); ctx.lineTo(x - (fall + 0.25) * px * 0.5, y + (fall + 0.5) * px); ctx.stroke();
@@ -2839,14 +2911,17 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     } else if (a.k === "sand") {
       a.x += a.vx * k; a.y += a.vy * k + Math.sin(a.t / 12) * 0.004 * k;
       if (a.x > W + 1) a.t = a.life;
-      ctx.globalAlpha = 0.35; ctx.strokeStyle = "#e0b878"; ctx.lineWidth = Math.max(1, px / 20);
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - a.size * px, y - a.size * px * 0.08); ctx.stroke();
+      if (pixel) pix.air("sand", a.x, a.y, kk, a.size);
+      else { ctx.globalAlpha = 0.35; ctx.strokeStyle = "#e0b878"; ctx.lineWidth = Math.max(1, px / 20); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - a.size * px, y - a.size * px * 0.08); ctx.stroke(); }
     } else if (a.k === "mote") {
       a.x += a.vx * k; a.y += a.vy * k;
       if (a.x > W + 0.5) a.t = a.life;
-      ctx.globalAlpha = Math.sin(Math.min(1, kk * 4) * Math.PI / 2) * (a.glint ? 0.5 + 0.5 * Math.sin(a.t / 8) : 0.35);
-      ctx.fillStyle = a.glint ? "#bfe0ff" : "#ffffff";
-      ctx.beginPath(); ctx.arc(x, y, a.size * px, 0, TAU); ctx.fill();
+      if (pixel) pix.air("mote", a.x, a.y, kk, a.size, a.glint);
+      else {
+        ctx.globalAlpha = Math.sin(Math.min(1, kk * 4) * Math.PI / 2) * (a.glint ? 0.5 + 0.5 * Math.sin(a.t / 8) : 0.35);
+        ctx.fillStyle = a.glint ? "#bfe0ff" : "#ffffff";
+        ctx.beginPath(); ctx.arc(x, y, a.size * px, 0, TAU); ctx.fill();
+      }
     } else if (a.k === "bulb") {
       ctx.restore();
       glow(x, y, px * 0.5 * (1 - kk), "#ffffff", 0.9 * (1 - kk));
@@ -2873,7 +2948,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1 - kk * kk; ctx.imageSmoothingEnabled = false;
         if (Math.cos(ang) < 0) ctx.scale(1, -1);
         ctx.drawImage(stream, 0, -h / 2, len, h);
-      } else {
+      } else if (classicFx()) {
         beamStyle(e.type, len, wide, kk, e.colour);
         ctx.globalAlpha = 0.55 * (1 - kk); ctx.fillStyle = e.colour; ctx.fillRect(0, -wide, len, wide * 2);
         ctx.globalAlpha = 0.95 * (1 - kk); ctx.fillStyle = "#fff"; ctx.fillRect(0, -wide * 0.3, len, wide * 0.6);
@@ -3607,23 +3682,26 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   }
 
   // A status on the body: its tint and motion, and a chip over its head.
-  function statusOn(f, x, y, k) {
+  // `pixel`: the pixel layer has this body's status on its outline, so only its tag is drawn here.
+  function statusOn(f, x, y, k, pixel = false) {
     if (f.status === -1) return;
     const st = STATUS[f.status];
     const cx = sx(x), cy = sy(y - 0.3);
-    if (f.status === BRN && rand() < k / 6) fx.push({ k: "rise", x: x + (rand() - 0.5) * 0.8, y: y - 0.2, colour: "#ff7a3d", t: 0, life: 24 });
-    if (f.status === PSN && rand() < k / 10) part({ k: "bubble", x: x + (rand() - 0.5) * 0.7, y: y - 0.4, vx: 0, vy: -0.015, colour: "#d48cff", life: 30, size: 0.1 });
-    if (f.status === PAR && rand() < k / 12) part({ k: "bolt", x: x + (rand() - 0.5) * 0.6, y: y - 0.5, ang: rand() * TAU, len: 0.5, colour: "#fff59a", life: 6 });
-    if (f.status === FRZ) {
-      ctx.save(); ctx.globalAlpha = 0.45; ctx.fillStyle = "#bff0ff";
-      ctx.beginPath(); ctx.arc(cx, cy, px * 0.9, 0, TAU); ctx.fill(); ctx.restore();
-    }
-    if (f.status === SLP) {
-      ctx.save(); ctx.fillStyle = "#e9eeff"; ctx.globalAlpha = 0.9;
-      ctx.font = `700 ${Math.round(px * 0.45)}px "Chakra Petch", Rubik, sans-serif`;
-      const kk = (clock % 1000) / 1000;
-      ctx.fillText("z", cx + px * 0.5, cy - px * (0.6 + kk * 0.5)); ctx.fillText("Z", cx + px * 0.8, cy - px * (1 + kk * 0.4));
-      ctx.restore();
+    if (!pixel) {
+      if (f.status === BRN && rand() < k / 6) fx.push({ k: "rise", x: x + (rand() - 0.5) * 0.8, y: y - 0.2, colour: "#ff7a3d", t: 0, life: 24 });
+      if (f.status === PSN && rand() < k / 10) part({ k: "bubble", x: x + (rand() - 0.5) * 0.7, y: y - 0.4, vx: 0, vy: -0.015, colour: "#d48cff", life: 30, size: 0.1 });
+      if (f.status === PAR && rand() < k / 12) part({ k: "bolt", x: x + (rand() - 0.5) * 0.6, y: y - 0.5, ang: rand() * TAU, len: 0.5, colour: "#fff59a", life: 6 });
+      if (f.status === FRZ) {
+        ctx.save(); ctx.globalAlpha = 0.45; ctx.fillStyle = "#bff0ff";
+        ctx.beginPath(); ctx.arc(cx, cy, px * 0.9, 0, TAU); ctx.fill(); ctx.restore();
+      }
+      if (f.status === SLP) {
+        ctx.save(); ctx.fillStyle = "#e9eeff"; ctx.globalAlpha = 0.9;
+        ctx.font = `700 ${Math.round(px * 0.45)}px "Chakra Petch", Rubik, sans-serif`;
+        const kk = (clock % 1000) / 1000;
+        ctx.fillText("z", cx + px * 0.5, cy - px * (0.6 + kk * 0.5)); ctx.fillText("Z", cx + px * 0.8, cy - px * (1 + kk * 0.4));
+        ctx.restore();
+      }
     }
     ctx.save();
     const size = Math.round(px * 0.34);
@@ -3647,6 +3725,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   function drawArt(art, x, y, sc, angle, k, alpha = 1) {
     const im = art && img(art.path);
     if (!im) return false;
+    if (!classicFx()) { sc = px / BODY_PX; angle = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2); }
     const f = sheetFrame(art, k);
     ctx.save();
     ctx.globalAlpha = alpha * (art.blend ? 0.85 : 1);
@@ -3750,7 +3829,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     const pc = pieceOf(atlas.meta, fr);
     if (!pc) return;
     const [qx, qy, w, h, ox, oy, flip] = pc;
-    const sc = (px * 2.6) / 32;
+    const sc = px / BODY_PX;
     ctx.save();
     ctx.globalAlpha = clamp(alpha, 0, 1);
     ctx.translate(sx(x), sy(y + 0.42));
