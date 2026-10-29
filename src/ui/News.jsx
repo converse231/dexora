@@ -16,6 +16,17 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-30-anime-ultis",
+    icon: "💥",
+    date: "October 2026",
+    title: "The famous ULTIs, the anime way",
+    items: [
+      ["Sixteen ULTIs", "Blast Burn erupts under the foe, Frenzy Plant's roots burst up, Moonblast calls the moon."],
+      ["Water Shuriken", "Ash-Greninja's giant orange shuriken leads the volley."],
+      ["One pixel size", "Every move's own art now matches the Pokémon's pixels."],
+    ],
+  },
+  {
     id: "2026-10-29-pixel-hits",
     icon: "✨",
     date: "October 2026",

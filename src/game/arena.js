@@ -175,7 +175,8 @@ export const DARK_SEE = 5;
    ULT_WARN and stops following its target ULT_LOCK before it lands, so it
    can be dodged. Its hits are the League's formula on a 90-power move of
    that type, scaled by the part (`k`). */
-const ULT_BASE = -100, ULT_P = 90, ULT_WARN = sec(0.75), ULT_LOCK = sec(0.45);
+export const ULT_BASE = -100;   // an ULTI's move index is at or under it (render.js tells its shots apart)
+const ULT_P = 90, ULT_WARN = sec(0.75), ULT_LOCK = sec(0.45);
 export const ULT_TYPE_NAME = { electric: "Thunderstorm", fire: "Inferno", water: "Tidal Cannon", grass: "Leaf Storm", ice: "Absolute Zero",
   fighting: "Final Fist", poison: "Venom Rain", ground: "Fissure", flying: "Hurricane", psychic: "Mind Crush", bug: "Swarm",
   rock: "Rockfall", ghost: "Phantom Barrage", dragon: "Draco Cannon", dark: "Nightfall", steel: "Steel Cannon", fairy: "Starfall", normal: "Hyper Impact" };

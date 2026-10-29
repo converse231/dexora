@@ -89,6 +89,24 @@ MOVES = {
     # slash, any heal, any boost, any drop - until a move is drawn alone.
     "slam": 5, "claw": 4, "heal": 6, "power-up": 6, "stat-drop": 7,
 }
+# RETIRED (2026-10-30, the Arena VFX Lab's audit): drawn 3-5 of their pixels to a Pokemon's, and now drawn
+# better by the pixel engine (ui/league/arena/pixfx.js) - the stretched beams, the charges, the orbs, the rings
+# and bursts, the heal and boost sheets, the stun stars, the swirl, the smoke - or, the bites and Play Rough,
+# drawn in code because their teeth and hearts did not survive the bodies' grid. Their drawings stay in art/;
+# they are no longer built, and a shipped copy is removed. The classic look draws its own in their place.
+RETIRED = {"flamethrower", "hydro-pump", "ice-beam", "hyper-beam", "solar-beam", "dragon-pulse", "flash-cannon", "dark-pulse",
+           "hyper-beam-charge", "solar-beam-charge", "aura-sphere", "energy-ball", "shadow-ball", "focus-blast", "moonblast",
+           "sludge-bomb", "flare-blitz", "volt-tackle", "aqua-jet", "explosion", "thunderbolt", "discharge", "dazzling-gleam",
+           "hyper-voice", "heat-wave", "sludge-wave", "psychic", "earthquake", "surf", "stun", "confused", "smoke", "heal",
+           "power-up", "stat-drop", "quick-attack", "crunch", "fire-fang", "ice-fang", "thunder-fang", "play-rough"}
+# THE BODIES' GRID (2026-10-30): every kept move sheet is re-gridded to GRID px wide - its usual drawn size in
+# the Arena (tiles) times BODY_PX, the Pokemon's own pixels a tile (render.js draws a PMD body at px / BODY_PX)
+# - whole frames downscaled, 16 colours, a sprite's 1 px dark outline. fx.js marks it `g`, and the pixel look
+# draws it a sheet pixel to a body pixel (render.js `sheetFx`). 42 is a blow's 3.4 tiles.
+BODY_PX = 32 / 2.6
+GRID = {"boulder": 14, "psychic-lift": 32, "mega-symbol": 27, "evolve": 52, "mega-evolve": 52, "spikes": 32, "toxic-spikes": 32,
+        "stealth-rock": 32, "sticky-web": 32, "air-slash": 30, "razor-leaf": 30, "blizzard": 49, "petal-blizzard": 49, "twister": 49,
+        "fly": 44, "dig": 44}
 SEEN = 24                        # alpha that counts as drawn when looking for the gaps
 HARD = 110                       # alpha past which a shrunk pixel is solid, under which it is gone
 
@@ -182,6 +200,37 @@ def build(name, n, width, hard, anchor):
     return {"n": n, "w": width, "h": fh}
 
 
+def regrid(name, meta, width):
+    """A built move strip onto the bodies' grid: each frame downscaled whole to `width`, alpha cut at half,
+    the strip in 16 colours with a 1 px outline in its darkest, halved - as a sprite is drawn."""
+    out = OUT / f"{name}.png"
+    strip = Image.open(out).convert("RGBA")
+    n, w = meta["n"], meta["w"]
+    gh = max(1, round(meta["h"] * width / w))
+    small = Image.new("RGBA", (width * n, gh), (0, 0, 0, 0))
+    for k in range(n):
+        f = strip.crop((k * w, 0, (k + 1) * w, meta["h"])).resize((width, gh), Image.LANCZOS)
+        f.putalpha(f.getchannel("A").point(lambda v: 255 if v > HARD else 0))
+        small.paste(f, (k * width, 0))
+    rgb = small.convert("RGB").quantize(16, method=Image.Quantize.MEDIANCUT).convert("RGB").convert("RGBA")
+    rgb.putalpha(small.getchannel("A"))
+    px = rgb.load()
+    W, H = rgb.size
+    solid = [px[x, y] for y in range(H) for x in range(W) if px[x, y][3]]
+    dark = min(solid, key=lambda c: c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11)
+    dark = (dark[0] // 2, dark[1] // 2, dark[2] // 2, 255)
+    edged = rgb.copy()
+    e = edged.load()
+    for y in range(H):
+        for x in range(W):
+            # Within its own frame only: an outline never crosses into the next.
+            if not px[x, y][3] and any(0 <= x + dx < W and (x + dx) // width == x // width and 0 <= y + dy < H and px[x + dx, y + dy][3]
+                                       for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                e[x, y] = dark
+    edged.save(out, optimize=True)
+    return {**meta, "w": width, "h": gh, "g": 1}
+
+
 def main():
     meta = {name: build(name, *spec) for name, spec in FRAMES.items()}
     for name in meta:
@@ -189,11 +238,14 @@ def main():
             meta[name]["c"] = 1                  # a sequence still is drawn in its own colours
     names = list(FRAMES)
     for slug, n in MOVES.items():
+        if slug in RETIRED:
+            (OUT / "moves" / f"{slug}.png").unlink(missing_ok=True)
+            continue
         if not (SRC / "moves" / f"{slug}.png").exists():
             continue
         square = n == 1 and Image.open(SRC / "moves" / f"{slug}.png").width < 1.5 * Image.open(SRC / "moves" / f"{slug}.png").height
         width = 160 if square else 640 if n == 1 else 160
-        meta[f"moves/{slug}"] = {**build(f"moves/{slug}", n, width, True, "centre"), "c": 1}
+        meta[f"moves/{slug}"] = regrid(f"moves/{slug}", {**build(f"moves/{slug}", n, width, True, "centre"), "c": 1}, GRID.get(slug, round(3.4 * BODY_PX)))
         names.append(f"moves/{slug}")
     stray = sorted(f.stem for f in (SRC / "moves").glob("*.png") if f.stem not in MOVES)
     assert not stray, f"move art with no frame count in MOVES: {stray}"

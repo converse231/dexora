@@ -87,7 +87,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/cards/<promo set>/`, `src/data/cards/sets/<promo set>.js`, `src/data/cards/promos.js` | `npm run promos` (tools/fetch_promo_cards.py: real promo cards no pack sells, scans from Bulbagarden Archives cached in .assets-src/promo) |
 | `public/arena/<id>.webp`, `public/arena/cover/<material>.webp` | `npm run arenas` from the drawn floors in `art/arena/<id>.png` (26:16, shrunk to 832x512 WebP; one per `ARENAS` id) and the cover blocks in `art/arena/cover/` (transparent, cropped to solid pixels, 128px; one per `GROUND` material) - check.mjs holds both |
 | `public/arena/pmd/`, `src/data/pmd.js` | `npm run pmd` (PMD Sprite Repository, pinned `COMMIT`, cached in .assets-src/pmd; ~5 min on all cores - `-- 25 6` bakes a sample but writes no pmd.js) |
-| `public/arena/fx/`, `src/data/fx.js` | `npm run fx` from the drawn originals in `art/arena/fx/` (white pixel art, tinted per type by render.js's `tinted`; a sheet's frames found by the gaps nearest even spacing, each anchored in one box; check.mjs reads every header and re-hashes `FX_REV`), the moves' own colour art in `art/arena/fx/moves/` (a new file needs its frame count in `MOVES`, or the build stops; one whose frames grow across the row goes in `WIDEST`), and the optional ULTI panels `ult-<pattern>` / `ult-<dex id>` |
+| `public/arena/fx/`, `src/data/fx.js` | `npm run fx` from the drawn originals in `art/arena/fx/` (white pixel art, tinted per type by render.js's `tinted`; a sheet's frames found by the gaps nearest even spacing, each anchored in one box; check.mjs reads every header and re-hashes `FX_REV`), the moves' own colour art in `art/arena/fx/moves/` (a new file needs its frame count in `MOVES`, or the build stops; one whose frames grow across the row goes in `WIDEST`; every one re-gridded to the bodies' pixel at its `GRID` width, a `RETIRED` one not built), and the optional ULTI panels `ult-<pattern>` / `ult-<dex id>` |
 | `public/arena/intro/` | `npm run intro` (the Arena announcement's two fighters, cut from the shipped PMD atlases; re-run after `npm run pmd`) |
 | `public/events/drift/`, `src/data/drift.js` | `npm run drift` (each event's `drift` Pokemon, their Arena Walk cut from the shipped PMD atlases for its poster's sky - facing right, and left (`-l`, `DRIFT_LEFT`) only where PMD's artist drew it, never a CSS mirror; re-run after `npm run pmd`) |
 | `src/data/kits.js`, `reports/Arena kits.md` | `npm run kits` (tools/build_kits.mjs: each line's fixed Arena kit from its learnsets, `FIXED` the hand-written ones, every move checked against the Pokemon) |
@@ -1347,8 +1347,24 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   distance field for a stat moved), then the big moments (`strike`, a sky
   bolt with a stepped leader, a flickering stroke and a scorch cooling to
   soot; every ULTI strike's `pillar`; the weather's rain, snow, sand, embers
-  and motes through `air`, queued as `drawAir` moves them). The classic
-  look and its switch stay until players have had their say.
+  and motes through `air`, queued as `drawAir` moves them). **The named
+  ULTIs are drawn the way the anime draws them** (Phase 7, 2026-10-30; the
+  lab's drafts, from Bulbapedia's anime descriptions): pixfx's `ULT`, one
+  entry per `ULT_NAMES` name (check.mjs), a `cast` round its user from the
+  "ult" event and a `land` where the rules land it - a strike, a cannon's
+  beam, or a Barrage's shots' own look (`shot`'s `ult`, the middle of the
+  fan the big one: Ash-Greninja's orange shuriken). A named landing takes
+  the place of the generic pillar, shockwave and archetype sheet; the
+  famous Pokemon's manga panel stays. render.js knows a side's ULTI by
+  `lastUlt`, its shots by `ULT_BASE`. Hyper Beam's spent flicker is
+  cosmetic; Outrage leaves no dizzy stars (stars mean confusion here).
+  **The drawn move sheets are on the bodies' grid** (Phase 7b): 41 RETIRED
+  in build_fx.py (beams, charges, orbs, bursts, heal and boost, stun,
+  swirl, smoke - the pixel engine's now - and the bites and Play Rough,
+  whose detail did not survive: pixfx `jaws`, `scuffle`), and the other 33
+  re-gridded (`regrid`: GRID px wide, 16 colours, a 1 px outline; fx.js
+  `g`), drawn a sheet pixel to a body pixel in quarter turns (`sheetFx`).
+  The classic look and its switch stay until players have had their say.
   The vector look stays behind the pause menu's Pixel effects switch
   (`dexora-arena-classic`, a device preference) until the last phase deletes
   it. Never imported by arena.js: the rules never see the picture.

@@ -50,7 +50,7 @@
    the dark only what glows - and what stands near you - is seen. */
 import { W, H, TPS, INSET, INTRO, LIMIT, FINAL_T, moveAt, activeOf, PAR, BRN, PSN, SLP, FRZ, GROUND, ZONE_SAYS, PICKUPS,
   arenaMove as moveOf, BASIC_P, BASIC_S, BASIC_K, clonesOf, ULT_NAMES, WIDE, VANISH, evoTargets, megaTargets, EVOLVE_T,
-  FLOOR_SAYS, waterOf, herdAt, LANE_RUN, LANE_WARN, LANE_H, HELPERS, BEAM_LEN, BEAM_W, ringOf } from "../../../game/arena.js";
+  FLOOR_SAYS, waterOf, herdAt, LANE_RUN, LANE_WARN, LANE_H, HELPERS, BEAM_LEN, BEAM_W, ringOf, ULT_BASE } from "../../../game/arena.js";
 import { speciesById } from "../../../game/biomes.js";
 import { label } from "../../../game/map.js";
 import { arenaArt, loadAnims } from "../moveAnim.js";
@@ -83,6 +83,8 @@ const artKey = (i) => {
 };
 // What every match may play, whatever its moves: a heal's, a boost's and a drop's own sheets (drawn or not yet).
 const SHARED = ["moves/heal", "moves/power-up", "moves/stat-drop"];
+// The biting moves, drawn as jaws in the pixel look (their drawn sheets lost their teeth at the bodies' pixel).
+const BITES = new Set(["crunch", "fire-fang", "ice-fang", "thunder-fang", "bite", "psychic-fangs", "poison-fang", "hyper-fang", "super-fang", "jaw-lock"]);
 const isBasic = (i) => i === BASIC_P || i === BASIC_S;
 // A move's name as the callout says it ("Thunder Punch").
 const callName = (i) => (i === STRUGGLE ? "Struggle" : MOVES[i].n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "));
@@ -934,6 +936,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
      recently made out past 400). The pixel layer draws it one frame late,
      as it paints before the bodies - a 60th of a second nobody sees. */
   const masks = new Map(), lastBody = [null, null];
+  /* Each side's ULTI as cast (Phase 7, the anime way): its name and the line to its foe, which its
+     strikes, beam and shots are drawn by while they last - a side casts one ULTI at a time. */
+  const lastUlt = [null, null];
+  const named = (side) => !classicFx() && lastUlt[side] && pix.ultHas(lastUlt[side].name) ? lastUlt[side] : null;
   function maskOf(f, fr, at) {
     const atlas = atlasOf(f.id, shiny[f.side]?.[f.slot]), pc = atlas && pieceOf(atlas.meta, fr);
     if (!pc) return null;
@@ -1369,7 +1375,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         }
         // A blow's own art, at its reach.
         const mk = e.shape === "melee" && !isBasic(e.move) && !LANDS.has(slugOf(e.move)) && !VANISH[slugOf(e.move)] && artKey(e.move);
-        if (mk) fx.push({ k: "mv", key: mk, x: body.x + e.dx * 1.2, y: body.y - 0.2 + e.dy * 1.2, size: 3.2, ang: Math.atan2(e.dy, e.dx), t: 0, life: 24 });
+        if (!classicFx() && e.shape === "melee" && BITES.has(slugOf(e.move))) pix.jaws(typeOf(e.move), body.x + e.dx * 1.2, body.y + e.dy * 1.2);
+        else if (!classicFx() && slugOf(e.move) === "play-rough") pix.scuffle(body.x + e.dx * 1.2, body.y + e.dy * 1.2);
+        else if (mk) fx.push({ k: "mv", key: mk, x: body.x + e.dx * 1.2, y: body.y - 0.2 + e.dy * 1.2, size: 3.2, ang: Math.atan2(e.dy, e.dx), t: 0, life: 24 });
         else if (e.shape === "shot" || e.shape === "multi" || e.shape === "beam") {
           p.ox -= e.dx * 0.14; p.oy -= e.dy * 0.14; p.sx = 1.12; p.sy = 0.9;
           part({ k: "glow", x: body.x + e.dx * 0.6, y: body.y - 0.2 + e.dy * 0.6, colour, life: 8, size: 0.7 });
@@ -1387,7 +1395,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         fx.push({ k: "beam", x: e.x, y: e.y, dx: e.dx, dy: e.dy, len: e.len, colour: colourOf(e.move), art: arenaArt(slugOf(e.move))?.shot, type: typeOf(e.move), t: 0, life: e.big ? 44 : 26, big: e.big,
           key: artKey(e.move) && FX[artKey(e.move)].n === 1 ? artKey(e.move) : null });
         // A beam with no stream art of its own is the pixel layer's; its Emerald sprite is still laid down it (`drawFx`).
-        if (!classicFx() && !fx[fx.length - 1].key) pix.beam(typeOf(e.move), e.x, e.y, e.dx, e.dy, e.len, BEAM_W * (e.big ? 2 : 1), (e.big ? 44 : 26) / 60);
+        const nu = e.big && e.move <= ULT_BASE && named(e.side);
+        if (nu) pix.ultLand(nu.name, { side: e.side, x: e.x, y: e.y, dx: e.dx, dy: e.dy, len: e.len });
+        else if (!classicFx() && !fx[fx.length - 1].key) pix.beam(typeOf(e.move), e.x, e.y, e.dx, e.dy, e.len, BEAM_W * (e.big ? 2 : 1), (e.big ? 44 : 26) / 60);
         shake(e.big ? 0.9 : 0.45); kick(-e.dx, -e.dy, px * (e.big ? 0.3 : 0.16));
         if (e.big) { zoomAt(e.x + e.dx * e.len / 2, e.y + e.dy * e.len / 2, 0.12); tilt(e.dx > 0 ? -0.03 : 0.03); }
         // Sparks thrown off all along it, and a burst where it ends.
@@ -1486,10 +1496,13 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         if (cut) cut.name = e.name;
         const colour = colours[e.type] ?? "#ffd23f";
         ultAt[e.side] = { at: clock, id: e.id, name: e.name, type: e.type, colour, shiny: body ? shiny[e.side]?.[body.slot] : false, famous: Boolean(ULT_NAMES[e.id]), seq: seqOn.has(`${e.side}:${e.id}`) };
+        { const foe = activeOf(s, 1 - e.side), [ux, uy] = foe ? [foe.x - e.x, foe.y - e.y] : [1, 0], l = Math.hypot(ux, uy) || 1;
+          lastUlt[e.side] = { name: e.name, dx: ux / l, dy: uy / l };
+          if (named(e.side)) pix.ultCast(e.name, { side: e.side, dx: ux / l, dy: uy / l }); }
         zoomAt(e.x, e.y, 0.16); tilt(e.side === me ? 0.035 : -0.035); shake(0.5);
         if (e.kind === "storm") overlays.push({ k: "shade", colour: "rgba(6,8,30,", t: 0, life: 70 });
         // A Cannon's and a Barrage's sheet play at the caster: neither lands as a strike.
-        if (e.arch === "Cannon" || e.arch === "Barrage") {
+        if ((e.arch === "Cannon" || e.arch === "Barrage") && !named(e.side)) {
           const foe = activeOf(s, 1 - e.side);
           ulti(e.arch, e.x, e.y, 4, colour, foe ? Math.atan2(foe.y - e.y, foe.x - e.x) : 0);
         }
@@ -1508,12 +1521,15 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           else if (e.vanish === "ground") { for (let i = 0; i < 18; i++) { const [vx, vy] = around(0.07); part({ k: "chunk", x: e.x, y: e.y, vx, vy, vz: 0.12 + rand() * 0.1, g: 0.01, colour: rand() < 0.5 ? "#8a6a3e" : "#b58b52", life: 50, size: 0.16 + rand() * 0.12, vr: 0.3, bounce: 2, drag: 0.96 }); } mark("crack", e.x, e.y + 0.3, 2.4); }
           else if (e.vanish === "water") impact("water", e.x, e.y, 0, -1, true);
           else poof(e.x, e.y, 1.6);
-        } else if (type === "electric" || !e.nova && e.r < 1.5) strike(e.x, e.y);
+        } else if (type === "electric" || (!e.nova && e.r < 1.5 && !named(e.side))) strike(e.x, e.y);   // a named ULTI lands as itself
         impact(type, e.x, e.y, 0, 0, true);
-        if (!still && !classicFx()) pix.pillar(type, e.x, e.y, e.r, 52 / 60);
+        const nu = !e.vanish && named(e.side);
+        if (nu && !still) pix.ultLand(nu.name, { side: e.side, x: e.x, y: e.y, r: e.r, follow: e.r < 1.3 });
+        else if (!still && !classicFx()) pix.pillar(type, e.x, e.y, e.r, 52 / 60);
         else if (!still) { fx.push({ k: "pillar", type, x: e.x, y: e.y, r: e.r, t: 0, life: 52, seed: rand() }); pillarBurst(type, e.x, e.y, e.r); }
-        sheet("shockwave", e.x, e.y + 0.3, e.r * 2.6, colour, 30);
-        if (e.arch && e.arch !== "Snare") ulti(e.arch, e.x, e.y, e.r * 2.6, colour);   // a Snare plays its own, in its colour, on "snare"
+        // A named ULTI's own landing replaces the generic shockwave and archetype sheets (they swamped it).
+        if (!nu) sheet("shockwave", e.x, e.y + 0.3, e.r * 2.6, colour, 30);
+        if (!nu && e.arch && e.arch !== "Snare") ulti(e.arch, e.x, e.y, e.r * 2.6, colour);   // a Snare plays its own, in its colour, on "snare"
         if (e.big) { impactFrame(sx(e.x), sy(e.y)); mark("crack", e.x, e.y + 0.3, e.r * 2); shake(1.2); stop(110); }
         sheet("impact", e.x, e.y - 0.3, e.r * (e.nova ? 1.6 : 2.2), colour, 24);
         for (let i = 0; i < (e.nova ? 3 : 2); i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? colour : "#ffffff", life: 24, size: 0.3, grow: (e.nova ? 0.26 : 0.12) - i * 0.03, t: -i * 3 });
@@ -2146,7 +2162,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     if (!classicFx()) for (const p of s.shots) {
       const x = p.x - p.dx * (10 / TPS) * (1 - alpha), y = p.y - p.dy * (10 / TPS) * (1 - alpha), bas = isBasic(p.move), slug = slugOf(p.move);
       const own = BOULDERS.has(slug) || (!bas && !LANDS.has(slug) && artKey(p.move)) || arenaArt(slug)?.shot;
-      pix.shot(p.id, bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, trails.get(p.id) ?? [], { basic: bas, boost: p.boost, orb: !own, k });
+      const nu = p.move <= ULT_BASE && named(p.side), mid = nu && p.dx * nu.dx + p.dy * nu.dy > 0.995;
+      pix.shot(p.id, bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, trails.get(p.id) ?? [], { basic: bas, boost: p.boost, orb: !own || Boolean(nu), k, ult: nu?.name, centre: mid });
     }
     // A stream pouring, from the fighter's own act (Phase 3); `pour` below is the classic look's.
     if (!classicFx()) for (const f of bodies) if (f.act?.ph === "chan") {
@@ -2342,6 +2359,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     for (const c of s.clouds) {
       const a = Math.min(1, c.t / 40);
       // Smoke drawn as its own sheet, once there is one.
+      if (!classicFx()) { pix.cloud(c.x, c.y - 0.2, a, Boolean(c.smoke)); continue; }
       if (c.smoke && FX["moves/smoke"] && sheetFx("moves/smoke", clock / 110 % FX["moves/smoke"].n, sx(c.x), sy(c.y - 0.2), px * 4, 0, null, a)) continue;
       for (let i = 0; i < 7; i++) {
         const ang = i * 0.9 + clock / 1400, r = 0.9 + 0.35 * Math.sin(i * 2.1 + clock / 500);
@@ -2670,6 +2688,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   }
   // Flinched: stars turning round its head.
   function dizzyStars(x, y, a) {
+    if (!classicFx()) { pix.dizzy(x, y - 1.5, Math.min(1, a * 2)); return; }
     if (FX["moves/stun"] && sheetFx("moves/stun", clock / 80 % FX["moves/stun"].n, sx(x), sy(y - 1.6), px * 2.2, 0, null, Math.min(1, a * 2))) return;
     ctx.save(); ctx.globalAlpha = Math.min(1, a * 2); ctx.fillStyle = "#ffe14a"; ctx.strokeStyle = "#7a5a00"; ctx.lineWidth = Math.max(1, px / 20);
     for (let i = 0; i < 3; i++) {
@@ -2718,6 +2737,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     sprite(to ? f.evoTo : f.id, f.side, f.slot, at.x, at.y, fr, 1, "#ffffff", { ...at, sx: at.sx * beat, sy: at.sy * beat });
   }
   function confusedSwirl(x, y) {
+    if (!classicFx()) { pix.swirl(x, y - 1.6); return; }
     if (FX["moves/confused"] && sheetFx("moves/confused", clock / 90 % FX["moves/confused"].n, sx(x), sy(y - 1.7), px * 2.1, 0, null, 1)) return;
     ctx.save(); ctx.translate(sx(x), sy(y - 1.6)); ctx.rotate(clock / 200);
     ctx.strokeStyle = "#e6a0ff"; ctx.lineWidth = Math.max(2, px / 12); ctx.beginPath();
@@ -3746,6 +3766,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   function sheetFx(name, frame, x, y, w, rot = 0, colour = "#ffffff", alpha = 1, squash = 1, flip = false) {
     const im = img(fxPath(name)), meta = FX[name];
     if (!im || !meta || !(alpha > 0) || !(w > 0)) return Boolean(im);
+    if (meta.g && !classicFx()) { w = meta.w * px / BODY_PX; rot = Math.round(rot / (Math.PI / 2)) * (Math.PI / 2); }
     const f = clamp(Math.floor(frame), 0, meta.n - 1), h = w * meta.h / meta.w;
     ctx.save();
     ctx.translate(x, y); ctx.scale(1, squash); if (rot) ctx.rotate(rot); if (flip) ctx.scale(-1, 1);

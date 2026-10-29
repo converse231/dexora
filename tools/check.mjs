@@ -8666,7 +8666,18 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     assert.ok(/if \(!classicFx\(\)\) \{ sc = px \/ BODY_PX; angle = Math\.round\(angle \/ \(Math\.PI \/ 2\)\) \* \(Math\.PI \/ 2\); \}/.test(renderSrc),
       "drawArt draws a move sprite at its own scale or angle in the pixel look - one pixel size, quarter turns only");
     assert.ok(!/pixfx/.test(read("game/arena.js")), "arena.js reaches the pixel effects - the rules must never depend on the picture");
-    console.log(`pixfx ok — ${TYPES.length} type ramps of ${RAMP_STEPS}, one pixel size (${Math.round(BODY_PX * 10) / 10} a tile) for bodies and effects, no alpha or gradient in the pixel layer`);
+    // Phase 7: every named ULTI is drawn as itself (pixfx.js ULT), never left to its archetype's generic look.
+    const { ULT_NAMES } = await import("../src/game/arena.js");
+    const named = [...new Set(Object.values(ULT_NAMES).map(([n]) => n))];
+    for (const n of named) assert.ok(pixSrc.includes(` ${n}: {`) || pixSrc.includes(`"${n}": {`), `the ULTI "${n}" has no pixel effect in pixfx.js's ULT`);
+    // Phase 7b: every shipped move sheet is on the bodies' grid (build_fx.py's re-grid, `g`), and no retired one ships.
+    const { FX } = await import("../src/data/fx.js");
+    const sheets = Object.keys(FX).filter((k) => k.startsWith("moves/"));
+    for (const k of sheets) assert.ok(FX[k].g, `${k} is not re-gridded to the bodies' pixel - run npm run fx`);
+    const retired = [...readFileSync(new URL("./build_fx.py", import.meta.url), "utf8").match(/RETIRED = \{([^}]*)\}/)[1].matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
+    for (const n of retired) assert.ok(!existsSync(new URL(`../public/arena/fx/moves/${n}.png`, import.meta.url)) && !FX[`moves/${n}`], `the retired sheet ${n} still ships`);
+    console.log(`pixfx ok — ${TYPES.length} type ramps of ${RAMP_STEPS}, one pixel size (${Math.round(BODY_PX * 10) / 10} a tile) for bodies and effects, no alpha or gradient in the pixel layer; ` +
+      `${named.length} named ULTIs drawn as themselves, ${sheets.length} move sheets on the grid, ${retired.length} retired`);
   }
 
   /* AND THE LEAGUE'S FOLDER IS REACHED ONLY BY A LAZY IMPORT: a static import
