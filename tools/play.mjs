@@ -3087,6 +3087,32 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     until(dark, (s) => !s.encounter, "the Nightmare to fade", 4000);
     assert.equal(dark.state.dreams[ev.id], ev.hunt.keep, "a Nightmare run from did not wax the moon back");
     dark.destroy();
+    /* IT COMES AGAIN (2026-10-30, asked for: "let us catch more"): caught,
+       the moon wanes to `keep` as a loss does, the medal is the first catch's
+       alone, and a full moon meets it again - each meeting a tier roll. */
+    const twice = boot({ ...SAVE, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
+    for (let n = 0; n < 2; n++) {
+      twice.state.dreams = { ...twice.state.dreams, [ev.id]: ev.hunt.dreams };
+      Math.random = () => 0.01;
+      try {
+        for (const dir of ["right", "down", "left", "up"]) {
+          twice.press(dir);
+          for (let i = 0; i < 30 && !twice.state.encounter; i++) tick(16);
+          twice.clearHeld();
+          if (twice.state.encounter) break;
+        }
+      } finally { Math.random = real; }
+      assert.ok(twice.state.encounter?.hunt, `a full moon after ${n} Nightmares caught met no Nightmare`);
+      until(twice, (s) => s.encounter?.phase === "idle", "the Nightmare to settle");
+      twice.throwBall("master-ball");
+      twice.answerAsk(true);
+      until(twice, (s) => !s.encounter || s.encounter.phase === "caught", "the master ball to land");
+      until(twice, (s) => !s.encounter, "the Nightmare to be filed");
+      assert.equal(twice.state.dreams[ev.id], ev.hunt.keep, "a Nightmare caught did not wane the moon to keep");
+    }
+    assert.equal(twice.state.medals.filter((m) => m === `event:${ev.hunt.medal}`).length, 1, "a second Nightmare paid its medal again");
+    assert.equal(twice.state.box.filter((m) => m.species === ev.hunt.id).length, 2, "the second Nightmare never reached the Box");
+    twice.destroy();
     // By day, or anywhere else, a full moon meets nothing new.
     const day = boot({ ...SAVE, areaId: "meadow", dreams: moon }).e;
     assert.equal(day.state.dreams[ev.id], ev.hunt.dreams, "a full moon did not survive a load");

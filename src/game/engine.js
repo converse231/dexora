@@ -1908,7 +1908,7 @@ export function createEngine(canvas, onChange, mini = null) {
        encounter walking"): it waited for the map's night, and a player who
        came due by day walked ~235 steps through ~16 other meetings for it -
        up to 750 and 50 just after dawn. The twenty costumes are the hunt. */
-    const hunt = source === "wild" ? huntDue(state.dreams, state.medals) : null;
+    const hunt = source === "wild" ? huntDue(state.dreams) : null;
     const nightmare = !!hunt && state.areaId === hunt.area;
     const owned = (id) => state.dex[dexIndex(id)] === 2;
     // A roaming week (events.js `roamLook`): a walking meeting may be one of its looks, by the map's types.
@@ -2717,8 +2717,8 @@ export function createEngine(canvas, onChange, mini = null) {
      or stops in silence. */
   /* THE HUNT'S END, and the dreams that feed it (events.js). A costume
      caught on its event's days is a Bad Dream; the last one says the
-     Nightmare is due. The hunted one caught is its medal - its title -
-     at once; lost, the moon waxes back to `keep`. */
+     Nightmare is due. The hunted one caught the first time is its medal;
+     caught or lost, the moon wanes back to `keep`, and it comes again. */
   /* A LOOK'S CARD (eventforms.js `card`, 2026-10-28, asked for: "once you
      catch the pokemon you'll be given the card"): a poncho printed on a real
      promo card files that card into the collection - ONE copy, the first
@@ -2738,20 +2738,17 @@ export function createEngine(canvas, onChange, mini = null) {
     const h = ev?.hunt;
     if (!h) return;
     if (e.hunt) {
-      if (outcome === "caught") {
+      state.dreams = { ...state.dreams, [ev.id]: Math.min(state.dreams[ev.id] ?? 0, h.keep) };
+      const again = `Catch ${h.dreams - h.keep} more costumes and ${huntWords(h).back}.`;
+      if (outcome === "caught" && !state.medals.includes(`event:${h.medal}`)) {
         state.medals.push(`event:${h.medal}`);
         cheer({ kind: "medal", title: h.name.toUpperCase(), sub: `${h.title} is yours.${eventDue(state.dex, state.medals).some((x) => x.id === ev.id)
           ? ` ${ev.title} waits on the Events board.`
-          : state.medals.includes(`event:${ev.id}`) ? "" : ` Catch every ${ev.name} look for ${ev.title}.`}` });
-      } else {
-        state.dreams = { ...state.dreams, [ev.id]: Math.min(state.dreams[ev.id] ?? 0, h.keep) };
-        cheer({ kind: "medal", title: huntWords(h).fade,
-          sub: `Catch ${h.dreams - h.keep} more costumes and ${huntWords(h).back}.` });
-      }
+          : state.medals.includes(`event:${ev.id}`) ? "" : ` Catch every ${ev.name} look for ${ev.title}.`} ${again}` });
+      } else if (outcome !== "caught") cheer({ kind: "medal", title: huntWords(h).fade, sub: again });
       return;
     }
-    if (outcome !== "caught" || speciesById(e.speciesId)?.event !== ev.id
-      || state.medals.includes(`event:${h.medal}`)) return;
+    if (outcome !== "caught" || speciesById(e.speciesId)?.event !== ev.id) return;
     const was = state.dreams[ev.id] ?? 0;
     if (was >= h.dreams) return;
     state.dreams = { ...state.dreams, [ev.id]: was + 1 };

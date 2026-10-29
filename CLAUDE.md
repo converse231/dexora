@@ -286,7 +286,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
   caught on its days is a Bad Dream (`state.dreams`, `huntOn`); at `dreams`
   the next wild meeting in its `area` IS it, day or night (2026-10-27: it
   waited for dark, ~235 steps and 16 meetings of walking) (`huntDue`, no alpha,
-  it asks before you run); lost, the count falls to `keep`; caught, it is
+  it asks before you run); lost OR caught, the count falls to `keep` and it
+  comes again (2026-10-30, asked for: "let us catch more" - one meeting was
+  one tier roll, its rare forms out of reach); the first catch is
   `event:<medal>` - NO title of its own (2026-10-26, your call): the
   event's title asks for every look AND it (`eventDone`), and `shownTitles`
   never draws a hunt medal. Every event's title is a DRAWN medal
@@ -1356,7 +1358,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   fan the big one: Ash-Greninja's orange shuriken). A named landing takes
   the place of the generic pillar, shockwave and archetype sheet; the
   famous Pokemon's manga panel stays. render.js knows a side's ULTI by
-  `lastUlt`, its shots by `ULT_BASE`. Hyper Beam's spent flicker is
+  `lastUlt`, its shots by `ULT_BASE`. **Signature moves are drawn the anime
+  way too** (2026-10-30, the lab's batch 1): pixfx's `SIGNATURES` and `SIG`,
+  each move's look at its own moments (`sig(slug, "fire" | "hit" | "shot" |
+  "beam" | "pulse")` - a `shot` it draws replaces the orb and sprite), in
+  place of the generic look and any drawn sheet (`artKey` skips them,
+  check.mjs refuses one shipped). A beam-shaped move is a held STREAM, so
+  its colours are `STREAM_RAMP` (Solar Beam, Hyper Beam); the `beam` moment
+  is a Cannon ULTI's. Volt Tackle is in no learnset the League reads, so its
+  look is Wild Charge's. Batches 2-4 (same day) are the moves the most
+  kits carry; a status shot (Hypnosis, Thunder Wave) has no hit, so its landing is the
+  status's own look. Hyper Beam's spent flicker is
   cosmetic; Outrage leaves no dizzy stars (stars mean confusion here).
   **The drawn move sheets are on the bodies' grid** (Phase 7b): 41 RETIRED
   in build_fx.py (beams, charges, orbs, bursts, heal and boost, stun,
@@ -1364,10 +1376,10 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   whose detail did not survive: pixfx `jaws`, `scuffle`), and the other 33
   re-gridded (`regrid`: GRID px wide, 16 colours, a 1 px outline; fx.js
   `g`), drawn a sheet pixel to a body pixel in quarter turns (`sheetFx`).
-  The classic look and its switch stay until players have had their say.
-  The vector look stays behind the pause menu's Pixel effects switch
-  (`dexora-arena-classic`, a device preference) until the last phase deletes
-  it. Never imported by arena.js: the rules never see the picture.
+  **There is one look** (2026-10-30, your call): the classic vector look,
+  its pause-menu switch and `dexora-arena-classic` were deleted once every
+  phase had shipped - two looks for every move was double the upkeep.
+  Never imported by arena.js: the rules never see the picture.
   **Instant moves cost their dodge, so damage came down** (2026-10-27,
   reported: "my Pokemon is dead though same level and type advantage"):
   with no wind-up Hard v Hard fell from 63 s to 40 s, a Pokemon to 10 s on

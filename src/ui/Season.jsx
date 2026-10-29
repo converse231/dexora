@@ -298,7 +298,7 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
       {ev.hunt && (() => {
         const won = medals.includes(`event:${ev.hunt.medal}`);
         const n = dreams[ev.id] ?? 0;
-        const due = !!huntDue(dreams, medals) && live;
+        const due = !!huntDue(dreams) && live;
         return (
           <div className={`sn-hunt-row${due ? " due" : ""}`}>
             <button type="button" className={`sn-slot${won ? " got" : ""}`} data-tip={won ? ev.hunt.title : "???"}
@@ -307,11 +307,10 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
             </button>
             <span>
               <b>{won ? `${ev.hunt.name} ✓` : due ? huntWords(ev.hunt).due : ev.hunt.name}</b>
-              <small>{won ? ev.hunt.title
-                : due ? `Walk in ${AREAS[ev.hunt.area]?.name} - your next meeting there`
-                  : `${n} of ${ev.hunt.dreams} costumes caught`}</small>
+              <small>{due ? `Walk in ${AREAS[ev.hunt.area]?.name} - your next meeting there`
+                : `${n} of ${ev.hunt.dreams} costumes caught${won ? " - it comes again" : ""}`}</small>
             </span>
-            {!won && <Moons n={n} of={ev.hunt.dreams} says={huntWords(ev.hunt).tokens} />}
+            {(!won || live) && <Moons n={n} of={ev.hunt.dreams} says={huntWords(ev.hunt).tokens} />}
           </div>
         );
       })()}

@@ -61,7 +61,7 @@ import { STRUGGLE } from "../../../game/battle.js";
 import { spriteUrl } from "../../Sprite.jsx";
 import { PMD_IDS, PMD_REV } from "../../../data/pmd.js";
 import { FX, FX_REV } from "../../../data/fx.js";
-import { createPix, classicFx, BODY_PX } from "./pixfx.js";
+import { createPix, BODY_PX, SIGNATURES } from "./pixfx.js";
 
 const asset = (p) => new URL(p, document.baseURI).href;
 // The basic attack (arena.js) is no League move: no slug, no sprite - it is drawn in its user's colour.
@@ -76,8 +76,11 @@ const FAMILY = Object.fromEntries([
   ["claw", ["slash", "scratch", "fury-swipes", "crush-claw", "metal-claw", "aerial-ace", "cut", "psycho-cut", "sacred-sword", "false-swipe",
     "fury-cutter", "dual-chop", "cross-poison", "smart-strike", "secret-sword", "behemoth-blade", "kowtow-cleave", "ceaseless-edge"]],
 ].flatMap(([fam, ns]) => ns.map((n) => [n, fam])));
+// A signature move (pixfx's `sig`) is drawn the anime way, never by a sheet.
+const SIG = new Set(SIGNATURES);
 const artKey = (i) => {
   const slug = slugOf(i);
+  if (SIG.has(slug)) return null;
   for (const k of [slug, FAMILY[slug]]) if (k && FX[`moves/${k}`]) return `moves/${k}`;
   return null;
 };
@@ -178,10 +181,7 @@ const fxPath = (name) => `arena/fx/${name}.png?v=${FX_REV}`;
 /* A MOVE'S OWN ART (npm run fx, art/arena/fx/moves): its sheet's key, or
    null. Most play where the move does - a projectile loops along its path,
    a stream lies down a beam or trails a shot, a blow plays at its reach, a
-   dash trails its user, a blast plays round it - and these two where they
-   land instead: Psychic is a shot, Rock Slide a blast, and neither looks
-   right flying or round its user. */
-const LANDS = new Set(["psychic", "rock-slide", "fire-blast"]);
+   dash trails its user, a blast plays round it. */
 /* MOVES WITH A STORY OF THEIR OWN (asked for, 2026-10-23: "creative and
    Pokemon-accurate"). The mind moves LIFT the struck Pokemon in a psychic
    glow and slam it down; the thrown rocks RISE out of the floor before they
@@ -501,131 +501,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   // A side's Pokemon's first type: what its typeless basic attack wears.
   const typeAt = (s, side) => { const sd = s.sides[side]; return TYPES[sd.team[sd.active]?.types[0]] ?? "normal"; };
   const tintOf = (i, s, side) => (isBasic(i) ? colours[typeAt(s, side)] ?? "#e8e8f0" : colourOf(i));
-  /* A SHOT LOOKS LIKE ITS TYPE (asked for, 2026-10-23: "Razor Leaf will
-     have leaves, Hydro Pump water... unique effects"): under the move's own
-     Emerald sprite, a body drawn for its type - a bubble, a flame, a
-     crackling ball, leaves spinning round, a crystal, a shadow orb - turned
-     along its path. `r` in screen px. */
-  function shotStyle(type, x, y, ang, r, colour, n = "") {
-    const t = clock;
-    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
-    ctx.globalCompositeOperation = "lighter";
-    const leaf = (lx, ly, rot, c) => {
-      ctx.save(); ctx.translate(lx, ly); ctx.rotate(rot); ctx.fillStyle = c;
-      ctx.beginPath(); ctx.ellipse(0, 0, r * 0.55, r * 0.22, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.fillRect(-r * 0.45, -r * 0.02, r * 0.9, r * 0.04); ctx.restore();
-    };
-    if (signatureShot(n, r, t)) { ctx.restore(); return; }
-    switch (type) {
-      case "water":
-        ctx.globalCompositeOperation = "source-over";
-        ctx.fillStyle = "rgba(90,180,255,0.55)"; ctx.strokeStyle = "#d8f6ff"; ctx.lineWidth = Math.max(2, r * 0.12);
-        ctx.beginPath(); ctx.arc(0, 0, r * 0.75, 0, TAU); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(-r * 0.25, -r * 0.3, r * 0.18, 0, TAU); ctx.fill();
-        break;
-      case "fire":
-        for (const [c, k] of [["#ff4a1a", 1], ["#ff9b2a", 0.72], ["#fff2a8", 0.42]]) {
-          const fl = 1 + 0.15 * Math.sin(t / 45 + k * 5);
-          ctx.fillStyle = c; ctx.beginPath();
-          ctx.moveTo(r * 0.8 * k, 0); ctx.quadraticCurveTo(0, -r * 0.75 * k, -r * 1.9 * k * fl, 0); ctx.quadraticCurveTo(0, r * 0.75 * k, r * 0.8 * k, 0); ctx.fill();
-        }
-        break;
-      case "electric":
-        ctx.fillStyle = "#fff59a"; ctx.beginPath(); ctx.arc(0, 0, r * 0.5, 0, TAU); ctx.fill();
-        ctx.strokeStyle = "#ffe74a"; ctx.lineWidth = Math.max(2, r * 0.1);
-        for (let i = 0; i < 4; i++) {
-          let a = rand() * TAU, px0 = Math.cos(a) * r * 0.4, py0 = Math.sin(a) * r * 0.4;
-          ctx.beginPath(); ctx.moveTo(px0, py0);
-          for (let j = 0; j < 3; j++) { a += (rand() - 0.5) * 1.2; px0 += Math.cos(a) * r * 0.35; py0 += Math.sin(a) * r * 0.35; ctx.lineTo(px0, py0); }
-          ctx.stroke();
-        }
-        break;
-      case "grass": case "bug": {
-        // Leaves turning round the centre: Razor Leaf's volley, a seed's spin.
-        const many = n.includes("leaf") || n.includes("petal") ? 4 : 3;
-        for (let i = 0; i < many; i++) { const a = t / 90 + i * TAU / many; leaf(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, a * 2, i % 2 ? "#5fd35a" : "#a6e86b"); }
-        break;
-      }
-      case "ice":
-        ctx.rotate(t / 160);
-        ctx.fillStyle = "rgba(190,240,255,0.85)"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1, r * 0.08);
-        ctx.beginPath(); ctx.moveTo(0, -r * 0.85); ctx.lineTo(r * 0.45, 0); ctx.lineTo(0, r * 0.85); ctx.lineTo(-r * 0.45, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
-        break;
-      case "ghost": case "dark":
-        ctx.globalCompositeOperation = "source-over";
-        for (let i = 0; i < 6; i++) { const a = t / 120 + i; ctx.fillStyle = type === "ghost" ? "rgba(110,70,190,0.55)" : "rgba(40,30,60,0.6)"; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.25, Math.sin(a) * r * 0.25, r * 0.6, 0, TAU); ctx.fill(); }
-        ctx.fillStyle = type === "ghost" ? "#d6b8ff" : "#c08aff"; ctx.beginPath(); ctx.arc(r * 0.1, -r * 0.05, r * 0.18, 0, TAU); ctx.fill();
-        break;
-      case "psychic": case "fairy":
-        ctx.strokeStyle = colour; ctx.lineWidth = Math.max(2, r * 0.12);
-        for (let i = 0; i < 2; i++) { const k = ((t / 400 + i / 2) % 1); ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.arc(0, 0, r * (0.3 + k * 0.8), 0, TAU); ctx.stroke(); }
-        break;
-      case "rock": case "ground": case "steel":
-        ctx.globalCompositeOperation = "source-over"; ctx.rotate(t / 110);
-        ctx.fillStyle = type === "steel" ? "#c8d0dc" : type === "rock" ? "#9b8466" : "#b58b52"; ctx.strokeStyle = "rgba(0,0,0,0.4)"; ctx.lineWidth = Math.max(1, r * 0.08);
-        ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * TAU, rr = r * (0.55 + (i % 2) * 0.15); ctx[i ? "lineTo" : "moveTo"](Math.cos(a) * rr, Math.sin(a) * rr); } ctx.closePath(); ctx.fill(); ctx.stroke();
-        break;
-      case "poison":
-        ctx.fillStyle = "rgba(190,110,255,0.75)"; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc((i - 1) * r * 0.3, Math.sin(t / 80 + i) * r * 0.2, r * 0.45, 0, TAU); ctx.fill(); }
-        break;
-      case "dragon":
-        for (let i = 0; i < 3; i++) { const a = t / 70 + i * TAU / 3; ctx.fillStyle = i % 2 ? "#9b7bff" : "#5fb8ff"; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.35, Math.sin(a) * r * 0.35, r * 0.4, 0, TAU); ctx.fill(); }
-        break;
-      default: {
-        ctx.fillStyle = "#ffffff"; ctx.beginPath();
-        for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + t / 200, rr = i % 2 ? r * 0.3 : r * 0.8; ctx[i ? "lineTo" : "moveTo"](Math.cos(a) * rr, Math.sin(a) * rr); }
-        ctx.closePath(); ctx.fill();
-      }
-    }
-    ctx.restore();
-  }
-  /* A BEAM LOOKS LIKE ITS TYPE, drawn in the beam's own turned frame (0..len
-     along it): lightning that jumps, a water stream that ripples, a flame
-     stream, crystals, Solar Beam's light, psychic rings. */
-  function beamStyle(type, len, wide, kk, colour) {
-    const a = 1 - kk;
-    if (type === "electric") {
-      ctx.strokeStyle = "#fff8b0"; ctx.globalAlpha = a; ctx.lineWidth = Math.max(2, wide * 0.25);
-      for (let k2 = 0; k2 < 3; k2++) {
-        ctx.beginPath(); ctx.moveTo(0, 0);
-        for (let d = px * 0.5; d < len; d += px * 0.5) ctx.lineTo(d, (rand() - 0.5) * wide * 1.6);
-        ctx.stroke();
-      }
-    } else if (type === "water") {
-      ctx.fillStyle = "rgba(220,248,255,0.9)"; ctx.globalAlpha = a;
-      for (let d = 0; d < len; d += px * 0.3) {
-        const wv = Math.sin(d / px * 2 - clock / 40) * wide * 0.5;
-        ctx.beginPath(); ctx.arc(d, wv, Math.max(1, wide * 0.18), 0, TAU); ctx.fill();
-      }
-    } else if (type === "fire") {
-      ctx.globalAlpha = a * 0.8;
-      for (let d = 0; d < len; d += px * 0.45) {
-        ctx.fillStyle = rand() < 0.5 ? "#ffd27a" : "#ff5a1f";
-        ctx.beginPath(); ctx.arc(d, (rand() - 0.5) * wide, wide * (0.4 + rand() * 0.5), 0, TAU); ctx.fill();
-      }
-    } else if (type === "ice") {
-      ctx.fillStyle = "#e8fbff"; ctx.globalAlpha = a;
-      for (let d = px * 0.6; d < len; d += px * 0.9) {
-        ctx.save(); ctx.translate(d, 0); ctx.rotate(Math.PI / 4);
-        ctx.fillRect(-wide * 0.35, -wide * 0.35, wide * 0.7, wide * 0.7); ctx.restore();
-      }
-    } else if (type === "grass") {
-      ctx.fillStyle = "#fff8c0"; ctx.globalAlpha = a * 0.8;
-      for (let d = 0; d < len; d += px * 0.4) { ctx.beginPath(); ctx.arc(d, (rand() - 0.5) * wide * 1.4, Math.max(1, wide * 0.12), 0, TAU); ctx.fill(); }
-    } else if (type === "psychic" || type === "fairy") {
-      ctx.strokeStyle = colour; ctx.lineWidth = Math.max(2, wide * 0.15); ctx.globalAlpha = a;
-      for (let d = (clock / 4) % (px * 1.2); d < len; d += px * 1.2) { ctx.beginPath(); ctx.ellipse(d, 0, wide * 0.3, wide * 1.1, 0, 0, TAU); ctx.stroke(); }
-    } else if (type === "ghost" || type === "dark") {
-      ctx.fillStyle = type === "ghost" ? "rgba(140,90,220,0.5)" : "rgba(60,40,90,0.6)"; ctx.globalAlpha = a; ctx.globalCompositeOperation = "source-over";
-      for (let d = 0; d < len; d += px * 0.5) { ctx.beginPath(); ctx.arc(d, Math.sin(d / px + clock / 60) * wide * 0.4, wide * 0.7, 0, TAU); ctx.fill(); }
-    }
-    ctx.globalAlpha = 1;
-  }
   // A bolt from above onto the struck (Thunderbolt, Thunder, Zap Cannon...).
   function strike(x, y) {
     if (still) return;
-    if (!classicFx()) pix.strike(x, y);
-    else fx.push({ k: "strike", x, y, t: 0, life: 12, seed: rand() });
+    pix.strike(x, y);
     shake(0.35); impactFrame(sx(x), sy(y));
   }
 
@@ -645,136 +524,6 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       default: part({ k: "glow", x, y, vx, vy, wob: type === "ghost" ? 1 : 0, colour, life: 16, size: 0.1 });
     }
   }
-  /* A STREAM AS IT POURS (arena.js: hold and aim, 2026-10-27): drawn from the
-     fighter's own act every frame, mouth to where it strikes - Hydro Pump a
-     rippling jet with foam running down it, Flamethrower a roaring cone that
-     whitens at the mouth, a lightning stream crackling, an ice stream
-     glittering - its matter thrown off all along it and a splash where it
-     lands. The rules' strikes only bite (`take`); this is the stream. */
-  function pour(f, x, y, k) {
-    const a = f.act, i = moveAt(f, a.k).i, type = typeOf(i), colour = colourOf(i);
-    const len = Math.max(0.6, a.len || 0), L = len * px, ang = Math.atan2(a.dy, a.dx);
-    const mx = x + a.dx * 0.45, my = y - 0.3 + a.dy * 0.45;
-    const w = px * BEAM_W * 1.35, t = clock;
-    const width = (d, wk, ph) => w * wk * (0.4 + 0.6 * Math.min(1, d / (px * 3))) + Math.sin(d / px * 2.2 - t / 28 + ph) * w * 0.13 * wk;
-    ctx.save(); ctx.translate(sx(mx), sy(my)); ctx.rotate(ang);
-    if (type === "water") {
-      for (const [c, wk, al] of [["rgba(60,150,255,0.4)", 1.4, 1], ["#3f9cff", 0.95, 0.85], ["#9fdcff", 0.58, 0.95], ["#ffffff", 0.22, 1]]) {
-        ctx.globalAlpha = al; ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(0, 0);
-        for (let d = 0; d <= L; d += px * 0.25) ctx.lineTo(d, -width(d, wk, 0));
-        for (let d = L; d >= 0; d -= px * 0.25) ctx.lineTo(d, width(d, wk, 1.7));
-        ctx.closePath(); ctx.fill();
-      }
-      // Foam running down the jet.
-      ctx.globalAlpha = 0.85; ctx.fillStyle = "#ffffff";
-      for (let d = (t / 2.5) % (px * 0.8); d < L; d += px * 0.8) ctx.fillRect(d, Math.sin(d / px * 1.3 + t / 40) * w * 0.4, px * 0.45, Math.max(1, px * 0.07));
-    } else if (type === "fire") {
-      ctx.globalCompositeOperation = "lighter";
-      for (let d = 0; d < L; d += px * 0.3) {
-        const q = d / L, r = w * (0.3 + q * 1.15) * (0.8 + 0.35 * Math.sin(d / px * 3.1 + t / 20));
-        ctx.globalAlpha = 0.42; ctx.fillStyle = q < 0.22 ? "#fff3b0" : q < 0.55 ? "#ffb13a" : "#ff4a1a";
-        ctx.beginPath(); ctx.arc(d, Math.sin(d / px * 1.7 + t / 30) * w * 0.3 * q, r, 0, TAU); ctx.fill();
-      }
-      ctx.globalAlpha = 0.9; ctx.fillStyle = "#fffbe0";
-      ctx.beginPath(); ctx.ellipse(Math.min(L, px * 1.4) * 0.6, 0, Math.min(L, px * 1.4) * 0.6, w * 0.32, 0, 0, TAU); ctx.fill();
-    } else if (type === "electric") {
-      ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = 0.3; ctx.fillStyle = "#fff59a"; ctx.fillRect(0, -w * 0.7, L, w * 1.4);
-      for (let b = 0; b < 4; b++) {
-        ctx.globalAlpha = 1; ctx.strokeStyle = b ? "#ffe74a" : "#ffffff"; ctx.lineWidth = Math.max(1.5, px * (b ? 0.12 : 0.07)); ctx.lineJoin = "round";
-        ctx.beginPath(); ctx.moveTo(0, 0);
-        for (let d = px * 0.4; d < L; d += px * 0.4) ctx.lineTo(d, (rand() - 0.5) * w * 1.5);
-        ctx.lineTo(L, 0); ctx.stroke();
-      }
-    } else if (type === "ice") {
-      ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = 0.45; ctx.fillStyle = "#9fe9ff"; ctx.fillRect(0, -w * 0.9, L, w * 1.8);
-      ctx.globalAlpha = 0.95; ctx.fillStyle = "#ffffff"; ctx.fillRect(0, -w * 0.25, L, w * 0.5);
-      ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "#e8fbff"; ctx.strokeStyle = "#7fd4ff"; ctx.lineWidth = Math.max(1, px * 0.05);
-      for (let d = (t / 6) % (px * 1.1); d < L; d += px * 1.1) {
-        ctx.save(); ctx.translate(d, Math.sin(d / px + t / 50) * w * 0.5); ctx.rotate(t / 90 + d);
-        const c = w * 0.45; ctx.beginPath(); ctx.moveTo(0, -c); ctx.lineTo(c * 0.5, 0); ctx.lineTo(0, c); ctx.lineTo(-c * 0.5, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
-      }
-    } else {
-      ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = 0.45; ctx.fillStyle = colour;
-      ctx.beginPath(); ctx.moveTo(0, 0);
-      for (let d = 0; d <= L; d += px * 0.3) ctx.lineTo(d, -width(d, 1, 0));
-      for (let d = L; d >= 0; d -= px * 0.3) ctx.lineTo(d, width(d, 1, 1.7));
-      ctx.closePath(); ctx.fill();
-      ctx.globalAlpha = 0.9; ctx.fillStyle = "#ffffff"; ctx.fillRect(0, -w * 0.25, L, w * 0.5);
-      beamStyle(type, L, w, 0, colour);
-    }
-    ctx.restore();
-    const ex = mx + a.dx * len, ey = my + a.dy * len;
-    glow(sx(mx), sy(my), px * 1, type === "fire" ? "#fff3b0" : colour, 0.75);
-    glow(sx(ex), sy(ey), px * 1.5, colour, 0.6);
-    if (still) return;
-    // Its matter, thrown off all along it; and where it lands, a splash of it.
-    for (let q = 0; q < (lite ? 1 : 3); q++) if (rand() < 0.9 * k) { const d = rand() * len; trailBit(type, mx + a.dx * d, my + a.dy * d, a.dx, a.dy, colour); }
-    if (rand() < 0.9 * k) {
-      const [vx, vy] = spray(-a.dx, -a.dy, 2.4, 0.07);
-      if (type === "water") part({ k: "dot", x: ex, y: ey, vx, vy, vz: 0.05 + rand() * 0.07, g: 0.007, colour: rand() < 0.5 ? "#d8f6ff" : "#7fd4ff", life: 32, size: 0.11, splash: rand() < 0.2 });
-      else if (type === "fire") { part({ k: "glow", x: ex, y: ey, vx, vy, lift: 0.003, colour: rand() < 0.5 ? "#ffd27a" : "#ff5a1f", life: 26, size: 0.16 }); if (rand() < 0.3) part({ k: "smoke", x: ex, y: ey, vx: (rand() - 0.5) * 0.02, vy: -0.012, colour: "rgba(70,45,30,", life: 44, size: 0.32 }); }
-      else if (type === "electric") part({ k: "bolt", x: ex, y: ey, ang: rand() * TAU, len: 0.6 + rand() * 0.6, colour: "#fff59a", life: 6 });
-      else trailBit(type, ex, ey, -a.dx, -a.dy, colour);
-    }
-  }
-
-  /* A SIGNATURE SHOT (2026-10-27, asked for: "Water Shuriken should be
-     unique"): the moves everybody knows by sight, drawn as themselves -
-     a spinning star of water, a ball of shadow, a sphere of aura. Answers
-     whether it drew one. */
-  function signatureShot(n, r, t) {
-    const star = (rr, c, pts = 4) => {
-      ctx.fillStyle = c; ctx.beginPath();
-      for (let i = 0; i < pts * 2; i++) { const a = (i / (pts * 2)) * TAU, q = i % 2 ? rr * 0.3 : rr; ctx.lineTo(Math.cos(a) * q, Math.sin(a) * q); }
-      ctx.closePath(); ctx.fill();
-    };
-    if (n === "water-shuriken") {
-      ctx.globalCompositeOperation = "source-over"; ctx.rotate(t / 22);
-      star(r * 1.5, "rgba(60,140,255,0.45)"); star(r * 1.15, "#2f8fff"); star(r * 0.78, "#9fdcff"); star(r * 0.4, "#ffffff");
-      ctx.globalAlpha = 0.9; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1, r * 0.08);
-      ctx.beginPath(); ctx.arc(0, 0, r * 1.05, 0.2, 1.1); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, r * 1.05, 3.3, 4.2); ctx.stroke();
-      return true;
-    }
-    if (n === "shadow-ball") {
-      ctx.globalCompositeOperation = "source-over";
-      for (let i = 0; i < 7; i++) { const a = t / 90 + i * 0.9; ctx.fillStyle = "rgba(120,60,200,0.35)"; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.35 - r * 0.3, Math.sin(a) * r * 0.35, r * 0.75, 0, TAU); ctx.fill(); }
-      ctx.fillStyle = "#1c0f33"; ctx.beginPath(); ctx.arc(0, 0, r * 0.82, 0, TAU); ctx.fill();
-      ctx.strokeStyle = "#b28cff"; ctx.lineWidth = Math.max(1.5, r * 0.12); ctx.beginPath(); ctx.arc(0, 0, r * 0.82, 0, TAU); ctx.stroke();
-      ctx.fillStyle = "#e6d6ff"; ctx.beginPath(); ctx.arc(r * 0.2, -r * 0.2, r * 0.16, 0, TAU); ctx.fill();
-      return true;
-    }
-    if (n === "aura-sphere") {
-      ctx.fillStyle = "#3f7dff"; ctx.beginPath(); ctx.arc(0, 0, r * 0.9, 0, TAU); ctx.fill();
-      ctx.fillStyle = "#bfe2ff"; ctx.beginPath(); ctx.arc(0, 0, r * 0.55, 0, TAU); ctx.fill();
-      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1.5, r * 0.1);
-      for (let i = 0; i < 2; i++) { ctx.save(); ctx.rotate(t / (60 + i * 30) * (i ? -1 : 1)); ctx.beginPath(); ctx.ellipse(0, 0, r * 1.25, r * 0.45, 0, 0, TAU); ctx.stroke(); ctx.restore(); }
-      return true;
-    }
-    if (n === "focus-blast") {
-      ctx.fillStyle = "#ff8a2a"; ctx.beginPath(); ctx.arc(0, 0, r * 1.05, 0, TAU); ctx.fill();
-      ctx.fillStyle = "#fff2c0"; ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, TAU); ctx.fill();
-      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1, r * 0.08);
-      for (let i = 0; i < 8; i++) { const a = t / 50 + i * TAU / 8; ctx.beginPath(); ctx.moveTo(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7); ctx.lineTo(Math.cos(a) * r * 1.5, Math.sin(a) * r * 1.5); ctx.stroke(); }
-      return true;
-    }
-    if (n === "energy-ball") {
-      ctx.fillStyle = "#4fd35a"; ctx.beginPath(); ctx.arc(0, 0, r * 0.95, 0, TAU); ctx.fill();
-      ctx.fillStyle = "#e6ffc0"; ctx.beginPath(); ctx.arc(0, 0, r * 0.5, 0, TAU); ctx.fill();
-      for (let i = 0; i < 4; i++) { const a = t / 70 + i * TAU / 4; ctx.save(); ctx.translate(Math.cos(a) * r * 1.1, Math.sin(a) * r * 1.1); ctx.rotate(a); ctx.fillStyle = "#a6e86b"; ctx.beginPath(); ctx.ellipse(0, 0, r * 0.35, r * 0.14, 0, 0, TAU); ctx.fill(); ctx.restore(); }
-      return true;
-    }
-    if (n === "sludge-bomb" || n === "gunk-shot") {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "#8a3fc4"; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc((i - 1.5) * r * 0.3, Math.sin(t / 60 + i) * r * 0.25, r * (0.55 - i * 0.05), 0, TAU); ctx.fill(); }
-      ctx.fillStyle = "#e0b0ff"; ctx.beginPath(); ctx.arc(r * 0.25, -r * 0.2, r * 0.15, 0, TAU); ctx.fill();
-      return true;
-    }
-    return false;
-  }
-
   /* WHERE A SIGNATURE SHOT BURSTS: the water star breaks into a splash and
      two rings, the shadow ball tears open, the aura sphere rings out. */
   function signatureHit(slug, x, y, dx, dy) {
@@ -801,130 +550,6 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     }
   }
 
-  /* AN ULTI LANDS AS ITS TYPE (2026-10-27, asked for: "very awesome and epic,
-     especially ults"): over its blast, a pillar of its own matter - a column
-     of flame, a geyser, a bolt from the sky, a ring of ice spikes, vines
-     twisting up, rock bursting out of the floor, shadow reaching up, a
-     meteor, a tornado - rising fast and falling away. */
-  function pillar(e, kk) {
-    const up = Math.min(1, kk * 4), fade = kk > 0.55 ? 1 - (kk - 0.55) / 0.45 : 1;
-    const X = sx(e.x), Y = sy(e.y + 0.3), R2 = px * Math.max(0.9, e.r) * 0.9, Hh = px * 7 * up;
-    const rr = seeded(Math.floor(e.seed * 1e6) + Math.floor(e.t / 3));
-    ctx.save(); ctx.globalAlpha = fade;
-    switch (e.type) {
-      case "fire":
-        ctx.globalCompositeOperation = "lighter";
-        for (let i = 0; i < 18; i++) {
-          const q = i / 18, r = R2 * (1.1 - q * 0.65) * (0.75 + 0.5 * rr());
-          ctx.globalAlpha = 0.5 * fade; ctx.fillStyle = q < 0.2 ? "#fff3b0" : q < 0.5 ? "#ffb13a" : "#ff4a1a";
-          ctx.beginPath(); ctx.arc(X + (rr() - 0.5) * R2 * 0.5, Y - Hh * q, r, 0, TAU); ctx.fill();
-        }
-        break;
-      case "water": {
-        const g = ctx.createLinearGradient(0, Y - Hh, 0, Y);
-        g.addColorStop(0, "#ffffff"); g.addColorStop(0.35, "#9fdcff"); g.addColorStop(1, "#2f8fff");
-        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(X - R2 * 0.7, Y);
-        for (let q = 0; q <= 1; q += 0.1) ctx.lineTo(X - R2 * (0.7 - 0.25 * q) + Math.sin(q * 9 + clock / 30) * px * 0.15, Y - Hh * q);
-        for (let q = 1; q >= 0; q -= 0.1) ctx.lineTo(X + R2 * (0.7 - 0.25 * q) + Math.sin(q * 9 + clock / 30 + 2) * px * 0.15, Y - Hh * q);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = "#ffffff"; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(X + (rr() - 0.5) * R2, Y - Hh + (rr() - 0.5) * px * 0.6, px * (0.25 + rr() * 0.3), 0, TAU); ctx.fill(); }
-        break;
-      }
-      case "electric": {
-        ctx.globalCompositeOperation = "lighter";
-        for (const [c, wd] of [["#ffe74a", 0.5], ["#ffffff", 0.2]]) {
-          ctx.strokeStyle = c; ctx.lineWidth = px * wd; ctx.lineJoin = "round"; ctx.beginPath();
-          let bx = X + (rr() - 0.5) * R2, by = Y - px * 14;
-          ctx.moveTo(bx, by);
-          for (let i = 1; i <= 9; i++) { bx = X + (rr() - 0.5) * R2 * (1 - i / 9); by = Y - px * 14 * (1 - i / 9); ctx.lineTo(bx, by); }
-          ctx.stroke();
-        }
-        glow(X, Y, R2 * 1.6, "#fff59a", 0.6 * fade);
-        break;
-      }
-      case "ice":
-        ctx.fillStyle = "#d8f8ff"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(1, px * 0.06);
-        for (let i = 0; i < 9; i++) {
-          const a = (i / 9) * TAU, d = i ? R2 * 0.9 : 0, h = px * (i ? 1.6 + (i % 3) * 0.6 : 3.2) * up, b = px * (i ? 0.35 : 0.55);
-          const bx = X + Math.cos(a) * d, by = Y + Math.sin(a) * d * 0.45;
-          ctx.beginPath(); ctx.moveTo(bx - b, by); ctx.lineTo(bx + Math.cos(a) * b * 0.3, by - h); ctx.lineTo(bx + b, by); ctx.closePath(); ctx.fill(); ctx.stroke();
-        }
-        break;
-      case "grass": case "bug":
-        ctx.lineCap = "round";
-        for (let j = 0; j < 3; j++) {
-          ctx.strokeStyle = j % 2 ? "#5fd35a" : "#2f9a3a"; ctx.lineWidth = px * 0.24; ctx.beginPath();
-          for (let q = 0; q <= up; q += 0.05) { const a = q * TAU * 1.4 + j * TAU / 3 + kk * 5; ctx.lineTo(X + Math.cos(a) * R2 * (0.9 - q * 0.45), Y - Hh * (q / Math.max(0.01, up))); }
-          ctx.stroke();
-        }
-        break;
-      case "rock": case "ground":
-        for (let i = 0; i < 6; i++) {
-          const a = (i / 6) * TAU + e.seed * 6, d = R2 * (0.3 + (i % 2) * 0.55), h = px * (1.4 + ((i * 5) % 4) * 0.5) * up, wd = px * 0.55;
-          const bx = X + Math.cos(a) * d, by = Y + Math.sin(a) * d * 0.45;
-          ctx.fillStyle = e.type === "rock" ? "#8a7458" : "#9a7444";
-          ctx.beginPath(); ctx.moveTo(bx - wd, by); ctx.lineTo(bx - wd * 0.8, by - h); ctx.lineTo(bx, by - h * 1.15); ctx.lineTo(bx + wd * 0.8, by - h * 0.9); ctx.lineTo(bx + wd, by); ctx.closePath(); ctx.fill();
-          ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fillRect(bx - wd * 0.7, by - h, wd * 0.5, h * 0.9);
-        }
-        break;
-      case "ghost": case "dark":
-        ctx.lineCap = "round";
-        for (let j = 0; j < 5; j++) {
-          ctx.strokeStyle = e.type === "ghost" ? (j % 2 ? "#5a3d9a" : "#8f6fe0") : (j % 2 ? "#1c0f33" : "#4a2a6a"); ctx.lineWidth = px * (0.5 - j * 0.05); ctx.globalAlpha = 0.85 * fade;
-          ctx.beginPath(); ctx.moveTo(X + (j - 2) * R2 * 0.3, Y);
-          for (let q = 0; q <= 1; q += 0.1) ctx.lineTo(X + (j - 2) * R2 * 0.3 + Math.sin(q * 6 + clock / 40 + j) * px * 0.4, Y - Hh * 0.8 * q);
-          ctx.stroke();
-        }
-        glow(X, Y - Hh * 0.5, R2 * 1.4, e.type === "ghost" ? "#8f6fe0" : "#4a2a6a", 0.4 * fade);
-        break;
-      case "psychic": case "fairy":
-        ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = e.type === "psychic" ? "#ff7ad9" : "#ffb3e6"; ctx.lineWidth = Math.max(2, px * 0.14);
-        for (let i = 0; i < 4; i++) { const q = (kk * 2 + i / 4) % 1; ctx.globalAlpha = (1 - q) * fade; ctx.beginPath(); ctx.ellipse(X, Y - Hh * 0.3, R2 * (0.4 + q * 1.6), R2 * (0.4 + q * 1.6) * 0.5, 0, 0, TAU); ctx.stroke(); }
-        ctx.globalAlpha = 0.35 * fade; ctx.fillStyle = ctx.strokeStyle; ctx.fillRect(X - R2 * 0.35, Y - Hh, R2 * 0.7, Hh);
-        break;
-      case "dragon": {
-        const q = Math.min(1, kk * 3), mx = X + (1 - q) * px * 4, my = Y - (1 - q) * px * 14;
-        ctx.globalCompositeOperation = "lighter";
-        ctx.strokeStyle = "#9b7bff"; ctx.lineWidth = px * 0.6; ctx.globalAlpha = 0.5 * fade;
-        ctx.beginPath(); ctx.moveTo(mx + px * 3, my - px * 9); ctx.lineTo(mx, my); ctx.stroke();
-        glow(mx, my, px * 1.1, "#7a5cff", 0.9 * fade); glow(mx, my, px * 0.5, "#ffffff", 0.9 * fade);
-        if (q >= 1) glow(X, Y, R2 * 2, "#9b7bff", 0.6 * fade);
-        break;
-      }
-      case "poison":
-        ctx.fillStyle = "rgba(170,90,230,0.55)"; ctx.fillRect(X - R2 * 0.5, Y - Hh * 0.8, R2, Hh * 0.8);
-        ctx.strokeStyle = "#e0b0ff"; ctx.lineWidth = Math.max(1, px * 0.06);
-        for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.arc(X + (rr() - 0.5) * R2, Y - Hh * 0.8 * rr(), px * (0.15 + rr() * 0.25), 0, TAU); ctx.stroke(); }
-        break;
-      case "flying":
-        ctx.strokeStyle = "rgba(235,246,255,0.8)"; ctx.lineWidth = Math.max(2, px * 0.12);
-        for (let i = 0; i < 8; i++) { const q = i / 8; ctx.beginPath(); ctx.ellipse(X + Math.sin(clock / 60 + i) * px * 0.3, Y - Hh * q, R2 * (0.3 + q * 0.9), R2 * (0.3 + q * 0.9) * 0.3, 0, clock / 30 + i, clock / 30 + i + 4.2); ctx.stroke(); }
-        break;
-      default:
-        ctx.globalCompositeOperation = "lighter";
-        glow(X, Y - Hh * 0.5, R2 * 1.2, "#ffffff", 0.5 * fade);
-        ctx.globalAlpha = 0.6 * fade; ctx.fillStyle = "#ffffff"; ctx.fillRect(X - R2 * 0.3, Y - Hh, R2 * 0.6, Hh);
-    }
-    ctx.restore();
-  }
-  // Its matter as the pillar goes up: embers rising, a geyser's rain, shards, leaves, rubble.
-  function pillarBurst(type, x, y, r) {
-    if (still) return;
-    const n = lite ? 10 : 22;
-    for (let i = 0; i < n; i++) {
-      const [vx, vy] = around(0.03 + rand() * 0.06), hx = x + (rand() - 0.5) * r;
-      switch (type) {
-        case "fire": part({ k: "glow", x: hx, y, vx: vx * 0.5, vy: -0.05 - rand() * 0.05, lift: 0.003, colour: rand() < 0.5 ? "#ffd27a" : "#ff5a1f", life: 50, size: 0.18, drag: 0.97 }); break;
-        case "water": part({ k: "dot", x: hx, y, vx, vy, vz: 0.15 + rand() * 0.12, g: 0.01, colour: rand() < 0.5 ? "#d8f6ff" : "#7fd4ff", life: 60, size: 0.13, splash: rand() < 0.3, drag: 0.98 }); break;
-        case "ice": part({ k: "shard", x: hx, y, vx, vy, vz: 0.1, g: 0.008, colour: rand() < 0.5 ? "#bff3ff" : "#ffffff", life: 50, size: 0.22, vr: 0.3, bounce: 1 }); break;
-        case "grass": case "bug": part({ k: "leaf", x: hx, y, vx, vy: vy - 0.04, vz: 0.05, g: 0.0015, colour: rand() < 0.5 ? "#5fd35a" : "#a6e86b", life: 70, size: 0.18, vr: 0.3 }); break;
-        case "rock": case "ground": part({ k: "chunk", x: hx, y, vx, vy, vz: 0.12 + rand() * 0.1, g: 0.01, colour: rand() < 0.5 ? "#9b8466" : "#6e5c48", life: 60, size: 0.18, vr: 0.3, bounce: 2 }); break;
-        case "electric": if (i % 3 === 0) part({ k: "bolt", x: hx, y, ang: rand() * TAU, len: 1 + rand(), colour: "#fff59a", life: 9 }); break;
-        case "ghost": case "dark": part({ k: "glow", x: hx, y, vx: vx * 0.5, vy: -0.03, lift: 0.002, wob: 1, colour: type === "ghost" ? "#8f6fe0" : "#4a2a6a", life: 60, size: 0.26 }); break;
-        default: part({ k: "star", x: hx, y, vx, vy, colour: colours[type] ?? "#ffffff", life: 40, size: 0.18 });
-      }
-    }
-  }
   let px = 16, floor = null, ox = 0, oy = 0, dpr = 1;
   const fx = [];          // live effects: bursts, numbers, words, rings, beams, corpses
   const parts = [];       // matter: embers, droplets, shards, chunks...
@@ -939,7 +564,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   /* Each side's ULTI as cast (Phase 7, the anime way): its name and the line to its foe, which its
      strikes, beam and shots are drawn by while they last - a side casts one ULTI at a time. */
   const lastUlt = [null, null];
-  const named = (side) => !classicFx() && lastUlt[side] && pix.ultHas(lastUlt[side].name) ? lastUlt[side] : null;
+  const named = (side) => lastUlt[side] && pix.ultHas(lastUlt[side].name) ? lastUlt[side] : null;
   function maskOf(f, fr, at) {
     const atlas = atlasOf(f.id, shiny[f.side]?.[f.slot]), pc = atlas && pieceOf(atlas.meta, fr);
     if (!pc) return null;
@@ -1101,73 +726,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
 
   /* WHAT EACH TYPE THROWS where it lands: the line of the blow first (every
      hit sprays along it), then its own matter. */
-  function impact(type, x, y, dx, dy, heavy) {
-    if (!classicFx()) { pix.impact(type, x, y, dx, dy, heavy); return; }
-    const n = heavy ? 1.7 : 1;
-    const c = colours[type] ?? "#fff";
-    const hx = dx || rand() - 0.5, hy = dy || rand() - 0.5;
-    for (let i = 0; i < 6 * n; i++) { const [vx, vy] = spray(hx, hy, 1.1, 0.1); part({ k: "streak", x, y, vx, vy, colour: "#ffffff", life: 11, size: 0.55, drag: 0.84 }); }
-    const each = (count, fn) => { for (let i = 0; i < count * n; i++) part(fn(i)); };
-    switch (type) {
-      case "fire":
-        each(14, () => { const [vx, vy] = spray(hx, hy, 2.4, 0.07); return { k: "glow", x, y, vx, vy, lift: 0.0025, colour: rand() < 0.5 ? "#ffd27a" : "#ff5a1f", life: 28 + rand() * 24, size: 0.12 + rand() * 0.1, drag: 0.93 }; });
-        each(4, () => ({ k: "smoke", x: x + (rand() - 0.5) * 0.4, y, vx: (rand() - 0.5) * 0.02, vy: -0.012, colour: "rgba(60,40,30,", life: 54, size: 0.35 }));
-        break;
-      case "water":
-        each(14, () => { const [vx, vy] = spray(hx, hy, 2.6, 0.06); return { k: "dot", x, y, vx, vy, vz: 0.06 + rand() * 0.09, g: 0.008, colour: rand() < 0.5 ? "#7fd4ff" : "#d8f6ff", life: 46, size: 0.11, drag: 0.97, splash: rand() < 0.2 }; });
-        part({ k: "ring", x, y, colour: "#bff0ff", life: 22, size: 0.3, grow: 0.07 });
-        break;
-      case "electric":
-        each(5, () => ({ k: "bolt", x, y, ang: rand() * TAU, len: 0.8 + rand() * 1, colour: "#fff59a", life: 7 + rand() * 7 }));
-        each(8, () => { const [vx, vy] = around(0.09); return { k: "glow", x, y, vx, vy, colour: "#ffe74a", life: 16, size: 0.09 }; });
-        break;
-      case "ice":
-        each(11, () => { const [vx, vy] = spray(hx, hy, 2.2, 0.07); return { k: "shard", x, y, vx, vy, vz: 0.05 + rand() * 0.08, g: 0.007, colour: rand() < 0.5 ? "#bff3ff" : "#ffffff", life: 48, size: 0.2, vr: (rand() - 0.5) * 0.4, bounce: 1, drag: 0.95 }; });
-        each(3, () => ({ k: "smoke", x, y, vx: (rand() - 0.5) * 0.02, vy: -0.004, colour: "rgba(220,245,255,", life: 40, size: 0.4 }));
-        break;
-      case "grass": case "bug":
-        each(10, () => { const [vx, vy] = spray(hx, hy, 2.6, 0.06); return { k: "leaf", x, y, vx, vy, vz: 0.05 + rand() * 0.05, g: 0.0022, colour: type === "bug" ? (rand() < 0.5 ? "#b6d84a" : "#8fb33a") : rand() < 0.5 ? "#5fd35a" : "#a6e86b", life: 64, size: 0.17, vr: (rand() - 0.5) * 0.3, drag: 0.95 }; });
-        break;
-      case "rock": case "ground":
-        each(10, () => { const [vx, vy] = spray(hx, hy, 2.8, 0.06); return { k: "chunk", x, y, vx, vy, vz: 0.07 + rand() * 0.09, g: 0.009, colour: type === "rock" ? (rand() < 0.5 ? "#9b8466" : "#6e5c48") : (rand() < 0.5 ? "#b58b52" : "#8a6a3e"), life: 58, size: 0.13 + rand() * 0.12, vr: (rand() - 0.5) * 0.3, bounce: 2, drag: 0.96 }; });
-        each(5, () => ({ k: "smoke", x: x + (rand() - 0.5) * 0.6, y, vx: (rand() - 0.5) * 0.03, vy: -0.006, colour: "rgba(200,176,138,", life: 50, size: 0.4 }));
-        break;
-      case "poison":
-        each(10, () => ({ k: "bubble", x: x + (rand() - 0.5) * 0.7, y: y + (rand() - 0.5) * 0.4, vx: (rand() - 0.5) * 0.02, vy: -0.02 - rand() * 0.02, colour: "#d48cff", life: 34 + rand() * 20, size: 0.08 + rand() * 0.12, drag: 0.98 }));
-        break;
-      case "psychic":
-        for (let i = 0; i < 3; i++) part({ k: "ring", x, y, colour: "#ff7ad9", life: 26, size: 0.25, grow: 0.08, t: -i * 4 });
-        each(6, () => { const [vx, vy] = around(0.05); return { k: "star", x, y, vx, vy, colour: "#ffc2ef", life: 30, size: 0.16 }; });
-        break;
-      case "ghost":
-        each(8, () => { const [vx, vy] = around(0.03); return { k: "glow", x, y, vx, vy, lift: 0.0018, wob: 1, colour: rand() < 0.5 ? "#8f6fe0" : "#5a3d9a", life: 52, size: 0.22, drag: 0.96 }; });
-        break;
-      case "dark":
-        for (let i = 0; i < 3; i++) part({ k: "slash", x, y, ang: rand() * Math.PI, len: 1.5, colour: "#c08aff", life: 13, t: -i * 2 });
-        break;
-      case "fighting":
-        part({ k: "burst", x, y, colour: "#ffb15a", life: 12, size: 1.1 * n });
-        part({ k: "ring", x, y, colour: "#ffffff", life: 16, size: 0.3, grow: 0.12 });
-        break;
-      case "steel":
-        each(14, () => { const [vx, vy] = spray(hx, hy, 2, 0.16); return { k: "streak", x, y, vx, vy, colour: rand() < 0.5 ? "#fff6c0" : "#ffffff", life: 15, size: 0.4, drag: 0.88 }; });
-        break;
-      case "dragon":
-        each(10, () => { const [vx, vy] = spray(hx, hy, 2.4, 0.08); return { k: "shard", x, y, vx, vy, colour: rand() < 0.5 ? "#9b7bff" : "#5fb8ff", life: 30, size: 0.2, vr: 0.3, drag: 0.92 }; });
-        each(5, () => { const [vx, vy] = around(0.04); return { k: "glow", x, y, vx, vy, colour: "#7a5cff", life: 34, size: 0.18 }; });
-        break;
-      case "fairy":
-        each(10, () => { const [vx, vy] = around(0.06); return { k: "star", x, y, vx, vy, colour: rand() < 0.5 ? "#ffb3e6" : "#ffffff", life: 36, size: 0.18, drag: 0.94 }; });
-        break;
-      case "flying":
-        for (let i = 0; i < 4; i++) part({ k: "arc", x, y, ang: Math.atan2(hy, hx) + (rand() - 0.5) * 1.2, colour: "#eaf6ff", life: 15, size: 0.9 + rand() * 0.4, t: -i });
-        break;
-      default:
-        part({ k: "burst", x, y, colour: "#ffffff", life: 10, size: 0.9 * n });
-        each(6, () => { const [vx, vy] = around(0.07); return { k: "star", x, y, vx, vy, colour: "#fff8d0", life: 24, size: 0.15 }; });
-    }
-    if (heavy) part({ k: "glow", x, y, colour: c, life: 14, size: 1.2 });
-  }
+  function impact(type, x, y, dx, dy, heavy) { pix.impact(type, x, y, dx, dy, heavy); }
   // Dust kicked up at the feet (a roll, a landing, a dash).
   const dust = (x, y, n = 4) => {
     const c = ground.ice ? "rgba(235,250,255," : arena === "caldera" ? "rgba(70,55,50," : arena === "grove" ? "rgba(120,150,90," : "rgba(210,200,180,";
@@ -1233,11 +792,9 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         fx.push({ k: "burst", x: e.x, y: e.y, art: art?.burst ?? art?.shot, colour, t: 0, life: bas && !e.boost ? 16 : 30 });
         impact(type, e.x, e.y, e.dx, e.dy, heavy);
         if (!bas) signatureHit(slugOf(e.move), e.x, e.y, e.dx, e.dy);
-        if (classicFx()) sheet("impact", e.x, e.y - 0.25, bas ? (e.boost ? 2.1 : 1.3) : heavy ? 3.4 : 2.5, colour, bas && !e.boost ? 14 : 22, (rand() - 0.5) * 0.6);
+        const striker = activeOf(s, 1 - e.side);
+        if (!bas) pix.sig(slugOf(e.move), "hit", { side: e.side, x: e.x, y: e.y, dx: e.dx, dy: e.dy, ux: striker?.x ?? e.x, uy: striker?.y ?? e.y });
         if (!bas && LIFTS.has(slugOf(e.move))) { const lp = poseOf(e.side, s.sides[e.side].active); lp.lift = LIFT_T; lp.liftC = colour; lp.liftDx = e.dx ?? 0; lp.liftDy = e.dy ?? 0; }
-        if (!bas && slugOf(e.move) === "fire-blast" && !artKey(e.move)) fx.push({ k: "dai", x: e.x, y: e.y - 0.4, t: 0, life: 46 });
-        const lk = !bas && LANDS.has(slugOf(e.move)) && artKey(e.move);
-        if (lk) fx.push({ k: "mv", key: lk, x: e.x, y: e.y - 0.3, size: 3.4, ang: 0, t: 0, life: 30 });
         // An ULTI's hit: its panel, once a cast, and twice the matter.
         if (e.ult) { panel(1 - e.side, e.x, e.y); impact(type, e.x, e.y, e.dx, e.dy, true); }
         // Electric on a soaked Pokemon: the water carries it.
@@ -1246,7 +803,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           strike(e.x, e.y);
           for (let i = 0; i < 10; i++) part({ k: "bolt", x: e.x + (rand() - 0.5) * 1.2, y: e.y - 0.3 + (rand() - 0.5) * 0.8, ang: rand() * TAU, len: 0.5 + rand() * 0.6, colour: "#bff3ff", life: 8 + rand() * 6 });
         }
-        const mn = bas ? "" : moveOf(e.move).n ?? "";
+        const mn = bas || SIG.has(slugOf(e.move)) ? "" : moveOf(e.move).n ?? "";      // a signature move has its own look
         if (/thunder|zap|volt|bolt-strike|wild-charge/.test(mn)) strike(e.x, e.y);
         if (/leaf|petal|blossom/.test(mn)) for (let i = 0; i < 14; i++) { const [vx, vy] = around(0.09); part({ k: "leaf", x: e.x, y: e.y, vx, vy, vz: 0.05, g: 0.002, colour: i % 2 ? "#5fd35a" : "#ffb3d9", life: 60, size: 0.2, vr: 0.3, drag: 0.95 }); }
         if (/hydro|surf|water-spout|aqua|waterfall|scald/.test(mn)) { sheet("shockwave", e.x, e.y + 0.35, 2.6, "#7fd4ff", 22); for (let i = 0; i < 16; i++) { const [vx, vy] = around(0.08); part({ k: "dot", x: e.x, y: e.y, vx, vy, vz: 0.1 + rand() * 0.08, g: 0.008, colour: "#d8f6ff", life: 40, size: 0.12, splash: true }); } }
@@ -1281,8 +838,6 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         kick(e.dx, e.dy, px * (bas ? 0.12 : 0.18) * power);
         if (heavy) {
           zoomAt(e.x, e.y, e.crit ? 0.1 : 0.07); impactFrame(sx(e.x), sy(e.y)); crowd(3);
-          // Debris thrown off a heavy blow, along it.
-          if (classicFx()) for (let i = 0; i < 8; i++) { const [vx, vy] = spray(e.dx || 1, e.dy, 1.6, 0.12); part({ k: "streak", x: e.x, y: e.y - 0.2, vx, vy, colour: i % 2 ? colour : "#ffffff", life: 12, size: 0.5, drag: 0.88 }); }
         }
         if (MARK_OF[type] && (heavy || type !== "fighting" && type !== "steel" && rand() < 0.55)) mark(MARK_OF[type], e.x + (rand() - 0.5) * 0.3, e.y + 0.3, heavy ? 1.6 : 1.1, colour);
         else if (heavy) mark("ring", e.x, e.y + 0.3, 1.4, colour);
@@ -1307,16 +862,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         const p = poseOf(e.side, s.sides[e.side].active); p.sx = 1.12; p.sy = 0.9; p.tint = STATUS[e.st]?.colour; p.tintT = 8;
       } else if (e.k === "heal") {
         fx.push({ k: "num", x: e.x, y: e.y - 0.6, text: `+${e.n}`, size: 0.46, colour: "#5fe08a", t: 0, life: 50 });
-        if (!classicFx()) pix.heal(e.x, e.y - 0.2);
-        else for (let i = 0; i < 8; i++) fx.push({ k: "rise", x: e.x + (rand() - 0.5) * 1.2, y: e.y + 0.3, colour: "#7dffa8", t: -i * 3, life: 34 });
+        pix.heal(e.x, e.y - 0.2);
         if (FX["moves/heal"]) fx.push({ k: "mv", key: "moves/heal", x: e.x, y: e.y - 0.5, size: 3, ang: 0, t: 0, life: 40 });
       } else if (e.k === "stage") {
         // Its family sheet once a tick a side, however many stats moved.
         const sk = e.n > 0 ? "moves/power-up" : "moves/stat-drop", once = `${e.side}:${s.t}:${sk}`;
         if (FX[sk] && stageOnce !== once) { stageOnce = once; fx.push({ k: "mv", key: sk, x: e.x, y: e.y - 0.5, size: 3, ang: 0, t: 0, life: 40 }); }
         word(e.x, e.y - 1.1 - (e.stat % 2) * 0.35, `${STAT[e.stat]} ${e.n > 0 ? "▲" : "▼"}`, e.n > 0 ? "#ff9d52" : "#7ab8ff", 45);
-        if (!classicFx()) { const o2 = `${e.side}:${s.t}:${e.n > 0}`; if (auraOnce !== o2) { auraOnce = o2; pix.boost(e.side, e.n > 0); } }
-        else for (let i = 0; i < 6; i++) fx.push({ k: "arrow", x: e.x + (rand() - 0.5), y: e.y + 0.2, up: e.n > 0, colour: e.n > 0 ? "#ff9d52" : "#7ab8ff", t: -i * 4, life: 30 });
+        { const o2 = `${e.side}:${s.t}:${e.n > 0}`; if (auraOnce !== o2) { auraOnce = o2; pix.boost(e.side, e.n > 0); } }
       } else if (e.k === "status") {
         word(e.x, e.y - 1.2, { [PAR]: "Paralysed!", [BRN]: "Burned!", [PSN]: "Poisoned!", [SLP]: "Fell asleep!", [FRZ]: "Frozen solid!" }[e.st], STATUS[e.st].colour, 55);
         sparks(e.x, e.y, STATUS[e.st].colour, 10, 0.07);
@@ -1332,7 +885,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           slow(260, 0.3);
         } else word(e.x, e.y - 1, "Dodged", "#45d4ff", 40);
       } else if (e.k === "blocked") {
-        if (!classicFx()) pix.shieldHit(e.side, e.x, e.y);
+        pix.shieldHit(e.side, e.x, e.y);
         word(e.x, e.y - 1, "Blocked", "#9fe3ff", 40);
         fx.push({ k: "ring", x: e.x, y: e.y, colour: "#9fe3ff", t: 0, life: 18 });
         sparks(e.x, e.y - 0.3, "#e8fbff", 8, 0.08);
@@ -1373,10 +926,11 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           if (e.shape === "dash") dust(body.x, body.y, 5);
           else if (!isBasic(e.move) || rand() < 0.4) dust(body.x + e.dx * 0.7, body.y + e.dy * 0.4, isBasic(e.move) ? 1 : 3);
         }
+        if (!isBasic(e.move)) pix.sig(slugOf(e.move), "fire", { side: e.side, x: body.x, y: body.y, dx: e.dx ?? 0, dy: e.dy ?? 0 });
         // A blow's own art, at its reach.
-        const mk = e.shape === "melee" && !isBasic(e.move) && !LANDS.has(slugOf(e.move)) && !VANISH[slugOf(e.move)] && artKey(e.move);
-        if (!classicFx() && e.shape === "melee" && BITES.has(slugOf(e.move))) pix.jaws(typeOf(e.move), body.x + e.dx * 1.2, body.y + e.dy * 1.2);
-        else if (!classicFx() && slugOf(e.move) === "play-rough") pix.scuffle(body.x + e.dx * 1.2, body.y + e.dy * 1.2);
+        const mk = e.shape === "melee" && !isBasic(e.move) && !VANISH[slugOf(e.move)] && artKey(e.move);
+        if (e.shape === "melee" && BITES.has(slugOf(e.move))) pix.jaws(typeOf(e.move), body.x + e.dx * 1.2, body.y + e.dy * 1.2);
+        else if (slugOf(e.move) === "play-rough") pix.scuffle(body.x + e.dx * 1.2, body.y + e.dy * 1.2);
         else if (mk) fx.push({ k: "mv", key: mk, x: body.x + e.dx * 1.2, y: body.y - 0.2 + e.dy * 1.2, size: 3.2, ang: Math.atan2(e.dy, e.dx), t: 0, life: 24 });
         else if (e.shape === "shot" || e.shape === "multi" || e.shape === "beam") {
           p.ox -= e.dx * 0.14; p.oy -= e.dy * 0.14; p.sx = 1.12; p.sy = 0.9;
@@ -1397,7 +951,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         // A beam with no stream art of its own is the pixel layer's; its Emerald sprite is still laid down it (`drawFx`).
         const nu = e.big && e.move <= ULT_BASE && named(e.side);
         if (nu) pix.ultLand(nu.name, { side: e.side, x: e.x, y: e.y, dx: e.dx, dy: e.dy, len: e.len });
-        else if (!classicFx() && !fx[fx.length - 1].key) pix.beam(typeOf(e.move), e.x, e.y, e.dx, e.dy, e.len, BEAM_W * (e.big ? 2 : 1), (e.big ? 44 : 26) / 60);
+        else if (pix.sig(slugOf(e.move), "beam", { side: e.side, x: e.x, y: e.y, dx: e.dx, dy: e.dy, len: e.len, w: BEAM_W * (e.big ? 2 : 1) })) fx.pop();
+        else if (!fx[fx.length - 1].key) pix.beam(typeOf(e.move), e.x, e.y, e.dx, e.dy, e.len, BEAM_W * (e.big ? 2 : 1), (e.big ? 44 : 26) / 60);
         shake(e.big ? 0.9 : 0.45); kick(-e.dx, -e.dy, px * (e.big ? 0.3 : 0.16));
         if (e.big) { zoomAt(e.x + e.dx * e.len / 2, e.y + e.dy * e.len / 2, 0.12); tilt(e.dx > 0 ? -0.03 : 0.03); }
         // Sparks thrown off all along it, and a burst where it ends.
@@ -1418,15 +973,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else if (e.k === "smoke") {
         poof(e.x, e.y, 3);
         word(e.x, e.y - 1.5, "Smokescreen!", "#c8cbd6", 50, true);
-      } else if (e.k === "pulse" && slugOf(e.move) === "rock-slide") {
-        // Rock Slide: boulders fall out of the sky round its user, each landing with a thud.
-        for (let i = 0; i < 7; i++) {
-          const a = (i / 7) * TAU + rand() * 0.4, r = 1.2 + rand() * 1.5;
-          fx.push({ k: "fall", x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r * 0.7, t: -i * 3, life: 20, rot: rand() * TAU, size: 0.35 + rand() * 0.25 });
-        }
-        shake(0.5);
       } else if (e.k === "pulse") {
-        const type = typeOf(e.move), colour = colourOf(e.move), pk = !LANDS.has(slugOf(e.move)) && artKey(e.move);
+        const foeAt = activeOf(s, 1 - e.side);
+        const signed = !e.wide && pix.sig(slugOf(e.move), "pulse", { side: e.side, x: e.x, y: e.y, r: e.r, fx: foeAt?.x, fy: foeAt?.y });
+        const type = typeOf(e.move), colour = colourOf(e.move), pk = artKey(e.move);
         const toward = (activeOf(s, 1 - e.side)?.x ?? W) < e.x ? Math.PI : 0;
         if (pk) fx.push({ k: "mv", key: pk, x: e.x, y: e.y + 0.1, size: e.wide ? 6.5 : e.r * 2.4, ang: e.wide ? toward : 0, t: 0, life: 32 });
         if (e.wide) {
@@ -1446,8 +996,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           shake(0.7); crowd(6);
           continue;
         }
-        fx.push({ k: "wave", x: e.x, y: e.y, r: e.r, colour, art: arenaArt(slugOf(e.move))?.burst, t: 0, life: 24 });
-        sheet("shockwave", e.x, e.y + 0.3, e.r * 2.3, colour, 26);
+        if (!signed) {
+          fx.push({ k: "wave", x: e.x, y: e.y, r: e.r, colour, art: arenaArt(slugOf(e.move))?.burst, t: 0, life: 24 });
+          sheet("shockwave", e.x, e.y + 0.3, e.r * 2.3, colour, 26);
+        }
         if (!moveOf(e.move).p) continue;
         const quake = type === "ground" || type === "rock";
         shake(quake ? 0.55 : 0.25);
@@ -1525,8 +1077,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         impact(type, e.x, e.y, 0, 0, true);
         const nu = !e.vanish && named(e.side);
         if (nu && !still) pix.ultLand(nu.name, { side: e.side, x: e.x, y: e.y, r: e.r, follow: e.r < 1.3 });
-        else if (!still && !classicFx()) pix.pillar(type, e.x, e.y, e.r, 52 / 60);
-        else if (!still) { fx.push({ k: "pillar", type, x: e.x, y: e.y, r: e.r, t: 0, life: 52, seed: rand() }); pillarBurst(type, e.x, e.y, e.r); }
+        else if (!still) pix.pillar(type, e.x, e.y, e.r, 52 / 60);
         // A named ULTI's own landing replaces the generic shockwave and archetype sheets (they swamped it).
         if (!nu) sheet("shockwave", e.x, e.y + 0.3, e.r * 2.6, colour, 30);
         if (!nu && e.arch && e.arch !== "Snare") ulti(e.arch, e.x, e.y, e.r * 2.6, colour);   // a Snare plays its own, in its colour, on "snare"
@@ -2159,25 +1710,27 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
 
     // 1b. The pixel effects' back layer (pixfx.js): rings on the floor, smoke - under the bodies.
     pix.step(k);
-    if (!classicFx()) for (const p of s.shots) {
+    for (const p of s.shots) {
       const x = p.x - p.dx * (10 / TPS) * (1 - alpha), y = p.y - p.dy * (10 / TPS) * (1 - alpha), bas = isBasic(p.move), slug = slugOf(p.move);
-      const own = BOULDERS.has(slug) || (!bas && !LANDS.has(slug) && artKey(p.move)) || arenaArt(slug)?.shot;
+      const own = BOULDERS.has(slug) || (!bas && artKey(p.move)) || arenaArt(slug)?.shot;
       const nu = p.move <= ULT_BASE && named(p.side), mid = nu && p.dx * nu.dx + p.dy * nu.dy > 0.995;
+      if (!bas && !nu && pix.sig(slug, "shot", { id: p.id, side: p.side, x, y, dx: p.dx, dy: p.dy })) continue;
       pix.shot(p.id, bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, trails.get(p.id) ?? [], { basic: bas, boost: p.boost, orb: !own || Boolean(nu), k, ult: nu?.name, centre: mid });
     }
     // A stream pouring, from the fighter's own act (Phase 3); `pour` below is the classic look's.
-    if (!classicFx()) for (const f of bodies) if (f.act?.ph === "chan") {
+    for (const f of bodies) if (f.act?.ph === "chan") {
       const [x, y] = lerp(f), a = f.act;
-      pix.stream(f.side, typeOf(moveAt(f, a.k).i), x + a.dx * 0.45, y - 0.3 + a.dy * 0.45, a.dx, a.dy, Math.max(0.6, a.len || 0), BEAM_W, k);
+      const mi = moveAt(f, a.k).i;
+      pix.stream(f.side, typeOf(mi), x + a.dx * 0.45, y - 0.3 + a.dy * 0.45, a.dx, a.dy, Math.max(0.6, a.len || 0), BEAM_W, k, slugOf(mi));
     }
     // Each body's status on its own outline, from the frame it was drawn in last.
-    if (!classicFx()) for (let side = 0; side < 2; side++) {
+    for (let side = 0; side < 2; side++) {
       const lb = lastBody[side], kind = lb && { [BRN]: "brn", [PAR]: "par", [PSN]: "psn", [FRZ]: "frz", [SLP]: "slp" }[lb.st];
       pix.setBody(side, lb?.body ?? null);
       if (kind && !still) pix.status(side, kind, lb.body, k);
       lastBody[side] = null;
     }
-    const pixOn = !classicFx() && pix.paint(!lite), pxs = px / BODY_PX;
+    const pixOn = pix.paint(!lite), pxs = px / BODY_PX;
     if (pixOn) pix.blit(ctx, "back", sx(-pix.MARGIN), sy(-pix.MARGIN), pxs);
 
     // 2. Bodies: shadow, afterimages, the walking sprite, its status and flash.
@@ -2189,7 +1742,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       ctx.beginPath(); ctx.ellipse(sx(x), sy(y + 0.42), px * 0.6, px * 0.22, 0, 0, TAU); ctx.fill();
       ctx.restore();
       const lunging = f.act?.shape === "dash" && f.act.ph === "act";
-      const pixGhost = !classicFx() && !f.hidden;
+      const pixGhost = !f.hidden;
       if ((f.dodge > 0 || lunging || ((f.surge > 0 || f.haste > 0) && f.moving)) && ghostAcc >= 2) {
         const tint = lunging ? colourOf(moveAt(f, f.act.k).i) : f.surge > 0 ? colours[TYPES[f.types[0]]] : f.haste > 0 ? "#45d4ff" : f.dodge > 0 ? "#9fe9ff" : null;
         const fr0 = poseOf(f.side, f.slot).fr ?? { frame: frameOf(f, t) }, body = pixGhost && maskOf(f, fr0, { x, y });
@@ -2300,8 +1853,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       if (f.evo > 0) evolving(f, p, at, fr);
       else sprite(f.id, f.side, f.slot, at.x, at.y, fr, (blink ? 0.45 : 1) * hid, f.flash > 0 ? "#ffffff" : null, at);
       if (p.tintT > 0 && p.tint && f.flash <= 0) {
-        if (classicFx()) sprite(f.id, f.side, f.slot, at.x, at.y, fr, 0.55 * (p.tintT / 12) * hid, p.tint, at);
-        else if (Math.floor(p.tintT / 3) % 2 === 1) sprite(f.id, f.side, f.slot, at.x, at.y, fr, 0.9 * hid, p.tint, at);
+        if (Math.floor(p.tintT / 3) % 2 === 1) sprite(f.id, f.side, f.slot, at.x, at.y, fr, 0.9 * hid, p.tint, at);
       }
       if (f.hidden) {
         ctx.save(); ctx.fillStyle = "rgba(40,110,45,0.85)";
@@ -2310,7 +1862,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.restore();
       }
       // Its silhouette as drawn: its status and a stat's aura follow it in the pixel layer.
-      if (!classicFx() && !f.hidden) { const body = maskOf(f, fr, at); if (body) lastBody[f.side] = { st: f.status, body }; }
+      if (!f.hidden) { const body = maskOf(f, fr, at); if (body) lastBody[f.side] = { st: f.status, body }; }
       statusOn(f, x, y, k, !!lastBody[f.side]);
       if (p.dizzy > 0) { p.dizzy -= k; dizzyStars(at.x, at.y, p.dizzy / 50); }
       if (f.confused > 0) confusedSwirl(at.x, at.y);
@@ -2326,13 +1878,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         // Double Team's copies carry the same bar: one over the real one alone gave the trick away.
         for (const [cx, cy] of clonesOf({ clones: f.clones, x, y })) hpBar(f, p, cx, cy);
       }
-      if (f.shield > 0 && !classicFx()) pix.shield(f.side, x, y);
-      else if (f.shield > 0) {
-        ctx.save(); ctx.globalAlpha = 0.35 + 0.25 * Math.abs(Math.sin(clock / 100));
-        ctx.strokeStyle = "#9fe3ff"; ctx.lineWidth = Math.max(2, px / 8);
-        ctx.fillStyle = "rgba(160,230,255,0.15)";
-        ctx.beginPath(); ctx.arc(sx(x), sy(y - 0.3), px * 1.25, 0, TAU); ctx.fill(); ctx.stroke(); ctx.restore();
-      }
+      if (f.shield > 0) pix.shield(f.side, x, y);
     };
 
     // 2b. Cover: its material, cracking as it weakens, wobbling when struck.
@@ -2358,15 +1904,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     // 2c. Steam: a cloud over whoever stands in it, thinning as it goes.
     for (const c of s.clouds) {
       const a = Math.min(1, c.t / 40);
-      // Smoke drawn as its own sheet, once there is one.
-      if (!classicFx()) { pix.cloud(c.x, c.y - 0.2, a, Boolean(c.smoke)); continue; }
-      if (c.smoke && FX["moves/smoke"] && sheetFx("moves/smoke", clock / 110 % FX["moves/smoke"].n, sx(c.x), sy(c.y - 0.2), px * 4, 0, null, a)) continue;
-      for (let i = 0; i < 7; i++) {
-        const ang = i * 0.9 + clock / 1400, r = 0.9 + 0.35 * Math.sin(i * 2.1 + clock / 500);
-        const qx = c.x + Math.cos(ang) * r * 0.75, qy = c.y - 0.2 + Math.sin(ang) * r * 0.45;
-        ctx.save(); ctx.globalAlpha = (c.smoke ? 0.72 : 0.5) * a; ctx.fillStyle = c.smoke ? (i % 2 ? "#6b6f7c" : "#8d919e") : i % 2 ? "#eef4fb" : "#d4dde8";
-        ctx.beginPath(); ctx.arc(sx(qx), sy(qy), px * (0.85 + 0.15 * Math.sin(clock / 300 + i)), 0, TAU); ctx.fill(); ctx.restore();
-      }
+      pix.cloud(c.x, c.y - 0.2, a, Boolean(c.smoke));
     }
     // 2c. A POKE BALL'S HELPERS, each drawing its own warning: Electrode flashing faster and faster,
     // Snorlax's shadow growing under it as it falls, Jigglypuff's song reaching out, Chansey's hearts.
@@ -2432,44 +1970,24 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     for (const p of s.shots) {
       live.add(p.id);
       const x = p.x - p.dx * (10 / TPS) * (1 - alpha), y = p.y - p.dy * (10 / TPS) * (1 - alpha);
-      const bas = isBasic(p.move), colour = tintOf(p.move, s, p.side);
+      const bas = isBasic(p.move);
       const tr = trails.get(p.id) ?? [];
       tr.push([x, y]); if (tr.length > (bas ? 6 : 12)) tr.shift();
       trails.set(p.id, tr);
-      if (classicFx()) {
-        tr.forEach(([qx, qy], n) => glow(sx(qx), sy(qy), px * (bas ? 0.1 + 0.04 * n : 0.18 + 0.07 * n), colour, 0.07 + 0.05 * n));
-        glow(sx(x), sy(y), px * (bas ? 0.6 : 1.15), colour, 0.65);
-        if (!bas) glow(sx(x), sy(y), px * 0.4, "#ffffff", 0.55);
-        if (rand() < (bas ? 0.35 : 1.1) * k) trailBit(bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, colour);
-      }
       // Skimming the Boardwalk's water it throws spray; over the Grove's grass, it tears a leaf loose.
       if (!still && rand() < 0.3 * k) {
         if (inArea(ground.water, x, y)) part({ k: "dot", x, y: y + 0.3, vx: p.dx * 0.02, vy: 0, vz: 0.06, g: 0.006, colour: "#d8f6ff", life: 20, size: 0.08, splash: true });
         else if (inArea(ground.grass, x, y)) part({ k: "leaf", x, y: y + 0.3, vx: p.dx * 0.03, vy: -0.01, colour: rand() < 0.5 ? "#4fae47" : "#7fd35a", life: 34, size: 0.12, vr: 0.25 });
       }
       if (BOULDERS.has(slugOf(p.move))) { boulder(x, y - 0.3, clock / 90, 0.42); continue; }
-      const art = arenaArt(slugOf(p.move))?.shot, key = !bas && !LANDS.has(slugOf(p.move)) && artKey(p.move), ang0 = Math.atan2(p.dy, p.dx);
+      if (!bas && pix.sigHas(slugOf(p.move), "shot")) continue;          // drawn whole by the pixel layer
+      const art = arenaArt(slugOf(p.move))?.shot, key = !bas && artKey(p.move), ang0 = Math.atan2(p.dy, p.dx);
       // Its own art: a projectile looping along its path, or a stream trailing behind its head.
       if (key && (FX[key].n > 1 ? moveFx(key, clock / 70 % FX[key].n, sx(x), sy(y), px * 2.4, ang0, 1)
         : moveFx(key, 0, sx(x - p.dx * 1.7), sy(y - p.dy * 1.7), px * 4.2, ang0, 1))) continue;
-      if (!classicFx()) { drawArt(art, sx(x), sy(y), 0, ang0, clock / 16.7); continue; }
-      if (!bas) shotStyle(typeOf(p.move), sx(x), sy(y), Math.atan2(p.dy, p.dx), px * 0.75, colour, moveOf(p.move).n ?? "");
-      if (!drawArt(art, sx(x), sy(y), Math.max(1, px / 10), Math.atan2(p.dy, p.dx), clock / 16.7)
-        && !sheetFx("bolt", clock / 70 % 4, sx(x), sy(y), px * (bas ? (p.boost ? 2.2 : 1.6) : 2.2), Math.atan2(p.dy, p.dx), colour)) {
-        // No sprite and the bolt not loaded yet: a comet - a bright head and a tapered tail along its path.
-        const r = px * (bas ? (p.boost ? 0.3 : 0.2) : 0.32), ang = Math.atan2(p.dy, p.dx);
-        ctx.save(); ctx.translate(sx(x), sy(y)); ctx.rotate(ang);
-        ctx.globalCompositeOperation = "lighter";
-        ctx.fillStyle = colour; ctx.globalAlpha = 0.8;
-        ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r * 4, -r * 0.6); ctx.lineTo(-r * 4, r * 0.6); ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
-        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, TAU); ctx.fill(); ctx.restore();
-      }
+      drawArt(art, sx(x), sy(y), 0, ang0, clock / 16.7);
     }
     for (const id of trails.keys()) if (!live.has(id)) trails.delete(id);
-
-    // 3b. Streams pouring (hold and aim): drawn from the fighter's own act, every frame.
-    if (classicFx()) for (const f of bodies) if (f.act?.ph === "chan") { const [x, y] = lerp(f); pour(f, x, y, k); }
 
     // 4. A dash's own art, trailing its user (a cloud, as Play Rough's, round it).
     for (const f of bodies) {
@@ -2669,36 +2187,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     ctx.restore();
     if (rand() < 2.2 * kk) { const a = rand() * TAU, d = 1.6 + rand(); part({ k: "glow", x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, vx: -Math.cos(a) * d / 10, vy: -Math.sin(a) * d / 10, colour: rand() < 0.4 ? "#ffffff" : colour, life: 10, size: 0.1, drag: 1 }); }
   }
-  /* FIRE BLAST'S 大: the games draw its burst as the character, five arms of
-     flame from a heart - drawn here stroke by stroke, the strokes thick with
-     embers (or `moves/fire-blast`, once drawn, where it lands). */
-  function daiFlame(x, y, kk) {
-    const grow = ease(Math.min(1, kk * 3)), fade = kk > 0.6 ? 1 - (kk - 0.6) / 0.4 : 1, L = 1.5 * grow;
-    const strokes = [[[-1, -0.45], [1, -0.45]], [[0, -1.15], [0, 0]], [[0, 0], [-0.95, 1.05]], [[0, 0], [0.95, 1.05]]];
-    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round"; ctx.globalAlpha = fade;
-    for (const [w, c] of [[0.55, "#ff5a1f"], [0.32, "#ffb03a"], [0.12, "#fff3c4"]]) {
-      ctx.strokeStyle = c; ctx.lineWidth = px * w * (0.8 + 0.2 * Math.sin(clock / 40));
-      for (const [[ax, ay], [bx, by]] of strokes) { ctx.beginPath(); ctx.moveTo(sx(x + ax * L), sy(y + ay * L)); ctx.lineTo(sx(x + bx * L), sy(y + by * L)); ctx.stroke(); }
-    }
-    ctx.restore();
-    if (!still && rand() < 0.9) {
-      const [[ax, ay], [bx, by]] = strokes[(rand() * 4) | 0], q = rand();
-      part({ k: "glow", x: x + (ax + (bx - ax) * q) * L, y: y + (ay + (by - ay) * q) * L, vx: (rand() - 0.5) * 0.02, vy: -0.02, lift: 0.002, colour: rand() < 0.5 ? "#ffd27a" : "#ff5a1f", life: 22, size: 0.14 });
-    }
-  }
   // Flinched: stars turning round its head.
-  function dizzyStars(x, y, a) {
-    if (!classicFx()) { pix.dizzy(x, y - 1.5, Math.min(1, a * 2)); return; }
-    if (FX["moves/stun"] && sheetFx("moves/stun", clock / 80 % FX["moves/stun"].n, sx(x), sy(y - 1.6), px * 2.2, 0, null, Math.min(1, a * 2))) return;
-    ctx.save(); ctx.globalAlpha = Math.min(1, a * 2); ctx.fillStyle = "#ffe14a"; ctx.strokeStyle = "#7a5a00"; ctx.lineWidth = Math.max(1, px / 20);
-    for (let i = 0; i < 3; i++) {
-      const t = clock / 180 + (i / 3) * TAU, sx0 = sx(x + Math.cos(t) * 0.55), sy0 = sy(y - 1.5 + Math.sin(t) * 0.18), r = px * 0.13;
-      ctx.beginPath();
-      for (let j = 0; j < 8; j++) { const a2 = (j / 8) * TAU - Math.PI / 2, q = j % 2 ? r * 0.45 : r; j ? ctx.lineTo(sx0 + Math.cos(a2) * q, sy0 + Math.sin(a2) * q) : ctx.moveTo(sx0 + Math.cos(a2) * q, sy0 + Math.sin(a2) * q); }
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-    }
-    ctx.restore();
-  }
+  function dizzyStars(x, y, a) { pix.dizzy(x, y - 1.5, Math.min(1, a * 2)); }
   // Confused: a spiral turning over its head, and a question mark bobbing beside it.
   /* EVOLVING (arena.js `evolveInto`), as the games draw it: the body goes
      white and flickers between itself and what it becomes, faster and faster,
@@ -2736,18 +2226,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     const to = Math.sin(q * q * TAU * 9) > 0, beat = 1 + 0.06 * Math.sin(clock / 50);
     sprite(to ? f.evoTo : f.id, f.side, f.slot, at.x, at.y, fr, 1, "#ffffff", { ...at, sx: at.sx * beat, sy: at.sy * beat });
   }
-  function confusedSwirl(x, y) {
-    if (!classicFx()) { pix.swirl(x, y - 1.6); return; }
-    if (FX["moves/confused"] && sheetFx("moves/confused", clock / 90 % FX["moves/confused"].n, sx(x), sy(y - 1.7), px * 2.1, 0, null, 1)) return;
-    ctx.save(); ctx.translate(sx(x), sy(y - 1.6)); ctx.rotate(clock / 200);
-    ctx.strokeStyle = "#e6a0ff"; ctx.lineWidth = Math.max(2, px / 12); ctx.beginPath();
-    for (let i = 0; i < 40; i++) { const a = i * 0.32, q = px * 0.04 * i / 3; i ? ctx.lineTo(Math.cos(a) * q, Math.sin(a) * q * 0.55) : ctx.moveTo(0, 0); }
-    ctx.stroke(); ctx.restore();
-    ctx.save(); ctx.font = `900 ${Math.round(px * 0.5)}px ${FACE}`; ctx.lineWidth = Math.max(2, px / 14); ctx.lineJoin = "round";
-    const qy = sy(y - 1.9) + Math.sin(clock / 150) * px * 0.08;
-    ctx.strokeStyle = "#0b1124"; ctx.strokeText("?", sx(x + 0.55), qy); ctx.fillStyle = "#e6a0ff"; ctx.fillText("?", sx(x + 0.55), qy);
-    ctx.restore();
-  }
+  function confusedSwirl(x, y) { pix.swirl(x, y - 1.6); }
   /* A BODY WITH NO PMD SHEET (its follower art: four facings and a walk, no
      attack, hurt, sleep or roll frames) is posed by motion instead (asked
      for, 2026-10-23): it breathes standing, bobs and sways walking, crouches
@@ -2904,50 +2383,15 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     }
     ctx.restore();
   }
+  // The air moves here; the pixel layer draws it (`air`), but for the crowd's camera flashes.
   function drawAir(a, k) {
-    const x = sx(a.x), y = sy(a.y);
-    const kk = a.t / a.life, pixel = !classicFx() && a.k !== "bulb";
-    ctx.save();
-    if (a.k === "ember") {
-      a.x += a.vx * k + Math.sin(a.t / 9) * 0.004 * k; a.y += a.vy * k;
-      if (pixel) pix.air("ember", a.x, a.y, kk);
-      else {
-        ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = Math.sin(kk * Math.PI) * (0.6 + 0.4 * Math.sin(a.t / 3));
-        ctx.fillStyle = kk < 0.5 ? "#ffcf6a" : "#ff6a2a";
-        const s = a.size * px; ctx.fillRect(x - s / 2, y - s / 2, s, s);
-      }
-    } else if (a.k === "snow") {
-      a.x += (a.vx + Math.sin(a.t / 40 + a.ph) * 0.006) * k; a.y += a.vy * k;
-      if (a.y > H + 0.5) a.t = a.life;
-      if (pixel) pix.air("snow", a.x, a.y, kk, a.size);
-      else { ctx.globalAlpha = 0.8; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(x, y, a.size * px, 0, TAU); ctx.fill(); }
-    } else if (a.k === "rain") {
-      if (pixel) { pix.air("rain", a.x, a.y, kk); ctx.restore(); return; }
-      const fall = kk * 1.4;
-      ctx.globalAlpha = 0.28; ctx.strokeStyle = "#cfe8ff"; ctx.lineWidth = Math.max(1, px / 28);
-      ctx.beginPath(); ctx.moveTo(x - fall * px * 0.5, y + fall * px); ctx.lineTo(x - (fall + 0.25) * px * 0.5, y + (fall + 0.5) * px); ctx.stroke();
-      if (a.t + k > a.life) { ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.ellipse(x - 0.7 * px * 0.5, y + 1.4 * px, px * 0.12, px * 0.05, 0, 0, TAU); ctx.stroke(); }
-    } else if (a.k === "sand") {
-      a.x += a.vx * k; a.y += a.vy * k + Math.sin(a.t / 12) * 0.004 * k;
-      if (a.x > W + 1) a.t = a.life;
-      if (pixel) pix.air("sand", a.x, a.y, kk, a.size);
-      else { ctx.globalAlpha = 0.35; ctx.strokeStyle = "#e0b878"; ctx.lineWidth = Math.max(1, px / 20); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - a.size * px, y - a.size * px * 0.08); ctx.stroke(); }
-    } else if (a.k === "mote") {
-      a.x += a.vx * k; a.y += a.vy * k;
-      if (a.x > W + 0.5) a.t = a.life;
-      if (pixel) pix.air("mote", a.x, a.y, kk, a.size, a.glint);
-      else {
-        ctx.globalAlpha = Math.sin(Math.min(1, kk * 4) * Math.PI / 2) * (a.glint ? 0.5 + 0.5 * Math.sin(a.t / 8) : 0.35);
-        ctx.fillStyle = a.glint ? "#bfe0ff" : "#ffffff";
-        ctx.beginPath(); ctx.arc(x, y, a.size * px, 0, TAU); ctx.fill();
-      }
-    } else if (a.k === "bulb") {
-      ctx.restore();
-      glow(x, y, px * 0.5 * (1 - kk), "#ffffff", 0.9 * (1 - kk));
-      return;
-    }
-    ctx.restore();
+    const kk = a.t / a.life;
+    if (a.k === "ember") { a.x += a.vx * k + Math.sin(a.t / 9) * 0.004 * k; a.y += a.vy * k; pix.air("ember", a.x, a.y, kk); }
+    else if (a.k === "snow") { a.x += (a.vx + Math.sin(a.t / 40 + a.ph) * 0.006) * k; a.y += a.vy * k; if (a.y > H + 0.5) a.t = a.life; pix.air("snow", a.x, a.y, kk, a.size); }
+    else if (a.k === "rain") pix.air("rain", a.x, a.y, kk);
+    else if (a.k === "sand") { a.x += a.vx * k; a.y += a.vy * k + Math.sin(a.t / 12) * 0.004 * k; if (a.x > W + 1) a.t = a.life; pix.air("sand", a.x, a.y, kk, a.size); }
+    else if (a.k === "mote") { a.x += a.vx * k; a.y += a.vy * k; if (a.x > W + 0.5) a.t = a.life; pix.air("mote", a.x, a.y, kk, a.size, a.glint); }
+    else if (a.k === "bulb") glow(sx(a.x), sy(a.y), px * 0.5 * (1 - kk), "#ffffff", 0.9 * (1 - kk));
   }
   function drawFx(e) {
     const kk = e.t / e.life;
@@ -2968,10 +2412,6 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1 - kk * kk; ctx.imageSmoothingEnabled = false;
         if (Math.cos(ang) < 0) ctx.scale(1, -1);
         ctx.drawImage(stream, 0, -h / 2, len, h);
-      } else if (classicFx()) {
-        beamStyle(e.type, len, wide, kk, e.colour);
-        ctx.globalAlpha = 0.55 * (1 - kk); ctx.fillStyle = e.colour; ctx.fillRect(0, -wide, len, wide * 2);
-        ctx.globalAlpha = 0.95 * (1 - kk); ctx.fillStyle = "#fff"; ctx.fillRect(0, -wide * 0.3, len, wide * 0.6);
       }
       ctx.restore();
       if (e.art && !e.key) for (let d = 0.6; d < e.len; d += 0.8) drawArt(e.art, sx(e.x + e.dx * d), sy(e.y + e.dy * d), Math.max(1, px / 14), ang, e.t + d * 7, 1 - kk);
@@ -2992,17 +2432,6 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     } else if (e.k === "rise") {
       // A boulder pushed up out of the floor, then gone as the shot leaves.
       boulder(e.x, e.y + 0.3 - kk * 0.7, kk * 2, 0.42 * Math.min(1, kk * 2.5), 1 - Math.max(0, kk - 0.75) * 4);
-    } else if (e.k === "fall") {
-      // A falling boulder: its shadow grows, it drops, and it lands in dust.
-      const q = kk, sz = e.size;
-      ctx.save(); ctx.globalAlpha = 0.35 * q; ctx.fillStyle = "#000";
-      ctx.beginPath(); ctx.ellipse(sx(e.x), sy(e.y + 0.3), px * sz * (0.5 + q), px * sz * 0.4 * (0.5 + q), 0, 0, TAU); ctx.fill(); ctx.restore();
-      if (q < 0.85) boulder(e.x, e.y - (1 - q / 0.85) * 6, e.rot + q * 4, sz);
-      else if (!e.landed) { e.landed = true; dust(e.x, e.y, 3); impactRing(e.x, e.y); }
-    } else if (e.k === "dai") {
-      daiFlame(e.x, e.y, kk);
-    } else if (e.k === "pillar") {
-      pillar(e, kk);
     } else if (e.k === "mv") {
       const m = FX[e.key];
       moveFx(e.key, kk * m.n, sx(e.x), sy(e.y), px * e.size, e.ang, kk > 0.85 ? (1 - kk) / 0.15 : 1);
@@ -3046,19 +2475,6 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         ctx.restore();
         if (rand() < 0.6) part({ k: "streak", x: x - e.dir * 2, y: y - 2 + (rand() - 0.5) * 2, vx: -e.dir * 0.2, vy: 0, colour: "#ffffff", life: 10, size: 0.8, drag: 0.92 });
       }
-    } else if (e.k === "strike") {
-      // A jagged bolt from above the screen down onto the struck, fading.
-      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 1 - kk;
-      ctx.lineJoin = "round";
-      for (const [w2, c] of [[px * 0.5, "#ffe74a"], [px * 0.18, "#ffffff"]]) {
-        ctx.strokeStyle = c; ctx.lineWidth = w2; ctx.beginPath();
-        let bx = sx(e.x) + (e.seed - 0.5) * px * 2, by = sy(e.y) - px * 9;
-        ctx.moveTo(bx, by);
-        for (let i = 1; i <= 8; i++) { bx += (((e.seed * 97 + i * 37) % 1) - 0.5) * px * 1.4; by += px * 9 / 8; ctx.lineTo(i === 8 ? sx(e.x) : bx, by); }
-        ctx.stroke();
-      }
-      ctx.restore();
-      glow(sx(e.x), sy(e.y), px * 2, "#fff59a", 0.6 * (1 - kk));
     } else if (e.k === "sheet") {
       const n = FX[e.name]?.n ?? 1;
       sheetFx(e.name, kk * n, sx(e.x), sy(e.y), px * e.size, e.rot, e.colour, n > 1 ? (kk > 0.85 ? (1 - kk) / 0.15 : 1) : 1 - kk);
@@ -3745,7 +3161,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   function drawArt(art, x, y, sc, angle, k, alpha = 1) {
     const im = art && img(art.path);
     if (!im) return false;
-    if (!classicFx()) { sc = px / BODY_PX; angle = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2); }
+    sc = px / BODY_PX; angle = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2);   // one pixel size, quarter turns
     const f = sheetFrame(art, k);
     ctx.save();
     ctx.globalAlpha = alpha * (art.blend ? 0.85 : 1);
@@ -3766,7 +3182,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
   function sheetFx(name, frame, x, y, w, rot = 0, colour = "#ffffff", alpha = 1, squash = 1, flip = false) {
     const im = img(fxPath(name)), meta = FX[name];
     if (!im || !meta || !(alpha > 0) || !(w > 0)) return Boolean(im);
-    if (meta.g && !classicFx()) { w = meta.w * px / BODY_PX; rot = Math.round(rot / (Math.PI / 2)) * (Math.PI / 2); }
+    if (meta.g) { w = meta.w * px / BODY_PX; rot = Math.round(rot / (Math.PI / 2)) * (Math.PI / 2); }
     const f = clamp(Math.floor(frame), 0, meta.n - 1), h = w * meta.h / meta.w;
     ctx.save();
     ctx.translate(x, y); ctx.scale(1, squash); if (rot) ctx.rotate(rot); if (flip) ctx.scale(-1, 1);

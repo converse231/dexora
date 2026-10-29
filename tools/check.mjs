@@ -8662,8 +8662,10 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     assert.ok(!/globalAlpha|create(Radial|Linear)Gradient|shadowBlur|filter\s*=/.test(pixSrc), "pixfx.js fades by alpha, a gradient or a blur - a pixel effect dithers");
     assert.ok(/const sc = px \/ BODY_PX;/.test(renderSrc) && !/\(px \* 2\.6\) \/ 32/.test(renderSrc), "a PMD body is drawn at a scale of its own, not the effects' BODY_PX");
     assert.ok(!/^import/m.test(pixSrc), "pixfx.js imports something - it is drawing alone, never the rules");
+    // One look (2026-10-30): the classic vector look and its switch were deleted; nothing may bring a second back.
+    assert.ok(!/classicFx|dexora-arena-classic/.test(renderSrc + pixSrc + read("ui/league/arena/Arena.jsx")), "a classic-look switch is back - the Arena has one look");
     // The games' own move sprites too (Phase 2): the bodies' pixel, turned only by quarter turns - any other angle shears a pixel.
-    assert.ok(/if \(!classicFx\(\)\) \{ sc = px \/ BODY_PX; angle = Math\.round\(angle \/ \(Math\.PI \/ 2\)\) \* \(Math\.PI \/ 2\); \}/.test(renderSrc),
+    assert.ok(/ sc = px \/ BODY_PX; angle = Math\.round\(angle \/ \(Math\.PI \/ 2\)\) \* \(Math\.PI \/ 2\);/.test(renderSrc),
       "drawArt draws a move sprite at its own scale or angle in the pixel look - one pixel size, quarter turns only");
     assert.ok(!/pixfx/.test(read("game/arena.js")), "arena.js reaches the pixel effects - the rules must never depend on the picture");
     // Phase 7: every named ULTI is drawn as itself (pixfx.js ULT), never left to its archetype's generic look.
@@ -8676,8 +8678,17 @@ import { opponent as bOpponent, neverHits as bNeverHits } from "../src/game/batt
     for (const k of sheets) assert.ok(FX[k].g, `${k} is not re-gridded to the bodies' pixel - run npm run fx`);
     const retired = [...readFileSync(new URL("./build_fx.py", import.meta.url), "utf8").match(/RETIRED = \{([^}]*)\}/)[1].matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
     for (const n of retired) assert.ok(!existsSync(new URL(`../public/arena/fx/moves/${n}.png`, import.meta.url)) && !FX[`moves/${n}`], `the retired sheet ${n} still ships`);
+    // The signature moves (2026-10-30): each a move the Arena plays, drawn by its own `sig` entry, never by a sheet.
+    const { SIGNATURES } = await import("../src/ui/league/arena/pixfx.js");
+    const { MOVES: SIG_MOVES } = await import("../src/data/moves.js");
+    const { shapeOf: sigShape } = await import("../src/game/arena.js");
+    for (const n of SIGNATURES) {
+      assert.ok(sigShape(SIG_MOVES.find((m) => m.n === n)), `the signature move ${n} is no move the Arena plays`);
+      assert.ok(pixSrc.includes(`    ${/-/.test(n) ? `"${n}"` : n}: {`), `the signature move ${n} has no entry in pixfx.js's SIG`);
+      assert.ok(!FX[`moves/${n}`], `the signature move ${n} still ships a drawn sheet - retire it in build_fx.py`);
+    }
     console.log(`pixfx ok — ${TYPES.length} type ramps of ${RAMP_STEPS}, one pixel size (${Math.round(BODY_PX * 10) / 10} a tile) for bodies and effects, no alpha or gradient in the pixel layer; ` +
-      `${named.length} named ULTIs drawn as themselves, ${sheets.length} move sheets on the grid, ${retired.length} retired`);
+      `${named.length} named ULTIs drawn as themselves, ${SIGNATURES.length} signature moves, ${sheets.length} move sheets on the grid, ${retired.length} retired`);
   }
 
   /* AND THE LEAGUE'S FOLDER IS REACHED ONLY BY A LAZY IMPORT: a static import

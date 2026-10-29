@@ -652,7 +652,7 @@ export default function App({
   // The event announces itself once, never over an encounter or the check-in.
   // The event running, or the one about to open (its teaser and countdown).
   const season = eventOn() ?? eventSoon();
-  const nightmare = st ? huntDue(st.dreams, st.medals) : null;
+  const nightmare = st ? huntDue(st.dreams) : null;
   // A daytime event's hunt (Shichi-Go-San) draws no closing dark.
   const nightmareNear = !!nightmare && !eventOn()?.daytime && st.areaId === nightmare.area && isNight(st.steps);
   useEffect(() => {

@@ -16,6 +16,61 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-30-anime-moves-4",
+    icon: "👻",
+    date: "October 2026",
+    title: "Eight more moves, the anime way",
+    items: [
+      ["Astonish, Sucker Punch", "A ghost face looms over the foe; a strike wrapped in dark purple."],
+      ["Zen Headbutt, Confusion", "A head glowing blue; eyes that glow and a foe outlined in blue."],
+      ["Thunder Wave, Dragon Breath", "Crackling rings of electricity; a green-and-yellow blast."],
+      ["Aqua Tail, Icy Wind", "Water spiralling round the swing; a wind full of sparkles."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-moves-3",
+    icon: "💫",
+    date: "October 2026",
+    title: "Eight more moves, the anime way",
+    items: [
+      ["Tackle, Quick Attack", "A POW star on the blow; a white trail of light to the foe."],
+      ["Scary Face, Hypnosis", "Red eyes and a menacing face; violet rings that put the foe to sleep."],
+      ["Discharge, Water Pulse", "Bolts fired every way; a water sphere ringed by pulses."],
+      ["Ancient Power, Dragon Pulse", "Rocks wrapped in purple; a blue-violet shock wave."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-moves-2",
+    icon: "⛰️",
+    date: "October 2026",
+    title: "Eight more moves, the anime way",
+    items: [
+      ["Earth Power, Earthquake, Rock Slide", "Gold cracks run to the foe and erupt; the floor heaves; rocks fall from above."],
+      ["Hyper Beam, Air Slash, Giga Drain", "An orange beam with pink streaks, spinning saw-discs of air, green energy drained back."],
+      ["Iron Head, Dragon Claw", "A head of gleaming steel, and claws that slash in light green."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-moves",
+    icon: "🌊",
+    date: "October 2026",
+    title: "Eight moves, the anime way",
+    items: [
+      ["Surf, Thunderbolt, Psychic", "Surf rolls out a wave, Thunderbolt leaps from the cheeks, Psychic holds the foe in blue."],
+      ["Solar Beam, Fire Blast", "Sunlight gathers into a white-gold beam; Fire Blast burns its 大 on the foe."],
+      ["Razor Leaf, Vine Whip, Wild Charge", "Spinning leaves, two lashing vines, and a golden electric charge."],
+    ],
+  },
+  {
+    id: "2026-10-30-nightmare-again",
+    icon: "🌑",
+    date: "October 2026",
+    title: "The event legendary comes back",
+    items: [
+      ["Catch it again", "After you catch it, 8 more costumes bring it back - every visit a new chance at a rare form."],
+    ],
+  },
+  {
     id: "2026-10-30-anime-ultis",
     icon: "💥",
     date: "October 2026",
@@ -38,7 +93,6 @@ export const NEWS = [
       ["Statuses", "A burn flickers up the Pokémon's outline, paralysis crackles, a freeze crusts it in ice."],
       ["Dash, guard, heal", "Afterimages of the real Pokémon, Protect's hex dome that shatters, rising crosses, boost auras."],
       ["Big moments", "Thunder's sky strike scorches the floor, ULTI pillars, and pixel rain, snow and sand."],
-      ["Prefer the old look?", "Pause a match › Pixel effects › Off."],
     ],
   },
   {

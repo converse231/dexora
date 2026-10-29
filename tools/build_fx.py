@@ -98,14 +98,15 @@ RETIRED = {"flamethrower", "hydro-pump", "ice-beam", "hyper-beam", "solar-beam",
            "hyper-beam-charge", "solar-beam-charge", "aura-sphere", "energy-ball", "shadow-ball", "focus-blast", "moonblast",
            "sludge-bomb", "flare-blitz", "volt-tackle", "aqua-jet", "explosion", "thunderbolt", "discharge", "dazzling-gleam",
            "hyper-voice", "heat-wave", "sludge-wave", "psychic", "earthquake", "surf", "stun", "confused", "smoke", "heal",
-           "power-up", "stat-drop", "quick-attack", "crunch", "fire-fang", "ice-fang", "thunder-fang", "play-rough"}
+           "power-up", "stat-drop", "quick-attack", "crunch", "fire-fang", "ice-fang", "thunder-fang", "play-rough",
+           "razor-leaf", "fire-blast", "dragon-claw", "rock-slide", "air-slash"}   # 2026-10-30: drawn the anime way by pixfx's `sig`
 # THE BODIES' GRID (2026-10-30): every kept move sheet is re-gridded to GRID px wide - its usual drawn size in
 # the Arena (tiles) times BODY_PX, the Pokemon's own pixels a tile (render.js draws a PMD body at px / BODY_PX)
 # - whole frames downscaled, 16 colours, a sprite's 1 px dark outline. fx.js marks it `g`, and the pixel look
 # draws it a sheet pixel to a body pixel (render.js `sheetFx`). 42 is a blow's 3.4 tiles.
 BODY_PX = 32 / 2.6
 GRID = {"boulder": 14, "psychic-lift": 32, "mega-symbol": 27, "evolve": 52, "mega-evolve": 52, "spikes": 32, "toxic-spikes": 32,
-        "stealth-rock": 32, "sticky-web": 32, "air-slash": 30, "razor-leaf": 30, "blizzard": 49, "petal-blizzard": 49, "twister": 49,
+        "stealth-rock": 32, "sticky-web": 32, "blizzard": 49, "petal-blizzard": 49, "twister": 49,
         "fly": 44, "dig": 44}
 SEEN = 24                        # alpha that counts as drawn when looking for the gaps
 HARD = 110                       # alpha past which a shrunk pixel is solid, under which it is gone

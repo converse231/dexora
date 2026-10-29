@@ -215,8 +215,11 @@ export const eventDue = (dex, medals = []) =>
 
 /* THE NIGHTMARE (an event's `hunt`, eventforms.js): `state.dreams` holds
    each event's Bad Dreams, one a costume caught on its days. Full, the hunt
-   is DUE until its medal is won: the next wild meeting in its area after
-   dark is it. A save's count is held to the hunt's own range. */
+   is DUE: the next wild meeting in its area is it. It REPEATS (2026-10-30,
+   asked for: "let us catch more" - one meeting was one tier roll, so its
+   rare forms were out of reach): caught or lost, the moon wanes to `keep`.
+   The medal is the first catch's. A save's count is held to the hunt's own
+   range. */
 /* THE HUNT'S WORDS: Hallowed Night's dreams and new moon, unless an event
    names its own (`hunt.words`: Shichi-Go-San's blessings and shrine bell). */
 const HUNT_WORDS = {
@@ -225,10 +228,10 @@ const HUNT_WORDS = {
   run: "The Nightmare fades if you run",
 };
 export const huntWords = (h) => ({ ...HUNT_WORDS, ...h?.words });
-export function huntDue(dreams, medals = [], day) {
+export function huntDue(dreams, day) {
   const ev = eventOn(day);
   const h = ev?.hunt;
-  if (!h || medals.includes(`event:${h.medal}`)) return null;
+  if (!h) return null;
   return (dreams?.[ev.id] ?? 0) >= h.dreams ? h : null;
 }
 export const cleanDreams = (d) => Object.fromEntries(EVENTS.filter((ev) => ev.hunt).flatMap((ev) => {
