@@ -72,22 +72,33 @@ const slugOf = (i) => (i === STRUGGLE ? "struggle" : MOVES[i]?.n ?? null);
    until a move is drawn alone. */
 const FAMILY = Object.fromEntries([
   ["slam", ["take-down", "double-edge", "body-slam", "slam", "thrash", "headbutt", "skull-bash", "heavy-slam", "heat-crash", "zen-headbutt",
-    "head-smash", "giga-impact", "rollout", "horn-attack", "stomp", "tackle", "high-horsepower", "body-press", "outrage", "rock-smash"]],
+    "head-smash", "giga-impact", "rollout", "horn-attack", "stomp", "tackle", "high-horsepower", "body-press", "outrage", "rock-smash",
+    "darkest-lariat", "psyshield-bash", "headlong-rush", "shadow-bone", "spirit-break", "brutal-swing", "zing-zap", "order-up", "drum-beating"]],
   ["claw", ["slash", "scratch", "fury-swipes", "crush-claw", "metal-claw", "aerial-ace", "cut", "psycho-cut", "sacred-sword", "false-swipe",
-    "fury-cutter", "dual-chop", "cross-poison", "smart-strike", "secret-sword", "behemoth-blade", "kowtow-cleave", "ceaseless-edge"]],
+    "fury-cutter", "dual-chop", "cross-poison", "smart-strike", "secret-sword", "behemoth-blade", "kowtow-cleave", "ceaseless-edge",
+    "stone-axe", "dire-claw", "psyblade", "thief"]],
+  // Sweep 2 (2026-10-30): the punches, kicks, throws, powders, songs and drains - each in its type's colours.
+  ["punch", ["bullet-punch", "mach-punch", "hammer-arm", "mega-punch", "focus-punch", "wicked-blow", "sky-uppercut", "comet-punch",
+    "dizzy-punch", "power-up-punch", "jet-punch", "rage-fist", "double-iron-bash", "plasma-fists", "surging-strikes"]],
+  ["kick", ["trop-kick", "thunderous-kick", "mega-kick", "triple-kick", "triple-axel", "low-kick", "rolling-kick", "jump-kick", "axe-kick", "aqua-step"]],
+  ["throw", ["vital-throw", "circle-throw", "submission", "seismic-toss", "storm-throw"]],
+  ["powder", ["poison-powder", "rage-powder", "magic-powder"]],
+  ["sound", ["round", "relic-song", "chatter", "sparkling-aria", "torch-song", "alluring-voice", "eerie-spell", "psychic-noise", "overdrive"]],
+  ["drain", ["horn-leech", "matcha-gotcha", "parabolic-charge", "bitter-blade", "leech-seed"]],
 ].flatMap(([fam, ns]) => ns.map((n) => [n, fam])));
-// A signature move (pixfx's `sig`) is drawn the anime way, never by a sheet.
+// A signature move (pixfx's `sig`) is drawn the anime way, never by a sheet; a family's move plays its family's (`_slam`, `_claw`).
 const SIG = new Set(SIGNATURES);
+const sigOf = (i) => { const slug = slugOf(i); return SIG.has(slug) ? slug : FAMILY[slug] ? `_${FAMILY[slug]}` : slug; };
 const artKey = (i) => {
   const slug = slugOf(i);
-  if (SIG.has(slug)) return null;
+  if (SIG.has(slug) || FAMILY[slug]) return null;
   for (const k of [slug, FAMILY[slug]]) if (k && FX[`moves/${k}`]) return `moves/${k}`;
   return null;
 };
 // What every match may play, whatever its moves: a heal's, a boost's and a drop's own sheets (drawn or not yet).
 const SHARED = ["moves/heal", "moves/power-up", "moves/stat-drop"];
 // The biting moves, drawn as jaws in the pixel look (their drawn sheets lost their teeth at the bodies' pixel).
-const BITES = new Set(["crunch", "fire-fang", "ice-fang", "thunder-fang", "bite", "psychic-fangs", "poison-fang", "hyper-fang", "super-fang", "jaw-lock"]);
+const BITES = new Set(["crunch", "fire-fang", "ice-fang", "thunder-fang", "bite", "psychic-fangs", "poison-fang", "hyper-fang", "super-fang", "jaw-lock", "fishious-rend"]);
 const isBasic = (i) => i === BASIC_P || i === BASIC_S;
 // A move's name as the callout says it ("Thunder Punch").
 const callName = (i) => (i === STRUGGLE ? "Struggle" : MOVES[i].n.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "));
@@ -533,19 +544,15 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       for (let i = 0; i < 2; i++) part({ k: "ring", x, y, colour: i ? "#3f9cff" : "#ffffff", life: 22, size: 0.3, grow: 0.11 - i * 0.03, t: -i * 3 });
       for (let i = 0; i < 4; i++) { const a = (i / 4) * TAU + rand() * 0.4; part({ k: "streak", x, y, vx: Math.cos(a) * 0.12, vy: Math.sin(a) * 0.12, colour: "#bfeaff", life: 12, size: 0.6, drag: 0.85 }); }
       mark("wet", x, y + 0.25, 0.9);
-    } else if (slug === "shadow-ball") {
-      for (let i = 0; i < 3; i++) part({ k: "ring", x, y, colour: i ? "#7a3fd0" : "#d6b8ff", life: 26, size: 0.3, grow: 0.1 - i * 0.02, t: -i * 4 });
-      for (let i = 0; i < 12; i++) { const [vx, vy] = around(0.05); part({ k: "glow", x, y, vx, vy, lift: 0.002, wob: 1, colour: rand() < 0.5 ? "#5a3d9a" : "#1c0f33", life: 50, size: 0.24, drag: 0.95 }); }
-    } else if (slug === "aura-sphere" || slug === "focus-blast") {
-      const c = slug === "aura-sphere" ? "#3f7dff" : "#ff8a2a";
-      for (let i = 0; i < 3; i++) part({ k: "ring", x, y, colour: i % 2 ? c : "#ffffff", life: 24, size: 0.3, grow: 0.14 - i * 0.03, t: -i * 3 });
-      part({ k: "burst", x, y, colour: c, life: 14, size: 1.6 });
+    } else if (slug === "aura-sphere") {
       shake(0.35);
-    } else if (slug === "energy-ball") {
-      for (let i = 0; i < 14; i++) { const [vx, vy] = around(0.06); part({ k: "leaf", x, y, vx, vy, vz: 0.04, g: 0.002, colour: rand() < 0.5 ? "#5fd35a" : "#a6e86b", life: 54, size: 0.17, vr: 0.3, drag: 0.95 }); }
-      part({ k: "ring", x, y, colour: "#a6e86b", life: 22, size: 0.3, grow: 0.1 });
-    } else if (slug === "sludge-bomb" || slug === "gunk-shot") {
-      for (let i = 0; i < 14; i++) part({ k: "bubble", x: x + (rand() - 0.5) * 0.9, y: y + (rand() - 0.5) * 0.5, vx: (rand() - 0.5) * 0.03, vy: -0.02 - rand() * 0.02, colour: "#c77cff", life: 40 + rand() * 20, size: 0.1 + rand() * 0.14, drag: 0.98 });
+    } else if (slug === "focus-blast") {
+      for (let i = 0; i < 3; i++) part({ k: "ring", x, y, colour: i % 2 ? "#ff8a2a" : "#ffffff", life: 24, size: 0.3, grow: 0.14 - i * 0.03, t: -i * 3 });
+      part({ k: "burst", x, y, colour: "#ff8a2a", life: 14, size: 1.6 });
+      shake(0.35);
+    } else if (slug === "sludge-bomb") {
+      mark("char", x, y + 0.25, 0.9, "#7a3fb0");
+    } else if (slug === "gunk-shot") {
       mark("char", x, y + 0.25, 0.9, "#7a3fb0");
     }
   }
@@ -787,13 +794,14 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         // A basic attack hits in its user's colour and type, lighter - its third, boosted, does not.
         const bas = isBasic(e.move);
         const colour = tintOf(e.move, s, 1 - e.side), type = bas ? typeAt(s, 1 - e.side) : typeOf(e.move);
-        const art = arenaArt(slugOf(e.move));
+        // A hit the pixel layer draws itself takes no Emerald burst too (Hammer Arm's drew a grey slab over its punch).
+        const art = !bas && pix.sigHas(sigOf(e.move), "hit") ? null : arenaArt(slugOf(e.move));
         const heavy = e.heavy || e.ko || e.frac > 0.25;
         fx.push({ k: "burst", x: e.x, y: e.y, art: art?.burst ?? art?.shot, colour, t: 0, life: bas && !e.boost ? 16 : 30 });
         impact(type, e.x, e.y, e.dx, e.dy, heavy);
         if (!bas) signatureHit(slugOf(e.move), e.x, e.y, e.dx, e.dy);
         const striker = activeOf(s, 1 - e.side);
-        if (!bas) pix.sig(slugOf(e.move), "hit", { side: e.side, x: e.x, y: e.y, dx: e.dx, dy: e.dy, ux: striker?.x ?? e.x, uy: striker?.y ?? e.y });
+        if (!bas) pix.sig(sigOf(e.move), "hit", { side: e.side, x: e.x, y: e.y, dx: e.dx, dy: e.dy, ux: striker?.x ?? e.x, uy: striker?.y ?? e.y, type: typeOf(e.move) });
         if (!bas && LIFTS.has(slugOf(e.move))) { const lp = poseOf(e.side, s.sides[e.side].active); lp.lift = LIFT_T; lp.liftC = colour; lp.liftDx = e.dx ?? 0; lp.liftDy = e.dy ?? 0; }
         // An ULTI's hit: its panel, once a cast, and twice the matter.
         if (e.ult) { panel(1 - e.side, e.x, e.y); impact(type, e.x, e.y, e.dx, e.dy, true); }
@@ -927,11 +935,10 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
           if (e.shape === "dash") dust(body.x, body.y, 5);
           else if (!isBasic(e.move) || rand() < 0.4) dust(body.x + e.dx * 0.7, body.y + e.dy * 0.4, isBasic(e.move) ? 1 : 3);
         }
-        if (!isBasic(e.move)) pix.sig(slugOf(e.move), "fire", { side: e.side, x: body.x, y: body.y, dx: e.dx ?? 0, dy: e.dy ?? 0 });
+        if (!isBasic(e.move)) pix.sig(sigOf(e.move), "fire", { side: e.side, x: body.x, y: body.y, dx: e.dx ?? 0, dy: e.dy ?? 0, type: typeOf(e.move) });
         // A blow's own art, at its reach.
         const mk = e.shape === "melee" && !isBasic(e.move) && !VANISH[slugOf(e.move)] && artKey(e.move);
         if (e.shape === "melee" && BITES.has(slugOf(e.move))) pix.jaws(typeOf(e.move), body.x + e.dx * 1.2, body.y + e.dy * 1.2);
-        else if (slugOf(e.move) === "play-rough") pix.scuffle(body.x + e.dx * 1.2, body.y + e.dy * 1.2);
         else if (mk) fx.push({ k: "mv", key: mk, x: body.x + e.dx * 1.2, y: body.y - 0.2 + e.dy * 1.2, size: 3.2, ang: Math.atan2(e.dy, e.dx), t: 0, life: 24 });
         else if (e.shape === "shot" || e.shape === "multi" || e.shape === "beam") {
           p.ox -= e.dx * 0.14; p.oy -= e.dy * 0.14; p.sx = 1.12; p.sy = 0.9;
@@ -976,10 +983,12 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         word(e.x, e.y - 1.5, "Smokescreen!", "#c8cbd6", 50, true);
       } else if (e.k === "pulse") {
         const foeAt = activeOf(s, 1 - e.side);
-        const signed = !e.wide && pix.sig(slugOf(e.move), "pulse", { side: e.side, x: e.x, y: e.y, r: e.r, fx: foeAt?.x, fy: foeAt?.y });
+        const signed = !e.wide && pix.sig(sigOf(e.move), "pulse", { side: e.side, x: e.x, y: e.y, r: e.r, fx: foeAt?.x, fy: foeAt?.y, type: typeOf(e.move) });
         const type = typeOf(e.move), colour = colourOf(e.move), pk = artKey(e.move);
         const toward = (activeOf(s, 1 - e.side)?.x ?? W) < e.x ? Math.PI : 0;
         if (pk) fx.push({ k: "mv", key: pk, x: e.x, y: e.y + 0.1, size: e.wide ? 6.5 : e.r * 2.4, ang: e.wide ? toward : 0, t: 0, life: 32 });
+        const wideSig = e.wide && pix.sig(slugOf(e.move), "wide", { side: e.side, x: e.x, y: e.y, fx: foeAt?.x, fy: foeAt?.y });
+        if (wideSig) { overlays.push({ k: "tint", colour, t: 0, life: 30 }); crowd(6); continue; }
         if (e.wide) {
           /* THE WHOLE COURT: the move's colour floods the screen and its matter
              blows across every tile (its own art stamped over the court where
@@ -1063,28 +1072,31 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       } else if (e.k === "strike") {
         // An ULTI's strike lands: a blast the size of its ring, its type's matter, a bolt from the sky for a storm.
         const colour = colourOf(e.move), type = typeOf(e.move);
+        // A move off the court that lands as itself (pixfx's `land`): the generic pillar and sheets would bury it.
+        const own = Boolean(e.vanish) && !still && pix.sig(slugOf(e.move), "land", { side: e.side, x: e.x, y: e.y });
         if (e.vanish) {
           // Back down on the foe: from above (a dive), from below (bursting out), out of the water or the dark.
           const f = activeOf(s, e.side), p = f && poseOf(e.side, f.slot);
           if (p) { if (e.vanish === "air") { p.oy = -4; p.sx = 0.7; p.sy = 1.5; } else { p.oy = 0.6; p.sx = 1.3; p.sy = 0.4; } }
-          // Its own art plays where it lands, never where it left.
-          const vk = artKey(e.move);
+          // Its own art plays where it lands, never where it left - a signature's own landing first.
+          const vk = !own && artKey(e.move);
           if (vk) fx.push({ k: "mv", key: vk, x: e.x, y: e.y - 0.2, size: 3.6, ang: 0, t: 0, life: 30 });
           if (e.vanish === "air") for (let i = 0; i < 8; i++) part({ k: "streak", x: e.x + (rand() - 0.5) * 0.8, y: e.y - 3, vx: 0, vy: 0.35, colour: "#ffffff", life: 8, size: 0.9, drag: 0.9 });
+          else if (own) { /* its own landing */ }
           else if (e.vanish === "ground") { for (let i = 0; i < 18; i++) { const [vx, vy] = around(0.07); part({ k: "chunk", x: e.x, y: e.y, vx, vy, vz: 0.12 + rand() * 0.1, g: 0.01, colour: rand() < 0.5 ? "#8a6a3e" : "#b58b52", life: 50, size: 0.16 + rand() * 0.12, vr: 0.3, bounce: 2, drag: 0.96 }); } mark("crack", e.x, e.y + 0.3, 2.4); }
           else if (e.vanish === "water") impact("water", e.x, e.y, 0, -1, true);
           else poof(e.x, e.y, 1.6);
         } else if (type === "electric" || (!e.nova && e.r < 1.5 && !named(e.side))) strike(e.x, e.y);   // a named ULTI lands as itself
-        impact(type, e.x, e.y, 0, 0, true);
+        if (!own) impact(type, e.x, e.y, 0, 0, true);
         const nu = !e.vanish && named(e.side);
         if (nu && !still) pix.ultLand(nu.name, { side: e.side, x: e.x, y: e.y, r: e.r, follow: e.r < 1.3 });
-        else if (!still) pix.pillar(type, e.x, e.y, e.r, 52 / 60);
+        else if (!still && !own) pix.pillar(type, e.x, e.y, e.r, 52 / 60);
         // A named ULTI's own landing replaces the generic shockwave and archetype sheets (they swamped it).
-        if (!nu) sheet("shockwave", e.x, e.y + 0.3, e.r * 2.6, colour, 30);
+        if (!nu && !own) sheet("shockwave", e.x, e.y + 0.3, e.r * 2.6, colour, 30);
         if (!nu && e.arch && e.arch !== "Snare") ulti(e.arch, e.x, e.y, e.r * 2.6, colour);   // a Snare plays its own, in its colour, on "snare"
         if (e.big) { impactFrame(sx(e.x), sy(e.y)); mark("crack", e.x, e.y + 0.3, e.r * 2); shake(1.2); stop(110); }
-        sheet("impact", e.x, e.y - 0.3, e.r * (e.nova ? 1.6 : 2.2), colour, 24);
-        for (let i = 0; i < (e.nova ? 3 : 2); i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? colour : "#ffffff", life: 24, size: 0.3, grow: (e.nova ? 0.26 : 0.12) - i * 0.03, t: -i * 3 });
+        if (!own) sheet("impact", e.x, e.y - 0.3, e.r * (e.nova ? 1.6 : 2.2), colour, 24);
+        if (!own) for (let i = 0; i < (e.nova ? 3 : 2); i++) part({ k: "ring", x: e.x, y: e.y, colour: i ? colour : "#ffffff", life: 24, size: 0.3, grow: (e.nova ? 0.26 : 0.12) - i * 0.03, t: -i * 3 });
         mark(MARK_OF[type] ?? "crack", e.x, e.y + 0.3, e.r * 1.8, colour);
         if (e.nova) { for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU; impactRing(e.x + Math.cos(a) * e.r * 0.9, e.y + Math.sin(a) * e.r * 0.9); } shake(0.9); zoomAt(e.x, e.y, 0.14); }
         else shake(0.55);
@@ -1096,7 +1108,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         /* GONE: up into the sky, down into the ground, under the water, into
            the shadows - its landing is marked on the ground from here. */
         const f = s.sides[e.side].team[s.sides[e.side].active];
-        if (e.kind === "air") { fx.push({ k: "launch", id: f.id, side: e.side, slot: f.slot, x: e.x, y: e.y, t: 0, life: 20 }); dust(e.x, e.y, 8); part({ k: "ring", x: e.x, y: e.y + 0.3, colour: "#ffffff", life: 18, size: 0.3, grow: 0.12 }); }
+        if (pix.sig(slugOf(e.move), "vanish", { side: e.side, x: e.x, y: e.y })) { if (e.kind === "air") fx.push({ k: "launch", id: f.id, side: e.side, slot: f.slot, x: e.x, y: e.y, t: 0, life: 20 }); }
+        else if (e.kind === "air") { fx.push({ k: "launch", id: f.id, side: e.side, slot: f.slot, x: e.x, y: e.y, t: 0, life: 20 }); dust(e.x, e.y, 8); part({ k: "ring", x: e.x, y: e.y + 0.3, colour: "#ffffff", life: 18, size: 0.3, grow: 0.12 }); }
         else if (e.kind === "ground") { impact("ground", e.x, e.y + 0.2, 0, -1, true); mark("crack", e.x, e.y + 0.3, 1.6); dust(e.x, e.y, 10); }
         else if (e.kind === "water") { impact("water", e.x, e.y + 0.2, 0, -1, true); part({ k: "ring", x: e.x, y: e.y + 0.3, colour: "#bff3ff", life: 24, size: 0.3, grow: 0.1 }); }
         else poof(e.x, e.y, 1.4);
@@ -1597,33 +1610,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       }
     }
 
-    // 0. Hazards on the ground: spikes, rocks, toxic spikes, a web.
-    for (const zz of s.hazards) {
-      const colour = colourOf(zz.move), fade = Math.min(1, zz.t / 60);
-      ctx.save(); ctx.globalAlpha = 0.85 * fade;
-      ctx.translate(sx(zz.x), sy(zz.y));
-      const hk = artKey(zz.move);
-      if (hk && img(fxPath(hk))) sheetFx(hk, 0, 0, 0, px * 2.6, 0, null, 0.9 * fade);
-      else if (zz.kind === "sticky-web") {
-        ctx.strokeStyle = "rgba(240,240,255,0.8)"; ctx.lineWidth = Math.max(1, px / 14);
-        for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * px * 1.1, Math.sin(a) * px * 1.1); ctx.stroke(); }
-        for (const r of [0.4, 0.75, 1.05]) { ctx.beginPath(); ctx.arc(0, 0, r * px, 0, TAU); ctx.stroke(); }
-      } else {
-        const art = arenaArt(slugOf(zz.move))?.shot;
-        for (let i = 0; i < 5; i++) {
-          const a = (i / 5) * TAU + zz.id, r = (i % 2 ? 0.55 : 0.25) * px;
-          if (!drawArt(art, Math.cos(a) * r, Math.sin(a) * r, Math.max(1, px / 18), 0, 0, fade)) {
-            ctx.fillStyle = colour; ctx.beginPath();
-            ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r - px * 0.22);
-            ctx.lineTo(Math.cos(a) * r - px * 0.16, Math.sin(a) * r + px * 0.12);
-            ctx.lineTo(Math.cos(a) * r + px * 0.16, Math.sin(a) * r + px * 0.12); ctx.fill();
-          }
-        }
-        ctx.globalAlpha = 0.25 * fade; ctx.strokeStyle = colour; ctx.lineWidth = Math.max(1, px / 12);
-        ctx.beginPath(); ctx.arc(0, 0, 1.1 * px, 0, TAU); ctx.stroke();
-      }
-      ctx.restore();
-    }
+    // 0. Hazards on the ground: the pixel layer's (pixfx `hazard`), queued before it paints.
+    for (const zz of s.hazards) pix.hazard(zz.id, zz.kind, zz.x, zz.y, Math.min(1, zz.t / 60));
 
     // 1. Telegraphs on the ground, under everything.
     for (const f of bodies) {
@@ -1715,7 +1703,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       const x = p.x - p.dx * (10 / TPS) * (1 - alpha), y = p.y - p.dy * (10 / TPS) * (1 - alpha), bas = isBasic(p.move), slug = slugOf(p.move);
       const own = BOULDERS.has(slug) || (!bas && artKey(p.move)) || arenaArt(slug)?.shot;
       const nu = p.move <= ULT_BASE && named(p.side), mid = nu && p.dx * nu.dx + p.dy * nu.dy > 0.995;
-      if (!bas && !nu && pix.sig(slug, "shot", { id: p.id, side: p.side, x, y, dx: p.dx, dy: p.dy })) continue;
+      if (!bas && !nu && pix.sig(sigOf(p.move), "shot", { id: p.id, side: p.side, x, y, dx: p.dx, dy: p.dy, type: typeOf(p.move) })) continue;
       pix.shot(p.id, bas ? typeAt(s, p.side) : typeOf(p.move), x, y, p.dx, p.dy, trails.get(p.id) ?? [], { basic: bas, boost: p.boost, orb: !own || Boolean(nu), k, ult: nu?.name, centre: mid });
     }
     // A stream pouring, from the fighter's own act (Phase 3); `pour` below is the classic look's.
@@ -1809,7 +1797,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         // ...and THROWN: the fall carries it on along the blow, where it lands.
         const fl = q < 0.8 ? 0 : (q - 0.8) / 0.2;
         at.y -= h * 1.3; at.x += (rand() - 0.5) * 0.06 * h + (p.liftDx ?? 0) * fl * 0.9; at.y += (p.liftDy ?? 0) * fl * 0.9;
-        if (h > 0.2 && !(FX["moves/psychic-lift"] && sheetFx("moves/psychic-lift", clock / 70 % FX["moves/psychic-lift"].n, sx(at.x), sy(at.y - 0.3), px * 2.6, 0, null, h))) aura(f, at, fr, p.liftC ?? "#e070ff", 0.9);
+        if (h > 0.2) pix.lift(f.side, h);
         if (p.lift <= 0) { p.ox += (p.liftDx ?? 0) * 0.9; p.oy += (p.liftDy ?? 0) * 0.9; dust(x, y, 8); part({ k: "ring", x, y: y + 0.35, colour: "#ffffff", life: 16, size: 0.3, grow: 0.12 }); shake(0.45); }
       }
       if (f.fortress > 0) {
@@ -1981,7 +1969,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
         else if (inArea(ground.grass, x, y)) part({ k: "leaf", x, y: y + 0.3, vx: p.dx * 0.03, vy: -0.01, colour: rand() < 0.5 ? "#4fae47" : "#7fd35a", life: 34, size: 0.12, vr: 0.25 });
       }
       if (BOULDERS.has(slugOf(p.move))) { boulder(x, y - 0.3, clock / 90, 0.42); continue; }
-      if (!bas && pix.sigHas(slugOf(p.move), "shot")) continue;          // drawn whole by the pixel layer
+      if (!bas && pix.sigHas(sigOf(p.move), "shot")) continue;          // drawn whole by the pixel layer
       const art = arenaArt(slugOf(p.move))?.shot, key = !bas && artKey(p.move), ang0 = Math.atan2(p.dy, p.dx);
       // Its own art: a projectile looping along its path, or a stream trailing behind its head.
       if (key && (FX[key].n > 1 ? moveFx(key, clock / 70 % FX[key].n, sx(x), sy(y), px * 2.4, ang0, 1)
@@ -2154,20 +2142,8 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
     ctx.restore();
   }
 
-  /* A BOULDER (Rock Throw and friends): a rough rock, shaded, turning - or
-     its drawn sheet (`moves/boulder`) once the art is in. */
-  function boulder(x, y, rot, size, alpha = 1) {
-    if (!(alpha > 0) || !(size > 0)) return;
-    if (FX["moves/boulder"] && sheetFx("moves/boulder", (rot * 2) % FX["moves/boulder"].n, sx(x), sy(y), px * size * 2.6, 0, null, alpha)) return;
-    const r = px * size;
-    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(sx(x), sy(y)); ctx.rotate(rot);
-    ctx.fillStyle = "#7a6650"; ctx.strokeStyle = "#2e241a"; ctx.lineWidth = Math.max(1, px / 14);
-    ctx.beginPath();
-    for (let i = 0; i < 7; i++) { const a = (i / 7) * TAU, q = r * (0.82 + ((i * 37) % 10) / 45); i ? ctx.lineTo(Math.cos(a) * q, Math.sin(a) * q) : ctx.moveTo(Math.cos(a) * q, Math.sin(a) * q); }
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#a08a6c"; ctx.beginPath(); ctx.arc(-r * 0.25, -r * 0.3, r * 0.35, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
+  // A BOULDER (Rock Throw and friends): the pixel layer's tumbling rock (pixfx `rock`).
+  function boulder(x, y, rot, size, alpha = 1) { pix.rock(x, y, rot, size, alpha); }
   /* A BEAM'S CHARGE, Kamehameha-style: an orb in the move's colour swelling
      in front of its user, matter drawn into it, arcs crackling round it, a
      white core that burns hotter to the release - or the move's own
@@ -2198,16 +2174,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
      turns in a rainbow orb, the two strands of its symbol round it. */
   function evolving(f, p, at, fr) {
     const q = 1 - f.evo / EVOLVE_T, mega = Boolean(p.evoMega);
-    const key = mega ? "moves/mega-evolve" : "moves/evolve";
-    if (FX[key]) sheetFx(key, Math.floor(q * FX[key].n * 0.999), sx(at.x), sy(at.y - 0.6), px * 4.2, 0, null, 1);
-    else {
-      const top = sy(at.y - 7), bot = sy(at.y + 0.4), w = px * (0.7 + 0.7 * q);
-      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.4 + 0.5 * q;
-      const g = ctx.createLinearGradient(0, top, 0, bot);
-      g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(1, mega ? "rgba(255,170,240,0.6)" : "rgba(190,240,255,0.6)");
-      ctx.fillStyle = g; ctx.fillRect(sx(at.x) - w / 2, top, w, bot - top);
-      ctx.restore();
-    }
+    pix.evolve(at.x, at.y, q, mega);      // the pillar of light (and a Mega's helix), the pixel layer's
     glow(sx(at.x), sy(at.y - 0.4), px * (1.4 + 1.3 * q), mega ? RAINBOW[Math.floor(clock / 90) % RAINBOW.length] : "#bfefff", 0.35 + 0.4 * q);
     if (!still && rand() < 0.9) {
       const a = rand() * TAU, r = 2.3;
@@ -2449,16 +2416,7 @@ export function createRenderer(canvas, sides, arena = "indigo", { names = [["You
       /* THE MEGA SYMBOL over the new Mega: a rainbow ring and the strand it
          carries, swelling in and fading - or its drawn sheet once there is one. */
       const grow = Math.min(1, kk * 5), fade = kk > 0.7 ? (1 - kk) / 0.3 : 1;
-      if (!(FX["moves/mega-symbol"] && sheetFx("moves/mega-symbol", 0, sx(e.x), sy(e.y), px * 2.2 * grow, 0, null, fade))) {
-        const r = px * 0.8 * grow;
-        ctx.save(); ctx.translate(sx(e.x), sy(e.y)); ctx.globalAlpha = fade; ctx.lineWidth = Math.max(2, px / 7);
-        RAINBOW.forEach((c, i) => { ctx.strokeStyle = c; ctx.beginPath(); ctx.arc(0, 0, r, (i / RAINBOW.length) * TAU + clock / 400, ((i + 1) / RAINBOW.length) * TAU + clock / 400); ctx.stroke(); });
-        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(2, px / 9);
-        ctx.beginPath(); ctx.moveTo(-r * 0.5, r * 0.55); ctx.bezierCurveTo(-r * 0.9, -r * 0.2, r * 0.2, -r * 0.1, 0, -r * 0.6);
-        ctx.moveTo(r * 0.5, r * 0.55); ctx.bezierCurveTo(r * 0.9, -r * 0.2, -r * 0.2, -r * 0.1, 0, -r * 0.6); ctx.stroke();
-        ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(0, r * 0.15, r * 0.16, 0, TAU); ctx.fill();
-        ctx.restore();
-      }
+      pix.megaSymbol(e.x, e.y, grow, fade);
     } else if (e.k === "fly") {
       /* THE FLYOVER: a legendary crosses the court high up, its shadow
          sweeping the floor under it; it is gone before the drop lands. */

@@ -1370,15 +1370,31 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   check.mjs refuses one shipped). A beam-shaped move is a held STREAM, so
   its colours are `STREAM_RAMP` (Solar Beam, Hyper Beam); the `beam` moment
   is a Cannon ULTI's. Volt Tackle is in no learnset the League reads, so its
-  look is Wild Charge's. Batches 2-10 (same day) are the moves the most
+  look is Wild Charge's. A court-filling move draws its own `wide` storm
+  and a move off the court its own `vanish` and `land` (the generic pillar and
+  sheets would bury it). The LAST drawn sheets went too (asked for: "redo
+  all"): the slam and claw families play pixfx's `_slam`/`_claw` (render.js
+  `sigOf`), and the hazards, a mind move's lift, the thrown boulder,
+  Evolution, Mega Evolution and its symbol are pixfx's (`hazard`, `lift`,
+  `rock`, `evolve`, `megaSymbol`) - no move sheet ships. Batches 2-12 (same day) are the moves the most
   kits carry (6 went straight to the game, asked for: "more moves instead
   of bit by bit"; each still checked in a real match); a status shot (Hypnosis, Thunder Wave) has no hit, so its landing is the
-  status's own look. Hyper Beam's spent flicker is
+  status's own look. Batch 12 took the 32 most carried still on the
+  generic look (Protect to Boomburst): Protect and Detect only flash as the
+  dome rises (`shield` is the dome), Ice Beam pours through `STREAM_RAMP`,
+  Play Rough's fight cloud is its hit (the old `scuffle` went), and
+  render.js's vector `signatureHit` keeps only the moves pixfx does not
+  draw. **Sweep 2 left no kit move on the generic look** (same day,
+  asked for: "bigger sweeps"): 118 more moves of their own, and render.js
+  FAMILY's punch, kick, throw, powder, sound and drain - pixfx's `_punch`
+  ... `_drain`, in the move's type, every moment (shot and pulse too)
+  routed through `sigOf`; a move pixfx draws a hit for drops the Emerald
+  burst under it (Hammer Arm's was a grey slab). Hyper Beam's spent flicker is
   cosmetic; Outrage leaves no dizzy stars (stars mean confusion here).
   **The drawn move sheets are on the bodies' grid** (Phase 7b): 41 RETIRED
   in build_fx.py (beams, charges, orbs, bursts, heal and boost, stun,
   swirl, smoke - the pixel engine's now - and the bites and Play Rough,
-  whose detail did not survive: pixfx `jaws`, `scuffle`), and the other 33
+  whose detail did not survive: pixfx `jaws`, Play Rough's `sig`), and the other 33
   re-gridded (`regrid`: GRID px wide, 16 colours, a 1 px outline; fx.js
   `g`), drawn a sheet pixel to a body pixel in quarter turns (`sheetFx`).
   **There is one look** (2026-10-30, your call): the classic vector look,

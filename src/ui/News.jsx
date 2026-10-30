@@ -16,6 +16,49 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-10-30-anime-sweep",
+    icon: "🎆",
+    date: "October 2026",
+    title: "Every Arena move has its own look",
+    items: [
+      ["118 more", "Swift's stars, Swords Dance's ring of blades, Eruption, Whirlpool, Icicle Crash and more."],
+      ["Families", "Punches, kicks, throws, powders, songs and drains, each in its own type's colours."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-32",
+    icon: "✨",
+    date: "October 2026",
+    title: "32 more moves redrawn",
+    items: [
+      ["Shots", "Shadow Ball, Energy Ball, Moonblast, Aura Sphere, Inferno and Leaf Storm, each its own look."],
+      ["Charges", "Flare Blitz's fireball, Brave Bird's wings of blue fire, Megahorn's lance of light."],
+      ["Self moves", "Protect, Recover, Double Team's copies, Roost's feathers - and Explosion's mushroom cloud."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-all",
+    icon: "🎨",
+    date: "October 2026",
+    title: "Every Arena move in pixel art",
+    items: [
+      ["Hazards", "Steel spikes, purple Toxic Spikes, floating Stealth Rocks and a silk Sticky Web."],
+      ["Evolution", "A pillar of light as it evolves - a rainbow helix for Mega Evolution."],
+      ["The rest", "Thrash, Fury Swipes and their kin, Rock Throw's rock, Psychic's blue lift."],
+    ],
+  },
+  {
+    id: "2026-10-30-anime-storms",
+    icon: "🌪️",
+    date: "October 2026",
+    title: "Storms and vanishing moves, redone",
+    items: [
+      ["Blizzard, Petal Blizzard, Heat Wave", "A snowstorm, a storm of petals, shimmering heat - across the whole court."],
+      ["Twister", "A tall tornado whirls up round the user."],
+      ["Fly, Bounce, Dig, Dive, Phantom Force", "Each leaves and lands its own way - a dive from the sky, a geyser, a dark rift."],
+    ],
+  },
+  {
     id: "2026-10-30-anime-punches",
     icon: "🥊",
     date: "October 2026",
