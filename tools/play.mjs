@@ -3056,7 +3056,8 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     e.throwBall("master-ball");
     e.answerAsk(true);
     until(e, (s) => !s.encounter || s.encounter.phase === "caught", "the master ball to land");
-    assert.equal(e.state.dreams[ev.id], 1, "a costume caught was no Bad Dream");
+    // Before the hunt is met its first call is the Pokedex (every look once), never a count of catches.
+    assert.equal(e.state.dreams[ev.id] ?? 0, 0, "a costume caught before the hunt was met counted a Bad Dream");
     assert.equal(dexCaught(e.state.dex), before, "an event look moved the Pokedex's count");
     e.destroy();
 
@@ -3066,8 +3067,18 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     const { isNight } = await import("../src/game/clock.js");
     let night = SAVE.steps;
     while (isNight(night)) night++;      // a DAY step, the case that used to meet nothing
-    const moon = { [ev.id]: ev.hunt.dreams };
-    const dark = boot({ ...SAVE, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
+    /* THE FIRST CALL IS ONE OF EVERY LOOK (2026-10-31, asked for: "one of
+       each event pokemon, not just 20"): a Pokedex holding all but one calls
+       nothing, however many costumes were caught. */
+    const { huntDue } = await import("../src/game/events.js");
+    const allLooks = Array(Math.max(...ev.looks.map((l) => dexIndex(l.id))) + 1).fill(0);
+    for (const l of ev.looks) allLooks[dexIndex(l.id)] = 2;
+    const short = [...allLooks];
+    short[dexIndex(ev.looks.at(-1).id)] = 0;
+    assert.equal(huntDue({ [ev.id]: ev.hunt.again }, short, ev.start), null, "the hunt came before every look was caught");
+    assert.equal(huntDue({}, allLooks, ev.start), ev.hunt, "every look caught did not call the hunt");
+    const moon = {};
+    const dark = boot({ ...SAVE, dex: allLooks, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
     Math.random = () => 0.01;
     try {
       for (const dir of ["right", "down", "left", "up"]) {
@@ -3091,11 +3102,11 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     /* IT COMES AGAIN (2026-10-30, asked for: "let us catch more"): caught,
        the moon wanes to `keep` as a loss does, the medal is the first catch's
        alone, and a full moon meets it again - each meeting a tier roll. */
-    const twice = boot({ ...SAVE, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
+    const twice = boot({ ...SAVE, dex: allLooks, steps: night, areaId: ev.hunt.area, dreams: moon }).e;
     for (let n = 0; n < 2; n++) {
-      // The first time it asks `dreams`; once met, `again` (25) - one short of it is not enough.
-      if (n) { twice.state.dreams = { ...twice.state.dreams, [ev.id]: ev.hunt.again - 1 }; assert.equal((await import("../src/game/events.js")).huntDue(twice.state.dreams), null, "a met Nightmare came back short of `again` costumes"); }
-      twice.state.dreams = { ...twice.state.dreams, [ev.id]: n ? ev.hunt.again : ev.hunt.dreams };
+      // The first time it asks every look; once met, `again` (25) - one short of it is not enough.
+      if (n) { twice.state.dreams = { ...twice.state.dreams, [ev.id]: ev.hunt.again - 1 }; assert.equal(huntDue(twice.state.dreams, twice.state.dex), null, "a met Nightmare came back short of `again` costumes"); }
+      if (n) twice.state.dreams = { ...twice.state.dreams, [ev.id]: ev.hunt.again };
       Math.random = () => 0.01;
       try {
         for (const dir of ["right", "down", "left", "up"]) {
@@ -3117,8 +3128,9 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
     assert.equal(twice.state.box.filter((m) => m.species === ev.hunt.id).length, 2, "the second Nightmare never reached the Box");
     twice.destroy();
     // By day, or anywhere else, a full moon meets nothing new.
-    const day = boot({ ...SAVE, areaId: "meadow", dreams: moon }).e;
-    assert.equal(day.state.dreams[ev.id], ev.hunt.dreams, "a full moon did not survive a load");
+    const metFull = { [ev.id]: ev.hunt.again, [`${ev.id}+`]: 1 };
+    const day = boot({ ...SAVE, areaId: "meadow", dreams: metFull }).e;
+    assert.equal(day.state.dreams[ev.id], ev.hunt.again, "a full moon did not survive a load");
     day.destroy();
 
     /* PONCHO PARADE: a roaming week's look is met on a map its poncho fits

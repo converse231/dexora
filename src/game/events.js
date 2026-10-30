@@ -218,7 +218,9 @@ export const eventDue = (dex, medals = []) =>
    is DUE: the next wild meeting in its area is it. It REPEATS (2026-10-30,
    asked for: "let us catch more" - one meeting was one tier roll, so its
    rare forms were out of reach): caught or lost, the count starts over and
-   it asks `again` (25) costumes each time after the first `dreams` (20) -
+   it asks `again` (25) costumes each time after the first. The FIRST call is
+   one of every look in the Pokedex (2026-10-31, asked for: "one of each event
+   pokemon, not just 20"; an evolved one counts, as for the title) -
    `<id>+` in the same object marks it met (asked for the same day; no new
    save field). The medal is the first catch's. A save's count is held to
    the hunt's own range. */
@@ -230,17 +232,19 @@ const HUNT_WORDS = {
   run: "The Nightmare fades if you run",
 };
 export const huntWords = (h) => ({ ...HUNT_WORDS, ...h?.words });
-// How many costumes call it now: `dreams` the first time, `again` once it has been met.
-export const huntNeed = (dreams, ev) => (dreams?.[`${ev.id}+`] ? ev.hunt.again : ev.hunt.dreams);
-export function huntDue(dreams, day) {
+// [have, need] toward calling it: every look held the first time, `again` Bad Dreams once it has been met.
+export const huntCount = (dreams, dex, ev) => (dreams?.[`${ev.id}+`]
+  ? [dreams[ev.id] ?? 0, ev.hunt.again] : [eventHeld(ev, dex), ev.looks.length]);
+export function huntDue(dreams, dex, day) {
   const ev = eventOn(day);
   const h = ev?.hunt;
   if (!h) return null;
-  return (dreams?.[ev.id] ?? 0) >= huntNeed(dreams, ev) ? h : null;
+  const [n, need] = huntCount(dreams, dex, ev);
+  return n >= need ? h : null;
 }
 export const cleanDreams = (d) => Object.fromEntries(EVENTS.filter((ev) => ev.hunt).flatMap((ev) => {
   const n = d?.[ev.id], met = d?.[`${ev.id}+`] === 1;
-  return [...(Number.isInteger(n) && n >= 0 && n <= Math.max(ev.hunt.dreams, ev.hunt.again) ? [[ev.id, n]] : []), ...(met ? [[`${ev.id}+`, 1]] : [])];
+  return [...(Number.isInteger(n) && n >= 0 && n <= ev.hunt.again ? [[ev.id, n]] : []), ...(met ? [[`${ev.id}+`, 1]] : [])];
 }));
 
 /* THE CLOCK ON AN EVENT, for its countdowns: it opens at local midnight on

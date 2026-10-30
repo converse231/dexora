@@ -866,8 +866,10 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
       const real = row.look || row.event
         ? baseOf_(speciesById(row.to)).from === baseOf_(sp).name
           && EVOLUTIONS.some((r) => !r.look && !r.event && r.from === baseOf_(sp).id
-            && r.to === baseOf_(speciesById(row.to)).id && r.kind === row.kind
-            && r.level === row.level && r.item === row.item)
+            && r.to === baseOf_(speciesById(row.to)).id
+            && (r.kind === row.kind && r.level === row.level && r.item === row.item
+              // In costume a trade is a level-up at the level it already cost (fetch-evolutions).
+              || row.event && r.kind === "trade" && row.kind === "level" && row.level === evoLevel(r)))
         : row.regional
         ? speciesById(speciesById(row.to).of).from === (isForm(sp.id) ? sp.from : sp.name)
         : speciesById(row.to).from === sp.name;
@@ -2695,7 +2697,6 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
   {
     const looks = EVENTS.flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])]);
     for (const ev of EVENTS.filter((e) => e.hunt)) {
-      assert.ok(ev.hunt.again >= ev.hunt.dreams, `${ev.id}'s hunt comes back for fewer costumes than it first asked`);
       assert.ok(BIOMES.some((b) => b.id === ev.hunt.area), `${ev.id}'s hunt waits in no map`);
       assert.ok(/^[a-z]+$/.test(ev.hunt.medal) && !EVENTS.some((e) => e.id === ev.hunt.medal),
         `${ev.id}'s hunt medal is not an event: id the server's titles can take`);

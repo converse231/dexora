@@ -35,7 +35,7 @@ import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
-  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntNeed, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook, dressed,
+  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntCount, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook, dressed,
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
@@ -1908,7 +1908,7 @@ export function createEngine(canvas, onChange, mini = null) {
        encounter walking"): it waited for the map's night, and a player who
        came due by day walked ~235 steps through ~16 other meetings for it -
        up to 750 and 50 just after dawn. The twenty costumes are the hunt. */
-    const hunt = source === "wild" ? huntDue(state.dreams) : null;
+    const hunt = source === "wild" ? huntDue(state.dreams, state.dex) : null;
     const nightmare = !!hunt && state.areaId === hunt.area;
     const owned = (id) => state.dex[dexIndex(id)] === 2;
     // A roaming week (events.js `roamLook`): a walking meeting may be one of its looks, by the map's types.
@@ -2749,10 +2749,15 @@ export function createEngine(canvas, onChange, mini = null) {
       return;
     }
     if (outcome !== "caught" || speciesById(e.speciesId)?.event !== ev.id) return;
-    const was = state.dreams[ev.id] ?? 0, need = huntNeed(state.dreams, ev);
-    if (was >= need) return;
-    state.dreams = { ...state.dreams, [ev.id]: was + 1 };
-    if (was + 1 === need) {
+    // Before it is met the Pokedex counts (every look once); after, each costume is a Bad Dream.
+    const met = state.dreams[`${ev.id}+`];
+    if (met) {
+      const was = state.dreams[ev.id] ?? 0;
+      if (was >= h.again) return;
+      state.dreams = { ...state.dreams, [ev.id]: was + 1 };
+    } else if (!e.isNew) return;
+    const [n, need] = huntCount(state.dreams, state.dex, ev);
+    if (n === need) {
       cheer({ kind: "medal", title: huntWords(h).rise,
         sub: `Something waits in ${AREAS[h.area]?.name ?? "the dark"}... Walk in - and bring a Nanab Berry, or it may run.` });
     }

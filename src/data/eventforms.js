@@ -81,17 +81,20 @@ export const EVENTS = [
       { id: 19915, of: 592, title: "Ghost Bride Frillish", flavor: "It drifts up the shore in a veil of old lace, holding roses that wilted long ago. It is still waiting at the water's edge." },
     ],
     /* THE NIGHTMARE: the event's legendary, never a swap and never in the
-       grass. Every costume caught on the event's days is a Bad Dream; at
-       `dreams` the new moon falls, and the next wild meeting in `area` after
-       dark IS it. Lost - fled or run from - it waxes back to `keep`, and three
+       grass. The first time, one of EVERY look of the event in the Pokedex
+       calls it (2026-10-31, asked for: "one of each, not just 20"); after
+       that each costume caught on the event's days is a Bad Dream, and at
+       `again` the next wild meeting in `area` IS it. Lost - fled or run from - it waxes back to `keep`, and three
        more costumes bring it round again. Caught, it is the `medal` and its
        `name`, a title of its own beside the event's. */
-    hunt: { id: 19908, of: 491, title: "Scarecrow Darkrai", flavor: "It stitched a sack over its head and stuffed its sleeves with straw to stand in the fields - and every crow that lands on it dreams of the dark.", medal: "nightmare", name: "Nightmare King", dreams: 20, again: 25, area: "tower" },   // 7 and 4 at 1 costume in 16 meetings; now 1 in 2 (2026-10-24)
+    hunt: { id: 19908, of: 491, title: "Scarecrow Darkrai", flavor: "It stitched a sack over its head and stuffed its sleeves with straw to stand in the fields - and every crow that lands on it dreams of the dark.", medal: "nightmare", name: "Nightmare King", again: 25, area: "tower" },   // 7 and 4 at 1 costume in 16 meetings; now 1 in 2 (2026-10-24)
   },
   /* HALLOWED NIGHT'S SECOND WEEK (2026-10-26, asked for): costumes
      and a new legendary, from Halloween itself - whole lines this time, second
-     and final stages too, and NONE EVOLVES (`evolves: false`, your call): each
-     stage is a catch of its own. A later stage is rarely met wild (Dusknoir
+     and final stages too. Each stage is a catch of its own AND a drawn line
+     evolves in costume (2026-10-31, asked for: it shipped with none evolving,
+     `evolves: false`); a look whose next stage nobody drew is a dead end, as
+     the first week's. A later stage is rarely met wild (Dusknoir
      almost never), so a look may also be met `on` its line's base: meeting a
      Duskull can be any of the three Reapers (events.js `eventLook`). Themes
      the first week did not wear, and no devils (your call). */
@@ -102,7 +105,6 @@ export const EVENTS = [
     emblem: "👻",
     shelf: "halloween",
     drift: [93, 355, 477, 198, 278],
-    evolves: false,
     // HARDER (2026-10-26, asked for): a third of the species' meetings, where the first week had half.
     share: 1 / 3,
     checkin: { weekday: 5, items: { "hallow-ball": 5 } },
@@ -144,7 +146,7 @@ export const EVENTS = [
       { id: 19938, of: 199, on: 79, title: "Ghost Story Slowking", flavor: "It holds a candle under its chin and opens the old book. Its stories are so slow that the scary part arrives after sunrise." },
       { id: 19939, of: 465, on: 114, title: "Swamp Monster Tangrowth", flavor: "It rose out of the bog wearing half of it. A frog has lived on its shoulder for three Halloweens and has never once been asked to leave." },
     ],
-    hunt: { id: 19931, of: 487, title: "Grim Reaper Giratina", flavor: "It rose out of the Distortion World in a reaper's hood, its scythe as long as its wings - and the Pokémon Mansion's clocks all stopped at midnight.", medal: "reaper", name: "The Reaper", dreams: 20, again: 25, area: "mansion" },
+    hunt: { id: 19931, of: 487, title: "Grim Reaper Giratina", flavor: "It rose out of the Distortion World in a reaper's hood, its scythe as long as its wings - and the Pokémon Mansion's clocks all stopped at midnight.", medal: "reaper", name: "The Reaper", again: 25, area: "mansion" },
   },
   /* PONCHO PARADE (2026-10-28, asked for): Pikachu in the Pokemon Center's
      ponchos - the 16 printed on Japan's promo cards, three sold only as
@@ -220,7 +222,7 @@ export const EVENTS = [
     /* THE SPECIAL ONE: the other way round - Mew in a Pikachu poncho. Twenty
        ponchos caught and the next meeting in the Safari Zone is it. */
     hunt: { id: 19966, of: 151,
-      title: "Pikachu Poncho Mew", medal: "mischief", name: "Pink Mischief", dreams: 20, again: 25, area: "safari",
+      title: "Pikachu Poncho Mew", medal: "mischief", name: "Pink Mischief", again: 25, area: "safari",
       flavor: "It borrowed a Pikachu poncho from the rack and wears it back to front, the hood's ears flopping over its eyes. When you call it a Pikachu it giggles and vanishes.",
       words: {
         token: "Poncho Stamp", tokens: "Poncho Stamps", due: "Something pink is in the Safari Zone", rise: "A PINK SHIMMER",
@@ -286,7 +288,7 @@ export const EVENTS = [
     /* THE SPECIAL ONE: Mew again, in an Eevee poncho now. Twenty ponchos
        caught and the next meeting in the Safari Zone is it. */
     hunt: { id: 19983, of: 151,
-      title: "Eevee Poncho Mew", medal: "quickchange", name: "Quick Change", dreams: 20, again: 25, area: "safari",
+      title: "Eevee Poncho Mew", medal: "quickchange", name: "Quick Change", again: 25, area: "safari",
       flavor: "It gave the Pikachu poncho back and took an Eevee one off the rack instead, the long ears flopping over its eyes. It giggles at its own disguise - and is gone before you can say which Pokemon it is.",
       words: {
         token: "Poncho Stamp", tokens: "Poncho Stamps", due: "Something pink is in the Safari Zone again", rise: "A PINK SHIMMER",

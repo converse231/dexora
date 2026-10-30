@@ -42,7 +42,7 @@ const API = "https://pokeapi.co/api/v2";
    is not a hard evolution, it is an impossible one". Reading `STONES` means the
    shop decides, so adding a stone to the shelf is what promotes its evolutions
    from `bond`, and shipping a generation never strands a line. */
-const { STONES } = await import("../src/game/items.js");
+const { STONES, evoLevel } = await import("../src/game/items.js");
 const SELLS = new Set(STONES.map((s) => s.id));
 
 const { SPECIES: SHIPPED_SPECIES } = await import("../src/data/species.js");
@@ -227,14 +227,18 @@ for (const f of FORMS) {
    own row - method, level, item - marked `event`. Never into the plain next
    stage (the costume is the point) and never the other way: an ordinary Gastly
    evolves into an ordinary Haunter. A stage its event did not draw is where
-   the line stops. */
+   the line stops. A TRADE row is a plain level-up in costume, at the level
+   the game already charges for it (`evoLevel`; 2026-10-31, asked for: "remove
+   the trade evolution, just put it in level up"). */
 for (const ev of EVENTS) {
   // An event whose costumes are each a catch of their own (`evolves: false`) writes none.
   if (ev.evolves === false) continue;
   for (const l of ev.looks) {
     for (const r of baseRows.filter((e) => e.from === l.of && e.to < 10000)) {
       const kin = ev.looks.find((k) => k.of === r.to);
-      if (kin) rows.push({ ...r, from: l.id, to: kin.id, event: true });
+      if (kin) rows.push(r.kind === "trade"
+        ? { from: l.id, to: kin.id, kind: "level", level: evoLevel(r), event: true }
+        : { ...r, from: l.id, to: kin.id, event: true });
     }
   }
 }

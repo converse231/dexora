@@ -228,9 +228,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
   Ball**: every ball takes a number key, and check.mjs allows nine; the
   Hallow Ball works on any costume, so a later week sells only its own
   honey (two events' jars are not tiers of each other). **A week may dress whole
-  lines without evolving them** (`evolves: false`, The Haunting, your call:
-  second and final stages, each its own catch - fetch-evolutions writes no
-  row): a later stage is rarely met wild, so a look `on` its line's base is
+  lines** (The Haunting): second and final stages, each its own catch, and a
+  drawn line evolves in costume (2026-10-31, asked for - it shipped with
+  `evolves: false`, which still makes fetch-evolutions write no row): a later stage is rarely met wild, so a look `on` its line's base is
   met in that base's place too (`eventLook`: one draw for the costume, a
   second to pick among the line only when there is a choice; check.mjs holds
   `on` to the line's base and every such look to being met).
@@ -292,14 +292,15 @@ anything done. The run prints each suite; the count is not typed anywhere.
   `SeasonChip`) each tick on their own clock (`useNow`), never App's. Its
   `checkin` weekday pays its items on top of the day's reward
   (`eventCheckin`: Friday, five Hallow Balls). **An event's `hunt` is its legendary**
-  (Scarecrow Darkrai, 2026-10-20): never a swap or a table row. Each costume
-  caught on its days is a Bad Dream (`state.dreams`, `huntOn`); at `dreams`
-  the next wild meeting in its `area` IS it, day or night (2026-10-27: it
+  (Scarecrow Darkrai, 2026-10-20): never a swap or a table row. It is
+  first called by ONE OF EVERY LOOK in the Pokedex (2026-10-31, asked for: "one
+  of each, not just 20"; an evolved one counts), and once met each costume
+  caught on its days is a Bad Dream (`state.dreams`, `huntOn`); then the next wild meeting in its `area` IS it, day or night (2026-10-27: it
   waited for dark, ~235 steps and 16 meetings of walking) (`huntDue`, no alpha,
   it asks before you run); lost OR caught, the count starts over and it
   comes again (2026-10-30, asked for: "let us catch more" - one meeting was
   one tier roll, its rare forms out of reach) after `again` (25) costumes,
-  `<id>+` in `dreams` marking it met (`huntNeed`); the card's tally is a
+  `<id>+` in `dreams` marking it met (`huntCount`); the card's tally is a
   Poke Ball a slot in fives, an empty one greyed (hollow rings read as broken); the first catch is
   `event:<medal>` - NO title of its own (2026-10-26, your call): the
   event's title asks for every look AND it (`eventDone`), and `shownTitles`

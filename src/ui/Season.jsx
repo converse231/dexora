@@ -20,7 +20,7 @@ import { label, AREAS } from "../game/map.js";
 import { speciesById, foundIn, dexIndex } from "../game/biomes.js";
 import { eventShelf } from "../game/items.js";
 import { shelfOf, eventAfter,
-  eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, eventDone, huntDue, huntNeed, huntWords,
+  eventOn, eventSoon, eventOpens, eventCloses, eventDaysLeft, eventHeld, eventDone, huntDue, huntCount, huntWords,
   shareOf, EVENT_NIGHT, EVENT_PACKS, roamAreas,
 } from "../game/events.js";
 
@@ -229,9 +229,9 @@ export function SeasonIntro({ ev, dex, onClose, onBoard, onNext }) {
             <span className="sn-mon solo sn-shade"><Sprite id={ev.hunt.id} alt="" eager /></span>
             <span>
               <b>{ev.hunt.name}</b>
-              Catch any {ev.hunt.dreams} costumed Pokémon of this event (repeats count). Then walk in
+              Catch one of every costume of this event (an evolved one counts). Then walk in
               {" "}{AREAS[ev.hunt.area]?.name} - the first Pokémon you meet there is it. Once you have
-              {" "}met it, {ev.hunt.again} more costumes bring it back.
+              {" "}met it, any {ev.hunt.again} more costumes (repeats count) bring it back.
             </span>
           </section>
         )}
@@ -301,8 +301,8 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
       </div>
       {ev.hunt && (() => {
         const won = medals.includes(`event:${ev.hunt.medal}`);
-        const n = dreams[ev.id] ?? 0, need = huntNeed(dreams, ev), met = Boolean(dreams[`${ev.id}+`]);
-        const due = !!huntDue(dreams) && live;
+        const [n, need] = huntCount(dreams, dex, ev), met = Boolean(dreams[`${ev.id}+`]);
+        const due = !!huntDue(dreams, dex) && live;
         return (
           <div className={`sn-hunt-row${due ? " due" : ""}`}>
             <button type="button" className={`sn-slot${won ? " got" : ""}`} data-tip={won ? ev.hunt.title : "???"}
@@ -312,7 +312,8 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
             <span>
               <b>{won ? `${ev.hunt.name} ✓` : due ? huntWords(ev.hunt).due : ev.hunt.name}</b>
               <small>{due ? `Walk in ${AREAS[ev.hunt.area]?.name} - your next meeting there`
-                : `Catch ${need - n} more costumed Pokémon to call it${met ? " back" : ""} (${n} of ${need})`}</small>
+                : met ? `Catch ${need - n} more costumed Pokémon to call it back (${n} of ${need})`
+                : `Catch every costume once to call it (${n} of ${need})`}</small>
             </span>
             {(!won || live) && <Moons n={n} of={need} says={huntWords(ev.hunt).tokens} />}
           </div>

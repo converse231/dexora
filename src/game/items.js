@@ -448,8 +448,10 @@ export const FIELD = [
     /* `pull` (2026-10-29, players: "even with the honey I keep running into
        non-costumed Kanto Pokemon"): the lure only dressed a species that HAS a
        costume, and most of a map has none - so half the meetings under it are
-       drawn from the map's costumed species alone (the engine's `lured`). */
-    event: "halloween", steps: HONEY_STEPS, lure: 3, pull: 0.5, blurb: "Lures costumed Pokémon",   // a lure up to EVENT_CAP: half by day already (2026-10-24)
+       drawn from the map's costumed species alone (the engine's `lured`).
+       0.5 -> 0.3 (2026-10-31, asked for: "max 35%"): at half, a honey made
+       38-46% of every meeting a costume; now 24-34%, Route 114 the most. */
+    event: "halloween", steps: HONEY_STEPS, lure: 3, pull: 0.3, blurb: "Lures costumed Pokémon",   // a lure up to EVENT_CAP: half by day already (2026-10-24)
   },
   {
     // Poncho Parade's (2026-10-28): the same jar in Pikachu yellow, luring the week's roaming ponchos -

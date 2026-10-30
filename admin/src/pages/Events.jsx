@@ -38,7 +38,7 @@ export default function Events({ days, tick }) {
                       tip="Trainers holding the most-caught look - at least this many took part" />
                     <Kpi label="Claimed the event" value={num(m.medals?.[`event:${ev.id}`] ?? 0)} tip={`Every look in the Pokédex: the "${ev.title}" title`} />
                     {ev.hunt && <Kpi label={`${ev.hunt.name}s`} value={num(hunters)} tip={`Caught ${ev.hunt.title}`} />}
-                    {ev.hunt && <Kpi label="Dreaming" value={num(m.dreams?.[ev.id]?.players ?? 0)} tip={`Trainers with Bad Dreams; median ${num(m.dreams?.[ev.id]?.p50)} of ${ev.hunt.dreams}`} />}
+                    {ev.hunt && <Kpi label="Dreaming" value={num(m.dreams?.[ev.id]?.players ?? 0)} tip={`Trainers with Bad Dreams; median ${num(m.dreams?.[ev.id]?.p50)} of ${ev.hunt.again}`} />}
                   </div>
                 </Card>,
                 <Card key={`${ev.id}-b`} span={5} title="Each look" sub="Trainers who have caught it"><Bars items={caught} /></Card>,

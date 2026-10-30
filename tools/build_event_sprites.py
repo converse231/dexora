@@ -70,7 +70,8 @@ HOLE_FIT = 0.85          # the share of a pocket on a checker's squares that mak
 # a look is named here by eye.
 # Grim Reaper Dusknoir too (2026-10-31, reported: white in its scythe's curve
 # and between the scroll and the handle).
-HOLLOW = {("haunting", "487"), ("haunting", "477")}
+# Gargoyle Geodude too (same day: white between its arms and its body).
+HOLLOW = {("haunting", "487"), ("haunting", "477"), ("haunting", "74")}
 # SCENES (2026-10-31, reported: Gravedigger Diglett had lost an eye). A
 # drawing fitted to its species' body is a costume; one that is a whole
 # scene - Diglett's mound, headstone and lantern - fitted to Diglett's narrow
@@ -79,6 +80,19 @@ HOLLOW = {("haunting", "487"), ("haunting", "477")}
 # browns took all sixteen, and the nose went grey and the headstone cream.
 SCENE = {("haunting", "50")}
 SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR = 24, 6, 60
+# PIXELS THE SHRINK CANNOT KEEP, put back by hand on the built sprite (x, y),
+# each painted the colour of a source pixel of the same sprite (2026-10-31,
+# reported: Gravedigger Diglett's left eye was its glint alone - one eye's
+# black fell between two blocks; the right eye's black is copied).
+DOTS = {("haunting", "50"): ([(25, 17), (25, 18)], (29, 17))}
+# SMOOTH DRAWINGS (2026-10-31, reported "too grainy": the Gargoyles). A
+# drawing textured all over - cracked stone, moss - has more detail than its
+# sprite has pixels, and the outline rule (a third dark is black) turned every
+# crack into a black speck. Named here, the outline wins only on the
+# silhouette's rim, and a block no colour holds `SMOOTH_HOLD` of takes its mean
+# colour's nearest. Not for everyone: it greyed Skeleton Houndour's white bones.
+SMOOTH = {("haunting", "74"), ("haunting", "75"), ("haunting", "76")}
+SMOOTH_HOLD = 0.6
 POCKET_WHITE = 236       # near-white: a pocket's pixels
 POCKET_RIM = 4           # source pixels of tinted glow round a pocket that go with it
 # An island smaller than this share of the body is a speck of background.
@@ -293,7 +307,7 @@ def palette(a, m, colours=COLOURS, accents=ACCENTS, far_=ACCENT_FAR):
     return pal, idx
 
 
-def shrink(a, m, base, scene=False):
+def shrink(a, m, base, scene=False, smooth=False):
     """The art at the base sprite's size, one target pixel per block of source.
 
     A block takes its commonest palette colour, except that the darkest colour
@@ -308,6 +322,7 @@ def shrink(a, m, base, scene=False):
     tw, th = max(1, round((ax1 - ax0) * s)), max(1, round((ay1 - ay0) * s))
     pal, idx = palette(a, m, *((SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR) if scene else ()))
     dark = int(np.argmin(pal.sum(axis=1)))
+    rim = grow(~m, max(1, int(0.5 / s))) if smooth else None
     art = np.zeros((th, tw, 4), np.uint8)
     for j in range(th):
         y0 = ay0 + int(j / s); y1 = max(y0 + 1, ay0 + int((j + 1) / s))
@@ -317,7 +332,15 @@ def shrink(a, m, base, scene=False):
             if bm.mean() < 0.5:
                 continue
             counts = np.bincount(idx[y0:y1, x0:x1][bm], minlength=len(pal))
-            k = dark if counts[dark] >= bm.sum() / 3 else int(np.argmax(counts))
+            if not smooth:
+                k = dark if counts[dark] >= bm.sum() / 3 else int(np.argmax(counts))
+            elif rim[y0:y1, x0:x1].any() and counts[dark] >= bm.sum() / 3:
+                k = dark
+            elif counts.max() >= bm.sum() * SMOOTH_HOLD:
+                k = int(np.argmax(counts))
+            else:
+                mean = a[y0:y1, x0:x1][bm].astype(float).mean(axis=0)
+                k = int(np.abs(pal - mean).sum(axis=1).argmin())
             art[j, i, :3] = pal[k]
             art[j, i, 3] = 255
     out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -494,7 +517,11 @@ def build(path, ids):
     if (event, base_id) in HOLLOW:
         m = hollow(a, m)
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
-    out = thin(shrink(a, m, base, (event, stem) in SCENE))
+    out = thin(shrink(a, m, base, (event, stem) in SCENE, (event, stem) in SMOOTH))
+    if (event, stem) in DOTS:
+        at, like = DOTS[(event, stem)]
+        for xy in at:
+            out.putpixel(xy, out.getpixel(like))
     out.save(os.path.join(SPRITES, f"{lid}.png"), optimize=True)
     shiny(out, base_id, lid in ROAM).save(os.path.join(SPRITES, "shiny", f"{lid}.png"), optimize=True)
     print(f"{event}/{base_id} -> {lid}: {out.size[0]}px, {len(out.getcolors(4096)) - 1} colours")
