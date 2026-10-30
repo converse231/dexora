@@ -229,4 +229,70 @@ export const EVENTS = [
       },
     },
   },
+  /* EEVEE PONCHO PARADE (2026-10-30, asked for: "part 2 of the Poncho event"):
+     the parade's second week - Eevee in its eight evolutions' ponchos, the
+     Pokemon Center's 2017 campaign printed on SM-P 137-144 (the promo set
+     data/cards/sets/eponcho.js), and nine of ours: Pikachu's, Ditto's,
+     Dragonite's, Alcremie's, Greninja's and Butterfree's (Cubone and Mimikyu bring
+     the Ground and Ghost maps a poncho), and Ho-Oh, Lugia and Snorlax as the
+     rare three - never a shiny poncho
+     (asked for: every look already rolls the Shiny tier). It roams like the
+     Pikachu week and shares its shelf, so a Poncho Honey bought then still
+     works. Its hunt is Mew again, back in the Safari Zone - it has swapped
+     last week's Pikachu poncho for an Eevee one (asked for). */
+  {
+    id: "eponchos",
+    name: "Eevee Poncho Parade",
+    title: "Poncho Stylist",
+    emblem: "🎀",
+    shelf: "ponchos",
+    // Mew over the bunting; the Eeveelutions walk.
+    drift: [151],
+    evolves: false,
+    roam: true,
+    daytime: true,
+    share: 1 / 12,
+    checkin: { weekday: 5, items: { "poncho-honey": 1 } },
+    // The week after the Pikachu one.
+    start: "20261115",
+    end: "20261121",
+    lore: "The Pikachu have handed the ponchos back - and the Eevee were waiting at the rack. This week they are out in their evolutions' ponchos: a Vaporeon fin, Jolteon's spikes, Sylveon's ribbons trailing in the wind. Each turns up where its poncho's Pokémon would live, so the Flareon ones are by the volcano and the Glaceon ones out on the ice. A few wear something else entirely. Catch one that was printed on a card and the card is yours. And the pink one from last week is back in the Safari Zone - it has swapped its Pikachu poncho for one with long brown ears.",
+    looks: [
+      // The 2017 campaign: one card each, Kouki Saitou's.
+      { id: 19970, of: 133, wears: 134, card: "eponcho-sm137", title: "Vaporeon Poncho Eevee", flavor: "A blue Vaporeon poncho with a frilled fin hood and a fish tail trailing behind. It flops into every puddle it passes, on purpose." },
+      { id: 19971, of: 133, wears: 135, card: "eponcho-sm138", title: "Jolteon Poncho Eevee", flavor: "A spiky yellow Jolteon poncho. The spikes are soft, but it puffs them up anyway whenever anyone gets close." },
+      { id: 19972, of: 133, wears: 136, card: "eponcho-sm139", title: "Flareon Poncho Eevee", flavor: "A fiery Flareon poncho with a great fluffy cream collar. It is far too warm in it and refuses to take it off." },
+      { id: 19973, of: 133, wears: 196, card: "eponcho-sm140", title: "Espeon Poncho Eevee", flavor: "A lilac Espeon poncho with a red gem on the hood. It stares at things very hard, hoping they will float." },
+      { id: 19974, of: 133, wears: 197, card: "eponcho-sm141", title: "Umbreon Poncho Eevee", flavor: "A black Umbreon poncho with yellow rings that glow at dusk. It only comes out properly once the sun is low." },
+      { id: 19975, of: 133, wears: 470, card: "eponcho-sm142", title: "Leafeon Poncho Eevee", flavor: "A cream Leafeon poncho with a leaf on the hood and a leaf for a tail. It naps in sunny patches and calls it photosynthesis." },
+      { id: 19976, of: 133, wears: 471, card: "eponcho-sm143", title: "Glaceon Poncho Eevee", flavor: "An icy blue Glaceon poncho with diamond-patterned flaps. Its breath frosts the air even in the sun." },
+      { id: 19977, of: 133, wears: 700, card: "eponcho-sm144", title: "Sylveon Poncho Eevee", flavor: "A pink and white Sylveon poncho with ribbon feelers that trail behind it. It wraps them round anyone it likes." },
+      // Our own: the rare three - two legends' ponchos and Eevee's old Let's Go partner.
+      { id: 19978, of: 133, wears: 250, rare: 0.25, title: "Ho-Oh Poncho Eevee", flavor: "A rainbow-feathered Ho-Oh poncho with a golden crest. Wherever it walks, people swear they saw a rainbow." },
+      { id: 19979, of: 133, wears: 249, rare: 0.25, title: "Lugia Poncho Eevee", flavor: "A silver-white Lugia poncho with blue fins down the back. It hums to itself, and the wind seems to hum back." },
+      { id: 19980, of: 133, wears: 143, rare: 0.25, title: "Snorlax Poncho Eevee", flavor: "A huge round Snorlax poncho, three sizes too big. It fell asleep in it the moment it put it on, and nobody has the heart to wake it." },
+      // ...and two more of ours: the parade's other poncho, and the one that never quite holds its shape.
+      { id: 19981, of: 133, wears: 25, title: "Pikachu Poncho Eevee", flavor: "It borrowed a Pikachu poncho from last week's rack. The ears flop, the tail drags, and it sparks with pride anyway." },
+      { id: 19982, of: 133, wears: 132, title: "Ditto Poncho Eevee", flavor: "A floppy purple Ditto poncho with a dotted smile. It never sits the same way twice, and nobody can tell who is wearing whom." },
+      /* More of ours (asked for, same day). Cubone, Mimikyu, Bellibolt,
+         Krookodile, Electivire and Sceptile were drawn up and left out (your
+         call) - hence the gaps in the ids. Ids past the hunt's: a look's place
+         follows its id, so the hunt never moves. */
+      { id: 19986, of: 133, wears: 149, title: "Dragonite Poncho Eevee", flavor: "An orange Dragonite poncho with two little antennae and stubby wings. It flaps them hard and hugs everyone it meets, exactly like the real thing." },
+      { id: 19988, of: 133, wears: 869, title: "Alcremie Poncho Eevee", flavor: "A cream Alcremie poncho piled up like a cake, a strawberry on top. It smells sweet, and Pokemon follow it everywhere hoping for a lick." },
+      { id: 19989, of: 133, wears: 658, title: "Greninja Poncho Eevee", flavor: "A navy Greninja poncho with a long pink tongue wound round its neck for a scarf. It throws itself into the bushes like a ninja and lands nose first." },
+      { id: 19993, of: 133, wears: 12, title: "Butterfree Poncho Eevee", flavor: "A purple Butterfree poncho with two great white wings. It flutters them on every breeze and leaves a trail of glittering dust." },
+    ],
+    /* THE SPECIAL ONE: Mew again, in an Eevee poncho now. Twenty ponchos
+       caught and the next meeting in the Safari Zone is it. */
+    hunt: { id: 19983, of: 151,
+      title: "Eevee Poncho Mew", medal: "quickchange", name: "Quick Change", dreams: 20, again: 25, area: "safari",
+      flavor: "It gave the Pikachu poncho back and took an Eevee one off the rack instead, the long ears flopping over its eyes. It giggles at its own disguise - and is gone before you can say which Pokemon it is.",
+      words: {
+        token: "Poncho Stamp", tokens: "Poncho Stamps", due: "Something pink is in the Safari Zone again", rise: "A PINK SHIMMER",
+        falls: "Mew giggles and slips away...", fade: "MEW SLIPS AWAY", back: "it will come back to play",
+        run: "Mew slips away if you run",
+      },
+    },
+  },
 ];

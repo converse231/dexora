@@ -177,8 +177,8 @@ export function SeasonIntro({ ev, dex, onClose, onBoard, onNext }) {
         {(soon || live) && <Countdown to={soon ? eventOpens(ev) : eventCloses(ev)} label={soon ? "Starts in" : "Ends in"} />}
         <p className="sn-lede">
           {ev.roam ? (soon
-            ? <>From {day(ev.start)}, Pikachu in ponchos turn up on every map - each where its poncho's Pokémon would live. One week only.</>
-            : <>Pikachu in ponchos are out on every map! For {live ? (left === 1 ? "one last day" : `${left} more days`) : "a week"},
+            ? <>From {day(ev.start)}, {label(speciesById(ev.looks[0].of))} in ponchos turn up on every map - each where its poncho's Pokémon would live. One week only.</>
+            : <>{label(speciesById(ev.looks[0].of))} in ponchos are out on every map! For {live ? (left === 1 ? "one last day" : `${left} more days`) : "a week"},
               {" "}each turns up where its poncho's Pokémon would live - and only then.</>)
             : soon
             ? <>Pokémon are coming out in costume! From {day(ev.start)}, any of these can turn up where its species lives - for one week only.</>

@@ -246,7 +246,15 @@ anything done. The run prints each suite; the count is not typed anywhere.
   of it on its first catch (the engine's `grantPromo`, asked for: "the card
   should only be one"), stamped `earned`, never a second for a card already
   held - three ponchos share card 203. The running week's poster names the
-  next week (`eventAfter`, `onNext`), so the Haunting announces it.
+  next week (`eventAfter`, `onNext`), so the Haunting announces it. **Its
+  second week is Eevee's** (`eponchos`, 11-15 to 11-21, asked for
+  2026-10-30): the eight Eeveelution ponchos of the 2017 campaign (SM-P
+  137-144, the promo set `eponcho` - fetch_promo_cards.py's `SETS`), nine of
+  ours (Pikachu's, Ditto's, Dragonite's, Alcremie's, Greninja's and
+  Butterfree's ponchos - six more were drawn up and left out, your call; Ho-Oh, Lugia and Snorlax as the
+  rares - never a "shiny" poncho, since every look rolls the Shiny tier) and
+  Mew again in the Safari Zone - in an Eevee poncho now - as its hunt; it shares the Pikachu
+  week's shelf, and the poster names the wearer off its looks.
 - **An event look is a costume from a dated event** (`src/data/eventforms.js`,
   hand-written; Hallowed Night, asked for 2026-10-19):
   `form: "event"`, ids 19901+ (under trading.sql's 20000), built from its

@@ -452,9 +452,10 @@ export const FIELD = [
     event: "halloween", steps: HONEY_STEPS, lure: 3, pull: 0.5, blurb: "Lures costumed Pokémon",   // a lure up to EVENT_CAP: half by day already (2026-10-24)
   },
   {
-    // Poncho Parade's (2026-10-28): the same jar in Pikachu yellow, luring the week's roaming ponchos.
+    // Poncho Parade's (2026-10-28): the same jar in Pikachu yellow, luring the week's roaming ponchos -
+    // Pikachu's, then Eevee's (the second week shares the shelf).
     id: "poncho-honey", art: "honey", fx: "poncho", family: "event", name: "Poncho Honey", price: 1200, level: 3,
-    event: "ponchos", steps: HONEY_STEPS, lure: 3, blurb: "Poncho Pikachu 3× as likely",
+    event: "ponchos", steps: HONEY_STEPS, lure: 3, blurb: "Ponchos 3× as likely",
   },
 ];
 

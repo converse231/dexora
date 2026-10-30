@@ -4,15 +4,16 @@
 Run:  npm run promos      (python tools/fetch_promo_cards.py)
 
 Poncho Parade (eventforms.js, 2026-10-28): the Poncho-wearing Pikachu
-promos, Japan's XY-P and SM-P cards. TCGdex carries neither promo set, so
+promos, Japan's XY-P and SM-P cards; its second week (2026-10-30) the
+Poncho-wearing Eevee, SM-P 137-144. TCGdex carries neither promo set, so
 the scans come from Bulbagarden Archives (as fetch_card_art.py's card back
-and wrappers do), cached in .assets-src/promo. Writes:
+and wrappers do), cached in .assets-src/promo. Writes, for each set:
 
-  public/cards/poncho/<localId>.webp          the card, at a pack card's size
-  public/cards/poncho/hi/<localId>/high.webp  the large one, for the card view
-  public/cards/poncho/logo.webp               the set picker's mark: three of them fanned
-  src/data/cards/sets/poncho.js               SET and CARDS, a pack set's shape
-  src/data/cards/promos.js                    PROMO_SETS, the list the Cards page reads
+  public/cards/<set>/<localId>.webp          the card, at a pack card's size
+  public/cards/<set>/hi/<localId>/high.webp  the large one, for the card view
+  public/cards/<set>/logo.webp               the set picker's mark: three of them fanned
+  src/data/cards/sets/<set>.js               SET and CARDS, a pack set's shape
+  src/data/cards/promos.js                   PROMO_SETS, the list the Cards page reads
 
 A promo set is NOT in CARD_SETS (fetch-cards' index): nothing sells, packs,
 crafts or titles it. The engine's `grantPromo` is its only way in."""
@@ -32,11 +33,10 @@ UA = {"User-Agent": "Dexora (non-commercial fan game; build-time asset fetch)"}
 # A pack card's picture (public/cards/<set>/*.webp) and the large one.
 SIZE, HI = (245, 337), 600
 
-SET = {"id": "poncho", "name": "Poncho-wearing Pikachu", "released": "2015-12-12", "asset": "cards/poncho/hi/"}
-# [localId, archive file, the card's name]. Each is a Pikachu card; the ponchos
-# are what eventforms.js's looks name it by (`card: "poncho-<localId>"`).
+# [localId, archive file, the card's name]. A look names its card `<set>-<localId>`
+# (eventforms.js's `card: "poncho-xy207"`).
 PONCHO = "Poncho-wearing Pikachu"
-CARDS = [
+PIKACHU = [
     ("xy203", "PonchoWearingPikachuXYPromo203.jpg", PONCHO),   # Mega Audino, Mega Lucario, Mega Slowbro
     ("xy207", "PonchoWearingPikachuXYPromo207.jpg", PONCHO),   # Mega Charizard X
     ("xy208", "PonchoWearingPikachuXYPromo208.jpg", PONCHO),   # Mega Charizard Y
@@ -49,6 +49,13 @@ CARDS = [
     # The Hiroshima Special Box (2015): the same series' costumes, named "Pretend" on the card.
     ("xy150", "PretendMagikarpPikachuXYPromo150.jpg", "Pretend Magikarp Pikachu"),   # Magikarp
     ("xy151", "PretendGyaradosPikachuXYPromo151.jpg", "Pretend Gyarados Pikachu"),   # Gyarados (blue)    # Vulpix
+]
+# The 2017 campaign: five packs bought at a Pokemon Center chose one of eight, in its evolutions' dex order.
+EEVEE = [(f"sm{n}", f"PonchowearingEeveeSMPromo{n}.jpg", "Poncho-wearing Eevee") for n in range(137, 145)]
+# Each set: its meta, its cards, the species every card shows, and the three fanned on its logo. Kouki Saitou drew them all.
+SETS = [
+    ({"id": "poncho", "name": "Poncho-wearing Pikachu", "released": "2015-12-12", "asset": "cards/poncho/hi/"}, PIKACHU, [25], ("xy207", "xy230", "sm037")),
+    ({"id": "eponcho", "name": "Poncho-wearing Eevee", "released": "2017-10-07", "asset": "cards/eponcho/hi/"}, EEVEE, [133], ("sm137", "sm141", "sm144")),
 ]
 
 
@@ -84,7 +91,7 @@ def logo(cards):
     return out
 
 
-if __name__ == "__main__":
+def build(SET, CARDS, species, fan):
     dest = os.path.join(ROOT, "public", "cards", SET["id"])
     rows, scans = [], {}
     for lid, name, title in CARDS:
@@ -94,9 +101,9 @@ if __name__ == "__main__":
         hi = img.resize((HI, round(img.height * HI / img.width)), Image.LANCZOS)
         hi.save(os.path.join(dest, "hi", lid, "high.webp"), "WEBP", quality=85, method=6)
         # Every one is Kouki Saitou's, as each card prints at its foot.
-        rows.append([lid, title, "P", "promo", "h", [25], "Kouki Saitou"])
+        rows.append([lid, title, "P", "promo", "h", species, "Kouki Saitou"])
         print(f"{lid}: {img.width}x{img.height}")
-    logo([scans["xy207"], scans["xy230"], scans["sm037"]]).save(os.path.join(dest, "logo.webp"), "WEBP", quality=85, method=6)
+    logo([scans[k] for k in fan]).save(os.path.join(dest, "logo.webp"), "WEBP", quality=85, method=6)
     meta = {**SET, "official": len(rows), "total": len(rows)}
     body = ",\r\n".join(json.dumps(r, ensure_ascii=False, separators=(",", ":")) for r in rows)
     io.open(os.path.join(ROOT, "src", "data", "cards", "sets", f"{SET['id']}.js"), "w", encoding="utf-8", newline="").write(
@@ -105,9 +112,14 @@ if __name__ == "__main__":
         "   Rows: [localId, name, category, rarity, variants, speciesIds, illustrator]. */\r\n"
         f"export const SET = {json.dumps(meta, separators=(',', ':'))};\r\n"
         f"export const CARDS = [\r\n{body},\r\n];\r\n")
-    index = [{k: meta[k] for k in ("id", "name", "released", "total")}]
+    return meta
+
+
+if __name__ == "__main__":
+    metas = [build(*s) for s in SETS]
+    index = [{k: m[k] for k in ("id", "name", "released", "total")} for m in metas]
     io.open(os.path.join(ROOT, "src", "data", "cards", "promos.js"), "w", encoding="utf-8", newline="").write(
         "/* GENERATED by tools/fetch_promo_cards.py (npm run promos) - the promo sets: real cards no\r\n"
         "   pack sells, kept out of CARD_SETS so nothing sells, packs, crafts or titles them. */\r\n"
         f"export const PROMO_SETS = {json.dumps(index, separators=(',', ':'))};\r\n")
-    print(f"{len(rows)} promo cards")
+    print(f"{sum(m['total'] for m in metas)} promo cards")

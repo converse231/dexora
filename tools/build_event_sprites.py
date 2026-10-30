@@ -46,6 +46,12 @@ SHARED = 0.25
 # (2026-10-26: grey gargoyles and black reaper robes came out 0-3% changed,
 # Sheet Ghost Hoothoot 0%) it is tinted toward the species' own shiny colour.
 SEEN = 0.15
+# A shiny keeping under this share of its species' colour is the species gone grey (`recolour`):
+# Eevee's silver keeps 0.50, Pikachu's 0.94 and Mew's 0.96.
+GREY = 0.6
+# How far a drawn colour may sit from the species' own and still be its fur, for a roaming grey shiny:
+# Gemini's browns land 30-60 off Eevee's palette, so NEAR alone left half the ponchos' faces brown.
+FUR = 70
 COLOURS = 16
 # Of those, up to this many are held back for small strong colours (an eye).
 ACCENTS = 3
@@ -62,7 +68,17 @@ HOLE_FIT = 0.85          # the share of a pocket on a checker's squares that mak
 # the pale tinted glow round them. No share of white tells the two apart
 # (Giratina's trapped background is 11% of it, Wingull's own white body 15%):
 # a look is named here by eye.
-HOLLOW = {("haunting", "487")}
+# Grim Reaper Dusknoir too (2026-10-31, reported: white in its scythe's curve
+# and between the scroll and the handle).
+HOLLOW = {("haunting", "487"), ("haunting", "477")}
+# SCENES (2026-10-31, reported: Gravedigger Diglett had lost an eye). A
+# drawing fitted to its species' body is a costume; one that is a whole
+# scene - Diglett's mound, headstone and lantern - fitted to Diglett's narrow
+# body shrank 21 source pixels to one and the eyes went. A scene named here
+# may fill the canvas's width instead, and has more colours to share: its
+# browns took all sixteen, and the nose went grey and the headstone cream.
+SCENE = {("haunting", "50")}
+SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR = 24, 6, 60
 POCKET_WHITE = 236       # near-white: a pocket's pixels
 POCKET_RIM = 4           # source pixels of tinted glow round a pocket that go with it
 # An island smaller than this share of the body is a speck of background.
@@ -245,7 +261,7 @@ def specks(m):
     return keep[label]
 
 
-def palette(a, m):
+def palette(a, m, colours=COLOURS, accents=ACCENTS, far_=ACCENT_FAR):
     """`COLOURS` colours for the whole sprite, from its opaque pixels only -
     and the ACCENTS it would lose: median cut spends its colours where the
     pixels are, so a small, strong colour (Darkrai's blue eye, 2026-10-20)
@@ -253,8 +269,8 @@ def palette(a, m):
     common enough not to be noise, takes one of `ACCENTS` places."""
     px = a[m].reshape(-1, 3).astype(int)
     q = Image.fromarray(px.reshape(1, -1, 3).astype(np.uint8), "RGB").quantize(
-        COLOURS - ACCENTS, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-    pal = np.array(q.getpalette()[:(COLOURS - ACCENTS) * 3]).reshape(-1, 3)
+        colours - accents, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    pal = np.array(q.getpalette()[:(colours - accents) * 3]).reshape(-1, 3)
     near = lambda p: np.abs(px[:, None, :] - p[None, :, :]).sum(axis=2)
     # Three of Darkrai's thirteen were blacks a step apart: one of each.
     kept = []
@@ -265,8 +281,8 @@ def palette(a, m):
     # ONE AT A TIME, the commonest lost colour first, into every place left:
     # cutting the lost pixels together blended Darkrai's blue eye with the
     # straw into a grey, and its collar's reds took the places before it.
-    while len(pal) < COLOURS:
-        far = px[near(pal).min(axis=1) > ACCENT_FAR]
+    while len(pal) < colours:
+        far = px[near(pal).min(axis=1) > far_]
         if len(far) < ACCENT_MIN:
             break
         bins, counts = np.unique(far // 24, axis=0, return_counts=True)
@@ -277,7 +293,7 @@ def palette(a, m):
     return pal, idx
 
 
-def shrink(a, m, base):
+def shrink(a, m, base, scene=False):
     """The art at the base sprite's size, one target pixel per block of source.
 
     A block takes its commonest palette colour, except that the darkest colour
@@ -288,9 +304,9 @@ def shrink(a, m, base):
     ys, xs = np.nonzero(m)
     ax0, ax1, ay0, ay1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
     # As wide as the base's body; a hat may stand taller, never off the canvas.
-    s = min((bx1 - bx0) / (ax1 - ax0), (H - 1) / (ay1 - ay0), (W - 1) / (ax1 - ax0))
+    s = min((W - 1 if scene else bx1 - bx0) / (ax1 - ax0), (H - 1) / (ay1 - ay0), (W - 1) / (ax1 - ax0))
     tw, th = max(1, round((ax1 - ax0) * s)), max(1, round((ay1 - ay0) * s))
-    pal, idx = palette(a, m)
+    pal, idx = palette(a, m, *((SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR) if scene else ()))
     dark = int(np.argmin(pal.sum(axis=1)))
     art = np.zeros((th, tw, 4), np.uint8)
     for j in range(th):
@@ -340,6 +356,8 @@ def thin(img):
 
 # Each look's species, by look id (the canvas it is shrunk to and its shiny's base).
 OF = {}
+# The looks of a roaming week (`roam: true`): one species in costume, where a grey shiny keeps the costume (`recolour`).
+ROAM = set()
 
 
 def looks():
@@ -353,12 +371,26 @@ def looks():
             out[(ev.group(1), of)] = int(lid)
             out[(ev.group(1), lid)] = int(lid)
             OF[int(lid)] = of
+            if "\n    roam: true," in ev.group(2):
+                ROAM.add(int(lid))
     return out
 
 
-def shiny(look, base_id):
-    """The look's shiny: `recolour`, or - when that barely shows - `tint`."""
-    out = recolour(look, base_id)
+def greys(base_id):
+    """Whether the species' shiny is it gone grey: a turn of the wheel with no colour to turn."""
+    n = np.asarray(Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")).astype(int)
+    sh = np.asarray(Image.open(os.path.join(SPRITES, "shiny", f"{base_id}.png")).convert("RGBA")).astype(int)
+    on = n[..., 3] > 0
+    return hue_shift(n[on][:, :3], sh[on][:, :3])[1] < GREY
+
+
+def shiny(look, base_id, roam=False):
+    """The look's shiny: `recolour`, or - when that barely shows - `tint`. A roaming
+    week's grey shiny is never tinted: its silver face IS the change, and a tint
+    toward a grey's hue is green."""
+    out = recolour(look, base_id, roam)
+    if roam and greys(base_id):
+        return out
     a, b = np.asarray(look).astype(int), np.asarray(out).astype(int)
     on = a[..., 3] > 0
     moved = ((np.abs(a[..., :3] - b[..., :3]).sum(-1) > 30) & on).sum() / max(1, on.sum())
@@ -386,7 +418,7 @@ def tint(look, base_id):
     return Image.fromarray(a.astype(np.uint8), "RGBA")
 
 
-def recolour(look, base_id):
+def recolour(look, base_id, roam=False):
     """The look recoloured by its species' own normal -> shiny shift.
 
     Where the look still wears the species' own colours (the Gastly line,
@@ -405,17 +437,30 @@ def recolour(look, base_id):
     dst = np.array([max(set(v), key=v.count) for v in pairs.values()])
     a = np.asarray(look).copy()
     opaque = list(zip(*np.nonzero(a[..., 3])))
+    # A roaming week's grey shiny looks for its fur loosely (`FUR`), but only among the
+    # species' own hues - so a red or yellow poncho is never taken for Eevee.
+    grey = roam and greys(base_id)
+    hues = [colorsys.rgb_to_hls(*(c / 255)) for c in src]
+    hues = [h for h, l, sat in hues if sat > 0.15]
+    lo, hi = (min(hues) - 0.02, max(hues) + 0.02) if hues else (0, 0)
     near = []
     for y, x in opaque:
         d = np.abs(src - a[y, x, :3].astype(int)).sum(axis=1)
         k = int(np.argmin(d))
-        near.append(k if d[k] <= NEAR and (dst[k] != src[k]).any() else None)
-    if sum(k is not None for k in near) >= SHARED * len(opaque):
+        h, l, sat = colorsys.rgb_to_hls(*(a[y, x, :3] / 255))
+        fur = grey and d[k] <= FUR and (sat <= 0.15 or lo <= h <= hi)
+        near.append(k if (d[k] <= NEAR or fur) and (dst[k] != src[k]).any() else None)
+    turn, fade = hue_shift(n[on][:, :3], sh[on][:, :3])
+    # A ROAMING week's species gone GREY (Eevee's silver) has no turn of the
+    # wheel to give: turning the whole look by it painted every poncho Eevee's
+    # face green (2026-10-30). Its own colours go silver; the poncho stays as
+    # drawn. Only a roaming week's: Pumpkin Mimikyu's shipped shiny is the
+    # whole costume gone grey, and this half-greyed it.
+    if sum(k is not None for k in near) >= SHARED * len(opaque) or grey:
         for (y, x), k in zip(opaque, near):
             if k is not None:
                 a[y, x, :3] = np.clip(a[y, x, :3].astype(int) + dst[k] - src[k], 0, 255)
         return Image.fromarray(a.astype(np.uint8), "RGBA")
-    turn, fade = hue_shift(n[on][:, :3], sh[on][:, :3])
     for y, x in opaque:
         h, l, s_ = colorsys.rgb_to_hls(*(a[y, x, :3] / 255))
         if s_ > 0.2 and 0.08 < l < 0.92:
@@ -449,9 +494,9 @@ def build(path, ids):
     if (event, base_id) in HOLLOW:
         m = hollow(a, m)
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
-    out = thin(shrink(a, m, base))
+    out = thin(shrink(a, m, base, (event, stem) in SCENE))
     out.save(os.path.join(SPRITES, f"{lid}.png"), optimize=True)
-    shiny(out, base_id).save(os.path.join(SPRITES, "shiny", f"{lid}.png"), optimize=True)
+    shiny(out, base_id, lid in ROAM).save(os.path.join(SPRITES, "shiny", f"{lid}.png"), optimize=True)
     print(f"{event}/{base_id} -> {lid}: {out.size[0]}px, {len(out.getcolors(4096)) - 1} colours")
     return lid
 

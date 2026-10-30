@@ -12740,6 +12740,37 @@ button.wl-chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2
 .evcard .sn-board-card.ev-ponchos .ev-banner h4 { color: #ffe27a; }
 .sn-board-card.ev-ponchos .sn-slot.got { border-color: #ffd23f; }
 .ev-ponchos .sn-title { color: #fff3c4; text-shadow: 0 0 18px rgba(255, 210, 63, .8), 0 3px 0 #7a3b12; }
+
+/* EEVEE PONCHO PARADE'S POSTER AND CARD (2026-10-30): the same parade a week
+   on, at dusk - an Eevee-brown sky, a cream moon, and bunting in Sylveon pink
+   and cream. Eevee's cream for the glow. */
+.sn-card.ev-eponchos {
+  --sn-glow: #ffe2b0; --sn-ink: #fff6ea; --sn-soft: #f0d6bd; --sn-night: #2b1b24;
+  border-color: rgba(255, 196, 150, .5);
+  background: radial-gradient(120% 70% at 50% 0%, #b5734a 0%, #6e3f52 45%, var(--sn-night) 100%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .55), inset 0 0 60px rgba(255, 196, 150, .12);
+}
+.ev-eponchos .sn-moon {
+  background: radial-gradient(circle, #fffaf0 0 40%, #ffe2b0 62%, #e8b07a 100%);
+  box-shadow: none; filter: drop-shadow(0 0 22px rgba(255, 220, 170, .7));
+}
+.ev-eponchos .sn-fog {
+  background: radial-gradient(40% 50% at 25% 60%, rgba(255, 230, 220, .22), transparent 70%),
+    radial-gradient(35% 45% at 70% 50%, rgba(255, 230, 220, .18), transparent 70%);
+}
+.ev-eponchos .sn-bat {
+  width: 16px; height: 18px; background: #ffe2b0; border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  box-shadow: none; animation: sn-fly 10s ease-in-out infinite;
+}
+.ev-eponchos .sn-bat.b1, .ev-eponchos .sn-bat.b3 { background: #ff9ad0; }
+.ev-eponchos .sn-go { background: linear-gradient(180deg, #ffd0a0, #d98a52); color: #2a1408; box-shadow: 0 10px 28px rgba(230, 150, 90, .4); }
+.ev-eponchos .sn-sub, .ev-eponchos .sn-kicker { color: var(--sn-glow); }
+.ev-eponchos .sn-dark > img { filter: brightness(0) drop-shadow(0 0 6px rgba(255, 210, 170, .6)) !important; }
+.sn-board-card.ev-eponchos .ev-banner { background: linear-gradient(90deg, #6e3f52, #b5734a); }
+.evcard .sn-board-card.ev-eponchos .ev-banner h4 { color: #ffe2b0; }
+.sn-board-card.ev-eponchos .sn-slot.got { border-color: #ff9ad0; }
+.ev-eponchos .sn-title { color: #fff1dc; text-shadow: 0 0 18px rgba(255, 200, 150, .8), 0 3px 0 #6b3416; }
 /* A poncho on a real card says so on the poster (Season.jsx). */
 .sn-card-tag { margin-left: 4px; padding: 0 5px; border-radius: 4px; font: 700 9px var(--pixel); color: #2a1600; background: #ffd23f; }
 
