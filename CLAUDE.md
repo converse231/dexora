@@ -249,9 +249,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
   next week (`eventAfter`, `onNext`), so the Haunting announces it. **Its
   second week is Eevee's** (`eponchos`, 11-15 to 11-21, asked for
   2026-10-30): the eight Eeveelution ponchos of the 2017 campaign (SM-P
-  137-144, the promo set `eponcho` - fetch_promo_cards.py's `SETS`), nine of
+  137-144, the promo set `eponcho` - fetch_promo_cards.py's `SETS`), twelve of
   ours (Pikachu's, Ditto's, Dragonite's, Alcremie's, Greninja's and
-  Butterfree's ponchos - six more were drawn up and left out, your call; Ho-Oh, Lugia and Snorlax as the
+  Butterfree's ponchos - six more were drawn up and left out, your call; Ho-Oh, Lugia, Snorlax and the three legendary birds as the
   rares - never a "shiny" poncho, since every look rolls the Shiny tier) and
   Mew again in the Safari Zone - in an Eevee poncho now - as its hunt; it shares the Pikachu
   week's shelf, and the poster names the wearer off its looks.

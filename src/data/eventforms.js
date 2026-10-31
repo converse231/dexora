@@ -284,6 +284,10 @@ export const EVENTS = [
       { id: 19988, of: 133, wears: 869, title: "Alcremie Poncho Eevee", flavor: "A cream Alcremie poncho piled up like a cake, a strawberry on top. It smells sweet, and Pokemon follow it everywhere hoping for a lick." },
       { id: 19989, of: 133, wears: 658, title: "Greninja Poncho Eevee", flavor: "A navy Greninja poncho with a long pink tongue wound round its neck for a scarf. It throws itself into the bushes like a ninja and lands nose first." },
       { id: 19993, of: 133, wears: 12, title: "Butterfree Poncho Eevee", flavor: "A purple Butterfree poncho with two great white wings. It flutters them on every breeze and leaves a trail of glittering dust." },
+      // The legendary birds, rare like the three above (2026-10-31, asked for).
+      { id: 19994, of: 133, wears: 144, rare: 0.25, title: "Articuno Poncho Eevee", flavor: "An icy blue Articuno poncho with a long ribbon of a tail. Snow starts falling wherever it sits down, and it never notices." },
+      { id: 19995, of: 133, wears: 145, rare: 0.25, title: "Zapdos Poncho Eevee", flavor: "A spiky yellow Zapdos poncho that crackles in the wind. Its fur has stood on end since the day it put it on." },
+      { id: 19996, of: 133, wears: 146, rare: 0.25, title: "Moltres Poncho Eevee", flavor: "A blazing Moltres poncho with a tail of pixel flames. It is warm to hug, and it knows it." },
     ],
     /* THE SPECIAL ONE: Mew again, in an Eevee poncho now. Twenty ponchos
        caught and the next meeting in the Safari Zone is it. */

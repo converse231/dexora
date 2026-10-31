@@ -80,6 +80,9 @@ HOLLOW = {("haunting", "487"), ("haunting", "477"), ("haunting", "74")}
 # browns took all sixteen, and the nose went grey and the headstone cream.
 SCENE = {("haunting", "50")}
 SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR = 24, 6, 60
+# More colours alone, for a small accent the sixteen merged away (2026-10-31:
+# Zapdos Poncho Eevee's orange beak went brown into Eevee's face).
+COLOURFUL = {("eponchos", "19995"): (20, 4, 60)}
 # PIXELS THE SHRINK CANNOT KEEP, put back by hand on the built sprite (x, y),
 # each painted the colour of a source pixel of the same sprite (2026-10-31,
 # reported: Gravedigger Diglett's left eye was its glint alone - one eye's
@@ -307,7 +310,7 @@ def palette(a, m, colours=COLOURS, accents=ACCENTS, far_=ACCENT_FAR):
     return pal, idx
 
 
-def shrink(a, m, base, scene=False, smooth=False):
+def shrink(a, m, base, scene=False, smooth=False, colours=()):
     """The art at the base sprite's size, one target pixel per block of source.
 
     A block takes its commonest palette colour, except that the darkest colour
@@ -320,7 +323,7 @@ def shrink(a, m, base, scene=False, smooth=False):
     # As wide as the base's body; a hat may stand taller, never off the canvas.
     s = min((W - 1 if scene else bx1 - bx0) / (ax1 - ax0), (H - 1) / (ay1 - ay0), (W - 1) / (ax1 - ax0))
     tw, th = max(1, round((ax1 - ax0) * s)), max(1, round((ay1 - ay0) * s))
-    pal, idx = palette(a, m, *((SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR) if scene else ()))
+    pal, idx = palette(a, m, *((SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR) if scene else colours))
     dark = int(np.argmin(pal.sum(axis=1)))
     rim = grow(~m, max(1, int(0.5 / s))) if smooth else None
     art = np.zeros((th, tw, 4), np.uint8)
@@ -517,7 +520,7 @@ def build(path, ids):
     if (event, base_id) in HOLLOW:
         m = hollow(a, m)
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
-    out = thin(shrink(a, m, base, (event, stem) in SCENE, (event, stem) in SMOOTH))
+    out = thin(shrink(a, m, base, (event, stem) in SCENE, (event, stem) in SMOOTH, COLOURFUL.get((event, stem), ())))
     if (event, stem) in DOTS:
         at, like = DOTS[(event, stem)]
         for xy in at:
