@@ -78,7 +78,9 @@ HOLLOW = {("haunting", "487"), ("haunting", "477"), ("haunting", "74")}
 # body shrank 21 source pixels to one and the eyes went. A scene named here
 # may fill the canvas's width instead, and has more colours to share: its
 # browns took all sixteen, and the nose went grey and the headstone cream.
-SCENE = {("haunting", "50")}
+# Ghost Story Slowking too (same day: its book and candle fitted to Slowking's
+# narrow body left it 33px wide and muddy).
+SCENE = {("haunting", "50"), ("haunting", "199")}
 SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR = 24, 6, 60
 # More colours alone, for a small accent the sixteen merged away (2026-10-31:
 # Zapdos Poncho Eevee's orange beak went brown into Eevee's face).
