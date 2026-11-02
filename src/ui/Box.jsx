@@ -40,7 +40,7 @@ import { sexOf, looksFemale } from "../game/gender.js";
 // Rarest first: the order the Box, the Dex and the encounter all read in -
 // one array, in biomes.js, beside the odds that define it.
 import {
-  TIERS as RARE, speciesById, isLegendary, lockedTiers, tierName,
+  TIERS as RARE, speciesById, isLegendary, legendMark, lockedTiers, tierName,
 } from "../game/biomes.js";
 
 /* The order rows of one species sit in: the ordinary pile, then its variants
@@ -327,7 +327,7 @@ function Box({
            would mean you could never convert a fifth Latios even deliberately,
            from its own row. The default does the protecting; the tick is there
            for when you really did mean it. */
-        const rare = isLegendary(id);
+        const rare = legendMark(id);
         return {
           key: `${id}|${team}`,
           uids: mons.map((m) => m.uid),

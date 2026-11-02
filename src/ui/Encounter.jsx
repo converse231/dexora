@@ -9,7 +9,7 @@
 import { BALLS } from "../game/items.js";
 import { label } from "../game/map.js";
 import {
-  speciesById, sizeOf, sizeTag, measured, isLegendary,
+  speciesById, sizeOf, sizeTag, measured, legendMark,
 } from "../game/biomes.js";
 import { berryById, artOf } from "../game/items.js";
 import Types from "./Types.jsx";
@@ -283,7 +283,7 @@ export default function Encounter({ enc, bag, onFlee, onSkip }) {
         {/* A FACT ABOUT THE SPECIES, not something you earned, so it sits with
             the name rather than in the row of tier marks - a badge that cannot
             be collected next to four that can would read as a fifth tier. */}
-        {isLegendary(enc.speciesId) && (
+        {legendMark(enc.speciesId) && (
           <Mark tier="legendary" size={16} className="np-legend" />
         )}
         <span className="np-name">{enc.name}</span>

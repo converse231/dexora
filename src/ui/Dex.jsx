@@ -28,7 +28,7 @@ const inRegion = (sp, region, seen = 0) => (region === "event" ? isEvent(sp.id) 
   : region === "all" || (!isEvent(sp.id) && genOf(sp.id) === Number(region)));
 import { label } from "../game/map.js";
 import {
-  LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor, isLegendary,
+  LEGENDARY, TIERS, dexIndex, genOf, GENERATIONS, tiersFor, legendMark,
   ROSETTE_NEED,
   GEN_UNLOCK, REGION_NAME, tierName,
 } from "../game/biomes.js";
@@ -124,7 +124,7 @@ const Cell = memo(function Cell({ sp, state, variant, marks, full, studied, lack
           so a legendary badge sitting in that row would read as a fifth
           tier - and it is the same mistake as putting it beside the
           rosette, which is the one mark you cannot simply be given. */}
-      {isLegendary(sp.id) && state >= 1 && (
+      {legendMark(sp.id) && state >= 1 && (
         <Mark tier="legendary" size={13} className="cell-legend" />
       )}
 

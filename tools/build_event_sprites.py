@@ -71,35 +71,46 @@ HOLE_FIT = 0.85          # the share of a pocket on a checker's squares that mak
 # Grim Reaper Dusknoir too (2026-10-31, reported: white in its scythe's curve
 # and between the scroll and the handle).
 # Gargoyle Geodude too (same day: white between its arms and its body).
-HOLLOW = {("haunting", "487"), ("haunting", "477"), ("haunting", "74")}
-# SCENES (2026-10-31, reported: Gravedigger Diglett had lost an eye). A
-# drawing fitted to its species' body is a costume; one that is a whole
-# scene - Diglett's mound, headstone and lantern - fitted to Diglett's narrow
-# body shrank 21 source pixels to one and the eyes went. A scene named here
-# may fill the canvas's width instead, and has more colours to share: its
-# browns took all sixteen, and the nose went grey and the headstone cream.
-# Ghost Story Slowking too (same day: its book and candle fitted to Slowking's
-# narrow body left it 33px wide and muddy).
-SCENE = {("haunting", "50"), ("haunting", "199")}
-SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR = 24, 6, 60
-# More colours alone, for a small accent the sixteen merged away (2026-10-31:
-# Zapdos Poncho Eevee's orange beak went brown into Eevee's face).
-COLOURFUL = {("eponchos", "19995"): (20, 4, 60)}
-# PIXELS THE SHRINK CANNOT KEEP, put back by hand on the built sprite (x, y),
-# each painted the colour of a source pixel of the same sprite (2026-10-31,
-# reported: Gravedigger Diglett's left eye was its glint alone - one eye's
-# black fell between two blocks; the right eye's black is copied).
-DOTS = {("haunting", "50"): ([(25, 17), (25, 18)], (29, 17))}
-# SMOOTH DRAWINGS (2026-10-31, reported "too grainy": the Gargoyles). A
-# drawing textured all over - cracked stone, moss - has more detail than its
-# sprite has pixels, and the outline rule (a third dark is black) turned every
-# crack into a black speck. Named here, the outline wins only on the
-# silhouette's rim, and a block no colour holds `SMOOTH_HOLD` of takes its mean
-# colour's nearest. Not for everyone: it greyed Skeleton Houndour's white bones.
-SMOOTH = {("haunting", "74"), ("haunting", "75"), ("haunting", "76")}
-SMOOTH_HOLD = 0.6
+# Black Cat Meowth too (2026-11-02: white inside its tail's curl).
+HOLLOW = {("haunting", "487"), ("haunting", "477"), ("haunting", "74"), ("haunting", "52")}
+# More colours, for a drawing whose small accents the sixteen merged away
+# (2026-10-31): Gravedigger Diglett's browns took all sixteen and its nose
+# went grey; Ghost Story Slowking's quilt; Zapdos Poncho Eevee's orange beak.
+COLOURFUL = {("haunting", "50"): (24, 6, 60), ("haunting", "199"): (24, 6, 60),
+             ("eponchos", "19995"): (20, 4, 60)}
+# THE DRAWING'S OWN GRID (2026-11-02, reported: Dugtrio's and Kadabra's eyes
+# broken, Diglett's lost, the Gargoyles grainy). Every drawing is pixel art on a
+# grid of its own - 12.8 or 16 source pixels a drawn pixel, some 20.5 - and
+# shrinking it on any other grid split a one-pixel eye between two blocks and
+# turned cracks into specks. So it is read cell by cell, one sprite pixel a
+# drawn pixel, at a whole scale (`SCALES`) - the one nearest the species' body
+# width that fits the canvas. A drawing no whole scale fits falls back to
+# `shrink`, filling the canvas. `GRID_MIN`/`GRID_MAX` bound the search.
+GRID_MIN, GRID_MAX = 8.0, 24.0
+# Every other edge of a grid is a grid too, and it can score a hair higher:
+# Golett, Giratina, Mew and the Zubat line were read at 20.5-21.4, half their
+# drawn pixels, and came out small and blocky. Half a grid scoring this share
+# of it is the real one (a right grid's half scores about 0.5; those, 0.92-0.99).
+HALF = 0.85
+# A drawing its own grid makes a little too big for the canvas (the Gengar line
+# by a row or two) drops whole rows and columns to fit - at no less than this
+# scale; past it, `shrink`.
+NEAR_FIT = 0.75
+# A drawing its own grid leaves narrower than this share of the species' body
+# (Zubat and Mimikyu, drawn at 20.5-21.3) is spread over the body by `shrink`:
+# its pixels are coarser than the sprite's, so nothing is lost.
+UNDER = 0.85
+SCALES = (1, 2, 3)
 POCKET_WHITE = 236       # near-white: a pocket's pixels
 POCKET_RIM = 4           # source pixels of tinted glow round a pocket that go with it
+# A HOLLOW drawing whose glow runs wider than the rim (Grim Reaper Giratina,
+# 2026-11-02, reported: a pink haze between its wing ribs stayed as a broken
+# white stroke): the glow is followed out from each pocket for as long as it
+# stays light and tinted - `GLOW_LIGHT` its darkest channel, `GLOW_TINT` its
+# spread (the silver scythes are light but near grey, and went at 12). Not
+# Dusknoir, whose cream scroll touches a pocket and would go with it.
+GLOW = {("haunting", "487")}
+GLOW_LIGHT, GLOW_TINT = 150, 30
 # An island smaller than this share of the body is a speck of background.
 SPECK = 0.004
 
@@ -139,13 +150,20 @@ def pockets(a, m):
     return out
 
 
-def hollow(a, m):
+def hollow(a, m, glow=False):
     """A HOLLOW drawing's mask without its enclosed pockets and their glow:
     light, TINTED pixels within POCKET_RIM of one (a silver blade is light but
-    grey, and stays)."""
+    grey, and stays) - or, `glow`, all of it that joins one (`GLOW`)."""
     pk = pockets(a, m)
     mn, mx = a.min(axis=2).astype(int), a.max(axis=2).astype(int)
     rim = grow(pk, POCKET_RIM) & m & (mn > 200) & (mx - mn >= 12)
+    if glow:
+        haze = m & (mn > GLOW_LIGHT) & (mx - mn >= GLOW_TINT)
+        while True:
+            more = grow(rim | pk, 2) & haze & ~rim
+            if not more.any():
+                break
+            rim |= more
     return specks(m & ~pk & ~rim)
 
 
@@ -312,7 +330,96 @@ def palette(a, m, colours=COLOURS, accents=ACCENTS, far_=ACCENT_FAR):
     return pal, idx
 
 
-def shrink(a, m, base, scene=False, smooth=False, colours=()):
+def edges(a, axis):
+    """How much colour changes across each line of the image, summed along it."""
+    d = np.abs(np.diff(a.astype(int), axis=axis)).sum(axis=2)
+    return d.sum(axis=1 - axis).astype(float)
+
+
+def comb(e, periods=None):
+    """(period, offset, score) of the drawn grid on one axis: the evenly spaced
+    cell edges that hold the most colour change - or half of it (`HALF`). The
+    score is over the axis's mean change, so two axes compare."""
+    n = len(e)
+
+    def fit(periods):
+        best = (0.0, 0.0, -1.0)
+        for p in periods:
+            for ph in np.arange(0, p, 0.5):
+                score = e[np.round(np.arange(ph, n - 1, p)).astype(int)].mean()
+                if score > best[2]:
+                    best = (p, ph, score)
+        return best
+
+    if periods is not None:
+        p, ph, score = fit(periods)
+        return p, ph, score / e.mean()
+    p, ph, score = fit(np.arange(GRID_MIN, GRID_MAX, 0.05))
+    if p / 2 >= GRID_MIN:
+        hp, hph, hscore = fit([p / 2])
+        if hscore >= HALF * score:
+            p, ph, score = hp, hph, hscore
+    return p, ph, score / e.mean()
+
+
+def native(a, m, base, colours=()):
+    """The drawing read on its own grid: a cell is opaque when most of it is, and
+    its colour is the median of its inner half (JPEG blurs a cell's edges) taken
+    to the palette. Scaled whole, placed as `shrink` places - or, when it cannot
+    be, why: "big" (no scale fits the canvas) or "small" (`UNDER`)."""
+    W, H = base.size
+    bx0, by0, bx1, by1 = base.getchannel("A").getbbox()
+    pal, _ = palette(a, m, *colours)
+    # Drawn pixels are square: the axis that reads clearer names the size for
+    # both (Haunter's height read 16 against its width's 12.8, and stretched).
+    ex, ey = edges(a, 1), edges(a, 0)
+    fx, fy = comb(ex), comb(ey)
+    p = fx[0] if fx[2] >= fy[2] else fy[0]
+    grid = []
+    for axis, e in ((1, ex), (0, ey)):
+        _, ph, _ = comb(e, [p])
+        starts = np.arange(ph + 1, a.shape[axis], p)
+        grid.append((p, np.concatenate([[max(0.0, ph + 1 - p)], starts])))
+    (px, xs), (py, ys) = grid
+    q = max(1, round(min(px, py) / 4))
+    cells = np.zeros((len(ys), len(xs), 4), np.uint8)
+    for j, y0 in enumerate(ys):
+        ya, yb = int(round(y0)), int(round(y0 + py))
+        for i, x0 in enumerate(xs):
+            xa, xb = int(round(x0)), int(round(x0 + px))
+            cm = m[ya:yb, xa:xb]
+            if cm.size == 0 or cm.mean() < 0.5:
+                continue
+            im = m[ya + q:yb - q, xa + q:xb - q]
+            inner = a[ya + q:yb - q, xa + q:xb - q][im] if im.any() else a[ya:yb, xa:xb][cm]
+            c = np.median(inner, axis=0)
+            cells[j, i, :3] = pal[int(np.abs(pal - c).sum(axis=1).argmin())]
+            cells[j, i, 3] = 255
+    rs, cs = np.nonzero(cells[..., 3])
+    art = cells[rs.min():rs.max() + 1, cs.min():cs.max() + 1]
+    th, tw = art.shape[:2]
+    fits = [k for k in SCALES if tw * k <= W - 1 and th * k <= H - 1]
+    if fits:
+        k = min(fits, key=lambda k: abs(tw * k - (bx1 - bx0)))
+        if tw * k < UNDER * (bx1 - bx0):
+            return "small"
+        art = art.repeat(k, axis=0).repeat(k, axis=1)
+        th, tw = th * k, tw * k
+    else:
+        s = min((W - 1) / tw, (H - 1) / th)
+        if s < NEAR_FIT:
+            return "big"
+        tw, th = int(tw * s), int(th * s)
+        art = np.asarray(Image.fromarray(np.ascontiguousarray(art), "RGBA").resize((tw, th), Image.NEAREST))
+    out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    cx = (bx0 + bx1) // 2
+    x = min(max(0, cx - tw // 2), W - tw)
+    y = min(max(0, by1 - th), H - th)                     # feet on the base's row
+    out.alpha_composite(Image.fromarray(np.ascontiguousarray(art), "RGBA"), (x, y))
+    return out
+
+
+def shrink(a, m, base, colours=(), fill=False):
     """The art at the base sprite's size, one target pixel per block of source.
 
     A block takes its commonest palette colour, except that the darkest colour
@@ -323,11 +430,11 @@ def shrink(a, m, base, scene=False, smooth=False, colours=()):
     ys, xs = np.nonzero(m)
     ax0, ax1, ay0, ay1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
     # As wide as the base's body; a hat may stand taller, never off the canvas.
-    s = min((W - 1 if scene else bx1 - bx0) / (ax1 - ax0), (H - 1) / (ay1 - ay0), (W - 1) / (ax1 - ax0))
+    # `fill`: a drawing its own grid overflows, as big as the canvas allows.
+    s = min((W - 1 if fill else bx1 - bx0) / (ax1 - ax0), (H - 1) / (ay1 - ay0), (W - 1) / (ax1 - ax0))
     tw, th = max(1, round((ax1 - ax0) * s)), max(1, round((ay1 - ay0) * s))
-    pal, idx = palette(a, m, *((SCENE_COLOURS, SCENE_ACCENTS, SCENE_FAR) if scene else colours))
+    pal, idx = palette(a, m, *colours)
     dark = int(np.argmin(pal.sum(axis=1)))
-    rim = grow(~m, max(1, int(0.5 / s))) if smooth else None
     art = np.zeros((th, tw, 4), np.uint8)
     for j in range(th):
         y0 = ay0 + int(j / s); y1 = max(y0 + 1, ay0 + int((j + 1) / s))
@@ -337,15 +444,7 @@ def shrink(a, m, base, scene=False, smooth=False, colours=()):
             if bm.mean() < 0.5:
                 continue
             counts = np.bincount(idx[y0:y1, x0:x1][bm], minlength=len(pal))
-            if not smooth:
-                k = dark if counts[dark] >= bm.sum() / 3 else int(np.argmax(counts))
-            elif rim[y0:y1, x0:x1].any() and counts[dark] >= bm.sum() / 3:
-                k = dark
-            elif counts.max() >= bm.sum() * SMOOTH_HOLD:
-                k = int(np.argmax(counts))
-            else:
-                mean = a[y0:y1, x0:x1][bm].astype(float).mean(axis=0)
-                k = int(np.abs(pal - mean).sum(axis=1).argmin())
+            k = dark if counts[dark] >= bm.sum() / 3 else int(np.argmax(counts))
             art[j, i, :3] = pal[k]
             art[j, i, 3] = 255
     out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -520,16 +619,19 @@ def build(path, ids):
     a = np.asarray(Image.open(path).convert("RGB"))
     m = key(a)
     if (event, base_id) in HOLLOW:
-        m = hollow(a, m)
+        m = hollow(a, m, (event, base_id) in GLOW)
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
-    out = thin(shrink(a, m, base, (event, stem) in SCENE, (event, stem) in SMOOTH, COLOURFUL.get((event, stem), ())))
-    if (event, stem) in DOTS:
-        at, like = DOTS[(event, stem)]
-        for xy in at:
-            out.putpixel(xy, out.getpixel(like))
+    colours = COLOURFUL.get((event, stem), ())
+    # Its own grid keeps its own one-pixel outline: `thin` is the shrink's.
+    out = native(a, m, base, colours)
+    how = "its own grid"
+    if isinstance(out, str):
+        # Too big for the canvas: as big as it allows. Too small: the body's width.
+        how = f"shrunk ({out})"
+        out = thin(shrink(a, m, base, colours, fill=out == "big"))
     out.save(os.path.join(SPRITES, f"{lid}.png"), optimize=True)
     shiny(out, base_id, lid in ROAM).save(os.path.join(SPRITES, "shiny", f"{lid}.png"), optimize=True)
-    print(f"{event}/{base_id} -> {lid}: {out.size[0]}px, {len(out.getcolors(4096)) - 1} colours")
+    print(f"{event}/{base_id} -> {lid}: {how}, {out.size[0]}px, {len(out.getcolors(4096)) - 1} colours")
     return lid
 
 

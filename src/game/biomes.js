@@ -304,6 +304,10 @@ const COSTUMES = SPECIES.filter((sp) => sp.form === "costume").map((sp) => sp.id
    asks per cell per render. `LEGENDARY` stays the list - this is the lookup. */
 const LEGEND_SET = new Set(LEGENDARY);
 export const isLegendary = (id) => LEGEND_SET.has(id);
+/* THE LEGENDARY MARK, for screens only: a legendary, or an event's hunted one
+   (2026-11-02, reported: Grim Reaper Giratina wore no star). The hunt stays
+   out of LEGENDARY, which the tables, fleeing, research and trading read. */
+export const legendMark = (id) => LEGEND_SET.has(id) || Boolean(speciesById(id)?.hunt);
 
 export const ENCLOSED = new Set(["ridge", "power", "ember", "frost", "tower",
                                  "mansion"]);
