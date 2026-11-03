@@ -72,12 +72,18 @@ HOLE_FIT = 0.85          # the share of a pocket on a checker's squares that mak
 # and between the scroll and the handle).
 # Gargoyle Geodude too (same day: white between its arms and its body).
 # Black Cat Meowth too (2026-11-02: white inside its tail's curl).
-HOLLOW = {("haunting", "487"), ("haunting", "477"), ("haunting", "74"), ("haunting", "52")}
+# Monster Hunter Lucario too (same day: white between its arm and its coat) -
+# but only its one big pocket: its eye shine, claws and a chest highlight are
+# white pockets too (580-990 pixels against the background's 4,320), and went
+# with it. Each look names the least pocket that is background.
+HOLLOW = {("haunting", "487"): HOLE_MIN, ("haunting", "477"): HOLE_MIN, ("haunting", "74"): HOLE_MIN,
+          ("haunting", "52"): 800, ("haunting", "448"): 2000}  # Meowth's coin shine is 587
 # More colours, for a drawing whose small accents the sixteen merged away
 # (2026-10-31): Gravedigger Diglett's browns took all sixteen and its nose
 # went grey; Ghost Story Slowking's quilt; Zapdos Poncho Eevee's orange beak.
 COLOURFUL = {("haunting", "50"): (24, 6, 60), ("haunting", "199"): (24, 6, 60),
-             ("eponchos", "19995"): (20, 4, 60)}
+             ("eponchos", "19995"): (20, 4, 60),
+             ("haunting", "487"): (24, 6, 60)}  # Giratina's scythes kept two of their greys (2026-11-02)
 # THE DRAWING'S OWN GRID (2026-11-02, reported: Dugtrio's and Kadabra's eyes
 # broken, Diglett's lost, the Gargoyles grainy). Every drawing is pixel art on a
 # grid of its own - 12.8 or 16 source pixels a drawn pixel, some 20.5 - and
@@ -101,6 +107,11 @@ NEAR_FIT = 0.75
 # its pixels are coarser than the sprite's, so nothing is lost.
 UNDER = 0.85
 SCALES = (1, 2, 3)
+# White a HOLLOW drawing encloses that is ART, named by a point (x, y) in the
+# drawing: its pocket is never taken (2026-11-02, reported: the shine down Grim
+# Reaper Giratina's right scythe went, 5,001 pixels - as big as the background
+# between its wing ribs, so no size tells them apart).
+KEEP = {("haunting", "487"): [(904, 733)]}
 POCKET_WHITE = 236       # near-white: a pocket's pixels
 POCKET_RIM = 4           # source pixels of tinted glow round a pocket that go with it
 # A HOLLOW drawing whose glow runs wider than the rim (Grim Reaper Giratina,
@@ -126,9 +137,9 @@ def grow(m, r):
     return out
 
 
-def pockets(a, m):
-    """The near-white regions the kept mask encloses, HOLE_MIN pixels or more,
-    as one mask."""
+def pockets(a, m, least=HOLE_MIN, keep=()):
+    """The near-white regions the kept mask encloses, `least` pixels or more
+    and holding none of the `keep` points, as one mask."""
     white = m & (a.min(axis=2).astype(int) > POCKET_WHITE)
     h, w = white.shape
     seen = np.zeros((h, w), bool)
@@ -144,17 +155,17 @@ def pockets(a, m):
                 yy, xx = y + dy, x + dx
                 if 0 <= yy < h and 0 <= xx < w and white[yy, xx] and not seen[yy, xx]:
                     seen[yy, xx] = True; q.append((yy, xx)); comp.append((yy, xx))
-        if len(comp) >= HOLE_MIN:
+        if len(comp) >= least and not set(comp) & {(y, x) for x, y in keep}:
             ys, xs = zip(*comp)
             out[list(ys), list(xs)] = True
     return out
 
 
-def hollow(a, m, glow=False):
+def hollow(a, m, glow=False, least=HOLE_MIN, keep=()):
     """A HOLLOW drawing's mask without its enclosed pockets and their glow:
     light, TINTED pixels within POCKET_RIM of one (a silver blade is light but
     grey, and stays) - or, `glow`, all of it that joins one (`GLOW`)."""
-    pk = pockets(a, m)
+    pk = pockets(a, m, least, keep)
     mn, mx = a.min(axis=2).astype(int), a.max(axis=2).astype(int)
     rim = grow(pk, POCKET_RIM) & m & (mn > 200) & (mx - mn >= 12)
     if glow:
@@ -619,7 +630,7 @@ def build(path, ids):
     a = np.asarray(Image.open(path).convert("RGB"))
     m = key(a)
     if (event, base_id) in HOLLOW:
-        m = hollow(a, m, (event, base_id) in GLOW)
+        m = hollow(a, m, (event, base_id) in GLOW, HOLLOW[(event, base_id)], KEEP.get((event, base_id), ()))
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
     colours = COLOURFUL.get((event, stem), ())
     # Its own grid keeps its own one-pixel outline: `thin` is the shrink's.
