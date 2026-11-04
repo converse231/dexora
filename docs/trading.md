@@ -297,3 +297,12 @@ decision), `ui/Invite.jsx` (the dialog: You › Invite friends, and Trading's
   `REF_RULE` (tradedb).
 - **Paid once, by the game**: `my_referrals` says who is owed; the engine's
   `claimReferrals` pays each reward id once (`referralsPaid` in the save).
+- **The Starforged four** *(2026-11-05, asked for)*: Pikachu at 1 friend (and for
+  the friend who joined), Charizard at 3, Mewtwo at 5, Arceus and the title
+  `event:friends` at 10 - `INVITE` in eventforms.js, ids of their own
+  (`ref:gift<n>`, `ref:gift0` the friend's) so a save that claimed its milestones
+  long ago is still owed them. Event looks, so no Pokedex count and no battle.
+  **They stay with their owner**, as does a trained kit: `keeper`, `tradeable`,
+  and on the server `invite_only()` and `stays_home(e)`, which give neither a
+  `mons` row and keep them off a friend's box, a search and a shelf. Without the
+  server's check a friend could ask for one by uid.

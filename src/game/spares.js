@@ -15,7 +15,7 @@ export function variantSpareUids(box, keep = []) {
   const rows = new Map();
   for (const mon of box) {
     const v = variantOf(mon);
-    if (!v || mon.alpha) continue;
+    if (!v || mon.alpha || mon.mastery) continue;
     const k = `${mon.species}:${v}`;
     if (!rows.has(k)) rows.set(k, []);
     rows.get(k).push(mon);

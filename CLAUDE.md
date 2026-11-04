@@ -89,6 +89,7 @@ anything done. The run prints each suite; the count is not typed anywhere.
 | `public/arena/pmd/`, `src/data/pmd.js` | `npm run pmd` (PMD Sprite Repository, pinned `COMMIT`, cached in .assets-src/pmd; ~5 min on all cores - `-- 25 6` bakes a sample but writes no pmd.js) |
 | `public/arena/fx/`, `src/data/fx.js` | `npm run fx` from the drawn originals in `art/arena/fx/` (white pixel art, tinted per type by render.js's `tinted`; a sheet's frames found by the gaps nearest even spacing, each anchored in one box; check.mjs reads every header and re-hashes `FX_REV`), the moves' own colour art in `art/arena/fx/moves/` (a new file needs its frame count in `MOVES`, or the build stops; one whose frames grow across the row goes in `WIDEST`; every one re-gridded to the bodies' pixel at its `GRID` width, a `RETIRED` one not built), and the optional ULTI panels `ult-<pattern>` / `ult-<dex id>` |
 | `public/arena/intro/` | `npm run intro` (the Arena announcement's two fighters, cut from the shipped PMD atlases; re-run after `npm run pmd`) |
+| `public/events/poster/` | `npm run posters` from the drawn skies in `art/posters/<event id>.jpg` (outside `art/events/`, where eventart would take one for a costume). An event names its own with `poster`, the printed width / height: only its name goes over the picture and `.sn-gap` holds the rest below it (2026-11-04: the story was unreadable across the town) |
 | `public/events/drift/`, `src/data/drift.js` | `npm run drift` (each event's `drift` Pokemon, their Arena Walk cut from the shipped PMD atlases for its poster's sky - facing right, and left (`-l`, `DRIFT_LEFT`) only where PMD's artist drew it, never a CSS mirror; re-run after `npm run pmd`) |
 | `src/data/kits.js`, `reports/Arena kits.md` | `npm run kits` (tools/build_kits.mjs: each line's fixed Arena kit from its learnsets, `FIXED` the hand-written ones, every move checked against the Pokemon) |
 | `public/sprites/female/`, `public/sprites/shiny/female/`, `src/data/genders.js` | `npm run genders` (PokeAPI's gender rates and female looks, cached in .assets-src/genders; art from the ordinary sprite's OWN set only) |
@@ -311,6 +312,23 @@ anything done. The run prints each suite; the count is not typed anywhere.
   build_event_sprites.py: the border flood, enclosed pockets that fit a
   checker at its own square size (Gemini paints a pocket on a grid of its
   own), specks, and accent colours one at a time.
+  **Audit a new drawing on a LOUD colour, zoomed, beside its base sprite**
+  (2026-11-05, reported twice: white patches; a dark background hid them): white
+  the outline shut in is named cell by cell (`SHUT_IN`, a white claw is the same
+  colour), a body near white gets a stricter backdrop (`FLOOR`), and sixteen colours
+  can turn armour another colour (`COLOURFUL`).
+- **The Starforged four are an invite's, never an event's** (`INVITE` in
+  eventforms.js, 2026-11-05, asked for): Pikachu, Charizard, Mewtwo and Arceus,
+  built as event looks (no count, no battle) but outside `EVENTS` - no days, no
+  meeting, no hunt. `referralDue` owes each at its `friends`, the first to the
+  friend who joined too, the last with the title `event:friends`, under
+  `ref:gift<n>` ids. They stay with their owner, as a trained kit does: `keeper`,
+  `tradeable`, trading.sql's `invite_only()` and `stays_home` (no `mons` row; held
+  equal by check.mjs). `eventById` answers for both kinds; `EVENTS.find` on a look's
+  `event` misses these. A look's place follows its id ACROSS events now (dex.js).
+  They took the last ids under trading.sql's 20000. The announcement is
+  `InviteIntro` (`INVITE_NEWS_KEY`) and the desktop bar's button glows until the
+  dialog has been opened (`INVITE_SEEN_KEY`), both device preferences.
 - **A look is one of a family's drawings** (`form: "look"`: Unown's letters,
   Furfrou's trims, Flabebe's colours, Silvally's types - `LOOK_FAMILIES` in
   fetch-forms, ids `PLATE_BASE` + form id like the plates). It is a species
@@ -825,6 +843,17 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   also outrank the Pokedex Charm (2x, a whole generation) and the Region Charm
   (1.5x, nine hard runs) - check.mjs refuses both.
   `loadState` drops a bad row, never the whole object.
+- **Rare Candy's late game** (2026-11-04, asked for: it had no use once the
+  Pokedex was nearly done). **Kit Mastery** (`mastery.js`, docs/arena-kits.md):
+  `engine.masterKit`, ten levels on a Box entry's `mastery`, each 1% damage and
+  1% cooldowns, in the match's `perks` beside the cards' - never online, ranked
+  or the League, held by check.mjs to a bound on Hard v Hard. A trained one is a
+  `keeper()`, no rare-form spare, and refused by `tradeable`. **A Candy Trail**
+  (`events.js`, `engine.layTrail`, the Dex sheet, a ring on the map; the save's
+  `trail`): `TRAIL_SHARE` of a resident's walking meetings for `TRAIL_STEPS`, on
+  any map it lives on, residents only like an outbreak, never a tier roll or a
+  table; steps carry onto the same species, a repel ends it. Both go through
+  `useRaise`'s `spend`: short of candy, the press buys the rest.
 - **The first days are `starter.js`** (onboarding, 2026-10-22: new players
   never found the core features). A partner picked with the trainer
   (`STARTERS` at `STARTER_LEVEL`, `grantStarter` into an EMPTY Box only,
@@ -1048,7 +1077,8 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   RANDOM open set (`randomOpen`; the newest by list order paid one set
   forever). **Pull rates are real life,
   one row a set** (`SET_RATES`, TCGplayer's per-pack data; your call
-  2026-10-06): `rulesOf(setId)` is a set's rates, hit rate and pity, and
+  2026-10-06), **every hit times `KINDER`** (1.25, your call 2026-11-04):
+  `rulesOf(setId)` is a set's rates, hit rate and pity, and
   `openPack` takes it. A set with no row fails check.mjs, so a new
   expansion ships with its own real numbers. Pity is a safety net scaled
   to each set (`PITY_NET`: rising from 1.5x the average wait, certain at

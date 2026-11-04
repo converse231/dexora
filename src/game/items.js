@@ -1,4 +1,4 @@
-import { SPECIES } from "../data/dex.js";
+import { SPECIES, isInviteLook } from "../data/dex.js";
 import { EVOLUTIONS as EVO_ROWS } from "../data/evolutions.js";
 import { GUARANTEED, PLAIN_MULT } from "../catch.js";
 import {
@@ -1220,7 +1220,8 @@ export const evolutionRow = (from, to) =>
    others. It now reads `TIERS` rather than naming them: the fourth tier was
    added by writing one row in `biomes.js`, and this line did not have to be
    remembered, which is the whole reason the list exists. */
-export const keeper = (mon) => !!mon && (TIERS.some((t) => mon[t]) || !!mon.alpha);
+// A trained kit too (mastery.js): its candy is spent, and a sale would throw it away.
+export const keeper = (mon) => !!mon && (TIERS.some((t) => mon[t]) || !!mon.alpha || mon.mastery > 0 || isInviteLook(mon.species));
 
 /* Which tier a box entry is, or null for an ordinary one. Rarest first, so a
    hand-edited save carrying two is described by its best - the same order

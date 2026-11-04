@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { SPECIES, isForm, isEvent, EVENT_SLOTS, DEX_TOTAL, dexCaught } from "../src/data/dex.js";
-import { EVENTS } from "../src/data/eventforms.js";
+import { EVENTS, INVITE } from "../src/data/eventforms.js";
 import { RETRO_IDS } from "../src/data/retro.js";
 import { evoCycleFrames, EVO_SWAPS, SCALE_MAX } from "../src/game/evocycle.js";
 import {
@@ -838,6 +838,8 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
          (events.js `eventLook` swaps it for a meeting with the species). */
       for (const l of EVENTS.flatMap((ev) => ev.looks)) if (l.of === id || l.on === id) reach.add(l.id);
     }
+  // AN INVITE'S LOOK is reached by inviting (referral.js), which `invite ok` holds.
+  for (const l of INVITE.looks) reach.add(l.id);
   /* AN EVENT'S HUNTED ONE is reached by its hunt: its Bad Dreams are its
      costumes caught, so it is reachable when they are and its area is a map. */
   for (const ev of EVENTS)
@@ -2695,7 +2697,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      species but them, a dex holding only them counts nothing, and the trading
      server's card count skips the same places (trading.sql `event_slots()`). */
   {
-    const looks = EVENTS.flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])]);
+    const looks = [...EVENTS, INVITE].flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])]);
     for (const ev of EVENTS.filter((e) => e.hunt)) {
       assert.ok(BIOMES.some((b) => b.id === ev.hunt.area), `${ev.id}'s hunt waits in no map`);
       assert.ok(/^[a-z]+$/.test(ev.hunt.medal) && !EVENTS.some((e) => e.id === ev.hunt.medal),
@@ -2721,7 +2723,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(existsSync(new URL(`../public/sprites/${l.id}.png`, import.meta.url))
         && existsSync(new URL(`../public/sprites/shiny/${l.id}.png`, import.meta.url)),
         `${sp.name} has no sprite or shiny - npm run eventart`);
-      assert.ok(l.id < 20000, `${sp.name}'s id is past the 20000 the trading server takes`);
+      assert.ok(l.id <= 20000, `${sp.name}'s id is past the 20000 the trading server takes`);
     }
     /* AN EVENT IS ONE WEEK (2026-10-26, your call): seven local days, none
        overlapping another (eventOn takes the first match), an id the server's
@@ -2840,7 +2842,71 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
         if (drawn) assert.ok(existsSync(new URL(`../public/events/drift/${id}-l.png`, import.meta.url)), `#${id}'s left-facing walk is not baked - npm run drift`);
       }
     }
+    /* AN EVENT'S DRAWN SKY (`poster`): built from its drawing by npm run posters. */
+    for (const ev of EVENTS.filter((e) => e.poster)) {
+      assert.ok(existsSync(new URL(`../public/events/poster/${ev.id}.webp`, import.meta.url)), `${ev.id}'s poster is not built - npm run posters`);
+    }
     console.log(`event looks ok — ${looks.length} in ${EVENTS.length} event(s) of one week each, outside every count of the dex`);
+
+    /* THE STARFORGED FOUR (eventforms.js INVITE): earned only by inviting. Every rung
+       within the friends a player is paid for and each owed by the rule itself, in
+       order of friends; their place in a save after every event already shipped;
+       kept from sale and trade in the game and the same four on the server. */
+    {
+      const { REF_RULE, referralDue, REF_TITLE } = await import("../src/game/referral.js");
+      const { keeper } = await import("../src/game/items.js");
+      const { tradeable } = await import("../src/game/trade.js");
+      const ids = INVITE.looks.map((l) => l.id);
+      const rungs = INVITE.looks.map((l) => l.friends);
+      assert.deepEqual(rungs, [...rungs].sort((a, b) => a - b), "the invite looks are not in order of friends");
+      assert.equal(new Set(rungs).size, rungs.length, "two invite looks share a rung");
+      assert.equal(rungs.at(-1), REF_RULE.cap, "the last invite look is not at the friends a player is paid for (REF_RULE.cap)");
+      assert.ok(ids.every((id) => id <= 20000), "an invite look is past the ids the trading server accepts");
+      assert.ok(EVENTS.flatMap((ev) => ev.looks.concat(ev.hunt ?? [])).every((l) => l.id < ids[0] || l.id > ids.at(-1)), "an event look sits among the invite looks");
+      const invited = (n) => ({ invited: Array.from({ length: n }, (_, k) => ({ id: `u${k}`, username: `F${k}`, paid: true })) });
+      for (const l of INVITE.looks) {
+        assert.ok(referralDue(invited(l.friends)).some((r) => r.mon === l.id), `${l.title} is not owed at ${l.friends} friends`);
+        if (l.friends > 1) assert.ok(!referralDue(invited(l.friends - 1)).some((r) => r.mon === l.id), `${l.title} is owed before ${l.friends} friends`);
+      }
+      assert.ok(referralDue(invited(REF_RULE.cap)).some((r) => r.medal === REF_TITLE), "the last rung pays no title");
+      assert.ok(referralDue({ me: { referrer: "A", qualified: true }, invited: [] }).some((r) => r.mon === ids[0]), "the friend who joined is not owed the first look");
+      assert.deepEqual(referralDue({ flagged: true, ...invited(REF_RULE.cap) }), [], "a flagged account is owed an invite look");
+      const box = ids.flatMap((id, k) => [{ uid: 2 * k + 1, species: id, level: 100 }, { uid: 2 * k + 2, species: id, level: 100 }]);
+      for (const m of box) {
+        assert.ok(keeper(m), `${m.species} could be sold or converted`);
+        assert.equal(tradeable(box, m), false, `${m.species} could be offered in a trade`);
+      }
+      const sqlIds = sql.match(/function public\.invite_only\(\)[\s\S]*?array\[([\d,\s]*)\]/)?.[1].split(",").map(Number);
+      assert.deepEqual(sqlIds, ids, "db/trading.sql's invite_only() is not INVITE's looks - re-type it and re-apply trading.sql");
+      for (const id of ids) assert.ok(existsSync(new URL(`../public/sprites/${id}.png`, import.meta.url)), `no sprite for invite look ${id} - run npm run eventart`);
+      console.log(`invite ok — ${ids.length} looks at ${rungs.join(", ")} friends, kept from sale and trade, the same on the server`);
+    }
+  }
+  /* RARE CANDY'S LATE GAME (2026-11-04). A mastered team is better, never a
+     different game: even Hard v Hard teams, mastered top against none, stay
+     under a bound and above a coin. And a Candy Trail never pays for itself on
+     a resident that a game's cheap balls can catch (the dear end costs more to
+     catch than it sells for, asserted elsewhere). */
+  {
+    const AR = await import("../src/game/arena.js");
+    const { teamPerks } = await import("../src/game/cardperks.js");
+    const M = await import("../src/game/mastery.js");
+    const EV = await import("../src/game/events.js");
+    const { ENCOUNTER_RATE } = await import("../src/game/biomes.js");
+    const { CANDY_PRICE, SELL } = await import("../src/game/items.js");
+    const sets = [[6, 25, 94], [9, 3, 130], [59, 65, 68]];
+    let wins = 0, n = 0;
+    for (const a of sets) for (const b of sets) for (let seed = 1; seed <= 5; seed++) {
+      const perks = [M.withMastery(teamPerks([], a), a.map(() => ({ mastery: M.MASTERY_MAX }))), null];
+      const s = AR.newMatch({ teams: [AR.fairTeam(a), AR.fairTeam(b)], cpu: ["hard", "hard"], seed: seed * 97 + a[0], arena: "indigo", perks, events: false });
+      for (let g = 0; !s.over && g < 400 * AR.TPS; g++) AR.tick(s, [null, null]);
+      n++; wins += s.winner === 0 ? 1 : s.winner === 1 ? 0 : 0.5;
+    }
+    assert.ok(wins / n > 0.5 && wins / n < 0.8, `a mastered team won ${Math.round(100 * wins / n)}% of even fights - it should be better, never a different game`);
+    assert.equal(M.masteryK(0), 0, "an untrained kit has a perk");
+    const met = EV.TRAIL_STEPS * ENCOUNTER_RATE * EV.TRAIL_SHARE;
+    assert.ok(met * SELL.A < EV.TRAIL_CANDY * CANDY_PRICE, `a Candy Trail's ${met.toFixed(1)} meetings sell for more than its candy costs`);
+    console.log(`candy ok — a mastered team wins ${Math.round(100 * wins / n)}% of even fights, a trail meets its species ${met.toFixed(1)} times`);
   }
   assert.equal(new Set(DEX_RANKS.map((r) => r.id)).size, DEX_RANKS.length, "two Pokédex ranks share an id");
   for (const [i, r] of DEX_RANKS.entries()) {
@@ -9429,7 +9495,8 @@ import { statSync } from "node:fs";
       n++;
     }
 
-    /* REAL-LIFE RATES, ONE ROW A SET (your call, 2026-10-06), held two ways:
+    /* REAL-LIFE RATES, ONE ROW A SET (your call, 2026-10-06), `KINDER` over each
+       hit (2026-11-04), held two ways:
        with pity held at zero every pack lands each rate within 15% (or four
        standard errors, for a rate too rare for 15% to be measurable); with
        pity running, no streak passes its guarantee and no pack holds a card
@@ -9475,9 +9542,9 @@ import { statSync } from "node:fs";
          scene's default blue, and with no pip colour its dot never lit. */
       if (CD.isHit(as)) assert.ok(new RegExp(`\.cd-open\.tone-${as}[ ,{]`).test(CARD_CSS) && new RegExp(`\.cd-pips i\.r-${as}[ ,{]`).test(CARD_CSS),
         `${meta.id}: the ${as} hit has no .cd-open.tone-${as} or .cd-pips i.r-${as} colour`);
-      const got = (flat.hits[as] ?? 0) / N;
-      const room = Math.max(0.15 * rate, 4 * Math.sqrt(rate * (1 - rate) / N));
-      assert.ok(Math.abs(got - rate) <= room, `${meta.id}: ${r} (${as}) came 1 in ${(1 / got).toFixed(1)}, not 1 in ${(1 / rate).toFixed(1)}`);
+      const got = (flat.hits[as] ?? 0) / N, want = r === "holo" ? rate : rate * CD.KINDER;
+      const room = Math.max(0.15 * want, 4 * Math.sqrt(want * (1 - want) / N));
+      assert.ok(Math.abs(got - want) <= room, `${meta.id}: ${r} (${as}) came 1 in ${(1 / got).toFixed(1)}, not 1 in ${(1 / want).toFixed(1)}`);
     }
     // A set printing no reverse holo (Base Set) has no God Pack.
     const godRate = CARDS.some((c) => c[4].includes("r")) ? CD.GOD_PACK : 0;

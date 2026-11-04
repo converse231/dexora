@@ -7,6 +7,7 @@
    round trip rather than to decide anything. The SQL mirrors LIMITS, and
    check.mjs holds the two equal. */
 import { variantOf } from "./items.js";
+import { isInviteLook } from "../data/dex.js";
 
 export const LIMITS = {
   TRADES_PER_DAY: 10,     // completed trades of any kind, per trainer per day
@@ -71,6 +72,10 @@ export const REPORT_REASONS = ["Offensive name", "Spam or harassment", "Cheating
    another - only a listing or the pool does. */
 export function tradeable(box, mon, offer = false) {
   if (!mon || (mon.lock && !(offer && mon.lock === "offer"))) return false;
+  // A trained kit lives on the entry, and the server's row would drop it (mastery.js).
+  if (mon.mastery) return false;
+  // An invite's Pokemon was earned by its owner's friends (eventforms.js): the server's `stays_home`.
+  if (isInviteLook(mon.species)) return false;
   let same = 0;
   for (const m of box) if (m.species === mon.species && ++same > 1) return true;
   return false;

@@ -35,6 +35,7 @@ import { resolveThrow, GUARANTEED } from "../catch.js";
 import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
+  TRAIL_CANDY, TRAIL_STEPS, TRAIL_SHARE, trailTarget, trailsOn, cleanTrail,
   eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntCount, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook, dressed,
 } from "./events.js";
 import {
@@ -68,7 +69,7 @@ import {
 import { variantSpareUids } from "./spares.js";
 import { comboLift, comboKey, nextCombo, cleanCombo, COMBO_STEPS } from "./combo.js";
 import { quizFor, cleanQuiz, QUIZ_PAY } from "./quiz.js";
-import { referralDue, cleanRefPaid } from "./referral.js";
+import { referralDue, cleanRefPaid, REF_LOOK_LEVEL } from "./referral.js";
 import { sexAt, sexOf, looksFemale, cleanFemales } from "./gender.js";
 /* ALIASED, and `advanceGoal` is not a style choice - it is the fix for a bug
    that froze every catch in the game. `createEngine` has its own
@@ -149,6 +150,7 @@ import {
 const mine = (key) => scoped(key, read(OWNER_KEY));
 import { push as pushCloud } from "../net/cloud.js";
 import { nextHint, HINT_IDS } from "./hints.js";
+import { MASTERY_MAX, masteryCost, cleanMastery } from "./mastery.js";
 import { STARTERS, STARTER_LEVEL, pathNow, cleanPath } from "./starter.js";
 
 /* THREE KEYS, AND THE OTHER TWO EXIST BECAUSE A COLLECTION WAS LOST.
@@ -217,6 +219,7 @@ function freshState() {
     research: {},         // per-species research counters, keyed by DEX ID - see research.js
     stars: [],            // dex ids whose finished research was starred - see `star`
     combo: null,          // the catch chain, `{ species, n }` - see combo.js
+    trail: null,          // a Candy Trail, `{ species, steps, total }` - see events.js
     females: [],          // dex ids whose female look you have held - see gender.js
     quiz: null,           // today's quiz answered, `{ day, ok }` - see quiz.js
     gifted: [],           // LEGACY: dex ids once held back from rewards as trades - paid and cleared at boot
@@ -592,7 +595,7 @@ function loadState() {
     const box = pool.filter(sound).map((m) => {
       if (!seen.has(m.uid)) { seen.add(m.uid); return m; }
       return { ...m, uid: nextUid++ };
-    }).map(cleanTradeFields).map(cleanTaught)
+    }).map(cleanTradeFields).map(cleanTaught).map(cleanMastery)
       // Steps walked with you (abilities.js): a count, or nothing - never a reason to drop the entry.
       .map((m) => (m.walked === undefined || (Number.isInteger(m.walked) && m.walked >= 0) ? m
         : (({ walked, ...rest }) => rest)(m)));
@@ -677,6 +680,7 @@ function loadState() {
       stars: [...new Set(Array.isArray(s.stars) ? s.stars : [])]
         .filter((id) => Number.isInteger(id) && speciesById(id)),
       combo: cleanCombo(s.combo, speciesById),
+      trail: cleanTrail(s.trail),
       quiz: cleanQuiz(s.quiz),
       females: cleanFemales(s.females),
       gifted: [...new Set(Array.isArray(s.gifted) ? s.gifted : [])]
@@ -1587,6 +1591,10 @@ export function createEngine(canvas, onChange, mini = null) {
         state.worn.push({ id: run.id, n: ++wornSeq });
       }
     }
+    if (state.trail && --state.trail.steps <= 0) {
+      state.worn.push({ id: "trail", title: `${label(speciesById(state.trail.species))} trail`, sub: "WENT COLD", n: ++wornSeq });
+      state.trail = null;
+    }
     const found = stepRift();
 
     /* Walking pays. `stepReward` is pure and the panel calls it too, on the
@@ -1911,11 +1919,14 @@ export function createEngine(canvas, onChange, mini = null) {
     const hunt = source === "wild" ? huntDue(state.dreams, state.dex) : null;
     const nightmare = !!hunt && state.areaId === hunt.area;
     const owned = (id) => state.dex[dexIndex(id)] === 2;
+    // A Candy Trail (events.js): walking only, on a map its species lives on; a roll only while one runs.
+    const trailed = !flood && source === "wild" && !!state.trail
+      && table.some(([id]) => id === state.trail.species) && Math.random() < TRAIL_SHARE;
     // A roaming week (events.js `roamLook`): a walking meeting may be one of its looks, by the map's types.
     const roam = !nightmare && !flood && source === "wild"
       ? roamLook(biomeFor(state.areaId)?.types, Math.random, { night: isNight(state.steps), lure: lure?.lure ?? 1 }) : null;
     const sp = nightmare ? speciesById(hunt.id) : roam
-      ?? eventLook(rollLook(flood ? speciesById(ob.speciesId) : pickSpecies(lured(table, lure)), Math.random,
+      ?? eventLook(rollLook(flood ? speciesById(ob.speciesId) : trailed ? speciesById(state.trail.species) : pickSpecies(lured(table, lure)), Math.random,
         { owned, types: biomeFor(state.areaId)?.types }), Math.random,
         { night: isNight(state.steps), lure: lure?.lure ?? 1 });
     /* Whether the dex already has this one, read BEFORE the throw can register
@@ -2599,7 +2610,7 @@ export function createEngine(canvas, onChange, mini = null) {
          reach. Rounded, because XP is whole and a half-point that only ever
          appears with a berry in play is a rounding difference nobody can
          explain. */
-      teach({ kind: "caught", duplicate: dupe, caught: state.caught,
+      teach({ kind: "caught", duplicate: dupe, candy: state.candy, caught: state.caught,
         chain: (state.combo?.species === comboKey(e.speciesId) ? state.combo.n : 0) + 1 });
       const gained = gainXp(Math.round(xpForCatch(sp, e.isNew) * berryXp(e.berries)));
 
@@ -3679,6 +3690,13 @@ export function createEngine(canvas, onChange, mini = null) {
       give(r.items);
       state.candy += r.candy ?? 0;
       if (r.packs) grantPacks(r.packs, r.id);
+      // A Starforged look goes straight into the Box, and its title onto the card.
+      if (r.mon) {
+        state.box.push({ uid: state.nextUid++, species: r.mon, level: REF_LOOK_LEVEL, at: Date.now() });
+        registerGift(r.mon);
+        cheer({ kind: "medal", title: label(speciesById(r.mon)).toUpperCase(), sub: r.why });
+      }
+      if (r.medal && !state.medals.includes(r.medal)) state.medals.push(r.medal);
     }
     state.referralsPaid = [...state.referralsPaid, ...due.map((r) => r.id)];
     save();
@@ -4153,6 +4171,48 @@ export function createEngine(canvas, onChange, mini = null) {
     return spend;
   }
 
+  /* TRAIN A KIT ONE LEVEL (mastery.js). The whole cost or nothing; a held one
+     is frozen for the reason a raise is. */
+  function masterKit(uid) {
+    const mon = state.box.find((m) => m.uid === uid);
+    const at = mon?.mastery ?? 0;
+    if (!mon || mon.lock || at >= MASTERY_MAX || state.candy < masteryCost(at)) return false;
+    state.candy -= masteryCost(at);
+    mon.mastery = at + 1;
+    save();
+    changed();
+    return true;
+  }
+
+  /* A CANDY TRAIL (events.js). `trailOffer` is the Dex sheet's whole answer:
+     null where none can be laid (never caught, or not a resident of any map
+     open to you), else the species and whether you stand on its map. */
+  function trailOffer(id) {
+    const species = trailTarget(id), level = levelFromXp(state.xp);
+    if (!looksOf(species).some((k) => state.dex[dexIndex(k)] === 2)) return null;
+    const homes = BIOMES.filter((b) => areaOpen(b.id, level) && trailsOn(species, b, level));
+    if (!homes.length) return null;
+    return { species, here: homes.some((b) => b.id === state.areaId), where: AREAS[homes[0].id].name };
+  }
+  function layTrail(id, confirmed = false) {
+    const offer = trailOffer(id);
+    if (!offer?.here || state.candy < TRAIL_CANDY) return false;
+    const run = state.trail, same = run?.species === offer.species;
+    // Like a field item: the steps carry onto the same trail, and it asks before throwing another's away.
+    if (run && !same && !confirmed) {
+      ask("field", () => layTrail(id, true), `Follow ${label(speciesById(offer.species))} instead?`,
+        `Your ${label(speciesById(run.species))} trail has ${run.steps} steps left, and they go with it.`);
+      return false;
+    }
+    state.candy -= TRAIL_CANDY;
+    state.field.repel = null;
+    const steps = (same ? run.steps : 0) + TRAIL_STEPS;
+    state.trail = { species: offer.species, steps, total: steps };
+    save();
+    changed();
+    return true;
+  }
+
   /* Cash into candy. Priced through `priceOf` like everything else in the shop,
      so Haggle discounts it - candy is bought with money, and the stat that
      makes money go further has to make it go further here too or the shop has
@@ -4256,6 +4316,7 @@ export function createEngine(canvas, onChange, mini = null) {
     if (run && !carry) state.worn.push({ id: run.id, n: ++wornSeq });
     if (item.family === "repel") {
       for (const fam of FAMILIES) state.field[fam] = null;
+      state.trail = null;           // total, like every other thing a repel stops
     } else if (state.field.repel) {
       state.field.repel = null;
     }
@@ -4630,6 +4691,9 @@ export function createEngine(canvas, onChange, mini = null) {
     hasPatch,
     addToBinder,
     buyCandy,
+    masterKit,
+    trailOffer,
+    layTrail,
     useField,
     useBerry,
     claimDaily,

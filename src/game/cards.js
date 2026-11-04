@@ -231,11 +231,18 @@ export const hitRateOf = (r) => 1 - (1 - r.mega - r.special - r.illustration
 export const PITY_NET = [1.5, 3];
 const net = (p) => ({ soft: Math.round(PITY_NET[0] / p), hard: Math.round(PITY_NET[1] / p) });
 
+/* A BIT KINDER THAN THE SHOP (your call, 2026-11-04): every hit's rate times
+   this. `SET_RATES` stays the measured record it cites; a Holo Rare is no hit
+   and stays as it is. The Packs tab prints the kinder number, and each set's
+   pity follows it. */
+export const KINDER = 1.25;
+
 /* EVERYTHING A SET'S PACKS FOLLOW: its rates, its hit rate and its pity.
    Null for a set with no row (which check.mjs refuses to ship). */
 export function rulesOf(setId) {
-  const rates = SET_RATES[setId];
-  if (!rates) return null;
+  const row = SET_RATES[setId];
+  if (!row) return null;
+  const rates = Object.fromEntries(Object.entries(row).map(([k, p]) => [k, k === "holo" ? p : p * KINDER]));
   const hit = hitRateOf(rates);
   return { rates, hit, pity: { hit: { hard: Math.round(PITY_NET[1] / hit) }, special: net(rates.special), mega: net(rates.mega) } };
 }

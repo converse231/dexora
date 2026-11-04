@@ -12,7 +12,7 @@
    migration again, for 120 entries and no reason. */
 import { SPECIES as NATIONAL } from "./species.js";
 import { FORMS } from "./forms.js";
-import { EVENTS, EVENT_WAVE } from "./eventforms.js";
+import { EVENTS, INVITE, EVENT_WAVE } from "./eventforms.js";
 
 /* EVENT LOOKS (eventforms.js) are built from their own species here - the
    types, stats, size and catch rate are the species', so a costume is never
@@ -23,14 +23,16 @@ const base = new Map(NATIONAL.map((sp) => [sp.id, sp]));
 /* A look's place follows its ID, never where it is written (a save is keyed by
    position): the second wave of Hallowed Night (19909+) came after the hunt
    (19908), and written beside the first seven it would have moved Darkrai. */
-const EVENT_LOOKS = EVENTS.flatMap((ev) => [...ev.looks, ...(ev.hunt ? [{ ...ev.hunt, hunt: true }] : [])].sort((a, b) => a.id - b.id).map((l) => {
+/* Across events too (2026-11-05): the invite looks are written apart from EVENTS,
+   and a later event must still go after them. */
+const EVENT_LOOKS = [...EVENTS, INVITE].flatMap((ev) => [...ev.looks, ...(ev.hunt ? [{ ...ev.hunt, hunt: true }] : [])].map((l) => {
   const sp = base.get(l.of);
   return {
     ...sp, id: l.id, name: `${sp.name}-${ev.id}`, from: sp.name, of: sp.id,
     form: "event", event: ev.id, title: l.title, flavor: l.flavor,
     legendary: false, wave: EVENT_WAVE, ...(l.hunt ? { hunt: true } : {}),
   };
-}));
+})).sort((a, b) => a.id - b.id);
 
 const wave = (f) => f.wave ?? (f.wild ? 1 : 0);
 export const SPECIES = [
@@ -47,6 +49,9 @@ export const SPECIES = [
    in trading.sql, held equal by check.mjs). */
 const EVENT_IDS = new Set(EVENT_LOOKS.map((sp) => sp.id));
 export const isEvent = (id) => EVENT_IDS.has(id);
+// The looks only an invite pays (eventforms.js): they stay with whoever earned them.
+const INVITE_IDS = new Set(INVITE.looks.map((l) => l.id));
+export const isInviteLook = (id) => INVITE_IDS.has(id);
 export const EVENT_SLOTS = SPECIES.flatMap((sp, i) => (EVENT_IDS.has(sp.id) ? [i] : []));
 const COUNTED = SPECIES.map((sp) => !EVENT_IDS.has(sp.id));
 export const DEX_TOTAL = COUNTED.filter(Boolean).length;

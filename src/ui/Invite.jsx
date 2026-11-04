@@ -6,13 +6,18 @@
    through someone's link, your own welcome gift's progress sits on top.
 
    It only ever SHOWS what the server answered (`info`); the engine pays
-   (`onClaim`), once per reward id. */
+   (`onClaim`), once per reward id.
+
+   THE STARFORGED FOUR head it (`Looks`, eventforms.js): the point of inviting,
+   seen first, signed in or not. `InviteIntro` is their announcement, once a
+   device, and leads here. */
 import { useEffect, useState } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
 import Icon from "./Icon.jsx";
-import { TrainerArt } from "./Sprite.jsx";
-import { REF_RULE, REF_WELCOME, REF_EACH, REF_MILESTONES, inviteLink, referralDue, rewardWords } from "../game/referral.js";
+import { TrainerArt, spriteUrl } from "./Sprite.jsx";
+import { REF_RULE, REF_WELCOME, REF_EACH, REF_FRIEND_LOOK, REF_MILESTONES, inviteLink, referralDue, rewardWords } from "../game/referral.js";
 import { itemById } from "../game/items.js";
+import { INVITE } from "../data/eventforms.js";
 
 const itemName = (id) => itemById(id)?.name ?? id;
 const asset = (path) => new URL(path, document.baseURI).href;
@@ -25,9 +30,52 @@ function Prize({ r }) {
   ].filter(Boolean);
   return (
     <span className="iv-prize" aria-label={rewardWords(r, itemName)}>
+      {r.mon && <span data-tip={rewardWords({ mon: r.mon })}><img src={asset(spriteUrl(r.mon))} alt="" />{rewardWords({ mon: r.mon })}</span>}
       {bits.map(([src, n, name]) => <span key={name} data-tip={name}><img src={src} alt="" />×{n}</span>)}
       {r.packs > 0 && <span data-tip={r.packs >= 36 ? "A booster box" : "Card packs"}><Icon n="cards" size={18} />{r.packs >= 36 ? "Box" : `×${r.packs}`}</span>}
+      {r.medal && <span>{rewardWords({ medal: r.medal })}</span>}
     </span>
+  );
+}
+
+// The four, each at the friends it takes; the ones you have reached are marked.
+function Looks({ counted = 0 }) {
+  return (
+    <ol className="iv-looks">
+      {INVITE.looks.map((l) => (
+        <li key={l.id} className={counted >= l.friends ? "done" : ""}>
+          <img src={asset(spriteUrl(l.id))} alt="" />
+          <b>{l.title.replace(`${INVITE.title} `, "")}</b>
+          <small>{l.friends} friend{l.friends > 1 ? "s" : ""}{l.friends === 1 ? ", for you both" : ""}{l === INVITE.looks.at(-1) ? " + title" : ""}</small>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/* THE ANNOUNCEMENT (asked for, 2026-11-05): once a device, on the map, after
+   the day's check-in (App). A press on Invite friends opens the dialog below. */
+export function InviteIntro({ onGo, onClose }) {
+  useModalLock();
+  useEffect(() => {
+    const esc = (e) => { if (e.key === "Escape") { e.stopImmediatePropagation(); onClose(); } };
+    addEventListener("keydown", esc, true);
+    return () => removeEventListener("keydown", esc, true);
+  }, [onClose]);
+  return (
+    <div className="sheet" {...useDismiss(onClose)}>
+      <div className="confirm iv iv-intro" role="dialog" aria-modal="true" aria-labelledby="iv-intro-title" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="cd-x" onClick={onClose} aria-label="Close">✕</button>
+        <span className="iv-kicker">New · Only from inviting friends</span>
+        <h2 id="iv-intro-title">{INVITE.title} Pokémon</h2>
+        <p>Four Pokémon you can't catch anywhere. Bring friends into Dexora, and when they get going, these are yours.</p>
+        <Looks />
+        <div className="iv-go">
+          <button type="button" className="ci-go" onClick={onGo}>Invite friends</button>
+          <button type="button" className="ci-go quiet" onClick={onClose}>Later</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -50,7 +98,7 @@ function Progress({ p }) {
   );
 }
 
-export default function Invite({ name, info, signedIn, paidIds = [], welcome = false, onClaim, onRefresh, onClose }) {
+export default function Invite({ name, info, signedIn, paidIds = [], welcome = false, onClaim, onRefresh, onClose, onJoin = null }) {
   useModalLock();
   const [note, setNote] = useState("");
   const [got, setGot] = useState(null);
@@ -70,7 +118,7 @@ export default function Invite({ name, info, signedIn, paidIds = [], welcome = f
     catch { setNote("Copy this link: " + link); }
   };
   const share = async () => {
-    try { await navigator.share({ title: "Play Dexora with me", text: "Catch Pokémon with me on Dexora - we both get rewards:", url: link }); }
+    try { await navigator.share({ title: "Play Dexora with me", text: "Catch Pokémon with me on Dexora - we both get a Starforged Pikachu:", url: link }); }
     catch { /* closed the share sheet */ }
   };
 
@@ -83,17 +131,27 @@ export default function Invite({ name, info, signedIn, paidIds = [], welcome = f
           <div>
             <h3>{welcome ? "Welcome to Dexora!" : "Invite friends"}</h3>
             <p>{welcome && info?.me
-              ? `${info.me.referrer} invited you. Get going and you both earn a gift.`
+              ? `${info.me.referrer} invited you. Get going and you both earn a Starforged Pikachu.`
               : "Bring a friend in. When they get going, you both get big rewards."}</p>
           </div>
         </header>
 
-        {!signedIn ? <p className="ev-quiet">Sign in to get your own invite link.</p> : (
+        <section className="iv-card iv-star">
+          <h4>{INVITE.title} Pokémon <small>Only from inviting friends</small></h4>
+          <Looks counted={paidCount} />
+        </section>
+
+        {!signedIn ? (
+          <>
+            <p className="ev-quiet">Make an account to get your own invite link.</p>
+            {onJoin && <button type="button" className="ev-go iv-claim" onClick={() => { onClose(); onJoin(); }}>Save my progress</button>}
+          </>
+        ) : (
           <>
             {info?.me && (
               <section className={`iv-card iv-me${info.me.qualified ? " done" : ""}`}>
                 <h4>Your welcome gift <small>from {info.me.referrer}</small></h4>
-                <Prize r={REF_WELCOME} />
+                <Prize r={{ ...REF_WELCOME, ...REF_FRIEND_LOOK }} />
                 {info.me.qualified ? <p className="iv-ok">Unlocked!</p> : <Progress p={info.me} />}
               </section>
             )}
@@ -112,7 +170,7 @@ export default function Invite({ name, info, signedIn, paidIds = [], welcome = f
               <h4>Rewards</h4>
               <div className="iv-rows">
                 <span className="iv-k">You, for each friend</span><Prize r={REF_EACH} />
-                <span className="iv-k">Your friend</span><Prize r={REF_WELCOME} />
+                <span className="iv-k">Your friend</span><Prize r={{ ...REF_WELCOME, ...REF_FRIEND_LOOK }} />
               </div>
               <ol className="iv-ladder" aria-label="Milestones">
                 {REF_MILESTONES.map(([n, r]) => (

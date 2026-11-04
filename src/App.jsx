@@ -7,10 +7,10 @@ import { freePoints } from "./game/trainer.js";
 import Tip from "./ui/Tip.jsx";
 import { phaseAt, timeLabel, isNight } from "./game/clock.js";
 import Rail from "./ui/Rail.jsx";
-import { RAIL_KEY, ORDER_KEY, REF_KEY, ARENA_NEWS_KEY, BATTLES_KEY, read, write, drop, flushNow } from "./game/store.js";
+import { RAIL_KEY, ORDER_KEY, REF_KEY, ARENA_NEWS_KEY, INVITE_NEWS_KEY, INVITE_SEEN_KEY, BATTLES_KEY, read, write, drop, flushNow } from "./game/store.js";
 import { tradeInbox, push, myDefense, setReferrer, myReferrals, CLOUD, arenaInvites, arenaAnswer } from "./net/cloud.js";
 import { ArenaCall, CALL_MS } from "./ui/ArenaCall.jsx";
-import Invite from "./ui/Invite.jsx";
+import Invite, { InviteIntro } from "./ui/Invite.jsx";
 import { referralDue } from "./game/referral.js";
 import { inboxToReconcile, freshTrades } from "./game/trade.js";
 import Pad from "./ui/Pad.jsx";
@@ -250,6 +250,9 @@ export default function App({
      visit when this one has just played. */
   const [arenaNews, setArenaNews] = useState(() => read(ARENA_NEWS_KEY));
   const [arenaIntro, setArenaIntro] = useState(false);
+  // The Starforged announcement (Invite.jsx), once a device, and the Invite button's glow.
+  const [inviteIntro, setInviteIntro] = useState(false);
+  const [inviteSeen, setInviteSeen] = useState(() => Boolean(read(INVITE_SEEN_KEY)));
   const announced = useRef(false);
   const onEditParty = useCallback(() => setPartyPick(true), []);
   const onJumped = useCallback(() => setBoxJump(null), []);
@@ -318,7 +321,7 @@ export default function App({
       if (ref) {
         const got = await setReferrer(ref);
         if (!got.ok) write(REF_KEY, ref);
-        else if (got.data === "linked") setInvite({ welcome: true });
+        else if (got.data === "linked") { write(INVITE_SEEN_KEY, "1"); setInviteSeen(true); setInvite({ welcome: true }); }
       }
       loadRefs();
     })();
@@ -425,6 +428,7 @@ export default function App({
      because this account just followed someone's link. */
   const [refInfo, setRefInfo] = useState(null);
   const [invite, setInvite] = useState(null);         // null, or { welcome }
+  const openInvite = () => { write(INVITE_SEEN_KEY, "1"); setInviteSeen(true); setInvite({ welcome: false }); };
   /* "See in Box" crosses two components that do not know each other: the sheet
      lives here and the tab lives in the Rail. A species id parked here is the
      smallest thing that can travel between them, and the Rail clears it once it
@@ -585,7 +589,7 @@ export default function App({
      on the summary. */
   /* And while a Pokédex reward rolls (DexClaim): the "new packs" tip over the reel. */
   const held = (enc && !["caught", "fled", "ran"].includes(enc.phase)) || cardScene || claimGen != null
-    || checkinOpen || rouletteOpen || streakLots || quizOpen || seasonOpen || arenaIntro;
+    || checkinOpen || rouletteOpen || streakLots || quizOpen || seasonOpen || arenaIntro || inviteIntro;
   const checkin = engine?.checkinStatus?.() ?? null;
   const quiz = engine?.quiz?.() ?? null;
   const spins = st?.checkin?.spins ?? 0;
@@ -659,10 +663,10 @@ export default function App({
     /* AFTER the day's check-in, never beside it: both decide in one render,
        and on a Friday of the event the two opened stacked (found in QA). */
     if (!engine || !season || !seasonUnseen(season) || enc || !st?.char || checkinOpen || rouletteOpen
-      || checkin?.due || pathAt < 2 || arenaIntro || announced.current) return;
+      || checkin?.due || pathAt < 2 || arenaIntro || inviteIntro || announced.current) return;
     announced.current = true;
     setSeasonOpen(true);
-  }, [engine, season, enc, st?.char, checkinOpen, rouletteOpen, checkin?.due, pathAt, arenaIntro]);
+  }, [engine, season, enc, st?.char, checkinOpen, rouletteOpen, checkin?.due, pathAt, arenaIntro, inviteIntro]);
   /* The Arena's turn, first: after the day's check-in, never over an
      encounter, never on a first visit (the Starter Path's second goal), and
      never to a player who has already fought there. */
@@ -675,6 +679,16 @@ export default function App({
     arenaNewsTo("seen");
     setArenaIntro(true);
   }, [arenaNews, arenaPlayed, engine, st?.char, enc, tab, checkinOpen, rouletteOpen, streakLots, seasonOpen, checkin?.due, pathAt]);
+  /* THE STARFORGED FOUR, on the same terms, for a game with an account to invite
+     from: one announcement a session, so it waits its turn behind the event's and
+     the Arena's. Anybody who has already opened the invite dialog knows. */
+  useEffect(() => {
+    if (!CLOUD || inviteSeen || read(INVITE_NEWS_KEY) || !engine || !st?.char || enc || tab !== "catch" || checkinOpen || rouletteOpen
+      || streakLots || seasonOpen || arenaIntro || invite || checkin?.due || pathAt < 2 || announced.current) return;
+    announced.current = true;
+    write(INVITE_NEWS_KEY, "seen");
+    setInviteIntro(true);
+  }, [inviteSeen, engine, st?.char, enc, tab, checkinOpen, rouletteOpen, streakLots, seasonOpen, arenaIntro, invite, checkin?.due, pathAt]);
   // Back from the League page, which marks the Arena found.
   useEffect(() => { if (!arenaPage) setArenaNews(read(ARENA_NEWS_KEY)); }, [arenaPage]);
   const toArena = () => { arenaNewsTo("done"); setArenaIntro(false); goTab("arena"); };
@@ -997,7 +1011,7 @@ export default function App({
             dexOf={(x) => st?.dex[dexIndex(x)] ?? 0}
             openName={trade.name}
             openBoard={trade.board ?? null}
-            onInvite={() => setInvite({ welcome: false })}
+            onInvite={openInvite}
             profile={Boolean(trade.profile)}
             offers={offerAlert}
             inbox={inbox}
@@ -1112,7 +1126,7 @@ export default function App({
           onProfile={account ? () => setTrade({ name: null, profile: true }) : null}
           requests={inbox?.friend_requests ?? 0}
           invites={refDue}
-          onInvite={account ? () => setInvite({ welcome: false }) : null}
+          onInvite={account ? openInvite : null}
           onNews={() => setNews(true)}
           onHelp={() => setHelp(true)}
           onForms={() => setForms(true)}
@@ -1135,8 +1149,9 @@ export default function App({
         <Invite name={trainerName} info={refInfo} signedIn={Boolean(account)} paidIds={st?.referralsPaid ?? []}
           welcome={invite.welcome} onRefresh={loadRefs}
           onClaim={() => engine?.claimReferrals(refInfo)}
-          onClose={() => setInvite(null)} />
+          onClose={() => setInvite(null)} onJoin={onJoin} />
       )}
+      {inviteIntro && <InviteIntro onGo={() => { setInviteIntro(false); openInvite(); }} onClose={() => setInviteIntro(false)} />}
 
       {scenes.length > 0 && (
         <Suspense fallback={null}>
@@ -1174,7 +1189,7 @@ export default function App({
           and Hint.jsx for why it is a dialog rather than the bar it started as:
           a tip somebody scrolls past is a tip nobody read. */}
       {/* Tips wait for the check-in and the roulette too: a pack's first-time tip named the prize mid-spin. */}
-      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && !streakLots && !quizOpen && !seasonOpen && !arenaIntro && (
+      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && !streakLots && !quizOpen && !seasonOpen && !arenaIntro && !inviteIntro && (
         <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 
@@ -1195,6 +1210,9 @@ export default function App({
         streak={streakNow(st?.checkin).streak}
         streakDue={!!st?.char && streakNow(st?.checkin).due}
         onStreak={() => setCheckinOpen(true)}
+        onInvite={CLOUD ? openInvite : null}
+        inviteDue={refDue}
+        inviteGlow={!inviteSeen}
         deltas={deltas}
         xp={st?.xp ?? 0}
         /* LOG OUT REPLACES RESET once there is an account. Reset wiped the
@@ -1436,6 +1454,18 @@ export default function App({
               );
             })}
 
+            {/* A CANDY TRAIL (events.js), the same ring: its species inside, the steps left on the edge. */}
+            {st?.trail && (() => {
+              const tip = `Candy Trail: you meet ${label(speciesById(st.trail.species))} far more often on its map. ${st.trail.steps} steps left.`;
+              return (
+                <span className="rift-ring combo-ring lit" role="status" data-tip={tip} aria-label={tip}
+                  style={{ "--p": st.trail.steps / (st.trail.total || st.trail.steps) }}>
+                  <Sprite id={st.trail.species} alt="" eager />
+                  <b>{st.trail.steps}</b>
+                </span>
+              );
+            })()}
+
             {/* THE CATCH CHAIN (combo.js), a ring like a running item: the
                 chained species inside, the count on the edge, the rim filling
                 to the next rung - gold once the chain lifts its rare forms.
@@ -1614,7 +1644,7 @@ export default function App({
               onClaimEvent={(id) => engine.claimEvent(id)}
               onEventIntro={(ev) => setSeasonOpen(ev ?? true)}
               invite={{ due: refDue, counted: (refInfo?.invited ?? []).filter((x) => x.paid).length }}
-              onInvite={account ? () => setInvite({ welcome: false }) : null}
+              onInvite={account ? openInvite : null}
             />
           )}
           state={st}
@@ -1693,6 +1723,9 @@ export default function App({
             else if (st.party.length >= PARTY_MAX) { setEntry(null); setPartyPick(true); }
             else { const m = bestOf(st.box, entry); if (m) engine.setParty([...st.party, m.uid]); }
           }}
+          trail={engine.trailOffer(entry)}
+          trailing={st.trail?.species === engine.trailOffer(entry)?.species}
+          onTrail={() => engine.layTrail(entry)}
           /* Only once the inbox has answered: signed in, and trading open. */
           onFindOnBoard={inbox ? (id) => { setEntry(null); setTrade({ name: null, board: id }); } : null}
           /* Travelling closes the sheet, because the answer to "where do I

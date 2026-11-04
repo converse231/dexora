@@ -16,6 +16,45 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-11-05-starforged",
+    icon: "🌟",
+    date: "November 2026",
+    title: "Starforged Pokémon",
+    items: [
+      ["Four you can't catch", "Starforged Pikachu, Charizard, Mewtwo and Arceus only come from inviting friends."],
+      ["Pikachu for you both", "When a friend gets going, you each get one. Keep inviting for the other three."],
+    ],
+  },
+  {
+    id: "2026-11-04-candy-trail",
+    icon: "🍬",
+    date: "November 2026",
+    title: "Candy Trail",
+    items: [
+      ["Hunt one Pokémon", "Open a caught Pokémon in the Dex and spend Rare Candy to meet it far more often on its map."],
+      ["Chain it", "A trail makes a Catch Combo much easier to keep going."],
+    ],
+  },
+  {
+    id: "2026-11-04-kit-mastery",
+    icon: "🏆",
+    date: "November 2026",
+    title: "Kit Mastery in the Arena",
+    items: [
+      ["Train your team", "Spend Rare Candy on your Arena team's kits: more damage and shorter cooldowns, ten levels each."],
+      ["Where it counts", "Against the CPU, the Ladder and the Gym Circuit. Online and ranked stay fair."],
+    ],
+  },
+  {
+    id: "2026-11-04-kinder-packs",
+    icon: "🎁",
+    date: "November 2026",
+    title: "Kinder card packs",
+    items: [
+      ["More hits", "Every rare pull now comes 1.25x as often, in every set."],
+    ],
+  },
+  {
     id: "2026-10-30-anime-sweep",
     icon: "🎆",
     date: "October 2026",

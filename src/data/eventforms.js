@@ -171,6 +171,7 @@ export const EVENTS = [
     shelf: "ponchos",
     // Mew, Rayquaza and Altaria among the bunting (a Pikachu walks; it does not fly).
     drift: [151, 384, 334],
+    poster: "1240 / 832",
     evolves: false,
     roam: true,
     daytime: true,
@@ -250,6 +251,7 @@ export const EVENTS = [
     shelf: "ponchos",
     // Mew over the bunting; the Eeveelutions walk.
     drift: [151],
+    poster: "1240 / 692",
     evolves: false,
     roam: true,
     daytime: true,
@@ -302,3 +304,28 @@ export const EVENTS = [
     },
   },
 ];
+
+/* THE STARFORGED FOUR (asked for, 2026-11-05: "epic Pokemon rewards ... can only
+   be claimed thru friend invite", the most famous ones). Built as event looks
+   and outside every count of the Pokedex, but this is NO DATED EVENT and not in
+   EVENTS: no days, no meeting, no hunt, no evolution row. Each is `friends`
+   friends who got going (referral.js, the server's `my_referrals`), and they
+   stay home: never sold or converted (`keeper`), never traded (`tradeable`, and
+   the server's `invite_only()`, held equal by check.mjs).
+   A look's place follows its id across events (dex.js), so a later event's looks
+   go after these. These four take the last ids under trading.sql's 20000: a
+   later event needs that limit raised first. */
+export const [INVITE] = [
+  {
+    id: "friends",
+    name: "Invite Friends",
+    title: "Starforged",
+    looks: [
+      { id: 19997, of: 25, friends: 1, title: "Starforged Pikachu", flavor: "Its cape was cut from the night sky and pinned with a star that fell the day it made a friend. Nobody has ever met one alone." },
+      { id: 19998, of: 6, friends: 3, title: "Starforged Charizard", flavor: "Its armour was hammered out of a fallen star, and its tail burns comet blue. Three friends lit that flame." },
+      { id: 19999, of: 150, friends: 5, title: "Starforged Mewtwo", flavor: "It answers to no one, yet it wears the crown the night sky gave it. Five friends is more than it ever expected to have." },
+      { id: 20000, of: 493, friends: 10, title: "Starforged Arceus", flavor: "It made the stars, and ten friends gathered them into a mantle. The sun and moon follow it wherever it goes." },
+    ],
+  },
+];
+export const eventById = (id) => (id === INVITE.id ? INVITE : EVENTS.find((ev) => ev.id === id));

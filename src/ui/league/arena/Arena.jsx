@@ -30,6 +30,7 @@ import { isEvent } from "../../../data/dex.js";
 import { connect } from "./net.js";
 import { LADDER, masterOf, ladderOpen, ladderPay, ARENA_TEAM, rentalOf, RENTALS, CIRCUIT_REGIONS, circuitOf, gymKey, gymOpen, gymPay, gymCpu, isChampion, regionDone } from "../../../game/ladder.js";
 import { teamPerks } from "../../../game/cardperks.js";
+import { MASTERY_MAX, masteryCost, masteryK, withMastery } from "../../../game/mastery.js";
 import { useEquipped, CardPerkPick, DeckStrip } from "./CardPerks.jsx";
 import { playerFighter, moveOf, STRUGGLE, refusal, learnable, movesOf } from "../../../game/battle.js";
 import { TUTOR_PRICE } from "../../../game/items.js";
@@ -198,7 +199,7 @@ export default function ArenaPage({ engine, box, team, arenaTeam = [], record, l
   if (online) return <Online start={online} mons={mons} impacts={impacts} impactsOff={impactsOff} onExit={() => setOnline(null)} />;
   return (
     <>
-      <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0} onMode={onMode} onTutor={setTutorFor}
+      <Lobby mons={mons} level={level} record={record} ladder={ladder} custom={arenaTeam.length > 0} onMode={onMode} onTutor={setTutorFor} onTrain={(uid) => engine?.masterKit(uid)}
         candy={candy} equipped={equipped} onCards={() => setCardPick(true)}
         onStart={(m) => { immerse(); setMatch(m); }} onOnline={(o) => { immerse(); setOnline(o); }} onEdit={() => setEditing(true)} onHowto={() => setHowto(true)} onShop={() => setShop(true)} />
       {editing && <FighterSelect box={box} picked={mons} custom={arenaTeam.length > 0}
@@ -220,7 +221,7 @@ const pickFloor = (floor, seed) => (floor === "random" ? ARENAS[Math.abs(seed) %
    the floors under them, and one big Battle along the foot. Each mode is a
    tile; the chosen one opens its own panel (the Ladder's ten masters, a
    CPU's difficulty, your friends). */
-function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, onOnline, onEdit, onHowto, onShop, candy = 0, equipped = [], onCards }) {
+function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, onOnline, onEdit, onHowto, onShop, candy = 0, equipped = [], onCards, onTrain }) {
   // The team is raised here: short of candy, a raise buys the rest (the wallet in the head shows what you hold).
   const raise = useRaise();
   const [mode, setMode0] = useState(() => { const m = pref(MODE_KEY, "ladder"); return MODE_NAME[m] && (m !== "friends" || CLOUD) ? m : "ladder"; });
@@ -337,6 +338,23 @@ function Lobby({ mons, level, record, ladder, custom, onMode, onTutor, onStart, 
                       <Types of={sp.types} />
                       {/* Its FIXED kit (docs/arena-kits.md): the same four for every trainer's one. */}
                       <KitList id={f.id} className="ag-moves" />
+                      {/* KIT MASTERY (mastery.js): Rare Candy trains this one's kit. CPU, Ladder and Gym Circuit only. */}
+                      {!m.rental && (() => {
+                        const lv = m.mastery ?? 0, pc = Math.round(masteryK(lv) * 100), cost = masteryCost(lv);
+                        return (
+                          <span className="ag-mastery" data-tip="Trained kits fight better against the CPU, the Ladder and the Gym Circuit - never online or ranked. A trained Pokémon can't be sold or traded.">
+                            <b>Mastery {lv}/{MASTERY_MAX}</b>
+                            {lv > 0 && <small>+{pc}% damage, {pc}% shorter cooldowns</small>}
+                            {lv < MASTERY_MAX && !m.lock && (
+                              <button type="button" disabled={!raise.spendable(cost)}
+                                onClick={() => raise.spend(cost, { title: `Train ${nameOf(m.species)}'s kit?`, label: "TRAIN", run: () => onTrain(m.uid) })}
+                                data-tip={candy >= cost ? `${cost} Rare Candy` : `Buys the ${cost - candy} candy it lacks`}>
+                                Train · {cost}
+                              </button>
+                            )}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </li>
                 );
@@ -1146,7 +1164,7 @@ function Match({ mons, mode, master, level, seed, floor, online = null, rematch 
       ],
       // The equipped cards' perks are yours alone, and never online (the Fair format).
       s: newMatch({ teams, cpu: [null, online ? null : cpu], seed, arena: floor, intro: INTRO,
-        perks: [online ? null : teamPerks(cardPerks, teams[0].map((f) => f.id)), null] }),
+        perks: [online ? null : withMastery(teamPerks(cardPerks, teams[0].map((f) => f.id)), mons), null] }),
       // Who fights, for the VS card.
       names: online ? online.names : [["You", nameOf(teams[0][0]?.id)],
         [master ? master.name : `CPU · ${LEVEL_NAME[mode] ?? "Training"}`, nameOf(teams[1][0]?.id)]],

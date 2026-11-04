@@ -202,7 +202,7 @@ export default function Help({ onClose }) {
           <ul className="vr-notes">
             <li>
               <b>Packs</b> are in the Cards tab: {PACK_SIZE} real Pokémon TCG cards for ¥{PACK_PRICE.toLocaleString()},
-              at each set&rsquo;s real-life pull rates. Every first gym badge gives one too, and its cards carry the
+              at each set&rsquo;s real-life pull rates, made a little kinder. Every first gym badge gives one too, and its cards carry the
               badge&rsquo;s stamp; a region&rsquo;s Champion gives a whole box, and every {STREAK_PACK}th day of
               a daily-quest streak a pack. A box or bundle is the cheapest way to buy, and Open all opens every
               pack you hold at once.

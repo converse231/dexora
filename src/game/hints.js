@@ -1,5 +1,6 @@
 import { COMBO_STEPS } from "./combo.js";
 import { tierName } from "./biomes.js";
+import { TRAIL_CANDY } from "./events.js";
 
 /* THE TUTORIAL IS NOT A TUTORIAL. Nobody reads a five-step tour of a game they
    have not played yet, and this one has nothing to explain until you are
@@ -65,6 +66,13 @@ export const HINTS = [
     text: `Catch Combo! Catch the same Pokémon again and again: at ${COMBO_STEPS.map(([n]) => n).join(", ")} `
       + "in a row its rare forms get likelier. Catch other Pokémon as you like, "
       + "but if this one flees or you run, the chain breaks.",
+  },
+  /* Once candy has piled up (2026-11-04): it had nothing left to do. */
+  {
+    id: "trail",
+    when: (e) => e.kind === "caught" && e.duplicate && e.candy >= TRAIL_CANDY * 2,
+    text: "Rare Candy piling up? Open a caught Pokémon in the Dex and lay a Candy Trail: "
+      + "you'll meet it far more often on its map. Train an Arena team's kits with it too.",
   },
   {
     id: "duplicate",

@@ -74,9 +74,28 @@ export function useRaise() {
       run,
     });
   };
+  /* ANY OTHER USE OF CANDY (a kit's training, a Candy Trail): `n` of it, the same
+     buy-the-rest press as a raise. */
+  const spendable = (n) => candy + Math.floor(money / price) >= n;
+  const spend = (n, { title, label: says, run }) => {
+    if (!spendable(n)) return;
+    const buy = Math.max(0, n - candy);
+    const go = () => { if (!buy || engine.buyCandy(buy)) run(); };
+    if (!buy) { go(); return; }
+    setPending({
+      title,
+      lines: [
+        ["Rare Candy", `${n} (${candy} held + ${buy} bought)`],
+        ["Costs", `¥${(buy * price).toLocaleString()}`],
+        ["Money left", `¥${(money - buy * price).toLocaleString()}`],
+      ],
+      confirmLabel: `BUY & ${says} · ¥${(buy * price).toLocaleString()}`,
+      run: go,
+    });
+  };
   const dialog = pending && (
     <Confirm title={pending.title} lines={pending.lines} note={pending.note} confirmLabel={pending.confirmLabel} tone="buy"
       onConfirm={() => { pending.run(); setPending(null); }} onCancel={() => setPending(null)} />
   );
-  return { ask, can, price, dialog };
+  return { ask, can, price, dialog, spend, spendable };
 }

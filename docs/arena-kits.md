@@ -77,6 +77,8 @@ A line shares one kit, and each stage's move in a slot is that stage's version o
 - **The team card and the fighter select** show the kit as four labelled slots with the combo line, like a MOBA hero page.
 - **Online play** (the Fair format) already plays species, not saves, so it gets the fixed kits for free.
 
+**Kit Mastery is built (2026-11-04, your call).** `game/mastery.js`: ten levels a Box entry, +1% damage and 1% shorter cooldowns each, paid in Rare Candy alone (20 x the next level, 1,100 to the top) so that a late game's hoard has a use. It joins the card perks in the match's `perks`, so online and ranked never see it. Measured Hard v Hard on even teams: 50% -> 54% at level 5, 65% at 10. A trained one is a `keeper()` and refused by `tradeable`: its candy is spent, and the server's row would drop the field.
+
 ## Phases
 
 1. The kit model, the generator, the class rules, and the 10 sample kits above. The Arena plays fixed kits; the team card shows them.

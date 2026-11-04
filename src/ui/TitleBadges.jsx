@@ -7,13 +7,14 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { titleBadge, titleFull, titleName, titleLogo, shownTitles, titleTier, regionTiers } from "../game/titles.js";
 import { useModalLock, useDismiss } from "./modal.js";
-import { EVENTS } from "../data/eventforms.js";
+import { EVENTS, INVITE } from "../data/eventforms.js";
 
 const asset = (path) => new URL(path, document.baseURI).href;
 
 // How a title is won, under its picture.
 const HOW = { dex: () => "Every species of the region in the Pokédex", tier: () => "Every species of the region in one rare form",
   event: (id) => {
+    if (id === INVITE.id) return `${INVITE.looks.at(-1).friends} friends brought into Dexora`;
     const ev = EVENTS.find((e) => e.id === id);
     return ev ? `Every ${ev.name} Pokémon caught${ev.hunt ? `, ${ev.hunt.title.split(" ").pop()} included` : ""}` : "";
   } };

@@ -21,7 +21,7 @@ import {
 } from "../game/research.js";
 import { badgesOf } from "../game/league.js";
 import { SeasonCard, boardSeasons } from "./Season.jsx";
-import { EVENTS } from "../data/eventforms.js";
+import { EVENTS, INVITE } from "../data/eventforms.js";
 import Icon from "./Icon.jsx";
 import { REF_EACH, REF_WELCOME, REF_RULE, rewardWords } from "../game/referral.js";
 import { itemById } from "../game/items.js";
@@ -121,10 +121,11 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
                 {invite?.due ? "REWARD!" : `${invite?.counted ?? 0} / ${REF_RULE.cap}`}
               </span>
             </header>
-            <p>Share your link. When a friend gets going, you both get big rewards.</p>
+            <p>Share your link. When a friend gets going, you both get a Starforged Pikachu and big rewards.</p>
             <div className="ev-meta">
               <span>You, per friend: {rewardWords(REF_EACH, (id) => itemById(id)?.name ?? id)}</span>
               <span>Your friend: {rewardWords(REF_WELCOME, (id) => itemById(id)?.name ?? id)}</span>
+              <span>Starforged Pokémon at {INVITE.looks.map((l) => l.friends).join(", ")} friends</span>
             </div>
             {onInvite
               ? (

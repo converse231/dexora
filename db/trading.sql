@@ -132,6 +132,19 @@ returns jsonb language sql stable set search_path = '' as $$
     'traded', m.traded, 'status', m.status)
 $$;
 
+-- THE POKEMON THAT STAY WITH THEIR OWNER. An invite's looks (src/data/eventforms.js
+-- INVITE, held equal by check.mjs) were earned by bringing friends in, and a trained
+-- kit lives on the box entry, which a `mons` row would drop (src/game/mastery.js).
+-- Neither ever gets a row, so neither can be offered, listed, pooled or asked for.
+create or replace function public.invite_only()
+returns int[] language sql immutable set search_path = '' as $$
+  select array[19997, 19998, 19999, 20000]
+$$;
+create or replace function public.stays_home(e jsonb)
+returns boolean language sql immutable set search_path = '' as $$
+  select e ? 'mastery' or coalesce(e->>'species', '') = any(public.invite_only()::text[])
+$$;
+
 -- ------------------------------------------------------------------ register
 -- A box entry enters trading. Checked against the caller's STORED save: the
 -- uid must be there, species and level must match, and the tier, alpha and
@@ -175,11 +188,13 @@ begin
   for s in select * from jsonb_array_elements(snaps) loop
     if coalesce(s->>'uid', '') !~ '^\d{1,9}$' then continue; end if;
     u := (s->>'uid')::int;
+    select x into e from jsonb_array_elements(coalesce(box, '[]')) x
+     where x->>'uid' = u::text limit 1;
+    -- Even one registered before it was trained.
+    if e is not null and public.stays_home(e) then continue; end if;
     select id into m from public.mons
      where owner = me and local_uid = u and status <> 'released';
     if m is null then
-      select x into e from jsonb_array_elements(coalesce(box, '[]')) x
-       where x->>'uid' = u::text limit 1;
       if e is null or e ? 'mid'
          or e->>'species' is distinct from s->>'species'
          or e->>'level' is distinct from s->>'level'
@@ -278,7 +293,7 @@ begin
               from jsonb_array_elements(coalesce(box, '[]')) e
              where coalesce(e->>'uid', '') ~ '^\d{1,9}$' and coalesce(e->>'species', '') ~ '^\d{1,5}$'
                and coalesce(e->>'level', '') ~ '^\d{1,4}$') z
-     where (z.e->>'uid')::int = any(uids) and z.n > 1 and not (z.e ? 'lock');
+     where (z.e->>'uid')::int = any(uids) and z.n > 1 and not (z.e ? 'lock') and not public.stays_home(z.e);
     if jsonb_array_length(snaps) <> cardinality(uids) then
       raise exception 'asked-for Pokemon are not available';
     end if;
@@ -707,7 +722,7 @@ $$;
 -- this list equal to the game's `EVENT_SLOTS`.
 create or replace function public.event_slots()
 returns int[] language sql immutable set search_path = '' as $$
-  select array[1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499]
+  select array[1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503]
 $$;
 
 -- A card's numbers, and its showcase kept honest, from a save document.
@@ -1174,6 +1189,7 @@ begin
             from (select distinct on (v) v, n from unnest(coalesce(uids, '{}')) with ordinality x(v, n) order by v, n) u
             join jsonb_array_elements(box) e on e->>'uid' = u.v::text
            where coalesce(e->>'species', '') ~ '^\d{1,5}$' and coalesce(e->>'level', '') ~ '^\d{1,4}$'
+             and not public.stays_home(e)
            order by u.n limit public.trade_limit('SHELF')) z;
   -- Entries already carrying an id are registered rows of ours: find them by uid.
   perform public.register_mons(snaps);
@@ -1488,7 +1504,7 @@ begin
                 from jsonb_array_elements(case when jsonb_typeof(d->'box') = 'array' then d->'box' else '[]' end) e
                where coalesce(e->>'uid', '') ~ '^\d{1,9}$' and coalesce(e->>'species', '') ~ '^\d{1,5}$'
                  and coalesce(e->>'level', '') ~ '^\d{1,4}$') z
-             where z.n > 1 and not (z.e ? 'lock')), '[]'));
+             where z.n > 1 and not (z.e ? 'lock') and not public.stays_home(z.e)), '[]'));
 end;
 $$;
 
@@ -1506,7 +1522,7 @@ language sql stable security definer set search_path = '' as $$
           from public.friends f
           join public.trainer_cards c on c.user_id = case when f.a = auth.uid() then f.b else f.a end
           cross join lateral (
-            select count(*) n, count(*) filter (where not (e ? 'lock')) free from public.saves sv,
+            select count(*) n, count(*) filter (where not (e ? 'lock') and not public.stays_home(e)) free from public.saves sv,
                    jsonb_array_elements(case when jsonb_typeof(sv.data->'box') = 'array' then sv.data->'box' else '[]' end) e
              where sv.user_id = c.user_id and e->>'species' = q::text) s
          where f.status = 'accepted' and auth.uid() in (f.a, f.b) and least(s.n - 1, s.free) > 0

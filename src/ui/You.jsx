@@ -36,7 +36,7 @@ export default function You({
     onProfile && ["card", "Your trainer card",
       requests ? `${requests} friend request${requests === 1 ? "" : "s"}` : "Your card and your friends", onProfile, requests > 0],
     onInvite && ["gift", "Invite friends",
-      invites ? `${invites} reward${invites === 1 ? "" : "s"} to claim` : "Big rewards for you and a friend", onInvite, invites > 0],
+      invites ? `${invites} reward${invites === 1 ? "" : "s"} to claim` : "Earn Starforged Pokémon with your friends", onInvite, invites > 0],
     onAchievements && ["trophy", "Achievements",
       due ? `${due} step${due === 1 ? "" : "s"} to claim` : "Catching, battles, cards, trading", onAchievements, due > 0],
     ["news", "What's new", unread ? "New since you last looked" : "Updates to the game", onNews, unread],

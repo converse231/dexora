@@ -215,7 +215,7 @@ export function Account({ onSignUp, onSignIn, onForgot = null, offline, notice =
       step="STEP 1 OF 2"
       title={keeping && up ? "Save your progress" : up ? "Make an account" : "Welcome back"}
       blurb={up && invited
-        ? `${invited} invited you! Make an account and get going - you both get a gift.`
+        ? `${invited} invited you! Make an account and get going - you both get a Starforged Pikachu.`
         : keeping && up
           ? "Your Pokédex, Box and bag come with you to the new account - and from then on, to any device."
           : up

@@ -667,8 +667,8 @@ const LOOK_VARIETIES = [
   if (new Set(ids).size !== ids.length) throw new Error("two forms share an id");
   if (ids.some((id) => id < 10000 || id > 20000)) throw new Error("a form id left 10000-20000");
   // The event looks hold hand-picked ids in the same range (eventforms.js).
-  const { EVENTS } = await import("../src/data/eventforms.js");
-  const taken = new Set(EVENTS.flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])].map((l) => l.id)));
+  const { EVENTS, INVITE } = await import("../src/data/eventforms.js");
+  const taken = new Set([...EVENTS, INVITE].flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])].map((l) => l.id)));
   if (ids.some((id) => taken.has(id))) throw new Error("a form id is an event look's - give the look another");
 }
 

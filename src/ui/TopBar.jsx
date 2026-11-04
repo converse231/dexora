@@ -117,6 +117,7 @@ export default function TopBar({
   onNews = null, unread = false, tradeAlert = 0, youAlert = false, cardAlert = 0,
   trainerName = null,
   stale = null, streak = 0, streakDue = false, onStreak = null,
+  onInvite = null, inviteDue = 0, inviteGlow = false,
 }) {
   const { level, into, need, frac } = levelProgress(xp);
   const r = dexRank(caught);
@@ -216,6 +217,17 @@ export default function TopBar({
           </span>
         </span>
       </div>
+
+      {/* INVITE, on a desktop's bar (asked for, 2026-11-05: "make it glow the first
+          time so users won't miss it"): it glows until the dialog has been opened
+          once, and carries the dot while a reward waits. A phone has You and Events. */}
+      {onInvite && (
+        <button type="button" className={`tb-invite${inviteGlow ? " glow" : ""}`} onClick={onInvite}
+          aria-label={inviteDue ? `Invite friends: ${inviteDue} to claim` : "Invite friends"} data-tip="Invite friends, earn Starforged Pokémon">
+          <Icon n="gift" size={18} /><span>Invite</span>
+          {inviteDue > 0 && <i className="tb-dot" aria-hidden="true" />}
+        </button>
+      )}
 
       {onNews && (
         <button type="button" className="tb-bell" onClick={onNews} aria-label="What's new" data-tip="What's new">

@@ -42,7 +42,8 @@
     "prices": "node tools/fetch-prices.mjs",
     "retro": "python tools/build_retro.py",
     "promos": "python tools/fetch_promo_cards.py",
-    "drift": "python tools/build_event_drift.py"
+    "drift": "python tools/build_event_drift.py",
+    "posters": "python tools/build_posters.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

@@ -21,7 +21,7 @@
 import { useEffect, useState } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
 import { SPECIES, isEvent } from "../data/dex.js";
-import { EVENTS } from "../data/eventforms.js";
+import { EVENTS, INVITE } from "../data/eventforms.js";
 import { eventOn, eventDaysLeft, lookEvery, roamAreas, shareOf } from "../game/events.js";
 import { label, AREAS } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx, STRIP_TIERS } from "./Sprite.jsx";
@@ -35,6 +35,8 @@ import Mark from "./Marks.jsx";
 import DexCards from "./cards/DexCards.jsx";
 import { tierName } from "../game/biomes.js";
 import { hasLook } from "../game/gender.js";
+import { TRAIL_CANDY, TRAIL_STEPS } from "../game/events.js";
+import { useRaise } from "./wallet.jsx";
 import {
   tasksFor, progress, researchLevel, RESEARCH_MAX, RESEARCH_LIFT,
 } from "../game/research.js";
@@ -69,6 +71,9 @@ function whereToFind(id) {
      event's own evolutions (eventforms.js). */
   if (isEvent(id)) {
     const sp = speciesById(id);
+    // An invite's Pokemon is met nowhere: friends who get going are the only way (referral.js).
+    const friends = INVITE.looks.find((l) => l.id === id)?.friends;
+    if (friends) return [{ key: "invite", where: "Invite friends", how: friends === 1 ? "1 friend who gets going, and they get one too" : `${friends} friends who get going` }];
     const ev = EVENTS.find((e) => e.id === sp.event);
     const live = eventOn()?.id === ev.id;
     // The hunted one is met by its hunt alone, never in its species' places.
@@ -278,7 +283,9 @@ export default function DexSheet({
   level = 1, here = null, busy = false,
   onClose, onFindInBox, onFindOnBoard = null, onTravel, onSelect = null, dexOf = () => 0,
   cards = {}, onCards = null, walk = null, onWalk = null,
+  trail = null, trailing = false, onTrail = () => {},
 }) {
+  const candy = useRaise();
   const sp = speciesById(id);
   const caught = state === 2;
   const seen = state >= 1;
@@ -652,6 +659,17 @@ export default function DexSheet({
               {walk.member != null ? "IN PARTY · REMOVE" : walk.full ? "PARTY FULL · EDIT" : "WALK WITH ME"}
             </button>
           )}
+          {/* A CANDY TRAIL (events.js): only for one you can lay, and only on its own map. */}
+          {trail && (
+            <button className={`sheet-inbox${trailing ? " on" : ""}`} disabled={!trail.here || busy || !candy.spendable(TRAIL_CANDY)}
+              onClick={() => candy.spend(TRAIL_CANDY, { title: `Lay a trail for ${label(speciesById(trail.species))}?`, label: "LAY", run: onTrail })}
+              data-tip={trail.here
+                ? `${TRAIL_CANDY} Rare Candy: meet ${label(speciesById(trail.species))} far more often on its map for ${TRAIL_STEPS} steps.`
+                : `Lay it where ${label(speciesById(trail.species))} lives: ${trail.where}.`}>
+              {trail.here ? `${trailing ? "ADD TO TRAIL" : "CANDY TRAIL"} · ${TRAIL_CANDY}` : `TRAIL AT ${trail.where.toUpperCase()}`}
+            </button>
+          )}
+          {candy.dialog}
           <button className="sheet-close" onClick={onClose}>CLOSE</button>
         </div>
       </div>

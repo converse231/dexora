@@ -13,16 +13,16 @@
 
 import { genOf, speciesById } from "../game/biomes.js";
 import { isEvent } from "../data/dex.js";
-import { EVENTS } from "../data/eventforms.js";
+import { eventById } from "../data/eventforms.js";
 
 export default function Gen({ id, className = "" }) {
   /* AN EVENT LOOK belongs to no generation (eventforms.js): its chip names
      the event, in the event's own colours, so a costume met in the grass is
      announced on the nameplate itself. */
   if (isEvent(id)) {
-    const ev = EVENTS.find((e) => e.id === speciesById(id).event);
+    const ev = eventById(speciesById(id).event);
     return (
-      <span className={`gen gen-event ev-${ev.id} ${className}`.trim()} data-tip={`${ev.name} event Pokémon`}>
+      <span className={`gen gen-event ev-${ev.id} ${className}`.trim()} data-tip={ev.start ? `${ev.name} event Pokémon` : "Only from inviting friends"}>
         EVENT
       </span>
     );

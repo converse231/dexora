@@ -279,7 +279,7 @@ function PackCard({ meta, set, pity, cards, log, onLook }) {
     const mine = log.filter(([id]) => id.startsWith(`${meta.id}-`)).map(([id, v]) => [set?.CARDS.find((c) => cardId(meta.id, c[0]) === id), v]).filter(([c]) => c);
     return mine.sort((a, b) => rungOf(b[0][3]) - rungOf(a[0][3]))[0] ?? null;
   }, [log, set, meta.id]);
-  /* THIS SET'S OWN RULES (`rulesOf`): its real-life rates and the pity scaled
+  /* THIS SET'S OWN RULES (`rulesOf`): its real-life rates, `KINDER`, and the pity scaled
      to them. Each rate under the rarity it gives IN THIS SET (`landsOn`):
      Prismatic's illustration roll is an ACE SPEC, a Scarlet & Violet set's
      top roll a Hyper rare. */

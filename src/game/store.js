@@ -135,6 +135,10 @@ export const REF_KEY = "dexora-ref";
    "seen" once its takeover has played, "done" once the Arena tab has been
    opened (League.jsx) - the map's Arena chip stands between the two. */
 export const ARENA_NEWS_KEY = "dexora-arena-news";
+/* THE STARFORGED ANNOUNCEMENT and the top bar's Invite button, the device's:
+   the dialog plays once, the button glows until the invite dialog is opened. */
+export const INVITE_NEWS_KEY = "dexora-invite-news";
+export const INVITE_SEEN_KEY = "dexora-invite-seen";
 /* The League page's last tab, a device preference - here, not in League.jsx,
    so the announcement's Fight now can open the page on its Arena tab. */
 export const LEAGUE_TAB_KEY = "dexora-league-region";

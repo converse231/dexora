@@ -77,12 +77,49 @@ HOLE_FIT = 0.85          # the share of a pocket on a checker's squares that mak
 # white pockets too (580-990 pixels against the background's 4,320), and went
 # with it. Each look names the least pocket that is background.
 HOLLOW = {("haunting", "487"): HOLE_MIN, ("haunting", "477"): HOLE_MIN, ("haunting", "74"): HOLE_MIN,
-          ("haunting", "52"): 800, ("haunting", "448"): 2000}  # Meowth's coin shine is 587
+          ("haunting", "52"): 800, ("haunting", "448"): 2000, ("friends", "493"): HOLE_MIN}  # Meowth's coin shine is 587
+# What counts as backdrop, for a drawing whose body is nearly as light as it: Starforged
+# Arceus is 231 silver with a pale edge on its head, and the usual fill took the head
+# and neck (2026-11-05). On a pure white backdrop (255) the fill can be asked for white.
+FLOOR = {("friends", "493"): 245}
+# BACKDROP THE OUTLINE SHUT IN (2026-11-05, reported: "be careful with those white bgs"):
+# a gap between an arm and a tail, or Charizard's open mouth, which the real sprite leaves
+# see-through too, stays white when the border's fill cannot reach it. Named by a cell of
+# the finished sprite (row, column), because a white claw or belly is the same colour:
+# audit a new drawing on a loud colour beside its base, never on a dark one.
+SHUT_IN = {("friends", "6"): [(22, 25), (28, 33), (35, 49), (41, 47), (43, 50)],
+           ("friends", "493"): [(40, 56), (39, 55), (38, 72), (34, 67), (22, 42)]}
+SHUT_IN_WHITE = 235
+
+
+def open_up(out, cells):
+    """`out` with the near-white region at each cell made transparent. A cell that
+    is not near-white stops the build: the drawing changed, so look again."""
+    a = np.asarray(out).copy()
+    white = (a[..., 3] > 0) & (a[..., :3].min(axis=2) > SHUT_IN_WHITE)
+    for cell in cells:
+        if not white[cell] and a[cell][3] > 0:
+            sys.exit(f"{cell} is no shut-in white: look at the drawing again (SHUT_IN)")
+        q = deque([cell])
+        while q:
+            y, x = q.popleft()
+            if not (0 <= y < a.shape[0] and 0 <= x < a.shape[1]) or not white[y, x]:
+                continue
+            white[y, x] = False
+            a[y, x] = 0
+            q.extend(((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)))
+    return Image.fromarray(a, "RGBA")
+
+
 # More colours, for a drawing whose small accents the sixteen merged away
 # (2026-10-31): Gravedigger Diglett's browns took all sixteen and its nose
 # went grey; Ghost Story Slowking's quilt; Zapdos Poncho Eevee's orange beak.
 COLOURFUL = {("haunting", "50"): (24, 6, 60), ("haunting", "199"): (24, 6, 60),
              ("eponchos", "19995"): (20, 4, 60),
+             # The Starforged four: sixteen merged Arceus's silver into its gold and turned
+             # Charizard's navy armour and gold star brown and orange (2026-11-05, reported).
+             ("friends", "493"): (28, 6, 60), ("friends", "6"): (32, 6, 60),
+             ("friends", "150"): (28, 6, 60), ("friends", "25"): (24, 6, 60),
              ("haunting", "487"): (24, 6, 60)}  # Giratina's scythes kept two of their greys (2026-11-02)
 # THE DRAWING'S OWN GRID (2026-11-02, reported: Dugtrio's and Kadabra's eyes
 # broken, Diglett's lost, the Gargoyles grainy). Every drawing is pixel art on a
@@ -178,13 +215,13 @@ def hollow(a, m, glow=False, least=HOLE_MIN, keep=()):
     return specks(m & ~pk & ~rim)
 
 
-def key(a):
+def key(a, floor=168):
     """Opaque mask: everything the border flood over light greys cannot reach."""
     h, w, _ = a.shape
     mx, mn = a.max(axis=2).astype(int), a.min(axis=2).astype(int)
     # The checker is two neutral greys (~195 and ~255); white is white. Light
     # AND unsaturated, so the fill never runs into a coloured body.
-    bg = (mn > 168) & (mx - mn < 22)
+    bg = (mn > floor) & (mx - mn < 22)
     # SEALED FIRST (2026-10-24): where a pale outline steps diagonally, JPEG blur
     # leaves a light corner between its two pixels, and the fill ran through it
     # and took Drifloon's white puff. The fill runs only where the art is more
@@ -628,7 +665,7 @@ def build(path, ids):
         sys.exit(f"{path}: no look of {stem} in event {event!r} (eventforms.js)")
     base_id = OF[lid]
     a = np.asarray(Image.open(path).convert("RGB"))
-    m = key(a)
+    m = key(a, FLOOR.get((event, base_id), 168))
     if (event, base_id) in HOLLOW:
         m = hollow(a, m, (event, base_id) in GLOW, HOLLOW[(event, base_id)], KEEP.get((event, base_id), ()))
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
@@ -640,6 +677,7 @@ def build(path, ids):
         # Too big for the canvas: as big as it allows. Too small: the body's width.
         how = f"shrunk ({out})"
         out = thin(shrink(a, m, base, colours, fill=out == "big"))
+    out = open_up(out.convert("RGBA"), SHUT_IN.get((event, base_id), []))
     out.save(os.path.join(SPRITES, f"{lid}.png"), optimize=True)
     shiny(out, base_id, lid in ROAM).save(os.path.join(SPRITES, "shiny", f"{lid}.png"), optimize=True)
     print(f"{event}/{base_id} -> {lid}: {how}, {out.size[0]}px, {len(out.getcolors(4096)) - 1} colours")
@@ -650,7 +688,9 @@ if __name__ == "__main__":
     ids = looks()
     files = sorted(glob.glob(os.path.join(ART, "*", "*.jpg")) +
                    glob.glob(os.path.join(ART, "*", "*.png")))
-    files = [f for f in files if os.path.basename(os.path.dirname(f)) != "ref"]
+    # A folder no event names yet is art waiting for its event, and `ref` is the references. A typo inside an event's still stops.
+    known = {event for event, _ in ids}
+    files = [f for f in files if os.path.basename(os.path.dirname(f)) in known]
     made = {build(f, ids) for f in files}
     missing = sorted(set(ids.values()) - made)
     if missing:

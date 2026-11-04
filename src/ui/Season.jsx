@@ -29,6 +29,7 @@ import { shelfOf, eventAfter,
    second wave of costumes (Hallowed Night's, 2026-10-24) is announced again to
    a device that saw the first. */
 const driftUrl = (id) => new URL(`events/drift/${id}.png`, document.baseURI).href;
+const posterUrl = (id) => new URL(`events/poster/${id}.webp`, document.baseURI).href;
 const SEEN = (ev, soon) => `dexora-event-seen:${ev.id}${soon ? ":soon" : ""}:${ev.looks.length}`;
 const isSoon = (ev) => eventOn()?.id !== ev.id && eventOpens(ev) > Date.now();
 export const seasonUnseen = (ev) => {
@@ -155,11 +156,14 @@ export function SeasonIntro({ ev, dex, onClose, onBoard, onNext }) {
 
   return (
     <div className="sheet sn-sheet" {...useDismiss(onClose)}>
-      <div className={`sn-card ev-${ev.id}`} role="dialog" aria-modal="true" aria-labelledby="sn-title"
+      <div className={`sn-card ev-${ev.id}${ev.poster ? " sn-drawn" : ""}`} role="dialog" aria-modal="true" aria-labelledby="sn-title"
         onClick={(e) => e.stopPropagation()}>
         <div className="sn-sky" aria-hidden="true">
-          <i className="sn-moon" />
-          <i className="sn-fog a" /><i className="sn-fog b" />
+          {/* A DRAWN SKY (`poster`, npm run posters) has its own sun or moon. */}
+          {ev.poster ? <img className="sn-poster" src={posterUrl(ev.id)} alt="" /> : <>
+            <i className="sn-moon" />
+            <i className="sn-fog a" /><i className="sn-fog b" />
+          </>}
           {/* ITS POKEMON, where an event names them (`drift`): the Arena's own PMD walks
               (npm run drift), crisp at native pixels; the rest of the sky its bats. */}
           {[0, 1, 2, 3, 4].map((k) => {
@@ -173,6 +177,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard, onNext }) {
         <button type="button" className="set-x sn-x" aria-label="Close" onClick={onClose}>✕</button>
         <span className="sn-kicker">{soon ? "Coming soon" : "Limited-time event"} · {day(ev.start)} – {day(ev.end)}</span>
         <h2 id="sn-title" className="sn-title">{ev.name}</h2>
+        {ev.poster && <i className="sn-gap" style={{ aspectRatio: ev.poster }} />}
         {ev.lore && <p className="sn-lore">{ev.lore}</p>}
         {(soon || live) && <Countdown to={soon ? eventOpens(ev) : eventCloses(ev)} label={soon ? "Starts in" : "Ends in"} />}
         <p className="sn-lede">

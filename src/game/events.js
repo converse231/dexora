@@ -15,7 +15,7 @@
    it is over until tomorrow. */
 import { SPECIES } from "../data/dex.js";
 import { EVENTS } from "../data/eventforms.js";
-import { BIOMES, areaOpen, dexIndex, encounterTable, isLegendary, speciesById } from "./biomes.js";
+import { BIOMES, areaOpen, dexIndex, encounterTable, isLegendary, speciesById, tableFor } from "./biomes.js";
 import { dayKey, hash } from "./daily.js";
 import { STONES } from "./items.js";
 
@@ -29,10 +29,33 @@ const costume = new Set(SPECIES.filter((sp) => sp.form === "costume").map((sp) =
    never the evolved overlay (a flock of Charizard is a free evolution line, and
    the overlay is meant to be a late find), never a legendary (a legendary is one
    of a kind), never a costume (an event does not host an event). */
+const resident = (r) => !r[2] && r[1] > 0 && !isLegendary(r[0]) && !costume.has(r[0]);
 export function outbreakPool(biome, level) {
-  return encounterTable(biome, level)
-    .filter((r) => !r[2] && r[1] > 0 && !isLegendary(r[0]) && !costume.has(r[0]))
-    .map((r) => r[0]);
+  return encounterTable(biome, level).filter(resident).map((r) => r[0]);
+}
+
+/* A CANDY TRAIL (2026-11-04, asked for: Rare Candy has no use once the Pokedex
+   is nearly done, and a rare form is what a late game hunts). Candy lays one
+   for a species you have caught, on a map it lives on, and `TRAIL_SHARE` of the
+   walking meetings there are that species until the steps run out. An outbreak's
+   rule for who: residents only. It moves which species you meet and never the
+   tier roll, so a rare form gets more chances, not better odds; no table moves,
+   and no roll is drawn unless one runs. A resident sells for less than it costs
+   to catch at the dear end, so the price needs only to clear the cheap end. */
+export const TRAIL_CANDY = 60;
+export const TRAIL_STEPS = 300;
+export const TRAIL_SHARE = 0.4;
+// A family of looks is one row of a table: its base.
+export const trailTarget = (id) => {
+  const sp = speciesById(id);
+  return sp?.form === "look" ? sp.of : id;
+};
+export const trailsOn = (id, biome, level) => tableFor(biome, level).some((r) => r[0] === id && resident(r));
+export function cleanTrail(t) {
+  if (!t || typeof t !== "object" || !speciesById(t.species)) return null;
+  const steps = Math.floor(Number(t.steps));
+  if (!(steps > 0)) return null;
+  return { species: t.species, steps, total: Math.max(steps, Math.floor(Number(t.total)) || 0) };
 }
 
 /* Today's outbreak for a trainer at `level`, or null. UNIFORM over open maps

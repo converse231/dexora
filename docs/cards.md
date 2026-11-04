@@ -786,6 +786,14 @@ now and then when a step started an encounter.
 - A complete set now costs far more: a given Mega Hyper Rare is ~1 in 1,900
   Mega Evolution packs, and the chase is packs only.
 
+## A bit kinder *(2026-11-04, your call)*
+
+- **Every hit comes 1.25x as often as real life** (`KINDER`, over `SET_RATES`,
+  which stays the measured record; a Sword & Shield Holo Rare is no hit and
+  stays). The Packs tab prints the kinder number and each set's pity scales
+  with it. Measured with pity running: Mega Evolution any hit 1 in 2.6 -> 2.1,
+  SIR 1 in 79 -> 64, MHR 1 in 1,047 -> 844. Past the figures in the section above.
+
 ## Sword & Shield and real-life prices *(2026-10-15, your calls)*
 
 - **Five Sword & Shield sets** (`swsh7` Evolving Skies, `swsh9` Brilliant

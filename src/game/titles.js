@@ -13,7 +13,7 @@
 import { CARD_SETS } from "../data/cards/index.js";
 import { REGION_NAME, TIERS, tierName } from "./biomes.js";
 import { MILESTONES } from "./cards.js";
-import { EVENTS } from "../data/eventforms.js";
+import { EVENTS, eventById } from "../data/eventforms.js";
 
 // `milestones` counts MILESTONES paid per set, one past them for a master set.
 export const MASTER_STEP = MILESTONES.length + 1;
@@ -70,7 +70,7 @@ export function titleName(t) {
   if (kind === "set") return `${setName(id)} Collector`;
   if (kind === "master") return `${setName(id)} Master Collector`;
   if (kind === "dex") return `${REGION_NAME[id] ?? `Gen ${id}`} Dex Master`;
-  if (kind === "event") return EVENTS.find((ev) => ev.id === id)?.title
+  if (kind === "event") return eventById(id)?.title
     ?? EVENTS.find((ev) => ev.hunt?.medal === id)?.hunt.name ?? "Event Hunter";
   if (titleTier(t)) {
     const g = t.split(":")[2];

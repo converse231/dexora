@@ -995,6 +995,43 @@ await q("delete from public.ranked_ratings where user_id = any($1)", [both]);
     "qualifying takes the rule over separate days and a confirmed email, a flagged account earns nothing, the cap holds, the table is the functions' alone");
 }
 
+// ---- WHAT STAYS WITH ITS OWNER: an invite's looks and a trained kit ---------------
+{
+  const { INVITE } = await import("../src/data/eventforms.js");
+  const H = await trainer("hm"), F = await trainer("hf");
+  const two = [H.id, F.id];
+  await q("delete from public.trades where a = any($1) or b = any($1)", [two]);
+  await q("delete from public.listings where owner = any($1)", [two]);
+  await q("delete from public.mons where owner = any($1)", [two]);
+  await q("delete from public.friends where a = any($1) or b = any($1)", [two]);
+  await q("update public.saves set session = null where user_id = any($1)", [two]);
+  await q("update public.profiles set flagged_at = null, flag_reason = null where user_id = any($1)", [two]);
+  const look = INVITE.looks[0].id;
+  const box = [{ uid: 1, species: look, level: 100 }, { uid: 2, species: look, level: 100 },
+    { uid: 3, species: 16, level: 5, mastery: 2 }, { uid: 4, species: 16, level: 5, mastery: 1 },
+    { uid: 5, species: 19, level: 5 }, { uid: 6, species: 19, level: 6 }];
+  await save(H, box);
+  await save(F, [{ uid: 1, species: 25, level: 5 }, { uid: 2, species: 25, level: 6 }]);
+  const got = await rpc(H, "register_mons", { snaps: box.map(({ uid, species, level }) => ({ uid, species, level })) });
+  assert.deepEqual(got.map((r) => r.uid).sort(), [5, 6], `what stays home entered trading: ${JSON.stringify(got)}`);
+  await q("insert into public.friends (a, b, status) values ($1, $2, 'accepted')", [H.id, F.id]);
+  const seen = await rpc(F, "friend_box", { who: H.id });
+  assert.deepEqual(seen.box.map((m) => m.uid).sort(), [5, 6], "a friend's box offered what stays home");
+  assert.equal((await rpc(F, "trade_search", { q: look })).friends.length, 0, "a search found an invite's look as a spare");
+  const [give] = await rpc(F, "register_mons", { snaps: [{ uid: 1, species: 25, level: 5 }] });
+  for (const uid of [1, 3]) await refuses(rpc(F, "propose_trade", { target: H.id, give: [give.mid], want: [], want_uids: [uid] }), `a friend asked for uid ${uid}, which stays home`);
+  assert.ok(await rpc(F, "propose_trade", { target: H.id, give: [give.mid], want: [], want_uids: [5] }), "a friend could not ask for an ordinary spare");
+  assert.deepEqual((await rpc(H, "set_shelf", { uids: [1, 3] })), [], "what stays home went on a shelf");
+  // Trained after it entered trading: its row stands, but no new way out opens.
+  await save(H, box.map((m) => (m.uid === 6 ? { ...m, mastery: 1 } : m)));
+  assert.deepEqual((await rpc(H, "register_mons", { snaps: [{ uid: 6, species: 19, level: 6 }] })), [], "a kit trained since registering still answered a row");
+  assert.deepEqual((await q("select public.invite_only() v"))[0].v, INVITE.looks.map((l) => l.id), "invite_only() is not INVITE's looks");
+  await q("delete from public.trades where a = any($1) or b = any($1)", [two]);
+  await q("delete from public.mons where owner = any($1)", [two]);
+  await q("delete from public.friends where a = any($1) or b = any($1)", [two]);
+  console.log("tradedb stays home ok — an invite's look and a trained kit get no row, and no friend, search or shelf can reach them");
+}
+
 // ---- THE ADMIN DASHBOARD (db/admin.sql, docs/admin.md) ---------------------------
 {
   /* A TOTP code from a base32 secret (RFC 6238), so the test signs in the way

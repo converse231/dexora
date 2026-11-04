@@ -4088,7 +4088,7 @@ button.fieldbox:focus-visible > span { outline: 2px solid var(--gold); outline-o
 /* A caught entry has tabs, and a card that took its height from the tab on
    show jumped 80px switching FORMS to ABOUT. Fixed; the panel scrolls. */
 .sheet-card.tabbed { height: min(88vh, 700px); }
-.sheet-actions { flex: none; display: flex; align-items: stretch; gap: 8px; margin-top: 12px; }
+.sheet-actions { flex: none; display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin-top: 12px; }
 .sheet-actions .sheet-close { flex: 1; margin-top: 0; }
 /* GREEN, not the path rose. Rose is what SELL wears in the confirm dialog and
    what a caught cell is tinted with - beside a green CLOSE it read as the
@@ -11791,6 +11791,13 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .fs-locked .fs-stage > .ic { position: absolute; color: #ffd23f; }
 /* Rare Candy on the team card: the count in the header, +1 / +10 / Max on each Pokemon. */
 .ag-lvrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.ag-mastery { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 7px; margin-top: 3px; font-size: 10.5px; color: #c6cfe8; }
+.ag-mastery b { font: 700 10px var(--pixel); color: #e9eeff; }
+.ag-mastery small { font-size: 10px; opacity: .8; }
+.ag-mastery button { min-height: 22px; padding: 1px 7px; border-radius: 7px; cursor: pointer; font: 700 10px var(--pixel); color: #e9eeff;
+  background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .16); }
+.ag-mastery button:hover:not(:disabled) { background: rgba(69, 212, 255, .22); border-color: rgba(69, 212, 255, .5); }
+.ag-mastery button:disabled { opacity: .4; cursor: default; }
 .ag-lvup { display: inline-flex; gap: 4px; }
 .ag-lvup button { min-height: 22px; padding: 1px 7px; border-radius: 7px; cursor: pointer; font: 700 10px var(--pixel); color: #e9eeff;
   background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .16); }
@@ -12771,8 +12778,89 @@ button.wl-chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2
 .evcard .sn-board-card.ev-eponchos .ev-banner h4 { color: #ffe2b0; }
 .sn-board-card.ev-eponchos .sn-slot.got { border-color: #ff9ad0; }
 .ev-eponchos .sn-title { color: #fff1dc; text-shadow: 0 0 18px rgba(255, 200, 150, .8), 0 3px 0 #6b3416; }
+
+/* AN EVENT'S DRAWN SKY (`poster`, npm run posters; 2026-11-04, asked for): the
+   picture replaces the gradient, moon and fog. It sits at the top of the card
+   and fades out over the card's own night, so no seam shows where it ends.
+   Only the name goes over it (the story was unreadable across the town): the
+   kicker and title lift out of the flow, and `.sn-gap`, the picture's own shape,
+   holds everything else below it. */
+.sn-card.sn-drawn { background: var(--sn-night); }
+.sn-poster {
+  position: absolute; top: 0; left: 0; width: 100%; height: auto;
+  -webkit-mask-image: linear-gradient(#000 85%, transparent); mask-image: linear-gradient(#000 85%, transparent);
+}
+.sn-drawn .sn-kicker, .sn-drawn .sn-title { position: absolute; left: 22px; right: 22px; margin: 0; }
+.sn-drawn .sn-kicker { top: 24px; text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
+.sn-drawn .sn-title { top: 42px; }
+.sn-gap { display: block; width: 100%; margin-bottom: -18px; }
+/* A sideways phone has no room for a banner: the picture dims behind the text. */
+@media (max-height: 540px) {
+  .sn-gap { aspect-ratio: auto !important; height: 84px; margin: 0; }
+  .sn-poster { opacity: .4; }
+}
 /* A poncho on a real card says so on the poster (Season.jsx). */
 .sn-card-tag { margin-left: 4px; padding: 0 5px; border-radius: 4px; font: 700 9px var(--pixel); color: #2a1600; background: #ffd23f; }
 
 /* The event's story, under its name (eventforms.js `lore`). */
 .sn-lore { margin: -6px 0 0; max-width: 52ch; font-size: 12.5px; line-height: 1.5; color: var(--sn-soft); }
+
+/* THE STARFORGED FOUR (Invite.jsx) and the top bar's Invite button. The band is the
+   night sky in either theme: their armour is drawn navy and gold, so it never changes. */
+.iv-looks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.iv-looks li { display: grid; justify-items: center; align-content: start; gap: 2px; padding: 6px 4px 8px; border-radius: 12px; background: #1c2450; text-align: center; }
+.iv-looks li.done { outline: 2px solid #f2c14e; outline-offset: -2px; }
+.iv-looks img { width: 100%; max-width: 104px; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated; }
+.iv-looks b { font: 700 13.5px var(--display); color: #fff3cf; }
+.iv-looks small { font: 500 11.5px / 1.25 var(--body); color: #b9c1e8; }
+.iv-star { background: #131937; border-color: #2c3566; }
+.iv-star h4 { color: #fff3cf; }
+.iv-star h4 small { color: #b9c1e8; }
+.iv-intro { width: min(680px, 100%); padding: 22px; background: #131937; border-color: #2c3566; color: #dfe4fa; }
+.iv-intro .cd-x { color: #dfe4fa; }
+.iv-kicker { font: 600 12px var(--pixel); color: #f2c14e; }
+.iv-intro h2 { margin: 0; font: 800 italic 32px / 1.05 var(--display); color: #fff3cf; }
+.iv-intro p { margin: 0; font-size: 14.5px; color: #dfe4fa; }
+.iv-go { display: flex; flex-wrap: wrap; gap: 8px; }
+.iv-go .ci-go { flex: 1 1 160px; min-height: 44px; }
+@media (max-width: 420px) {
+  .iv-looks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .iv-looks img { max-width: 76px; }
+}
+@media (max-height: 540px) {
+  .iv-looks img { max-width: 64px; }
+  .iv-intro { padding: 14px; }
+  .iv-intro h2 { font-size: 24px; }
+}
+.topbar .tb-invite {
+  position: relative; flex: none; height: 44px; padding: 0 14px; display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: #ff7a35; font: 700 13.5px var(--display);
+}
+.topbar .tb-invite:hover { border-color: #ff7a35; }
+.topbar .tb-invite .tb-dot { top: 5px; right: 5px; }
+.topbar .tb-invite.glow { border-color: #ff7a35; animation: tb-invite-glow 1.7s ease-in-out infinite; }
+@keyframes tb-invite-glow {
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(255, 122, 53, .35); }
+  50% { box-shadow: 0 0 20px 5px rgba(255, 122, 53, .85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar .tb-invite.glow { animation: none; box-shadow: 0 0 14px 3px rgba(255, 122, 53, .7); }
+}
+@media (hover: none) and (pointer: coarse) { .topbar .tb-invite { display: none; } }
+/* The one-row bar was already full below ~1400px (2026-11-05, measured: the bell squashed to
+   22px and on the trainer chip at 1280), and You sits absolute at its right end, so nothing
+   made room. Your chip is its medal first, then the logo's word and this label, then the
+   Dex count, which the rail beside the map shows anyway. */
+@media (min-width: 1100px) and (max-width: 1460px) {
+  .topbar .tb-tab.t-you { max-width: 48px; padding: 4px; }
+  .topbar .tb-tab.t-you .tb-you { display: none; }
+  .topbar { padding-right: 76px; }
+  .topbar .tb-bell { flex: none; }
+}
+@media (min-width: 1100px) and (max-width: 1280px) {
+  .topbar .tb-logo { font-size: 0; gap: 0; }
+  .topbar .tb-invite span { display: none; }
+  .topbar .tb-invite { padding: 0 12px; }
+}
+@media (max-width: 1099px) { .topbar .tb-invite span { display: none; } .topbar .tb-invite { padding: 0 12px; } }
+@media (min-width: 1100px) and (max-width: 1180px) { .topbar .tb-stat.dex { display: none; } }

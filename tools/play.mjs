@@ -1918,6 +1918,37 @@ async function savedField(name, good, bad, empty, base = SAVE) {
     `a garbage "${name}" was trusted instead of dropped to empty`);
 }
 await savedField("dry", 123, "lots", 0);
+await savedField("trail", { species: 16, steps: 120, total: 300 }, "junk", null);
+/* KIT MASTERY (mastery.js): the whole cost or nothing, a level at a time, capped;
+   a held one is frozen; a trained one cannot be swept, sold or traded; a bad field
+   drops alone. */
+{
+  const { masteryCost, MASTERY_MAX } = await import("../src/game/mastery.js");
+  const { keeper } = await import("../src/game/items.js");
+  const { tradeable } = await import("../src/game/trade.js");
+  const { variantSpareUids } = await import("../src/game/spares.js");
+  const mons = [{ uid: 1, species: 16, level: 5 }, { uid: 2, species: 16, level: 5 }];
+  const e = boot({ ...SAVE, box: mons, nextUid: 3, candy: masteryCost(0) + masteryCost(1) - 1 }).e;
+  e.state.box[1].lock = "offer";
+  assert.equal(e.masterKit(2), false, "a held Pokemon's kit was trained");
+  assert.equal(e.masterKit(1), true, "a kit with candy for it did not train");
+  assert.equal(e.state.box[0].mastery, 1);
+  assert.equal(e.state.candy, masteryCost(1) - 1, "training did not cost its level's candy");
+  assert.equal(e.masterKit(1), false, "a kit trained on too little candy");
+  assert.equal(e.state.box[0].mastery, 1, "a refused training moved the level");
+  const top = boot({ ...SAVE, box: [{ uid: 1, species: 16, level: 5, mastery: MASTERY_MAX }], nextUid: 2, candy: 99999 }).e;
+  assert.equal(top.masterKit(1), false, "a kit trained past its top");
+  assert.equal(top.state.candy, 99999, "the top level took candy");
+  const trained = { uid: 1, species: 16, level: 5, mastery: 1 };
+  assert.ok(keeper(trained) && !keeper({ uid: 1, species: 16 }), "keeper() does not protect a trained kit");
+  assert.equal(tradeable([trained, { uid: 2, species: 16 }], trained), false, "a trained kit can be traded away");
+  assert.deepEqual(variantSpareUids([{ uid: 1, species: 16, level: 9, shiny: 1 }, { uid: 2, species: 16, level: 5, shiny: 1, mastery: 1 }]), [],
+    "a trained rare form counted as a spare");
+  const junk = boot({ ...SAVE, box: [{ uid: 1, species: 16, level: 5, mastery: 99 }, { uid: 2, species: 16, level: 5, mastery: 3 }], nextUid: 3 }).e;
+  assert.equal(junk.state.box.length, 2, "a bad mastery field cost a Pokemon");
+  assert.equal(junk.state.box[0].mastery, undefined, "a bad mastery field was trusted");
+  assert.equal(junk.state.box[1].mastery, 3, "a good mastery field did not load");
+}
 await savedField("dreams", { halloween: 3, "halloween+": 1 }, { halloween: 99, nowhere: 2, "haunting+": 7 }, {});
 /* CARDS (docs/cards.md): each field loads empty from an old save, survives a
    reload, and drops garbage - row by row for the collection. */
@@ -2506,11 +2537,35 @@ await savedField("referralsPaid", ["ref:welcome", "ref:m3"], "junk", []);
   const R = await import("../src/game/referral.js");
   const friends = (n, paid = true) => Array.from({ length: n }, (_, k) => ({ id: `u${k}`, username: `F${k}`, paid }));
   const info = { me: { referrer: "Ash", qualified: true }, invited: [...friends(3), { id: "late", username: "L", paid: false }] };
-  assert.deepEqual(R.referralDue(info).map((r) => r.id), ["ref:welcome", "ref:u0", "ref:u1", "ref:u2", "ref:m3"]);
+  assert.deepEqual(R.referralDue(info).map((r) => r.id), ["ref:welcome", "ref:gift0", "ref:u0", "ref:u1", "ref:u2", "ref:m3", "ref:gift1", "ref:gift3"]);
   assert.deepEqual(R.referralDue({ ...info, flagged: true }), [], "a flagged account was owed invite rewards");
   const g = boot({ ...SAVE, candy: 0, bag: { ...SAVE.bag, "ultra-ball": 0 }, packs: {} }).e;
   const paid = g.claimReferrals(info);
-  assert.equal(paid.length, 5, "the invite rewards were not all paid");
+  assert.equal(paid.length, 8, "the invite rewards were not all paid");
+  /* THE STARFORGED FOUR: into the Box and the Pokedex's Event region, no count
+     moved, and a save that claimed its milestone long ago is still owed them. */
+  {
+    const { INVITE } = await import("../src/data/eventforms.js");
+    const { dexIndex } = await import("../src/game/biomes.js");
+    const has = (e, id) => e.state.box.filter((m) => m.species === id).length;
+    const [pika, char, , arc] = INVITE.looks.map((l) => l.id);
+    assert.equal(has(g, pika), 2, "the friend's and the inviter's Starforged Pikachu did not both arrive");
+    assert.equal(has(g, char), 1, "three friends paid no Starforged Charizard");
+    assert.equal(g.state.dex[dexIndex(char)], 2, "a Starforged look did not register");
+    const old = boot({ ...SAVE, referralsPaid: ["ref:welcome", "ref:u0", "ref:u1", "ref:u2", "ref:m3"] }).e;
+    assert.deepEqual(old.claimReferrals(info).map((r) => r.id), ["ref:gift0", "ref:gift1", "ref:gift3"], "an old claim was not owed its Starforged looks");
+    const tenth = boot({ ...SAVE }).e;
+    tenth.claimReferrals({ invited: friends(10) });
+    assert.equal(has(tenth, arc), 1, "ten friends paid no Starforged Arceus");
+    assert.ok(tenth.state.medals.includes(R.REF_TITLE), "ten friends paid no title");
+    const uid = tenth.state.box.find((m) => m.species === arc).uid;
+    tenth.sell([uid]);
+    assert.equal(has(tenth, arc), 1, "a Starforged look was sold");
+    const again = boot(JSON.parse(JSON.stringify({ ...SAVE, box: tenth.state.box, medals: tenth.state.medals, dex: tenth.state.dex, referralsPaid: tenth.state.referralsPaid, nextUid: tenth.state.nextUid }))).e;
+    assert.equal(has(again, arc), 1, "a Starforged look did not survive a reload");
+    assert.ok(again.state.medals.includes(R.REF_TITLE), "the title did not survive a reload");
+    assert.equal(again.claimReferrals({ invited: friends(10) }), null, "a reload paid the Starforged looks again");
+  }
   assert.equal(g.state.candy, R.REF_WELCOME.candy + 3 * R.REF_EACH.candy, "invite candy was not paid");
   assert.equal(g.state.bag["ultra-ball"], R.REF_WELCOME.items["ultra-ball"] + 3 * R.REF_EACH.items["ultra-ball"], "invite balls were not paid");
   const packs = Object.values(g.state.packs).reduce((a, n) => a + n, 0);
@@ -2973,6 +3028,42 @@ assert.deepEqual(boot({ ...SAVE, cardShowcase: ["me01-187:h", "bad", "me01-187:h
     until(e, (st) => !st.encounter, "the encounter to close", 4000);
     return enc;
   };
+  /* A CANDY TRAIL (events.js): laid only where it lives and only for one caught,
+     it meets its species on a walking step, runs down, stacks on itself, asks
+     before replacing another, a repel ends it - and it says when it goes cold. */
+  {
+    const { TRAIL_CANDY, TRAIL_STEPS, outbreakPool: pool2 } = await import("../src/game/events.js");
+    const meadow = BIOMES.find((b) => b.id === "meadow");
+    const [target, other] = pool2(meadow, 50);
+    const { dexIndex: at } = await import("../src/game/biomes.js");
+    const t = boot({ ...SAVE, areaId: "meadow", candy: TRAIL_CANDY * 2 - 1, outbreak: null }).e;
+    t.state.dex[at(target)] = 0;
+    assert.equal(t.trailOffer(target), null, "a trail was offered for something never caught");
+    t.state.dex[at(target)] = 2; t.state.dex[at(other)] = 2;
+    assert.equal(t.trailOffer(target)?.here, true, "a resident caught here had no trail");
+    assert.equal(t.layTrail(target), true);
+    assert.equal(t.state.candy, TRAIL_CANDY - 1, "a trail did not cost its candy");
+    assert.equal(t.layTrail(target), false, "a trail was laid on too little candy");
+    t.state.candy = TRAIL_CANDY * 3;
+    assert.equal(t.layTrail(target), true);
+    assert.equal(t.state.trail.steps, TRAIL_STEPS * 2, "a second trail for the same species did not stack");
+    assert.equal(t.layTrail(other), false, "another species' trail replaced this one unasked");
+    assert.equal(t.state.ask?.kind, "field", "replacing a trail asked nothing");
+    t.answerAsk(true);
+    assert.equal(t.state.trail.species, other, "answering yes did not lay the new trail");
+    assert.equal(t.state.trail.steps, TRAIL_STEPS, "another species' trail kept the old one's steps");
+    const seen = step(t);
+    assert.equal(seen.speciesId, other, "a trail step did not meet the trail's species");
+    t.state.trail = { species: target, steps: 1, total: 300 };
+    const worn = t.state.worn.length;
+    step(t);
+    assert.equal(t.state.trail, null, "a spent trail stayed");
+    assert.ok(t.state.worn.length > worn || t.state.worn.some((w) => w.id === "trail"), "a trail went cold in silence");
+    t.state.trail = { species: target, steps: 50, total: 300 };
+    t.state.bag.repel = 1;
+    t.useField("repel", true);
+    assert.equal(t.state.trail, null, "a repel left a trail running");
+  }
   const e = boot({ ...SAVE, outbreak: { ...ob, left: 2 } }).e;
   const met = step(e);
   assert.equal(met.speciesId, ob.speciesId, "an outbreak step did not meet the outbreak species");
