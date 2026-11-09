@@ -80,7 +80,8 @@ function whereToFind(id) {
     if (sp.hunt) {
       return [
         { key: "event", where: ev.name, how: live ? `${eventDaysLeft(ev)} days left` : "the event is over" },
-        { key: "hunt", where: AREAS[ev.hunt.area]?.name ?? "", how: `catch every costume once (any ${ev.hunt.again} each time after), then your next meeting here` },
+        // A place, so it offers to go there (`area`), as every map row does - these had none (2026-11-09).
+        { key: "hunt", area: ev.hunt.area, where: AREAS[ev.hunt.area]?.name ?? "", how: `catch every costume once (any ${ev.hunt.again} each time after), then your next meeting here` },
       ];
     }
     const look = ev.looks.find((l) => l.id === id);
@@ -88,7 +89,7 @@ function whereToFind(id) {
     if (ev.roam && look) {
       return [
         { key: "event", where: ev.name, how: live ? `${eventDaysLeft(ev)} days left` : "the event is over" },
-        ...(live ? roamAreas(look).map((b) => ({ key: b.id, where: b.name, how: `1 meeting in ${Math.round(1 / shareOf(ev))} is a poncho${look.rare ? " · rare" : ""}` })) : []),
+        ...(live ? roamAreas(look).map((b) => ({ key: b.id, area: b.id, where: b.name, how: `1 meeting in ${Math.round(1 / shareOf(ev))} is a poncho${look.rare ? " · rare" : ""}` })) : []),
       ];
     }
     // A look `on` its line's base is met where the base lives (events.js `eventLook`).
