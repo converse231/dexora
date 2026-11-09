@@ -246,7 +246,10 @@ anything done. The run prints each suite; the count is not typed anywhere.
   A look with a `card` (a real Poncho-wearing Pikachu promo) files ONE copy
   of it on its first catch (the engine's `grantPromo`, asked for: "the card
   should only be one"), stamped `earned`, never a second for a card already
-  held - three ponchos share card 203. The running week's poster names the
+  held - three ponchos share card 203. Its CLAIM DIALOG (`PromoClaim.jsx`, lazy;
+  2026-11-09, asked for: the banner was missed) waits in the save's `promoNew`
+  until seen, opens once the encounter has closed, turns the card over on Claim
+  and offers See card (Cards' `focus`). The running week's poster names the
   next week (`eventAfter`, `onNext`), so the Haunting announces it. **Its
   second week is Eevee's** (`eponchos`, 11-15 to 11-21, asked for
   2026-10-30): the eight Eeveelution ponchos of the 2017 campaign (SM-P

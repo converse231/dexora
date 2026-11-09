@@ -89,6 +89,7 @@ const StreakPacks = lazyPage(() => import("./ui/StreakPacks.jsx"));
 const ArenaIntro = lazyPage(() => import("./ui/ArenaIntro.jsx"));
 // The fifth tab (docs/cards.md): its page, and every set's cards, load only when opened.
 const Cards = lazyPage(() => import("./ui/cards/Cards.jsx"));
+const PromoClaim = lazyPage(() => import("./ui/cards/PromoClaim.jsx"));
 /* Which trades this DEVICE has shown its scene for - a per-device nicety like
    "seen" news, so localStorage and never the save. */
 const SEEN_TRADES = "dexora-trades-seen";
@@ -254,6 +255,11 @@ export default function App({
   const [inviteIntro, setInviteIntro] = useState(false);
   const [inviteSeen, setInviteSeen] = useState(() => Boolean(read(INVITE_SEEN_KEY)));
   const announced = useRef(false);
+  /* Something opened its own dialog in THIS commit (an announcement, the check-in,
+     the account ask): a promo card's claim, decided last, waits for it - both
+     read the same old state in one commit and opened stacked (2026-11-09). */
+  const opening = useRef(false);
+  const [promo, setPromo] = useState(null);       // the claim on screen: [cardId, lookId]
   const onEditParty = useCallback(() => setPartyPick(true), []);
   const onJumped = useCallback(() => setBoxJump(null), []);
   /* THE ROTOM PANEL'S APP (Dex, Box, Shop, Map, Events), held here so the
@@ -369,6 +375,8 @@ export default function App({
   const [arenaPage, setArenaPage] = useState(false);
   const [cards, setCards] = useState(false);
   const [cardScene, setCardScene] = useState(false);
+  // A promo card's claim dialog opens on the card it names, once (Cards' `focus`).
+  const [cardFocus, setCardFocus] = useState(null);
   const [you, setYou] = useState(() => location.hash.startsWith("#/you"));
   /* THE TABS ARE THE PAGES (Rotom, 2026-10-01): Trade is the Trade Center,
      Battles the League, You its own page; Catch is all of them closed. A
@@ -639,20 +647,21 @@ export default function App({
     if (yes) { setArenaJoin({ role: "guest", invite: got.data, friend: inv.card }); goTab("arena"); }
   };
   useEffect(() => {
-    if (!onJoin || enc) return;
+    if (!onJoin || enc || promo) return;
     const asked = Number(read(JOIN_KEY)) || 0;
     // Asked only once the count is written: a browser that will not store it is never asked again and again.
-    if (asked < JOIN_AT.length && (st?.caught ?? 0) >= JOIN_AT[asked] && write(JOIN_KEY, String(asked + 1)).ok) setJoinAsk(true);
-  }, [onJoin, enc, st?.caught]);
+    if (asked < JOIN_AT.length && (st?.caught ?? 0) >= JOIN_AT[asked] && write(JOIN_KEY, String(asked + 1)).ok) { opening.current = true; setJoinAsk(true); }
+  }, [onJoin, enc, st?.caught, promo]);
   // Finished generations not yet claimed - derived, so it is a button until pressed.
   const claims = engine?.dexClaims?.() ?? [];
   /* First visit of the day: the check-in asks by itself, once a session -
      never over an encounter or before the trainer is chosen. */
   useEffect(() => {
-    if (askedCheckin.current || !engine || !checkin?.due || enc || !st?.char || pathAt < 1) return;
+    if (askedCheckin.current || !engine || !checkin?.due || enc || !st?.char || pathAt < 1 || promo) return;
     askedCheckin.current = true;
+    opening.current = true;
     setCheckinOpen(true);
-  }, [engine, checkin?.due, enc, st?.char, pathAt]);
+  }, [engine, checkin?.due, enc, st?.char, pathAt, promo]);
   // The event announces itself once, never over an encounter or the check-in.
   // The event running, or the one about to open (its teaser and countdown).
   const season = eventOn() ?? eventSoon();
@@ -663,10 +672,11 @@ export default function App({
     /* AFTER the day's check-in, never beside it: both decide in one render,
        and on a Friday of the event the two opened stacked (found in QA). */
     if (!engine || !season || !seasonUnseen(season) || enc || !st?.char || checkinOpen || rouletteOpen
-      || checkin?.due || pathAt < 2 || arenaIntro || inviteIntro || announced.current) return;
+      || checkin?.due || pathAt < 2 || arenaIntro || inviteIntro || promo || announced.current) return;
     announced.current = true;
+    opening.current = true;
     setSeasonOpen(true);
-  }, [engine, season, enc, st?.char, checkinOpen, rouletteOpen, checkin?.due, pathAt, arenaIntro, inviteIntro]);
+  }, [engine, season, enc, st?.char, checkinOpen, rouletteOpen, checkin?.due, pathAt, arenaIntro, inviteIntro, promo]);
   /* The Arena's turn, first: after the day's check-in, never over an
      encounter, never on a first visit (the Starter Path's second goal), and
      never to a player who has already fought there. */
@@ -674,21 +684,32 @@ export default function App({
   const arenaNewsTo = (v) => { write(ARENA_NEWS_KEY, v); setArenaNews(v); };
   useEffect(() => {
     if (arenaNews || arenaPlayed || !engine || !st?.char || enc || tab !== "catch" || checkinOpen || rouletteOpen
-      || streakLots || seasonOpen || checkin?.due || pathAt < 2 || announced.current) return;
+      || streakLots || seasonOpen || checkin?.due || pathAt < 2 || promo || announced.current) return;
     announced.current = true;
+    opening.current = true;
     arenaNewsTo("seen");
     setArenaIntro(true);
-  }, [arenaNews, arenaPlayed, engine, st?.char, enc, tab, checkinOpen, rouletteOpen, streakLots, seasonOpen, checkin?.due, pathAt]);
+  }, [arenaNews, arenaPlayed, engine, st?.char, enc, tab, checkinOpen, rouletteOpen, streakLots, seasonOpen, checkin?.due, pathAt, promo]);
   /* THE STARFORGED FOUR, on the same terms, for a game with an account to invite
      from: one announcement a session, so it waits its turn behind the event's and
      the Arena's. Anybody who has already opened the invite dialog knows. */
   useEffect(() => {
     if (!CLOUD || inviteSeen || read(INVITE_NEWS_KEY) || !engine || !st?.char || enc || tab !== "catch" || checkinOpen || rouletteOpen
-      || streakLots || seasonOpen || arenaIntro || invite || checkin?.due || pathAt < 2 || announced.current) return;
+      || streakLots || seasonOpen || arenaIntro || invite || checkin?.due || pathAt < 2 || promo || announced.current) return;
     announced.current = true;
+    opening.current = true;
     write(INVITE_NEWS_KEY, "seen");
     setInviteIntro(true);
-  }, [inviteSeen, engine, st?.char, enc, tab, checkinOpen, rouletteOpen, streakLots, seasonOpen, arenaIntro, invite, checkin?.due, pathAt]);
+  }, [inviteSeen, engine, st?.char, enc, tab, checkinOpen, rouletteOpen, streakLots, seasonOpen, arenaIntro, invite, checkin?.due, pathAt, promo]);
+  /* A PONCHO'S PROMO CARD (PromoClaim.jsx): once the encounter has closed and
+     nothing else is up, held here once raised (claiming empties `promoNew`, and
+     See card comes after the claim). Every render, and last: a dialog opened in
+     this commit goes first. */
+  const promoUp = st?.promoNew?.length > 0 && !enc && !held && !joinAsk && !invite && !!engine;
+  useEffect(() => {
+    if (opening.current) { opening.current = false; return; }
+    if (promoUp && !promo) setPromo(st.promoNew[0]);
+  });
   // Back from the League page, which marks the Arena found.
   useEffect(() => { if (!arenaPage) setArenaNews(read(ARENA_NEWS_KEY)); }, [arenaPage]);
   const toArena = () => { arenaNewsTo("done"); setArenaIntro(false); goTab("arena"); };
@@ -1087,9 +1108,11 @@ export default function App({
             level={level}
             onSpecies={(id) => setEntry(id)}
             onScene={setCardScene}
+            focus={cardFocus}
             onClose={() => {
               setCards(false);
               setCardScene(false);
+              setCardFocus(null);
               if (history.state?.cd) history.back();
               else if (location.hash) history.replaceState(null, "", location.pathname + location.search);
             }}
@@ -1151,6 +1174,15 @@ export default function App({
           onClaim={() => engine?.claimReferrals(refInfo)}
           onClose={() => setInvite(null)} onJoin={onJoin} />
       )}
+      {/* A PONCHO'S PROMO CARD (PromoClaim.jsx): once the encounter has closed. */}
+      {promo && (
+        <Suspense fallback={null}>
+          <PromoClaim key={promo[0]} card={promo[0]} look={promo[1]}
+            onClaim={() => engine.claimPromo(promo[0])}
+            onClose={() => setPromo(null)}
+            onSee={(setId, localId) => { setPromo(null); setCardFocus({ setId, localId }); goTab("cards"); }} />
+        </Suspense>
+      )}
       {inviteIntro && <InviteIntro onGo={() => { setInviteIntro(false); openInvite(); }} onClose={() => setInviteIntro(false)} />}
 
       {scenes.length > 0 && (
@@ -1189,7 +1221,7 @@ export default function App({
           and Hint.jsx for why it is a dialog rather than the bar it started as:
           a tip somebody scrolls past is a tip nobody read. */}
       {/* Tips wait for the check-in and the roulette too: a pack's first-time tip named the prize mid-spin. */}
-      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && !streakLots && !quizOpen && !seasonOpen && !arenaIntro && !inviteIntro && (
+      {st?.hint && !cardScene && claimGen == null && !checkinOpen && !rouletteOpen && !streakLots && !quizOpen && !seasonOpen && !arenaIntro && !inviteIntro && !promoUp && !promo && (
         <Hint text={st.hint.text} onClose={() => engine.clearHint()} />
       )}
 

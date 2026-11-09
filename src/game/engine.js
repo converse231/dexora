@@ -247,6 +247,7 @@ function freshState() {
     cardPity: {},
     dust: 0,              // Card Dust: spares turned in, spent crafting
     cardLog: [],          // the Pulls wall: `[cardId, variant, at]`, newest first
+    promoNew: [],         // promo cards filed and not yet claimed in their dialog: `[cardId, lookId]`
     milestones: {},       // set id -> how many of MILESTONES it has paid
     cardDay: null,        // the day the last pack opened - the daily first pack
     boxVouchers: [],      // free boxes of your choice, by where they came from ("dex:1")
@@ -319,6 +320,8 @@ function freshState() {
    reload mid-battle is a forfeit with nothing spent. */
 /* `boarding` is true while the ferry's stops are offered (docs/world.md):
    walked into a ferry cell, not yet sailed or stepped back ashore. */
+/* Each look printed on a promo card, and its card (eventforms.js): what `promoNew` may name. */
+const PROMO_OF = new Map(EVENTS.flatMap((ev) => ev.looks).filter((l) => l.card).map((l) => [l.id, l.card]));
 const VOLATILE = ["encounter", "evolution", "fishing", "running", "cheers",
   "worn", "ask", "rev", "colRev", "stale", "hint", "battle", "defense", "boarding"];
 const persisted = (s) => {
@@ -733,6 +736,8 @@ function loadState() {
       cardPity: Object.fromEntries(Object.entries(plain(s.cardPity)).map(([k, v]) => [k,
         Object.fromEntries(Object.keys(freshPity()).map((c) => [c, Math.max(0, Math.floor(Number(v?.[c]) || 0))]))])),
       dust: Math.max(0, Math.floor(Number(s.dust) || 0)),
+      promoNew: (Array.isArray(s.promoNew) ? s.promoNew : [])
+        .filter((p) => Array.isArray(p) && PROMO_OF.get(p[1]) === p[0]).slice(0, 32),
       cardLog: (Array.isArray(s.cardLog) ? s.cardLog : []).filter((e) => Array.isArray(e)
         && typeof e[0] === "string" && /^[\w.]+-\w+$/.test(e[0]) && ["n", "h", "r"].includes(e[1])
         && Number.isFinite(e[2])).slice(0, LOG_MAX),
@@ -2742,7 +2747,15 @@ export function createEngine(canvas, onChange, mini = null) {
     if (!card || state.cards[card]) return;
     state.cards = { ...state.cards, [card]: { h: 1, earned: [`look:${e.speciesId}`] } };
     state.cardLog = [[card, "h", Date.now()], ...state.cardLog].slice(0, LOG_MAX);
-    cheer({ kind: "medal", title: "PROMO CARD!", sub: `${e.name}'s real promo card is in your collection.` });
+    // Its claim dialog (PromoClaim.jsx) waits here, saved, until seen - a banner was missed (2026-11-09).
+    state.promoNew = [...state.promoNew, [card, e.speciesId]];
+  }
+  function claimPromo(card) {
+    if (!state.promoNew.some((p) => p[0] === card)) return false;
+    state.promoNew = state.promoNew.filter((p) => p[0] !== card);
+    save();
+    changed();
+    return true;
   }
 
   function huntOn(e, outcome) {
@@ -4681,6 +4694,7 @@ export function createEngine(canvas, onChange, mini = null) {
     craftCards,
     claimDex,
     claimReferrals,
+    claimPromo,
     claimAchievements,
     claimEvent,
     dexClaims,

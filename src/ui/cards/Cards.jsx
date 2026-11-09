@@ -45,17 +45,19 @@ const CHASE = ["mega", "hyper", "blackwhite", "futuristic", "special"];
 // The best copy a card is held in: a foil over a plain one.
 const bestVariant = (row, card) => ["h", "r", "n"].find((v) => row?.[v] && card[4].includes(v)) ?? card[4][0];
 
-export default function Cards({ engine, st, level, onClose, onSpecies, onScene }) {
+export default function Cards({ engine, st, level, onClose, onSpecies, onScene, focus = null }) {
   // A page like the others: the map hears no keys under it, and `stacked` sees a dialog on top.
   useModalLock();
   // Packs waiting (a reward, the roulette, a checkout) open on My Packs; otherwise the shop.
-  const [tab, setTab] = useState(() => (Object.values(st?.packs ?? {}).some((n) => n > 0) ? "mine" : "shop"));
+  // A claimed promo card (PromoClaim.jsx) opens its binder with the card in view.
+  const [tab, setTab] = useState(() => (focus ? "binder" : Object.values(st?.packs ?? {}).some((n) => n > 0) ? "mine" : "shop"));
   const [sets, setSets] = useState({});            // id -> { SET, CARDS }, as each loads
   const [opening, setOpening] = useState(null);    // { set, result, wrapper, n }
-  const [inspect, setInspect] = useState(null);    // { setId, localId }
+  const [inspect, setInspect] = useState(focus);   // { setId, localId }
   /* ONE SET ACROSS THE BINDER AND DUST, starting on the set of your newest
      pull: a card's "Dust or craft the whole set" lands on its own set. */
   const [setId, setSetId] = useState(() => {
+    if (focus) return focus.setId;
     const last = st?.cardLog?.[0]?.[0];
     const id = last && last.slice(0, last.lastIndexOf("-"));
     return CARD_SETS.some((s) => s.id === id) || isPromo(id) ? id : CARD_SETS[0]?.id;

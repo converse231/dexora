@@ -1919,6 +1919,7 @@ async function savedField(name, good, bad, empty, base = SAVE) {
 }
 await savedField("dry", 123, "lots", 0);
 await savedField("trail", { species: 16, steps: 120, total: 300 }, "junk", null);
+await savedField("promoNew", [["poncho-xy207", 19940]], "junk", []);
 /* KIT MASTERY (mastery.js): the whole cost or nothing, a level at a time, capped;
    a held one is frozen; a trained one cannot be swept, sold or traded; a bad field
    drops alone. */
@@ -3255,6 +3256,15 @@ console.log("outbreak ok — spawns on its map, counts down, ends with a notice"
       assert.equal(pg.state.encounter?.speciesId, first.id, "a parade-day step in the meadow met no poncho");
       catchIt(pg);
       assert.deepEqual(pg.state.cards[first.card], { h: 1, earned: [`look:${first.id}`] }, "a poncho's first catch filed no promo card");
+      // Its claim dialog waits in the save until claimed, once (PromoClaim.jsx).
+      assert.deepEqual(pg.state.promoNew, [[first.card, first.id]], "a poncho's promo card raised no claim");
+      const kept = boot({ ...SAVE, promoNew: pg.state.promoNew, cards: pg.state.cards }).e;
+      assert.deepEqual(kept.state.promoNew, [[first.card, first.id]], "a reload lost an unclaimed promo card's dialog");
+      assert.equal(kept.claimPromo(first.card), true);
+      assert.deepEqual(kept.state.promoNew, [], "claiming left the dialog waiting");
+      assert.equal(kept.claimPromo(first.card), false, "a promo card was claimed twice");
+      assert.ok(kept.state.cards[first.card]?.h === 1, "claiming moved the card");
+      kept.destroy?.();
       const saved = { ...SAVE, areaId: "meadow", dex: pg.state.dex, cards: pg.state.cards };
       pg.destroy();
       const again = meet(saved);
