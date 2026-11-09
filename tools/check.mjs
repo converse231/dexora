@@ -4937,7 +4937,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
 
   /* TRADING'S CLIENT RULES (docs/trading.md) - pure, so here. */
   {
-    const { LIMITS, LOCKS, PRESETS, REPORT_REASONS, cleanTradeFields, tradeable, snapshot, inboxToReconcile, freshTrades, fits, keepLast } =
+    const { LIMITS, LOCKS, PRESETS, REPORT_REASONS, cleanTradeFields, tradeable, snapshot, inboxToReconcile, freshTrades, fits, lastOf, keepLast } =
       await import("../src/game/trade.js");
     for (const [k, v] of Object.entries(LIMITS)) {
       assert.ok(Number.isInteger(v) && v > 0, `trade limit ${k} is ${v}`);
@@ -4978,11 +4978,17 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       "a listed Pokemon could go into an offer");
     // The board's "you have one": species, tier if named, and free to trade.
     const pika = [{ uid: 1, species: 25, level: 5 }, { uid: 2, species: 25, level: 6, shiny: 1 }, { uid: 3, species: 25, level: 7, lock: "offer", mid: "m" }];
-    assert.ok(fits(pika, pika[1], { want_species: 25, want_tier: "shiny" }), "a shiny did not fit a shiny listing");
-    assert.ok(!fits(pika, pika[0], { want_species: 25, want_tier: "shiny" }), "a plain one fitted a shiny listing");
-    assert.ok(fits(pika, pika[0], { want_species: 25, want_tier: null }), "a plain one did not fit an any-form listing");
-    assert.ok(!fits(pika, pika[2], { want_species: 25, want_tier: null }), "a locked one fitted a listing");
-    assert.ok(!fits([pika[0]], pika[0], { want_species: 25 }), "the last of a species fitted a listing");
+    assert.ok(fits(pika[1], { want_species: 25, want_tier: "shiny" }), "a shiny did not fit a shiny listing");
+    assert.ok(!fits(pika[0], { want_species: 25, want_tier: "shiny" }), "a plain one fitted a shiny listing");
+    assert.ok(fits(pika[0], { want_species: 25, want_tier: null }), "a plain one did not fit an any-form listing");
+    assert.ok(!fits(pika[2], { want_species: 25, want_tier: null }), "a locked one fitted a listing");
+    // Your last one completes a listing, and the board asks first (trade.js); only your own offers and listings keep it back.
+    assert.ok(lastOf([pika[0]], pika[0]) && fits(pika[0], { want_species: 25 }), "the last of a species did not fit a listing");
+    assert.ok(!lastOf(pika, pika[0]), "a Pikachu with others beside it read as the last");
+    assert.ok(!tradeable([pika[0]], pika[0]), "the last of a species could be offered");
+    for (const m of [{ uid: 9, species: 25, level: 5, mastery: 1 }, { uid: 9, species: INVITE.looks[0].id, level: 5 }]) {
+      assert.ok(!fits(m, { want_species: m.species }), "what stays home fitted a listing");
+    }
     // A scene plays once per trade, only for one that brought you something, only fresh.
     const now = Date.parse("2026-09-26T12:00:00Z");
     const at = (h) => new Date(now - h * 3600e3).toISOString();

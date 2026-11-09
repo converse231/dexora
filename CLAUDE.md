@@ -317,6 +317,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
   the outline shut in is named cell by cell (`SHUT_IN`, a white claw is the same
   colour), a body near white gets a stricter backdrop (`FLOOR`), and sixteen colours
   can turn armour another colour (`COLOURFUL`).
+  A pocket can also be named on the ORIGINAL (`HOLES`, a 1024px point that floods
+  backdrop white; 2026-11-09, every Pikachu poncho had white between its raised arm
+  and the cape): chosen by eye, never by size, since capes and eyes are that white too.
 - **The Starforged four are an invite's, never an event's** (`INVITE` in
   eventforms.js, 2026-11-05, asked for): Pikachu, Charizard, Mewtwo and Arceus,
   built as event looks (no count, no battle) but outside `EVENTS` - no days, no
@@ -1978,7 +1981,9 @@ then legendaries and costumes appended. `tableFor` caches one (biome, level).
   accepter's saved box carries the ids it gives; the trigger strips and keeps
   entries by uid+species as well as by id. **The last of a species is
   counted over the whole move** (`leaves_one` in SQL, `keepLast` in trade.js
-  and the Picker's `limit`). Listings are bundles (`mon || bundle`). Every
+  and the Picker's `limit`), except that completing someone's listing may spend
+  your last one, after a confirm (`fits`, `lastOf`; `fulfil_listing` never asked;
+  2026-11-05, asked for). Listings are bundles (`mon || bundle`). Every
   trading screen picks through `Picker.jsx` (grouped, searchable, filtered);
   wishes and wants search ANY species. The trade scene throws one ball per
   Pokemon each way. SQL first, client second: the new client calls

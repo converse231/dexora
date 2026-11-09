@@ -19,7 +19,7 @@ built. Change a decision here first, then the code.
 | One Pokémon, several offers | **A Pokémon may sit in several open offers at once**; the first accepted takes it and every other offer naming it fails. The game still refuses to sell or evolve it while any offer holds it. | DelugeRPG's way - one lock per offer meant a spare could be offered to one person at a time. |
 | Bundles | **A Board listing is up to six of yours for one wanted Pokémon**, completed in one tap, all or nothing. | "Several for one" was the missing shape of a listing. |
 | Search | **Wishes, Board wants and searches name any species**, seen or not. The Board's search also lists friends with a spare and anybody's shelf. | Trading is how a Pokédex fills its gaps; hiding unseen species hid exactly what a player is looking for. |
-| The last one | **"You keep the last of each species" is counted over a whole offer or listing** (`leaves_one` / `keepLast`), both sides. | Per Pokémon, three Meowth each looked spare and all three could go at once. |
+| The last one | **"You keep the last of each species" is counted over a whole offer or listing** (`leaves_one` / `keepLast`), both sides. **Completing someone's listing may spend your last one**, after a confirm (`fits`, `lastOf`; 2026-11-05, asked for). | Per Pokémon, three Meowth each looked spare and all three could go at once. On a listing you see exactly what you get, and your Pokédex keeps the entry. |
 | Counter-offers | A counter is a new offer to the same trainer, pre-filled with the sides swapped; sending it declines the one it answers. | No messaging, still a negotiation. |
 
 ## Limits (one table - `trade.js` exports these, the SQL mirrors them, check.mjs holds them equal)

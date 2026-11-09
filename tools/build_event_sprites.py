@@ -90,6 +90,56 @@ FLOOR = {("friends", "493"): 245}
 SHUT_IN = {("friends", "6"): [(22, 25), (28, 33), (35, 49), (41, 47), (43, 50)],
            ("friends", "493"): [(40, 56), (39, 55), (38, 72), (34, 67), (22, 42)]}
 SHUT_IN_WHITE = 235
+# THE SAME, NAMED ON THE ORIGINAL (2026-11-09, reported on the ponchos: white
+# between the raised arm and the cape, and between a wing and a tail): one
+# point (x, y) of the 1024px drawing inside each backdrop pocket. The pocket
+# is the backdrop-white the point floods to, taken out of the mask before the
+# grid is read. Chosen by eye beside the drawing, never by size - Slowbro's
+# eyes, Mawile's teeth and every white cape are pockets of the same white.
+HOLES = {
+         ("ponchos", "19940"): [(702, 505), (372, 517), (721, 674)],
+         ("ponchos", "19942"): [(709, 635), (330, 639)],
+         ("ponchos", "19943"): [(348, 544), (641, 793), (515, 757)],
+         ("ponchos", "19944"): [(389, 527), (317, 623)],
+         ("ponchos", "19945"): [(346, 552)],
+         ("ponchos", "19946"): [(353, 558)],
+         ("ponchos", "19948"): [(397, 533)],
+         ("ponchos", "19949"): [(393, 537)],
+         ("ponchos", "19951"): [(420, 301), (370, 563)],
+         ("ponchos", "19953"): [(364, 564)],
+         ("ponchos", "19954"): [(364, 563)],
+         ("ponchos", "19955"): [(369, 552)],
+         ("ponchos", "19956"): [(401, 527)],
+         ("ponchos", "19965"): [(391, 528)],
+         ("ponchos", "19967"): [(348, 555)],
+         ("ponchos", "19968"): [(354, 560)],
+         ("ponchos", "19969"): [(370, 565)],
+         ("eponchos", "19986"): [(824, 686)],
+         ("eponchos", "19994"): [(817, 729)],
+}
+HOLE_WHITE = 244
+
+
+def holes_out(a, m, points):
+    """`m` without the backdrop pocket at each point; a point on anything but
+    backdrop white stops the build - the drawing changed, so look again."""
+    mn, mx = a.min(axis=2).astype(int), a.max(axis=2).astype(int)
+    white = m & (mn >= HOLE_WHITE) & (mx - mn < 10)
+    m = m.copy()
+    for x, y in points:
+        if not white[y, x]:
+            sys.exit(f"({x}, {y}) is no backdrop pocket: look at the drawing again (HOLES)")
+        q = deque([(y, x)])
+        white[y, x] = False
+        while q:
+            yy, xx = q.popleft()
+            m[yy, xx] = False
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ny, nx = yy + dy, xx + dx
+                if 0 <= ny < a.shape[0] and 0 <= nx < a.shape[1] and white[ny, nx]:
+                    white[ny, nx] = False
+                    q.append((ny, nx))
+    return m
 
 
 def open_up(out, cells):
@@ -668,6 +718,8 @@ def build(path, ids):
     m = key(a, FLOOR.get((event, base_id), 168))
     if (event, base_id) in HOLLOW:
         m = hollow(a, m, (event, base_id) in GLOW, HOLLOW[(event, base_id)], KEEP.get((event, base_id), ()))
+    if (event, stem) in HOLES:
+        m = holes_out(a, m, HOLES[(event, stem)])
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
     colours = COLOURFUL.get((event, stem), ())
     # Its own grid keeps its own one-pixel outline: `thin` is the shrink's.

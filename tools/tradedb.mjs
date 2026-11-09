@@ -732,6 +732,7 @@ assert.deepEqual(row7?.mons.map((m) => m.mid), [p100, p102, p103], "the board do
 assert.ok((await rpc(B, "trade_board", { q: 16 })).some((x) => x.id === lid7), "a search missed a bundled species");
 for (const m of [p100, p102, p103]) assert.equal((await mon(m)).status, "listed", "a bundled Pokemon was not locked");
 await refuses(rpc(A, "post_listing", { mids: [p100], want_species: 1 }), "a bundled Pokemon was listed twice");
+// b6[118] is B's only Eevee: completing a listing may spend your last one (trade.js `fits`).
 const done7 = await rpc(B, "fulfil_listing", { lid: lid7, mid: b6[118] });
 assert.equal(done7.status, "done", `a bundle was not completed: ${done7.status}`);
 assert.equal(done7.gots?.length, 3, "completing a bundle did not say all three arrived");

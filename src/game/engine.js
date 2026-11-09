@@ -1922,8 +1922,9 @@ export function createEngine(canvas, onChange, mini = null) {
     // A Candy Trail (events.js): walking only, on a map its species lives on; a roll only while one runs.
     const trailed = !flood && source === "wild" && !!state.trail
       && table.some(([id]) => id === state.trail.species) && Math.random() < TRAIL_SHARE;
-    // A roaming week (events.js `roamLook`): a walking meeting may be one of its looks, by the map's types.
-    const roam = !nightmare && !flood && source === "wild"
+    /* A roaming week (events.js `roamLook`): a walking meeting may be one of its looks, by the map's types -
+       never one a paid trail already took, as an outbreak's (2026-11-09: a Poncho week ate trail meetings). */
+    const roam = !nightmare && !flood && !trailed && source === "wild"
       ? roamLook(biomeFor(state.areaId)?.types, Math.random, { night: isNight(state.steps), lure: lure?.lure ?? 1 }) : null;
     const sp = nightmare ? speciesById(hunt.id) : roam
       ?? eventLook(rollLook(flood ? speciesById(ob.speciesId) : trailed ? speciesById(state.trail.species) : pickSpecies(lured(table, lure)), Math.random,

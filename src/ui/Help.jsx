@@ -185,8 +185,9 @@ export default function Help({ onClose }) {
               never seen.
             </li>
             <li>
-              <b>What counts.</b> You always keep the last of each species -
-              counted over the whole offer. Up to {LIMITS.TRADES_PER_DAY}{" "}
+              <b>What counts.</b> Offers and your own listings keep the last of
+              each species, counted over the whole offer. Completing someone's
+              listing can take your last one, and it asks first. Up to {LIMITS.TRADES_PER_DAY}{" "}
               trades a day. A traded Pokémon fills your Pokédex and counts for
               every Pokédex reward, as in the games; only rare-form marks are
               for ones you caught.

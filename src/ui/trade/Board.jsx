@@ -3,17 +3,19 @@
    block. A listing is a BUNDLE - up to MAX_SIDE of yours - for one wanted
    species (and tier, if named); anyone whose box fits completes it in one
    tap. The server checks everything again; `fits` only lets the button say so.
+   Your last one may complete a listing, and that press asks first.
 
    FIND is the other half: pick any species and see who has one - listings,
    friends with a spare (browse their box), and anybody's shelf. */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { speciesById, TIERS, tierName } from "../../game/biomes.js";
 import { label } from "../../game/map.js";
-import { LIMITS, tradeable, fits } from "../../game/trade.js";
+import { LIMITS, tradeable, fits, lastOf } from "../../game/trade.js";
 import { variantOf, keeper } from "../../game/items.js";
 import { defendNote } from "../../game/ranked.js";
 import { tradeBoard, postListing, withdrawListing, fulfilListing, tradeSearch } from "../../net/cloud.js";
 import Sprite, { TrainerArt } from "../Sprite.jsx";
+import Confirm from "../Confirm.jsx";
 import Mark from "../Marks.jsx";
 import Picker, { SpeciesFind, keyOf, keepLast } from "./Picker.jsx";
 import { Who } from "./Offers.jsx";
@@ -107,6 +109,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, in
   const [posting, setPosting] = useState(false);
   const [busy, setBusy] = useState(null);
   const [say, setSay] = useState(null);
+  const [lastAsk, setLastAsk] = useState(null);      // { l, mon }: your last one, asked before it goes
   const load = useCallback(async () => {
     const [got, found] = await Promise.all([tradeBoard(q), q ? tradeSearch(q) : Promise.resolve(null)]);
     setList(got.ok ? got.data : []);
@@ -229,7 +232,7 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, in
           <ul className="of-list">
             {others.map((l) => {
               // The one it would take: never a keeper or a defender while another fits.
-              const fit = box.filter((m) => fits(box, m, l))
+              const fit = box.filter((m) => fits(m, l))
                 .sort((a, b) => Number(keeper(a)) - Number(keeper(b))
                   || Number(Boolean(defense?.[a.uid])) - Number(Boolean(defense?.[b.uid])) || a.level - b.level)[0];
               return (
@@ -241,10 +244,11 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, in
                     <Want species={l.want_species} tier={l.want_tier} />
                   </div>
                   {fit ? (
-                    <button type="button" className="ev-go" disabled={busy === l.id} onClick={() => fill(l, fit)}>
-                      {busy === l.id ? "Trading…" : `Trade your ${label(speciesById(fit.species))} Lv ${fit.level}`}
+                    <button type="button" className="ev-go" disabled={busy === l.id}
+                      onClick={() => (lastOf(box, fit) ? setLastAsk({ l, mon: fit }) : fill(l, fit))}>
+                      {busy === l.id ? "Trading…" : `Trade your ${lastOf(box, fit) ? "last " : ""}${label(speciesById(fit.species))} Lv ${fit.level}`}
                     </button>
-                  ) : <p className="ev-quiet">You have none to spare.</p>}
+                  ) : <p className="ev-quiet">You have none to trade.</p>}
                   {fit && defense?.[fit.uid] && <p className="tc-err">Your only fit defends in ranked ({defense[fit.uid]}).</p>}
                 </li>
               );
@@ -252,6 +256,19 @@ export default function BoardTab({ box, dexOf, engine, inbox, sync, onTraded, in
           </ul>
         ) : list && <p className="ev-quiet">{q ? "No listing for that species." : "No listings yet."}</p>}
       </section>
+      {lastAsk && (
+        <Confirm
+          title={`Trade your last ${label(speciesById(lastAsk.mon.species))}?`}
+          lines={[
+            ["You give", `${label(speciesById(lastAsk.mon.species))} Lv ${lastAsk.mon.level}`],
+            ["You get", lots(lastAsk.l).map((m) => label(speciesById(m.species))).join(", ")],
+          ]}
+          note="It stays in your Pokédex. To hold one again, you'll need to catch or trade for it."
+          confirmLabel="TRADE IT"
+          onCancel={() => setLastAsk(null)}
+          onConfirm={() => { const { l, mon } = lastAsk; setLastAsk(null); fill(l, mon); }}
+        />
+      )}
     </div>
   );
 }

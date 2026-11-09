@@ -70,12 +70,15 @@ export const REPORT_REASONS = ["Offensive name", "Spam or harassment", "Cheating
    `offer` is for a DIRECT offer: one Pokemon may sit in several open offers
    at once (docs/trading.md), so an "offer" lock does not keep it out of
    another - only a listing or the pool does. */
-export function tradeable(box, mon, offer = false) {
+const mayLeave = (mon, offer = false) => {
   if (!mon || (mon.lock && !(offer && mon.lock === "offer"))) return false;
   // A trained kit lives on the entry, and the server's row would drop it (mastery.js).
   if (mon.mastery) return false;
   // An invite's Pokemon was earned by its owner's friends (eventforms.js): the server's `stays_home`.
-  if (isInviteLook(mon.species)) return false;
+  return !isInviteLook(mon.species);
+};
+export function tradeable(box, mon, offer = false) {
+  if (!mayLeave(mon, offer)) return false;
   let same = 0;
   for (const m of box) if (m.species === mon.species && ++same > 1) return true;
   return false;
@@ -130,8 +133,12 @@ export function freshTrades(recent, seen, now = Date.now()) {
 
 /* DOES THIS ONE FIT THAT LISTING? The server's rule in `fulfil_listing`,
    copied so the board can say "you have one" before a round trip: the wanted
-   species, and the wanted tier if one was named - and free to trade at all. */
-export const fits = (box, mon, listing) => tradeable(box, mon)
+   species, and the wanted tier if one was named - and free to trade at all.
+   YOUR LAST ONE FITS (2026-11-05, asked for): you see exactly what you get for
+   it, unlike an offer or a listing of your own, which wait on somebody else.
+   The Pokedex keeps it either way. The board asks first (`lastOf`). */
+export const lastOf = (box, mon) => !box.some((m) => m !== mon && m.species === mon.species);
+export const fits = (mon, listing) => mayLeave(mon)
   && mon.species === listing.want_species
   && (!listing.want_tier || variantOf(mon) === listing.want_tier);
 
