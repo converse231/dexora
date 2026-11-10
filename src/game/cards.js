@@ -105,6 +105,11 @@ export function landsOn(cards, rarity) {
      UR 8.29%, SIR 1.21%, MHR 0.10%.
    - me05 Pitch Black (TCGplayer, 4,000+ packs): DR 21.02%, IR 11.01%,
      UR 8.30%, SIR 1.25%, MHR 0.09%.
+   - me06 Delta Reign (2026-11-10, four days after release): TCGplayer has
+     not published its study yet, so Pitch Black's stands in, as every site
+     does; the one measured sample (TCGTalk, 252 pre-release packs: DR 22.6%,
+     IR 9.5%, UR 8.7%, SIR 1.6%, MHR 1 pull) agrees within its range. Revisit
+     when TCGplayer's numbers are out.
    - 30th 30th Celebration (2026-10-07): no official odds; two community logs
      (cardprice.com ~800 packs, DigitalTQ 420) agree near DR 25%, IR 19%,
      SIR 5.1%, Futuristic Rare 0.9% (the top roll), a Pikachu in every pack
@@ -178,6 +183,7 @@ export const SET_RATES = {
   me03: { double: 0.2000, illustration: 0.1111, ultra: 0.0833, special: 0.0123, mega: 0.0006 },
   me04: { double: 0.2030, illustration: 0.1066, ultra: 0.0829, special: 0.0121, mega: 0.0010 },
   me05: { double: 0.2102, illustration: 0.1101, ultra: 0.0830, special: 0.0125, mega: 0.0009 },
+  me06: { double: 0.2102, illustration: 0.1101, ultra: 0.0830, special: 0.0125, mega: 0.0009 },
   "30th": { double: 0.25, illustration: 0.19, ultra: 0, special: 0.051, mega: 0.009 },
   sv08: { double: 0.169, illustration: 0.077, ace: 0.05, ultra: 0.068, special: 0.0115, mega: 0.0053 },
   sv09: { double: 1 / 5, illustration: 1 / 9, ultra: 1 / 35 + 1 / 63, special: 1 / 83, mega: 3 / 956 },
@@ -419,6 +425,7 @@ export const BOXES = {
   me03: { name: "Booster box", packs: 36, price: 120000 },
   me04: { name: "Booster box", packs: 36, price: 120000 },
   me05: { name: "Booster box", packs: 36, price: 120000 },
+  me06: { name: "Booster box", packs: 36, price: 120000 },
   // A celebration set, sold in bundles rather than boxes.
   "30th": { name: "Booster bundle", packs: 6, price: 21600 },
   sv08: { name: "Booster box", packs: 36, price: 120000 },
@@ -474,7 +481,9 @@ export const SET_LEVEL = { me01: 10, me02: 25, me03: 35, "me02.5": 40, me04: 45,
   // Sword & Shield's favourites (2026-10-15), spread over the ladder; Evolving Skies early, its best-loved.
   swsh7: 30, swsh9: 45, swsh11: 60, swsh12: 75, "swsh12.5": 90,
   // Five more (2026-10-20), into the gaps, Darkness Ablaze's Charizard early.
-  swsh3: 25, swsh6: 40, swsh8: 50, swsh10: 65, "swsh10.5": 80 };
+  swsh3: 25, swsh6: 40, swsh8: 50, swsh10: 65, "swsh10.5": 80,
+  // Delta Reign (2026-11-10), with the Mega Evolution sets' last.
+  me06: 60 };
 
 export const setById = (id) => CARD_SETS.find((s) => s.id === id) ?? null;
 export const setOpen = (id, level) => !!setById(id) && level >= (SET_LEVEL[id] ?? Infinity);

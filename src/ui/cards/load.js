@@ -23,4 +23,6 @@ let prices;
 export const loadPrices = () => (prices ??= import("../../data/cards/prices.js"));
 
 // The large image is TCGdex's own, loaded only when a card is inspected.
-export const hiUrl = (set, localId) => `${set.SET.asset}${localId}/high.webp`;
+// A set TCGdex has not filled in yet names its own (`hi`, fetch-cards.mjs's FALLBACK), by unpadded number.
+export const hiUrl = (set, localId) => (set.SET.hi ? set.SET.hi.replace("{n}", String(Number(localId)))
+  : `${set.SET.asset}${localId}/high.webp`);

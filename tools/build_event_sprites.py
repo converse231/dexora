@@ -189,6 +189,24 @@ HALF = 0.85
 # by a row or two) drops whole rows and columns to fit - at no less than this
 # scale; past it, `shrink`.
 NEAR_FIT = 0.75
+# A drawing too big by a fifth loses a row or column in five, and evenly spaced
+# they fell through Mawile Poncho Pikachu's left eye (2026-11-10, reported). These
+# drop instead the lines most like their neighbour - the inside of a wide flat
+# hair, never an eye's dark pixels (`trim`) - and only on the axis that overflows,
+# since shrinking both dropped rows through the face too. Opt-in: every other
+# sprite was approved as it is.
+TRIM = {("ponchos", "19950")}
+
+
+def trim(art, tw, th):
+    """`art` cut to tw x th by dropping, one at a time, the column (then row)
+    that differs least from the one beside it."""
+    a = art.astype(int)
+    for axis, want in ((1, tw), (0, th)):
+        while a.shape[axis] > want:
+            d = np.abs(np.diff(a, axis=axis)).sum(axis=(0, 2) if axis == 1 else (1, 2))
+            a = np.delete(a, int(np.argmin(d)) + 1, axis=axis)
+    return a.astype(np.uint8)
 # A drawing its own grid leaves narrower than this share of the species' body
 # (Zubat and Mimikyu, drawn at 20.5-21.3) is spread over the body by `shrink`:
 # its pixels are coarser than the sprite's, so nothing is lost.
@@ -460,7 +478,7 @@ def comb(e, periods=None):
     return p, ph, score / e.mean()
 
 
-def native(a, m, base, colours=()):
+def native(a, m, base, colours=(), smart=False):
     """The drawing read on its own grid: a cell is opaque when most of it is, and
     its colour is the median of its inner half (JPEG blurs a cell's edges) taken
     to the palette. Scaled whole, placed as `shrink` places - or, when it cannot
@@ -507,8 +525,9 @@ def native(a, m, base, colours=()):
         s = min((W - 1) / tw, (H - 1) / th)
         if s < NEAR_FIT:
             return "big"
-        tw, th = int(tw * s), int(th * s)
-        art = np.asarray(Image.fromarray(np.ascontiguousarray(art), "RGBA").resize((tw, th), Image.NEAREST))
+        # Trimmed, only the axis that overflows narrows: the face keeps every row.
+        tw, th = (min(tw, W - 1), min(th, H - 1)) if smart else (int(tw * s), int(th * s))
+        art = trim(art, tw, th) if smart else np.asarray(Image.fromarray(np.ascontiguousarray(art), "RGBA").resize((tw, th), Image.NEAREST))
     out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     cx = (bx0 + bx1) // 2
     x = min(max(0, cx - tw // 2), W - tw)
@@ -723,7 +742,7 @@ def build(path, ids):
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
     colours = COLOURFUL.get((event, stem), ())
     # Its own grid keeps its own one-pixel outline: `thin` is the shrink's.
-    out = native(a, m, base, colours)
+    out = native(a, m, base, colours, (event, stem) in TRIM)
     how = "its own grid"
     if isinstance(out, str):
         # Too big for the canvas: as big as it allows. Too small: the body's width.

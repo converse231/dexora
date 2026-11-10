@@ -668,7 +668,8 @@ function sigK(s, a, d, m, move, contact) {
     * ((m.t === "fire" || m.t === "dragon") && hasSig(a, "blueflame") ? 1.15 : 1) * (shapeOf(m) === "beam" && hasSig(a, "psydrive") ? 1.15 : 1) * (!contact && hasSig(a, "shuriken") ? 1.15 : 1)
     * (hasSig(a, "rage") ? 1 + 0.03 * Math.floor((1 - a.hp / a.max) * 10) : 1)
     * (hasSig(a, "protean") && !BASIC[move] && !isUlt(move) && !a.types.some((t) => TYPES[t] === m.t) ? 1.5 : 1)
-    * (hasSig(a, "lost") ? 1.25 : 1) * (hasSig(a, "fury") ? 1 + 0.08 * fallen : 1) * (!contact && hasSig(d, "shell") ? 0.8 : 1);
+    * (hasSig(a, "lost") ? 1.25 : 1) * (hasSig(a, "fury") ? 1 + 0.08 * fallen : 1) * (!contact && hasSig(d, "shell") ? 0.8 : 1)
+    * (hasSig(d, "delta") && effectiveness(m.t, d.types) > 1 ? 0.75 : 1);
 }
 function body(f, side, slot, cp = NO_CP) {
   return {

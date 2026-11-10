@@ -16,6 +16,16 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-11-10-delta-reign",
+    icon: "🐉",
+    date: "November 2026",
+    title: "New cards: Delta Reign",
+    items: [
+      ["141 new cards", "The newest set is in the Card Shop, with Mega Rayquaza ex as its chase."],
+      ["Delta Stream", "Mega Rayquaza ex's Arena card takes 25% less from super-effective hits."],
+    ],
+  },
+  {
     id: "2026-11-05-starforged",
     icon: "🌟",
     date: "November 2026",

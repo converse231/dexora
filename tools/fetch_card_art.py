@@ -41,6 +41,8 @@ WRAPPERS = {
     "me05": ["ME5 Booster Mega Darkrai.png", "ME5 Booster Mega Zeraora.png", "ME5 Booster Mega Chandelure.png",
              "ME5 Booster Mega Excadrill.png"],
     "30th": ["30th Celebration Booster.png"],
+    "me06": ["ME6 Booster Mega Rayquaza.png", "ME6 Booster Mega Golurk.png", "ME6 Booster Mega Golisopod.png",
+             "ME6 Booster Mega Malamar.png"],
     "sv08": ["SV8 Booster Pikachu.png", "SV8 Booster Latias.png", "SV8 Booster Archaludon.png",
              "SV8 Booster Alolan Exeggutor.png"],
     "sv09": ["SV9 Booster Hop Zacian.png", "SV9 Booster Lillie Clefairy.png", "SV9 Booster N Zoroark.png",
@@ -93,7 +95,7 @@ WRAPPERS = {
     "swsh10.5": ["Pok\u00e9mon GO Booster.jpg"],
 }
 # A set TCGdex has no logo for gets one from here (fetch-cards leaves it out).
-LOGOS = {"30th": "30th Anniversary logo.png", "sv05": "SV5 Logo EN.png"}
+LOGOS = {"30th": "30th Anniversary logo.png", "sv05": "SV5 Logo EN.png", "me06": "ME6 Logo EN.png"}
 LOGO_W = 400
 PACK_W = 300          # shown at most ~230px wide, twice that on a dense screen is wasted here
 BACK_W = 490

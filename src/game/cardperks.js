@@ -62,7 +62,7 @@ export const GOLDEN = {
 export const CHASE = {
   "30th": ["158", "Mew ex"], base1: ["4", "Charizard"], me01: ["188", "Mega Lucario ex"],
   "me02.5": ["284", "Mega Gengar ex"], me02: ["125", "Mega Charizard X ex"], me03: ["124", "Mega Zygarde ex"],
-  me04: ["116", "Mega Greninja ex"], me05: ["116", "Mega Darkrai ex"], sv01: ["245", "Gardevoir ex"],
+  me04: ["116", "Mega Greninja ex"], me05: ["116", "Mega Darkrai ex"], me06: ["138", "Mega Rayquaza ex"], sv01: ["245", "Gardevoir ex"],
   sv02: ["203", "Magikarp"], "sv03.5": ["199", "Charizard ex"], sv03: ["223", "Charizard ex"],
   "sv04.5": ["232", "Mew ex"], sv04: ["199", "Groudon"], sv05: ["177", "Gastly"], "sv06.5": ["078", "Persian"],
   sv06: ["214", "Greninja ex"], sv07: ["148", "Squirtle"], "sv08.5": ["161", "Umbreon ex"], sv08: ["238", "Pikachu ex"],
@@ -86,6 +86,8 @@ export const SIGNATURE = {
   me03: ["core", "Zygarde Core", "once a match, under 30% HP it regains a third of its HP"],
   me04: ["shuriken", "Shuriken Flurry", "its shots hit 15% harder"],
   me05: ["void", "Dark Void", "its hits put the foe to sleep one time in ten"],
+  // Its own ability, and the set's name: the games' Delta Stream takes the Flying type's weaknesses away.
+  me06: ["delta", "Delta Stream", "takes 25% less from super-effective hits"],
   sv01: ["embrace", "Psychic Embrace", "its ULTI charges 50% faster"],
   sv02: ["splash", "Gyarados Rage", "evolves twice as fast in a match"],
   "sv03.5": ["rage", "Burning Darkness", "+3% damage for every 10% of HP it has lost"],
