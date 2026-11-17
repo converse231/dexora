@@ -478,6 +478,56 @@ def comb(e, periods=None):
     return p, ph, score / e.mean()
 
 
+def reddish(c, share=0.45):
+    """Red, not brown: green and blue both well under the red (Eevee's fur,
+    170 116 69, is not; the gem's ring, 133 31 42, is)."""
+    return int(c[0]) > 60 and max(int(c[1]), int(c[2])) < share * int(c[0])
+
+
+def unbled(cells):
+    """A LONE RED CELL among cells with no red in them is the gem's or the cheek's
+    red caught by a dark border cell, never drawn (2026-11-17, reported: the Espeon
+    poncho's face and feet were dotted with what looked like blood; the drawing has
+    none). It takes the commonest colour round it. A red detail is a clump - a gem
+    keeps its ring, a cheek its blush - so only one with no red beside it goes."""
+    h, w = cells.shape[:2]
+    out = cells.copy()
+    for y in range(h):
+        for x in range(w):
+            c = cells[y, x]
+            if c[3] == 0 or not reddish(c):
+                continue
+            ring = [cells[j, i] for j in range(max(0, y - 1), min(h, y + 2))
+                    for i in range(max(0, x - 1), min(w, x + 2)) if (j, i) != (y, x) and cells[j, i, 3]]
+            # ...or white: a red pupil beside its shine is drawn (Ghost Bride Frillish).
+            if len(ring) < 5 or any(reddish(n, 0.6) or n[:3].min() >= 200 for n in ring):
+                continue
+            cols, n = np.unique(np.array(ring), axis=0, return_counts=True)
+            out[y, x] = cols[n.argmax()]
+    return out
+
+
+# A GLOW DRAWN ROUND ONLY PART OF THE BODY, closed round the rest in its own
+# colour: Eevee Poncho Mew's pink shimmer stopped at its hood (2026-11-17,
+# reported: "no aura on top part"; the drawing has none there either).
+AURA = {("eponchos", "19983"): (253, 224, 244)}
+
+
+def aura(out, colour):
+    """One pixel of `colour` on every empty cell touching the body - the body
+    being everything but the glow, so where the glow is already drawn nothing moves."""
+    a = np.array(out)
+    body = (a[..., 3] > 0) & ~(a[..., :3] == colour).all(-1)
+    p = np.pad(body, 1)
+    near = np.zeros_like(body)
+    for dy in (0, 1, 2):
+        for dx in (0, 1, 2):
+            near |= p[dy:dy + body.shape[0], dx:dx + body.shape[1]]
+    ring = near & (a[..., 3] == 0)
+    a[ring] = (*colour, 255)
+    return Image.fromarray(a, "RGBA")
+
+
 def native(a, m, base, colours=(), smart=False):
     """The drawing read on its own grid: a cell is opaque when most of it is, and
     its colour is the median of its inner half (JPEG blurs a cell's edges) taken
@@ -511,6 +561,7 @@ def native(a, m, base, colours=(), smart=False):
             c = np.median(inner, axis=0)
             cells[j, i, :3] = pal[int(np.abs(pal - c).sum(axis=1).argmin())]
             cells[j, i, 3] = 255
+    cells = unbled(cells)
     rs, cs = np.nonzero(cells[..., 3])
     art = cells[rs.min():rs.max() + 1, cs.min():cs.max() + 1]
     th, tw = art.shape[:2]
@@ -749,6 +800,8 @@ def build(path, ids):
         how = f"shrunk ({out})"
         out = thin(shrink(a, m, base, colours, fill=out == "big"))
     out = open_up(out.convert("RGBA"), SHUT_IN.get((event, base_id), []))
+    if (event, stem) in AURA:
+        out = aura(out, AURA[(event, stem)])
     out.save(os.path.join(SPRITES, f"{lid}.png"), optimize=True)
     shiny(out, base_id, lid in ROAM).save(os.path.join(SPRITES, "shiny", f"{lid}.png"), optimize=True)
     print(f"{event}/{base_id} -> {lid}: {how}, {out.size[0]}px, {len(out.getcolors(4096)) - 1} colours")

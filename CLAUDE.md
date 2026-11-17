@@ -323,6 +323,9 @@ anything done. The run prints each suite; the count is not typed anywhere.
   A pocket can also be named on the ORIGINAL (`HOLES`, a 1024px point that floods
   backdrop white; 2026-11-09, every Pikachu poncho had white between its raised arm
   and the cape): chosen by eye, never by size, since capes and eyes are that white too.
+  A LONE RED CELL with no red or white beside it is a gem's red caught by a
+  dark border, never drawn (`unbled`, 2026-11-17: "blood" on the Espeon poncho);
+  a glow drawn round part of a body is closed round the rest (`AURA`).
 - **The Starforged four are an invite's, never an event's** (`INVITE` in
   eventforms.js, 2026-11-05, asked for): Pikachu, Charizard, Mewtwo and Arceus,
   built as event looks (no count, no battle) but outside `EVENTS` - no days, no
