@@ -274,7 +274,7 @@ export function SeasonIntro({ ev, dex, onClose, onBoard, onNext }) {
 /* THE BOARD'S CARD, first while the event runs, and after it while its
    claim waits. Each look is drawn when held and a shadow until then; a tap
    opens its Dex entry. */
-export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClaim, onIntro }) {
+export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClaim, onIntro, onTravel = null }) {
   const live = eventOn()?.id === ev.id;
   const soon = isSoon(ev);
   const held = eventHeld(ev, dex);
@@ -316,7 +316,10 @@ export function SeasonCard({ ev, dex, medals = [], dreams = {}, onSelect, onClai
             </button>
             <span>
               <b>{won ? `${ev.hunt.name} ✓` : due ? huntWords(ev.hunt).due : ev.hunt.name}</b>
-              <small>{due ? `Walk in ${AREAS[ev.hunt.area]?.name} - your next meeting there`
+              {/* Its map is a link once it is due (2026-11-19, asked for), as WHERE TO LOOK's rows are. */}
+              <small>{due ? <>Walk in {onTravel
+                ? <button type="button" className="sn-where" onClick={() => onTravel(ev.hunt.area)}>{AREAS[ev.hunt.area]?.name} ›</button>
+                : AREAS[ev.hunt.area]?.name} - your next meeting there</>
                 : met ? `Catch ${need - n} more costumed Pokémon to call it back (${n} of ${need})`
                 : `Catch every costume once to call it (${n} of ${need})`}</small>
             </span>

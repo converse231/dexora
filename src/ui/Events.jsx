@@ -108,7 +108,8 @@ export default function Events({ world, state, level, busy, onTravel, onSelect, 
           {/* A DATED EVENT, first while it runs (Season.jsx) - a week, then gone; a finished week's claim waits beside it. */}
           {seasons.map((season) => (
             <SeasonCard key={season.id} ev={season} dex={state?.dex} medals={state?.medals} dreams={state?.dreams} onSelect={onSelect}
-              onClaim={() => onClaimEvent?.(season.id)} onIntro={onEventIntro} />
+              onClaim={() => onClaimEvent?.(season.id)} onIntro={onEventIntro}
+              onTravel={!busy && season.hunt?.area !== state?.areaId && areaOpen(season.hunt?.area, level) ? onTravel : null} />
           ))}
           {/* INVITE FRIENDS, first on the board (asked for, 2026-10-16: on Events
               so it is seen) - what you both get, how many have counted, and the

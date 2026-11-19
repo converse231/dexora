@@ -11614,6 +11614,10 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
 .sn-hunt-row > span:not(.sn-moons) { display: grid; gap: 1px; min-width: 0; }
 .sn-hunt-row b { font: 700 13.5px var(--display); color: var(--ink); }
 .sn-hunt-row small { font-size: 11.5px; color: var(--ink-soft); }
+/* The hunt's map, a link once it is due: travel there. */
+.sn-where { all: unset; cursor: pointer; font-weight: 700; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.sn-where:hover, .sn-where:focus-visible { color: var(--cta); }
+.sn-where:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 /* Its own row under the words, wrapping: at 20 Bad Dreams (2026-10-24) a single line ran the card off the side. */
 .sn-moons { display: flex; flex-wrap: wrap; gap: 3px; grid-column: 1 / -1; justify-content: center; }
 /* EVERY SLOT IS A POKE BALL, in groups of five (2026-10-30, reported: 25 hollow rings read as
@@ -11677,6 +11681,20 @@ html:has(body.cd-opening), body.cd-opening { overflow: hidden; }
   animation: ifx-wisp 2.6s ease-out infinite;
 }
 @media (prefers-reduced-motion: reduce) { .item-poncho > i { animation: none; } }
+/* THE HARVEST HONEY: the same jar in deep amber, a warm glow in its belly and
+   a golden leaf drifting off the lid. */
+.item-harvest { position: relative; }
+.item-harvest > img { filter: sepia(1) hue-rotate(-12deg) saturate(3) brightness(.95) !important; }
+.item-harvest > .ifx-glow {
+  position: absolute; left: 22%; top: 40%; width: 56%; height: 46%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 180, 60, .9) 0 20%, rgba(255, 150, 40, .45) 45%, rgba(255, 150, 40, 0) 72%);
+  mix-blend-mode: screen; animation: ifx-breathe 2.6s ease-in-out infinite;
+}
+.item-harvest > .ifx-wisp {
+  position: absolute; left: 44%; top: -4%; width: 14%; height: 22%; border-radius: 0 70% 0 70%; pointer-events: none;
+  background: #f0a630; animation: ifx-wisp 3s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .item-harvest > i { animation: none; } }
 
 /* ================================================================ THE ARENA
    Real-time battles, its own tab since 2026-10-22 (ui/league/arena/Arena.jsx).
@@ -12778,6 +12796,36 @@ button.wl-chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2
 .evcard .sn-board-card.ev-eponchos .ev-banner h4 { color: #ffe2b0; }
 .sn-board-card.ev-eponchos .sn-slot.got { border-color: #ff9ad0; }
 .ev-eponchos .sn-title { color: #fff1dc; text-shadow: 0 0 18px rgba(255, 200, 150, .8), 0 3px 0 #6b3416; }
+
+/* GRATEFUL HARVEST'S POSTER AND CARD (2026-11-19): a harvest festival at golden
+   hour - an amber sky into plum, a low gold sun, and falling leaves in orange and
+   gold where the bats flew. Wheat gold for the glow. */
+.sn-card.ev-harvest {
+  --sn-glow: #ffc85a; --sn-ink: #fff6e6; --sn-soft: #f0d8b0; --sn-night: #2b1a1e;
+  border-color: rgba(255, 190, 90, .5);
+  background: radial-gradient(120% 70% at 50% 0%, #d0752e 0%, #6a3040 45%, var(--sn-night) 100%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .55), inset 0 0 60px rgba(255, 190, 90, .12);
+}
+.ev-harvest .sn-moon {
+  background: radial-gradient(circle, #fff0c0 0 40%, #ffc85a 62%, #e8862e 100%);
+  box-shadow: none; filter: drop-shadow(0 0 22px rgba(255, 190, 90, .7));
+}
+.ev-harvest .sn-fog {
+  background: radial-gradient(40% 50% at 25% 60%, rgba(255, 220, 170, .2), transparent 70%),
+    radial-gradient(35% 45% at 70% 50%, rgba(255, 220, 170, .16), transparent 70%);
+}
+.ev-harvest .sn-bat {
+  width: 14px; height: 14px; background: #f0a630; border-radius: 0 70% 0 70%;
+  box-shadow: none; animation: sn-fly 11s ease-in-out infinite;
+}
+.ev-harvest .sn-bat.b1, .ev-harvest .sn-bat.b3 { background: #c8502a; }
+.ev-harvest .sn-go { background: linear-gradient(180deg, #ffc85a, #d9822a); color: #2a1406; box-shadow: 0 10px 28px rgba(230, 150, 50, .4); }
+.ev-harvest .sn-sub, .ev-harvest .sn-kicker { color: var(--sn-glow); }
+.ev-harvest .sn-dark > img { filter: brightness(0) drop-shadow(0 0 6px rgba(255, 200, 100, .6)) !important; }
+.sn-board-card.ev-harvest .ev-banner { background: linear-gradient(90deg, #6a3040, #d0752e); }
+.evcard .sn-board-card.ev-harvest .ev-banner h4 { color: #ffe0a0; }
+.sn-board-card.ev-harvest .sn-slot.got { border-color: #ffc85a; }
+.ev-harvest .sn-title { color: #fff2d0; text-shadow: 0 0 18px rgba(255, 190, 90, .8), 0 3px 0 #6b2e12; }
 
 /* AN EVENT'S DRAWN SKY (`poster`, npm run posters; 2026-11-04, asked for): the
    picture replaces the gradient, moon and fog. It sits at the top of the card

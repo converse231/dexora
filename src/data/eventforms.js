@@ -21,8 +21,9 @@
    (`eventLook` in events.js). It evolves the way its species does, look to
    look, at the species' own price.
 
-   Ids are 19901 and up: under the 20000 the trading server accepts
-   (`between 1 and 20000` in trading.sql), and above the plates and looks
+   Ids are 19901 and up: under the 30000 the trading server accepts
+   (`between 1 and 30000` in trading.sql; 20000 until the Grateful Harvest
+   took the first ids past it, 2026-11-19), and above the plates and looks
    (PLATE_BASE + a PokeAPI form id, 19716 at most today). fetch-forms refuses
    a form of its own that lands on one. An id is a saved fact: never renumber
    one. */
@@ -303,6 +304,75 @@ export const EVENTS = [
       },
     },
   },
+  /* GRATEFUL HARVEST (Thanksgiving week, asked for 2026-11-04; built 2026-11-19
+     once its badge was drawn): a country harvest festival by daylight. Eleven
+     lines dress and evolve in costume, the feast table and the farm are seven
+     one-of-a-kind catches, and Turkey-Tail Unfezant is met in Pidove's place
+     too. Its hunt is Shaymin, the Gratitude Pokemon, in the flowers of Route
+     117. THE FIRST IDS PAST 20000 (the invite's four took the last under it):
+     trading.sql's species bound rose to 30000 with it - re-apply trading.sql. */
+  {
+    id: "harvest",
+    name: "Grateful Harvest",
+    title: "Grateful Heart",
+    emblem: "🌾",
+    shelf: "harvest",
+    // Over the fields: Unfezant, a Flapple on the wind and a Combee.
+    drift: [521, 841, 415],
+    poster: "1240 / 832",
+    daytime: true,
+    checkin: { weekday: 5, items: { "harvest-honey": 1 } },
+    start: "20261122",
+    end: "20261128",
+    lore: "The fields are in, and the whole countryside has come to the festival. Skwovet carry home sacks of acorns, Smoliv pick the olive groves, Wooloo wait for their prize rosettes and Mudbray haul the hay. Snorlax has already found the feast table. Every costumed Pokémon grows up in its costume, so a basket-carrying Applin may yet bake a pie. And out in the flowers of Route 117, something small is saying thank you.",
+    looks: [
+      { id: 20001, of: 819, title: "Acorn-Sack Skwovet", flavor: "It drags a sack of acorns twice its size and has stuffed both cheeks for the walk home. It will forget where it buried half of them." },
+      { id: 20002, of: 820, on: 819, title: "Acorn-Sack Greedent", flavor: "Its basket is heaped with acorns and berries, and a sprig of wheat sticks out of its tail. It is saving them all for later. Later never comes." },
+      { id: 20003, of: 928, title: "Olive-Picker Smoliv", flavor: "Its apron pocket holds three olives it picked itself. It checks on them every few minutes." },
+      { id: 20004, of: 929, on: 928, title: "Olive-Picker Dolliv", flavor: "A basket of green and purple olives swings from its arm. The oil it gives off smells of sunshine and the grove." },
+      { id: 20005, of: 930, on: 928, title: "Olive-Picker Arboliva", flavor: "The grove's oldest picker, crowned in wheat and olive leaves. It shares its basket with anyone who stops to say thank you." },
+      // Miltank is 0.2% of its best map: every one met is dressed (`rare` 3, as the Haunting's Plague Doctors).
+      { id: 20006, of: 241, rare: 3, title: "Milk-Churn Miltank", flavor: "It brought a churn of warm milk to the festival and pours a cup for every tired picker. Nobody leaves the barn thirsty." },
+      { id: 20007, of: 840, title: "Harvest-Basket Applin", flavor: "It hides in a little basket of apples and waits to be picked. It has been taken home by mistake four times this week." },
+      { id: 20008, of: 842, on: 840, title: "Apple-Pie Appletun", flavor: "Its back has become a lattice-topped apple pie, still warm from the oven. It lets everyone have a slice, and the pie never runs out." },
+      { id: 20009, of: 841, on: 840, title: "Cider-Press Flapple", flavor: "It wears a cider-barrel hoop for a belt and carries a bottle of golden cider. It flies between the orchards, tasting every press." },
+      { id: 20010, of: 420, title: "Cherry-Picker Cherubi", flavor: "It holds a little bucket of cherries and wears a straw hat on its bigger cherry. It cannot tell its own cherries from the ones it picked." },
+      { id: 20011, of: 421, on: 420, title: "Cherry-Picker Cherrim", flavor: "A sunbonnet keeps its petals shut until the sun comes out over the orchard. Then it opens and sings to the trees." },
+      { id: 20012, of: 650, title: "Chestnut-Roast Chespin", flavor: "It sells roasted chestnuts from a paper cone and eats one for every two it sells. Business is slow." },
+      { id: 20013, of: 651, on: 650, title: "Chestnut-Roast Quilladin", flavor: "It shakes its iron pan over the coals, and the chestnuts pop and crack. The smell brings the whole festival to its stall." },
+      { id: 20014, of: 652, on: 650, title: "Chestnut-Roast Chesnaught", flavor: "The chestnut seller at the festival gate, with a flat cap and a tray strapped to its chest. It roasts them on its own warmth." },
+      { id: 20015, of: 926, title: "Baker Fidough", flavor: "It sits by the oven in a little baker's hat, waiting for its loaf to rise. It is rising too." },
+      { id: 20016, of: 927, on: 926, title: "Baker Dachsbun", flavor: "It carries a tray of harvest rolls on its back to every table. The rolls smell exactly like it does." },
+      { id: 20017, of: 191, title: "Cornhusk Sunkern", flavor: "A bonnet of corn husks keeps the sun off it. It is too small to see over the corn, so it waits for the corn to come to it." },
+      { id: 20018, of: 192, on: 191, title: "Cornhusk Sunflora", flavor: "It carries a basket of corn and sunflower seeds and turns to follow the sun across the fields all afternoon." },
+      { id: 20019, of: 831, title: "Shearing-Day Wooloo", flavor: "It won best in show at the county fair and has not stopped rolling around the barn to show everyone the rosette." },
+      { id: 20020, of: 832, on: 831, title: "Shearing-Day Dubwool", flavor: "First prize again. A skein of its own spun wool hangs from one horn, and it stands very still so everyone can admire it." },
+      { id: 20021, of: 749, title: "Hay-Cart Mudbray", flavor: "It carries a bale of hay on its back and refuses help with it. It has been carrying the same bale since sunrise." },
+      { id: 20022, of: 750, on: 749, title: "Hay-Cart Mudsdale", flavor: "It hauls two great bales from the far fields to the barn without a rest. The farmers say it does the work of ten carts." },
+      { id: 20023, of: 415, title: "Beekeeper Combee", flavor: "Three little beekeepers under one veil. They argue all day about whose turn it is to carry the honey." },
+      { id: 20024, of: 416, on: 415, title: "Beekeeper Vespiquen", flavor: "The queen of the apiary, her veil pushed back like a crown. She gives the first jar of the year's honey to the festival." },
+      { id: 20025, of: 521, on: 519, title: "Turkey-Tail Unfezant", flavor: "It fanned its tail out in harvest colours and struts round the festival like it owns the place. Nobody has told it otherwise." },
+      /* One of a kind: the feast table, and the farm. Snorlax and Diggersby are
+         full-grown, so each is met in its line's first stage's place too (`on`). */
+      { id: 20026, of: 143, on: 446, title: "Feast-Day Snorlax", flavor: "It sat down at the feast table in a napkin bib, and the table has been empty ever since. It is still waiting for dessert." },
+      { id: 20027, of: 1, title: "Stuffed-Bulb Bulbasaur", flavor: "Its bulb is stuffed with herbs and harvest greens and smells like a holiday kitchen. It is very proud of it." },
+      { id: 20028, of: 4, title: "Roast-Master Charmander", flavor: "It roasts sweet potatoes and marshmallows over its own tail, very carefully. It has only burnt the oven mitts twice." },
+      { id: 20029, of: 7, title: "Cranberry-Bog Squirtle", flavor: "It wades through the flooded bog in waders, raking up the floating cranberries. It eats more than it rakes." },
+      { id: 20030, of: 83, title: "Leek-Harvest Farfetch'd", flavor: "Its own leek won a ribbon at the fair, and it carries a sack of the rest home on its back. It will not let anyone cook the prize one." },
+      { id: 20031, of: 660, on: 659, title: "Potato-Dig Diggersby", flavor: "It digs up a whole row of potatoes with its ears in one go, carrots and all. The farmers just follow it with baskets." },
+    ],
+    /* THE SPECIAL ONE: Shaymin, the Gratitude Pokemon, in Route 117's flowers -
+       one of every costume caught and the next meeting there is it. */
+    hunt: { id: 20032, of: 492,
+      title: "Gracidea Shaymin", medal: "gratitude", name: "Gratitude", again: 25, area: "route117",
+      flavor: "It came down to the festival with a Gracidea flower to give away, and it says thank you to every Pokémon it meets. Where it rests, the harvest grows back.",
+      words: {
+        token: "Gracidea Flower", tokens: "Gracidea Flowers", due: "Something is blooming on Route 117", rise: "THE FLOWERS BLOOM",
+        falls: "Shaymin scatters petals and is gone...", fade: "SHAYMIN FLOATS AWAY", back: "it will bloom again",
+        run: "Shaymin floats away if you run",
+      },
+    },
+  },
 ];
 
 /* THE STARFORGED FOUR (asked for, 2026-11-05: "epic Pokemon rewards ... can only
@@ -328,4 +398,28 @@ export const [INVITE] = [
     ],
   },
 ];
-export const eventById = (id) => (id === INVITE.id ? INVITE : EVENTS.find((ev) => ev.id === id));
+/* POKOPIA FORMS (2026-11-19, asked for: "add these pokemons to our dex"): seven
+   special forms from Pokemon Pokopia, drawn as our own Gen 3 sprites
+   (art/events/pokopia, reports/Pokopia forms prompts.md). Built as event looks -
+   outside every count of the Pokedex, never a battle - but in no EVENTS week:
+   no days, no hunt, no title. They are met ALL YEAR, a rare swap for their
+   species (events.js `pokopiaLook`, POKOPIA_SHARE times `rare`), a later stage
+   `on` its line's base as an event's is (your call: rare wild forms, always on).
+   Tradeable like any event look. Ids past the Grateful Harvest's. */
+export const [POKOPIA] = [
+  {
+    id: "pokopia",
+    name: "Pokopia",
+    looks: [
+      { id: 20033, of: 465, on: 114, title: "Professor Tangrowth", flavor: "It lectures every Pokémon that stops to listen, pointer in hand, and keeps its notes on a shiny disc at the top of its head. Its hair has gone white from thinking." },
+      { id: 20034, of: 25, title: "Peakychu", flavor: "A Pikachu whose colour has all washed out. It looks a little peaky, but it is cheerful about it, and it gets its spark back slowly in the sun." },
+      { id: 20035, of: 143, on: 446, title: "Mosslax", flavor: "It slept in one place for so long that moss grew all over it, and a flower came up on its head. Small Pokémon nest in its coat." },
+      // Smeargle is a third of a percent of its best map: five times the share, so it can be found.
+      { id: 20036, of: 235, rare: 5, title: "Smearguru", flavor: "The master painter. Its tail is a brush as big as it is, and every Pokémon in town has a splash of its paint somewhere." },
+      { id: 20037, of: 479, title: "DJ Rotom", flavor: "Rotom moved into a stereo and refuses to leave. The music changes with its mood, and its mood is always party." },
+      { id: 20038, of: 820, on: 819, title: "Chef Dente", flavor: "It wears a cooking pot for a hat and has a utensil for every dish. It cooks more than anyone could eat, and then eats it." },
+      { id: 20039, of: 959, on: 957, title: "Tinkmaster", flavor: "It rebuilt its hammer with a wrench and every scrap it could find. There is nothing it cannot fix, or flatten." },
+    ],
+  },
+];
+export const eventById = (id) => (id === INVITE.id ? INVITE : id === POKOPIA.id ? POKOPIA : EVENTS.find((ev) => ev.id === id));

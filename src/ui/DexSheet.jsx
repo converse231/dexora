@@ -21,8 +21,8 @@
 import { useEffect, useState } from "react";
 import { useModalLock, useDismiss } from "./modal.js";
 import { SPECIES, isEvent } from "../data/dex.js";
-import { EVENTS, INVITE } from "../data/eventforms.js";
-import { eventOn, eventDaysLeft, lookEvery, roamAreas, shareOf } from "../game/events.js";
+import { EVENTS, INVITE, POKOPIA } from "../data/eventforms.js";
+import { eventOn, eventDaysLeft, lookEvery, roamAreas, shareOf, pokopiaEvery } from "../game/events.js";
 import { label, AREAS } from "../game/map.js";
 import Sprite, { spriteUrl, VariantFx, STRIP_TIERS } from "./Sprite.jsx";
 import {
@@ -74,6 +74,14 @@ function whereToFind(id) {
     // An invite's Pokemon is met nowhere: friends who get going are the only way (referral.js).
     const friends = INVITE.looks.find((l) => l.id === id)?.friends;
     if (friends) return [{ key: "invite", where: "Invite friends", how: friends === 1 ? "1 friend who gets going, and they get one too" : `${friends} friends who get going` }];
+    // A Pokopia form is met all year where its species (or its line's base) lives (events.js `pokopiaLook`).
+    const pk = POKOPIA.looks.find((l) => l.id === id);
+    if (pk) {
+      const base = pk.on ?? pk.of;
+      return whereToFind(base).filter((r) => !r.key.startsWith("evo-")).map((r) => ({
+        ...r, how: `1 in ${pokopiaEvery(pk)} ${label(speciesById(base))} · ${r.how}`,
+      }));
+    }
     const ev = EVENTS.find((e) => e.id === sp.event);
     const live = eventOn()?.id === ev.id;
     // The hunted one is met by its hunt alone, never in its species' places.

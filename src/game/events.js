@@ -14,7 +14,7 @@
    falls, and it cannot be burned by leaving the game open. Once they are met
    it is over until tomorrow. */
 import { SPECIES } from "../data/dex.js";
-import { EVENTS } from "../data/eventforms.js";
+import { EVENTS, POKOPIA } from "../data/eventforms.js";
 import { BIOMES, areaOpen, dexIndex, encounterTable, isLegendary, speciesById, tableFor } from "./biomes.js";
 import { dayKey, hash } from "./daily.js";
 import { STONES } from "./items.js";
@@ -182,6 +182,17 @@ export function eventLook(sp, random, { day, night, lure } = {}) {
   let r = random() * sum, k = 0;
   while (r >= w[k] && k < looks.length - 1) r -= w[k++];
   return speciesById(looks[k].id);
+}
+/* A POKOPIA FORM (eventforms.js POKOPIA, 2026-11-19): met ALL YEAR in its
+   species' place - or its line's base, `on` - at POKOPIA_SHARE of those
+   meetings times its `rare`. Draws from `random` ONLY for a species that has
+   one, so every other roll and every seeded record is untouched. */
+export const POKOPIA_SHARE = 1 / 20;
+export const pokopiaOf = (id) => POKOPIA.looks.find((l) => l.of === id || l.on === id) ?? null;
+export const pokopiaEvery = (look) => Math.round(1 / (POKOPIA_SHARE * (look.rare ?? 1)));
+export function pokopiaLook(sp, random) {
+  const look = pokopiaOf(sp.id);
+  return look && random() < POKOPIA_SHARE * (look.rare ?? 1) ? speciesById(look.id) : sp;
 }
 /* WHETHER THE RUNNING WEEK DRESSED A SPECIES (a costume of it, or `on` it):
    what a lure's `pull` draws the map's meeting from (the engine's `lured`). */

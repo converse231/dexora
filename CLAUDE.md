@@ -261,7 +261,8 @@ anything done. The run prints each suite; the count is not typed anywhere.
   week's shelf, and the poster names the wearer off its looks.
 - **An event look is a costume from a dated event** (`src/data/eventforms.js`,
   hand-written; Hallowed Night, asked for 2026-10-19):
-  `form: "event"`, ids 19901+ (under trading.sql's 20000), built from its
+  `form: "event"`, ids 19901+ (under trading.sql's species bound, 30000 since the
+  Grateful Harvest took 20001+ on 2026-11-19 - check.mjs reads it off the SQL), built from its
   species in dex.js and appended by `wave` (fetch-forms takes a wave past
   it). It is met ONLY as a substitution (`eventLook` in events.js, after
   `rollLook`): `EVENT_SHARE` of its species' meetings on the event's days
@@ -325,7 +326,13 @@ anything done. The run prints each suite; the count is not typed anywhere.
   and the cape): chosen by eye, never by size, since capes and eyes are that white too.
   A LONE RED CELL with no red or white beside it is a gem's red caught by a
   dark border, never drawn (`unbled`, 2026-11-17: "blood" on the Espeon poncho);
-  a glow drawn round part of a body is closed round the rest (`AURA`).
+  a glow drawn round part of a body is closed round the rest (`AURA`), and a detail drawn finer than the body's pixel is set pixel by pixel
+  on the output (`PAINT`: the Pikachu Poncho Eevee's Poke Ball, 2026-11-19).
+  BACKGROUND THE OUTLINE SHUTS IN IS PAINTED, not left white: the palette has no
+  white, so a pocket between legs comes out cream and a white-only audit misses it
+  (2026-11-19, reported). Find pockets on the ORIGINAL - enclosed pure white of four
+  sprite pixels or more - and judge each by eye into `HOLES`. A shiny's shade the
+  species' sprite lacks takes its own hue's nearest shift (`recolour`).
 - **The Starforged four are an invite's, never an event's** (`INVITE` in
   eventforms.js, 2026-11-05, asked for): Pikachu, Charizard, Mewtwo and Arceus,
   built as event looks (no count, no battle) but outside `EVENTS` - no days, no
@@ -335,9 +342,17 @@ anything done. The run prints each suite; the count is not typed anywhere.
   `tradeable`, trading.sql's `invite_only()` and `stays_home` (no `mons` row; held
   equal by check.mjs). `eventById` answers for both kinds; `EVENTS.find` on a look's
   `event` misses these. A look's place follows its id ACROSS events now (dex.js).
-  They took the last ids under trading.sql's 20000. The announcement is
+  They took the last ids under trading.sql's old 20000. The announcement is
   `InviteIntro` (`INVITE_NEWS_KEY`) and the desktop bar's button glows until the
   dialog has been opened (`INVITE_SEEN_KEY`), both device preferences.
+- **The Pokopia forms are met all year** (`POKOPIA` in eventforms.js, 2026-11-19,
+  your call: "rare wild forms, always on"): Professor Tangrowth, Peakychu,
+  Mosslax, Smearguru, DJ Rotom, Chef Dente and Tinkmaster, built as event looks
+  (no count, no battle, tradeable) in no dated week. `pokopiaLook` (events.js)
+  swaps `POKOPIA_SHARE` x `rare` of their species' meetings - or their line's
+  base's (`on`) - drawing only for a species that has one; check.mjs's `pokopia
+  ok` holds each within 1,500 meetings of its best map. A drawing Gemini made at
+  twice the sprite's size is read two pixels to one (`HALVED`, build_event_sprites).
 - **A look is one of a family's drawings** (`form: "look"`: Unown's letters,
   Furfrou's trims, Flabebe's colours, Silvally's types - `LOOK_FAMILIES` in
   fetch-forms, ids `PLATE_BASE` + form id like the plates). It is a species

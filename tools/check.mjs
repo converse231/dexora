@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { SPECIES, isForm, isEvent, EVENT_SLOTS, DEX_TOTAL, dexCaught } from "../src/data/dex.js";
-import { EVENTS, INVITE } from "../src/data/eventforms.js";
+import { EVENTS, INVITE, POKOPIA } from "../src/data/eventforms.js";
 import { RETRO_IDS } from "../src/data/retro.js";
 import { evoCycleFrames, EVO_SWAPS, SCALE_MAX } from "../src/game/evocycle.js";
 import {
@@ -836,7 +836,8 @@ console.log(`economy ok — common nets +${commonProfit.toFixed(0)}, ` +
       for (const look of looksOf(id)) reach.add(look);
       /* AN EVENT LOOK IS REACHED WHERE ITS SPECIES IS, while its event runs
          (events.js `eventLook` swaps it for a meeting with the species). */
-      for (const l of EVENTS.flatMap((ev) => ev.looks)) if (l.of === id || l.on === id) reach.add(l.id);
+      // A Pokopia form the same way, any day (`pokopiaLook`).
+      for (const l of [...EVENTS.flatMap((ev) => ev.looks), ...POKOPIA.looks]) if (l.of === id || l.on === id) reach.add(l.id);
     }
   // AN INVITE'S LOOK is reached by inviting (referral.js), which `invite ok` holds.
   for (const l of INVITE.looks) reach.add(l.id);
@@ -2697,7 +2698,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
      species but them, a dex holding only them counts nothing, and the trading
      server's card count skips the same places (trading.sql `event_slots()`). */
   {
-    const looks = [...EVENTS, INVITE].flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])]);
+    const looks = [...EVENTS, INVITE, POKOPIA].flatMap((ev) => [...ev.looks, ...(ev.hunt ? [ev.hunt] : [])]);
     for (const ev of EVENTS.filter((e) => e.hunt)) {
       assert.ok(BIOMES.some((b) => b.id === ev.hunt.area), `${ev.id}'s hunt waits in no map`);
       assert.ok(/^[a-z]+$/.test(ev.hunt.medal) && !EVENTS.some((e) => e.id === ev.hunt.medal),
@@ -2712,6 +2713,11 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       .split(",").map(Number);
     assert.deepEqual(slots, EVENT_SLOTS.map((i) => i + 1),
       "db/trading.sql's event_slots() is not where the event looks sit in SPECIES (1-based) - re-type it and re-apply trading.sql");
+    // The species the server takes: every bound in trading.sql one number, and every id under it.
+    const bounds = [...sql.matchAll(/species (?:not )?between 1 and (\d+)|\bs between 1 and (\d+)/g)].map((m) => Number(m[1] ?? m[2]));
+    assert.ok(bounds.length >= 5 && new Set(bounds).size === 1, `trading.sql's species bounds disagree: ${bounds}`);
+    const SPECIES_MAX = bounds[0];
+    assert.ok(SPECIES.every((sp) => sp.id <= SPECIES_MAX), `a species id is past trading.sql's ${SPECIES_MAX}`);
     // Its milestone and its medal, the same whole.
     assert.equal(MILESTONES.at(-1).at, DEX_TOTAL, "the last milestone counts the event looks");
     assert.ok(!MEDALS.some((m) => m.need.some(isEvent)), "a medal asks for an event look");
@@ -2723,7 +2729,8 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.ok(existsSync(new URL(`../public/sprites/${l.id}.png`, import.meta.url))
         && existsSync(new URL(`../public/sprites/shiny/${l.id}.png`, import.meta.url)),
         `${sp.name} has no sprite or shiny - npm run eventart`);
-      assert.ok(l.id <= 20000, `${sp.name}'s id is past the 20000 the trading server takes`);
+      // The bound is read off trading.sql's own CHECK, never typed here.
+      assert.ok(l.id <= SPECIES_MAX, `${sp.name}'s id is past the ${SPECIES_MAX} the trading server takes`);
     }
     /* AN EVENT IS ONE WEEK (2026-10-26, your call): seven local days, none
        overlapping another (eventOn takes the first match), an id the server's
@@ -2757,6 +2764,38 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
           for (const l of ev.looks) assert.ok(!rowsOf(l.id).some((r) => r.event), `${speciesById(l.id).name} evolves in costume, but ${ev.id} does not evolve`);
         }
       }
+    }
+    /* A POKOPIA FORM IS MET ALL YEAR, AND ONLY IN ITS PLACE (events.js
+       `pokopiaLook`, 2026-11-19): `on` is its line's base, every one turns up
+       within 1,500 meetings on its base's best map (rare, never lost), a
+       species with no form draws nothing, and its day never matters. */
+    {
+      const { pokopiaLook, POKOPIA_SHARE } = await import("../src/game/events.js");
+      const { mulberry32 } = await import("../src/game/battle.js");
+      const best = new Map();
+      for (const b of BIOMES) {
+        const t = encounterTable(b, MAX_LEVEL), tot = t.reduce((n, [, w]) => n + w, 0);
+        for (const [id, w] of t) best.set(id, Math.max(best.get(id) ?? 0, w / tot));
+      }
+      let worst = 0;
+      for (const l of POKOPIA.looks) {
+        let base = speciesById(l.of);
+        while (base.from && SPECIES.find((x) => x.name === base.from)) base = SPECIES.find((x) => x.name === base.from);
+        assert.ok(!l.on || l.on === base.id, `${l.title} is met on ${l.on}, not its line's base`);
+        const met = [l.of, l.on].filter(Boolean).reduce((n, id) => n + (best.get(id) ?? 0), 0);
+        const every = 1 / (met * POKOPIA_SHARE * (l.rare ?? 1));
+        assert.ok(every <= 1500, `${l.title} is one meeting in ${Math.round(every)} - too rare to find`);
+        worst = Math.max(worst, every);
+        const rng = mulberry32(7);
+        let got = 0;
+        for (let k = 0; k < 4000; k++) if (pokopiaLook(speciesById(l.on ?? l.of), rng).id === l.id) got++;
+        assert.ok(got > 0, `${l.title} is never met where ${speciesById(l.on ?? l.of).name} lives`);
+      }
+      let drew = false;
+      pokopiaLook(speciesById(16), () => { drew = true; return 0; });
+      assert.ok(!drew, "a species with no Pokopia form drew a roll");
+      assert.ok(POKOPIA.looks.every((l) => !EVENTS.some((ev) => ev.looks.some((x) => x.id === l.id))), "a Pokopia form is in a dated week");
+      console.log(`pokopia ok — ${POKOPIA.looks.length} forms met all year, the rarest one meeting in ${Math.round(worst)} on its best map`);
     }
     /* EVERY COSTUME IS FINDABLE IN A WEEK (audited 2026-10-29): by day, with no
        lure, on its base's best map at the cap. At a third of the meetings the
@@ -2861,7 +2900,7 @@ import { saveProblem, repairDex } from "../src/game/engine.js";
       assert.deepEqual(rungs, [...rungs].sort((a, b) => a - b), "the invite looks are not in order of friends");
       assert.equal(new Set(rungs).size, rungs.length, "two invite looks share a rung");
       assert.equal(rungs.at(-1), REF_RULE.cap, "the last invite look is not at the friends a player is paid for (REF_RULE.cap)");
-      assert.ok(ids.every((id) => id <= 20000), "an invite look is past the ids the trading server accepts");
+      assert.ok(ids.every((id) => id <= 20000), "an invite look moved past the ids the trading server first accepted");
       assert.ok(EVENTS.flatMap((ev) => ev.looks.concat(ev.hunt ?? [])).every((l) => l.id < ids[0] || l.id > ids.at(-1)), "an event look sits among the invite looks");
       const invited = (n) => ({ invited: Array.from({ length: n }, (_, k) => ({ id: `u${k}`, username: `F${k}`, paid: true })) });
       for (const l of INVITE.looks) {

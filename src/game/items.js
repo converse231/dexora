@@ -459,6 +459,11 @@ export const FIELD = [
     id: "poncho-honey", art: "honey", fx: "poncho", family: "event", name: "Poncho Honey", price: 1200, level: 3,
     event: "ponchos", steps: HONEY_STEPS, lure: 3, blurb: "Ponchos 3× as likely",
   },
+  {
+    // The Grateful Harvest's (2026-11-19): the same jar in amber, luring the week's costumes.
+    id: "harvest-honey", art: "honey", fx: "harvest", family: "event", name: "Harvest Honey", price: 1200, level: 3,
+    event: "harvest", steps: HONEY_STEPS, lure: 3, pull: 0.3, blurb: "Lures costumed Pokémon",
+  },
 ];
 
 /* WHICH BALL EACH NUMBER KEY THROWS, AND IT IS THE PLAYER'S TO ARRANGE.

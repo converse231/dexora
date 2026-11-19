@@ -33,7 +33,7 @@ create table if not exists public.mons (
   -- The owner's box uid for it. NULL while it is on its way to a new owner,
   -- whose client assigns one; the save trigger learns it back.
   local_uid  int,
-  species    int  not null check (species between 1 and 20000),
+  species    int  not null check (species between 1 and 30000),
   level      int  not null check (level between 1 and 1000),
   size       int  check (size between 1 and 1000),
   tier       text,
@@ -89,6 +89,10 @@ create index if not exists trade_log_to   on public.trade_log (to_user, at desc)
 -- Re-derived every run, so a new tier reaches a live table (a CHECK written
 -- inside `create table if not exists` is never looked at again).
 alter table public.mons drop constraint if exists mons_tier_check;
+-- The species bound, re-added every run (`create table if not exists` keeps an
+-- old one): 20000 until the Grateful Harvest's costumes took 20001+ (2026-11-19).
+alter table public.mons drop constraint if exists mons_species_check;
+alter table public.mons add constraint mons_species_check check (species between 1 and 30000);
 alter table public.mons add constraint mons_tier_check check (tier = any (public.tier_list()));
 
 alter table public.mons      enable row level security;
@@ -722,7 +726,7 @@ $$;
 -- this list equal to the game's `EVENT_SLOTS`.
 create or replace function public.event_slots()
 returns int[] language sql immutable set search_path = '' as $$
-  select array[1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503]
+  select array[1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503, 1504, 1505, 1506, 1507, 1508, 1509, 1510, 1511, 1512, 1513, 1514, 1515, 1516, 1517, 1518, 1519, 1520, 1521, 1522, 1523, 1524, 1525, 1526, 1527, 1528, 1529, 1530, 1531, 1532, 1533, 1534, 1535, 1536, 1537, 1538, 1539, 1540, 1541, 1542]
 $$;
 
 -- A card's numbers, and its showcase kept honest, from a save document.
@@ -884,7 +888,7 @@ begin
   update public.trainer_cards set
     showcase = shown,
     seeking = (coalesce((select array_agg(distinct s) from unnest(coalesce(update_card.seeking, '{}')) s
-                          where s between 1 and 20000), '{}'))[1:public.trade_limit('SEEKING')]
+                          where s between 1 and 30000), '{}'))[1:public.trade_limit('SEEKING')]
    where user_id = me;
   return (select to_jsonb(c) from public.trainer_cards c where c.user_id = me);
 end;
@@ -1229,7 +1233,7 @@ create table if not exists public.listings (
   id           uuid primary key default gen_random_uuid(),
   owner        uuid not null references auth.users on delete cascade,
   mon          uuid not null references public.mons on delete cascade,
-  want_species int  not null check (want_species between 1 and 20000),
+  want_species int  not null check (want_species between 1 and 30000),
   -- null: any form of that species. Otherwise exactly this tier.
   want_tier    text,
   status       text not null default 'open' check (status in ('open','done','withdrawn','expired')),
@@ -1240,6 +1244,8 @@ create index if not exists listings_open on public.listings (status, created_at 
 create index if not exists listings_owner on public.listings (owner, status);
 -- One open listing per Pokemon, whatever the client sends.
 create unique index if not exists listings_one_open on public.listings (mon) where status = 'open';
+alter table public.listings drop constraint if exists listings_want_species_check;
+alter table public.listings add constraint listings_want_species_check check (want_species between 1 and 30000);
 alter table public.listings drop constraint if exists listings_want_tier_check;
 alter table public.listings add constraint listings_want_tier_check check (want_tier = any (public.tier_list()));
 alter table public.listings enable row level security;
@@ -1271,7 +1277,7 @@ declare
                        group by x order by min(n));
 begin
   if me is null then raise exception 'not signed in'; end if;
-  if want_species is null or want_species not between 1 and 20000 then raise exception 'pick what you want for it'; end if;
+  if want_species is null or want_species not between 1 and 30000 then raise exception 'pick what you want for it'; end if;
   if cardinality(ids) not between 1 and public.trade_limit('MAX_SIDE') then raise exception 'one to six Pokemon'; end if;
   if (select count(*) from public.listings where owner = me and status = 'open')
      >= public.trade_limit('OPEN_LISTINGS') then

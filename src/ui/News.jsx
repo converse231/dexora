@@ -16,6 +16,27 @@ import { useModalLock, useDismiss } from "./modal.js";
 
 export const NEWS = [
   {
+    id: "2026-11-19-pokopia",
+    icon: "🌿",
+    date: "November 2026",
+    title: "Pokopia forms in the wild",
+    items: [
+      ["Seven new forms", "Professor Tangrowth, Peakychu, Mosslax, Smearguru, DJ Rotom, Chef Dente and Tinkmaster."],
+      ["Met all year", "A rare swap for their species, wherever it lives. Check the Dex for where to look."],
+    ],
+  },
+  {
+    id: "2026-11-19-harvest",
+    icon: "🌾",
+    date: "November 2026",
+    title: "Coming November 22: Grateful Harvest",
+    items: [
+      ["31 harvest costumes", "Eleven lines grow up in costume, from acorn sacks to a whole apple pie."],
+      ["The feast table", "Snorlax, Bulbasaur, Charmander and Squirtle dressed for dinner, and a turkey-tailed Unfezant."],
+      ["Gracidea Shaymin", "Catch every costume and it waits in Route 117's flowers."],
+    ],
+  },
+  {
     id: "2026-11-10-delta-reign",
     icon: "🐉",
     date: "November 2026",

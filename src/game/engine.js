@@ -36,7 +36,7 @@ import {
   outbreakFor, OUTBREAK_SHARE, OUTBREAK_SIZE, OUTBREAK_LIFT,
   riftChance, riftFind, RIFT_STEPS, RIFT_SURE, RIFT_TILT, RIFT_CANDY, RIFT_FROM,
   TRAIL_CANDY, TRAIL_STEPS, TRAIL_SHARE, trailTarget, trailsOn, cleanTrail,
-  eventLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntCount, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook, dressed,
+  eventLook, pokopiaLook, eventOn, eventDue, EVENT_PACKS, huntDue, huntCount, huntWords, cleanDreams, eventCheckin, shelfOf, roamLook, dressed,
 } from "./events.js";
 import {
   bump, researchLevel, researchLift, researchPay, cleanRow, RESEARCH_MAX, RESEARCH_LIFT,
@@ -1931,10 +1931,11 @@ export function createEngine(canvas, onChange, mini = null) {
        never one a paid trail already took, as an outbreak's (2026-11-09: a Poncho week ate trail meetings). */
     const roam = !nightmare && !flood && !trailed && source === "wild"
       ? roamLook(biomeFor(state.areaId)?.types, Math.random, { night: isNight(state.steps), lure: lure?.lure ?? 1 }) : null;
+    // A Pokopia form (events.js `pokopiaLook`) is its species met any day, when no costume took it.
     const sp = nightmare ? speciesById(hunt.id) : roam
-      ?? eventLook(rollLook(flood ? speciesById(ob.speciesId) : trailed ? speciesById(state.trail.species) : pickSpecies(lured(table, lure)), Math.random,
+      ?? pokopiaLook(eventLook(rollLook(flood ? speciesById(ob.speciesId) : trailed ? speciesById(state.trail.species) : pickSpecies(lured(table, lure)), Math.random,
         { owned, types: biomeFor(state.areaId)?.types }), Math.random,
-        { night: isNight(state.steps), lure: lure?.lure ?? 1 });
+        { night: isNight(state.steps), lure: lure?.lure ?? 1 }), Math.random);
     /* Whether the dex already has this one, read BEFORE the throw can register
        it. It rides on the encounter rather than being looked up while drawing,
        because the panel would then read live state: settling a catch sets the

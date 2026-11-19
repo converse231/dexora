@@ -81,13 +81,19 @@ HOLLOW = {("haunting", "487"): HOLE_MIN, ("haunting", "477"): HOLE_MIN, ("haunti
 # What counts as backdrop, for a drawing whose body is nearly as light as it: Starforged
 # Arceus is 231 silver with a pale edge on its head, and the usual fill took the head
 # and neck (2026-11-05). On a pure white backdrop (255) the fill can be asked for white.
-FLOOR = {("friends", "493"): 245}
+FLOOR = {("friends", "493"): 245, ("harvest", "4"): 245}   # Roast-Master Charmander's white toque (2026-11-19)
 # BACKDROP THE OUTLINE SHUT IN (2026-11-05, reported: "be careful with those white bgs"):
 # a gap between an arm and a tail, or Charizard's open mouth, which the real sprite leaves
 # see-through too, stays white when the border's fill cannot reach it. Named by a cell of
 # the finished sprite (row, column), because a white claw or belly is the same colour:
 # audit a new drawing on a loud colour beside its base, never on a dark one.
 SHUT_IN = {("friends", "6"): [(22, 25), (28, 33), (35, 49), (41, 47), (43, 50)],
+           ("harvest", "4"): [(33, 38)],
+           # Pokopia: inside Smearguru's tail loop, between Tinkmaster's wrench and plate,
+           # and beside Professor Tangrowth's right arm (2026-11-19).
+           ("pokopia", "235"): [(40, 33)], ("pokopia", "959"): [(37, 61), (49, 51)], ("pokopia", "465"): [(54, 65)],
+           # Reported 2026-11-19: beside Beekeeper Vespiquen's face, Turkey-Tail Unfezant's neck and legs.
+           ("harvest", "416"): [(29, 22)], ("harvest", "521"): [(15, 45), (62, 42)],   # Roast-Master Charmander, between its roasting stick and tail
            ("friends", "493"): [(40, 56), (39, 55), (38, 72), (34, 67), (22, 42)]}
 SHUT_IN_WHITE = 235
 # THE SAME, NAMED ON THE ORIGINAL (2026-11-09, reported on the ponchos: white
@@ -97,6 +103,14 @@ SHUT_IN_WHITE = 235
 # grid is read. Chosen by eye beside the drawing, never by size - Slowbro's
 # eyes, Mawile's teeth and every white cape are pockets of the same white.
 HOLES = {
+         # The second audit (2026-11-19, reported: "many event pokemons has white background
+         # problems"): every drawing's enclosed pure white of four sprite pixels or more,
+         # cropped and judged by eye - between legs, under an arm, beside a leaf.
+         ("harvest", "192"): [(594, 640)], ("harvest", "420"): [(551, 474)], ("harvest", "521"): [(353, 342)],
+         ("harvest", "651"): [(694, 608)], ("harvest", "749"): [(523, 619), (448, 619), (619, 640)],
+         ("harvest", "750"): [(256, 427), (587, 598)], ("harvest", "832"): [(555, 192)],
+         ("harvest", "840"): [(590, 416)], ("harvest", "841"): [(459, 491)], ("harvest", "929"): [(555, 598)],
+         ("haunting", "198"): [(525, 679)], ("haunting", "65"): [(719, 344)], ("halloween", "169"): [(451, 738)],
          ("ponchos", "19940"): [(702, 505), (372, 517), (721, 674)],
          ("ponchos", "19942"): [(709, 635), (330, 639)],
          ("ponchos", "19943"): [(348, 544), (641, 793), (515, 757)],
@@ -166,6 +180,9 @@ def open_up(out, cells):
 # went grey; Ghost Story Slowking's quilt; Zapdos Poncho Eevee's orange beak.
 COLOURFUL = {("haunting", "50"): (24, 6, 60), ("haunting", "199"): (24, 6, 60),
              ("eponchos", "19995"): (20, 4, 60),
+             # Pokopia (2026-11-19): Tinkmaster's pink went to the hammer's greys, Peakychu's
+             # pale cheeks to its cream, Professor Tangrowth's disc to plain grey.
+             ("pokopia", "959"): (24, 6, 60), ("harvest", "416"): (24, 6, 60), ("harvest", "521"): (24, 6, 60), ("pokopia", "25"): (24, 6, 40), ("pokopia", "465"): (24, 6, 60),
              # The Starforged four: sixteen merged Arceus's silver into its gold and turned
              # Charizard's navy armour and gold star brown and orange (2026-11-05, reported).
              ("friends", "493"): (28, 6, 60), ("friends", "6"): (32, 6, 60),
@@ -513,6 +530,38 @@ def unbled(cells):
 AURA = {("eponchos", "19983"): (253, 224, 244)}
 
 
+# A DETAIL DRAWN SMALLER THAN THE BODY'S PIXEL, set pixel by pixel on the output
+# (x, y as the sprite ships): the drawing's own grid cannot hold it, and its cells
+# read as mud. The Pikachu Poncho Eevee's Poke Ball clasp (2026-11-19, reported:
+# "the pokeball is broken") - red cap, black band and button, white base.
+_R, _K, _W, _G = (207, 54, 43), (16, 15, 14), (253, 253, 254), (199, 204, 210)
+PAINT = {("eponchos", "19981"): {(20, 37): _K, (21, 37): _R, (22, 37): _R, (23, 37): _K,
+                                  (20, 38): _R, (21, 38): _R, (22, 38): _R, (23, 38): _R,
+                                  (20, 39): _K, (21, 39): _W, (22, 39): _K, (23, 39): _K,
+                                  (20, 40): _W, (21, 40): _W, (22, 40): _W, (23, 40): _G},
+         # Peakychu (2026-11-19): halved, its pale cheeks read as its cream and a one-pixel
+         # eye shine falls inside a dark block - its pink cheeks, both shines, the left eye whole.
+         ("pokopia", "25"): {**{(x, y): (238, 186, 180) for y, xs in ((20, (29,)), (21, (28, 29, 30)),
+                                 (22, (28, 29, 30, 31, 49)), (23, (28, 29, 30, 31, 48, 49)), (24, (28, 29, 30, 31, 48, 49)),
+                                 (25, (29, 30, 31, 47, 48, 49)), (26, (30, 47, 48, 49)), (27, (48,))) for x in xs},
+                             (35, 17): (254, 254, 250), (47, 18): (254, 254, 250),
+                             (32, 19): (48, 25, 16), (33, 20): (48, 25, 16),
+                             # Its eyes two browns, as drawn (2026-11-19, reported: "one colour").
+                             (33, 19): (124, 84, 60), (34, 19): (124, 84, 60), (34, 20): (124, 84, 60),
+                             (45, 19): (124, 84, 60), (46, 19): (124, 84, 60), (46, 20): (124, 84, 60)},
+         # Mosslax (2026-11-19, reported): its closed eyes - two lines the grid lost - and
+         # its fangs, which the palette turned moss green and read as eyes.
+         ("pokopia", "143"): {**{(x, 20): (35, 22, 13) for x in (31, 32, 33, 34, 39, 40, 41, 42)},
+                              (34, 23): (250, 247, 232), (40, 23): (250, 247, 232)},
+         # Leek-Harvest Farfetch'd's eye ring had a grey top and two brown pixels on its right (reported).
+         ("harvest", "83"): {(27, 22): (23, 26, 19), (29, 23): (23, 26, 19), (29, 26): (23, 26, 19)},
+         # Chef Dente's right eye was a column short, its shine on the outer edge: the left one mirrored.
+         ("pokopia", "820"): {(58, 38): (10, 6, 4), (59, 38): (119, 117, 115),
+                              (57, 39): (10, 6, 4), (58, 39): (10, 6, 4), (59, 39): (10, 6, 4),
+                              (57, 40): (10, 6, 4), (58, 40): (246, 248, 247), (59, 40): (10, 6, 4),
+                              (57, 41): (10, 6, 4), (58, 41): (246, 248, 247), (59, 41): (10, 6, 4)}}
+
+
 def aura(out, colour):
     """One pixel of `colour` on every empty cell touching the body - the body
     being everything but the glow, so where the glow is already drawn nothing moves."""
@@ -528,7 +577,35 @@ def aura(out, colour):
     return Image.fromarray(a, "RGBA")
 
 
-def native(a, m, base, colours=(), smart=False):
+# DRAWN AT TWICE THE SPRITE'S SIZE, read two drawn pixels to one (2026-11-19):
+# Peakychu and Smearguru came back ~96 pixels tall for a 64px Pikachu and
+# Smeargle, and the shrink's 1.5 smeared their faces. Halving is exact - a 96
+# drawing is a 48 sprite, Pikachu's own height - and keeps every shape.
+HALVED = {("pokopia", "25"), ("pokopia", "235")}
+
+
+def halve(art):
+    """`art` at half size, a 2x2 block to a pixel: opaque where most of it is,
+    and its darkest pixel where it holds a dark one (the outline and the eyes,
+    one drawn pixel wide, would fall between blocks), else its commonest."""
+    h, w = art.shape[0] // 2 * 2, art.shape[1] // 2 * 2
+    out = np.zeros((h // 2, w // 2, 4), np.uint8)
+    for y in range(0, h, 2):
+        for x in range(0, w, 2):
+            blk = art[y:y + 2, x:x + 2].reshape(-1, 4)
+            on = blk[blk[:, 3] > 0]
+            if len(on) < 2:
+                continue
+            lum = on[:, :3].astype(int).sum(1)
+            if lum.min() < 200:
+                out[y // 2, x // 2] = on[lum.argmin()]
+            else:
+                cols, n = np.unique(on, axis=0, return_counts=True)
+                out[y // 2, x // 2] = cols[n.argmax()]
+    return out
+
+
+def native(a, m, base, colours=(), smart=False, half=False):
     """The drawing read on its own grid: a cell is opaque when most of it is, and
     its colour is the median of its inner half (JPEG blurs a cell's edges) taken
     to the palette. Scaled whole, placed as `shrink` places - or, when it cannot
@@ -564,6 +641,8 @@ def native(a, m, base, colours=(), smart=False):
     cells = unbled(cells)
     rs, cs = np.nonzero(cells[..., 3])
     art = cells[rs.min():rs.max() + 1, cs.min():cs.max() + 1]
+    if half:
+        art = halve(art)
     th, tw = art.shape[:2]
     fits = [k for k in SCALES if tw * k <= W - 1 and th * k <= H - 1]
     if fits:
@@ -738,20 +817,32 @@ def recolour(look, base_id, roam=False):
     hues = [colorsys.rgb_to_hls(*(c / 255)) for c in src]
     hues = [h for h, l, sat in hues if sat > 0.15]
     lo, hi = (min(hues) - 0.02, max(hues) + 0.02) if hues else (0, 0)
-    near = []
+    near, strict = [], []
     for y, x in opaque:
         d = np.abs(src - a[y, x, :3].astype(int)).sum(axis=1)
         k = int(np.argmin(d))
         h, l, sat = colorsys.rgb_to_hls(*(a[y, x, :3] / 255))
         fur = grey and d[k] <= FUR and (sat <= 0.15 or lo <= h <= hi)
-        near.append(k if (d[k] <= NEAR or fur) and (dst[k] != src[k]).any() else None)
+        k = k if (d[k] <= NEAR or fur) and (dst[k] != src[k]).any() else None
+        strict.append(k is not None)
+        # A SHADE THE SPECIES' SPRITE DOES NOT HAVE EXACTLY (2026-11-19, reported: Professor
+        # Tangrowth's shiny kept patches of blue, its darkest vines 45 from Tangrowth's own,
+        # and Chef Dente's tail stayed tan): a coloured pixel takes the shift of the nearest
+        # colour of its own hue within twice NEAR. A costume grey or white, or a hue the
+        # species never wore, still stays as drawn. Only the strict matches choose the path
+        # below: counted, the loose ones dulled Mosslax's shiny to its normal.
+        if k is None and sat > 0.2 and not grey:
+            same = [j for j in np.argsort(d) if d[j] <= 2 * NEAR and (dst[j] != src[j]).any()
+                    and abs((colorsys.rgb_to_hls(*(src[j] / 255))[0] - h + 0.5) % 1 - 0.5) < 0.06]
+            k = int(same[0]) if same else None
+        near.append(k)
     turn, fade = hue_shift(n[on][:, :3], sh[on][:, :3])
     # A ROAMING week's species gone GREY (Eevee's silver) has no turn of the
     # wheel to give: turning the whole look by it painted every poncho Eevee's
     # face green (2026-10-30). Its own colours go silver; the poncho stays as
     # drawn. Only a roaming week's: Pumpkin Mimikyu's shipped shiny is the
     # whole costume gone grey, and this half-greyed it.
-    if sum(k is not None for k in near) >= SHARED * len(opaque) or grey:
+    if sum(strict) >= SHARED * len(opaque) or grey:
         for (y, x), k in zip(opaque, near):
             if k is not None:
                 a[y, x, :3] = np.clip(a[y, x, :3].astype(int) + dst[k] - src[k], 0, 255)
@@ -793,7 +884,7 @@ def build(path, ids):
     base = Image.open(os.path.join(SPRITES, f"{base_id}.png")).convert("RGBA")
     colours = COLOURFUL.get((event, stem), ())
     # Its own grid keeps its own one-pixel outline: `thin` is the shrink's.
-    out = native(a, m, base, colours, (event, stem) in TRIM)
+    out = native(a, m, base, colours, (event, stem) in TRIM, (event, stem) in HALVED)
     how = "its own grid"
     if isinstance(out, str):
         # Too big for the canvas: as big as it allows. Too small: the body's width.
@@ -802,6 +893,8 @@ def build(path, ids):
     out = open_up(out.convert("RGBA"), SHUT_IN.get((event, base_id), []))
     if (event, stem) in AURA:
         out = aura(out, AURA[(event, stem)])
+    for (x, y), c in PAINT.get((event, stem), {}).items():
+        out.putpixel((x, y), (*c, 255))
     out.save(os.path.join(SPRITES, f"{lid}.png"), optimize=True)
     shiny(out, base_id, lid in ROAM).save(os.path.join(SPRITES, "shiny", f"{lid}.png"), optimize=True)
     print(f"{event}/{base_id} -> {lid}: {how}, {out.size[0]}px, {len(out.getcolors(4096)) - 1} colours")

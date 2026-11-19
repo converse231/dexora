@@ -22,8 +22,8 @@ export default function Gen({ id, className = "" }) {
   if (isEvent(id)) {
     const ev = eventById(speciesById(id).event);
     return (
-      <span className={`gen gen-event ev-${ev.id} ${className}`.trim()} data-tip={ev.start ? `${ev.name} event Pokémon` : "Only from inviting friends"}>
-        EVENT
+      <span className={`gen gen-event ev-${ev.id} ${className}`.trim()} data-tip={ev.start ? `${ev.name} event Pokémon` : ev.id === "pokopia" ? "A Pokopia form, met all year" : "Only from inviting friends"}>
+        {ev.id === "pokopia" ? "POKOPIA" : "EVENT"}
       </span>
     );
   }
